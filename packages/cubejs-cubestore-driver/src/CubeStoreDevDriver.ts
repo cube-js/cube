@@ -6,7 +6,7 @@ import { ConnectionConfig } from './types';
 export class CubeStoreDevDriver extends CubeStoreDriver {
   public constructor(
     protected readonly cubeStoreHandler: CubeStoreHandler,
-    config?: Partial<ConnectionConfig>
+    config?: Partial<ConnectionConfig>,
   ) {
     super({
       ...config,
@@ -23,9 +23,8 @@ export class CubeStoreDevDriver extends CubeStoreDriver {
     return this.cubeStoreHandler.acquire();
   }
 
-  public async query(query, values): Promise<any[]> {
+  public async query(query, values, options): Promise<any[]> {
     await this.acquireCubeStore();
-
-    return super.query(query, values);
+    return super.query(query, values, options);
   }
 }

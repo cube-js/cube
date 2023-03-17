@@ -1,0 +1,45 @@
+union HttpCommand {
+    HttpQuery,
+    HttpResultSet,
+    HttpError
+}
+
+table HttpMessage {
+    message_id: uint;
+    command: HttpCommand;
+    connection_id: string;
+}
+
+table HttpQuery {
+    query: string;
+    trace_obj: string;
+    inline_tables: [HttpTable];
+}
+
+table HttpTable {
+    name: string;
+    columns: [string];
+    types: [string];
+    // csv format to replicate the usual csv import path.
+    csv_rows: string;
+}
+
+table HttpError {
+    error: string;
+}
+
+table HttpResultSet {
+    columns: [string];
+    rows: [HttpRow];
+}
+
+table HttpRow {
+    values: [HttpColumnValue];
+}
+
+table HttpColumnValue {
+    string_value: string;
+}
+
+
+root_type HttpMessage;

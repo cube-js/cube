@@ -1,0 +1,11 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"SELECT * FROM information_schema.role_table_grants\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++---------+---------+---------------+--------------+---------------------------+----------------+--------------+----------------+
+| grantor | grantee | table_catalog | table_schema | table_name                | privilege_type | is_grantable | with_hierarchy |
++---------+---------+---------------+--------------+---------------------------+----------------+--------------+----------------+
+| ovr     | ovr     | cubedb        | public       | KibanaSampleDataEcommerce | SELECT         | YES          | YES            |
+| ovr     | ovr     | cubedb        | public       | Logs                      | SELECT         | YES          | YES            |
+| ovr     | ovr     | cubedb        | public       | NumberCube                | SELECT         | YES          | YES            |
++---------+---------+---------------+--------------+---------------------------+----------------+--------------+----------------+

@@ -23,6 +23,8 @@ spec:
                   fieldPath: metadata.name
             - name: CUBESTORE_META_ADDR
               value: cubestore-router:9999
+            - name: CUBESTORE_DATA_DIR
+              value: /cube/.cubestore/data
             - name: CUBESTORE_REMOTE_DIR
               value: /cube/data
               # The $(POD_NAME) is a way of referencing dependent env vars

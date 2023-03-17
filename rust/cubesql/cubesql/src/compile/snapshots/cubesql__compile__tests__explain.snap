@@ -1,0 +1,14 @@
+---
+source: cubesql/src/compile/mod.rs
+assertion_line: 5805
+expression: "execute_query(\"EXPLAIN SELECT 1+1;\".to_string(),\n            DatabaseProtocol::MySQL).await?"
+---
++---------------+--------------------------------------+
+| plan_type     | plan                                 |
++---------------+--------------------------------------+
+| logical_plan  | Projection: Int64(2)                 |
+|               |   EmptyRelation                      |
+| physical_plan | ProjectionExec: expr=[2 as Int64(2)] |
+|               |   EmptyExec: produce_one_row=true    |
+|               |                                      |
++---------------+--------------------------------------+

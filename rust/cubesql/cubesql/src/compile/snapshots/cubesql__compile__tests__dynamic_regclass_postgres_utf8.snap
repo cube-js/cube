@@ -1,0 +1,11 @@
+---
+source: cubesql/src/compile/mod.rs
+assertion_line: 7272
+expression: "execute_query(\"SELECT cast(r.a as regclass) FROM (\n                    SELECT 'pg_class' as a\n                    UNION ALL\n                    SELECT NULL\n                ) as r\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++---------------------------+
+| __cube_regclass_cast(r.a) |
++---------------------------+
+| 83                        |
+| NULL                      |
++---------------------------+

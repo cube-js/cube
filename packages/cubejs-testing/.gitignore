@@ -1,3 +1,8 @@
+.env.athena.sh
+.env.bigquery.sh
+.env.postgres.sh
+.env.databricks.sh
+.cubestore
 dist
 cypress/videos
 cypress/screenshots
@@ -5,3 +10,24 @@ cypress/snapshots
 # BirdBox for CLI is creating a project in package directory
 birdbox-test-project
 birdbox-fixtures/datasets
+birdbox-fixtures/postgresql/.cubestore
+# birdbox-fixtures/postgresql/cube.js
+birdbox-fixtures/postgresql/schema/CAST.js
+birdbox-fixtures/postgresql/schema/Customers.js
+birdbox-fixtures/postgresql/schema/Customers.sql.js
+birdbox-fixtures/postgresql/schema/ECommerce.js
+birdbox-fixtures/postgresql/schema/ECommerce.sql.js
+birdbox-fixtures/postgresql/schema/Products.js
+birdbox-fixtures/postgresql/schema/Products.sql.js
+birdbox-fixtures/questdb/schema/CAST.js
+birdbox-fixtures/questdb/schema/Customers.js
+birdbox-fixtures/questdb/schema/Customers.sql.js
+birdbox-fixtures/questdb/schema/ECommerce.js
+birdbox-fixtures/questdb/schema/ECommerce.sql.js
+birdbox-fixtures/questdb/schema/Products.js
+birdbox-fixtures/questdb/schema/Products.sql.js
+birdbox-fixtures/postgresql.json
+
+birdbox-fixtures/databricks-jdbc.json
+birdbox-fixtures/databricks
+!birdbox-fixtures/databricks/cube.js

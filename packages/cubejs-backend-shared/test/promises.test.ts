@@ -224,7 +224,7 @@ test('withTimeoutRace(timeout)', async () => {
     );
 
     throw new Error('Unexpected');
-  } catch (e) {
+  } catch (e: any) {
     expect(e.message).toEqual('Timeout reached after 250ms');
   }
 
@@ -442,7 +442,7 @@ describe('asyncRetry', () => {
       );
 
       throw new Error('should throw exception');
-    } catch (e) {
+    } catch (e: any) {
       expect(e.message).toEqual('test');
       expect(called).toEqual(3);
     }

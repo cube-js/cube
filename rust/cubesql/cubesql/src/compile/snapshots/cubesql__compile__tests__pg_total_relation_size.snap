@@ -1,0 +1,11 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"SELECT\n                    oid,\n                    relname,\n                    pg_total_relation_size(oid) relsize\n                FROM pg_class\n                ORDER BY oid ASC\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++-------+---------------------------+---------+
+| oid   | relname                   | relsize |
++-------+---------------------------+---------+
+| 18000 | KibanaSampleDataEcommerce | 8192    |
+| 18018 | Logs                      | 8192    |
+| 18028 | NumberCube                | 8192    |
++-------+---------------------------+---------+

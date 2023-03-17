@@ -1,6 +1,5 @@
 import { createCancelablePromise, MaybeCancelablePromise } from '@cubejs-backend/shared';
-
-import { CacheDriverInterface } from './cache-driver.interface';
+import { CacheDriverInterface } from '@cubejs-backend/base-driver';
 
 interface ItemBucket {
   value: any,
@@ -28,6 +27,10 @@ export class LocalCacheDriver implements CacheDriverInterface {
     this.store[key] = {
       value,
       exp: new Date().getTime() + expiration * 1000
+    };
+    return {
+      key,
+      bytes: Buffer.byteLength(JSON.stringify(value)),
     };
   }
 

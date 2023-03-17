@@ -16,7 +16,8 @@
     "paths": {
       "react": ["node_modules/@types/react"],
       "@cubejs-client/core": ["../packages/cubejs-client-core"]
-    }
+    },
+    "skipLibCheck": true
   },
   "exclude": ["./dist", "./test", "**/*.spec.ts"]
 }

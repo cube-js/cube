@@ -320,7 +320,7 @@ class TemplateGalleryPage extends Component<any, any> {
     return (
       <MarginFrame>
         <StyledTitle>
-          Build your app from one the popular templates below or{' '}
+          Build your app from one of the popular templates below or{' '}
           <a onClick={() => this.setState({ createOwnModalVisible: true })}>
             create your own
           </a>

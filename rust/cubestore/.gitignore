@@ -1,0 +1,11 @@
+/target
+/.idea
+upstream
+.cubestore
+.cargo/config.toml
+dist
+node_modules
+downloaded
+cubestore/target
+cubesql/target
+cubestore-sql-tests/data/**

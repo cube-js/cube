@@ -40,9 +40,16 @@ class HttpTransport {
     });
 
     return {
+      /* eslint no-unsafe-finally: off */
       async subscribe(callback) {
-        const result = await runRequest();
-        return callback(result, () => this.subscribe(callback));
+        let result = {
+          error: 'network Error' // add default error message
+        };
+        try {
+          result = await runRequest();
+        } finally {
+          return callback(result, () => this.subscribe(callback));
+        }
       }
     };
   }

@@ -1,7 +1,5 @@
-import { PostgresDBRunner } from '@cubejs-backend/testing';
-
+import { PostgresDBRunner } from '@cubejs-backend/testing-shared';
 import { StartedTestContainer } from 'testcontainers';
-
 import { PostgresDriver } from '../src';
 
 const streamToArray = require('stream-to-array');
@@ -25,21 +23,20 @@ describe('PostgresDriver', () => {
   });
 
   afterAll(async () => {
-    await driver.release();
-
-    if (container) {
-      await container.stop();
-    }
+    await container.stop();
   });
 
   test('type coercion', async () => {
+    await driver.query('CREATE TYPE CUBEJS_TEST_ENUM AS ENUM (\'FOO\');', []);
+
     const data = await driver.query(
       `
         SELECT
           CAST('2020-01-01' as DATE) as date,
           CAST('2020-01-01 00:00:00' as TIMESTAMP) as timestamp,
           CAST('2020-01-01 00:00:00+02' as TIMESTAMPTZ) as timestamptz,
-          CAST('1.0' as DECIMAL(10,2)) as decimal
+          CAST('1.0' as DECIMAL(10,2)) as decimal,
+          CAST('FOO' as CUBEJS_TEST_ENUM) as enum
       `,
       []
     );
@@ -52,7 +49,9 @@ describe('PostgresDriver', () => {
         // converted to utc
         timestamptz: '2019-12-31T22:00:00.000',
         // Numerics as string
-        decimal: '1.00'
+        decimal: '1.00',
+        // Enum datatypes as string
+        enum: 'FOO',
       }
     ]);
   });
@@ -110,10 +109,25 @@ describe('PostgresDriver', () => {
       });
 
       throw new Error('stream must throw an exception');
-    } catch (e) {
+    } catch (e: any) {
       expect(e.message).toEqual(
         'relation "test.random_name_for_table_that_doesnot_exist_sql_must_fail" does not exist'
       );
     }
+  });
+
+  // Note: This test MUST be the last in the list.
+  test('release', async () => {
+    expect(async () => {
+      await driver.release();
+    }).not.toThrowError(
+      /Called end on pool more than once/
+    );
+
+    expect(async () => {
+      await driver.release();
+    }).not.toThrowError(
+      /Called end on pool more than once/
+    );
   });
 });

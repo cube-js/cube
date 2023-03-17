@@ -1,5 +1,8 @@
 /* eslint-disable @typescript-eslint/no-shadow */
+
+// eslint-disable-next-line import/no-extraneous-dependencies
 import express from 'express';
+// eslint-disable-next-line import/no-extraneous-dependencies
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
 
@@ -120,6 +123,25 @@ describe('API Gateway', () => {
     );
   });
 
+  test('catch error requestContextMiddleware', async () => {
+    const { app } = createApiGateway(
+      new AdapterApiMock(),
+      new DataSourceStorageMock(),
+      {
+        extendContext: (_req) => {
+          throw new Error('Server should not crash');
+        }
+      }
+    );
+
+    const res = await request(app)
+      .get('/cubejs-api/v1/load?query={"measures":["Foo.bar"]}')
+      .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+      .expect(500);
+
+    expect(res.body && res.body.error).toStrictEqual('Error: Server should not crash');
+  });
+
   test('query transform with checkAuth', async () => {
     const queryRewrite = jest.fn(async (query: Query, context) => {
       expect(context.securityContext).toEqual({
@@ -237,6 +259,7 @@ describe('API Gateway', () => {
               timezone: 'UTC',
               order: [],
               filters: [],
+              limit: 10000,
               dimensions: [],
               timeDimensions: [],
               queryType: 'regularQuery'
@@ -248,6 +271,7 @@ describe('API Gateway', () => {
             timezone: 'UTC',
             order: [],
             filters: [],
+            limit: 10000,
             dimensions: [],
             timeDimensions: [],
             queryType: 'regularQuery'
@@ -336,6 +360,30 @@ describe('API Gateway', () => {
     expect(res.body.query.measures).toStrictEqual(['Foo.bar']);
   });
 
+  test('meta endpoint to get schema information', async () => {
+    const { app } = createApiGateway();
+
+    const res = await request(app)
+      .get('/cubejs-api/v1/meta')
+      .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+      .expect(200);
+    expect(res.body).toHaveProperty('cubes');
+    expect(res.body.cubes[0]?.name).toBe('Foo');
+    expect(res.body.cubes[0]?.hasOwnProperty('sql')).toBe(false);
+  });
+
+  test('meta endpoint extended to get schema information with additional data', async () => {
+    const { app } = createApiGateway();
+
+    const res = await request(app)
+      .get('/cubejs-api/v1/meta?extended')
+      .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+      .expect(200);
+    expect(res.body).toHaveProperty('cubes');
+    expect(res.body.cubes[0]?.name).toBe('Foo');
+    expect(res.body.cubes[0]?.hasOwnProperty('sql')).toBe(true);
+  });
+
   describe('multi query support', () => {
     const searchParams = new URLSearchParams({
       query: JSON.stringify({
@@ -418,7 +466,7 @@ describe('API Gateway', () => {
 
     const scheduledRefreshTimeZonesFactory = () => (['UTC', 'America/Los_Angeles']);
 
-    const appPrepareFactory = () => {
+    const appPrepareFactory = (scope?: string[]) => {
       const playgroundAuthSecret = 'test12345';
       const { app } = createApiGateway(
         new AdapterApiMock(),
@@ -431,7 +479,7 @@ describe('API Gateway', () => {
           scheduledRefreshTimeZones: scheduledRefreshTimeZonesFactory()
         }
       );
-      const token = generateAuthToken({ uid: 5, }, {}, playgroundAuthSecret);
+      const token = generateAuthToken({ uid: 5, scope }, {}, playgroundAuthSecret);
       const tokenUser = generateAuthToken({ uid: 5, }, {}, API_SECRET);
 
       return { app, token, tokenUser };
@@ -461,8 +509,8 @@ describe('API Gateway', () => {
         .expect(404);
     };
 
-    const successTestFactory = ({ route, method = 'get', successBody = {}, successResult }) => async () => {
-      const { app, token } = appPrepareFactory();
+    const successTestFactory = ({ route, method = 'get', successBody = {}, successResult, scope = [''] }) => async () => {
+      const { app, token } = appPrepareFactory(scope);
 
       const req = request(app)[method](`/cubejs-system/v1/${route}`)
         .set('Content-type', 'application/json')
@@ -473,6 +521,32 @@ describe('API Gateway', () => {
 
       const res = await req;
       expect(res.body).toMatchObject(successResult);
+    };
+       
+    const wrongPayloadsTestFactory = ({ route, wrongPayloads, scope }: {
+      route: string,
+      method: string,
+      scope?: string[],
+      wrongPayloads: {
+        result: {
+          status: number,
+          error: string
+        },
+        body: {},
+      }[]
+    }) => async () => {
+      const { app, token } = appPrepareFactory(scope);
+
+      for (const payload of wrongPayloads) {
+        const req = request(app).post(`/cubejs-system/v1/${route}`)
+          .set('Content-type', 'application/json')
+          .set('Authorization', `Bearer ${token}`)
+          .expect(payload.result.status);
+
+        req.send(payload.body);
+        const res = await req;
+        expect(res.body.error).toBe(payload.result.error);
+      }
     };
 
     const testConfigs = [
@@ -494,7 +568,116 @@ describe('API Gateway', () => {
           }
         },
         successResult: { preAggregationPartitions: preAggregationPartitionsResultFactory() }
-      }
+      },
+      {
+        route: 'sql-runner',
+        scope: ['sql-runner'],
+        method: 'post',
+        successBody: {
+          query: {
+            query: 'SELECT * FROM sql-runner; ',
+            limit: 10000,
+            resultFilter: {
+              objectLimit: 2,
+              stringLimit: 2,
+              objectTypes: ['Buffer'],
+              limit: 1,
+              offset: 1,
+            },
+          }
+        },
+        successResult: { data: [{ string: 'st', number: 1, buffer: '[4', bufferTwo: 'Placeholder', object: '{"' }] },
+        wrongPayloads: [{
+          result: {
+            status: 400,
+            error: 'A user\'s query must contain a body'
+          },
+          body: {}
+        }, {
+          result: {
+            status: 400,
+            error: 'A user\'s query must contain at least one query param.'
+          },
+          body: { query: {} }
+        }, {
+          result: {
+            status: 400,
+            error: 'A user\'s query must contain limit query param and it must be positive number'
+          },
+          body: { query: { query: 'SELECT * FROM sql-runner' } }
+        }, {
+          result: {
+            status: 400,
+            error: 'The query limit has been exceeded'
+          },
+          body: { query: { query: 'SELECT * FROM sql-runner', limit: 60000 } }
+        }, {
+          result: {
+            status: 400,
+            error: 'A user\'s query must contain limit query param and it must be positive number'
+          },
+          body: { query: { query: 'SELECT * FROM sql-runner', limit: -1 } }
+        }, {
+          result: {
+            status: 400,
+            error: 'A query.resultFilter.objectTypes must be an array of strings'
+          },
+          body: {
+            query: {
+              query: 'SELECT * FROM sql-runner',
+              limit: 10000,
+              resultFilter: {
+                objectTypes: 'text'
+              },
+            }
+          }
+        }]
+      },
+      { route: 'data-sources', scope: ['sql-runner'], successResult: { dataSources: [{ dataSource: 'default', dbType: 'postgres' }] } },
+      {
+        route: 'db-schema',
+        method: 'post',
+        scope: ['sql-runner'],
+        successBody: {
+          query: {
+            dataSource: 'default',
+          }
+        },
+        successResult: {
+          data: {
+            other: {
+              orders: [
+                {
+                  name: 'id',
+                  type: 'integer',
+                  attributes: [],
+                },
+                {
+                  name: 'test_id',
+                  type: 'integer',
+                  attributes: [],
+                },
+              ],
+            },
+          },
+        },
+        wrongPayloads: [
+          {
+            result: {
+              status: 400,
+              error: 'A user\'s query must contain a body'
+            },
+            body: {}
+          },
+          {
+            result: {
+              status: 400,
+              error: 'A user\'s query must contain dataSource.'
+            },
+            body: { query: {} }
+          }
+        ]
+      },
     ];
 
     testConfigs.forEach((config) => {
@@ -503,6 +686,9 @@ describe('API Gateway', () => {
         test('not allowed with user token', notAllowedWithUserTokenTestFactory(config));
         test('not route (works only with playgroundAuthSecret)', notExistsTestFactory(config));
         test('success', successTestFactory(config));
+        if (config.method === 'post' && config.wrongPayloads?.length) {
+          test('wrong params', wrongPayloadsTestFactory(config));
+        }
       });
     });
   });

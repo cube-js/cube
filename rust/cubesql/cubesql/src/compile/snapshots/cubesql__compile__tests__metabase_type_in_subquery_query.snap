@@ -1,0 +1,8 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"\n                SELECT nspname, typname \n                FROM pg_type t \n                JOIN pg_namespace n ON n.oid = t.typnamespace \n                WHERE t.oid IN (SELECT DISTINCT enumtypid FROM pg_enum e);\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++---------+---------+
+| nspname | typname |
++---------+---------+
++---------+---------+

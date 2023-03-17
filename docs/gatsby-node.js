@@ -2,7 +2,7 @@ const path = require('path');
 const { renameCategory } = require('./src/rename-category.js');
 
 exports.createPages = ({ actions, graphql }) => {
-  const { createPage } = actions;
+  const { createPage, createRedirect } = actions;
 
   const DocTemplate = path.resolve('src/templates/DocTemplate.tsx');
 
@@ -20,6 +20,7 @@ exports.createPages = ({ actions, graphql }) => {
             scope
             category
             menuOrder
+            redirect_from
           }
         }
       }
@@ -30,6 +31,10 @@ exports.createPages = ({ actions, graphql }) => {
     }
 
     result.data.allMdx.edges.forEach(({ node }) => {
+      if (!node.frontmatter.permalink && node.frontmatter.category === 'Internal') {
+        return;
+      }
+
       createPage({
         path: node.frontmatter.permalink,
         title: node.frontmatter.title,
@@ -42,6 +47,12 @@ exports.createPages = ({ actions, graphql }) => {
           slug: node.frontmatter.permalink,
         },
       });
+
+      if (Array.isArray(node.frontmatter.redirect_from)) {
+        node.frontmatter.redirect_from.forEach(
+          (from) => createRedirect({ fromPath: from, toPath: node.frontmatter.permalink, isPermanent: true })
+        );
+      }
     });
   });
 };

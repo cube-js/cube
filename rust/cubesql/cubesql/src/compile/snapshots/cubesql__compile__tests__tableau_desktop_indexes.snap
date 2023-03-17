@@ -1,0 +1,8 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"SELECT\n                    ta.attname,\n                    ia.attnum,\n                    ic.relname,\n                    n.nspname,\n                    tc.relname\n                FROM\n                    pg_catalog.pg_attribute ta,\n                    pg_catalog.pg_attribute ia,\n                    pg_catalog.pg_class tc,\n                    pg_catalog.pg_index i,\n                    pg_catalog.pg_namespace n,\n                    pg_catalog.pg_class ic\n                WHERE\n                    tc.relname = 'KibanaSampleDataEcommerce'\n                    AND n.nspname = 'public'\n                    AND tc.oid = i.indrelid\n                    AND n.oid = tc.relnamespace\n                    AND i.indisprimary = 't'\n                    AND ia.attrelid = i.indexrelid\n                    AND ta.attrelid = i.indrelid\n                    AND ta.attnum = i.indkey [ia.attnum-1]\n                    AND (NOT ta.attisdropped)\n                    AND (NOT ia.attisdropped)\n                    AND ic.oid = i.indexrelid\n                ORDER BY\n                    ia.attnum;\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++---------+--------+---------+---------+---------+
+| attname | attnum | relname | nspname | relname |
++---------+--------+---------+---------+---------+
++---------+--------+---------+---------+---------+

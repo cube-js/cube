@@ -285,8 +285,8 @@ describe('ClickHouse JoinGraph', () => {
     })
     `);
 
-  // FAILS - ClickHouse doesn't support OR in JOIN expressions
-  it.skip('simple join', () => {
+  // SUCCESS but need to finish query to override ::timestamptz
+  it('simple join', () => {
     const result = compiler.compile().then(() => {
       debugLog(joinGraph.buildJoin(['visitor_checkins', 'visitors']));
 
@@ -314,28 +314,28 @@ describe('ClickHouse JoinGraph', () => {
         expect(res).toEqual(
           [
             {
-              visitors__created_at_day: '2017-01-02T00:00:00.000Z',
+              visitors__created_at_day: '2017-01-02T00:00:00.000',
               visitors__visitor_revenue: '100',
               visitors__visitor_count: '1',
               visitor_checkins__visitor_checkins_count: '3',
               visitors__per_visitor_revenue: '100'
             },
             {
-              visitors__created_at_day: '2017-01-04T00:00:00.000Z',
+              visitors__created_at_day: '2017-01-04T00:00:00.000',
               visitors__visitor_revenue: '200',
               visitors__visitor_count: '1',
               visitor_checkins__visitor_checkins_count: '2',
               visitors__per_visitor_revenue: '200'
             },
             {
-              visitors__created_at_day: '2017-01-05T00:00:00.000Z',
+              visitors__created_at_day: '2017-01-05T00:00:00.000',
               visitors__visitor_revenue: null,
               visitors__visitor_count: '1',
               visitor_checkins__visitor_checkins_count: '1',
               visitors__per_visitor_revenue: null
             },
             {
-              visitors__created_at_day: '2017-01-06T00:00:00.000Z',
+              visitors__created_at_day: '2017-01-06T00:00:00.000',
               visitors__visitor_revenue: null,
               visitors__visitor_count: '2',
               visitor_checkins__visitor_checkins_count: '0',

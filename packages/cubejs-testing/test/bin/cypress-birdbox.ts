@@ -1,16 +1,17 @@
 import cypress from 'cypress';
-import { startBirdBoxFromContainer } from '../../src';
+import { DriverType, startBirdBoxFromContainer } from '../../src';
 
 (async () => {
   let birdbox;
 
-  const name = process.env.BIRDBOX_CYPRESS_TARGET || 'postgresql-cubestore';
+  const name = (process.env.BIRDBOX_CYPRESS_TARGET || 'postgresql-cubestore') as DriverType;
 
   console.log(`[Birdbox] Starting "${name}"`);
 
   try {
     birdbox = await startBirdBoxFromContainer({
-      name,
+      type: name,
+      loadScript: 'load.sh'
     });
   } catch (e) {
     console.log(e);

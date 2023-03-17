@@ -2,7 +2,7 @@ import { DependencyList, useMemo } from 'react';
 
 import { useDeepDependencies } from './deep-dependencies';
 
-export default function useDeepMemo<T>(
+export function useDeepMemo<T>(
   callback: () => T,
   dependencies: DependencyList
 ) {

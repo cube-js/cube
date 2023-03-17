@@ -75,7 +75,7 @@ describe('Cube Validation', () => {
     const validationResult = cubeValidator.validate(cube, {
       error: (message, e) => {
         console.log(message);
-        expect(message).toContain('must be one of [count, number, sum');
+        expect(message).toContain('must be one of [count, number,');
       }
     });
 
@@ -158,6 +158,31 @@ describe('Cube Validation', () => {
       error: (message, e) => {
         console.log(message);
         expect(message).toContain('granularity) is required');
+      }
+    });
+
+    expect(validationResult.error).toBeTruthy();
+  });
+
+  it('RollUpJoinSchema scheduledRefresh', async () => {
+    const cubeValidator = new CubeValidator(new CubeSymbols());
+    const cube = {
+      fileName: 'filename',
+      name: 'name',
+      sql: () => '',
+      preAggregations: {
+        eventsByType: {
+          type: 'rollupJoin',
+          granularity: 'month',
+          scheduledRefresh: true,
+        }
+      }
+    };
+
+    const validationResult = cubeValidator.validate(cube, {
+      error: (message, e) => {
+        console.log(message);
+        expect(message).toContain('(preAggregations.eventsByType.scheduledRefresh = true) must be [false]');
       }
     });
 

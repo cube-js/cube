@@ -2,7 +2,7 @@ import { DependencyList, useEffect } from 'react';
 
 import { useDeepDependencies } from './deep-dependencies';
 
-export function useDeepEffect<T>(
+export function useDeepEffect(
   callback: () => void,
   dependencies: DependencyList
 ) {

@@ -3,7 +3,7 @@ import { useCubeQuery } from '@cubejs-client/react';
 
 import Line from './Line';
 
-export default () => {
+const Query = () => {
   const [data, setData] = useState([]);
   const { resultSet } = useCubeQuery([
     {
@@ -56,3 +56,5 @@ export default () => {
 
   return <Line data={data} title={'a Data Blending query'} />;
 };
+
+export default Query;

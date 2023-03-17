@@ -1,0 +1,8 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(r#\"SELECT r.conname,\n                pg_catalog.pg_get_constraintdef(r.oid, true) as condef,\n                n.nspname as conschema\n                FROM  pg_catalog.pg_constraint r,\n                pg_namespace n,\n                pg_class c\n                WHERE r.conrelid = 13449 AND\n                r.contype = 'f' AND\n                c.oid = confrelid AND\n                n.oid = c.relnamespace\n                ORDER BY 1\n                \"#.to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++---------+--------+-----------+
+| conname | condef | conschema |
++---------+--------+-----------+
++---------+--------+-----------+

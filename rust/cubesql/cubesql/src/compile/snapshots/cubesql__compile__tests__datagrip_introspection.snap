@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"select current_database(), current_schema(), current_user;\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++--------------------+------------------+----------------+
+| current_database() | current_schema() | current_user() |
++--------------------+------------------+----------------+
+| cubedb             | public           | ovr            |
++--------------------+------------------+----------------+

@@ -1,0 +1,24 @@
+{
+  "name": "cube-tpch-scale-1",
+  "version": "1.0.0",
+  "description": "- Boilerplate Cube deployment - PostgreSQL - TCP-H scale 1, size 1.5M rows and 1 GB",
+  "main": "cube.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cubedevinc/cube-tpch-scale-1.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/cubedevinc/cube-tpch-scale-1/issues"
+  },
+  "homepage": "https://github.com/cubedevinc/cube-tpch-scale-1#readme",
+  "devDependencies": {
+    "cubejs-cli": "^0.30.48",
+    "@cubejs-backend/server": "^0.29.23"
+  }
+}

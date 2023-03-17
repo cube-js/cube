@@ -89,6 +89,7 @@ export default function Settings({
                 type="number"
                 value={limit}
                 step={500}
+                min={0}
                 onChange={setLimit}
                 onPressEnter={() => {
                   onUpdate({ limit });

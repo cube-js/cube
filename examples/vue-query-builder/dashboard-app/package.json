@@ -4,12 +4,13 @@
   "private": true,
   "scripts": {
     "serve": "cross-env NODE_ENV=development SKIP_PREFLIGHT_CHECK=true vue-cli-service serve",
-    "start ": "cross-env NODE_ENV=development SKIP_PREFLIGHT_CHECK=true vue-cli-service serve",
+    "start": "cross-env NODE_ENV=development SKIP_PREFLIGHT_CHECK=true vue-cli-service serve",
     "build": "SKIP_PREFLIGHT_CHECK=true vue-cli-service build",
     "lint": "vue-cli-service lint",
     "deploy": "cross-env NODE_ENV=production npm run build && netlify deploy --prod --dir dist"
   },
   "dependencies": {
+    "@cube-dev/example-wrapper": "^1.1.10",
     "@cubejs-client/core": "^0.26.70",
     "@cubejs-client/vue": "^0.26.70",
     "apollo-boost": "^0.4.9",

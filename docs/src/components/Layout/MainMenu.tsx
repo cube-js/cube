@@ -20,9 +20,11 @@ import { layout } from '../../theme';
 const menuOrderCloud = [
   'Cube Cloud Getting Started',
   'Configuration',
-  'Developer Tools',
+  'Cloud Workspace',
   'Deploys',
-  'Inspecting Queries'
+  'Inspecting Queries',
+  'Release Notes',
+  'Cloud Runtime'
 ];
 
 const menuOrder = [
@@ -32,11 +34,14 @@ const menuOrder = [
   'Data Schema',
   'Caching',
   'Authentication & Authorization',
-  'Cube.js Backend',
-  'Cube.js Frontend',
+  'API Reference',
+  'SQL API',
+  'Frontend Integrations',
   'Deployment',
   'Developer Tools',
   'Examples & Tutorials',
+  'FAQs',
+  'Release Notes',
 ];
 
 const nameRules: Record<string, string> = {
@@ -135,7 +140,9 @@ const MainMenu: React.FC<Props> = (props = defaultProps) => {
                       }
                     );
 
-                    return subItems.map(nodeParser);
+                    return item === 'Release Notes'
+                      ? subItems.reverse().map(nodeParser)
+                      : subItems.map(nodeParser);
                   }
                   return (
                     <Menu.ItemGroup key={subCategory} title={subCategory}>

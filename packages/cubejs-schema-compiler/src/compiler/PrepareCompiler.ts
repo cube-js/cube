@@ -1,3 +1,4 @@
+import { SchemaFileRepository } from '@cubejs-backend/shared';
 import { CubeValidator } from './CubeValidator';
 import { DataSchemaCompiler } from './DataSchemaCompiler';
 import {
@@ -15,8 +16,19 @@ import { ContextEvaluator } from './ContextEvaluator';
 import { JoinGraph } from './JoinGraph';
 import { CubeToMetaTransformer } from './CubeToMetaTransformer';
 import { CompilerCache } from './CompilerCache';
+import { YamlCompiler } from './YamlCompiler';
 
-export const prepareCompiler = (repo, options) => {
+export type PrepareCompilerOptions = {
+  allowJsDuplicatePropsInSchema?: boolean
+  maxQueryCacheSize?: number;
+  maxQueryCacheAge?: number;
+  compileContext?: any;
+  standalone?: boolean;
+  headCommitId?: string;
+  adapter?: string;
+};
+
+export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareCompilerOptions = {}) => {
   const cubeDictionary = new CubeDictionary();
   const cubeSymbols = new CubeSymbols();
   const cubeValidator = new CubeValidator(cubeSymbols);
@@ -26,6 +38,7 @@ export const prepareCompiler = (repo, options) => {
   const metaTransformer = new CubeToMetaTransformer(cubeValidator, cubeEvaluator, contextEvaluator, joinGraph);
   const { maxQueryCacheSize, maxQueryCacheAge } = options;
   const compilerCache = new CompilerCache({ maxQueryCacheSize, maxQueryCacheAge });
+  const yamlCompiler = new YamlCompiler(cubeSymbols, cubeDictionary);
 
   const transpilers: TranspilerInterface[] = [
     new ValidationTranspiler(),
@@ -50,7 +63,9 @@ export const prepareCompiler = (repo, options) => {
       RefreshKeys,
       Reflection
     },
-    compileContext: options.compileContext
+    compileContext: options.compileContext,
+    standalone: options.standalone,
+    yamlCompiler
   }, options));
 
   return {
@@ -64,7 +79,7 @@ export const prepareCompiler = (repo, options) => {
   };
 };
 
-export const compile = (repo, options) => {
+export const compile = (repo: SchemaFileRepository, options?: PrepareCompilerOptions) => {
   const compilers = prepareCompiler(repo, options);
   return compilers.compiler.compile().then(
     () => compilers

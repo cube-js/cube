@@ -1,7 +1,7 @@
 import { createCancelablePromise, MaybeCancelablePromise } from '@cubejs-backend/shared';
+import { CacheDriverInterface } from '@cubejs-backend/base-driver';
 
 import { RedisPool } from './RedisPool';
-import { CacheDriverInterface } from './cache-driver.interface';
 
 interface RedisCacheDriverOptions {
   pool: RedisPool,
@@ -50,8 +50,15 @@ export class RedisCacheDriver implements CacheDriverInterface {
         'EX',
         expiration
       );
-
       if (response === 'OK') {
+        if (tkn.isCanceled()) {
+          if (freeAfter) {
+            await client.delAsync(key);
+          }
+
+          return false;
+        }
+
         try {
           await tkn.with(cb());
         } finally {
@@ -73,7 +80,12 @@ export class RedisCacheDriver implements CacheDriverInterface {
     const client = await this.getClient();
 
     try {
-      return await client.setAsync(key, JSON.stringify(value), 'EX', expiration);
+      const strValue = JSON.stringify(value);
+      await client.setAsync(key, strValue, 'EX', expiration);
+      return {
+        key,
+        bytes: Buffer.byteLength(strValue),
+      };
     } finally {
       this.redisPool.release(client);
     }

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useCubeQuery } from '@cubejs-client/react';
-import { Button, Space, Layout } from 'antd';
+import { Layout } from 'antd';
 import { AgGridColumn, AgGridReact } from 'ag-grid-react';
 import 'ag-grid-enterprise';
 import 'ag-grid-community/dist/styles/ag-grid.css';
@@ -51,17 +51,6 @@ const Grid = () => {
 
   return (
     <Layout>
-      <Layout.Header style={{ backgroundColor: '#43436B' }}>
-        <Space size='large'>
-          <a href='https://cube.dev' target='_blank' rel='noreferrer'>
-            <img src='https://cubejs.s3-us-west-2.amazonaws.com/downloads/logo-full.svg' alt='Cube.js' />
-          </a>
-          <Space>
-            <Button href='https://github.com/cube-js/cube.js' target='_blank' ghost>GitHub</Button>
-            <Button href='https://slack.cube.dev' target='_blank' ghost>Slack</Button>
-          </Space>
-        </Space>
-      </Layout.Header>
       <div className='ag-theme-alpine' style={{ height: 700 }}>
         <AgGridReact
           defaultColDef={{

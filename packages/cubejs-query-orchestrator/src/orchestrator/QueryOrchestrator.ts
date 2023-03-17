@@ -1,14 +1,23 @@
+import * as stream from 'stream';
 import R from 'ramda';
 import { getEnv } from '@cubejs-backend/shared';
+import { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
 
-import { QueryCache } from './QueryCache';
-import { PreAggregations, PreAggregationDescription } from './PreAggregations';
+import { QueryCache, QueryBody, TempTable } from './QueryCache';
+import { PreAggregations, PreAggregationDescription, getLastUpdatedAtTimestamp } from './PreAggregations';
 import { RedisPool, RedisPoolOptions } from './RedisPool';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { RedisQueueEventsBus } from './RedisQueueEventsBus';
 import { LocalQueueEventsBus } from './LocalQueueEventsBus';
+import { QueryStream } from './QueryStream';
 
-export type CacheAndQueryDriverType = 'redis' | 'memory';
+export type CacheAndQueryDriverType = 'redis' | 'memory' | 'cubestore';
+
+export enum DriverType {
+  External = 'external',
+  Internal = 'internal',
+  Cache = 'cache',
+}
 
 export interface QueryOrchestratorOptions {
   externalDriverFactory?: DriverFactory;
@@ -19,6 +28,29 @@ export interface QueryOrchestratorOptions {
   rollupOnlyMode?: boolean;
   continueWaitTimeout?: number;
   skipExternalCacheAndQueue?: boolean;
+}
+
+let redisDeprecationShowed = false;
+
+function detectQueueAndCacheDriver(options: QueryOrchestratorOptions): CacheAndQueryDriverType {
+  if (options.cacheAndQueueDriver) {
+    return options.cacheAndQueueDriver;
+  }
+
+  const cacheAndQueueDriver = getEnv('cacheAndQueueDriver');
+  if (cacheAndQueueDriver) {
+    return cacheAndQueueDriver;
+  }
+
+  if (getEnv('redisUrl') || getEnv('redisUseIORedis')) {
+    return 'redis';
+  }
+
+  if (getEnv('nodeEnv') === 'production') {
+    return 'cubestore';
+  }
+
+  return 'memory';
 }
 
 export class QueryOrchestrator {
@@ -41,21 +73,42 @@ export class QueryOrchestrator {
     options: QueryOrchestratorOptions = {}
   ) {
     this.rollupOnlyMode = options.rollupOnlyMode;
+    const cacheAndQueueDriver = detectQueueAndCacheDriver(options);
 
-    const cacheAndQueueDriver = options.cacheAndQueueDriver || getEnv('cacheAndQueueDriver') || (
-      (getEnv('nodeEnv') === 'production' || getEnv('redisUrl') || getEnv('redisUseIORedis'))
-        ? 'redis'
-        : 'memory'
-    );
-    this.cacheAndQueueDriver = cacheAndQueueDriver;
-
-    if (!['redis', 'memory'].includes(cacheAndQueueDriver)) {
-      throw new Error('Only \'redis\' or \'memory\' are supported for cacheAndQueueDriver option');
+    if (!['redis', 'memory', 'cubestore'].includes(cacheAndQueueDriver)) {
+      throw new Error(
+        `Only 'cubestore', 'redis' or 'memory' are supported for cacheAndQueueDriver option, passed: ${cacheAndQueueDriver}`
+      );
     }
+
+    if (cacheAndQueueDriver === 'redis' && !redisDeprecationShowed) {
+      this.logger('Redis Deprecation', {
+        warning: (
+          'Redis queue and cache driver is deprecated and no longer supported. Please consider switching to cubestore option.'
+        )
+      });
+
+      redisDeprecationShowed = true;
+    }
+
+    const { externalDriverFactory, continueWaitTimeout, skipExternalCacheAndQueue } = options;
 
     const redisPool = cacheAndQueueDriver === 'redis' ? new RedisPool(options.redisPoolOptions) : undefined;
     this.redisPool = redisPool;
-    const { externalDriverFactory, continueWaitTimeout, skipExternalCacheAndQueue } = options;
+    this.cacheAndQueueDriver = cacheAndQueueDriver;
+
+    const cubeStoreDriverFactory = cacheAndQueueDriver === 'cubestore' ? async () => {
+      if (externalDriverFactory) {
+        const externalDriver = await externalDriverFactory();
+        if (externalDriver instanceof CubeStoreDriver) {
+          return externalDriver;
+        }
+
+        throw new Error('It`s not possible to use Cube Store as queue/cache driver without using it as external');
+      }
+
+      throw new Error('Cube Store was specified as queue/cache driver. Please set CUBEJS_CUBESTORE_HOST and CUBEJS_CUBESTORE_PORT variables. Please see https://cube.dev/docs/deployment/production-checklist#set-up-cube-store to learn more.');
+    } : undefined;
 
     this.queryCache = new QueryCache(
       this.redisPrefix,
@@ -65,20 +118,28 @@ export class QueryOrchestrator {
         externalDriverFactory,
         cacheAndQueueDriver,
         redisPool,
+        cubeStoreDriverFactory,
         continueWaitTimeout,
         skipExternalCacheAndQueue,
         ...options.queryCacheOptions,
       }
     );
     this.preAggregations = new PreAggregations(
-      this.redisPrefix, this.driverFactory, this.logger, this.queryCache, {
+      this.redisPrefix,
+      this.driverFactory,
+      this.logger,
+      this.queryCache,
+      {
         externalDriverFactory,
         cacheAndQueueDriver,
         redisPool,
+        cubeStoreDriverFactory,
         continueWaitTimeout,
         skipExternalCacheAndQueue,
         ...options.preAggregationsOptions,
-        getQueueEventsBus: getEnv('preAggregationsQueueEventsBus') && this.getQueueEventsBus.bind(this)
+        getQueueEventsBus:
+          getEnv('preAggregationsQueueEventsBus') &&
+          this.getQueueEventsBus.bind(this)
       }
     );
   }
@@ -93,8 +154,91 @@ export class QueryOrchestrator {
     return this.queueEventsBus;
   }
 
-  public async fetchQuery(queryBody: any): Promise<any> {
-    const { preAggregationsTablesToTempTables, values } = await this.preAggregations.loadAllPreAggregationsIfNeeded(queryBody);
+  /**
+   * Returns QueryCache instance.
+   */
+  public getQueryCache(): QueryCache {
+    return this.queryCache;
+  }
+
+  /**
+   * Returns PreAggregations instance.
+   */
+  public getPreAggregations(): PreAggregations {
+    return this.preAggregations;
+  }
+
+  /**
+   * Force reconcile queue logic to be executed.
+   */
+  public async forceReconcile(datasource = 'default') {
+    // pre-aggregations queue reconcile
+    const preaggsQueue = await this.preAggregations.getQueue(datasource);
+    if (preaggsQueue) {
+      await preaggsQueue.reconcileQueue();
+    }
+
+    // queries queue reconcile
+    const queryQueue = await this.queryCache.getQueue(datasource);
+    if (queryQueue) {
+      await queryQueue.reconcileQueue();
+    }
+  }
+
+  /**
+   * Determines whether the partition table is already exists or not.
+   */
+  public async isPartitionExist(
+    request: string,
+    external: boolean,
+    dataSource = 'default',
+    schema: string,
+    table: string,
+    key: any,
+    token: string,
+  ): Promise<[boolean, string]> {
+    return this.preAggregations.isPartitionExist(
+      request,
+      external,
+      dataSource,
+      schema,
+      table,
+      key,
+      token,
+    );
+  }
+
+  /**
+   * Returns stream object which will be used to stream results from
+   * the data source if applicable. Throw otherwise.
+   *
+   * @throw Error
+   */
+  public async streamQuery(query: QueryBody): Promise<stream.Transform> {
+    const {
+      preAggregationsTablesToTempTables,
+      values,
+    } = await this.preAggregations.loadAllPreAggregationsIfNeeded(query);
+    query.values = values || query.values;
+    const _stream = await this.queryCache.cachedQueryResult(
+      query,
+      preAggregationsTablesToTempTables,
+    );
+    return <stream.Transform>_stream;
+  }
+
+  /**
+   * Push query to the queue, fetch and return result if query takes
+   * less than `continueWaitTimeout` seconds, throw `ContinueWaitError`
+   * error otherwise.
+   *
+   * @throw ContinueWaitError
+   */
+  public async fetchQuery(queryBody: QueryBody): Promise<any> {
+    const {
+      preAggregationsTablesToTempTables,
+      values,
+    } = await this.preAggregations.loadAllPreAggregationsIfNeeded(queryBody);
 
     if (values) {
       queryBody = {
@@ -103,15 +247,56 @@ export class QueryOrchestrator {
       };
     }
 
-    const usedPreAggregations = R.fromPairs(preAggregationsTablesToTempTables);
+    const usedPreAggregations = R.pipe(
+      R.fromPairs,
+      R.map((pa: TempTable) => ({
+        targetTableName: pa.targetTableName,
+        refreshKeyValues: pa.refreshKeyValues,
+        lastUpdatedAt: pa.lastUpdatedAt,
+      })),
+    )(
+      preAggregationsTablesToTempTables as unknown as [
+        number, // TODO: we actually have a string here
+        {
+          buildRangeEnd: string,
+          lastUpdatedAt: number,
+          queryKey: unknown,
+          refreshKeyValues: [{
+            'refresh_key': string,
+          }][],
+          targetTableName: string,
+          type: string,
+        },
+      ][]
+    );
+
     if (this.rollupOnlyMode && Object.keys(usedPreAggregations).length === 0) {
-      throw new Error('No pre-aggregation exists for that query');
+      throw new Error(
+        'No pre-aggregation table has been built for this query yet. ' +
+        'Please check your refresh worker configuration if it persists.'
+      );
     }
 
+    let lastRefreshTimestamp = getLastUpdatedAtTimestamp(
+      preAggregationsTablesToTempTables.map(pa => pa[1].lastUpdatedAt)
+    );
+
     if (!queryBody.query) {
-      return {
-        usedPreAggregations
-      };
+      // We want to return a more convenient and filled object for the following
+      // processing for a jobed build query (initialized by the
+      // /cubejs-system/v1/pre-aggregations/jobs endpoint).
+      if (queryBody.isJob) {
+        return preAggregationsTablesToTempTables.map((pa) => ({
+          preAggregation: queryBody.preAggregations[0].preAggregationId,
+          tableName: pa[0],
+          ...pa[1],
+        }));
+      } else {
+        return {
+          usedPreAggregations,
+          lastRefreshTime: lastRefreshTimestamp && new Date(lastRefreshTimestamp),
+        };
+      }
     }
 
     const result = await this.queryCache.cachedQueryResult(
@@ -119,11 +304,22 @@ export class QueryOrchestrator {
       preAggregationsTablesToTempTables
     );
 
+    lastRefreshTimestamp = getLastUpdatedAtTimestamp([
+      lastRefreshTimestamp,
+      result.lastRefreshTime?.getTime()
+    ]);
+
+    if (result instanceof QueryStream) {
+      // TODO do some wrapper object to provide metadata?
+      return result;
+    }
+
     return {
       ...result,
       dataSource: queryBody.dataSource,
       external: queryBody.external,
-      usedPreAggregations
+      usedPreAggregations,
+      lastRefreshTime: lastRefreshTimestamp && new Date(lastRefreshTimestamp),
     };
   }
 
@@ -136,7 +332,7 @@ export class QueryOrchestrator {
 
     const preAggregationsQueryStageState = async (dataSource) => {
       if (!preAggregationsQueryStageStateByDataSource[dataSource]) {
-        const queue = this.preAggregations.getQueue(dataSource);
+        const queue = await this.preAggregations.getQueue(dataSource);
         preAggregationsQueryStageStateByDataSource[dataSource] = queue.fetchQueryStageState();
       }
       return preAggregationsQueryStageStateByDataSource[dataSource];
@@ -145,17 +341,24 @@ export class QueryOrchestrator {
     const pendingPreAggregationIndex =
       (await Promise.all(
         (queryBody.preAggregations || [])
-          .map(async p => this.preAggregations.getQueue(p.dataSource).getQueryStage(
-            PreAggregations.preAggregationQueryCacheKey(p), 10, await preAggregationsQueryStageState(p.dataSource)
-          ))
+          .map(async p => {
+            const queue = await this.preAggregations.getQueue(p.dataSource);
+            return queue.getQueryStage(
+              PreAggregations.preAggregationQueryCacheKey(p),
+              10,
+              await preAggregationsQueryStageState(p.dataSource),
+            );
+          })
       )).findIndex(p => !!p);
 
     if (pendingPreAggregationIndex === -1) {
-      return this.queryCache.getQueue(queryBody.dataSource).getQueryStage(QueryCache.queryCacheKey(queryBody));
+      const qcQueue = await this.queryCache.getQueue(queryBody.dataSource);
+      return qcQueue.getQueryStage(QueryCache.queryCacheKey(queryBody));
     }
 
     const preAggregation = queryBody.preAggregations[pendingPreAggregationIndex];
-    const preAggregationStage = await this.preAggregations.getQueue(preAggregation.dataSource).getQueryStage(
+    const paQueue = await this.preAggregations.getQueue(preAggregation.dataSource);
+    const preAggregationStage = await paQueue.getQueryStage(
       PreAggregations.preAggregationQueryCacheKey(preAggregation),
       undefined,
       await preAggregationsQueryStageState(preAggregation.dataSource)
@@ -176,9 +379,14 @@ export class QueryOrchestrator {
     return this.queryCache.resultFromCacheIfExists(queryBody);
   }
 
-  public async testConnections() {
+  public async testConnections(): Promise<void> {
     // @todo Possible, We will allow to use different drivers for cache and queue, dont forget to add both
-    return this.queryCache.testConnection();
+    try {
+      await this.queryCache.testConnection();
+    } catch (e: any) {
+      e.driverType = DriverType.Cache;
+      throw e;
+    }
   }
 
   public async cleanup() {
@@ -206,8 +414,8 @@ export class QueryOrchestrator {
       .map(p => p.partitions)
       .reduce(flatFn, [])
       .reduce((obj, partition) => {
-        if (partition && partition.sql) {
-          obj[partition.sql.tableName] = PreAggregations.structureVersion(partition.sql);
+        if (partition) {
+          obj[partition.tableName] = PreAggregations.structureVersion(partition);
         }
         return obj;
       }, {});
@@ -250,6 +458,10 @@ export class QueryOrchestrator {
     return this.preAggregations.expandPartitionsInPreAggregations(queryBody);
   }
 
+  public async checkPartitionsBuildRangeCache(queryBody) {
+    return this.preAggregations.checkPartitionsBuildRangeCache(queryBody);
+  }
+
   public async getPreAggregationQueueStates(dataSource = 'default') {
     return this.preAggregations.getQueueState(dataSource);
   }
@@ -264,5 +476,13 @@ export class QueryOrchestrator {
 
   public async unSubscribeQueueEvents(id) {
     return this.getQueueEventsBus().unsubscribe(id);
+  }
+
+  public async updateRefreshEndReached() {
+    return this.preAggregations.updateRefreshEndReached();
+  }
+
+  public async fetchSchema(dataSource: string) {
+    return this.queryCache.fetchSchema(dataSource);
   }
 }

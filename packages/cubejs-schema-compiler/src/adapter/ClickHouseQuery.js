@@ -13,8 +13,10 @@ const GRANULARITY_TO_INTERVAL = {
 };
 
 class ClickHouseFilter extends BaseFilter {
-  likeIgnoreCase(column, not, param) {
-    return `lower(${column}) ${not ? 'NOT' : ''} LIKE CONCAT('%', lower(${this.allocateParam(param)}), '%')`;
+  likeIgnoreCase(column, not, param, type) {
+    const p = (!type || type === 'contains' || type === 'ends') ? '%' : '';
+    const s = (!type || type === 'contains' || type === 'starts') ? '%' : '';
+    return `lower(${column}) ${not ? 'NOT' : ''} LIKE CONCAT('${p}', lower(${this.allocateParam(param)}), '${s}')`;
   }
 
   castParameter() {
@@ -92,6 +94,16 @@ export class ClickHouseQuery extends BaseQuery {
     return `parseDateTimeBestEffort(${value})`;
   }
 
+  dimensionsJoinCondition(leftAlias, rightAlias) {
+    const dimensionAliases = this.dimensionAliasNames();
+    if (!dimensionAliases.length) {
+      return '1 = 1';
+    }
+    return dimensionAliases
+      .map(alias => `(assumeNotNull(${leftAlias}.${alias}) = assumeNotNull(${rightAlias}.${alias}))`)
+      .join(' AND ');
+  }
+
   getFieldAlias(id) {
     const equalIgnoreCase = (a, b) => (
       typeof a === 'string' && typeof b === 'string' && a.toUpperCase() === b.toUpperCase()
@@ -100,7 +112,7 @@ export class ClickHouseQuery extends BaseQuery {
     let field;
 
     field = this.dimensionsForSelect().find(
-      d => equalIgnoreCase(d.dimension, id)
+      d => equalIgnoreCase(d.dimension, id),
     );
 
     if (field) {
@@ -108,7 +120,7 @@ export class ClickHouseQuery extends BaseQuery {
     }
 
     field = this.measures.find(
-      d => equalIgnoreCase(d.measure, id) || equalIgnoreCase(d.expressionName, id)
+      d => equalIgnoreCase(d.measure, id) || equalIgnoreCase(d.expressionName, id),
     );
 
     if (field) {
@@ -150,12 +162,19 @@ export class ClickHouseQuery extends BaseQuery {
   }
 
   primaryKeyCount(cubeName, distinct) {
-    const primaryKeySql = this.primaryKeySql(this.cubeEvaluator.primaryKeys[cubeName], cubeName);
+    const primaryKeys = this.cubeEvaluator.primaryKeys[cubeName];
+    const primaryKeySql = primaryKeys.length > 1 ?
+      this.concatStringsSql(primaryKeys.map((pk) => this.castToString(this.primaryKeySql(pk, cubeName)))) :
+      this.primaryKeySql(primaryKeys[0], cubeName);
     if (distinct) {
       return `uniqExact(${primaryKeySql})`;
     } else {
       return `count(${primaryKeySql})`;
     }
+  }
+
+  castToString(sql) {
+    return `CAST(${sql} as STRING)`;
   }
 
   seriesSql(timeDimension) {

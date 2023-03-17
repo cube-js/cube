@@ -4,6 +4,7 @@ import { BigqueryQuery } from '../../../src/adapter/BigqueryQuery';
 import { PrestodbQuery } from '../../../src/adapter/PrestodbQuery';
 import { prepareCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './PostgresDBRunner';
+import { createJoinedCubesSchema } from '../../unit/utils';
 
 describe('SQL Generation', () => {
   jest.setTimeout(200000);
@@ -94,6 +95,10 @@ describe('SQL Generation', () => {
           type: 'avg',
           sql: \`\${doubledCheckings}\`
         },
+        strCase: {
+          sql: \`CASE WHEN \${visitor_count} > 1 THEN 'More than 1' ELSE (\${visitor_revenue})::text END\`,
+          type: \`string\`
+        },
         ...(['foo', 'bar'].map(m => ({ [m]: { type: 'count' } })).reduce((a, b) => ({ ...a, ...b })))
       },
 
@@ -119,6 +124,12 @@ describe('SQL Generation', () => {
         
         checkins: {
           sql: \`\${visitor_checkins.visitor_checkins_count}\`,
+          type: \`number\`,
+          subQuery: true
+        },
+        
+        checkinsRolling: {
+          sql: \`\${visitor_checkins.visitorCheckinsRolling}\`,
           type: \`number\`,
           subQuery: true
         },
@@ -180,6 +191,14 @@ describe('SQL Generation', () => {
         visitor_checkins_count: {
           type: 'count'
         },
+        
+        visitorCheckinsRolling: {
+          type: 'count',
+          rollingWindow: {
+            trailing: 'unbounded'
+          }
+        },
+        
         revenue_per_checkin: {
           type: 'number',
           sql: \`\${visitors.visitor_revenue} / \${visitor_checkins_count}\`
@@ -337,6 +356,41 @@ describe('SQL Generation', () => {
         }
       }
     });
+    
+    cube('compound', {
+      sql: \`
+        select * from compound_key_cards
+      \`, 
+      
+      joins: {
+        visitors: {
+          relationship: 'belongsTo',
+          sql: \`\${visitors}.id = \${CUBE}.visitor_id\`
+        },
+      },
+
+      measures: {
+        count: {
+          type: 'count'
+        },
+        rank_avg: {
+          type: 'avg',
+          sql: 'visit_rank'
+        }
+      },
+      dimensions: {
+        id_a: {
+          type: 'number',
+          sql: 'id_a',
+          primaryKey: true
+        },
+        id_b: {
+          type: 'number',
+          sql: 'id_b',
+          primaryKey: true
+        },
+      }
+    });
     `);
 
   it('simple join', async () => {
@@ -432,6 +486,20 @@ describe('SQL Generation', () => {
     visitors__visitor_count: '5',
     visitor_checkins__visitor_checkins_count: '6',
     visitors__per_visitor_revenue: '60'
+  }]));
+
+  it('string measure', async () => runQueryTest({
+    measures: [
+      'visitors.strCase',
+    ],
+    timeDimensions: [{
+      dimension: 'visitors.created_at',
+      dateRange: ['2017-01-01', '2017-01-30']
+    }],
+    timezone: 'America/Los_Angeles',
+    order: []
+  }, [{
+    visitors__str_case: 'More than 1'
   }]));
 
   it('running total', async () => {
@@ -956,6 +1024,54 @@ describe('SQL Generation', () => {
           visitors__visitor_count: '1'
         }, {
           visitors__checkins: '3',
+          visitors__created_at_day: '2017-01-02T00:00:00.000Z',
+          visitors__visitor_count: '1'
+        }]
+      );
+    });
+  });
+
+  it('subquery rolling', async () => {
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'visitors.visitor_count'
+      ],
+      dimensions: [
+        'visitors.checkinsRolling'
+      ],
+      timeDimensions: [{
+        dimension: 'visitors.created_at',
+        granularity: 'day',
+        dateRange: ['2017-01-01', '2017-01-30']
+      }],
+      timezone: 'America/Los_Angeles',
+      filters: [],
+      order: [{
+        id: 'visitors.checkins'
+      }]
+    });
+
+    console.log(query.buildSqlAndParams());
+
+    return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
+      console.log(JSON.stringify(res));
+      expect(res).toEqual(
+        [{
+          visitors__checkins_rolling: '0',
+          visitors__created_at_day: '2017-01-06T00:00:00.000Z',
+          visitors__visitor_count: '2'
+        }, {
+          visitors__checkins_rolling: '1',
+          visitors__created_at_day: '2017-01-05T00:00:00.000Z',
+          visitors__visitor_count: '1'
+        }, {
+          visitors__checkins_rolling: '2',
+          visitors__created_at_day: '2017-01-04T00:00:00.000Z',
+          visitors__visitor_count: '1'
+        }, {
+          visitors__checkins_rolling: '3',
           visitors__created_at_day: '2017-01-02T00:00:00.000Z',
           visitors__visitor_count: '1'
         }]
@@ -1778,4 +1894,79 @@ describe('SQL Generation', () => {
       expect(sqlBuild[1][1]).toEqual(granularityTest.to);
     });
   }
+
+  it('compound key count', async () => runQueryTest(
+    {
+      measures: ['compound.count'],
+      timeDimensions: [
+      ],
+      timezone: 'America/Los_Angeles',
+      filters: [
+        {
+          dimension: 'visitor_checkins.revenue_per_checkin',
+          operator: 'gte',
+          values: ['10'],
+        },
+      ],
+    },
+    [{ compound__count: '4' }]
+  ));
+
+  it('compound key self join', async () => runQueryTest(
+    {
+      measures: ['compound.rank_avg'],
+      timeDimensions: [
+        {
+          dimension: 'visitors.created_at',
+          granularity: 'day',
+          dateRange: ['2017-01-01', '2017-01-30'],
+        },
+      ],
+      timezone: 'America/Los_Angeles',
+      filters: [
+        {
+          dimension: 'visitor_checkins.revenue_per_checkin',
+          operator: 'gte',
+          values: ['10'],
+        },
+      ],
+    },
+    [
+      { compound__rank_avg: '7.5000000000000000', visitors__created_at_day: '2017-01-02T00:00:00.000Z' },
+      { compound__rank_avg: '7.5000000000000000', visitors__created_at_day: '2017-01-04T00:00:00.000Z' },
+    ]
+  ));
+
+  it('columns order for the query with the sub-query', async () => {
+    const joinedSchemaCompilers = prepareCompiler(createJoinedCubesSchema());
+    await joinedSchemaCompilers.compiler.compile();
+    const query = new PostgresQuery({
+      joinGraph: joinedSchemaCompilers.joinGraph,
+      cubeEvaluator: joinedSchemaCompilers.cubeEvaluator,
+      compiler: joinedSchemaCompilers.compiler,
+    },
+    {
+      measures: ['B.bval_sum', 'B.count'],
+      dimensions: ['B.aid'],
+      filters: [{
+        member: 'C.did',
+        operator: 'lt',
+        values: ['10']
+      }],
+      order: [{
+        'B.bval_sum': 'desc'
+      }]
+    });
+    const sql = query.buildSqlAndParams();
+    return dbRunner
+      .testQuery(sql)
+      .then((res) => {
+        res.forEach((row) => {
+          const cols = Object.keys(row);
+          expect(cols[0]).toEqual('b__aid');
+          expect(cols[1]).toEqual('b__bval_sum');
+          expect(cols[2]).toEqual('b__count');
+        });
+      });
+  });
 });

@@ -1,34 +1,69 @@
+/**
+ * @copyright Cube Dev, Inc.
+ * @license Apache-2.0
+ * @fileoverview The `ElasticSearchDriver` and related types declaration.
+ */
+
+const {
+  getEnv,
+  assertDataSource,
+} = require('@cubejs-backend/shared');
 const { Client } = require('@elastic/elasticsearch');
 const SqlString = require('sqlstring');
-const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
+const { BaseDriver } = require('@cubejs-backend/base-driver');
 
+/**
+ * ElasticSearch driver class.
+ */
 class ElasticSearchDriver extends BaseDriver {
-  constructor(config) {
-    super();
+  /**
+   * Returns default concurrency value.
+   * @return {number}
+   */
+  static getDefaultConcurrency() {
+    return 2;
+  }
+
+  /**
+   * Class constructor.
+   */
+  constructor(config = {}) {
+    super({
+      testConnectionTimeout: config.testConnectionTimeout,
+    });
+
+    const dataSource =
+      config.dataSource ||
+      assertDataSource('default');
 
     const auth = {
-      username: process.env.CUBEJS_DB_USER,
-      password: process.env.CUBEJS_DB_PASS,
+      username: getEnv('dbUser', { dataSource }),
+      password: getEnv('dbPass', { dataSource }),
     };
-
-    if (process.env.CUBEJS_DB_ELASTIC_APIKEY_ID || process.env.CUBEJS_DB_ELASTIC_APIKEY_KEY) {
+    if (
+      getEnv('elasticApiId', { dataSource }) ||
+      getEnv('elasticApiKey', { dataSource })
+    ) {
       auth.apiKey = {
-        id: process.env.CUBEJS_DB_ELASTIC_APIKEY_ID,
-        api_key: process.env.CUBEJS_DB_ELASTIC_APIKEY_KEY
+        id: getEnv('elasticApiId', { dataSource }),
+        api_key: getEnv('elasticApiKey', { dataSource }),
       };
     }
 
-    // TODO: This config applies to AWS ES, Elastic.co ES, Native ES and OpenDistro ES
-    // They have different dialects according to their respective documentation
+    // TODO: This config applies to AWS ES, Elastic.co ES, Native ES
+    // and OpenDistro ES. They have different dialects according to
+    // their respective documentation.
     this.config = {
-      url: process.env.CUBEJS_DB_URL,
-      ssl: this.getSslOptions(),
       auth,
+      url: getEnv('dbUrl', { dataSource }),
+      ssl: this.getSslOptions(dataSource),
       openDistro:
-        (process.env.CUBEJS_DB_ELASTIC_OPENDISTRO || 'false').toLowerCase() === 'true' ||
-        process.env.CUBEJS_DB_TYPE === 'odelasticsearch',
-      queryFormat: process.env.CUBEJS_DB_ELASTIC_QUERY_FORMAT || 'jdbc',
-      ...config
+        (getEnv('elasticOpenDistro', { dataSource }) || 'false')
+          .toLowerCase() === 'true' ||
+        getEnv('dbType', { dataSource }) === 'odelasticsearch',
+      queryFormat:
+        getEnv('elasticQueryFormat', { dataSource }) || 'jdbc',
+      ...config,
     };
 
     this.client = new Client({
@@ -50,6 +85,8 @@ class ElasticSearchDriver extends BaseDriver {
   }
 
   static driverEnvVariables() {
+    // TODO (buntarb): check how this method can/must be used with split
+    // names by the data source.
     return [
       'CUBEJS_DB_URL',
       'CUBEJS_DB_ELASTIC_QUERY_FORMAT',

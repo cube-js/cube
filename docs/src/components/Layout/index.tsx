@@ -5,13 +5,14 @@ import { Layout, Row, Col } from 'antd';
 import { StaticQuery, graphql } from 'gatsby';
 
 import FrameworkOfChoiceStore from '../../stores/frameworkOfChoice';
-import EventBanner from '../EventBanner';
 import Search from '../Search';
 import Header from '../Header';
 import MobileFooter from './MobileFooter';
 import MainMenu from './MainMenu';
 import ScrollMenu from './ScrollMenu';
 import FrameworkSwitcher from '../templates/FrameworkSwitcher';
+
+import PurpleBanner from "@cube-dev/purple-banner";
 
 import * as styles from '../../../static/styles/index.module.scss';
 import '../../../static/styles/prism.scss';
@@ -197,8 +198,8 @@ class AppLayout extends React.Component<
           query={layoutQuery}
           render={(data: LayoutQueryResponse) => (
             <>
-              <EventBanner />
               <Row>
+                <PurpleBanner utmSource='docs'/>
                 <Header
                   className={cx(styles.header, {
                     [styles.fixed]: this.state.mobileMode === MobileModes.MENU,
@@ -230,7 +231,14 @@ class AppLayout extends React.Component<
                     }
                   >
                     {pageFrameworkOfChoice && (
-                      <FrameworkSwitcher value={pageFrameworkOfChoice} />
+                      <div
+                        className={styles.contentWrapper}
+                        style={{ margin: '0 24px' }}
+                      >
+                        <div className={styles.frameworkSwitcherWrapper}>
+                          <FrameworkSwitcher value={pageFrameworkOfChoice} />
+                        </div>
+                      </div>
                     )}
                     <Layout.Content
                       className={styles.contentWrapper}

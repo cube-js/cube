@@ -12,6 +12,7 @@ import {
   PackageManifest,
   resolveBuiltInPackageVersion,
 } from '@cubejs-backend/shared';
+import { SystemOptions } from '@cubejs-backend/server-core';
 
 import {
   getMajorityVersion,
@@ -135,22 +136,24 @@ export class ServerContainer {
       return;
     }
 
-    /**
-     * It's needed to detect case when user didnt install @cubejs-backend/server, but
-     * install @cubejs-backend/postgres-driver and it doesn't fit to built-in server
-     */
-    const depsToCompareVersions = Object.keys(manifest.devDependencies).filter(
-      isCubeNotServerPackage
-    );
-    // eslint-disable-next-line no-restricted-syntax
-    for (const pkgName of depsToCompareVersions) {
-      const pkgVersion = safetyParseSemver(
-        lock.resolveVersion(pkgName)
+    if (manifest.devDependencies) {
+      /**
+       * It's needed to detect case when user didnt install @cubejs-backend/server, but
+       * install @cubejs-backend/postgres-driver and it doesn't fit to built-in server
+       */
+      const depsToCompareVersions = Object.keys(manifest.devDependencies).filter(
+        isCubeNotServerPackage
       );
-      if (pkgVersion) {
-        this.compareBuiltInAndUserVersions(builtInCoreVersion, pkgVersion);
+      // eslint-disable-next-line no-restricted-syntax
+      for (const pkgName of depsToCompareVersions) {
+        const pkgVersion = safetyParseSemver(
+          lock.resolveVersion(pkgName)
+        );
+        if (pkgVersion) {
+          this.compareBuiltInAndUserVersions(builtInCoreVersion, pkgVersion);
 
-        return;
+          return;
+        }
       }
     }
   }
@@ -229,16 +232,14 @@ export class ServerContainer {
       configuration.scheduledRefreshTimer = false;
     }
 
-    const server = new CubejsServer(configuration, {
-      isCubeConfigEmpty
-    });
+    const server = this.createServer(configuration, { isCubeConfigEmpty });
 
     if (!embedded) {
       try {
         const { version, port } = await server.listen();
 
-        console.log(`🚀 Cube.js server (${version}) is listening on ${port}`);
-      } catch (e) {
+        console.log(`🚀 Cube API server (${version}) is listening on ${port}`);
+      } catch (e: any) {
         console.error('Fatal error during server start: ');
         console.error(e.stack || e);
 
@@ -247,6 +248,10 @@ export class ServerContainer {
     }
 
     return server;
+  }
+
+  protected createServer(config: CreateOptions, systemOptions?: SystemOptions): CubejsServer {
+    return new CubejsServer(config, systemOptions);
   }
 
   public async lookupConfiguration(override: boolean = false): Promise<CreateOptions> {
@@ -358,7 +363,7 @@ export class ServerContainer {
       let shutdownHandler: Promise<0 | 1> | null = null;
       let killSignalCount = 0;
 
-      const signalToShutdown = [
+      const signalToShutdown: NodeJS.Signals[] = [
         // Signal Terminate - graceful shutdown in Unix systems
         'SIGTERM',
         // Ctrl+C

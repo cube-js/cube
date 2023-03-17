@@ -1,3 +1,4 @@
+import createExampleWrapper from "@cube-dev/example-wrapper";
 import React from 'react';
 import ReactDOM from 'react-dom';
 import cubejs from '@cubejs-client/core';
@@ -6,16 +7,13 @@ import 'antd/dist/antd.css';
 import './index.css';
 import App from './App';
 
-const API_URL =
-  process.env.NODE_ENV === 'production'
-    ? 'https://nervous-itmann.gcp-us-central1.cubecloudapp.dev'
-    : 'http://localhost:4000';
+createExampleWrapper({
+  title: "Open Source Story of Hacktoberfest 2020",
+  text: `This story reveals the unofficial results of <a href='https://hacktoberfest.digitalocean.com' target='_blank' rel='noreferrer'>Hacktoberfest 2020</a> based on a subset of public data.`,
+});
 
-const CUBEJS_TOKEN =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE2Mjc0NjM2MDZ9.1boj2JrVcsxVkbQsZxuOP21VDxNQyHpxrh3go45k9pc';
-
-const api = cubejs(CUBEJS_TOKEN, {
-  apiUrl: `${API_URL}/cubejs-api/v1`,
+const api = cubejs(process.env.REACT_APP_CUBE_TOKEN, {
+  apiUrl: `${process.env.REACT_APP_CUBE_API}`,
 });
 
 ReactDOM.render(

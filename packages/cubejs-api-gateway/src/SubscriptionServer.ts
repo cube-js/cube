@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { UserError } from './UserError';
 import type { ApiGateway } from './gateway';
 import type { LocalSubscriptionStore } from './LocalSubscriptionStore';
-import { ExtendedRequestContext } from './interfaces';
+import { ExtendedRequestContext, ContextAcceptorFn } from './interfaces';
 
 const methodParams: Record<string, string[]> = {
   load: ['query', 'queryType'],
@@ -15,6 +15,10 @@ const methodParams: Record<string, string[]> = {
   'subscribe.queue.events': []
 };
 
+const calcMessageLength = (message: unknown) => Buffer.byteLength(
+  typeof message === 'string' ? message : JSON.stringify(message)
+);
+
 export type WebSocketSendMessageFn = (connectionId: string, message: any) => void;
 
 export class SubscriptionServer {
@@ -22,16 +26,26 @@ export class SubscriptionServer {
     protected readonly apiGateway: ApiGateway,
     protected readonly sendMessage: WebSocketSendMessageFn,
     protected readonly subscriptionStore: LocalSubscriptionStore,
+    protected readonly contextAcceptor: ContextAcceptorFn,
   ) {
   }
 
-  public resultFn(connectionId: string, messageId: string) {
-    return (message, { status } = { status: 200 }) => this.sendMessage(connectionId, { messageId, message, status });
+  public resultFn(connectionId: string, messageId: string, requestId: string | undefined) {
+    return (message, { status } = { status: 200 }) => {
+      this.apiGateway.log({
+        type: 'Outgoing network usage',
+        service: 'api-ws',
+        bytes: calcMessageLength(message),
+      }, { requestId });
+      return this.sendMessage(connectionId, { messageId, message, status });
+    };
   }
 
   public async processMessage(connectionId: string, message, isSubscription) {
     let authContext: any = {};
     let context: Partial<ExtendedRequestContext> = {};
+
+    const bytes = calcMessageLength(message);
 
     try {
       if (typeof message === 'string') {
@@ -41,6 +55,11 @@ export class SubscriptionServer {
       if (message.authorization) {
         authContext = { isSubscription: true };
         await this.apiGateway.checkAuthFn(authContext, message.authorization);
+        const acceptanceResult = this.contextAcceptor(authContext);
+        if (!acceptanceResult.accepted) {
+          this.sendMessage(connectionId, acceptanceResult.rejectMessage);
+          return;
+        }
         await this.subscriptionStore.setAuthContext(connectionId, authContext);
         this.sendMessage(connectionId, { handshake: true });
         return;
@@ -81,6 +100,12 @@ export class SubscriptionServer {
       const requestId = `${baseRequestId}-span-${uuidv4()}`;
       context = await this.apiGateway.contextByReq(message, authContext.securityContext, requestId);
 
+      this.apiGateway.log({
+        type: 'Incoming network usage',
+        service: 'api-ws',
+        bytes,
+      }, context);
+
       const allowedParams = methodParams[message.method];
       const params = allowedParams.map(k => ({ [k]: (message.params || {})[k] }))
         .reduce((a, b) => ({ ...a, ...b }), {});
@@ -92,7 +117,8 @@ export class SubscriptionServer {
         context,
         signedWithPlaygroundAuthSecret: authContext.signedWithPlaygroundAuthSecret,
         isSubscription,
-        res: this.resultFn(connectionId, message.messageId),
+        apiType: 'ws',
+        res: this.resultFn(connectionId, message.messageId, requestId),
         subscriptionState: async () => {
           const subscription = await this.subscriptionStore.getSubscription(connectionId, message.messageId);
           return subscription && subscription.state;
@@ -109,7 +135,7 @@ export class SubscriptionServer {
       this.apiGateway.handleError({
         e,
         query: message.query,
-        res: this.resultFn(connectionId, message.messageId),
+        res: this.resultFn(connectionId, message.messageId, context.requestId),
         context
       });
     }

@@ -1,0 +1,10 @@
+[workspace]
+resolver = "2"
+members = [
+    "cubesql",
+    "cubeclient",
+    "pg-srv"
+]
+
+[profile.bench]
+debug = true

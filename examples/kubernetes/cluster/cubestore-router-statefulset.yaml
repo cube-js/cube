@@ -18,6 +18,8 @@ spec:
         - env: # Refer to https://cube.dev/docs/reference/environment-variables for more options
             - name: CUBESTORE_META_PORT
               value: "9999"
+            - name: CUBESTORE_DATA_DIR
+              value: /cube/.cubestore/data
             - name: CUBESTORE_REMOTE_DIR
               value: /cube/data
             - name: CUBESTORE_SERVER_NAME

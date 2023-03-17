@@ -12,7 +12,7 @@ interface RequestParserResult {
 }
 
 export function getRequestIdFromRequest(req: Request): string {
-  return req.get('x-request-id') || req.get('traceparent') || uuidv4();
+  return req.get('x-request-id') || req.get('traceparent') || `${uuidv4()}-span-1`;
 }
 
 export function requestParser(req: Request, res: Response) {

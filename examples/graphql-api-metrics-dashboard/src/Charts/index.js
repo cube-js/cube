@@ -1,0 +1,1 @@
+export { BarChart } from './BarChart';

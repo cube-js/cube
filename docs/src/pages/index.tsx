@@ -27,22 +27,17 @@ class IndexPage extends Component<Props> {
   render() {
     return (
       <div className={styles.docContent}>
-        <Helmet title="Main | Cube.js Docs" />
+        <Helmet>
+          <title>Main | Cube Docs</title>
+          <meta name="description" content={"Main | Documentation for working with Cube, the open-source analytics framework"}></meta>
+        </Helmet>
         <h1>Documentation</h1>
-
-        <InfoBox >
-
-        The Cube multitenancy workshop is on October 27th at 9-10:30 am PST! If you want to learn why you need multitenancy, how to get started, recipes and more, you will want to attend this event 😀
-        <br />
-        You can register for the workshop at <a href="https://cube.dev/events/multitenancy/">the event page</a>.
-
-        </InfoBox>
 
         <Row>
           <Col span={24}>
             <p>
               Read about major concepts, dive into technical details or follow
-              practical examples to learn how Cube.js works.
+              practical examples to learn how Cube works.
             </p>
           </Col>
         </Row>
@@ -51,29 +46,44 @@ class IndexPage extends Component<Props> {
             <MainTab
               title="Getting Started"
               img={imgGettingStarted}
-              desc="It is a good place to start, if you are new to Cube.js."
+              desc="Start here if you're new to Cube"
               to="/getting-started"
             />
             <MainTab
-              title="Data Schema"
-              img={imgForDevs}
-              desc="Learn how to build Cube.js Data Schema."
-              to="/getting-started-cubejs-schema"
+              title="Connect to Data Sources"
+              img={imgInsights}
+              desc="Connecting to data warehouses, query engines, relational databases, etc."
+              to="/config/databases"
               right
             />
           </Row>
           <Row>
             <MainTab
-              title="Cube.js Backend"
-              img={imgInsights}
-              desc="How to connect to database and deploy Cube.js service."
-              to="/connecting-to-the-database"
+              title="Data Model"
+              img={imgForDevs}
+              desc="Building the data model, the single source of truth for your metrics"
+              to="/schema/getting-started"
             />
             <MainTab
-              title="Cube.js Frontend"
+              title="Connect to Visualization Tools"
               img={imgDashboards}
-              desc="Frontend libraries tutorials and API reference."
-              to="/frontend-introduction"
+              desc="Integrating Cube with BI tools, data apps, notebooks, and front-end tools"
+              to="/config/downstream"
+              right
+            />
+          </Row>
+          <Row>
+            <MainTab
+              title="Caching"
+              img={imgDashboards}
+              desc="Accelerating queries and getting the best performance from Cube"
+              to="/caching"
+            />
+            <MainTab
+              title="Deployment"
+              img={imgInsights}
+              desc="Deploying your application to Cube Cloud, a public cloud, or on-premise"
+              to="/deployment/overview"
               right
             />
           </Row>

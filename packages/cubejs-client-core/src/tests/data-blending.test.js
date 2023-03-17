@@ -255,11 +255,14 @@ describe('data blending', () => {
         xValues: ['2020-08-01T00:00:00.000'],
         'Orders.count': 1,
         'Australia,Users.count': 20,
+        'Italy,Users.count': 0,
+        'Spain,Users.count': 0
       },
       {
         x: '2020-08-02T00:00:00.000',
         xValues: ['2020-08-02T00:00:00.000'],
         'Orders.count': 2,
+        'Australia,Users.count': 0,
         'Spain,Users.count': 34,
         'Italy,Users.count': 18,
       },

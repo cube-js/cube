@@ -12,7 +12,7 @@ test('convertTimeStrToMs', () => {
 
 test('convertTimeStrToMs(exception)', () => {
   expect(() => convertTimeStrToMs('', 'VARIABLE_ENV')).toThrowError(
-    `Value "" is not valid for VARIABLE_ENV. Must be number (in seconds) or string in time format (1s, 1m, 1h).`
+    `Value "" is not valid for VARIABLE_ENV. Must be a number in seconds or duration string (1s, 1m, 1h).`
   );
 });
 
@@ -68,17 +68,21 @@ describe('getEnv', () => {
   });
 
   test('dbPollTimeout', () => {
-    expect(getEnv('dbPollTimeout')).toBe(15 * 60);
-
     process.env.CUBEJS_DB_POLL_TIMEOUT = '1m';
-    expect(getEnv('dbPollTimeout')).toBe(60);
+    expect(
+      getEnv('dbPollTimeout', { dataSource: 'default' })
+    ).toBe(60);
   });
 
   test('dbPollMaxInterval', () => {
-    expect(getEnv('dbPollMaxInterval')).toBe(5);
+    expect(
+      getEnv('dbPollMaxInterval', { dataSource: 'default' })
+    ).toBe(5);
 
     process.env.CUBEJS_DB_POLL_MAX_INTERVAL = '10s';
-    expect(getEnv('dbPollMaxInterval')).toBe(10);
+    expect(
+      getEnv('dbPollMaxInterval', { dataSource: 'default' })
+    ).toBe(10);
   });
 
   test('livePreview', () => {

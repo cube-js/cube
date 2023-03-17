@@ -277,7 +277,7 @@ export class FilterMember {
     this.query.setPartialQuery({
       filters: this.filters.map((filter) => {
         const field = filter.member ? 'member' : 'dimension';
-        return filter.member || filter.dimension === name
+        return filter.member === name || filter.dimension === name
           ? {
               ...filter,
               [field]: replaceWithName,

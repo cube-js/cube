@@ -1,14 +1,14 @@
 ---
-title: Getting Started with Cube.js using Node.js
+title: Getting Started with Cube using Node.js
 permalink: /getting-started/nodejs
 ---
 
-This guide walks you through getting started with Cube.js and requires
+This guide walks you through getting started with Cube and requires
 [Node.js][link-nodejs] to be installed.
 
 ## 1. Scaffold the project
 
-Run the following command to get started with Cube.js, specifying the project
+Run the following command to get started with Cube, specifying the project
 name and optionally your database using the `-d` flag.
 
 ```bash
@@ -23,9 +23,9 @@ $ npx cubejs-cli create hello-world -d postgres
 ```
 
 Once run, the `create` command will create a new project directory that contains
-the scaffolding for your new Cube.js project. This includes all the files
-necessary to spin up the Cube.js backend and some example schema files to
-highlight the format of the Cube.js Data Schema layer.
+the scaffolding for your new Cube project. This includes all the files
+necessary to spin up the Cube backend and some example schema files to
+highlight the format of the Cube Data Schema layer.
 
 The `.env` file in this project directory contains placeholders for the relevant
 database credentials. Setting credentials is covered in the [Connecting to the
@@ -33,11 +33,11 @@ Database][ref-connecting-to-the-database] section.
 
 ## 2. Define Your Data Schema
 
-Cube.js uses [Data Schema][ref-cubejs-schema] to generate and execute SQL.
+Cube uses [Data Schema][ref-cubejs-schema] to generate and execute SQL.
 
 It acts as an ORM for your database and it is flexible enough to model
 everything from simple counts to cohort retention and funnel analysis. [Read
-more about Cube.js Schema][ref-cubejs-schema].
+more about Cube Schema][ref-cubejs-schema].
 
 You can generate schema files using [Developer Playground][ref-dev-playground].
 To do so, you can start the dev server from project directory like this:
@@ -58,7 +58,9 @@ You can also add schema files to the `schema` folder manually:
 
 cube(`Users`, {
   measures: {
-    type: `count`,
+    count: {
+      type: `count`,
+    },
   },
 
   dimensions: {
@@ -82,10 +84,10 @@ cube(`Users`, {
 
 ## 3. Visualize Results
 
-The Cube.js client provides set of methods to access Cube.js API and to work
+The Cube client provides set of methods to access Cube API and to work
 with query result. The client itself doesn't provide any visualizations and is
 designed to work with existing chart libraries. You can find more information
-about [the Cube.js client as well as our frontend integrations here][ref-frontend-intro].
+about [the Cube client as well as our frontend integrations here][ref-frontend-intro].
 
 As a shortcut you can run your dev server first:
 
@@ -98,10 +100,10 @@ This will open a Developer Playground app. You can change the metrics and
 dimensions of the example to use the schema you defined earlier, change the
 chart types, generate sample code and more!
 
-Cube.js also provides a [REST API](/rest-api) for accessing your data
+Cube also provides a [REST API](/rest-api) for accessing your data
 programmatically.
 
-### <--{"id" : "3. Visualize Results"}-->  Cube.js Client Installation
+### <--{"id" : "3. Visualize Results"}-->  Cube Client Installation
 
 Vanilla JS:
 
@@ -134,11 +136,11 @@ $ npm i --save @cubejs-client/ngx
 
 #### Vanilla Javascript
 
-Instantiate the Cube.js API and then use it to fetch data. `CubejsApi.load()`
+Instantiate the Cube API and then use it to fetch data. `CubejsApi.load()`
 accepts a query, which is a plain Javascript object.
 [Learn more about the query format here](query-format).
 
-```js
+```javascript
 import cubejs from '@cubejs-client/core';
 import Chart from 'chart.js';
 import chartjsConfig from './toChartjsData';
@@ -207,7 +209,7 @@ export default () => {
 Import `cubejs` and `QueryRenderer` components, and use them to fetch the data.
 In the example below, we use `vue-chartkick` to visualize data.
 
-```vue
+```javascript
 <template>
   <div class="hello">
     <query-renderer :cubejs-api="cubejsApi" :query="query">
@@ -323,13 +325,7 @@ export class AppComponent {
 
 ## 4. Deploy to Production
 
-Cube.js has first-class deployment support for [Docker][link-docker] and the
-[Serverless Framework][link-serverless-framework].
-
-### <--{"id" : "4. Deploy to Production"}-->  Docker
-
-For more information on deploying our official Docker image, please consult the
-[Deployment Guide][ref-docker-deployment-guide].
+Cube has first-class deployment support for [Docker][link-docker]:
 
 ```bash
 $ docker run --rm \
@@ -344,17 +340,13 @@ $ docker run --rm \
   <YOUR-USERNAME>/cubejs-docker-demo
 ```
 
-### <--{"id" : "4. Deploy to Production"}-->  Serverless
-
-For more information on deploying with the Serverless Framework, consult the
-[Deployment Guide][ref-sls-aws-deployment-guide].
+For more information on deploying our official Docker image, please consult the
+[Deployment Guide][ref-docker-deployment-guide].
 
 [link-docker]: https://www.docker.com/
 [link-nodejs]: https://nodejs.org/en/
-[link-serverless-framework]: https://www.serverless.com/
 [ref-dev-playground]: /dev-tools/dev-playground
 [ref-frontend-intro]: /frontend-introduction
 [ref-docker-deployment-guide]: /deployment/platforms/docker
-[ref-sls-aws-deployment-guide]: /deployment/serverless/aws
 [ref-connecting-to-the-database]: /connecting-to-the-database
 [ref-cubejs-schema]: /schema/getting-started

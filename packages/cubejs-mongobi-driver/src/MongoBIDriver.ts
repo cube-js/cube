@@ -1,45 +1,96 @@
+/**
+ * @copyright Cube Dev, Inc.
+ * @license Apache-2.0
+ * @fileoverview The `MongoBIDriver` and related types declaration.
+ */
+
+import {
+  getEnv,
+  assertDataSource,
+} from '@cubejs-backend/shared';
 import { createConnection, Connection, ConnectionOptions, RowDataPacket, Field } from 'mysql2';
 import genericPool, { Pool } from 'generic-pool';
-import {
-  BaseDriver, DownloadQueryResultsOptions,
-  DownloadQueryResultsResult,
-  DriverInterface, StreamOptions,
-} from '@cubejs-backend/query-orchestrator';
 import { Readable } from 'stream';
-import moment from 'moment';
-
+import {
+  BaseDriver,
+  DownloadQueryResultsOptions,
+  DownloadQueryResultsResult,
+  DriverInterface,
+  StreamOptions,
+} from '@cubejs-backend/base-driver';
 import { getNativeTypeName } from './MySQLType';
 
 export interface MongoBIDriverConfiguration extends ConnectionOptions {
   storeTimezone?: string;
 }
 
+/**
+ * MongoBI driver class.
+ */
 export class MongoBIDriver extends BaseDriver implements DriverInterface {
+  /**
+   * Returns default concurrency value.
+   */
+  public static getDefaultConcurrency(): number {
+    return 2;
+  }
+
   protected readonly config: MongoBIDriverConfiguration;
 
   protected readonly pool: Pool<Connection>;
 
-  public constructor(config: MongoBIDriverConfiguration = {}) {
-    super();
+  /**
+   * Class constructor.
+   */
+  public constructor(
+    config: MongoBIDriverConfiguration & {
+      /**
+       * Data source name.
+       */
+      dataSource?: string,
+
+      /**
+       * Max pool size value for the [cube]<-->[db] pool.
+       */
+      maxPoolSize?: number,
+
+      /**
+       * Time to wait for a response from a connection after validation
+       * request before determining it as not valid. Default - 10000 ms.
+       */
+      testConnectionTimeout?: number,
+    } = {}
+  ) {
+    super({
+      testConnectionTimeout: config.testConnectionTimeout,
+    });
+
+    const dataSource =
+      config.dataSource ||
+      assertDataSource('default');
 
     this.config = {
-      host: process.env.CUBEJS_DB_HOST,
-      database: process.env.CUBEJS_DB_NAME,
-      port: <any>process.env.CUBEJS_DB_PORT,
-      user: process.env.CUBEJS_DB_USER,
-      password: process.env.CUBEJS_DB_PASS,
-      ssl: this.getSslOptions(),
+      host: getEnv('dbHost', { dataSource }),
+      database: getEnv('dbName', { dataSource }),
+      port: getEnv('dbPort', { dataSource }),
+      user: getEnv('dbUser', { dataSource }),
+      password: getEnv('dbPass', { dataSource }),
+      ssl: this.getSslOptions(dataSource),
       authPlugins: {
         mysql_clear_password: () => async () => {
-          const password = config.password || process.env.CUBEJS_DB_PASS || '';
+          const password =
+            config.password ||
+            getEnv('dbPass', { dataSource }) ||
+            '';
           return Buffer.from((password).concat('\0')).toString();
         }
       },
       typeCast: (field: Field, next) => {
         if (field.type === 'DATETIME') {
           // Example value 1998-08-02 00:00:00
-          return moment.utc(field.string())
-            .format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
+          // Here we just omit Date parsing and avoiding Date.toString()
+          // done by driver. MongoBI original format is just fine.
+          return field.string();
         }
 
         return next();
@@ -75,7 +126,10 @@ export class MongoBIDriver extends BaseDriver implements DriverInterface {
       }
     }, {
       min: 0,
-      max: 8,
+      max:
+        config.maxPoolSize ||
+        getEnv('dbMaxPoolSize', { dataSource }) ||
+        8,
       evictionRunIntervalMillis: 10000,
       softIdleTimeoutMillis: 30000,
       idleTimeoutMillis: 30000,
@@ -221,7 +275,11 @@ export class MongoBIDriver extends BaseDriver implements DriverInterface {
   }
 
   public informationSchemaQuery() {
-    return `${super.informationSchemaQuery()} AND columns.table_schema = '${this.config.database}'`;
+    if (this.config.database) {
+      return `${super.informationSchemaQuery()} AND columns.table_schema = '${this.config.database}'`;
+    } else {
+      return super.informationSchemaQuery();
+    }
   }
 
   public quoteIdentifier(identifier: string) {

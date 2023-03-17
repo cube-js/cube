@@ -23,9 +23,9 @@ query-to-query basis.
 | Application (Postgres/MySQL)   | ✅           | ❌                |
 | Analytical (BigQuery/Redshift) | ❌           | ✅                |
 
-Cube.js provides a solution to this problem: pre-aggregations. In layman's
-terms, a pre-aggregation is a condensed version of the source data. It specifies
-attributes from the source, which Cube.js uses to condense (or crunch) the data.
+Cube provides a solution to this problem: pre-aggregations. In layman's terms, a
+pre-aggregation is a condensed version of the source data. It specifies
+attributes from the source, which Cube uses to condense (or crunch) the data.
 This simple yet powerful optimization can reduce the size of the dataset by
 several orders of magnitude, and ensures subsequent queries can be served by the
 same condensed dataset if any matching attributes are found.
@@ -34,7 +34,7 @@ same condensed dataset if any matching attributes are found.
 schema][ref-schema-preaggs], and cubes can have as many pre-aggregations as they
 require. The pre-aggregated data [can be stored either alongside the source data
 in the same database, in an external database][ref-caching-preaggs-storage] that
-is supported by Cube.js, [or in Cube Store, a dedicated pre-aggregation storage
+is supported by Cube, [or in Cube Store, a dedicated pre-aggregation storage
 layer][ref-caching-preaggs-cubestore].
 
 ## Pre-Aggregations without Time Dimension
@@ -84,8 +84,8 @@ Some sample data from this table might look like:
 | 5      | completed  | 2021-03-10T18:25:32.109 |
 
 Our first requirement is to populate a dropdown in our front-end application
-which shows all possible statuses. The Cube.js query to retrieve this
-information might look something like:
+which shows all possible statuses. The Cube query to retrieve this information
+might look something like:
 
 ```json
 {
@@ -134,10 +134,10 @@ cube(`Orders`, {
 ```
 
 Note that we have added a `granularity` property with a value of `month` to this
-definition. This allows Cube.js to aggregate the dataset to a single entry for
-each month.
+definition. This allows Cube to aggregate the dataset to a single entry for each
+month.
 
-The next time the API receives the same JSON query, Cube.js will build (if it
+The next time the API receives the same JSON query, Cube will build (if it
 doesn't already exist) the pre-aggregated dataset, store it in the source
 database server and use that dataset for any subsequent queries. A sample of the
 data in this pre-aggregated dataset might look like:
@@ -150,15 +150,15 @@ data in this pre-aggregated dataset might look like:
 ## Keeping pre-aggregations up-to-date
 
 Pre-aggregations can become out-of-date or out-of-sync if the original dataset
-changes. [Cube.js uses a refresh key to check the freshness of the
+changes. [Cube uses a refresh key to check the freshness of the
 data][ref-caching-preaggs-refresh]; if a change in the refresh key is detected,
 the pre-aggregations are rebuilt. These refreshes are performed in the
 background as a scheduled process, unless configured otherwise.
 
 ## Ensuring pre-aggregations are targeted by queries
 
-Cube.js selects the best available pre-aggregation based on the incoming queries
-it receives via the API. The process for selection is summarized below:
+Cube selects the best available pre-aggregation based on the incoming queries it
+receives via the API. The process for selection is summarized below:
 
 1. Are all measures of type `count`, `sum`, `min`, `max` or
    `countDistinctApprox`?
@@ -179,10 +179,10 @@ it receives via the API. The process for selection is summarized below:
 
 You can find a complete flowchart [here][self-select-pre-agg].
 
-### <--{"id" : "Ensuring pre-aggregations are targeted by queries"}-->  Additivity
+### <--{"id" : "Ensuring pre-aggregations are targeted by queries"}--> Additivity
 
 So far, we've described pre-aggregations as aggregated versions of your existing
-data. However, there are some rules that apply when Cube.js uses the
+data. However, there are some rules that apply when Cube uses the
 pre-aggregation. The **additivity** of fields specified in both the query and in
 the pre-aggregation determines this.
 
@@ -196,7 +196,7 @@ cube(`LineItems`, {
 
   joins: {
     Orders: {
-      sql: `${CUBE}.order_id = ${Orders}.id`,
+      sql: `${CUBE}.order_id = ${Orders.id}`,
       relationship: `belongsTo`,
     },
   },
@@ -275,7 +275,7 @@ additive** query. Additive leaf measures can only be of the following
 
 [ref-schema-types-measure]: /types-and-formats#measures-types
 
-### <--{"id" : "Ensuring pre-aggregations are targeted by queries"}-->  Non-Additivity
+### <--{"id" : "Ensuring pre-aggregations are targeted by queries"}--> Non-Additivity
 
 Using the same sample data for `line_items`, there's a `profit_margin` field
 which is different for each row. However, despite the value being numerical, it
@@ -419,7 +419,7 @@ cube(`LineItems`, {
 });
 ```
 
-### <--{"id" : "Ensuring pre-aggregations are targeted by queries"}-->  Selecting the pre-aggregation
+### <--{"id" : "Ensuring pre-aggregations are targeted by queries"}--> Selecting the pre-aggregation
 
 To recap what we've learnt so far:
 
@@ -436,16 +436,16 @@ To recap what we've learnt so far:
 - A query is **leaf measure additive** if all of its leaf measures are one of:
   `count`, `sum`, `min`, `max` or `countDistinctApprox`
 
-Cube.js attempts to find the best available pre-aggregation for the queries it
-receives via the API. The process for selection is outlined in the diagram
-below:
+Cube looks for matching pre-aggregations in the order they are defined in a
+cube's schema file. Each defined pre-aggregation is then tested for a match
+based on the criteria in the flowchart below:
 
 <div
   style="text-align: center"
 >
   <img
   alt="Pre-Aggregation Selection Flowchart"
-  src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Caching/pre-agg-selection-flow.png"
+  src="https://ucarecdn.com/f986b0cb-a9ea-47b7-a743-ca9a4644c246/"
   style="border: none"
   width="100%"
   />
@@ -476,9 +476,9 @@ Some extra considerations for pre-aggregation selection:
   find a matching `rollup`.
 
 - `rollup` pre-aggregations **always** have priority over `originalSql`. Thus,
-  if you have both `originalSql` and `rollup` defined, Cube.js will try to match
+  if you have both `originalSql` and `rollup` defined, Cube will try to match
   `rollup` pre-aggregations before trying to match `originalSql`. You can
-  instruct Cube.js to use the original SQL pre-aggregations by using
+  instruct Cube to use the original SQL pre-aggregations by using
   [`useOriginalSqlPreAggregations`][ref-schema-preaggs-origsql].
 
 [ref-caching-preaggs-cubestore]:
@@ -492,6 +492,5 @@ Some extra considerations for pre-aggregation selection:
 [ref-schema-preaggs]: /schema/reference/pre-aggregations
 [ref-schema-preaggs-origsql]:
   /schema/reference/pre-aggregations#type-originalsql
-[self-select-pre-agg]:
-  #selecting-the-pre-aggregation
+[self-select-pre-agg]: #selecting-the-pre-aggregation
 [wiki-gcd]: https://en.wikipedia.org/wiki/Greatest_common_divisor

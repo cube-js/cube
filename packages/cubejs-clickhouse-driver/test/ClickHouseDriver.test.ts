@@ -51,7 +51,7 @@ describe('ClickHouseDriver', () => {
               uint32 UInt32,
               uint64 UInt64,
               float32 Float32,
-              float64 Float64,
+              float64 Nullable(Float64),
               decimal32 Decimal32(2),
               decimal64 Decimal64(2),
               decimal128 Decimal128(2)

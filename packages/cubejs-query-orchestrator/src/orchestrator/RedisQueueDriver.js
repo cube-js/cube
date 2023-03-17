@@ -1,6 +1,11 @@
 import R from 'ramda';
+import { QueueDriverInterface, QueueDriverConnectionInterface } from '@cubejs-backend/base-driver';
+
 import { BaseQueueDriver } from './BaseQueueDriver';
 
+/**
+ * @implements {QueueDriverConnectionInterface}
+ */
 export class RedisQueueDriverConnection {
   constructor(driver, options) {
     this.driver = driver;
@@ -13,9 +18,14 @@ export class RedisQueueDriverConnection {
   }
 
   async getResultBlocking(queryKey) {
-    const resultListKey = this.resultListKey(queryKey);
-    if (!(await this.redisClient.hgetAsync([this.queriesDefKey(), this.redisHash(queryKey)]))) {
-      return this.getResult(queryKey);
+    return this.getResultBlockingByHash(this.redisHash(queryKey));
+  }
+
+  async getResultBlockingByHash(queryKeyHash) {
+    // Double redisHash apply is being used here
+    const resultListKey = this.resultListKey(queryKeyHash);
+    if (!(await this.redisClient.hgetAsync([this.queriesDefKey(), queryKeyHash]))) {
+      return this.getResult(queryKeyHash);
     }
     const result = await this.redisClient.brpopAsync([resultListKey, this.continueWaitTimeout]);
     if (result) {
@@ -31,6 +41,36 @@ export class RedisQueueDriverConnection {
     return result && JSON.parse(result);
   }
 
+  async getQueriesToCancel() {
+    return (
+      await this.getStalledQueries()
+    ).concat(
+      await this.getOrphanedQueries()
+    );
+  }
+
+  async getActiveAndToProcess() {
+    const active = await this.getActiveQueries();
+    const toProcess = await this.getToProcessQueries();
+
+    return [active, toProcess];
+  }
+
+  /**
+   * Adds specified by the queryKey query to the queue, returns tuple
+   * with the operation result.
+   *
+   * @typedef {[added: number, _b: *, _c: *, toProcessLength: number, addedTime: number]} AddedTuple
+   *
+   * @param {number} keyScore
+   * @param {*} queryKey
+   * @param {number} orphanedTime
+   * @param {string} queryHandler (for the regular query is eq to 'query')
+   * @param {*} query
+   * @param {number} priority
+   * @param {*} options
+   * @returns {AddedTuple}
+   */
   addToQueue(keyScore, queryKey, orphanedTime, queryHandler, query, priority, options) {
     const data = {
       queryHandler,
@@ -63,7 +103,7 @@ export class RedisQueueDriverConnection {
         })
       );
     }
-    return tx.execAsync();
+    return tx.execAsync().then(result => [...result, data.addedToQueueTime]);
   }
 
   getToProcessQueries() {
@@ -120,7 +160,7 @@ export class RedisQueueDriverConnection {
         .zrem([this.recentRedisKey(), this.redisHash(queryKey)])
         .hdel([this.queriesDefKey(), this.redisHash(queryKey)])
         .del(this.queryProcessingLockKey(queryKey));
-      
+
       if (this.getQueueEventsBus) {
         tx.publish(
           this.getQueueEventsBus().eventsChannel,
@@ -162,10 +202,15 @@ export class RedisQueueDriverConnection {
   }
 
   async getQueryDef(queryKey) {
-    const query = await this.redisClient.hgetAsync([this.queriesDefKey(), this.redisHash(queryKey)]);
+    const query = await this.redisClient.hgetAsync([this.queriesDefKey(), queryKey]);
     return JSON.parse(query);
   }
 
+  /**
+   * Updates heart beat for the processing query by its `queryKey`.
+   *
+   * @param {string} queryKey
+   */
   updateHeartBeat(queryKey) {
     return this.redisClient.zaddAsync([this.heartBeatRedisKey(), new Date().getTime(), this.redisHash(queryKey)]);
   }
@@ -317,9 +362,12 @@ export class RedisQueueDriverConnection {
   }
 }
 
+/**
+ * @implements {QueueDriverInterface}
+ */
 export class RedisQueueDriver extends BaseQueueDriver {
   constructor(options) {
-    super();
+    super(options.processUid);
     this.redisPool = options.redisPool;
     this.options = options;
   }

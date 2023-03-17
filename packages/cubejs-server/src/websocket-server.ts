@@ -21,9 +21,7 @@ export class WebSocketServer {
   public constructor(
     protected readonly serverCore: CubejsServerCore,
     protected readonly options: WebSocketServerOptions = {},
-  ) {
-    this.serverCore = serverCore;
-  }
+  ) { }
 
   public initServer(server: http.Server | https.Server) {
     this.wsServer = new WebSocket.Server({

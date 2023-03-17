@@ -1,0 +1,16 @@
+
+version: '2.2'
+
+services:
+  cube:
+    image: cubejs/cube:v0.31.4
+    ports:
+      # It's better to use random port binding for 4000/3000 ports
+      # without it you will not able to start multiple projects inside docker
+      - 4000:4000  # Cube.js API and Developer Playground
+      - 3000:3000  # Dashboard app, if created
+    env_file: .env
+    volumes:
+      - .:/cube/conf
+      # We ignore Cube.js deps, because they are built-in inside the official Docker image
+      - .empty:/cube/conf/node_modules/@cubejs-backend/

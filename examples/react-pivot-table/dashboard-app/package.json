@@ -6,11 +6,13 @@
     "@ant-design/compatible": "^1.0.8",
     "@ant-design/icons": "^4.6.2",
     "@apollo/react-hooks": "^4.0.0",
+    "@cube-dev/example-wrapper": "^1.1.10",
     "@cubejs-client/core": "^0.26.61",
     "@cubejs-client/react": "^0.26.61",
     "@testing-library/jest-dom": "^5.11.9",
     "@testing-library/react": "^11.2.5",
     "@testing-library/user-event": "^12.8.3",
+    "ag-grid-community": "^25.1.0",
     "ag-grid-enterprise": "^25.1.0",
     "ag-grid-react": "^25.1.0",
     "antd": "^4.14.0",
@@ -36,7 +38,9 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "deploy": "cross-env NODE_ENV=production npm run build && netlify deploy --prod --dir build",
+    "preview": "cross-env NODE_ENV=production npm run build && netlify deploy --dir build"
   },
   "eslintConfig": {
     "extends": [
@@ -62,5 +66,8 @@
     "bizcharts-charts": "0.0.1",
     "antd-tables": "0.0.1",
     "react-credentials": "0.0.1"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3"
   }
 }

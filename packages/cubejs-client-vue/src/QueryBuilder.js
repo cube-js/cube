@@ -7,7 +7,7 @@ import {
   getOrderMembersFromOrder,
   moveItemInArray,
   movePivotItem,
-  areQueriesEqual
+  areQueriesEqual,
 } from '@cubejs-client/core';
 import { clone, equals } from 'ramda';
 
@@ -23,35 +23,49 @@ const toOrderMember = (member) => ({
 const reduceOrderMembers = (array) =>
   array.reduce((acc, { id, order }) => (order !== 'none' ? [...acc, [id, order]] : acc), []);
 
-const validateFilter = (f) => f.operator
+const operators = ['and', 'or'];
 
-const operators = [ 'and', 'or' ]
-
-const validateFilters = (filters) => filters.reduce((acc, raw) => {
-  const validated = { ...raw }
-
-  operators.reduce((acc, operator) => {
-    const filters = raw[operator]
-    if (filters) {
-      acc[operator] = filters.filter(validateFilter)
+const validateFilters = (filters) =>
+  filters.reduce((acc, raw) => {
+    if (raw.operator) {
+      return [...acc, raw];
     }
-    return acc
-  }, validated)
 
-  if (validated.operator || operators.some((operator) => validated[operator] && validated[operator].length)) {
-    acc.push(validated)
-  }
+    const validBooleanFilter = operators.reduce((acc, operator) => {
+      const filters = raw[operator];
 
-  return acc
-}, [])
+      const booleanFilters = validateFilters(filters || []);
+
+      if (booleanFilters.length) {
+        return { ...acc, [operator]: booleanFilters };
+      }
+
+      return acc;
+    }, {});
+
+    if (operators.some((operator) => validBooleanFilter[operator])) {
+      return [...acc, validBooleanFilter];
+    }
+
+    return acc;
+  }, []);
 
 const getDimensionOrMeasure = (meta, m) => {
-  const memberName = m.member || m.dimension
-  return memberName && meta.resolveMember(memberName, [ 'dimensions', 'measures' ])
-}
+  const memberName = m.member || m.dimension;
+  return memberName && meta.resolveMember(memberName, ['dimensions', 'measures']);
+};
 
 const resolveMembers = (meta, arr) =>
-  arr && arr.map((e, index) => ({ ...e, member: getDimensionOrMeasure(meta, e), index }))
+  arr &&
+  arr.map((e, index) => {
+    return {
+      ...e,
+      member: getDimensionOrMeasure(meta, e),
+      index,
+      and: resolveMembers(meta, e.and),
+      or: resolveMembers(meta, e.or),
+    };
+  });
 
 export default {
   components: {
@@ -79,6 +93,10 @@ export default {
     initialVizState: {
       type: Object,
       default: () => ({}),
+    },
+    wrapWithQueryRenderer: {
+      type: Boolean,
+      default: true,
     },
   },
   data() {
@@ -203,7 +221,7 @@ export default {
             this.pivotConfig = {
               ...this.pivotConfig,
               ...pivotConfig,
-            }
+            };
           },
         },
       };
@@ -229,6 +247,10 @@ export default {
       });
     }
 
+    if (!this.wrapWithQueryRenderer && this.$scopedSlots.builder) {
+      return createElement('div', {}, [this.$scopedSlots.builder(builderProps)]);
+    }
+
     // Pass parent slots to child QueryRenderer component
     const children = Object.keys(this.$slots).map((slot) =>
       createElement('template', { slot }, this.$slots[slot])
@@ -246,8 +268,8 @@ export default {
         on: {
           queryStatus: (event) => {
             this.$emit('queryStatus', event);
-          }
-        }
+          },
+        },
       },
       children
     );
@@ -320,7 +342,7 @@ export default {
       });
 
       if (validatedQuery.filters) {
-        validatedQuery.filters = validateFilters(validatedQuery.filters)
+        validatedQuery.filters = validateFilters(validatedQuery.filters);
       }
 
       // only set limit and offset if there are elements otherwise an invalid request with just limit/offset
@@ -353,7 +375,7 @@ export default {
         const { query, chartType, shouldApplyHeuristicOrder, pivotConfig } = heuristicsFn(
           {
             query: validatedQuery,
-            chartType: this.chartType
+            chartType: this.chartType,
           },
           this.prevValidatedQuery,
           {
@@ -396,11 +418,11 @@ export default {
         const dryRunResponse = await this.cubejsApi.dryRun(this.initialQuery);
 
         this.pivotConfig = ResultSet.getNormalizedPivotConfig(
-            dryRunResponse?.pivotQuery || {},
-            this.pivotConfig
+          dryRunResponse?.pivotQuery || {},
+          this.pivotConfig
         );
       } catch (error) {
-          console.error(error)
+        console.error(error);
       }
     }
   },
@@ -439,15 +461,17 @@ export default {
         },
         index,
       }));
-      const memberTypes = ['dimensions', 'measures']
+      const memberTypes = ['dimensions', 'measures'];
       this.filters = filters.map((m, index) => {
-        const memberName = m.member || m.dimension
+        const memberName = m.member || m.dimension;
         return {
           ...m,
           member: memberName && this.meta.resolveMember(memberName, memberTypes),
           operators: memberName && this.meta.filterOperatorsForMember(memberName, memberTypes),
+          and: resolveMembers(this.meta, m.and),
+          or: resolveMembers(this.meta, m.or),
           index,
-        }
+        };
       });
 
       this.availableMeasures = this.meta.membersForQuery({}, 'measures') || [];
@@ -487,7 +511,7 @@ export default {
           and: resolveMembers(this.meta, member.and),
           or: resolveMembers(this.meta, member.or),
           member: getDimensionOrMeasure(this.meta, member),
-        }
+        };
       } else {
         mem = this[`available${name}`].find((m) => m.name === member);
       }
@@ -497,21 +521,15 @@ export default {
       }
     },
     removeMember(element, member) {
-      const name = element.charAt(0).toUpperCase() + element.slice(1);
-      let mem;
-
+      let index;
       if (element === 'timeDimensions') {
-        mem = this[`available${name}`].find((x) => x.name === member);
+        index = this[element].findIndex((x) => x.name === member);
       } else if (element === 'filters') {
-        mem = member;
+        index = this[element].findIndex((x) => x.member.name === member);
       } else {
-        mem = this[`available${name}`].find((m) => m.name === member);
+        index = this[element].findIndex((x) => x.name === member);
       }
-
-      if (mem) {
-        const index = this[element].findIndex((x) => x.name === mem);
-        this[element].splice(index, 1);
-      }
+      this[element].splice(index, 1);
     },
     updateMember(element, old, member) {
       const name = element.charAt(0).toUpperCase() + element.slice(1);
@@ -542,7 +560,7 @@ export default {
           and: resolveMembers(this.meta, member.and),
           or: resolveMembers(this.meta, member.or),
           member: getDimensionOrMeasure(this.meta, member),
-        }
+        };
       } else {
         index = this[element].findIndex((x) => x.name === old);
         mem = this[`available${name}`].find((m) => m.name === member);
@@ -580,7 +598,7 @@ export default {
             and: resolveMembers(this.meta, m.and),
             or: resolveMembers(this.meta, m.or),
             member: getDimensionOrMeasure(this.meta, m),
-          }
+          };
         } else {
           mem = this[`available${name}`].find((x) => x.name === m);
         }

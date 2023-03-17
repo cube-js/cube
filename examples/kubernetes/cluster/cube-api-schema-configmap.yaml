@@ -283,6 +283,25 @@ data:
           timeDimension: CUBE.createdAt,
           granularity: `day`,
           partitionGranularity: `month`,
+          refreshKey: {
+            every: `1 minute`,
+            incremental: true,
+            updateWindow: `3 day`,
+          },
+          buildRangeEnd: {
+            sql: `SELECT NOW()`,
+          }
+        },
+
+        second: {
+          measures: [CUBE.count],
+          dimensions: [CUBE.status],
+          timeDimension: CUBE.completedAt,
+          granularity: `day`,
+          partitionGranularity: `month`,
+          refreshKey: {
+            every: `1 minute`,
+          },
         },
       },
       joins: {

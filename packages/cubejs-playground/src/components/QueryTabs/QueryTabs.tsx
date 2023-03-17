@@ -1,12 +1,18 @@
-import { ChartType, Query } from '@cubejs-client/core';
-import { Tabs } from 'antd';
+import {
+  ChartType,
+  PivotConfig,
+  Query,
+  validateQuery,
+} from '@cubejs-client/core';
+import { Input, Tabs } from 'antd';
 import equals from 'fast-deep-equal';
-import { ReactNode, useEffect, useState } from 'react';
+import React, { ReactNode, useEffect, useState } from 'react';
 import styled from 'styled-components';
 
 import { event } from '../../events';
 import { useLocalStorage } from '../../hooks';
 import { QueryLoadResult } from '../ChartRenderer/ChartRenderer';
+import { DrilldownModal } from '../DrilldownModal/DrilldownModal';
 import { useChartRendererStateMethods } from './ChartRendererStateProvider';
 
 const { TabPane } = Tabs;
@@ -27,11 +33,17 @@ type QueryTab = {
   id: string;
   query: Query;
   chartType?: ChartType;
+  name?: string;
 };
 
 type QueryTabs = {
   activeId: string;
   tabs: QueryTab[];
+};
+
+type DrillDownConfig = {
+  query?: Query | null;
+  pivotConfig?: PivotConfig | null;
 };
 
 export type QueryTabsProps = {
@@ -59,8 +71,11 @@ export function QueryTabs({
     setBuildInProgress,
     setSlowQuery,
     setSlowQueryFromCache,
+    setQueryRequestId,
   } = useChartRendererStateMethods();
 
+  const [editableTabId, setEditableTabId] = useState<string>();
+  const [editableTabValue, setEditableTabValue] = useState<string>('');
   const [ready, setReady] = useState<boolean>(false);
   const [queryTabs, saveTabs] = useLocalStorage<QueryTabs>('queryTabs', {
     activeId: '1',
@@ -71,6 +86,8 @@ export function QueryTabs({
       },
     ],
   });
+
+  const [drilldownConfig, setDrilldownConfig] = useState<DrillDownConfig>({});
 
   useEffect(() => {
     window['__cubejsPlayground'] = {
@@ -89,11 +106,16 @@ export function QueryTabs({
             if (resultSet) {
               const { loadResponse } = resultSet.serialize();
               const {
+                requestId,
                 external,
                 dbType,
                 extDbType,
                 usedPreAggregations = {},
               } = loadResponse.results[0] || {};
+
+              if (requestId) {
+                setQueryRequestId(queryId, requestId);
+              }
 
               setSlowQueryFromCache(queryId, Boolean(loadResponse.slowQuery));
               Boolean(loadResponse.slowQuery) && setSlowQuery(queryId, false);
@@ -153,6 +175,12 @@ export function QueryTabs({
             setSlowQuery(queryId, isQuerySlow);
             isQuerySlow && setSlowQueryFromCache(queryId, false);
           },
+          onQueryDrilldown: (query, pivotConfig) => {
+            setDrilldownConfig({
+              query,
+              pivotConfig,
+            });
+          },
         };
       },
     };
@@ -167,7 +195,10 @@ export function QueryTabs({
       (tab) => tab.id === queryTabs.activeId
     );
 
-    if (query && !equals(currentTab?.query, query)) {
+    if (
+      query &&
+      !equals(validateQuery(currentTab?.query), validateQuery(query))
+    ) {
       const id = getNextId();
 
       saveTabs({
@@ -215,9 +246,27 @@ export function QueryTabs({
       }),
     });
   }
+  
+  function setTabName(tabId: string, name: string) {
+    saveTabs({
+      ...queryTabs,
+      tabs: tabs.map((currentTab) => {
+        return tabId === currentTab.id
+          ? {
+              ...currentTab,
+              name
+            }
+          : currentTab;
+      }),
+    });
+  }
 
   function setActiveId(activeId: string) {
     saveTabs({ activeId, tabs });
+  }
+
+  function handleDrilldownModalClose() {
+    setDrilldownConfig({});
   }
 
   if (!ready || !queryTabs.activeId) {
@@ -268,10 +317,54 @@ export function QueryTabs({
         <TabPane
           key={tab.id}
           data-testid={`query-tab-${tab.id}`}
-          tab={`Query ${tab.id}`}
           closable={tabs.length > 1}
+          tab={
+            editableTabId === tab.id ? (
+              <Input
+                autoFocus
+                size="small"
+                value={editableTabValue}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    setEditableTabId(undefined);
+                    
+                    if (editableTabValue.trim()) {
+                      setTabName(tab.id, editableTabValue.trim());
+                      setEditableTabValue('');
+                    }
+                  }
+                  e.stopPropagation();
+                }}
+                onChange={(e) => setEditableTabValue(e.target.value)}
+                onBlur={() => {
+                  if (editableTabValue.trim()) {
+                    setTabName(tab.id, editableTabValue.trim());
+                    setEditableTabValue('');
+                  }
+                  setEditableTabId(undefined);
+                }}
+              />
+            ) : (
+              <span
+                style={{ userSelect: 'none' }}
+                onDoubleClick={() => {
+                  setEditableTabValue(tab.name || `Query ${tab.id}`);
+                  setEditableTabId(tab.id);
+                }}
+              >
+                {tab.name ? tab.name : `Query ${tab.id}`}
+              </span>
+            )
+          }
         >
           {children(tab, handleTabSave)}
+          {drilldownConfig.query ? (
+            <DrilldownModal
+              query={drilldownConfig.query}
+              pivotConfig={drilldownConfig.pivotConfig}
+              onClose={handleDrilldownModalClose}
+            />
+          ) : null}
         </TabPane>
       ))}
     </StyledTabs>

@@ -1,0 +1,15 @@
+.select {
+  color: rgb(20 20 70 / 75%);
+  height: 40px;
+  margin: 0 10px;
+  padding: 10px;
+  border-radius: 5px;
+  border: 1px solid rgb(20 20 70 / 75%);
+  min-width: 200px;
+  width: 300px;
+}
+
+.buttonwrp {
+  height: 40px;
+  margin: 0 10px;
+}

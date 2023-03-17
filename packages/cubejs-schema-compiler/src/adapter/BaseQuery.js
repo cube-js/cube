@@ -1,10 +1,23 @@
 /* eslint-disable no-unused-vars,prefer-template */
+
+/**
+ * @fileoverview BaseQuery class definition.
+ * @copyright Cube Dev, Inc.
+ * @license Apache-2.0
+ */
+
 import R from 'ramda';
 import cronParser from 'cron-parser';
 
 import moment from 'moment-timezone';
 import inflection from 'inflection';
-import { inDbTimeZone } from '@cubejs-backend/shared';
+import {
+  FROM_PARTITION_RANGE,
+  MAX_SOURCE_ROW_LIMIT,
+  inDbTimeZone,
+  QueryAlias,
+  getEnv,
+} from '@cubejs-backend/shared';
 
 import { UserError } from '../compiler/UserError';
 import { BaseMeasure } from './BaseMeasure';
@@ -20,13 +33,14 @@ import { SqlParser } from '../parser/SqlParser';
 const DEFAULT_PREAGGREGATIONS_SCHEMA = 'stb_pre_aggregations';
 
 const standardGranularitiesParents = {
-  year: 'month',
-  quarter: 'month',
-  month: 'day',
-  week: 'day',
-  day: 'hour',
-  hour: 'minute',
-  minute: 'second'
+  year: ['year', 'quarter', 'month', 'month', 'day', 'hour', 'minute', 'second'],
+  quarter: ['quarter', 'month', 'day', 'hour', 'minute', 'second'],
+  month: ['month', 'day', 'hour', 'minute', 'second'],
+  week: ['week', 'day', 'hour', 'minute', 'second'],
+  day: ['day', 'hour', 'minute', 'second'],
+  hour: ['hour', 'minute', 'second'],
+  minute: ['minute', 'second'],
+  second: ['second']
 };
 
 const SecondsDurations = {
@@ -37,7 +51,39 @@ const SecondsDurations = {
   second: 1
 };
 
-export class BaseQuery {
+/**
+ * Set of the schema compilers.
+ * @typedef {Object} Compilers
+ * @property {DataSchemaCompiler} compiler
+ * @property {CubeToMetaTransformer} metaTransformer
+ * @property {CubeEvaluator} cubeEvaluator
+ * @property {ContextEvaluator} contextEvaluator
+ * @property {JoinGraph} joinGraph
+ * @property {CompilerCache} compilerCache
+ * @property {*} headCommitId
+ */
+
+export
+
+/**
+ * BaseQuery class. BaseQuery object encapsulates the logic of
+ * transforming an incoming to a specific cube request to the
+ * SQL-query string.
+ *
+ * This class is a parent class for the set of dialect specific
+ * query adapters (for ex. MysqlQuery, OracleQuery, etc.).
+ *
+ * You should never instantiate this class manually. Instead, you
+ * should use {@code CompilerApi#getDialectClass} method, which
+ * should return query object based on the datasource, database type
+ * and {@code CompilerApi} configuration.
+ */
+class BaseQuery {
+  /**
+   * BaseQuery class constructor.
+   * @param {Compilers|*} compilers
+   * @param {*} options
+   */
   constructor(compilers, options) {
     this.compilers = compilers;
     this.cubeEvaluator = compilers.cubeEvaluator;
@@ -48,8 +94,6 @@ export class BaseQuery {
     this.defaultOrder = this.defaultOrder.bind(this);
 
     this.initFromOptions();
-
-    this.granularityParentHierarchyCache = {};
   }
 
   extractDimensionsAndMeasures(filters = []) {
@@ -182,7 +226,7 @@ export class BaseQuery {
 
     this.timeDimensions = (this.options.timeDimensions || []).map(dimension => {
       if (!dimension.dimension) {
-        const join = this.joinGraph.buildJoin(this.collectCubeNames(true));
+        const join = this.joinGraph.buildJoin(this.collectJoinHints(true));
         if (!join) {
           return undefined;
         }
@@ -197,7 +241,7 @@ export class BaseQuery {
     }).filter(R.identity).map(this.newTimeDimension.bind(this));
     this.allFilters = this.timeDimensions.concat(this.segments).concat(this.filters);
 
-    this.join = this.joinGraph.buildJoin(this.allCubeNames);
+    this.join = this.joinGraph.buildJoin(this.allJoinHints);
     this.cubeAliasPrefix = this.options.cubeAliasPrefix;
     this.preAggregationsSchemaOption =
       this.options.preAggregationsSchema != null ? this.options.preAggregationsSchema : DEFAULT_PREAGGREGATIONS_SCHEMA;
@@ -253,10 +297,17 @@ export class BaseQuery {
     return this.collectedCubeNames;
   }
 
+  get allJoinHints() {
+    if (!this.collectedJoinHints) {
+      this.collectedJoinHints = this.collectJoinHints();
+    }
+    return this.collectedJoinHints;
+  }
+
   get dataSource() {
     const dataSources = R.uniq(this.allCubeNames.map(c => this.cubeDataSource(c)));
     if (dataSources.length > 1 && !this.externalPreAggregationQuery()) {
-      throw new UserError(`To join across data sources use rollupJoin with external pre-aggregations. Found data sources: ${dataSources.join(', ')}`);
+      throw new UserError(`To join across data sources use rollupJoin with Cube Store. If rollupJoin is defined, this error indicates it doesn't match the query. Please use Rollup Designer to verify it's definition. Found data sources: ${dataSources.join(', ')}`);
     }
     return dataSources[0];
   }
@@ -281,14 +332,11 @@ export class BaseQuery {
     if (this.ungrouped) {
       if (!this.options.allowUngroupedWithoutPrimaryKey) {
         const cubes = R.uniq([this.join.root].concat(this.join.joins.map(j => j.originalTo)));
-        const primaryKeyNames = cubes.map(c => this.primaryKeyName(c));
+        const primaryKeyNames = cubes.flatMap(c => this.primaryKeyNames(c));
         const missingPrimaryKeys = primaryKeyNames.filter(key => !this.dimensions.find(d => d.dimension === key));
         if (missingPrimaryKeys.length) {
           throw new UserError(`Ungrouped query requires primary keys to be present in dimensions: ${missingPrimaryKeys.map(k => `'${k}'`).join(', ')}. Pass allowUngroupedWithoutPrimaryKey option to disable this check.`);
         }
-      }
-      if (this.measures.length) {
-        throw new UserError('Measures aren\'t allowed in ungrouped query');
       }
       if (this.measureFilters.length) {
         throw new UserError('Measure filters aren\'t allowed in ungrouped query');
@@ -392,24 +440,69 @@ export class BaseQuery {
     return new PreAggregations(this, this.options.historyQueries || [], this.options.cubeLatticeCache);
   }
 
+  /**
+   * Wrap specified column/table name with the double quote.
+   * @param {string} name
+   * @returns {string}
+   */
   escapeColumnName(name) {
     return `"${name}"`;
   }
 
+  /**
+   * Returns SQL query string.
+   * @returns {string}
+   */
   buildParamAnnotatedSql() {
+    let sql;
+    let preAggForQuery;
     if (!this.options.preAggregationQuery && !this.ungrouped) {
-      const preAggregationForQuery = this.preAggregations.findPreAggregationForQuery();
-      if (preAggregationForQuery) {
-        const { multipliedMeasures, regularMeasures, cumulativeMeasures } = this.fullKeyQueryAggregateMeasures();
-
-        if (!cumulativeMeasures.length) {
-          return this.preAggregations.rollupPreAggregation(preAggregationForQuery, this.measures, true);
-        }
-
-        return this.regularAndTimeSeriesRollupQuery(regularMeasures, multipliedMeasures, cumulativeMeasures, preAggregationForQuery);
-      }
+      preAggForQuery =
+        this.preAggregations.findPreAggregationForQuery();
     }
-    return this.fullKeyQueryAggregate();
+    if (preAggForQuery) {
+      const {
+        multipliedMeasures,
+        regularMeasures,
+        cumulativeMeasures,
+      } = this.fullKeyQueryAggregateMeasures();
+
+      if (cumulativeMeasures.length === 0) {
+        sql = this.preAggregations.rollupPreAggregation(
+          preAggForQuery,
+          this.measures,
+          true,
+        );
+      } else {
+        sql = this.regularAndTimeSeriesRollupQuery(
+          regularMeasures,
+          multipliedMeasures,
+          cumulativeMeasures,
+          preAggForQuery,
+        );
+      }
+    } else {
+      sql = this.fullKeyQueryAggregate();
+    }
+    return this.options.totalQuery
+      ? this.countAllQuery(sql)
+      : sql;
+  }
+
+  /**
+   * Generate SQL query to calculate total number of rows of the
+   * specified SQL query.
+   * @param {string} sql
+   * @returns {string}
+   */
+  countAllQuery(sql) {
+    return `select count(*) ${
+      this.escapeColumnName(QueryAlias.TOTAL_COUNT)
+    } from (\n${
+      sql
+    }\n) ${
+      this.escapeColumnName(QueryAlias.ORIGINAL_QUERY)
+    }`;
   }
 
   regularAndTimeSeriesRollupQuery(regularMeasures, multipliedMeasures, cumulativeMeasures, preAggregationForQuery) {
@@ -419,6 +512,7 @@ export class BaseQuery {
         this.withCubeAliasPrefix('main', () => this.preAggregations.rollupPreAggregation(preAggregationForQuery, regularAndMultiplied, false)),
       ] : []).concat(
         R.map(
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
           ([multiplied, measure]) => this.withCubeAliasPrefix(
             `${this.aliasName(measure.measure.replace('.', '_'))}_cumulative`,
             () => this.overTimeSeriesQuery(
@@ -448,6 +542,10 @@ export class BaseQuery {
     return false;
   }
 
+  /**
+   * Returns an array of SQL query strings for the query.
+   * @returns {Array<string>}
+   */
   buildSqlAndParams() {
     if (!this.options.preAggregationQuery && this.externalQueryClass) {
       if (this.externalPreAggregationQuery()) { // TODO performance
@@ -459,10 +557,56 @@ export class BaseQuery {
       this,
       () => this.cacheValue(
         ['buildSqlAndParams'],
-        () => this.paramAllocator.buildSqlAndParams(this.buildParamAnnotatedSql()),
+        () => this.paramAllocator.buildSqlAndParams(
+          this.buildParamAnnotatedSql()
+        ),
         { cache: this.queryCache }
       )
     );
+  }
+
+  /**
+   * Returns a dictionary mapping each preagregation to its corresponding query fragment.
+   * @returns {Record<string, Array<string>>}
+   */
+  buildLambdaQuery() {
+    const preAggForQuery = this.preAggregations.findPreAggregationForQuery();
+    const result = {};
+    if (preAggForQuery && preAggForQuery.preAggregation.unionWithSourceData) {
+      const lambdaPreAgg = preAggForQuery.referencedPreAggregations[preAggForQuery.referencedPreAggregations.length - 1];
+      // TODO(cristipp) Use source query instead of preaggregation references.
+      const references = this.cubeEvaluator.evaluatePreAggregationReferences(lambdaPreAgg.cube, lambdaPreAgg.preAggregation);
+      const lambdaQuery = this.newSubQuery(
+        {
+          measures: references.measures,
+          dimensions: references.dimensions,
+          timeDimensions: references.timeDimensions,
+          filters: [
+            ...this.options.filters ?? [],
+            references.timeDimensions.length > 0
+              ? {
+                member: references.timeDimensions[0].dimension,
+                operator: 'afterDate',
+                values: [FROM_PARTITION_RANGE]
+              }
+              : [],
+          ],
+          segments: this.options.segments,
+          order: [],
+          limit: undefined,
+          offset: undefined,
+          rowLimit: MAX_SOURCE_ROW_LIMIT,
+          preAggregationQuery: true,
+        }
+      );
+      const sqlAndParams = lambdaQuery.buildSqlAndParams();
+      const cacheKeyQueries = this.evaluateSymbolSqlWithContext(
+        () => this.cacheKeyQueries(),
+        { preAggregationQuery: true }
+      );
+      result[this.preAggregations.preAggregationId(lambdaPreAgg)] = { sqlAndParams, cacheKeyQueries };
+    }
+    return result;
   }
 
   externalQuery() {
@@ -477,6 +621,7 @@ export class BaseQuery {
     return this.timeDimensions.map(
       d => [
         d,
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         (dateFrom, dateTo, dateField, dimensionDateFrom, dimensionDateTo) => `${dateField} >= ${dimensionDateFrom} AND ${dateField} <= ${dateTo}`
       ]
     );
@@ -540,8 +685,16 @@ export class BaseQuery {
       this.groupByDimensionLimit();
   }
 
+  /**
+   * Returns SQL query string.
+   * @returns {string}
+   */
   fullKeyQueryAggregate() {
-    const { multipliedMeasures, regularMeasures, cumulativeMeasures } = this.fullKeyQueryAggregateMeasures();
+    const {
+      multipliedMeasures,
+      regularMeasures,
+      cumulativeMeasures,
+    } = this.fullKeyQueryAggregateMeasures();
 
     if (!multipliedMeasures.length && !cumulativeMeasures.length) {
       return this.simpleQuery();
@@ -551,82 +704,141 @@ export class BaseQuery {
 
     if (this.options.preAggregationQuery) {
       const allRegular = regularMeasures.concat(
-        cumulativeMeasures.map(([multiplied, measure]) => (multiplied ? null : measure)).filter(m => !!m)
+        cumulativeMeasures
+          .map(
+            ([multiplied, measure]) => (multiplied ? null : measure)
+          )
+          .filter(m => !!m)
       );
       const allMultiplied = multipliedMeasures.concat(
-        cumulativeMeasures.map(([multiplied, measure]) => (multiplied ? measure : null)).filter(m => !!m)
+        cumulativeMeasures
+          .map(
+            ([multiplied, measure]) => (multiplied ? measure : null)
+          )
+          .filter(m => !!m)
       );
-
       toJoin = (allRegular.length ? [
-        this.withCubeAliasPrefix('main', () => this.regularMeasuresSubQuery(allRegular))
+        this.withCubeAliasPrefix(
+          'main',
+          () => this.regularMeasuresSubQuery(allRegular),
+        )
       ] : [])
         .concat(
           R.pipe(
             R.groupBy(m => m.cube().name),
             R.toPairs,
             R.map(
-              ([keyCubeName, measures]) => this.withCubeAliasPrefix(`${keyCubeName}_key`, () => this.aggregateSubQuery(keyCubeName, measures))
+              ([keyCubeName, measures]) => this.withCubeAliasPrefix(
+                `${keyCubeName}_key`,
+                () => this.aggregateSubQuery(keyCubeName, measures),
+              )
             )
           )(allMultiplied)
         );
     } else {
       toJoin =
         (regularMeasures.length ? [
-          this.withCubeAliasPrefix('main', () => this.regularMeasuresSubQuery(regularMeasures))
+          this.withCubeAliasPrefix(
+            'main',
+            () => this.regularMeasuresSubQuery(regularMeasures),
+          ),
         ] : [])
           .concat(
             R.pipe(
               R.groupBy(m => m.cube().name),
               R.toPairs,
               R.map(
-                ([keyCubeName, measures]) => this.withCubeAliasPrefix(`${keyCubeName}_key`, () => this.aggregateSubQuery(keyCubeName, measures))
+                ([keyCubeName, measures]) => this
+                  .withCubeAliasPrefix(
+                    `${this.aliasName(keyCubeName)}_key`,
+                    () => this.aggregateSubQuery(
+                      keyCubeName,
+                      measures,
+                    )
+                  )
               )
             )(multipliedMeasures)
           ).concat(
             R.map(
               ([multiplied, measure]) => this.withCubeAliasPrefix(
-                `${this.aliasName(measure.measure.replace('.', '_'))}_cumulative`,
+                `${
+                  this.aliasName(measure.measure.replace('.', '_'))
+                }_cumulative`,
                 () => this.overTimeSeriesQuery(
-                  multiplied ?
-                    (measures, filters) => this.aggregateSubQuery(measures[0].cube().name, measures, filters) :
-                    this.regularMeasuresSubQuery.bind(this),
+                  multiplied
+                    ? (measures, filters) => this.aggregateSubQuery(
+                      measures[0].cube().name,
+                      measures,
+                      filters,
+                    )
+                    : this.regularMeasuresSubQuery.bind(this),
                   measure,
-                  false
-                )
+                  false,
+                ),
               )
             )(cumulativeMeasures)
           );
     }
 
-    // Move regular measures to multiplied ones if there're same cubes to calculate.
-    // Most of the times it'll be much faster to calculate as there will be only single scan per cube
+    // Move regular measures to multiplied ones if there're same
+    // cubes to calculate. Most of the times it'll be much faster to
+    // calculate as there will be only single scan per cube.
     if (
       regularMeasures.length &&
       multipliedMeasures.length &&
       !cumulativeMeasures.length
     ) {
-      const cubeNames = R.pipe(R.map(m => m.cube().name), R.uniq, R.sortBy(R.identity));
+      const cubeNames = R.pipe(
+        R.map(m => m.cube().name),
+        R.uniq,
+        R.sortBy(R.identity),
+      );
       const regularMeasuresCubes = cubeNames(regularMeasures);
       const multipliedMeasuresCubes = cubeNames(multipliedMeasures);
       if (R.equals(regularMeasuresCubes, multipliedMeasuresCubes)) {
+        const measuresList = regularMeasures.concat(multipliedMeasures);
+        // We need to use original measures sorting to avoid problems
+        // with the query order.
+        measuresList.sort((m1, m2) => {
+          let i1;
+          let i2;
+          this.measures.forEach((m, i) => {
+            if (m.measure === m1.measure) { i1 = i; }
+            if (m.measure === m2.measure) { i2 = i; }
+          });
+          return i1 - i2;
+        });
         toJoin = R.pipe(
           R.groupBy(m => m.cube().name),
           R.toPairs,
           R.map(
-            ([keyCubeName, measures]) => this.withCubeAliasPrefix(`${keyCubeName}_key`, () => this.aggregateSubQuery(keyCubeName, measures))
+            ([keyCubeName, measures]) => this.withCubeAliasPrefix(
+              `${keyCubeName}_key`,
+              () => this.aggregateSubQuery(keyCubeName, measures),
+            )
           )
-        )(regularMeasures.concat(multipliedMeasures));
+        )(measuresList);
       }
     }
-
-    return this.joinFullKeyQueryAggregate(multipliedMeasures, regularMeasures, cumulativeMeasures, toJoin);
+    return this.joinFullKeyQueryAggregate(
+      multipliedMeasures,
+      regularMeasures,
+      cumulativeMeasures,
+      toJoin,
+    );
   }
 
-  joinFullKeyQueryAggregate(multipliedMeasures, regularMeasures, cumulativeMeasures, toJoin) {
+  joinFullKeyQueryAggregate(
+    multipliedMeasures,
+    regularMeasures,
+    cumulativeMeasures,
+    toJoin,
+  ) {
     const renderedReferenceContext = {
       renderedReference: R.pipe(
         R.map(m => [m.measure, m.aliasName()]),
         R.fromPairs,
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       )(multipliedMeasures.concat(regularMeasures).concat(cumulativeMeasures.map(([multiplied, measure]) => measure))),
     };
 
@@ -641,13 +853,25 @@ export class BaseQuery {
       () => this.dimensionColumns('q_0').concat(this.measures.map(m => m.selectColumns())).join(', '),
       renderedReferenceContext,
     );
+
+    const queryHasNoRemapping = this.evaluateSymbolSqlWithContext(
+      () => this.dimensionsForSelect().concat(this.measures).every(r => r.hasNoRemapping()),
+      renderedReferenceContext,
+    );
+
     const havingFilters = this.evaluateSymbolSqlWithContext(
       () => this.baseWhere(this.measureFilters),
       renderedReferenceContext,
     );
 
     // TODO all having filters should be pushed down
-    if (toJoin.length === 1 && this.measureFilters.length === 0) {
+    // subQuery dimensions can introduce projection remapping
+    if (
+      toJoin.length === 1 &&
+      this.measureFilters.length === 0 &&
+      this.measures.filter(m => m.expression).length === 0 &&
+      queryHasNoRemapping
+    ) {
       return `${toJoin[0].replace(/^SELECT/, `SELECT ${this.topLimit()}`)} ${this.orderBy()}${this.groupByDimensionLimit()}`;
     }
 
@@ -706,17 +930,8 @@ export class BaseQuery {
     return R.fromPairs(Object.keys(standardGranularitiesParents).map(k => [k, this.granularityParentHierarchy(k)]));
   }
 
-  granularityParent(granularity) {
-    return standardGranularitiesParents[granularity];
-  }
-
   granularityParentHierarchy(granularity) {
-    if (!this.granularityParentHierarchyCache[granularity]) {
-      this.granularityParentHierarchyCache[granularity] = [granularity].concat(
-        this.granularityParent(granularity) ? this.granularityParentHierarchy(this.granularityParent(granularity)) : []
-      );
-    }
-    return this.granularityParentHierarchyCache[granularity];
+    return standardGranularitiesParents[granularity];
   }
 
   minGranularity(granularityA, granularityB) {
@@ -831,7 +1046,7 @@ export class BaseQuery {
     const values = timeDimension.timeSeries().map(
       ([from, to]) => `('${from}', '${to}')`
     );
-    return `SELECT ${this.dateTimeCast('date_from')}, ${this.dateTimeCast('date_to')} FROM (VALUES ${values}) ${this.asSyntaxTable} dates (date_from, date_to)`;
+    return `SELECT ${this.dateTimeCast('date_from')} as ${this.escapeColumnName('date_from')}, ${this.dateTimeCast('date_to')} as ${this.escapeColumnName('date_to')} FROM (VALUES ${values}) ${this.asSyntaxTable} dates (date_from, date_to)`;
   }
 
   /**
@@ -902,17 +1117,20 @@ export class BaseQuery {
   rewriteInlineCubeSql(cube, isLeftJoinCondition) {
     const sql = this.cubeSql(cube);
     const cubeAlias = this.cubeAlias(cube);
-    // TODO params independent sql caching
-    const parser = this.queryCache.cache(['SqlParser', sql], () => new SqlParser(sql));
     if (
-      this.cubeEvaluator.cubeFromPath(cube).rewriteQueries &&
-      parser.isSimpleAsteriskQuery()
+      this.cubeEvaluator.cubeFromPath(cube).rewriteQueries
     ) {
-      const conditions = parser.extractWhereConditions(cubeAlias);
-      if (!isLeftJoinCondition && this.safeEvaluateSymbolContext().inlineWhereConditions) {
-        this.safeEvaluateSymbolContext().inlineWhereConditions.push({ filterToWhere: () => conditions });
+      // TODO params independent sql caching
+      const parser = this.queryCache.cache(['SqlParser', sql], () => new SqlParser(sql));
+      if (parser.isSimpleAsteriskQuery()) {
+        const conditions = parser.extractWhereConditions(cubeAlias);
+        if (!isLeftJoinCondition && this.safeEvaluateSymbolContext().inlineWhereConditions) {
+          this.safeEvaluateSymbolContext().inlineWhereConditions.push({ filterToWhere: () => conditions });
+        }
+        return [parser.extractTableFrom(), cubeAlias, conditions];
+      } else {
+        return [sql, cubeAlias];
       }
-      return [parser.extractTableFrom(), cubeAlias, conditions];
     } else {
       return [sql, cubeAlias];
     }
@@ -951,7 +1169,7 @@ export class BaseQuery {
 
   subQueryJoin(dimension) {
     const { prefix, subQuery, cubeName } = this.subQueryDescription(dimension);
-    const primaryKey = this.newDimension(this.primaryKeyName(cubeName));
+    const primaryKeys = this.cubeEvaluator.primaryKeys[cubeName];
     const subQueryAlias = this.escapeColumnName(this.aliasName(prefix));
 
     const { collectOriginalSqlPreAggregations } = this.safeEvaluateSymbolContext();
@@ -961,7 +1179,7 @@ export class BaseQuery {
     return {
       sql: `(${sql})`,
       alias: subQueryAlias,
-      on: `${subQueryAlias}.${primaryKey.aliasName()} = ${this.primaryKeySql(this.cubeEvaluator.primaryKeys[cubeName], cubeName)}`
+      on: primaryKeys.map((pk) => `${subQueryAlias}.${this.newDimension(this.primaryKeyName(cubeName, pk)).aliasName()} = ${this.primaryKeySql(pk, cubeName)}`)
     };
   }
 
@@ -1009,7 +1227,7 @@ export class BaseQuery {
         cubeName,
         name
       }],
-      dimensions: [this.primaryKeyName(cubeName)],
+      dimensions: this.primaryKeyNames(cubeName),
       filters,
       segments,
       timeDimensions,
@@ -1041,9 +1259,16 @@ export class BaseQuery {
     (!this.safeEvaluateSymbolContext().ungrouped && this.groupByClause() || '');
   }
 
+  /**
+   * Returns SQL query for the "aggregating on top of sub-queries" uses cases.
+   * @param {string} keyCubeName
+   * @param {Array<BaseMeasure>} measures
+   * @param {Array<BaseFilter>} filters
+   * @returns {string}
+   */
   aggregateSubQuery(keyCubeName, measures, filters) {
     filters = filters || this.allFilters;
-    const primaryKeyDimension = this.newDimension(this.primaryKeyName(keyCubeName));
+    const primaryKeyDimensions = this.primaryKeyNames(keyCubeName).map((k) => this.newDimension(k));
     const shouldBuildJoinForMeasureSelect = this.checkShouldBuildJoinForMeasureSelect(measures, keyCubeName);
 
     let keyCubeSql;
@@ -1056,14 +1281,14 @@ export class BaseQuery {
     );
 
     if (shouldBuildJoinForMeasureSelect) {
-      const cubes = this.collectFrom(measures, this.collectCubeNamesFor.bind(this), 'collectCubeNamesFor');
-      const measuresJoin = this.joinGraph.buildJoin(cubes);
+      const joinHints = this.collectFrom(measures, this.collectJoinHintsFor.bind(this), 'collectJoinHintsFor');
+      const measuresJoin = this.joinGraph.buildJoin(joinHints);
       if (measuresJoin.multiplicationFactor[keyCubeName]) {
         throw new UserError(
           `'${measures.map(m => m.measure).join(', ')}' reference cubes that lead to row multiplication.`
         );
       }
-      keyCubeSql = `(${this.aggregateSubQueryMeasureJoin(keyCubeName, measures, measuresJoin, primaryKeyDimension, measureSubQueryDimensions)})`;
+      keyCubeSql = `(${this.aggregateSubQueryMeasureJoin(keyCubeName, measures, measuresJoin, primaryKeyDimensions, measureSubQueryDimensions)})`;
       keyCubeAlias = this.cubeAlias(keyCubeName);
     } else {
       [keyCubeSql, keyCubeAlias, keyCubeInlineLeftJoinConditions] = this.rewriteInlineCubeSql(keyCubeName);
@@ -1076,32 +1301,49 @@ export class BaseQuery {
         ungroupedAliases: R.fromPairs(measures.map(m => [m.measure, m.aliasName()]))
       }
     ) : measureSelectFn();
-    const columnsForSelect =
-      this.dimensionColumns(this.escapeColumnName('keys')).concat(selectedMeasures).filter(s => !!s).join(', ');
-    const keyInMeasureSelect = shouldBuildJoinForMeasureSelect ?
-      `${this.cubeAlias(keyCubeName)}.${primaryKeyDimension.aliasName()}` :
-      this.dimensionSql(primaryKeyDimension);
+    const columnsForSelect = this
+      .dimensionColumns(this.escapeColumnName(QueryAlias.AGG_SUB_QUERY_KEYS))
+      .concat(selectedMeasures)
+      .filter(s => !!s)
+      .join(', ');
+
+    const primaryKeyJoinConditions = primaryKeyDimensions.map((pkd) => (
+      `${
+        this.escapeColumnName(QueryAlias.AGG_SUB_QUERY_KEYS)
+      }.${
+        pkd.aliasName()
+      } = ${
+        shouldBuildJoinForMeasureSelect
+          ? `${this.cubeAlias(keyCubeName)}.${pkd.aliasName()}`
+          : this.dimensionSql(pkd)
+      }`
+    )).join(' AND ');
+
     const subQueryJoins =
       shouldBuildJoinForMeasureSelect ? [] : measureSubQueryDimensions.map(d => this.subQueryJoin(d));
     const joinSql = this.joinSql([
-      { sql: `(${this.keysQuery(primaryKeyDimension, filters)})`, alias: this.escapeColumnName('keys') },
+      {
+        sql: `(${this.keysQuery(primaryKeyDimensions, filters)})`,
+        alias: this.escapeColumnName(QueryAlias.AGG_SUB_QUERY_KEYS),
+      },
       {
         sql: keyCubeSql,
         alias: keyCubeAlias,
-        on: `${this.escapeColumnName('keys')}.${primaryKeyDimension.aliasName()} = ${keyInMeasureSelect}
-             ${keyCubeInlineLeftJoinConditions ? ` AND (${keyCubeInlineLeftJoinConditions})` : ''}`
+        on: `${primaryKeyJoinConditions}
+             ${keyCubeInlineLeftJoinConditions ? ` AND (${keyCubeInlineLeftJoinConditions})` : ''}`,
       },
       ...subQueryJoins
     ]);
     return `SELECT ${columnsForSelect} FROM ${joinSql}` +
-      (!this.safeEvaluateSymbolContext().ungrouped && this.groupByClause() || '');
+      (!this.safeEvaluateSymbolContext().ungrouped && this.aggregateSubQueryGroupByClause() || '');
   }
 
   checkShouldBuildJoinForMeasureSelect(measures, keyCubeName) {
     return measures.map(measure => {
-      const cubeNames = this.collectFrom([measure], this.collectCubeNamesFor.bind(this), 'collectCubeNamesFor');
-      if (R.any(cubeName => keyCubeName !== cubeName, cubeNames)) {
-        const measuresJoin = this.joinGraph.buildJoin(cubeNames);
+      const cubes = this.collectFrom([measure], this.collectCubeNamesFor.bind(this), 'collectCubeNamesFor');
+      const joinHints = this.collectFrom([measure], this.collectJoinHintsFor.bind(this), 'collectJoinHintsFor');
+      if (R.any(cubeName => keyCubeName !== cubeName, cubes)) {
+        const measuresJoin = this.joinGraph.buildJoin(joinHints);
         if (measuresJoin.multiplicationFactor[keyCubeName]) {
           throw new UserError(
             `'${measure.measure}' references cubes that lead to row multiplication. Please rewrite it using sub query.`
@@ -1113,10 +1355,10 @@ export class BaseQuery {
     }).reduce((a, b) => a || b);
   }
 
-  aggregateSubQueryMeasureJoin(keyCubeName, measures, measuresJoin, primaryKeyDimension, measureSubQueryDimensions) {
+  aggregateSubQueryMeasureJoin(keyCubeName, measures, measuresJoin, primaryKeyDimensions, measureSubQueryDimensions) {
     return this.ungroupedMeasureSelect(() => this.withCubeAliasPrefix(`${keyCubeName}_measure_join`,
       () => {
-        const columns = [primaryKeyDimension.selectColumns()].concat(measures.map(m => m.selectColumns()))
+        const columns = primaryKeyDimensions.map(p => p.selectColumns()).concat(measures.map(m => m.selectColumns()))
           .filter(s => !!s).join(', ');
         return `SELECT ${columns} FROM ${this.joinQuery(measuresJoin, measureSubQueryDimensions)}`;
       }));
@@ -1136,36 +1378,33 @@ export class BaseQuery {
     );
   }
 
-  keysQuery(primaryKeyDimension, filters) {
+  keysQuery(primaryKeyDimensions, filters) {
     const inlineWhereConditions = [];
     const query = this.rewriteInlineWhere(() => this.joinQuery(
       this.join,
       this.collectFrom(
-        this.keyDimensions(primaryKeyDimension),
+        this.keyDimensions(primaryKeyDimensions),
         this.collectSubQueryDimensionsFor.bind(this),
         'collectSubQueryDimensionsFor'
       )
     ), inlineWhereConditions);
-    return `SELECT DISTINCT ${this.keysSelect(primaryKeyDimension)} FROM ${
+    return `SELECT DISTINCT ${this.keysSelect(primaryKeyDimensions)} FROM ${
       query
     } ${this.baseWhere(filters.concat(inlineWhereConditions))}`;
   }
 
-  keysSelect(primaryKeyDimension) {
+  keysSelect(primaryKeyDimensions) {
     return R.flatten(
-      this.keyDimensions(primaryKeyDimension)
+      this.keyDimensions(primaryKeyDimensions)
         .map(s => s.selectColumns())
     ).filter(s => !!s).join(', ');
   }
 
-  keyDimensions(primaryKeyDimension) {
-    return this.dimensionsForSelect()
-      .concat(
-        R.none(
-          d => d.dimension === primaryKeyDimension.dimension,
-          this.dimensionsForSelect()
-        ) ? [primaryKeyDimension] : []
-      );
+  keyDimensions(primaryKeyDimensions) {
+    return R.uniqBy(
+      (d) => d.dimension, this.dimensionsForSelect()
+        .concat(primaryKeyDimensions)
+    );
   }
 
   cubeSql(cube) {
@@ -1198,6 +1437,14 @@ export class BaseQuery {
       excludeTimeDimensions,
       this.collectCubeNamesFor.bind(this),
       'collectCubeNamesFor'
+    );
+  }
+
+  collectJoinHints(excludeTimeDimensions = false) {
+    return this.collectFromMembers(
+      excludeTimeDimensions,
+      this.collectJoinHintsFor.bind(this),
+      'collectJoinHintsFor'
     );
   }
 
@@ -1255,6 +1502,19 @@ export class BaseQuery {
     );
   }
 
+  /**
+   * Returns `GROUP BY` clause for the "aggregating on top of sub-queries" uses
+   * cases. By the default returns the result of the `groupByClause` method.
+   * @returns {string}
+   */
+  aggregateSubQueryGroupByClause() {
+    return this.groupByClause();
+  }
+
+  /**
+   * Returns `GROUP BY` clause for the basic uses cases.
+   * @returns {string}
+   */
   groupByClause() {
     if (this.ungrouped) {
       return '';
@@ -1323,16 +1583,33 @@ export class BaseQuery {
     return ` ORDER BY ${orderByString}`;
   }
 
+  /**
+   * Returns a complete list of the aliased dimensions, including time
+   * dimensions.
+   * @returns {Array<string>}
+   */
   dimensionAliasNames() {
     return R.flatten(this.dimensionsForSelect().map(d => d.aliasName()).filter(d => !!d));
   }
 
+  /**
+   * Returns an array of column names correlated to the specified cube dimensions.
+   * @param {string} cubeAlias
+   * @returns {Array<string>}
+   */
   dimensionColumns(cubeAlias) {
     return this.dimensionAliasNames().map(alias => `${cubeAlias && `${cubeAlias}.` || ''}${alias}`);
   }
 
   groupByDimensionLimit() {
-    const limitClause = this.rowLimit === null ? '' : ` LIMIT ${this.rowLimit && parseInt(this.rowLimit, 10) || 10000}`;
+    let limitClause = '';
+    if (this.rowLimit !== null) {
+      if (this.rowLimit === MAX_SOURCE_ROW_LIMIT) {
+        limitClause = ` LIMIT ${this.paramAllocator.allocateParam(MAX_SOURCE_ROW_LIMIT)}`;
+      } else if (typeof this.rowLimit === 'number') {
+        limitClause = ` LIMIT ${this.rowLimit}`;
+      }
+    }
     const offsetClause = this.offset ? ` OFFSET ${parseInt(this.offset, 10)}` : '';
     return `${limitClause}${offsetClause}`;
   }
@@ -1355,17 +1632,15 @@ export class BaseQuery {
     return this.dimensionsForSelect().concat(this.measures);
   }
 
+  /**
+   * Returns a complete list of the dimensions, including time dimensions.
+   * @returns {Array<BaseDimension>}
+   */
   dimensionsForSelect() {
     return this.dimensions.concat(this.timeDimensions);
   }
 
   dimensionSql(dimension) {
-    const context = this.safeEvaluateSymbolContext();
-    if (context.rollupQuery) {
-      return this.escapeColumnName(dimension.unescapedAliasName(context.rollupGranularity));
-    } else if (context.wrapQuery) {
-      return this.escapeColumnName(dimension.unescapedAliasName(context.wrappedGranularity));
-    }
     return this.evaluateSymbolSql(dimension.path()[0], dimension.path()[1], dimension.dimensionDefinition());
   }
 
@@ -1394,11 +1669,30 @@ export class BaseQuery {
     }
   }
 
+  pushJoinHints(joinHints) {
+    if (this.safeEvaluateSymbolContext().joinHints && joinHints) {
+      if (joinHints.length === 1) {
+        [joinHints] = joinHints;
+      }
+      this.safeEvaluateSymbolContext().joinHints.push(joinHints);
+    }
+  }
+
   pushMemberNameForCollectionIfNecessary(cubeName, name) {
-    this.pushCubeNameForCollectionIfNecessary(cubeName);
+    const pathFromArray = this.cubeEvaluator.pathFromArray([cubeName, name]);
+    if (this.cubeEvaluator.byPathAnyType(pathFromArray).ownedByCube) {
+      const joinHints = this.cubeEvaluator.joinHints();
+      if (joinHints && joinHints.length) {
+        joinHints.forEach(cube => this.pushCubeNameForCollectionIfNecessary(cube));
+        this.pushJoinHints(joinHints);
+      } else {
+        this.pushCubeNameForCollectionIfNecessary(cubeName);
+        this.pushJoinHints(cubeName);
+      }
+    }
     const context = this.safeEvaluateSymbolContext();
     if (context.memberNames && name) {
-      context.memberNames.push(this.cubeEvaluator.pathFromArray([cubeName, name]));
+      context.memberNames.push(pathFromArray);
     }
   }
 
@@ -1408,7 +1702,9 @@ export class BaseQuery {
 
   evaluateSymbolSql(cubeName, name, symbol) {
     this.pushMemberNameForCollectionIfNecessary(cubeName, name);
-    if (this.cubeEvaluator.isMeasure([cubeName, name])) {
+    const memberPathArray = [cubeName, name];
+    const memberPath = this.cubeEvaluator.pathFromArray(memberPathArray);
+    if (this.cubeEvaluator.isMeasure(memberPathArray)) {
       let parentMeasure;
       if (this.safeEvaluateSymbolContext().compositeCubeMeasures ||
         this.safeEvaluateSymbolContext().leafMeasures) {
@@ -1417,13 +1713,13 @@ export class BaseQuery {
           if (parentMeasure &&
             (
               this.cubeEvaluator.cubeNameFromPath(parentMeasure) !== cubeName ||
-              this.newMeasure(this.cubeEvaluator.pathFromArray([cubeName, name])).isCumulative()
+              this.newMeasure(this.cubeEvaluator.pathFromArray(memberPathArray)).isCumulative()
             )
           ) {
             this.safeEvaluateSymbolContext().compositeCubeMeasures[parentMeasure] = true;
           }
         }
-        this.safeEvaluateSymbolContext().currentMeasure = this.cubeEvaluator.pathFromArray([cubeName, name]);
+        this.safeEvaluateSymbolContext().currentMeasure = this.cubeEvaluator.pathFromArray(memberPathArray);
         if (this.safeEvaluateSymbolContext().leafMeasures) {
           if (parentMeasure) {
             this.safeEvaluateSymbolContext().leafMeasures[parentMeasure] = false;
@@ -1431,13 +1727,18 @@ export class BaseQuery {
           this.safeEvaluateSymbolContext().leafMeasures[this.safeEvaluateSymbolContext().currentMeasure] = true;
         }
       }
+      const primaryKeys = this.cubeEvaluator.primaryKeys[cubeName];
       const result = this.renderSqlMeasure(
         name,
         this.applyMeasureFilters(
           this.autoPrefixWithCubeName(
             cubeName,
             symbol.sql && this.evaluateSql(cubeName, symbol.sql) ||
-            this.cubeEvaluator.primaryKeys[cubeName] && this.primaryKeySql(this.cubeEvaluator.primaryKeys[cubeName], cubeName) || '*'
+            primaryKeys.length && (
+              primaryKeys.length > 1 ?
+                this.concatStringsSql(primaryKeys.map((pk) => this.castToString(this.primaryKeySql(pk, cubeName))))
+                : this.primaryKeySql(primaryKeys[0], cubeName)
+            ) || '*'
           ),
           symbol,
           cubeName
@@ -1453,13 +1754,15 @@ export class BaseQuery {
         this.safeEvaluateSymbolContext().currentMeasure = parentMeasure;
       }
       return result;
-    } else if (this.cubeEvaluator.isDimension([cubeName, name])) {
+    } else if (this.cubeEvaluator.isDimension(memberPathArray)) {
+      if ((this.safeEvaluateSymbolContext().renderedReference || {})[memberPath]) {
+        return this.evaluateSymbolContext.renderedReference[memberPath];
+      }
       if (symbol.subQuery) {
-        const dimensionPath = this.cubeEvaluator.pathFromArray([cubeName, name]);
         if (this.safeEvaluateSymbolContext().subQueryDimensions) {
-          this.safeEvaluateSymbolContext().subQueryDimensions.push(dimensionPath);
+          this.safeEvaluateSymbolContext().subQueryDimensions.push(memberPath);
         }
-        return this.escapeColumnName(this.aliasName(dimensionPath));
+        return this.escapeColumnName(this.aliasName(memberPath));
       }
       if (symbol.case) {
         return this.renderDimensionCase(symbol, cubeName);
@@ -1472,7 +1775,10 @@ export class BaseQuery {
       } else {
         return this.autoPrefixAndEvaluateSql(cubeName, symbol.sql);
       }
-    } else if (this.cubeEvaluator.isSegment([cubeName, name])) {
+    } else if (this.cubeEvaluator.isSegment(memberPathArray)) {
+      if ((this.safeEvaluateSymbolContext().renderedReference || {})[memberPath]) {
+        return this.evaluateSymbolContext.renderedReference[memberPath];
+      }
       return this.autoPrefixWithCubeName(cubeName, this.evaluateSql(cubeName, symbol.sql));
     }
     return this.evaluateSql(cubeName, symbol.sql);
@@ -1486,11 +1792,15 @@ export class BaseQuery {
     return strings.join(' || ');
   }
 
-  primaryKeyName(cubeName) {
-    const primaryKey = this.cubeEvaluator.primaryKeys[cubeName];
-    if (!primaryKey) {
-      throw new UserError(`Primary key is required for '${cubeName}`);
+  primaryKeyNames(cubeName) {
+    const primaryKeys = this.cubeEvaluator.primaryKeys[cubeName];
+    if (!primaryKeys || !primaryKeys.length) {
+      throw new UserError(`One or more Primary key is required for '${cubeName}`);
     }
+    return primaryKeys.map((pk) => this.primaryKeyName(cubeName, pk));
+  }
+
+  primaryKeyName(cubeName, primaryKey) {
     return `${cubeName}.${primaryKey}`;
   }
 
@@ -1498,10 +1808,8 @@ export class BaseQuery {
     options = options || {};
     const self = this;
     const { cubeEvaluator } = this;
-    this.pushCubeNameForCollectionIfNecessary(cubeName);
     return cubeEvaluator.resolveSymbolsCall(sql, (name) => {
       const nextCubeName = cubeEvaluator.symbols[name] && name || cubeName;
-      this.pushCubeNameForCollectionIfNecessary(nextCubeName);
       const resolvedSymbol =
         cubeEvaluator.resolveSymbol(
           cubeName,
@@ -1516,7 +1824,8 @@ export class BaseQuery {
       sqlResolveFn: options.sqlResolveFn || ((symbol, cube, n) => self.evaluateSymbolSql(cube, n, symbol)),
       cubeAliasFn: self.cubeAlias.bind(self),
       contextSymbols: this.parametrizedContextSymbols(),
-      query: this
+      query: this,
+      collectJoinHints: true,
     });
   }
 
@@ -1524,9 +1833,21 @@ export class BaseQuery {
     return this.evaluateSymbolSqlWithContext(fn, { cubeAliasPrefix });
   }
 
+  /**
+   * Evaluate escaped SQL-alias for cube or cube's property
+   * (measure, dimention).
+   * @param {string} cubeName
+   * @returns string
+   */
   cubeAlias(cubeName) {
     const prefix = this.safeEvaluateSymbolContext().cubeAliasPrefix || this.cubeAliasPrefix;
-    return this.escapeColumnName(this.aliasName(`${prefix ? prefix + '__' : ''}${cubeName}`));
+    return this.escapeColumnName(
+      this.aliasName(
+        `${prefix
+          ? prefix + '__' + this.aliasName(cubeName)
+          : cubeName}`
+      )
+    );
   }
 
   collectCubeNamesFor(fn) {
@@ -1537,6 +1858,16 @@ export class BaseQuery {
     );
 
     return R.uniq(context.cubeNames);
+  }
+
+  collectJoinHintsFor(fn) {
+    const context = { joinHints: [] };
+    this.evaluateSymbolSqlWithContext(
+      fn,
+      context
+    );
+
+    return context.joinHints;
   }
 
   collectMemberNamesFor(fn) {
@@ -1622,6 +1953,13 @@ export class BaseQuery {
     ) {
       return evaluateSql === '*' ? '1' : evaluateSql;
     }
+    if (this.ungrouped) {
+      if (symbol.type === 'count' || symbol.type === 'countDistinct' || symbol.type === 'countDistinctApprox') {
+        return '1';
+      } else {
+        return evaluateSql;
+      }
+    }
     if ((this.safeEvaluateSymbolContext().ungroupedAliases || {})[measurePath]) {
       evaluateSql = (this.safeEvaluateSymbolContext().ungroupedAliases || {})[measurePath];
     }
@@ -1649,10 +1987,14 @@ export class BaseQuery {
         return this.primaryKeyCount(cubeName, true);
       }
     }
-    if (symbol.type === 'number') {
+    if (BaseQuery.isCalculatedMeasureType(symbol.type)) {
       return evaluateSql;
     }
     return `${symbol.type}(${evaluateSql})`;
+  }
+
+  static isCalculatedMeasureType(type) {
+    return type === 'number' || type === 'string' || type === 'time' || type === 'boolean';
   }
 
   aggregateOnGroupedColumn(symbol, evaluateSql, topLevelMerge, measurePath) {
@@ -1680,14 +2022,17 @@ export class BaseQuery {
     return evaluateSql;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   hllInit(sql) {
     throw new UserError('Distributed approximate distinct count is not supported by this DB');
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   hllMerge(sql) {
     throw new UserError('Distributed approximate distinct count is not supported by this DB');
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   hllCardinality(sql) {
     throw new UserError('Distributed approximate distinct count is not supported by this DB');
   }
@@ -1700,12 +2045,20 @@ export class BaseQuery {
     return this.hllMerge(sql);
   }
 
+  castToString(sql) {
+    return `CAST(${sql} as TEXT)`;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   countDistinctApprox(sql) {
     throw new UserError('Approximate distinct count is not supported by this DB');
   }
 
   primaryKeyCount(cubeName, distinct) {
-    const primaryKeySql = this.primaryKeySql(this.cubeEvaluator.primaryKeys[cubeName], cubeName);
+    const primaryKeys = this.cubeEvaluator.primaryKeys[cubeName];
+    const primaryKeySql = primaryKeys.length > 1 ?
+      this.concatStringsSql(primaryKeys.map((pk) => this.castToString(this.primaryKeySql(pk, cubeName)))) :
+      this.primaryKeySql(primaryKeys[0], cubeName);
     return `count(${distinct ? 'distinct ' : ''}${primaryKeySql})`;
   }
 
@@ -1784,14 +2137,22 @@ export class BaseQuery {
    * @param {string} field
    * @return {string}
    */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   convertTz(field) {
     throw new Error('Not implemented');
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   timeGroupedColumn(granularity, dimension) {
     throw new Error('Not implemented');
   }
 
+  /**
+   * Evaluate alias for specific cube's property.
+   * @param {string} name Property name.
+   * @param {boolean?} isPreAggregationName Pre-agg flag.
+   * @returns {string}
+   */
   aliasName(name, isPreAggregationName) {
     const path = name.split('.');
     if (path[0] && this.cubeEvaluator.cubeExists(path[0]) && this.cubeEvaluator.cubeFromPath(path[0]).sqlAlias) {
@@ -1800,26 +2161,36 @@ export class BaseQuery {
       path.unshift(this.cubeEvaluator.cubeFromPath(cubeName).sqlAlias);
       name = this.cubeEvaluator.pathFromArray(path);
     }
+    // TODO: https://github.com/cube-js/cube.js/issues/4019
     // use single underscore for pre-aggregations to avoid fail of pre-aggregation name replace
     return inflection.underscore(name).replace(/\./g, isPreAggregationName ? '_' : '__');
   }
 
   newSubQuery(options) {
     const QueryClass = this.constructor;
-    return new QueryClass(
-      this.compilers,
-      Object.assign({
-        paramAllocator: this.paramAllocator,
-        timezone: this.timezone,
-        preAggregationQuery: this.options.preAggregationQuery,
-        useOriginalSqlPreAggregationsInPreAggregation: this.options.useOriginalSqlPreAggregationsInPreAggregation,
-        contextSymbols: this.contextSymbols,
-        preAggregationsSchema: this.preAggregationsSchemaOption,
-        cubeLatticeCache: this.options.cubeLatticeCache,
-        historyQueries: this.options.historyQueries,
-        externalQueryClass: this.options.externalQueryClass,
-      }, options)
-    );
+    return new QueryClass(this.compilers, this.subQueryOptions(options));
+  }
+
+  newSubQueryForCube(cube, options) {
+    return this.options.queryFactory
+      ? this.options.queryFactory.createQuery(cube, this.compilers, this.subQueryOptions(options))
+      : this.newSubQuery(options);
+  }
+
+  subQueryOptions(options) {
+    return {
+      paramAllocator: this.paramAllocator,
+      timezone: this.timezone,
+      preAggregationQuery: this.options.preAggregationQuery,
+      useOriginalSqlPreAggregationsInPreAggregation: this.options.useOriginalSqlPreAggregationsInPreAggregation,
+      contextSymbols: this.contextSymbols,
+      preAggregationsSchema: this.preAggregationsSchemaOption,
+      cubeLatticeCache: this.options.cubeLatticeCache,
+      historyQueries: this.options.historyQueries,
+      externalQueryClass: this.options.externalQueryClass,
+      queryFactory: this.options.queryFactory,
+      ...options,
+    };
   }
 
   cacheKeyQueries(transformFn) { // TODO collect sub queries
@@ -1995,6 +2366,14 @@ export class BaseQuery {
       },
       { inputProps: { collectOriginalSqlPreAggregations: [] }, cache: this.queryCache }
     );
+  }
+
+  preAggregationReadOnly(_cube, _preAggregation) {
+    return false;
+  }
+
+  preAggregationAllowUngroupingWithPrimaryKey(_cube, _preAggregation) {
+    return false;
   }
 
   // eslint-disable-next-line consistent-return
@@ -2321,13 +2700,13 @@ export class BaseQuery {
     );
   }
 
-  refreshKeyRenewalThresholdForInterval(refreshKey, limitedWithMax = true) {
+  refreshKeyRenewalThresholdForInterval(refreshKey, everyWithoutSql = true) {
     const { every } = refreshKey;
 
     if (/^(\d+) (second|minute|hour|day|week)s?$/.test(every)) {
-      const threshold = Math.max(Math.round(this.parseSecondDuration(every) / 10), 1);
+      const threshold = Math.max(Math.round(this.parseSecondDuration(every) / (everyWithoutSql ? 10 : 1)), 1);
 
-      if (limitedWithMax) {
+      if (everyWithoutSql) {
         return Math.min(threshold, 300);
       }
 
@@ -2335,9 +2714,9 @@ export class BaseQuery {
     }
 
     const { interval } = this.calcIntervalForCronString(refreshKey);
-    const threshold = Math.max(Math.round(interval / 10), 1);
+    const threshold = Math.max(Math.round(interval / (everyWithoutSql ? 10 : 1)), 1);
 
-    if (limitedWithMax) {
+    if (everyWithoutSql) {
       return Math.min(threshold, 300);
     }
 
@@ -2375,7 +2754,21 @@ export class BaseQuery {
     return this.parametrizedContextSymbolsValue;
   }
 
+  static emptyParametrizedContextSymbols(cubeEvaluator, allocateParam) {
+    return {
+      filterParams: BaseQuery.filterProxyFromAllFilters(null, cubeEvaluator, allocateParam),
+      sqlUtils: {
+        convertTz: (field) => field,
+      },
+      securityContext: BaseQuery.contextSymbolsProxyFrom({}, allocateParam),
+    };
+  }
+
   contextSymbolsProxy(symbols) {
+    return BaseQuery.contextSymbolsProxyFrom(symbols, this.paramAllocator.allocateParam.bind(this.paramAllocator));
+  }
+
+  static contextSymbolsProxyFrom(symbols, allocateParam) {
     return new Proxy(symbols, {
       get: (target, name) => {
         const propValue = target[name];
@@ -2383,8 +2776,8 @@ export class BaseQuery {
           filter: (column) => {
             if (paramValue) {
               const value = Array.isArray(paramValue) ?
-                paramValue.map(this.paramAllocator.allocateParam.bind(this.paramAllocator)) :
-                this.paramAllocator.allocateParam(paramValue);
+                paramValue.map(allocateParam) :
+                allocateParam(paramValue);
               if (typeof column === 'function') {
                 return column(value);
               } else {
@@ -2403,7 +2796,7 @@ export class BaseQuery {
           unsafeValue: () => paramValue
         });
         return methods(target)[name] ||
-          typeof propValue === 'object' && this.contextSymbolsProxy(propValue) ||
+          typeof propValue === 'object' && propValue !== null && BaseQuery.contextSymbolsProxyFrom(propValue, allocateParam) ||
           methods(propValue);
       }
     });
@@ -2411,19 +2804,29 @@ export class BaseQuery {
 
   filtersProxy() {
     const { allFilters } = this;
+    return BaseQuery.filterProxyFromAllFilters(
+      allFilters,
+      this.cubeEvaluator,
+      this.paramAllocator.allocateParam.bind(this.paramAllocator)
+    );
+  }
+
+  static filterProxyFromAllFilters(allFilters, cubeEvaluator, allocateParam) {
     return new Proxy({}, {
       get: (target, name) => {
         if (name === '_objectWithResolvedProperties') {
           return true;
         }
-        const cubeName = this.cubeEvaluator.cubeNameFromPath(name);
+        // allFilters is null whenever it's used to test if the member is owned by cube so it should always render to `1 = 1`
+        // and do not check cube validity as it's part of compilation step.
+        const cubeName = allFilters && cubeEvaluator.cubeNameFromPath(name);
         return new Proxy({ cube: cubeName }, {
           get: (cubeNameObj, propertyName) => {
             const filters =
-              allFilters.filter(f => f.dimension === this.cubeEvaluator.pathFromArray([cubeNameObj.cube, propertyName]));
+              allFilters?.filter(f => f.dimension === cubeEvaluator.pathFromArray([cubeNameObj.cube, propertyName]));
             return {
               filter: (column) => {
-                if (!filters.length) {
+                if (!filters || !filters.length) {
                   return '1 = 1';
                 }
 
@@ -2436,7 +2839,7 @@ export class BaseQuery {
                       // eslint-disable-next-line prefer-spread
                       return column.apply(
                         null,
-                        filterParams.map(this.paramAllocator.allocateParam.bind(this.paramAllocator))
+                        filterParams.map(allocateParam),
                       );
                     } else {
                       return filter.conditionSql(column);

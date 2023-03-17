@@ -4,6 +4,7 @@ import {
   PivotConfig,
   PreAggregationType,
   Query,
+  validateQuery,
   TransformedQuery,
 } from '@cubejs-client/core';
 import {
@@ -11,11 +12,13 @@ import {
   SchemaChangeProps,
   VizState,
 } from '@cubejs-client/react';
-import { Col, Row } from 'antd';
-import { RefObject, useEffect, useRef, useState } from 'react';
+import { Col, Row, Space } from 'antd';
+import { PlaySquareOutlined } from '@ant-design/icons';
+import React, { RefObject, useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
 
-import { Card, FatalError } from '../../../atoms';
+import { Button, Card } from '../../../atoms';
+import { FatalError } from '../../../components/Error/FatalError';
 import ChartContainer from '../../../ChartContainer';
 import { SectionHeader, SectionRow } from '../../../components';
 import ChartRenderer from '../../../components/ChartRenderer/ChartRenderer';
@@ -26,6 +29,7 @@ import {
   useDeepEffect,
   useIsMounted,
   useSecurityContext,
+  useServerCoreVersionGte,
 } from '../../../hooks';
 import FilterGroup from '../../../QueryBuilder/FilterGroup';
 import MemberGroup from '../../../QueryBuilder/MemberGroup';
@@ -148,7 +152,7 @@ function QueryChangeEmitter({
   onChange,
 }: QueryChangeEmitterProps) {
   useDeepEffect(() => {
-    if (!areQueriesEqual(query1, query2)) {
+    if (!areQueriesEqual(validateQuery(query1), validateQuery(query2))) {
       onChange();
     }
   }, [query1, query2]);
@@ -170,6 +174,7 @@ export type PlaygroundQueryBuilderProps = {
   dashboardSource?: DashboardSource;
   schemaVersion?: number;
   initialVizState?: VizState;
+  extra?: React.FC<any>;
   onVizStateChanged?: (vizState: VizState) => void;
   onSchemaChange?: (props: SchemaChangeProps) => void;
 };
@@ -191,13 +196,21 @@ export function PlaygroundQueryBuilder({
   dashboardSource,
   schemaVersion = 0,
   initialVizState,
+  extra: Extra,
   onSchemaChange,
   onVizStateChanged,
 }: PlaygroundQueryBuilderProps) {
   const isMounted = useIsMounted();
 
-  const { isChartRendererReady, queryStatus, queryError } =
-    useChartRendererState(queryId);
+  const isGraphQLSupported = useServerCoreVersionGte('0.29.0');
+
+  const {
+    isChartRendererReady,
+    queryStatus,
+    queryError,
+    queryRequestId,
+    resultSetExists,
+  } = useChartRendererState(queryId);
   const {
     setQueryStatus,
     setQueryLoading,
@@ -281,6 +294,9 @@ export function PlaygroundQueryBuilder({
         query,
         error,
         metaError,
+        richMetaError,
+        metaErrorStack,
+        meta,
         isQueryPresent,
         chartType,
         updateChartType,
@@ -313,6 +329,11 @@ export function PlaygroundQueryBuilder({
           // @ts-ignore
           parsedDateRange = query.timeDimensions[0].dateRange;
         }
+        
+        const queriesEqual = areQueriesEqual(
+          validateQuery(query),
+          validateQuery(queryRef.current)
+        );
 
         return (
           <Wrapper data-testid={`query-builder-${queryId}`}>
@@ -442,14 +463,42 @@ export function PlaygroundQueryBuilder({
                     onUpdate={updatePivotConfig.update}
                   />
 
-                  {queryStatus ? (
-                    <PreAggregationStatus
-                      apiUrl={apiUrl}
-                      availableMembers={availableMembers}
-                      query={query}
-                      {...(queryStatus as QueryStatus)}
-                    />
-                  ) : null}
+                  <Space style={{ marginLeft: 'auto' }}>
+                    {Extra ? (
+                      <Extra
+                        queryRequestId={
+                          queryRequestId || queryError?.response?.requestId
+                        }
+                        queryStatus={queryStatus}
+                        error={queryError}
+                      />
+                    ) : null}
+                    {queryStatus ? (
+                      <PreAggregationStatus
+                        apiUrl={apiUrl}
+                        availableMembers={availableMembers}
+                        query={query}
+                        {...(queryStatus as QueryStatus)}
+                      />
+                    ) : null}
+
+                    {resultSetExists && queriesEqual ? (
+                      <Button
+                        icon={<PlaySquareOutlined />}
+                        onClick={async () => {
+                          await refreshToken();
+
+                          handleRunButtonClick({
+                            query: validateQuery(query),
+                            pivotConfig,
+                            chartType: chartType || 'line',
+                          });
+                        }}
+                      >
+                        Rerun query
+                      </Button>
+                    ) : null}
+                  </Space>
                 </SectionRow>
               </Col>
             </Row>
@@ -461,9 +510,9 @@ export function PlaygroundQueryBuilder({
               style={{ margin: 0 }}
             >
               <Col span={24}>
-                {!isQueryPresent && metaError ? (
+                {!isQueryPresent && richMetaError ? (
                   <Card>
-                    <FatalError error={metaError} />
+                    <FatalError error={richMetaError} stack={metaErrorStack} />
                   </Card>
                 ) : null}
 
@@ -477,6 +526,8 @@ export function PlaygroundQueryBuilder({
                   <ChartContainer
                     apiUrl={apiUrl}
                     cubejsToken={cubejsToken}
+                    meta={meta}
+                    isGraphQLSupported={isGraphQLSupported}
                     iframeRef={iframeRef}
                     isChartRendererReady={isChartRendererReady}
                     query={query}
@@ -507,17 +558,19 @@ export function PlaygroundQueryBuilder({
                     chartLibraries={frameworkChartLibraries}
                     isFetchingMeta={isFetchingMeta}
                     render={({ framework }) => {
-                      if (metaError) {
-                        return <FatalError error={metaError} />;
+                      if (richMetaError) {
+                        return (
+                          <FatalError
+                            error={richMetaError}
+                            stack={metaErrorStack}
+                          />
+                        );
                       }
 
                       return (
                         <ChartRenderer
                           queryId={queryId}
-                          areQueriesEqual={areQueriesEqual(
-                            query,
-                            queryRef.current
-                          )}
+                          areQueriesEqual={queriesEqual}
                           isFetchingMeta={isFetchingMeta}
                           queryError={queryError}
                           framework={framework}
@@ -535,7 +588,7 @@ export function PlaygroundQueryBuilder({
                               await refreshToken();
 
                               handleRunButtonClick({
-                                query,
+                                query: validateQuery(query),
                                 pivotConfig,
                                 chartType: chartType || 'line',
                               });

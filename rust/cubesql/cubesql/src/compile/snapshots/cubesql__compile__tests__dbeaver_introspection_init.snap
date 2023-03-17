@@ -1,0 +1,10 @@
+---
+source: cubesql/src/compile/mod.rs
+assertion_line: 8316
+expression: "execute_query(\"SELECT current_schema(), session_user;\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++------------------+----------------+
+| current_schema() | session_user() |
++------------------+----------------+
+| public           | ovr            |
++------------------+----------------+

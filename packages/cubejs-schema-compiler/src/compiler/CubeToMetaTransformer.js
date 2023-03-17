@@ -3,7 +3,7 @@ import R from 'ramda';
 import camelCase from 'camelcase';
 
 import { UserError } from './UserError';
-import { BaseMeasure } from '../adapter';
+import { BaseMeasure, BaseQuery } from '../adapter';
 
 export class CubeToMetaTransformer {
   constructor(cubeValidator, cubeEvaluator, contextEvaluator, joinGraph) {
@@ -34,7 +34,7 @@ export class CubeToMetaTransformer {
         measures: R.compose(
           R.map((nameToMetric) => ({
             ...this.measureConfig(cube.name, cubeTitle, nameToMetric),
-            isVisible: this.isVisible(nameToMetric[1], true)
+            isVisible: this.isVisible(nameToMetric[1], this.isVisible(cube, true))
           })),
           R.toPairs
         )(cube.measures || {}),
@@ -49,7 +49,7 @@ export class CubeToMetaTransformer {
               nameToDimension[1].suggestFilterValues == null ? true : nameToDimension[1].suggestFilterValues,
             format: nameToDimension[1].format,
             meta: nameToDimension[1].meta,
-            isVisible: this.isVisible(nameToDimension[1], !nameToDimension[1].primaryKey)
+            isVisible: this.isVisible(nameToDimension[1], this.isVisible(cube, !nameToDimension[1].primaryKey))
           })),
           R.toPairs
         )(cube.dimensions || {}),
@@ -60,6 +60,7 @@ export class CubeToMetaTransformer {
             shortTitle: this.title(cubeTitle, nameToSegment, true),
             description: nameToSegment[1].description,
             meta: nameToSegment[1].meta,
+            isVisible: this.isVisible(nameToSegment[1], this.isVisible(cube, true))
           })),
           R.toPairs
         )(cube.segments || {})
@@ -105,6 +106,9 @@ export class CubeToMetaTransformer {
       cubeName, drillMembers, { originalSorting: true }
     )) || [];
 
+    // TODO support type qualifiers on min and max
+    const type = BaseQuery.isCalculatedMeasureType(nameToMetric[1].type) ? nameToMetric[1].type : 'number';
+
     return {
       name,
       title: this.title(cubeTitle, nameToMetric),
@@ -113,7 +117,7 @@ export class CubeToMetaTransformer {
       format: nameToMetric[1].format,
       cumulativeTotal: nameToMetric[1].cumulative || BaseMeasure.isCumulative(nameToMetric[1]),
       cumulative: nameToMetric[1].cumulative || BaseMeasure.isCumulative(nameToMetric[1]),
-      type: 'number', // TODO
+      type,
       aggType: nameToMetric[1].type,
       drillMembers: drillMembersArray,
       drillMembersGrouped: {

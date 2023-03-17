@@ -9,18 +9,16 @@ redirect_from:
   - /recipes/extending-cubes
 ---
 
-Cube.js supports the [`extends` feature][ref-schema-ref-cube-extends], which
-allows you to reuse all declared members of a cube. This is a foundation for
-building reusable data schemas.
+Cube supports the [`extends` feature][ref-schema-ref-cube-extends], which allows
+you to reuse all declared members of a cube. This is a foundation for building
+reusable data schemas.
 
-[Cubes][self-schema-concepts-cubes] are represented as [JavaScript
+[Cubes][ref-schema-concepts-cubes] are represented as [JavaScript
 objects][mdn-js-objects] with such properties as measures, dimensions, and
-segments. Extending in Cube.js works similarly to JavaScript’s prototype
+segments. Extending in Cube works similarly to JavaScript’s prototype
 inheritance. Measures, dimensions, and segments are merged as separate objects.
 So if the base cube defines measure `A` and the extending cube defines measure
 `B`, the resulting cube will have both measures `A` and `B`.
-
-[self-schema-concepts-cubes]: /schema/fundamentals/concepts#cubes
 
 The usual pattern is to **extract common measures, dimensions, and joins into
 the base cube** and then **extend from the base cube**. This helps to prevent
@@ -31,20 +29,20 @@ dimensions, and a join to the `Users` cube:
 
 <InfoBox>
 
-It’s important to use the `${CUBE}` reference instead of the `${BaseEvents}`
-reference when referencing the extending cube. `${BaseEvents}` would not work in
-this case, when the cube will be extended.
+It’s important to use the `CUBE` reference when referencing properties on the
+cube. Not specifying the cube name or using `${BaseEvents}` does not work when
+the cube is extended.
 
 </InfoBox>
 
 ```javascript
 cube(`BaseEvents`, {
-  sql: `select * from events`,
+  sql: `SELECT * FROM events`,
 
   joins: {
     Users: {
       relationship: `belongsTo`,
-      sql: `${CUBE}.user_id = ${Users}.id`,
+      sql: `${CUBE}.user_id = ${Users.id}`,
     },
   },
 
@@ -69,7 +67,7 @@ define only the specific dimensions – `productName` for product purchases and
 
 ```javascript
 cube(`ProductPurchases`, {
-  sql: `select * from product_purchases`,
+  sql: `SELECT * FROM product_purchases`,
   extends: BaseEvents,
 
   dimensions: {
@@ -81,7 +79,7 @@ cube(`ProductPurchases`, {
 });
 
 cube(`PageViews`, {
-  sql: `select * from page_views`,
+  sql: `SELECT * FROM page_views`,
   extends: BaseEvents,
 
   dimensions: {
@@ -93,6 +91,32 @@ cube(`PageViews`, {
 });
 ```
 
+## Usage with FILTER_PARAMS
+
+If the base cube is using [`FILTER_PARAMS`][ref-schema-ref-cube-filter-params]
+in any `sql` property, then extending cubes can do one of two things:
+
+- Override the `sql` property in each target cube.
+  ```javascript
+  cube(`ProductPurchases`, {
+    sql: `SELECT * FROM events WHERE 
+           {$FILTER_PARAMS.ProductPurchases.timestamp.filter('time')}`,
+  ...
+  ```
+
+- Put all filters inside the base cube and reference all specific cubes filters
+  using `AND`. The unused filters will be rendered to `1 = 1` in the SQL query.
+  ```javascript
+  cube(`BaseEvents`, {
+    sql: `SELECT * FROM events WHERE  
+              {$FILTER_PARAMS.BaseEvents.timestamp.filter('time')}
+          AND {$FILTER_PARAMS.ProductPurchases.timestamp.filter('time')}
+          AND {$FILTER_PARAMS.PageViews.timestamp.filter('time')}`,
+  ...
+  ```
+
 [mdn-js-objects]:
   https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object
+[ref-schema-concepts-cubes]: /schema/fundamentals/concepts#cubes
 [ref-schema-ref-cube-extends]: /schema/reference/cube#extends
+[ref-schema-ref-cube-filter-params]: /schema/reference/cube#filter-params

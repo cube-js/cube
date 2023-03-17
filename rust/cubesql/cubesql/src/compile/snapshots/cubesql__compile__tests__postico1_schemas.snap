@@ -1,0 +1,12 @@
+---
+source: cubesql/src/compile/mod.rs
+assertion_line: 8094
+expression: "execute_query(\"SELECT\n                    oid,\n                    nspname,\n                    nspname = ANY (current_schemas(true)) AS is_on_search_path,\n                    oid = pg_my_temp_schema() AS is_my_temp_schema,\n                    pg_is_other_temp_schema(oid) AS is_other_temp_schema\n                FROM pg_namespace\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++-------+--------------------+-------------------+-------------------+----------------------+
+| oid   | nspname            | is_on_search_path | is_my_temp_schema | is_other_temp_schema |
++-------+--------------------+-------------------+-------------------+----------------------+
+| 11    | pg_catalog         | true              | false             | false                |
+| 2200  | public             | true              | false             | false                |
+| 13000 | information_schema | false             | false             | false                |
++-------+--------------------+-------------------+-------------------+----------------------+

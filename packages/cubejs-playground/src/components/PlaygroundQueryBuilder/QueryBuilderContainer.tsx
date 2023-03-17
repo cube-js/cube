@@ -2,18 +2,15 @@ import { LockOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import { CubeProvider } from '@cubejs-client/react';
 import { Card, Space } from 'antd';
 import { useLayoutEffect } from 'react';
-import { useHistory } from 'react-router';
+import { useHistory } from 'react-router-dom';
 import styled from 'styled-components';
 
-import { Button } from '../../atoms';
-import { useCubejsApi, useSecurityContext } from '../../hooks';
-// import { LightningIcon } from '../../shared/icons/LightningIcon';
+import { Button, CubeLoader } from '../../atoms';
+import { useCloud } from '../../cloud';
+import { useAppContext, useCubejsApi, useSecurityContext } from '../../hooks';
+import { useRollupDesignerContext, RollupDesignerContext } from '../../rollup-designer';
 import { ChartRendererStateProvider } from '../QueryTabs/ChartRendererStateProvider';
 import { QueryTabs, QueryTabsProps } from '../QueryTabs/QueryTabs';
-import {
-  RollupDesignerContext,
-  useRollupDesignerContext,
-} from '../RollupDesigner';
 import {
   PlaygroundQueryBuilder,
   PlaygroundQueryBuilderProps,
@@ -30,28 +27,25 @@ const StyledCard = styled(Card)`
   }
 `;
 
-type QueryBuilderContainerProps = {
-  apiUrl: string | null;
-  token: string | null;
-} & Pick<
+type QueryBuilderContainerProps = Pick<
   PlaygroundQueryBuilderProps,
   | 'defaultQuery'
   | 'initialVizState'
   | 'schemaVersion'
   | 'dashboardSource'
+  | 'extra'
   | 'onVizStateChanged'
   | 'onSchemaChange'
 > &
   Pick<QueryTabsProps, 'onTabChange'>;
 
-export function QueryBuilderContainer({
-  apiUrl,
-  token,
-  ...props
-}: QueryBuilderContainerProps) {
-  const { token: securityContextToken, setIsModalOpen } = useSecurityContext();
-
-  const currentToken = securityContextToken || token;
+export function QueryBuilderContainer(props: QueryBuilderContainerProps) {
+  const { apiUrl } = useAppContext();
+  const {
+    currentToken,
+    token: securityContextToken,
+    setIsModalOpen,
+  } = useSecurityContext();
 
   useLayoutEffect(() => {
     if (apiUrl && currentToken) {
@@ -65,6 +59,10 @@ export function QueryBuilderContainer({
 
   const cubejsApi = useCubejsApi(apiUrl, currentToken);
 
+  if (!cubejsApi) {
+    return <CubeLoader />;
+  }
+
   return (
     <CubeProvider cubejsApi={cubejsApi}>
       <RollupDesignerContext apiUrl={apiUrl!}>
@@ -75,7 +73,11 @@ export function QueryBuilderContainer({
               token={currentToken!}
               dashboardSource={props.dashboardSource}
               securityContextToken={securityContextToken}
+              extra={props.extra}
+              schemaVersion={props.schemaVersion}
+              onSchemaChange={props.onSchemaChange}
               onTabChange={props.onTabChange}
+              onVizStateChanged={props.onVizStateChanged}
               onSecurityContextModalOpen={() => setIsModalOpen(true)}
             />
           </StyledCard>
@@ -92,7 +94,11 @@ type QueryTabsRendererProps = {
   onSecurityContextModalOpen: () => void;
 } & Pick<
   PlaygroundQueryBuilderProps,
-  'schemaVersion' | 'dashboardSource' | 'onVizStateChanged' | 'onSchemaChange'
+  | 'schemaVersion'
+  | 'dashboardSource'
+  | 'onVizStateChanged'
+  | 'onSchemaChange'
+  | 'extra'
 > &
   Pick<QueryTabsProps, 'onTabChange'>;
 
@@ -101,12 +107,12 @@ function QueryTabsRenderer({
   token,
   securityContextToken,
   dashboardSource,
-  schemaVersion,
   onSecurityContextModalOpen,
   ...props
 }: QueryTabsRendererProps) {
   const { location } = useHistory();
   const { setQuery, toggleModal } = useRollupDesignerContext();
+  const { isAddRollupButtonVisible } = useCloud();
 
   const params = new URLSearchParams(location.search);
   const query = JSON.parse(params.get('query') || 'null');
@@ -126,14 +132,16 @@ function QueryTabsRenderer({
             {securityContextToken ? 'Edit' : 'Add'} Security Context
           </Button>
 
-          <Button
-            data-testid="rd-btn"
-            icon={<ThunderboltOutlined />}
-            size="small"
-            onClick={() => toggleModal()}
-          >
-            Add Rollup to Schema
-          </Button>
+          {isAddRollupButtonVisible == null || isAddRollupButtonVisible ? (
+            <Button
+              data-testid="rd-btn"
+              icon={<ThunderboltOutlined />}
+              size="small"
+              onClick={() => toggleModal()}
+            >
+              Add Rollup to Schema
+            </Button>
+          ) : null}
         </Space>
       }
       onTabChange={(tab) => {
@@ -151,7 +159,9 @@ function QueryTabsRenderer({
             chartType,
           }}
           dashboardSource={dashboardSource}
-          schemaVersion={schemaVersion}
+          schemaVersion={props.schemaVersion}
+          extra={props.extra}
+          onSchemaChange={props.onSchemaChange}
           onVizStateChanged={(vizState) => {
             saveTab({
               query: vizState.query || {},

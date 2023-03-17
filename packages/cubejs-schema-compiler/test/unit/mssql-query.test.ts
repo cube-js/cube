@@ -1,5 +1,7 @@
+import { QueryAlias } from '@cubejs-backend/shared';
 import { MssqlQuery } from '../../src/adapter/MssqlQuery';
 import { prepareCompiler } from './PrepareCompiler';
+import { createJoinedCubesSchema } from './utils';
 
 describe('MssqlQuery', () => {
   const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(`
@@ -81,6 +83,8 @@ describe('MssqlQuery', () => {
     });
     `);
 
+  const joinedSchemaCompilers = prepareCompiler(createJoinedCubesSchema());
+
   it('group by the date_from field on unbounded trailing windows',
     () => compiler.compile().then(() => {
       const query = new MssqlQuery(
@@ -134,4 +138,22 @@ describe('MssqlQuery', () => {
       expect(/ORDER BY/.test(subQuery.sql)).toEqual(false);
       expect(queryAndParams[0]).toMatch(/ORDER BY/);
     }));
+
+  it('aggregating on top of sub-queries', async () => {
+    await joinedSchemaCompilers.compiler.compile();
+    const query = new MssqlQuery({
+      joinGraph: joinedSchemaCompilers.joinGraph,
+      cubeEvaluator: joinedSchemaCompilers.cubeEvaluator,
+      compiler: joinedSchemaCompilers.compiler,
+    },
+    {
+      dimensions: ['E.eval'],
+      measures: ['B.bval_sum'],
+      order: [{ id: 'B.bval_sum' }],
+    });
+    const sql = query.buildSqlAndParams();
+    // eslint-disable-next-line no-useless-escape
+    const re = new RegExp(`(GROUP BY)(\n|.)+("${QueryAlias.AGG_SUB_QUERY_KEYS}"\."e__eval")`);
+    expect(re.test(sql[0])).toBeTruthy();
+  });
 });

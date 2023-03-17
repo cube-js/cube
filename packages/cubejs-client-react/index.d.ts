@@ -1,7 +1,7 @@
 /**
  * @title @cubejs-client/react
  * @permalink /@cubejs-client-react
- * @menuCategory Cube.js Frontend
+ * @menuCategory Frontend Integrations
  * @subcategory Reference
  * @menuOrder 3
  * @description `@cubejs-client/react` provides React Components for easy Cube.js integration in a React app.
@@ -30,6 +30,8 @@ declare module '@cubejs-client/react' {
     DateRange,
     UnaryOperator,
     BinaryOperator,
+    DeeplyReadonly,
+    QueryRecordType,
   } from '@cubejs-client/core';
 
   type CubeProviderProps = {
@@ -44,7 +46,7 @@ declare module '@cubejs-client/react' {
    * import cubejs from '@cubejs-client/core';
    * import { CubeProvider } from '@cubejs-client/react';
    *
-   * const API_URL = 'https://react-dashboard.cubecloudapp.dev';
+   * const API_URL = 'https://harsh-eel.aws-us-east-2.cubecloudapp.dev';
    * const CUBEJS_TOKEN =
    *   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.* eyJpYXQiOjE1OTE3MDcxNDgsImV4cCI6MTU5NDI5OTE0OH0.* n5jGLQJ14igg6_Hri_Autx9qOIzVqp4oYxmX27V-4T4';
    *
@@ -238,6 +240,8 @@ declare module '@cubejs-client/react' {
 
     meta: Meta | undefined;
     metaError?: Error | null;
+    richMetaError?: Error | null;
+    metaErrorStack?: string | null;
     isFetchingMeta: boolean;
     /**
      * Indicates whether the query is ready to be displayed or not
@@ -304,6 +308,12 @@ declare module '@cubejs-client/react' {
      * Used for chart type update
      */
     updateChartType: (chartType: ChartType) => void;
+
+    /**
+     * Used to set the initial query for this component. Note that adding this prop turns this into an
+     * uncontrolled component and will only be able to execute `dryRun` queries. To use this component
+     * as a controlled component, use `setQuery` instead.
+     */
     query: Query;
     validatedQuery: Query;
     refresh: () => void;
@@ -405,7 +415,7 @@ declare module '@cubejs-client/react' {
    *   });
    *
    *   if (isLoading) {
-   *     return <div>{progress && progress.stage && progress.stage.stage || 'Loading...'}</div>;
+   *     return <div>{progress?.stage || 'Loading...'}</div>;
    *   }
    *
    *   if (error) {
@@ -426,7 +436,16 @@ declare module '@cubejs-client/react' {
    * @order 1
    * @stickyTypes
    */
-  export function useCubeQuery<TData>(query: Query | Query[], options?: UseCubeQueryOptions): UseCubeQueryResult<TData>;
+  export function useCubeQuery<
+    TData,
+    TQuery extends DeeplyReadonly<Query | Query[]> = DeeplyReadonly<Query | Query[]>>(
+    query: TQuery,
+    options?: UseCubeQueryOptions,
+  ): UseCubeQueryResult<
+    unknown extends TData
+      ? QueryRecordType<TQuery>
+      : TData
+  >;
 
   type UseCubeQueryOptions = {
     /**
@@ -643,9 +662,11 @@ declare module '@cubejs-client/react' {
     sourceAxis: TSourceAxis;
     destinationAxis: TSourceAxis;
   };
+
   type PivotConfigExtraUpdateFields = {
     limit?: number;
   };
+
   type PivotConfigUpdater = {
     moveItem: (args: PivotConfigUpdaterArgs) => void;
     update: (pivotConfig: PivotConfig & PivotConfigExtraUpdateFields) => void;

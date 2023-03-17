@@ -28,7 +28,7 @@ export class RedisQueueEventsBus extends BaseQueueEventsBus {
       try {
         message = JSON.parse(message);
         await Promise.all(Object.values(this.subscribers).map(subscriber => subscriber.callback(message)));
-      } catch (error) {
+      } catch (error: any) {
         console.error(error.stack || error);
       }
     });

@@ -1,4 +1,4 @@
-import Joi from '@hapi/joi';
+import Joi from 'joi';
 import DriverDependencies from './DriverDependencies';
 
 const schemaQueueOptions = Joi.object().keys({
@@ -60,10 +60,11 @@ const schemaOptions = Joi.object().keys({
   externalDialectFactory: Joi.func(),
   externalDriverFactory: Joi.func(),
   //
-  cacheAndQueueDriver: Joi.string().valid('redis', 'memory'),
+  cacheAndQueueDriver: Joi.string().valid('cubestore', 'redis', 'memory'),
   contextToAppId: Joi.func(),
   contextToOrchestratorId: Joi.func(),
   contextToDataSourceId: Joi.func(),
+  contextToPermissions: Joi.func(),
   repositoryFactory: Joi.func(),
   checkAuth: Joi.func(),
   checkAuthMiddleware: Joi.func(),
@@ -84,6 +85,7 @@ const schemaOptions = Joi.object().keys({
   scheduledRefreshTimeZones: Joi.array().items(Joi.string()),
   scheduledRefreshContexts: Joi.func(),
   scheduledRefreshConcurrency: Joi.number().min(1).integer(),
+  scheduledRefreshBatchSize: Joi.number().min(1).integer(),
   // Compiler cache
   compilerCacheSize: Joi.number().min(0).integer(),
   updateCompilerCacheKeepAlive: Joi.boolean(),
@@ -126,8 +128,10 @@ const schemaOptions = Joi.object().keys({
       preAggregationsOptions: {
         queueOptions: schemaQueueOptions,
         externalRefresh: Joi.boolean(),
+        maxPartitions: Joi.number(),
       },
-      rollupOnlyMode: Joi.boolean()
+      rollupOnlyMode: Joi.boolean(),
+      testConnectionTimeout: Joi.number().min(0).integer(),
     })
   ),
   allowJsDuplicatePropsInSchema: Joi.boolean(),
@@ -135,12 +139,21 @@ const schemaOptions = Joi.object().keys({
   dashboardAppPort: Joi.number(),
   sqlCache: Joi.boolean(),
   livePreview: Joi.boolean(),
+  // SQL API
+  sqlPort: Joi.number(),
+  pgSqlPort: Joi.number(),
+  sqlSuperUser: Joi.string(),
+  checkSqlAuth: Joi.func(),
+  canSwitchSqlUser: Joi.func(),
+  sqlUser: Joi.string(),
+  sqlPassword: Joi.string(),
   // Additional system flags
   serverless: Joi.boolean(),
+  allowNodeRequire: Joi.boolean(),
 });
 
 export default (options: any) => {
-  const { error } = Joi.validate(options, schemaOptions, { abortEarly: false, });
+  const { error } = schemaOptions.validate(options, { abortEarly: false });
   if (error) {
     throw new Error(`Invalid cube-server-core options: ${error.message || error.toString()}`);
   }

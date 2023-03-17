@@ -1,4 +1,4 @@
-/* eslint-disable global-require,no-unused-vars */
+/* eslint-disable global-require */
 /* globals describe, jest, beforeEach, test, expect */
 import R from 'ramda';
 
@@ -7,6 +7,7 @@ class MockDriver {
     this.tables = [];
     this.executedQueries = [];
     this.cancelledQueries = [];
+    this.now = new Date().getTime();
   }
 
   query(query) {
@@ -44,20 +45,24 @@ class MockDriver {
     return { rows: await this.query(`SELECT * FROM ${table}`) };
   }
 
-  async tableColumnTypes(table) {
+  async tableColumnTypes(_table) {
     return [];
   }
 
-  async uploadTable(table, columns, tableData) {
+  async uploadTable(table, columns, _tableData) {
     await this.createTable(table, columns);
   }
 
-  createTable(quotedTableName, columns) {
+  createTable(quotedTableName, _columns) {
     this.tables.push(quotedTableName);
   }
 
   readOnly() {
     return false;
+  }
+
+  nowTimestamp() {
+    return this.now;
   }
 }
 
@@ -121,9 +126,10 @@ describe('PreAggregations', () => {
       // eslint-disable-next-line @typescript-eslint/no-empty-function
       () => {},
       {
-        queueOptions: {
-          executionTimeout: 1
-        },
+        queueOptions: () => ({
+          executionTimeout: 1,
+          concurrency: 2,
+        }),
       },
     );
   });
@@ -140,16 +146,19 @@ describe('PreAggregations', () => {
         () => {},
         queryCache,
         {
-          queueOptions: {
-            executionTimeout: 1
-          },
+          queueOptions: () => ({
+            executionTimeout: 1,
+            concurrency: 2,
+          }),
         },
       );
     });
 
     test('syncronously create rollup from scratch', async () => {
+      mockDriver.now = 12345000;
       const { preAggregationsTablesToTempTables: result } = await preAggregations.loadAllPreAggregationsIfNeeded(basicQueryWithRenew);
       expect(result[0][1].targetTableName).toMatch(/stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il/);
+      expect(result[0][1].lastUpdatedAt).toEqual(12345000);
     });
   });
 
@@ -165,9 +174,10 @@ describe('PreAggregations', () => {
         () => {},
         queryCache,
         {
-          queueOptions: {
-            executionTimeout: 1
-          },
+          queueOptions: () => ({
+            executionTimeout: 1,
+            concurrency: 2,
+          }),
           externalDriverFactory: mockExternalDriverFactory,
         },
       );
@@ -176,6 +186,7 @@ describe('PreAggregations', () => {
     test('refresh external preaggregation with a writable source (refreshImplTempTableExternalStrategy)', async () => {
       const { preAggregationsTablesToTempTables: result } = await preAggregations.loadAllPreAggregationsIfNeeded(basicQueryExternal);
       expect(result[0][1].targetTableName).toMatch(/stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il/);
+      expect(result[0][1].lastUpdatedAt).toEqual(1593709044209);
     });
   });
 
@@ -191,9 +202,10 @@ describe('PreAggregations', () => {
         () => {},
         queryCache,
         {
-          queueOptions: {
-            executionTimeout: 1
-          },
+          queueOptions: () => ({
+            executionTimeout: 1,
+            concurrency: 2,
+          }),
           externalDriverFactory: mockExternalDriverFactory,
         },
       );
@@ -202,6 +214,7 @@ describe('PreAggregations', () => {
     test('refresh external preaggregation with a writable source (refreshImplStreamExternalStrategy)', async () => {
       const { preAggregationsTablesToTempTables: result } = await preAggregations.loadAllPreAggregationsIfNeeded(basicQueryExternal);
       expect(result[0][1].targetTableName).toMatch(/stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il/);
+      expect(result[0][1].lastUpdatedAt).toEqual(1593709044209);
     });
   });
 
@@ -217,9 +230,10 @@ describe('PreAggregations', () => {
         () => {},
         queryCache,
         {
-          queueOptions: {
-            executionTimeout: 1
-          },
+          queueOptions: () => ({
+            executionTimeout: 1,
+            concurrency: 2,
+          }),
           externalRefresh: true,
         },
       );
@@ -232,7 +246,7 @@ describe('PreAggregations', () => {
 
     test('fail if rollup doesn\'t already exist', async () => {
       await expect(preAggregations.loadAllPreAggregationsIfNeeded(basicQuery))
-        .rejects.toThrowError(/Your configuration restricts query requests to only be served from pre-aggregations/);
+        .rejects.toThrowError(/No pre-aggregation partitions were built yet/);
     });
   });
 
@@ -248,9 +262,10 @@ describe('PreAggregations', () => {
         () => {},
         queryCache,
         {
-          queueOptions: {
-            executionTimeout: 1
-          },
+          queueOptions: () => ({
+            executionTimeout: 1,
+            concurrency: 2,
+          }),
           externalDriverFactory: mockExternalDriverFactory,
           externalRefresh: true,
         },
@@ -265,6 +280,7 @@ describe('PreAggregations', () => {
     test('load external preaggregation without communicating to the source database', async () => {
       const { preAggregationsTablesToTempTables: result } = await preAggregations.loadAllPreAggregationsIfNeeded(basicQueryExternal);
       expect(result[0][1].targetTableName).toMatch(/stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il/);
+      expect(result[0][1].lastUpdatedAt).toEqual(1593709044209);
     });
   });
 
@@ -280,9 +296,10 @@ describe('PreAggregations', () => {
         () => {},
         queryCache,
         {
-          queueOptions: {
-            executionTimeout: 1
-          },
+          queueOptions: () => ({
+            executionTimeout: 1,
+            concurrency: 2,
+          }),
           externalDriverFactory: async () => {
             const driver = mockExternalDriver;
             driver.createTable('stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il_1593709044209');
@@ -316,6 +333,7 @@ describe('PreAggregations', () => {
     test('naming_version and sort by last_updated_at', async () => {
       const { preAggregationsTablesToTempTables: result } = await preAggregations.loadAllPreAggregationsIfNeeded(basicQueryExternal);
       expect(result[0][1].targetTableName).toMatch(/stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il_1fm6652/);
+      expect(result[0][1].lastUpdatedAt).toEqual(1600329890000);
     });
   });
 
@@ -331,9 +349,10 @@ describe('PreAggregations', () => {
         () => {},
         queryCache,
         {
-          queueOptions: {
-            executionTimeout: 1
-          },
+          queueOptions: () => ({
+            executionTimeout: 1,
+            concurrency: 2,
+          }),
           externalDriverFactory: async () => {
             const driver = mockExternalDriver;
             driver.createTable('stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il_1893709044209');
@@ -347,6 +366,7 @@ describe('PreAggregations', () => {
     test('naming_version and sort by last_updated_at', async () => {
       const { preAggregationsTablesToTempTables: result } = await preAggregations.loadAllPreAggregationsIfNeeded(basicQueryExternal);
       expect(result[0][1].targetTableName).toMatch(/stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il_1893709044209/);
+      expect(result[0][1].lastUpdatedAt).toEqual(1893709044209);
     });
   });
 });

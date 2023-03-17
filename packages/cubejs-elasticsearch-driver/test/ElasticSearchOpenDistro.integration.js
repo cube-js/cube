@@ -20,7 +20,7 @@ describe('ElasticSearchDriver OpenDistro', () => {
       interval: 3 * 1000,
       startPeriod: 15 * 1000,
       timeout: 500,
-      retries: 3
+      retries: 30
     })
     .withWaitStrategy(Wait.forHealthCheck())
     .start();

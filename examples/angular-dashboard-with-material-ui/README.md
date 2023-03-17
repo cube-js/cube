@@ -4,7 +4,7 @@ Example: https://angular-dashboard-demo.cube.dev
 
 Guide: https://angular-dashboard.cube.dev
 
-Angular Material UI dashboard with Cube.js
+Angular Material dashboard with Cube.js
 
 ## Run Project
 
