@@ -9,17 +9,17 @@ redirect_from:
   - /pre-aggregations
 ---
 
-Pre-aggregations are materialized query results persisted as tables. Cube.js has
-an ability to analyze queries against a defined set of pre-aggregation rules in
+Pre-aggregations are materialized query results persisted as tables. Cube has an
+ability to analyze queries against a defined set of pre-aggregation rules in
 order to choose the optimal one that will be used to create pre-aggregation
 table.
 
-If Cube.js finds a suitable pre-aggregation rule, database querying becomes a
+If Cube finds a suitable pre-aggregation rule, database querying becomes a
 multi-stage process:
 
-1. Cube.js checks if an up-to-date copy of the pre-aggregation exists.
+1. Cube checks if an up-to-date copy of the pre-aggregation exists.
 
-2. Cube.js will execute a query against the pre-aggregated tables instead of the
+2. Cube will execute a query against the pre-aggregated tables instead of the
    raw data.
 
 Pre-aggregations can be defined in the `preAggregations` available on each cube.
@@ -112,7 +112,7 @@ multiple cubes. In case of multiple cubes being involved, the join query will be
 built according to the standard rules of cubes joining.
 
 Rollups are selected for querying based on properties found in queries made to
-the Cube.js REST API. A thorough explanation can be found under [Getting Started
+the Cube REST API. A thorough explanation can be found under [Getting Started
 with Pre-Aggregations][ref-caching-preaggs-target].
 
 <CodeTabs>
@@ -181,7 +181,7 @@ cube(`CompletedOrders`, {
 
   preAggregations: {
     main: {
-      type: `originalSql`
+      type: `originalSql`,
     },
   },
 });
@@ -209,9 +209,10 @@ version.
 
 <WarningBox>
 
-Rollup join can be used only to join two tables, and one can't contain more than one partition so that the join can operate correctly.
-It means that at least one table should be less than 1M of rows.
-There's work in progress to remove those limitations.
+Rollup join can be used only to join two tables, and one can't contain more than
+one partition so that the join can operate correctly. It means that at least one
+table should be less than 1M of rows. There's work in progress to remove those
+limitations.
 
 </WarningBox>
 
@@ -221,11 +222,11 @@ to them.
 
 <WarningBox>
 
-`rollupJoin` is ephemeral pre-aggregation that relies on referenced rollups
- when queries are executed. 
-Setting [`scheduledRefresh`](#parameters-scheduled-refresh) to `true` is 
-unnecessary for `rollupJoin` and will result in an error.
-Appropriate freshness controls should be set on referenced rollups instead.
+`rollupJoin` is ephemeral pre-aggregation that relies on referenced rollups when
+queries are executed. Setting
+[`scheduledRefresh`](#parameters-scheduled-refresh) to `true` is unnecessary for
+`rollupJoin` and will result in an error. Appropriate freshness controls should
+be set on referenced rollups instead.
 
 </WarningBox>
 
@@ -414,6 +415,7 @@ cube('Orders', {
 });
 ```
 
+```yaml
 cubes:
   - name: Orders
     sql: SELECT * FROM orders
@@ -595,8 +597,8 @@ pre-aggregation definition.
 ### <--{"id" : "Parameters"}--> granularity
 
 The `granularity` property defines the granularity of data _within_ the
-pre-aggregation. If set to `week`, for example, then Cube.js will pre-aggregate
-the data by week and persist it to Cube Store.
+pre-aggregation. If set to `week`, for example, then Cube will pre-aggregate the
+data by week and persist it to Cube Store.
 
 <CodeTabs>
 
@@ -742,7 +744,7 @@ cause out of memory.
 
 ### <--{"id" : "Parameters"}--> refreshKey
 
-Cube.js can also take care of keeping pre-aggregations up to date with the
+Cube can also take care of keeping pre-aggregations up to date with the
 `refreshKey` property. By default, it is set to `every: '1 hour'`.
 
 <InfoBox>
@@ -1030,11 +1032,11 @@ cubes:
 
 ### <--{"id" : "Parameters"}--> useOriginalSqlPreAggregations
 
-Cube.js supports multi-stage pre-aggregations by reusing original SQL
+Cube supports multi-stage pre-aggregations by reusing original SQL
 pre-aggregations in rollups through the `useOriginalSqlPreAggregations`
 property. It is helpful in cases where you want to re-use a heavy SQL query
 calculation in multiple `rollup` pre-aggregations. Without
-`useOriginalSqlPreAggregations` enabled, Cube.js will always re-execute all
+`useOriginalSqlPreAggregations` enabled, Cube will always re-execute all
 underlying SQL calculations every time it builds new rollup tables.
 
 <WarningBox>
@@ -1118,7 +1120,7 @@ starting with most recent ones in time and checks if the
 [`refreshKey`][self-refreshkey] has changed. If a change was detected, then that
 partition will be refreshed.
 
-In development mode, Cube.js runs the background refresh by default and will
+In development mode, Cube runs the background refresh by default and will
 refresh all pre-aggregations which have `scheduledRefresh: true`.
 
 Please consult [Production Checklist][ref-production-checklist-refresh] for best
@@ -1161,8 +1163,9 @@ cubes:
 
 <WarningBox>
 
-Currently `buildRangeStart` and `buildRangeEnd` doesn't have any effect on pre-aggregations without `partitionGranularity`.
-This behavior can be changed in future versions.
+Currently `buildRangeStart` and `buildRangeEnd` doesn't have any effect on
+pre-aggregations without `partitionGranularity`. This behavior can be changed in
+future versions.
 
 </WarningBox>
 
@@ -1289,12 +1292,11 @@ is of type `rollupLambda`, and then set `unionWithSourceData` to `true`:
 
 ```javascript
 cube(`Orders`, {
-
   preAggregations: {
     lambda: {
       type: `rollupLambda`,
       unionWithSourceData: true,
-      rollups: [Orders.main]
+      rollups: [Orders.main],
     },
   },
 });
@@ -1431,7 +1433,6 @@ definition:
 
 ```javascript
 cube(`Orders`, {
-
   preAggregations: {
     categoryAndDate: {
       measures: [CUBE.count],

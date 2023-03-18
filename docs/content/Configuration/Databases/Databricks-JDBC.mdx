@@ -15,7 +15,7 @@ permalink: /config/databases/databricks/jdbc
 
 Add the following to a `.env` file in your Cube project:
 
-```bash
+```dotenv
 CUBEJS_DB_TYPE=databricks-jdbc
 # CUBEJS_DB_NAME is optional
 CUBEJS_DB_NAME=default
@@ -41,7 +41,7 @@ RUN npm install
 
 You can then build and run the image using the following commands:
 
-```bash
+```bash{promptUser: user}
 docker build -t cubejs-jdk .
 docker run -it -p 4000:4000 --env-file=.env cubejs-jdk
 ```
@@ -105,7 +105,7 @@ writes to the export bucket in S3.
 
 </InfoBox>
 
-```bash
+```dotenv
 CUBEJS_DB_EXPORT_BUCKET_TYPE=s3
 CUBEJS_DB_EXPORT_BUCKET=s3://my.bucket.on.s3
 CUBEJS_DB_EXPORT_BUCKET_AWS_KEY=<AWS_KEY>
@@ -121,7 +121,7 @@ mounting Azure Blob Storage to Databricks DBFS][databricks-docs-dbfs-azure].
 [Retrieve the storage account access key][azure-bs-docs-get-key] from your Azure
 account and use as follows:
 
-```bash
+```dotenv
 CUBEJS_DB_EXPORT_BUCKET_TYPE=azure
 CUBEJS_DB_EXPORT_BUCKET=wasbs://my-bucket@my-account.blob.core.windows.net
 CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY=<AZURE_STORAGE_ACCOUNT_ACCESS_KEY>

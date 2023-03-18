@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.32.8](https://github.com/cube-js/cube.js/compare/v0.32.7...v0.32.8) (2023-03-17)
+
+
+### Bug Fixes
+
+* **cubesql:** Catch error on TcpStream.peer_addr() ([#6300](https://github.com/cube-js/cube.js/issues/6300)) ([d74a1f0](https://github.com/cube-js/cube.js/commit/d74a1f059ce7f1baa9dad5f216e013a3f0f1bc45))
+* **cubesql:** Use writable streams with plain objects instead of JSON.stringify pipe for streaming capability ([#6306](https://github.com/cube-js/cube.js/issues/6306)) ([a9b19fa](https://github.com/cube-js/cube.js/commit/a9b19fa1a1a9c2f0710c8058ed797a4b7a48ed7e))
+* **cubestore:** Panic: index out of bounds: the len is 0 but the index is 0 ([#6311](https://github.com/cube-js/cube.js/issues/6311)) ([41dbbc0](https://github.com/cube-js/cube.js/commit/41dbbc03365f6067e85a09e8d5cafbfc6fe39990))
+* **query-orchestrator:** queues reconciliation logic ([#6286](https://github.com/cube-js/cube.js/issues/6286)) ([b45def4](https://github.com/cube-js/cube.js/commit/b45def46d99710e4fcf43cbc84b1b38341b859f6))
+
+
+### Features
+
+* **cubestore:** RocksStore - panic protection for broken rw loop ([#6293](https://github.com/cube-js/cube.js/issues/6293)) ([1f2db32](https://github.com/cube-js/cube.js/commit/1f2db32c289c119468f4cbe522fa40bab1a00068))
+
+
+
+
+
 ## [0.32.7](https://github.com/cube-js/cube.js/compare/v0.32.6...v0.32.7) (2023-03-14)
 
 

@@ -60,17 +60,17 @@ rollups from the same cube in a `rollupLambda` definition.
 The Cube CLI now lets you validate your models on your local machine - simply
 run `npx cubejs-cli validate` to check the models in your project for errors:
 
-```bash
-$ npx cubejs-cli validate
+```bash{outputLines: 2-20}
+npx cubejs-cli validate
 ❌ Cube Schema validation failed
 
 Cube Error ---------------------------------------
 
 Orders cube: "dimensions.id" does not match any of the allowed types
 Possible reasons (one of):
-	* (dimensions.id.case) is required
-	* (dimensions.id.latitude) is required
-	* (dimensions.id.sql) is required
+  * (dimensions.id.case) is required
+  * (dimensions.id.latitude) is required
+  * (dimensions.id.sql) is required
 LineItems cube: Cube Orders doesn't exist
 
 Need some help? -------------------------------------

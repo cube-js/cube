@@ -74,7 +74,7 @@ In case we need to choose a dimension or render dropdowns for all dimensions, we
 can fetch the list of dimensions for all cubes from the `/meta`
 [endpoint](https://cube.dev/docs/rest-api#api-reference-v-1-meta):
 
-```bash
+```bash{promptUser: user}
 curl http://localhost:4000/cubejs-api/v1/meta
 ```
 

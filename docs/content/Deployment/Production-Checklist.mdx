@@ -30,7 +30,7 @@ Development mode is disabled by default.
 
 </InfoBox>
 
-```bash
+```dotenv
 # Set this to false or leave unset to disable development mode
 CUBEJS_DEV_MODE=false
 ```
@@ -42,7 +42,7 @@ background, we recommend running a separate Cube Refresh Worker instance. This
 allows your Cube API Instance to continue to serve requests with high
 availability.
 
-```bash
+```dotenv
 # Set to true so a Cube instance acts as a refresh worker
 CUBEJS_REFRESH_WORKER=true
 ```
@@ -51,15 +51,15 @@ CUBEJS_REFRESH_WORKER=true
 
 <WarningBox>
 
-While Cube can operate with in-memory cache and queue storage, there're multiple parts of Cube which
-require Cube Store in production mode.
-Replicating Cube instances without Cube Store can lead to source database degraded performance, various race conditions and
-cached data inconsistencies.
+While Cube can operate with in-memory cache and queue storage, there're multiple
+parts of Cube which require Cube Store in production mode. Replicating Cube
+instances without Cube Store can lead to source database degraded performance,
+various race conditions and cached data inconsistencies.
 
 </WarningBox>
 
-Cube Store manages in-memory cache, queue and pre-aggregations for Cube. Follow the
-[instructions here][ref-caching-cubestore] to set it up.
+Cube Store manages in-memory cache, queue and pre-aggregations for Cube. Follow
+the [instructions here][ref-caching-cubestore] to set it up.
 
 Depending on your database, Cube may need to "stage" pre-aggregations inside
 your database first before ingesting them into Cube Store. In this case, Cube

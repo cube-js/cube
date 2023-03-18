@@ -27,7 +27,7 @@ Google BigQuery credentials [here][bq-docs-getting-started].
 
 Add the following to a `.env` file in your Cube project:
 
-```bash
+```dotenv
 CUBEJS_DB_TYPE=bigquery
 CUBEJS_DB_BQ_PROJECT_ID=my-bigquery-project-12345
 CUBEJS_DB_BQ_KEY_FILE=/path/to/my/keyfile.json
@@ -36,7 +36,7 @@ CUBEJS_DB_BQ_KEY_FILE=/path/to/my/keyfile.json
 You could also encode the key file using Base64 and set the result to
 `CUBEJS_DB_BQ_CREDENTIALS`:
 
-```bash
+```dotenv
 CUBEJS_DB_BQ_CREDENTIALS=$(cat /path/to/my/keyfile.json | base64)
 ```
 
@@ -105,7 +105,7 @@ When using an export bucket, remember to assign the **BigQuery Data Editor** and
 
 </InfoBox>
 
-```bash
+```dotenv
 CUBEJS_DB_EXPORT_BUCKET=export_data_58148478376
 CUBEJS_DB_EXPORT_BUCKET_TYPE=gcp
 ```

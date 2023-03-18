@@ -41,14 +41,14 @@ Using Windows? Remember to use [PowerShell][link-powershell] or
 
 </InfoBox>
 
-```bash
-$ docker compose up -d
+```bash{promptUser: user}
+docker compose up -d
 ```
 
 Check if the container is running:
 
-```bash
-$ docker compose ps
+```bash{promptUser: user}
+docker compose ps
 ```
 
 ## 3. Open Developer Playground
@@ -57,7 +57,7 @@ Head to [http://localhost:4000](http://localhost:4000) to open [Developer
 Playground][ref-devtools-playground].
 
 The [Developer Playground][ref-devtools-playground] has a database connection
-wizard that loads when Cube.js is first started up and no `.env` file is found.
+wizard that loads when Cube is first started up and no `.env` file is found.
 After database credentials have been set up, an `.env` file will automatically
 be created and populated with the same credentials.
 
@@ -87,10 +87,10 @@ you can execute queries on the Build tab.
 ## Next Steps
 
 Generating Data Schema files in the Developer Playground is a good first step to
-start modeling your data. You can [learn more about Cube.js Data
+start modeling your data. You can [learn more about Cube Data
 Schema][ref-cubejs-schema] for complex data modeling techniques.
 
-Learn how to [query Cube.js with REST API][ref-rest-api] or [use our Javascript
+Learn how to [query Cube with REST API][ref-rest-api] or [use our Javascript
 client library and integrations with frontend
 frameworks][ref-frontend-introduction].
 

@@ -20,7 +20,13 @@ time.
 cube('MyCube', {
   joins: {
     TargetCubeName: {
-      relationship: `belongsTo` || `hasMany` || `hasOne` || `belongs_to` || `has_many` || `has_one`,
+      relationship:
+        `belongsTo` ||
+        `hasMany` ||
+        `hasOne` ||
+        `belongs_to` ||
+        `has_many` ||
+        `has_one`,
       sql: `SQL ON clause`,
     },
   },

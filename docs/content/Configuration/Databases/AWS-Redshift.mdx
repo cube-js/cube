@@ -25,7 +25,7 @@ network route to the cluster.
 
 Add the following to a `.env` file in your Cube project:
 
-```bash
+```dotenv
 CUBEJS_DB_TYPE=redshift
 CUBEJS_DB_HOST=my-redshift-cluster.cfbs3dkw1io8.eu-west-1.redshift.amazonaws.com
 CUBEJS_DB_NAME=my_redshift_database
@@ -97,7 +97,7 @@ writes to the export bucket in S3.
 
 </InfoBox>
 
-```bash
+```dotenv
 CUBEJS_DB_EXPORT_BUCKET_TYPE=s3
 CUBEJS_DB_EXPORT_BUCKET=my.bucket.on.s3
 CUBEJS_DB_EXPORT_BUCKET_AWS_KEY=<AWS_KEY>

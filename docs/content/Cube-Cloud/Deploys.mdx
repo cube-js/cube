@@ -5,8 +5,8 @@ category: Deploys
 menuOrder: 1
 ---
 
-This guide covers features and tools you can use to deploy your Cube.js project
-to Cube Cloud.
+This guide covers features and tools you can use to deploy your Cube project to
+Cube Cloud.
 
 ## Deploy with Git
 
@@ -28,10 +28,10 @@ Git credentials:
 The instructions to set up Cube Cloud as a Git remote are also available on the
 same screen:
 
-```bash
-$ git config credential.helper store
-$ git remote add cubecloud <YOUR-CUBE-CLOUD-GIT-URL>
-$ git push cubecloud master
+```bash{promptUser: user}
+git config credential.helper store
+git remote add cubecloud <YOUR-CUBE-CLOUD-GIT-URL>
+git push cubecloud master
 ```
 
 ## Deploy with GitHub
@@ -58,30 +58,30 @@ can also use the CLI to manually deploy changes without continuous deployment.
 
 ### <--{"id" : "Deploy with CLI"}--> Manual Deploys
 
-You can deploy your Cube.js project manually. This method uploads data schema
-and configuration files directly from your local project directory.
+You can deploy your Cube project manually. This method uploads data schema and
+configuration files directly from your local project directory.
 
 You can obtain Cube Cloud deploy token from your deployment **Settings** page.
 
-```bash
-$ npx cubejs-cli deploy --token TOKEN
+```bash{promptUser: user}
+npx cubejs-cli deploy --token TOKEN
 ```
 
 ### <--{"id" : "Deploy with CLI"}--> Continuous Deployment
 
-You can use Cube.js CLI with your continuous integration tool.
+You can use Cube CLI with your continuous integration tool.
 
 <InfoBox>
 
 You can use the `CUBE_CLOUD_DEPLOY_AUTH` environment variable to pass the Cube
-Cloud deploy token to Cube.js CLI.
+Cloud deploy token to Cube CLI.
 
 </InfoBox>
 
 Below is an example configuration for GitHub Actions:
 
-```bash
-name: My Cube.js App
+```yaml
+name: My Cube App
 on:
   push:
     paths:
@@ -90,7 +90,7 @@ on:
       - 'master'
 jobs:
   deploy:
-    name: Deploy My Cube.js App
+    name: Deploy My Cube App
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:

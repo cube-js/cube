@@ -2969,3 +2969,72 @@ pub fn create_sha1_udf() -> ScalarUDF {
         &fun,
     )
 }
+
+pub fn create_current_setting_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 1);
+
+        let setting_names = downcast_string_arg!(args[0], "str", i32);
+
+        let result = setting_names
+            .iter()
+            .map(|setting_name| {
+                if let Some(setting_name) = setting_name {
+                    Ok(Some(match setting_name.to_ascii_lowercase().as_str() {
+                        "max_index_keys" => "32".to_string(), // Taken from PostgreSQL
+                        "search_path" => "\"$user\", public".to_string(), // Taken from PostgreSQL
+                        setting_name => Err(DataFusionError::Execution(format!(
+                            "unrecognized configuration parameter \"{}\"",
+                            setting_name
+                        )))?,
+                    }))
+                } else {
+                    Ok(None)
+                }
+            })
+            .collect::<Result<StringArray>>()?;
+
+        Ok(Arc::new(result))
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Utf8)));
+
+    ScalarUDF::new(
+        "current_setting",
+        &Signature::exact(vec![DataType::Utf8], Volatility::Stable),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_quote_ident_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 1);
+
+        let idents = downcast_string_arg!(args[0], "str", i32);
+
+        let re = Regex::new(r"^[a-z_][a-z0-9_]*$").unwrap();
+        let result = idents
+            .iter()
+            .map(|ident| {
+                ident.map(|ident| {
+                    if re.is_match(ident) {
+                        return ident.to_string();
+                    }
+                    format!("\"{}\"", ident.replace("\"", "\"\""))
+                })
+            })
+            .collect::<StringArray>();
+
+        Ok(Arc::new(result))
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Utf8)));
+
+    ScalarUDF::new(
+        "quote_ident",
+        &Signature::exact(vec![DataType::Utf8], Volatility::Immutable),
+        &return_type,
+        &fun,
+    )
+}

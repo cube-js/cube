@@ -9,9 +9,9 @@ menuOrder: 4
 ## Introduction
 
 In this guide, you'll learn how to integrate AWS Cognito authentication with a
-Cube.js deployment. If you already have a pre-existing Cognito User Pool in AWS
+Cube deployment. If you already have a pre-existing Cognito User Pool in AWS
 that you'd like to re-use, please skip ahead to
-[Configure Cube.js](#configure-cube-js).
+[Configure Cube](#configure-cube-js).
 
 ## Create and configure a User Pool
 
@@ -68,13 +68,13 @@ left sidebar and associate the Lambda function you created previously:
 You can find more examples of [modifying claims in JWTs
 here][link-aws-cognito-pretoken-example].
 
-## Configure Cube.js
+## Configure Cube
 
-Now we're ready to configure Cube.js to use AWS Cognito. Go to your Cube.js
-project and open the `.env` file and add the following, replacing the values
-wrapped in `<>`.
+Now we're ready to configure Cube to use AWS Cognito. Go to your Cube project
+and open the `.env` file and add the following, replacing the values wrapped in
+`<>`.
 
-```bash
+```dotenv
 CUBEJS_JWK_URL=https://cognito-idp.<AWS_REGION>.amazonaws.com/<USER_POOL_ID>/.well-known/jwks.json
 CUBEJS_JWT_AUDIENCE=<APPLICATION_URL>
 CUBEJS_JWT_ISSUER=https://cognito-idp.<AWS_REGION>.amazonaws.com/<USER_POOL_ID>

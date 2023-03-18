@@ -30,7 +30,7 @@ cube(`Users`, {
 cubes:
   - name: Users
     segments:
-      sf_users:
+      - name: sf_users
         sql: "{CUBE}.location = 'San Francisco'"
 ```
 
@@ -54,7 +54,7 @@ cube(`Users`, {
 cubes:
   - name: Users
     segments:
-      sf_users:
+      - name: sf_users
         sql: "{CUBE}.location = 'San Francisco' or {CUBE}.state = 'CA'"
 ```
 
@@ -121,11 +121,11 @@ cube(`Users`, {
 cubes:
   - name: Users
     dimensions:
-      location:
+      - name: location
         sql: location
         type: string
     segments:
-      sf_users:
+      - name: sf_users
         sql: "{CUBE}.location = 'San Francisco'"
 ```
 
@@ -178,7 +178,7 @@ cube(`Users`, {
 cubes:
   - name: Users
     segments:
-      sf_ny_users:
+      - name: sf_ny_users
         sql:
           "{CUBE}.location = 'San Francisco' OR {CUBE}.location like '%New
           York%'"

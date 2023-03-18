@@ -88,12 +88,12 @@ always use a different charting library that suits your needs:
 
 You can install Cube JavaScript Client and the Vue package with npm or Yarn:
 
-```bash
+```bash{outputLines: 1,3-4}
 # npm
-$ npm install --save @cubejs-client/core @cubejs-client/vue3
+npm install --save @cubejs-client/core @cubejs-client/vue3
 
 # Yarn
-$ yarn add @cubejs-client/core @cubejs-client/vue3
+yarn add @cubejs-client/core @cubejs-client/vue3
 ```
 
 **Note.** If you're using Vue 2, please use `@cubejs-client/vue`.

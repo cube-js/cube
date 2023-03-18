@@ -16,8 +16,8 @@ A measure can only have one type.
 
 ### <--{"id" : "Measure Types"}--> string
 
-This measure type allows defining measures as a `string` value. In the example below,
-we create a `string` measure by converting a numerical value to a string:
+This measure type allows defining measures as a `string` value. In the example
+below, we create a `string` measure by converting a numerical value to a string:
 
 <CodeTabs>
 
@@ -45,8 +45,8 @@ cubes:
 
 ### <--{"id" : "Measure Types"}--> time
 
-This measure type allows defining measures as a `time` value. In the example below,
-we create a `time` measure from an existing dimension:
+This measure type allows defining measures as a `time` value. In the example
+below, we create a `time` measure from an existing dimension:
 
 <CodeTabs>
 
@@ -253,7 +253,7 @@ function or **additive**. This allows its usage in **additive** [rollup
 pre-aggregations][ref-schema-ref-preaggs-rollup] which are much more versatile
 than **non-additive** ones. It uses special SQL backend-dependent functions to
 estimate distinct counts, usually based on HyperLogLog or similar algorithms.
-Wherever possible Cube.js will use multi-stage HLL which significantly improves
+Wherever possible Cube will use multi-stage HLL which significantly improves
 calculation of distinct counts at scale.
 
 The `sql` parameter is required and can take any valid SQL expression.
@@ -285,8 +285,8 @@ cubes:
 ### <--{"id" : "Measure Types"}--> sum
 
 Adds up the values in a given field. It is similar to SQL’s `SUM` function.
-However, unlike writing raw SQL, Cube.js will properly calculate sums even if
-your query’s joins will result in row duplication.
+However, unlike writing raw SQL, Cube will properly calculate sums even if your
+query’s joins will result in row duplication.
 
 The `sql` parameter is required and can take any valid SQL expression that
 results in a numeric table column, or interpolated JavaScript expression. `sql`
@@ -368,8 +368,8 @@ cubes:
 ### <--{"id" : "Measure Types"}--> avg
 
 Averages the values in a given field. It is similar to SQL’s AVG function.
-However, unlike writing raw SQL, Cube.js will properly calculate averages even
-if your query’s joins will result in row duplication.
+However, unlike writing raw SQL, Cube will properly calculate averages even if
+your query’s joins will result in row duplication.
 
 The sql parameter for type: average measures can take any valid SQL expression
 that results in a numeric table column, or interpolated JavaScript expression.
@@ -555,7 +555,7 @@ This section describes the various types that can be assigned to a
 
 ### <--{"id" : "Dimension Types"}--> time
 
-In order to be able to create time series charts, Cube.js needs to identify time
+In order to be able to create time series charts, Cube needs to identify time
 dimension which is a timestamp column in your database.
 
 You can define several time dimensions in schemas and apply each when creating

@@ -21,7 +21,7 @@ please post an issue on GitHub.
 
 </InfoBox>
 
-Cube.js allows schemas to be created on-the-fly using a special
+Cube allows schemas to be created on-the-fly using a special
 [`asyncModule()`][ref-async-module] function only available in the [schema
 execution environment][ref-schema-env]. `asyncModule()` allows registering an
 async function to be executed at the end of the data schema compile phase so
@@ -43,8 +43,8 @@ following differences compared to statically defining schemas with `cube()`:
 - The `sql` and `drillMembers` properties for both dimensions and measures must
   be of type `() => string` and `() => string[]` accordingly
 
-Cube.js supports importing JavaScript logic from other files in a schema, so it
-is useful to declare utility functions for handling the above differences in a
+Cube supports importing JavaScript logic from other files in a schema, so it is
+useful to declare utility functions for handling the above differences in a
 separate file:
 
 [ref-import-export]: /recipes/export-import
@@ -179,7 +179,7 @@ module.exports = {
 ## Usage with COMPILE_CONTEXT
 
 The `COMPILE_CONTEXT` global object can also be used in conjunction with async
-schema creation to allow for multi-tenant deployments of Cube.js.
+schema creation to allow for multi-tenant deployments of Cube.
 
 In an example scenario where all tenants share the same cube, but see different
 dimensions and measures, you could do the following:
