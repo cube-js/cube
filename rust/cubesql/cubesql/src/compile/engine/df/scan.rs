@@ -217,10 +217,11 @@ impl ValueObject for JsonValueObject {
                 self.rows[index]
             )));
         };
-        let value = as_object.remove(field_name).ok_or(CubeError::user(format!(
-            r#"Unexpected response from Cube, Field "{}" doesn't exist in row: {:?}"#,
-            field_name, as_object
-        )))?;
+        let value = as_object
+            .get(field_name)
+            .unwrap_or(&Value::Null)
+            // TODO expose strings as references to avoid clonning
+            .clone();
         Ok(match value {
             Value::String(s) => FieldValue::String(s),
             Value::Number(n) => FieldValue::Number(n.as_f64().ok_or(
@@ -854,6 +855,7 @@ mod tests {
     async fn test_df_cube_scan_execute() {
         let schema = Arc::new(Schema::new(vec![
             Field::new("KibanaSampleDataEcommerce.count", DataType::Utf8, false),
+            Field::new("KibanaSampleDataEcommerce.count", DataType::Utf8, false),
             Field::new(
                 "KibanaSampleDataEcommerce.maxPrice",
                 DataType::Float64,
@@ -924,6 +926,13 @@ mod tests {
             RecordBatch::try_new(
                 schema.clone(),
                 vec![
+                    Arc::new(StringArray::from(vec![
+                        None,
+                        Some("5"),
+                        Some("5"),
+                        None,
+                        None
+                    ])) as ArrayRef,
                     Arc::new(StringArray::from(vec![
                         None,
                         Some("5"),
