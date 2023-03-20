@@ -1,0 +1,3534 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=false) and the external (csvImport=false, streamImport=false) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "query",
+    "downloadQueryResults",
+  ],
+  Array [
+    "getTablesQuery",
+    "createSchemaIfNotExists",
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=false) and the external (csvImport=false, streamImport=false) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=false) and the external (csvImport=false, streamImport=false) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "getTablesQuery",
+    "createSchemaIfNotExists",
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=false) and the external (csvImport=false, streamImport=false) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=false) and the external (csvImport=false, streamImport=true) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=false) and the external (csvImport=false, streamImport=true) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=false) and the external (csvImport=false, streamImport=true) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=false) and the external (csvImport=false, streamImport=true) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=false) and the external (csvImport=true, streamImport=false) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=false) and the external (csvImport=true, streamImport=false) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=false) and the external (csvImport=true, streamImport=false) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=false) and the external (csvImport=true, streamImport=false) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=false) and the external (csvImport=true, streamImport=true) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=false) and the external (csvImport=true, streamImport=true) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=false) and the external (csvImport=true, streamImport=true) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=false) and the external (csvImport=true, streamImport=true) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=true) and the external (csvImport=false, streamImport=false) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=true) and the external (csvImport=false, streamImport=false) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=true) and the external (csvImport=false, streamImport=false) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=true) and the external (csvImport=false, streamImport=false) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=true) and the external (csvImport=false, streamImport=true) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=true) and the external (csvImport=false, streamImport=true) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=true) and the external (csvImport=false, streamImport=true) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=true) and the external (csvImport=false, streamImport=true) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=true) and the external (csvImport=true, streamImport=false) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=true) and the external (csvImport=true, streamImport=false) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=true) and the external (csvImport=true, streamImport=false) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=true) and the external (csvImport=true, streamImport=false) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=true) and the external (csvImport=true, streamImport=true) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=true) and the external (csvImport=true, streamImport=true) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=true) and the external (csvImport=true, streamImport=true) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=true) and the external (csvImport=true, streamImport=true) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=false) and the external (csvImport=false, streamImport=false) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=false) and the external (csvImport=false, streamImport=false) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=false) and the external (csvImport=false, streamImport=false) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=false) and the external (csvImport=false, streamImport=false) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=false) and the external (csvImport=false, streamImport=true) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=false) and the external (csvImport=false, streamImport=true) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=false) and the external (csvImport=false, streamImport=true) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=false) and the external (csvImport=false, streamImport=true) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=false) and the external (csvImport=true, streamImport=false) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=false) and the external (csvImport=true, streamImport=false) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=false) and the external (csvImport=true, streamImport=false) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=false) and the external (csvImport=true, streamImport=false) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=false) and the external (csvImport=true, streamImport=true) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=false) and the external (csvImport=true, streamImport=true) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=false) and the external (csvImport=true, streamImport=true) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=false) and the external (csvImport=true, streamImport=true) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=true) and the external (csvImport=false, streamImport=false) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=true) and the external (csvImport=false, streamImport=false) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=true) and the external (csvImport=false, streamImport=false) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=true) and the external (csvImport=false, streamImport=false) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=true) and the external (csvImport=false, streamImport=true) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=true) and the external (csvImport=false, streamImport=true) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=true) and the external (csvImport=false, streamImport=true) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=true) and the external (csvImport=false, streamImport=true) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=true) and the external (csvImport=true, streamImport=false) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=true) and the external (csvImport=true, streamImport=false) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=true) and the external (csvImport=true, streamImport=false) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=true) and the external (csvImport=true, streamImport=false) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=true) and the external (csvImport=true, streamImport=true) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=true) and the external (csvImport=true, streamImport=true) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=true) and the external (csvImport=true, streamImport=true) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=true) and the external (csvImport=true, streamImport=true) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=false) and the external (csvImport=false, streamImport=false) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=false) and the external (csvImport=false, streamImport=false) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=false) and the external (csvImport=false, streamImport=false) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=false) and the external (csvImport=false, streamImport=false) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=false) and the external (csvImport=false, streamImport=true) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=false) and the external (csvImport=false, streamImport=true) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=false) and the external (csvImport=false, streamImport=true) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=false) and the external (csvImport=false, streamImport=true) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=false) and the external (csvImport=true, streamImport=false) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=false) and the external (csvImport=true, streamImport=false) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=false) and the external (csvImport=true, streamImport=false) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=false) and the external (csvImport=true, streamImport=false) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=false) and the external (csvImport=true, streamImport=true) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=false) and the external (csvImport=true, streamImport=true) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=false) and the external (csvImport=true, streamImport=true) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=false) and the external (csvImport=true, streamImport=true) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=true) and the external (csvImport=false, streamImport=false) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=true) and the external (csvImport=false, streamImport=false) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=true) and the external (csvImport=false, streamImport=false) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=true) and the external (csvImport=false, streamImport=false) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=true) and the external (csvImport=false, streamImport=true) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=true) and the external (csvImport=false, streamImport=true) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=true) and the external (csvImport=false, streamImport=true) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=true) and the external (csvImport=false, streamImport=true) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=true) and the external (csvImport=true, streamImport=false) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=true) and the external (csvImport=true, streamImport=false) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=true) and the external (csvImport=true, streamImport=false) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=true) and the external (csvImport=true, streamImport=false) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=true) and the external (csvImport=true, streamImport=true) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=true) and the external (csvImport=true, streamImport=true) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=true) and the external (csvImport=true, streamImport=true) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=true) and the external (csvImport=true, streamImport=true) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=false) and the external (csvImport=false, streamImport=false) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=false) and the external (csvImport=false, streamImport=false) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=false) and the external (csvImport=false, streamImport=false) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=false) and the external (csvImport=false, streamImport=false) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=false) and the external (csvImport=false, streamImport=true) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=false) and the external (csvImport=false, streamImport=true) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=false) and the external (csvImport=false, streamImport=true) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=false) and the external (csvImport=false, streamImport=true) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=false) and the external (csvImport=true, streamImport=false) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=false) and the external (csvImport=true, streamImport=false) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=false) and the external (csvImport=true, streamImport=false) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=false) and the external (csvImport=true, streamImport=false) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=false) and the external (csvImport=true, streamImport=true) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=false) and the external (csvImport=true, streamImport=true) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=false) and the external (csvImport=true, streamImport=true) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=false) and the external (csvImport=true, streamImport=true) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=true) and the external (csvImport=false, streamImport=false) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=true) and the external (csvImport=false, streamImport=false) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=true) and the external (csvImport=false, streamImport=false) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=true) and the external (csvImport=false, streamImport=false) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=true) and the external (csvImport=false, streamImport=true) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=true) and the external (csvImport=false, streamImport=true) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=true) and the external (csvImport=false, streamImport=true) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=true) and the external (csvImport=false, streamImport=true) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=true) and the external (csvImport=true, streamImport=false) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=true) and the external (csvImport=true, streamImport=false) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=true) and the external (csvImport=true, streamImport=false) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=true) and the external (csvImport=true, streamImport=false) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=true) and the external (csvImport=true, streamImport=true) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=true) and the external (csvImport=true, streamImport=true) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=true) and the external (csvImport=true, streamImport=true) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=false, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=true) and the external (csvImport=true, streamImport=true) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=false) and the external (csvImport=false, streamImport=false) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=false) and the external (csvImport=false, streamImport=false) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=false) and the external (csvImport=false, streamImport=false) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=false) and the external (csvImport=false, streamImport=false) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=false) and the external (csvImport=false, streamImport=true) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=false) and the external (csvImport=false, streamImport=true) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=false) and the external (csvImport=false, streamImport=true) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=false) and the external (csvImport=false, streamImport=true) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=false) and the external (csvImport=true, streamImport=false) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=false) and the external (csvImport=true, streamImport=false) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=false) and the external (csvImport=true, streamImport=false) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=false) and the external (csvImport=true, streamImport=false) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=false) and the external (csvImport=true, streamImport=true) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=false) and the external (csvImport=true, streamImport=true) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=false) and the external (csvImport=true, streamImport=true) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=false) and the external (csvImport=true, streamImport=true) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=true) and the external (csvImport=false, streamImport=false) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=true) and the external (csvImport=false, streamImport=false) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=true) and the external (csvImport=false, streamImport=false) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=true) and the external (csvImport=false, streamImport=false) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=true) and the external (csvImport=false, streamImport=true) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=true) and the external (csvImport=false, streamImport=true) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=true) and the external (csvImport=false, streamImport=true) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=true) and the external (csvImport=false, streamImport=true) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=true) and the external (csvImport=true, streamImport=false) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=true) and the external (csvImport=true, streamImport=false) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=true) and the external (csvImport=true, streamImport=false) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=true) and the external (csvImport=true, streamImport=false) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=true) and the external (csvImport=true, streamImport=true) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=true) and the external (csvImport=true, streamImport=true) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=true) and the external (csvImport=true, streamImport=true) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=false, unloadSupported=true) and the external (csvImport=true, streamImport=true) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=false) and the external (csvImport=false, streamImport=false) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=false) and the external (csvImport=false, streamImport=false) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=false) and the external (csvImport=false, streamImport=false) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=false) and the external (csvImport=false, streamImport=false) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=false) and the external (csvImport=false, streamImport=true) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=false) and the external (csvImport=false, streamImport=true) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=false) and the external (csvImport=false, streamImport=true) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=false) and the external (csvImport=false, streamImport=true) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=false) and the external (csvImport=true, streamImport=false) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=false) and the external (csvImport=true, streamImport=false) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=false) and the external (csvImport=true, streamImport=false) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=false) and the external (csvImport=true, streamImport=false) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=false) and the external (csvImport=true, streamImport=true) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=false) and the external (csvImport=true, streamImport=true) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=false) and the external (csvImport=true, streamImport=true) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=false) and the external (csvImport=true, streamImport=true) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=true) and the external (csvImport=false, streamImport=false) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=true) and the external (csvImport=false, streamImport=false) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=true) and the external (csvImport=false, streamImport=false) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=true) and the external (csvImport=false, streamImport=false) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=true) and the external (csvImport=false, streamImport=true) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=true) and the external (csvImport=false, streamImport=true) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=true) and the external (csvImport=false, streamImport=true) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=true) and the external (csvImport=false, streamImport=true) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=true) and the external (csvImport=true, streamImport=false) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=true) and the external (csvImport=true, streamImport=false) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=true) and the external (csvImport=true, streamImport=false) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=true) and the external (csvImport=true, streamImport=false) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=true) and the external (csvImport=true, streamImport=true) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=true) and the external (csvImport=true, streamImport=true) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=true) and the external (csvImport=true, streamImport=true) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=false, streamingSource=true, unloadSupported=true) and the external (csvImport=true, streamImport=true) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=false) and the external (csvImport=false, streamImport=false) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=false) and the external (csvImport=false, streamImport=false) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=false) and the external (csvImport=false, streamImport=false) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=false) and the external (csvImport=false, streamImport=false) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=false) and the external (csvImport=false, streamImport=true) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=false) and the external (csvImport=false, streamImport=true) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=false) and the external (csvImport=false, streamImport=true) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=false) and the external (csvImport=false, streamImport=true) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=false) and the external (csvImport=true, streamImport=false) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=false) and the external (csvImport=true, streamImport=false) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=false) and the external (csvImport=true, streamImport=false) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=false) and the external (csvImport=true, streamImport=false) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=false) and the external (csvImport=true, streamImport=true) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=false) and the external (csvImport=true, streamImport=true) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=false) and the external (csvImport=true, streamImport=true) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=false) and the external (csvImport=true, streamImport=true) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=true) and the external (csvImport=false, streamImport=false) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=true) and the external (csvImport=false, streamImport=false) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=true) and the external (csvImport=false, streamImport=false) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=true) and the external (csvImport=false, streamImport=false) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=true) and the external (csvImport=false, streamImport=true) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=true) and the external (csvImport=false, streamImport=true) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=true) and the external (csvImport=false, streamImport=true) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=true) and the external (csvImport=false, streamImport=true) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=true) and the external (csvImport=true, streamImport=false) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=true) and the external (csvImport=true, streamImport=false) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=true) and the external (csvImport=true, streamImport=false) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=true) and the external (csvImport=true, streamImport=false) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=true) and the external (csvImport=true, streamImport=true) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=true) and the external (csvImport=true, streamImport=true) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=true) and the external (csvImport=true, streamImport=true) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=false, unloadSupported=true) and the external (csvImport=true, streamImport=true) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=false) and the external (csvImport=false, streamImport=false) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=false) and the external (csvImport=false, streamImport=false) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=false) and the external (csvImport=false, streamImport=false) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=false) and the external (csvImport=false, streamImport=false) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=false) and the external (csvImport=false, streamImport=true) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=false) and the external (csvImport=false, streamImport=true) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=false) and the external (csvImport=false, streamImport=true) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=false) and the external (csvImport=false, streamImport=true) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=false) and the external (csvImport=true, streamImport=false) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=false) and the external (csvImport=true, streamImport=false) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=false) and the external (csvImport=true, streamImport=false) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=false) and the external (csvImport=true, streamImport=false) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=false) and the external (csvImport=true, streamImport=true) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=false) and the external (csvImport=true, streamImport=true) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=false) and the external (csvImport=true, streamImport=true) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=false) and the external (csvImport=true, streamImport=true) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=true) and the external (csvImport=false, streamImport=false) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=true) and the external (csvImport=false, streamImport=false) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=true) and the external (csvImport=false, streamImport=false) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=true) and the external (csvImport=false, streamImport=false) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=true) and the external (csvImport=false, streamImport=true) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=true) and the external (csvImport=false, streamImport=true) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=true) and the external (csvImport=false, streamImport=true) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=true) and the external (csvImport=false, streamImport=true) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=true) and the external (csvImport=true, streamImport=false) and  external readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=true) and the external (csvImport=true, streamImport=false) and  external writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=true) and the external (csvImport=true, streamImport=false) and  internal readonly pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;
+
+exports[`Test PreAggregationLoader.refresh() with the client (readonly=true, unloadWithoutTempTable=true, streamingSource=true, unloadSupported=true) and the external (csvImport=true, streamImport=false) and  internal writable pre-aggregation 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+    "getTablesQuery",
+  ],
+  Array [],
+]
+`;

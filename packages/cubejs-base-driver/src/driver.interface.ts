@@ -106,8 +106,8 @@ export function isDownloadTableMemoryData(tableData: any): tableData is Download
 export type DownloadTableData = DownloadTableMemoryData | DownloadTableCSVData | StreamTableData | StreamingSourceTableData;
 
 export interface ExternalDriverCompatibilities {
-  csvImport?: true,
-  streamImport?: true,
+  csvImport?: boolean,
+  streamImport?: boolean,
 }
 
 export interface DriverCapabilities extends ExternalDriverCompatibilities {

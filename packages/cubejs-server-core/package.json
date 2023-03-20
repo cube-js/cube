@@ -27,7 +27,7 @@
     "lint:fix": "eslint --fix src/* test/* --ext .ts,.js",
     "test": "npm run unit",
     "unit": "jest --runInBand --coverage dist/test",
-    "tst": "clear && yarn tsc && jest --runInBand --coverage dist/test/unit/OptsHandler.test.js"
+    "tst": "clear && yarn tsc && jest --runInBand --coverage dist/test/unit/PreAggregationLoader.test.js"
   },
   "dependencies": {
     "@cubejs-backend/api-gateway": "^0.32.27",
@@ -89,6 +89,7 @@
     ],
     "coveragePathIgnorePatterns": [
       ".*\\.d\\.ts"
-    ]
+    ],
+    "snapshotResolver": "<rootDir>/test/snapshotResolver.js"
   }
 }
