@@ -13,7 +13,7 @@ This package provides wiring of all essential Cube components and is used by
 
 <WarningBox>
 This API was deprecated and will be removed in upcoming versions.
-[Learn more](https://github.com/cube-js/cube.js/blob/master/DEPRECATION.md#embedding-cubejs-within-express).
+[Learn more](https://github.com/cube-js/cube/blob/master/DEPRECATION.md#embedding-cubejs-within-express).
 </WarningBox>
 
 ## API Reference

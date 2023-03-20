@@ -117,5 +117,5 @@ The `/meta` endpoint shows the available cubes and views:
 ## Source code
 
 Please feel free to check out the
-[full source code](https://github.com/cube-js/cube.js/tree/master/examples/recipes/changing-visibility-of-cubes-or-views)
+[full source code](https://github.com/cube-js/cube/tree/master/examples/recipes/changing-visibility-of-cubes-or-views)
 or run it with the `docker-compose up` command.

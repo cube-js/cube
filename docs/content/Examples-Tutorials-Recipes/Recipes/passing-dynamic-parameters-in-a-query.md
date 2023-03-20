@@ -39,20 +39,20 @@ filter value:
 cube(`Users`, {
   sql: `
     WITH data AS (
-      SELECT 
+      SELECT
         users.id AS id,
         users.city AS city,
         users.gender AS gender
       FROM public.users
     ),
-    
+
     cities AS (
       SELECT city
       FROM data
     ),
-    
+
     grouped AS (
-      SELECT 
+      SELECT
         cities.city AS city_filter,
         data.id AS id,
         data.city AS city,
@@ -60,7 +60,7 @@ cube(`Users`, {
       FROM cities, data
       GROUP BY 1, 2, 3, 4
     )
-    
+
     SELECT *
     FROM grouped
   `,
@@ -134,6 +134,6 @@ can get the ratio we wanted to achieve:
 ## Source code
 
 Please feel free to check out the
-[full source code](https://github.com/cube-js/cube.js/tree/master/examples/recipes/passing-dynamic-parameters-in-query)
+[full source code](https://github.com/cube-js/cube/tree/master/examples/recipes/passing-dynamic-parameters-in-query)
 or run it with the `docker-compose up` command. You'll see the result, including
 queried data, in the console.

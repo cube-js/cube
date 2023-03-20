@@ -170,7 +170,7 @@ them has been updated when an order changed its status:
 {
   "dev_pre_aggregations.orders__orders": {
     "targetTableName": "(
-      SELECT * FROM dev_pre_aggregations.orders__orders20210801_qgajzwit_mdtjpixm_1glan84 UNION ALL 
+      SELECT * FROM dev_pre_aggregations.orders__orders20210801_qgajzwit_mdtjpixm_1glan84 UNION ALL
       SELECT * FROM dev_pre_aggregations.orders__orders20210901_bvzl43q1_py2oudte_1glan84)",
     "refreshKeyValues": [
       {},
@@ -212,7 +212,7 @@ them has been updated when an order changed its status:
 {
   "dev_pre_aggregations.orders__orders": {
     "targetTableName": "(
-      SELECT * FROM dev_pre_aggregations.orders__orders20210801_lx4b2bkg_mdtjpixm_1glana3 UNION ALL 
+      SELECT * FROM dev_pre_aggregations.orders__orders20210801_lx4b2bkg_mdtjpixm_1glana3 UNION ALL
       SELECT * FROM dev_pre_aggregations.orders__orders20210901_bvzl43q1_py2oudte_1glan84)",
     "refreshKeyValues": [
       {},
@@ -225,6 +225,6 @@ them has been updated when an order changed its status:
 ## Source code
 
 Please feel free to check out the
-[full source code](https://github.com/cube-js/cube.js/tree/master/examples/recipes/refreshing-select-partitions)
+[full source code](https://github.com/cube-js/cube/tree/master/examples/recipes/refreshing-select-partitions)
 or run it with the `docker-compose up` command. You'll see the result, including
 queried data, in the console.

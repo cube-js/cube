@@ -114,6 +114,6 @@ Then, we can iterate through dimension names and use any of them in a
 ## Source code
 
 Please feel free to check out the
-[full source code](https://github.com/cube-js/cube.js/tree/master/examples/recipes/getting-unique-values-for-a-field)
+[full source code](https://github.com/cube-js/cube/tree/master/examples/recipes/getting-unique-values-for-a-field)
 or run it with the `docker-compose up` command. You'll see the result, including
 queried data, in the console.

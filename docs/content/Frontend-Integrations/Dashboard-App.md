@@ -19,7 +19,7 @@ hosting.
 _Currently Dashboard App is generated based on [React](https://reactjs.org/) JS
 library and [Ant Design](https://ant.design/) UI framework. If you'd like to see
 more options with different JS and CSS frameworks please
-[open a Github issue](https://github.com/cube-js/cube.js/issues/new) or
+[open a Github issue](https://github.com/cube-js/cube/issues/new) or
 [ping us in Slack.](https://slack.cube.dev)_
 
 [link-dev-playground]: /dev-tools/dev-playground

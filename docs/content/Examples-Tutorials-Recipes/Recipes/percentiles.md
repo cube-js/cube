@@ -103,6 +103,6 @@ For this particular dataset, the average age closely matches the median age, and
 ## Source code
 
 Please feel free to check out the
-[full source code](https://github.com/cube-js/cube.js/tree/master/examples/recipes/percentiles)
+[full source code](https://github.com/cube-js/cube/tree/master/examples/recipes/percentiles)
 or run it with the `docker-compose up` command. You'll see the result, including
 queried data, in the console.

@@ -140,6 +140,6 @@ We have received different data depending on the supplier's email.
 ## Source code
 
 Please feel free to check out the
-[full source code](https://github.com/cube-js/cube.js/tree/master/examples/recipes/column-based-access)
+[full source code](https://github.com/cube-js/cube/tree/master/examples/recipes/column-based-access)
 or run it with the `docker-compose up` command. You'll see the result, including
 queried data, in the console.
