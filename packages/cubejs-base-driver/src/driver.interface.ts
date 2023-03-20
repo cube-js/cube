@@ -103,7 +103,11 @@ export function isDownloadTableMemoryData(tableData: any): tableData is Download
   return Boolean(tableData.rows);
 }
 
-export type DownloadTableData = DownloadTableMemoryData | DownloadTableCSVData | StreamTableData | StreamingSourceTableData;
+export type DownloadTableData =
+  | DownloadTableMemoryData
+  | DownloadTableCSVData
+  | StreamTableData
+  | StreamingSourceTableData;
 
 export interface ExternalDriverCompatibilities {
   csvImport?: true,
@@ -159,7 +163,14 @@ export type ExternalCreateTableOptions = {
   createTableIndexes?: CreateTableIndex[],
   sealAt?: string
 };
-export type DownloadQueryResultsResult = DownloadQueryResultsBase & (DownloadTableMemoryData | DownloadTableCSVData | StreamTableData | StreamingSourceTableData | StreamTableDataWithTypes);
+
+export type DownloadQueryResultsResult = DownloadQueryResultsBase & (
+  DownloadTableMemoryData |
+  DownloadTableCSVData |
+  StreamTableData |
+  StreamingSourceTableData |
+  StreamTableDataWithTypes
+);
 
 // eslint-disable-next-line camelcase
 export type TableQueryResult = { table_name?: string, TABLE_NAME?: string };
