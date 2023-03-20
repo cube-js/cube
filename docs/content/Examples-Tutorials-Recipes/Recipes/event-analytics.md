@@ -48,7 +48,7 @@ purchases products) before they leave equals one session.
 
 <div style="text-align: center">
   <img
-    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Schema/session-schema.png"
+    src="https://ucarecdn.com/33b44821-e139-4ec5-b6a1-9f0aaa575799/"
     style="border: none"
     width="100%"
   />

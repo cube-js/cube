@@ -74,7 +74,7 @@ client.
   style="text-align: center"
 >
   <img
-  src="https://i.imgur.com/FluGFqo.png"
+  src="https://ucarecdn.com/5ca2ec6d-6fd0-4a10-9b17-5246de20f38c/"
   style="border: none"
   width="100%"
   />

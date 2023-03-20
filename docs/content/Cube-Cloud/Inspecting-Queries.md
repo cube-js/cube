@@ -11,7 +11,7 @@ You can inspect your Cube queries in Cube Cloud.
   style="text-align: center"
 >
   <img
-  src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Cube-Cloud/inspect-queries.png"
+  src="https://ucarecdn.com/815b2afb-3d8d-40d7-bfe6-ce2f917b421b/"
   style="border: none"
   width="100%"
   />
@@ -25,7 +25,7 @@ You can use filters to find slow and not pre-aggregated queries.
   style="text-align: center"
 >
   <img
-  src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Cube-Cloud/inspect-queries-1.png"
+  src="https://ucarecdn.com/a242026b-3a99-46fc-8803-147559985543/"
   style="border: none"
   width="100%"
   />
@@ -34,7 +34,7 @@ You can use filters to find slow and not pre-aggregated queries.
 ## Pre-aggregation suggestions
 
 Cube Cloud provides useful tips for pre-aggregation strategies and recommends
-you the best pre-aggregation for the specific query. Click on the any query on
+you the best pre-aggregation for the specific query. Click on any query on
 the **Queries** page and navigate to the **Pre-Aggregations** tab inside the
 query details page.
 
@@ -42,7 +42,7 @@ query details page.
   style="text-align: center"
 >
   <img
-  src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Cube-Cloud/inspect-queries-2.png"
+  src="https://ucarecdn.com/aefcb733-12c2-4446-9520-c968062dd500/"
   style="border: none"
   width="100%"
   />
