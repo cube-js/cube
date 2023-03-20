@@ -1,3 +1,4 @@
+use crate::app_metrics;
 use crate::di_service;
 use crate::remotefs::{LocalDirRemoteFs, RemoteFile, RemoteFs};
 use crate::util::lock::acquire_lock;
@@ -25,6 +26,7 @@ pub struct S3RemoteFs {
     bucket: std::sync::RwLock<Bucket>,
     sub_path: Option<String>,
     delete_mut: Mutex<()>,
+    cube_host: String,
 }
 
 impl fmt::Debug for S3RemoteFs {
@@ -48,6 +50,7 @@ impl S3RemoteFs {
         region: String,
         bucket_name: String,
         sub_path: Option<String>,
+        cube_host: String,
     ) -> Result<Arc<Self>, CubeError> {
         let key_id = env::var("CUBESTORE_AWS_ACCESS_KEY_ID").ok();
         let access_key = env::var("CUBESTORE_AWS_SECRET_ACCESS_KEY").ok();
@@ -61,6 +64,7 @@ impl S3RemoteFs {
             bucket,
             sub_path,
             delete_mut: Mutex::new(()),
+            cube_host,
         });
         spawn_creds_refresh_loop(key_id, access_key, bucket_name, region, &fs);
         Ok(fs)
@@ -138,6 +142,15 @@ impl RemoteFs for S3RemoteFs {
         remote_path: &str,
     ) -> Result<u64, CubeError> {
         {
+            app_metrics::REMOTE_FS_OPERATION_CORE.add_with_tags(
+                1,
+                Some(&vec![
+                    "operation:upload_file".to_string(),
+                    "driver:s3".to_string(),
+                    format!("cube_host:{}", self.cube_host),
+                ]),
+            );
+
             let time = SystemTime::now();
             debug!("Uploading {}", remote_path);
             let path = self.s3_path(remote_path);
@@ -188,6 +201,14 @@ impl RemoteFs for S3RemoteFs {
 
         fs::create_dir_all(&downloads_dir).await?;
         if !local_file.exists() {
+            app_metrics::REMOTE_FS_OPERATION_CORE.add_with_tags(
+                1,
+                Some(&vec![
+                    "operation:download_file".to_string(),
+                    "driver:s3".to_string(),
+                    format!("cube_host:{}", self.cube_host),
+                ]),
+            );
             let time = SystemTime::now();
             debug!("Downloading {}", remote_path);
             let path = self.s3_path(remote_path);
@@ -216,6 +237,14 @@ impl RemoteFs for S3RemoteFs {
     }
 
     async fn delete_file(&self, remote_path: &str) -> Result<(), CubeError> {
+        app_metrics::REMOTE_FS_OPERATION_CORE.add_with_tags(
+            1,
+            Some(&vec![
+                "operation:delete_file".to_string(),
+                "driver:s3".to_string(),
+                format!("cube_host:{}", self.cube_host),
+            ]),
+        );
         let time = SystemTime::now();
         debug!("Deleting {}", remote_path);
         let path = self.s3_path(remote_path);
@@ -251,6 +280,14 @@ impl RemoteFs for S3RemoteFs {
     }
 
     async fn list_with_metadata(&self, remote_prefix: &str) -> Result<Vec<RemoteFile>, CubeError> {
+        app_metrics::REMOTE_FS_OPERATION_CORE.add_with_tags(
+            1,
+            Some(&vec![
+                "operation:list".to_string(),
+                "driver:s3".to_string(),
+                format!("cube_host:{}", self.cube_host),
+            ]),
+        );
         let path = self.s3_path(remote_prefix);
         let bucket = self.bucket.read().unwrap().clone();
         let list = cube_ext::spawn_blocking(move || bucket.list_blocking(path, None)).await??;

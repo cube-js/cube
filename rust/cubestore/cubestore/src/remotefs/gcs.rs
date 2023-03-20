@@ -1,3 +1,4 @@
+use crate::app_metrics;
 use crate::di_service;
 use crate::remotefs::{LocalDirRemoteFs, RemoteFile, RemoteFs};
 use crate::util::lock::acquire_lock;
@@ -96,6 +97,7 @@ pub struct GCSRemoteFs {
     bucket: String,
     sub_path: Option<String>,
     delete_mut: Mutex<()>,
+    cube_host: String,
 }
 
 impl GCSRemoteFs {
@@ -103,6 +105,7 @@ impl GCSRemoteFs {
         dir: PathBuf,
         bucket_name: String,
         sub_path: Option<String>,
+        cube_host: String,
     ) -> Result<Arc<Self>, CubeError> {
         ensure_credentials_init();
         Ok(Arc::new(Self {
@@ -110,6 +113,7 @@ impl GCSRemoteFs {
             bucket: bucket_name.to_string(),
             sub_path,
             delete_mut: Mutex::new(()),
+            cube_host,
         }))
     }
 }
@@ -123,6 +127,14 @@ impl RemoteFs for GCSRemoteFs {
         temp_upload_path: &str,
         remote_path: &str,
     ) -> Result<u64, CubeError> {
+        app_metrics::REMOTE_FS_OPERATION_CORE.add_with_tags(
+            1,
+            Some(&vec![
+                "operation:upload_file".to_string(),
+                "driver:gcs".to_string(),
+                format!("cube_host:{}", self.cube_host),
+            ]),
+        );
         let time = SystemTime::now();
         debug!("Uploading {}", remote_path);
         let file = File::open(temp_upload_path).await?;
@@ -168,6 +180,14 @@ impl RemoteFs for GCSRemoteFs {
 
         fs::create_dir_all(&downloads_dirs).await?;
         if !local_file.exists() {
+            app_metrics::REMOTE_FS_OPERATION_CORE.add_with_tags(
+                1,
+                Some(&vec![
+                    "operation:download_file".to_string(),
+                    "driver:gcs".to_string(),
+                    format!("cube_host:{}", self.cube_host),
+                ]),
+            );
             let time = SystemTime::now();
             debug!("Downloading {}", remote_path);
             let (temp_file, temp_path) =
@@ -206,6 +226,14 @@ impl RemoteFs for GCSRemoteFs {
     }
 
     async fn delete_file(&self, remote_path: &str) -> Result<(), CubeError> {
+        app_metrics::REMOTE_FS_OPERATION_CORE.add_with_tags(
+            1,
+            Some(&vec![
+                "operation:delete_file".to_string(),
+                "driver:gcs".to_string(),
+                format!("cube_host:{}", self.cube_host),
+            ]),
+        );
         let time = SystemTime::now();
         debug!("Deleting {}", remote_path);
         Object::delete(self.bucket.as_str(), self.gcs_path(remote_path).as_str()).await?;
@@ -232,6 +260,14 @@ impl RemoteFs for GCSRemoteFs {
     }
 
     async fn list_with_metadata(&self, remote_prefix: &str) -> Result<Vec<RemoteFile>, CubeError> {
+        app_metrics::REMOTE_FS_OPERATION_CORE.add_with_tags(
+            1,
+            Some(&vec![
+                "operation:list".to_string(),
+                "driver:gcs".to_string(),
+                format!("cube_host:{}", self.cube_host),
+            ]),
+        );
         let prefix = self.gcs_path(remote_prefix);
         let list = Object::list_prefix(self.bucket.as_str(), prefix.as_str()).await?;
         let leading_slash = Regex::new(format!("^{}", self.gcs_path("")).as_str()).unwrap();
