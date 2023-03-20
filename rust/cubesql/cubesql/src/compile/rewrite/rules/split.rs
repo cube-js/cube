@@ -20,7 +20,7 @@ use crate::{
             OuterProjectionSplitReplacerAliasToCube, ProjectionAlias, ScalarFunctionExprFun,
         },
     },
-    transport::V1CubeMetaExt,
+    transport::{V1CubeMetaExt, V1CubeMetaMeasureExt},
     var, var_iter, CubeError,
 };
 use datafusion::{
@@ -1603,14 +1603,15 @@ impl RewriteRules for SplitRules {
                 ),
             ),
             // Aggregate function
-            transforming_rewrite(
+            transforming_chain_rewrite(
                 "split-push-down-aggr-fun-inner-replacer",
                 inner_aggregate_split_replacer(
-                    agg_fun_expr("?fun", vec![column_expr("?column")], "?distinct"),
+                    "?aggr_expr",
                     "?cube",
                 ),
-                agg_fun_expr("?fun", vec![column_expr("?column")], "?distinct"),
-                self.transform_inner_measure("?cube", Some("?column")),
+                vec![("?aggr_expr", agg_fun_expr("?fun", vec![column_expr("?column")], "?distinct"))],
+                "?out_expr".to_string(),
+                self.transform_inner_measure("?cube", Some("?column"), Some("?aggr_expr"), Some("?fun"), Some("?distinct"), Some("?out_expr")),
             ),
             transforming_rewrite(
                 "split-push-down-aggr-fun-inner-replacer-simple-count",
@@ -1619,7 +1620,7 @@ impl RewriteRules for SplitRules {
                     "?cube",
                 ),
                 agg_fun_expr("?fun", vec![literal_expr("?literal")], "?distinct"),
-                self.transform_inner_measure("?cube", None),
+                self.transform_inner_measure("?cube", None, None, None, None, None),
             ),
             transforming_rewrite(
                 "split-push-down-aggr-fun-inner-replacer-missing-count",
@@ -1638,7 +1639,17 @@ impl RewriteRules for SplitRules {
                     agg_fun_expr("?fun", vec![column_expr("?column")], "?distinct"),
                 )],
                 "?alias".to_string(),
-                self.transform_outer_projection_aggr_fun("?cube", "?expr", "?column", "?alias"),
+                self.transform_outer_projection_aggr_fun("?cube", "?expr", Some("?column"), "?alias"),
+            ),
+            transforming_chain_rewrite(
+                "split-push-down-aggr-fun-outer-replacer-simple-count",
+                outer_projection_split_replacer("?expr", "?cube"),
+                vec![(
+                    "?expr",
+                    agg_fun_expr("?fun", vec![literal_expr("?literal")], "?distinct"),
+                )],
+                "?alias".to_string(),
+                self.transform_outer_projection_aggr_fun("?cube", "?expr", None, "?alias"),
             ),
             transforming_chain_rewrite(
                 "split-push-down-aggr-fun-outer-aggr-replacer",
@@ -4511,9 +4522,17 @@ impl SplitRules {
         &self,
         cube_expr_var: &'static str,
         column_var: Option<&'static str>,
+        aggr_expr_var: Option<&'static str>,
+        fun_var: Option<&'static str>,
+        distinct_var: Option<&'static str>,
+        out_expr_var: Option<&'static str>,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
         let cube_expr_var = var!(cube_expr_var);
         let column_var = column_var.map(|column_var| var!(column_var));
+        let aggr_expr_var = aggr_expr_var.map(|v| var!(v));
+        let fun_var = fun_var.map(|v| var!(v));
+        let distinct_var = distinct_var.map(|v| var!(v));
+        let out_expr_var = out_expr_var.map(|v| var!(v));
         let meta = self.cube_context.meta.clone();
         move |egraph, subst| {
             for alias_to_cube in var_iter!(
@@ -4533,7 +4552,99 @@ impl SplitRules {
                     )])
                 {
                     if let Some((_, cube)) = meta.find_cube_by_column(&alias_to_cube, &column) {
-                        if cube.lookup_measure(&column.name).is_some() {
+                        if let Some(measure) = cube.lookup_measure(&column.name) {
+                            if let Some((((fun_var, distinct_var), out_expr_var), aggr_expr_var)) =
+                                fun_var
+                                    .zip(distinct_var)
+                                    .zip(out_expr_var)
+                                    .zip(aggr_expr_var)
+                            {
+                                for fun in
+                                    var_iter!(egraph[subst[fun_var]], AggregateFunctionExprFun)
+                                {
+                                    for distinct in var_iter!(
+                                        egraph[subst[distinct_var]],
+                                        AggregateFunctionExprDistinct
+                                    ) {
+                                        // If count is wrapping non count measure let's allow split and just count rows
+                                        // TODO it might worth allowing all other non matching aggregate functions
+                                        if let AggregateFunction::Count = fun {
+                                            if !distinct {
+                                                let agg_type = MemberRules::get_agg_type(
+                                                    Some(&fun),
+                                                    *distinct,
+                                                );
+                                                if !measure.is_same_agg_type(&agg_type.unwrap()) {
+                                                    if let Some(expr_name) = original_expr_name(
+                                                        egraph,
+                                                        subst[aggr_expr_var],
+                                                    ) {
+                                                        let measure_fun = egraph.add(
+                                                            LogicalPlanLanguage::AggregateFunctionExprFun(
+                                                                AggregateFunctionExprFun(AggregateFunction::Count)
+                                                            ),
+                                                        );
+
+                                                        let measure_distinct = egraph.add(
+                                                            LogicalPlanLanguage::AggregateFunctionExprDistinct(
+                                                                AggregateFunctionExprDistinct(false)
+                                                            ),
+                                                        );
+                                                        let tail = egraph.add(
+                                                            LogicalPlanLanguage::AggregateFunctionExprArgs(
+                                                                vec![],
+                                                            ),
+                                                        );
+
+                                                        let literal_expr_value = egraph.add(
+                                                            LogicalPlanLanguage::LiteralExprValue(
+                                                                LiteralExprValue(
+                                                                    ScalarValue::Int64(None),
+                                                                ),
+                                                            ),
+                                                        );
+
+                                                        let column_expr = egraph.add(
+                                                            LogicalPlanLanguage::LiteralExpr([
+                                                                literal_expr_value,
+                                                            ]),
+                                                        );
+                                                        let args = egraph.add(
+                                                            LogicalPlanLanguage::AggregateFunctionExprArgs(
+                                                                vec![column_expr, tail],
+                                                            ),
+                                                        );
+                                                        let aggr_expr = egraph.add(
+                                                            LogicalPlanLanguage::AggregateFunctionExpr(
+                                                                [measure_fun, args, measure_distinct],
+                                                            ),
+                                                        );
+                                                        let alias = egraph.add(
+                                                            LogicalPlanLanguage::AliasExprAlias(
+                                                                AliasExprAlias(expr_name),
+                                                            ),
+                                                        );
+
+                                                        let alias_expr = egraph.add(
+                                                            LogicalPlanLanguage::AliasExpr([
+                                                                aggr_expr, alias,
+                                                            ]),
+                                                        );
+                                                        subst.insert(out_expr_var, alias_expr);
+                                                        return true;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            if let Some((aggr_expr_var, out_expr_var)) =
+                                aggr_expr_var.zip(out_expr_var)
+                            {
+                                subst.insert(out_expr_var, subst[aggr_expr_var]);
+                            }
                             return true;
                         }
                     }
@@ -5379,12 +5490,12 @@ impl SplitRules {
         &self,
         cube_var: &'static str,
         original_expr_var: &'static str,
-        column_var: &'static str,
+        column_var: Option<&'static str>,
         alias_expr_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
         let cube_var = var!(cube_var);
         let original_expr_var = var!(original_expr_var);
-        let column_var = var!(column_var);
+        let column_var = column_var.map(|v| var!(v));
         let alias_expr_var = var!(alias_expr_var);
         let meta = self.cube_context.meta.clone();
         move |egraph, subst| {
@@ -5395,7 +5506,16 @@ impl SplitRules {
             .cloned()
             {
                 if let Some(name) = original_expr_name(egraph, subst[original_expr_var]) {
-                    for column in var_iter!(egraph[subst[column_var]], ColumnExprColumn).cloned() {
+                    for column in column_var
+                        .map(|column_var| {
+                            var_iter!(egraph[subst[column_var]], ColumnExprColumn)
+                                .map(|c| c.clone())
+                                .collect()
+                        })
+                        .unwrap_or(vec![Column::from_name(
+                            MemberRules::default_count_measure_name(),
+                        )])
+                    {
                         if let Some((_, cube)) = meta.find_cube_by_column(&alias_to_cube, &column) {
                             if cube.lookup_measure(&column.name).is_some() {
                                 let alias = egraph.add(LogicalPlanLanguage::ColumnExprColumn(
