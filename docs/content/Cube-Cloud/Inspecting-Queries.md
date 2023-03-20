@@ -5,7 +5,7 @@ category: Inspecting Queries
 menuOrder: 1
 ---
 
-You can inspect your Cube.js queries in Cube Cloud.
+You can inspect your Cube queries in Cube Cloud.
 
 <div
   style="text-align: center"
@@ -34,9 +34,9 @@ You can use filters to find slow and not pre-aggregated queries.
 ## Pre-aggregation suggestions
 
 Cube Cloud provides useful tips for pre-aggregation strategies and recommends
-you the best pre-aggregation for the specific query.
-Click on the any query on the **Queries** page and navigate to the **Pre-Aggregations**
-tab inside the query details page.
+you the best pre-aggregation for the specific query. Click on the any query on
+the **Queries** page and navigate to the **Pre-Aggregations** tab inside the
+query details page.
 
 <div
   style="text-align: center"

@@ -4,7 +4,7 @@ permalink: /recipes
 category: Examples & Tutorials
 ---
 
-These recipes will show you the best practices of using Cube.js.
+These recipes will show you the best practices of using Cube.
 
 ### <--{"id" : "Recipes"}--> Analytics
 
@@ -26,7 +26,6 @@ These recipes will show you the best practices of using Cube.js.
 - [Using SSL connections to a data source](/recipes/enable-ssl-connections-to-database)
 - [Joining data from multiple data sources](/recipes/joining-multiple-data-sources)
 
-
 ### <--{"id" : "Recipes"}--> Data schema
 
 - [Calculating average and percentiles](https://cube.dev/docs/recipes/percentiles)
@@ -47,6 +46,7 @@ These recipes will show you the best practices of using Cube.js.
 - [Accelerating non-additive measures](/recipes/non-additivity)
 - [Using originalSql and rollup pre-aggregations effectively](/recipes/using-originalsql-and-rollups-effectively)
 - [Incrementally building pre-aggregations for a date range](/recipes/incrementally-building-pre-aggregations-for-a-date-range)
+- [Refreshing select partitions of a pre-aggregation](/recipes/refreshing-select-partitions)
 
 ### <--{"id" : "Recipes"}--> Code reusability
 

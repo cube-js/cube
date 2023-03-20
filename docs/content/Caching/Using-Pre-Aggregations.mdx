@@ -95,7 +95,7 @@ from the source database.
 <WarningBox>
 
 When using this configuration in a single node deployment (where the API
-instance and [Refresh Worker ][ref-deploy-refresh-wrkr] are configured on the
+instance and [Refresh Worker][ref-deploy-refresh-wrkr] are configured on the
 same host), requests made to the API that cannot be satisfied by a rollup throw
 an error. Scheduled refreshes will continue to work in the background.
 
@@ -145,62 +145,77 @@ cube(`Orders`, {
 ## Using Indexes
 
 ### When to use indexes?
-Indexes are great when you filter large amounts of data across one or several dimension columns. You can read more about them
+
+Indexes are great when you filter large amounts of data across one or several
+dimension columns. You can read more about them
 [here][ref-schema-ref-preaggs-index].
 
 ### Best Practices
-To maximize performance, you can introduce an index per type of query so the set of dimensions used in the query overlap as much as possible with the ones defined in the index.
-Measures are traditionally only used in indexes if you plan to filter a measured value and the cardinality of the possible values of the measure is low.
 
-The order in which columns are specified in the index is **very** important; suboptimal ordering can lead to diminished performance.
-To improve the performance of an index the main thing to consider is the order of the columns defined in it. The order of the columns should be defined in accordance with the [Index Selectivity](https://blog.toadworld.com/2018/09/05/unselective-indexes-selectivity).
-In a nutshell, index selectivity measures how many unique values a database has. An index is said to have a **higher** selectivity as the number of unique values goes up and a **lower** selectivity as the number of unique values goes down.
-Once we know the selectivity of the columns we'll be adding to the index, we need to place them from **lowest** to **highest** selectivity (this is probably contrary to what you've read about the topic in traditional row-based databases).
+To maximize performance, you can introduce an index per type of query so the set
+of dimensions used in the query overlap as much as possible with the ones
+defined in the index. Measures are traditionally only used in indexes if you
+plan to filter a measured value and the cardinality of the possible values of
+the measure is low.
+
+The order in which columns are specified in the index is **very** important;
+suboptimal ordering can lead to diminished performance. To improve the
+performance of an index the main thing to consider is the order of the columns
+defined in it. The order of the columns should be defined in accordance with the
+[Index Selectivity](https://blog.toadworld.com/2018/09/05/unselective-indexes-selectivity).
+In a nutshell, index selectivity measures how many unique values a database has.
+An index is said to have a **higher** selectivity as the number of unique values
+goes up and a **lower** selectivity as the number of unique values goes down.
+Once we know the selectivity of the columns we'll be adding to the index, we
+need to place them from **lowest** to **highest** selectivity (this is probably
+contrary to what you've read about the topic in traditional row-based
+databases).
 
 **Example:**
 
-Suppose you have a pre-aggregation that has millions of rows with the following structure:
+Suppose you have a pre-aggregation that has millions of rows with the following
+structure:
 
-| timestamp           | product_name   | product_category | zip_code | order_total |
-| ------------------- | -------------- | ---------------- | -------- | ----------- |
-| 2023-01-01 10:00:00 | Plastic Chair  | Furniture        | 88523    | 2000        |
-| 2023-01-01 10:00:00 | Keyboard       | Electronics      | 88523    | 1000        |
-| 2023-01-01 10:00:00 | Mouse          | Electronics      | 88523    | 800         |
-| 2023-01-01 11:00:00 | Plastic Chair  | Furniture        | 88524    | 3000        |
-| 2023-01-01 11:00:00 | Keyboard       | Electronics      | 88524    | 2000        |
+| timestamp           | product_name  | product_category | zip_code | order_total |
+| ------------------- | ------------- | ---------------- | -------- | ----------- |
+| 2023-01-01 10:00:00 | Plastic Chair | Furniture        | 88523    | 2000        |
+| 2023-01-01 10:00:00 | Keyboard      | Electronics      | 88523    | 1000        |
+| 2023-01-01 10:00:00 | Mouse         | Electronics      | 88523    | 800         |
+| 2023-01-01 11:00:00 | Plastic Chair | Furniture        | 88524    | 3000        |
+| 2023-01-01 11:00:00 | Keyboard      | Electronics      | 88524    | 2000        |
 
 The pre-aggregation code would look as follows:
 
 <CodeTabs>
 
-``` javascript
+```javascript
 cube('Orders', {
-    sql: `SELECT * FROM Orders`,
-    preAggregations: {
-        main: {
-            measures: [CUBE.order_total],
-            dimensions: [CUBE.product_name, CUBE.product_category, CUBE.zip_code],
-            timeDimension: CUBE.timestamp,
-            granularity: `hour`,
-            partitionGranularity: `day`,
-            allowNonStrictDateRangeMatch: true,
-            refreshKey: {
-                every: `1 hour`,
-                updateWindow: `1 day`,
-                incremental: true
-            },
-            buildRangeStart: {
-                sql: `SELECT date_sub(NOW(), 365)`,
-            },
-            buildRangeEnd: {
-                sql: `SELECT NOW()`,
-            },
-        }
-    }
+  sql: `SELECT * FROM Orders`,
+  preAggregations: {
+    main: {
+      measures: [CUBE.order_total],
+      dimensions: [CUBE.product_name, CUBE.product_category, CUBE.zip_code],
+      timeDimension: CUBE.timestamp,
+      granularity: `hour`,
+      partitionGranularity: `day`,
+      allowNonStrictDateRangeMatch: true,
+      refreshKey: {
+        every: `1 hour`,
+        updateWindow: `1 day`,
+        incremental: true,
+      },
+      buildRangeStart: {
+        sql: `SELECT date_sub(NOW(), 365)`,
+      },
+      buildRangeEnd: {
+        sql: `SELECT NOW()`,
+      },
+    },
+  },
 });
 ```
 
-``` yaml
+```yaml
 cubes:
   - name: Orders
     sql: SELECT * FROM orders
@@ -213,19 +228,19 @@ cubes:
         partition_granularity: day
         allowNonStrictDateRangeMatch: true
         refresh_key:
-            every: 1 hour
-            update_window: 1 day
-            incremental: true
+          every: 1 hour
+          update_window: 1 day
+          incremental: true
         build_range_start:
-            sql: SELECT date_sub(NOW(), 365)
+          sql: SELECT date_sub(NOW(), 365)
         build_range_end:
-            sql: SELECT NOW()
+          sql: SELECT NOW()
 ```
 
 </CodeTabs>
 
-
-You run the following query on a regular basis, with the only difference between queries being the filter values:
+You run the following query on a regular basis, with the only difference between
+queries being the filter values:
 
 ```JSON
 {
@@ -272,41 +287,43 @@ You run the following query on a regular basis, with the only difference between
 }
 ```
 
-After running this on a dataset with millions of records you find that it's taking a long time to run, so you decide to add an index to target this specific query.
-Taking into account the best practices mentioned previously you should define an index as follows:
+After running this on a dataset with millions of records you find that it's
+taking a long time to run, so you decide to add an index to target this specific
+query. Taking into account the best practices mentioned previously you should
+define an index as follows:
 
 <CodeTabs>
 
 ```javascript
 cube('Orders', {
-    sql: `SELECT * FROM Orders;`,
-    preAggregations: {
-        main: {
-            measures: [CUBE.order_total],
-            dimensions: [CUBE.product_name, CUBE.product_category, CUBE.zip_code],
-            timeDimension: CUBE.timestamp,
-            granularity: `hour`,
-            partitionGranularity: `day`,
-            allowNonStrictDateRangeMatch: true,
-            refreshKey: {
-                every: `1 hour`,
-                updateWindow: `1 day`,
-                incremental: true
-            },
-            buildRangeStart: {
-                sql: `SELECT date_sub(NOW(), 365)`,
-            },
-            buildRangeEnd: {
-                sql: `SELECT NOW()`,
-            },
-            // New Index
-            indexes: {
-                category_productname_zipcode_index: {
-                      columns: [CUBE.product_category, CUBE.product_name, CUBE.zip_code],
-                },
-            }
-        }
-    }
+  sql: `SELECT * FROM Orders;`,
+  preAggregations: {
+    main: {
+      measures: [CUBE.order_total],
+      dimensions: [CUBE.product_name, CUBE.product_category, CUBE.zip_code],
+      timeDimension: CUBE.timestamp,
+      granularity: `hour`,
+      partitionGranularity: `day`,
+      allowNonStrictDateRangeMatch: true,
+      refreshKey: {
+        every: `1 hour`,
+        updateWindow: `1 day`,
+        incremental: true,
+      },
+      buildRangeStart: {
+        sql: `SELECT date_sub(NOW(), 365)`,
+      },
+      buildRangeEnd: {
+        sql: `SELECT NOW()`,
+      },
+      // New Index
+      indexes: {
+        category_productname_zipcode_index: {
+          columns: [CUBE.product_category, CUBE.product_name, CUBE.zip_code],
+        },
+      },
+    },
+  },
 });
 ```
 
@@ -323,13 +340,13 @@ cubes:
         partition_granularity: day
         allowNonStrictDateRangeMatch: true
         refresh_key:
-            every: 1 hour
-            update_window: 1 day
-            incremental: true
+          every: 1 hour
+          update_window: 1 day
+          incremental: true
         build_range_start:
-            sql: SELECT date_sub(NOW(), 365)
+          sql: SELECT date_sub(NOW(), 365)
         build_range_end:
-            sql: SELECT NOW()
+          sql: SELECT NOW()
         # new index
         indexes:
           - name: category_productname_zipcode_index
@@ -340,21 +357,24 @@ cubes:
 
 Then the data within `category_productname_zipcode_index` would look like:
 
-| product_category | product_name   | zip_code | timestamp           | order_total |
-| --------------- | ------------- | ------- | ------------------- | ---------- |
-| Furniture       | Plastic Chair | 88523   | 2023-01-01 10:00:00 | 2000       |
-| Electronics     | Keyboard      | 88523   | 2023-01-01 10:00:00 | 1000       |
-| Electronics     | Mouse         | 88523   | 2023-01-01 10:00:00 | 800        |
-| Furniture       | Plastic Chair | 88524   | 2023-01-01 11:00:00 | 3000       |
-| Electronics     | Keyboard      | 88524   | 2023-01-01 11:00:00 | 2000       |
+| product_category | product_name  | zip_code | timestamp           | order_total |
+| ---------------- | ------------- | -------- | ------------------- | ----------- |
+| Furniture        | Plastic Chair | 88523    | 2023-01-01 10:00:00 | 2000        |
+| Electronics      | Keyboard      | 88523    | 2023-01-01 10:00:00 | 1000        |
+| Electronics      | Mouse         | 88523    | 2023-01-01 10:00:00 | 800         |
+| Furniture        | Plastic Chair | 88524    | 2023-01-01 11:00:00 | 3000        |
+| Electronics      | Keyboard      | 88524    | 2023-01-01 11:00:00 | 2000        |
 
-The columns are ordered from **lowest** to **highest** selectivity.
-We can expect there to be a lower number of product categories, hence a lower number of unique records resulting in a lower selectivity.
-Although `zip_code` may have lower or higher selectivity, the dimensions used to filter must come first than the dimensions in the GROUP BY part of the query.
+The columns are ordered from **lowest** to **highest** selectivity. We can
+expect there to be a lower number of product categories, hence a lower number of
+unique records resulting in a lower selectivity. Although `zip_code` may have
+lower or higher selectivity, the dimensions used to filter must come first than
+the dimensions in the GROUP BY part of the query.
 
 ### Aggregated indexes
 
-Aggregated indexes be defined as well. You can read more about them [here][ref-schema-ref-preaggs-index].
+Aggregated indexes be defined as well. You can read more about them
+[here][ref-schema-ref-preaggs-index].
 
 **Example:**
 
@@ -362,38 +382,38 @@ Aggregated indexes be defined as well. You can read more about them [here][ref-s
 
 ```javascript
 cube('Orders', {
-    sql: `SELECT * FROM Orders;`,
-    preAggregations: {
-        main: {
-            measures: [CUBE.order_total],
-            dimensions: [CUBE.product_name, CUBE.product_category, CUBE.zip_code],
-            timeDimension: CUBE.timestamp,
-            granularity: `hour`,
-            partitionGranularity: `day`,
-            allowNonStrictDateRangeMatch: true,
-            refreshKey: {
-                every: `1 hour`,
-                updateWindow: `1 day`,
-                incremental: true
-            },
-            buildRangeStart: {
-                sql: `SELECT date_sub(NOW(), 365)`,
-            },
-            buildRangeEnd: {
-                sql: `SELECT NOW()`,
-            },
-            indexes: {
-                category_productname_zipcode_index: {
-                    columns: [CUBE.product_category, CUBE.product_name, CUBE.zip_code],
-                },
-                // New Index
-                zip_code_index: {
-                    columns: [CUBE.zip_code],
-                    type: `aggregate`
-                }
-            }
-        }
-    }
+  sql: `SELECT * FROM Orders;`,
+  preAggregations: {
+    main: {
+      measures: [CUBE.order_total],
+      dimensions: [CUBE.product_name, CUBE.product_category, CUBE.zip_code],
+      timeDimension: CUBE.timestamp,
+      granularity: `hour`,
+      partitionGranularity: `day`,
+      allowNonStrictDateRangeMatch: true,
+      refreshKey: {
+        every: `1 hour`,
+        updateWindow: `1 day`,
+        incremental: true,
+      },
+      buildRangeStart: {
+        sql: `SELECT date_sub(NOW(), 365)`,
+      },
+      buildRangeEnd: {
+        sql: `SELECT NOW()`,
+      },
+      indexes: {
+        category_productname_zipcode_index: {
+          columns: [CUBE.product_category, CUBE.product_name, CUBE.zip_code],
+        },
+        // New Index
+        zip_code_index: {
+          columns: [CUBE.zip_code],
+          type: `aggregate`,
+        },
+      },
+    },
+  },
 });
 ```
 
@@ -410,13 +430,13 @@ cubes:
         partition_granularity: day
         allowNonStrictDateRangeMatch: true
         refresh_key:
-            every: 1 hour
-            update_window: 1 day
-            incremental: true
+          every: 1 hour
+          update_window: 1 day
+          incremental: true
         build_range_start:
-            sql: SELECT date_sub(NOW(), 365)
+          sql: SELECT date_sub(NOW(), 365)
         build_range_end:
-            sql: SELECT NOW()
+          sql: SELECT NOW()
         indexes:
           - name: category_productname_zipcode_index
             columns: [CUBE.product_category, CUBE.product_name, CUBE.zip_code]
@@ -431,10 +451,9 @@ cubes:
 And the data for `zip_code_index` would look like the following:
 
 | zip_code | order_total |
-| ------- | ---------- |
-| 88523   | 3800       |
-| 88524   | 5000       |
-
+| -------- | ----------- |
+| 88523    | 3800        |
+| 88524    | 5000        |
 
 ## Inspecting Pre-Aggregations
 
@@ -442,15 +461,16 @@ Cube Store partially supports the MySQL protocol. This allows you to execute
 simple queries using a familiar SQL syntax. You can connect using the MySQL CLI
 client, for example:
 
-```bash
+```bash{promptUser: user}
 mysql -h <CUBESTORE_IP> --user=cubestore -pcubestore
 ```
 
 <WarningBox>
 
 Only Linux and Mac OS versions of MySQL client are supported as of right now.
-You can install one on ubuntu using `apt-get install default-mysql-client` command or `brew install mysql-client` on Mac OS.
-Windows versions of the MySQL client aren't supported.
+You can install one on ubuntu using `apt-get install default-mysql-client`
+command or `brew install mysql-client` on Mac OS. Windows versions of the MySQL
+client aren't supported.
 
 </WarningBox>
 

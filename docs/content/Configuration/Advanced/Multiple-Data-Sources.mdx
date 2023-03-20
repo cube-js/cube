@@ -47,7 +47,7 @@ environment variable, then use
 [decorated environment variables](#environment-variables-decorated-environment-variables)
 to configure each data source:
 
-```bash
+```dotenv
 CUBEJS_DATASOURCES=default,datasource1
 CUBEJS_DB_TYPE=postgres
 CUBEJS_DB_NAME=ecom
@@ -62,14 +62,14 @@ CUBEJS_DS_DATASOURCE1_DB_HOST=remotehost
 Cube allows database-specific environment variables to be decorated with a data
 source name:
 
-```bash
+```dotenv
 CUBEJS_[DS_<DATASOURCE>_]<ENV_VAR>
 ```
 
 For example, using the `datasource1` data source, `CUBEJS_DB_TYPE` could be
 decorated as:
 
-```bash
+```dotenv
 CUBEJS_DS_DATASOURCE1_DB_TYPE=postgres
 ```
 

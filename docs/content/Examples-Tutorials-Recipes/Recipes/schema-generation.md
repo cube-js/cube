@@ -8,9 +8,9 @@ redirect_from:
   - /schema-generation
 ---
 
-Cube.js Schema is Javascript code, which means the full power of this language
-can be used to configure your schema definitions. In this guide we generate
-several measure definitions based on an array of strings.
+Cube Schema is Javascript code, which means the full power of this language can
+be used to configure your schema definitions. In this guide we generate several
+measure definitions based on an array of strings.
 
 One example, based on a real world scenario, is when you have a single `events`
 table containing an `event_type` and `user_id` column. Based on this table you

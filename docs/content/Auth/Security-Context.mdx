@@ -6,22 +6,22 @@ menuOrder: 2
 ---
 
 Your authentication server issues JWTs to your client application, which, when
-sent as part of the request, are verified and decoded by Cube.js to get security
+sent as part of the request, are verified and decoded by Cube to get security
 context claims to evaluate access control rules. Inbound JWTs are decoded and
 verified using industry-standard [JSON Web Key Sets (JWKS)][link-auth0-jwks].
 
-For access control or authorization, Cube.js allows you to define granular
-access control rules for every cube in your data schema. Cube.js uses both the
-request and security context claims in the JWT token to generate a SQL query,
-which includes row-level constraints from the access control rules.
+For access control or authorization, Cube allows you to define granular access
+control rules for every cube in your data schema. Cube uses both the request and
+security context claims in the JWT token to generate a SQL query, which includes
+row-level constraints from the access control rules.
 
-JWTs sent to Cube.js should be passed in the `Authorization: <JWT>` header to
+JWTs sent to Cube should be passed in the `Authorization: <JWT>` header to
 authenticate requests.
 
 JWTs can also be used to pass additional information about the user, known as a
 **security context**. A security context is a verified set of claims about the
-current user that the Cube.js server can use to ensure that users only have
-access to the data that they are authorized to access.
+current user that the Cube server can use to ensure that users only have access
+to the data that they are authorized to access.
 
 It will be accessible as the [`securityContext`][ref-config-sec-ctx] property
 inside:
@@ -63,10 +63,10 @@ be injected into the security context:
 
 <WarningBox>
 
-Cube.js expects the context to be an object. If you don't provide an object as
-the JWT payload, you will receive the following error:
+Cube expects the context to be an object. If you don't provide an object as the
+JWT payload, you will receive the following error:
 
-```
+```bash
 Cannot create proxy with a non-object as target or handler
 ```
 
@@ -105,18 +105,18 @@ const cubejsToken = jwt.sign({ user_id: 42 }, CUBEJS_API_SECRET, {
 });
 ```
 
-Using this token, we authorize our request to the Cube.js API by passing it in
-the Authorization HTTP header.
+Using this token, we authorize our request to the Cube API by passing it in the
+Authorization HTTP header.
 
-```bash
+```bash{outputLines: 2-5}
 curl \
- -H "Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1Ijp7ImlkIjo0Mn0sImlhdCI6MTU1NjAyNTM1MiwiZXhwIjoxNTU4NjE3MzUyfQ._8QBL6nip6SkIrFzZzGq2nSF8URhl5BSSSGZYp7IJZ4" \
- -G \
- --data-urlencode 'query={"measures":["Orders.count"]}' \
- http://localhost:4000/cubejs-api/v1/load
+  -H "Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1Ijp7ImlkIjo0Mn0sImlhdCI6MTU1NjAyNTM1MiwiZXhwIjoxNTU4NjE3MzUyfQ._8QBL6nip6SkIrFzZzGq2nSF8URhl5BSSSGZYp7IJZ4" \
+  -G \
+  --data-urlencode 'query={"measures":["Orders.count"]}' \
+  http://localhost:4000/cubejs-api/v1/load
 ```
 
-And Cube.js will generate the following SQL:
+And Cube will generate the following SQL:
 
 ```sql
 SELECT
@@ -132,11 +132,11 @@ LIMIT 10000
 In the example below `user_id`, `company_id`, `sub` and `iat` will be injected
 into the security context and will be accessible in both the [Security
 Context][ref-schema-sec-ctx] and [`COMPILE_CONTEXT`][ref-cubes-compile-ctx]
-global variable in the Cube.js Data Schema.
+global variable in the Cube Data Schema.
 
 <InfoBox>
 
-`COMPILE_CONTEXT` is used by Cube.js at schema compilation time, which allows
+`COMPILE_CONTEXT` is used by Cube at schema compilation time, which allows
 changing the underlying dataset completely; the Security Context is only used at
 query execution time, which simply filters the dataset with a `WHERE` clause.
 

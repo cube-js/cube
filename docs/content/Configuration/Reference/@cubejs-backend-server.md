@@ -10,7 +10,7 @@ redirect_from:
 
 `@cubejs-backend/server` is a web server for the
 [@cubejs-backend/server-core][ref-config-ref-backend-server-core]. There are
-also multiple options to run Cube.js Backend Server [in
+also multiple options to run Cube Backend Server [in
 production][ref-deployment].
 
 ## API Reference
@@ -30,7 +30,7 @@ const CubejsServer = require('@cubejs-backend/server');
 const server = new CubejsServer();
 
 server.listen().then(({ version, port }) => {
-  console.log(`🚀 Cube.js server (${version}) is listening on ${port}`);
+  console.log(`🚀 Cube API server (${version}) is listening on ${port}`);
 });
 ```
 

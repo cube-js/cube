@@ -97,9 +97,10 @@ If the base cube is using [`FILTER_PARAMS`][ref-schema-ref-cube-filter-params]
 in any `sql` property, then extending cubes can do one of two things:
 
 - Override the `sql` property in each target cube.
+
   ```javascript
   cube(`ProductPurchases`, {
-    sql: `SELECT * FROM events WHERE 
+    sql: `SELECT * FROM events WHERE
            {$FILTER_PARAMS.ProductPurchases.timestamp.filter('time')}`,
   ...
   ```
@@ -108,7 +109,7 @@ in any `sql` property, then extending cubes can do one of two things:
   using `AND`. The unused filters will be rendered to `1 = 1` in the SQL query.
   ```javascript
   cube(`BaseEvents`, {
-    sql: `SELECT * FROM events WHERE  
+    sql: `SELECT * FROM events WHERE
               {$FILTER_PARAMS.BaseEvents.timestamp.filter('time')}
           AND {$FILTER_PARAMS.ProductPurchases.timestamp.filter('time')}
           AND {$FILTER_PARAMS.PageViews.timestamp.filter('time')}`,

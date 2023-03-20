@@ -33,7 +33,7 @@ you can still use it to pass a security context.
 
 ### <--{"id" : "Prerequisites"}--> Example request
 
-```bash
+```bash{promptUser: user}
 curl -H "Authorization: EXAMPLE-API-TOKEN" https://example.com/cubejs-api/v1/sql
 ```
 
@@ -129,13 +129,13 @@ Response
 
 Example request:
 
-```bash
+```bash{outputLines: 1,3-9,11-15}
 # Request with http method GET
 curl \
- -H "Authorization: EXAMPLE-API-TOKEN" \
- -G \
- --data-urlencode 'query={"measures":["Users.count"]}' \
- http://localhost:4000/cubejs-api/v1/load
+  -H "Authorization: EXAMPLE-API-TOKEN" \
+  -G \
+  --data-urlencode 'query={"measures":["Users.count"]}' \
+  http://localhost:4000/cubejs-api/v1/load
 
 # Request with http method POST
 # Use POST to fix problem with query length limits
@@ -208,13 +208,13 @@ Response
 
 Example request:
 
-```bash
+```bash{outputLines: 2-6}
 curl \
- -H "Authorization: EXAMPLE-API-TOKEN" \
- -G \
- --data-urlencode 'query={"measures":["Users.count"],
- "timeDimensions":[{"dimension": "Users.createdAt","granularity":"day","dateRange":["2019-03-01","2019-03-31"]}]}' \
- http://localhost:4000/cubejs-api/v1/sql
+  -H "Authorization: EXAMPLE-API-TOKEN" \
+  -G \
+  --data-urlencode 'query={"measures":["Users.count"],
+  "timeDimensions":[{"dimension": "Users.createdAt","granularity":"day","dateRange":["2019-03-01","2019-03-31"]}]}' \
+  http://localhost:4000/cubejs-api/v1/sql
 ```
 
 Example response:
@@ -268,11 +268,11 @@ Response
 
 Example request:
 
-```bash
+```bash{outputLines: 2-4}
 curl \
- -H "Authorization: EXAMPLE-API-TOKEN" \
- -G \
- http://localhost:4000/cubejs-api/v1/meta
+  -H "Authorization: EXAMPLE-API-TOKEN" \
+  -G \
+  http://localhost:4000/cubejs-api/v1/meta
 ```
 
 Example response:
@@ -335,12 +335,12 @@ Empty object response if scheduled successfully.
 
 Example request:
 
-```bash
+```bash{outputLines: 2-5}
 curl \
- -H "Authorization: EXAMPLE-API-TOKEN" \
- -G \
- --data-urlencode 'queryingOptions={"timezone":"UTC"}' \
- http://localhost:4000/cubejs-api/v1/run-scheduled-refresh
+  -H "Authorization: EXAMPLE-API-TOKEN" \
+  -G \
+  --data-urlencode 'queryingOptions={"timezone":"UTC"}' \
+  http://localhost:4000/cubejs-api/v1/run-scheduled-refresh
 ```
 
 ### <--{"id" : "API Reference"}--> /cubejs-system/v1/pre-aggregations/jobs
@@ -364,12 +364,12 @@ job.
 
 Example request:
 
-```bash
+```bash{outputLines: 2-5}
 curl \
- -d '{"action": "post", "selector": { "preAggregations": ["Orders.ordersByStatus"]}}' \
- -H "Authorization: EXAMPLE-API-TOKEN" \
- -X POST \
- https://localhost:4000/cubejs-system/v1/pre-aggregations/jobs
+  -d '{"action": "post", "selector": { "preAggregations": ["Orders.ordersByStatus"]}}' \
+  -H "Authorization: EXAMPLE-API-TOKEN" \
+  -X POST \
+  https://localhost:4000/cubejs-system/v1/pre-aggregations/jobs
 ```
 
 Example response:
@@ -396,12 +396,12 @@ a `tokens` property.
 
 Example request:
 
-```bash
+```bash{outputLines: 2-5}
 curl \
- -d '{"action": "get", "tokens": ["e9a6a0c55885cea5371348500ce7d7dc","d1329b6c8d152e734fc4dcf7307b1b58","6f4ea38373663fffc4334a576574845b","ea903b10634b2f3141b35a2529870e89"]}' \
- -H "Authorization: EXAMPLE-API-TOKEN" \
- -X POST \
- https://localhost:4000/cubejs-system/v1/pre-aggregations/jobs
+  -d '{"action": "get", "tokens": ["e9a6a0c55885cea5371348500ce7d7dc","d1329b6c8d152e734fc4dcf7307b1b58","6f4ea38373663fffc4334a576574845b","ea903b10634b2f3141b35a2529870e89"]}' \
+  -H "Authorization: EXAMPLE-API-TOKEN" \
+  -X POST \
+  https://localhost:4000/cubejs-system/v1/pre-aggregations/jobs
 ```
 
 Example response:
@@ -485,12 +485,12 @@ Example response:
 
 Example request with `resType: object`:
 
-```bash
+```bash{outputLines: 2-5}
 curl \
- -d '{"action": "get", "resType": "object", "tokens": ["e9a6a0c55885cea5371348500ce7d7dc","d1329b6c8d152e734fc4dcf7307b1b58","6f4ea38373663fffc4334a576574845b","ea903b10634b2f3141b35a2529870e89"]}' \
- -H "Authorization: EXAMPLE-API-TOKEN" \
- -X POST \
- https://localhost:4000/cubejs-system/v1/pre-aggregations/jobs
+  -d '{"action": "get", "resType": "object", "tokens": ["e9a6a0c55885cea5371348500ce7d7dc","d1329b6c8d152e734fc4dcf7307b1b58","6f4ea38373663fffc4334a576574845b","ea903b10634b2f3141b35a2529870e89"]}' \
+  -H "Authorization: EXAMPLE-API-TOKEN" \
+  -X POST \
+  https://localhost:4000/cubejs-system/v1/pre-aggregations/jobs
 ```
 
 Example response with `resType: object`:
@@ -578,15 +578,10 @@ connection to the default `dataSource`.
 **Multi-tenant:** Tests connections per-tenant. If no connections exist, it will
 report as successful.
 
-Example request:
+Example of a successful request:
 
-```bash
+```bash{outputLines: 2-12}
 curl -i http://localhost:4000/readyz
-```
-
-Successful example response:
-
-```bash
 HTTP/1.1 200 OK
 X-Powered-By: Express
 Access-Control-Allow-Origin: *
@@ -600,9 +595,10 @@ Keep-Alive: timeout=5
 {"health":"HEALTH"}
 ```
 
-Failure example response:
+Example of a failed response:
 
-```bash
+```bash{outputLines: 2-12}
+curl -i http://localhost:4000/readyz
 HTTP/1.1 500 Internal Server Error
 X-Powered-By: Express
 Access-Control-Allow-Origin: *
@@ -622,13 +618,10 @@ Returns the liveness state of the deployment. This is confirmed by testing any
 existing connections to `dataSource`. If no connections exist, it will report as
 successful.
 
-```bash
+Example of a successful response:
+
+```bash{outputLines: 2-12}
 curl -i http://localhost:4000/livez
-```
-
-Successful example response:
-
-```bash
 HTTP/1.1 200 OK
 X-Powered-By: Express
 Access-Control-Allow-Origin: *
@@ -642,9 +635,10 @@ Keep-Alive: timeout=5
 {"health":"HEALTH"}
 ```
 
-Failure example response:
+Example of a failed response:
 
-```bash
+```bash{outputLines: 2-12}
+curl -i http://localhost:4000/livez
 HTTP/1.1 500 Internal Server Error
 X-Powered-By: Express
 Access-Control-Allow-Origin: *

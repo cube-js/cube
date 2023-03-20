@@ -74,12 +74,12 @@ that you can always use a different charting library that suits your needs:
 
 You can install Cube JavaScript Client with npm or Yarn:
 
-```bash
+```bash{outputLines: 1,3-4}
 # npm
-$ npm install --save @cubejs-client/core
+npm install --save @cubejs-client/core
 
 # Yarn
-$ yarn add @cubejs-client/core
+yarn add @cubejs-client/core
 ```
 
 Now you can build your application from scratch or generate the code with

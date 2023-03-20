@@ -40,8 +40,8 @@ First, you'd need to install the third-party library with [NPM][link-npm]. In
 our example, we're going to use [winston-loggly-bulk][link-loggly-client] to
 collect and send logs to Loggly. You can install it with the following command:
 
-```bash
-$ npm install --save winston-loggly-bulk
+```bash{promptUser: user}
+npm install --save winston-loggly-bulk
 ```
 
 <InfoBox heading={`Running Cube in Docker`}>
@@ -49,8 +49,8 @@ $ npm install --save winston-loggly-bulk
 When installing custom Node.js packages for Cube running in Docker container,
 make sure you mount the project _including_ the `node_modules` subfolder:
 
-```bash
-$ docker run -d \
+```bash{outputLines: 2-4}
+docker run -d \
   -v ~/my-cubejs-project:/cube/conf
   cubejs/cube
 ```
@@ -105,13 +105,13 @@ const CubejsServer = require('@cubejs-backend/server');
 const server = new CubejsServer();
 
 server.listen().then(({ version, port }) => {
-  console.log(`🚀 Cube server (${version}) is listening on ${port}`);
+  console.log(`🚀 Cube API server (${version}) is listening on ${port}`);
 });
 ```
 
 Then start Cube as a regular Node.js application:
 
-```bash
+```bash{promptUser: user}
 node index.js
 ```
 

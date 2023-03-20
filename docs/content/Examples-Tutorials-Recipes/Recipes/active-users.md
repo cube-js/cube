@@ -79,25 +79,25 @@ cube(`ActiveUsers`, {
 
 We should set a `timeDimensions` with the `dateRange`.
 
-```bash
+```bash{outputLines: 2-18}
 curl cube:4000/cubejs-api/v1/load \
-'query={
-  "measures": [
-    "ActiveUsers.monthlyActiveUsers",
-    "ActiveUsers.weeklyActiveUsers",
-    "ActiveUsers.dailyActiveUsers",
-    "ActiveUsers.wauToMau"
-  ],
-  "timeDimensions": [
-    {
-      "dimension": "ActiveUsers.createdAt",
-      "dateRange": [
-        "2020-01-01",
-        "2020-12-31"
-      ]
-    }
-  ]
-}'
+  'query={
+    "measures": [
+      "ActiveUsers.monthlyActiveUsers",
+      "ActiveUsers.weeklyActiveUsers",
+      "ActiveUsers.dailyActiveUsers",
+      "ActiveUsers.wauToMau"
+    ],
+    "timeDimensions": [
+      {
+        "dimension": "ActiveUsers.createdAt",
+        "dateRange": [
+          "2020-01-01",
+          "2020-12-31"
+        ]
+      }
+    ]
+  }'
 ```
 
 ## Result

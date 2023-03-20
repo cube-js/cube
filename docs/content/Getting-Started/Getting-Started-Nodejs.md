@@ -8,24 +8,24 @@ This guide walks you through getting started with Cube and requires
 
 ## 1. Scaffold the project
 
-Run the following command to get started with Cube, specifying the project
-name and optionally your database using the `-d` flag.
+Run the following command to get started with Cube, specifying the project name
+and optionally your database using the `-d` flag.
 
-```bash
-$ npx cubejs-cli create <project name> -d <database type>
+```bash{promptUser: user}
+npx cubejs-cli create <project name> -d <database type>
 ```
 
 You can find [all available databases here][ref-connecting-to-the-database]. For
 example, to create a new project with the Postgres database, use the following:
 
-```bash
-$ npx cubejs-cli create hello-world -d postgres
+```bash{promptUser: user}
+npx cubejs-cli create hello-world -d postgres
 ```
 
 Once run, the `create` command will create a new project directory that contains
-the scaffolding for your new Cube project. This includes all the files
-necessary to spin up the Cube backend and some example schema files to
-highlight the format of the Cube Data Schema layer.
+the scaffolding for your new Cube project. This includes all the files necessary
+to spin up the Cube backend and some example schema files to highlight the
+format of the Cube Data Schema layer.
 
 The `.env` file in this project directory contains placeholders for the relevant
 database credentials. Setting credentials is covered in the [Connecting to the
@@ -42,14 +42,14 @@ more about Cube Schema][ref-cubejs-schema].
 You can generate schema files using [Developer Playground][ref-dev-playground].
 To do so, you can start the dev server from project directory like this:
 
-```bash
-$ npm run dev
+```bash{promptUser: user}
+npm run dev
 ```
 
 Then go to `http://localhost:4000` and use Developer Playground to generate
 schema files.
 
-### <--{"id" : "2. Define Your Data Schema"}-->  Manually creating Data Schema files
+### <--{"id" : "2. Define Your Data Schema"}--> Manually creating Data Schema files
 
 You can also add schema files to the `schema` folder manually:
 
@@ -84,15 +84,16 @@ cube(`Users`, {
 
 ## 3. Visualize Results
 
-The Cube client provides set of methods to access Cube API and to work
-with query result. The client itself doesn't provide any visualizations and is
+The Cube client provides set of methods to access Cube API and to work with
+query result. The client itself doesn't provide any visualizations and is
 designed to work with existing chart libraries. You can find more information
-about [the Cube client as well as our frontend integrations here][ref-frontend-intro].
+about [the Cube client as well as our frontend integrations
+here][ref-frontend-intro].
 
 As a shortcut you can run your dev server first:
 
-```bash
-$ npm run dev
+```bash{promptUser: user}
+npm run dev
 ```
 
 Then open `http://localhost:4000` in a browser to see visualization examples.
@@ -103,36 +104,36 @@ chart types, generate sample code and more!
 Cube also provides a [REST API](/rest-api) for accessing your data
 programmatically.
 
-### <--{"id" : "3. Visualize Results"}-->  Cube Client Installation
+### <--{"id" : "3. Visualize Results"}--> Cube Client Installation
 
 Vanilla JS:
 
-```bash
-$ npm i --save @cubejs-client/core
+```bash{promptUser: user}
+npm i --save @cubejs-client/core
 ```
 
 React:
 
-```bash
-$ npm i --save @cubejs-client/core
-$ npm i --save @cubejs-client/react
+```bash{promptUser: user}
+npm i --save @cubejs-client/core
+npm i --save @cubejs-client/react
 ```
 
 Vue:
 
-```bash
-$ npm i --save @cubejs-client/core
-$ npm i --save @cubejs-client/vue
+```bash{promptUser: user}
+npm i --save @cubejs-client/core
+npm i --save @cubejs-client/vue
 ```
 
 Angular:
 
-```bash
-$ npm i --save @cubejs-client/core
-$ npm i --save @cubejs-client/ngx
+```bash{promptUser: user}
+npm i --save @cubejs-client/core
+npm i --save @cubejs-client/ngx
 ```
 
-### <--{"id" : "3. Visualize Results"}-->  Example Usage
+### <--{"id" : "3. Visualize Results"}--> Example Usage
 
 #### Vanilla Javascript
 
@@ -327,8 +328,8 @@ export class AppComponent {
 
 Cube has first-class deployment support for [Docker][link-docker]:
 
-```bash
-$ docker run --rm \
+```bash{outputLines: 2-12}
+docker run --rm \
   --name cubejs-docker-demo \
   -e CUBEJS_API_SECRET=<YOUR-API-SECRET> \
   -e CUBEJS_DB_HOST=<YOUR-DB-HOST-HERE> \

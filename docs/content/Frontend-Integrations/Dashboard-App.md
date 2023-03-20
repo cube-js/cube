@@ -8,7 +8,7 @@ menuOrder: 6
 You can generate a Dashboard App in the [Developer
 Playground][link-dev-playground]. The Dashboard App wires multiple frontend
 components together into single app. It setups all the structure and
-configuration to work with Cube.js Backend, while giving you full control to
+configuration to work with Cube Backend, while giving you full control to
 customize it however you want.
 
 The main purpose of the Dashboard App is to easily get the project up and
@@ -34,10 +34,10 @@ You can access it directly by going to
 [http://localhost:3000](http://localhost:3000) or inside the Playground under
 the "Dashboard App" tab.
 
-Dashboard App uses Cube.js backend to power the query builder and the dashboard.
-It also uses Apollo GraphQL with local storage to save meta data such as
-dashboard items titles and locations on the dashboard. You can easily switch
-from local storage to your own or hosted GraphQL backend.
+Dashboard App uses Cube backend to power the query builder and the dashboard. It
+also uses Apollo GraphQL with local storage to save meta data such as dashboard
+items titles and locations on the dashboard. You can easily switch from local
+storage to your own or hosted GraphQL backend.
 
 ## Customization Guides
 
@@ -59,16 +59,16 @@ guide for additional deployment options.
 
 Install Netlify CLI:
 
-```bash
-$ npm install netlify-cli -g
+```bash{promptUser: user}
+npm install netlify-cli -g
 ```
 
 Then build and deploy your Dashboard App:
 
-```bash
-$ cd my-cubejs-app/dashboard-app
-$ npm run build
-$ netlify deploy
+```bash{promptUser: user}
+cd my-cubejs-app/dashboard-app
+npm run build
+netlify deploy
 ```
 
 Next follow command line prompts and choose yes for new project and `build` as
@@ -78,13 +78,13 @@ your deploy folder.
 
 Install Vercel CLI:
 
-```bash
-$ npm install vercel -g
+```bash{promptUser: user}
+npm install vercel -g
 ```
 
 Run `vercel` command in the root directory of the app.
 
-```bash
-$ cd my-cubejs-app/dashboard-app
-$ vercel
+```bash{promptUser: user}
+cd my-cubejs-app/dashboard-app
+vercel
 ```

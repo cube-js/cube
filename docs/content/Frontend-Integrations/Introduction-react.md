@@ -91,12 +91,12 @@ always use a different charting library that suits your needs:
 
 You can install Cube JavaScript Client and the React package with npm or Yarn:
 
-```bash
+```bash{outputLines: 1,3-4}
 # npm
-$ npm install --save @cubejs-client/core @cubejs-client/react
+npm install --save @cubejs-client/core @cubejs-client/react
 
 # Yarn
-$ yarn add @cubejs-client/core @cubejs-client/react
+yarn add @cubejs-client/core @cubejs-client/react
 ```
 
 Now you can build your project from scratch or generate a

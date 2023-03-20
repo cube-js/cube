@@ -1,0 +1,49 @@
+version: '2.2'
+
+services:
+  cubestore:
+    image: cubejs/cubestore:arm64-experimental-v2021-07-29
+    environment:
+      - CUBESTORE_REMOTE_DIR=/cube/data
+    volumes:
+      - .cubestore:/cube/data
+
+  cube:
+    image: cubejs/cube:latest
+    ports:
+      - 4000:4000
+      - 3000:3000
+    env_file: .env
+    volumes:
+      - .:/cube/conf  
+    depends_on:
+      - cubestore
+    links:
+      - cubestore
+
+  postgres:
+    image: postgres
+    restart: always
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_PASSWORD: example
+      POSTGRES_DB: localDB
+    volumes:
+      - ./db-scripts:/docker-entrypoint-initdb.d
+
+  query:
+    image: cfmanteiga/alpine-bash-curl-jq
+    depends_on:
+      - cube
+    volumes:
+      - .:/query
+    entrypoint: ["sh", "query/queries/run.sh"]
+
+  node:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - .:/node
+    entrypoint: ["sh", "node/data-updater/data-updater.sh"]

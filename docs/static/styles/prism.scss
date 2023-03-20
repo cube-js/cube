@@ -152,3 +152,31 @@ pre[class*="language-"] {
   cursor: help;
 }
 
+.language-bash {
+
+  > .command-line-prompt {
+    border-right: none;
+    margin-right: 0;
+  }
+
+  > .command-line-prompt > span:before {
+    color: #999;
+    content: " ";
+    display: block;
+    padding-right: 0.8em;
+  }
+
+  /* Prompt for all users */
+  > .command-line-prompt > span[data-user]:before {
+    content: "$";
+  }
+
+  /* Prompt for root */
+  > .command-line-prompt > span[data-user="root"]:before {
+    content: "#";
+  }
+
+  > .command-line-prompt > span[data-prompt]:before {
+    content: attr(data-prompt);
+  }
+}

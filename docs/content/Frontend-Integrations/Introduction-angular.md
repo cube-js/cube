@@ -85,12 +85,12 @@ can always use a different charting library that suits your needs:
 
 You can install Cube JavaScript Client and the Angular package with npm or Yarn:
 
-```bash
+```bash{outputLines: 1,3-4}
 # npm
-$ npm install --save @cubejs-client/core @cubejs-client/ngx
+npm install --save @cubejs-client/core @cubejs-client/ngx
 
 # Yarn
-$ yarn add @cubejs-client/core @cubejs-client/ngx
+yarn add @cubejs-client/core @cubejs-client/ngx
 ```
 
 Now you can build your application from scratch or generate the code with

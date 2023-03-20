@@ -7,7 +7,7 @@ subCategory: Platforms
 menuOrder: 2
 ---
 
-This guide walks you through deploying Cube.js with Docker.
+This guide walks you through deploying Cube with Docker.
 
 <WarningBox>
 
@@ -25,8 +25,8 @@ can vary significantly depending on desired performance and scale.
 Create a Docker Compose stack by creating a `docker-compose.yml`. A
 production-ready stack would at minimum consist of:
 
-- One or more Cube.js API instance
-- A Cube.js Refresh Worker
+- One or more Cube API instance
+- A Cube Refresh Worker
 - A Cube Store Router node
 - One or more Cube Store Worker nodes
 - A Redis instance
@@ -129,9 +129,9 @@ services:
 
 ## Set up reverse proxy
 
-In production, the Cube.js API should be served over an HTTPS connection to
-ensure security of the data in-transit. We recommend using a reverse proxy; as
-an example, let's use [NGINX][link-nginx].
+In production, the Cube API should be served over an HTTPS connection to ensure
+security of the data in-transit. We recommend using a reverse proxy; as an
+example, let's use [NGINX][link-nginx].
 
 <InfoBox>
 
@@ -141,7 +141,7 @@ You can also use a reverse proxy to enable HTTP 2.0 and GZIP compression
 
 First we'll create a new server configuration file called `nginx/cube.conf`:
 
-```
+```nginx
 server {
   listen 443 ssl;
   server_name cube.my-domain.com;
@@ -192,9 +192,9 @@ post][medium-letsencrypt-nginx] may be useful.
 
 ### <--{"id" : "Security"}--> Use JSON Web Tokens
 
-Cube.js can be configured to use industry-standard JSON Web Key Sets for
-securing its API and limiting access to data. To do this, we'll define the
-relevant options on our Cube.js API instance:
+Cube can be configured to use industry-standard JSON Web Key Sets for securing
+its API and limiting access to data. To do this, we'll define the relevant
+options on our Cube API instance:
 
 <WarningBox>
 
@@ -235,17 +235,16 @@ services:
 
 ### <--{"id" : "Security"}--> Securing Cube Store
 
-All Cube Store nodes (both router and workers) should only be accessible to
-Cube.js API instances and refresh workers. To do this with Docker Compose, we
-simply need to make sure that none of the Cube Store services have any exposed
-ports.
+All Cube Store nodes (both router and workers) should only be accessible to Cube
+API instances and refresh workers. To do this with Docker Compose, we simply
+need to make sure that none of the Cube Store services have any exposed ports.
 
 ## Monitoring
 
-All Cube.js logs can be found by through the Docker Compose CLI:
+All Cube logs can be found by through the Docker Compose CLI:
 
-```bash
-$ docker-compose ps
+```bash{outputLines: 2-9,11-18}
+docker-compose ps
 
            Name                           Command               State                    Ports
 ---------------------------------------------------------------------------------------------------------------------------------
@@ -254,13 +253,13 @@ cluster_cubestore_router_1     ./cubestored                     Up      3030/tcp
 cluster_cubestore_worker_1_1   ./cubestored                     Up      3306/tcp, 9001/tcp
 cluster_cubestore_worker_2_1   ./cubestored                     Up      3306/tcp, 9001/tcp
 
-$ docker-compose logs
+docker-compose logs
 
 cubestore_router_1    | 2021-06-02 15:03:20,915 INFO  [cubestore::metastore] Creating metastore from scratch in /cube/.cubestore/data/metastore
 cubestore_router_1    | 2021-06-02 15:03:20,950 INFO  [cubestore::cluster] Meta store port open on 0.0.0.0:9999
 cubestore_router_1    | 2021-06-02 15:03:20,951 INFO  [cubestore::mysql] MySQL port open on 0.0.0.0:3306
 cubestore_router_1    | 2021-06-02 15:03:20,952 INFO  [cubestore::http] Http Server is listening on 0.0.0.0:3030
-cube_1                | 🚀 Cube.js server (%CURRENT_VERSION) is listening on 4000
+cube_1                | 🚀 Cube server (%CURRENT_VERSION) is listening on 4000
 cubestore_worker_2_1  | 2021-06-02 15:03:24,945 INFO  [cubestore::cluster] Worker port open on 0.0.0.0:9001
 cubestore_worker_1_1  | 2021-06-02 15:03:24,830 INFO  [cubestore::cluster] Worker port open on 0.0.0.0:9001
 ```
@@ -302,7 +301,7 @@ configuration file][ref-config-js], you'll need to build your own Docker image.
 You can do this by first creating a `Dockerfile` and a corresponding
 `.dockerignore`:
 
-```bash
+```bash{promptUser: user}
 touch Dockerfile
 touch .dockerignore
 ```
@@ -318,7 +317,7 @@ RUN npm install
 
 And this to the `.dockerignore`:
 
-```bash
+```gitignore
 node_modules
 npm-debug.log
 schema
@@ -328,13 +327,13 @@ cube.js
 
 Then start the build process by running the following command:
 
-```bash
+```bash{promptUser: user}
 docker build -t <YOUR-USERNAME>/cubejs-custom-build .
 ```
 
 Finally, update your `docker-compose.yml` to use your newly-built image:
 
-```bash
+```yaml
 version: '2.2'
 
 services:

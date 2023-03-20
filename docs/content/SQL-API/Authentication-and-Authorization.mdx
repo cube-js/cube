@@ -28,8 +28,11 @@ module.exports = {
 };
 ```
 
-As Cube expects passwords to be provided by `checkSqlAuth` implementation best practice is to use a generated password here instead of an actual user password.
-Generated passwords can be implemented as an HMAC of the user name or requested from some service that provides the mapping of the user name to passwords for additional security. 
+As Cube expects passwords to be provided by `checkSqlAuth` implementation best
+practice is to use a generated password here instead of an actual user password.
+Generated passwords can be implemented as an HMAC of the user name or requested
+from some service that provides the mapping of the user name to passwords for
+additional security.
 
 ## Security Context (Row-Level Security)
 
@@ -43,7 +46,7 @@ this, we must first define which user is allowed to change Security Context:
 
 First, you need to define what user is allowed to change security context:
 
-```
+```dotenv
 CUBEJS_SQL_SUPER_USER=admin
 ```
 
