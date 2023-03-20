@@ -593,7 +593,7 @@ impl MetaStore for MetaStoreMock {
     async fn create_replay_handle_from_seq_pointers(
         &self,
         _table_id: u64,
-    _seq_pointer: Option<Vec<Option<SeqPointer>>>,
+        _seq_pointer: Option<Vec<Option<SeqPointer>>>,
     ) -> Result<IdRow<ReplayHandle>, CubeError> {
         panic!("MetaStore mock!")
     }
