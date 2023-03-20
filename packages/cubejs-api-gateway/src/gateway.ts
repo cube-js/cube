@@ -565,12 +565,6 @@ class ApiGateway {
   public async metaExtended({ context, res }: { context: RequestContext, res: ResponseResultFn }) {
     const requestStarted = new Date();
 
-    // TODO: test and remove this function.
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    function visibilityFilter(item) {
-      return getEnv('devMode') || context.signedWithPlaygroundAuthSecret || item.isVisible;
-    }
-
     try {
       await this.assertPermission('meta', context.securityContext);
       const metaConfigExtended = await this.getCompilerApi(context).metaConfigExtended({

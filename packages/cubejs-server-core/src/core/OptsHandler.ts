@@ -221,7 +221,7 @@ export class OptsHandler {
           );
         }
         // TODO (buntarb): wrapping this call with assertDriverFactoryResult
-        // change assertions sequince and cause a fail of few tests. Review it.
+        // change assertions sequence and cause a fail of few tests. Review it.
         return this.defaultDriverFactory(ctx);
       } else {
         return this.assertDriverFactoryResult(
