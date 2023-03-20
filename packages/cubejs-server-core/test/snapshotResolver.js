@@ -4,8 +4,6 @@ function resolveSnapshotPath(testPath, snapshotExtension) {
   const testSourcePath = testPath.replace('dist/', '');
   const testDirectory = path.dirname(testSourcePath);
   const testFilename = path.basename(testSourcePath).replace('.js', '.ts');
-
-  console.log(`${testDirectory}/__snapshots__/${testFilename}${snapshotExtension}`);
   return `${testDirectory}/__snapshots__/${testFilename}${snapshotExtension}`;
 }
 
@@ -14,7 +12,6 @@ function resolveTestPath(snapshotFilePath, snapshotExtension) {
     .replace('test/__snapshots__', 'dist/test')
     .replace('.ts', '.js')
     .replace(snapshotExtension, '');
-
   return testSourceFile;
 }
 
