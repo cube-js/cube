@@ -159,12 +159,18 @@ pub(crate) enum ChunkRocksIndex {
     ReplayHandleId = 2,
 }
 
-rocks_table_impl!(Chunk, ChunkRocksTable, TableId::Chunks, {
-    vec![
-        Box::new(ChunkRocksIndex::PartitionId),
-        Box::new(ChunkRocksIndex::ReplayHandleId),
-    ]
-});
+rocks_table_impl!(
+    Chunk,
+    ChunkRocksTable,
+    TableId::Chunks,
+    {
+        vec![
+            Box::new(ChunkRocksIndex::PartitionId),
+            Box::new(ChunkRocksIndex::ReplayHandleId),
+        ]
+    },
+    rocksdb::DEFAULT_COLUMN_FAMILY_NAME
+);
 
 base_rocks_secondary_index!(Chunk, ChunkRocksIndex);
 

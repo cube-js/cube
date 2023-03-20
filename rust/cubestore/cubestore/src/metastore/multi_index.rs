@@ -55,9 +55,13 @@ pub(crate) enum MultiIndexRocksIndex {
 
 crate::base_rocks_secondary_index!(MultiIndex, MultiIndexRocksIndex);
 
-rocks_table_impl!(MultiIndex, MultiIndexRocksTable, TableId::MultiIndexes, {
-    vec![Box::new(MultiIndexRocksIndex::ByName)]
-});
+rocks_table_impl!(
+    MultiIndex,
+    MultiIndexRocksTable,
+    TableId::MultiIndexes,
+    { vec![Box::new(MultiIndexRocksIndex::ByName)] },
+    rocksdb::DEFAULT_COLUMN_FAMILY_NAME
+);
 
 #[derive(Hash, Clone, Debug)]
 pub enum MultiIndexIndexKey {
@@ -210,7 +214,8 @@ rocks_table_impl!(
             Box::new(MultiPartitionRocksIndex::ByMultiIndexId),
             Box::new(MultiPartitionRocksIndex::ByParentId),
         ]
-    }
+    },
+    rocksdb::DEFAULT_COLUMN_FAMILY_NAME
 );
 
 #[derive(Hash, Clone, Debug)]

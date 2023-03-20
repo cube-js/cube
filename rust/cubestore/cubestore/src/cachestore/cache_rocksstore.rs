@@ -24,7 +24,7 @@ use crate::CubeError;
 use async_trait::async_trait;
 
 use futures_timer::Delay;
-use rocksdb::{BlockBasedOptions, Options, DB};
+use rocksdb::{BlockBasedOptions, ColumnFamilyDescriptor, Options, DB};
 
 use crate::cachestore::compaction::CompactionPreloadedState;
 use crate::cachestore::listener::RocksCacheStoreListener;
@@ -37,6 +37,8 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::sync::broadcast::Sender;
+
+pub const CACHESTORE_QUEUE_COLUMN_FAMILY_NAME: &str = "queue";
 
 pub(crate) struct RocksCacheStoreDetails {}
 
@@ -74,10 +76,8 @@ impl RocksStoreDetails for RocksCacheStoreDetails {
 
         let mut opts = Options::default();
         opts.create_if_missing(true);
+        opts.create_missing_column_families(true);
         opts.set_prefix_extractor(rocksdb::SliceTransform::create_fixed_prefix(13));
-        opts.set_compaction_filter_factory(compaction::MetaStoreCacheCompactionFactory::new(
-            compaction_state,
-        ));
         // Disable automatic compaction before migration, will be enabled later in after_migration
         opts.set_disable_auto_compactions(true);
 
@@ -87,7 +87,27 @@ impl RocksStoreDetails for RocksCacheStoreDetails {
 
         opts.set_block_based_table_factory(&block_opts);
 
-        DB::open(&opts, path)
+        let default_cf = {
+            let mut opts = Options::default();
+            opts.set_prefix_extractor(rocksdb::SliceTransform::create_fixed_prefix(13));
+            opts.set_compaction_filter_factory(compaction::MetaStoreCacheCompactionFactory::new(
+                compaction_state.clone(),
+            ));
+
+            ColumnFamilyDescriptor::new(rocksdb::DEFAULT_COLUMN_FAMILY_NAME, opts)
+        };
+
+        let queue_cf = {
+            let mut opts = Options::default();
+            opts.set_prefix_extractor(rocksdb::SliceTransform::create_fixed_prefix(13));
+            opts.set_compaction_filter_factory(compaction::MetaStoreCacheCompactionFactory::new(
+                compaction_state,
+            ));
+
+            ColumnFamilyDescriptor::new(CACHESTORE_QUEUE_COLUMN_FAMILY_NAME, opts)
+        };
+
+        DB::open_cf_descriptors(&opts, path, vec![default_cf, queue_cf])
             .map_err(|err| CubeError::internal(format!("DB::open error for cachestore: {}", err)))
     }
 

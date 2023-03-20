@@ -1,3 +1,4 @@
+use super::cache_rocksstore::CACHESTORE_QUEUE_COLUMN_FAMILY_NAME;
 use crate::metastore::{
     BaseRocksTable, IndexId, RocksEntity, RocksSecondaryIndex, RocksTable, TableId, TableInfo,
 };
@@ -364,13 +365,19 @@ impl<'a> BaseRocksTable for QueueItemRocksTable<'a> {
     }
 }
 
-rocks_table_new!(QueueItem, QueueItemRocksTable, TableId::QueueItems, {
-    vec![
-        Box::new(QueueItemRocksIndex::ByPath),
-        Box::new(QueueItemRocksIndex::ByPrefixAndStatus),
-        Box::new(QueueItemRocksIndex::ByPrefix),
-    ]
-});
+rocks_table_new!(
+    QueueItem,
+    QueueItemRocksTable,
+    TableId::QueueItems,
+    {
+        vec![
+            Box::new(QueueItemRocksIndex::ByPath),
+            Box::new(QueueItemRocksIndex::ByPrefixAndStatus),
+            Box::new(QueueItemRocksIndex::ByPrefix),
+        ]
+    },
+    CACHESTORE_QUEUE_COLUMN_FAMILY_NAME
+);
 
 #[derive(Hash, Clone, Debug)]
 pub enum QueueItemIndexKey {

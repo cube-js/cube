@@ -21,7 +21,7 @@ pub use rocks_table::*;
 use crate::cluster::node_name_by_partition;
 use async_trait::async_trait;
 use log::info;
-use rocksdb::{BlockBasedOptions, Env, MergeOperands, Options, DB};
+use rocksdb::{BlockBasedOptions, ColumnFamilyDescriptor, Env, MergeOperands, Options, DB};
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
 use std::{env, io::Cursor, sync::Arc};
@@ -1157,7 +1157,14 @@ impl RocksStoreDetails for RocksMetaStoreDetails {
 
         opts.set_block_based_table_factory(&block_opts);
 
-        DB::open(&opts, path)
+        let default_cf = {
+            let mut opts = Options::default();
+            opts.set_prefix_extractor(rocksdb::SliceTransform::create_fixed_prefix(13));
+
+            ColumnFamilyDescriptor::new(rocksdb::DEFAULT_COLUMN_FAMILY_NAME, opts)
+        };
+
+        DB::open_cf_descriptors(&opts, path, vec![default_cf])
             .map_err(|err| CubeError::internal(format!("DB::open error for metastore: {}", err)))
     }
 

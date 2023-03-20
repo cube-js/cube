@@ -7,7 +7,9 @@ use crate::CubeError;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use chrono::{DateTime, Utc};
 use itertools::Itertools;
-use rocksdb::{DBIterator, Direction, IteratorMode, ReadOptions, Snapshot, WriteBatch, DB};
+use rocksdb::{
+    ColumnFamily, DBIterator, Direction, IteratorMode, ReadOptions, Snapshot, WriteBatch, DB,
+};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
@@ -19,7 +21,7 @@ use std::time::SystemTime;
 
 #[macro_export]
 macro_rules! rocks_table_impl {
-    ($table: ty, $rocks_table: ident, $table_id: expr, $indexes: block) => {
+    ($table: ty, $rocks_table: ident, $table_id: expr, $indexes: block, $column_family: expr) => {
         pub(crate) struct $rocks_table<'a> {
             db: crate::metastore::DbTableRef<'a>,
         }
@@ -43,15 +45,19 @@ macro_rules! rocks_table_impl {
             }
         }
 
-        crate::rocks_table_new!($table, $rocks_table, $table_id, $indexes);
+        crate::rocks_table_new!($table, $rocks_table, $table_id, $indexes, $column_family);
     };
 }
 
 #[macro_export]
 macro_rules! rocks_table_new {
-    ($table: ty, $rocks_table: ident, $table_id: expr, $indexes: block) => {
+    ($table: ty, $rocks_table: ident, $table_id: expr, $indexes: block, $column_family: expr) => {
         impl<'a> crate::metastore::RocksTable for $rocks_table<'a> {
             type T = $table;
+
+            fn cf_name(&self) -> &'static str {
+                $column_family
+            }
 
             fn db(&self) -> &rocksdb::DB {
                 self.db.db
@@ -363,6 +369,17 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
     where
         D: Deserializer<'de>;
     fn indexes() -> Vec<Box<dyn BaseRocksSecondaryIndex<Self::T>>>;
+    fn cf_default(&self) -> Result<&ColumnFamily, CubeError> {
+        self.db()
+            .cf_handle(&rocksdb::DEFAULT_COLUMN_FAMILY_NAME)
+            .ok_or_else(|| CubeError::internal(format!("cf {:?} not found", self.cf_name())))
+    }
+    fn cf(&self) -> Result<&ColumnFamily, CubeError> {
+        self.db()
+            .cf_handle(&self.cf_name().to_string())
+            .ok_or_else(|| CubeError::internal(format!("cf {:?} not found", self.cf_name())))
+    }
+    fn cf_name(&self) -> &'static str;
 
     fn migrate_table_by_truncate(&self, mut batch: &mut WriteBatch) -> Result<(), CubeError> {
         log::trace!("Truncating rows from {:?} table", self);
@@ -403,17 +420,29 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
 
         let (row_id, inserted_row) = self.insert_row(serialized_row)?;
         batch_pipe.add_event(MetaStoreEvent::Insert(Self::table_id(), row_id));
-        if self.snapshot().get(&inserted_row.key)?.is_some() {
+        if self
+            .snapshot()
+            .get_cf(self.cf()?, &inserted_row.key)?
+            .is_some()
+        {
             return Err(CubeError::internal(format!("Primary key constraint violation. Primary key already exists for a row id {}: {:?}", row_id, &row)));
         }
-        batch_pipe.batch().put(inserted_row.key, inserted_row.val);
+        batch_pipe
+            .batch()
+            .put_cf(self.cf()?, inserted_row.key, inserted_row.val);
 
         let index_row = self.insert_index_row(&row, row_id)?;
         for to_insert in index_row {
-            if self.snapshot().get(&to_insert.key)?.is_some() {
+            if self
+                .snapshot()
+                .get_cf(self.cf()?, &to_insert.key)?
+                .is_some()
+            {
                 return Err(CubeError::internal(format!("Primary key constraint violation in secondary index. Primary key already exists for a row id {}: {:?}", row_id, &row)));
             }
-            batch_pipe.batch().put(to_insert.key, to_insert.val);
+            batch_pipe
+                .batch()
+                .put_cf(self.cf()?, to_insert.key, to_insert.val);
         }
 
         Ok(IdRow::new(row_id, row))
@@ -429,7 +458,8 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
     fn migration_check_table(&self) -> Result<(), CubeError> {
         let snapshot = self.snapshot();
 
-        let table_info = snapshot.get(
+        let table_info = snapshot.get_cf(
+            self.cf_default()?,
             &RowKey::TableInfo {
                 table_id: Self::table_id(),
             }
@@ -446,7 +476,8 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
 
                 self.migrate_table(&mut batch, table_info)?;
 
-                batch.put(
+                batch.put_cf(
+                    self.cf_default()?,
                     &RowKey::TableInfo {
                         table_id: Self::table_id(),
                     }
@@ -461,7 +492,8 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
                 self.db().write(batch)?;
             }
         } else {
-            self.db().put(
+            self.db().put_cf(
+                self.cf_default()?,
                 &RowKey::TableInfo {
                     table_id: Self::table_id(),
                 }
@@ -480,7 +512,8 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
     fn migration_check_indexes(&self) -> Result<(), CubeError> {
         let snapshot = self.snapshot();
         for index in Self::indexes().into_iter() {
-            let index_info = snapshot.get(
+            let index_info = snapshot.get_cf(
+                self.cf_default()?,
                 &RowKey::SecondaryIndexInfo {
                     index_id: Self::index_id(index.get_id()),
                 }
@@ -558,9 +591,10 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
             }
             let row = row?;
             let index_row = self.index_key_val(row.get_row(), row.get_id(), index);
-            batch.put(index_row.key, index_row.val);
+            batch.put_cf(self.cf()?, index_row.key, index_row.val);
         }
-        batch.put(
+        batch.put_cf(
+            self.cf_default()?,
             &RowKey::SecondaryIndexInfo {
                 index_id: Self::index_id(index.get_id()),
             }
@@ -712,7 +746,7 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
     ) -> Result<IdRow<Self::T>, CubeError> {
         let deleted_row = self.delete_index_row(&old_row, row_id)?;
         for row in deleted_row {
-            batch_pipe.batch().delete(row.key);
+            batch_pipe.batch().delete_cf(self.cf()?, row.key);
         }
 
         let mut ser = flexbuffers::FlexbufferSerializer::new();
@@ -729,11 +763,13 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
             ));
         }
 
-        batch_pipe.batch().put(updated_row.key, updated_row.val);
+        batch_pipe
+            .batch()
+            .put_cf(self.cf()?, updated_row.key, updated_row.val);
 
         let index_row = self.insert_index_row(&new_row, row_id)?;
         for row in index_row {
-            batch_pipe.batch().put(row.key, row.val);
+            batch_pipe.batch().put_cf(self.cf()?, row.key, row.val);
         }
         Ok(IdRow::new(row_id, new_row))
     }
@@ -768,12 +804,12 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         }
 
         for row in deleted_row {
-            batch_pipe.batch().delete(row.key);
+            batch_pipe.batch().delete_cf(self.cf()?, row.key);
         }
 
         batch_pipe
             .batch()
-            .delete(self.delete_row(row.get_id())?.key);
+            .delete_cf(self.cf()?, self.delete_row(row.get_id())?.key);
 
         Ok(row)
     }
@@ -783,7 +819,7 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         let seq_key = RowKey::Sequence(Self::table_id());
         let before_merge = self
             .snapshot()
-            .get(seq_key.to_bytes())?
+            .get_cf(self.cf()?, seq_key.to_bytes())?
             .map(|v| Cursor::new(v).read_u64::<BigEndian>().unwrap());
 
         // TODO revert back merge operator if locking works
@@ -793,7 +829,7 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
 
         let mut to_write = vec![];
         to_write.write_u64::<BigEndian>(next_seq)?;
-        db.put(seq_key.to_bytes(), to_write)?;
+        db.put_cf(self.cf()?, seq_key.to_bytes(), to_write)?;
 
         Ok(next_seq)
     }
@@ -835,7 +871,10 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
 
     fn get_row(&self, row_id: u64) -> Result<Option<IdRow<Self::T>>, CubeError> {
         let ref db = self.snapshot();
-        let res = db.get(RowKey::Table(Self::table_id(), row_id).to_bytes())?;
+        let res = db.get_cf(
+            self.cf()?,
+            RowKey::Table(Self::table_id(), row_id).to_bytes(),
+        )?;
 
         if let Some(buffer) = res {
             let row = self.deserialize_id_row(row_id, buffer.as_slice())?;
@@ -919,9 +958,10 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
 
         let mut opts = ReadOptions::default();
         opts.set_prefix_same_as_start(true);
-        let iter = db.iterator_opt(
-            IteratorMode::From(&key_min.to_bytes()[0..(key_len + 5)], Direction::Forward),
+        let iter = db.iterator_cf_opt(
+            self.cf()?,
             opts,
+            IteratorMode::From(&key_min.to_bytes()[0..(key_len + 5)], Direction::Forward),
         );
         let index = self.get_index_by_id(secondary_id);
 
@@ -970,17 +1010,20 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         let ref db = self.snapshot();
         let key_min = RowKey::Table(table_id, 0);
 
-        let iter = db.iterator(IteratorMode::From(
-            &key_min.to_bytes()[0..get_fixed_prefix()],
-            Direction::Forward,
-        ));
+        let iter = db.iterator_cf(
+            self.cf()?,
+            IteratorMode::From(
+                &key_min.to_bytes()[0..get_fixed_prefix()],
+                Direction::Forward,
+            ),
+        );
 
         for kv_res in iter {
             let (key, _) = kv_res?;
             let row_key = RowKey::from_bytes(&key);
             if let RowKey::Table(row_table_id, _) = row_key {
                 if row_table_id == table_id {
-                    batch.delete(key);
+                    batch.delete_cf(self.cf()?, key);
                 } else {
                     return Ok(());
                 }
@@ -999,17 +1042,17 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         let key_len = zero_vec.len();
         let key_min = RowKey::SecondaryIndex(Self::index_id(secondary_id), zero_vec.clone(), 0);
 
-        let iter = db.iterator(IteratorMode::From(
-            &key_min.to_bytes()[0..(key_len + 5)],
-            Direction::Forward,
-        ));
+        let iter = db.iterator_cf(
+            self.cf()?,
+            IteratorMode::From(&key_min.to_bytes()[0..(key_len + 5)], Direction::Forward),
+        );
 
         for kv_res in iter {
             let (key, _) = kv_res?;
             let row_key = RowKey::from_bytes(&key);
             if let RowKey::SecondaryIndex(index_id, _, _) = row_key {
                 if index_id == Self::index_id(secondary_id) {
-                    batch.delete(key);
+                    batch.delete_cf(self.cf()?, key);
                 } else {
                     return Ok(());
                 }
@@ -1053,9 +1096,10 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
 
         let mut opts = ReadOptions::default();
         opts.set_prefix_same_as_start(true);
-        let iter = db.iterator_opt(
-            IteratorMode::From(&key_min.to_bytes()[0..(key_len + 5)], Direction::Forward),
+        let iter = db.iterator_cf_opt(
+            self.cf()?,
             opts,
+            IteratorMode::From(&key_min.to_bytes()[0..(key_len + 5)], Direction::Forward),
         );
 
         Ok(IndexScanIter {
@@ -1073,12 +1117,13 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
 
         let mut opts = ReadOptions::default();
         opts.set_prefix_same_as_start(true);
-        let iterator = db.iterator_opt(
+        let iterator = db.iterator_cf_opt(
+            self.cf()?,
+            opts,
             IteratorMode::From(
                 &key_min.to_bytes()[0..get_fixed_prefix()],
                 Direction::Forward,
             ),
-            opts,
         );
 
         Ok(TableScanIter {

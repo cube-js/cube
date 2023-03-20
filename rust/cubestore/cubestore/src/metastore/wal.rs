@@ -45,9 +45,13 @@ pub(crate) enum WALRocksIndex {
     TableID = 1,
 }
 
-rocks_table_impl!(WAL, WALRocksTable, TableId::WALs, {
-    vec![Box::new(WALRocksIndex::TableID)]
-});
+rocks_table_impl!(
+    WAL,
+    WALRocksTable,
+    TableId::WALs,
+    { vec![Box::new(WALRocksIndex::TableID)] },
+    rocksdb::DEFAULT_COLUMN_FAMILY_NAME
+);
 
 #[derive(Hash, Clone, Debug)]
 pub enum WALIndexKey {

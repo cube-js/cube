@@ -62,9 +62,13 @@ pub enum SourceRocksIndex {
 
 base_rocks_secondary_index!(Source, SourceRocksIndex);
 
-rocks_table_impl!(Source, SourceRocksTable, TableId::Sources, {
-    vec![Box::new(SourceRocksIndex::Name)]
-});
+rocks_table_impl!(
+    Source,
+    SourceRocksTable,
+    TableId::Sources,
+    { vec![Box::new(SourceRocksIndex::Name)] },
+    rocksdb::DEFAULT_COLUMN_FAMILY_NAME
+);
 
 #[derive(Hash, Clone, Debug)]
 pub enum SourceIndexKey {

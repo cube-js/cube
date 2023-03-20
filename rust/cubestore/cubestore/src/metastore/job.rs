@@ -118,12 +118,18 @@ pub enum JobRocksIndex {
 
 base_rocks_secondary_index!(Job, JobRocksIndex);
 
-rocks_table_impl!(Job, JobRocksTable, TableId::Jobs, {
-    vec![
-        Box::new(JobRocksIndex::RowReference),
-        Box::new(JobRocksIndex::ByShard),
-    ]
-});
+rocks_table_impl!(
+    Job,
+    JobRocksTable,
+    TableId::Jobs,
+    {
+        vec![
+            Box::new(JobRocksIndex::RowReference),
+            Box::new(JobRocksIndex::ByShard),
+        ]
+    },
+    rocksdb::DEFAULT_COLUMN_FAMILY_NAME
+);
 
 #[derive(Hash, Clone, Debug)]
 pub enum JobIndexKey {

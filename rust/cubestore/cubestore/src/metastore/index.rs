@@ -80,13 +80,19 @@ pub(crate) enum IndexRocksIndex {
 
 crate::base_rocks_secondary_index!(Index, IndexRocksIndex);
 
-rocks_table_impl!(Index, IndexRocksTable, TableId::Indexes, {
-    vec![
-        Box::new(IndexRocksIndex::TableID),
-        Box::new(IndexRocksIndex::Name),
-        Box::new(IndexRocksIndex::MultiIndexId),
-    ]
-});
+rocks_table_impl!(
+    Index,
+    IndexRocksTable,
+    TableId::Indexes,
+    {
+        vec![
+            Box::new(IndexRocksIndex::TableID),
+            Box::new(IndexRocksIndex::Name),
+            Box::new(IndexRocksIndex::MultiIndexId),
+        ]
+    },
+    rocksdb::DEFAULT_COLUMN_FAMILY_NAME
+);
 
 #[derive(Hash, Clone, Debug)]
 pub enum IndexIndexKey {
