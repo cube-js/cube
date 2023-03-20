@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.32.10](https://github.com/cube-js/cube.js/compare/v0.32.9...v0.32.10) (2023-03-20)
+
+
+### Bug Fixes
+
+* Refresh Scheduler - empty securityContext in driverFactory ([#6316](https://github.com/cube-js/cube.js/issues/6316)) ([dd4c9d5](https://github.com/cube-js/cube.js/commit/dd4c9d5a508de03b076850daed78afa18e99eb4f))
+
+
+
+
+
 ## [0.32.8](https://github.com/cube-js/cube.js/compare/v0.32.7...v0.32.8) (2023-03-17)
 
 
