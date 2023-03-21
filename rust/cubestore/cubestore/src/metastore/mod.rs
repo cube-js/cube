@@ -1009,6 +1009,7 @@ pub trait MetaStore: DIService + Send + Sync {
         &self,
         orphaned_timeout: Duration,
     ) -> Result<Vec<IdRow<Job>>, CubeError>;
+    async fn get_jobs_on_non_exists_nodes(&self) -> Result<Vec<IdRow<Job>>, CubeError>;
     async fn delete_job(&self, job_id: u64) -> Result<IdRow<Job>, CubeError>;
     async fn start_processing_job(
         &self,
@@ -3573,6 +3574,33 @@ impl MetaStore for RocksMetaStore {
                     let duration1 =
                         time.signed_duration_since(j.get_row().last_heart_beat().clone());
                     duration1 > duration
+                })
+                .collect::<Vec<_>>();
+            Ok(all_jobs)
+        })
+        .await
+    }
+
+    async fn get_jobs_on_non_exists_nodes(&self) -> Result<Vec<IdRow<Job>>, CubeError> {
+        let workers = if self.store.config.select_workers().is_empty() {
+            vec![self.store.config.server_name().clone()]
+        } else {
+            self.store.config.select_workers().clone()
+        };
+        let nodes = workers
+            .iter()
+            .map(|s| s.to_string())
+            .collect::<HashSet<_>>();
+        self.read_operation_out_of_queue(move |db_ref| {
+            let jobs_table = JobRocksTable::new(db_ref);
+            let all_jobs = jobs_table
+                .all_rows()?
+                .into_iter()
+                .filter(|j| match j.get_row().status() {
+                    JobStatus::Scheduled(node) | JobStatus::ProcessingBy(node) => {
+                        !nodes.contains(node)
+                    }
+                    _ => false,
                 })
                 .collect::<Vec<_>>();
             Ok(all_jobs)
