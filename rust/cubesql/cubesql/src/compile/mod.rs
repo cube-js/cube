@@ -3732,16 +3732,12 @@ ORDER BY \"COUNT(count)\" DESC"
     async fn test_select_error() {
         let variants = vec![
             (
-                "SELECT COUNT(maxPrice) FROM KibanaSampleDataEcommerce".to_string(),
-                CompilationError::user("Error during rewrite: Measure aggregation type doesn't match. The aggregation type for 'maxPrice' is 'MAX()' but 'COUNT()' was provided. Please check logs for additional information.".to_string()),
+                "SELECT AVG(maxPrice) FROM KibanaSampleDataEcommerce".to_string(),
+                CompilationError::user("Error during rewrite: Measure aggregation type doesn't match. The aggregation type for 'maxPrice' is 'MAX()' but 'AVG()' was provided. Please check logs for additional information.".to_string()),
             ),
             (
-                "SELECT COUNT(someNumber) FROM NumberCube".to_string(),
-                CompilationError::user("Error during rewrite: Measure aggregation type doesn't match. The aggregation type for 'someNumber' is 'MEASURE()' but 'COUNT()' was provided. Please check logs for additional information.".to_string()),
-            ),
-            (
-                "SELECT COUNT(order_date) FROM KibanaSampleDataEcommerce".to_string(),
-                CompilationError::user("Error during rewrite: Dimension 'order_date' was used with the aggregate function 'COUNT()'. Please use a measure instead. Please check logs for additional information.".to_string()),
+                "SELECT AVG(someNumber) FROM NumberCube".to_string(),
+                CompilationError::user("Error during rewrite: Measure aggregation type doesn't match. The aggregation type for 'someNumber' is 'MEASURE()' but 'AVG()' was provided. Please check logs for additional information.".to_string()),
             ),
         ];
 
@@ -10389,6 +10385,52 @@ ORDER BY \"COUNT(count)\" DESC"
                     "desc".to_string()
                 ]]),
                 limit: Some(2500),
+                offset: None,
+                filters: None,
+            }
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_quicksight_dense_rank() -> Result<(), CubeError> {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            r#"
+            SELECT "faabeaae-5980-4f8f-a5ba-12f56f191f1e.order_date", "isotherrow_1", "faabeaae-5980-4f8f-a5ba-12f56f191f1e.avgPrice_avg", "$otherbucket_group_count", "count"
+            FROM (
+            SELECT "$f4" AS "faabeaae-5980-4f8f-a5ba-12f56f191f1e.order_date", "$f5", "$f6" AS "isotherrow_1", SUM("$weighted_avg_unit_4") AS "faabeaae-5980-4f8f-a5ba-12f56f191f1e.avgPrice_avg", COUNT(*) AS "$otherbucket_group_count", SUM("count") AS "count"
+            FROM (
+            SELECT "count", CASE WHEN "$RANK_1" > 2500 THEN NULL ELSE "faabeaae-5980-4f8f-a5ba-12f56f191f1e.order_date" END AS "$f4", CASE WHEN "$RANK_1" > 2500 THEN NULL ELSE "$RANK_1" END AS "$f5", CASE WHEN "$RANK_1" > 2500 THEN 1 ELSE 0 END AS "$f6", CAST("$weighted_avg_count_3" AS FLOAT) / NULLIF(CAST(SUM("$weighted_avg_count_3") OVER (PARTITION BY CASE WHEN "$RANK_1" > 2500 THEN NULL ELSE "faabeaae-5980-4f8f-a5ba-12f56f191f1e.order_date" END, CASE WHEN "$RANK_1" > 2500 THEN NULL ELSE "$RANK_1" END, CASE WHEN "$RANK_1" > 2500 THEN 1 ELSE 0 END) AS FLOAT), 0) * "faabeaae-5980-4f8f-a5ba-12f56f191f1e.avgPrice_avg" AS "$weighted_avg_unit_4"
+            FROM (
+            SELECT "order_date" AS "faabeaae-5980-4f8f-a5ba-12f56f191f1e.order_date", COUNT(*) AS "count", AVG("avgPrice") AS "faabeaae-5980-4f8f-a5ba-12f56f191f1e.avgPrice_avg", DENSE_RANK() OVER (ORDER BY AVG("avgPrice") DESC NULLS LAST, "order_date" NULLS FIRST) AS "$RANK_1", COUNT("avgPrice") AS "$weighted_avg_count_3"
+            FROM "public"."KibanaSampleDataEcommerce"
+            GROUP BY "order_date"
+            ) AS "t"
+            ) AS "t0"
+            GROUP BY "$f4", "$f5", "$f6"
+            ORDER BY "$f5" NULLS FIRST
+            ) AS "t1"
+            ;"#.to_string(),
+            DatabaseProtocol::PostgreSQL,
+        ).await;
+
+        let logical_plan = query_plan.as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![
+                    "KibanaSampleDataEcommerce.count".to_string(),
+                    "KibanaSampleDataEcommerce.avgPrice".to_string()
+                ]),
+                segments: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
                 offset: None,
                 filters: None,
             }
