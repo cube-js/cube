@@ -1157,6 +1157,12 @@ impl Config {
             .register_typed::<dyn ConfigObj, _, _, _>(async move |_| config_obj_to_register)
             .await;
 
+        let server_name = self.config_obj.server_name();
+        let host_name = server_name
+            .split(":")
+            .next()
+            .unwrap_or("undefined")
+            .to_string();
         match &self.config_obj.store_provider {
             FileStoreProvider::Filesystem { remote_dir } => {
                 let remote_dir = remote_dir.clone();
@@ -1180,7 +1186,8 @@ impl Config {
                 self.injector
                     .register("original_remote_fs", async move |_| {
                         let arc: Arc<dyn DIService> =
-                            S3RemoteFs::new(data_dir, region, bucket_name, sub_path).unwrap();
+                            S3RemoteFs::new(data_dir, region, bucket_name, sub_path, host_name)
+                                .unwrap();
                         arc
                     })
                     .await;
@@ -1195,7 +1202,7 @@ impl Config {
                 self.injector
                     .register("original_remote_fs", async move |_| {
                         let arc: Arc<dyn DIService> =
-                            GCSRemoteFs::new(data_dir, bucket_name, sub_path).unwrap();
+                            GCSRemoteFs::new(data_dir, bucket_name, sub_path, host_name).unwrap();
                         arc
                     })
                     .await;

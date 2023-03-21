@@ -50,3 +50,6 @@ pub static METASTORE_INNER_WRITE_OPERATION: Histogram =
     metrics::histogram("cs.metastore.inner_write_operation.ms");
 pub static METASTORE_READ_OUT_QUEUE_OPERATION: Histogram =
     metrics::histogram("cs.metastore.read_out_queue_operation.ms");
+
+/// RemoteFs metrics
+pub static REMOTE_FS_OPERATION_CORE: Counter = metrics::counter("cs.remote_fs.operations.core");
