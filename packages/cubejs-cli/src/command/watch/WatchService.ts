@@ -21,7 +21,7 @@ export class WatchService {
 
   private readonly deployDirectory: DeployDirectory;
 
-  constructor(public readonly directory: string, private readonly options: Options = {}) {
+  public constructor(public readonly directory: string, private readonly options: Options = {}) {
     this.watcher = chokidar.watch(this.directory, {
       ignored: ['**/node_modules/**/*', '**/.git/**/*'],
     });
@@ -39,7 +39,7 @@ export class WatchService {
     await this.upload();
     this.fetchStatus().catch(() => undefined);
 
-    const onEvent = debounce((event, path) => {
+    const onEvent = debounce(() => {
       this.upload().then(() => this.fetchStatus());
     }, 2_000);
 
@@ -79,6 +79,8 @@ export class WatchService {
     } catch (error) {
       console.error('fetchStatus', error);
     }
+
+    return null;
   }
 
   private async upload() {

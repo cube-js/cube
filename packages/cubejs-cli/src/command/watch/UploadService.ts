@@ -19,7 +19,7 @@ export class UploadService {
 
   public bar: SingleBar;
 
-  constructor(
+  public constructor(
     private readonly config: Config,
     private readonly directory: string,
     private readonly options: Options = {}

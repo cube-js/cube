@@ -21,14 +21,12 @@ export const executeCommand = (command: string, args: string[]) => {
   });
 };
 
-export const writePackageJson = async (json: any) =>
-  fs.writeJson('package.json', json, {
-    spaces: 2,
-    EOL: os.EOL,
-  });
+export const writePackageJson = async (json: any) => fs.writeJson('package.json', json, {
+  spaces: 2,
+  EOL: os.EOL,
+});
 
-export const npmInstall = (dependencies: string[], isDev?: boolean) =>
-  executeCommand('npm', ['install', isDev ? '--save-dev' : '--save'].concat(dependencies));
+export const npmInstall = (dependencies: string[], isDev?: boolean) => executeCommand('npm', ['install', isDev ? '--save-dev' : '--save'].concat(dependencies));
 
 export const displayWarning = (message: string) => {
   console.log(`${chalk.yellow('Warning.')} ${message}`);
@@ -93,7 +91,7 @@ export function findMaxVersion(versions: string[]): SemVer {
   return versions.map((v) => <SemVer>semverParse(v)).reduce((a, b) => (semverCompare(a, b) === 1 ? a : b));
 }
 
-export function debounce<T extends (...args: any[]) => void>(func: T, delay: number): (...args: Parameters<T>) => void {
+export function debounce<T extends(...args: any[]) => void>(func: T, delay: number): (...args: Parameters<T>) => void {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   return (...args: Parameters<T>): void => {
     if (timeoutId) {
