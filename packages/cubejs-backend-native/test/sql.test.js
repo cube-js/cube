@@ -220,17 +220,15 @@ describe('SQLInterface', () => {
         }
       }
 
-      // stream
-      // CUBESQL_STREAM_MODE = 'true'
-      // {
-      //   const [result, _columns] = await connection.query({
-      //     sql: 'select id, order_date from KibanaSampleDataEcommerce order by order_date desc limit 50001',
-      //     rowsAsArray: false,
-      //   });
-      //   expect(result.length).toEqual(50001);
-      //   expect(result[0].id).toEqual(0);
-      //   expect(result[50000].id).toEqual(50000);
-      // }
+      if (process.env.CUBESQL_STREAM_MODE === 'true') {
+        const [result, _columns] = await connection.query({
+          sql: 'select id, order_date from KibanaSampleDataEcommerce order by order_date desc limit 50001',
+          rowsAsArray: false,
+        });
+        expect(result.length).toEqual(50001);
+        expect(result[0].id).toEqual(0);
+        expect(result[50000].id).toEqual(50000);
+      }
 
       {
         const [result] = await connection.query('select CAST(\'2020-12-25 22:48:48.000\' AS timestamp)');

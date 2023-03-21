@@ -188,6 +188,7 @@ jobs:
       - name: Test native (GNU only)
         if: (matrix.target == 'x86_64-unknown-linux-gnu')
         env:
+          CUBESQL_STREAM_MODE: true
           CUBEJS_NATIVE_INTERNAL_DEBUG: true
         run: cd packages/cubejs-backend-native && yarn run test:unit
       - name: Run E2E Smoke testing over whole Cube (GNU only)
@@ -271,5 +272,6 @@ jobs:
         run: yarn tsc
       - name: Build native
         env:
+          CUBESQL_STREAM_MODE: true
           CUBEJS_NATIVE_INTERNAL_DEBUG: true
         run: cd packages/cubejs-backend-native && yarn run native:build && yarn run test:unit
