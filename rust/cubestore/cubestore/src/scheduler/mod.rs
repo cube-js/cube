@@ -557,7 +557,7 @@ impl SchedulerImpl {
     async fn remove_jobs_on_non_exists_nodes(&self) -> Result<(), CubeError> {
         let jobs_to_remove = self.meta_store.get_jobs_on_non_exists_nodes().await?;
         for job in jobs_to_remove.into_iter() {
-            log::info!("Removing job {:?} on non exists node", job);
+            log::info!("Removing job {:?} on non-existing node", job);
             self.meta_store.delete_job(job.get_id()).await?;
         }
         Ok(())
