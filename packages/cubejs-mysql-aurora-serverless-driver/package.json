@@ -5,7 +5,7 @@
   "version": "0.32.2",
   "repository": {
     "type": "git",
-    "url": "https://github.com/cube-js/cube.js.git",
+    "url": "https://github.com/cube-js/cube.git",
     "directory": "packages/cubejs-mysql-aurora-serverless-driver"
   },
   "engines": {

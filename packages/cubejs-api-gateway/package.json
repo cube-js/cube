@@ -5,7 +5,7 @@
   "version": "0.32.11",
   "repository": {
     "type": "git",
-    "url": "https://github.com/cube-js/cube.js.git",
+    "url": "https://github.com/cube-js/cube.git",
     "directory": "packages/cubejs-api-gateway"
   },
   "engines": {
