@@ -20,7 +20,7 @@ import {
   DownloadTableCSVData,
   DriverInterface,
   QueryOptions, StreamOptions,
-  StreamTableData, TableName
+  StreamTableData
 } from '@cubejs-backend/base-driver';
 import * as SqlString from 'sqlstring';
 import { AthenaClientConfig } from '@aws-sdk/client-athena/dist-types/AthenaClient';
