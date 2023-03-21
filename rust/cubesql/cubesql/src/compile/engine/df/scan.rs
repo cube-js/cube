@@ -30,7 +30,7 @@ use crate::{
     transport::{CubeStreamReceiver, LoadRequestMeta, TransportService},
     CubeError,
 };
-use chrono::{TimeZone, Utc};
+use chrono::NaiveDateTime;
 use datafusion::{
     arrow::{array::TimestampNanosecondBuilder, datatypes::TimeUnit},
     execution::context::TaskContext,
@@ -726,10 +726,8 @@ pub fn transform_response<V: ValueObject>(
                     field_name,
                     {
                         (FieldValue::String(s), builder) => {
-                            let timestamp = Utc
-                                .datetime_from_str(s.as_str(), "%Y-%m-%dT%H:%M:%S.%f")
-                        .or_else(|_| Utc
-                                .datetime_from_str(s.as_str(), "%Y-%m-%d %H:%M:%S.%f")
+                            let timestamp = NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%dT%H:%M:%S.%f")
+                        .or_else(|_| NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%d %H:%M:%S.%f")
                         )
                                 .map_err(|e| {
                                     DataFusionError::Execution(format!(
@@ -737,7 +735,12 @@ pub fn transform_response<V: ValueObject>(
                                         s, e
                                     ))
                                 })?;
-                            builder.append_value(timestamp.timestamp_nanos())?;
+                            // TODO switch parsing to microseconds
+                            if timestamp.timestamp_millis() > (((1 as i64) << 62) / 1_000_000) {
+                                builder.append_null()?;
+                            } else {
+                                builder.append_value(timestamp.timestamp_nanos())?;
+                            }
                         },
                     },
                     {
@@ -770,7 +773,7 @@ mod tests {
     use cubeclient::models::V1LoadResponse;
     use datafusion::{
         arrow::{
-            array::{BooleanArray, Float64Array, StringArray},
+            array::{BooleanArray, Float64Array, StringArray, TimestampNanosecondArray},
             datatypes::{Field, Schema},
         },
         execution::{
@@ -817,11 +820,11 @@ mod tests {
                             "timeDimensions": []
                         },
                         "data": [
-                            {"KibanaSampleDataEcommerce.count": null, "KibanaSampleDataEcommerce.maxPrice": null, "KibanaSampleDataEcommerce.isBool": null},
-                            {"KibanaSampleDataEcommerce.count": 5, "KibanaSampleDataEcommerce.maxPrice": 5.05, "KibanaSampleDataEcommerce.isBool": true},
-                            {"KibanaSampleDataEcommerce.count": "5", "KibanaSampleDataEcommerce.maxPrice": "5.05", "KibanaSampleDataEcommerce.isBool": false},
-                            {"KibanaSampleDataEcommerce.count": null, "KibanaSampleDataEcommerce.maxPrice": null, "KibanaSampleDataEcommerce.isBool": "true"},
-                            {"KibanaSampleDataEcommerce.count": null, "KibanaSampleDataEcommerce.maxPrice": null, "KibanaSampleDataEcommerce.isBool": "false"}
+                            {"KibanaSampleDataEcommerce.count": null, "KibanaSampleDataEcommerce.maxPrice": null, "KibanaSampleDataEcommerce.isBool": null, "KibanaSampleDataEcommerce.orderDate": null},
+                            {"KibanaSampleDataEcommerce.count": 5, "KibanaSampleDataEcommerce.maxPrice": 5.05, "KibanaSampleDataEcommerce.isBool": true, "KibanaSampleDataEcommerce.orderDate": "2022-01-01 00:00:00.000"},
+                            {"KibanaSampleDataEcommerce.count": "5", "KibanaSampleDataEcommerce.maxPrice": "5.05", "KibanaSampleDataEcommerce.isBool": false, "KibanaSampleDataEcommerce.orderDate": "2023-01-01 00:00:00.000"},
+                            {"KibanaSampleDataEcommerce.count": null, "KibanaSampleDataEcommerce.maxPrice": null, "KibanaSampleDataEcommerce.isBool": "true", "KibanaSampleDataEcommerce.orderDate": "9999-12-31 00:00:00.000"},
+                            {"KibanaSampleDataEcommerce.count": null, "KibanaSampleDataEcommerce.maxPrice": null, "KibanaSampleDataEcommerce.isBool": "false", "KibanaSampleDataEcommerce.orderDate": null}
                         ]
                     }
                 "#;
@@ -861,6 +864,11 @@ mod tests {
                 DataType::Float64,
                 false,
             ),
+            Field::new(
+                "KibanaSampleDataEcommerce.orderDate",
+                DataType::Timestamp(TimeUnit::Nanosecond, None),
+                false,
+            ),
             Field::new("KibanaSampleDataEcommerce.isBool", DataType::Boolean, false),
             Field::new(
                 "KibanaSampleDataEcommerce.is_female",
@@ -887,7 +895,10 @@ mod tests {
                     "KibanaSampleDataEcommerce.count".to_string(),
                     "KibanaSampleDataEcommerce.maxPrice".to_string(),
                 ]),
-                dimensions: Some(vec!["KibanaSampleDataEcommerce.isBool".to_string()]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.isBool".to_string(),
+                    "KibanaSampleDataEcommerce.orderDate".to_string(),
+                ]),
                 segments: None,
                 time_dimensions: None,
                 order: None,
@@ -944,6 +955,13 @@ mod tests {
                         None,
                         Some(5.05),
                         Some(5.05),
+                        None,
+                        None
+                    ])) as ArrayRef,
+                    Arc::new(TimestampNanosecondArray::from(vec![
+                        None,
+                        Some(1640995200000000000),
+                        Some(1672531200000000000),
                         None,
                         None
                     ])) as ArrayRef,
