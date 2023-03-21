@@ -75,7 +75,7 @@ interface CubejsConfiguration {
     subject?: string;
     claimsNamespace?: string;
   };
-  cacheAndQueueDriver: 'memory' | 'redis';
+  cacheAndQueueDriver: 'memory' | 'cubestore';
   orchestratorOptions:
     | OrchestratorOptions
     | ((context: RequestContext) => OrchestratorOptions);
@@ -687,8 +687,8 @@ Can also be set using `CUBEJS_JWT_CLAIMS_NAMESPACE`.
 
 ### <--{"id" : "Options Reference"}--> cacheAndQueueDriver
 
-The cache and queue driver to use for the Cube deployment. Defaults to `memory`
-in development, `redis` in production.
+The cache and queue driver to use for the Cube.js deployment. Defaults to
+`memory` in development, `cubestore` in production.
 
 ### <--{"id" : "Options Reference"}--> orchestratorOptions
 

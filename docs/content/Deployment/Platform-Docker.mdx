@@ -29,7 +29,6 @@ production-ready stack would at minimum consist of:
 - A Cube Refresh Worker
 - A Cube Store Router node
 - One or more Cube Store Worker nodes
-- A Redis instance
 
 An example stack using BigQuery as a data source is provided below:
 
@@ -55,15 +54,14 @@ services:
       - CUBEJS_DB_BQ_CREDENTIALS=<BQ-KEY>
       - CUBEJS_DB_EXPORT_BUCKET=cubestore
       - CUBEJS_CUBESTORE_HOST=cubestore_router
-      - CUBEJS_REDIS_URL=redis://redis:6379
       - CUBEJS_API_SECRET=secret
     volumes:
       - .:/cube/conf
     depends_on:
+      - cube_refresh_worker
+      - cubestore_router
       - cubestore_worker_1
       - cubestore_worker_2
-      - cube_refresh_worker
-      - redis
 
   cube_refresh_worker:
     restart: always
@@ -74,7 +72,6 @@ services:
       - CUBEJS_DB_BQ_CREDENTIALS=<BQ-KEY>
       - CUBEJS_DB_EXPORT_BUCKET=cubestore
       - CUBEJS_CUBESTORE_HOST=cubestore_router
-      - CUBEJS_REDIS_URL=redis://redis:6379
       - CUBEJS_API_SECRET=secret
       - CUBEJS_REFRESH_WORKER=true
     volumes:
@@ -118,20 +115,13 @@ services:
       - .cubestore:/cube/data
     depends_on:
       - cubestore_router
-
-  redis:
-    image: bitnami/redis:latest
-    environment:
-      - ALLOW_EMPTY_PASSWORD=yes
-    logging:
-      driver: none
 ```
 
 ## Set up reverse proxy
 
-In production, the Cube API should be served over an HTTPS connection to ensure
-security of the data in-transit. We recommend using a reverse proxy; as an
-example, let's use [NGINX][link-nginx].
+In production, the Cube API should be served over an HTTPS connection to
+ensure security of the data in-transit. We recommend using a reverse proxy; as
+an example, let's use [NGINX][link-nginx].
 
 <InfoBox>
 
@@ -192,9 +182,9 @@ post][medium-letsencrypt-nginx] may be useful.
 
 ### <--{"id" : "Security"}--> Use JSON Web Tokens
 
-Cube can be configured to use industry-standard JSON Web Key Sets for securing
-its API and limiting access to data. To do this, we'll define the relevant
-options on our Cube API instance:
+Cube can be configured to use industry-standard JSON Web Key Sets for
+securing its API and limiting access to data. To do this, we'll define the
+relevant options on our Cube API instance:
 
 <WarningBox>
 
@@ -235,9 +225,9 @@ services:
 
 ### <--{"id" : "Security"}--> Securing Cube Store
 
-All Cube Store nodes (both router and workers) should only be accessible to Cube
-API instances and refresh workers. To do this with Docker Compose, we simply
-need to make sure that none of the Cube Store services have any exposed ports.
+All Cube Store nodes (both router and workers) should only be accessible to
+Cube API instances and refresh workers. To do this with Docker Compose, we
+simply need to make sure that none of the Cube Store services have any exposed
 
 ## Monitoring
 
@@ -259,7 +249,7 @@ cubestore_router_1    | 2021-06-02 15:03:20,915 INFO  [cubestore::metastore] Cre
 cubestore_router_1    | 2021-06-02 15:03:20,950 INFO  [cubestore::cluster] Meta store port open on 0.0.0.0:9999
 cubestore_router_1    | 2021-06-02 15:03:20,951 INFO  [cubestore::mysql] MySQL port open on 0.0.0.0:3306
 cubestore_router_1    | 2021-06-02 15:03:20,952 INFO  [cubestore::http] Http Server is listening on 0.0.0.0:3030
-cube_1                | 🚀 Cube server (%CURRENT_VERSION) is listening on 4000
+cube_1                | 🚀 Cube API server (%CURRENT_VERSION) is listening on 4000
 cubestore_worker_2_1  | 2021-06-02 15:03:24,945 INFO  [cubestore::cluster] Worker port open on 0.0.0.0:9001
 cubestore_worker_1_1  | 2021-06-02 15:03:24,830 INFO  [cubestore::cluster] Worker port open on 0.0.0.0:9001
 ```

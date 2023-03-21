@@ -71,7 +71,7 @@ earlier:
 ```toml
 [sinks.loki]
   type = "loki"
-  inputs = [ "cubejs-server", "redis", "refresh-scheduler", "ext-db" ]
+  inputs = [ "cubejs-server", "refresh-scheduler", "ext-db" ]
   endpoint = "https://logs-prod-us-central1.grafana.net"
 [sinks.loki.encoding]
   codec = "json"
@@ -119,7 +119,6 @@ the Overview page, you should now see a new "Log Export" resource:
 Valid values for `input` are
 
 - `cubejs-server`
-- `redis`
 - `refresh-scheduler`
 - `ext-db`
 - `warmup-job`
