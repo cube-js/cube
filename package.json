@@ -69,7 +69,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/cube-js/cube.js.git"
+    "url": "https://github.com/cube-js/cube.git"
   },
   "resolutions": {
     "@types/node": "^14",
