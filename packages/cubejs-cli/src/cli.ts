@@ -7,6 +7,7 @@ import { configureGenerateCommand } from './command/generate';
 import { configureTokenCommand } from './command/token';
 import { configureTypegenCommand } from './command/typegen';
 import { configureAuthCommand } from './command/auth';
+import { configureWatchCommand } from './command/watch';
 import { loadCliManifest } from './utils';
 import { configureValidateCommand } from './command/validate';
 
@@ -32,6 +33,7 @@ program
   await configureDeployCommand(program);
   await configureServerCommand(program);
   await configureValidateCommand(program);
+  await configureWatchCommand(program);
 
   if (!process.argv.slice(2).length) {
     program.help();
