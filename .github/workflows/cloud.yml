@@ -1,21 +1,25 @@
 # CAUTION: This workflow exposes secrets. It is only supposed to be run on "merge into master" condition.
 name: 'Cloud Tests'
 on:
+  # push doesn't work for PRs, it's safe to use it
+  # only maintainers/core contributors are allowed to push directly to the main repository
   push:
     paths:
-      - '.github/actions/integration/**'
+      - '.github/actions/integration/athena.sh'
+      - '.github/actions/integration/bigquery.sh'
       - '.github/workflows/cloud.yml'
-      - 'packages/**'
-      - '.eslintrc.js'
-      - '.prettierrc'
+      - 'packages/cubejs-testing/**'
+      - 'packages/cubejs-testing-shared/**'
+      - 'packages/cubejs-backend-shared/**'
+      - 'packages/cubejs-base-driver/**'
+      - 'packages/cubejs-query-orchestrator/**'
+      - 'packages/cubejs-schema-compiler/**'
+      # drivers
+      - 'packages/cubejs-athena-driver/**'
+      - 'packages/cubejs-bigquery-driver/**'
       - 'lerna.json'
       - 'package.json'
-      - 'rollup.config.js'
       - 'yarn.lock'
-      - 'docs-gen/**'
-      - 'docs/**'
-    branches:
-      - master
 
 jobs:
   integration-cloud:
