@@ -40,7 +40,7 @@ pre-aggregations for them, if needed.
 Our `cube.js` file will look like this:
 
 ```javascript
-const FileRepository = require('@cubejs-backend/server-core/core/FileRepository');
+const FileRepository = require('@cubejs-backend/shared');
 
 module.exports = {
   contextToAppId: ({ securityContext }) =>
