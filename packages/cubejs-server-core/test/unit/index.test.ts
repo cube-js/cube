@@ -167,8 +167,7 @@ describe('index.test', () => {
   test('driverFactory should return driver, failure', async () => {
     const options: CreateOptions = { dbType: () => <any>'mongo', driverFactory: () => <any>null, };
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const [driverFactory, orchestratorOptions] = getCreateOrchestratorOptionsFromServer(options);
+    const [driverFactory, _orchestratorOptions] = getCreateOrchestratorOptionsFromServer(options);
 
     try {
       await driverFactory('default');
@@ -182,8 +181,7 @@ describe('index.test', () => {
   test('externalDriverFactory should return driver, failure', async () => {
     const options: CreateOptions = { dbType: () => <any>'mongo', externalDriverFactory: () => <any>null, };
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const [driverFactory, orchestratorOptions] = getCreateOrchestratorOptionsFromServer(options);
+    const [_driverFactory, orchestratorOptions] = getCreateOrchestratorOptionsFromServer(options);
 
     try {
       await orchestratorOptions.externalDriverFactory();

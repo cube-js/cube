@@ -47,7 +47,6 @@ export type QueryBody = {
   continueWait?: boolean;
   renewQuery?: boolean;
   requestId?: string;
-  context?: any;
   external?: boolean;
   isJob?: boolean;
   forceNoCache?: boolean;

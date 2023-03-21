@@ -10,11 +10,11 @@ import {
   QueryBody,
 } from '@cubejs-backend/query-orchestrator';
 
-import { DbTypeAsyncFn, ExternalDbTypeFn, RequestContext } from './types';
+import { DatabaseType, RequestContext } from './types';
 
 export interface OrchestratorApiOptions extends QueryOrchestratorOptions {
-  contextToDbType: DbTypeAsyncFn;
-  contextToExternalDbType: ExternalDbTypeFn;
+  contextToDbType: (dataSource: string) => Promise<DatabaseType>;
+  contextToExternalDbType: () => DatabaseType;
   redisPrefix?: string;
 }
 
@@ -104,34 +104,19 @@ export class OrchestratorApi {
         requestId: query.requestId
       });
 
-      const extractDbType = async (response) => {
-        const dbType = await this.options.contextToDbType({
-          ...query.context,
-          dataSource: response.dataSource,
-        });
-        return dbType;
-      };
-
-      const extractExternalDbType = (response) => (
-        this.options.contextToExternalDbType({
-          ...query.context,
-          dataSource: response.dataSource,
-        })
-      );
-
       if (Array.isArray(data)) {
         const res = await Promise.all(
           data.map(async (item) => ({
             ...item,
-            dbType: await extractDbType(item),
-            extDbType: extractExternalDbType(item),
+            dbType: await this.options.contextToDbType(item.dataSource),
+            extDbType: this.options.contextToExternalDbType(),
           }))
         );
         return res;
       }
 
-      data.dbType = await extractDbType(data);
-      data.extDbType = extractExternalDbType(data);
+      data.dbType = await this.options.contextToDbType(data.dataSource);
+      data.extDbType = this.options.contextToExternalDbType();
 
       return data;
     } catch (err) {

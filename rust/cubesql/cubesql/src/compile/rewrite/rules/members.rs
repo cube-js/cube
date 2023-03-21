@@ -911,6 +911,18 @@ impl MemberRules {
             ),
             true,
         ));
+        rules.extend(find_matching_old_member_with_count(
+            "agg-fun-default-count-alias",
+            alias_expr(
+                agg_fun_expr(
+                    "Count",
+                    vec![literal_expr("?any")],
+                    "AggregateFunctionExprDistinct:false",
+                ),
+                "?alias",
+            ),
+            true,
+        ));
         rules.extend(find_matching_old_member(
             "agg-fun-with-cast",
             // TODO need to check data_type if we can remove the cast
@@ -1012,6 +1024,17 @@ impl MemberRules {
         rules.push(pushdown_measure_rewrite(
             "member-pushdown-replacer-agg-fun-default-count",
             agg_fun_expr("?fun_name", vec![literal_expr("?any")], "?distinct"),
+            measure_expr("?name", "?old_alias"),
+            Some("?fun_name"),
+            Some("?distinct"),
+            None,
+        ));
+        rules.push(pushdown_measure_rewrite(
+            "member-pushdown-replacer-agg-fun-default-count-alias",
+            alias_expr(
+                agg_fun_expr("?fun_name", vec![literal_expr("?any")], "?distinct"),
+                "?alias",
+            ),
             measure_expr("?name", "?old_alias"),
             Some("?fun_name"),
             Some("?distinct"),
@@ -3257,7 +3280,7 @@ impl MemberRules {
         }
     }
 
-    fn get_agg_type(fun: Option<&AggregateFunction>, distinct: bool) -> Option<String> {
+    pub fn get_agg_type(fun: Option<&AggregateFunction>, distinct: bool) -> Option<String> {
         fun.map(|fun| {
             match fun {
                 AggregateFunction::Count => {

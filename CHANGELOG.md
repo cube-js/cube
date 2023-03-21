@@ -3,6 +3,29 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.32.11](https://github.com/cube-js/cube.js/compare/v0.32.10...v0.32.11) (2023-03-21)
+
+
+### Bug Fixes
+
+* **cubesql:** Ignore timestamps which can't be represented as nanoseconds instead of failing ([e393b06](https://github.com/cube-js/cube.js/commit/e393b0601fb663b03158ea03143a30eb0086ebbf))
+* **cubesql:** Quicksight AVG measures support ([#6323](https://github.com/cube-js/cube.js/issues/6323)) ([ada0afd](https://github.com/cube-js/cube.js/commit/ada0afd17b42a54fbecac69b849abf40158991c1))
+
+
+
+
+
+## [0.32.10](https://github.com/cube-js/cube.js/compare/v0.32.9...v0.32.10) (2023-03-20)
+
+
+### Bug Fixes
+
+* Refresh Scheduler - empty securityContext in driverFactory ([#6316](https://github.com/cube-js/cube.js/issues/6316)) ([dd4c9d5](https://github.com/cube-js/cube.js/commit/dd4c9d5a508de03b076850daed78afa18e99eb4f))
+
+
+
+
+
 ## [0.32.9](https://github.com/cube-js/cube.js/compare/v0.32.8...v0.32.9) (2023-03-18)
 
 
