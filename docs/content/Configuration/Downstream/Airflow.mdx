@@ -1,0 +1,258 @@
+---
+title: Apache Airflow Cube integration
+permalink: /config/downstream/airflow
+---
+
+We are excited to announce native Cube integration in Apache Airflow, a popular
+open source workflow scheduler.
+
+## What is Apache Airflow?
+
+Airflow is a generic workflow scheduler. It allows you to schedule periodic
+jobs and configure dependencies between different stages in your data pipeline.
+
+In Airflow, each ETL pipeline is represented as a directed acyclic graph (or
+DAG) of tasks. Dependencies between tasks are encoded into the DAG by its edges.
+The downstream task is only scheduled for a given edge if the upstream task is
+completed successfully.
+
+The tasks in Airflow are instances of the `Operator` class. They are implemented
+using Python. Operators can perform many tasks: poll for some precondition,
+perform ETL or trigger external systems like Cube.
+
+<InfoBox>
+For more information about Airflow, please check out the official documentation.
+</InfoBox>
+
+## Native Cube integration in Airflow
+
+We implemented Airflow operators called `CubeQueryOperator` and
+`CubeBuildOperator`, enabling a native integration between Airflow and Cube.
+Through the `CubeQueryOperator` operator, we can hit the Cube's `/v1/load`
+endpoint to get data. On the other hand, the `CubeBuildOperator` allows us to
+run pre-aggregations build jobs through the `/v1/pre-aggregations/jobs`
+endpoint.
+
+At the moment, these operators contributed to Cube's open-source repository.
+However, we are going to merge it with the open-source Airflow project. Until
+then, to use these operators, you can install them independently.
+
+Let's look closer at the installation and configuration processes.
+
+## Installation process
+
+We are assuming that you are installing Airflow in your local Linux environment.
+First of all, make sure you have Python 3 already installed.
+
+According to the official documentation, Airflow could be easily installed with
+the following command:
+
+```bash
+pip install "apache-airflow[celery]==2.5.2" --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-2.5.2/constraints-3.7.txt"
+```
+
+As already mentioned, in additionally to the Airflow itself, you will need to
+install the Cube's provider package:
+
+```bash
+python3 -m pip install airflow-provider-cube
+```
+
+For this tutorial purpose, we will use Airflow in standalone mode. To start
+Airflow, you need to run:
+
+```bash
+airflow standalone
+```
+
+## Configuring the connection
+
+By default, Cube operators use an Airflow connection named `cube_default`. So
+first, we need to create it.
+
+There are several ways of creating the connection in the Airflow. One of the
+easiest - is to use the UI. But in our case, we will use the command line tool
+and environment variable:
+
+```bash
+export AIRFLOW_CONN_CUBE_DEFAULT="{ \
+  "conn_type": "generic", \
+  "host": "https://example.cube.dev", \
+  "password": "CUBEJS_API_SECRET", \
+  "extra": {"security_context": {"expiresIn": "7d"}} \
+}"
+```
+
+It's easy to understand that `host` is a `URL` of your Cube server, `password` 
+is a value of your `CUBEJS_API_SECRET` environment variable, and `extra`
+contains security context that will be used during querying.
+
+You can fill in the same fields in the UI to create the same connection using
+it.
+
+## Creating query DAG.
+
+For the tests we will use simple `ECommerce` cube that can be found
+[here](https://github.com/cube-js/cube/tree/master/packages/cubejs-testing/birdbox-fixtures/driver-test-data)
+and locally installed Postgres Database.
+
+By default, Airflow expected DAG files in the `~/airflow/dags` folder. Let's 
+create one:
+
+```bash
+cd ~/airflow/dags
+touch cube_query.py
+```
+
+Now we can add the following content to it:
+
+```python3
+from typing import Any
+from pendulum import datetime
+from airflow.decorators import dag, task
+from cube_provider.operators.cube import CubeQueryOperator
+
+@dag(
+    start_date=datetime(2023, 1, 1),
+    schedule=None,
+    default_args={"retries": 1, "cube_conn_id": "cube_default"},
+    tags=["cube", "query", "example"],
+)
+def cube_query_workflow():
+    query_op = CubeQueryOperator(
+        task_id="query_op",
+        query={
+            "measures": ["ECommerce.totalQuantity", "ECommerce.totalProfit"],
+            "dimensions": ["ECommerce.productName"],
+            "timeDimensions": [
+                {
+                    "dimension": "ECommerce.orderDate",
+                    "dateRange": ["2020-01-01 00:00:00.000", "2020-03-30 22:50:50.999"],
+                    "granularity": "quarter",
+                }
+            ],
+        },
+    )
+
+    @task()
+    def print_op(data: Any):
+        print(f"Fetched data: {data}")
+
+    print_op(query_op.output)
+
+cube_query_workflow()
+```
+
+As you can see, the `CubeQueryOperator` expect the `query` parameter to equal
+the Cube query object. An instance of this class (`query_op`) is the first
+Airflow task.
+
+The second task in this DAG is the `print_op` task. It just takes `data` as an
+incoming parameter and prints it out.
+
+Now let's upload our DAG to the Airflow runtime:
+
+```bash
+python3 ~/airflow/dags/cube_query.py
+```
+
+And now, finally, we can run it through the UI and check the logs to find
+queried data after DAG execution.
+
+You can find all supported parameters in the following table:
+
+| Parameter     | Type     | Default          | Description                                            |
+| ------------- | -------- | ---------------- - ------------------------------------------------------ |
+| cube_conn_id  | string   | `cube_default`   | Airflow connection name.                               |
+| headers       | dict     |                  | The HTTP headers to be added to the request.           |
+| query         | dict     |                  | Cube query object.                                     |
+| timeout       | int      | 30               | Timeout in seconds to wait for an API call to respond. |
+| wait          | int      | 10               | Number of seconds to wait between API calls.           |
+
+## Creating build DAG.
+
+First of all, make sure you configured your Cube and Airflow connection with
+`jobs` permission required by the `/v1/pre-aggregations/jobs` endpoint. Checkout
+Cube documentation for more details.
+
+Let's create a second DAG file:
+
+```bash
+cd ~/airflow/dags
+touch cube_build.py
+```
+
+And add the following content to it:
+
+```python3
+from typing import Any
+from pendulum import datetime
+from airflow.decorators import dag, task
+from cube_provider.operators.cube import CubeBuildOperator
+
+@dag(
+    start_date=datetime(2023, 1, 1),
+    schedule=None,
+    default_args={"retries": 1, "cube_conn_id": "cube_default"},
+    tags=["cube", "build", "example"],
+)
+def cube_build_workflow():
+    build_op = CubeBuildOperator(
+        task_id="build_op",
+        selector={
+            "contexts": [
+                {"securityContext": {"tenant": "t1"}},
+                {"securityContext": {"tenant": "t2"}},
+                {"securityContext": {"tenant": "t3"}},
+                {"securityContext": {"tenant": "t4"}},
+            ],
+            "timezones": ["UTC"],
+            "datasources": ["default"],
+            "cubes": ["ECommerce"],
+            "preAggregations": ["ECommerce.manual"],
+        },
+        complete=True,
+        wait=10,
+    )
+
+    @task()
+    def print_op(data: Any):
+        print(f"Data is: {data}")
+
+    print_op(build_op.output)
+
+
+cube_build_workflow()
+```
+
+As you can see from the provided code, this DAG is very similiar to the
+previous. It also contains two tasks: the first is a Cube operator and the 
+second - is a printing out the forst step result.
+
+The `CubeBuildOperator` expect the `selector` parameter to be provided. This
+parameter must be a valid `selector` object of the `/v1/pre-aggregations/jobs`
+API.
+
+Pay attention to the `complete` parameter. If its value is `True` the operator
+will continue to poll for the result of the build. When it completes
+successfully, the operator allowing for downstream tasks to run. If its value is
+`False`, the operator just returns an array of scheduled jobs and allowing for
+downstream tasks to run.
+
+List of all supported parameters could be found in the following table:
+
+| Parameter     | Type     | Default          | Description                                                    |
+| ------------- | -------- | ---------------- - -------------------------------------------------------------- |
+| cube_conn_id  | string   | `cube_default`   | Airflow connection name.                                       |
+| headers       | dict     |                  | The HTTP headers to be added to the request.                   |
+| selector      | dict     |                  | Valid `pre-aggregations/jobs` API selector.                    |
+| complete      | bool     | False            | whether the task should wait for the job run completion or not |
+| wait          | int      | 10               | Number of seconds to wait between API calls.                   |
+
+## Next Steps
+
+This post provides an easy example of setting up Airflow integration with Cube.
+It demonstrates how Cube integration package with Airflow allows access Cube 
+APIs to get data or execute pre-aggregations jobs. For more detailed 
+instructions on how to set up an Airflow, please go to the official Airflow 
+documentation.

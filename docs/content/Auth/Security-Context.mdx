@@ -127,6 +127,56 @@ SELECT
 LIMIT 10000
 ```
 
+## Using permissions
+
+Starting from version v0.32.5, a "permission" security feature was established.
+This feature aims to allow users to configure access to specific APIs based on
+the claims provided in the JWT token.
+
+To configure permissions new `contextToPermissions` function should be provided
+in the `cube.js` file. This function takes two optional parameters,
+`securityContext` and `defaultPermissions`, and returns a promise that must be
+resolved with the array of allowed permissions.
+
+The `defaultPermissions` parameter is an array that contains all possible
+permissions but the `jobs`, and the Cube uses its value if no
+`contextToPermissions` function was provided:
+
+```javascript
+console.log(defaultPermissions); // ['graphql', 'meta', 'data']
+```
+
+The default implementation of full access to Cube's APIs could look like this:
+
+```javascript
+async function contextToPermissions(
+  securityContext?: any,
+  defaultPermissions?: string[],
+): Promise<string[]> {
+  if (securityContext && securityContext.isAdmin) {
+    defaultPermissions.push('jobs');
+  }
+  return defaultPermissions;
+}
+```
+
+The following table shows the complete list of permissions with corresponding
+APIs:
+
+| Permission | APIs                          | Default enabled |
+| ---------- | ----------------------------- | --------------- |
+| `graphql`  | /graphql                      | ✅              |
+| `meta`     | /v1/meta                      | ✅              |
+|            | /v1/pre-aggregations/can-use  | ✅              |
+| `data`     | /v1/load                      | ✅              |
+|            | /v1/subscribe                 | ✅              |
+|            | /v1/sql                       | ✅              |
+|            | /v1/dry-run                   | ✅              |
+| `jobs`     | /v1/run-scheduled-refresh     | ❌              |
+|            | /v1/pre-aggregations/jobs     | ❌              |
+
+The rest of the APIs continue to work as before without any changes.
+
 ## Using COMPILE_CONTEXT
 
 In the example below `user_id`, `company_id`, `sub` and `iat` will be injected
