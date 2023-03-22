@@ -24,7 +24,10 @@ import { WebSocketConnection } from './WebSocketConnection';
 const GenericTypeToCubeStore: Record<string, string> = {
   string: 'varchar(255)',
   text: 'varchar(255)',
-  uuid: 'varchar(64)'
+  uuid: 'varchar(64)',
+  // Cube Store uses an old version of sql parser which doesn't support timestamp with custom precision, but
+  // athena driver (I believe old version) allowed to use it
+  'timestamp(3)': 'timestamp',
 };
 
 type Column = {
@@ -81,7 +84,15 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
   }
 
   public informationSchemaQuery() {
-    return `${super.informationSchemaQuery()} AND columns.table_schema = '${this.config.database}'`;
+    return `
+      SELECT columns.column_name as ${this.quoteIdentifier('column_name')},
+             columns.table_name as ${this.quoteIdentifier('table_name')},
+             columns.table_schema as ${this.quoteIdentifier('table_schema')},
+             columns.data_type as ${this.quoteIdentifier('data_type')}
+      FROM information_schema.columns as columns
+      WHERE columns.table_schema NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys', 'INFORMATION_SCHEMA')
+      AND columns.table_schema = '${this.config.database}'
+   `;
   }
 
   public createTableSqlWithOptions(tableName, columns, options: CreateTableOptions) {

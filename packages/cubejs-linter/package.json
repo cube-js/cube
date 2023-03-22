@@ -5,7 +5,7 @@
   "version": "0.32.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/cube-js/cube.js.git",
+    "url": "https://github.com/cube-js/cube.git",
     "directory": "packages/cubejs-mssql-driver"
   },
   "engines": {

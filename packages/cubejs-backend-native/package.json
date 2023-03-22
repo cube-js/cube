@@ -7,7 +7,7 @@
   "typings": "dist/js/index.d.ts",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/cube-js/cube.js.git"
+    "url": "git+https://github.com/cube-js/cube.git"
   },
   "scripts": {
     "tsc": "tsc",

@@ -482,7 +482,12 @@ export class QueryOrchestrator {
     return this.preAggregations.updateRefreshEndReached();
   }
 
-  public async fetchSchema(dataSource: string) {
-    return this.queryCache.fetchSchema(dataSource);
+  public async fetchSchema(dataSource?: string, external?: boolean) {
+    return this.queryCache.queryWithRetryAndRelease('', [], {
+      cacheKey: [`Fetch schema for ${dataSource}`, []],
+      dataSource,
+      external,
+      tablesSchema: true
+    });
   }
 }
