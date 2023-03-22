@@ -19,6 +19,7 @@
     "upload-binary-cross": "mkdir -p native && cp index.node native/index.node && node-pre-gyp package --target_arch=$PACKAGE_TARGET_ARCH --target_platform=$PACKAGE_TARGET_PLATFORM --target_libc=$PACKAGE_TARGET_LIBC && node-pre-gyp-github publish",
     "upload-binary": "mkdir -p native && cp index.node native/index.node && node-pre-gyp package && node-pre-gyp-github publish",
     "test:server": "CUBEJS_NATIVE_INTERNAL_DEBUG=true CUBESQL_LOG_LEVEL=trace CUBESQL_PG_PORT=5555 node test/server.js",
+    "test:server:stream": "CUBESQL_STREAM_MODE=true CUBESQL_LOG_LEVEL=error CUBESQL_PG_PORT=5555 node test/server.js",
     "test:unit": "jest --forceExit test",
     "test:cargo": "cargo test"
   },
@@ -29,6 +30,7 @@
     "dist/js"
   ],
   "devDependencies": {
+    "@cubejs-backend/testing-shared": "^0.32.8",
     "@cubejs-infra/node-pre-gyp-github": "^1.0.3",
     "@types/jest": "^26",
     "@types/node": "^14",
