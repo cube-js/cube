@@ -14,7 +14,9 @@ use crate::config::processing_loop::ProcessingLoop;
 use crate::http::HttpServer;
 use crate::import::limits::ConcurrencyLimits;
 use crate::import::{ImportService, ImportServiceImpl};
-use crate::metastore::{BaseRocksStoreFs, MetaStore, MetaStoreRpcClient, RocksMetaStore, RocksStoreConfig};
+use crate::metastore::{
+    BaseRocksStoreFs, MetaStore, MetaStoreRpcClient, RocksMetaStore, RocksStoreConfig,
+};
 use crate::mysql::{MySqlServer, SqlAuthDefaultImpl, SqlAuthService};
 use crate::queryplanner::query_executor::{QueryExecutor, QueryExecutorImpl};
 use crate::queryplanner::{QueryPlanner, QueryPlannerImpl};
@@ -895,8 +897,8 @@ impl Config {
                     env_optparse::<u16>("CUBESTORE_META_PORT").map(|v| format!("0.0.0.0:{}", v))
                 }),
                 metastore_remote_address: env::var("CUBESTORE_META_ADDR").ok(),
-                metastore_rocks_store_config: RocksStoreConfig::default(),
-                cachestore_rocks_store_config: RocksStoreConfig::default(),
+                metastore_rocks_store_config: RocksStoreConfig::metastore_default(),
+                cachestore_rocks_store_config: RocksStoreConfig::cachestore_default(),
                 upload_concurrency: env_parse("CUBESTORE_MAX_ACTIVE_UPLOADS", 4),
                 download_concurrency: env_parse("CUBESTORE_MAX_ACTIVE_DOWNLOADS", 8),
                 max_ingestion_data_frames: env_parse("CUBESTORE_MAX_DATA_FRAMES", 4),
@@ -997,8 +999,8 @@ impl Config {
                 worker_bind_address: None,
                 metastore_bind_address: None,
                 metastore_remote_address: None,
-                metastore_rocks_store_config: RocksStoreConfig::default(),
-                cachestore_rocks_store_config: RocksStoreConfig::default(),
+                metastore_rocks_store_config: RocksStoreConfig::metastore_default(),
+                cachestore_rocks_store_config: RocksStoreConfig::cachestore_default(),
                 upload_concurrency: 4,
                 download_concurrency: 8,
                 max_ingestion_data_frames: 4,

@@ -14,14 +14,17 @@ use crate::config::{Config, ConfigObj};
 use std::collections::HashMap;
 use std::env;
 
-use crate::metastore::{BaseRocksStoreFs, DbTableRef, IdRow, MetaStoreEvent, MetaStoreFs, RocksStore, RocksStoreChecksumType, RocksStoreConfig, RocksStoreDetails, RocksTable};
+use crate::metastore::{
+    BaseRocksStoreFs, DbTableRef, IdRow, MetaStoreEvent, MetaStoreFs, RocksStore,
+    RocksStoreDetails, RocksTable,
+};
 use crate::remotefs::LocalDirRemoteFs;
 use crate::util::WorkerLoop;
 use crate::CubeError;
 use async_trait::async_trait;
 
 use futures_timer::Delay;
-use rocksdb::{BlockBasedOptions, Options, DB, Cache};
+use rocksdb::{BlockBasedOptions, Cache, Options, DB};
 
 use crate::cachestore::compaction::CompactionPreloadedState;
 use crate::cachestore::listener::RocksCacheStoreListener;
@@ -79,8 +82,7 @@ impl RocksStoreDetails for RocksCacheStoreDetails {
         // Disable automatic compaction before migration, will be enabled later in after_migration
         opts.set_disable_auto_compactions(true);
 
-
-        let mut block_opts = {
+        let block_opts = {
             let mut block_opts = BlockBasedOptions::default();
             // https://github.com/facebook/rocksdb/blob/v7.9.2/include/rocksdb/table.h#L524
             block_opts.set_format_version(5);

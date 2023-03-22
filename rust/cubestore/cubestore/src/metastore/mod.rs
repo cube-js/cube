@@ -21,7 +21,7 @@ pub use rocks_table::*;
 use crate::cluster::node_name_by_partition;
 use async_trait::async_trait;
 use log::info;
-use rocksdb::{BlockBasedOptions, Env, MergeOperands, Options, DB, Cache};
+use rocksdb::{BlockBasedOptions, Cache, Env, MergeOperands, Options, DB};
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
 use std::{env, io::Cursor, sync::Arc};
@@ -1153,7 +1153,7 @@ impl RocksStoreDetails for RocksMetaStoreDetails {
         opts.set_prefix_extractor(rocksdb::SliceTransform::create_fixed_prefix(13));
         opts.set_merge_operator_associative("meta_store merge", meta_store_merge);
 
-        let mut block_opts = {
+        let block_opts = {
             let mut block_opts = BlockBasedOptions::default();
             // https://github.com/facebook/rocksdb/blob/v7.9.2/include/rocksdb/table.h#L524
             block_opts.set_format_version(5);

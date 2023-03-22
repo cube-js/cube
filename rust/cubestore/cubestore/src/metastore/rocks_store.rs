@@ -15,7 +15,7 @@ use rocksdb::checkpoint::Checkpoint;
 use rocksdb::{Env, Snapshot, WriteBatch, WriteBatchIterator, DB};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::fmt::{Debug, Formatter};
+use std::fmt::Debug;
 use std::io::{Cursor, Write};
 
 use crate::metastore::snapshot_info::SnapshotInfo;
@@ -507,7 +507,7 @@ impl RocksStoreChecksumType {
             RocksStoreChecksumType::CRC32c => rocksdb::ChecksumType::CRC32c,
             RocksStoreChecksumType::XXHash => rocksdb::ChecksumType::XXHash,
             RocksStoreChecksumType::XXHash64 => rocksdb::ChecksumType::XXHash64,
-            RocksStoreChecksumType::XXH3 =>  rocksdb::ChecksumType::XXH3,
+            RocksStoreChecksumType::XXH3 => rocksdb::ChecksumType::XXH3,
         }
     }
 }
@@ -518,9 +518,16 @@ pub struct RocksStoreConfig {
     pub cache_capacity: usize,
 }
 
-impl Default for RocksStoreConfig {
-    fn default() -> Self {
-        RocksStoreConfig {
+impl RocksStoreConfig {
+    pub fn metastore_default() -> Self {
+        Self {
+            checksum_type: RocksStoreChecksumType::XXHash,
+            cache_capacity: 1024 * 8,
+        }
+    }
+
+    pub fn cachestore_default() -> Self {
+        Self {
             checksum_type: RocksStoreChecksumType::XXHash,
             cache_capacity: 1024 * 8,
         }
