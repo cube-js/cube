@@ -1358,10 +1358,10 @@
   resolved "https://registry.yarnpkg.com/@ctrl/tinycolor/-/tinycolor-3.4.1.tgz#75b4c27948c81e88ccd3a8902047bcd797f38d32"
   integrity sha512-ej5oVy6lykXsvieQtqZxCOaLT+xD4+QNarq78cIYISHmZXshCvROLudpQN3lfL8G0NL7plMSSK+zlyvCaIJ4Iw==
 
-"@cube-dev/purple-banner@^2.0.6":
-  version "2.0.6"
-  resolved "https://registry.yarnpkg.com/@cube-dev/purple-banner/-/purple-banner-2.0.6.tgz#5725e03791d63ac1a310cb0d8729b171977526ac"
-  integrity sha512-uVOy1nHEY+gbOaxUVcILgl+2aHI6ClFxRuLWqUySynZQs9y9u2BTlEip8QXQM3KRoYgS6sx3eBlrJ3JXKmdTDw==
+"@cube-dev/purple-banner@^2.0.7":
+  version "2.0.7"
+  resolved "https://registry.yarnpkg.com/@cube-dev/purple-banner/-/purple-banner-2.0.7.tgz#5afae0e9e3fa7f3f32d2db0314a7906c3f84f782"
+  integrity sha512-SKwE11Mce5l0t653NleXLFyNCJuvYoB/c06lMeU2ArRzrkv5gShp/DaqUa20WGqH1mfSN3e3dmZgRswNr9HdVw==
   dependencies:
     classnames "^2.3.1"
     dayjs "^1.11.7"
