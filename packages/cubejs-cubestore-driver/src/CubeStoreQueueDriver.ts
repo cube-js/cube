@@ -217,7 +217,7 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
     return rows.map((row) => row.id);
   }
 
-  protected decodeQueryDefFromRow(row: { payload: string, extra?: string }, method: string): QueryDef {
+  protected decodeQueryDefFromRow(row: { payload: string, extra?: string | null }, method: string): QueryDef {
     if (!row.payload) {
       throw new Error(`Field payload is empty, incorrect response for ${method} method`);
     }
@@ -256,7 +256,7 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
   }
 
   public async retrieveForProcessing(queryKeyHashed: QueryKeyHash, _processingId: string): Promise<RetrieveForProcessingResponse> {
-    const rows = await this.driver.query<{ active: string | null, pending: string, payload: string, extra: string }>('QUEUE RETRIEVE EXTENDED CONCURRENCY ? ?', [
+    const rows = await this.driver.query<{ active: string | null, pending: string, payload: string, extra: string | null }>('QUEUE RETRIEVE EXTENDED CONCURRENCY ? ?', [
       this.options.concurrency,
       this.prefixKey(queryKeyHashed),
     ]);
