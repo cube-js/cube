@@ -217,7 +217,7 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
     return rows.map((row) => row.id);
   }
 
-  protected decodeQueryDefFromRow(row: { payload: string, extra?: string }, method: string): QueryDef {
+  protected decodeQueryDefFromRow(row: { payload: string, extra?: string | null }, method: string): QueryDef {
     if (!row.payload) {
       throw new Error(`Field payload is empty, incorrect response for ${method} method`);
     }
@@ -256,21 +256,25 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
   }
 
   public async retrieveForProcessing(queryKeyHashed: QueryKeyHash, _processingId: string): Promise<RetrieveForProcessingResponse> {
-    // TODO(ovr): Enable extended
-    const rows = await this.driver.query('QUEUE RETRIEVE CONCURRENCY ? ?', [
+    const rows = await this.driver.query<{ active: string | null, pending: string, payload: string, extra: string | null }>('QUEUE RETRIEVE EXTENDED CONCURRENCY ? ?', [
       this.options.concurrency,
       this.prefixKey(queryKeyHashed),
     ]);
     if (rows && rows.length) {
-      const addedCount = 1;
-      const active = (rows[0].active || queryKeyHashed /* backward compatibility for old Cube Store */).split(',');
-      const pending = parseInt(rows[0].pending || '0' /* backward compatibility for old Cube Store */, 10);
-      const lockAcquired = true;
-      const def = this.decodeQueryDefFromRow(rows[0], 'retrieveForProcessing');
+      const active = rows[0].active ? (rows[0].active).split(',') as unknown as QueryKeyHash[] : [];
+      const pending = parseInt(rows[0].pending, 10);
 
-      return [
-        addedCount, null, active, pending, def, lockAcquired
-      ];
+      if (rows[0].payload) {
+        const def = this.decodeQueryDefFromRow(rows[0], 'retrieveForProcessing');
+
+        return [
+          1, null, active, pending, def, true
+        ];
+      } else {
+        return [
+          0, null, active, pending, null, false
+        ];
+      }
     }
 
     return null;
