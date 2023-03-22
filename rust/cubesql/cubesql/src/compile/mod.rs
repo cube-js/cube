@@ -14,6 +14,7 @@ use datafusion::{
         optimizer::{OptimizerConfig, OptimizerRule},
         projection_drop_out::ProjectionDropOut,
     },
+    physical_plan::ExecutionPlan,
     prelude::*,
     scalar::ScalarValue,
     sql::{parser::Statement as DFStatement, planner::SqlToRel},
@@ -1478,9 +1479,21 @@ impl fmt::Debug for QueryPlan {
 }
 
 impl QueryPlan {
-    pub fn as_logical_plan(self) -> LogicalPlan {
+    pub fn as_logical_plan(&self) -> LogicalPlan {
         match self {
-            QueryPlan::DataFusionSelect(_, plan, _) => plan,
+            QueryPlan::DataFusionSelect(_, plan, _) => plan.clone(),
+            QueryPlan::MetaOk(_, _) | QueryPlan::MetaTabular(_, _) => {
+                panic!("This query doesnt have a plan, because it already has values for response")
+            }
+        }
+    }
+
+    pub async fn as_physical_plan(&self) -> Result<Arc<dyn ExecutionPlan>, CubeError> {
+        match self {
+            QueryPlan::DataFusionSelect(_, plan, ctx) => DataFrame::new(ctx.state.clone(), plan)
+                .create_physical_plan()
+                .await
+                .map_err(|e| CubeError::user(e.to_string())),
             QueryPlan::MetaOk(_, _) | QueryPlan::MetaTabular(_, _) => {
                 panic!("This query doesnt have a plan, because it already has values for response")
             }
@@ -10435,6 +10448,9 @@ ORDER BY \"COUNT(count)\" DESC"
                 filters: None,
             }
         );
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!("Physical plan: {:?}", physical_plan);
 
         Ok(())
     }
