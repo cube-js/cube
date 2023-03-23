@@ -362,7 +362,7 @@ export abstract class BaseDriver implements DriverInterface {
     return value;
   }
 
-  public async tableColumnTypes(table: string) {
+  public async tableColumnTypes(table: string): Promise<TableStructure> {
     const [schema, name] = table.split('.');
 
     const columns = await this.query<TableColumnQueryResult>(
