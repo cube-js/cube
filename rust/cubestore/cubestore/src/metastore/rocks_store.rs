@@ -523,7 +523,7 @@ impl RocksStoreConfig {
         Self {
             // Supported since RocksDB 6.27
             checksum_type: RocksStoreChecksumType::XXH3,
-            cache_capacity: 1024 * 8,
+            cache_capacity: 8 * 1024 * 1024,
         }
     }
 
@@ -531,7 +531,7 @@ impl RocksStoreConfig {
         Self {
             // Supported since RocksDB 6.27
             checksum_type: RocksStoreChecksumType::XXH3,
-            cache_capacity: 1024 * 8,
+            cache_capacity: 8 * 1024 * 1024,
         }
     }
 }
