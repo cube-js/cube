@@ -135,9 +135,12 @@ has access to the data schema files.
 
 ## Refresh Worker
 
-A Refresh Worker updates pre-aggregations and the in-memory cache in the
+A Refresh Worker updates pre-aggregations and invalidates the in-memory cache in the
 background. They also keep the refresh keys up-to-date for all defined schemas
 and pre-aggregations.
+Please note that the in-memory cache is just invalidated but not populated by Refresh Worker.
+In-memory cache is populated lazily during querying.
+On the other hand, pre-aggregations are eagerly populated and kept up-to-date by Refresh Worker.
 
 [Cube Docker image][dh-cubejs] can be used for creating Refresh Workers; to make
 the service act as a Refresh Worker, `CUBEJS_REFRESH_WORKER=true` should be set
