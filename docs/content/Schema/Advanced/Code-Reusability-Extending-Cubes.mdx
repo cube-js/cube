@@ -41,7 +41,7 @@ cube(`BaseEvents`, {
 
   joins: {
     Users: {
-      relationship: `belongsTo`,
+      relationship: `belongs_to`,
       sql: `${CUBE}.user_id = ${Users.id}`,
     },
   },

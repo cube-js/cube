@@ -44,7 +44,7 @@ If the request takes too long to be processed, Cube Backend responds with
 mechanism in Cube is implemented. Clients should continuously retry the same
 query in a loop until they get a successful result. Subsequent calls to the Cube
 endpoints are idempotent and don't lead to scheduling new database queries if
-not required by `refreshKey`. Also, receiving `Continue wait` doesn't mean the
+not required by `refresh_key`. Also, receiving `Continue wait` doesn't mean the
 database query has been canceled, and it's actually still being processed by the
 Cube. Database queries that weren't started and are no longer waited by the
 client's long polling loop will be marked as orphaned and removed from the
@@ -292,7 +292,7 @@ Example response:
           aliasName: 'users.count',
           type: 'number',
           aggType: 'count',
-          drillMembers: ['Users.id', 'Users.city', 'Users.createdAt'],
+          drill_members: ['Users.id', 'Users.city', 'Users.createdAt'],
         },
       ],
       dimensions: [

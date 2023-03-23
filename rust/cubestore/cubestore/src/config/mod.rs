@@ -14,7 +14,9 @@ use crate::config::processing_loop::ProcessingLoop;
 use crate::http::HttpServer;
 use crate::import::limits::ConcurrencyLimits;
 use crate::import::{ImportService, ImportServiceImpl};
-use crate::metastore::{BaseRocksStoreFs, MetaStore, MetaStoreRpcClient, RocksMetaStore};
+use crate::metastore::{
+    BaseRocksStoreFs, MetaStore, MetaStoreRpcClient, RocksMetaStore, RocksStoreConfig,
+};
 use crate::mysql::{MySqlServer, SqlAuthDefaultImpl, SqlAuthService};
 use crate::queryplanner::query_executor::{QueryExecutor, QueryExecutorImpl};
 use crate::queryplanner::{QueryPlanner, QueryPlannerImpl};
@@ -392,7 +394,11 @@ pub trait ConfigObj: DIService {
 
     fn metastore_bind_address(&self) -> &Option<String>;
 
+    fn metastore_rocksdb_config(&self) -> &RocksStoreConfig;
+
     fn metastore_remote_address(&self) -> &Option<String>;
+
+    fn cachestore_rocksdb_config(&self) -> &RocksStoreConfig;
 
     fn download_concurrency(&self) -> u64;
 
@@ -478,6 +484,8 @@ pub struct ConfigObjImpl {
     pub worker_bind_address: Option<String>,
     pub metastore_bind_address: Option<String>,
     pub metastore_remote_address: Option<String>,
+    pub metastore_rocks_store_config: RocksStoreConfig,
+    pub cachestore_rocks_store_config: RocksStoreConfig,
     pub upload_concurrency: u64,
     pub download_concurrency: u64,
     pub connection_timeout: u64,
@@ -624,6 +632,14 @@ impl ConfigObj for ConfigObjImpl {
 
     fn metastore_remote_address(&self) -> &Option<String> {
         &self.metastore_remote_address
+    }
+
+    fn metastore_rocksdb_config(&self) -> &RocksStoreConfig {
+        &self.metastore_rocks_store_config
+    }
+
+    fn cachestore_rocksdb_config(&self) -> &RocksStoreConfig {
+        &self.cachestore_rocks_store_config
     }
 
     fn download_concurrency(&self) -> u64 {
@@ -881,6 +897,8 @@ impl Config {
                     env_optparse::<u16>("CUBESTORE_META_PORT").map(|v| format!("0.0.0.0:{}", v))
                 }),
                 metastore_remote_address: env::var("CUBESTORE_META_ADDR").ok(),
+                metastore_rocks_store_config: RocksStoreConfig::metastore_default(),
+                cachestore_rocks_store_config: RocksStoreConfig::cachestore_default(),
                 upload_concurrency: env_parse("CUBESTORE_MAX_ACTIVE_UPLOADS", 4),
                 download_concurrency: env_parse("CUBESTORE_MAX_ACTIVE_DOWNLOADS", 8),
                 max_ingestion_data_frames: env_parse("CUBESTORE_MAX_DATA_FRAMES", 4),
@@ -981,6 +999,8 @@ impl Config {
                 worker_bind_address: None,
                 metastore_bind_address: None,
                 metastore_remote_address: None,
+                metastore_rocks_store_config: RocksStoreConfig::metastore_default(),
+                cachestore_rocks_store_config: RocksStoreConfig::cachestore_default(),
                 upload_concurrency: 4,
                 download_concurrency: 8,
                 max_ingestion_data_frames: 4,

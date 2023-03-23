@@ -24,7 +24,7 @@ or multiple API instances, a Refresh Worker and a Cube Store cluster.
 <div style="text-align: center">
   <img
     alt="Deployment Overview"
-    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Deployment/deployment-overview.png"
+    src="https://ucarecdn.com/8e8ced60-d304-4d9c-90e7-cd2c39cda9aa/"
     style="border: none"
     width="100%"
   />
@@ -135,9 +135,12 @@ has access to the data schema files.
 
 ## Refresh Worker
 
-A Refresh Worker updates pre-aggregations and the in-memory cache in the
+A Refresh Worker updates pre-aggregations and invalidates the in-memory cache in the
 background. They also keep the refresh keys up-to-date for all defined schemas
 and pre-aggregations.
+Please note that the in-memory cache is just invalidated but not populated by Refresh Worker.
+In-memory cache is populated lazily during querying.
+On the other hand, pre-aggregations are eagerly populated and kept up-to-date by Refresh Worker.
 
 [Cube Docker image][dh-cubejs] can be used for creating Refresh Workers; to make
 the service act as a Refresh Worker, `CUBEJS_REFRESH_WORKER=true` should be set
@@ -275,9 +278,9 @@ services:
 [dh-cubejs]: https://hub.docker.com/r/cubejs/cube
 [dh-cubestore]: https://hub.docker.com/r/cubejs/cubestore
 [gh-cube-examples-k8s]:
-  https://github.com/cube-js/cube.js/tree/master/examples/kubernetes
+  https://github.com/cube-js/cube/tree/master/examples/kubernetes
 [gh-cube-examples-k8s-helm]:
-  https://github.com/cube-js/cube.js/tree/master/examples/helm-charts
+  https://github.com/cube-js/cube/tree/master/examples/helm-charts
 [ref-deploy-prod-list]: /deployment/production-checklist
 [ref-deploy-cubecloud]: /deployment/platforms/cube-cloud
 [ref-deploy-docker]: /deployment/platforms/docker

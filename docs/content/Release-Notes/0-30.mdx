@@ -3,7 +3,7 @@ title: v0.30
 permalink: /releases/v0-30
 category: Release Notes
 releaseDate: 2022-05-11
-releaseLink: https://github.com/cube-js/cube.js/releases/tag/v0.30.0
+releaseLink: https://github.com/cube-js/cube/releases/tag/v0.30.0
 ---
 
 We're super excited to announce Cube v0.30 🥳 This new release brings major new
@@ -45,29 +45,29 @@ please ensure nothing depends on the above.
 ## Cube Store
 
 - **Added:** Support Docker images for ARM64 platform
-  ([#3841](https://github.com/cube-js/cube.js/pull/3841))
+  ([#3841](https://github.com/cube-js/cube/pull/3841))
 - **Added:** Split batching upload of pre-aggregations into multiple files to
   enhance performance and avoid load balancer
 - **Added:** Support `quarter` granularity in `date_trunc`
-  ([#4011](https://github.com/cube-js/cube.js/pull/4011))
+  ([#4011](https://github.com/cube-js/cube/pull/4011))
 - **Added:** Decimal partition pruning
-  ([#4089](https://github.com/cube-js/cube.js/pull/4089))
+  ([#4089](https://github.com/cube-js/cube/pull/4089))
 - **Added:** Unwinds select worker panics to provide descriptive error messages
-  ([#4097](https://github.com/cube-js/cube.js/pull/4097))
+  ([#4097](https://github.com/cube-js/cube/pull/4097))
 - **Added:** Introduce `CUBESTORE_EVENT_LOOP_WORKER_THREADS` to allow setting
   Tokio worker threads and processes explicitly
 - **Added:** Repartition single chunks instead of partition as a whole to speed
   up ingestion of big tables
-  ([#4125](https://github.com/cube-js/cube.js/pull/4125))
+  ([#4125](https://github.com/cube-js/cube/pull/4125))
 - **Added:** Add `CUBEJS_GH_API_TOKEN` environment variable to download script
-  ([#4282](https://github.com/cube-js/cube.js/pull/4282))
+  ([#4282](https://github.com/cube-js/cube/pull/4282))
 - **Added:** Add `EXPLAIN` implementation
-  ([#4303](https://github.com/cube-js/cube.js/pull/4303))
+  ([#4303](https://github.com/cube-js/cube/pull/4303))
 - **Added:** `IN` operator support for decimal type
-  ([#4306](https://github.com/cube-js/cube.js/pull/4306))
+  ([#4306](https://github.com/cube-js/cube/pull/4306))
 - **Added:** Support space-separated binary strings for HyperLogLog fields in
   CSV, resolves issue with `countDistinctApprox` in AWS Athena
-  ([#4383](https://github.com/cube-js/cube.js/pull/4383))
+  ([#4383](https://github.com/cube-js/cube/pull/4383))
 - **Fixed:** Reduce excessive startup memory usage
 - **Fixed:** Re-parent chunks on compaction instead of repartitioning
 - **Fixed:** Silence errors for not uploaded chunks scheduled for removal
@@ -76,32 +76,32 @@ please ensure nothing depends on the above.
 - **Fixed:** Provide better messages for CSV parsing error
 - **Fixed:** Decimals without integral parts are now respecting sign
 - **Fixed:** Schema type mismatch when in memory chunks are queried
-  ([#4024](https://github.com/cube-js/cube.js/pull/4024))
+  ([#4024](https://github.com/cube-js/cube/pull/4024))
 - **Fixed:** Ensure file size matches during downloads to localize any remote
   filesystem consistency issues
-  ([#4054](https://github.com/cube-js/cube.js/pull/4054))
+  ([#4054](https://github.com/cube-js/cube/pull/4054))
 - **Fixed:** Deactivate tables on data corruption to allow refresh worker to
   reconcile failing partitions
-  ([#4092](https://github.com/cube-js/cube.js/pull/4092))
+  ([#4092](https://github.com/cube-js/cube/pull/4092))
 - **Fixed:** Add list file size validation after file upload to check upload
-  consistency ([#4093](https://github.com/cube-js/cube.js/pull/4093))
+  consistency ([#4093](https://github.com/cube-js/cube/pull/4093))
 - **Fixed:** Postpone deletion of partitions and chunks after metastore log
   commits to avoid missing files on sudden metastore loss
-  ([#4094](https://github.com/cube-js/cube.js/pull/4094))
+  ([#4094](https://github.com/cube-js/cube/pull/4094))
 - **Fixed:** Do not spawn select workers for router nodes
 - **Fixed:** Jobs are fetched only once every 5 seconds if there's a queue
 - **Fixed:** Do not warmup chunks on table creation to avoid stuck on warmup of
   unpartitioned chunks situation
 - **Fixed:** Leading decimal zeros are truncated during formatting
 - **Fixed:** Empty tables in Cube Store if index is being used
-  ([#4170](https://github.com/cube-js/cube.js/pull/4170))
+  ([#4170](https://github.com/cube-js/cube/pull/4170))
 - **Fixed:** Add compaction and chunk writing guards to cleanup uploads folder
   on any failures to minimize storage bloating
 - **Fixed:** Filters are now included in index choosing
 - **Fixed:** Empty `CUBESTORE_S3_SUB_PATH` leads to can't list file error
-  ([#4324](https://github.com/cube-js/cube.js/pull/4324))
+  ([#4324](https://github.com/cube-js/cube/pull/4324))
 - **Fixed:** Inactive partition compaction: replace error with warn
-  ([#4337](https://github.com/cube-js/cube.js/pull/4337))
+  ([#4337](https://github.com/cube-js/cube/pull/4337))
 
 ## Cube SQL
 
@@ -113,31 +113,31 @@ please ensure nothing depends on the above.
 - **Added:** Improved selection finder for `ORDER BY`
 - **Added:** Ignore `KILL` statement without error
 - **Added:** Improved error messages
-  ([#3829](https://github.com/cube-js/cube.js/pull/3829))
+  ([#3829](https://github.com/cube-js/cube/pull/3829))
 - **Added:** Support for ARM64 Linux
-  ([#3865](https://github.com/cube-js/cube.js/pull/3865))
+  ([#3865](https://github.com/cube-js/cube/pull/3865))
 - **Added:** Support `USE 'db'`
 - **Added:** Support `SHOW COLUMNS`
-  ([#3995](https://github.com/cube-js/cube.js/pull/3995))
+  ([#3995](https://github.com/cube-js/cube/pull/3995))
 - **Added:** Support `SHOW TABLES`
-  ([#4001](https://github.com/cube-js/cube.js/pull/4001))
+  ([#4001](https://github.com/cube-js/cube/pull/4001))
 - **Added:** Support `COUNT(1)`
-  ([#4004](https://github.com/cube-js/cube.js/pull/4004))
+  ([#4004](https://github.com/cube-js/cube/pull/4004))
 - **Added:** Support prepared statements
-  ([#4005](https://github.com/cube-js/cube.js/pull/4005))
+  ([#4005](https://github.com/cube-js/cube/pull/4005))
 - **Added:** Support binary expression for measures
-  ([#4009](https://github.com/cube-js/cube.js/pull/4009))
+  ([#4009](https://github.com/cube-js/cube/pull/4009))
 - **Added:** Support `SHOW COLLATION`
-  ([#4025](https://github.com/cube-js/cube.js/pull/4025))
+  ([#4025](https://github.com/cube-js/cube/pull/4025))
 - **Added:** Query execution now uses DataFusion-based Query Engine
 - **Added:** Support `SHOW processlist`
 - **Added:** Split variables for session and server
-  ([#4255](https://github.com/cube-js/cube.js/pull/4255))
+  ([#4255](https://github.com/cube-js/cube/pull/4255))
 - **Added:** Support `pg_catalog.*` tables
 - **Added:** Support `SET` variables
-  ([#4266](https://github.com/cube-js/cube.js/pull/4266))
+  ([#4266](https://github.com/cube-js/cube/pull/4266))
 - Added: Improved error messages
-  ([#4515](https://github.com/cube-js/cube.js/pull/4515))
+  ([#4515](https://github.com/cube-js/cube/pull/4515))
 - **Fixed:** `LIKE '%(%)%'` comparators
 - **Fixed:** Support for `IF()`
 - **Fixed:** `SUBSTRING()` with negative count now returns an empty string
@@ -146,25 +146,25 @@ please ensure nothing depends on the above.
 - **Fixed:** Ignore case-sensitive search for usage of identifiers
 - **Fixed:** Unique filtering for measures/dimensions/segments in Request
 - **Fixed:** Allow using a measure as an argument in `COUNT()`
-  ([#4063](https://github.com/cube-js/cube.js/pull/4063))
+  ([#4063](https://github.com/cube-js/cube/pull/4063))
 - **Fixed:** Add `numeric_scale` field for `information_schema.columns`
 - **Fixed:** Table columns should take precedence over projection to mimic
   database behavior
 - **Fixed:** Allow quoted variables with `SHOW <variable>` syntax
-  ([#4313](https://github.com/cube-js/cube.js/pull/4313))
+  ([#4313](https://github.com/cube-js/cube/pull/4313))
 - **Fixed:** Correct MySQL types in response headers
-  ([#4362](https://github.com/cube-js/cube.js/pull/4362))
+  ([#4362](https://github.com/cube-js/cube/pull/4362))
 - **Fixed:** Support `boolean` column type
 
 ## AWS Athena
 
 - **Added:** Batching and export support
-  ([#4039](https://github.com/cube-js/cube.js/pull/4039))
+  ([#4039](https://github.com/cube-js/cube/pull/4039))
 - **Fixed:** Fixes export bucket location and column order
-  ([#4183](https://github.com/cube-js/cube.js/pull/4183))
+  ([#4183](https://github.com/cube-js/cube/pull/4183))
 - **Fixed:** Support plain bucket (instead of a path) for
   `CUBEJS_DB_EXPORT_BUCKET`
-  ([#4390](https://github.com/cube-js/cube.js/pull/4390))
+  ([#4390](https://github.com/cube-js/cube/pull/4390))
 
 ## BigQuery
 
@@ -174,32 +174,32 @@ please ensure nothing depends on the above.
 ## Databricks
 
 - **Added:** Export bucket support on S3/Azure
-  ([#4430](https://github.com/cube-js/cube.js/pull/4430))
+  ([#4430](https://github.com/cube-js/cube/pull/4430))
 
 ## JDBC
 
 - **Fixed:** Handle Maven error for empty Java dependencies
-  ([#4307](https://github.com/cube-js/cube.js/pull/4307))
+  ([#4307](https://github.com/cube-js/cube/pull/4307))
 
 ## Materialize
 
 - **Added:** New driver for Materialize
-  ([#4320](https://github.com/cube-js/cube.js/pull/4320))
+  ([#4320](https://github.com/cube-js/cube/pull/4320))
 
 ## MS-SQL
 
 - **Fixed:** Add `uniqueidentifier` type support
-  ([#4386](https://github.com/cube-js/cube.js/pull/4386))
+  ([#4386](https://github.com/cube-js/cube/pull/4386))
 
 ## Postgres
 
 - **Added:** Enums now supported in pre-aggregations
-  ([#3957](https://github.com/cube-js/cube.js/pull/3957))
+  ([#3957](https://github.com/cube-js/cube/pull/3957))
 
 ## QuestDB
 
 - **Added:** New driver for QuestDB
-  ([#4096](https://github.com/cube-js/cube.js/pull/4096))
+  ([#4096](https://github.com/cube-js/cube/pull/4096))
 
 ## Snowflake
 
@@ -211,19 +211,19 @@ please ensure nothing depends on the above.
 ## Playground
 
 - **Added:** A message now displays when using non-additive measures
-  ([#4236](https://github.com/cube-js/cube.js/pull/4236))
+  ([#4236](https://github.com/cube-js/cube/pull/4236))
 - **Added:** A message now displays when using count distinct
-  ([#4309](https://github.com/cube-js/cube.js/pull/4309))
+  ([#4309](https://github.com/cube-js/cube/pull/4309))
 - **Added:** Display error stack traces
-  ([#4438](https://github.com/cube-js/cube.js/pull/4438))
+  ([#4438](https://github.com/cube-js/cube/pull/4438))
 - **Fixed:** Filter groups now correctly display the full field name
-  ([#3816](https://github.com/cube-js/cube.js/pull/3816))
+  ([#3816](https://github.com/cube-js/cube/pull/3816))
 - **Fixed:** Adjust chart to fill the window
-  ([#4042](https://github.com/cube-js/cube.js/pull/4042))
+  ([#4042](https://github.com/cube-js/cube/pull/4042))
 - **Fixed:** Use security context in GraphQL sandbox
 - **Fixed:** Fixed an issue rollup designer undefined key
 - **Fixed:** Tab close button styles
-  ([#4047](https://github.com/cube-js/cube.js/pull/4047))
+  ([#4047](https://github.com/cube-js/cube/pull/4047))
 - **Fixed:** Fixed an issue that caused parameters to shift around when removing
   filters
 
@@ -231,11 +231,11 @@ please ensure nothing depends on the above.
 
 - **Added:** New environment variable
   `CUBEJS_ALLOW_UNGROUPED_WITHOUT_PRIMARY_KEY`
-  ([#2941](https://github.com/cube-js/cube.js/pull/2941))
+  ([#2941](https://github.com/cube-js/cube/pull/2941))
 - **Added:** Allow configuring `allowNodeRequire` for `DataSchemaCompiler`
-  ([#4235](https://github.com/cube-js/cube.js/pull/4235))
+  ([#4235](https://github.com/cube-js/cube/pull/4235))
 - **Fixed:** Timestamp for `quarter` range in time series has incorrect ending
-  period of `23:59:99` ([#4162](https://github.com/cube-js/cube.js/pull/4162))
+  period of `23:59:99` ([#4162](https://github.com/cube-js/cube/pull/4162))
 - **Fixed:** `TypeError` when requesting `/cubejs-api/v1/run-scheduled-refresh`
   without auth params
 - **Fixed:** Validate `contextToAppId()` is in place when `COMPILE_CONTEXT` is
@@ -245,84 +245,84 @@ please ensure nothing depends on the above.
 ## API Gateway
 
 - **Added:** Compact JSON array-based response data format support
-  ([#4046](https://github.com/cube-js/cube.js/pull/4046))
+  ([#4046](https://github.com/cube-js/cube/pull/4046))
 - **Added:** A new property `total` is available in the JSON query. If `true` ,
   the query also returns the total number of rows for that query
-  ([#4134](https://github.com/cube-js/cube.js/pull/4134))
+  ([#4134](https://github.com/cube-js/cube/pull/4134))
 - **Fixed:** Fix a type issue where queries did not properly support logical
-  `and` / `or` operators ([#4016](https://github.com/cube-js/cube.js/pull/4016))
+  `and` / `or` operators ([#4016](https://github.com/cube-js/cube/pull/4016))
 - **Fixed:** Skip GraphQL types generation for empty cubes
 - **Fixed:** GraphQL cannot read property `findIndex` of `undefined`
 - **Fixed:** Allow HTTP POST requests for `/sql` endpoint
-  ([#4180](https://github.com/cube-js/cube.js/pull/4180))
+  ([#4180](https://github.com/cube-js/cube/pull/4180))
 
 ## Query Orchestrator
 
 - **Added:** New environment variable to control database timeouts:
   `CUBEJS_DB_QUERY_TIMEOUT`
-  ([#3864](https://github.com/cube-js/cube.js/pull/3864))
+  ([#3864](https://github.com/cube-js/cube/pull/3864))
 - **Fixed:** Refresh process for `useOriginalSqlPreAggregations`
-  ([#3826](https://github.com/cube-js/cube.js/pull/3826))
+  ([#3826](https://github.com/cube-js/cube/pull/3826))
 - **Fixed:** Table cache incorrectly invalidated in multitenant configurations
-  ([#3828](https://github.com/cube-js/cube.js/pull/3828))
+  ([#3828](https://github.com/cube-js/cube/pull/3828))
 - **Fixed:** Cannot read property `last_updated_at` of `undefined`
-  ([#3980](https://github.com/cube-js/cube.js/pull/3980))
+  ([#3980](https://github.com/cube-js/cube/pull/3980))
 - **Fixed:** Improve error message on missing partitions
 - **Fixed:** Remove orphaned tables on error while pre-aggregation creation
-  ([#3996](https://github.com/cube-js/cube.js/pull/3996))
+  ([#3996](https://github.com/cube-js/cube/pull/3996))
 - **Fixed:** An out-of-memory error when an empty table was used to build
   partitioned pre-aggregations
-  ([#4021](https://github.com/cube-js/cube.js/pull/4021))
+  ([#4021](https://github.com/cube-js/cube/pull/4021))
 
 ## Schema Compiler
 
 - **Added:** Allow filtering with `or` / `and` in `FILTER_PARAMS`
-  ([#4253](https://github.com/cube-js/cube.js/pull/4253))
+  ([#4253](https://github.com/cube-js/cube/pull/4253))
 - **Added:** Support for compound primary keys
-  ([#4370](https://github.com/cube-js/cube.js/pull/4370))
+  ([#4370](https://github.com/cube-js/cube/pull/4370))
 - **Fixed:** Handle `null` values in security context
-  ([#3868](https://github.com/cube-js/cube.js/pull/3868))
+  ([#3868](https://github.com/cube-js/cube/pull/3868))
 - **Fixed:** An error when using `subQuery` for a `rollingWindow` measure
 - **Fixed:** Do not instantiate `SqlParser` if `rewriteQueries` is `false` to
   save cache memory
 - **Fixed:** `refreshKey` is evaluated ten times more frequently if `sql` and
   `every` are simultaneously defined
-  ([#3873](https://github.com/cube-js/cube.js/pull/3873))
+  ([#3873](https://github.com/cube-js/cube/pull/3873))
 - **Fixed:** Use prototype name matching instead of classes to allow exact
   version mismatches for `AbstractExtension`
 - **Fixed:** Use a cube's alias when generating join aliases
-  ([#4010](https://github.com/cube-js/cube.js/pull/4010))
+  ([#4010](https://github.com/cube-js/cube/pull/4010))
 - **Fixed:** Add strictness to booleans
-  ([#4157](https://github.com/cube-js/cube.js/pull/4157))
+  ([#4157](https://github.com/cube-js/cube/pull/4157))
 
 ## Client Libraries
 
 ### Angular
 
 - **Fixed:** `cubejs.watch()` is now producing errors
-  ([#3974](https://github.com/cube-js/cube.js/pull/3974))
+  ([#3974](https://github.com/cube-js/cube/pull/3974))
 
 ### Core
 
 - **Added:** Support for compact response data format
-  ([#4046](https://github.com/cube-js/cube.js/pull/4046))
+  ([#4046](https://github.com/cube-js/cube/pull/4046))
 - **Added:** Accept immutable queries
-  ([#4366](https://github.com/cube-js/cube.js/pull/4366))
+  ([#4366](https://github.com/cube-js/cube/pull/4366))
 - **Added:** Add HTTP status code to `RequestError`
-  ([#4412](https://github.com/cube-js/cube.js/pull/4412))
+  ([#4412](https://github.com/cube-js/cube/pull/4412))
 - **Fixed:** Add `meta` field to TypeScript `TCubeMember` type
-  ([#3815](https://github.com/cube-js/cube.js/pull/3815))
+  ([#3815](https://github.com/cube-js/cube/pull/3815))
 - **Fixed:** Allow any filter types in `and` / `or`
-  ([#4343](https://github.com/cube-js/cube.js/pull/4343))
+  ([#4343](https://github.com/cube-js/cube/pull/4343))
 - **Fixed:** HTTP poll not working if Cube API stops and recovers
-  ([#3506](https://github.com/cube-js/cube.js/pull/3506))
+  ([#3506](https://github.com/cube-js/cube/pull/3506))
 
 ### Vue
 
 - **Added:** Boolean filters support
-  ([#4314](https://github.com/cube-js/cube.js/pull/4314))
+  ([#4314](https://github.com/cube-js/cube/pull/4314))
 - **Fixed:** Fix error when deleting a member in `QueryBuilder`
-  ([#3806](https://github.com/cube-js/cube.js/pull/3806))
+  ([#3806](https://github.com/cube-js/cube/pull/3806))
 
 ## Documentation & Examples
 
