@@ -24,7 +24,7 @@ use crate::CubeError;
 use async_trait::async_trait;
 
 use futures_timer::Delay;
-use rocksdb::{BlockBasedOptions, Options, DB};
+use rocksdb::{BlockBasedOptions, Cache, Options, DB};
 
 use crate::cachestore::compaction::CompactionPreloadedState;
 use crate::cachestore::listener::RocksCacheStoreListener;
@@ -67,7 +67,8 @@ impl RocksCacheStoreDetails {
 }
 
 impl RocksStoreDetails for RocksCacheStoreDetails {
-    fn open_db(&self, path: &Path) -> Result<DB, CubeError> {
+    fn open_db(&self, path: &Path, config: &Arc<dyn ConfigObj>) -> Result<DB, CubeError> {
+        let rocksdb_config = config.cachestore_rocksdb_config();
         let compaction_state = Arc::new(Mutex::new(Some(
             RocksCacheStoreDetails::get_compaction_state(),
         )));
@@ -81,9 +82,17 @@ impl RocksStoreDetails for RocksCacheStoreDetails {
         // Disable automatic compaction before migration, will be enabled later in after_migration
         opts.set_disable_auto_compactions(true);
 
-        let mut block_opts = BlockBasedOptions::default();
-        // https://github.com/facebook/rocksdb/blob/v7.9.2/include/rocksdb/table.h#L524
-        block_opts.set_format_version(5);
+        let block_opts = {
+            let mut block_opts = BlockBasedOptions::default();
+            // https://github.com/facebook/rocksdb/blob/v7.9.2/include/rocksdb/table.h#L524
+            block_opts.set_format_version(5);
+            block_opts.set_checksum_type(rocksdb_config.checksum_type.as_rocksdb_enum());
+
+            let cache = Cache::new_lru_cache(rocksdb_config.cache_capacity)?;
+            block_opts.set_block_cache(&cache);
+
+            block_opts
+        };
 
         opts.set_block_based_table_factory(&block_opts);
 
