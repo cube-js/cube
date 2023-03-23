@@ -12,7 +12,7 @@ import {
   StreamTableData,
   StreamingSourceTableData,
   QueryOptions,
-  ExternalDriverCompatibilities,
+  ExternalDriverCompatibilities, TableStructure, TableColumnQueryResult,
 } from '@cubejs-backend/base-driver';
 import { getEnv } from '@cubejs-backend/shared';
 import { format as formatSql, escape } from 'sqlstring';
@@ -161,6 +161,22 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
       `SELECT table_name, build_range_end FROM information_schema.tables WHERE table_schema = ${this.param(0)} AND (${prefixWhere})`,
       [schemaName].concat(tablePrefixes)
     );
+  }
+
+  public async tableColumnTypes(table: string): Promise<TableStructure> {
+    const [schema, name] = table.split('.');
+
+    const columns = await this.query<TableColumnQueryResult>(
+      `SELECT column_name as ${this.quoteIdentifier('column_name')},
+             table_name as ${this.quoteIdentifier('table_name')},
+             table_schema as ${this.quoteIdentifier('table_schema')},
+             data_type as ${this.quoteIdentifier('data_type')}
+      FROM information_schema.columns
+      WHERE table_name = ${this.param(0)} AND table_schema = ${this.param(1)}`,
+      [name, schema]
+    );
+
+    return columns.map(c => ({ name: c.column_name, type: this.toGenericType(c.data_type) }));
   }
 
   public quoteIdentifier(identifier: string): string {
