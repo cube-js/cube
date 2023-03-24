@@ -521,15 +521,17 @@ pub struct RocksStoreConfig {
 impl RocksStoreConfig {
     pub fn metastore_default() -> Self {
         Self {
-            checksum_type: RocksStoreChecksumType::XXHash,
-            cache_capacity: 1024 * 8,
+            // Supported since RocksDB 6.27
+            checksum_type: RocksStoreChecksumType::XXH3,
+            cache_capacity: 8 * 1024 * 1024,
         }
     }
 
     pub fn cachestore_default() -> Self {
         Self {
-            checksum_type: RocksStoreChecksumType::XXHash,
-            cache_capacity: 1024 * 8,
+            // Supported since RocksDB 6.27
+            checksum_type: RocksStoreChecksumType::XXH3,
+            cache_capacity: 8 * 1024 * 1024,
         }
     }
 }
