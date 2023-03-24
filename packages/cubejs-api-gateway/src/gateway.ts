@@ -80,7 +80,6 @@ import { SQLServer } from './sql-server';
 import { makeSchema } from './graphql';
 import { ConfigItem, prepareAnnotation } from './helpers/prepareAnnotation';
 import transformData from './helpers/transformData';
-import { shouldAddLimit } from './helpers/shouldAddLimit';
 import {
   transformCube,
   transformMeasure,
@@ -387,11 +386,6 @@ class ApiGateway {
         this.requestLoggerMiddleware
       ];
 
-      const sqlRunnerMiddlewares = [
-        ...systemMiddlewares,
-        this.checkSqlRunnerScope,
-      ];
-
       app.get('/cubejs-system/v1/context', systemMiddlewares, this.createSystemContextHandler(this.basePath));
 
       app.get('/cubejs-system/v1/pre-aggregations', systemMiddlewares, (async (req, res) => {
@@ -453,39 +447,6 @@ class ApiGateway {
           query: req.body.query,
           context: req.context,
           res: this.resToResultFn(res)
-        });
-      }));
-
-      app.post(
-        '/cubejs-system/v1/sql-runner',
-        jsonParser,
-        sqlRunnerMiddlewares,
-        async (req: Request, res: Response) => {
-          await this.sqlRunner({
-            query: req.body.query,
-            context: req.context!,
-            res: this.resToResultFn(res),
-          });
-        }
-      );
-      
-      app.get(
-        '/cubejs-system/v1/data-sources',
-        jsonParser,
-        sqlRunnerMiddlewares,
-        async (req: Request, res: Response) => {
-          await this.dataSources({
-            context: req.context,
-            res: this.resToResultFn(res),
-          });
-        }
-      );
-      
-      app.post('/cubejs-system/v1/db-schema', jsonParser, systemMiddlewares, (async (req: Request, res: Response) => {
-        await this.dbSchema({
-          query: req.body.query,
-          context: req.context,
-          res: this.resToResultFn(res),
         });
       }));
     }
@@ -1110,171 +1071,6 @@ class ApiGateway {
     } catch (e) {
       this.handleError({
         e, context, res, requestStarted
-      });
-    }
-  }
-  
-  protected async dataSources({ context, res }: { context?: RequestContext, res: ResponseResultFn }) {
-    const requestStarted = new Date();
-
-    try {
-      const orchestratorApi = await this.getAdapterApi(context);
-      const { dataSources } = await this.getCompilerApi(context).dataSources(orchestratorApi);
-
-      res({ dataSources });
-    } catch (e) {
-      this.handleError({
-        e,
-        context,
-        res,
-        requestStarted,
-      });
-    }
-  }
-
-  protected async sqlRunner({ query, context, res }: QueryRequest) {
-    const requestStarted = new Date();
-    try {
-      if (!query) {
-        throw new UserError('A user\'s query must contain a body');
-      }
-
-      if (!Array.isArray(query) && !query.query) {
-        throw new UserError(
-          'A user\'s query must contain at least one query param.'
-        );
-      }
-      
-      query = {
-        ...query,
-        requestId: context.requestId,
-      };
-
-      const orchestratorApi = this.getAdapterApi(context);
-
-      if (shouldAddLimit(query.query)) {
-        if (
-          !query.limit ||
-          !Number.isInteger(query.limit) ||
-          query.limit < 0
-        ) {
-          throw new UserError(
-            'A user\'s query must contain limit query param and it must be positive number'
-          );
-        }
-
-        if (query.limit > getEnv('dbQueryDefaultLimit')) {
-          throw new UserError('The query limit has been exceeded');
-        }
-  
-        if (
-          query.resultFilter?.objectTypes &&
-          !Array.isArray(query.resultFilter.objectTypes)
-        ) {
-          throw new UserError(
-            'A query.resultFilter.objectTypes must be an array of strings'
-          );
-        }
-        
-        query.query = query.query.trim();
-        if (query.query.charAt(query.query.length - 1) === ';') {
-          query.query = query.query.slice(0, -1);
-        }
-
-        const driver = await orchestratorApi
-          .driverFactory(query.dataSource || 'default');
-
-        driver.wrapQueryWithLimit(query);
-      }
-      
-      this.log(
-        {
-          type: 'Load SQL Runner Request',
-          query,
-        },
-        context
-      );
-
-      const result = await orchestratorApi.executeQuery(query);
-
-      if (result.data.length) {
-        const objectLimit = Number(query.resultFilter?.objectLimit) || 100;
-        const stringLimit = Number(query.resultFilter?.stringLimit) || 100;
-        const objectTypes = query.resultFilter?.objectTypes || [];
-        const limit = Number(query.resultFilter?.limit) || 20;
-        const offset = Number(query.resultFilter?.offset) || 0;
-        result.total = result.data.length;
-        result.offset = offset;
-        result.data = result.data.slice(offset, offset + limit);
-        result.data = result.data.map((row) => {
-          Object.keys(row).forEach((key) => {
-            if (
-              typeof row[key] === 'object' && row[key] !== null && row[key].type &&
-              (objectTypes.length === 0 || !objectTypes.includes(row[key].type))
-            ) {
-              row[key] = row[key].type;
-            } else if (typeof row[key] === 'object' && row[key] !== null) {
-              row[key] = JSON.stringify(row[key].data || row[key]).slice(0, objectLimit);
-            } else if (typeof row[key] === 'string') {
-              row[key] = row[key].slice(0, stringLimit);
-            }
-          });
-
-          return row;
-        });
-      }
-
-      this.log(
-        {
-          type: 'Load SQL Runner Request Success',
-          query,
-          duration: this.duration(requestStarted),
-          dbType: result.dbType,
-        },
-        context
-      );
-
-      res(result);
-    } catch (e) {
-      this.handleError({
-        e, context, query, res, requestStarted
-      });
-    }
-  }
-
-  protected async dbSchema({ query, context, res }: {
-    query: {
-      dataSource: string;
-    };
-    context?: RequestContext;
-    res: ResponseResultFn;
-  }) {
-    const requestStarted = new Date();
-    try {
-      if (!query) {
-        throw new UserError(
-          'A user\'s query must contain a body'
-        );
-      }
-
-      if (!query.dataSource) {
-        throw new UserError(
-          'A user\'s query must contain dataSource.'
-        );
-      }
-
-      const orchestratorApi = await this.getAdapterApi(context);
-   
-      const schema = await orchestratorApi
-        .getQueryOrchestrator()
-        .fetchSchema(query.dataSource);
-
-      res({ data: schema });
-    } catch (e) {
-      this.handleError({ e,
-        context,
-        res,
-        requestStarted,
       });
     }
   }
@@ -2258,24 +2054,6 @@ class ApiGateway {
     await this.checkAuthWrapper(this.checkAuthSystemFn, req, res, next);
   };
   
-  protected checkSqlRunnerScope: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
-    await this.checkAuthWrapper(
-      async () => {
-        if (
-          !getEnv('devMode') &&
-          (!req.context?.securityContext?.scope ||
-          !Array.isArray(req.context?.securityContext?.scope) ||
-          !req.context?.securityContext?.scope.includes('sql-runner'))
-        ) {
-          throw new CubejsHandlerError(403, 'Forbidden', 'Sql-runner scope is missing.');
-        }
-      },
-      req,
-      res,
-      next
-    );
-  };
-
   protected requestContextMiddleware: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
     try {
       req.context = await this.contextByReq(req, req.securityContext, getRequestIdFromRequest(req));
