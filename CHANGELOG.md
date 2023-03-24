@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.32.15](https://github.com/cube-js/cube/compare/v0.32.14...v0.32.15) (2023-03-24)
+
+
+### Bug Fixes
+
+* **cubesql:** Allow any aggregation for number measure as it can be a wildcard ([48f8828](https://github.com/cube-js/cube/commit/48f882867b020ca4a0d058ff147e61ef9bea9555))
+* **cubestore-driver:** Fix informationSchemaQuery ([#6338](https://github.com/cube-js/cube/issues/6338)) ([387020d](https://github.com/cube-js/cube/commit/387020d13ae3e82bac7b55699880e16f79940016))
+* **cubestore:** RocksStore - specify TTL for WAL to protect logs uploading ([#6345](https://github.com/cube-js/cube/issues/6345)) ([3a9cba4](https://github.com/cube-js/cube/commit/3a9cba478387dd4712b9ea3c566db159a32302d5))
+
+
+### Features
+
+* **cubestore:** Use XXH3 checksum alg for RocksDB ([#6339](https://github.com/cube-js/cube/issues/6339)) ([866f965](https://github.com/cube-js/cube/commit/866f965044536dac72c74160f9da6abc923e3dfb))
+* **playground:** BI connection guides, frontend integration snippets ([#6341](https://github.com/cube-js/cube/issues/6341)) ([8fdeb1b](https://github.com/cube-js/cube/commit/8fdeb1b882d959f9e8aec0ae963e5a0b1995e517))
+
+
+
+
+
 ## [0.32.14](https://github.com/cube-js/cube/compare/v0.32.13...v0.32.14) (2023-03-23)
 
 
