@@ -1708,6 +1708,28 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_select_number() {
+        let query_plan = convert_select_to_query_plan(
+            "SELECT MEASURE(someNumber) as s1, SUM(someNumber) as s2, MIN(someNumber) as s3, MAX(someNumber) as s4, COUNT(someNumber) as s5 FROM NumberCube".to_string(),
+            DatabaseProtocol::PostgreSQL).await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["NumberCube.someNumber".to_string(),]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None
+            }
+        );
+    }
+
+    #[tokio::test]
     async fn test_select_null_if_measure_diff() {
         let query_plan = convert_select_to_query_plan(
             "SELECT MEASURE(count), NULLIF(MEASURE(count), 0) as t, MEASURE(count) / NULLIF(MEASURE(count), 0) FROM KibanaSampleDataEcommerce;".to_string(),
@@ -3747,10 +3769,6 @@ ORDER BY \"COUNT(count)\" DESC"
             (
                 "SELECT AVG(maxPrice) FROM KibanaSampleDataEcommerce".to_string(),
                 CompilationError::user("Error during rewrite: Measure aggregation type doesn't match. The aggregation type for 'maxPrice' is 'MAX()' but 'AVG()' was provided. Please check logs for additional information.".to_string()),
-            ),
-            (
-                "SELECT AVG(someNumber) FROM NumberCube".to_string(),
-                CompilationError::user("Error during rewrite: Measure aggregation type doesn't match. The aggregation type for 'someNumber' is 'MEASURE()' but 'AVG()' was provided. Please check logs for additional information.".to_string()),
             ),
         ];
 
