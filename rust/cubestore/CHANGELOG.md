@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.32.15](https://github.com/cube-js/cube.js/compare/v0.32.14...v0.32.15) (2023-03-24)
+
+
+### Bug Fixes
+
+* **cubestore:** RocksStore - specify TTL for WAL to protect logs uploading ([#6345](https://github.com/cube-js/cube.js/issues/6345)) ([3a9cba4](https://github.com/cube-js/cube.js/commit/3a9cba478387dd4712b9ea3c566db159a32302d5))
+
+
+### Features
+
+* **cubestore:** Use XXH3 checksum alg for RocksDB ([#6339](https://github.com/cube-js/cube.js/issues/6339)) ([866f965](https://github.com/cube-js/cube.js/commit/866f965044536dac72c74160f9da6abc923e3dfb))
+
+
+
+
+
 ## [0.32.14](https://github.com/cube-js/cube.js/compare/v0.32.13...v0.32.14) (2023-03-23)
 
 

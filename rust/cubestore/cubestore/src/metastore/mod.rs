@@ -1152,6 +1152,10 @@ impl RocksStoreDetails for RocksMetaStoreDetails {
         opts.create_if_missing(true);
         opts.set_prefix_extractor(rocksdb::SliceTransform::create_fixed_prefix(13));
         opts.set_merge_operator_associative("meta_store merge", meta_store_merge);
+        // TODO(ovr): Decrease after additional fix for get_updates_since
+        opts.set_wal_ttl_seconds(
+            config.meta_store_snapshot_interval() + config.meta_store_log_upload_interval(),
+        );
 
         let block_opts = {
             let mut block_opts = BlockBasedOptions::default();

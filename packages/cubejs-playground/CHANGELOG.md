@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.32.15](https://github.com/cube-js/cube/compare/v0.32.14...v0.32.15) (2023-03-24)
+
+
+### Features
+
+* **playground:** BI connection guides, frontend integration snippets ([#6341](https://github.com/cube-js/cube/issues/6341)) ([8fdeb1b](https://github.com/cube-js/cube/commit/8fdeb1b882d959f9e8aec0ae963e5a0b1995e517))
+
+
+
+
+
 ## [0.32.12](https://github.com/cube-js/cube/compare/v0.32.11...v0.32.12) (2023-03-22)
 
 **Note:** Version bump only for package @cubejs-client/playground

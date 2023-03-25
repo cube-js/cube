@@ -90,9 +90,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
              columns.table_schema as ${this.quoteIdentifier('table_schema')},
              columns.data_type as ${this.quoteIdentifier('data_type')}
       FROM information_schema.columns as columns
-      WHERE columns.table_schema NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys', 'INFORMATION_SCHEMA')
-      AND columns.table_schema = '${this.config.database}'
-   `;
+      WHERE columns.table_schema NOT IN ('information_schema', 'system')`;
   }
 
   public createTableSqlWithOptions(tableName, columns, options: CreateTableOptions) {

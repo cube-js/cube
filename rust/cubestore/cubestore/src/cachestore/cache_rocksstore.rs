@@ -79,6 +79,10 @@ impl RocksStoreDetails for RocksCacheStoreDetails {
         opts.set_compaction_filter_factory(compaction::MetaStoreCacheCompactionFactory::new(
             compaction_state,
         ));
+        // TODO(ovr): Decrease after additional fix for get_updates_since
+        opts.set_wal_ttl_seconds(
+            config.meta_store_snapshot_interval() + config.meta_store_log_upload_interval(),
+        );
         // Disable automatic compaction before migration, will be enabled later in after_migration
         opts.set_disable_auto_compactions(true);
 

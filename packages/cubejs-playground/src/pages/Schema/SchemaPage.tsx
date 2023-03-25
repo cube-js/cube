@@ -38,7 +38,7 @@ const schemaToTreeData = (schemas) =>
 
 type SchemaPageProps = RouterProps;
 
-export default class SchemaPage extends Component<SchemaPageProps, any> {
+export class SchemaPage extends Component<SchemaPageProps, any> {
   static contextType = AppContext;
 
   context!: React.ContextType<typeof AppContext>;
@@ -105,7 +105,7 @@ export default class SchemaPage extends Component<SchemaPageProps, any> {
   async generateSchema(format: SchemaFormat = SchemaFormat.js) {
     const { checkedKeys, tablesSchema } = this.state;
     const { history } = this.props;
-    
+
     const options = { format };
 
     playgroundAction('Generate Schema', options);
