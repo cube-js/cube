@@ -1166,8 +1166,15 @@ changed in future versions of Cube.
 
 </WarningBox>
 
-The build range defines what partitions should be built by a scheduled refresh.
-Data will **never** be queried beyond this range. By default, the build range is
+<WarningBox>
+
+Cube will **NOT** return results outside of the defined build range. Data will **only** be queried within this range,
+which can lead to an empty result set, depending on the query. Consider using [Lambda pre-aggregations][self-rolluplambda]
+if you want to query data outside of the build range.
+
+</WarningBox>
+
+The build range defines what partitions should be built by a scheduled refresh. By default, the build range is
 defined as the minimum and maximum values possible for the
 [`time_dimension`][self-timedimension] used in the rollup.
 
