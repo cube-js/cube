@@ -1,0 +1,60 @@
+{
+  "cast": {
+    "SELECT_PREFIX": "",
+    "SELECT_SUFFIX": "",
+    "DATE_PREFIX": "date_parse(",
+    "DATE_SUFFIX": ", '%Y-%m-%d')",
+    "CREATE_TBL_PREFIX": "CREATE TABLE ",
+    "CREATE_TBL_SUFFIX": " AS ",
+    "CREATE_SUB_PREFIX": "(",
+    "CREATE_SUB_SUFFIX": ");"
+  },
+  "cube": {
+    "environment": {
+      "CUBEJS_DB_TYPE": "athena",
+      "CUBEJS_DEV_MODE": "true",
+      "CUBEJS_API_SECRET": "mysupersecret",
+      "CUBEJS_AWS_KEY": "${CUBEJS_AWS_KEY}",
+      "CUBEJS_AWS_SECRET": "${CUBEJS_AWS_SECRET}",
+      "CUBEJS_AWS_REGION": "${CUBEJS_AWS_REGION}",
+      "CUBEJS_AWS_S3_OUTPUT_LOCATION": "${CUBEJS_AWS_S3_OUTPUT_LOCATION}",
+      "CUBEJS_DB_EXPORT_BUCKET": "${CUBEJS_DB_EXPORT_BUCKET}"
+    },
+    "volumes": ["./:/cube/conf/"],
+    "ports" : ["4000:4000"]
+  },
+  "preAggregations": {
+    "Products": [],
+    "Customers": [
+      {
+        "name": "Rolling",
+        "measures": ["CUBE.count", "CUBE.runningTotal"]
+      }
+    ],
+    "ECommerce": [
+      {
+        "name": "SimpleAnalysis",
+        "dimensions": ["CUBE.productName"],
+        "measures": [
+          "CUBE.totalQuantity",
+          "CUBE.avgDiscount",
+          "CUBE.totalSales",
+          "CUBE.totalProfit"
+        ]
+      },
+      {
+        "name": "TimeAnalysis",
+        "time_dimension": "CUBE.orderDate",
+        "granularity": "month",
+        "partition_granularity": "month",
+        "dimensions": ["CUBE.productName"],
+        "measures": [
+          "CUBE.totalQuantity",
+          "CUBE.avgDiscount",
+          "CUBE.totalSales",
+          "CUBE.totalProfit"
+        ]
+      }
+    ]
+  }
+}
