@@ -1,10 +1,6 @@
 @import 'variables';
 @import 'mixins';
 
-body {
-  overscroll-behavior: none;
-}
-
 .algolia-autocomplete {
   line-height: 40px;
   width: 100%;
