@@ -94,6 +94,7 @@ const MainMenu: React.FC<Props> = (props = defaultProps) => {
     <Col
       {...layout.leftSidebar.width}
       xs={props.mobileMode === 'menu' ? 24 : 0}
+      className={cx(styles.menuWrapperCol)}
     >
       <div className={cx(styles.menuWrapper, styles.menuWrapperHack)}>
         <Menu {...menuProps} className={styles.antMenu}>
