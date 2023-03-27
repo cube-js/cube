@@ -401,27 +401,34 @@ span.group-header {
 }
 
 .menuWrapperHack {
-  padding-top: 56px !important;
-  margin-top: -40px;
   @media screen and (max-width: 767px) {
+    height: 100% !important;
+    position: fixed;
+    top: 0;
     padding-top: 70px !important;
     margin-top: 0;
   }
 }
 
+.menuWrapperCol {
+  position: sticky;
+  top: 64px;
+}
+
 .menuWrapper {
-  height: 100%;
-  width: inherit;
+  // height: 100%;
+  height: calc(100vh - 64px);
+  width: 100%;
   background: $sidebar-bg;
-  padding: 16px 24px;
+  padding: 16px 24px 24px;
   overflow-y: auto;
   overflow-x: hidden;
-  position: fixed;
+  // position: fixed;
   //padding-left: calc(9999px + 24px);
   //padding-right: 24px;
   //margin-left: -9999px;
   //min-width: 245px;
-  max-height: calc(100% - 66px);
+  // max-height: calc(100% - 66px);
   //background: $light;
 
   @media screen and (max-width: 767px) {
