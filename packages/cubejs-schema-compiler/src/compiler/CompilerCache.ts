@@ -2,8 +2,11 @@ import LRUCache from 'lru-cache';
 import { QueryCache } from '../adapter/QueryCache';
 
 export class CompilerCache extends QueryCache {
-  constructor({ maxQueryCacheSize, maxQueryCacheAge }) {
+  protected readonly queryCache: LRUCache<string, QueryCache>;
+
+  public constructor({ maxQueryCacheSize, maxQueryCacheAge }) {
     super();
+
     this.queryCache = new LRUCache({
       max: maxQueryCacheSize || 10000,
       maxAge: (maxQueryCacheAge * 1000) || 1000 * 60 * 10,
@@ -11,11 +14,17 @@ export class CompilerCache extends QueryCache {
     });
   }
 
-  getQueryCache(key) {
+  public getQueryCache(key: unknown): QueryCache {
     const keyString = JSON.stringify(key);
-    if (!this.queryCache.get(keyString)) {
-      this.queryCache.set(keyString, new QueryCache());
+
+    const exist = this.queryCache.get(keyString);
+    if (exist) {
+      return exist;
     }
-    return this.queryCache.get(keyString);
+
+    const result = new QueryCache();
+    this.queryCache.set(keyString, result);
+
+    return result;
   }
 }
