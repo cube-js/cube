@@ -1,10 +1,30 @@
 import moment from 'moment-timezone';
 import { BaseQuery, PostgresQuery, MssqlQuery, UserError } from '../../src';
-import { prepareCompiler } from './PrepareCompiler';
-import { createCubeSchema, createJoinedCubesSchema } from './utils';
+import { prepareCompiler, prepareYamlCompiler } from './PrepareCompiler';
+import { createCubeSchema, createCubeSchemaYaml, createJoinedCubesSchema } from './utils';
 
 describe('SQL Generation', () => {
-  describe('Common - sqlTable', () => {
+  describe('Common - Yaml - syntax sugar', () => {
+    const compilers = /** @type Compilers */ prepareYamlCompiler(
+      createCubeSchemaYaml({ name: 'cards', sqlTable: 'card_tbl' })
+    );
+
+    it('Simple query', async () => {
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: [
+          'cards.count'
+        ],
+        timeDimensions: [],
+        filters: [],
+      });
+      const queryAndParams = query.buildSqlAndParams();
+      expect(queryAndParams[0]).toContain('card_tbl');
+    });
+  });
+
+  describe('Common - JS - syntax sugar', () => {
     const compilers = /** @type Compilers */ prepareCompiler(
       createCubeSchema({
         name: 'cards',
@@ -27,7 +47,7 @@ describe('SQL Generation', () => {
     });
   });
 
-  describe('Common', () => {
+  describe('Common - JS', () => {
     const compilers = /** @type Compilers */ prepareCompiler(
       createCubeSchema({
         name: 'cards',

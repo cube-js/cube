@@ -8,7 +8,7 @@ interface CreateCubeSchemaOptions {
 export function createCubeSchema({ name, refreshKey = '', preAggregations = '', sqlTable }: CreateCubeSchemaOptions): string {
   return ` 
     cube('${name}', {
-        ${sqlTable ? `sqlTable: \`${sqlTable}\`` : `sql: \`select * from cards\``},
+        ${sqlTable ? `sqlTable: \`${sqlTable}\`` : 'sql: `select * from cards`'},
 
         ${refreshKey}
    
@@ -46,6 +46,35 @@ export function createCubeSchema({ name, refreshKey = '', preAggregations = '', 
             ${preAggregations}
         }
       }) 
+  `;
+}
+
+export function createCubeSchemaYaml({ name, sqlTable }: CreateCubeSchemaOptions): string {
+  return ` 
+    cubes:
+      - name: ${name}
+        sql_table: ${sqlTable}
+    
+        measures:
+          - name: count
+            type: count
+          - name: sum
+            type: sum
+            sql: amount
+          - name: min
+            sql: amount
+            type: min
+          - name: max
+            sql: amount
+            type: max
+        dimensions:
+          - name: id
+            sql: id
+            type: number
+            primary_key: true
+          - name: createdAt
+            sql: created_at
+            type: time
   `;
 }
 
