@@ -37,12 +37,6 @@ export class CubeEvaluator extends CubeSymbols {
    * @protected
    */
   prepareCube(cube, errorReporter) {
-    if (cube.sqlTable) {
-      cube.sql = function sql(...args) {
-        return `SELECT * FROM ${cube.sqlTable(...args)}`;
-      };
-    }
-
     if (cube.preAggregations) {
       // eslint-disable-next-line no-restricted-syntax
       for (const preAggregation of Object.values(cube.preAggregations)) {
