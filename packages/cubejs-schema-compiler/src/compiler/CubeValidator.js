@@ -579,7 +579,7 @@ function collectFunctionFieldsPatterns(patterns, path, o) {
 
 export function functionFieldsPatterns() {
   const functionPatterns = new Set();
-  collectFunctionFieldsPatterns(functionPatterns, '', Object.assign({}, cubeSchema, viewSchema));
+  collectFunctionFieldsPatterns(functionPatterns, '', { ...cubeSchema, ...viewSchema });
   return Array.from(functionPatterns);
 }
 
