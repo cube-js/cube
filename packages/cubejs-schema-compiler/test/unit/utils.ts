@@ -1,21 +1,15 @@
 interface CreateCubeSchemaOptions {
   name: string,
+  sqlTable?: string,
   refreshKey?: string,
   preAggregations?: string,
 }
 
-/**
- * Returns test cube schema based on incoming parameters.
- * @param {CreateCubeSchemaOptions} param
- * @returns {string}
- */
-export function createCubeSchema({ name, refreshKey = '', preAggregations = '' }: CreateCubeSchemaOptions) {
+export function createCubeSchema({ name, refreshKey = '', preAggregations = '', sqlTable }: CreateCubeSchemaOptions): string {
   return ` 
     cube('${name}', {
-        sql: \`
-        select * from cards
-        \`,
-        
+        ${sqlTable ? `sqlTable: \`${sqlTable}\`` : `sql: \`select * from cards\``},
+
         ${refreshKey}
    
         measures: {
@@ -59,7 +53,6 @@ export function createCubeSchema({ name, refreshKey = '', preAggregations = '' }
  * Returns joined test cubes schema. Schema looks like: A -< B -< C >- D >- E.
  * The original data set can be found under the link.
  * {@link https://docs.google.com/spreadsheets/d/1BNDpA7x4JLhlvvPdrQIC0c0PH4xZhdRrEFfXdRW1j4U/edit?usp=sharing|Dataset}
- * @returns {string}
  */
 export function createJoinedCubesSchema(): string {
   return `

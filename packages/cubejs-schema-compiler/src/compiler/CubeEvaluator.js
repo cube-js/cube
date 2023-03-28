@@ -38,10 +38,8 @@ export class CubeEvaluator extends CubeSymbols {
    */
   prepareCube(cube, errorReporter) {
     if (cube.sqlTable) {
-      const sqlTable = cube.sqlTable(...args);
-
       cube.sql = function sql(...args) {
-        return `SELECT * FROM ${sqlTable(...args)}`;
+        return `SELECT * FROM ${cube.sqlTable(...args)}`;
       };
     }
 

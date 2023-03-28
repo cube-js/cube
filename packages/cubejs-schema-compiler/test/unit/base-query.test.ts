@@ -1,12 +1,32 @@
 import moment from 'moment-timezone';
-import { UserError } from '../../src/compiler/UserError';
-import { PostgresQuery } from '../../src/adapter/PostgresQuery';
+import { BaseQuery, PostgresQuery, MssqlQuery, UserError } from '../../src';
 import { prepareCompiler } from './PrepareCompiler';
-import { MssqlQuery } from '../../src/adapter/MssqlQuery';
-import { BaseQuery } from '../../src';
 import { createCubeSchema, createJoinedCubesSchema } from './utils';
 
 describe('SQL Generation', () => {
+  describe('Common - sqlTable', () => {
+    const compilers = /** @type Compilers */ prepareCompiler(
+      createCubeSchema({
+        name: 'cards',
+        sqlTable: 'card_tbl'
+      })
+    );
+
+    it('Simple query', async () => {
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: [
+          'cards.count'
+        ],
+        timeDimensions: [],
+        filters: [],
+      });
+      const queryAndParams = query.buildSqlAndParams();
+      expect(queryAndParams[0]).toContain('card_tbl');
+    });
+  });
+
   describe('Common', () => {
     const compilers = /** @type Compilers */ prepareCompiler(
       createCubeSchema({

@@ -32,11 +32,11 @@ describe('Cube Validation', () => {
     expect(validationResult.error).toBeFalsy();
   });
 
-  it('cube defined with sql_table - correct', async () => {
+  it('cube defined with sqlTable - correct', async () => {
     const cubeValidator = new CubeValidator(new CubeSymbols());
     const cube = {
       name: 'name',
-      sql: () => 'public.Users',
+      sqlTable: () => 'public.Users',
       fileName: 'fileName',
     };
 
@@ -49,19 +49,19 @@ describe('Cube Validation', () => {
     expect(validationResult.error).toBeFalsy();
   });
 
-  it('cube defined with sql and sql_table - fail', async () => {
+  it('cube defined with sql and sqlTable - fail', async () => {
     const cubeValidator = new CubeValidator(new CubeSymbols());
     const cube = {
       name: 'name',
       sql: () => 'SELECT * FROM public.Users',
-      sql_table: () => 'public.Users',
+      sqlTable: () => 'public.Users',
       fileName: 'fileName',
     };
 
     const validationResult = cubeValidator.validate(cube, {
       error: (message, e) => {
         console.log(message);
-        expect(message).toContain('You must use only sql or sql_table to define cube');
+        expect(message).toContain('You must use only sql or sqlTable to define cube');
       }
     });
 
