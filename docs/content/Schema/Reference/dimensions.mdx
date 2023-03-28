@@ -11,8 +11,8 @@ redirect_from:
 ---
 
 The `dimensions` property contains a set of dimensions. You can think about a
-dimension as an attribute related to a measure, e.g. the measure `user_count`
-can have dimensions like `country`, `age`, `occupation`, etc.
+dimension as an attribute related to a measure, e.g. the measure `userCount` can
+have dimensions like `country`, `age`, `occupation`, etc.
 
 Any dimension should have the following properties: `name`, `sql` and `type`.
 
@@ -209,7 +209,7 @@ cubes:
 
 </CodeTabs>
 
-### <--{"id" : "Parameters"}--> primary_key
+### <--{"id" : "Parameters"}--> primaryKey
 
 Specify which dimension is a primary key for a cube. The default value is
 `false`.
@@ -218,7 +218,7 @@ A primary key is used to make [joins][ref-schema-ref-joins] work properly.
 
 <WarningBox>
 
-Setting `primary_key` to `true` will change the default value of `shown`
+Setting `primaryKey` to `true` will change the default value of `shown`
 parameter to `false`. If you still want `shown` to be `true`, set it manually.
 
 </WarningBox>
@@ -231,7 +231,7 @@ cube('Products', {
     id: {
       sql: `id`,
       type: `number`,
-      primary_key: true,
+      primaryKey: true,
     },
   },
 });
@@ -249,7 +249,7 @@ cubes:
 
 </CodeTabs>
 
-### <--{"id" : "Parameters"}--> propagate_filters_to_sub_query
+### <--{"id" : "Parameters"}--> propagateFiltersToSubQuery
 
 When this statement is set to `true`, the filters applied to the query will be
 passed to the [subquery][self-subquery].
@@ -262,8 +262,8 @@ cube('Products', {
     users_count: {
       sql: `${Users.count}`,
       type: `number`,
-      sub_query: true,
-      propagate_filters_to_sub_query: true,
+      subQuery: true,
+      propagateFiltersToSubQuery: true,
     },
   },
 });
@@ -276,8 +276,8 @@ cubes:
       - name: users_count
         sql: "{Users.count}"
         type: number
-        sub_query: true
-        propagate_filters_to_sub_query: true
+        subQuery: true
+        propagateFiltersToSubQuery: true
 ```
 
 </CodeTabs>
@@ -331,10 +331,10 @@ cube(`Orders`, {
 });
 ```
 
-### <--{"id" : "Parameters"}--> sub_query
+### <--{"id" : "Parameters"}--> subQuery
 
-The `sub_query` statement allows you to reference a measure in a dimension. It's
-an advanced concept; you can learn more about it [here][ref-subquery].
+The `subQuery` statement allows you to reference a measure in a dimension. It's
+an advanced concept and you can learn more about it [here][ref-subquery].
 
 <CodeTabs>
 
@@ -344,7 +344,7 @@ cube('Products', {
     users_count: {
       sql: `${Users.count}`,
       type: `number`,
-      sub_query: true,
+      subQuery: true,
     },
   },
 });
@@ -357,7 +357,7 @@ cubes:
       - name: usersCount
         sql: "{Users.count}"
         type: number
-        sub_query: true
+        subQuery: true
 ```
 
 </CodeTabs>

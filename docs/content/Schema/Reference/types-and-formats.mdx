@@ -213,7 +213,7 @@ cubes:
 
 </CodeTabs>
 
-### <--{"id" : "Measure Types"}--> count_distinct
+### <--{"id" : "Measure Types"}--> countDistinct
 
 Calculates the number of distinct values in a given field. It makes use of SQL’s
 `COUNT DISTINCT` function.
@@ -228,7 +228,7 @@ cube('Orders', {
   measures: {
     uniqueUserCount: {
       sql: `user_id`,
-      type: 'count_distinct',
+      type: 'countDistinct',
     },
   },
 });
@@ -240,15 +240,15 @@ cubes:
     measures:
       - name: uniqueUserCount
         sql: user_id
-        type: count_distinct
+        type: countDistinct
 ```
 
 </CodeTabs>
 
-### <--{"id" : "Measure Types"}--> count_distinct_approx
+### <--{"id" : "Measure Types"}--> countDistinctApprox
 
 Calculates approximate number of distinct values in a given field. Unlike
-`count_distinct` measure type, `count_distinct_approx` is decomposable aggregate
+`countDistinct` measure type, `countDistinctApprox` is decomposable aggregate
 function or **additive**. This allows its usage in **additive** [rollup
 pre-aggregations][ref-schema-ref-preaggs-rollup] which are much more versatile
 than **non-additive** ones. It uses special SQL backend-dependent functions to
@@ -265,7 +265,7 @@ cube('Orders', {
   measures: {
     uniqueUserCount: {
       sql: `user_id`,
-      type: 'count_distinct_approx',
+      type: 'countDistinctApprox',
     },
   },
 });
@@ -277,7 +277,7 @@ cubes:
     measures:
       - name: uniqueUserCount
         sql: user_id
-        type: count_distinct_approx
+        type: countDistinctApprox
 ```
 
 </CodeTabs>
@@ -454,9 +454,9 @@ cubes:
 
 </CodeTabs>
 
-### <--{"id" : "Measure Types"}--> running_total
+### <--{"id" : "Measure Types"}--> runningTotal
 
-Type of measure `running_total` is calculated as summation of values defined in
+Type of measure `runningTotal` is calculated as summation of values defined in
 `sql`. Use it to calculate cumulative measures.
 
 <CodeTabs>
@@ -466,7 +466,7 @@ cube('Orders', {
   measures: {
     total_subscriptions: {
       sql: `subscription_amount`,
-      type: `running_total`,
+      type: `runningTotal`,
     },
   },
 });
@@ -478,7 +478,7 @@ cubes:
     measures:
       - name: total_subscriptions
         sql: subscription_amount
-        type: running_total
+        type: runningTotal
 ```
 
 </CodeTabs>
@@ -529,7 +529,7 @@ cube('Orders', {
   measures: {
     total_amount: {
       sql: `amount`,
-      type: `running_total`,
+      type: `runningTotal`,
       format: `currency`,
     },
   },
@@ -542,7 +542,7 @@ cubes:
     measures:
       - name: total_amount
         sql: amount
-        type: running_total
+        type: runningTotal
         format: currency
 ```
 
@@ -715,9 +715,9 @@ cubes:
 
 ## Dimension Formats
 
-### <--{"id" : "Dimension Formats"}--> image_url
+### <--{"id" : "Dimension Formats"}--> imageUrl
 
-`image_url` is used for displaying images in table visualization. In this case
+`imageUrl` is used for displaying images in table visualization. In this case
 `sql` parameter should contain full path to the image.
 
 <CodeTabs>
@@ -728,7 +728,7 @@ cube('Orders', {
     image: {
       sql: `CONCAT('https://img.example.com/id/', ${id})`,
       type: `string`,
-      format: `image_url`,
+      format: `imageUrl`,
     },
   },
 });
@@ -741,7 +741,7 @@ cubes:
       - name: image
         sql: "CONCAT('https://img.example.com/id/', {id})"
         type: string
-        format: image_url
+        format: imageUrl
 ```
 
 </CodeTabs>

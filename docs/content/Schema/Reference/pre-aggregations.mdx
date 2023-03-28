@@ -22,8 +22,8 @@ multi-stage process:
 2. Cube will execute a query against the pre-aggregated tables instead of the
    raw data.
 
-Pre-aggregations can be defined in the `pre_aggregations` available on each
-cube. A more in-depth diagram detailing how pre-aggregations are selected can be
+Pre-aggregations can be defined in the `preAggregations` available on each cube.
+A more in-depth diagram detailing how pre-aggregations are selected can be
 [found here][ref-caching-preaggs-selecting-preaggs].
 
 ## Naming
@@ -44,7 +44,7 @@ Pre-aggregation names should:
 cube(`Orders`, {
   sql: `SELECT * FROM orders`,
 
-  pre_aggregations: {
+  preAggregations: {
     orders_by_status: {
       dimensions: [CUBE.status],
       measures: [CUBE.count],
@@ -123,7 +123,7 @@ cube(`Orders`, {
 
   ...,
 
-  pre_aggregations: {
+  preAggregations: {
     orders_by_company: {
       measures: [CUBE.count],
       dimensions: [CUBE.status],
@@ -165,7 +165,7 @@ They often do not provide much in the way of performance directly, but there are
 two specific applications:
 
 1. They can be used in tandem with the
-   [`use_original_sql_pre_aggregations`][self-origsql-preaggs] option in other
+   [`useOriginalSqlPreAggregations`][self-origsql-preaggs] option in other
    rollup pre-aggregations.
 
 2. Situations where it is not possible to use a `rollup` pre-aggregations, such
@@ -179,7 +179,7 @@ For example, to pre-aggregate all completed orders, you could do the following:
 cube(`CompletedOrders`, {
   sql: `SELECT * FROM orders WHERE completed = true`,
 
-  pre_aggregations: {
+  preAggregations: {
     main: {
       type: `originalSql`,
     },
@@ -246,7 +246,7 @@ cube(`Users`, {
   dataSource: 'postgres',
   sql: `SELECT * FROM public.users`,
 
-  pre_aggregations: {
+  preAggregations: {
     users_rollup: {
       dimensions: [CUBE.id, CUBE.name],
     },
@@ -276,11 +276,11 @@ cube('Orders', {
   dataSource: 'mssql',
   sql: `SELECT * FROM orders`,
 
-  pre_aggregations: {
+  preAggregations: {
     orders_rollup: {
       measures: [CUBE.count],
       dimensions: [CUBE.user_id, CUBE.status],
-      time_dimension: CUBE.created_at,
+      timeDimension: CUBE.created_at,
       granularity: `day`,
     },
     // Here we add a new pre-aggregation of type `rollupJoin`
@@ -404,11 +404,11 @@ directly:
 cube('Orders', {
   sql: `SELECT * FROM orders`,
 
-  pre_aggregations: {
+  preAggregations: {
     orders_rollup: {
       measures: [CUBE.count],
       dimensions: [Users.name, CUBE.status],
-      time_dimension: CUBE.created_at,
+      timeDimension: CUBE.created_at,
       granularity: `day`,
     },
   },
@@ -423,7 +423,7 @@ cubes:
       - name: orders_rollup
         measures: [CUBE.count]
         dimensions: [Users.name, CUBE.status]
-        time_dimension: CUBE.created_at
+        timeDimension: CUBE.created_at
         granularity: day
 ```
 
@@ -463,7 +463,7 @@ cube('Orders', {
     },
   },
 
-  pre_aggregations: {
+  preAggregations: {
     users_rollup: {
       measures: [CUBE.count],
     },
@@ -503,7 +503,7 @@ cube('Orders', {
     },
   },
 
-  pre_aggregations: {
+  preAggregations: {
     users_rollup: {
       dimensions: [CUBE.status],
     },
@@ -526,9 +526,9 @@ cubes:
 
 </CodeTabs>
 
-### <--{"id" : "Parameters"}--> time_dimension
+### <--{"id" : "Parameters"}--> timeDimension
 
-The `time_dimension` property can be any [`dimension`][ref-schema-dimensions] of
+The `timeDimension` property can be any [`dimension`][ref-schema-dimensions] of
 type [`time`][ref-schema-types-dim-time]. All other measures and dimensions in
 the schema are aggregated This property is an extremely useful tool for
 improving performance with massive datasets.
@@ -556,11 +556,11 @@ cube('Orders', {
     },
   },
 
-  pre_aggregations: {
+  preAggregations: {
     orders_by_status: {
       measures: [CUBE.count],
       dimensions: [CUBE.status],
-      time_dimension: CUBE.created_at,
+      timeDimension: CUBE.created_at,
       granularity: `day`,
     },
   },
@@ -585,7 +585,7 @@ cubes:
       - name: orders_by_status
         measures: [CUBE.count]
         dimensions: [CUBE.status]
-        time_dimension: CUBE.created_at
+        timeDimension: CUBE.created_at
         granularity: day
 ```
 
@@ -606,11 +606,11 @@ data by week and persist it to Cube Store.
 cube('Orders', {
   sql: `SELECT * FROM orders`,
 
-  pre_aggregations: {
+  preAggregations: {
     users_rollupByWeek: {
       measures: [CUBE.count],
       dimensions: [CUBE.status],
-      time_dimension: CUBE.created_at,
+      timeDimension: CUBE.created_at,
       granularity: `week`,
     },
   },
@@ -625,7 +625,7 @@ cubes:
       - name: users_rollup_by_week
         measures: [CUBE.count]
         dimensions: [CUBE.status]
-        time_dimension: CUBE.created_at
+        timeDimension: CUBE.created_at
         granularity: week
 ```
 
@@ -633,7 +633,7 @@ cubes:
 
 The value can be one of `second`, `minute`, `hour`, `day`, `week`, `month`,
 `quarter` or `year`. This property is required when using
-[`time_dimension`][self-timedimension].
+[`timeDimension`][self-timedimension].
 
 ### <--{"id" : "Parameters"}--> segments
 
@@ -658,7 +658,7 @@ cube(`Orders`, {
     },
   },
 
-  pre_aggregations: {
+  preAggregations: {
     main: {
       measures: [CUBE.count],
       segments: [CUBE.only_complete],
@@ -685,9 +685,9 @@ cubes:
 
 </CodeTabs>
 
-### <--{"id" : "Parameters"}--> partition_granularity
+### <--{"id" : "Parameters"}--> partitionGranularity
 
-The `partition_granularity` defines the granularity for each
+The `partitionGranularity` defines the granularity for each
 [partition][ref-caching-partitioning] of the pre-aggregation:
 
 <CodeTabs>
@@ -696,13 +696,13 @@ The `partition_granularity` defines the granularity for each
 cube('Orders', {
   sql: `SELECT * FROM orders`,
 
-  pre_aggregations: {
+  preAggregations: {
     users_rollup: {
       measures: [CUBE.count],
       dimensions: [CUBE.status],
-      time_dimension: CUBE.created_at,
+      timeDimension: CUBE.created_at,
       granularity: `day`,
-      partition_granularity: `month`,
+      partitionGranularity: `month`,
     },
   },
 });
@@ -724,12 +724,12 @@ cubes:
 </CodeTabs>
 
 The value can be one of `hour`, `day`, `week`, `month`, `quarter`, `year`. A
-[`time_dimension`][self-timedimension] and [`granularity`][self-granularity]
+[`timeDimension`][self-timedimension] and [`granularity`][self-granularity]
 **must** also be included in the pre-aggregation definition. This property is
 required when using [partitioned pre-aggregations][ref-caching-partitioning].
 
 Number of partitions to be built per cube is calculated as
-[buildRange][self-buildrange] divided by `partition_granularity`. Number of
+[buildRange][self-buildrange] divided by `partitionGranularity`. Number of
 partitions to be built per cube is multiplied by the count of time zones and
 tenants in case different tenants have different pre-aggregation SQL.
 
@@ -742,10 +742,10 @@ cause out of memory.
 
 </WarningBox>
 
-### <--{"id" : "Parameters"}--> refresh_key
+### <--{"id" : "Parameters"}--> refreshKey
 
 Cube can also take care of keeping pre-aggregations up to date with the
-`refresh_key` property. By default, it is set to `every: '1 hour'`.
+`refreshKey` property. By default, it is set to `every: '1 hour'`.
 
 <InfoBox>
 
@@ -764,10 +764,10 @@ You can set up a custom refresh check strategy by using the `sql` property:
 cube(`Orders`, {
   sql: `SELECT * FROM orders`,
 
-  pre_aggregations: {
+  preAggregations: {
     main: {
       measures: [CUBE.count],
-      refresh_key: {
+      refreshKey: {
         sql: `SELECT MAX(created_at) FROM orders`,
       },
     },
@@ -795,7 +795,7 @@ refreshed.
 
 <h4 id="parameters-refresh-key-every">every</h4>
 
-The `refresh_key` can define an `every` property which can be used to refresh
+The `refreshKey` can define an `every` property which can be used to refresh
 pre-aggregations based on a time interval. By default, it is set to `1 hour`
 unless the [`sql` property][self-refreshkey-sql] is also defined, in which case
 it is set to `10 seconds`. For example:
@@ -806,10 +806,10 @@ it is set to `10 seconds`. For example:
 cube(`Orders`, {
   sql: `SELECT * FROM orders`,
 
-  pre_aggregations: {
+  preAggregations: {
     main: {
       measures: [CUBE.count],
-      refresh_key: {
+      refreshKey: {
         every: `1 day`,
       },
     },
@@ -831,7 +831,7 @@ cubes:
 </CodeTabs>
 
 For possible `every` parameter values please refer to
-[`refresh_key`][ref-cube-refreshkey] documentation.
+[`refreshKey`][ref-cube-refreshkey] documentation.
 
 You can also use `every` with `sql`:
 
@@ -841,10 +841,10 @@ You can also use `every` with `sql`:
 cube(`Orders`, {
   sql: `SELECT * FROM orders`,
 
-  pre_aggregations: {
+  preAggregations: {
     main: {
       measures: [CUBE.count],
-      refresh_key: {
+      refreshKey: {
         every: `1 hour`,
         sql: `SELECT MAX(created_at) FROM orders`,
       },
@@ -891,13 +891,13 @@ existing tables.
 cube(`Orders`, {
   sql: `SELECT * FROM orders`,
 
-  pre_aggregations: {
+  preAggregations: {
     main: {
       measures: [CUBE.count],
-      time_dimension: CUBE.created_at,
+      timeDimension: CUBE.created_at,
       granularity: `day`,
-      partition_granularity: `day`,
-      refresh_key: {
+      partitionGranularity: `day`,
+      refreshKey: {
         every: `1 day`,
         incremental: true,
       },
@@ -923,18 +923,18 @@ cubes:
 
 </CodeTabs>
 
-<h4 id="parameters-refresh-key-updatewindow">update_window</h4>
+<h4 id="parameters-refresh-key-updatewindow">updateWindow</h4>
 
 <WarningBox>
 
-Incremental refreshes without a defined `update_window` will only update the
-last partition as determined by the pre-aggregation's `partition_granularity`.
+Incremental refreshes without a defined `updateWindow` will only update the last
+partition as determined by the pre-aggregation's `partitionGranularity`.
 
 </WarningBox>
 
-The `incremental: true` flag generates a special `refresh_key` SQL query which
+The `incremental: true` flag generates a special `refreshKey` SQL query which
 triggers a refresh for partitions where the end date lies within the
-`update_window` from the current time.
+`updateWindow` from the current time.
 
 <WarningBox>
 
@@ -953,16 +953,16 @@ once they are built unless the rollup SQL is changed.
 cube(`Orders`, {
   sql: `SELECT * FROM orders`,
 
-  pre_aggregations: {
+  preAggregations: {
     main: {
       measures: [CUBE.count],
-      time_dimension: CUBE.created_at,
+      timeDimension: CUBE.created_at,
       granularity: `day`,
-      partition_granularity: `day`,
-      refresh_key: {
+      partitionGranularity: `day`,
+      refreshKey: {
         every: `1 day`,
         incremental: true,
-        update_window: `7 day`,
+        updateWindow: `7 day`,
       },
     },
   },
@@ -1003,12 +1003,12 @@ Superset][ref-config-downstream-superset] that use loose date ranges by default.
 cube(`Orders`, {
   sql: `SELECT * FROM orders`,
 
-  pre_aggregations: {
+  preAggregations: {
     main: {
       measure: [CUBE.count],
-      time_dimension: CUBE.created_at,
+      timeDimension: CUBE.created_at,
       granularity: `day`,
-      partition_granularity: `day`,
+      partitionGranularity: `day`,
       allowNonStrictDateRangeMatch: true,
     },
   },
@@ -1030,13 +1030,13 @@ cubes:
 
 </CodeTabs>
 
-### <--{"id" : "Parameters"}--> use_original_sql_pre_aggregations
+### <--{"id" : "Parameters"}--> useOriginalSqlPreAggregations
 
 Cube supports multi-stage pre-aggregations by reusing original SQL
-pre-aggregations in rollups through the `use_original_sql_pre_aggregations`
+pre-aggregations in rollups through the `useOriginalSqlPreAggregations`
 property. It is helpful in cases where you want to re-use a heavy SQL query
 calculation in multiple `rollup` pre-aggregations. Without
-`use_original_sql_pre_aggregations` enabled, Cube will always re-execute all
+`useOriginalSqlPreAggregations` enabled, Cube will always re-execute all
 underlying SQL calculations every time it builds new rollup tables.
 
 <WarningBox>
@@ -1060,20 +1060,20 @@ cube(`Orders`, {
     SELECT * FROM orders3
     `,
 
-  pre_aggregations: {
+  preAggregations: {
     main: {
       type: `originalSql`,
     },
     statuses: {
       measures: [CUBE.count],
       dimensions: [CUBE.status],
-      use_original_sql_pre_aggregations: true,
+      useOriginalSqlPreAggregations: true,
     },
     completed_orders: {
       measures: [CUBE.count],
-      time_dimension: CUBE.completedAt,
+      timeDimension: CUBE.completedAt,
       granularity: `day`,
-      use_original_sql_pre_aggregations: true,
+      useOriginalSqlPreAggregations: true,
     },
   },
 });
@@ -1094,34 +1094,34 @@ cubes:
       - name: statuses
         measures: [CUBE.count]
         dimensions: [CUBE.status]
-        use_original_sql_pre_aggregations: true
+        useOriginalSqlPreAggregations: true
       - name: completed_orders
         measures: [CUBE.count]
         time_dimension: CUBE.completed_at
         granularity: day
-        use_original_sql_pre_aggregations: true
+        useOriginalSqlPreAggregations: true
 ```
 
 </CodeTabs>
 
-### <--{"id" : "Parameters"}--> scheduled_refresh
+### <--{"id" : "Parameters"}--> scheduledRefresh
 
 To always keep pre-aggregations up-to-date, you can set
-`scheduled_refresh: true`. This option defaults to `true`. If set to `false`,
+`scheduledRefresh: true`. This option defaults to `true`. If set to `false`,
 pre-aggregations will always be built on-demand. The
-[`refresh_key`][self-refreshkey] is used to determine if there's a need to
-update specific pre-aggregations on each scheduled refresh run. For partitioned
+[`refreshKey`][self-refreshkey] is used to determine if there's a need to update
+specific pre-aggregations on each scheduled refresh run. For partitioned
 pre-aggregations, `min` and `max` dates for
-[`time_dimension`][self-timedimension] are checked to determine range for the
+[`timeDimension`][self-timedimension] are checked to determine range for the
 refresh.
 
 Each time a scheduled refresh is run, it takes every pre-aggregation partition
 starting with most recent ones in time and checks if the
-[`refresh_key`][self-refreshkey] has changed. If a change was detected, then
-that partition will be refreshed.
+[`refreshKey`][self-refreshkey] has changed. If a change was detected, then that
+partition will be refreshed.
 
 In development mode, Cube runs the background refresh by default and will
-refresh all pre-aggregations which have `scheduled_refresh: true`.
+refresh all pre-aggregations which have `scheduledRefresh: true`.
 
 Please consult [Production Checklist][ref-production-checklist-refresh] for best
 practices on running background refresh in production environments.
@@ -1132,13 +1132,13 @@ practices on running background refresh in production environments.
 cube(`Orders`, {
   sql: `SELECT * FROM orders`,
 
-  pre_aggregations: {
+  preAggregations: {
     ordersByStatus: {
       measures: [CUBE.count],
       dimensions: [CUBE.status],
-      time_dimension: CUBE.created_at,
+      timeDimension: CUBE.created_at,
       granularity: `day`,
-      partition_granularity: `month`,
+      partitionGranularity: `month`,
     },
   },
 });
@@ -1159,7 +1159,7 @@ cubes:
 
 </CodeTabs>
 
-### <--{"id" : "Parameters"}--> build_range_start and build_range_end
+### <--{"id" : "Parameters"}--> buildRangeStart and buildRangeEnd
 
 <WarningBox>
 
@@ -1179,12 +1179,12 @@ if you want to query data outside of the build range.
 
 The build range defines what partitions should be built by a scheduled refresh. By default, the build range is
 defined as the minimum and maximum values possible for the
-[`time_dimension`][self-timedimension] used in the rollup.
+[`timeDimension`][self-timedimension] used in the rollup.
 
 <InfoBox>
 
 The SQL queries for the build range (as defined by the `sql` property) are
-executed based on the [`refresh_key`][self-refreshkey] settings of the
+executed based on the [`refreshKey`][self-refreshkey] settings of the
 pre-aggregation.
 
 </InfoBox>
@@ -1195,16 +1195,16 @@ pre-aggregation.
 cube(`Orders`, {
   sql: `SELECT * FROM orders`,
 
-  pre_aggregations: {
+  preAggregations: {
     main: {
       measures: [CUBE.count],
-      time_dimension: CUBE.created_at,
+      timeDimension: CUBE.created_at,
       granularity: `day`,
-      partition_granularity: `month`,
-      build_range_start: {        
+      partitionGranularity: `month`,
+      buildRangeStart: {
         sql: `SELECT NOW() - interval '300 day'`,
       },
-      build_range_end: {
+      buildRangeEnd: {
         sql: `SELECT NOW()`,
       },
     },
@@ -1221,7 +1221,7 @@ cubes:
         measures: [CUBE.count]
         time_dimension: CUBE.created_at
         granularity: day
-        partition_granularity: month
+        partitionGranularity: month
         build_range_start:
           sql: SELECT NOW() - interval '300 day'
         build_range_end:
@@ -1230,13 +1230,13 @@ cubes:
 
 </CodeTabs>
 
-It can be used together with the pre-aggregation's `refresh_key` to define
-granular update settings. Set `refresh_key.update_window` to the interval in
-which your data can change and `build_range_start` to the earliest point of time
-when history should be available.
+It can be used together with the pre-aggregation's `refreshKey` to define
+granular update settings. Set `refreshKey.updateWindow` to the interval in which
+your data can change and `buildRangeStart` to the earliest point of time when
+history should be available.
 
-In the following example, `refresh_key.update_window` is `1 week` and
-`build_range_start` is `SELECT NOW() - interval '365 day'`, so the scheduled
+In the following example, `refreshKey.updateWindow` is `1 week` and
+`buildRangeStart` is `SELECT NOW() - interval '365 day'`, so the scheduled
 refresh will build historical partitions for 365 days in the past and will only
 refresh last week's data.
 
@@ -1246,20 +1246,20 @@ refresh last week's data.
 cube(`Orders`, {
   sql: `SELECT * FROM orders`,
 
-  pre_aggregations: {
+  preAggregations: {
     main: {
       measures: [CUBE.count],
-      time_dimension: CUBE.created_at,
+      timeDimension: CUBE.created_at,
       granularity: `day`,
-      partition_granularity: `month`,
-      build_range_start: {
+      partitionGranularity: `month`,
+      buildRangeStart: {
         sql: `SELECT NOW() - interval '365 day'`,
       },
-      build_range_end: {
+      buildRangeEnd: {
         sql: `SELECT NOW()`,
       },
-      refresh_key: {
-        update_window: `1 week`,
+      refreshKey: {
+        updateWindow: `1 week`,
       },
     },
   },
@@ -1286,23 +1286,23 @@ cubes:
 
 </CodeTabs>
 
-### <--{"id" : "Parameters"}--> union_with_source_data
+### <--{"id" : "Parameters"}--> unionWithSourceData
 
 This option allows combining a pre-aggregation with fresh data retrieved from
 the data source; this is extremely useful in scenarios where latency can be
 sacrificed for accuracy.
 
 To configure a pre-aggregation to behave in this way, ensure the pre-aggregation
-is of type `rollupLambda`, and then set `union_with_source_data` to `true`:
+is of type `rollupLambda`, and then set `unionWithSourceData` to `true`:
 
 <CodeTabs>
 
 ```javascript
 cube(`Orders`, {
-  pre_aggregations: {
+  preAggregations: {
     lambda: {
       type: `rollupLambda`,
-      union_with_source_data: true,
+      unionWithSourceData: true,
       rollups: [Orders.main],
     },
   },
@@ -1315,7 +1315,7 @@ cubes:
     pre_aggregations:
       - name: lambda
         type: rollupLambda
-        union_with_source_data: true
+        unionWithSourceData: true
         rollups: [Orders.main]
 ```
 
@@ -1333,11 +1333,11 @@ follows:
 cube(`Orders`, {
   sql: `SELECT * FROM orders`,
 
-  pre_aggregations: {
+  preAggregations: {
     categoryAndDate: {
       measures: [CUBE.count],
       dimensions: [CUBE.category],
-      time_dimension: CUBE.created_at,
+      timeDimension: CUBE.created_at,
       granularity: `day`,
       indexes: {
         categoryIndex: {
@@ -1386,7 +1386,7 @@ used:
 cube(`Orders`, {
   sql: `SELECT * FROM orders`,
 
-  pre_aggregations: {
+  preAggregations: {
     main: {
       type: `originalSql`,
       indexes: {
@@ -1440,11 +1440,11 @@ definition:
 
 ```javascript
 cube(`Orders`, {
-  pre_aggregations: {
+  preAggregations: {
     categoryAndDate: {
       measures: [CUBE.count],
       dimensions: [CUBE.status],
-      time_dimension: CUBE.created_at,
+      timeDimension: CUBE.created_at,
       granularity: `day`,
       indexes: {
         categoryIndex: {
