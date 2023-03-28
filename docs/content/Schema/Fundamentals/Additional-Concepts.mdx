@@ -34,12 +34,12 @@ cube(`Orders`, {
 
   joins: {
     Users: {
-      relationship: `belongs_to`,
+      relationship: `belongsTo`,
       sql: `${CUBE}.user_id = ${Users.id}`,
     },
 
     Products: {
-      relationship: `belongs_to`,
+      relationship: `belongsTo`,
       sql: `${CUBE}.product_id = ${Products.id}`,
     },
   },
@@ -49,7 +49,7 @@ cube(`Orders`, {
       type: `count`,
       // Here we define all possible properties we might want
       // to "drill down" on from our front-end
-      drill_members: [id, status, Products.name, Users.city],
+      drillMembers: [id, status, Products.name, Users.city],
     },
   },
 
@@ -57,7 +57,7 @@ cube(`Orders`, {
     id: {
       type: `number`,
       sql: `id`,
-      primary_key: true,
+      primaryKey: true,
       shown: true,
     },
 
@@ -72,22 +72,22 @@ cube(`Orders`, {
 ```yaml
 cubes:
   - name: Orders
-    sql: 'SELECT * FROM orders'
+    sql: "SELECT * FROM orders"
 
     joins:
       - name: Users
         relationship: belongs_to
-        sql: '{CUBE}.user_id = {Users}.id'
+        sql: "{CUBE}.user_id = {Users}.id"
       - name: Products
         relationship: belongs_to
-        sql: '{CUBE}.product_id = {Products}.id'
+        sql: "{CUBE}.product_id = {Products}.id"
 
     measures:
       - name: count
         type: count
         # Here we define all possible properties we might want
         # to "drill down" on from our front-end
-        drill_members:
+        drillMembers:
           - id
           - status
           - Products.name
@@ -147,7 +147,7 @@ GROUP BY 1
 ```
 
 Cube makes subqueries easy and efficient. Subqueries are defined as regular
-dimensions with the parameter `sub_query` set to true.
+dimensions with the parameter `subQuery` set to true.
 
 <CodeTabs>
 
@@ -175,7 +175,7 @@ cube(`SalesManagers`, {
 
   joins: {
     Deals: {
-      relationship: `has_many`,
+      relationship: `hasMany`,
       sql: `${CUBE}.id = ${Deals.salesManagerId}`,
     },
   },
@@ -191,13 +191,13 @@ cube(`SalesManagers`, {
     id: {
       sql: `id`,
       type: `string`,
-      primary_key: true,
+      primaryKey: true,
     },
 
     deals_amount: {
       sql: `${Deals.amount}`,
       type: `number`,
-      sub_query: true,
+      subQuery: true,
     },
   },
 });
@@ -219,11 +219,11 @@ cubes:
     joins:
       - name: Deals
         relationship: has_many
-        sql: '{SalesManagers}.id = {Deals}.sales_manager_id'
+        sql: "{SalesManagers}.id = {Deals}.sales_manager_id"
 
     measures:
       - name: average_deal_amount
-        sql: '{CUBE.deals_amount}'
+        sql: "{CUBE.deals_amount}"
         type: avg
 
     dimensions:
@@ -232,7 +232,7 @@ cubes:
         type: string
         primary_key: true
       - name: deals_amount
-        sql: '{Deals.amount}'
+        sql: "{Deals.amount}"
         type: number
         sub_query: true
 ```
@@ -266,7 +266,7 @@ cube(`SalesManagers`, {
     deals_amount: {
       sql: `SUM(${Deals.amount})`, // Doesn't work, because `amount` is not a measure on `Deals`
       type: `number`,
-      sub_query: true,
+      subQuery: true,
     },
   },
 });
@@ -284,9 +284,9 @@ cubes:
   - name: SalesManagers
     dimensions:
       - name: deals_amount
-        sql: 'SUM({Deals}.amount)' # Doesn't work, because `amount` is not a measure on `Deals`
+        sql: "SUM({Deals}.amount)" # Doesn't work, because `amount` is not a measure on `Deals`
         type: number
-        sub_query: true
+        subQuery: true
 ```
 
 </CodeTabs>
@@ -310,12 +310,12 @@ cube(`SalesManagers`, {
     id: {
       sql: `id`,
       type: `string`,
-      primary_key: true,
+      primaryKey: true,
     },
     deals_amount: {
       sql: `${Deals.amount}`,
       type: `number`,
-      sub_query: true,
+      subQuery: true,
     },
   },
 });
@@ -326,7 +326,7 @@ cubes:
   - name: SalesManagers
     measures:
       - name: average_deals_amount
-        sql: '{CUBE.deals_amount}'
+        sql: "{CUBE.deals_amount}"
         type: avg
     dimensions:
       - name: id
@@ -334,7 +334,7 @@ cubes:
         type: string
         primary_key: true
       - name: deals_amount
-        sql: '{Deals.amount}'
+        sql: "{Deals.amount}"
         type: number
         sub_query: true
 ```
@@ -359,8 +359,8 @@ query will be generated:
 }
 ```
 
-If a query includes the `SalesManagers.average_deal_amount` measure, the
-following SQL will be generated:
+If a query includes the `SalesManagers.average_deal_amount` measure, the following
+SQL will be generated:
 
 ```sql
 SELECT

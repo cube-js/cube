@@ -105,7 +105,7 @@ cube(`monthlyRetention`, {
     totalActiveCount: {
       sql: `user_id`,
       type: `countDistinct`,
-      drill_members: [Users.id, Users.email],
+      drillMembers: [Users.id, Users.email],
       filters: [{ sql: `${CUBE}.monthly_pageviews > 0` }],
     },
 
@@ -113,12 +113,7 @@ cube(`monthlyRetention`, {
       sql: `100.0 * ${totalActiveCount} / nullif(${totalCount}, 0)`,
       type: `number`,
       format: `percent`,
-      drill_members: [
-        Users.email,
-        bots.team,
-        bots.lastSeen,
-        percentageOfActive,
-      ],
+      drillMembers: [Users.email, bots.team, bots.lastSeen, percentageOfActive],
     },
   },
 });

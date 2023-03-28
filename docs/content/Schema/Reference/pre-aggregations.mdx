@@ -75,7 +75,7 @@ query with.
 Cube supports the following types of pre-aggregations:
 
 - [`rollup`][self-rollup]
-- [`original_sql`][self-originalsql]
+- [`originalSql`][self-originalsql]
 - [`rollupJoin`][self-rollupjoin]
 - [`rollupLambda`][self-rolluplambda]
 
@@ -144,19 +144,19 @@ cubes:
 
 </CodeTabs>
 
-<h4 id="parameters-type-originalsql">original_sql</h4>
+<h4 id="parameters-type-originalsql">originalSql</h4>
 
 As the name suggests, it persists the results of the `sql` property of the cube.
-Pre-aggregations of type `original_sql` should **only** be used when the cube's
+Pre-aggregations of type `originalSql` should **only** be used when the cube's
 `sql` is a complex query (i.e. nested, window functions and/or multiple joins).
-We **strongly** recommend persisting results of `original_sql` only back to the
+We **strongly** recommend persisting results of `originalSql` only back to the
 source database.
 
 <WarningBox>
 
-`original_sql` pre-aggregations **must only** be used when [storing
+`originalSql` pre-aggregations **must only** be used when [storing
 pre-aggregations in the source database][ref-caching-using-preaggs-internal].
-While you can set `external: true` for `original_sql` pre-aggregation, this is
+While you can set `external: true` for `originalSql` pre-aggregation, this is
 not recommended or generally supported.
 
 </WarningBox>
@@ -181,7 +181,7 @@ cube(`CompletedOrders`, {
 
   pre_aggregations: {
     main: {
-      type: `original_sql`,
+      type: `originalSql`,
     },
   },
 });
@@ -193,7 +193,7 @@ cubes:
     sql: SELECT * FROM orders WHERE completed = true
     pre_aggregations:
       - name: main
-        type: original_sql
+        type: originalSql
 ```
 
 </CodeTabs>
@@ -222,11 +222,11 @@ to them.
 
 <WarningBox>
 
-`rollupJoin` is ephemeral pre-aggregation that relies on referenced rollups
- when queries are executed.
-Setting [`scheduled_refresh`](#parameters-scheduled-refresh) to `true` is
-unnecessary for `rollupJoin` and will result in an error.
-Appropriate freshness controls should be set on referenced rollups instead.
+`rollupJoin` is ephemeral pre-aggregation that relies on referenced rollups when
+queries are executed. Setting
+[`scheduledRefresh`](#parameters-scheduled-refresh) to `true` is unnecessary for
+`rollupJoin` and will result in an error. Appropriate freshness controls should
+be set on referenced rollups instead.
 
 </WarningBox>
 
@@ -234,7 +234,7 @@ In the following example, we have a `Users` cube with a `users_rollup`
 pre-aggregation, and an `Orders` cube with an `orders_rollup` pre-aggregation,
 and an `orders_with_users_rollup` pre-aggregation. Note the following:
 
-- Both cubes have different values for `data_source`.
+- Both cubes have different values for `dataSource`.
 - The type of `orders_with_users_rollup` is `rollupJoin`.
 - This pre-aggregation has a special property `rollups` which is an array
   containing references to both "source" rollups.
@@ -243,7 +243,7 @@ and an `orders_with_users_rollup` pre-aggregation. Note the following:
 
 ```javascript
 cube(`Users`, {
-  data_source: 'postgres',
+  dataSource: 'postgres',
   sql: `SELECT * FROM public.users`,
 
   pre_aggregations: {
@@ -263,7 +263,7 @@ cube(`Users`, {
       sql: `id`,
       type: `number`,
       // We need to set this field as the primary key for joins to work
-      primary_key: true,
+      primaryKey: true,
     },
     name: {
       sql: `first_name || last_name`,
@@ -273,7 +273,7 @@ cube(`Users`, {
 });
 
 cube('Orders', {
-  data_source: 'mssql',
+  dataSource: 'mssql',
   sql: `SELECT * FROM orders`,
 
   pre_aggregations: {
@@ -294,7 +294,7 @@ cube('Orders', {
 
   joins: {
     Users: {
-      relationship: `belongs_to`,
+      relationship: `belongsTo`,
       // Make sure the join uses dimensions on the cube, rather than
       // the column names from the underlying SQL
       sql: `${CUBE.user_id} = ${Users.id}`,
@@ -311,7 +311,7 @@ cube('Orders', {
     id: {
       sql: `id`,
       type: `number`,
-      primary_key: true,
+      primaryKey: true,
     },
     user_id: {
       sql: `user_id`,
@@ -332,7 +332,7 @@ cube('Orders', {
 ```yaml
 cubes:
   - name: Users
-    data_source: postgres
+    dataSource: postgres
     sql: SELECT * FROM public.users
     pre_aggregations:
       - name: users_rollup
@@ -348,11 +348,11 @@ cubes:
         type: number
         primary_key: true
       - name: name
-        sql: '{CUBE}.first_name || {CUBE}.last_name'
+        sql: "{CUBE}.first_name || {CUBE}.last_name"
         type: string
 
   - name: Orders
-    data_source: mssql
+    dataSource: mssql
     sql: SELECT * FROM orders
     pre_aggregations:
       - name: orders_rollup
@@ -368,7 +368,7 @@ cubes:
     joins:
       - name: Users
         relationship: belongs_to
-        sql: '{CUBE.user_id} = {Users.id}'
+        sql: "{CUBE.user_id} = {Users.id}"
     measures:
       - name: count
         type: count
@@ -783,7 +783,7 @@ cubes:
       - name: main
         measures: [CUBE.count]
         refresh_key:
-          sql: 'SELECT MAX(created_at) FROM orders'
+          sql: "SELECT MAX(created_at) FROM orders"
 ```
 
 </CodeTabs>
@@ -862,7 +862,7 @@ cubes:
         measures: [CUBE.count]
         refresh_key:
           every: 1 hour
-          sql: 'SELECT MAX(created_at) FROM orders'
+          sql: "SELECT MAX(created_at) FROM orders"
 ```
 
 </CodeTabs>
@@ -1041,10 +1041,10 @@ underlying SQL calculations every time it builds new rollup tables.
 
 <WarningBox>
 
-`original_sql` pre-aggregations **must only** be used when [storing
+`originalSql` pre-aggregations **must only** be used when [storing
 pre-aggregations in the source database][ref-caching-using-preaggs-internal].
-This also means that `original_sql` pre-aggregations require `readOnly: false`
-to be set on their respective database driver.
+This also means that `originalSql` pre-aggregations require `readOnly: false` to
+be set on their respective database driver.
 
 </WarningBox>
 
@@ -1062,7 +1062,7 @@ cube(`Orders`, {
 
   pre_aggregations: {
     main: {
-      type: `original_sql`,
+      type: `originalSql`,
     },
     statuses: {
       measures: [CUBE.count],
@@ -1083,11 +1083,14 @@ cube(`Orders`, {
 cubes:
   - name: Orders
     sql: >
-      SELECT * FROM orders1 UNION ALL SELECT * FROM orders2 UNION ALL SELECT *
-      FROM orders3
+      SELECT * FROM orders1
+      UNION ALL
+      SELECT * FROM orders2
+      UNION ALL
+      SELECT * FROM orders3
     pre_aggregations:
       - name: main
-        type: original_sql
+        type: originalSql
       - name: statuses
         measures: [CUBE.count]
         dimensions: [CUBE.status]
@@ -1160,9 +1163,9 @@ cubes:
 
 <WarningBox>
 
-Currently `build_range_start` and `build_range_end` do **not** have any effect
-on pre-aggregations without `partition_granularity`. This behavior may be
-changed in future versions of Cube.
+Currently `buildRangeStart` and `buildRangeEnd` doesn't have any effect on
+pre-aggregations without `partitionGranularity`. This behavior can be changed in
+future versions.
 
 </WarningBox>
 
@@ -1198,7 +1201,7 @@ cube(`Orders`, {
       time_dimension: CUBE.created_at,
       granularity: `day`,
       partition_granularity: `month`,
-      build_range_start: {
+      build_range_start: {        
         sql: `SELECT NOW() - interval '300 day'`,
       },
       build_range_end: {
@@ -1374,7 +1377,7 @@ from `GROUP BY` last. For range filter columns like `contains`, `>`, `<`, `>=`,
 before `GROUP BY` dimensions. Otherwise, for low selectivity range filters,
 consider putting these columns after `GROUP BY` dimensions.
 
-For `original_sql` pre-aggregations, the original column names as strings can be
+For `originalSql` pre-aggregations, the original column names as strings can be
 used:
 
 <CodeTabs>
@@ -1385,7 +1388,7 @@ cube(`Orders`, {
 
   pre_aggregations: {
     main: {
-      type: `original_sql`,
+      type: `originalSql`,
       indexes: {
         timestampIndex: {
           columns: ['timestamp'],
@@ -1402,7 +1405,7 @@ cubes:
     sql: SELECT * FROM orders
     pre_aggregations:
       - name: main
-        type: original_sql
+        type: originalSql
         indexes:
           - name: timestamp_index
             columns: [timestamp]
@@ -1492,6 +1495,7 @@ cubes:
 [ref-production-checklist-refresh]:
   /deployment/production-checklist#set-up-refresh-worker
 [ref-recipe-funnels]: /recipes/funnels
+[ref-sqlalias]: /schema/reference/cube#sql-alias
 [ref-schema-cube-naming]: /schema/reference/cube#naming
 [ref-schema-ref-cube-datasource]: /schema/reference/cube#parameters-data-source
 [ref-schema-dimensions]: /schema/reference/dimensions
