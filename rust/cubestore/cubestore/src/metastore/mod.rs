@@ -869,10 +869,6 @@ pub trait MetaStore: DIService + Send + Sync {
         &self,
         seconds_ago: i64,
     ) -> Result<Vec<IdRow<Partition>>, CubeError>;
-    async fn get_in_memory_chunks_deactivated_seconds_ago(
-        &self,
-        seconds_ago: i64,
-    ) -> Result<Vec<(Option<IdRow<Partition>>, Vec<IdRow<Chunk>>)>, CubeError>;
     async fn get_partitions_for_in_memory_compaction(
         &self,
         node: String,
@@ -2892,48 +2888,6 @@ impl MetaStore for RocksMetaStore {
             }
 
             Ok(partitions)
-        })
-        .await
-    }
-
-    #[tracing::instrument(level = "trace", skip(self))]
-    async fn get_in_memory_chunks_deactivated_seconds_ago(
-        &self,
-        seconds_ago: i64,
-    ) -> Result<Vec<(Option<IdRow<Partition>>, Vec<IdRow<Chunk>>)>, CubeError> {
-        self.read_operation_out_of_queue(move |db_ref| {
-            let chunks_table = ChunkRocksTable::new(db_ref.clone());
-
-            let now = Utc::now();
-            let mut result = Vec::new();
-            let mut partitions_map = HashMap::new();
-            for c in chunks_table.scan_all_rows()? {
-                let c = c?;
-                if !c.get_row().active()
-                    && c.get_row()
-                        .deactivated_at()
-                        .as_ref()
-                        .map(|deactivated_at| {
-                            now.signed_duration_since(deactivated_at.clone())
-                                .num_seconds()
-                                >= seconds_ago
-                        })
-                        .unwrap_or(false)
-                {
-                    partitions_map
-                        .entry(c.get_row().get_partition_id())
-                        .or_insert(Vec::new())
-                        .push(c);
-                }
-            }
-
-            let partitions_table = PartitionRocksTable::new(db_ref.clone());
-
-            for (id, chunks) in partitions_map.into_iter() {
-                result.push((partitions_table.get_row(id)?, chunks));
-            }
-
-            Ok(result)
         })
         .await
     }

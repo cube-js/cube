@@ -709,12 +709,6 @@ impl MetaStore for MetaStoreMock {
     ) -> Result<IdRow<Partition>, CubeError> {
         panic!("MetaStore mock!")
     }
-    async fn get_in_memory_chunks_deactivated_seconds_ago(
-        &self,
-        _seconds_ago: i64,
-    ) -> Result<Vec<(Option<IdRow<Partition>>, Vec<IdRow<Chunk>>)>, CubeError> {
-        panic!("MetaStore mock!")
-    }
     async fn get_partitions_for_in_memory_compaction(
         &self,
         _node: String,
