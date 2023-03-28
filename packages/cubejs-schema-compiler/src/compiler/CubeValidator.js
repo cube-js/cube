@@ -517,7 +517,7 @@ const cubeSchema = inherit(baseSchema, {
   sql: Joi.func(),
   sqlTable: Joi.func(),
 }).xor('sql', 'sqlTable').messages({
-  'object.xor': 'You must use only sql or sqlTable to define cube'
+  'object.xor': 'You must use either sql or sqlTable within a model, but not both'
 });
 
 const viewSchema = inherit(baseSchema, {

@@ -61,7 +61,7 @@ describe('Cube Validation', () => {
     const validationResult = cubeValidator.validate(cube, {
       error: (message, e) => {
         console.log(message);
-        expect(message).toContain('You must use only sql or sqlTable to define cube');
+        expect(message).toContain('You must use either sql or sqlTable within a model, but not both');
       }
     });
 
