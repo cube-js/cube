@@ -10,6 +10,7 @@ import type { CubeDictionary } from '../CubeDictionary';
 export const transpiledFieldsPatterns: Array<RegExp> = [
   /\.sql$/,
   /sql$/,
+  /sqlTable$/,
   /^measures\.[_a-zA-Z][_a-zA-Z0-9]*\.(drillMemberReferences|drillMembers)$/,
   /^preAggregations\.[_a-zA-Z][_a-zA-Z0-9]*\.indexes\.[_a-zA-Z][_a-zA-Z0-9]*\.columns$/,
   /^preAggregations\.[_a-zA-Z][_a-zA-Z0-9]*\.(timeDimensionReference|timeDimension|segments|dimensions|measures|rollups|segmentReferences|dimensionReferences|measureReferences|rollupReferences)$/,

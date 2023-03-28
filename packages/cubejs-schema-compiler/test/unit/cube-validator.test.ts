@@ -15,6 +15,77 @@ describe('Cube Validation', () => {
     console.log('CubePropContextTranspiler.transpiledFieldsPatterns =', transpiledFieldsPatterns);
   });
 
+  it('cube defined with sql - correct', async () => {
+    const cubeValidator = new CubeValidator(new CubeSymbols());
+    const cube = {
+      name: 'name',
+      sql: () => 'SELECT * FROM public.Users',
+      fileName: 'fileName',
+    };
+
+    const validationResult = cubeValidator.validate(cube, {
+      error: (message, e) => {
+        console.log(message);
+      }
+    });
+
+    expect(validationResult.error).toBeFalsy();
+  });
+
+  it('cube defined with sql_table - correct', async () => {
+    const cubeValidator = new CubeValidator(new CubeSymbols());
+    const cube = {
+      name: 'name',
+      sql: () => 'public.Users',
+      fileName: 'fileName',
+    };
+
+    const validationResult = cubeValidator.validate(cube, {
+      error: (message, e) => {
+        console.log(message);
+      }
+    });
+
+    expect(validationResult.error).toBeFalsy();
+  });
+
+  it('cube defined with sql and sql_table - fail', async () => {
+    const cubeValidator = new CubeValidator(new CubeSymbols());
+    const cube = {
+      name: 'name',
+      sql: () => 'SELECT * FROM public.Users',
+      sql_table: () => 'public.Users',
+      fileName: 'fileName',
+    };
+
+    const validationResult = cubeValidator.validate(cube, {
+      error: (message, e) => {
+        console.log(message);
+        expect(message).toContain('You must use only sql or sql_table to define cube');
+      }
+    });
+
+    expect(validationResult.error).toBeTruthy();
+  });
+
+  it('view defined by includes - correct', async () => {
+    const cubeValidator = new CubeValidator(new CubeSymbols());
+    const cube = {
+      name: 'name',
+      // it's a hidden field which we use internally
+      isView: true,
+      fileName: 'fileName',
+    };
+
+    const validationResult = cubeValidator.validate(cube, {
+      error: (message, e) => {
+        console.log(message);
+      }
+    });
+
+    expect(validationResult.error).toBeFalsy();
+  });
+
   it('refreshKey alternatives', async () => {
     const cubeValidator = new CubeValidator(new CubeSymbols());
     const cube = {
