@@ -4,6 +4,8 @@ pub mod transport;
 #[cfg(not(target_os = "windows"))]
 pub mod worker_pool;
 
+mod memory_compaction_runner;
+
 #[cfg(not(target_os = "windows"))]
 use crate::cluster::worker_pool::{worker_main, MessageProcessor, WorkerPool};
 
@@ -48,6 +50,7 @@ use futures::{Future, Stream};
 use futures_timer::Delay;
 use itertools::Itertools;
 use log::{debug, error, info, warn};
+use memory_compaction_runner::MemoryCompactionRunner;
 use mockall::automock;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -128,6 +131,11 @@ pub trait Cluster: DIService + Send + Sync {
     ) -> Result<(), CubeError>;
 
     async fn free_memory_chunk(&self, node_name: &str, chunk_id: u64) -> Result<(), CubeError>;
+    async fn free_deleted_memory_chunks(
+        &self,
+        node_name: &str,
+        chunk_ids: Vec<u64>,
+    ) -> Result<(), CubeError>;
 
     fn job_result_listener(&self) -> JobResultListener;
 
@@ -435,6 +443,23 @@ impl Cluster for ClusterImpl {
         }
     }
 
+    async fn free_deleted_memory_chunks(
+        &self,
+        node_name: &str,
+        chunk_ids: Vec<u64>,
+    ) -> Result<(), CubeError> {
+        let response = self
+            .send_or_process_locally(
+                node_name,
+                NetworkMessage::FreeDeletedMemoryChunks(chunk_ids),
+            )
+            .await?;
+        match response {
+            NetworkMessage::FreeDeletedMemoryChunksResult(r) => r,
+            x => panic!("Unexpected result for add chunk: {:?}", x),
+        }
+    }
+
     fn job_result_listener(&self) -> JobResultListener {
         JobResultListener {
             receiver: self.meta_store_sender.subscribe(),
@@ -573,8 +598,21 @@ impl Cluster for ClusterImpl {
                 let res = chunk_store.free_memory_chunk(chunk_id).await;
                 NetworkMessage::FreeMemoryChunkResult(res)
             }
+            NetworkMessage::FreeDeletedMemoryChunks(ids) => {
+                let chunk_store = self
+                    .injector
+                    .upgrade()
+                    .unwrap()
+                    .get_service_typed::<dyn ChunkDataStore>()
+                    .await;
+                let res = chunk_store.free_deleted_memory_chunks(ids).await;
+                NetworkMessage::FreeDeletedMemoryChunksResult(res)
+            }
             NetworkMessage::FreeMemoryChunkResult(_) => {
-                panic!("AddChunkResult sent to worker");
+                panic!("FreeMemoryChunkResult sent to worker");
+            }
+            NetworkMessage::FreeDeletedMemoryChunksResult(_) => {
+                panic!("FreeDeletedMemoryChunksResult sent to worker");
             }
             NetworkMessage::MetaStoreCall(_) | NetworkMessage::MetaStoreCallResult(_) => {
                 panic!("MetaStoreCall sent to worker");
@@ -890,9 +928,25 @@ impl JobRunner {
                 if let RowKey::Table(TableId::Partitions, partition_id) = job.row_reference() {
                     let compaction_service = self.compaction_service.clone();
                     let partition_id = *partition_id;
+                    log::warn!(
+                        "JobType::InMemoryChunksCompaction is deprecated and should not be used"
+                    );
                     Ok(cube_ext::spawn(async move {
                         compaction_service
                             .compact_in_memory_chunks(partition_id)
+                            .await
+                    }))
+                } else {
+                    Self::fail_job_row_key(job)
+                }
+            }
+            JobType::NodeInMemoryChunksCompaction(_) => {
+                if let RowKey::Table(TableId::Tables, _) = job.row_reference() {
+                    let compaction_service = self.compaction_service.clone();
+                    let node_name = self.server_name.clone();
+                    Ok(cube_ext::spawn(async move {
+                        compaction_service
+                            .compact_node_in_memory_chunks(node_name)
                             .await
                     }))
                 } else {
@@ -1074,6 +1128,15 @@ impl ClusterImpl {
             }));
         }
 
+        let memory_compaction_runner = MemoryCompactionRunner::new(
+            self.config_obj.clone(),
+            self.injector.upgrade().unwrap().get_service_typed().await,
+            self.server_name.clone(),
+            self.stop_token.clone(),
+        );
+        futures.push(MemoryCompactionRunner::spawn_processing_loop(
+            memory_compaction_runner.clone(),
+        ));
         let stop_token = self.stop_token.clone();
         let long_running_job_notify = self.long_running_job_notify.clone();
         let job_notify = self.job_notify.clone();

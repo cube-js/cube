@@ -797,6 +797,10 @@ pub trait MetaStore: DIService + Send + Sync {
     fn partition_table(&self) -> PartitionMetaStoreTable;
     async fn create_partition(&self, partition: Partition) -> Result<IdRow<Partition>, CubeError>;
     async fn get_partition(&self, partition_id: u64) -> Result<IdRow<Partition>, CubeError>;
+    async fn get_partition_out_of_queue(
+        &self,
+        partition_id: u64,
+    ) -> Result<IdRow<Partition>, CubeError>;
     async fn get_partition_for_compaction(
         &self,
         partition_id: u64,
@@ -843,6 +847,26 @@ pub trait MetaStore: DIService + Send + Sync {
         &self,
         seconds_ago: i64,
     ) -> Result<Vec<IdRow<Partition>>, CubeError>;
+    async fn get_in_memory_chunks_deactivated_seconds_ago(
+        &self,
+        seconds_ago: i64,
+    ) -> Result<Vec<(Option<IdRow<Partition>>, Vec<IdRow<Chunk>>)>, CubeError>;
+    async fn get_partitions_for_in_memory_compaction(
+        &self,
+        node: String,
+    ) -> Result<
+        Vec<(
+            IdRow<Partition>,
+            IdRow<Index>,
+            IdRow<Table>,
+            Vec<IdRow<Chunk>>,
+        )>,
+        CubeError,
+    >;
+    async fn get_all_node_in_memory_chunks(
+        &self,
+        node: String,
+    ) -> Result<Vec<IdRow<Chunk>>, CubeError>;
     async fn get_chunks_without_partition_created_seconds_ago(
         &self,
         seconds_ago: i64,
@@ -857,6 +881,10 @@ pub trait MetaStore: DIService + Send + Sync {
     ) -> Result<IdRow<Index>, CubeError>;
     async fn get_default_index(&self, table_id: u64) -> Result<IdRow<Index>, CubeError>;
     async fn get_table_indexes(&self, table_id: u64) -> Result<Vec<IdRow<Index>>, CubeError>;
+    async fn get_table_indexes_out_of_queue(
+        &self,
+        table_id: u64,
+    ) -> Result<Vec<IdRow<Index>>, CubeError>;
     async fn get_active_partitions_by_index_id(
         &self,
         index_id: u64,
@@ -1062,7 +1090,7 @@ pub trait MetaStore: DIService + Send + Sync {
         &self,
         old_ids: Vec<u64>,
         new_seq_pointer: Option<Vec<Option<SeqPointer>>>,
-    ) -> Result<IdRow<ReplayHandle>, CubeError>;
+    ) -> Result<Option<IdRow<ReplayHandle>>, CubeError>;
 
     async fn get_tables_with_indexes(
         &self,
@@ -2262,6 +2290,18 @@ impl MetaStore for RocksMetaStore {
         .await
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
+    async fn get_partition_out_of_queue(
+        &self,
+        partition_id: u64,
+    ) -> Result<IdRow<Partition>, CubeError> {
+        self.read_operation_out_of_queue(move |db_ref| {
+            PartitionRocksTable::new(db_ref).get_row_or_not_found(partition_id)
+        })
+        .await
+    }
+
+    #[tracing::instrument(level = "trace", skip(self))]
     async fn get_partition_for_compaction(
         &self,
         partition_id: u64,
@@ -2803,6 +2843,172 @@ impl MetaStore for RocksMetaStore {
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
+    async fn get_in_memory_chunks_deactivated_seconds_ago(
+        &self,
+        seconds_ago: i64,
+    ) -> Result<Vec<(Option<IdRow<Partition>>, Vec<IdRow<Chunk>>)>, CubeError> {
+        self.read_operation_out_of_queue(move |db_ref| {
+            let chunks_table = ChunkRocksTable::new(db_ref.clone());
+
+            let now = Utc::now();
+            let mut result = Vec::new();
+            let mut partitions_map = HashMap::new();
+            for c in chunks_table.scan_all_rows()? {
+                let c = c?;
+                if !c.get_row().active()
+                    && c.get_row()
+                        .deactivated_at()
+                        .as_ref()
+                        .map(|deactivated_at| {
+                            now.signed_duration_since(deactivated_at.clone())
+                                .num_seconds()
+                                >= seconds_ago
+                        })
+                        .unwrap_or(false)
+                {
+                    partitions_map
+                        .entry(c.get_row().get_partition_id())
+                        .or_insert(Vec::new())
+                        .push(c);
+                }
+            }
+
+            let partitions_table = PartitionRocksTable::new(db_ref.clone());
+
+            for (id, chunks) in partitions_map.into_iter() {
+                result.push((partitions_table.get_row(id)?, chunks));
+            }
+
+            Ok(result)
+        })
+        .await
+    }
+
+    #[tracing::instrument(level = "trace", skip(self))]
+    async fn get_partitions_for_in_memory_compaction(
+        &self,
+        node: String,
+    ) -> Result<
+        Vec<(
+            IdRow<Partition>,
+            IdRow<Index>,
+            IdRow<Table>,
+            Vec<IdRow<Chunk>>,
+        )>,
+        CubeError,
+    > {
+        let config = self.store.config.clone();
+        let partitions = self
+            .read_operation_out_of_queue(move |db_ref| {
+                let partitions_table = PartitionRocksTable::new(db_ref.clone());
+                partitions_table.get_rows_by_index(
+                    &PartitionIndexKey::ByActive(true),
+                    &PartitionRocksIndex::Active,
+                )
+            })
+            .await?
+            .into_iter()
+            .filter(|p| {
+                p.get_row().multi_partition_id.is_none()
+                    && node_name_by_partition(config.as_ref(), &p) == node
+            })
+            .collect::<Vec<_>>();
+
+        let index_ids = partitions
+            .iter()
+            .map(|p| p.get_row().get_index_id())
+            .unique()
+            .collect::<Vec<_>>();
+        let indices = self
+            .read_operation_out_of_queue(move |db_ref| {
+                let mut indices = HashMap::new();
+                let index_table = IndexRocksTable::new(db_ref);
+                for index_id in index_ids {
+                    let index = index_table.get_row_or_not_found(index_id)?;
+                    indices.insert(index_id, index);
+                }
+                Ok(indices)
+            })
+            .await?;
+
+        let table_ids = indices
+            .values()
+            .map(|i| i.get_row().table_id())
+            .unique()
+            .collect::<Vec<_>>();
+        let tables = self
+            .read_operation_out_of_queue(move |db_ref| {
+                let mut tables = HashMap::new();
+                let tables_table = TableRocksTable::new(db_ref);
+                for table_id in table_ids {
+                    let index = tables_table.get_row_or_not_found(table_id)?;
+                    tables.insert(table_id, index);
+                }
+                Ok(tables)
+            })
+            .await?;
+
+        let mut result = Vec::new();
+
+        for p in partitions {
+            let chunks = self
+                .get_chunks_by_partition_out_of_queue(p.get_id(), false)
+                .await?;
+            let index = indices
+                .get(&p.get_row().get_index_id())
+                .ok_or(CubeError::internal(format!(
+                    "index {} not found",
+                    p.get_row().get_index_id()
+                )))?;
+            let table = tables
+                .get(&index.get_row().table_id())
+                .ok_or(CubeError::internal(format!(
+                    "table {} not found",
+                    index.get_row().table_id()
+                )))?;
+            result.push((p, index.clone(), table.clone(), chunks));
+        }
+
+        Ok(result)
+    }
+
+    #[tracing::instrument(level = "trace", skip(self))]
+    async fn get_all_node_in_memory_chunks(
+        &self,
+        node: String,
+    ) -> Result<Vec<IdRow<Chunk>>, CubeError> {
+        let config = self.store.config.clone();
+        self.read_operation_out_of_queue(move |db_ref| {
+            let chunks_table = ChunkRocksTable::new(db_ref.clone());
+            let partitions_table = PartitionRocksTable::new(db_ref.clone());
+
+            let mut partitions_map = HashMap::new();
+            for c in chunks_table.scan_all_rows()? {
+                let c = c?;
+                if c.get_row().in_memory() {
+                    partitions_map
+                        .entry(c.get_row().get_partition_id())
+                        .or_insert(Vec::new())
+                        .push(c);
+                }
+            }
+
+            let mut result = Vec::new();
+
+            for (id, mut chunks) in partitions_map.into_iter() {
+                if let Some(partition) = partitions_table.get_row(id)? {
+                    if node_name_by_partition(config.as_ref(), &partition) == node {
+                        result.append(&mut chunks);
+                    }
+                }
+            }
+
+            Ok(result)
+        })
+        .await
+    }
+
+    #[tracing::instrument(level = "trace", skip(self))]
     async fn get_chunks_without_partition_created_seconds_ago(
         &self,
         seconds_ago: i64,
@@ -2910,11 +3116,24 @@ impl MetaStore for RocksMetaStore {
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
+    async fn get_table_indexes_out_of_queue(
+        &self,
+        table_id: u64,
+    ) -> Result<Vec<IdRow<Index>>, CubeError> {
+        self.read_operation_out_of_queue(move |db_ref| {
+            let index_table = IndexRocksTable::new(db_ref);
+            Ok(index_table
+                .get_rows_by_index(&IndexIndexKey::TableId(table_id), &IndexRocksIndex::TableID)?)
+        })
+        .await
+    }
+
+    #[tracing::instrument(level = "trace", skip(self))]
     async fn get_active_partitions_by_index_id(
         &self,
         index_id: u64,
     ) -> Result<Vec<IdRow<Partition>>, CubeError> {
-        self.read_operation(move |db_ref| {
+        self.read_operation_out_of_queue(move |db_ref| {
             let rocks_partition = PartitionRocksTable::new(db_ref);
             // TODO iterate over range
             Ok(rocks_partition
@@ -3141,12 +3360,11 @@ impl MetaStore for RocksMetaStore {
         self.write_operation(move |db_ref, batch_pipe| {
             let rocks_chunk = ChunkRocksTable::new(db_ref.clone());
             let mut result = Vec::with_capacity(chunks.len());
-
             for chunk in chunks.into_iter() {
                 let id_row = rocks_chunk.insert(chunk, batch_pipe)?;
+
                 result.push(id_row);
             }
-
             Ok(result)
         })
         .await
@@ -3787,7 +4005,7 @@ impl MetaStore for RocksMetaStore {
         &self,
         table_id: u64,
     ) -> Result<Vec<IdRow<ReplayHandle>>, CubeError> {
-        self.read_operation(move |db_ref| {
+        self.read_operation_out_of_queue(move |db_ref| {
             Ok(ReplayHandleRocksTable::new(db_ref).get_rows_by_index(
                 &ReplayHandleIndexKey::ByTableId(table_id),
                 &ReplayHandleRocksIndex::ByTableId,
@@ -3837,7 +4055,7 @@ impl MetaStore for RocksMetaStore {
         &self,
         old_ids: Vec<u64>,
         new_seq_pointer: Option<Vec<Option<SeqPointer>>>,
-    ) -> Result<IdRow<ReplayHandle>, CubeError> {
+    ) -> Result<Option<IdRow<ReplayHandle>>, CubeError> {
         self.write_operation(move |db_ref, batch_pipe| {
             if old_ids.is_empty() {
                 return Err(CubeError::internal("Can't merge empty replay handles list".to_string()));
@@ -3874,8 +4092,14 @@ impl MetaStore for RocksMetaStore {
                 }
                 replay_handles.push(replay_handle);
             }
-            let new_replay_handle = ReplayHandle::new_from_seq_pointers(replay_handles[0].get_row().table_id(), new_seq_pointer);
-            let new_handle = table.insert(new_replay_handle, batch_pipe)?;
+            let new_handle = if let Some(_) = new_seq_pointer {
+                let new_replay_handle = ReplayHandle::new_from_seq_pointers(replay_handles[0].get_row().table_id(), new_seq_pointer);
+                Some(table.insert(new_replay_handle, batch_pipe)?)
+
+            } else {
+                None
+            };
+
             for handle in replay_handles.iter() {
                 table.delete(handle.get_id(), batch_pipe)?;
             }
@@ -3895,7 +4119,7 @@ impl MetaStore for RocksMetaStore {
     async fn all_replay_handles_to_merge(
         &self,
     ) -> Result<Vec<(IdRow<ReplayHandle>, bool)>, CubeError> {
-        self.read_operation(move |db_ref| {
+        self.read_operation_out_of_queue(move |db_ref| {
             let all_replay_handles = ReplayHandleRocksTable::new(db_ref.clone()).all_rows()?;
             let chunks_table = ChunkRocksTable::new(db_ref);
             let mut result = Vec::new();

@@ -388,16 +388,21 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         for index in Self::indexes().iter() {
             let hash = index.key_hash(&row);
             let index_val = index.index_key_by(&row);
-            let existing_keys =
-                self.get_row_from_index(index.get_id(), &index_val, &hash.to_be_bytes().to_vec())?;
-            if index.is_unique() && existing_keys.len() > 0 {
-                return Err(CubeError::user(
-                    format!(
-                        "Unique constraint violation: row {:?} has a key that already exists in {:?} index",
-                        &row,
-                        index
-                    )
-                ));
+            if index.is_unique() {
+                let existing_keys = self.get_row_from_index(
+                    index.get_id(),
+                    &index_val,
+                    &hash.to_be_bytes().to_vec(),
+                )?;
+                if existing_keys.len() > 0 {
+                    return Err(CubeError::user(
+                        format!(
+                            "Unique constraint violation: row {:?} has a key that already exists in {:?} index",
+                            &row,
+                            index
+                        )
+                    ));
+                }
             }
         }
 

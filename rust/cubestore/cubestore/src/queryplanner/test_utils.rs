@@ -622,19 +622,11 @@ impl MetaStore for MetaStoreMock {
         panic!("MetaStore mock!")
     }
 
-    async fn update_replay_handle_failed_if_exists(
-        &self,
-        _id: u64,
-        _failed: bool,
-    ) -> Result<(), CubeError> {
-        panic!("MetaStore mock!")
-    }
-
     async fn replace_replay_handles(
         &self,
         _old_ids: Vec<u64>,
         _new_seq_pointer: Option<Vec<Option<SeqPointer>>>,
-    ) -> Result<IdRow<ReplayHandle>, CubeError> {
+    ) -> Result<Option<IdRow<ReplayHandle>>, CubeError> {
         panic!("MetaStore mock!")
     }
 
@@ -664,6 +656,38 @@ impl MetaStore for MetaStoreMock {
     async fn set_current_snapshot(&self, _snapshot_id: u128) -> Result<(), CubeError> {
         panic!("MetaStore mock!")
     }
+    async fn get_partition_out_of_queue(
+        &self,
+        _partition_id: u64,
+    ) -> Result<IdRow<Partition>, CubeError> {
+        panic!("MetaStore mock!")
+    }
+    async fn get_in_memory_chunks_deactivated_seconds_ago(
+        &self,
+        _seconds_ago: i64,
+    ) -> Result<Vec<(Option<IdRow<Partition>>, Vec<IdRow<Chunk>>)>, CubeError> {
+        panic!("MetaStore mock!")
+    }
+    async fn get_partitions_for_in_memory_compaction(
+        &self,
+        _node: String,
+    ) -> Result<
+        Vec<(
+            IdRow<Partition>,
+            IdRow<Index>,
+            IdRow<Table>,
+            Vec<IdRow<Chunk>>,
+        )>,
+        CubeError,
+    > {
+        panic!("MetaStore mock!")
+    }
+    async fn get_table_indexes_out_of_queue(
+        &self,
+        _table_id: u64,
+    ) -> Result<Vec<IdRow<Index>>, CubeError> {
+        panic!("MetaStore mock!")
+    }
     async fn get_chunks_out_of_queue(
         &self,
         _ids: Vec<u64>,
@@ -677,6 +701,19 @@ impl MetaStore for MetaStoreMock {
         panic!("MetaStore mock!")
     }
     async fn delete_chunks_without_checks(&self, _chunk_ids: Vec<u64>) -> Result<(), CubeError> {
+        panic!("MetaStore mock!")
+    }
+    async fn update_replay_handle_failed_if_exists(
+        &self,
+        _id: u64,
+        _failed: bool,
+    ) -> Result<(), CubeError> {
+        panic!("MetaStore mock!")
+    }
+    async fn get_all_node_in_memory_chunks(
+        &self,
+        _node: String,
+    ) -> Result<Vec<IdRow<Chunk>>, CubeError> {
         panic!("MetaStore mock!")
     }
     async fn get_chunks_without_partition_created_seconds_ago(

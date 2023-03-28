@@ -33,6 +33,13 @@ impl WorkerLoop {
         }
     }
 
+    pub fn new_with_stopped_token(name: &str, stopped_token: CancellationToken) -> Self {
+        Self {
+            name: name.to_string(),
+            stopped_token,
+        }
+    }
+
     pub async fn process<T, S, F, FR>(
         &self,
         service: Arc<S>,

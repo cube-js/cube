@@ -52,6 +52,7 @@ use tokio::task::JoinHandle;
 pub trait CompactionService: DIService + Send + Sync {
     async fn compact(&self, partition_id: u64) -> Result<(), CubeError>;
     async fn compact_in_memory_chunks(&self, partition_id: u64) -> Result<(), CubeError>;
+    async fn compact_node_in_memory_chunks(&self, node: String) -> Result<(), CubeError>;
     /// Split multi-partition that has too many rows. Figures out the keys based on stored data.
     async fn split_multi_partition(&self, multi_partition_id: u64) -> Result<(), CubeError>;
     /// Process partitions that were added concurrently with multi-split.
@@ -86,6 +87,103 @@ impl CompactionServiceImpl {
         })
     }
 
+    fn is_compaction_needed(&self, chunks: &Vec<IdRow<Chunk>>) -> bool {
+        let compaction_in_memory_chunks_count_threshold = 5;
+        //self.config.compaction_in_memory_chunks_count_threshold();
+
+        let oldest_insert_at = chunks
+            .iter()
+            .filter_map(|c| c.get_row().oldest_insert_at().clone())
+            .min();
+
+        chunks.len() > compaction_in_memory_chunks_count_threshold
+            || oldest_insert_at
+                .map(|min| {
+                    Utc::now().signed_duration_since(min).num_seconds()
+                        > self
+                            .config
+                            .compaction_in_memory_chunks_max_lifetime_threshold()
+                            as i64
+                })
+                .unwrap_or(false)
+    }
+
+    async fn compact_prepared_in_memory_chunks(
+        &self,
+        partition: IdRow<Partition>,
+        index: IdRow<Index>,
+        table: IdRow<Table>,
+        chunks: Vec<IdRow<Chunk>>,
+    ) -> Result<(), CubeError> {
+        // Test invariants
+        if !partition.get_row().is_active() && partition.get_row().multi_partition_id().is_some() {
+            log::trace!(
+                "Cannot compact inactive partition: {:?}",
+                partition.get_row()
+            );
+            return Ok(());
+        }
+
+        let compaction_in_memory_chunks_size_limit =
+            self.config.compaction_in_memory_chunks_size_limit();
+
+        let active_in_memory = chunks
+            .into_iter()
+            .filter(|c| c.get_row().in_memory() && c.get_row().active())
+            .collect::<Vec<_>>();
+        let chunk_and_inmemory = active_in_memory
+            .into_iter()
+            .map(|c| {
+                let chunk_store = self.chunk_store.clone();
+                let partition = partition.clone();
+                cube_ext::spawn(async move {
+                    let has_in_memory_chunk = chunk_store
+                        .has_in_memory_chunk(c.clone(), partition)
+                        .await?;
+                    Result::<_, CubeError>::Ok((c, has_in_memory_chunk))
+                })
+            })
+            .collect::<Vec<_>>();
+        let chunk_and_inmemory = join_all(chunk_and_inmemory)
+            .await
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()?;
+        let (in_memory, failed) = chunk_and_inmemory
+            .into_iter()
+            .partition::<Vec<_>, _>(|(_, has_in_memory_chunk)| *has_in_memory_chunk);
+        let (mem_chunks, persistent_chunks) =
+            in_memory.into_iter().map(|(c, _)| c).partition(|c| {
+                c.get_row().get_row_count() <= compaction_in_memory_chunks_size_limit
+                    && c.get_row()
+                        .oldest_insert_at()
+                        .map(|m| {
+                            Utc::now().signed_duration_since(m).num_seconds()
+                                <= self
+                                    .config
+                                    .compaction_in_memory_chunks_max_lifetime_threshold()
+                                    as i64
+                        })
+                        .unwrap_or(false)
+            });
+
+        let deactivate_res = self
+            .deactivate_and_mark_failed_chunks_for_replay(failed)
+            .await;
+        let in_memory_res = self
+            .compact_chunks_to_memory(mem_chunks, &partition, &index, &table)
+            .await;
+        let persistent_res = self
+            .compact_chunks_to_persistent(persistent_chunks, &partition, &index, &table)
+            .await;
+        deactivate_res?;
+        in_memory_res?;
+        persistent_res?;
+
+        Ok(())
+    }
+
     async fn compact_chunks_to_memory(
         &self,
         mut chunks: Vec<IdRow<Chunk>>,
@@ -112,16 +210,9 @@ impl CompactionServiceImpl {
         let mut count = 0;
         let mut start = 0;
 
-        let ratio_threshold = self.config.compaction_in_memory_chunks_ratio_threshold();
-        let ratio_check_threshold = self
-            .config
-            .compaction_in_memory_chunks_ratio_check_threshold();
         for chunk in chunks.iter() {
             if count > 0 {
-                let chunk_size = chunk.get_row().get_row_count();
-                if (chunk_size > ratio_check_threshold && chunk_size > size * ratio_threshold)
-                    || size >= compaction_in_memory_chunks_size_limit
-                {
+                if size >= compaction_in_memory_chunks_size_limit {
                     if count > 1 {
                         compact_groups.push((start, start + count));
                         start = start + count;
@@ -405,7 +496,7 @@ impl CompactionService for CompactionServiceImpl {
                 .sum::<u64>()
                 + partition.get_row().main_table_row_count();
             // Split partitions ahead for more than actual compaction size. The trade off here is partition accuracy vs write amplification
-            let new_partitions_count = (div_ceil(
+            let new_partitions_count_by_rows = (div_ceil(
                 pending_rows,
                 table
                     .get_row()
@@ -413,6 +504,21 @@ impl CompactionService for CompactionServiceImpl {
             ) as usize)
                 // Do not allow to much of new partitions to limit partition accuracy trade off
                 .min(16);
+            let new_partitions_count_by_file_size =
+                if let Some(partition_file_size) = partition.get_row().file_size() {
+                    if pending_rows > self.config.min_partition_split_threshold() {
+                        let threshold = self.config.partition_size_split_threshold_bytes();
+                        (div_ceil(partition_file_size, threshold) as usize).min(16)
+                    } else {
+                        1
+                    }
+                } else {
+                    1
+                };
+
+            let new_partitions_count =
+                new_partitions_count_by_rows.max(new_partitions_count_by_file_size);
+
             for _ in 0..new_partitions_count {
                 new_partitions.push(
                     self.meta_store
@@ -660,92 +766,44 @@ impl CompactionService for CompactionServiceImpl {
         Ok(())
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
+    async fn compact_node_in_memory_chunks(&self, node: String) -> Result<(), CubeError> {
+        let candidates = self
+            .meta_store
+            .get_partitions_for_in_memory_compaction(node)
+            .await?;
+        let mut futures = Vec::new();
+
+        for (partition, index, table, chunks) in candidates.into_iter() {
+            if self.is_compaction_needed(&chunks) {
+                futures
+                    .push(self.compact_prepared_in_memory_chunks(partition, index, table, chunks));
+            }
+        }
+
+        join_all(futures)
+            .await
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(())
+    }
+
     async fn compact_in_memory_chunks(&self, partition_id: u64) -> Result<(), CubeError> {
-        let (partition, index, table, multi_part) = self
+        let (partition, index, table, _) = self
             .meta_store
             .get_partition_for_compaction(partition_id)
             .await?;
 
-        // Test invariants
-        if !partition.get_row().is_active() && !multi_part.is_some() {
-            log::trace!(
-                "Cannot compact inactive partition: {:?}",
-                partition.get_row()
-            );
-            return Ok(());
-        }
-        if let Some(mp) = &multi_part {
-            if mp.get_row().prepared_for_split() {
-                log::debug!(
-                    "Cancelled compaction of {}. It runs concurrently with multi-split",
-                    partition_id
-                );
-                return Ok(());
-            }
-        }
-
-        let compaction_in_memory_chunks_size_limit =
-            self.config.compaction_in_memory_chunks_size_limit();
-
-        // Get all in_memory and active chunks
-        let active_in_memory = self
+        let chunks = self
             .meta_store
             .get_chunks_by_partition(partition_id, false)
             .await?
             .into_iter()
             .filter(|c| c.get_row().in_memory() && c.get_row().active())
             .collect::<Vec<_>>();
-        let chunk_and_inmemory = active_in_memory
-            .into_iter()
-            .map(|c| {
-                let chunk_store = self.chunk_store.clone();
-                let partition = partition.clone();
-                cube_ext::spawn(async move {
-                    let has_in_memory_chunk = chunk_store
-                        .has_in_memory_chunk(c.clone(), partition)
-                        .await?;
-                    Result::<_, CubeError>::Ok((c, has_in_memory_chunk))
-                })
-            })
-            .collect::<Vec<_>>();
-        let chunk_and_inmemory = join_all(chunk_and_inmemory)
+
+        self.compact_prepared_in_memory_chunks(partition, index, table, chunks)
             .await
-            .into_iter()
-            .collect::<Result<Vec<_>, _>>()?
-            .into_iter()
-            .collect::<Result<Vec<_>, _>>()?;
-        let (in_memory, failed) = chunk_and_inmemory
-            .into_iter()
-            .partition::<Vec<_>, _>(|(_, has_in_memory_chunk)| *has_in_memory_chunk);
-        let (mem_chunks, persistent_chunks) =
-            in_memory.into_iter().map(|(c, _)| c).partition(|c| {
-                c.get_row().get_row_count() <= compaction_in_memory_chunks_size_limit
-                    && c.get_row()
-                        .oldest_insert_at()
-                        .map(|m| {
-                            Utc::now().signed_duration_since(m).num_seconds()
-                                <= self
-                                    .config
-                                    .compaction_in_memory_chunks_max_lifetime_threshold()
-                                    as i64
-                        })
-                        .unwrap_or(false)
-            });
-
-        let deactivate_res = self
-            .deactivate_and_mark_failed_chunks_for_replay(failed)
-            .await;
-        let in_memory_res = self
-            .compact_chunks_to_memory(mem_chunks, &partition, &index, &table)
-            .await;
-        let persistent_res = self
-            .compact_chunks_to_persistent(persistent_chunks, &partition, &index, &table)
-            .await;
-        deactivate_res?;
-        in_memory_res?;
-        persistent_res?;
-
-        Ok(())
     }
 
     async fn split_multi_partition(&self, multi_partition_id: u64) -> Result<(), CubeError> {
@@ -1410,6 +1468,14 @@ mod tests {
         config.expect_partition_split_threshold().returning(|| 20);
 
         config
+            .expect_partition_size_split_threshold_bytes()
+            .returning(|| 100 * 1024 * 1024);
+
+        config
+            .expect_min_partition_split_threshold()
+            .returning(|| 10);
+
+        config
             .expect_compaction_chunks_total_size_threshold()
             .returning(|| 30);
 
@@ -1859,6 +1925,63 @@ mod tests {
         let _ = DB::destroy(&Options::default(), path);
         let _ = fs::remove_dir_all(chunk_store_path.clone());
         let _ = fs::remove_dir_all(chunk_remote_store_path.clone());
+    }
+
+    #[tokio::test]
+    async fn partition_split_by_file_size() {
+        Config::test("partition_split_by_file_size")
+            .update_config(|mut c| {
+                c.partition_split_threshold = 2000;
+                c.in_memory_chunks_compaction_period_ms = 100000;
+                c.partition_size_split_threshold_bytes = 10000;
+                c
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
+                let _ = service.exec_query("CREATE SCHEMA test").await.unwrap();
+                let compaction_service = services
+                    .injector
+                    .get_service_typed::<dyn CompactionService>()
+                    .await;
+                service
+                    .exec_query("create table test.a (a varchar(255), b varchar(255))")
+                    .await
+                    .unwrap();
+                let values = (0..1000)
+                    .map(|i| format!("('{}{}', '{}{}')", i, "a".repeat(10), i, "b".repeat(10)))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                let query = format!("insert into test.a (a, b) values {}", values);
+                service.exec_query(&query).await.unwrap();
+                compaction_service.compact(1).await.unwrap();
+                let partitions = services
+                    .meta_store
+                    .get_active_partitions_by_index_id(1)
+                    .await
+                    .unwrap();
+                assert_eq!(partitions.len(), 1);
+                let values = (0..10)
+                    .map(|_| format!("('{}', '{}')", "a".repeat(10), "b".repeat(10)))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                let query = format!("insert into test.a (a, b) values {}", values);
+
+                service.exec_query(&query).await.unwrap();
+                compaction_service
+                    .compact(partitions[0].get_id())
+                    .await
+                    .unwrap();
+                let partitions = services
+                    .meta_store
+                    .get_active_partitions_by_index_id(1)
+                    .await
+                    .unwrap();
+                assert!(partitions.len() > 1);
+                for p in partitions.iter() {
+                    assert!(p.get_row().file_size().unwrap() <= 10000);
+                }
+            })
+            .await;
     }
 }
 

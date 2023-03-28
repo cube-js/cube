@@ -1805,6 +1805,7 @@ mod tests {
     use crate::queryplanner::query_executor::MockQueryExecutor;
     use crate::queryplanner::MockQueryPlanner;
     use crate::remotefs::{LocalDirRemoteFs, RemoteFile, RemoteFs};
+    use crate::store::compaction::CompactionService;
     use crate::store::ChunkStore;
 
     use super::*;
@@ -2967,7 +2968,7 @@ mod tests {
                 let last_active_partition = active_partitions.iter().next().unwrap();
 
                 // Wait for GC tasks to drop files
-                Delay::new(Duration::from_millis(3000)).await;
+                Delay::new(Duration::from_millis(4000)).await;
 
                 let remote_fs = services.injector.get_service_typed::<dyn RemoteFs>().await;
                 let files = remote_fs
@@ -3842,6 +3843,109 @@ mod tests {
                 .await
                 .expect_err("Validation should fail");
         }).await;
+    }
+    #[tokio::test]
+    async fn filter_query_chunks() {
+        Config::test("filter_query_chunks")
+            .start_test(async move |services| {
+                let service = services.sql_service;
+                let compaction_service = services
+                    .injector
+                    .get_service_typed::<dyn CompactionService>()
+                    .await;
+
+                let _ = service.exec_query("CREATE SCHEMA test").await.unwrap();
+                let remove_chunk_filename_re = Regex::new(r"files: .*\.chunk\.parquet").unwrap();
+                let remove_filename_re = Regex::new(r"files: .*\.parquet").unwrap();
+                service
+                    .exec_query("create table test.a (a int, b int)")
+                    .await
+                    .unwrap();
+                service
+                    .exec_query("insert into test.a (a, b) values (1, 2), (1, 3), (1, 4), (1, 5)")
+                    .await
+                    .unwrap();
+                compaction_service.compact(1).await.unwrap();
+                service
+                    .exec_query("insert into test.a (a, b) values (1, 6), (1, 7), (1, 8), (1, 9)")
+                    .await
+                    .unwrap();
+                service
+                    .exec_query("insert into test.a (a, b) values (1, 6), (2, 7), (2, 8), (2, 9)")
+                    .await
+                    .unwrap();
+
+                let plans = service
+                    .plan_query("SELECT * from test.a where a >= 1")
+                    .await
+                    .unwrap();
+
+                let worker_plan = &pp_phys_plan(plans.worker.as_ref());
+                let worker_plan =
+                    remove_chunk_filename_re.replace_all(&worker_plan, "files: chunk");
+                let worker_plan = remove_filename_re.replace_all(&worker_plan, "files: partition");
+
+                assert_eq!(
+                    worker_plan,
+                    "Worker\
+                 \n  Projection, [a, b]\
+                 \n    Filter\
+                 \n      Merge\
+                 \n        Scan, index: default:1:[1, 2], fields: *\
+                 \n          FilterByKeyRange\
+                 \n            ParquetScan, files: partition\
+                 \n          FilterByKeyRange\
+                 \n            ParquetScan, files: chunk\
+                 \n          FilterByKeyRange\
+                 \n            ParquetScan, files: chunk"
+                );
+
+                let plans = service
+                    .plan_query("SELECT * from test.a where a < 1")
+                    .await
+                    .unwrap();
+
+                let worker_plan = &pp_phys_plan(plans.worker.as_ref());
+                let worker_plan =
+                    remove_chunk_filename_re.replace_all(&worker_plan, "files: chunk");
+                let worker_plan = remove_filename_re.replace_all(&worker_plan, "files: partition");
+
+                assert_eq!(
+                    worker_plan,
+                    "Worker\
+                 \n  Projection, [a, b]\
+                 \n    Filter\
+                 \n      Merge\
+                 \n        Scan, index: default:1:[1, 2], fields: *\
+                 \n          FilterByKeyRange\
+                 \n            ParquetScan, files: partition"
+                );
+
+                let plans = service
+                    .plan_query("SELECT * from test.a where a >= 2")
+                    .await
+                    .unwrap();
+
+                let worker_plan = &pp_phys_plan(plans.worker.as_ref());
+                println!("wp {}", worker_plan);
+                let worker_plan =
+                    remove_chunk_filename_re.replace_all(&worker_plan, "files: chunk");
+                let worker_plan = remove_filename_re.replace_all(&worker_plan, "files: partition");
+
+                assert_eq!(
+                    worker_plan,
+                    "Worker\
+                 \n  Projection, [a, b]\
+                 \n    Filter\
+                 \n      Merge\
+                 \n        Scan, index: default:1:[1, 2], fields: *\
+                 \n          FilterByKeyRange\
+                 \n            ParquetScan, files: partition\
+                 \n          FilterByKeyRange\
+                 \n            ParquetScan, files: chunk"
+                );
+            })
+            .await;
     }
 }
 

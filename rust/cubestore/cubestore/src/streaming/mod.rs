@@ -1176,6 +1176,7 @@ mod tests {
             c.compaction_chunks_total_size_threshold = 100000;
             c.stale_stream_timeout = 1;
             c.wal_split_threshold = 1638;
+            c.in_memory_chunks_compaction_period_ms = 5000;
             c
         }).start_with_injector_override(async move |injector| {
             injector.register_typed::<dyn KsqlClient, _, _, _>(async move |_| {

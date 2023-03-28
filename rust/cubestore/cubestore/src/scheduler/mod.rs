@@ -46,9 +46,36 @@ pub struct SchedulerImpl {
     reconcile_loop: WorkerLoop,
     chunk_processing_loop: WorkerLoop,
     chunk_events_queue: Mutex<Vec<(SystemTime, u64)>>,
+    node_last_actions: Mutex<HashMap<String, LastNodeActionTimes>>,
 }
 
 crate::di_service!(SchedulerImpl, []);
+
+struct LastNodeActionTimes {
+    in_memory_compaction: SystemTime,
+    deleted_chunks_release: SystemTime,
+}
+
+impl LastNodeActionTimes {
+    pub fn new() -> Self {
+        Self {
+            in_memory_compaction: SystemTime::now(),
+            deleted_chunks_release: SystemTime::now(),
+        }
+    }
+    pub fn in_memory_compaction(&self) -> SystemTime {
+        self.in_memory_compaction.clone()
+    }
+    pub fn deleted_chunks_release(&self) -> SystemTime {
+        self.deleted_chunks_release.clone()
+    }
+    pub fn set_in_memory_compaction(&mut self, time: SystemTime) {
+        self.in_memory_compaction = time;
+    }
+    pub fn set_deleted_chunks_release(&mut self, time: SystemTime) {
+        self.deleted_chunks_release = time;
+    }
+}
 
 impl SchedulerImpl {
     pub fn new(
@@ -65,6 +92,15 @@ impl SchedulerImpl {
             config.clone(),
             cancel_token.clone(),
         );
+
+        let mut workers = config.select_workers().clone();
+        if workers.is_empty() {
+            workers.push(config.server_name().clone());
+        }
+        let workers = workers
+            .into_iter()
+            .map(|n| (n, LastNodeActionTimes::new()))
+            .collect::<HashMap<_, _>>();
         Self {
             meta_store,
             cluster,
@@ -75,6 +111,7 @@ impl SchedulerImpl {
             config,
             reconcile_loop: WorkerLoop::new("Reconcile"),
             chunk_events_queue: Mutex::new(Vec::with_capacity(1000)),
+            node_last_actions: Mutex::new(workers),
             chunk_processing_loop: WorkerLoop::new("ChunkProcessing"),
         }
     }
@@ -427,8 +464,6 @@ impl SchedulerImpl {
             .get_partitions_with_chunks_created_seconds_ago(60)
             .await?;
         for p in partition_compaction_candidates_id {
-            self.schedule_compaction_in_memory_chunks_if_needed(&p)
-                .await?;
             self.schedule_compaction_if_needed(&p).await?;
         }
         Ok(())
@@ -477,26 +512,10 @@ impl SchedulerImpl {
         // TODO we can do this reconciliation more rarely
         let all_inactive_chunks = self.meta_store.all_inactive_chunks().await?;
 
-        let (in_memory_inactive, persistent_inactive): (Vec<_>, Vec<_>) = all_inactive_chunks
+        log::info!("send {} inactive chunks to GC", all_inactive_chunks.len());
+        let (_, persistent_inactive): (Vec<_>, Vec<_>) = all_inactive_chunks
             .iter()
             .partition(|c| c.get_row().in_memory());
-
-        if !in_memory_inactive.is_empty() {
-            let seconds = self.config.in_memory_not_used_timeout();
-            let deadline = Instant::now() + Duration::from_secs(seconds);
-            let ids = in_memory_inactive
-                .iter()
-                .map(|c| c.get_id().clone())
-                .collect::<Vec<_>>();
-            for part in ids.as_slice().chunks(10000) {
-                self.gc_loop
-                    .send(GCTimedTask {
-                        deadline,
-                        task: GCTask::DeleteChunks(part.iter().cloned().collect_vec()),
-                    })
-                    .await?;
-            }
-        }
 
         if !persistent_inactive.is_empty() {
             let seconds = self.config.not_used_timeout();
@@ -636,16 +655,7 @@ impl SchedulerImpl {
             tokio::fs::remove_file(file).await?;
         }
         if let MetaStoreEvent::DeleteChunk(chunk) = &event {
-            if chunk.get_row().in_memory() {
-                let partition = self
-                    .meta_store
-                    .get_partition(chunk.get_row().get_partition_id())
-                    .await?;
-                let node_name = self.cluster.node_name_by_partition(&partition);
-                self.cluster
-                    .free_memory_chunk(&node_name, chunk.get_id())
-                    .await?;
-            } else if chunk.get_row().uploaded() {
+            if !chunk.get_row().in_memory() && chunk.get_row().uploaded() {
                 let file_name =
                     ChunkStore::chunk_remote_path(chunk.get_id(), chunk.get_row().suffix());
                 let deadline = Instant::now()
@@ -795,6 +805,24 @@ impl SchedulerImpl {
             self.process_inactive_chunks(inactive_chunks).await?;
         }
 
+        let seconds = self.config.in_memory_not_used_timeout();
+        let chunks_to_delete = self
+            .meta_store
+            .get_in_memory_chunks_deactivated_seconds_ago(seconds as i64)
+            .await?;
+        for (partition, chunks) in chunks_to_delete {
+            let ids = chunks.iter().map(|c| c.get_id()).collect::<Vec<_>>();
+            self.meta_store
+                .delete_chunks_without_checks(ids.clone())
+                .await?;
+            if let Some(partition) = partition {
+                let node_name = self.cluster.node_name_by_partition(&partition);
+                self.cluster
+                    .free_deleted_memory_chunks(&node_name, ids)
+                    .await?;
+            }
+        }
+
         Ok(())
     }
 
@@ -823,17 +851,13 @@ impl SchedulerImpl {
                 .get_partitions_out_of_queue(partition_ids)
                 .await?;
             let mut futures = Vec::with_capacity(partitions.len());
+            //let mut nodes_for_in_memory_compactions = HashSet::new();
             for partition in partitions.into_iter() {
                 if partition.get_row().is_active() {
-                    if *partition_ids_map.get(&partition.get_id()).unwrap_or(&false) {
-                        let self_to_move = self.clone();
-                        let partition_to_move = partition.clone();
-                        futures.push(cube_ext::spawn(async move {
-                            self_to_move
-                                .schedule_compaction_in_memory_chunks_if_needed(&partition_to_move)
-                                .await
-                        }));
-                    }
+                    /* if *partition_ids_map.get(&partition.get_id()).unwrap_or(&false) {
+                        let node_name = self.cluster.node_name_by_partition(&partition);
+                        nodes_for_in_memory_compactions.insert(node_name);
+                    } */
                     let partition_to_move = partition.clone();
                     let self_to_move = self.clone();
                     futures.push(cube_ext::spawn(async move {
@@ -852,6 +876,11 @@ impl SchedulerImpl {
                     }));
                 }
             }
+
+            /* for node in nodes_for_in_memory_compactions {
+                self.schedule_node_in_memory_compaction(node).await?;
+            } */
+
             join_all(futures)
                 .await
                 .into_iter()
@@ -867,12 +896,12 @@ impl SchedulerImpl {
         self: &Arc<Self>,
         chunks: Vec<IdRow<Chunk>>,
     ) -> Result<(), CubeError> {
-        let (in_memory_inactive, persistent_inactive): (Vec<_>, Vec<_>) = chunks
+        let (_, persistent_inactive): (Vec<_>, Vec<_>) = chunks
             .into_iter()
             .filter(|c| !c.get_row().active())
             .partition(|c| c.get_row().in_memory());
 
-        if !in_memory_inactive.is_empty() {
+        /* if !in_memory_inactive.is_empty() {
             let seconds = self.config.in_memory_not_used_timeout();
             let deadline = Instant::now() + Duration::from_secs(seconds);
             self.gc_loop
@@ -886,7 +915,7 @@ impl SchedulerImpl {
                     ),
                 })
                 .await?;
-        }
+        } */
         if !persistent_inactive.is_empty() {
             let seconds = self.config.not_used_timeout();
             let deadline = Instant::now() + Duration::from_secs(seconds);
@@ -1118,6 +1147,37 @@ impl SchedulerImpl {
         Ok(())
     }
 
+    pub async fn schedule_node_in_memory_compaction(&self, node: String) -> Result<(), CubeError> {
+        let mut node_last_actions = self.node_last_actions.lock().await;
+        if let Some(last_action) = node_last_actions.get_mut(&node) {
+            if last_action
+                .in_memory_compaction()
+                .elapsed()
+                .ok()
+                .map_or(false, |d| d >= Duration::from_secs(5))
+            {
+                let job = self
+                    .meta_store
+                    .add_job(Job::new(
+                        RowKey::Table(TableId::Tables, 0),
+                        JobType::NodeInMemoryChunksCompaction(node.clone()),
+                        node.clone(),
+                    ))
+                    .await?;
+                if job.is_some() {
+                    self.cluster.notify_job_runner(node).await?;
+                }
+                last_action.set_in_memory_compaction(SystemTime::now());
+            }
+            Ok(())
+        } else {
+            Err(CubeError::internal(format!(
+                "schedule_node_in_memory_compaction: undefined node {}",
+                node
+            )))
+        }
+    }
+
     async fn schedule_partition_warmup(
         &self,
         p: &IdRow<Partition>,
@@ -1266,7 +1326,7 @@ impl DataGCLoop {
                         match self.metastore.get_chunks_out_of_queue(chunk_ids).await {
                             Ok(chunks) => {
                                 let ids = chunks
-                                    .into_iter()
+                                    .iter()
                                     .filter_map(|c| {
                                         if c.get_row().active() {
                                             None
