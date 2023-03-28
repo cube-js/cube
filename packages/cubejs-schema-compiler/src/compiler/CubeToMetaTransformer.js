@@ -88,12 +88,20 @@ export class CubeToMetaTransformer {
   }
 
   isVisible(symbol, defaultValue) {
+    // TODO: Deprecate and remove, please use public
     if (symbol.visible != null) {
       return symbol.visible;
     }
+
+    if (symbol.public != null) {
+      return symbol.public;
+    }
+
+    // TODO: Deprecate and remove, please use public
     if (symbol.shown != null) {
       return symbol.shown;
     }
+
     return defaultValue;
   }
 
