@@ -14,19 +14,17 @@ export function getComposePath(type: string): [path: string, file: string] {
     version: '2.2',
     services: {
       cube: {
+        ...cube,
         container_name: 'cube',
         image: 'cubejs/cube:testing-drivers',
-        environment: cube.environment,
-        volumes: cube.volumes,
-        ports: cube.ports,
         restart: 'always',
       },
     },
   };
   if (data) {
     compose.services.data = {
-      container_name: 'data',
       ...data,
+      container_name: 'data',
     };
   }
   fs.writeFileSync(

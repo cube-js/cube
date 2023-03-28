@@ -2,8 +2,8 @@
   "cast": {
     "SELECT_PREFIX": "",
     "SELECT_SUFFIX": "",
-    "DATE_PREFIX": "date_parse(",
-    "DATE_SUFFIX": ", '%Y-%m-%d')",
+    "DATE_PREFIX": "to_date(",
+    "DATE_SUFFIX": ", 'YYYY-MM-DD')",
     "CREATE_TBL_PREFIX": "CREATE TABLE ",
     "CREATE_TBL_SUFFIX": " AS ",
     "CREATE_SUB_PREFIX": "(",
@@ -14,19 +14,28 @@
       "CUBEJS_DEV_MODE": "true",
       "CUBEJS_API_SECRET": "mysupersecret",
       "CUBEJS_CACHE_AND_QUEUE_DRIVER": "cubestore",
-      "CUBEJS_DB_TYPE": "athena",
-      "CUBEJS_AWS_KEY": "${CUBEJS_AWS_KEY}",
-      "CUBEJS_AWS_SECRET": "${CUBEJS_AWS_SECRET}",
-      "CUBEJS_AWS_REGION": "${CUBEJS_AWS_REGION}",
-      "CUBEJS_AWS_ATHENA_WORKGROUP": "${CUBEJS_AWS_ATHENA_WORKGROUP}",
-      "CUBEJS_AWS_S3_OUTPUT_LOCATION": "${CUBEJS_AWS_S3_OUTPUT_LOCATION}",
-      "CUBEJS_DB_EXPORT_BUCKET": "${CUBEJS_DB_EXPORT_BUCKET}"
+      "CUBEJS_DB_TYPE": "postgres",
+      "CUBEJS_DB_HOST": "data",
+      "CUBEJS_DB_NAME": "test",
+      "CUBEJS_DB_USER": "test",
+      "CUBEJS_DB_PASS": "test"
     },
+    "depends_on": ["data"],
+    "links": ["data"],
     "volumes": [
       "./cube.js:/cube/conf/cube.js",
       "./schema/ecommerce.yaml:/cube/conf/schema/ecommerce.yaml"
     ],
     "ports" : ["4000"]
+  },
+  "data": {
+    "image": "postgres:13",
+    "environment": [
+      "POSTGRES_PASSWORD=test",
+      "POSTGRES_USER=test",
+      "POSTGRES_DB=test"
+    ],
+    "ports" : ["5432"]
   },
   "preAggregations": {
     "Products": [],

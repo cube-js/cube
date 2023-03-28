@@ -2,7 +2,7 @@
   "cubes": [
     {
       "name": "Products",
-      "sql": "select * from products;",
+      "sql": "select * from products",
       "dimensions": [
         {
           "name": "category",
@@ -23,7 +23,7 @@
     },
     {
       "name": "Customers",
-      "sql": "select * from customers;",
+      "sql": "select * from customers",
       "dimensions": [
         {
           "primary_key": true,

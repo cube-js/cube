@@ -1,9 +1,25 @@
 import {
-  getComposePath,
-  getSchemaPath,
-  getCubeJsPath,
+  getFixtures,
+  getCreateQueries,
+  getSelectQueries,
+  getDriver,
+  runEnvironment,
 } from './helpers';
+import { Fixture } from './types/Fixture';
+import { Environment } from './types/Environment';
+import { testConnection } from './tests/testConnection';
+import { testSequence } from './tests/testSequence';
+import { testQueries } from './tests/testQueries';
 
-console.log(getComposePath('athena'));
-console.log(getSchemaPath('athena'));
-console.log(getCubeJsPath('athena'));
+export {
+  Fixture,
+  Environment,
+  getFixtures,
+  getCreateQueries,
+  getSelectQueries,
+  getDriver,
+  runEnvironment,
+  testConnection,
+  testSequence,
+  testQueries,
+};
