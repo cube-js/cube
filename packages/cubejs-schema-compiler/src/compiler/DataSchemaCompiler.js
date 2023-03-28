@@ -181,6 +181,7 @@ export class DataSchemaCompiler {
     if (err) {
       errorsReport.error(err.toString());
     }
+
     try {
       vm.runInNewContext(file.content, {
         view: (name, cube) => (

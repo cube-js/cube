@@ -97,8 +97,9 @@ export class CubeEvaluator extends CubeSymbols {
   transformMembers(members, cube, errorReporter) {
     members = members || {};
     for (const memberName of Object.keys(members)) {
-      const member = members[memberName];
       let ownedByCube = true;
+
+      const member = members[memberName];
       if (member.sql && !member.subQuery) {
         const funcArgs = this.funcArguments(member.sql);
         const cubeReferences = this.collectUsedCubeReferences(cube.name, member.sql);
@@ -112,9 +113,11 @@ export class CubeEvaluator extends CubeSymbols {
           errorReporter.error(`Member '${cube.name}.${memberName}' references foreign cubes: ${foreignCubes.join(', ')}. Please split and move this definition to corresponding cubes.`);
         }
       }
+
       if (ownedByCube && cube.isView) {
         errorReporter.error(`View '${cube.name}' defines own member '${cube.name}.${memberName}'. Please move this member definition to one of the cubes.`);
       }
+
       members[memberName] = { ...members[memberName], ownedByCube };
     }
   }

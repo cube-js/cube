@@ -450,17 +450,8 @@ const MeasuresSchema = Joi.object().pattern(identifierRegex, Joi.alternatives().
  * and update CubePropContextTranspiler.transpiledFieldsPatterns
  **************************** */
 
-const cubeSchema = Joi.object().keys({
+const baseSchema = {
   name: identifier,
-  sql: Joi.alternatives().conditional(
-    Joi.ref('..isView'), [
-      {
-        is: true,
-        then: Joi.forbidden(),
-        otherwise: Joi.func().required()
-      }
-    ]
-  ),
   refreshKey: CubeRefreshKeySchema,
   fileName: Joi.string().required(),
   extends: Joi.func(),
@@ -470,7 +461,6 @@ const cubeSchema = Joi.object().keys({
   dataSource: Joi.string(),
   description: Joi.string(),
   rewriteQueries: Joi.boolean().strict(),
-  isView: Joi.boolean().strict(),
   shown: Joi.boolean().strict(),
   joins: Joi.object().pattern(identifierRegex, Joi.object().keys({
     sql: Joi.func().required(),
@@ -521,6 +511,17 @@ const cubeSchema = Joi.object().keys({
   preAggregations: PreAggregationsAlternatives,
   includes: Joi.func(),
   excludes: Joi.func(),
+};
+
+const cubeSchema = inherit(baseSchema, {
+  sql: Joi.func(),
+  sqlTable: Joi.func(),
+}).xor('sql', 'sqlTable').messages({
+  'object.xor': 'You must use either sql or sqlTable within a model, but not both'
+});
+
+const viewSchema = inherit(baseSchema, {
+  isView: Joi.boolean().strict(),
 });
 
 function formatErrorMessageFromDetails(explain, d) {
@@ -578,7 +579,7 @@ function collectFunctionFieldsPatterns(patterns, path, o) {
 
 export function functionFieldsPatterns() {
   const functionPatterns = new Set();
-  collectFunctionFieldsPatterns(functionPatterns, '', cubeSchema);
+  collectFunctionFieldsPatterns(functionPatterns, '', { ...cubeSchema, ...viewSchema });
   return Array.from(functionPatterns);
 }
 
@@ -595,7 +596,7 @@ export class CubeValidator {
   }
 
   validate(cube, errorReporter) {
-    const result = cubeSchema.validate(cube);
+    const result = cube.isView ? viewSchema.validate(cube) : cubeSchema.validate(cube);
 
     if (result.error != null) {
       errorReporter.error(formatErrorMessage(result.error), result.error);

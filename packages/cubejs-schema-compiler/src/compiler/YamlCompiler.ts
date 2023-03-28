@@ -94,7 +94,7 @@ export class YamlCompiler {
       for (const p of transpiledFieldsPatterns) {
         const fullPath = propertyPath.join('.');
         if (fullPath.match(p)) {
-          if (typeof obj === 'string' && propertyPath[propertyPath.length - 1] === 'sql') {
+          if (typeof obj === 'string' && ['sql', 'sqlTable'].includes(propertyPath[propertyPath.length - 1])) {
             return this.parsePythonIntoArrowFunction(`f"${this.escapeDoubleQuotes(obj)}"`, cubeName, obj, errorsReport);
           } else if (typeof obj === 'string') {
             return this.parsePythonIntoArrowFunction(obj, cubeName, obj, errorsReport);

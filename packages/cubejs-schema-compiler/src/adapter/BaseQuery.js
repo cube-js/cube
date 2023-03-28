@@ -1418,11 +1418,18 @@ class BaseQuery {
       }
       return this.preAggregations.originalSqlPreAggregationTable(foundPreAggregation);
     }
-    const evaluatedSql = this.evaluateSql(cube, this.cubeEvaluator.cubeFromPath(cube).sql);
+
+    const fromPath = this.cubeEvaluator.cubeFromPath(cube);
+    if (fromPath.sqlTable) {
+      return this.evaluateSql(cube, fromPath.sqlTable);
+    }
+
+    const evaluatedSql = this.evaluateSql(cube, fromPath.sql);
     const selectAsterisk = evaluatedSql.match(/^\s*select\s+\*\s+from\s+([a-zA-Z0-9_\-`".*]+)\s*$/i);
     if (selectAsterisk) {
       return selectAsterisk[1];
     }
+
     return `(${evaluatedSql})`;
   }
 
