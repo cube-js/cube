@@ -2,7 +2,7 @@
 
 [Website](https://cube.dev) • [Docs](https://cube.dev/docs) •
 [Examples](#examples) • [Blog](https://cube.dev/blog) •
-[Slack](https://slack.cube.dev) • [Twitter](https://twitter.com/thecubejs)
+[Slack](https://slack.cube.dev) • [Twitter](https://twitter.com/the_cube_dev)
 
 [![npm version](https://badge.fury.io/js/%40cubejs-backend%2Fserver.svg)](https://badge.fury.io/js/%40cubejs-backend%2Fserver)
 [![GitHub Actions](https://github.com/cube-js/cube.js/workflows/Rust/badge.svg)](https://github.com/cube-js/cube.js/actions?query=workflow%3ARust+branch%3Amaster)

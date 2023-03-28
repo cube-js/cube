@@ -2,7 +2,7 @@
   <a href="https://cube.dev?ref=github-readme"><img src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/cube-logo-with-bg.png" alt="Cube — Semantic Layer for Data Applications" width="300px"></a>
 </p>
 
-[Website](https://cube.dev?ref=github-readme) • [Getting Started](https://cube.dev/docs/getting-started?ref=github-readme) • [Docs](https://cube.dev/docs?ref=github-readme) • [Examples](https://cube.dev/docs/examples?ref=github-readme) • [Blog](https://cube.dev/blog?ref=github-readme) • [Slack](https://slack.cube.dev?ref=github-readme) • [Twitter](https://twitter.com/thecubejs)
+[Website](https://cube.dev?ref=github-readme) • [Getting Started](https://cube.dev/docs/getting-started?ref=github-readme) • [Docs](https://cube.dev/docs?ref=github-readme) • [Examples](https://cube.dev/docs/examples?ref=github-readme) • [Blog](https://cube.dev/blog?ref=github-readme) • [Slack](https://slack.cube.dev?ref=github-readme) • [Twitter](https://twitter.com/the_cube_dev)
 
 [![npm version](https://badge.fury.io/js/%40cubejs-backend%2Fserver.svg)](https://badge.fury.io/js/%40cubejs-backend%2Fserver)
 [![GitHub Actions](https://github.com/cube-js/cube/workflows/Build/badge.svg)](https://github.com/cube-js/cube/actions?query=workflow%3ABuild+branch%3Amaster)
@@ -88,7 +88,7 @@ We publish our open source roadmap every quarter and discuss them during our [mo
 
 There are many ways you can contribute to Cube! Here are a few possibilities:
 
-* Star this repo and follow us on [Twitter](https://twitter.com/thecubejs).
+* Star this repo and follow us on [Twitter](https://twitter.com/the_cube_dev).
 * Add Cube to your stack on [Stackshare](https://stackshare.io/cube-js).
 * Upvote issues with 👍 reaction so we know what's the demand for particular issue to prioritize it within road map.
 * Create issues every time you feel something is missing or goes wrong.
