@@ -29,19 +29,33 @@ export function createCubeSchema({ name, refreshKey = '', preAggregations = '', 
             type: \`min\`
           }
         },
-  
+
         dimensions: {
           id: {
             type: 'number',
             sql: 'id',
             primaryKey: true
           },
+          type: {
+            type: 'string',
+            sql: 'type'
+          },
           createdAt: {
             type: 'time',
             sql: 'created_at'
           },
+          location: {
+            type: 'string',
+            sql: 'location'
+          }
         },
-        
+
+        segments: {
+          sfUsers: {
+            sql: \`\${CUBE}.location = 'San Francisco'\`
+          }
+        },
+
         preAggregations: {
             ${preAggregations}
         }

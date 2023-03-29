@@ -1,49 +1,11 @@
 import { prepareCompiler } from './PrepareCompiler';
-
-export function makeCubeSchema({ preAggregations }) {
-  return ` 
-      cube('CubeA', {
-        sql: \`select * from test\`,
-   
-        measures: {
-          count: {
-            type: 'count'
-          }
-        },
-  
-        dimensions: {
-          id: {
-            type: 'number',
-            sql: 'id',
-            primaryKey: true
-          },
-          type: {
-            type: 'string',
-            sql: 'type',
-          },
-          createdAt: {
-            type: 'time',
-            sql: 'created_at'
-          },
-        },
-        
-        segments: {
-          sfUsers: {
-            sql: \`\${CUBE}.location = 'San Francisco'\`
-          }
-        },
-
-        preAggregations: {
-          ${preAggregations}
-        },
-      }) 
-    `;
-}
+import { createCubeSchema } from './utils';
 
 describe('Schema Testing', () => {
   const schemaCompile = async () => {
     const { compiler, cubeEvaluator } = prepareCompiler(
-      makeCubeSchema({
+      createCubeSchema({
+        name: 'CubeA',
         preAggregations: `
           main: {
                 type: 'originalSql',
@@ -208,7 +170,8 @@ describe('Schema Testing', () => {
     const logger = jest.fn();
 
     const { compiler } = prepareCompiler(
-      makeCubeSchema({
+      createCubeSchema({
+        name: 'CubeA',
         preAggregations: `
             main: {
                 type: 'originalSql',
