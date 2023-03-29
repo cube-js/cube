@@ -3,6 +3,30 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.32.17](https://github.com/cube-js/cube/compare/v0.32.16...v0.32.17) (2023-03-29)
+
+
+### Bug Fixes
+
+* **deps:** Upgrade minimist, @xmldom/xmldom, refs [#6340](https://github.com/cube-js/cube/issues/6340) ([#6364](https://github.com/cube-js/cube/issues/6364)) ([04a1c9a](https://github.com/cube-js/cube/commit/04a1c9a04ca2eaae841024eb797e7ee549e98445))
+* **deps:** Upgrade moment, moment-timezone, refs [#6340](https://github.com/cube-js/cube/issues/6340) ([#6365](https://github.com/cube-js/cube/issues/6365)) ([d967cf3](https://github.com/cube-js/cube/commit/d967cf3fcf5d3f92ee32e47925fd1090f381a9c5))
+
+
+### Features
+
+* **schema-compiler:** Introduce support for sqlTable (syntactic sugar) ([#6360](https://github.com/cube-js/cube/issues/6360)) ([c73b368](https://github.com/cube-js/cube/commit/c73b368ca20735c63d01d2364b1c2f26d3b24cc5))
+* **sqlite-driver:** Upgrade sqlite3 from 5.0.11 to 5.1.6, refs [#6340](https://github.com/cube-js/cube/issues/6340) ([#6287](https://github.com/cube-js/cube/issues/6287)) ([4ec1da3](https://github.com/cube-js/cube/commit/4ec1da361afa9146b4ac955addd89120cfe23e2d))
+
+
+### Reverts
+
+* Revert "docs(schema): replace camel-case properties with snake-case" ([4731f4a](https://github.com/cube-js/cube/commit/4731f4ae16c1568f6a0956bc89f79f9a81f53e06))
+* Revert "docs: use snake-case property names" ([eb97883](https://github.com/cube-js/cube/commit/eb97883d75985bea7abce5bf3cc434473297cc96))
+
+
+
+
+
 ## [0.32.16](https://github.com/cube-js/cube/compare/v0.32.15...v0.32.16) (2023-03-27)
 
 **Note:** Version bump only for package cubejs
