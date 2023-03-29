@@ -515,8 +515,6 @@ const baseSchema = {
     meta: Joi.any()
   })),
   preAggregations: PreAggregationsAlternatives,
-  includes: Joi.func(),
-  excludes: Joi.func(),
 };
 
 const cubeSchema = inherit(baseSchema, {
@@ -528,6 +526,8 @@ const cubeSchema = inherit(baseSchema, {
 
 const viewSchema = inherit(baseSchema, {
   isView: Joi.boolean().strict(),
+  includes: Joi.func(),
+  excludes: Joi.func(),
 });
 
 function formatErrorMessageFromDetails(explain, d) {
