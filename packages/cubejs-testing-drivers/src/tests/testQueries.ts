@@ -52,7 +52,8 @@ export function testQueries(type: string): void {
       await env.stop();
     });
 
-    it('built pre-aggregations', async () => {
+    // MUST be the first test in the list!
+    it('must built pre-aggregations', async () => {
       await buildPreaggs(env.cube.port, 'mysupersecret', {
         contexts: [
           { securityContext: { tenant: 't1' } }
@@ -63,6 +64,24 @@ export function testQueries(type: string): void {
           'ECommerce.SimpleAnalysisExternal',
           'ECommerce.TimeAnalysisExternal',
         ]
+      });
+    });
+
+    execute('must not fetch a hidden cube', async () => {
+      const meta = await client.meta();
+      expect(meta.cubes.find(cube => cube.name === 'HiddenECommerce')).toBe(undefined);
+    });
+
+    execute('must throw if a hidden member was requested', async () => {
+      const promise = async () => {
+        await client.load({
+          measures: [
+            'ECommerce.hiddenSum'
+          ]
+        });
+      };
+      promise().catch(e => {
+        expect(e.toString()).toMatch(/hidden/);
       });
     });
 
@@ -1243,24 +1262,6 @@ export function testQueries(type: string): void {
       promise().catch(e => {
         expect(e.toString()).toMatch(/error/);
       });
-    });
-
-    execute('hidden member', async () => {
-      const promise = async () => {
-        await client.load({
-          measures: [
-            'ECommerce.hiddenSum'
-          ]
-        });
-      };
-      promise().catch(e => {
-        expect(e.toString()).toMatch(/hidden/);
-      });
-    });
-
-    execute('hidden cube', async () => {
-      const meta = await client.meta();
-      expect(meta.cubes.find(cube => cube.name === 'HiddenECommerce')).toBe(undefined);
     });
   });
 }

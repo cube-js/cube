@@ -22,7 +22,7 @@ export async function runEnvironment(type: string): Promise<Environment> {
     composeFile,
   );
   compose.withStartupTimeout(30 * 1000);
-  compose.withEnv('CUBEJS_TELEMETRY', 'false');
+  compose.withEnvironment({ CUBEJS_TELEMETRY: 'false' });
   const _path = `${path.resolve(process.cwd(), './fixtures/postgres.env')}`;
   if (fs.existsSync(_path)) {
     config({
@@ -33,7 +33,7 @@ export async function runEnvironment(type: string): Promise<Environment> {
   }
   Object.keys(fixtures.cube.environment).forEach((key) => {
     if (process.env[key]) {
-      compose.withEnv(key, <string>process.env[key]);
+      compose.withEnvironment({ [key]: <string>process.env[key] });
     } else if (fixtures.cube.environment[key]) {
       process.env[key] = fixtures.cube.environment[key];
     }
@@ -63,7 +63,7 @@ export async function runEnvironment(type: string): Promise<Environment> {
   return {
     cube,
     stop: async () => {
-      await environment.down();
+      await environment.down({ timeout: 30 * 1000 });
     },
   };
 }

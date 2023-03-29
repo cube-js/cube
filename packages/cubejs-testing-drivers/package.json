@@ -12,9 +12,9 @@
   "scripts": {
     "tsc": "tsc",
     "lint": "eslint src/* test/ test/bin --ext .ts",
-    "athena": "jest --verbose -i dist/test/athena.test.js",
-    "postgres": "jest --verbose -i dist/test/postgres.test.js",
-    "tst": "clear && yarn tsc && jest --detectOpenHandles --verbose -i dist/test/postgres.test.js"
+    "athena": "jest --detectOpenHandles  --runInBand --verbose -i dist/test/athena.test.js",
+    "postgres": "jest --detectOpenHandles  --runInBand --verbose -i dist/test/postgres.test.js",
+    "tst": "clear && yarn tsc && jest --detectOpenHandles  --runInBand --verbose -i dist/test/postgres.test.js"
   },
   "files": [
     "dist/src"
@@ -26,7 +26,7 @@
     "dotenv": "^16.0.3",
     "fs-extra": "^11.1.1",
     "typescript": "~4.9.5",
-    "testcontainers": "^8.12",
+    "testcontainers": "^9.3.0",
 
     "@types/node": "^14",
     "@types/jest": "^26.0.22",
