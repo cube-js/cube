@@ -1,4 +1,5 @@
 import { buildCube } from './buildCube';
+import { buildPreaggs } from './buildPreaggs';
 import { getTempPath } from './getTempPath';
 import { getComposePath } from './getComposePath';
 import { getCreateQueries } from './getCreateQueries';
@@ -13,6 +14,7 @@ import { runEnvironment } from './runEnvironment';
 
 export {
   buildCube,
+  buildPreaggs,
   getTempPath,
   getComposePath,
   getCreateQueries,

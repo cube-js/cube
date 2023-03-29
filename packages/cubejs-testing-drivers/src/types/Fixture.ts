@@ -23,4 +23,5 @@ export type Fixture = {
     Customers: [{ name: string, [prop: string]: unknown }],
     ECommerce: [{ name: string, [prop: string]: unknown }],
   },
+  skip?: string[],
 };
