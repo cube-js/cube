@@ -129,10 +129,7 @@ pre[class*="language-"] {
 
 .token.key.atrule,
 .token.function,
-.token.class-name {
-  color: $pink-02;
-}
-
+.token.class-name,
 .token.regex,
 .token.important,
 .token.variable {
@@ -150,6 +147,16 @@ pre[class*="language-"] {
 
 .token.entity {
   cursor: help;
+}
+
+.language-tree {
+  > .token.entry-dir {
+    color: $purple-02;
+  }
+
+  > .token.entry-name {
+    color: $pink-02;
+  }
 }
 
 .language-bash {

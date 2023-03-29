@@ -264,19 +264,19 @@ steps: [
 
 In order to provide additional dimensions, funnels can be joined with other
 cubes using `user_id` at the first step of a funnel. This will always use a
-`belongs_to` relationship, so hence you should always join with the
-corresponding user cube. Here, by 'user' we understand this to be any entity
-that can go through a sequence of steps within funnel. It could be a real web
-user with an auto assigned ID or a specific email sent by an email automation
-that goes through a typical flow of events like 'sent', 'opened', 'clicked', and
-so on. For example, for our `PurchaseFunnel` we can add a join to another funnel
-as following:
+`belongsTo` relationship, so hence you should always join with the corresponding
+user cube. Here, by 'user' we understand this to be any entity that can go
+through a sequence of steps within funnel. It could be a real web user with an
+auto assigned ID or a specific email sent by an email automation that goes
+through a typical flow of events like 'sent', 'opened', 'clicked', and so on.
+For example, for our `PurchaseFunnel` we can add a join to another funnel as
+following:
 
 ```javascript
 cube(`PurchaseFunnel`, {
   joins: {
     Users: {
-      relationship: `belongs_to`,
+      relationship: `belongsTo`,
       sql: `${CUBE}.first_step_user_id = ${Users.id}`,
     },
   },
@@ -323,7 +323,7 @@ In the following example, we use the `conversions` measure along with the
 Funnel joins are extremely heavy for most modern databases and complexity grows
 in a non-linear way with the addition of steps. However, if the cardinality of
 the first event isn't too high, very simple optimization can be applied:
-[`original_sql` pre-aggregation][ref-schema-ref-preaggs-origsql].
+[`originalSql` pre-aggregation][ref-schema-ref-preaggs-origsql].
 
 It is best to use [partitioned rollups][ref-partitioned-rollups] to cache the
 steps instead. Add one to the `PurchaseFunnel` cube as follows:
@@ -334,9 +334,9 @@ cube(`PurchaseFunnel`, {
     // ...
   }),
 
-  pre_aggregations: {
+  preAggregations: {
     main: {
-      type: `original_sql`,
+      type: `originalSql`,
     },
   },
 });

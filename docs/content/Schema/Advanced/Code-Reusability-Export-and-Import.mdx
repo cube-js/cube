@@ -105,20 +105,61 @@ The example below shows a correct way to import a helper function, which is loca
 ├── cube.js
 ├── package.json
 └── schema
-    ├── utils.js
+    ├── schema_utils.js
     └── Sales
         └── Orders.js
 ```
 
 ```javascript
 // in schema/Sales/Orders.js
-import { capitalize } from './utils';
+import { capitalize } from './schema_utils';
 ```
 
 ```javascript
-// in schema/utils.js
+// in schema/schema_utils.js
 export const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 ```
+
+### Expose environment variables to schema files
+
+A common use-case is to disable pre-aggregations unless running in "production" or "staging" environments.
+The best approach is to add an environment variable and make it available in schema files.
+
+In the example bellow we have the following file structure:
+```shell
+.
+├── README.md
+├── cube.js
+├── package.json
+├── utils.js
+└── schema
+    └── Sales
+        └── Orders.js
+```
+In the `utils.js` file we read the environment variable and expose it. We will default the environment variable to the value `dev`.
+```javascript
+// in utils.js
+const environment = typeof process.env.ENVIRONMENT === 'undefined' ? 'dev' : process.env.ENVIRONMENT.toLowerCase();
+exports.environment = () => environment;
+```
+In the schema file, the definition will change depending on the value of the environment value.
+```javascript
+// in schema/Sales/Orders.js
+import {environment} from '../utils'
+
+cube(`Orders`, {
+      ...
+      preAggregations: ["prod", "staging"].includes(environment()) ? {
+         main: {
+         ...
+         }
+      } : {}, // no pre-aggregations unless environment is prod or stagging.
+      ...
+});
+```
+
+
+
 
 [mdn-js-es6-export]:
   https://developer.mozilla.org/en-US/docs/web/javascript/reference/statements/export

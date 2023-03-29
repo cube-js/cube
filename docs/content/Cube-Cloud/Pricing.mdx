@@ -36,9 +36,10 @@ scope of support you may receive for your deployment.
 The Starter plan starts at a minimum of $99/month and targets low-scale
 production that is not business-critical.
 
-It offers a Production Cluster, the ability to use third-party packages from the
-npm registry, AWS and GCP support in select regions, pre-aggregations of upto
-150GB in size, alerts, auto-suspend controls and a 50,000 queries per day limit.
+It offers a [Production Cluster][ref-cloud-deployment-prod-cluster], the ability
+to use third-party packages from the npm registry, AWS and GCP support in select
+regions, pre-aggregations of upto 150GB in size, [alerts][ref-cloud-alerts],
+auto-suspend controls and a 50,000 queries per day limit.
 
 ### Support
 
@@ -81,8 +82,8 @@ high-scale or mission-critical production deployments with more significant
 security and compliance needs.
 
 It offers everything in the [Premium plan](#premium) as well as SAML/LDAP
-support for single sign-on, VPC peering, logs/metrics export, and role-based
-access control.
+support for single sign-on, [VPC peering][ref-cloud-vpc-peering], [logs/metrics
+export][ref-cloud-log-export], and [role-based access control][ref-cloud-acl].
 
 ### Support
 
@@ -99,12 +100,13 @@ Cloud provides a 99.99% uptime SLA for this plan.
 
 ## Enterprise Premier
 
-The Enterprise Premium Plan caters to high-scale, high-availability
+The Enterprise Premium plan caters to high-scale, high-availability
 mission-critical production deployments with security and compliance needs.
 
-It offers everything in the Enterprise plan as well as enabling the use of
-Production Multi-Clusters, unlimited pre-aggregation sizes, support for
-kSQL/Elasticsearch and custom domains.
+It offers everything in the [Enterprise plan](#enterprise) as well as enabling the use of
+[Production Multi-Clusters][ref-cloud-deployment-prod-multicluster], unlimited
+pre-aggregation sizes, support for kSQL/Elasticsearch and [custom
+domains][ref-cloud-custom-domains].
 
 ### Support
 
@@ -153,3 +155,13 @@ CCUs into CCUs for the higher subscription plan at the CCU pricing for that plan
 subscription plan). Future purchases and upgrades are subject to the pricing
 that is in effect at the time of the order. No credit is allowed for downgrading
 CCUs to a lower subscription plan level.
+
+[ref-cloud-deployment-prod-cluster]:
+  /cloud/configuration/deployment-types#production-cluster
+[ref-cloud-alerts]: /cloud/workspace/alerts
+[ref-cloud-log-export]: /cloud/workspace/logs
+[ref-cloud-acl]: /cloud/access-control/
+[ref-cloud-deployment-prod-multicluster]:
+  /cloud/configuration/deployment-types#production-multi-cluster
+[ref-cloud-custom-domains]: /cloud/configuration/custom-domains
+[ref-cloud-vpc-peering]: /cloud/configuration/connecting-with-a-vpc

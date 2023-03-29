@@ -38,16 +38,16 @@ data source.
 
 First, you need to create pre-aggregations that will contain your batch data. In
 the following example, we call it **batch**. Please note, it must have a
-`time_dimension` and `partition_granularity` specified. Cube will use these
+`timeDimension` and `partitionGranularity` specified. Cube will use these
 properties to union batch data with freshly-retrieved source data.
 
-You may also control the batch part of your data with the `build_range_start` and
-`build_range_end` properties of a pre-aggregation to determine a specific window
+You may also control the batch part of your data with the `buildRangeStart` and
+`buildRangeEnd` properties of a pre-aggregation to determine a specific window
 for your batched data.
 
 Next, you need to create a lambda pre-aggregation. To do that, create
 pre-aggregation with type `rollupLambda`, specify rollups you would like to use
-with `rollups` property, and finally set `union_with_source_data: true` to use
+with `rollups` property, and finally set `unionWithSourceData: true` to use
 source data as a real-time layer.
 
 Please make sure that the lambda pre-aggregation definition comes first when
@@ -57,22 +57,22 @@ defining your pre-aggregations.
 cube('Users', {
   ...,
 
-  pre_aggregations: {
+  preAggregations: {
     lambda: {
       type: `rollupLambda`,
-      union_with_source_data: true,
+      unionWithSourceData: true,
       rollups: [Users.batch]
     },
     batch: {
       measures: [Users.count],
       dimensions: [Users.name],
-      time_dimension: Users.createdAt,
+      timeDimension: Users.createdAt,
       granularity: `day`,
-      partition_granularity: `day`,
-      build_range_start: {
+      partitionGranularity: `day`,
+      buildRangeStart: {
         sql: `SELECT '2020-01-01'`
       },
-      build_range_end: {
+      buildRangeEnd: {
         sql: `SELECT '2022-05-30'`
       }
     }
@@ -102,7 +102,7 @@ streaming.
 // This cube uses a streaming SQL data source such as ksqlDB
 cube('StreamingUsers', {
   ...,
-  data_source: 'ksql',
+  dataSource: 'ksql',
 
   preAggregations: {
     streaming: {
@@ -119,7 +119,7 @@ cube('StreamingUsers', {
 // This cube uses a data source such as Clickhouse or BigQuery
 cube('Users', {
   ...,
-  pre_aggregations: {
+  preAggregations: {
     batchStreamingLambda: {
       type: `rollupLambda`,
       rollups: [Users.batch, StreamingUsers.streaming]
@@ -128,13 +128,13 @@ cube('Users', {
       type: `rollup`,
       measures: [Users.count],
       dimensions: [Users.name],
-      time_dimension: Users.createdAt,
+      timeDimension: Users.createdAt,
       granularity: `day`,
-      partition_granularity: `day`,
-      build_range_start: {
+      partitionGranularity: `day`,
+      buildRangeStart: {
         sql: `SELECT '2020-01-01'`
       },
-      build_range_end: {
+      buildRangeEnd: {
         sql: `SELECT '2022-05-30'`
       }
     },

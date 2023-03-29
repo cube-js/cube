@@ -1,21 +1,15 @@
 interface CreateCubeSchemaOptions {
   name: string,
+  sqlTable?: string,
   refreshKey?: string,
   preAggregations?: string,
 }
 
-/**
- * Returns test cube schema based on incoming parameters.
- * @param {CreateCubeSchemaOptions} param
- * @returns {string}
- */
-export function createCubeSchema({ name, refreshKey = '', preAggregations = '' }: CreateCubeSchemaOptions) {
+export function createCubeSchema({ name, refreshKey = '', preAggregations = '', sqlTable }: CreateCubeSchemaOptions): string {
   return ` 
     cube('${name}', {
-        sql: \`
-        select * from cards
-        \`,
-        
+        ${sqlTable ? `sqlTable: \`${sqlTable}\`` : 'sql: `select * from cards`'},
+
         ${refreshKey}
    
         measures: {
@@ -55,11 +49,39 @@ export function createCubeSchema({ name, refreshKey = '', preAggregations = '' }
   `;
 }
 
+export function createCubeSchemaYaml({ name, sqlTable }: CreateCubeSchemaOptions): string {
+  return ` 
+    cubes:
+      - name: ${name}
+        sql_table: ${sqlTable}
+    
+        measures:
+          - name: count
+            type: count
+          - name: sum
+            type: sum
+            sql: amount
+          - name: min
+            sql: amount
+            type: min
+          - name: max
+            sql: amount
+            type: max
+        dimensions:
+          - name: id
+            sql: id
+            type: number
+            primary_key: true
+          - name: createdAt
+            sql: created_at
+            type: time
+  `;
+}
+
 /**
  * Returns joined test cubes schema. Schema looks like: A -< B -< C >- D >- E.
  * The original data set can be found under the link.
  * {@link https://docs.google.com/spreadsheets/d/1BNDpA7x4JLhlvvPdrQIC0c0PH4xZhdRrEFfXdRW1j4U/edit?usp=sharing|Dataset}
- * @returns {string}
  */
 export function createJoinedCubesSchema(): string {
   return `
