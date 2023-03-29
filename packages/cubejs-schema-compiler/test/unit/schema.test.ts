@@ -211,4 +211,41 @@ describe('Schema Testing', () => {
       'You specified both buildRangeEnd and refreshRangeEnd, buildRangeEnd will be used.'
     ]);
   });
+
+  it('visibility modifier', async () => {
+    const { compiler, metaTransformer } = prepareCompiler([
+      createCubeSchema({
+        name: 'CubeA',
+        publicly: false
+      }),
+      createCubeSchema({
+        name: 'CubeB',
+        publicly: true
+      }),
+      createCubeSchema({
+        name: 'CubeC',
+        shown: false
+      })
+    ]);
+    await compiler.compile();
+
+    expect(metaTransformer.cubes[0]).toMatchObject({
+      isVisible: false,
+      config: {
+        name: 'CubeA',
+      }
+    });
+    expect(metaTransformer.cubes[1]).toMatchObject({
+      isVisible: true,
+      config: {
+        name: 'CubeB',
+      }
+    });
+    expect(metaTransformer.cubes[2]).toMatchObject({
+      isVisible: false,
+      config: {
+        name: 'CubeC',
+      }
+    });
+  });
 });
