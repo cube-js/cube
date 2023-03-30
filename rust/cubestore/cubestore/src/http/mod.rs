@@ -1033,6 +1033,8 @@ mod tests {
             Duration::from_millis(100),
             Duration::from_millis(10000),
             Duration::from_millis(1000),
+            64 << 20,
+            16 << 20,
         ));
         {
             let http_server = http_server.clone();
