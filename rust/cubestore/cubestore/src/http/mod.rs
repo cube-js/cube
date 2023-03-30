@@ -826,7 +826,7 @@ impl HttpMessage {
 #[cfg(test)]
 mod tests {
     use crate::codegen::{HttpMessageArgs, HttpQuery, HttpQueryArgs, HttpTable, HttpTableArgs};
-    use crate::config::init_test_logger;
+    use crate::config::{init_test_logger, Config};
     use crate::http::{HttpCommand, HttpMessage, HttpServer};
     use crate::metastore::{Column, ColumnType};
     use crate::mysql::MockSqlAuthService;
@@ -1026,6 +1026,9 @@ mod tests {
         };
         let mut auth = MockSqlAuthService::new();
         auth.expect_authenticate().return_const(Ok(None));
+
+        let config = Config::test("ws_test").config_obj();
+
         let http_server = Arc::new(HttpServer::new(
             "127.0.0.1:53031".to_string(),
             Arc::new(auth),
@@ -1033,8 +1036,8 @@ mod tests {
             Duration::from_millis(100),
             Duration::from_millis(10000),
             Duration::from_millis(1000),
-            64 << 20,
-            16 << 20,
+            config.transport_max_message_size(),
+            config.transport_max_frame_size(),
         ));
         {
             let http_server = http_server.clone();
