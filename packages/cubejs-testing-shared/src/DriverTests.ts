@@ -44,6 +44,7 @@ export class DriverTests {
     { id: 1, amount: 100, status: 'new' },
     { id: 2, amount: 200, status: 'new' },
     { id: 3, amount: 400, status: 'processed' },
+    { id: 4, amount: 500, status: null },
   ];
 
   public static CSV_ROWS = dedent`
