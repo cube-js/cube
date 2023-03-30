@@ -12,7 +12,7 @@ import { Environment } from '../types/Environment';
 
 export async function runEnvironment(type: string): Promise<Environment> {
   const fixtures = getFixtures(type);
-  // buildCube();
+  buildCube();
   getTempPath();
   getSchemaPath(type);
   getCubeJsPath(type);
@@ -23,7 +23,7 @@ export async function runEnvironment(type: string): Promise<Environment> {
   );
   compose.withStartupTimeout(30 * 1000);
   compose.withEnvironment({ CUBEJS_TELEMETRY: 'false' });
-  const _path = `${path.resolve(process.cwd(), './fixtures/postgres.env')}`;
+  const _path = `${path.resolve(process.cwd(), `./fixtures/${type}.env`)}`;
   if (fs.existsSync(_path)) {
     config({
       path: _path,

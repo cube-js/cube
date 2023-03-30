@@ -13,6 +13,8 @@
     "tsc": "tsc",
     "lint": "eslint src/* test/ test/bin --ext .ts",
     "athena": "jest --detectOpenHandles  --runInBand --verbose -i dist/test/athena.test.js",
+    "databricks-jdbc": "jest --detectOpenHandles  --runInBand --verbose -i dist/test/databricks-jdbc.test.js",
+    "mssql": "jest --detectOpenHandles  --runInBand --verbose -i dist/test/mssql.test.js",
     "postgres": "jest --detectOpenHandles  --runInBand --verbose -i dist/test/postgres.test.js",
     "tst": "clear && yarn tsc && jest --detectOpenHandles  --runInBand --verbose -i dist/test/postgres.test.js"
   },
