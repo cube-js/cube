@@ -446,6 +446,9 @@ pub trait ConfigObj: DIService {
     fn max_disk_space_per_worker(&self) -> u64;
 
     fn disk_space_cache_duration_secs(&self) -> u64;
+
+    fn transport_max_message_size(&self) -> usize;
+    fn transport_max_frame_size(&self) -> usize;
 }
 
 #[derive(Debug, Clone)]
@@ -508,6 +511,8 @@ pub struct ConfigObjImpl {
     pub max_disk_space: u64,
     pub max_disk_space_per_worker: u64,
     pub disk_space_cache_duration_secs: u64,
+    pub transport_max_message_size: usize,
+    pub transport_max_frame_size: usize,
 }
 
 crate::di_service!(ConfigObjImpl, [ConfigObj]);
@@ -731,6 +736,14 @@ impl ConfigObj for ConfigObjImpl {
     fn disk_space_cache_duration_secs(&self) -> u64 {
         self.disk_space_cache_duration_secs
     }
+
+    fn transport_max_message_size(&self) -> usize {
+        self.transport_max_message_size
+    }
+
+    fn transport_max_frame_size(&self) -> usize {
+        self.transport_max_frame_size
+    }
 }
 
 lazy_static! {
@@ -953,6 +966,8 @@ impl Config {
                     * 1024
                     * 1024,
                 disk_space_cache_duration_secs: 300,
+                transport_max_message_size: env_parse("TRANSPORT_MAX_MESSAGE_SIZE", 64 << 20),
+                transport_max_frame_size: env_parse("TRANSPORT_MAX_FRAME_SIZE", 16 << 20),
             }),
         }
     }
@@ -1027,6 +1042,8 @@ impl Config {
                 max_disk_space: 0,
                 max_disk_space_per_worker: 0,
                 disk_space_cache_duration_secs: 0,
+                transport_max_message_size: 64 << 20,
+                transport_max_frame_size: 16 << 20,
             }),
         }
     }
@@ -1596,6 +1613,8 @@ impl Config {
                         Duration::from_secs(config.check_ws_orphaned_messages_interval_secs()),
                         Duration::from_secs(config.drop_ws_processing_messages_after_secs()),
                         Duration::from_secs(config.drop_ws_complete_messages_after_secs()),
+                        config.transport_max_message_size(),
+                        config.transport_max_frame_size(),
                     )
                 })
                 .await;

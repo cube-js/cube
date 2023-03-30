@@ -50,6 +50,8 @@ pub struct HttpServer {
     worker_loop: WorkerLoop,
     drop_orphaned_messages_loop: WorkerLoop,
     cancel_token: CancellationToken,
+    max_message_size: usize,
+    max_frame_size: usize,
 }
 
 crate::di_service!(HttpServer, []);
@@ -81,6 +83,8 @@ impl HttpServer {
         check_orphaned_messages_interval: Duration,
         drop_processing_messages_after: Duration,
         drop_complete_messages_after: Duration,
+        max_message_size: usize,
+        max_frame_size: usize,
     ) -> Arc<Self> {
         Arc::new(Self {
             bind_address,
@@ -89,6 +93,8 @@ impl HttpServer {
             check_orphaned_messages_interval,
             drop_processing_messages_after,
             drop_complete_messages_after,
+            max_message_size,
+            max_frame_size,
             worker_loop: WorkerLoop::new("HttpServer message processing"),
             drop_orphaned_messages_loop: WorkerLoop::new("HttpServer drop orphaned messages"),
             cancel_token: CancellationToken::new(),
@@ -121,14 +127,16 @@ impl HttpServer {
         let context_filter = tx_to_move_filter.and(auth_filter.clone());
 
         let context_filter_to_move = context_filter.clone();
+        let max_frame_size = self.max_frame_size.clone();
+        let max_message_size = self.max_message_size.clone();
 
         let query_route = warp::path!("ws")
             .and(context_filter_to_move)
             .and(warp::ws::ws())
-            .and_then(|tx: mpsc::Sender<(mpsc::Sender<Arc<HttpMessage>>, SqlQueryContext, HttpMessage)>, sql_query_context: SqlQueryContext, ws: Ws| async move {
+            .and_then(move |tx: mpsc::Sender<(mpsc::Sender<Arc<HttpMessage>>, SqlQueryContext, HttpMessage)>, sql_query_context: SqlQueryContext, ws: Ws| async move {
                 let tx_to_move = tx.clone();
                 let sql_query_context = sql_query_context.clone();
-                Result::<_, Rejection>::Ok(ws.on_upgrade(async move |mut web_socket| {
+                Result::<_, Rejection>::Ok(ws.max_frame_size(max_frame_size).max_message_size(max_message_size).on_upgrade(async move |mut web_socket| {
                     let (response_tx, mut response_rx) = mpsc::channel::<Arc<HttpMessage>>(10000);
                     loop {
                         tokio::select! {
