@@ -15,6 +15,7 @@ export const nonStringFields = new Set([
   'unionWithSourceData',
   'rewriteQueries',
   'shown',
+  'public',
   'subQuery',
   'propagateFiltersToSubQuery',
   'incremental',
@@ -74,6 +75,7 @@ const BaseDimensionWithoutSubQuery = {
   valuesAsSegments: Joi.boolean().strict(),
   primaryKey: Joi.boolean().strict(),
   shown: Joi.boolean().strict(),
+  public: Joi.boolean().strict(),
   title: Joi.string(),
   description: Joi.string(),
   suggestFilterValues: Joi.boolean().strict(),
@@ -96,8 +98,11 @@ const BaseDimension = Object.assign({
 const BaseMeasure = {
   aliases: Joi.array().items(Joi.string()),
   format: Joi.any().valid('percent', 'currency', 'number'),
-  shown: Joi.boolean().strict(),
+  public: Joi.boolean().strict(),
+  // TODO: Deprecate and remove, please use public
   visible: Joi.boolean().strict(),
+  // TODO: Deprecate and remove, please use public
+  shown: Joi.boolean().strict(),
   cumulative: Joi.boolean().strict(),
   filters: Joi.array().items(
     Joi.object().keys({
@@ -462,6 +467,7 @@ const baseSchema = {
   description: Joi.string(),
   rewriteQueries: Joi.boolean().strict(),
   shown: Joi.boolean().strict(),
+  public: Joi.boolean().strict(),
   joins: Joi.object().pattern(identifierRegex, Joi.object().keys({
     sql: Joi.func().required(),
     relationship: Joi.any().valid('hasMany', 'belongsTo', 'hasOne').required()
@@ -509,8 +515,6 @@ const baseSchema = {
     meta: Joi.any()
   })),
   preAggregations: PreAggregationsAlternatives,
-  includes: Joi.func(),
-  excludes: Joi.func(),
 };
 
 const cubeSchema = inherit(baseSchema, {
@@ -522,6 +526,8 @@ const cubeSchema = inherit(baseSchema, {
 
 const viewSchema = inherit(baseSchema, {
   isView: Joi.boolean().strict(),
+  includes: Joi.func(),
+  excludes: Joi.func(),
 });
 
 function formatErrorMessageFromDetails(explain, d) {
