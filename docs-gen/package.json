@@ -46,6 +46,6 @@
   },
   "dependencies": {
     "fs-extra": "^9.0.0",
-    "inflection": "^1.12.0"
+    "inflection": "^1.13.4"
   }
 }
