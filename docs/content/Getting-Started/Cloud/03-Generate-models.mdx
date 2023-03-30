@@ -1,5 +1,5 @@
 ---
-title: Generate models
+title: Generate data models
 permalink: /getting-started/cloud/generate-models
 category: Getting Started
 subCategory: Cube Cloud
@@ -7,14 +7,17 @@ menuOrder: 4
 isDisableFeedbackBlock: true
 ---
 
-In this step, you will generate models using the connected data source from the
-last step. Cube's models provide a declarative way to define important facts
-about your data, relationships between them and access control.
+In this step, you will generate data models using the connected data source from
+the last step.
+
+Cube's data models provide a declarative way to define important facts about
+your data and relationships between them. You can create data models from
+scratch or let Cube generate an initial version for you.
 
 ## Select tables
 
 Start by selecting the database tables to generate the data schema from, then
-click **Measures and Dimensions**:
+click <Btn>Measures and Dimensions</Btn>:
 
 <div style="text-align: center">
   <img
@@ -28,7 +31,7 @@ click **Measures and Dimensions**:
 ## Measures and dimensions
 
 Next, you'll see all detected measures and dimensions from the data source.
-Click **Primary Keys** to progress to the next step:
+Click <Btn>Primary Keys</Btn> to progress to the next step:
 
 <div style="text-align: center">
   <img
@@ -41,8 +44,8 @@ Click **Primary Keys** to progress to the next step:
 
 ## Primary keys
 
-Review the detected primary keys for each cube and click **Joins** to move to
-the next step:
+Review the detected primary keys for each cube and click <Btn>Joins</Btn> to
+move to the next step:
 
 <div style="text-align: center">
   <img
@@ -55,7 +58,9 @@ the next step:
 
 ## Joins
 
-Once again, review the detected joins and click **Review**:
+Once again, review the detected joins and relationships and click
+
+<Btn>Review</Btn>:
 
 <div style="text-align: center">
   <img
@@ -69,9 +74,9 @@ Once again, review the detected joins and click **Review**:
 ## Review
 
 The last screen allows you to review all the detected cubes and their
-corresponding measures, dimensions and joins. If everything looks good, pick
-either YAML or JavaScript for the model's syntax and click **Confirm &
-Generate**:
+corresponding measures, dimensions, and joins. If everything looks good, pick
+either <Btn>YAML</Btn> (recommended) or <Btn>JavaScript</Btn> format and
+click&nbsp;<Btn>Confirm & Generate</Btn>:
 
 <div style="text-align: center">
   <img
@@ -94,7 +99,7 @@ a few moments you should see the following screen:
   />
 </div>
 
-You're now ready for the last step, [querying the data source via the Cube
-API][ref-getting-started-cloud-query-cube].
+You're now ready for the last step, [querying the
+data][ref-getting-started-cloud-query-cube].
 
 [ref-getting-started-cloud-query-cube]: /getting-started/cloud/query-data

@@ -7,17 +7,17 @@ menuOrder: 5
 isDisableFeedbackBlock: true
 ---
 
-In this step, you will learn how to query your data using the models you created
-in the previous step. Cube Cloud provides several ways to query your data, and
-we'll go over them here.
+In this step, you will learn how to query your data using the data models you
+created in the previous step. Cube Cloud provides several ways to query your
+data, and we'll go over them here.
 
 ## Developer Playground
 
-The Playground is a web-based tool that allows you to query your data without
-writing any code. It's a great way to get started with Cube and explore your
-data.
+The Developer Playground is a web-based tool that allows you to query your data
+without connecting any tools or writing any code. It's a fastest way to explore
+your data.
 
-To open the Playground, open the **Playground** page in Cube Cloud:
+Navigate to the <Btn>Playground</Btn> page in Cube Cloud:
 
 <div style="text-align: center">
   <img
@@ -32,8 +32,8 @@ Next, you will select the measures and dimensions you want to query, and then
 run the query. Let's do this for the `Orders` cube you generated in the previous
 step.
 
-Click **+ Measure** to display the available measures and add `Orders.count`,
-then click **Run**:
+Click <Btn>+ Measure</Btn> to display the available measures and add
+`Orders.count`, then click <Btn>Run</Btn>:
 
 <div style="text-align: center">
   <img
@@ -44,8 +44,8 @@ then click **Run**:
   />
 </div>
 
-Next, click **+ Dimension** for available dimensions and add `Orders.status` and
-then click **Run** again:
+Next, click <Btn>+ Dimension</Btn> for available dimensions, add
+`Orders.status`, and then click <Btn>Run</Btn> again:
 
 <div style="text-align: center">
   <img
@@ -70,8 +70,8 @@ deployment:
   />
 </div>
 
-To see an example of how to query the GraphQL API using cURL, click **How to
-connect your application**:
+To see an example of how to query the GraphQL API using `curl`, click <Btn>How
+to connect your application</Btn>:
 
 <div style="text-align: center">
   <img
@@ -93,8 +93,8 @@ connect your application**:
   />
 </div>
 
-To see an example of how to query the REST API using cURL, click **How to
-connect your application**:
+To see an example of how to query the REST API using `curl`, click <Btn>How to
+connect your application</Btn>:
 
 <div style="text-align: center">
   <img
@@ -107,12 +107,11 @@ connect your application**:
 
 ## SQL API
 
-On the Overview page, click **How to connect**, which will open a modal with
-instructions on different ways to connect to the SQL API. Navigate to the SQL
-API tab and enable the SQL API.
+First, navigate to the <Btn>Settings</Btn> page and enable the SQL API.
 
-Once it is enabled, you should see a screen like the one below with your
-connection credentials:
+Then, on the <Btn>Overview</Btn> page, click <Btn>How to connect</Btn>, which
+will open instructions on connecting different tools to the SQL API. You should
+see a screen with your connection credentials:
 
 <div style="text-align: center">
   <img
@@ -142,9 +141,9 @@ fierce-bear=> SELECT COUNT(*) FROM Orders;
 ```
 
 Since the Cube SQL API is Postgres-compatible, please make sure to select
-**Postgres** as the database type when connecting from BI tools.
+<Btn>Postgres</Btn> as the database type when connecting from BI tools.
 
-Now that we've seen how to query Cube across its APIs, let's take a look at [how
-to add pre-aggregations to your deployment to speed up your queries][next].
+Now that we've seen how to use Cube's APIs, let's take a look at [how to add
+pre-aggregations][next] to speed up your queries.
 
 [next]: /getting-started/cloud/add-a-pre-aggregation

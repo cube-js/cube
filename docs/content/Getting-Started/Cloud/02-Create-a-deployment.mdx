@@ -7,22 +7,19 @@ menuOrder: 3
 isDisableFeedbackBlock: true
 ---
 
-<InfoBox>
+In this step, we will create a new deployment in Cube Cloud. A deployment
+represents a data model, configuration, and managed infrastructure. We will use
+it to connect a data source and generate data models.
+
+## Create an account
 
 To continue with this guide, you'll need to have a Cube Cloud account. If you
 don't have one yet, [click here to sign up][cube-cloud-signup] for free.
 
-</InfoBox>
+## Create a deployment
 
-In this step, we will create a new deployment in Cube Cloud. Deployments
-represent a project, and we will use it to connect our data source and generate
-models.
-
-## Create deployment
-
-The first step in creating a deployment is to [sign in to your Cube Cloud
-account][cube-cloud-signin]. After signing in, click the **Create Deployment**
-button:
+First, [sign in to your Cube Cloud account][cube-cloud-signin]. Then,
+click&nbsp;<Btn>Create Deployment</Btn>:
 
 <div style="text-align: center">
   <img
@@ -33,8 +30,8 @@ button:
   />
 </div>
 
-Give the deployment a name and select the cloud provider and region of your
-choice and click **Next**:
+Give the deployment a name, select the cloud provider and region of your choice,
+and click <Btn>Next</Btn>:
 
 <div style="text-align: center">
   <img
@@ -45,9 +42,9 @@ choice and click **Next**:
   />
 </div>
 
-## Set up Cube project
+## Set up a Cube project
 
-Next, click **Create** to create a new project from scratch:
+Next, click <Btn>Create</Btn> to create a new project from scratch:
 
 <div style="text-align: center">
   <img
@@ -61,11 +58,21 @@ Next, click **Create** to create a new project from scratch:
 ## Connect a data source
 
 The last step in creating a deployment is to connect your data source to Cube
-Cloud.
+Cloud. First, select the data source from the grid:
+
+<div style="text-align: center">
+  <img
+    alt="Cube Cloud Setup Database Screen"
+    src="https://ucarecdn.com/1d656ba9-dd83-4ff4-a59e-8b5f97a9ddcc/"
+    style="border: none"
+    width="80%"
+  />
+</div>
 
 <InfoBox>
 
-Want to use a sample database instead? Use the credentials below:
+Want to use a sample database instead? Select <Btn>PostgreSQL</Btn> and use the
+credentials below:
 
 <br />
 
@@ -79,20 +86,9 @@ Want to use a sample database instead? Use the credentials below:
 
 </InfoBox>
 
-To do this, first select **PostgreSQL** as the data source:
-
-<div style="text-align: center">
-  <img
-    alt="Cube Cloud Setup Database Screen"
-    src="https://ucarecdn.com/1d656ba9-dd83-4ff4-a59e-8b5f97a9ddcc/"
-    style="border: none"
-    width="80%"
-  />
-</div>
-
-After selecting the data source, enter valid credentials for it and click
-**Apply**. Check the [Connecting to Databases][ref-conf-db] page for more
-details on specific data sources.
+After selecting the data source, enter valid credentials for it and
+click&nbsp;<Btn>Apply</Btn>. Check the [Connecting to Databases][ref-conf-db]
+page for more details on specific data sources.
 
 <div style="text-align: center">
   <img
@@ -116,8 +112,8 @@ this would mean adding new [rules][aws-docs-sec-group-rule] to your database's
 | `3.64.153.169`  | `TCP`    | `5432`     |
 | `18.185.128.84` | `TCP`    | `5432`     |
 
-Now that the deployment is configured, we can move on to [generating models from
-our data source][ref-getting-started-cloud-generate-models].
+Now that the deployment is configured, we can move on to [generating data
+models][ref-getting-started-cloud-generate-models].
 
 [aws-docs-sec-group]:
   https://docs.aws.amazon.com/vpc/latest/userguide/security-groups.html
