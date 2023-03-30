@@ -3,6 +3,7 @@ import { Environment } from '../types/Environment';
 import { PatchedDriver } from '../types/PatchedDriver';
 import { CubejsServerCoreExposed } from '../types/CubejsServerCoreExposed';
 import {
+  getFixtures,
   getCreateQueries,
   getCore,
   getDriver,
@@ -19,6 +20,15 @@ export function testSequence(type: string): void {
     let storage: PatchedDriver;
     let query: string[];
     let env: Environment;
+
+    function execute(name: string, test: () => Promise<void>) {
+      const fixtures = getFixtures(type);
+      if (fixtures.skip && fixtures.skip.indexOf(name) >= 0) {
+        it.skip(name, test);
+      } else {
+        it(name, test);
+      }
+    }
 
     beforeAll(async () => {
       env = await runEnvironment(type);
@@ -54,7 +64,7 @@ export function testSequence(type: string): void {
       storage.calls = [];
     });
 
-    it('for the Customers.RollingExternal', async () => {
+    execute('for the Customers.RollingExternal', async () => {
       await core.getRefreshScheduler().buildPreAggregations(
         {
           authInfo: { tenantId: 'tenant1' },
@@ -71,7 +81,7 @@ export function testSequence(type: string): void {
       expect([source.calls, storage.calls]).toMatchSnapshot();
     });
 
-    it('for the Customers.RollingInternal', async () => {
+    execute('for the Customers.RollingInternal', async () => {
       await core.getRefreshScheduler().buildPreAggregations(
         {
           authInfo: { tenantId: 'tenant1' },
@@ -88,7 +98,7 @@ export function testSequence(type: string): void {
       expect([source.calls, storage.calls]).toMatchSnapshot();
     });
 
-    it('for the ECommerce.SimpleAnalysisExternal', async () => {
+    execute('for the ECommerce.SimpleAnalysisExternal', async () => {
       await core.getRefreshScheduler().buildPreAggregations(
         {
           authInfo: { tenantId: 'tenant1' },
@@ -105,7 +115,7 @@ export function testSequence(type: string): void {
       expect([source.calls, storage.calls]).toMatchSnapshot();
     });
 
-    it('for the ECommerce.SimpleAnalysisInternal', async () => {
+    execute('for the ECommerce.SimpleAnalysisInternal', async () => {
       await core.getRefreshScheduler().buildPreAggregations(
         {
           authInfo: { tenantId: 'tenant1' },
@@ -122,7 +132,7 @@ export function testSequence(type: string): void {
       expect([source.calls, storage.calls]).toMatchSnapshot();
     });
 
-    it('for the ECommerce.TimeAnalysisExternal', async () => {
+    execute('for the ECommerce.TimeAnalysisExternal', async () => {
       await core.getRefreshScheduler().buildPreAggregations(
         {
           authInfo: { tenantId: 'tenant1' },
@@ -139,7 +149,7 @@ export function testSequence(type: string): void {
       expect([source.calls, storage.calls]).toMatchSnapshot();
     });
 
-    it('for the ECommerce.TimeAnalysisInternal', async () => {
+    execute('for the ECommerce.TimeAnalysisInternal', async () => {
       await core.getRefreshScheduler().buildPreAggregations(
         {
           authInfo: { tenantId: 'tenant1' },

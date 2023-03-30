@@ -10,6 +10,7 @@ const {
 } = require('@cubejs-backend/shared');
 const sql = require('mssql');
 const { BaseDriver } = require('@cubejs-backend/base-driver');
+const QueryStream = require('./QueryStream');
 
 
 const GenericTypeToMSSql = {
@@ -91,6 +92,64 @@ class MSSqlDriver extends BaseDriver {
 
   testConnection() {
     return this.initialConnectPromise.then((pool) => pool.request().query('SELECT 1 as number'));
+  }
+
+  /**
+   * Executes query in streaming mode.
+   *
+   * @param {string} query 
+   * @param {Array} values 
+   * @param {{ highWaterMark: number? }} options
+   * @return {Promise<StreamTableDataWithTypes>}
+   */
+  async stream(
+    query,
+    values,
+    options,
+  ) {
+    const pool = await this.initialConnectPromise;
+    const request = pool.request();
+
+    request.stream = true;
+    (values || []).forEach((v, i) => {
+      request.input(`_${i + 1}`, v);
+    });
+    request.query(query);
+
+    const stream = new QueryStream(request, options?.highWaterMark);
+    const fields = await new Promise((resolve, reject) => {
+      request.on('recordset', (columns) => {
+        resolve(columns);
+      });
+      request.on('error', (err) => {
+        reject(err);
+      });
+    });
+
+    // [
+    //   {
+    //     "name": "row_id",
+    //     "type": "int"
+    //   },
+    //   {
+    //     "name": "order_id",
+    //     "type": "text"
+    //   },
+    //   {
+    //     "name": "order_date",
+    //     "type": "date"
+    //   },
+    //   {
+    //     "name": "sales",
+    //     "type": "decimal"
+    //   }
+    // ]
+
+    return {
+      rowStream: stream,
+      types: fields,
+      release: async () => {},
+    };
   }
 
   query(query, values) {

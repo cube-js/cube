@@ -12,7 +12,7 @@ import { Environment } from '../types/Environment';
 
 export async function runEnvironment(type: string): Promise<Environment> {
   const fixtures = getFixtures(type);
-  buildCube();
+  // buildCube();
   getTempPath();
   getSchemaPath(type);
   getCubeJsPath(type);
