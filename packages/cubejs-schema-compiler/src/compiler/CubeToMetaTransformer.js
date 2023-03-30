@@ -15,17 +15,26 @@ export class CubeToMetaTransformer {
   }
 
   compile(cubes, errorReporter) {
-    // eslint-disable-next-line no-multi-assign
-    this.cubes = this.queries = this.cubeSymbols.cubeList
+    this.cubes = this.cubeSymbols.cubeList
       .filter(this.cubeValidator.isCubeValid.bind(this.cubeValidator))
       .map((v) => this.transform(v, errorReporter.inContext(`${v.name} cube`)))
       .filter(Boolean);
+
+    /**
+     * @deprecated
+     * @protected
+     */
+    this.queries = this.cubes;
   }
 
+  /**
+   * @protected
+   */
   transform(cube) {
     const cubeTitle = cube.title || this.titleize(cube.name);
-    
+
     return {
+      isVisible: this.isVisible(cube, true),
       config: {
         name: cube.name,
         title: cubeTitle,
@@ -87,13 +96,24 @@ export class CubeToMetaTransformer {
     )(this.queries);
   }
 
+  /**
+   * @protected
+   */
   isVisible(symbol, defaultValue) {
+    if (symbol.public != null) {
+      return symbol.public;
+    }
+
+    // TODO: Deprecated, should be removed in the future
     if (symbol.visible != null) {
       return symbol.visible;
     }
+
+    // TODO: Deprecated, should be removed in the futur
     if (symbol.shown != null) {
       return symbol.shown;
     }
+
     return defaultValue;
   }
 

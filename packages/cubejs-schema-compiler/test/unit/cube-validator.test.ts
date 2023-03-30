@@ -15,6 +15,51 @@ describe('Cube Validation', () => {
     console.log('CubePropContextTranspiler.transpiledFieldsPatterns =', transpiledFieldsPatterns);
   });
 
+  it('cube all ways - correct', async () => {
+    const cubeValidator = new CubeValidator(new CubeSymbols());
+    const cube = {
+      name: 'name',
+      sql: () => 'SELECT * FROM public.Users',
+      public: true,
+      measures: {
+        min: {
+          public: true,
+          sql: () => 'amount',
+          type: 'min'
+        },
+        max: {
+          // old way
+          shown: true,
+          sql: () => 'amount',
+          type: 'max'
+        },
+      },
+      dimensions: {
+        createdAt: {
+          public: true,
+          sql: () => 'created_at',
+          type: 'time'
+        },
+        pkey: {
+          // old way
+          shown: true,
+          sql: () => 'id',
+          type: 'number',
+          primaryKey: true
+        },
+      },
+      fileName: 'fileName',
+    };
+
+    const validationResult = cubeValidator.validate(cube, {
+      error: (message, e) => {
+        console.log(message);
+      }
+    });
+
+    expect(validationResult.error).toBeFalsy();
+  });
+
   it('cube defined with sql - correct', async () => {
     const cubeValidator = new CubeValidator(new CubeSymbols());
     const cube = {

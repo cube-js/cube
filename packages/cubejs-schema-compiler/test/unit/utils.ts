@@ -1,17 +1,21 @@
 interface CreateCubeSchemaOptions {
   name: string,
+  publicly?: boolean,
+  shown?: boolean,
   sqlTable?: string,
   refreshKey?: string,
   preAggregations?: string,
 }
 
-export function createCubeSchema({ name, refreshKey = '', preAggregations = '', sqlTable }: CreateCubeSchemaOptions): string {
+export function createCubeSchema({ name, refreshKey = '', preAggregations = '', sqlTable, publicly, shown }: CreateCubeSchemaOptions): string {
   return ` 
     cube('${name}', {
         ${sqlTable ? `sqlTable: \`${sqlTable}\`` : 'sql: `select * from cards`'},
 
+        ${publicly !== undefined ? `public: ${publicly},` : ''}
+        ${shown !== undefined ? `shown: ${shown},` : ''}
         ${refreshKey}
-   
+
         measures: {
           count: {
             type: 'count'
@@ -29,19 +33,33 @@ export function createCubeSchema({ name, refreshKey = '', preAggregations = '', 
             type: \`min\`
           }
         },
-  
+
         dimensions: {
           id: {
             type: 'number',
             sql: 'id',
             primaryKey: true
           },
+          type: {
+            type: 'string',
+            sql: 'type'
+          },
           createdAt: {
             type: 'time',
             sql: 'created_at'
           },
+          location: {
+            type: 'string',
+            sql: 'location'
+          }
         },
-        
+
+        segments: {
+          sfUsers: {
+            sql: \`\${CUBE}.location = 'San Francisco'\`
+          }
+        },
+
         preAggregations: {
             ${preAggregations}
         }
