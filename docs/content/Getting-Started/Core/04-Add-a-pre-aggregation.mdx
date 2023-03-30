@@ -2,17 +2,17 @@
 title: Add a pre-aggregation
 permalink: /getting-started/core/add-a-pre-aggregation
 category: Getting Started
-subCategory: Core
-menuOrder: 7
+subCategory: Cube Core
+menuOrder: 5
 isDisableFeedbackBlock: true
 ---
 
 In this step, we'll add a pre-aggregation to optimize the performance of a
 specific query. Pre-aggregations are a caching technique that massively reduces
-query time from seconds to milliseconds, and are extremely useful for speeding
+query time from seconds to milliseconds. They are extremely useful for speeding
 up queries that are run frequently.
 
-From the Developer Playground, execute a query:
+From the <Btn>Build</Btn> tab, execute a query:
 
 <div style="text-align: center">
   <img
@@ -23,8 +23,8 @@ From the Developer Playground, execute a query:
   />
 </div>
 
-Just above the results, click on **Query was not accelerated with
-pre-aggregation** to bring up the Rollup Designer:
+Just above the results, click on <Btn>Query was not accelerated with
+pre-aggregation</Btn> to bring up the Rollup Designer:
 
 <div style="text-align: center">
   <img
@@ -36,7 +36,7 @@ pre-aggregation** to bring up the Rollup Designer:
 </div>
 
 The Rollup Designer will automatically suggest a pre-aggregation for the query;
-simply click **Add to the Data Schema** and then retry the query in the
+click&nbsp;<Btn>Add to the Data Schema</Btn> and then retry the query in the
 Playground. This time, the query should be accelerated with a pre-aggregation:
 
 <div style="text-align: center">
