@@ -160,28 +160,22 @@ impl Sink {
         };
         let data = format!("{}:{}|{}", m.name, value, kind);
 
-        let tags_as_str = match (self.constant_tags.is_some(), tags) {
-            (true, tags) => {
+        let msg = match (&self.constant_tags, tags) {
+            (Some(constant_tags), tags) => {
                 if let Some(t) = tags {
-                    Some(&self.constant_tags + "," + &t.join(","))
+                    let tags = constant_tags.clone() + "," + &t.join(",");
+                    format!("{}|#{}", data, tags)
                 } else {
-                    Some(&self.constant_tags)
+                    format!("{}|#{}", data, constant_tags)
                 }
             }
-            (false, tags) => {
+            (None, tags) => {
                 if let Some(t) = tags {
-                    Some(t.join(","))
+                    format!("{}|#{}", data, t.join(","))
                 } else {
-                    None
+                    data
                 }
             }
-        };
-
-        let msg = match tags_as_str {
-            Some(t) => {
-                format!("{}|#{}", data, t)
-            }
-            None => data,
         };
 
         // We deliberately choose to loose metric submissions on failures.

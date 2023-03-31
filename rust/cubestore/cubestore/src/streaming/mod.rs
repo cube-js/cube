@@ -251,7 +251,6 @@ impl StreamingService for StreamingServiceImpl {
 
         let mut last_init_seq_check = SystemTime::now();
         let mut round_trip_started: Option<SystemTime> = None;
-        let server_name = self.config_obj.server_name();
         let tags = vec![format!("location:{}", location)];
 
         while !sealed {
