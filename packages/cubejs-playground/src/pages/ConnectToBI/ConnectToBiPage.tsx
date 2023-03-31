@@ -1,5 +1,5 @@
 import { ReactNode } from 'react';
-import { Tabs, Alert, Checkbox, Typography, Space, Layout } from 'antd';
+import { Tabs, Alert, Checkbox, Typography, Space } from 'antd';
 import styled from 'styled-components';
 import { CodeSnippet } from '../../atoms';
 import { CopiableInput } from '../../components/CopiableInput';
@@ -154,7 +154,7 @@ type FieldProps =
         | ((deployment: CubeSqlCredentials, branchName?: string) => boolean);
     };
 
-const CUBESQL_PG_PORT = '5432';
+const CUBESQL_PG_PORT = '15432';
 
 const PG_SNIPPET_FIELD: FieldProps = {
   type: 'snippet',
