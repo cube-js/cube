@@ -45,6 +45,7 @@ import MyH3 from '../components/Headers/MyH3';
 import { ParameterTable } from '../components/ReferenceDocs/ParameterTable';
 import { Snippet, SnippetGroup } from '../components/Snippets/SnippetGroup';
 import { CodeTabs } from '../components/CodeTabs';
+import InlineButton from '../components/InlineButton/InlineButton';
 
 const MyH4: React.FC<{ children: string }> = ({ children }) => {
   return (<h4 id={kebabCase(children)} name={kebabCase(children)}>{children}</h4>);
@@ -68,6 +69,7 @@ const components = {
   h3: ScrollSpyH3,
   h4: MyH4,
   CodeTabs,
+  Btn: InlineButton,
 };
 
 const MDX = (props) => (
