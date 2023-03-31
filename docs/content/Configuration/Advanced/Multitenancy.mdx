@@ -349,13 +349,6 @@ input.
 
 </WarningBox>
 
-## Connecting to Redis
-
-When configured for multitenancy, Cube uses a separate connection pool for each
-configured tenant. This means that the `CUBEJS_REDIS_POOL_MIN` and
-`CUBEJS_REDIS_POOL_MAX` environment variables specify the minimum and maximum
-number of Redis connections **per-tenant**.
-
 [ref-config]: /config
 [ref-config-opts]: /config#options-reference
 [ref-config-db]: /config/databases
