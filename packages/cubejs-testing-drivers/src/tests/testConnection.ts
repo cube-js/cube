@@ -1,6 +1,5 @@
 import { jest, expect, beforeAll, afterAll } from '@jest/globals';
 import { BaseDriver } from '@cubejs-backend/base-driver';
-import { Readable } from 'stream';
 import { Environment } from '../types/Environment';
 import {
   getFixtures,
