@@ -184,7 +184,7 @@ export class CompilerApi {
     );
   }
 
-  async metaConfig(options) {
+  async metaConfig(options = {}) {
     return (await this.getCompilers(options)).metaTransformer.cubes;
   }
 
