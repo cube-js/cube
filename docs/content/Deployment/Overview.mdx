@@ -21,9 +21,9 @@ Checklist][ref-deploy-prod-list].
 As shown in the diagram below, a typical production deployment of Cube includes
 the following components:
 
-- one or multiple API instances
-- a refresh worker
-- a Cube Store cluster
+- One or multiple API instances
+- A Refresh Worker
+- A Cube Store cluster
 
 <div style="text-align: center">
   <img
@@ -61,7 +61,7 @@ The [Cube Docker image][dh-cubejs] is used for API Instance.
 API instance needs to be configured via environment variables, cube.js file and
 has access to the data schema files.
 
-## Refresh worker
+## Refresh Worker
 
 A Refresh Worker updates pre-aggregations and invalidates the in-memory cache in
 the background. They also keep the refresh keys up-to-date for all defined
