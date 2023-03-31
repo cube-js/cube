@@ -33,6 +33,27 @@ CUBEJS_DB_USER=redshift_user
 CUBEJS_DB_PASS=**********
 ```
 
+### <--{"id" : "Setup"}--> Cube Cloud
+
+<InfoBox>
+
+The Redshift cluster must be accessible over the public Internet. If you'd
+prefer to keep the database on a private network,
+[contact us for VPC peering solutions](https://cube.dev/contact).
+
+</InfoBox>
+
+The following fields are required when creating an AWS Redshift connection:
+
+<div style="text-align: center">
+  <img
+    alt="Cube Cloud AWS Redshift Configuration Screen"
+    src="https://ucarecdn.com/4ccd3485-36fe-4740-9a11-0e8fb23fe8c3/"
+    style="border: none"
+    width="100%"
+  />
+</div>
+
 ## Environment Variables
 
 | Environment Variable                   | Description                                                                         | Possible Values           | Required | [Supports multiple data sources?][ref-config-multiple-ds-decorating-env] |

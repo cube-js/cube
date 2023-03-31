@@ -21,40 +21,10 @@ You can connect all Cube supported databases to your Cube Cloud deployment.
 Below you can find guides on how to use Cube Cloud with specific database
 vendors.
 
-- [AWS Redshift](#aws-redshift)
 - [BigQuery](#big-query)
 - [Snowflake](#snowflake)
 
 ## Guides
-
-### <--{"id" : "Guides"}--> AWS Redshift
-
-<WarningBox>
-
-Ensure that the database can be accessed over the public Internet. If you'd
-prefer to keep the database on a private network,
-[contact us for VPC peering solutions](#connecting-to-a-database-not-exposed-over-the-internet).
-
-</WarningBox>
-
-The following fields are required when creating an AWS Redshift connection:
-
-| Field        | Description                                  | Examples                                                       |
-| ------------ | -------------------------------------------- | -------------------------------------------------------------- |
-| **Hostname** | The host URL for the AWS Redshift cluster    | `examplecluster.abc123xyz789.us-west-2.redshift.amazonaws.com` |
-| **Port**     | The port for the AWS Redshift cluster        | `5439`                                                         |
-| **Database** | The name of the database to connect to       | `public`                                                       |
-| **Username** | The username used to connect to the database | `redshift`                                                     |
-| **Password** | The password used to connect to the database | `MY_SUPER_SECRET_PASSWORD`                                     |
-
-<div style="text-align: center">
-  <img
-    alt="Cube Cloud AWS Redshift Configuration Screen"
-    src="https://ucarecdn.com/4ccd3485-36fe-4740-9a11-0e8fb23fe8c3/"
-    style="border: none"
-    width="100%"
-  />
-</div>
 
 ### <--{"id" : "Guides"}--> BigQuery
 
