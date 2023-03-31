@@ -122,7 +122,7 @@ impl Metric {
 struct Sink {
     socket: UdpSocket,
     mode: Compatibility,
-    constant_tags: Vec<String>,
+    constant_tags: Option<String>,
 }
 
 impl Sink {
@@ -130,11 +130,18 @@ impl Sink {
         bind_addr: impl ToSocketAddrs,
         addr: impl ToSocketAddrs,
         mode: Compatibility,
-        constant_tags: Vec<String>,
+        tags: Vec<String>,
     ) -> Result<Sink, CubeError> {
         let socket = UdpSocket::bind(bind_addr)?;
         socket.connect(addr)?;
         socket.set_nonblocking(true)?;
+
+        let constant_tags = if tags.len() > 0 {
+            Some(tags.join(","))
+        } else {
+            None
+        };
+
         Ok(Sink {
             socket,
             mode,
@@ -153,17 +160,20 @@ impl Sink {
         };
         let data = format!("{}:{}|{}", m.name, value, kind);
 
-        let tags_as_str = if self.constant_tags.len() > 0 {
-            if let Some(t) = tags {
-                Some(self.constant_tags.join(",") + "," + &t.join(","))
-            } else {
-                Some(self.constant_tags.join(","))
+        let tags_as_str = match (self.constant_tags.is_some(), tags) {
+            (true, tags) => {
+                if let Some(t) = tags {
+                    Some(&self.constant_tags + "," + &t.join(","))
+                } else {
+                    Some(&self.constant_tags)
+                }
             }
-        } else {
-            if let Some(t) = tags {
-                Some(t.join(","))
-            } else {
-                None
+            (false, tags) => {
+                if let Some(t) = tags {
+                    Some(t.join(","))
+                } else {
+                    None
+                }
             }
         };
 
