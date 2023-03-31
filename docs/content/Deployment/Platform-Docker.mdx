@@ -4,7 +4,7 @@ menuTitle: Docker
 permalink: /deployment/platforms/docker
 category: Deployment
 subCategory: Platforms
-menuOrder: 2
+menuOrder: 11
 ---
 
 This guide walks you through deploying Cube with Docker.
@@ -207,7 +207,6 @@ services:
       - CUBEJS_DB_BQ_CREDENTIALS=<BQ-KEY>
       - CUBEJS_DB_EXPORT_BUCKET=cubestore
       - CUBEJS_CUBESTORE_HOST=cubestore_router
-      - CUBEJS_REDIS_URL=redis://redis:6379
       - CUBEJS_API_SECRET=secret
       - CUBEJS_JWK_URL=https://cognito-idp.<AWS_REGION>.amazonaws.com/<USER_POOL_ID>/.well-known/jwks.json
       - CUBEJS_JWT_AUDIENCE=<APPLICATION_URL>
@@ -220,7 +219,6 @@ services:
       - cubestore_worker_1
       - cubestore_worker_2
       - cube_refresh_worker
-      - redis
 ```
 
 ### <--{"id" : "Security"}--> Securing Cube Store
@@ -274,14 +272,12 @@ services:
       - CUBEJS_DB_BQ_CREDENTIALS=<BQ-KEY>
       - CUBEJS_DB_EXPORT_BUCKET=cubestore
       - CUBEJS_CUBESTORE_HOST=cubestore_router
-      - CUBEJS_REDIS_URL=redis://redis:6379
       - CUBEJS_API_SECRET=secret
     volumes:
       - .:/cube/conf
     depends_on:
       - cubestore_router
       - cube_refresh_worker
-      - redis
 ```
 
 ## Extend the Docker image
@@ -337,7 +333,6 @@ services:
       - CUBEJS_DB_BQ_CREDENTIALS=<BQ-KEY>
       - CUBEJS_DB_EXPORT_BUCKET=cubestore
       - CUBEJS_CUBESTORE_HOST=cubestore_router
-      - CUBEJS_REDIS_URL=redis://redis:6379
       - CUBEJS_API_SECRET=secret
     volumes:
       - .:/cube/conf
@@ -346,7 +341,6 @@ services:
     depends_on:
       - cubestore_router
       - cube_refresh_worker
-      - redis
 ```
 
 [medium-letsencrypt-nginx]:
