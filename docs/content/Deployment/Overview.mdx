@@ -10,16 +10,20 @@ redirect_from:
 ---
 
 This section contains a general overview of deploying a Cube cluster in
-production. You can find platform-specific guides for:
-
-- [Cube Cloud][ref-deploy-cubecloud]
-- [Docker][ref-deploy-docker]
+production. You can also check platform-specific guides for [Cube
+Cloud][ref-deploy-cubecloud] and [Docker][ref-deploy-docker].
 
 If you are moving Cube to production, check out the [Production
 Checklist][ref-deploy-prod-list].
 
-As shown in the diagram below, a typical production Cube cluster consists of one
-or multiple API instances, a Refresh Worker and a Cube Store cluster.
+## Components
+
+As shown in the diagram below, a typical production deployment of Cube includes
+the following components:
+
+- one or multiple API instances
+- a refresh worker
+- a Cube Store cluster
 
 <div style="text-align: center">
   <img
@@ -45,7 +49,7 @@ Cube Store cluster can be configured via environment variables.
 You can find an example Docker Compose configuration for a Cube deployment in
 the platform-specific guide for [Docker][ref-deploy-docker].
 
-## API Instance
+## API instances
 
 API instances process incoming API requests and query either Cube Store for
 pre-aggregated data or connected data sources for raw data. It is possible to
@@ -57,14 +61,14 @@ The [Cube Docker image][dh-cubejs] is used for API Instance.
 API instance needs to be configured via environment variables, cube.js file and
 has access to the data schema files.
 
-## Refresh Worker
+## Refresh worker
 
-A Refresh Worker updates pre-aggregations and invalidates the in-memory cache in the
-background. They also keep the refresh keys up-to-date for all defined schemas
-and pre-aggregations.
-Please note that the in-memory cache is just invalidated but not populated by Refresh Worker.
-In-memory cache is populated lazily during querying.
-On the other hand, pre-aggregations are eagerly populated and kept up-to-date by Refresh Worker.
+A Refresh Worker updates pre-aggregations and invalidates the in-memory cache in
+the background. They also keep the refresh keys up-to-date for all defined
+schemas and pre-aggregations. Please note that the in-memory cache is just
+invalidated but not populated by Refresh Worker. In-memory cache is populated
+lazily during querying. On the other hand, pre-aggregations are eagerly
+populated and kept up-to-date by Refresh Worker.
 
 [Cube Docker image][dh-cubejs] can be used for creating Refresh Workers; to make
 the service act as a Refresh Worker, `CUBEJS_REFRESH_WORKER=true` should be set
