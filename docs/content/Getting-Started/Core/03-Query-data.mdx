@@ -65,24 +65,25 @@ curl \
 
 ## SQL API
 
-To enable the SQL API, we first need to add a few new environment variables to
-the project's `.env` file:
-
-```bash
-CUBEJS_PG_SQL_PORT=5432
-CUBEJS_SQL_USER=myusername
-CUBEJS_SQL_PASSWORD=mypassword
-```
-
-If you're running Cube through Docker Compose, remember to add a port mapping to
-the Cube service for `CUBEJS_PG_SQL_PORT`:
+To enable the SQL API, we first need to add a few new environment variables.
+Let's add them to the `docker-compose.yml` file:
 
 ```yaml
+version: '2.2'
+
 services:
   cube:
-    image: cubejs/cube
+    image: cubejs/cube:latest
     ports:
-      - 5432:5432 # Cube SQL API
+      - 4000:4000 # Playground
+      - 5432:5432 # SQL API
+    environment:
+      - CUBEJS_DEV_MODE=true
+      - CUBEJS_PG_SQL_PORT=5432
+      - CUBEJS_SQL_USER=myusername
+      - CUBEJS_SQL_PASSWORD=mypassword
+    volumes:
+      - .:/cube/conf
 ```
 
 You can connect via the `psql` client with provided credentials:
