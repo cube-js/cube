@@ -14,11 +14,11 @@ Google BigQuery credentials [here][bq-docs-getting-started].
 
 </InfoBox>
 
-- [The Google Cloud Project ID][google-cloud-docs-projects] for the
+- The [Google Cloud Project ID][google-cloud-docs-projects] for the
   [BigQuery][bq] project
-- [A set of Google Cloud service credentials][google-support-create-svc-account]
-  [which allow access][bq-docs-getting-started] to the [BigQuery][bq] project
-- [The Google Cloud region][bq-docs-regional-locations] for the [BigQuery][bq]
+- A set of [Google Cloud service credentials][google-support-create-svc-account]
+  which [allow access][bq-docs-getting-started] to the [BigQuery][bq] project
+- The [Google Cloud region][bq-docs-regional-locations] for the [BigQuery][bq]
   project
 
 ## Setup
@@ -39,6 +39,19 @@ You could also encode the key file using Base64 and set the result to
 ```dotenv
 CUBEJS_DB_BQ_CREDENTIALS=$(cat /path/to/my/keyfile.json | base64)
 ```
+
+### <--{"id" : "Setup"}--> Cube Cloud
+
+The following fields are required when creating a BigQuery connection:
+
+<div style="text-align: center">
+  <img
+    alt="Cube Cloud BigQuery Configuration Screen"
+    src="https://ucarecdn.com/9fdfbd5d-5556-48b3-aa6e-fff0f24b30e9/"
+    style="border: none"
+    width="100%"
+  />
+</div>
 
 ## Environment Variables
 
