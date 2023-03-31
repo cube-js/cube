@@ -5,6 +5,7 @@ import { AthenaDriver } from '../src';
 
 class AthenaDriverTest extends DriverTests {
   protected getExpectedCsvRows() {
+    // Athena uses \N for null values
     return smartStringTrim`
       orders__status,orders__amount
       new,300

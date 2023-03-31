@@ -76,7 +76,7 @@ export class DriverTests {
       SELECT orders.status AS orders__status, sum(orders.amount) AS orders__amount        
       FROM (${DriverTests.QUERY}) AS orders
       GROUP BY 1
-      ORDER BY 1
+      ORDER BY 2
     `;
     const tableName = await this.createUnloadTable(query);
     assert(this.driver.unload);
