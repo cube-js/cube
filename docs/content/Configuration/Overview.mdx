@@ -6,10 +6,10 @@ category: Configuration
 menuOrder: 1
 ---
 
-Cube is designed to work with different configuration sources. There are two
-ways you can set configuration options; via [a configuration file][link-config],
-commonly known as the `cube.js` file, and [environment
-variables][link-env-vars].
+Cube can be configured in two ways. The first is through [a configuration
+file][link-config], commonly known as the `cube.js` file, and secondly, through
+[environment variables][link-env-vars]. Values specified in `cube.js` will take
+precedence over environment variables.
 
 <InfoBox>
 
@@ -18,10 +18,19 @@ When using Docker, ensure that the `cube.js` configuration file and your
 
 </InfoBox>
 
-## Configuration Precedence
+## Cube Cloud
 
-In Cube, values specified in `cube.js` take precedence over environment
-variables.
+You can set [Cube environment variables](/reference/environment-variables) and
+other custom environment variables in **Settings > Configuration**.
+
+<div style="text-align: center">
+  <img
+    alt="Cube Cloud Environment Variables Screen"
+    src="https://ucarecdn.com/b47693b9-f770-4e01-a0d1-60e3fcf19e23/"
+    style="border: none"
+    width="100%"
+  />
+</div>
 
 ## Development Mode
 
