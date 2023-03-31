@@ -51,6 +51,7 @@ export class DriverTests {
     orders__status,orders__amount
     new,300
     processed,400
+    \N,500
   `;
 
   public async testQuery() {
@@ -171,15 +172,17 @@ export class DriverTests {
     return text.split('\n').slice(1).join('\n');
   }
 
-  private static rowsToString(rows: Record<string, any>[]): Record<string, string>[] {
-    const result: Record<string, string>[] = [];
+  private static rowsToString(rows: Record<string, any>[]): Record<string, string | null>[] {
+    const result: Record<string, string | null>[] = [];
+
     for (const row of rows) {
       const newRow: Record<string, string> = {};
       for (const k of Object.keys(row)) {
-        newRow[k] = row[k].toString();
+        newRow[k] = row[k] === null ? null : row[k].toString();
       }
       result.push(newRow);
     }
+
     return result;
   }
 }
