@@ -73,25 +73,24 @@ export function testConnection(type: string): void {
       query = getSelectQueries(type);
       const response = await Promise.all(
         query.map(async (q) => {
-          const res = driver.stream &&
+          const stream = driver.stream &&
             await driver.stream(q, [], { highWaterMark: 16000 });
+          const { types } = stream;
+          const data: unknown[] = [];
           await new Promise((resolve) => {
-            console.log(JSON.stringify(res.types, undefined, 2));
-            Object.keys(res.types).forEach((k) => {
-              console.log('TYPE: ', res.types[k].type);
+            const { rowStream } = stream;
+            rowStream.on('data', (row: unknown) => {
+              data.push(row);
             });
-            const stream: Readable = res.rowStream;
-            stream.on('data', (el) => {
-              console.log(JSON.stringify(el, undefined, 2));
-            });
-            stream.on('close', () => {
-              res.release();
+            rowStream.on('end', () => {
+              stream.release();
               resolve(undefined);
             });
           });
-          return res;
+          return { types, data };
         })
       );
+      expect(response).toMatchSnapshot();
     });
 
     execute('must delete the data source', async () => {

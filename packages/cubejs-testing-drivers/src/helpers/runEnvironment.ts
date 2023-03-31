@@ -2,7 +2,6 @@ import * as fs from 'fs-extra';
 import * as path from 'path';
 import { config } from 'dotenv';
 import { DockerComposeEnvironment } from 'testcontainers';
-import { buildCube } from './buildCube';
 import { getFixtures } from './getFixtures';
 import { getTempPath } from './getTempPath';
 import { getComposePath } from './getComposePath';
@@ -12,7 +11,6 @@ import { Environment } from '../types/Environment';
 
 export async function runEnvironment(type: string): Promise<Environment> {
   const fixtures = getFixtures(type);
-  // buildCube();
   getTempPath();
   getSchemaPath(type);
   getCubeJsPath(type);

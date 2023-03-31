@@ -119,37 +119,100 @@ class MSSqlDriver extends BaseDriver {
     const stream = new QueryStream(request, options?.highWaterMark);
     const fields = await new Promise((resolve, reject) => {
       request.on('recordset', (columns) => {
-        resolve(columns);
+        resolve(this.mapFields(columns));
       });
       request.on('error', (err) => {
         reject(err);
       });
     });
-
-    // [
-    //   {
-    //     "name": "row_id",
-    //     "type": "int"
-    //   },
-    //   {
-    //     "name": "order_id",
-    //     "type": "text"
-    //   },
-    //   {
-    //     "name": "order_date",
-    //     "type": "date"
-    //   },
-    //   {
-    //     "name": "sales",
-    //     "type": "decimal"
-    //   }
-    // ]
-
     return {
       rowStream: stream,
       types: fields,
       release: async () => {},
     };
+  }
+
+  /**
+   * @param {{
+   *   [name: string]: {
+   *     index: number,
+   *     name: string,
+   *     type: *,
+   *     nullable: boolean,
+   *     caseSensitive: boolean,
+   *     identity: boolean,
+   *     readOnly: boolean,
+   *     length: number?,
+   *     scale: number?,
+   *     precision: number?
+   *   }
+   * }} fields 
+   */
+  mapFields(fields) {
+    return Object.keys(fields).map((field) => {
+      let type;
+      switch (fields[field].type) {
+        case sql.Bit:
+          type = 'boolean';
+          break;
+        // integers
+        case sql.Int:
+        case sql.SmallInt:
+        case sql.TinyInt:
+          type = 'int';
+          break;
+        // float
+        case sql.Real:
+        case sql.Money:
+        case sql.SmallMoney:
+        case sql.Numeric:
+          type = 'float';
+          break;
+        // double
+        case sql.Float:
+        case sql.Decimal:
+          type = 'double';
+          break;
+        // strings
+        case sql.Char:
+        case sql.NChar:
+        case sql.Text:
+        case sql.VarChar:
+        case sql.NVarChar:
+        case sql.Xml:
+          type = 'text';
+          break;
+        // date and time
+        case sql.Time:
+          type = 'string';
+          break;
+        case sql.Date:
+          type = 'date';
+          break;
+        case sql.DateTime:
+        case sql.DateTime2:
+        case sql.SmallDateTime:
+        case sql.DateTimeOffset:
+          type = 'timestamp';
+          break;
+        // others
+        case sql.UniqueIdentifier:
+        case sql.Variant:
+        case sql.Binary:
+        case sql.VarBinary:
+        case sql.Image:
+        case sql.UDT:
+        case sql.Geography:
+        case sql.Geometry:
+          type = 'string';
+          break;
+        // unknown
+        default:
+          type = 'string';
+          break;
+      }
+      return { name: fields[field].name, type };
+    });
   }
 
   query(query, values) {

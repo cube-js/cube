@@ -11,6 +11,7 @@
   },
   "scripts": {
     "tsc": "tsc",
+    "build": "node dist/test/build",
     "lint": "eslint src/* test/ test/bin --ext .ts",
     "athena": "jest --detectOpenHandles  --runInBand --verbose -i dist/test/athena.test.js",
     "databricks-jdbc": "jest --detectOpenHandles  --runInBand --verbose -i dist/test/databricks-jdbc.test.js",
