@@ -300,6 +300,8 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       throw new Error('Query has been cancelled');
     }
 
+    // test
+
     return status === 'SUCCEEDED';
   }
 
