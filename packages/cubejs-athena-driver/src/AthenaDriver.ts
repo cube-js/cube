@@ -343,7 +343,8 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
         const fields: Record<string, any> = {};
         columnInfo
           .forEach((c, j) => {
-            fields[c.Name] = row.Data?.[j].VarCharValue;
+            const r = row.Data;
+            fields[c.Name] = (r === null || r === undefined || r[j].VarCharValue === undefined) ? null : r[j].VarCharValue;
           });
         yield fields as R;
       }
