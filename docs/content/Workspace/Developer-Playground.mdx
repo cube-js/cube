@@ -11,7 +11,7 @@ applications from a variety of templates for different frontend frameworks and
 data visualization libraries.
 
 Developer Playground is available on `http://localhost:4000` when Cube is run in
-[development mode][link-dev-mode].
+[development mode][ref-dev-mode].
 
 Here's an example of building a query and plotting the results in Developer
 Playground:
@@ -59,7 +59,7 @@ queries, we do not recommend running it on a production instance. You can use
 use it to query your Cube API in a secure way.
 
 You can also securely run Playground on top of the production Cube instance
-inside [Cube Cloud][link-cube-cloud].
+inside [Cube Cloud][cube-cloud].
 
 <div style="text-align: center">
   <img
@@ -70,5 +70,23 @@ inside [Cube Cloud][link-cube-cloud].
   />
 </div>
 
-[link-cube-cloud]: https://cube.dev/cloud
-[link-dev-mode]: /configuration/overview
+## Running Playground in Cube Cloud
+
+The Cube Cloud Developer Playground is mostly similar to the one available in
+Cube with the notable difference of being able to query the Development Mode
+API. After making changes to the schema through the [Cube
+IDE][ref-devtools-ide], the API will restart and its status will be visible in
+the Playground:
+
+<div style="text-align: center">
+  <img
+    alt="Playground during API restart"
+    src="https://ucarecdn.com/ee419318-7021-4f77-ac62-215ef40292d7/"
+    style="border: none"
+    width="100%"
+  />
+</div>
+
+[cube-cloud]: https://cube.dev/cloud
+[ref-dev-mode]: /configuration/overview
+[ref-devtools-ide]: /cloud/dev-tools/cube-ide
