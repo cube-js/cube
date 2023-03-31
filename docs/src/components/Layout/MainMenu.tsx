@@ -25,21 +25,19 @@ const menuOrder = [
   'Caching',
   'Authentication & Authorization',
   'API Reference',
+  'HTTP API',
   'SQL API',
   'Frontend Integrations',
+  'Workspace',
   'Deployment',
-  'Developer Tools',
+  'Observability',
   'Examples & Tutorials',
   'FAQs',
   'Release Notes',
+  'Reference',
   'Cube Cloud Getting Started',
-  'Configuration',
-  'Cloud Workspace',
-  'Deploys',
   'Inspecting Queries',
-  'Release Notes',
   'Cloud Runtime',
-  'Pricing'
 ];
 
 const nameRules: Record<string, string> = {
