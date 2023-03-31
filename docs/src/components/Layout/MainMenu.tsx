@@ -21,7 +21,7 @@ const menuOrder = [
   'Cube.js Introduction',
   'Getting Started',
   'Configuration',
-  'Data Schema',
+  'Data Modeling',
   'Caching',
   'Authentication & Authorization',
   'API Reference',
