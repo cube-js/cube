@@ -11,8 +11,8 @@ Choose a data store to get started with below.
 
 <InfoBox>
   If you'd like to connect to a data store which is not yet listed on this page,
-  please <a href="https://github.com/cube-js/cube/issues">file an issue</a>{' '}
-  on GitHub. You can also contribute a driver, see this{' '}
+  please <a href="https://github.com/cube-js/cube/issues">file an issue</a> on
+  GitHub. You can also contribute a driver, see this{' '}
   <a href="https://github.com/cube-js/cube/blob/master/CONTRIBUTING.md#implementing-driver">
     step-by-step guide
   </a>
@@ -159,6 +159,12 @@ Choose a data store to get started with below.
 Cube supports connection to multiple databases out-of-the-box. Please refer to
 the [Multiple Data Sources page][ref-config-multi-data-src] to learn more.
 
+If you are connecting to multiple databases using Cube Cloud, set up the first
+database connection when creating a new deployment. Ensure you have the correct
+configuration in your `cube.js` file according to your
+[multitenancy setup](/config/multitenancy). Next, configure the corresponding
+environment variables on the **Settings - Env Vars page**.
+
 ## Driver Support
 
 Most of the drivers for data sources are supported either directly by the Cube
@@ -178,10 +184,28 @@ highlighted as such in their respective pages.
 
 You're more than welcome to contribute new drivers as well as new features and
 patches to
-[existing drivers](https://github.com/cube-js/cube/tree/master/packages).
-Please check the
+[existing drivers](https://github.com/cube-js/cube/tree/master/packages). Please
+check the
 [contribution guidelines](https://github.com/cube-js/cube/blob/master/CONTRIBUTING.md#contributing-database-drivers)
 and join the `#contributors` channel in our
 [Slack community](https://slack.cube.dev).
 
+## Cube Cloud
+
+### <--{"id" : "Cube Cloud"}--> Allowing connections from Cube Cloud IP
+
+In some cases you'd need to allow connections from your Cube Cloud deployment IP
+address to your database. You can copy the IP address from either the Database
+Setup step in deployment creation, or from **Settings / Configuration** in your
+deployment.
+
+### <--{"id" : "Cube Cloud"}--> Connecting to data sources not exposed over the Internet
+
+Cube Cloud supports connecting to data sources within private VPCs. Please
+[contact us][cube-contact] to learn more. If you already have VPCs
+enabled in your account, check out the [VPC documentation][ref-cloud-conf-vpc]
+to learn how to get started.
+
+[cube-contact]: https://cube.dev/contact/
 [ref-config-multi-data-src]: /config/multiple-data-sources
+[ref-cloud-conf-vpc]: /cloud/configuration/connecting-with-a-vpc
