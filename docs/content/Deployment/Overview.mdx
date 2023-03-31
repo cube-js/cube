@@ -10,16 +10,20 @@ redirect_from:
 ---
 
 This section contains a general overview of deploying a Cube cluster in
-production. You can find platform-specific guides for:
-
-- [Cube Cloud][ref-deploy-cubecloud]
-- [Docker][ref-deploy-docker]
+production. You can also check platform-specific guides for [Cube
+Cloud][ref-deploy-cubecloud] and [Docker][ref-deploy-docker].
 
 If you are moving Cube to production, check out the [Production
 Checklist][ref-deploy-prod-list].
 
-As shown in the diagram below, a typical production Cube cluster consists of one
-or multiple API instances, a Refresh Worker and a Cube Store cluster.
+## Components
+
+As shown in the diagram below, a typical production deployment of Cube includes
+the following components:
+
+- One or multiple API instances
+- A Refresh Worker
+- A Cube Store cluster
 
 <div style="text-align: center">
   <img
@@ -42,86 +46,10 @@ also need access to the data schema files.
 
 Cube Store cluster can be configured via environment variables.
 
-Below you can find an example Docker Compose configuration for a Cube cluster:
+You can find an example Docker Compose configuration for a Cube deployment in
+the platform-specific guide for [Docker][ref-deploy-docker].
 
-```yaml
-version: '2.2'
-
-services:
-  cube_api:
-    image: cubejs/cube
-    ports:
-      - 4000:4000
-    environment:
-      - CUBEJS_DB_TYPE=bigquery
-      - CUBEJS_DB_BQ_PROJECT_ID=cubejs-k8s-cluster
-      - CUBEJS_DB_BQ_CREDENTIALS=<BQ-KEY>
-      - CUBEJS_DB_EXPORT_BUCKET=cubestore
-
-      - CUBEJS_CUBESTORE_HOST=cubestore_router
-
-      - CUBEJS_API_SECRET=secret
-    volumes:
-      - .:/cube/conf
-    depends_on:
-      - cubestore_worker_1
-      - cubestore_worker_2
-      - cube_refresh_worker
-
-  cube_refresh_worker:
-    image: cubejs/cube
-    environment:
-      - CUBEJS_DB_TYPE=bigquery
-      - CUBEJS_DB_BQ_PROJECT_ID=cubejs-k8s-cluster
-      - CUBEJS_DB_BQ_CREDENTIALS=<BQ-KEY>
-      - CUBEJS_DB_EXPORT_BUCKET=cubestore
-
-      - CUBEJS_CUBESTORE_HOST=cubestore_router
-
-      - CUBEJS_API_SECRET=secret
-
-      - CUBEJS_REFRESH_WORKER=true
-    volumes:
-      - .:/cube/conf
-
-  cubestore_router:
-    image: cubejs/cubestore:latest
-    environment:
-      - CUBESTORE_WORKERS=cubestore_worker_1:10001,cubestore_worker_2:10002
-      - CUBESTORE_REMOTE_DIR=/cube/data
-      - CUBESTORE_META_PORT=9999
-      - CUBESTORE_SERVER_NAME=cubestore_router:9999
-    volumes:
-      - .cubestore:/cube/data
-
-  cubestore_worker_1:
-    image: cubejs/cubestore:latest
-    environment:
-      - CUBESTORE_WORKERS=cubestore_worker_1:10001,cubestore_worker_2:10002
-      - CUBESTORE_SERVER_NAME=cubestore_worker_1:10001
-      - CUBESTORE_WORKER_PORT=10001
-      - CUBESTORE_REMOTE_DIR=/cube/data
-      - CUBESTORE_META_ADDR=cubestore_router:9999
-    volumes:
-      - .cubestore:/cube/data
-    depends_on:
-      - cubestore_router
-
-  cubestore_worker_2:
-    image: cubejs/cubestore:latest
-    environment:
-      - CUBESTORE_WORKERS=cubestore_worker_1:10001,cubestore_worker_2:10002
-      - CUBESTORE_SERVER_NAME=cubestore_worker_2:10002
-      - CUBESTORE_WORKER_PORT=10002
-      - CUBESTORE_REMOTE_DIR=/cube/data
-      - CUBESTORE_META_ADDR=cubestore_router:9999
-    volumes:
-      - .cubestore:/cube/data
-    depends_on:
-      - cubestore_router
-```
-
-## API Instance
+## API instances
 
 API instances process incoming API requests and query either Cube Store for
 pre-aggregated data or connected data sources for raw data. It is possible to
@@ -135,12 +63,12 @@ has access to the data schema files.
 
 ## Refresh Worker
 
-A Refresh Worker updates pre-aggregations and invalidates the in-memory cache in the
-background. They also keep the refresh keys up-to-date for all defined schemas
-and pre-aggregations.
-Please note that the in-memory cache is just invalidated but not populated by Refresh Worker.
-In-memory cache is populated lazily during querying.
-On the other hand, pre-aggregations are eagerly populated and kept up-to-date by Refresh Worker.
+A Refresh Worker updates pre-aggregations and invalidates the in-memory cache in
+the background. They also keep the refresh keys up-to-date for all defined
+schemas and pre-aggregations. Please note that the in-memory cache is just
+invalidated but not populated by Refresh Worker. In-memory cache is populated
+lazily during querying. On the other hand, pre-aggregations are eagerly
+populated and kept up-to-date by Refresh Worker.
 
 [Cube Docker image][dh-cubejs] can be used for creating Refresh Workers; to make
 the service act as a Refresh Worker, `CUBEJS_REFRESH_WORKER=true` should be set
@@ -275,6 +203,22 @@ services:
       - cubestore_router
 ```
 
+## Redis
+
+Earlier, [Redis][redis] was used in production deployments as storage
+for in-memory cache and query queue. Since version v0.32.0, Cube Store is used
+for that purpose. It is still possible to [configure][ref-config-redis] Cube to
+use Redis; however, it is strongly not recommended. Please check the [blog
+post][blog-details] for details.
+
+<WarningBox>
+
+Redis support is deprecated and will be removed from Cube in the future. Upgrade
+to v0.32.0 or later to use Cube Store instead of Redis. See the [migration
+guide][blog-migration-guide].
+
+</WarningBox>
+
 [dh-cubejs]: https://hub.docker.com/r/cubejs/cube
 [dh-cubestore]: https://hub.docker.com/r/cubejs/cubestore
 [gh-cube-examples-k8s]:
@@ -286,3 +230,8 @@ services:
 [ref-deploy-docker]: /deployment/platforms/docker
 [ref-config-env]: /reference/environment-variables
 [ref-config-js]: /config
+[redis]: https://redis.io
+[ref-config-redis]: /reference/environment-variables#cubejs-redis-password
+[blog-details]: https://cube.dev/blog/how-you-win-by-using-cube-store-part-1
+[blog-migration-guide]:
+  https://cube.dev/blog/how-you-win-by-using-cube-store-part-1#how-to-migrate-to-cube-store
