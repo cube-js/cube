@@ -74,7 +74,9 @@ enum_from_primitive! {
         ReplayHandles = 0x0B00,
         CacheItems = 0x0C00,
         QueueItems = 0x0D00,
-        QueueResults = 0x0E00
+        QueueResults = 0x0E00,
+        TraceObjects = 0x0F00
+
     }
 }
 
@@ -95,6 +97,7 @@ impl TableId {
             TableId::CacheItems => true,
             TableId::QueueItems => true,
             TableId::QueueResults => true,
+            TableId::TraceObjects => false,
         }
     }
 }

@@ -12,6 +12,7 @@ use crate::store::ChunkDataStore;
 use crate::streaming::kafka::{KafkaClientService, KafkaStreamingSource};
 use crate::table::data::{append_row, create_array_builders};
 use crate::table::{Row, TableValue, TimestampValue};
+use crate::telemetry::incoming_traffic_agent_event;
 use crate::util::decimal::Decimal;
 use crate::{app_metrics, CubeError};
 use arrow::array::ArrayBuilder;
@@ -80,6 +81,7 @@ impl StreamingServiceImpl {
         &self,
         table: &IdRow<Table>,
         location: &str,
+        trace_obj: Option<String>,
     ) -> Result<Arc<dyn StreamingSource>, CubeError> {
         let location_url = Url::parse(location)?;
         if location_url.scheme() != "stream" {
@@ -121,6 +123,7 @@ impl StreamingServiceImpl {
                 user: user.clone(),
                 password: password.clone(),
                 table: table_name,
+                trace_obj,
                 endpoint_url: url.to_string(),
                 select_statement: table.get_row().select_statement().clone(),
                 partition,
@@ -149,6 +152,7 @@ impl StreamingServiceImpl {
                 )?,
                 self.kafka_client.clone(),
                 *use_ssl,
+                trace_obj,
             ))),
         }
     }
@@ -212,7 +216,12 @@ impl StreamingService for StreamingServiceImpl {
             return Ok(());
         }
 
-        let source = self.source_by(&table, location).await?;
+        let trace_obj = self
+            .meta_store
+            .get_trace_obj_by_table_id(table.get_id())
+            .await?;
+
+        let source = self.source_by(&table, location, trace_obj).await?;
         let seq_column = table.get_row().seq_column().ok_or_else(|| {
             CubeError::internal(format!(
                 "Seq column is not defined for streaming table '{}'",
@@ -404,7 +413,7 @@ impl StreamingService for StreamingServiceImpl {
         table: IdRow<Table>,
         location: &str,
     ) -> Result<(), CubeError> {
-        let source = self.source_by(&table, location).await?;
+        let source = self.source_by(&table, location, None).await?;
         source.validate_table_location()?;
         Ok(())
     }
@@ -435,6 +444,7 @@ pub struct KSqlStreamingSource {
     user: Option<String>,
     password: Option<String>,
     table: String,
+    trace_obj: Option<String>,
     endpoint_url: String,
     select_statement: Option<String>,
     offset: Option<StreamOffset>,
@@ -663,9 +673,13 @@ impl KSqlStreamingSource {
         tail_bytes: &mut Bytes,
         bytes: Result<Bytes, reqwest::Error>,
         columns: Vec<Column>,
+        trace_obj: &Option<String>,
     ) -> Result<Vec<Row>, CubeError> {
         let mut rows = Vec::new();
         let b = bytes?;
+        if let Some(trace_o) = trace_obj {
+            incoming_traffic_agent_event(trace_o, b.len() as u64)?;
+        }
         let string = String::from_utf8_lossy(&b);
         let mut concat = Cursor::new(Vec::new());
         concat.write_all(tail_bytes)?;
@@ -852,6 +866,7 @@ impl StreamingSource for KSqlStreamingSource {
             )
             .await?;
         let column_to_move = columns.clone();
+        let trace_obj = self.trace_obj.clone();
         Ok(Box::pin(
             res.bytes_stream()
                 .scan(
@@ -861,13 +876,18 @@ impl StreamingSource for KSqlStreamingSource {
                           -> futures_util::future::Ready<
                         Option<Pin<Box<dyn Stream<Item = Result<Row, CubeError>> + Send>>>,
                     > {
-                        let rows = Self::parse_lines(tail_bytes, bytes, column_to_move.clone())
-                            .map_err(|e| {
-                                CubeError::internal(format!(
-                                    "Error during parsing ksql response: {}",
-                                    e
-                                ))
-                            });
+                        let rows = Self::parse_lines(
+                            tail_bytes,
+                            bytes,
+                            column_to_move.clone(),
+                            &trace_obj,
+                        )
+                        .map_err(|e| {
+                            CubeError::internal(format!(
+                                "Error during parsing ksql response: {}",
+                                e
+                            ))
+                        });
                         futures_util::future::ready(Some(Box::pin(stream::iter(match rows {
                             Ok(rows) => rows.into_iter().map(|r| Ok(r)).collect::<Vec<_>>(),
                             Err(e) => vec![Err(e)],
