@@ -260,6 +260,7 @@ export class CubeSymbols {
       joinHints = joinHints.concat(cubeName);
     }
     const self = this;
+    const { sqlResolveFn, cubeAliasFn, query, cubeReferencesUsed } = self.resolveSymbolsCallContext || {};
     return new Proxy({}, {
       get: (v, propertyName) => {
         if (propertyName === '__cubeName') {
@@ -273,7 +274,6 @@ export class CubeSymbols {
           }
           return undefined;
         }
-        const { sqlResolveFn, cubeAliasFn, query, cubeReferencesUsed } = self.resolveSymbolsCallContext || {};
         if (propertyName === 'toString') {
           return () => {
             if (query) {
@@ -283,7 +283,10 @@ export class CubeSymbols {
             if (cubeReferencesUsed) {
               cubeReferencesUsed.push(cube.cubeName());
             }
-            return cubeAliasFn && cubeAliasFn(cube.cubeName()) || cube.cubeName();
+            return cubeAliasFn && this.withSymbolsCallContext(
+              () => cubeAliasFn(cube.cubeName()),
+              { ...this.resolveSymbolsCallContext, joinHints }
+            ) || cube.cubeName();
           };
         }
         if (propertyName === 'sql') {
