@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.32.18](https://github.com/cube-js/cube/compare/v0.32.17...v0.32.18) (2023-04-02)
+
+
+### Bug Fixes
+
+* **athena-driver:** Correct handling for NULL values ([#6171](https://github.com/cube-js/cube/issues/6171)) ([a1f4cd4](https://github.com/cube-js/cube/commit/a1f4cd498e84dde91d736cc87825ae3a8095f9bf))
+
+
+
+
+
 ## [0.32.17](https://github.com/cube-js/cube/compare/v0.32.16...v0.32.17) (2023-03-29)
 
 **Note:** Version bump only for package @cubejs-backend/athena-driver

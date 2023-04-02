@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.32.18](https://github.com/cube-js/cube.js/compare/v0.32.17...v0.32.18) (2023-04-02)
+
+
+### Features
+
+* Cube based includes and meta exposure ([#6380](https://github.com/cube-js/cube.js/issues/6380)) ([ead4ac0](https://github.com/cube-js/cube.js/commit/ead4ac0b3b78c074f29fcdec3f86282bce42c45a))
+
+
+
+
+
 ## [0.32.17](https://github.com/cube-js/cube/compare/v0.32.16...v0.32.17) (2023-03-29)
 
 **Note:** Version bump only for package @cubejs-backend/testing
