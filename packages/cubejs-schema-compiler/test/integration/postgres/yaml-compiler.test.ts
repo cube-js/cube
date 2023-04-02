@@ -353,7 +353,7 @@ views:
           - count
           - member: time
             name: date
-      - cube: customers
+      - cube: orders.customers
         includes:
           - name
     `);
