@@ -138,7 +138,7 @@ export class CubeToMetaTransformer {
       cumulativeTotal: nameToMetric[1].cumulative || BaseMeasure.isCumulative(nameToMetric[1]),
       cumulative: nameToMetric[1].cumulative || BaseMeasure.isCumulative(nameToMetric[1]),
       type,
-      aggType: nameToMetric[1].type,
+      aggType: nameToMetric[1].aggType || nameToMetric[1].type,
       drillMembers: drillMembersArray,
       drillMembersGrouped: {
         measures: drillMembersArray.filter((member) => this.cubeEvaluator.isMeasure(member)),

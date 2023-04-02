@@ -21,7 +21,8 @@ export const nonStringFields = new Set([
   'incremental',
   'external',
   'useOriginalSqlPreAggregations',
-  'readOnly'
+  'readOnly',
+  'prefix'
 ]);
 
 const identifierRegex = /^[_a-zA-Z][_a-zA-Z0-9]*$/;
@@ -528,6 +529,24 @@ const viewSchema = inherit(baseSchema, {
   isView: Joi.boolean().strict(),
   includes: Joi.func(),
   excludes: Joi.func(),
+  cubes: Joi.array().items(
+    Joi.object().keys({
+      cube: Joi.func().required(),
+      prefix: Joi.boolean(),
+      name: Joi.string(),
+      includes: Joi.alternatives([
+        Joi.string().valid('*'),
+        Joi.array().items(Joi.alternatives([
+          Joi.string().required(),
+          Joi.object().keys({
+            member: Joi.string().required(),
+            name: Joi.string()
+          })
+        ]))
+      ]).required(),
+      excludes: Joi.array().items(Joi.string().required()),
+    })
+  ),
 });
 
 function formatErrorMessageFromDetails(explain, d) {
