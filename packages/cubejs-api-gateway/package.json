@@ -31,7 +31,7 @@
     "@cubejs-backend/shared": "^0.32.17",
     "@ungap/structured-clone": "^0.3.4",
     "body-parser": "^1.19.0",
-    "chrono-node": "^2.2.6",
+    "chrono-node": "^2.6.2",
     "express-graphql": "^0.12.0",
     "graphql": "^15.8.0",
     "graphql-scalars": "^1.10.0",
