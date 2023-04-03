@@ -37,6 +37,47 @@ export class CubeEvaluator extends CubeSymbols {
    * @protected
    */
   prepareCube(cube, errorReporter) {
+    this.prepareJoins(cube, errorReporter);
+    this.preparePreAggregations(cube, errorReporter);
+    this.prepareMembers(cube.measures, cube, errorReporter);
+    this.prepareMembers(cube.dimensions, cube, errorReporter);
+    this.prepareMembers(cube.segments, cube, errorReporter);
+    this.prepareIncludes(cube, errorReporter);
+  }
+
+  /**
+   * @protected
+   */
+  prepareJoins(cube, _errorReporter) {
+    if (cube.joins) {
+      // eslint-disable-next-line no-restricted-syntax
+      for (const join of Object.values(cube.joins)) {
+        // eslint-disable-next-line default-case
+        switch (join.relationship) {
+          case 'belongs_to':
+          case 'many_to_one':
+          case 'manyToOne':
+            join.relationship = 'belongsTo';
+            break;
+          case 'has_many':
+          case 'one_to_many':
+          case 'oneToMany':
+            join.relationship = 'hasMany';
+            break;
+          case 'has_one':
+          case 'one_to_one':
+          case 'oneToOne':
+            join.relationship = 'hasOne';
+            break;
+        }
+      }
+    }
+  }
+
+  /**
+   * @protected
+   */
+  preparePreAggregations(cube, errorReporter) {
     if (cube.preAggregations) {
       // eslint-disable-next-line no-restricted-syntax
       for (const preAggregation of Object.values(cube.preAggregations)) {
@@ -88,13 +129,12 @@ export class CubeEvaluator extends CubeSymbols {
         }
       }
     }
-    this.transformMembers(cube.measures, cube, errorReporter);
-    this.transformMembers(cube.dimensions, cube, errorReporter);
-    this.transformMembers(cube.segments, cube, errorReporter);
-    this.addIncludes(cube, errorReporter);
   }
 
-  transformMembers(members, cube, errorReporter) {
+  /**
+   * @protected
+   */
+  prepareMembers(members, cube, errorReporter) {
     members = members || {};
     for (const memberName of Object.keys(members)) {
       let ownedByCube = true;
@@ -122,7 +162,10 @@ export class CubeEvaluator extends CubeSymbols {
     }
   }
 
-  addIncludes(cube, errorReporter) {
+  /**
+   * @protected
+   */
+  prepareIncludes(cube, errorReporter) {
     if (!cube.includes && !cube.cubes) {
       return;
     }
@@ -144,6 +187,9 @@ export class CubeEvaluator extends CubeSymbols {
     }
   }
 
+  /**
+   * @protected
+   */
   membersFromCubes(cubes, type, errorReporter) {
     return R.unnest(cubes.map(cubeInclude => {
       const fullPath = this.evaluateReferences(null, cubeInclude.cube, { collectJoinHints: true });
@@ -215,6 +261,9 @@ export class CubeEvaluator extends CubeSymbols {
     })).filter(Boolean);
   }
 
+  /**
+   * @protected
+   */
   generateIncludeMembers(members, cubeName, type) {
     return members.map(memberRef => {
       const path = memberRef.member.split('.');

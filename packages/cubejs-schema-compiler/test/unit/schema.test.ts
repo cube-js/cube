@@ -248,4 +248,42 @@ describe('Schema Testing', () => {
       }
     });
   });
+
+  it('join types', async () => {
+    const { compiler, cubeEvaluator } = prepareCompiler([
+      createCubeSchema({
+        name: 'CubeA',
+        joins: `{
+          CubeB: {
+            sql: \`SQL ON clause\`,
+            relationship: 'one_to_one'
+          },
+          CubeC: {
+            sql: \`SQL ON clause\`,
+            relationship: 'one_to_many'
+          },
+          CubeD: {
+            sql: \`SQL ON clause\`,
+            relationship: 'many_to_one'
+          },
+        }`
+      }),
+      createCubeSchema({
+        name: 'CubeB',
+      }),
+      createCubeSchema({
+        name: 'CubeC',
+      }),
+      createCubeSchema({
+        name: 'CubeD',
+      }),
+    ]);
+    await compiler.compile();
+
+    expect(cubeEvaluator.cubeFromPath('CubeA').joins).toMatchObject({
+      CubeB: { relationship: 'hasOne' },
+      CubeC: { relationship: 'hasMany' },
+      CubeD: { relationship: 'belongsTo' }
+    });
+  });
 });
