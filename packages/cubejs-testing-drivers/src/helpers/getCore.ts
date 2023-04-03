@@ -15,7 +15,7 @@ export function getCore(
     // devServer: true,
     scheduledRefreshTimer: 0,
     logger: (msg: string, params: Record<string, any>) => {
-      // process.stdout.write(`${msg}\n${JSON.stringify(params, undefined, 2)}\n`);
+      process.stdout.write(`${msg}\n${JSON.stringify(params, undefined, 2)}\n`);
     },
     dbType: <DatabaseType>type,
     driverFactory: async () => source,

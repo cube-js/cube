@@ -30,6 +30,12 @@ export function testQueries(type: string): void {
 
     beforeAll(async () => {
       env = await runEnvironment(type);
+      process.env.CUBEJS_REFRESH_WORKER = 'true';
+      process.env.CUBEJS_CUBESTORE_HOST = '127.0.0.1';
+      process.env.CUBEJS_CUBESTORE_PORT = `${env.store.port}`;
+      process.env.CUBEJS_CUBESTORE_USER = 'root';
+      process.env.CUBEJS_CUBESTORE_PASS = 'root';
+      process.env.CUBEJS_CACHE_AND_QUEUE_DRIVER = 'cubestore'; // memory
       if (env.data) {
         process.env.CUBEJS_DB_HOST = '127.0.0.1';
         process.env.CUBEJS_DB_PORT = `${env.data.port}`;

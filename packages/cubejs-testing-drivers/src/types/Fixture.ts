@@ -1,3 +1,4 @@
+/* eslint-disable camelcase */
 import { Cast } from 'src/dataset';
 
 export type Fixture = {
@@ -8,6 +9,8 @@ export type Fixture = {
     },
     volumes: string[],
     ports: string[],
+    depends_on: string[],
+    links: string[],
   },
   data?: {
     image: string,

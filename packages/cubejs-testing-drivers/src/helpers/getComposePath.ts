@@ -17,8 +17,16 @@ export function getComposePath(type: string): [path: string, file: string] {
         ...cube,
         container_name: 'cube',
         image: 'cubejs/cube:testing-drivers',
+        depends_on: [...cube.depends_on, 'store'],
+        links: [...cube.links, 'store'],
         restart: 'always',
       },
+      store: {
+        container_name: 'store',
+        image: 'cubejs/cubestore:latest',
+        ports: ['3030'],
+        restart: 'always',
+      }
     },
   };
   if (data) {

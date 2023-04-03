@@ -3,11 +3,12 @@ import { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
 
 export async function getDriver(type: string): Promise<{
   source: BaseDriver,
-  storage: CubeStoreDriver,
+  storage: BaseDriver,
 }> {
   return import(`@cubejs-backend/${type}-driver`).then((module) => {
     // eslint-disable-next-line new-cap
     const source: BaseDriver = new module.default();
+    // const storage: BaseDriver = new module.default();
     const storage = new CubeStoreDriver();
     return { source, storage };
   });

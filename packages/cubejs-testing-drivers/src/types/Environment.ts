@@ -5,6 +5,10 @@ export type Environment = {
       port: number;
       logs: Readable;
   };
+  store: {
+    port: number;
+    logs: Readable;
+  };
   data?: {
       port: number;
       logs: Readable;

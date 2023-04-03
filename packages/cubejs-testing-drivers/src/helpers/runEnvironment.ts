@@ -43,6 +43,10 @@ export async function runEnvironment(type: string): Promise<Environment> {
     ),
     logs: await environment.getContainer('cube').logs(),
   };
+  const store = {
+    port: environment.getContainer('store').getMappedPort(3030),
+    logs: await environment.getContainer('store').logs(),
+  };
   if (fixtures.data) {
     const data = {
       port: environment.getContainer('data').getMappedPort(
@@ -52,14 +56,16 @@ export async function runEnvironment(type: string): Promise<Environment> {
     };
     return {
       cube,
+      store,
       data,
       stop: async () => {
-        await environment.down();
+        await environment.down({ timeout: 30 * 1000 });
       },
     };
   }
   return {
     cube,
+    store,
     stop: async () => {
       await environment.down({ timeout: 30 * 1000 });
     },

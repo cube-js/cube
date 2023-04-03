@@ -14,7 +14,7 @@
     "lint": "eslint src/* test/ test/bin --ext .ts",
     "image": "node dist/test/image",
     "execute": "jest --detectOpenHandles  --runInBand --verbose -i dist/test/run.test.js",
-    "tst": "clear && yarn tsc && jest --detectOpenHandles  --runInBand --verbose -i dist/test/run.test.js -- --driver=postgres -- --suite=drive"
+    "tst": "clear && yarn tsc && jest --detectOpenHandles  --runInBand --verbose -i dist/test/run.test.js --driver=postgres --suite=scheduler"
   },
   "files": [
     "dist/src"
