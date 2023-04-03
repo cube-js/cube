@@ -784,6 +784,45 @@ where
     env_optparse(name).unwrap_or(default)
 }
 
+pub fn env_parse_size(name: &str, default: usize, max: Option<usize>, min: Option<usize>) -> usize {
+    let v = match env::var(name).ok() {
+        None => {
+            return default;
+        }
+        Some(v) => v,
+    };
+
+    let n = match parse_size::parse_size(&v) {
+        Ok(n) => n as usize,
+        Err(e) => panic!(
+            "could not parse environment variable '{}' with '{}' value: {}",
+            name, v, e
+        ),
+    };
+
+    if let Some(max) = max {
+        if n > max {
+            panic!(
+                "wrong configuration for environment variable '{}' with '{}' value: greater then max size {}",
+                name, v,
+                humansize::format_size(max, humansize::DECIMAL)
+            )
+        }
+    };
+
+    if let Some(min) = min {
+        if n < min {
+            panic!(
+                "wrong configuration for environment variable '{}' with '{}' value: lower then min size {}",
+                name, v,
+                humansize::format_size(min, humansize::DECIMAL)
+            )
+        }
+    };
+
+    n
+}
+
 fn env_optparse<T>(name: &str) -> Option<T>
 where
     T: FromStr,
@@ -966,8 +1005,18 @@ impl Config {
                     * 1024
                     * 1024,
                 disk_space_cache_duration_secs: 300,
-                transport_max_message_size: env_parse("TRANSPORT_MAX_MESSAGE_SIZE", 64 << 20),
-                transport_max_frame_size: env_parse("TRANSPORT_MAX_FRAME_SIZE", 16 << 20),
+                transport_max_message_size: env_parse_size(
+                    "CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE",
+                    64 << 20,
+                    Some(256 << 20),
+                    Some(16 << 20),
+                ),
+                transport_max_frame_size: env_parse_size(
+                    "CUBESTORE_TRANSPORT_MAX_FRAME_SIZE",
+                    32 << 20,
+                    Some(256 << 20),
+                    Some(4 << 20),
+                ),
             }),
         }
     }
