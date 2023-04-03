@@ -452,7 +452,7 @@ export class CubejsServerCore {
         extendContext: this.options.extendContext,
         playgroundAuthSecret: getEnv('playgroundAuthSecret'),
         jwt: this.options.jwt,
-        refreshScheduler: () => new RefreshScheduler(this),
+        refreshScheduler: this.getRefreshScheduler.bind(this),
         scheduledRefreshContexts: this.options.scheduledRefreshContexts,
         scheduledRefreshTimeZones: this.options.scheduledRefreshTimeZones,
         serverCoreVersion: this.coreServerVersion,
