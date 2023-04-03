@@ -163,8 +163,7 @@ impl Sink {
         let msg = match (&self.constant_tags, tags) {
             (Some(constant_tags), tags) => {
                 if let Some(t) = tags {
-                    let tags = constant_tags.clone() + "," + &t.join(",");
-                    format!("{}|#{}", data, tags)
+                    format!("{}|#{},{}", data, constant_tags, &t.join(","))
                 } else {
                     format!("{}|#{}", data, constant_tags)
                 }
