@@ -251,12 +251,7 @@ impl StreamingService for StreamingServiceImpl {
 
         let mut last_init_seq_check = SystemTime::now();
         let mut round_trip_started: Option<SystemTime> = None;
-        let server_name = self.config_obj.server_name();
-        let host_name = server_name.split(":").next().unwrap_or("undefined");
-        let tags = vec![
-            format!("cube_host:{}", host_name),
-            format!("location:{}", location),
-        ];
+        let tags = vec![format!("location:{}", location)];
 
         while !sealed {
             let new_rows = match tokio::time::timeout(

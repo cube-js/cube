@@ -97,7 +97,6 @@ pub struct GCSRemoteFs {
     bucket: String,
     sub_path: Option<String>,
     delete_mut: Mutex<()>,
-    cube_host: String,
 }
 
 impl GCSRemoteFs {
@@ -105,7 +104,6 @@ impl GCSRemoteFs {
         dir: PathBuf,
         bucket_name: String,
         sub_path: Option<String>,
-        cube_host: String,
     ) -> Result<Arc<Self>, CubeError> {
         ensure_credentials_init();
         Ok(Arc::new(Self {
@@ -113,7 +111,6 @@ impl GCSRemoteFs {
             bucket: bucket_name.to_string(),
             sub_path,
             delete_mut: Mutex::new(()),
-            cube_host,
         }))
     }
 }
@@ -132,7 +129,6 @@ impl RemoteFs for GCSRemoteFs {
             Some(&vec![
                 "operation:upload_file".to_string(),
                 "driver:gcs".to_string(),
-                format!("cube_host:{}", self.cube_host),
             ]),
         );
         let time = SystemTime::now();
@@ -185,7 +181,6 @@ impl RemoteFs for GCSRemoteFs {
                 Some(&vec![
                     "operation:download_file".to_string(),
                     "driver:gcs".to_string(),
-                    format!("cube_host:{}", self.cube_host),
                 ]),
             );
             let time = SystemTime::now();
@@ -231,7 +226,6 @@ impl RemoteFs for GCSRemoteFs {
             Some(&vec![
                 "operation:delete_file".to_string(),
                 "driver:gcs".to_string(),
-                format!("cube_host:{}", self.cube_host),
             ]),
         );
         let time = SystemTime::now();
@@ -265,7 +259,6 @@ impl RemoteFs for GCSRemoteFs {
             Some(&vec![
                 "operation:list".to_string(),
                 "driver:gcs".to_string(),
-                format!("cube_host:{}", self.cube_host),
             ]),
         );
         let prefix = self.gcs_path(remote_prefix);

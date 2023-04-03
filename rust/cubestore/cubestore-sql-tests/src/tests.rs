@@ -8397,6 +8397,13 @@ async fn queue_ack_then_result(service: Box<dyn SqlClient>) {
 }
 
 async fn queue_orphaned_timeout(service: Box<dyn SqlClient>) {
+    // CI is super slow, sometimes it can takes up to 1 second to bootstrap Cache Store
+    // let's warmup it
+    service
+        .exec_query(r#"SYS CACHESTORE HEALTHCHECK;"#)
+        .await
+        .unwrap();
+
     service
         .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:1" "payload1";"#)
         .await
