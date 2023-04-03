@@ -13,8 +13,16 @@
     "tsc": "tsc",
     "lint": "eslint src/* test/ test/bin --ext .ts",
     "image": "node dist/test/image",
-    "execute": "jest --detectOpenHandles  --runInBand --verbose -i dist/test/run.test.js",
-    "tst": "clear && yarn tsc && jest --detectOpenHandles  --runInBand --verbose -i dist/test/run.test.js --driver=postgres --suite=scheduler"
+    "clickhouse-driver": "jest --forceExit --runInBand --verbose -i dist/test/clickhouse-driver.test.js",
+    "clickhouse-core": "jest --forceExit --runInBand --verbose -i dist/test/clickhouse-core.test.js",
+    "clickhouse-full": "jest --forceExit --runInBand --verbose -i dist/test/clickhouse-full.test.js",
+    "mssql-driver": "jest --forceExit --runInBand --verbose -i dist/test/mssql-driver.test.js",
+    "mssql-core": "jest --forceExit --runInBand --verbose -i dist/test/mssql-core.test.js",
+    "mssql-full": "jest --forceExit --runInBand --verbose -i dist/test/mssql-full.test.js",
+    "postgres-driver": "jest --forceExit --runInBand --verbose -i dist/test/postgres-driver.test.js",
+    "postgres-core": "jest --forceExit --runInBand --verbose -i dist/test/postgres-core.test.js",
+    "postgres-full": "jest --forceExit --runInBand --verbose -i dist/test/postgres-full.test.js",
+    "tst": "clear && yarn tsc && jest --detectOpenHandles --runInBand --verbose -i dist/test/postgres-core.test.js"
   },
   "files": [
     "dist/src"

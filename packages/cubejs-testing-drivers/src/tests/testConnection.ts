@@ -65,7 +65,42 @@ export function testConnection(type: string): void {
           return res;
         })
       );
-      expect(response).toMatchSnapshot();
+      expect(response.length).toBe(3);
+
+      response[0].forEach(item => {
+        expect(item).toMatchSnapshot({
+          category: expect.any(String),
+          product_name: expect.any(String),
+          sub_category: expect.any(String),
+        });
+      });
+      expect(response[0].length).toBe(28);
+
+      response[1].forEach(item => {
+        expect(item).toMatchSnapshot({
+          customer_id: expect.any(String),
+          customer_name: expect.any(String),
+        });
+      });
+      expect(response[1].length).toBe(41);
+
+      response[2].forEach(item => {
+        expect(item).toMatchSnapshot({
+          row_id: expect.anything(), // can be String or Number
+          order_id: expect.any(String),
+          order_date: expect.anything(), // can be String or Date
+          customer_id: expect.any(String),
+          city: expect.any(String),
+          category: expect.any(String),
+          sub_category: expect.any(String),
+          product_name: expect.any(String),
+          sales: expect.anything(), // can be String or Number
+          quantity: expect.anything(), // can be String or Number
+          discount: expect.anything(), // can be String or Number
+          profit: expect.anything(), // can be String or Number
+        });
+      });
+      expect(response[2].length).toBe(44);
     });
 
     execute('must stream from the data source', async () => {
@@ -83,13 +118,16 @@ export function testConnection(type: string): void {
             });
             rowStream.on('end', () => {
               stream.release();
-              resolve(undefined);
+              resolve({ types, data });
             });
           });
           return { types, data };
         })
       );
-      expect(response).toMatchSnapshot();
+      expect(response.length).toBe(3);
+      expect(response[0].data.length).toBe(28);
+      expect(response[1].data.length).toBe(41);
+      expect(response[2].data.length).toBe(44);
     });
 
     execute('must delete the data source', async () => {

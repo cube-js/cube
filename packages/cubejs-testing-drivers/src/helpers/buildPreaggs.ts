@@ -1,5 +1,6 @@
 import * as http from 'http';
 import { clearInterval } from 'timers';
+import { CubejsServerCoreExposed } from '../types/CubejsServerCoreExposed';
 
 export async function postRequest(
   port: number,
@@ -93,6 +94,7 @@ export async function buildPreaggs(
               resolve(true);
             }
           }, 1000);
+
           setTimeout(() => {
             clearInterval(interval);
             reject('Cube pre-aggregations build failed: timeout.');
@@ -100,5 +102,65 @@ export async function buildPreaggs(
         }
       });
     });
+  });
+}
+
+export async function hookPreaggs(
+  core: CubejsServerCoreExposed,
+  preagg: string,
+) {
+  const tokens: string[] = await core
+    .getRefreshScheduler()
+    .postBuildJobs(
+      {
+        authInfo: { tenantId: 'tenant1' },
+        securityContext: { tenantId: 'tenant1' },
+        requestId: 'XXX',
+      },
+      {
+        timezones: ['UTC'],
+        preAggregations: [{ id: preagg }],
+        throwErrors: false,
+      }
+    );
+
+  return new Promise((resolve, reject) => {
+    const interval = setInterval(async () => {
+      const inProcess = [];
+      const selectors: {
+        token: string,
+        table: string,
+        status: string,
+        selector: any,
+      }[] = await core
+        .apiGateway()
+        .preAggregationsJobsGET(
+          {
+            authInfo: { tenantId: 'tenant1' },
+            securityContext: { tenantId: 'tenant1' },
+            requestId: 'XXX',
+          },
+          tokens,
+        );
+  
+      selectors.forEach((info) => {
+        const { status } = info;
+        if (status.indexOf('failure') >= 0) {
+          reject(`Cube pre-aggregations build failed: ${status}`);
+        }
+        if (status !== 'done' && status !== 'missing_partition') {
+          inProcess.push(info);
+        }
+        if (inProcess.length === 0) {
+          clearInterval(interval);
+          resolve(true);
+        }
+      });
+    }, 1000);
+
+    setTimeout(() => {
+      clearInterval(interval);
+      reject('Cube pre-aggregations build failed: timeout.');
+    }, 10000);
   });
 }

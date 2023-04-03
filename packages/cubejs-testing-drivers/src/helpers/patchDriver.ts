@@ -40,13 +40,20 @@ export function patchDriver(driver: PatchedDriver) {
             && `${args[0]}`.toLowerCase().indexOf('select floor') !== 0
             && `${args[0]}`.toLowerCase().indexOf('select schema_name') !== 0
             && `${args[0]}`.toLowerCase().indexOf('select table_name') !== 0
+            && `${args[0]}`.toLowerCase().indexOf('select name as table_name from system.tables') !== 0
             && `${args[0]}`.toLowerCase().indexOf('select max') !== 0
             && `${args[0]}`.toLowerCase().indexOf('select min') !== 0
+            && `${args[0]}`.toLowerCase().indexOf('create database') !== 0
             && `${args[0]}`.toLowerCase().indexOf('create schema') !== 0
             && `${args[0]}`.toLowerCase().indexOf('create table') !== 0
+            && `${args[0]}`.toLowerCase().indexOf('alter table') !== 0
             && `${args[0]}`.toLowerCase().indexOf('insert into') !== 0
             && `${args[0]}`.toLowerCase().indexOf('drop table') !== 0
+            && `${args[0]}`.toLowerCase().indexOf('cache ') !== 0
+            && `${args[0]}`.toLowerCase().indexOf('queue ') !== 0
+            && `${args[0]}`.toLowerCase().indexOf('select 1') !== 0
           ) {
+            console.log(args[0]);
             driver.calls?.push(name);
           }
         } else {

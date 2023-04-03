@@ -5,7 +5,8 @@ import { CubejsServerCore, DatabaseType } from '@cubejs-backend/server-core';
 import { CubejsServerCoreExposed } from '../types/CubejsServerCoreExposed';
 
 export function getCore(
-  type: string,
+  sourceType: string,
+  storageType: string,
   source: BaseDriver,
   storage: BaseDriver,
 ): CubejsServerCoreExposed {
@@ -15,11 +16,11 @@ export function getCore(
     // devServer: true,
     scheduledRefreshTimer: 0,
     logger: (msg: string, params: Record<string, any>) => {
-      process.stdout.write(`${msg}\n${JSON.stringify(params, undefined, 2)}\n`);
+      // process.stdout.write(`${msg}\n${JSON.stringify(params, undefined, 2)}\n`);
     },
-    dbType: <DatabaseType>type,
+    dbType: <DatabaseType>sourceType,
     driverFactory: async () => source,
-    externalDbType: <DatabaseType>type,
+    externalDbType: <DatabaseType>storageType,
     externalDriverFactory: async () => storage,
     repositoryFactory: () => ({
       localPath: () => __dirname,

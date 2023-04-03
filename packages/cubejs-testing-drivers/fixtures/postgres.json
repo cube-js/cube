@@ -4,6 +4,7 @@
       "CUBEJS_DEV_MODE": "true",
       "CUBEJS_API_SECRET": "mysupersecret",
       "CUBEJS_CACHE_AND_QUEUE_DRIVER": "cubestore",
+      "CUBEJS_CUBESTORE_HOST": "store",
       "CUBEJS_DB_TYPE": "postgres",
       "CUBEJS_DB_HOST": "data",
       "CUBEJS_DB_NAME": "test",
