@@ -5,7 +5,7 @@ interface CreateCubeSchemaOptions {
   sqlTable?: string,
   refreshKey?: string,
   preAggregations?: string,
-  joins?: unknown
+  joins?: string,
 }
 
 export function createCubeSchema({ name, refreshKey = '', preAggregations = '', sqlTable, publicly, shown, joins }: CreateCubeSchemaOptions): string {
