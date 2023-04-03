@@ -38,8 +38,9 @@ export function testSequence(type: string): void {
         process.env.CUBEJS_DB_HOST = '127.0.0.1';
         process.env.CUBEJS_DB_PORT = `${env.data.port}`;
       }
-      source = await getDriver(type);
-      storage = await getDriver(type);
+      const drivers = await getDriver(type);
+      source = drivers.source;
+      storage = drivers.storage;
       query = getCreateQueries(type);
       await Promise.all(query.map(async (q) => {
         await source.query(q);

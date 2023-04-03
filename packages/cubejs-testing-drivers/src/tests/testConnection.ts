@@ -38,7 +38,7 @@ export function testConnection(type: string): void {
         process.env.CUBEJS_DB_HOST = '127.0.0.1';
         process.env.CUBEJS_DB_PORT = `${env.data.port}`;
       }
-      driver = await getDriver(type);
+      driver = (await getDriver(type)).source;
     });
   
     afterAll(async () => {

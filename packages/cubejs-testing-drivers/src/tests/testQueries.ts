@@ -37,7 +37,7 @@ export function testQueries(type: string): void {
       client = cubejs('mysupersecret', {
         apiUrl: `http://127.0.0.1:${env.cube.port}/cubejs-api/v1`,
       });
-      driver = await getDriver(type);
+      driver = (await getDriver(type)).source;
       query = getCreateQueries(type);
       await Promise.all(query.map(async (q) => {
         await driver.query(q);

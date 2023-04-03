@@ -11,13 +11,10 @@
   },
   "scripts": {
     "tsc": "tsc",
-    "build": "node dist/test/build",
     "lint": "eslint src/* test/ test/bin --ext .ts",
-    "athena": "jest --detectOpenHandles  --runInBand --verbose -i dist/test/athena.test.js",
-    "databricks-jdbc": "jest --detectOpenHandles  --runInBand --verbose -i dist/test/databricks-jdbc.test.js",
-    "mssql": "jest --detectOpenHandles  --runInBand --verbose -i dist/test/mssql.test.js",
-    "postgres": "jest --detectOpenHandles  --runInBand --verbose -i dist/test/postgres.test.js",
-    "tst": "clear && yarn tsc && jest --detectOpenHandles  --runInBand --verbose -i dist/test/mssql.test.js"
+    "image": "node dist/test/image",
+    "execute": "jest --detectOpenHandles  --runInBand --verbose -i dist/test/run.test.js",
+    "tst": "clear && yarn tsc && jest --detectOpenHandles  --runInBand --verbose -i dist/test/run.test.js -- --driver=postgres -- --suite=drive"
   },
   "files": [
     "dist/src"
@@ -25,6 +22,7 @@
   "dependencies": {
     "yaml": "^1.10.2",
     "jest": "^26.6.3",
+    "yargs": "^17.7.1",
     "ramda": "^0.28.0",
     "dotenv": "^16.0.3",
     "fs-extra": "^11.1.1",
