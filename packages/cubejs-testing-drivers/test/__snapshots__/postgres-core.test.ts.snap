@@ -4,6 +4,7 @@ exports[`Sequence with the @cubejs-backend/postgres-driver for the Customers.Rol
 Array [
   Array [
     "downloadQueryResults",
+    "stream",
   ],
   Array [
     "createSchemaIfNotExists",
@@ -26,6 +27,7 @@ exports[`Sequence with the @cubejs-backend/postgres-driver for the ECommerce.Sim
 Array [
   Array [
     "downloadQueryResults",
+    "stream",
   ],
   Array [
     "uploadTableWithIndexes",
@@ -46,17 +48,29 @@ exports[`Sequence with the @cubejs-backend/postgres-driver for the ECommerce.Tim
 Array [
   Array [
     "downloadQueryResults",
+    "stream",
     "downloadQueryResults",
+    "stream",
     "downloadQueryResults",
+    "stream",
     "downloadQueryResults",
+    "stream",
     "downloadQueryResults",
+    "stream",
     "downloadQueryResults",
+    "stream",
     "downloadQueryResults",
+    "stream",
     "downloadQueryResults",
+    "stream",
     "downloadQueryResults",
+    "stream",
     "downloadQueryResults",
+    "stream",
     "downloadQueryResults",
+    "stream",
     "downloadQueryResults",
+    "stream",
   ],
   Array [
     "uploadTableWithIndexes",

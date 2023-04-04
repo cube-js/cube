@@ -184,7 +184,7 @@ class MSSqlDriver extends BaseDriver {
           break;
         // date and time
         case sql.Time:
-          type = 'string';
+          type = 'date';
           break;
         case sql.Date:
           type = 'date';
@@ -193,7 +193,7 @@ class MSSqlDriver extends BaseDriver {
         case sql.DateTime2:
         case sql.SmallDateTime:
         case sql.DateTimeOffset:
-          type = 'timestamp';
+          type = 'date';
           break;
         // others
         case sql.UniqueIdentifier:
@@ -281,7 +281,11 @@ class MSSqlDriver extends BaseDriver {
     `;
   }
 
-  async downloadQueryResults(query, values) {
+  async downloadQueryResults(query, values, options) {
+    if ((options || {}).streamImport) {
+      return this.stream(query, values, options);
+    }
+
     const result = await this.query(query, values);
     const types = Object.keys(result.columns).map((key) => ({
       name: result.columns[key].name,

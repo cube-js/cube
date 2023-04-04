@@ -29,8 +29,8 @@
   "cast": {
     "SELECT_PREFIX": "",
     "SELECT_SUFFIX": "",
-    "DATE_PREFIX": "Convert(DATETIME, ",
-    "DATE_SUFFIX": ", 126)",
+    "DATE_PREFIX": "convert(DATETIME, ",
+    "DATE_SUFFIX": ")",
     "CREATE_TBL_PREFIX": "SELECT * INTO ",
     "CREATE_TBL_SUFFIX": " FROM ",
     "CREATE_SUB_PREFIX": "(",

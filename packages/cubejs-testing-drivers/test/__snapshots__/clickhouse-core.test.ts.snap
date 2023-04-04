@@ -4,6 +4,7 @@ exports[`Sequence with the @cubejs-backend/clickhouse-driver for the Customers.R
 Array [
   Array [
     "downloadQueryResults",
+    "stream",
   ],
   Array [
     "createSchemaIfNotExists",
@@ -26,6 +27,7 @@ exports[`Sequence with the @cubejs-backend/clickhouse-driver for the ECommerce.S
 Array [
   Array [
     "downloadQueryResults",
+    "stream",
   ],
   Array [
     "uploadTableWithIndexes",
@@ -46,17 +48,29 @@ exports[`Sequence with the @cubejs-backend/clickhouse-driver for the ECommerce.T
 Array [
   Array [
     "downloadQueryResults",
+    "stream",
     "downloadQueryResults",
+    "stream",
     "downloadQueryResults",
+    "stream",
     "downloadQueryResults",
+    "stream",
     "downloadQueryResults",
+    "stream",
     "downloadQueryResults",
+    "stream",
     "downloadQueryResults",
+    "stream",
     "downloadQueryResults",
+    "stream",
     "downloadQueryResults",
+    "stream",
     "downloadQueryResults",
+    "stream",
     "downloadQueryResults",
+    "stream",
     "downloadQueryResults",
+    "stream",
   ],
   Array [
     "uploadTableWithIndexes",

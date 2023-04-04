@@ -4,7 +4,7 @@ exports[`Sequence with the @cubejs-backend/mssql-driver for the Customers.Rollin
 Array [
   Array [
     "downloadQueryResults",
-    "query",
+    "stream",
   ],
   Array [
     "createSchemaIfNotExists",
@@ -28,7 +28,7 @@ exports[`Sequence with the @cubejs-backend/mssql-driver for the ECommerce.Simple
 Array [
   Array [
     "downloadQueryResults",
-    "query",
+    "stream",
   ],
   Array [
     "uploadTableWithIndexes",
@@ -50,29 +50,29 @@ exports[`Sequence with the @cubejs-backend/mssql-driver for the ECommerce.TimeAn
 Array [
   Array [
     "downloadQueryResults",
-    "query",
+    "stream",
     "downloadQueryResults",
-    "query",
+    "stream",
     "downloadQueryResults",
-    "query",
+    "stream",
     "downloadQueryResults",
-    "query",
+    "stream",
     "downloadQueryResults",
-    "query",
+    "stream",
     "downloadQueryResults",
-    "query",
+    "stream",
     "downloadQueryResults",
-    "query",
+    "stream",
     "downloadQueryResults",
-    "query",
+    "stream",
     "downloadQueryResults",
-    "query",
+    "stream",
     "downloadQueryResults",
-    "query",
+    "stream",
     "downloadQueryResults",
-    "query",
+    "stream",
     "downloadQueryResults",
-    "query",
+    "stream",
   ],
   Array [
     "uploadTableWithIndexes",

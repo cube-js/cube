@@ -23,8 +23,10 @@ export type Method =
   | 'nowTimestamp'
   | 'wrapQueryWithLimit'
   | 'query'
-  | 'testConnection';
+  | 'testConnection'
+  | 'stream';
 
 export type PatchedDriver = BaseDriver & {
+  stream?: (...args: any[]) => any,
   calls?: Method[],
 };
