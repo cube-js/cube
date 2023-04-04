@@ -76,8 +76,19 @@ services:
 
 ## Architecture
 
-Deep dive on Cube Store architecture can be found in
-[this presentation](https://docs.google.com/presentation/d/1oQ-koloag0UcL-bUHOpBXK4txpqiGl41rxhgDVrw7gw/).
+<div style="text-align: center">
+  <img
+    alt="Cube Store cluster with Cube"
+    src="https://ucarecdn.com/28747c64-bc0e-4f2c-a438-e5a112c68436/"
+    style="border: none"
+    width="100%"
+  />
+</div>
+
+A Cube Store cluster consists of at least one Router and one or more Worker
+instances. Cube sends queries to the Cube Store Router, which then distributes
+the queries to the Cube Store Workers. The Workers then execute the queries and
+return the results to the Router, which in turn returns the results to Cube.
 
 ## Scaling
 
@@ -97,8 +108,8 @@ much concurrency as you require.
 
 In cluster mode, Cube Store runs two kinds of nodes:
 
-- a single **router** node handles incoming client connections, manages database
-  metadata and serves simple queries.
+- one or more **router** nodes handle incoming client connections, manage
+  database metadata and serve simple queries.
 - multiple **worker** nodes which execute SQL queries
 
 Cube Store querying performance is optimal when the count of partitions in a
