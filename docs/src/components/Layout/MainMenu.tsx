@@ -35,7 +35,6 @@ const menuOrder = [
   'FAQs',
   'Release Notes',
   'Reference',
-  'Inspecting Queries',
   'Cloud Runtime',
 ];
 
