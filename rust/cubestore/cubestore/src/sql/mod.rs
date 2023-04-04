@@ -1874,8 +1874,8 @@ mod tests {
                 rows_per_chunk,
                 query_timeout,
                 query_timeout,
-                config.query_cache_max_capacity_bytes(),
-                config.query_cache_time_to_idle_secs(),
+                config.config_obj().query_cache_max_capacity_bytes(),
+                config.config_obj().query_cache_time_to_idle_secs(),
             );
             let i = service.exec_query("CREATE SCHEMA foo").await.unwrap();
             assert_eq!(
@@ -1947,8 +1947,8 @@ mod tests {
                 rows_per_chunk,
                 query_timeout,
                 query_timeout,
-                config.query_cache_max_capacity_bytes(),
-                config.query_cache_time_to_idle_secs(),
+                config.config_obj().query_cache_max_capacity_bytes(),
+                config.config_obj().query_cache_time_to_idle_secs(),
             );
             let i = service.exec_query("CREATE SCHEMA Foo").await.unwrap();
             assert_eq!(
@@ -2049,8 +2049,8 @@ mod tests {
                 rows_per_chunk,
                 query_timeout,
                 query_timeout,
-                config.query_cache_max_capacity_bytes(),
-                config.query_cache_time_to_idle_secs(),
+                config.config_obj().query_cache_max_capacity_bytes(),
+                config.config_obj().query_cache_time_to_idle_secs(),
             );
             let i = service.exec_query("CREATE SCHEMA Foo").await.unwrap();
             assert_eq!(
