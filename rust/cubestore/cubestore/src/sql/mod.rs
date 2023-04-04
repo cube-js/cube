@@ -1834,13 +1834,13 @@ mod tests {
             );
             let meta_store = RocksMetaStore::new(
                 &Path::new(path).join("metastore"),
-                BaseRocksStoreFs::new(remote_fs.clone(), "metastore", config.config_obj()),
+                BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
                 config.config_obj(),
             )
             .unwrap();
             let cache_store = RocksCacheStore::new(
                 &Path::new(path).join("cachestore"),
-                BaseRocksStoreFs::new(remote_fs.clone(), "cachestore", config.config_obj()),
+                BaseRocksStoreFs::new_for_cachestore(remote_fs.clone(), config.config_obj()),
                 config.config_obj(),
             )
             .unwrap();
@@ -1906,13 +1906,13 @@ mod tests {
             );
             let meta_store = RocksMetaStore::new(
                 &Path::new(path).join("metastore"),
-                BaseRocksStoreFs::new(remote_fs.clone(), "metastore", config.config_obj()),
+                BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
                 config.config_obj(),
             )
             .unwrap();
             let cache_store = RocksCacheStore::new(
                 &Path::new(path).join("cachestore"),
-                BaseRocksStoreFs::new(remote_fs.clone(), "cachestore", config.config_obj()),
+                BaseRocksStoreFs::new_for_cachestore(remote_fs.clone(), config.config_obj()),
                 config.config_obj(),
             )
             .unwrap();
@@ -2007,13 +2007,13 @@ mod tests {
             );
             let meta_store = RocksMetaStore::new(
                 &Path::new(path).join("metastore"),
-                BaseRocksStoreFs::new(remote_fs.clone(), "metastore", config.config_obj()),
+                BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
                 config.config_obj(),
             )
             .unwrap();
             let cache_store = RocksCacheStore::new(
                 &Path::new(path).join("cachestore"),
-                BaseRocksStoreFs::new(remote_fs.clone(), "cachestore", config.config_obj()),
+                BaseRocksStoreFs::new_for_cachestore(remote_fs.clone(), config.config_obj()),
                 config.config_obj(),
             )
             .unwrap();
