@@ -72,6 +72,16 @@ describe('dateParser', () => {
     );
   });
 
+  test('from 1 quarter ago to now', () => {
+    Date.now = jest.fn().mockReturnValue(new Date(2021, 4, 3, 12, 0, 0, 0));
+
+    expect(dateParser('from 1 quarter ago to now', 'UTC')).toStrictEqual(
+      ['2023-01-03T00:00:00.000', '2023-04-03T23:59:59.999']
+    );
+
+    Date.now.mockRestore();
+  });
+
   test('from 7 days ago to now', () => {
     expect(dateParser('from 7 days ago to now', 'UTC')).toStrictEqual(
       [dateParser('last 7 days', 'UTC')[0], dateParser('today', 'UTC')[1]]
@@ -88,6 +98,17 @@ describe('dateParser', () => {
     expect(() => dateParser('unexpected date', 'UTC')).toThrowError(
       'Can\'t parse date: \'unexpected date\'',
     );
+  });
+
+  test('last 2 quarters', () => {
+    Date.now = jest.fn().mockReturnValue(new Date(2021, 1, 15, 13, 0, 0, 0));
+
+    expect(dateParser('last 2 quarters', 'UTC', new Date(2021, 1, 15, 13, 0, 0, 0))).toStrictEqual([
+      '2020-07-01T00:00:00.000',
+      '2020-12-31T23:59:59.999',
+    ]);
+
+    Date.now.mockRestore();
   });
 
   test('last 6 months from month with less days than previous month', () => {

@@ -5,9 +5,10 @@ interface CreateCubeSchemaOptions {
   sqlTable?: string,
   refreshKey?: string,
   preAggregations?: string,
+  joins?: string,
 }
 
-export function createCubeSchema({ name, refreshKey = '', preAggregations = '', sqlTable, publicly, shown }: CreateCubeSchemaOptions): string {
+export function createCubeSchema({ name, refreshKey = '', preAggregations = '', sqlTable, publicly, shown, joins }: CreateCubeSchemaOptions): string {
   return ` 
     cube('${name}', {
         ${sqlTable ? `sqlTable: \`${sqlTable}\`` : 'sql: `select * from cards`'},
@@ -15,6 +16,7 @@ export function createCubeSchema({ name, refreshKey = '', preAggregations = '', 
         ${publicly !== undefined ? `public: ${publicly},` : ''}
         ${shown !== undefined ? `shown: ${shown},` : ''}
         ${refreshKey}
+        ${joins ? `joins: ${joins},` : ''}
 
         measures: {
           count: {

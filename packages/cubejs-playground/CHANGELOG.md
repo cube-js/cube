@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.32.18](https://github.com/cube-js/cube/compare/v0.32.17...v0.32.18) (2023-04-02)
+
+
+### Bug Fixes
+
+* **playground:** SQL API default port 15432 ([416a9de](https://github.com/cube-js/cube/commit/416a9de677cb9a1a48f426a74e755b78c18e0952))
+
+
+
+
+
 ## [0.32.17](https://github.com/cube-js/cube/compare/v0.32.16...v0.32.17) (2023-03-29)
 
 **Note:** Version bump only for package @cubejs-client/playground

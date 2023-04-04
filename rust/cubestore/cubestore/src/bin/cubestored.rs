@@ -31,7 +31,7 @@ fn main() {
         ),
         Err(_) => metrics::Compatibility::StatsD,
     };
-    init_metrics("127.0.0.1:0", "127.0.0.1:8125", metrics_mode);
+    init_metrics("127.0.0.1:0", "127.0.0.1:8125", metrics_mode, vec![]);
     let telemetry_env = std::env::var("CUBESTORE_TELEMETRY")
         .or(std::env::var("CUBEJS_TELEMETRY"))
         .unwrap_or("true".to_string());

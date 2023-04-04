@@ -1,29 +1,32 @@
 ---
-title: Getting Started
+title: Overview
 permalink: /getting-started
 category: Getting Started
 menuOrder: 1
-isDisableFeedbackBlock: true
+isDisableFeedbackBlock: false
 ---
 
-You can get started with Cube locally or self-host it with Docker.
+You can get started with Cube in one of two ways.
 
-Alternatively, you can get started with [Cube Cloud](https://cube.dev/cloud/).
-It provides managed experience for Cube and has a free tier for development
-projects and proofs of concept.
+We recommend using [Cube Cloud][cube-cloud], our managed platform for Cube,
+because it's the easiest way to build, test, deploy, and manage Cube projects.
+Cube Cloud includes features such as collaboration for teams, a web-based IDE,
+auto-scaling, and observability. Cube Cloud also comes with a free tier for
+development and proof-of-concept projects.
 
-<Grid cols={2}>
+Alternatively, you can run Cube on your own infrastructure.
+
+<Grid cols={2} imageSize={[undefined, 50]}>
   <GridItem
-    url="getting-started/docker"
-    imageUrl="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/static/icons/docker.svg"
-    title="Docker"
-  />
-  <GridItem
-    url="cloud/getting-started/create"
+    url="getting-started/cloud/overview"
     imageUrl="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/static/icons/cube-cloud.svg"
     title="Cube Cloud"
   />
+  <GridItem
+    url="getting-started/core/overview"
+    imageUrl="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/static/icons/git.svg"
+    title="Cube Core"
+  />
 </Grid>
 
-There's also a legacy option to get started with
-[Node.js](getting-started/nodejs).
+[cube-cloud]: https://cube.dev/cloud/

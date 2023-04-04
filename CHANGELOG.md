@@ -3,6 +3,39 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.32.19](https://github.com/cube-js/cube/compare/v0.32.18...v0.32.19) (2023-04-03)
+
+
+### Features
+
+* **cubesql:** Support `date_trunc = literal date` filter ([#6376](https://github.com/cube-js/cube/issues/6376)) ([0ef53cb](https://github.com/cube-js/cube/commit/0ef53cb978e8995185a731985944b08f1f24949e))
+* **cubestore:** Increase default TRANSPORT_MAX_FRAME_SIZE to 32Mb ([#6381](https://github.com/cube-js/cube/issues/6381)) ([73f7ea9](https://github.com/cube-js/cube/commit/73f7ea9a79882cdcdeff9a7bc916077f86489852))
+* **schema-compiler:** Support new aliases for join.relationship ([#6367](https://github.com/cube-js/cube/issues/6367)) ([34a18d8](https://github.com/cube-js/cube/commit/34a18d8936d6e3e27d0dcba2456dbac3f03b0d76))
+* Support quarter(s) in dateRange for timeDimensions ([#6385](https://github.com/cube-js/cube/issues/6385)) ([5a08721](https://github.com/cube-js/cube/commit/5a087216dfd95be29d414ec83f4494de8e3a1fb2))
+
+
+
+
+
+## [0.32.18](https://github.com/cube-js/cube/compare/v0.32.17...v0.32.18) (2023-04-02)
+
+
+### Bug Fixes
+
+* **athena-driver:** Correct handling for NULL values ([#6171](https://github.com/cube-js/cube/issues/6171)) ([a1f4cd4](https://github.com/cube-js/cube/commit/a1f4cd498e84dde91d736cc87825ae3a8095f9bf))
+* **playground:** SQL API default port 15432 ([416a9de](https://github.com/cube-js/cube/commit/416a9de677cb9a1a48f426a74e755b78c18e0952))
+
+
+### Features
+
+* Cube based includes and meta exposure ([#6380](https://github.com/cube-js/cube/issues/6380)) ([ead4ac0](https://github.com/cube-js/cube/commit/ead4ac0b3b78c074f29fcdec3f86282bce42c45a))
+* **cubestore:** Allow to configure max message_size/frame_size for transport ([#6369](https://github.com/cube-js/cube/issues/6369)) ([be7d40b](https://github.com/cube-js/cube/commit/be7d40bcf3be29b2fc0edfe2983162c4b0cafbce))
+* **schema-compiler:** Introduce public field (alias for shown) ([#6361](https://github.com/cube-js/cube/issues/6361)) ([6d0c66a](https://github.com/cube-js/cube/commit/6d0c66aad43d51dd23cc3b0cbd6ba3454581afd6))
+
+
+
+
+
 ## [0.32.17](https://github.com/cube-js/cube/compare/v0.32.16...v0.32.17) (2023-03-29)
 
 

@@ -584,7 +584,6 @@ mod tests {
             region.clone(),
             bucket_name.clone(),
             None,
-            "test".to_string(),
         )
         .unwrap();
 
@@ -598,7 +597,6 @@ mod tests {
             region.clone(),
             bucket_name.clone(),
             Some("remotefs_test_subpathdir".to_string()),
-            "test".to_string(),
         )
         .unwrap();
 

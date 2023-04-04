@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.32.19](https://github.com/cube-js/cube/compare/v0.32.18...v0.32.19) (2023-04-03)
+
+
+### Features
+
+* **cubesql:** Support `date_trunc = literal date` filter ([#6376](https://github.com/cube-js/cube/issues/6376)) ([0ef53cb](https://github.com/cube-js/cube/commit/0ef53cb978e8995185a731985944b08f1f24949e))
+
+
+
+
+
 ## [0.32.17](https://github.com/cube-js/cube/compare/v0.32.16...v0.32.17) (2023-03-29)
 
 **Note:** Version bump only for package @cubejs-backend/cubesql

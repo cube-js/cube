@@ -26,7 +26,6 @@ pub struct S3RemoteFs {
     bucket: std::sync::RwLock<Bucket>,
     sub_path: Option<String>,
     delete_mut: Mutex<()>,
-    cube_host: String,
 }
 
 impl fmt::Debug for S3RemoteFs {
@@ -50,7 +49,6 @@ impl S3RemoteFs {
         region: String,
         bucket_name: String,
         sub_path: Option<String>,
-        cube_host: String,
     ) -> Result<Arc<Self>, CubeError> {
         let key_id = env::var("CUBESTORE_AWS_ACCESS_KEY_ID").ok();
         let access_key = env::var("CUBESTORE_AWS_SECRET_ACCESS_KEY").ok();
@@ -64,7 +62,6 @@ impl S3RemoteFs {
             bucket,
             sub_path,
             delete_mut: Mutex::new(()),
-            cube_host,
         });
         spawn_creds_refresh_loop(key_id, access_key, bucket_name, region, &fs);
         Ok(fs)
@@ -147,7 +144,6 @@ impl RemoteFs for S3RemoteFs {
                 Some(&vec![
                     "operation:upload_file".to_string(),
                     "driver:s3".to_string(),
-                    format!("cube_host:{}", self.cube_host),
                 ]),
             );
 
@@ -206,7 +202,6 @@ impl RemoteFs for S3RemoteFs {
                 Some(&vec![
                     "operation:download_file".to_string(),
                     "driver:s3".to_string(),
-                    format!("cube_host:{}", self.cube_host),
                 ]),
             );
             let time = SystemTime::now();
@@ -242,7 +237,6 @@ impl RemoteFs for S3RemoteFs {
             Some(&vec![
                 "operation:delete_file".to_string(),
                 "driver:s3".to_string(),
-                format!("cube_host:{}", self.cube_host),
             ]),
         );
         let time = SystemTime::now();
@@ -282,11 +276,7 @@ impl RemoteFs for S3RemoteFs {
     async fn list_with_metadata(&self, remote_prefix: &str) -> Result<Vec<RemoteFile>, CubeError> {
         app_metrics::REMOTE_FS_OPERATION_CORE.add_with_tags(
             1,
-            Some(&vec![
-                "operation:list".to_string(),
-                "driver:s3".to_string(),
-                format!("cube_host:{}", self.cube_host),
-            ]),
+            Some(&vec!["operation:list".to_string(), "driver:s3".to_string()]),
         );
         let path = self.s3_path(remote_prefix);
         let bucket = self.bucket.read().unwrap().clone();

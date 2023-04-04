@@ -1291,3 +1291,14 @@ export const hiddenCube = driverTestFn({
     expect(meta.cubes.find(cube => cube.name === 'HiddenECommerce')).toBe(undefined);
   }
 });
+
+export const viewMetaExposed = driverTestFn({
+  name: 'view meta exposed',
+  schemas: commonSchemas,
+  testFn: async (client) => {
+    const meta = await client.meta();
+    const view = meta.cubes.find(cube => cube.name === 'ECommerceView');
+    expect(view?.measures?.find(m => m.name === 'ECommerceView.count')?.aggType).toBe('count');
+    expect(view?.measures?.find(m => m.name === 'ECommerceView.count')?.meta?.foo).toBe('bar');
+  }
+});

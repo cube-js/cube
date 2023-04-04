@@ -3,6 +3,28 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.32.19](https://github.com/cube-js/cube/compare/v0.32.18...v0.32.19) (2023-04-03)
+
+
+### Features
+
+* **cubestore:** Increase default TRANSPORT_MAX_FRAME_SIZE to 32Mb ([#6381](https://github.com/cube-js/cube/issues/6381)) ([73f7ea9](https://github.com/cube-js/cube/commit/73f7ea9a79882cdcdeff9a7bc916077f86489852))
+
+
+
+
+
+## [0.32.18](https://github.com/cube-js/cube.js/compare/v0.32.17...v0.32.18) (2023-04-02)
+
+
+### Features
+
+* **cubestore:** Allow to configure max message_size/frame_size for transport ([#6369](https://github.com/cube-js/cube.js/issues/6369)) ([be7d40b](https://github.com/cube-js/cube.js/commit/be7d40bcf3be29b2fc0edfe2983162c4b0cafbce))
+
+
+
+
+
 ## [0.32.17](https://github.com/cube-js/cube/compare/v0.32.16...v0.32.17) (2023-03-29)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore

@@ -21,7 +21,8 @@ export const nonStringFields = new Set([
   'incremental',
   'external',
   'useOriginalSqlPreAggregations',
-  'readOnly'
+  'readOnly',
+  'prefix'
 ]);
 
 const identifierRegex = /^[_a-zA-Z][_a-zA-Z0-9]*$/;
@@ -470,7 +471,11 @@ const baseSchema = {
   public: Joi.boolean().strict(),
   joins: Joi.object().pattern(identifierRegex, Joi.object().keys({
     sql: Joi.func().required(),
-    relationship: Joi.any().valid('hasMany', 'belongsTo', 'hasOne').required()
+    relationship: Joi.any().valid(
+      'belongsTo', 'belongs_to', 'many_to_one', 'manyToOne',
+      'hasMany', 'has_many', 'one_to_many', 'oneToMany',
+      'hasOne', 'has_one', 'one_to_one', 'oneToOne'
+    ).required()
   })),
   measures: MeasuresSchema,
   dimensions: Joi.object().pattern(identifierRegex, Joi.alternatives().try(
@@ -528,6 +533,24 @@ const viewSchema = inherit(baseSchema, {
   isView: Joi.boolean().strict(),
   includes: Joi.func(),
   excludes: Joi.func(),
+  cubes: Joi.array().items(
+    Joi.object().keys({
+      cube: Joi.func().required(),
+      prefix: Joi.boolean(),
+      name: Joi.string(),
+      includes: Joi.alternatives([
+        Joi.string().valid('*'),
+        Joi.array().items(Joi.alternatives([
+          Joi.string().required(),
+          Joi.object().keys({
+            member: Joi.string().required(),
+            name: Joi.string()
+          })
+        ]))
+      ]).required(),
+      excludes: Joi.array().items(Joi.string().required()),
+    })
+  ),
 });
 
 function formatErrorMessageFromDetails(explain, d) {

@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.32.19](https://github.com/cube-js/cube/compare/v0.32.18...v0.32.19) (2023-04-03)
+
+
+### Features
+
+* Support quarter(s) in dateRange for timeDimensions ([#6385](https://github.com/cube-js/cube/issues/6385)) ([5a08721](https://github.com/cube-js/cube/commit/5a087216dfd95be29d414ec83f4494de8e3a1fb2))
+
+
+
+
+
+## [0.32.18](https://github.com/cube-js/cube/compare/v0.32.17...v0.32.18) (2023-04-02)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
 ## [0.32.17](https://github.com/cube-js/cube/compare/v0.32.16...v0.32.17) (2023-03-29)
 
 **Note:** Version bump only for package @cubejs-backend/api-gateway

@@ -9,7 +9,9 @@ Lambda pre-aggregations follow the
 [Lambda architecture](https://en.wikipedia.org/wiki/Lambda_architecture) design
 to union real-time and batch data. Cube acts as a serving layer and uses
 pre-aggregations as a batch layer and source data or other pre-aggregations,
-usually [streaming][streaming-pre-agg], as a speed layer.
+usually [streaming][streaming-pre-agg], as a speed layer. Due to this design,
+lambda pre-aggregations **only** work with data that is newer than the existing
+batched pre-aggregations.
 
 <WarningBox>
 

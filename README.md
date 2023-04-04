@@ -54,6 +54,7 @@ Once Docker is installed, in a new folder for your project, run the following co
 
 ```bash
 docker run -p 4000:4000 \
+  -p 15432:15432 \
   -v ${PWD}:/cube/conf \
   -e CUBEJS_DEV_MODE=true \
   cubejs/cube
