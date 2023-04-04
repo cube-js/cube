@@ -66,9 +66,9 @@ export function testQueries(type: string): void {
         ],
         timezones: ['UTC'],
         preAggregations: [
-          'Customers.RollingExternal',
-          'ECommerce.SimpleAnalysisExternal',
-          'ECommerce.TimeAnalysisExternal',
+          'Customers.RAExternal',
+          'ECommerce.SAExternal',
+          'ECommerce.TAExternal',
         ]
       });
     });

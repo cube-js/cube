@@ -71,32 +71,32 @@ export function testSequence(type: string): void {
     });
 
     execute('for the Customers.RollingExternal', async () => {
-      await hookPreaggs(core, 'Customers.RollingExternal');
+      await hookPreaggs(core, 'Customers.RAExternal');
       expect([source.calls, storage.calls]).toMatchSnapshot();
     });
 
     execute('for the Customers.RollingInternal', async () => {
-      await hookPreaggs(core, 'Customers.RollingInternal');
+      await hookPreaggs(core, 'Customers.RAInternal');
       expect([source.calls, storage.calls]).toMatchSnapshot();
     });
 
     execute('for the ECommerce.SimpleAnalysisExternal', async () => {
-      await hookPreaggs(core, 'ECommerce.SimpleAnalysisExternal');
+      await hookPreaggs(core, 'ECommerce.SAExternal');
       expect([source.calls, storage.calls]).toMatchSnapshot();
     });
 
     execute('for the ECommerce.SimpleAnalysisInternal', async () => {
-      await hookPreaggs(core, 'ECommerce.SimpleAnalysisInternal');
+      await hookPreaggs(core, 'ECommerce.SAInternal');
       expect([source.calls, storage.calls]).toMatchSnapshot();
     });
 
     execute('for the ECommerce.TimeAnalysisExternal', async () => {
-      await hookPreaggs(core, 'ECommerce.TimeAnalysisExternal');
+      await hookPreaggs(core, 'ECommerce.TAExternal');
       expect([source.calls, storage.calls]).toMatchSnapshot();
     });
 
     execute('for the ECommerce.TimeAnalysisInternal', async () => {
-      await hookPreaggs(core, 'ECommerce.TimeAnalysisInternal');
+      await hookPreaggs(core, 'ECommerce.TAInternal');
       expect([source.calls, storage.calls]).toMatchSnapshot();
     });
   });

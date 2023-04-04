@@ -21,12 +21,16 @@
     "mssql-driver": "jest --forceExit --runInBand --verbose -i dist/test/mssql-driver.test.js",
     "mssql-core": "jest --forceExit --runInBand --verbose -i dist/test/mssql-core.test.js",
     "mssql-full": "jest --forceExit --runInBand --verbose -i dist/test/mssql-full.test.js",
+
+    "mysql-driver": "jest --forceExit --runInBand --verbose -i dist/test/mysql-driver.test.js",
+    "mysql-core": "jest --forceExit --runInBand --verbose -i dist/test/mysql-core.test.js",
+    "mysql-full": "jest --forceExit --runInBand --verbose -i dist/test/mysql-full.test.js",
     
     "postgres-driver": "jest --forceExit --runInBand --verbose -i dist/test/postgres-driver.test.js",
     "postgres-core": "jest --forceExit --runInBand --verbose -i dist/test/postgres-core.test.js",
     "postgres-full": "jest --forceExit --runInBand --verbose -i dist/test/postgres-full.test.js",
     
-    "tst": "clear && yarn tsc && jest --detectOpenHandles --runInBand --verbose -i dist/test/postgres-core.test.js"
+    "tst": "clear && yarn tsc && yarn mysql-driver"
   },
   "files": [
     "dist/src"

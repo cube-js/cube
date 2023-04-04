@@ -40,13 +40,13 @@
     "Products": [],
     "Customers": [
       {
-        "name": "Rolling",
+        "name": "RA",
         "measures": ["CUBE.count", "CUBE.runningTotal"]
       }
     ],
     "ECommerce": [
       {
-        "name": "SimpleAnalysis",
+        "name": "SA",
         "dimensions": ["CUBE.productName"],
         "measures": [
           "CUBE.totalQuantity",
@@ -56,7 +56,7 @@
         ]
       },
       {
-        "name": "TimeAnalysis",
+        "name": "TA",
         "time_dimension": "CUBE.orderDate",
         "granularity": "month",
         "partition_granularity": "month",

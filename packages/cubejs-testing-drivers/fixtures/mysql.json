@@ -1,15 +1,15 @@
 {
   "cube": {
     "environment": {
-      "CUBEJS_DEV_MODE": true,
+      "CUBEJS_DEV_MODE": "true",
       "CUBEJS_API_SECRET": "mysupersecret",
       "CUBEJS_CACHE_AND_QUEUE_DRIVER": "cubestore",
       "CUBEJS_CUBESTORE_HOST": "store",
-      "CUBEJS_DB_TYPE": "clickhouse",
+      "CUBEJS_DB_TYPE": "mysql",
       "CUBEJS_DB_HOST": "data",
       "CUBEJS_DB_NAME": "test",
-      "CUBEJS_DB_USER": "test",
-      "CUBEJS_DB_PASS": "test"
+      "CUBEJS_DB_USER": "root",
+      "CUBEJS_DB_PASS": "123-Strong-Password-321"
     },
     "depends_on": ["data"],
     "links": ["data"],
@@ -20,39 +20,30 @@
     "ports" : ["4000"]
   },
   "data": {
-    "image": "clickhouse/clickhouse-server",
+    "image": "mysql:8",
     "environment": {
-      "CLICKHOUSE_DB": "test",
-      "CLICKHOUSE_USER": "test",
-      "CLICKHOUSE_PASSWORD": "test",
-      "CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT": 1
+      "MYSQL_DATABASE": "test",
+      "MYSQL_ROOT_PASSWORD": "123-Strong-Password-321"
     },
-    "ports" : ["8123"]
+    "command": "mysqld --default-authentication-plugin=mysql_native_password",
+    "ports" : ["3306"]
   },
   "cast": {
     "SELECT_PREFIX": "",
     "SELECT_SUFFIX": "",
-    "DATE_PREFIX": "toDateTime(",
-    "DATE_SUFFIX": ")",
+    "DATE_PREFIX": "STR_TO_DATE(",
+    "DATE_SUFFIX": ", '%Y-%m-%d')",
     "CREATE_TBL_PREFIX": "CREATE TABLE ",
-    "CREATE_TBL_SUFFIX": " ENGINE = Memory AS ",
-    "CREATE_SUB_PREFIX": "",
-    "CREATE_SUB_SUFFIX": ""
+    "CREATE_TBL_SUFFIX": " AS ",
+    "CREATE_SUB_PREFIX": "(",
+    "CREATE_SUB_SUFFIX": ");"
   },
   "preAggregations": {
     "Products": [],
     "Customers": [
       {
         "name": "RA",
-        "measures": ["CUBE.count", "CUBE.runningTotal"],
-        "indexes": {
-          "category_index": {
-            "columns": [
-              "CUBE.count",
-              "CUBE.runningTotal"
-            ]
-          }
-        }
+        "measures": ["CUBE.count", "CUBE.runningTotal"]
       }
     ],
     "ECommerce": [
@@ -64,12 +55,7 @@
           "CUBE.avgDiscount",
           "CUBE.totalSales",
           "CUBE.totalProfit"
-        ],
-        "indexes": {
-          "category_index": {
-            "columns": ["CUBE.productName"]
-          }
-        }
+        ]
       },
       {
         "name": "TA",
@@ -82,16 +68,15 @@
           "CUBE.avgDiscount",
           "CUBE.totalSales",
           "CUBE.totalProfit"
-        ],
-        "indexes": {
-          "category_index": {
-            "columns": ["CUBE.productName"]
-          }
-        }
+        ]
       }
     ]
   },
   "skip": [
+    "MySQL doesn't support offset wo limit",
+    "---------------------------------------",
+    "querying ECommerce: dimentions + order + total + offset",
+    "querying Customers: dimentions + order + total + offset",
     "SKIPED FOR ALL",
     "---------------------------------------",
     "querying Products: dimensions -- doesn't work wo ordering",
