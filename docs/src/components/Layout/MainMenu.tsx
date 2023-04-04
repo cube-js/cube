@@ -35,7 +35,6 @@ const menuOrder = [
   'FAQs',
   'Release Notes',
   'Reference',
-  'Cube Cloud Getting Started',
   'Inspecting Queries',
   'Cloud Runtime',
 ];
