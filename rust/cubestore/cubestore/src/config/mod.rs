@@ -846,6 +846,12 @@ where
 impl Config {
     pub fn default() -> Config {
         let query_timeout = env_parse("CUBESTORE_QUERY_TIMEOUT", 120);
+        let query_cache_time_to_idle_secs = env_parse(
+            "CUBESTORE_QUERY_CACHE_TIME_TO_IDLE",
+            // 1 hour
+            60 * 60,
+        );
+
         Config {
             injector: Injector::new(),
             config_obj: Arc::new(ConfigObjImpl {
@@ -977,11 +983,11 @@ impl Config {
                     Some(16384 << 20),
                     Some(0),
                 ) as u64,
-                query_cache_time_to_idle_secs: Some(env_parse(
-                    "CUBESTORE_QUERY_CACHE_TIME_TO_IDLE",
-                    // 1 hour
-                    60 * 60,
-                )),
+                query_cache_time_to_idle_secs: if query_cache_time_to_idle_secs == 0 {
+                    None
+                } else {
+                    Some(query_cache_time_to_idle_secs)
+                },
                 metadata_cache_max_capacity_bytes: env_parse(
                     "CUBESTORE_METADATA_CACHE_MAX_CAPACITY_BYTES",
                     0,
