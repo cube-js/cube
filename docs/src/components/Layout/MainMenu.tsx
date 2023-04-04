@@ -24,7 +24,6 @@ const menuOrder = [
   'Data Modeling',
   'Caching',
   'Authentication & Authorization',
-  'API Reference',
   'HTTP API',
   'SQL API',
   'Frontend Integrations',
