@@ -29,7 +29,7 @@ const menuOrder = [
   'Frontend Integrations',
   'Workspace',
   'Deployment',
-  'Observability',
+  'Monitoring',
   'Examples & Tutorials',
   'FAQs',
   'Release Notes',
