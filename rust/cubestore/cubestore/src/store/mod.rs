@@ -42,6 +42,7 @@ use arrow::record_batch::RecordBatch;
 use compaction::{merge_chunks, merge_replay_handles};
 use datafusion::cube_ext;
 use datafusion::cube_ext::util::lexcmp_array_rows;
+use deepsize::DeepSizeOf;
 use futures::future::join_all;
 use itertools::Itertools;
 use log::trace;
@@ -53,7 +54,7 @@ use tokio::task::JoinHandle;
 
 pub const ROW_GROUP_SIZE: usize = 16384; // TODO config
 
-#[derive(Serialize, Deserialize, Hash, Eq, PartialEq, Debug)]
+#[derive(Serialize, Deserialize, Hash, Eq, PartialEq, Debug, DeepSizeOf)]
 pub struct DataFrame {
     columns: Vec<Column>,
     data: Vec<Row>,

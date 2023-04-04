@@ -81,6 +81,7 @@ use std::str::FromStr;
 
 use crate::cachestore::{CacheItem, QueueItem, QueueItemStatus, QueueResult, QueueResultAckEvent};
 use crate::remotefs::LocalDirRemoteFs;
+use deepsize::DeepSizeOf;
 use snapshot_info::SnapshotInfo;
 use std::time::{Duration, SystemTime};
 use table::Table;
@@ -318,7 +319,7 @@ impl DataFrameValue<String> for Option<Vec<AggregateFunction>> {
     }
 }
 
-#[derive(Clone, Copy, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Copy, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, DeepSizeOf)]
 pub enum HllFlavour {
     Airlift,    // Compatible with Presto, Athena, etc.
     Snowflake,  // Same storage as Airlift, imports from Snowflake JSON.
@@ -342,7 +343,7 @@ pub fn is_valid_plain_binary_hll(data: &[u8], f: HllFlavour) -> Result<(), CubeE
     return Ok(());
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, DeepSizeOf)]
 pub enum ColumnType {
     String,
     Int,
@@ -480,7 +481,7 @@ impl From<&Column> for parquet::schema::types::Type {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, DeepSizeOf)]
 pub struct Column {
     name: String,
     column_type: ColumnType,

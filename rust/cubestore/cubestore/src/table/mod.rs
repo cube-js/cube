@@ -9,6 +9,7 @@ use arrow::datatypes::{DataType, TimeUnit};
 
 use chrono::{SecondsFormat, TimeZone, Utc};
 use datafusion::cube_ext::ordfloat::OrdF64;
+use deepsize::{Context, DeepSizeOf};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
@@ -29,6 +30,25 @@ pub enum TableValue {
     Bytes(Vec<u8>),
     Timestamp(TimestampValue),
     Boolean(bool),
+}
+
+impl DeepSizeOf for TableValue {
+    fn deep_size_of(&self) -> usize {
+        32
+    }
+
+    fn deep_size_of_children(&self, context: &mut Context) -> usize {
+        match self {
+            TableValue::Null => 0,
+            TableValue::String(v) => v.deep_size_of_children(context),
+            TableValue::Int(_) => 0,
+            TableValue::Decimal(_) => 0,
+            TableValue::Float(_) => 0,
+            TableValue::Bytes(v) => v.deep_size_of_children(context),
+            TableValue::Timestamp(_) => 0,
+            TableValue::Boolean(_) => 0,
+        }
+    }
 }
 
 impl TableValue {
@@ -166,7 +186,7 @@ impl ToString for TimestampValue {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, DeepSizeOf)]
 pub struct Row {
     values: Vec<TableValue>,
 }
