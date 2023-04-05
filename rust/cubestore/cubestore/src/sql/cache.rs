@@ -3,13 +3,16 @@ use crate::sql::InlineTables;
 use crate::sql::SqlQueryContext;
 use crate::store::DataFrame;
 use crate::{app_metrics, CubeError};
+use deepsize::DeepSizeOf;
 use futures::Future;
 use log::trace;
+use moka::future::Cache;
 use std::collections::HashSet;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::{watch, Mutex};
 
-#[derive(Clone, Hash, Eq, PartialEq, Debug)]
+#[derive(Clone, Hash, Eq, PartialEq, Debug, DeepSizeOf)]
 pub struct SqlResultCacheKey {
     query: String,
     inline_tables: InlineTables,
@@ -61,20 +64,38 @@ pub struct SqlResultCache {
     queue_cache: Mutex<
         lru::LruCache<SqlQueueCacheKey, watch::Receiver<Option<Result<Arc<DataFrame>, CubeError>>>>,
     >,
-    result_cache: Mutex<lru::LruCache<SqlResultCacheKey, Arc<DataFrame>>>,
+    result_cache: Cache<SqlResultCacheKey, Arc<DataFrame>>,
+}
+
+fn dataframe_sizeof(key: &SqlResultCacheKey, df: &Arc<DataFrame>) -> u32 {
+    (key.deep_size_of() + df.deep_size_of())
+        .try_into()
+        .unwrap_or(u32::MAX)
 }
 
 impl SqlResultCache {
-    pub fn new(capacity: usize) -> Self {
+    pub fn new(capacity_bytes: u64, time_to_idle_secs: Option<u64>) -> Self {
+        let cache_builder = if let Some(time_to_idle_secs) = time_to_idle_secs {
+            Cache::builder().time_to_idle(Duration::from_secs(time_to_idle_secs))
+        } else {
+            Cache::builder()
+        };
+
         Self {
-            queue_cache: Mutex::new(lru::LruCache::new(capacity)),
-            result_cache: Mutex::new(lru::LruCache::new(capacity)),
+            queue_cache: Mutex::new(lru::LruCache::new(1000)),
+            result_cache: cache_builder
+                .max_capacity(capacity_bytes)
+                .weigher(dataframe_sizeof)
+                .build(),
         }
     }
 
     pub async fn clear(&self) {
-        self.result_cache.lock().await.clear();
+        // invalidation will be done in the background
+        self.result_cache.invalidate_all();
+
         app_metrics::DATA_QUERIES_CACHE_SIZE.report(0);
+        app_metrics::DATA_QUERIES_CACHE_WEIGHT.report(0);
     }
 
     #[tracing::instrument(level = "trace", skip(self, context, plan, exec))]
@@ -90,13 +111,8 @@ impl SqlResultCache {
     {
         let inline_tables = &context.inline_tables;
         let result_key = SqlResultCacheKey::from_plan(query, inline_tables, &plan);
-        let cached_result = {
-            let mut result_cache = self.result_cache.lock().await;
-            result_cache.get(&result_key).cloned()
-        };
-        if let Some(result) = cached_result {
+        if let Some(result) = self.result_cache.get(&result_key) {
             app_metrics::DATA_QUERIES_CACHE_HIT.increment();
-
             trace!("Using result cache for '{}'", query);
             return Ok(result);
         }
@@ -108,7 +124,9 @@ impl SqlResultCache {
             if !cache.contains(&key) {
                 let (tx, rx) = watch::channel(None);
                 cache.put(key, rx);
-                app_metrics::DATA_QUERIES_CACHE_SIZE.report(cache.len() as i64);
+                app_metrics::DATA_QUERIES_CACHE_SIZE.report(self.result_cache.entry_count() as i64);
+                app_metrics::DATA_QUERIES_CACHE_WEIGHT
+                    .report(self.result_cache.weighted_size() as i64);
                 (Some(tx), None)
             } else {
                 (None, cache.get(&key).cloned())
@@ -126,10 +144,14 @@ impl SqlResultCache {
             }
             match &result {
                 Ok(r) => {
-                    let mut result_cache = self.result_cache.lock().await;
-                    if !result_cache.contains(&result_key) {
-                        result_cache.put(result_key.clone(), r.clone());
-                        app_metrics::DATA_QUERIES_CACHE_SIZE.report(result_cache.len() as i64);
+                    if !self.result_cache.contains_key(&result_key) {
+                        self.result_cache
+                            .insert(result_key.clone(), r.clone())
+                            .await;
+                        app_metrics::DATA_QUERIES_CACHE_SIZE
+                            .report(self.result_cache.entry_count() as i64);
+                        app_metrics::DATA_QUERIES_CACHE_WEIGHT
+                            .report(self.result_cache.weighted_size() as i64);
                     }
                 }
                 Err(_) => {
@@ -189,7 +211,7 @@ mod tests {
 
     #[tokio::test]
     async fn simple() -> Result<(), CubeError> {
-        let cache = SqlResultCache::new(100);
+        let cache = SqlResultCache::new(1 << 20, Some(120));
         let schema = Arc::new(DFSchema::new(Vec::new())?);
         let plan = SerializedPlan::try_new(
             LogicalPlan::EmptyRelation {

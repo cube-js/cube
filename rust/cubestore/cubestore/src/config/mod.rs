@@ -420,7 +420,9 @@ pub trait ConfigObj: DIService {
 
     fn malloc_trim_every_secs(&self) -> u64;
 
-    fn max_cached_queries(&self) -> usize;
+    fn query_cache_max_capacity_bytes(&self) -> u64;
+
+    fn query_cache_time_to_idle_secs(&self) -> Option<u64>;
 
     fn metadata_cache_max_capacity_bytes(&self) -> u64;
 
@@ -502,7 +504,8 @@ pub struct ConfigObjImpl {
     pub enable_topk: bool,
     pub enable_startup_warmup: bool,
     pub malloc_trim_every_secs: u64,
-    pub max_cached_queries: usize,
+    pub query_cache_max_capacity_bytes: u64,
+    pub query_cache_time_to_idle_secs: Option<u64>,
     pub metadata_cache_max_capacity_bytes: u64,
     pub metadata_cache_time_to_idle_secs: u64,
     pub stream_replay_check_interval_secs: u64,
@@ -691,8 +694,11 @@ impl ConfigObj for ConfigObjImpl {
     fn malloc_trim_every_secs(&self) -> u64 {
         self.malloc_trim_every_secs
     }
-    fn max_cached_queries(&self) -> usize {
-        self.max_cached_queries
+    fn query_cache_max_capacity_bytes(&self) -> u64 {
+        self.query_cache_max_capacity_bytes
+    }
+    fn query_cache_time_to_idle_secs(&self) -> Option<u64> {
+        self.query_cache_time_to_idle_secs
     }
     fn metadata_cache_max_capacity_bytes(&self) -> u64 {
         self.metadata_cache_max_capacity_bytes
@@ -854,6 +860,12 @@ where
 impl Config {
     pub fn default() -> Config {
         let query_timeout = env_parse("CUBESTORE_QUERY_TIMEOUT", 120);
+        let query_cache_time_to_idle_secs = env_parse(
+            "CUBESTORE_QUERY_CACHE_TIME_TO_IDLE",
+            // 1 hour
+            60 * 60,
+        );
+
         Config {
             injector: Injector::new(),
             config_obj: Arc::new(ConfigObjImpl {
@@ -979,7 +991,17 @@ impl Config {
                 enable_topk: env_bool("CUBESTORE_ENABLE_TOPK", true),
                 enable_startup_warmup: env_bool("CUBESTORE_STARTUP_WARMUP", true),
                 malloc_trim_every_secs: env_parse("CUBESTORE_MALLOC_TRIM_EVERY_SECS", 30),
-                max_cached_queries: env_parse("CUBESTORE_MAX_CACHED_QUERIES", 10_000),
+                query_cache_max_capacity_bytes: env_parse_size(
+                    "CUBESTORE_QUERY_CACHE_MAX_CAPACITY",
+                    512 << 20,
+                    Some(16384 << 20),
+                    Some(0),
+                ) as u64,
+                query_cache_time_to_idle_secs: if query_cache_time_to_idle_secs == 0 {
+                    None
+                } else {
+                    Some(query_cache_time_to_idle_secs)
+                },
                 metadata_cache_max_capacity_bytes: env_parse(
                     "CUBESTORE_METADATA_CACHE_MAX_CAPACITY_BYTES",
                     0,
@@ -1097,7 +1119,8 @@ impl Config {
                 enable_topk: true,
                 enable_startup_warmup: true,
                 malloc_trim_every_secs: 0,
-                max_cached_queries: 10_000,
+                query_cache_max_capacity_bytes: 512 << 20,
+                query_cache_time_to_idle_secs: Some(600),
                 metadata_cache_max_capacity_bytes: 0,
                 metadata_cache_time_to_idle_secs: 1_000,
                 meta_store_log_upload_interval: 30,
@@ -1640,7 +1663,8 @@ impl Config {
                     c.wal_split_threshold() as usize,
                     Duration::from_secs(c.query_timeout()),
                     Duration::from_secs(c.import_job_timeout() * 2),
-                    c.max_cached_queries(),
+                    c.query_cache_max_capacity_bytes(),
+                    c.query_cache_time_to_idle_secs(),
                 )
             })
             .await;
