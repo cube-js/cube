@@ -442,9 +442,9 @@ pub trait ConfigObj: DIService {
 
     fn metastore_snapshots_lifetime(&self) -> u64;
 
-    fn minimum_metastore_cache_snapshots_count(&self) -> u64;
+    fn minimum_cachestore_snapshots_count(&self) -> u64;
 
-    fn metastore_cache_snapshots_lifetime(&self) -> u64;
+    fn cachestore_snapshots_lifetime(&self) -> u64;
 
     fn max_disk_space(&self) -> u64;
     fn max_disk_space_per_worker(&self) -> u64;
@@ -512,8 +512,8 @@ pub struct ConfigObjImpl {
     pub skip_kafka_parsing_errors: bool,
     pub minimum_metastore_snapshots_count: u64,
     pub metastore_snapshots_lifetime: u64,
-    pub minimum_metastore_cache_snapshots_count: u64,
-    pub metastore_cache_snapshots_lifetime: u64,
+    pub minimum_cachestore_snapshots_count: u64,
+    pub cachestore_snapshots_lifetime: u64,
     pub max_disk_space: u64,
     pub max_disk_space_per_worker: u64,
     pub disk_space_cache_duration_secs: u64,
@@ -731,12 +731,12 @@ impl ConfigObj for ConfigObjImpl {
         self.metastore_snapshots_lifetime
     }
 
-    fn minimum_metastore_cache_snapshots_count(&self) -> u64 {
-        self.minimum_metastore_cache_snapshots_count
+    fn minimum_cachestore_snapshots_count(&self) -> u64 {
+        self.minimum_cachestore_snapshots_count
     }
 
-    fn metastore_cache_snapshots_lifetime(&self) -> u64 {
-        self.metastore_cache_snapshots_lifetime
+    fn cachestore_snapshots_lifetime(&self) -> u64 {
+        self.cachestore_snapshots_lifetime
     }
 
     fn max_disk_space(&self) -> u64 {
@@ -1013,12 +1013,12 @@ impl Config {
                     "CUBESTORE_METASTORE_SNAPSHOTS_LIFETIME",
                     24 * 60 * 60,
                 ),
-                minimum_metastore_cache_snapshots_count: env_parse(
-                    "CUBESTORE_MINIMUM_METASTORE_CACHE_SNAPSHOTS_COUNT",
+                minimum_cachestore_snapshots_count: env_parse(
+                    "CUBESTORE_MINIMUM_CACHESTORE_SNAPSHOTS_COUNT",
                     5,
                 ),
-                metastore_cache_snapshots_lifetime: env_parse(
-                    "CUBESTORE_METASTORE_CACHE_SNAPSHOTS_LIFETIME",
+                cachestore_snapshots_lifetime: env_parse(
+                    "CUBESTORE_CACHESTORE_SNAPSHOTS_LIFETIME",
                     60 * 60,
                 ),
                 max_disk_space: env_parse("CUBESTORE_MAX_DISK_SPACE_GB", 0) * 1024 * 1024 * 1024,
@@ -1110,8 +1110,8 @@ impl Config {
                 skip_kafka_parsing_errors: false,
                 minimum_metastore_snapshots_count: 3,
                 metastore_snapshots_lifetime: 24 * 3600,
-                minimum_metastore_cache_snapshots_count: 3,
-                metastore_cache_snapshots_lifetime: 3600,
+                minimum_cachestore_snapshots_count: 3,
+                cachestore_snapshots_lifetime: 3600,
                 max_disk_space: 0,
                 max_disk_space_per_worker: 0,
                 disk_space_cache_duration_secs: 0,

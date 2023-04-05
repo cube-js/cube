@@ -77,8 +77,8 @@ impl BaseRocksStoreFs {
         remote_fs: Arc<dyn RemoteFs>,
         config: Arc<dyn ConfigObj>,
     ) -> Arc<Self> {
-        let minimum_snapshots_count = config.minimum_metastore_cache_snapshots_count();
-        let snapshots_lifetime = config.metastore_cache_snapshots_lifetime();
+        let minimum_snapshots_count = config.minimum_cachestore_snapshots_count();
+        let snapshots_lifetime = config.cachestore_snapshots_lifetime();
         Arc::new(Self {
             remote_fs,
             name: "cachestore",
