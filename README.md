@@ -44,7 +44,7 @@ Cube has the necessary infrastructure and features to implement efficient data m
 
 <a href="https://cubecloud.dev/auth/signup?ref=github-readme"><img src="https://cubedev-blog-images.s3.us-east-2.amazonaws.com/f1f1eac0-0b44-4c47-936e-33b5c06eedf0.png" alt="Get started now" width="200px"></a>
 
-For a step-by-step guide on Cube Cloud, [see the docs](https://cube.dev/docs/cloud/getting-started/create?ref=github-readme).
+For a step-by-step guide on Cube Cloud, [see the docs](https://cube.dev/docs/getting-started/cloud/overview?ref=github-readme).
 
 ### Docker
 
