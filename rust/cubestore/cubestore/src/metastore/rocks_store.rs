@@ -1070,7 +1070,7 @@ mod tests {
         let details = Arc::new(RocksMetaStoreDetails {});
         let rocks_store = RocksStore::new(
             store_path.join("metastore").as_path(),
-            BaseRocksStoreFs::new(remote_fs.clone(), "metastore", config.config_obj()),
+            BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
             config.config_obj(),
             details,
         )?;

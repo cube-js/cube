@@ -442,6 +442,10 @@ pub trait ConfigObj: DIService {
 
     fn metastore_snapshots_lifetime(&self) -> u64;
 
+    fn minimum_cachestore_snapshots_count(&self) -> u64;
+
+    fn cachestore_snapshots_lifetime(&self) -> u64;
+
     fn max_disk_space(&self) -> u64;
     fn max_disk_space_per_worker(&self) -> u64;
 
@@ -508,6 +512,8 @@ pub struct ConfigObjImpl {
     pub skip_kafka_parsing_errors: bool,
     pub minimum_metastore_snapshots_count: u64,
     pub metastore_snapshots_lifetime: u64,
+    pub minimum_cachestore_snapshots_count: u64,
+    pub cachestore_snapshots_lifetime: u64,
     pub max_disk_space: u64,
     pub max_disk_space_per_worker: u64,
     pub disk_space_cache_duration_secs: u64,
@@ -723,6 +729,14 @@ impl ConfigObj for ConfigObjImpl {
 
     fn metastore_snapshots_lifetime(&self) -> u64 {
         self.metastore_snapshots_lifetime
+    }
+
+    fn minimum_cachestore_snapshots_count(&self) -> u64 {
+        self.minimum_cachestore_snapshots_count
+    }
+
+    fn cachestore_snapshots_lifetime(&self) -> u64 {
+        self.cachestore_snapshots_lifetime
     }
 
     fn max_disk_space(&self) -> u64 {
@@ -999,6 +1013,14 @@ impl Config {
                     "CUBESTORE_METASTORE_SNAPSHOTS_LIFETIME",
                     24 * 60 * 60,
                 ),
+                minimum_cachestore_snapshots_count: env_parse(
+                    "CUBESTORE_MINIMUM_CACHESTORE_SNAPSHOTS_COUNT",
+                    5,
+                ),
+                cachestore_snapshots_lifetime: env_parse(
+                    "CUBESTORE_CACHESTORE_SNAPSHOTS_LIFETIME",
+                    60 * 60,
+                ),
                 max_disk_space: env_parse("CUBESTORE_MAX_DISK_SPACE_GB", 0) * 1024 * 1024 * 1024,
                 max_disk_space_per_worker: env_parse("CUBESTORE_MAX_DISK_SPACE_PER_WORKER_GB", 0)
                     * 1024
@@ -1088,6 +1110,8 @@ impl Config {
                 skip_kafka_parsing_errors: false,
                 minimum_metastore_snapshots_count: 3,
                 metastore_snapshots_lifetime: 24 * 3600,
+                minimum_cachestore_snapshots_count: 3,
+                cachestore_snapshots_lifetime: 3600,
                 max_disk_space: 0,
                 max_disk_space_per_worker: 0,
                 disk_space_cache_duration_secs: 0,
@@ -1320,9 +1344,8 @@ impl Config {
                 .register("cachestore_fs", async move |i| {
                     // TODO metastore works with non queue remote fs as it requires loops to be started prior to load_from_remote call
                     let original_remote_fs = i.get_service("original_remote_fs").await;
-                    let arc: Arc<dyn DIService> = BaseRocksStoreFs::new(
+                    let arc: Arc<dyn DIService> = BaseRocksStoreFs::new_for_cachestore(
                         original_remote_fs,
-                        "cachestore",
                         i.get_service_typed().await,
                     );
 
@@ -1394,9 +1417,8 @@ impl Config {
                 .register("metastore_fs", async move |i| {
                     // TODO metastore works with non queue remote fs as it requires loops to be started prior to load_from_remote call
                     let original_remote_fs = i.get_service("original_remote_fs").await;
-                    let arc: Arc<dyn DIService> = BaseRocksStoreFs::new(
+                    let arc: Arc<dyn DIService> = BaseRocksStoreFs::new_for_metastore(
                         original_remote_fs,
-                        "metastore",
                         i.get_service_typed().await,
                     );
 
