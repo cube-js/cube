@@ -1985,7 +1985,14 @@ class ApiGateway {
         }
         return scopes;
       }
-      : this.contextToApiScopesDefFn;
+      : async () => {
+        const defaultApiScope = getEnv('defaultApiScope');
+        if (defaultApiScope) {
+          return defaultApiScope;
+        } else {
+          return this.contextToApiScopesDefFn();
+        }
+      };
   }
 
   protected async assertApiScope(

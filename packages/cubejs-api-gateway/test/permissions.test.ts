@@ -35,6 +35,44 @@ function createApiGateway(
 }
 
 describe('Gateway Api Scopes', () => {
+  test('CUBEJS_DEFAULT_API_SCOPES', async () => {
+    process.env.CUBEJS_DEFAULT_API_SCOPES = '';
+    
+    let res: request.Response;
+    const { app, apiGateway } = createApiGateway();
+
+    res = await request(app)
+      .get('/cubejs-api/graphql')
+      .set('Authorization', AUTH_TOKEN)
+      .expect(403);
+    expect(res.body && res.body.error)
+      .toStrictEqual('Api scope is missed: graphql');
+
+    res = await request(app)
+      .get('/cubejs-api/v1/meta')
+      .set('Authorization', AUTH_TOKEN)
+      .expect(403);
+    expect(res.body && res.body.error)
+      .toStrictEqual('Api scope is missed: meta');
+
+    res = await request(app)
+      .get('/cubejs-api/v1/load')
+      .set('Authorization', AUTH_TOKEN)
+      .expect(403);
+    expect(res.body && res.body.error)
+      .toStrictEqual('Api scope is missed: data');
+
+    res = await request(app)
+      .post('/cubejs-api/v1/pre-aggregations/jobs')
+      .set('Authorization', AUTH_TOKEN)
+      .expect(403);
+    expect(res.body && res.body.error)
+      .toStrictEqual('Api scope is missed: jobs');
+
+    delete process.env.CUBEJS_DEFAULT_API_SCOPES;
+    apiGateway.release();
+  });
+
   test('Liveliness declined', async () => {
     const { app, apiGateway } = createApiGateway({
       contextToApiScopes: async () => new Promise((resolve) => {

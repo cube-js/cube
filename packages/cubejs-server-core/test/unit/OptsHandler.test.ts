@@ -1036,7 +1036,7 @@ describe('OptsHandler class', () => {
     }
   );
 
-  test('must set default api scopes if not specified', async () => {
+  test('must set default api scopes if fn and env not specified', async () => {
     process.env.NODE_ENV = 'production';
     process.env.CUBEJS_DEV_MODE = 'false';
     process.env.CUBEJS_PRE_AGGREGATIONS_BUILDER = 'false';
@@ -1058,6 +1058,34 @@ describe('OptsHandler class', () => {
     expect(permissions).toBeDefined();
     expect(Array.isArray(permissions)).toBeTruthy();
     expect(permissions).toEqual(['liveliness', 'graphql', 'meta', 'data']);
+  });
+
+  test('must set env api scopes if fn not specified', async () => {
+    process.env.NODE_ENV = 'production';
+    process.env.CUBEJS_DEV_MODE = 'false';
+    process.env.CUBEJS_PRE_AGGREGATIONS_BUILDER = 'false';
+    process.env.CUBEJS_DEFAULT_API_SCOPES = 'graphql,meta';
+
+    const core = new CubejsServerCoreExposed({
+      ...conf,
+      apiSecret: '44b87d4309471e5d9d18738450db0e49',
+      scheduledRefreshTimer: false,
+      driverFactory: () => ({
+        type: 'postgres',
+        user: 'user',
+        password: 'password',
+        database: 'database',
+      }),
+    });
+
+    const gateway = <any>core.apiGateway();
+    const permissions = await gateway.contextToApiScopesFn();
+
+    expect(permissions).toBeDefined();
+    expect(Array.isArray(permissions)).toBeTruthy();
+    expect(permissions).toEqual(['graphql', 'meta']);
+
+    delete process.env.CUBEJS_DEFAULT_API_SCOPES;
   });
 
   test('must throw if contextToApiScopes returns wrong type', async () => {
