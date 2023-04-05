@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.32.20](https://github.com/cube-js/cube/compare/v0.32.19...v0.32.20) (2023-04-05)
+
+
+### Features
+
+* **questdb-driver:** Add SSL support ([#6395](https://github.com/cube-js/cube/issues/6395)) ([e9a4458](https://github.com/cube-js/cube/commit/e9a445807638f01c3762430339a84f5fe8518a50))
+
+
+
+
+
 ## [0.32.19](https://github.com/cube-js/cube/compare/v0.32.18...v0.32.19) (2023-04-03)
 
 **Note:** Version bump only for package @cubejs-backend/questdb-driver
