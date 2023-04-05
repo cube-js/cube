@@ -17,6 +17,10 @@
     "clickhouse-driver": "jest --forceExit --runInBand --verbose -i dist/test/clickhouse-driver.test.js",
     "clickhouse-core": "jest --forceExit --runInBand --verbose -i dist/test/clickhouse-core.test.js",
     "clickhouse-full": "jest --forceExit --runInBand --verbose -i dist/test/clickhouse-full.test.js",
+    
+    "databricks-jdbc-driver": "jest --forceExit --runInBand --verbose -i dist/test/databricks-jdbc-driver.test.js",
+    "databricks-jdbc-core": "jest --forceExit --runInBand --verbose -i dist/test/databricks-jdbc-core.test.js",
+    "databricks-jdbc-full": "jest --forceExit --runInBand --verbose -i dist/test/databricks-jdbc-full.test.js",
 
     "mssql-driver": "jest --forceExit --runInBand --verbose -i dist/test/mssql-driver.test.js",
     "mssql-core": "jest --forceExit --runInBand --verbose -i dist/test/mssql-core.test.js",
@@ -30,7 +34,7 @@
     "postgres-core": "jest --forceExit --runInBand --verbose -i dist/test/postgres-core.test.js",
     "postgres-full": "jest --forceExit --runInBand --verbose -i dist/test/postgres-full.test.js",
     
-    "tst": "clear && yarn tsc && yarn mysql-driver"
+    "tst": "clear && yarn tsc && yarn databricks-jdbc-driver"
   },
   "files": [
     "dist/src"

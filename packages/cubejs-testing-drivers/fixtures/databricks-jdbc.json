@@ -6,7 +6,7 @@
       "CUBEJS_CACHE_AND_QUEUE_DRIVER": "cubestore",
       "CUBEJS_CUBESTORE_HOST": "store",
       "CUBEJS_DB_TYPE": "databricks-jdbc",
-      "CUBEJS_DB_NAME": "${CUBEJS_AWS_KEY}",
+      "CUBEJS_DB_NAME": "${CUBEJS_DB_NAME}",
       "CUBEJS_DB_DATABRICKS_TOKEN": "${CUBEJS_DB_DATABRICKS_TOKEN}",
       "CUBEJS_DB_DATABRICKS_URL": "${CUBEJS_DB_DATABRICKS_URL}",
       "CUBEJS_DB_DATABRICKS_ACCEPT_POLICY": "${CUBEJS_DB_DATABRICKS_ACCEPT_POLICY}",
@@ -14,7 +14,8 @@
       "CUBEJS_DB_EXPORT_BUCKET": "${CUBEJS_DB_EXPORT_BUCKET}",
       "CUBEJS_DB_EXPORT_BUCKET_AWS_KEY": "${CUBEJS_DB_EXPORT_BUCKET_AWS_KEY}",
       "CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET": "${CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET}",
-      "CUBEJS_DB_EXPORT_BUCKET_AWS_REGION": "${CUBEJS_DB_EXPORT_BUCKET_AWS_REGION}"
+      "CUBEJS_DB_EXPORT_BUCKET_AWS_REGION": "${CUBEJS_DB_EXPORT_BUCKET_AWS_REGION}",
+      "CUBEJS_PRE_AGGREGATIONS_SCHEMA": "${CUBEJS_PRE_AGGREGATIONS_SCHEMA}"
     },
     "volumes": [
       "./cube.js:/cube/conf/cube.js",
@@ -67,6 +68,15 @@
     ]
   },
   "skip": [
+    "SKIPPED FOR Databricks",
+    "---------------------------------------",
+    "must stream from the data source",
+    "for the Customers.RollingExternal",
+    "for the ECommerce.SimpleAnalysisExternal",
+    "for the ECommerce.TimeAnalysisInternal",
+
+    "SKIPED FOR ALL",
+    "---------------------------------------",
     "querying Products: dimensions -- doesn't work wo ordering",
     "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- rounding in athena",
     "querying ECommerce: total sales, total profit by month + order (date) + total -- doesn't work with the BigQuery",

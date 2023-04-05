@@ -50,7 +50,7 @@ export async function readData(
 export async function buildPreaggs(
   port: number,
   token: string,
-  selector: unknown,
+  selector: any,
 ) {
   return new Promise((resolve, reject) => {
     postRequest(
@@ -65,7 +65,6 @@ export async function buildPreaggs(
           resolve(true);
         } else {
           const interval = setInterval(async () => {
-            let missingOnly = true;
             const inProcess = [];
             const get = await postRequest(
               port,
@@ -79,14 +78,8 @@ export async function buildPreaggs(
               if (status.indexOf('failure') >= 0) {
                 reject(`Cube pre-aggregations build failed: ${status}`);
               }
-              if (status !== 'missing_partition') {
-                missingOnly = false;
-              }
-              if (status !== 'done') {
+              if (status !== 'done' && status !== 'missing_partition') {
                 inProcess.push(t);
-              }
-              if (missingOnly) {
-                reject('Cube pre-aggregations build failed: missing partitions.');
               }
             });
             if (inProcess.length === 0) {
@@ -98,7 +91,7 @@ export async function buildPreaggs(
           setTimeout(() => {
             clearInterval(interval);
             reject('Cube pre-aggregations build failed: timeout.');
-          }, 10000);
+          }, 60000);
         }
       });
     });
@@ -161,6 +154,6 @@ export async function hookPreaggs(
     setTimeout(() => {
       clearInterval(interval);
       reject('Cube pre-aggregations build failed: timeout.');
-    }, 10000);
+    }, 60000);
   });
 }

@@ -8,7 +8,7 @@ export function buildCube(): void {
   const status = execInDir(
     path.resolve(process.cwd(), '../..'),
     'docker build . ' +
-      '-f packages/cubejs-docker/dev.Dockerfile ' +
+      '-f packages/cubejs-docker/testing-drivers.Dockerfile ' +
       '-t cubejs/cube:testing-drivers',
   );
   if (status !== 0) {

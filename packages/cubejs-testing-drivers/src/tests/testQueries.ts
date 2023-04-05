@@ -45,6 +45,7 @@ export function testQueries(type: string): void {
       });
       driver = (await getDriver(type)).source;
       query = getCreateQueries(type);
+
       await Promise.all(query.map(async (q) => {
         await driver.query(q);
       }));
@@ -61,15 +62,21 @@ export function testQueries(type: string): void {
     // MUST be the first test in the list!
     it('must built pre-aggregations', async () => {
       await buildPreaggs(env.cube.port, 'mysupersecret', {
-        contexts: [
-          { securityContext: { tenant: 't1' } }
-        ],
         timezones: ['UTC'],
-        preAggregations: [
-          'Customers.RAExternal',
-          'ECommerce.SAExternal',
-          'ECommerce.TAExternal',
-        ]
+        preAggregations: ['Customers.RAExternal'],
+        contexts: [{ securityContext: { tenant: 't1' } }],
+      });
+
+      await buildPreaggs(env.cube.port, 'mysupersecret', {
+        timezones: ['UTC'],
+        preAggregations: ['ECommerce.SAExternal'],
+        contexts: [{ securityContext: { tenant: 't1' } }],
+      });
+      
+      await buildPreaggs(env.cube.port, 'mysupersecret', {
+        timezones: ['UTC'],
+        preAggregations: ['ECommerce.TAExternal'],
+        contexts: [{ securityContext: { tenant: 't1' } }],
       });
     });
 

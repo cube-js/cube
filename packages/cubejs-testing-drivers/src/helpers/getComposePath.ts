@@ -1,3 +1,4 @@
+/* eslint-disable camelcase */
 import fs from 'fs-extra';
 import path from 'path';
 import * as YAML from 'yaml';
@@ -10,6 +11,14 @@ export function getComposePath(type: string): [path: string, file: string] {
   const _path = path.resolve(process.cwd(), './.temp');
   const _file = `${type}-compose.yaml`;
   const { cube, data } = getFixtures(type);
+  const depends_on = ['store'];
+  const links = ['store'];
+  if (cube.depends_on) {
+    depends_on.concat(cube.depends_on);
+  }
+  if (cube.links) {
+    depends_on.concat(cube.links);
+  }
   const compose: any = {
     version: '2.2',
     services: {
@@ -17,8 +26,8 @@ export function getComposePath(type: string): [path: string, file: string] {
         ...cube,
         container_name: 'cube',
         image: 'cubejs/cube:testing-drivers',
-        depends_on: [...cube.depends_on, 'store'],
-        links: [...cube.links, 'store'],
+        depends_on,
+        links,
         restart: 'always',
       },
       store: {
