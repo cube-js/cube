@@ -1,5 +1,5 @@
 use crate::queryplanner::project_schema;
-use crate::sql::cache::SqlResultCache;
+use crate::sql::cache::{sql_result_cache_sizeof, SqlResultCache};
 use arrow::array::{Array, Int64Builder, StringBuilder};
 use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
 use arrow::record_batch::RecordBatch;
@@ -11,7 +11,6 @@ use datafusion::logical_plan::Expr;
 use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::Partitioning;
 use datafusion::physical_plan::{ExecutionPlan, SendableRecordBatchStream};
-use deepsize::DeepSizeOf;
 use std::any::Any;
 use std::fmt;
 use std::fmt::Formatter;
@@ -145,7 +144,9 @@ impl ExecutionPlan for InfoSchemaQueryCacheTableExec {
         for (k, v) in self.cache.iter() {
             builder.add_row(
                 k.get_query(),
-                v.deep_size_of().try_into().unwrap_or(i64::MAX),
+                sql_result_cache_sizeof(&k, &v)
+                    .try_into()
+                    .unwrap_or(i64::MAX),
             );
         }
 
