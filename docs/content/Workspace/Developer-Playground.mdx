@@ -1,20 +1,11 @@
 ---
-title: Developer Playground
+title: Playground
 permalink: /dev-tools/dev-playground
 category: Workspace
-menuOrder: 3
+menuOrder: 1
 ---
 
-Developer Playground is a web-based tool which helps to generate and view the
-data schema, build and execute queries, plot the results, and generate dashboard
-applications from a variety of templates for different frontend frameworks and
-data visualization libraries.
-
-Developer Playground is available on `http://localhost:4000` when Cube is run in
-[development mode][ref-dev-mode].
-
-Here's an example of building a query and plotting the results in Developer
-Playground:
+Developer Playground is a web-based tool which allows to execute queries and preview the results:
 
 <div style="text-align: center">
   <img
@@ -25,7 +16,49 @@ Playground:
   />
 </div>
 
-## Using query tabs
+## Running Playground
+
+### Cube Core
+
+Playground is available at [http://localhost:4000](http://localhost:4000) when Cube is run in
+[development mode][ref-dev-mode], i.e., when `CUBEJS_DEV_MODE` is set to `true`.
+
+<WarningBox>
+
+Since Playground exposes all data models and allows running all possible
+queries, it should not be used in production. You can use
+the [JavaScript SDKs](/frontend-introduction) to build your own query builder and
+use it to query your Cube API in a secure way.
+
+</WarningBox>
+
+### Cube Cloud
+
+Playground is also available to authenticated [Cube Cloud][cube-cloud] users.
+
+<div style="text-align: center">
+  <img
+    alt="Cube Developer Playground"
+    src="https://ucarecdn.com/a9d726ee-8254-4d0a-b6ae-88a185f69b62/"
+    style="border: none"
+    width="100%"
+  />
+</div>
+
+When editing the data model through the [Cube
+IDE][ref-devtools-ide], Playground will switch to the Development API and its status will be visible in
+the Playground:
+
+<div style="text-align: center">
+  <img
+    alt="Playground during API restart"
+    src="https://ucarecdn.com/ee419318-7021-4f77-ac62-215ef40292d7/"
+    style="border: none"
+    width="100%"
+  />
+</div>
+
+## Query tabs
 
 You can use query tabs to keep results of previous queries while still being
 able to make new queries. The query tabs can be found at the top of the
@@ -42,50 +75,14 @@ Developer Playground:
 
 ## Editing the Security Context
 
-The Security Context used for requests can be modified by clicking the Edit
-Security Context button at the top of the playground:
+The Security Context used for requests can be modified by clicking&nbsp;<Btn>Edit
+Security Context</Btn> at the top:
 
 <LoomVideo url="https://www.loom.com/embed/5307e973ad7e435094a31b7163f14f3d" />
 
 You can paste in an existing JWT if desired; or create a brand-new one by
 providing a JSON object that represents the decoded JWT.
 
-## Running Playground in production
-
-Developer playground is only enabled when `CUBEJS_DEV_MODE` is set to `true`.
-Since Playground exposes data schema and admin access to all the possible
-queries, we do not recommend running it on a production instance. You can use
-[Cube frontend SDKs](/frontend-introduction) to build your own query builder and
-use it to query your Cube API in a secure way.
-
-You can also securely run Playground on top of the production Cube instance
-inside [Cube Cloud][cube-cloud].
-
-<div style="text-align: center">
-  <img
-    alt="Cube Developer Playground"
-    src="https://ucarecdn.com/a9d726ee-8254-4d0a-b6ae-88a185f69b62/"
-    style="border: none"
-    width="100%"
-  />
-</div>
-
-## Running Playground in Cube Cloud
-
-The Cube Cloud Developer Playground is mostly similar to the one available in
-Cube with the notable difference of being able to query the Development Mode
-API. After making changes to the schema through the [Cube
-IDE][ref-devtools-ide], the API will restart and its status will be visible in
-the Playground:
-
-<div style="text-align: center">
-  <img
-    alt="Playground during API restart"
-    src="https://ucarecdn.com/ee419318-7021-4f77-ac62-215ef40292d7/"
-    style="border: none"
-    width="100%"
-  />
-</div>
 
 [cube-cloud]: https://cube.dev/cloud
 [ref-dev-mode]: /configuration/overview
