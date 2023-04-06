@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.32.20](https://github.com/cube-js/cube/compare/v0.32.19...v0.32.20) (2023-04-05)
+
+
+### Features
+
+* **cubestore:** Query cache - limits by time_to_idle and max_capacity ([#6132](https://github.com/cube-js/cube/issues/6132)) ([edd220f](https://github.com/cube-js/cube/commit/edd220f0e76d43b05d482ff457c710d9ab4c2393))
+* **cubestore:** Separate configuration for count of metastore and cachestore snapshots ([#6388](https://github.com/cube-js/cube/issues/6388)) ([df73851](https://github.com/cube-js/cube/commit/df738513e06a3c4199255ae58ab9f52db1a4f2ef))
+
+
+
+
+
 ## [0.32.19](https://github.com/cube-js/cube/compare/v0.32.18...v0.32.19) (2023-04-03)
 
 

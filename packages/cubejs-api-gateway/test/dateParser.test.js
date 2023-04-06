@@ -73,10 +73,11 @@ describe('dateParser', () => {
   });
 
   test('from 1 quarter ago to now', () => {
-    Date.now = jest.fn().mockReturnValue(new Date(2021, 4, 3, 12, 0, 0, 0));
+    const now = new Date(2021, 4, 3, 12, 0, 0, 0);
+    Date.now = jest.fn().mockReturnValue(now);
 
-    expect(dateParser('from 1 quarter ago to now', 'UTC')).toStrictEqual(
-      ['2023-01-03T00:00:00.000', '2023-04-03T23:59:59.999']
+    expect(dateParser('from 1 quarter ago to now', 'UTC', now)).toStrictEqual(
+      ['2021-02-03T00:00:00.000', '2021-05-03T23:59:59.999']
     );
 
     Date.now.mockRestore();
@@ -101,9 +102,10 @@ describe('dateParser', () => {
   });
 
   test('last 2 quarters', () => {
-    Date.now = jest.fn().mockReturnValue(new Date(2021, 1, 15, 13, 0, 0, 0));
+    const now = new Date(2021, 1, 15, 13, 0, 0, 0);
+    Date.now = jest.fn().mockReturnValue(now);
 
-    expect(dateParser('last 2 quarters', 'UTC', new Date(2021, 1, 15, 13, 0, 0, 0))).toStrictEqual([
+    expect(dateParser('last 2 quarters', 'UTC', now)).toStrictEqual([
       '2020-07-01T00:00:00.000',
       '2020-12-31T23:59:59.999',
     ]);

@@ -1,8 +1,9 @@
 use bigdecimal::BigDecimal;
+use deepsize::DeepSizeOf;
 use num::BigInt;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, DeepSizeOf)]
 #[repr(transparent)]
 /// This it not a general-purpose decimal implementation. We use it inside [TableValue] to cement
 /// data format of decimals in CubeStore.

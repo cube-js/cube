@@ -420,7 +420,9 @@ pub trait ConfigObj: DIService {
 
     fn malloc_trim_every_secs(&self) -> u64;
 
-    fn max_cached_queries(&self) -> usize;
+    fn query_cache_max_capacity_bytes(&self) -> u64;
+
+    fn query_cache_time_to_idle_secs(&self) -> Option<u64>;
 
     fn metadata_cache_max_capacity_bytes(&self) -> u64;
 
@@ -441,6 +443,10 @@ pub trait ConfigObj: DIService {
     fn minimum_metastore_snapshots_count(&self) -> u64;
 
     fn metastore_snapshots_lifetime(&self) -> u64;
+
+    fn minimum_cachestore_snapshots_count(&self) -> u64;
+
+    fn cachestore_snapshots_lifetime(&self) -> u64;
 
     fn max_disk_space(&self) -> u64;
     fn max_disk_space_per_worker(&self) -> u64;
@@ -498,7 +504,8 @@ pub struct ConfigObjImpl {
     pub enable_topk: bool,
     pub enable_startup_warmup: bool,
     pub malloc_trim_every_secs: u64,
-    pub max_cached_queries: usize,
+    pub query_cache_max_capacity_bytes: u64,
+    pub query_cache_time_to_idle_secs: Option<u64>,
     pub metadata_cache_max_capacity_bytes: u64,
     pub metadata_cache_time_to_idle_secs: u64,
     pub stream_replay_check_interval_secs: u64,
@@ -508,6 +515,8 @@ pub struct ConfigObjImpl {
     pub skip_kafka_parsing_errors: bool,
     pub minimum_metastore_snapshots_count: u64,
     pub metastore_snapshots_lifetime: u64,
+    pub minimum_cachestore_snapshots_count: u64,
+    pub cachestore_snapshots_lifetime: u64,
     pub max_disk_space: u64,
     pub max_disk_space_per_worker: u64,
     pub disk_space_cache_duration_secs: u64,
@@ -685,8 +694,11 @@ impl ConfigObj for ConfigObjImpl {
     fn malloc_trim_every_secs(&self) -> u64 {
         self.malloc_trim_every_secs
     }
-    fn max_cached_queries(&self) -> usize {
-        self.max_cached_queries
+    fn query_cache_max_capacity_bytes(&self) -> u64 {
+        self.query_cache_max_capacity_bytes
+    }
+    fn query_cache_time_to_idle_secs(&self) -> Option<u64> {
+        self.query_cache_time_to_idle_secs
     }
     fn metadata_cache_max_capacity_bytes(&self) -> u64 {
         self.metadata_cache_max_capacity_bytes
@@ -723,6 +735,14 @@ impl ConfigObj for ConfigObjImpl {
 
     fn metastore_snapshots_lifetime(&self) -> u64 {
         self.metastore_snapshots_lifetime
+    }
+
+    fn minimum_cachestore_snapshots_count(&self) -> u64 {
+        self.minimum_cachestore_snapshots_count
+    }
+
+    fn cachestore_snapshots_lifetime(&self) -> u64 {
+        self.cachestore_snapshots_lifetime
     }
 
     fn max_disk_space(&self) -> u64 {
@@ -840,6 +860,12 @@ where
 impl Config {
     pub fn default() -> Config {
         let query_timeout = env_parse("CUBESTORE_QUERY_TIMEOUT", 120);
+        let query_cache_time_to_idle_secs = env_parse(
+            "CUBESTORE_QUERY_CACHE_TIME_TO_IDLE",
+            // 1 hour
+            60 * 60,
+        );
+
         Config {
             injector: Injector::new(),
             config_obj: Arc::new(ConfigObjImpl {
@@ -965,7 +991,17 @@ impl Config {
                 enable_topk: env_bool("CUBESTORE_ENABLE_TOPK", true),
                 enable_startup_warmup: env_bool("CUBESTORE_STARTUP_WARMUP", true),
                 malloc_trim_every_secs: env_parse("CUBESTORE_MALLOC_TRIM_EVERY_SECS", 30),
-                max_cached_queries: env_parse("CUBESTORE_MAX_CACHED_QUERIES", 10_000),
+                query_cache_max_capacity_bytes: env_parse_size(
+                    "CUBESTORE_QUERY_CACHE_MAX_CAPACITY",
+                    512 << 20,
+                    Some(16384 << 20),
+                    Some(0),
+                ) as u64,
+                query_cache_time_to_idle_secs: if query_cache_time_to_idle_secs == 0 {
+                    None
+                } else {
+                    Some(query_cache_time_to_idle_secs)
+                },
                 metadata_cache_max_capacity_bytes: env_parse(
                     "CUBESTORE_METADATA_CACHE_MAX_CAPACITY_BYTES",
                     0,
@@ -998,6 +1034,14 @@ impl Config {
                 metastore_snapshots_lifetime: env_parse(
                     "CUBESTORE_METASTORE_SNAPSHOTS_LIFETIME",
                     24 * 60 * 60,
+                ),
+                minimum_cachestore_snapshots_count: env_parse(
+                    "CUBESTORE_MINIMUM_CACHESTORE_SNAPSHOTS_COUNT",
+                    5,
+                ),
+                cachestore_snapshots_lifetime: env_parse(
+                    "CUBESTORE_CACHESTORE_SNAPSHOTS_LIFETIME",
+                    60 * 60,
                 ),
                 max_disk_space: env_parse("CUBESTORE_MAX_DISK_SPACE_GB", 0) * 1024 * 1024 * 1024,
                 max_disk_space_per_worker: env_parse("CUBESTORE_MAX_DISK_SPACE_PER_WORKER_GB", 0)
@@ -1075,7 +1119,8 @@ impl Config {
                 enable_topk: true,
                 enable_startup_warmup: true,
                 malloc_trim_every_secs: 0,
-                max_cached_queries: 10_000,
+                query_cache_max_capacity_bytes: 512 << 20,
+                query_cache_time_to_idle_secs: Some(600),
                 metadata_cache_max_capacity_bytes: 0,
                 metadata_cache_time_to_idle_secs: 1_000,
                 meta_store_log_upload_interval: 30,
@@ -1088,6 +1133,8 @@ impl Config {
                 skip_kafka_parsing_errors: false,
                 minimum_metastore_snapshots_count: 3,
                 metastore_snapshots_lifetime: 24 * 3600,
+                minimum_cachestore_snapshots_count: 3,
+                cachestore_snapshots_lifetime: 3600,
                 max_disk_space: 0,
                 max_disk_space_per_worker: 0,
                 disk_space_cache_duration_secs: 0,
@@ -1320,9 +1367,8 @@ impl Config {
                 .register("cachestore_fs", async move |i| {
                     // TODO metastore works with non queue remote fs as it requires loops to be started prior to load_from_remote call
                     let original_remote_fs = i.get_service("original_remote_fs").await;
-                    let arc: Arc<dyn DIService> = BaseRocksStoreFs::new(
+                    let arc: Arc<dyn DIService> = BaseRocksStoreFs::new_for_cachestore(
                         original_remote_fs,
-                        "cachestore",
                         i.get_service_typed().await,
                     );
 
@@ -1394,9 +1440,8 @@ impl Config {
                 .register("metastore_fs", async move |i| {
                     // TODO metastore works with non queue remote fs as it requires loops to be started prior to load_from_remote call
                     let original_remote_fs = i.get_service("original_remote_fs").await;
-                    let arc: Arc<dyn DIService> = BaseRocksStoreFs::new(
+                    let arc: Arc<dyn DIService> = BaseRocksStoreFs::new_for_metastore(
                         original_remote_fs,
-                        "metastore",
                         i.get_service_typed().await,
                     );
 
@@ -1618,7 +1663,8 @@ impl Config {
                     c.wal_split_threshold() as usize,
                     Duration::from_secs(c.query_timeout()),
                     Duration::from_secs(c.import_job_timeout() * 2),
-                    c.max_cached_queries(),
+                    c.query_cache_max_capacity_bytes(),
+                    c.query_cache_time_to_idle_secs(),
                 )
             })
             .await;

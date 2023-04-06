@@ -1706,7 +1706,7 @@ mod tests {
         );
         let metastore = RocksMetaStore::new(
             Path::new(path),
-            BaseRocksStoreFs::new(remote_fs.clone(), "metastore", config.config_obj()),
+            BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
             config.config_obj(),
         )
         .unwrap();
