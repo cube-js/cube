@@ -1,0 +1,45 @@
+name: 'Drivers tests'
+
+on:
+  push:
+    branches:
+      - 'master'
+    paths:
+      - '.github/workflows/drivers.yml'
+      - 'packages/**'
+  pull_request:
+    paths:
+      - '.github/workflows/drivers.yml'
+      - 'packages/**'
+
+jobs:
+  tests:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 60
+    strategy:
+      matrix:
+        node: 
+          - 16.x
+        database:
+          - clickhouse
+          # - databricks-jdbc
+          - mssql
+          - mysql
+          - postgres
+        suite:
+          - driver
+          - core
+          - full
+      fail-fast: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Install Node.js 16.x
+        uses: actions/setup-node@v3
+        with:
+          node-version: 16.x
+      - name: Build and test
+        run: |
+          cd packages/cubejs-testing-drivers
+          yarn image
+          yarn ${{ matrix.database }}-${{ matrix.suite }}

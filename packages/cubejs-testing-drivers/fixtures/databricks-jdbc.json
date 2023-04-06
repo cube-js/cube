@@ -44,8 +44,11 @@
     "Core tests                             ",
     "---------------------------------------",
     "for the Customers.RollingExternal",
+    "for the Customers.RollingInternal",
     "for the ECommerce.SimpleAnalysisExternal",
+    "for the ECommerce.SimpleAnalysisInternal",
     "for the ECommerce.TimeAnalysisInternal",
+    "for the ECommerce.TimeAnalysisExternal",
 
     "---------------------------------------",
     "Full tests                             ",
