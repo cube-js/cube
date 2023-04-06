@@ -65,9 +65,8 @@ jobs:
           timeout_minutes: 20
           command: yarn install --frozen-lockfile
 
-      - name: Build test package
+      - name: Build packages
         run: |
-          cd packages/cubejs-testing-drivers
           yarn tsc
 
       - name: Build test image
