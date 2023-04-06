@@ -34,12 +34,46 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
+
       - name: Install Node.js 16.x
         uses: actions/setup-node@v3
         with:
           node-version: 16.x
-      - name: Build and test
+
+      - name: Restore cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.npm
+            node_modules
+            packages/*/node_modules
+          key: ${{ runner.os }}-workspace-main-16.x-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-workspace-main-16.x-
+
+      - name: Configure `yarn`
+        run: yarn policies set-version v1.22.19
+
+      - name: Install dependencies
+        uses: nick-invision/retry@v2
+        env:
+          CUBESTORE_SKIP_POST_INSTALL: true
+        with:
+          max_attempts: 3
+          retry_on: error
+          retry_wait_seconds: 15
+          timeout_minutes: 20
+          command: yarn install --frozen-lockfile
+
+      - name: Build test package
+        run: |
+          cd packages/cubejs-testing-drivers
+          yarn tsc
+
+      - name: Build test image
         run: |
           cd packages/cubejs-testing-drivers
           yarn image
-          yarn ${{ matrix.database }}-${{ matrix.suite }}
+
+      - name: Run tests
+        run: yarn ${{ matrix.database }}-${{ matrix.suite }}
