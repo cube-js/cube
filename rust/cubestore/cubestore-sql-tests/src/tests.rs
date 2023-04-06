@@ -1386,6 +1386,11 @@ async fn system_query_cache(service: Box<dyn SqlClient>) {
         .exec_query("SELECT * FROM system.query_cache")
         .await
         .unwrap();
+
+    service
+        .exec_query("SELECT sql FROM system.query_cache;")
+        .await
+        .unwrap();
 }
 
 async fn case_column_escaping(service: Box<dyn SqlClient>) {

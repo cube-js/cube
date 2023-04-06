@@ -27,16 +27,20 @@ impl InfoSchemaQueryCacheTableProvider {
     }
 }
 
+fn get_schema() -> SchemaRef {
+    Arc::new(Schema::new(vec![
+        Field::new("sql", DataType::Utf8, false),
+        Field::new("size", DataType::Int64, false),
+    ]))
+}
+
 impl TableProvider for InfoSchemaQueryCacheTableProvider {
     fn as_any(&self) -> &dyn Any {
         self
     }
 
     fn schema(&self) -> SchemaRef {
-        Arc::new(Schema::new(vec![
-            Field::new("sql", DataType::Utf8, false),
-            Field::new("size", DataType::Int64, false),
-        ]))
+        get_schema()
     }
 
     fn scan(
@@ -146,8 +150,9 @@ impl ExecutionPlan for InfoSchemaQueryCacheTableExec {
         }
 
         let data = builder.finish();
-        let batch = RecordBatch::try_new(self.schema(), data.to_vec())?;
+        let batch = RecordBatch::try_new(get_schema(), data.to_vec())?;
 
+        // TODO: Please migrate to real streaming, if we are going to expose query results
         let mem_exec =
             MemoryExec::try_new(&vec![vec![batch]], self.schema(), self.projection.clone())?;
         mem_exec.execute(partition).await
