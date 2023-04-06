@@ -5,17 +5,19 @@ category: Configuration
 menuOrder: 4
 ---
 
-<InfoBox>
+For improved stability and security, Cube Cloud supports connecting to one
+or more VPCs (virtual private clouds) in your Azure, AWS, or GCP accounts.
 
-To enable VPC support for your account, please [contact Sales][cube-contact].
+<SuccessBox>
 
-</InfoBox>
+VPC connectivity is available in Cube Cloud on [Premium](https://cube.dev/pricing) tier. [Contact us](https://cube.dev/contact) for details.
 
-For improved stability and security, Cube Cloud also supports connecting to one
-or more VPCs in your AWS or Google Cloud accounts. A Cube Cloud VPC connection
-improves stability through dedicated infrastructure for a deployment, and
+</SuccessBox>
+
+VPC connection
+improves stability through dedicated infrastructure for a deployment and
 improves security by preventing your database traffic from being routed through
-the public Internet.
+the public internet.
 
 <Grid imageSize={[56, 56]} cols={2}>
   <GridItem
@@ -24,15 +26,13 @@ the public Internet.
     title="Amazon Web Services"
   />
   <GridItem
-    url="connecting-with-a-vpc/azure"
-    imageUrl="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/static/icons/azure.svg"
-    title="Microsoft Azure"
-  />
-  <GridItem
     url="connecting-with-a-vpc/gcp"
     imageUrl="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/static/icons/gcp.svg"
     title="Google Cloud Platform"
   />
+  <GridItem
+    url="connecting-with-a-vpc/azure"
+    imageUrl="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/static/icons/azure.svg"
+    title="Microsoft Azure"
+  />
 </Grid>
-
-[cube-contact]: https://cube.dev/contact/
