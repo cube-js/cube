@@ -64,6 +64,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("timestamp_seconds_frac", timestamp_seconds_frac),
         t("column_escaping", column_escaping),
         t("information_schema", information_schema),
+        t("system_query_cache", system_query_cache),
         t("case_column_escaping", case_column_escaping),
         t("inner_column_escaping", inner_column_escaping),
         t("convert_tz", convert_tz),
@@ -1366,6 +1367,30 @@ async fn information_schema(service: Box<dyn SqlClient>) {
         result.get_rows(),
         &vec![Row::new(vec![TableValue::String("timestamps".to_string())])]
     );
+}
+
+async fn system_query_cache(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+    service
+        .exec_query("CREATE TABLE foo.timestamps (t timestamp, amount int)")
+        .await
+        .unwrap();
+
+    service
+        .exec_query("SELECT * FROM foo.timestamps")
+        .await
+        .unwrap();
+
+    service
+        .exec_query("SELECT * FROM system.query_cache")
+        .await
+        .unwrap();
+
+    service
+        .exec_query("SELECT sql FROM system.query_cache;")
+        .await
+        .unwrap();
 }
 
 async fn case_column_escaping(service: Box<dyn SqlClient>) {

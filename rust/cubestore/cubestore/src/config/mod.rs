@@ -26,6 +26,7 @@ use crate::remotefs::queue::QueueRemoteFs;
 use crate::remotefs::s3::S3RemoteFs;
 use crate::remotefs::{LocalDirRemoteFs, RemoteFs};
 use crate::scheduler::SchedulerImpl;
+use crate::sql::cache::SqlResultCache;
 use crate::sql::{SqlService, SqlServiceImpl};
 use crate::store::compaction::{CompactionService, CompactionServiceImpl};
 use crate::store::{ChunkDataStore, ChunkStore, WALDataStore, WALStore};
@@ -1614,12 +1615,19 @@ impl Config {
             })
             .await;
 
+        let query_cache = Arc::new(SqlResultCache::new(
+            self.config_obj.query_cache_max_capacity_bytes(),
+            self.config_obj.query_cache_time_to_idle_secs(),
+        ));
+
+        let query_cache_to_move = query_cache.clone();
         self.injector
             .register_typed::<dyn QueryPlanner, _, _, _>(async move |i| {
                 QueryPlannerImpl::new(
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
+                    query_cache_to_move,
                 )
             })
             .await;
@@ -1646,6 +1654,7 @@ impl Config {
             })
             .await;
 
+        let query_cache_to_move = query_cache.clone();
         self.injector
             .register_typed::<dyn SqlService, _, _, _>(async move |i| {
                 let c = i.get_service_typed::<dyn ConfigObj>().await;
@@ -1663,8 +1672,7 @@ impl Config {
                     c.wal_split_threshold() as usize,
                     Duration::from_secs(c.query_timeout()),
                     Duration::from_secs(c.import_job_timeout() * 2),
-                    c.query_cache_max_capacity_bytes(),
-                    c.query_cache_time_to_idle_secs(),
+                    query_cache_to_move,
                 )
             })
             .await;

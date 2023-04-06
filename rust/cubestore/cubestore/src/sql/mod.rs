@@ -174,7 +174,7 @@ pub struct SqlServiceImpl {
     rows_per_chunk: usize,
     query_timeout: Duration,
     create_table_timeout: Duration,
-    cache: SqlResultCache,
+    cache: Arc<SqlResultCache>,
 }
 
 crate::di_service!(SqlServiceImpl, [SqlService]);
@@ -195,8 +195,7 @@ impl SqlServiceImpl {
         rows_per_chunk: usize,
         query_timeout: Duration,
         create_table_timeout: Duration,
-        query_cache_max_capacity_bytes: u64,
-        query_cache_time_to_idle_secs: Option<u64>,
+        cache: Arc<SqlResultCache>,
     ) -> Arc<SqlServiceImpl> {
         Arc::new(SqlServiceImpl {
             cachestore: CacheStoreSqlService::new(cachestore, query_planner.clone()),
@@ -212,10 +211,7 @@ impl SqlServiceImpl {
             query_timeout,
             create_table_timeout,
             remote_fs,
-            cache: SqlResultCache::new(
-                query_cache_max_capacity_bytes,
-                query_cache_time_to_idle_secs,
-            ),
+            cache,
         })
     }
 
@@ -1874,8 +1870,10 @@ mod tests {
                 rows_per_chunk,
                 query_timeout,
                 query_timeout,
-                config.config_obj().query_cache_max_capacity_bytes(),
-                config.config_obj().query_cache_time_to_idle_secs(),
+                Arc::new(SqlResultCache::new(
+                    config.config_obj().query_cache_max_capacity_bytes(),
+                    config.config_obj().query_cache_time_to_idle_secs(),
+                )),
             );
             let i = service.exec_query("CREATE SCHEMA foo").await.unwrap();
             assert_eq!(
@@ -1947,8 +1945,10 @@ mod tests {
                 rows_per_chunk,
                 query_timeout,
                 query_timeout,
-                config.config_obj().query_cache_max_capacity_bytes(),
-                config.config_obj().query_cache_time_to_idle_secs(),
+                Arc::new(SqlResultCache::new(
+                    config.config_obj().query_cache_max_capacity_bytes(),
+                    config.config_obj().query_cache_time_to_idle_secs(),
+                )),
             );
             let i = service.exec_query("CREATE SCHEMA Foo").await.unwrap();
             assert_eq!(
@@ -2049,8 +2049,10 @@ mod tests {
                 rows_per_chunk,
                 query_timeout,
                 query_timeout,
-                config.config_obj().query_cache_max_capacity_bytes(),
-                config.config_obj().query_cache_time_to_idle_secs(),
+                Arc::new(SqlResultCache::new(
+                    config.config_obj().query_cache_max_capacity_bytes(),
+                    config.config_obj().query_cache_time_to_idle_secs(),
+                )),
             );
             let i = service.exec_query("CREATE SCHEMA Foo").await.unwrap();
             assert_eq!(

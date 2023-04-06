@@ -6,7 +6,7 @@ use crate::{app_metrics, CubeError};
 use deepsize::DeepSizeOf;
 use futures::Future;
 use log::trace;
-use moka::future::Cache;
+use moka::future::{Cache, ConcurrentCacheExt, Iter};
 use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
@@ -21,6 +21,10 @@ pub struct SqlResultCacheKey {
 }
 
 impl SqlResultCacheKey {
+    pub fn get_query(&self) -> &String {
+        &self.query
+    }
+
     pub fn from_plan(query: &str, inline_tables: &InlineTables, plan: &SerializedPlan) -> Self {
         let mut partition_ids = HashSet::new();
         let mut chunk_ids = HashSet::new();
@@ -93,9 +97,19 @@ impl SqlResultCache {
     pub async fn clear(&self) {
         // invalidation will be done in the background
         self.result_cache.invalidate_all();
+        // it doesnt flush all, blocking, but it's ok because it's used in one command.
+        self.result_cache.sync();
 
-        app_metrics::DATA_QUERIES_CACHE_SIZE.report(0);
-        app_metrics::DATA_QUERIES_CACHE_WEIGHT.report(0);
+        app_metrics::DATA_QUERIES_CACHE_SIZE.report(self.result_cache.entry_count() as i64);
+        app_metrics::DATA_QUERIES_CACHE_WEIGHT.report(self.result_cache.weighted_size() as i64);
+    }
+
+    pub fn entry_count(&self) -> u64 {
+        self.result_cache.entry_count()
+    }
+
+    pub fn iter(&self) -> Iter<'_, SqlResultCacheKey, Arc<DataFrame>> {
+        self.result_cache.iter()
     }
 
     #[tracing::instrument(level = "trace", skip(self, context, plan, exec))]
@@ -109,24 +123,26 @@ impl SqlResultCache {
     where
         F: Future<Output = Result<DataFrame, CubeError>> + Send + 'static,
     {
-        let inline_tables = &context.inline_tables;
-        let result_key = SqlResultCacheKey::from_plan(query, inline_tables, &plan);
+        let result_key = SqlResultCacheKey::from_plan(query, &context.inline_tables, &plan);
+
         if let Some(result) = self.result_cache.get(&result_key) {
             app_metrics::DATA_QUERIES_CACHE_HIT.increment();
             trace!("Using result cache for '{}'", query);
             return Ok(result);
         }
 
-        let queue_key = SqlQueueCacheKey::from_query(query, inline_tables);
+        let queue_key = SqlQueueCacheKey::from_query(query, &context.inline_tables);
         let (sender, receiver) = {
             let key = queue_key.clone();
             let mut cache = self.queue_cache.lock().await;
             if !cache.contains(&key) {
                 let (tx, rx) = watch::channel(None);
                 cache.put(key, rx);
+
                 app_metrics::DATA_QUERIES_CACHE_SIZE.report(self.result_cache.entry_count() as i64);
                 app_metrics::DATA_QUERIES_CACHE_WEIGHT
                     .report(self.result_cache.weighted_size() as i64);
+
                 (Some(tx), None)
             } else {
                 (None, cache.get(&key).cloned())
@@ -148,6 +164,7 @@ impl SqlResultCache {
                         self.result_cache
                             .insert(result_key.clone(), r.clone())
                             .await;
+
                         app_metrics::DATA_QUERIES_CACHE_SIZE
                             .report(self.result_cache.entry_count() as i64);
                         app_metrics::DATA_QUERIES_CACHE_WEIGHT
@@ -158,6 +175,7 @@ impl SqlResultCache {
                     trace!("Removing error result from cache");
                 }
             }
+
             self.queue_cache.lock().await.pop(&queue_key);
 
             return result;
