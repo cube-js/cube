@@ -1,10 +1,11 @@
 ---
-title: 'Getting Started with Cube Cloud: Import GitLab repository via SSH'
+title: 'Import a GitLab repository to Cube Cloud'
 permalink: /cloud/getting-started/ssh/gitlab
 ---
 
-This guide walks you through creating a new deployment on Cube Cloud from a
-[GitLab][gitlab] repository via SSH.
+This guide walks you through setting up Cube Cloud, importing a [GitLab][gitlab]
+repository with an existing Cube project via SSH, and connecting to your
+database.
 
 ## Step 1: Create an account
 
@@ -13,7 +14,7 @@ account.
 
 ## Step 2: Create a new Deployment
 
-Click the `Create Deployment` button. This is the first step in the deployment
+Click <Btn>Create Deployment</Btn>. This is the first step in the deployment
 creation. Give it a name and select the cloud provider and region of your
 choice.
 
@@ -29,7 +30,7 @@ choice.
 ## Step 3: Import Git repository
 
 Next up, the second step in creating a Cube App from scratch in Cube Cloud is to
-click the `Import Git repository via SSH` button.
+click <Btn>Import Git repository via SSH</Btn>.
 
 <div style="text-align: center">
   <img
@@ -40,8 +41,8 @@ click the `Import Git repository via SSH` button.
   />
 </div>
 
-Now go to your GitLab repository and from the `Clone` dropdown menu, copy the
-`Clone with SSH` URL:
+Now go to your GitLab repository and from the <Btn>Clone</Btn> dropdown menu,
+copy the <Btn>Clone with SSH</Btn> URL:
 
 <div style="text-align: center">
   <img
@@ -52,7 +53,7 @@ Now go to your GitLab repository and from the `Clone` dropdown menu, copy the
   />
 </div>
 
-Back in Cube Cloud, paste the URL and click `Generate SSH key`:
+Back in Cube Cloud, paste the URL and click <Btn>Generate SSH key</Btn>:
 
 <div style="text-align: center">
   <img
@@ -64,8 +65,9 @@ Back in Cube Cloud, paste the URL and click `Generate SSH key`:
 </div>
 
 Now copy the SSH key and go back to GitLab and paste it into the repository's
-settings. Find the `Deploy keys` section and click `Expand`. Give the key a
-title (`Cube Cloud`, for example) and paste the SSH key in the relevant field:
+settings. Find the <Btn>Deploy keys</Btn> section and click <Btn>Expand</Btn>.
+Give the key a title (`Cube Cloud`, for example) and paste the SSH key in the
+relevant field:
 
 <div style="text-align: center">
   <img
@@ -76,9 +78,10 @@ title (`Cube Cloud`, for example) and paste the SSH key in the relevant field:
   />
 </div>
 
-Ensure `Grant write permissions to this key` is checked, then click `Add key`.
-Go back to Cube Cloud and click `Connect`. After a connection is successfully
-established, you should see the next screen:
+Ensure <Btn>Grant write permissions to this key</Btn> is checked, then
+click&nbsp;<Btn>Add key</Btn>. Go back to Cube Cloud and
+click&nbsp;<Btn>Connect</Btn>. After a connection is successfully established,
+you should see the next screen:
 
 <div style="text-align: center">
   <img
@@ -89,9 +92,10 @@ established, you should see the next screen:
   />
 </div>
 
-Copy the `Cube Cloud Git Webhook URL` and go to your GitLab project's `Webhooks`
-settings. Paste the URL into the correct field, ensure the `Push events` trigger
-is checked and click `Add webhook`.
+Copy the <Btn>Cube Cloud Git Webhook URL</Btn> and go to your GitLab
+project's&nbsp;<Btn>Webhooks</Btn> settings. Paste the URL into the correct
+field, ensure the&nbsp;<Btn>Push events</Btn> trigger is checked and
+click&nbsp;<Btn>Add webhook</Btn>.
 
 <div style="text-align: center">
   <img
@@ -102,7 +106,7 @@ is checked and click `Add webhook`.
   />
 </div>
 
-Back in Cube Cloud, click `Connect` to test the webhook.
+Back in Cube Cloud, click <Btn>Connect</Btn> to test the webhook.
 
 ## Step 4: Connect your Database
 
@@ -153,7 +157,8 @@ are using AWS, this would mean adding a security group with allowed IPs.
 ## Step 5: Generate the Data Schema
 
 Step five in this case consists of generating a data schema. Start by selecting
-the database tables to generate the data schema from, then hit `generate`.
+the database tables to generate the data schema from, then
+hit&nbsp;<Btn>Generate</Btn>.
 
 <div style="text-align: center">
   <img

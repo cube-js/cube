@@ -1,10 +1,11 @@
 ---
-title: 'Getting Started with Cube Cloud: Import Bitbucket repository via SSH'
+title: 'Import a Bitbucket repository to Cube Cloud'
 permalink: /cloud/getting-started/ssh/bitbucket
 ---
 
-This guide walks you through creating a new deployment on Cube Cloud from a
-[Bitbucket][bitbucket] repository via SSH.
+This guide walks you through setting up Cube Cloud, importing a
+[Bitbucket][bitbucket] repository with an existing Cube project via SSH, and
+connecting to your database.
 
 ## Step 1: Create an account
 
@@ -13,9 +14,9 @@ account.
 
 ## Step 2: Create a new Deployment
 
-Click the `Create Deployment` button. This is the first step in the deployment
-creation. Give it a name and select the cloud provider and region of your
-choice.
+Click&nbsp;<Btn>Create Deployment</Btn>. This is the first step in the
+deployment creation. Give it a name and select the cloud provider and region of
+your choice.
 
 <div style="text-align: center">
   <img
@@ -29,7 +30,7 @@ choice.
 ## Step 3: Import Git repository
 
 Next up, the second step in creating a Cube App from scratch in Cube Cloud is to
-click the `Import Git repository via SSH` button.
+click&nbsp;<Btn>Import Git repository via SSH</Btn>.
 
 <div style="text-align: center">
   <img
@@ -40,8 +41,8 @@ click the `Import Git repository via SSH` button.
   />
 </div>
 
-Now go to your Bitbucket repository and on the `Clone` dialog, switch to `SSH`
-and copy the URL:
+Now go to your Bitbucket repository and on the&nbsp;<Btn>Clone</Btn> dialog,
+switch to&nbsp;<Btn>SSH</Btn> and copy the URL:
 
 <div style="text-align: center">
   <img
@@ -52,7 +53,7 @@ and copy the URL:
   />
 </div>
 
-Back in Cube Cloud, paste the URL and click `Generate SSH key`:
+Back in Cube Cloud, paste the URL and click <Btn>Generate SSH key</Btn>:
 
 <div style="text-align: center">
   <img
@@ -64,9 +65,9 @@ Back in Cube Cloud, paste the URL and click `Generate SSH key`:
 </div>
 
 Now copy the SSH key and go back to Bitbucket and into the repository's
-settings. Click `Access keys` from the navigation, then click the `Add key`
-button. Give the key a label (`Cube Cloud`, for example) and paste the SSH key
-in the relevant field:
+settings. Click&nbsp;<Btn>Access keys</Btn> from the navigation, then click
+&nbsp;<Btn>Add key</Btn> button. Give the key a label (`Cube Cloud`, for
+example) and paste the SSH key in the relevant field:
 
 <div style="text-align: center">
   <img
@@ -77,8 +78,9 @@ in the relevant field:
   />
 </div>
 
-Click `Add SSH key` to save, then go back to Cube Cloud and click `Connect`.
-After a connection is successfully established, you should see the next screen:
+Click&nbsp;<Btn>Add SSH key</Btn> to save, then go back to Cube Cloud and
+click&nbsp;<Btn>Connect</Btn>. After a connection is successfully established,
+you should see the next screen:
 
 <div style="text-align: center">
   <img
@@ -89,10 +91,11 @@ After a connection is successfully established, you should see the next screen:
   />
 </div>
 
-Copy the `Cube Cloud Git Webhook URL` and go to your Bitbucket repository's
-settings and click `Webhooks` from the navigation. Click `Add webhook`, then add
-a title (`Cube Cloud`, for example). Paste the URL into the correct field,
-ensure the `Repository > Push` trigger is checked and click `Save`.
+Copy the&nbsp;<Btn>Cube Cloud Git Webhook URL</Btn>, go to your Bitbucket
+repository's settings, and click&nbsp;<Btn>Webhooks</Btn> from the navigation.
+Click&nbsp;<Btn>Add webhook</Btn>, then add a title (`Cube Cloud`, for example).
+Paste the URL into the correct field, ensure the&nbsp;<Btn>Repository >
+Push</Btn> trigger is checked and click&nbsp;<Btn>Save</Btn>.
 
 <div style="text-align: center">
   <img
@@ -103,7 +106,7 @@ ensure the `Repository > Push` trigger is checked and click `Save`.
   />
 </div>
 
-Back in Cube Cloud, click `Connect` to test the webhook.
+Back in Cube Cloud, click <Btn>Connect</Btn> to test the webhook.
 
 ## Step 4: Connect your Database
 
@@ -154,7 +157,8 @@ are using AWS, this would mean adding a security group with allowed IPs.
 ## Step 5: Generate the Data Schema
 
 Step five in this case consists of generating a data schema. Start by selecting
-the database tables to generate the data schema from, then hit `generate`.
+the database tables to generate the data schema from, then
+hit&nbsp;<Btn>Generate</Btn>.
 
 <div style="text-align: center">
   <img

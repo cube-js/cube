@@ -1,10 +1,11 @@
 ---
-title: 'Getting Started with Cube Cloud: Import Git repository via SSH'
+title: 'Import a Git repository to Cube Cloud'
 permalink: /cloud/getting-started/ssh/git
 ---
 
-This guide walks you through creating a new deployment on Cube Cloud from a Git
-repository via SSH.
+This guide walks you through setting up Cube Cloud, importing a generic Git
+repository with an existing Cube project via SSH, and connecting to your
+database.
 
 ## Step 1: Create an account
 
@@ -13,9 +14,9 @@ account.
 
 ## Step 2: Create a new Deployment
 
-Click the `Create Deployment` button. This is the first step in the deployment
-creation. Give it a name and select the cloud provider and region of your
-choice.
+Click&nbsp;<Btn>Create Deployment</Btn> button. This is the first step in the
+deployment creation. Give it a name and select the cloud provider and region of
+your choice.
 
 <div style="text-align: center">
   <img
@@ -29,7 +30,7 @@ choice.
 ## Step 3: Import Git repository
 
 Next up, the second step in creating a Cube App from scratch in Cube Cloud is to
-click the `Import Git repository via SSH` button.
+click&nbsp;<Btn>Import Git repository via SSH</Btn> button.
 
 <div style="text-align: center">
   <img
@@ -40,7 +41,8 @@ click the `Import Git repository via SSH` button.
   />
 </div>
 
-Enter the SSH URL of your Git repository, and click `Generate SSH key`:
+Enter the SSH URL of your Git repository, and click&nbsp;<Btn>Generate SSH
+key</Btn>:
 
 <div style="text-align: center">
   <img
@@ -52,8 +54,8 @@ Enter the SSH URL of your Git repository, and click `Generate SSH key`:
 </div>
 
 Copy the SSH key and add it to your hosted Git repository. Back in Cube Cloud,
-click `Connect`. After a connection is successfully established, you should see
-the next screen:
+click&nbsp;<Btn>Connect</Btn>. After a connection is successfully established,
+you should see the next screen:
 
 <div style="text-align: center">
   <img
@@ -64,9 +66,10 @@ the next screen:
   />
 </div>
 
-Copy the `Cube Cloud Git Webhook URL` and add it your hosted Git repository's
-webhooks. Ensure that the Git repository can push events which should trigger a
-build on Cube Cloud. Back in Cube Cloud, click `Connect` to test the webhook.
+Copy the&nbsp;<Btn>Cube Cloud Git Webhook URL</Btn> and add it your hosted Git
+repository's webhooks. Ensure that the Git repository can push events which
+should trigger a build on Cube Cloud. Back in Cube Cloud,
+click&nbsp;<Btn>Connect</Btn> to test the webhook.
 
 ## Step 4: Connect your Database
 
@@ -117,7 +120,8 @@ are using AWS, this would mean adding a security group with allowed IPs.
 ## Step 5: Generate the Data Schema
 
 Step five in this case consists of generating a data schema. Start by selecting
-the database tables to generate the data schema from, then hit `generate`.
+the database tables to generate the data schema from, then
+hit&nbsp;<Btn>Generate</Btn>.
 
 <div style="text-align: center">
   <img
