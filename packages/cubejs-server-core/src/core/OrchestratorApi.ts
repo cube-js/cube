@@ -21,7 +21,7 @@ export interface OrchestratorApiOptions extends QueryOrchestratorOptions {
 export class OrchestratorApi {
   private seenDataSources: Record<string, boolean> = {};
 
-  protected readonly orchestrator: QueryOrchestrator;
+  protected orchestrator: QueryOrchestrator;
 
   protected readonly continueWaitTimeout: number;
 

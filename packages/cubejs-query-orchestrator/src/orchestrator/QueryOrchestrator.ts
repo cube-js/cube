@@ -54,7 +54,7 @@ function detectQueueAndCacheDriver(options: QueryOrchestratorOptions): CacheAndQ
 }
 
 export class QueryOrchestrator {
-  protected readonly queryCache: QueryCache;
+  protected queryCache: QueryCache;
 
   protected readonly preAggregations: PreAggregations;
 
@@ -64,7 +64,7 @@ export class QueryOrchestrator {
 
   private queueEventsBus: RedisQueueEventsBus | LocalQueueEventsBus;
 
-  private readonly cacheAndQueueDriver: string;
+  protected readonly cacheAndQueueDriver: string;
 
   public constructor(
     protected readonly redisPrefix: string,
