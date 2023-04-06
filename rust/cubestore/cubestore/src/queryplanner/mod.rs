@@ -43,7 +43,6 @@ use crate::queryplanner::topk::ClusterAggregateTopK;
 use crate::queryplanner::udfs::aggregate_udf_by_kind;
 use crate::queryplanner::udfs::{scalar_udf_by_kind, CubeAggregateUDFKind, CubeScalarUDFKind};
 
-use crate::queryplanner::providers::InfoSchemaQueryCacheTableProvider;
 use crate::sql::cache::SqlResultCache;
 use crate::sql::InlineTables;
 use crate::store::DataFrame;
@@ -325,9 +324,9 @@ impl ContextProvider for MetaStoreSchemaProvider {
                 self.cache_store.clone(),
                 InfoSchemaTable::Schemata,
             ))),
-            ("system", "query_cache") => Some(Arc::new(InfoSchemaQueryCacheTableProvider::new(
-                self.cache.clone(),
-            ))),
+            ("system", "query_cache") => Some(Arc::new(
+                providers::InfoSchemaQueryCacheTableProvider::new(self.cache.clone()),
+            )),
             ("system", "cache") => Some(Arc::new(InfoSchemaTableProvider::new(
                 self.meta_store.clone(),
                 self.cache_store.clone(),
