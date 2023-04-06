@@ -12,13 +12,18 @@ export function getComposePath(type: string): [path: string, file: string] {
   const _file = `${type}-compose.yaml`;
   const { cube, data } = getFixtures(type);
   const depends_on = ['store'];
-  const links = ['store'];
   if (cube.depends_on) {
     depends_on.concat(cube.depends_on);
   }
+  const links = ['store'];
   if (cube.links) {
     depends_on.concat(cube.links);
   }
+  const volumes = [
+    './cube.js:/cube/conf/cube.js',
+    './package.json:/cube/conf/package.json',
+    './schema/ecommerce.yaml:/cube/conf/schema/ecommerce.yaml',
+  ];
   const compose: any = {
     version: '2.2',
     services: {
@@ -28,6 +33,7 @@ export function getComposePath(type: string): [path: string, file: string] {
         image: 'cubejs/cube:testing-drivers',
         depends_on,
         links,
+        volumes,
         restart: 'always',
       },
       store: {

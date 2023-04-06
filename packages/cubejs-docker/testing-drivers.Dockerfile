@@ -1,3 +1,6 @@
+######################################################################
+# Base image                                                         #
+######################################################################
 FROM node:16.19.1-bullseye-slim AS base
 
 ARG IMAGE_VERSION=dev
@@ -10,7 +13,7 @@ ENV CI=0
 RUN DEBIAN_FRONTEND=noninteractive \
     && apt-get update \
     && apt-get install -y --no-install-recommends rxvt-unicode libssl1.1 curl \
-       cmake python3 gcc g++ make cmake openjdk-11-jdk-headless unzip \
+       cmake python3 gcc g++ make cmake openjdk-11-jdk-headless unzip mc \
     && rm -rf /var/lib/apt/lists/*
 
 ENV RUSTUP_HOME=/usr/local/rustup
@@ -32,8 +35,6 @@ COPY yarn.lock .
 COPY tsconfig.base.json .
 COPY rollup.config.js .
 COPY packages/cubejs-linter packages/cubejs-linter
-
-# Backend
 COPY rust/cubesql/package.json rust/cubesql/package.json
 COPY rust/cubestore/package.json rust/cubestore/package.json
 COPY rust/cubestore/bin rust/cubestore/bin
@@ -73,10 +74,6 @@ COPY packages/cubejs-sqlite-driver/package.json packages/cubejs-sqlite-driver/pa
 COPY packages/cubejs-ksql-driver/package.json packages/cubejs-ksql-driver/package.json
 COPY packages/cubejs-dbt-schema-extension/package.json packages/cubejs-dbt-schema-extension/package.json
 COPY packages/cubejs-jdbc-driver/package.json packages/cubejs-jdbc-driver/package.json
-# Skip
-# COPY packages/cubejs-testing/package.json packages/cubejs-testing/package.json
-# COPY packages/cubejs-docker/package.json packages/cubejs-docker/package.json
-# Frontend
 COPY packages/cubejs-templates/package.json packages/cubejs-templates/package.json
 COPY packages/cubejs-client-core/package.json packages/cubejs-client-core/package.json
 COPY packages/cubejs-client-react/package.json packages/cubejs-client-react/package.json
@@ -87,25 +84,36 @@ COPY packages/cubejs-client-ws-transport/package.json packages/cubejs-client-ws-
 COPY packages/cubejs-playground/package.json packages/cubejs-playground/package.json
 
 RUN yarn policies set-version v1.22.19
-# Yarn v1 uses aggressive timeouts with summing time spending on fs, https://github.com/yarnpkg/yarn/issues/4890
 RUN yarn config set network-timeout 120000 -g
 
-# There is a problem with release process.
-# We are doing version bump without updating lock files for the docker package.
-#RUN yarn install --frozen-lockfile
+######################################################################
+# Production dependencies for all but the databricks driver          #
+######################################################################
 FROM base as prod_base_dependencies
+
 RUN yarn install --prod
 
+######################################################################
+# Databricks driver dependencies                                     #
+######################################################################
 FROM prod_base_dependencies as prod_dependencies
+
 COPY packages/cubejs-databricks-jdbc-driver/package.json packages/cubejs-databricks-jdbc-driver/package.json
 COPY packages/cubejs-databricks-jdbc-driver/bin packages/cubejs-databricks-jdbc-driver/bin
 RUN yarn install --prod --ignore-scripts
 
-FROM base as build
+######################################################################
+# Build dependencies                                                 #
+######################################################################
+FROM base as build_dependencies
 
 RUN yarn install
 
-# Backend
+######################################################################
+# Build layer                                                        #
+######################################################################
+FROM build_dependencies as build
+
 COPY rust/cubestore/ rust/cubestore/
 COPY rust/cubesql/ rust/cubesql/
 COPY packages/cubejs-backend-shared/ packages/cubejs-backend-shared/
@@ -145,10 +153,6 @@ COPY packages/cubejs-ksql-driver/ packages/cubejs-ksql-driver/
 COPY packages/cubejs-dbt-schema-extension/ packages/cubejs-dbt-schema-extension/
 COPY packages/cubejs-jdbc-driver/ packages/cubejs-jdbc-driver/
 COPY packages/cubejs-databricks-jdbc-driver/ packages/cubejs-databricks-jdbc-driver/
-# Skip
-# COPY packages/cubejs-testing/ packages/cubejs-testing/
-# COPY packages/cubejs-docker/ packages/cubejs-docker/
-# Frontend
 COPY packages/cubejs-templates/ packages/cubejs-templates/
 COPY packages/cubejs-client-core/ packages/cubejs-client-core/
 COPY packages/cubejs-client-react/ packages/cubejs-client-react/
@@ -158,15 +162,18 @@ COPY packages/cubejs-client-ngx/ packages/cubejs-client-ngx/
 COPY packages/cubejs-client-ws-transport/ packages/cubejs-client-ws-transport/
 COPY packages/cubejs-playground/ packages/cubejs-playground/
 
-RUN yarn build
-RUN yarn lerna run build
+# As we don't need any UI to test drivers, it's enough to transpile ts only.
+RUN yarn lerna run tsc
 RUN find . -name 'node_modules' -type d -prune -exec rm -rf '{}' +
 
+######################################################################
+# Final image                                                        #
+######################################################################
 FROM base AS final
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
-    && apt-get install -y ca-certificates unzip \
+    && apt-get install -y ca-certificates \
     && apt-get clean
 
 COPY --from=build /cubejs .
@@ -175,13 +182,12 @@ COPY --from=prod_dependencies /cubejs .
 # /cubejs/packages/cubejs-docker/conf/DatabricksJDBC42.jar
 # /cubejs/packages/cubejs-databricks-jdbc-driver/dist/download/DatabricksJDBC42.jar
 # RUN mkdir /cubejs/packages/cubejs-docker/conf
-RUN mkdir /cubejs/packages/cubejs-databricks-jdbc-driver/dist/download
-
-RUN curl -H "Accept: application/zip" \
-    https://databricks-bi-artifacts.s3.us-east-2.amazonaws.com/simbaspark-drivers/jdbc/2.6.29/DatabricksJDBC42-2.6.29.1051.zip \
-    -o /cubejs/packages/cubejs-databricks-jdbc-driver/dist/download/DatabricksJDBC42-2.6.29.1051.zip
-RUN unzip /cubejs/packages/cubejs-databricks-jdbc-driver/dist/download/DatabricksJDBC42-2.6.29.1051.zip \
-    -d /cubejs/packages/cubejs-databricks-jdbc-driver/dist/download
+# RUN mkdir /cubejs/packages/cubejs-databricks-jdbc-driver/dist/download
+# RUN curl -H "Accept: application/zip" \
+#     https://databricks-bi-artifacts.s3.us-east-2.amazonaws.com/simbaspark-drivers/jdbc/2.6.29/DatabricksJDBC42-2.6.29.1051.zip \
+#     -o /cubejs/packages/cubejs-databricks-jdbc-driver/dist/download/DatabricksJDBC42-2.6.29.1051.zip
+# RUN unzip /cubejs/packages/cubejs-databricks-jdbc-driver/dist/download/DatabricksJDBC42-2.6.29.1051.zip \
+#     -d /cubejs/packages/cubejs-databricks-jdbc-driver/dist/download
 
 COPY packages/cubejs-docker/bin/cubejs-dev /usr/local/bin/cubejs
 

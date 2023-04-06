@@ -6,6 +6,7 @@ import { getFixtures } from './getFixtures';
 import { getTempPath } from './getTempPath';
 import { getComposePath } from './getComposePath';
 import { getCubeJsPath } from './getCubeJsPath';
+import { getPackageJsonPath } from './getPackageJsonPath';
 import { getSchemaPath } from './getSchemaPath';
 import { Environment } from '../types/Environment';
 
@@ -14,6 +15,7 @@ export async function runEnvironment(type: string): Promise<Environment> {
   getTempPath();
   getSchemaPath(type);
   getCubeJsPath(type);
+  getPackageJsonPath(type);
   const [composePath, composeFile] = getComposePath(type);
   const compose = new DockerComposeEnvironment(
     composePath,

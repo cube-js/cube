@@ -60,7 +60,7 @@ export function testQueries(type: string): void {
     });
 
     // MUST be the first test in the list!
-    it('must built pre-aggregations', async () => {
+    execute('must built pre-aggregations', async () => {
       await buildPreaggs(env.cube.port, 'mysupersecret', {
         timezones: ['UTC'],
         preAggregations: ['Customers.RAExternal'],

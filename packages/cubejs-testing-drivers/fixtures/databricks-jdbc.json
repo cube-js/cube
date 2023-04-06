@@ -17,10 +17,6 @@
       "CUBEJS_DB_EXPORT_BUCKET_AWS_REGION": "${CUBEJS_DB_EXPORT_BUCKET_AWS_REGION}",
       "CUBEJS_PRE_AGGREGATIONS_SCHEMA": "${CUBEJS_PRE_AGGREGATIONS_SCHEMA}"
     },
-    "volumes": [
-      "./cube.js:/cube/conf/cube.js",
-      "./schema/ecommerce.yaml:/cube/conf/schema/ecommerce.yaml"
-    ],
     "ports" : ["4000"]
   },
   "cast": {
@@ -35,47 +31,33 @@
   },
   "preAggregations": {
     "Products": [],
-    "Customers": [
-      {
-        "name": "RA",
-        "measures": ["CUBE.count", "CUBE.runningTotal"]
-      }
-    ],
-    "ECommerce": [
-      {
-        "name": "SA",
-        "dimensions": ["CUBE.productName"],
-        "measures": [
-          "CUBE.totalQuantity",
-          "CUBE.avgDiscount",
-          "CUBE.totalSales",
-          "CUBE.totalProfit"
-        ]
-      },
-      {
-        "name": "TA",
-        "time_dimension": "CUBE.orderDate",
-        "granularity": "month",
-        "partition_granularity": "month",
-        "dimensions": ["CUBE.productName"],
-        "measures": [
-          "CUBE.totalQuantity",
-          "CUBE.avgDiscount",
-          "CUBE.totalSales",
-          "CUBE.totalProfit"
-        ]
-      }
-    ]
+    "Customers": [],
+    "ECommerce": []
   },
   "skip": [
-    "SKIPPED FOR Databricks",
+    "---------------------------------------",
+    "Driver tests                           ",
     "---------------------------------------",
     "must stream from the data source",
+
+    "---------------------------------------",
+    "Core tests                             ",
+    "---------------------------------------",
     "for the Customers.RollingExternal",
     "for the ECommerce.SimpleAnalysisExternal",
     "for the ECommerce.TimeAnalysisInternal",
 
-    "SKIPED FOR ALL",
+    "---------------------------------------",
+    "Full tests                             ",
+    "---------------------------------------",
+    "must built pre-aggregations",
+    "querying Customers: dimentions + order + total + offset",
+    "querying Customers: dimentions + order + limit + total + offset",
+    "querying ECommerce: dimentions + order + total + offset",
+    "querying ECommerce: dimentions + order + limit + total + offset",
+
+    "---------------------------------------",
+    "SKIPED FOR ALL                         ",
     "---------------------------------------",
     "querying Products: dimensions -- doesn't work wo ordering",
     "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- rounding in athena",

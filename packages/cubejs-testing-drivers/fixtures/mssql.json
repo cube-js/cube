@@ -12,10 +12,6 @@
     },
     "depends_on": ["data"],
     "links": ["data"],
-    "volumes": [
-      "./cube.js:/cube/conf/cube.js",
-      "./schema/ecommerce.yaml:/cube/conf/schema/ecommerce.yaml"
-    ],
     "ports" : ["4000"]
   },
   "data": {
