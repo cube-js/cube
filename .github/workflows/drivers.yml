@@ -68,6 +68,8 @@ jobs:
       - name: Build packages
         run: |
           yarn tsc
+          cd packages/cubejs-testing-drivers
+          yarn tsc
 
       - name: Build test image
         run: |
@@ -75,4 +77,6 @@ jobs:
           yarn image
 
       - name: Run tests
-        run: yarn ${{ matrix.database }}-${{ matrix.suite }}
+        run: |
+          cd packages/cubejs-testing-drivers
+          yarn ${{ matrix.database }}-${{ matrix.suite }}
