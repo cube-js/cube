@@ -71,7 +71,7 @@ pub struct SqlResultCache {
     result_cache: Cache<SqlResultCacheKey, Arc<DataFrame>>,
 }
 
-fn dataframe_sizeof(key: &SqlResultCacheKey, df: &Arc<DataFrame>) -> u32 {
+pub fn sql_result_cache_sizeof(key: &SqlResultCacheKey, df: &Arc<DataFrame>) -> u32 {
     (key.deep_size_of() + df.deep_size_of())
         .try_into()
         .unwrap_or(u32::MAX)
@@ -89,7 +89,7 @@ impl SqlResultCache {
             queue_cache: Mutex::new(lru::LruCache::new(1000)),
             result_cache: cache_builder
                 .max_capacity(capacity_bytes)
-                .weigher(dataframe_sizeof)
+                .weigher(sql_result_cache_sizeof)
                 .build(),
         }
     }

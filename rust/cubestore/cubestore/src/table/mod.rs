@@ -33,10 +33,6 @@ pub enum TableValue {
 }
 
 impl DeepSizeOf for TableValue {
-    fn deep_size_of(&self) -> usize {
-        32
-    }
-
     fn deep_size_of_children(&self, context: &mut Context) -> usize {
         match self {
             TableValue::Null => 0,
@@ -229,6 +225,7 @@ pub fn cmp_same_types(l: &TableValue, r: &TableValue) -> Ordering {
 mod tests {
     use crate::table::{TableValue, TimestampValue};
     use crate::util::decimal::Decimal;
+    use deepsize::DeepSizeOf;
     use serde::{Deserialize, Serialize};
 
     #[test]
@@ -255,6 +252,18 @@ mod tests {
             let v2 = TableValue::deserialize(flexbuffers::Reader::get_root(&b).unwrap())
                 .expect(&format!("could not deserialize {:?}", v));
             assert_eq!(v, &v2);
+        }
+    }
+
+    #[test]
+    fn table_value_deep_size_of() {
+        for (v, expected_size) in [
+            (TableValue::Null, 32_usize),
+            (TableValue::Int(1), 32_usize),
+            (TableValue::Decimal(Decimal::new(1)), 32_usize),
+            (TableValue::String("foo".into()), 35_usize),
+        ] {
+            assert_eq!(v.deep_size_of(), expected_size, "size for {:?}", v);
         }
     }
 }
