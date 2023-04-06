@@ -1,5 +1,5 @@
 ---
-title: Connecting to Data Sources
+title: Connecting to data sources
 permalink: /config/databases
 category: Configuration
 menuOrder: 2
@@ -8,6 +8,8 @@ redirect_from:
 ---
 
 Choose a data store to get started with below.
+
+Note that Cube also supports connecting to [multiple data stores][ref-config-multi-data-src] out of the box.
 
 <InfoBox>
   If you'd like to connect to a data store which is not yet listed on this page,
@@ -154,24 +156,13 @@ Choose a data store to get started with below.
   />
 </Grid>
 
-## Multiple Databases
-
-Cube supports connection to multiple databases out-of-the-box. Please refer to
-the [Multiple Data Sources page][ref-config-multi-data-src] to learn more.
-
-If you are connecting to multiple databases using Cube Cloud, set up the first
-database connection when creating a new deployment. Ensure you have the correct
-configuration in your `cube.js` file according to your
-[multitenancy setup](/config/multitenancy). Next, configure the corresponding
-environment variables on the **Settings - Env Vars page**.
-
 ## Driver Support
 
 Most of the drivers for data sources are supported either directly by the Cube
 team or by their vendors. The rest are community-supported and will be
 highlighted as such in their respective pages.
 
-## Third-party Community Drivers
+## Third-party Drivers
 
 - [CosmosDB driver](https://www.npmjs.com/package/cosmosdb-cubejs-driver)
 - [SAP Hana driver](https://www.npmjs.com/package/cubejs-hana-driver)
@@ -196,7 +187,7 @@ and join the `#contributors` channel in our
 
 In some cases you'd need to allow connections from your Cube Cloud deployment IP
 address to your database. You can copy the IP address from either the Database
-Setup step in deployment creation, or from **Settings / Configuration** in your
+Setup step in deployment creation, or from&nbsp;<Btn>Settings → Configuration</Btn> in your
 deployment.
 
 ### <--{"id" : "Cube Cloud"}--> Connecting to data sources not exposed over the Internet
