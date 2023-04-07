@@ -55,8 +55,7 @@ jobs:
             node_modules
             packages/*/node_modules
           key: yarn-cache-${{ hashFiles('**/yarn.lock') }}
-          restore-keys: |
-            yarn-cache-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: yarn-cache-
 
       - name: Configure `yarn`
         run: yarn policies set-version v1.22.19
@@ -79,9 +78,7 @@ jobs:
           yarn tsc
 
       - name: Build test image
-        run: docker build packages/cubejs-testing-drivers \
-          -f packages/cubejs-docker/testing-drivers.Dockerfile \
-          -t cubejs/cube:testing-drivers
+        run: docker build packages/cubejs-testing-drivers -f packages/cubejs-docker/testing-drivers.Dockerfile -t cubejs/cube:testing-drivers
 
       - name: Run tests
         run: |
