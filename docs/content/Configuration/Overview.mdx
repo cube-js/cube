@@ -6,10 +6,10 @@ category: Configuration
 menuOrder: 1
 ---
 
-Cube is designed to work with different configuration sources. There are two
-ways you can set configuration options; via [a configuration file][link-config],
-commonly known as the `cube.js` file, and [environment
-variables][link-env-vars].
+Cube can be configured in two ways. The first is through [options][link-config]
+in a configuration file, commonly known as the `cube.js` file, and secondly,
+through [environment variables][link-env-vars]. Values specified in `cube.js`
+will take precedence over environment variables.
 
 <InfoBox>
 
@@ -18,10 +18,18 @@ When using Docker, ensure that the `cube.js` configuration file and your
 
 </InfoBox>
 
-## Configuration Precedence
+## Cube Cloud
 
-In Cube, values specified in `cube.js` take precedence over environment
-variables.
+You can set environment variables in&nbsp;<Btn>Settings → Configuration</Btn>:
+
+<div style="text-align: center">
+  <img
+    alt="Cube Cloud Environment Variables Screen"
+    src="https://ucarecdn.com/b47693b9-f770-4e01-a0d1-60e3fcf19e23/"
+    style="border: none"
+    width="100%"
+  />
+</div>
 
 ## Development Mode
 
@@ -76,104 +84,9 @@ using the `CUBEJS_DB_MAX_POOL` environment variable; if changing this from the
 default, you must ensure that the new value is greater than the number of
 concurrent connections used by Cube's query queues and refresh scheduler.
 
-## Migrating from Express to Docker
-
-Since [`v0.23`][link-v-023-release], Cube CLI uses the `docker` template instead
-of `express` as a default for project creation, and it is the recommended route
-for production. To migrate you should move all Cube dependencies in
-`package.json` to `devDependencies` and leave dependencies that you use to
-configure Cube in `dependencies`.
-
-For example, your existing `package.json` might look something like:
-
-```json
-{
-  "name": "cubejs-app",
-  "version": "0.0.1",
-  "private": true,
-  "scripts": {
-    "dev": "node index.js"
-  },
-  "dependencies": {
-    "@cubejs-backend/postgres-driver": "^0.20.0",
-    "@cubejs-backend/server": "^0.20.0"
-  }
-}
-```
-
-It should become:
-
-```json
-{
-  "name": "cubejs-app",
-  "version": "0.0.1",
-  "private": true,
-  "scripts": {
-    "dev": "./node_modules/.bin/cubejs-server server"
-  },
-  "dependencies": {},
-  "devDependencies": {
-    "@cubejs-backend/postgres-driver": "^0.23.6",
-    "@cubejs-backend/server": "^0.23.7"
-  }
-}
-```
-
-You should also rename your `index.js` file to `cube.js` and replace the
-`CubejsServer.create()` call with export of configuration using
-`module.exports`.
-
-For an `index.js` like the following:
-
-```javascript
-const CubejsServer = require('@cubejs-backend/server');
-
-const server = new CubejsServer({
-  logger: (msg, params) => {
-    console.log(`${msg}: ${JSON.stringify(params)}`);
-  },
-});
-
-server
-  .listen()
-  .then(({ version, port }) => {
-    console.log(`🚀 Cube API server (${version}) is listening on ${port}`);
-  })
-  .catch((e) => {
-    console.error('Fatal error during server start: ');
-    console.error(e.stack || e);
-  });
-```
-
-It should be renamed to `cube.js` and its' contents should look like:
-
-```javascript
-module.exports = {
-  logger: (msg, params) => {
-    console.log(`${msg}: ${JSON.stringify(params)}`);
-  },
-};
-```
-
-Finally, add a `docker-compose.yml` file alongside the `cube.js` configuration
-file:
-
-```yaml
-version: '2.2'
-
-services:
-  cube:
-    image: cubejs/cube:latest
-    ports:
-      - 4000:4000
-    env_file: .env
-    volumes:
-      - .:/cube/conf
-```
-
 [link-config]: /config
 [link-config-cors-opts]: /config#http
 [link-dev-playground]: /dev-tools/dev-playground
 [link-env-vars]: /reference/environment-variables
 [link-scheduled-refresh]: /schema/reference/pre-aggregations#scheduled-refresh
-[link-v-023-release]: https://github.com/cube-js/cube/releases/tag/v0.23.0
+

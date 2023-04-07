@@ -121,21 +121,12 @@ can then use it to query the Cube API.
 
 ## Using JSON Web Key Sets (JWKS)
 
-Cube has out-of-the-box support for the following identity providers:
-
-- [Auth0][ref-jwt-auth0]
-- [AWS Cognito][ref-jwt-aws-cognito]
-
 <InfoBox>
 
-If you don't see your identity provider listed, please let us know with a post
-on our [Slack][link-slack].
+Looking for a guide on how to connect a specific identity provider? Check out
+our recipes for using [Auth0][ref-recipe-auth0] or [AWS Cognito][ref-recipe-cognito] with Cube.
 
 </InfoBox>
-
-[link-slack]: https://slack.cube.dev/
-[ref-jwt-auth0]: /security/jwt/auth0
-[ref-jwt-aws-cognito]: /security/jwt/aws-cognito
 
 ### <--{"id" : "Using JSON Web Key Sets (JWKS)"}--> Configuration
 
@@ -273,4 +264,7 @@ module.exports = {
 [ref-config-check-auth]: /config#check-auth
 [ref-config-migrate-cubejs]:
   /configuration/overview#migration-from-express-to-docker-template
+[ref-recipe-auth0]: /recipes/authn-with-auth0
+[ref-recipe-cognito]: /recipes/authn-with-aws-cognito
 [ref-sec-ctx]: /security/context
+[link-slack]: https://slack.cube.dev/

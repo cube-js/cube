@@ -1,30 +1,67 @@
 ---
-title: Working with YAML
+title: Syntax
 permalink: /schema/fundamentals/working-with-yaml
-category: Data Schema
+category: Data Modeling
 subCategory: Fundamentals
-menuOrder: 4
+menuOrder: 12
 redirect_from:
   - /schema/getting-started/yaml
 ---
 
-## Ensure deployment is using latest Cube
+Cube supports two ways to define data models: with YAML or JavaScript syntax.
 
-First, ensure you're using Cube version `0.31.0` or higher. Then create a new
-`.yml` file in the `schema/` folder.
+<InfoBox>
 
-## Syntax
+YAML syntax was introduced in Cube version `0.31.0`.
 
-The syntax for YAML modeling is very similar to the existing JavaScript syntax,
-with a few key differences:
+</InfoBox>
 
-1. All schema properties can be written in either camel-case or snake-case i.e.
-   `countDistinctApprox` can be written as `count_distinct_approx`,
-   `preAggregations` can be written as `pre_aggregations` etc. We recommend
-   using snake-case in YAML models.
+YAML data models are placed in `.yml` files in the `schema/` folder, whereas
+JavaScript data models are placed in `.js` files in the same folder.
 
-2. References to cubes, views and context variables should be wrapped in `{}`
-   i.e. `{FILTER_PARAMS.Orders.created_at.filter('created_at')}`.
+It's recommended to use YAML syntax by default; opt to JavaScript syntax when
+you need to [dynamic data models](/schema/advanced/dynamic-schema-creation).
 
-3. String values only need to have quotes around them if they contain special
-   values: `"{CUBE}.user_id = {Users.id}"`
+<CodeTabs>
+
+```javascript
+cube('Orders', {
+  sql: `
+    SELECT
+      *
+    FROM
+      orders,
+      line_items
+    WHERE
+      orders.id = line_items.order_id
+  `,
+});
+```
+
+```yaml
+cubes:
+  - name: Orders
+    sql: >
+      SELECT * FROM
+        orders,
+        line_items
+      WHERE
+        orders.id = line_items.order_id
+```
+
+</CodeTabs>
+
+## Syntax comparison
+
+YAML syntax is very similar to JavaScript syntax, with a few key differences:
+
+1. In YAML syntax, data model properties can be written in either camel case or
+   snake case, i.e., `countDistinctApprox` can be written as
+   `count_distinct_approx`, `preAggregations` can be written as
+   `pre_aggregations`, etc. It's recommended to use snake case in YAML models.
+
+2. In YAML syntax, cubes, views, and context variables should be wrapped in
+   `{}`, e.g., `{FILTER_PARAMS.Orders.created_at.filter('created_at')}`.
+
+3. In YAML syntax, string values only need to have quotes around them if they
+   contain special values, e.g., `"{CUBE}.user_id = {Users.id}"`.

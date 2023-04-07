@@ -1,8 +1,8 @@
 /**
  * @title @cubejs-client/core
  * @permalink /@cubejs-client-core
- * @menuCategory Frontend Integrations
- * @subcategory Reference
+ * @menuCategory Reference
+ * @subcategory Frontend
  * @menuOrder 2
  * @description Vanilla JavaScript Cube.js client.
  */

@@ -1,0 +1,95 @@
+---
+title: Playground
+permalink: /dev-tools/dev-playground
+category: Workspace
+menuOrder: 1
+---
+
+Playground is a web-based tool which allows to execute queries and preview the results:
+
+<SuccessBox>
+
+Playground is available in Cube Cloud on [all tiers](https://cube.dev/pricing). 
+
+</SuccessBox>
+
+<div style="text-align: center">
+  <img
+    alt="Playground Query and Results Example"
+    src="https://ucarecdn.com/67e2f8d6-149e-49d3-bdf8-70d00f6d4bb0/"
+    style="border: none"
+    width="100%"
+  />
+</div>
+
+## Running Playground
+
+### Cube Core
+
+Playground is available at [http://localhost:4000](http://localhost:4000) when Cube is run in
+[development mode][ref-dev-mode], i.e., when `CUBEJS_DEV_MODE` is set to `true`.
+
+<WarningBox>
+
+Since Playground exposes all data models and allows running all possible
+queries, it should not be used in production. You can use
+the [JavaScript SDKs](/frontend-introduction) to build your own query builder and
+use it to query your Cube API in a secure way.
+
+</WarningBox>
+
+### Cube Cloud
+
+Playground is available out of the box to authenticated [Cube Cloud][cube-cloud] users.
+
+<div style="text-align: center">
+  <img
+    alt="Cube Developer Playground"
+    src="https://ucarecdn.com/a9d726ee-8254-4d0a-b6ae-88a185f69b62/"
+    style="border: none"
+    width="100%"
+  />
+</div>
+
+When editing the data model through the [Cube
+IDE][ref-devtools-ide], Playground will switch to the Development API and its status will be visible in
+the Playground:
+
+<div style="text-align: center">
+  <img
+    alt="Playground during API restart"
+    src="https://ucarecdn.com/ee419318-7021-4f77-ac62-215ef40292d7/"
+    style="border: none"
+    width="100%"
+  />
+</div>
+
+## Query tabs
+
+You can use query tabs to keep results of previous queries while still being
+able to make new queries. The query tabs can be found at the top of the
+Developer Playground:
+
+<div style="text-align: center">
+  <img
+    alt="Cube Developer Playground Tabs"
+    src="https://ucarecdn.com/4bab9844-5229-4dde-98e0-399106eded10/"
+    style="border: none"
+    width="100%"
+  />
+</div>
+
+## Editing the Security Context
+
+The Security Context used for requests can be modified by clicking&nbsp;<Btn>Edit
+Security Context</Btn> at the top:
+
+<LoomVideo url="https://www.loom.com/embed/5307e973ad7e435094a31b7163f14f3d" />
+
+You can paste in an existing JWT if desired; or create a brand-new one by
+providing a JSON object that represents the decoded JWT.
+
+
+[cube-cloud]: https://cube.dev/cloud
+[ref-dev-mode]: /configuration/overview
+[ref-devtools-ide]: /cloud/dev-tools/cube-ide

@@ -48,12 +48,12 @@ export const DocsSwitcher = () => {
 
   return (
     <div ref={switchWrapperRef} className={styles.docsSwitcher}>
-      <GatsbyLink to={'/'} className={cubejsClasses} activeClassName="active">
-        <img src={cubeJsLogo} alt='Cube.js Logo' />
-      </GatsbyLink>
-      <GatsbyLink to={'/cloud'} className={cubeCloudClasses} activeClassName="active">
-        <img src={cloudLogo} alt='Cube Cloud Logo' />
-      </GatsbyLink>
+      <div>
+        <img src={cubeJsLogo} alt='Cube Logo' />
+      </div>
+      {/*<GatsbyLink to={'/cloud'} className={cubeCloudClasses} activeClassName="active">*/}
+      {/*  <img src={cloudLogo} alt='Cube Cloud Logo' />*/}
+      {/*</GatsbyLink>*/}
     </div>
   );
 };
