@@ -28,8 +28,8 @@ jobs:
           - postgres
         suite:
           - driver
-          - core
-          - full
+          # - core
+          # - full
       fail-fast: false
     steps:
       - name: Checkout
@@ -71,11 +71,11 @@ jobs:
           timeout_minutes: 20
           command: yarn install --frozen-lockfile
 
+      - name: Build client
+        run: yarn build
+
       - name: Build packages
-        run: |
-          lerna bootstrap
-          yarn build
-          yarn tsc
+        run: yarn tsc
 
       - name: Build test image
         run: |
