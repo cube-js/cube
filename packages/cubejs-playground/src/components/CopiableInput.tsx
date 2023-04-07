@@ -11,6 +11,7 @@ const IconButton: typeof Button = styled(Button)`
 
 type CopiableInputProps = {
   label?: string;
+  wrapperStyle?: object;
   onCopyClick?: (value: string) => void;
 } & InputProps;
 
@@ -18,6 +19,7 @@ export function CopiableInput({
   label,
   value,
   onCopyClick,
+  wrapperStyle,
   ...props
 }: CopiableInputProps) {
   const suffix = (
@@ -41,6 +43,7 @@ export function CopiableInput({
       label={label ? <b>{label}</b> : null}
       labelCol={{ span: 24 }}
       wrapperCol={{ span: 24 }}
+      style={wrapperStyle}
     >
       <Input
         data-testid={`localhost-tipbox-${label?.toLowerCase()}-input`}
