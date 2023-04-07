@@ -73,12 +73,13 @@ jobs:
 
       - name: Build packages
         run: |
-          yarn tsc
-          cd packages/cubejs-testing-drivers
+          yarn build
           yarn tsc
 
       - name: Build test image
-        run: docker build . -f packages/cubejs-docker/dev.Dockerfile -t cubejs/cube:testing-drivers
+        run: |
+          cd packages/cubejs-testing-drivers
+          yarn image
 
       - name: Run tests
         run: |
