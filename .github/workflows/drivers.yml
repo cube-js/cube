@@ -35,6 +35,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2022-06-22
+          override: true
+          components: rustfmt
+
       - name: Install Node.js 16.x
         uses: actions/setup-node@v3
         with:
@@ -47,9 +54,9 @@ jobs:
             ~/.npm
             node_modules
             packages/*/node_modules
-          key: ${{ runner.os }}-workspace-main-16.x-${{ hashFiles('**/yarn.lock') }}
+          key: yarn-cache-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-workspace-main-16.x-
+            yarn-cache-${{ hashFiles('**/yarn.lock') }}
 
       - name: Configure `yarn`
         run: yarn policies set-version v1.22.19
