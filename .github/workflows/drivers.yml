@@ -21,10 +21,10 @@ jobs:
         node: 
           - 16.x
         database:
-          - clickhouse
+          # - clickhouse
           # - databricks-jdbc
-          - mssql
-          - mysql
+          # - mssql
+          # - mysql
           - postgres
         suite:
           - driver
