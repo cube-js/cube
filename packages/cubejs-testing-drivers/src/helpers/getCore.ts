@@ -31,5 +31,5 @@ export function getCore(
         },
       ]),
     }),
-  }) as CubejsServerCoreExposed;
+  }) as unknown as CubejsServerCoreExposed;
 }
