@@ -1,13 +1,14 @@
-// eslint-disable-next-line import/no-extraneous-dependencies
-import { Database } from 'duckdb';
 import {
   BaseDriver,
   DriverInterface,
   GenericDataBaseType, StreamOptions,
   QueryOptions, StreamTableData,
 } from '@cubejs-backend/base-driver';
+import { assertDataSource, getEnv } from '@cubejs-backend/shared';
 import { promisify } from 'util';
 import * as stream from 'stream';
+// eslint-disable-next-line import/no-extraneous-dependencies
+import { Connection, Database } from 'duckdb';
 
 import { DucksDBQuery } from './DucksDBQuery';
 import { HydrationStream } from './HydrationStream';
@@ -19,31 +20,69 @@ const PostgresToGenericType: Record<string, GenericDataBaseType> = {
 };
 
 export type DucksDBDriverConfiguration = {
+  dataSource?: string,
+  enableHttpFs?: boolean,
 };
 
 export class DucksDBDriver extends BaseDriver implements DriverInterface {
   protected readonly config: DucksDBDriverConfiguration;
 
-  protected readonly db: Database;
+  protected initPromise: Promise<Database> | null = null;
 
   public constructor(
     config: DucksDBDriverConfiguration,
   ) {
     super();
 
-    this.config = config;
-    this.db = new Database(':memory:');
+    const dataSource =
+      config.dataSource ||
+      assertDataSource('default');
+
+    this.config = {
+      enableHttpFs: getEnv('ducksdbHttpFs', { dataSource }) || true,
+      ...config,
+    };
+  }
+
+  protected async initDatabase(): Promise<Database> {
+    const db = new Database(':memory:');
+    const conn = db.connect();
+
+    if (this.config.enableHttpFs) {
+      try {
+        await this.handleQuery(conn, 'INSTALL httpfs', []);
+      } catch (e) {
+        if (this.logger) {
+          console.error('DucksDB - error on httpfs installation', {
+            e
+          });
+        }
+      }
+    }
+
+    return db;
+  }
+
+  protected async getConnection() {
+    if (!this.initPromise) {
+      this.initPromise = this.initDatabase();
+    }
+
+    return (await this.initPromise).connect();
   }
 
   public static dialectClass() {
     return DucksDBQuery;
   }
 
-  public async query<R = unknown>(query: string, values: unknown[], _options?: QueryOptions): Promise<R[]> {
-    const connection = this.db.connect();
+  protected handleQuery<R = unknown>(connection: Connection, query: string, values: unknown[], _options?: QueryOptions): Promise<R[]> {
     const executeQuery: (sql: string, ...args: any[]) => Promise<R[]> = promisify(connection.all).bind(connection) as any;
 
     return executeQuery(query, ...(values || []));
+  }
+
+  public async query<R = unknown>(query: string, values: unknown[], _options?: QueryOptions): Promise<R[]> {
+    return this.handleQuery(await this.getConnection(), query, values, _options);
   }
 
   public async stream(
@@ -51,7 +90,7 @@ export class DucksDBDriver extends BaseDriver implements DriverInterface {
     values: unknown[],
     { highWaterMark }: StreamOptions
   ): Promise<StreamTableData> {
-    const connection = this.db.connect();
+    const connection = await this.getConnection();
 
     const asyncIterator = connection.stream(query, ...(values || []));
     const rowStream = stream.Readable.from(asyncIterator, { highWaterMark }).pipe(new HydrationStream());
@@ -78,7 +117,9 @@ export class DucksDBDriver extends BaseDriver implements DriverInterface {
   }
 
   public async release(): Promise<void> {
-    await promisify(this.db.close).bind(this);
+    if (this.initPromise) {
+      await promisify((await this.initPromise).close).bind(this);
+    }
   }
 
   public fromGenericType(columnType: string) {
