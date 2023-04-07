@@ -1,4 +1,4 @@
-import { CubejsServerCore } from './Core';
+import { CubejsServerCore } from '@cubejs-backend/server-core';
 
 export type CubejsServerCoreExposed = CubejsServerCore & {
   options: any;
