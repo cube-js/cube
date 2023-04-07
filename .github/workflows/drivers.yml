@@ -73,6 +73,7 @@ jobs:
 
       - name: Build packages
         run: |
+          lerna bootstrap
           yarn build
           yarn tsc
 
