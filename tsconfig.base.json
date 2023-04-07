@@ -20,6 +20,7 @@
         "packages/cubejs-schema-compiler/src",
         "packages/cubejs-server/src",
         "packages/cubejs-server-core/src",
+        "packages/cubejs-testing-drivers/src"
       ]
     },
     "composite": true,
