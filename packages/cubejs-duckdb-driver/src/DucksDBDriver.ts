@@ -75,7 +75,8 @@ export class DucksDBDriver extends BaseDriver implements DriverInterface {
     return false;
   }
 
-  public async release() {
+  public async release(): Promise<void> {
+    await promisify(this.db.close).bind(this);
   }
 
   public fromGenericType(columnType: string) {

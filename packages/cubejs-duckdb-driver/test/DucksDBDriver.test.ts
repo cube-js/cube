@@ -11,6 +11,10 @@ describe('DucksDBDriver', () => {
     await driver.query('CREATE SCHEMA IF NOT EXISTS test;', []);
   });
 
+  afterAll(async () => {
+    await driver.release();
+  });
+
   test('stream', async () => {
     await driver.uploadTable(
       'test.streaming_test',

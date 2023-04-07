@@ -5,6 +5,8 @@ set -eo pipefail
 export DEBUG=testcontainers
 
 echo "::group::DucksDB"
+# Should we create a separate job integration-ducksdb? I believe not, because it works fast.
+yarn lerna run --concurrency 1 --stream --no-prefix integration:ducksdb
 yarn lerna run --concurrency 1 --stream --no-prefix smoke:ducksdb
 echo "::endgroup::"
 
