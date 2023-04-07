@@ -15,6 +15,7 @@ mod filter_by_key_range;
 mod flatten_union;
 pub mod info_schema;
 pub mod now;
+pub mod providers;
 #[cfg(test)]
 mod test_utils;
 pub mod udfs;
@@ -42,6 +43,7 @@ use crate::queryplanner::topk::ClusterAggregateTopK;
 use crate::queryplanner::udfs::aggregate_udf_by_kind;
 use crate::queryplanner::udfs::{scalar_udf_by_kind, CubeAggregateUDFKind, CubeScalarUDFKind};
 
+use crate::sql::cache::SqlResultCache;
 use crate::sql::InlineTables;
 use crate::store::DataFrame;
 use crate::{app_metrics, metastore, CubeError};
@@ -90,6 +92,7 @@ pub struct QueryPlannerImpl {
     meta_store: Arc<dyn MetaStore>,
     cache_store: Arc<dyn CacheStore>,
     config: Arc<dyn ConfigObj>,
+    cache: Arc<SqlResultCache>,
 }
 
 crate::di_service!(QueryPlannerImpl, [QueryPlanner]);
@@ -113,6 +116,7 @@ impl QueryPlanner for QueryPlannerImpl {
             self.meta_store.clone(),
             self.cache_store.clone(),
             inline_tables,
+            self.cache.clone(),
         );
 
         let query_planner = SqlToRel::new(&schema_provider);
@@ -165,11 +169,13 @@ impl QueryPlannerImpl {
         meta_store: Arc<dyn MetaStore>,
         cache_store: Arc<dyn CacheStore>,
         config: Arc<dyn ConfigObj>,
+        cache: Arc<SqlResultCache>,
     ) -> Arc<QueryPlannerImpl> {
         Arc::new(QueryPlannerImpl {
             meta_store,
             cache_store,
             config,
+            cache,
         })
     }
 }
@@ -191,6 +197,7 @@ struct MetaStoreSchemaProvider {
     meta_store: Arc<dyn MetaStore>,
     cache_store: Arc<dyn CacheStore>,
     inline_tables: InlineTables,
+    cache: Arc<SqlResultCache>,
 }
 
 /// Points into [MetaStoreSchemaProvider::data], never null.
@@ -226,6 +233,7 @@ impl MetaStoreSchemaProvider {
         meta_store: Arc<dyn MetaStore>,
         cache_store: Arc<dyn CacheStore>,
         inline_tables: &InlineTables,
+        cache: Arc<SqlResultCache>,
     ) -> Self {
         let by_name = tables.iter().map(|t| TableKey(t)).collect();
         Self {
@@ -233,6 +241,7 @@ impl MetaStoreSchemaProvider {
             by_name,
             meta_store,
             cache_store,
+            cache,
             inline_tables: (*inline_tables).clone(),
         }
     }
@@ -315,6 +324,9 @@ impl ContextProvider for MetaStoreSchemaProvider {
                 self.cache_store.clone(),
                 InfoSchemaTable::Schemata,
             ))),
+            ("system", "query_cache") => Some(Arc::new(
+                providers::InfoSchemaQueryCacheTableProvider::new(self.cache.clone()),
+            )),
             ("system", "cache") => Some(Arc::new(InfoSchemaTableProvider::new(
                 self.meta_store.clone(),
                 self.cache_store.clone(),
@@ -490,12 +502,12 @@ pub struct InfoSchemaTableProvider {
 }
 
 impl InfoSchemaTableProvider {
-    fn new(
+    pub fn new(
         meta_store: Arc<dyn MetaStore>,
         cache_store: Arc<dyn CacheStore>,
         table: InfoSchemaTable,
-    ) -> InfoSchemaTableProvider {
-        InfoSchemaTableProvider {
+    ) -> Self {
+        Self {
             meta_store,
             cache_store,
             table,
@@ -665,14 +677,16 @@ fn compute_workers(
         fn pre_visit(&mut self, plan: &LogicalPlan) -> Result<bool, CubeError> {
             match plan {
                 LogicalPlan::Extension { node } => {
-                    let snapshots;
-                    if let Some(cs) = node.as_any().downcast_ref::<ClusterSendNode>() {
-                        snapshots = &cs.snapshots;
+                    let snapshots = if let Some(cs) =
+                        node.as_any().downcast_ref::<ClusterSendNode>()
+                    {
+                        &cs.snapshots
                     } else if let Some(cs) = node.as_any().downcast_ref::<ClusterAggregateTopK>() {
-                        snapshots = &cs.snapshots;
+                        &cs.snapshots
                     } else {
                         return Ok(true);
-                    }
+                    };
+
                     let workers = ClusterSendExec::distribute_to_workers(
                         self.config,
                         snapshots.as_slice(),
@@ -731,6 +745,7 @@ pub mod tests {
             Arc::new(test_utils::MetaStoreMock {}),
             Arc::new(test_utils::CacheStoreMock {}),
             &vec![],
+            Arc::new(SqlResultCache::new(1 << 20, None)),
         )
     }
 
@@ -746,6 +761,15 @@ pub mod tests {
             "SELECT * FROM information_schema.columns as r",
             get_test_execution_ctx(),
         );
+        assert_eq!(SerializedPlan::is_data_select_query(&plan), false);
+
+        let plan = initial_plan("select * from system.query_cache", get_test_execution_ctx());
+        assert_eq!(SerializedPlan::is_data_select_query(&plan), false);
+
+        let plan = initial_plan("SELECT * FROM system.cache", get_test_execution_ctx());
+        assert_eq!(SerializedPlan::is_data_select_query(&plan), false);
+
+        let plan = initial_plan("SELECT NOW()", get_test_execution_ctx());
         assert_eq!(SerializedPlan::is_data_select_query(&plan), false);
     }
 }
