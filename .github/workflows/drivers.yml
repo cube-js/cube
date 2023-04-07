@@ -52,8 +52,8 @@ jobs:
         with:
           path: |
             ~/.npm
-            node_modules
-            packages/*/node_modules
+            **/node_modules
+            packages/**/node_modules
           key: yarn-cache-${{ hashFiles('**/yarn.lock') }}
           restore-keys: yarn-cache-
 
@@ -78,7 +78,7 @@ jobs:
           yarn tsc
 
       - name: Build test image
-        run: docker build . -f packages/cubejs-docker/testing-drivers.Dockerfile -t cubejs/cube:testing-drivers
+        run: docker build . -f packages/cubejs-docker/dev.Dockerfile -t cubejs/cube:testing-drivers
 
       - name: Run tests
         run: |
