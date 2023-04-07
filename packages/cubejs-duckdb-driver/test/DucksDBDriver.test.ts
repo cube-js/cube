@@ -1,0 +1,42 @@
+import { oldStreamToArray, streamToArray } from '@cubejs-backend/shared';
+import { DucksDBDriver } from '../src';
+
+describe('DucksDBDriver', () => {
+  let driver: DucksDBDriver;
+
+  jest.setTimeout(2 * 60 * 1000);
+
+  beforeAll(async () => {
+    driver = new DucksDBDriver({});
+    await driver.query('CREATE SCHEMA IF NOT EXISTS test;', []);
+  });
+
+  test('stream', async () => {
+    await driver.uploadTable(
+      'test.streaming_test',
+      [
+        { name: 'id', type: 'bigint' },
+        { name: 'created', type: 'date' },
+        { name: 'price', type: 'decimal' }
+      ],
+      {
+        rows: [
+          { id: 1, created: '2020-01-01', price: '100' },
+          { id: 2, created: '2020-01-02', price: '200' },
+          { id: 3, created: '2020-01-03', price: '300' }
+        ]
+      }
+    );
+
+    const tableData = await driver.stream('select * from test.streaming_test', [], {
+      highWaterMark: 1000,
+    });
+
+    expect(await tableData.types).toEqual(undefined);
+    expect(await streamToArray(tableData.rowStream as any)).toEqual([
+      { id: '1', created: '2020-01-01T00:00:00.000Z', price: '100' },
+      { id: '2', created: '2020-01-02T00:00:00.000Z', price: '200' },
+      { id: '3', created: '2020-01-03T00:00:00.000Z', price: '300' }
+    ]);
+  });
+});
