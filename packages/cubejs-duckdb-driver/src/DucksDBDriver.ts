@@ -1,7 +1,7 @@
 import {
   BaseDriver,
   DriverInterface,
-  GenericDataBaseType, StreamOptions,
+  StreamOptions,
   QueryOptions, StreamTableData,
 } from '@cubejs-backend/base-driver';
 import { assertDataSource, getEnv } from '@cubejs-backend/shared';
@@ -12,12 +12,6 @@ import { Connection, Database } from 'duckdb';
 
 import { DucksDBQuery } from './DucksDBQuery';
 import { HydrationStream } from './HydrationStream';
-
-const GenericTypeToPostgres: Record<GenericDataBaseType, string> = {
-};
-
-const PostgresToGenericType: Record<string, GenericDataBaseType> = {
-};
 
 export type DucksDBDriverConfiguration = {
   dataSource?: string,
@@ -117,14 +111,6 @@ export class DucksDBDriver extends BaseDriver implements DriverInterface {
     // nothing to do
   }
 
-  public toGenericType(columnType: string): GenericDataBaseType {
-    if (columnType in PostgresToGenericType) {
-      return PostgresToGenericType[columnType];
-    }
-
-    return super.toGenericType(columnType);
-  }
-
   public readOnly() {
     return false;
   }
@@ -133,9 +119,5 @@ export class DucksDBDriver extends BaseDriver implements DriverInterface {
     if (this.initPromise) {
       await promisify((await this.initPromise).close).bind(this);
     }
-  }
-
-  public fromGenericType(columnType: string) {
-    return GenericTypeToPostgres[columnType] || super.fromGenericType(columnType);
   }
 }
