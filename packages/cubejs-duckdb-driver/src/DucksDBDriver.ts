@@ -22,6 +22,7 @@ const PostgresToGenericType: Record<string, GenericDataBaseType> = {
 export type DucksDBDriverConfiguration = {
   dataSource?: string,
   enableHttpFs?: boolean,
+  initSql?: string,
 };
 
 export class DucksDBDriver extends BaseDriver implements DriverInterface {
@@ -54,6 +55,18 @@ export class DucksDBDriver extends BaseDriver implements DriverInterface {
       } catch (e) {
         if (this.logger) {
           console.error('DucksDB - error on httpfs installation', {
+            e
+          });
+        }
+      }
+    }
+
+    if (this.config.initSql) {
+      try {
+        await this.handleQuery(conn, this.config.initSql, []);
+      } catch (e) {
+        if (this.logger) {
+          console.error('DucksDB - error on init sql (skipping)', {
             e
           });
         }
