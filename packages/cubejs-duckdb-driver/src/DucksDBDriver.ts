@@ -1,9 +1,9 @@
-import { Callback, Database, QueryResult, TableData } from 'duckdb';
+import { Database } from 'duckdb';
 import {
   BaseDriver,
-  DownloadQueryResultsOptions, DownloadTableMemoryData, DriverInterface,
-  GenericDataBaseType, IndexesSQL, TableStructure, StreamOptions,
-  StreamTableDataWithTypes, QueryOptions, DownloadQueryResultsResult, StreamTableData,
+  DriverInterface,
+  GenericDataBaseType, StreamOptions,
+  QueryOptions, StreamTableData,
 } from '@cubejs-backend/base-driver';
 import { DucksDBQuery } from './DucksDBQuery';
 import { promisify } from 'util';

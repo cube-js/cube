@@ -4,6 +4,10 @@ set -eo pipefail
 # Debug log for test containers
 export DEBUG=testcontainers
 
+echo "::group::DucksDB"
+yarn lerna run --concurrency 1 --stream --no-prefix smoke:ducksdb
+echo "::endgroup::"
+
 echo "::group::Oracle"
 yarn lerna run --concurrency 1 --stream --no-prefix smoke:oracle
 echo "::endgroup::"
