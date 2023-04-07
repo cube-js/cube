@@ -1,3 +1,4 @@
+// eslint-disable-next-line import/no-extraneous-dependencies
 import { Database } from 'duckdb';
 import {
   BaseDriver,
@@ -5,9 +6,10 @@ import {
   GenericDataBaseType, StreamOptions,
   QueryOptions, StreamTableData,
 } from '@cubejs-backend/base-driver';
-import { DucksDBQuery } from './DucksDBQuery';
 import { promisify } from 'util';
 import * as stream from 'stream';
+
+import { DucksDBQuery } from './DucksDBQuery';
 import { HydrationStream } from './HydrationStream';
 
 const GenericTypeToPostgres: Record<GenericDataBaseType, string> = {
