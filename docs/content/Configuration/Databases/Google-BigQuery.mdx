@@ -14,11 +14,11 @@ Google BigQuery credentials [here][bq-docs-getting-started].
 
 </InfoBox>
 
-- [The Google Cloud Project ID][google-cloud-docs-projects] for the
+- The [Google Cloud Project ID][google-cloud-docs-projects] for the
   [BigQuery][bq] project
-- [A set of Google Cloud service credentials][google-support-create-svc-account]
-  [which allow access][bq-docs-getting-started] to the [BigQuery][bq] project
-- [The Google Cloud region][bq-docs-regional-locations] for the [BigQuery][bq]
+- A set of [Google Cloud service credentials][google-support-create-svc-account]
+  which [allow access][bq-docs-getting-started] to the [BigQuery][bq] project
+- The [Google Cloud region][bq-docs-regional-locations] for the [BigQuery][bq]
   project
 
 ## Setup
@@ -39,6 +39,42 @@ You could also encode the key file using Base64 and set the result to
 ```dotenv
 CUBEJS_DB_BQ_CREDENTIALS=$(cat /path/to/my/keyfile.json | base64)
 ```
+
+### <--{"id" : "Setup"}--> Cube Cloud
+
+<InfoBox heading="Allowing connections from Cube Cloud IP">
+
+In some cases you'll need to allow connections from your Cube Cloud deployment IP
+address to your database. You can copy the IP address from either the Database
+Setup step in deployment creation, or from <Btn>Settings →
+Configuration</Btn> in your deployment.
+
+</InfoBox>
+
+The following fields are required when creating a BigQuery connection:
+
+<div style="text-align: center">
+  <img
+    alt="Cube Cloud BigQuery Configuration Screen"
+    src="https://ucarecdn.com/9fdfbd5d-5556-48b3-aa6e-fff0f24b30e9/"
+    style="border: none"
+    width="100%"
+  />
+</div>
+
+Cube Cloud also supports connecting to data sources within private VPCs. If you already have VPCs enabled in
+your account, check out the [VPC documentation][ref-cloud-conf-vpc] to learn how
+to get started.
+
+<SuccessBox>
+
+VPC connectivity is available in Cube Cloud on [Premium](https://cube.dev/pricing) tier. [Contact us][cube-contact] for details.
+
+</SuccessBox>
+
+[cube-pricing]: https://cube.dev/pricing/
+[cube-contact]: https://cube.dev/contact/
+[ref-cloud-conf-vpc]: /cloud/configuration/connecting-with-a-vpc
 
 ## Environment Variables
 

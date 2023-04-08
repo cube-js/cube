@@ -49,13 +49,11 @@ application can access consistent data via REST, SQL, and GraphQL APIs. Achieve
 insights from raw data within minutes, and get an API with sub-second response
 times on up to a trillion data points.
 
-<div
-  style="text-align: center"
->
+<div style="text-align: center">
   <img
-  src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/old-was-vs-cubejs-way.png"
-  style="border: none"
-  width="80%"
+    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/old-was-vs-cubejs-way.png"
+    style="border: none"
+    width="100%"
   />
 </div>
 
@@ -70,14 +68,37 @@ database. Cube fully manages query orchestration, database connections, as well
 as caching and access control layers. The result is then sent back to the
 client.
 
-<div
-  style="text-align: center"
->
+<div style="text-align: center">
   <img
-  src="https://ucarecdn.com/5ca2ec6d-6fd0-4a10-9b17-5246de20f38c/"
-  style="border: none"
-  width="100%"
+    src="https://ucarecdn.com/5ca2ec6d-6fd0-4a10-9b17-5246de20f38c/"
+    style="border: none"
+    width="100%"
   />
 </div>
 
-[ref-query-format]: https://cube.dev/docs/query-format
+## Why Cube Cloud?
+
+[Cube Cloud][cube-cloud] offers a managed Cube service with extra features for
+reliability and performance. It enhances Cube with features that substantially
+improve reliability, performance, and security:
+
+- **Performance:** Cube Store in-memory caching, Cube Store autoscaling,
+  autoscaling for multi-tenancy.
+
+- **Security:** Cube Store encryption at rest, SQL API connection via SSL,
+  secured access to Cube Playground, security audits and updates to Docker
+  images.
+
+- **Reliability:** Cube Store replication for high availability, distributed
+  file storage failovers and consistency checking.
+
+- **Integrations:** Optimized Databricks driver, optimized Elasticsearch driver,
+  support for Azure blob storage in Cube Store, and integration with monitoring
+  solutions.
+
+Cube Cloud is available as [managed service](https://cubecloud.dev/auth/signup)
+and through "bring your own cloud" model.
+[Please contact us](https://cube.dev/contact) if you'd like to install Cube
+Cloud within your AWS, GCP, or Azure account.
+
+[cube-cloud]: https://cube.dev/cloud

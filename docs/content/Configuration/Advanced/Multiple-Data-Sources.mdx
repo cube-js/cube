@@ -1,51 +1,24 @@
 ---
-title: Multiple Data Sources
+title: Multiple data sources
 permalink: /config/multiple-data-sources
 category: Configuration
 subCategory: Advanced
 menuOrder: 2
 ---
 
-Cube supports using multiple data sources, allowing the use of different
-databases for different cubes.
+Cube supports connecting to multiple data sources, so that different
+[cubes](/schema/reference/cube) reference data from different databases.
 
-<InfoBox>
+Usually, data sources are configured **statically** (see below). However, Cube
+can also lookup data sources **dynamically** which is useful in complex
+scenarios involving [multitenancy][ref-config-multitenancy].
 
-Cube expects that a `default` data source is **always** defined. Ensure that a
-`default` data source is defined using [`driverFactory`]
-[ref-conf-ref-driverfactory] in your `cube.js` file **or** that `CUBEJS_DB_*`
-variables exist as environment variables.
+## Environment variables
 
-</InfoBox>
-
-[ref-conf-ref-driverfactory]: /config#options-reference-driver-factory
-
-## Schema
-
-To configure multiple data sources, first explicitly declare a data source in
-some cubes by adding a `dataSource` property:
-
-```javascript
-cube('Orders', {
-  ...,
-
-  dataSource: 'default',
-});
-
-cube('OrdersFromOtherDataSource', {
-  ...,
-
-  dataSource: 'datasource1',
-});
-```
-
-## Configuring data sources with environment variables
-
-Next, Cube must be configured so that it knows which database to use for each
-data source; first declare the data sources using the `CUBEJS_DATASOURCES`
-environment variable, then use
-[decorated environment variables](#environment-variables-decorated-environment-variables)
-to configure each data source:
+Declare the list of data sources using the `CUBEJS_DATASOURCES` environment
+variable, then use
+[decorated environment variables](#decorated-environment-variables) to configure
+each data source:
 
 ```dotenv
 CUBEJS_DATASOURCES=default,datasource1
@@ -56,6 +29,15 @@ CUBEJS_DS_DATASOURCE1_DB_TYPE=postgres
 CUBEJS_DS_DATASOURCE1_DB_NAME=ecom
 CUBEJS_DS_DATASOURCE1_DB_HOST=remotehost
 ```
+
+<InfoBox>
+
+Cube expects that the `default` data source is **always** defined. Ensure that
+`CUBEJS_DB_*` environment variables are set **or** that the `default` data
+source is defined using [`driverFactory`] [ref-config-ref-driverfactory] in your
+`cube.js` file.
+
+</InfoBox>
 
 ### Decorated environment variables
 
@@ -74,16 +56,40 @@ CUBEJS_DS_DATASOURCE1_DB_TYPE=postgres
 ```
 
 For more information on environment variables that support decoration, check the
-[Environment Variables reference][ref-config-ref-env], or [a database-specific
-page if required][ref-config-db].
+[environment variables reference][ref-config-ref-env] or [database-specific
+pages][ref-config-db].
 
-## Dynamic data sources
+## Data model
 
-For more complex scenarios involving multitenancy, Cube can also be configured
-to dynamically lookup data sources. For more information, see [the Multitenancy
-page][ref-config-multitenancy].
+Use the [`dataSource`](/schema/reference/cube#parameters-data-source) property
+to set a data source for each cube:
+
+```javascript
+cube('Orders', {
+  ...,
+
+  dataSource: 'default',
+});
+
+cube('OrdersFromOtherDataSource', {
+  ...,
+
+  dataSource: 'datasource1',
+});
+```
 
 [ref-config-ref-env]: /reference/environment-variables
+[ref-config-ref-driverfactory]: /config#options-reference-driver-factory
 [ref-config-db]: /config/databases
 [ref-config-multitenancy]:
   /config/multitenancy#multitenancy-multitenancy-vs-multiple-data-sources
+
+## Cube Cloud
+
+Follow these steps to connect to multiple data sources in Cube Cloud:
+
+- Set up the `default` database connection when creating a new deployment.
+- Ensure you have the correct [multitenancy](/config/multitenancy) configuration
+  in your `cube.js` file.
+- Configure the corresponding environment variables in&nbsp;<Btn>Settings →
+  Environment variables</Btn>.

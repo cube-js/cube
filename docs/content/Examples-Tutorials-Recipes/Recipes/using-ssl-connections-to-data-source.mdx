@@ -14,6 +14,8 @@ Cube supports SSL-encrypted connections for:
 - [MySQL][ref-config-db-mysql]
 - [Postgres][ref-config-db-postgres]
 
+## Cube Core
+
 To enable it, set the `CUBEJS_DB_SSL` environment variable to `true`. Cube can
 also be configured to use custom connection settings. For example, to use a
 custom certificate authority and certificates, you could do the following:
@@ -52,9 +54,55 @@ KmZIuh7+XpXzJ1MN0SBZXgXH
 For a complete list of SSL-related environment variables, consult the
 [Environment Variables Reference][ref-env-var].
 
+## Cube Cloud
+
+When setting up a new deployment, select the SSL checkbox when entering
+database credentials:
+
+<div style="text-align: center">
+  <img
+    alt="Cube Cloud Database Connection Screen for Postgres"
+    src="https://ucarecdn.com/a3edc952-41e2-4320-8c32-4524c85af5a6/"
+    style="border: none"
+    width="100%"
+  />
+</div>
+
+To use custom SSL certificates between Cube Cloud and your database server, go
+to the **Env vars** tab in **Settings**:
+
+<WarningBox>
+
+Depending on how SSL is configured on your database server, you may need to
+specify additional environment variables, please check the [Environment
+Variables reference][ref-config-env-vars] for more information.
+
+</WarningBox>
+
+<div style="text-align: center">
+  <img
+    alt="Cube Cloud Database Connection Screen"
+    src="https://ucarecdn.com/1fd4354c-deec-4fc1-bfdb-e05636021efd/"
+    style="border: none"
+    width="100%"
+  />
+</div>
+
+Add the following environment variables:
+
+| Environment Variable | Description                                                                                                                                                                                                 | Example                                  |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| `CUBEJS_DB_SSL`      | If `true`, enables SSL encryption for database connections from Cube                                                                                                                                        | `true`, `false`                          |
+| `CUBEJS_DB_SSL_CA`   | The contents of a CA bundle in PEM format, or a path to one. For more information, check the `options.ca` property for TLS Secure Contexts [in the Node.js documentation][nodejs-docs-tls-options]          | A valid CA bundle or a path to one       |
+| `CUBEJS_DB_SSL_CERT` | The contents of an SSL certificate in PEM format, or a path to one. For more information, check the `options.cert` property for TLS Secure Contexts [in the Node.js documentation][nodejs-docs-tls-options] | A valid SSL certificate or a path to one |
+| `CUBEJS_DB_SSL_KEY`  | The contents of a private key in PEM format, or a path to one. For more information, check the `options.key` property for TLS Secure Contexts [in the Node.js documentation][nodejs-docs-tls-options]       | A valid SSL private key or a path to one |
+
+[nodejs-docs-tls-options]:
+  https://nodejs.org/docs/latest/api/tls.html#tls_tls_createsecurecontext_options
 [ref-config-db-clickhouse]: /config/databases/clickhouse
 [ref-config-db-mongodb]: /config/databases/mongodb
 [ref-config-db-mssql]: /config/databases/mssql
 [ref-config-db-mysql]: /config/databases/mysql
 [ref-config-db-postgres]: /config/databases/postgres
 [ref-env-var]: /reference/environment-variables
+

@@ -172,6 +172,13 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
     return super.downloadQueryResults(query, values, options);
   }
 
+  public informationSchemaQuery() {
+    if (this.config.schema) {
+      return `${super.informationSchemaQuery()} AND columns.table_schema = '${this.config.schema}'`;
+    }
+    return super.informationSchemaQuery();
+  }
+
   public normalizeResultOverColumns(data: any[], columns: TableStructure) {
     const columnNames = map(prop('name'), columns || []);
     const arrayToObject = zipObj(columnNames);

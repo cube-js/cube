@@ -1,5 +1,5 @@
 ---
-title: Connecting to Data Sources
+title: Connecting to data sources
 permalink: /config/databases
 category: Configuration
 menuOrder: 2
@@ -9,10 +9,13 @@ redirect_from:
 
 Choose a data store to get started with below.
 
+Note that Cube also supports connecting to [multiple data
+stores][ref-config-multi-data-src] out of the box.
+
 <InfoBox>
   If you'd like to connect to a data store which is not yet listed on this page,
-  please <a href="https://github.com/cube-js/cube/issues">file an issue</a>{' '}
-  on GitHub. You can also contribute a driver, see this{' '}
+  please <a href="https://github.com/cube-js/cube/issues">file an issue</a> on
+  GitHub. You can also contribute a driver, see this{' '}
   <a href="https://github.com/cube-js/cube/blob/master/CONTRIBUTING.md#implementing-driver">
     step-by-step guide
   </a>
@@ -154,18 +157,13 @@ Choose a data store to get started with below.
   />
 </Grid>
 
-## Multiple Databases
-
-Cube supports connection to multiple databases out-of-the-box. Please refer to
-the [Multiple Data Sources page][ref-config-multi-data-src] to learn more.
-
 ## Driver Support
 
 Most of the drivers for data sources are supported either directly by the Cube
 team or by their vendors. The rest are community-supported and will be
 highlighted as such in their respective pages.
 
-## Third-party Community Drivers
+## Third-party Drivers
 
 - [CosmosDB driver](https://www.npmjs.com/package/cosmosdb-cubejs-driver)
 - [SAP Hana driver](https://www.npmjs.com/package/cubejs-hana-driver)
@@ -178,8 +176,8 @@ highlighted as such in their respective pages.
 
 You're more than welcome to contribute new drivers as well as new features and
 patches to
-[existing drivers](https://github.com/cube-js/cube/tree/master/packages).
-Please check the
+[existing drivers](https://github.com/cube-js/cube/tree/master/packages). Please
+check the
 [contribution guidelines](https://github.com/cube-js/cube/blob/master/CONTRIBUTING.md#contributing-database-drivers)
 and join the `#contributors` channel in our
 [Slack community](https://slack.cube.dev).
