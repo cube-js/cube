@@ -2,8 +2,8 @@ name: 'Drivers tests'
 
 on:
   push:
-    branches:
-      - 'master'
+    # branches:
+    #   - 'master'
     paths:
       - '.github/workflows/drivers.yml'
       - 'packages/**'
@@ -47,15 +47,15 @@ jobs:
         with:
           node-version: 16.x
 
-      - name: Restore cache
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.npm
-            **/node_modules
-            packages/**/node_modules
-          key: yarn-cache-${{ hashFiles('**/yarn.lock') }}
-          restore-keys: yarn-cache-
+      # - name: Restore cache
+      #   uses: actions/cache@v3
+      #   with:
+      #     path: |
+      #       ~/.npm
+      #       **/node_modules
+      #       packages/**/node_modules
+      #     key: yarn-cache-${{ hashFiles('**/yarn.lock') }}
+      #     restore-keys: yarn-cache-
 
       - name: Configure `yarn`
         run: yarn policies set-version v1.22.19
@@ -77,17 +77,15 @@ jobs:
       - name: Build packages
         run: yarn tsc
 
-      - name: Build driver package
+      - name: Build/run tests
         run: |
           cd packages/cubejs-testing-drivers
+          export DEBUG=testcontainers
           yarn tsc
-
-      - name: Build test image
-        run: |
-          cd packages/cubejs-testing-drivers
           yarn image
-
-      - name: Run tests
-        run: |
-          cd packages/cubejs-testing-drivers
           yarn ${{ matrix.database }}-${{ matrix.suite }}
+
+      # - name: Run tests
+      #   run: |
+      #     cd packages/cubejs-testing-drivers
+      #     yarn ${{ matrix.database }}-${{ matrix.suite }}
