@@ -4,21 +4,21 @@ import { afterAll, beforeAll, jest } from '@jest/globals';
 import { BirdBox, getBirdbox } from '../src';
 import { DEFAULT_API_TOKEN, DEFAULT_CONFIG, testQueryMeasure } from './smoke-tests';
 
-describe('ducksdb', () => {
+describe('duckdb', () => {
   jest.setTimeout(60 * 5 * 1000);
   let birdbox: BirdBox;
   let client: CubejsApi;
 
   beforeAll(async () => {
     birdbox = await getBirdbox(
-      'ducksdb',
+      'duckdb',
       {
-        CUBEJS_DB_TYPE: 'ducksdb',
+        CUBEJS_DB_TYPE: 'duckdb',
 
         ...DEFAULT_CONFIG,
       },
       {
-        schemaDir: 'ducksdb/schema',
+        schemaDir: 'duckdb/schema',
       }
     );
     client = cubejs(async () => DEFAULT_API_TOKEN, {

@@ -11,12 +11,12 @@ const GRANULARITY_TO_INTERVAL: Record<string, (date: string) => string> = {
   year: date => `DATE_TRUNC('year', ${date})`
 };
 
-class DucksDBFilter extends BaseFilter {
+class DuckDBFilter extends BaseFilter {
 }
 
-export class DucksDBQuery extends BaseQuery {
+export class DuckDBQuery extends BaseQuery {
   public newFilter(filter: any) {
-    return new DucksDBFilter(this, filter);
+    return new DuckDBFilter(this, filter);
   }
 
   public convertTz(field: string) {
