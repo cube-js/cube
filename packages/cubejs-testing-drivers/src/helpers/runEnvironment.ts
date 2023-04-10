@@ -32,6 +32,13 @@ export async function runEnvironment(type: string): Promise<Environment> {
     });
   }
   Object.keys(fixtures.cube.environment).forEach((key) => {
+    const val = fixtures.cube.environment[key];
+    const { length } = val;
+    if (val.indexOf('${') === 0 && val.indexOf('}') === length - 1) {
+      const name = val.slice(2, length - 1).trim();
+      process.env[key] = process.env[name];
+    }
+
     if (process.env[key]) {
       compose.withEnvironment({ [key]: <string>process.env[key] });
     } else if (fixtures.cube.environment[key]) {

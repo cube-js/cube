@@ -1,5 +1,5 @@
 module.exports = {
-  contextToApiScopes: async (
+  contextToPermissions: async (
     securityContext,
     defaultPermissions,
   ) => {
