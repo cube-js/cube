@@ -20,7 +20,6 @@
     "@cubejs-backend/dbt-schema-extension": "file:/cube-build/packages/cubejs-dbt-schema-extension",
     "@cubejs-backend/dremio-driver": "file:/cube-build/packages/cubejs-dremio-driver",
     "@cubejs-backend/druid-driver": "file:/cube-build/packages/cubejs-druid-driver",
-    "@cubejs-backend/duckdb-driver": "file:/cube-build/packages/cubejs-duckdb-driver",
     "@cubejs-backend/elasticsearch-driver": "file:/cube-build/packages/cubejs-elasticsearch-driver",
     "@cubejs-backend/firebolt-driver": "file:/cube-build/packages/cubejs-firebolt-driver",
     "@cubejs-backend/hive-driver": "file:/cube-build/packages/cubejs-hive-driver",
