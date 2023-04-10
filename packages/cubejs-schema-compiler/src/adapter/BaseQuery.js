@@ -2029,18 +2029,15 @@ class BaseQuery {
     return evaluateSql;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  hllInit(sql) {
+  hllInit(_sql) {
     throw new UserError('Distributed approximate distinct count is not supported by this DB');
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  hllMerge(sql) {
+  hllMerge(_sql) {
     throw new UserError('Distributed approximate distinct count is not supported by this DB');
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  hllCardinality(sql) {
+  hllCardinality(_sql) {
     throw new UserError('Distributed approximate distinct count is not supported by this DB');
   }
 
