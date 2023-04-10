@@ -5,10 +5,10 @@
 [![npm version](https://badge.fury.io/js/%40cubejs-backend%2Fserver.svg)](https://badge.fury.io/js/%40cubejs-backend%2Fserver)
 [![GitHub Actions](https://github.com/cube-js/cube.js/workflows/Build/badge.svg)](https://github.com/cube-js/cube.js/actions?query=workflow%3ABuild+branch%3Amaster)
 
-# Cube.js DucksDB Database Driver
+# Cube.js DuckDB Database Driver
 
 [Learn more](https://github.com/cube-js/cube.js#getting-started)
 
 ### License
 
-Cube.js DucksDB driver is [Apache 2.0 licensed](./LICENSE).
+Cube.js DuckDB driver is [Apache 2.0 licensed](./LICENSE).

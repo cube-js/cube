@@ -1,13 +1,13 @@
-import { oldStreamToArray, streamToArray } from '@cubejs-backend/shared';
-import { DucksDBDriver } from '../src';
+import { streamToArray } from '@cubejs-backend/shared';
+import { DuckDBDriver } from '../src';
 
-describe('DucksDBDriver', () => {
-  let driver: DucksDBDriver;
+describe('DuckDBDriver', () => {
+  let driver: DuckDBDriver;
 
   jest.setTimeout(2 * 60 * 1000);
 
   beforeAll(async () => {
-    driver = new DucksDBDriver({});
+    driver = new DuckDBDriver({});
     await driver.query('CREATE SCHEMA IF NOT EXISTS test;', []);
   });
 

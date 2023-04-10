@@ -10,22 +10,22 @@ import * as stream from 'stream';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { Connection, Database } from 'duckdb';
 
-import { DucksDBQuery } from './DucksDBQuery';
+import { DuckDBQuery } from './DuckDBQuery';
 import { HydrationStream, transformRow } from './HydrationStream';
 
-export type DucksDBDriverConfiguration = {
+export type DuckDBDriverConfiguration = {
   dataSource?: string,
   enableHttpFs?: boolean,
   initSql?: string,
 };
 
-export class DucksDBDriver extends BaseDriver implements DriverInterface {
-  protected readonly config: DucksDBDriverConfiguration;
+export class DuckDBDriver extends BaseDriver implements DriverInterface {
+  protected readonly config: DuckDBDriverConfiguration;
 
   protected initPromise: Promise<Database> | null = null;
 
   public constructor(
-    config: DucksDBDriverConfiguration,
+    config: DuckDBDriverConfiguration,
   ) {
     super();
 
@@ -34,7 +34,7 @@ export class DucksDBDriver extends BaseDriver implements DriverInterface {
       assertDataSource('default');
 
     this.config = {
-      enableHttpFs: getEnv('ducksdbHttpFs', { dataSource }) || true,
+      enableHttpFs: getEnv('duckdbHttpFs', { dataSource }) || true,
       ...config,
     };
   }
@@ -48,7 +48,7 @@ export class DucksDBDriver extends BaseDriver implements DriverInterface {
         await this.handleQuery(conn, 'INSTALL httpfs', []);
       } catch (e) {
         if (this.logger) {
-          console.error('DucksDB - error on httpfs installation', {
+          console.error('DuckDB - error on httpfs installation', {
             e
           });
         }
@@ -60,7 +60,7 @@ export class DucksDBDriver extends BaseDriver implements DriverInterface {
         await this.handleQuery(conn, this.config.initSql, []);
       } catch (e) {
         if (this.logger) {
-          console.error('DucksDB - error on init sql (skipping)', {
+          console.error('DuckDB - error on init sql (skipping)', {
             e
           });
         }
@@ -86,7 +86,7 @@ export class DucksDBDriver extends BaseDriver implements DriverInterface {
   }
 
   public static dialectClass() {
-    return DucksDBQuery;
+    return DuckDBQuery;
   }
 
   protected handleQuery<R>(connection: Connection, query: string, values: unknown[] = [], _options?: QueryOptions): Promise<R[]> {

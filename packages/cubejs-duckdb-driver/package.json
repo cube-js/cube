@@ -1,12 +1,12 @@
 {
-  "name": "@cubejs-backend/ducksdb-driver",
-  "description": "Cube.js DucksDB database driver",
+  "name": "@cubejs-backend/duckdb-driver",
+  "description": "Cube.js DuckDB database driver",
   "author": "Cube Dev, Inc.",
   "version": "0.32.22",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
-    "directory": "packages/cubejs-ducksdb-driver"
+    "directory": "packages/cubejs-duckdb-driver"
   },
   "engines": {
     "node": "^14.0.0 || ^16.0.0 || >=17.0.0"
@@ -21,8 +21,8 @@
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
-    "integration": "npm run integration:ducksdb",
-    "integration:ducksdb": "jest --verbose dist/test",
+    "integration": "npm run integration:duckdb",
+    "integration:duckdb": "jest --verbose dist/test",
     "lint": "eslint src/* --ext .ts",
     "lint:fix": "eslint --fix src/* --ext .ts"
   },

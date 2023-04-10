@@ -8,4 +8,4 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
 
 ### Features
 
-* **ducksdb-driver:** Initial support ([#6403](https://github.com/cube-js/cube/issues/6403)) ([00e41bf](https://github.com/cube-js/cube/commit/00e41bfe8084e9dc7831ff14e2302199af2a8fe3))
+* **duckdb-driver:** Initial support ([#6403](https://github.com/cube-js/cube/issues/6403)) ([00e41bf](https://github.com/cube-js/cube/commit/00e41bfe8084e9dc7831ff14e2302199af2a8fe3))

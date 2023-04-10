@@ -4,10 +4,10 @@ set -eo pipefail
 # Debug log for test containers
 export DEBUG=testcontainers
 
-echo "::group::DucksDB"
-# Should we create a separate job integration-ducksdb? I believe not, because it works fast.
-yarn lerna run --concurrency 1 --stream --no-prefix integration:ducksdb
-yarn lerna run --concurrency 1 --stream --no-prefix smoke:ducksdb
+echo "::group::DuckDB"
+# Should we create a separate job integration-duckdb? I believe not, because it works fast.
+yarn lerna run --concurrency 1 --stream --no-prefix integration:duckdb
+yarn lerna run --concurrency 1 --stream --no-prefix smoke:duckdb
 echo "::endgroup::"
 
 echo "::group::Oracle"

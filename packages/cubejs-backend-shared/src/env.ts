@@ -1353,16 +1353,16 @@ const variables: Record<string, (...args: any) => any> = {
   },
 
   /** ****************************************************************
-   * DucksDB                                                         *
+   * duckdb                                                         *
    ***************************************************************** */
 
-  ducksdbHttpFs: ({
+  duckdbHttpFs: ({
     dataSource
   }: {
     dataSource: string,
   }) => (
     process.env[
-      keyByDataSource('CUBEJS_DB_DUCKSDB_HTTP_FS', dataSource)
+      keyByDataSource('CUBEJS_DB_DUCKDB_HTTP_FS', dataSource)
     ]
   ),
 

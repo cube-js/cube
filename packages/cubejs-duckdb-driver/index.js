@@ -1,7 +1,7 @@
 const fromExports = require('./dist/src');
-const { DucksDBDriver } = require('./dist/src/DucksDBDriver');
+const { DuckDBDriver } = require('./dist/src/DuckDBDriver');
 
-const toExport = DucksDBDriver;
+const toExport = DuckDBDriver;
 
 // eslint-disable-next-line no-restricted-syntax
 for (const [key, module] of Object.entries(fromExports)) {
