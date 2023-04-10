@@ -51,15 +51,15 @@ jobs:
         node: 
           - 16.x
         database:
-          # - clickhouse
-          # - databricks-jdbc
-          # - mssql
-          # - mysql
+          - clickhouse
+          - databricks-jdbc
+          - mssql
+          - mysql
           - postgres
         suite:
           - driver
-          # - core
-          # - full
+          - core
+          - full
       fail-fast: false
 
     steps:
