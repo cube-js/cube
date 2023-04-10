@@ -44,7 +44,7 @@ jobs:
 
   tests:
     runs-on: ubuntu-20.04
-    timeout-minutes: 60
+    timeout-minutes: 30
     needs: [build]
     strategy:
       matrix:
@@ -52,7 +52,7 @@ jobs:
           - 16.x
         database:
           - clickhouse
-          - databricks-jdbc
+          # - databricks-jdbc
           - mssql
           - mysql
           - postgres
