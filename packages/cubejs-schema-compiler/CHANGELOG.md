@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.32.22](https://github.com/cube-js/cube/compare/v0.32.21...v0.32.22) (2023-04-10)
+
+
+### Bug Fixes
+
+* Correct the syntax error in the ClickHouse cast method ([#6154](https://github.com/cube-js/cube/issues/6154)) Thanks [@fxx-real](https://github.com/fxx-real)! ([b5ccf18](https://github.com/cube-js/cube/commit/b5ccf18cd56ee9cc9d8c1c9bb5ffd519c00d0f3c))
+
+
+### Features
+
+* **schema-compiler:** Yaml - report error on misconfiguration (object instead of array) ([#6407](https://github.com/cube-js/cube/issues/6407)) ([29e3778](https://github.com/cube-js/cube/commit/29e37780c9c4f320c868880266dc73f55840987f))
+
+
+
+
+
 ## [0.32.21](https://github.com/cube-js/cube/compare/v0.32.20...v0.32.21) (2023-04-06)
 
 **Note:** Version bump only for package @cubejs-backend/schema-compiler
