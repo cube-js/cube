@@ -11,4 +11,4 @@
 
 ### License
 
-Cube.js Postgres driver is [Apache 2.0 licensed](./LICENSE).
+Cube.js DucksDB driver is [Apache 2.0 licensed](./LICENSE).
