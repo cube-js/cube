@@ -17,7 +17,6 @@ jobs:
     runs-on: ubuntu-20.04
     timeout-minutes: 30
     steps:
-
       - name: Check out the repo
         uses: actions/checkout@v3
 
@@ -43,79 +42,78 @@ jobs:
           tags: cubejs/cube:testing-drivers
           push: true
 
-  # tests:
-  #   runs-on: ubuntu-20.04
-  #   timeout-minutes: 60
-  #   strategy:
-  #     matrix:
-  #       node: 
-  #         - 16.x
-  #       database:
-  #         # - clickhouse
-  #         # - databricks-jdbc
-  #         # - mssql
-  #         # - mysql
-  #         - postgres
-  #       suite:
-  #         - driver
-  #         # - core
-  #         # - full
-  #     fail-fast: false
-  #   steps:
-  #     - name: Checkout
-  #       uses: actions/checkout@v3
+  tests:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 60
+    strategy:
+      matrix:
+        node: 
+          - 16.x
+        database:
+          # - clickhouse
+          # - databricks-jdbc
+          # - mssql
+          # - mysql
+          - postgres
+        suite:
+          - driver
+          # - core
+          # - full
+      fail-fast: false
 
-  #     - name: Install Rust
-  #       uses: actions-rs/toolchain@v1
-  #       with:
-  #         toolchain: nightly-2022-06-22
-  #         override: true
-  #         components: rustfmt
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
 
-  #     - name: Install Node.js 16.x
-  #       uses: actions/setup-node@v3
-  #       with:
-  #         node-version: 16.x
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2022-06-22
+          override: true
+          components: rustfmt
 
-  #     # - name: Restore cache
-  #     #   uses: actions/cache@v3
-  #     #   with:
-  #     #     path: |
-  #     #       ~/.npm
-  #     #       **/node_modules
-  #     #       packages/**/node_modules
-  #     #     key: yarn-cache-${{ hashFiles('**/yarn.lock') }}
-  #     #     restore-keys: yarn-cache-
+      - name: Install Node.js 16.x
+        uses: actions/setup-node@v3
+        with:
+          node-version: 16.x
 
-  #     - name: Configure `yarn`
-  #       run: yarn policies set-version v1.22.19
+      # - name: Restore cache
+      #   uses: actions/cache@v3
+      #   with:
+      #     path: |
+      #       ~/.npm
+      #       **/node_modules
+      #       packages/**/node_modules
+      #     key: yarn-cache-${{ hashFiles('**/yarn.lock') }}
+      #     restore-keys: yarn-cache-
 
-  #     - name: Install dependencies
-  #       uses: nick-invision/retry@v2
-  #       env:
-  #         CUBESTORE_SKIP_POST_INSTALL: true
-  #       with:
-  #         max_attempts: 3
-  #         retry_on: error
-  #         retry_wait_seconds: 15
-  #         timeout_minutes: 20
-  #         command: yarn install --frozen-lockfile
+      - name: Configure `yarn`
+        run: yarn policies set-version v1.22.19
 
-  #     - name: Build client
-  #       run: yarn build
+      - name: Install dependencies
+        uses: nick-invision/retry@v2
+        env:
+          CUBESTORE_SKIP_POST_INSTALL: true
+        with:
+          max_attempts: 3
+          retry_on: error
+          retry_wait_seconds: 15
+          timeout_minutes: 20
+          command: yarn install --frozen-lockfile
 
-  #     - name: Build packages
-  #       run: yarn tsc
+      - name: Build client
+        run: yarn build
 
-  #     - name: Build/run tests
-  #       run: |
-  #         cd packages/cubejs-testing-drivers
-  #         export DEBUG=testcontainers
-  #         yarn tsc
-  #         yarn image
-  #         yarn ${{ matrix.database }}-${{ matrix.suite }}
+      - name: Build packages
+        run: yarn tsc
 
-      # - name: Run tests
-      #   run: |
-      #     cd packages/cubejs-testing-drivers
-      #     yarn ${{ matrix.database }}-${{ matrix.suite }}
+      - name: Build/run tests
+        run: |
+          cd packages/cubejs-testing-drivers
+          yarn tsc
+
+      - name: Run tests
+        run: |
+          cd packages/cubejs-testing-drivers
+          export DEBUG=testcontainers
+          yarn ${{ matrix.database }}-${{ matrix.suite }}
