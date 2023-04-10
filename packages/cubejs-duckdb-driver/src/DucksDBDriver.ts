@@ -75,7 +75,14 @@ export class DucksDBDriver extends BaseDriver implements DriverInterface {
       this.initPromise = this.initDatabase();
     }
 
-    return (await this.initPromise).connect();
+    try {
+      const db = (await this.initPromise);
+      return db.connect();
+    } catch (e) {
+      this.initPromise = null;
+
+      throw e;
+    }
   }
 
   public static dialectClass() {
