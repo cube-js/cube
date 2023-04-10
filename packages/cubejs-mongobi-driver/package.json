@@ -30,7 +30,7 @@
     "@types/node": "^14",
     "generic-pool": "^3.6.0",
     "moment": "^2.29.1",
-    "mysql2": "^2.2.5"
+    "mysql2": "^2.3.3"
   },
   "license": "Apache-2.0",
   "publishConfig": {
