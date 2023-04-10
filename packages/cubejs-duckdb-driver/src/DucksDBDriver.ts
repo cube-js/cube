@@ -82,13 +82,13 @@ export class DucksDBDriver extends BaseDriver implements DriverInterface {
     return DucksDBQuery;
   }
 
-  protected handleQuery<R>(connection: Connection, query: string, values: unknown[], _options?: QueryOptions): Promise<R[]> {
+  protected handleQuery<R>(connection: Connection, query: string, values: unknown[] = [], _options?: QueryOptions): Promise<R[]> {
     const executeQuery: (sql: string, ...args: any[]) => Promise<R[]> = promisify(connection.all).bind(connection) as any;
 
-    return executeQuery(query, ...(values || []));
+    return executeQuery(query, ...values);
   }
 
-  public async query<R = unknown>(query: string, values: unknown[], _options?: QueryOptions): Promise<R[]> {
+  public async query<R = unknown>(query: string, values: unknown[] = [], _options?: QueryOptions): Promise<R[]> {
     const result = await this.handleQuery<R>(await this.getConnection(), query, values, _options);
 
     return result.map((item) => {
@@ -114,7 +114,7 @@ export class DucksDBDriver extends BaseDriver implements DriverInterface {
   }
 
   public async testConnection(): Promise<void> {
-    // nothing to do
+    await this.query('SELECT 1', []);
   }
 
   public readOnly() {
