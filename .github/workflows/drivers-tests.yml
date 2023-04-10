@@ -52,7 +52,7 @@ jobs:
           - 16.x
         database:
           - clickhouse
-          # - databricks-jdbc
+          - databricks-jdbc
           - mssql
           - mysql
           - postgres
