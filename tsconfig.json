@@ -53,6 +53,9 @@
       "path": "packages/cubejs-postgres-driver"
     },
     {
+      "path": "packages/cubejs-duckdb-driver"
+    },
+    {
       "path": "packages/cubejs-questdb-driver"
     },
     {
