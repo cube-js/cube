@@ -45,6 +45,7 @@ jobs:
   tests:
     runs-on: ubuntu-20.04
     timeout-minutes: 60
+    needs: [build]
     strategy:
       matrix:
         node: 
