@@ -10,6 +10,7 @@ import { CubeSymbols } from './CubeSymbols';
 import { DataSchemaCompiler } from './DataSchemaCompiler';
 import { nonStringFields } from './CubeValidator';
 import { CubeDictionary } from './CubeDictionary';
+import { ErrorReporter } from './ErrorReporter';
 
 type EscapeStateStack = {
   inFormattedStr?: boolean;
@@ -24,11 +25,11 @@ export class YamlCompiler {
   public constructor(private cubeSymbols: CubeSymbols, private cubeDictionary: CubeDictionary) {
   }
 
-  public compileYamlFile(file, errorsReport, cubes, contexts, exports, asyncModules, toCompile, compiledFiles) {
+  public compileYamlFile(file, errorsReport: ErrorReporter, cubes, contexts, exports, asyncModules, toCompile, compiledFiles) {
     if (!file.content.trim()) {
       return;
     }
-    
+
     const yamlObj = YAML.load(file.content);
     for (const key of Object.keys(yamlObj)) {
       if (key === 'cubes') {
@@ -47,7 +48,7 @@ export class YamlCompiler {
     }
   }
 
-  private transpileAndPrepareJsFile(file, methodFn, cubeObj, errorsReport) {
+  private transpileAndPrepareJsFile(file, methodFn, cubeObj, errorsReport: ErrorReporter) {
     const yamlAst = this.transformYamlCubeObj(cubeObj, errorsReport);
 
     const cubeOrViewCall = t.callExpression(t.identifier(methodFn), [t.stringLiteral(cubeObj.name), yamlAst]);
@@ -59,7 +60,7 @@ export class YamlCompiler {
     };
   }
 
-  private transformYamlCubeObj(cubeObj, errorsReport) {
+  private transformYamlCubeObj(cubeObj, errorsReport: ErrorReporter) {
     cubeObj = this.camelizeObj(cubeObj);
     cubeObj.measures = this.yamlArrayToObj(cubeObj.measures || [], 'measure', errorsReport);
     cubeObj.dimensions = this.yamlArrayToObj(cubeObj.dimensions || [], 'dimension', errorsReport);
@@ -220,14 +221,21 @@ export class YamlCompiler {
     return ast.program.body[0]?.expression;
   }
 
-  private yamlArrayToObj(yamlArray, memberType, errorsReport) {
-    return yamlArray.map(({ name, ...rest }) => {
+  private yamlArrayToObj(yamlArray, memberType: string, errorsReport: ErrorReporter) {
+    if (!Array.isArray(yamlArray)) {
+      errorsReport.error(`${memberType}s must be defined as array`);
+      return {};
+    }
+
+    const remapped = yamlArray.map(({ name, ...rest }) => {
       if (!name) {
         errorsReport.error(`name isn't defined for ${memberType}: ${YAML.stringify(rest)}`);
         return {};
       } else {
         return { [name]: rest };
       }
-    }).reduce((a, b) => ({ ...a, ...b }), {});
+    });
+
+    return remapped.reduce((a, b) => ({ ...a, ...b }), {});
   }
 }
