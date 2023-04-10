@@ -41,7 +41,7 @@ jobs:
           context: .
           file: ./packages/cubejs-docker/testing-drivers.Dockerfile
           tags: cubejs/cube:testing-drivers
-          push: false
+          push: true
 
   # tests:
   #   runs-on: ubuntu-20.04
