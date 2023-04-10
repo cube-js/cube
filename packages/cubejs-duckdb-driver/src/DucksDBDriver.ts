@@ -123,7 +123,10 @@ export class DucksDBDriver extends BaseDriver implements DriverInterface {
 
   public async release(): Promise<void> {
     if (this.initPromise) {
-      await promisify((await this.initPromise).close).bind(this);
+      const close = promisify((await this.initPromise).close).bind(this);
+      this.initPromise = null;
+
+      await close();
     }
   }
 }
