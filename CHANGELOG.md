@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.32.24](https://github.com/cube-js/cube/compare/v0.32.23...v0.32.24) (2023-04-10)
+
+
+### Reverts
+
+* Revert "feat(docker): Install DuckDB as built-in driver" ([99ea6c1](https://github.com/cube-js/cube/commit/99ea6c15333b3d0c19011cb58ed8a8d10e6b0d3c))
+
+
+
+
+
 ## [0.32.23](https://github.com/cube-js/cube/compare/v0.32.22...v0.32.23) (2023-04-10)
 
 
