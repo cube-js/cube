@@ -11,7 +11,7 @@ import * as stream from 'stream';
 import { Connection, Database } from 'duckdb';
 
 import { DucksDBQuery } from './DucksDBQuery';
-import { HydrationStream } from './HydrationStream';
+import { HydrationStream, transformRow } from './HydrationStream';
 
 export type DucksDBDriverConfiguration = {
   dataSource?: string,
@@ -82,14 +82,20 @@ export class DucksDBDriver extends BaseDriver implements DriverInterface {
     return DucksDBQuery;
   }
 
-  protected handleQuery<R = unknown>(connection: Connection, query: string, values: unknown[], _options?: QueryOptions): Promise<R[]> {
+  protected handleQuery<R>(connection: Connection, query: string, values: unknown[], _options?: QueryOptions): Promise<R[]> {
     const executeQuery: (sql: string, ...args: any[]) => Promise<R[]> = promisify(connection.all).bind(connection) as any;
 
     return executeQuery(query, ...(values || []));
   }
 
   public async query<R = unknown>(query: string, values: unknown[], _options?: QueryOptions): Promise<R[]> {
-    return this.handleQuery(await this.getConnection(), query, values, _options);
+    const result = await this.handleQuery<R>(await this.getConnection(), query, values, _options);
+
+    return result.map((item) => {
+      transformRow(item);
+
+      return item;
+    });
   }
 
   public async stream(
