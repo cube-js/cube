@@ -95,6 +95,27 @@ monitoring service of choice to use the [`/readyz`][ref-api-readyz] and
 [`/livez`][ref-api-livez] API endpoints so you can check on the Cube
 deployment's health and be alerted to any issues.
 
+## Appropriate cluster sizing
+
+There's no one-size-fits-all when it comes to sizing Cube cluster, and its resources.
+Resources required by Cube depend a lot on the amount of traffic Cube needs to serve and the amount of data it needs to process.
+The following sizing estimates are based on default settings and are very generic, which may not fit your Cube use case, so you should always tweak resources based on consumption patterns you see.
+
+Every Cube API instance should have at least 3GB of RAM and 2 CPU cores allocated for it.
+Each Cube cluster should contain at least 2 Cube API instances.
+Refresh workers tend to be much more CPU and memory intensive, so at least 6GB of RAM is recommended.
+Please note that to take advantage of all available RAM, the Node.js heap size should be adjusted accordingly.
+The Cube Store router node should have at least 6GB of RAM and 4 CPU cores allocated for it.
+Every Cube Store worker node should have at least 8GB of RAM and 4 CPU cores allocated for it.
+The Cube Store cluster should have at least two worker nodes.
+
+Depending on schema size, every Core Cube API instance can serve 1 to 10 requests per second.
+Every Core Cube Store router node can serve 50-100 queries per second.
+As a rule of thumb, you should provision 1 Cube Store worker node per one Cube Store partition or 1M of rows scanned in a query.
+For example if your queries scan 16M of rows per query, you should have at least 16 Cube Store worker nodes provisioned.
+`EXPLAIN ANALYZE` can be used to see partitions involved in a Cube Store query.
+Cube Cloud ballpark performance numbers can differ as it has different Cube runtime.
+
 [blog-migrate-to-cube-cloud]:
   https://cube.dev/blog/migrating-from-self-hosted-to-cube-cloud/
 [link-caddy]: https://caddyserver.com/
