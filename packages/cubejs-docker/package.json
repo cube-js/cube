@@ -17,6 +17,7 @@
     "@cubejs-backend/dbt-schema-extension": "^0.33.9",
     "@cubejs-backend/dremio-driver": "^0.33.9",
     "@cubejs-backend/druid-driver": "^0.33.9",
+    "@cubejs-backend/duckdb-driver": "^0.33.9",
     "@cubejs-backend/elasticsearch-driver": "^0.33.8",
     "@cubejs-backend/firebolt-driver": "^0.33.9",
     "@cubejs-backend/hive-driver": "^0.33.8",
