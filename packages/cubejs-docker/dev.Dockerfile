@@ -49,6 +49,7 @@ COPY packages/cubejs-clickhouse-driver/package.json packages/cubejs-clickhouse-d
 COPY packages/cubejs-crate-driver/package.json packages/cubejs-crate-driver/package.json
 COPY packages/cubejs-dremio-driver/package.json packages/cubejs-dremio-driver/package.json
 COPY packages/cubejs-druid-driver/package.json packages/cubejs-druid-driver/package.json
+COPY packages/cubejs-duckdb-driver/package.json packages/cubejs-duckdb-driver/package.json
 COPY packages/cubejs-elasticsearch-driver/package.json packages/cubejs-elasticsearch-driver/package.json
 COPY packages/cubejs-firebolt-driver/package.json packages/cubejs-firebolt-driver/package.json
 COPY packages/cubejs-hive-driver/package.json packages/cubejs-hive-driver/package.json
@@ -120,6 +121,7 @@ COPY packages/cubejs-clickhouse-driver/ packages/cubejs-clickhouse-driver/
 COPY packages/cubejs-crate-driver/ packages/cubejs-crate-driver/
 COPY packages/cubejs-dremio-driver/ packages/cubejs-dremio-driver/
 COPY packages/cubejs-druid-driver/ packages/cubejs-druid-driver/
+COPY packages/cubejs-duckdb-driver/ packages/cubejs-duckdb-driver/
 COPY packages/cubejs-elasticsearch-driver/ packages/cubejs-elasticsearch-driver/
 COPY packages/cubejs-firebolt-driver/ packages/cubejs-firebolt-driver/
 COPY packages/cubejs-hive-driver/ packages/cubejs-hive-driver/
