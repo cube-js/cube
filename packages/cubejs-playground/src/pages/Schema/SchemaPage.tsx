@@ -99,6 +99,7 @@ export class SchemaPage extends Component<SchemaPageProps, any> {
     const result = await res.json();
     this.setState({
       files: result.files,
+      activeTab: (result.files && result.files.length > 0) ? "files" : "schema"
     });
   }
 
@@ -128,8 +129,8 @@ export class SchemaPage extends Component<SchemaPageProps, any> {
       await this.loadFiles();
       this.setState({ checkedKeys: [], activeTab: 'files' });
       Modal.success({
-        title: 'Schema files successfully generated!',
-        content: 'You can start building the charts',
+        title: 'Data model files successfully generated!',
+        content: 'You can start exploring your data model and building the charts',
         okText: 'Build',
         cancelText: 'Close',
         okCancel: true,
@@ -254,10 +255,6 @@ export class SchemaPage extends Component<SchemaPageProps, any> {
                 data-testid="chart-type-btn"
                 overlay={
                   <Menu data-testid="generate-schema">
-                    <Menu.Item onClick={() => this.generateSchema()}>
-                      JavaScript
-                    </Menu.Item>
-
                     <Menu.Item
                       title={
                         !isYamlFormatSupported
@@ -269,11 +266,14 @@ export class SchemaPage extends Component<SchemaPageProps, any> {
                     >
                       YAML
                     </Menu.Item>
+                    <Menu.Item onClick={() => this.generateSchema()}>
+                      JavaScript
+                    </Menu.Item>
                   </Menu>
                 }
                 style={{ border: 0 }}
               >
-                Generate Schema
+                Generate Data Model
               </ButtonDropdown>
             }
           >
@@ -298,13 +298,13 @@ export class SchemaPage extends Component<SchemaPageProps, any> {
               message={
                 isDocker ? (
                   <span>
-                    Schema files are located and can be edited in the mount
+                    Data model files are located and can be edited in the mount
                     volume directory.{' '}
                     <Typography.Link
                       href="https://cube.dev/docs/schema/getting-started"
                       target="_blank"
                     >
-                      Learn more about working with Cube data schema in the docs
+                      Learn more about working with Cube data model in the docs
                     </Typography.Link>
                   </span>
                 ) : (
@@ -329,7 +329,7 @@ export class SchemaPage extends Component<SchemaPageProps, any> {
           ) : (
             <Empty
               style={{ marginTop: 50 }}
-              description="Select tables to generate Cube schema"
+              description="Select tables to generate Cube data model"
             />
           )}
 

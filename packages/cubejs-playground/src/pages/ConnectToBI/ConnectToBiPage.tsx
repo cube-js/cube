@@ -20,6 +20,8 @@ import hightouchSvg from '../../img/bi/hightouch.svg';
 import thoughtSpot from '../../img/bi/thoughtspot.svg';
 import { Content, Header } from '../components/Ui';
 
+const { Paragraph, Link } = Typography;
+
 const SpaceFlex = styled(Space)`
   div.ant-space {
     display: flex;
@@ -36,21 +38,21 @@ type CubeSqlCredentials = {
 
 const BI_KEYS = {
   Generic: 'BIs and Visualization Tools',
-  Tableau: 'Tableau',
-  PowerBI: 'Power BI',
   Superset: 'Apache Superset',
   Metabase: 'Metabase',
+  Tableau: 'Tableau',
+  ThoughtSpot: 'ThoughtSpot',
+  PowerBI: 'Power BI',
   Hex: 'Hex',
   Jupyter: 'Jupyter notebook',
   Streamlit: 'Streamlit',
+  Observable: 'Observable',
   // Not listed on the integration page:
   Deepnote: 'Deepnote',
   Excel: 'Excel',
   GoogleStudio: 'Google Data Studio',
   GoogleSheets: 'Google Sheets',
   Hightouch: 'Hightouch',
-  Observable: 'Observable',
-  ThoughtSpot: 'ThoughtSpot',
 } as const;
 
 type BiKeyNames = keyof typeof BI_KEYS;
@@ -290,11 +292,6 @@ type BIFields = {
 const BI_FIELDS: BIFields = {
   Generic: [
     POSTGRESQL_FIELD,
-    {
-      type: 'alert',
-      value:
-        'Warning: some BI tools are not fully supported yet and you may encounter problems when querying',
-    },
     PG_SNIPPET_FIELD,
     ...BASE_CREDENTIALS,
   ],
@@ -532,6 +529,11 @@ export function ConnectToBiPage() {
       </Header>
 
       <Content>
+        <Paragraph>
+          With Cube SQL API you can query Cube via Postgres-compatible SQL.
+          It enables the use of BI applications and other visualization tools on top of Cube. <br />
+          <Link href="https://cube.dev/docs/config/downstream" target="_blank">Learn more about SQL API and connecting to BI tools in Cube docs ↗ </Link>
+        </Paragraph>
         <Tabs defaultActiveKey="1" tabPosition="left" size="small">
           {Object.entries(BI_KEYS).map(([key, title]) => (
             <Tabs.TabPane
