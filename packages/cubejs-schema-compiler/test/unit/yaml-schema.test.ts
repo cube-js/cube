@@ -1,5 +1,4 @@
-import { prepareCompiler, prepareYamlCompiler } from './PrepareCompiler';
-import { createCubeSchema } from './utils';
+import { prepareYamlCompiler } from './PrepareCompiler';
 
 describe('Yaml Schema Testing', () => {
   it('members must be defined as arrays', async () => {
@@ -22,5 +21,21 @@ describe('Yaml Schema Testing', () => {
     } catch (e: any) {
       expect(e.message).toContain('dimensions must be defined as array');
     }
+  });
+
+  it('commented file crash', async () => {
+    const { compiler } = prepareYamlCompiler(
+      `
+      #cubes:
+      #- name: Products
+      #  sql: "select * from tbl"
+      #  dimensions:
+      #    name: Title
+      #    sql: name
+      #    type: string
+      `
+    );
+
+    await compiler.compile();
   });
 });
