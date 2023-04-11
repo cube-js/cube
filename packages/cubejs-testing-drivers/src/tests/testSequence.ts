@@ -32,7 +32,7 @@ export function testSequence(type: string): void {
     }
 
     beforeAll(async () => {
-      env = await runEnvironment(type);
+      env = await runEnvironment(type, 'core');
       process.env.CUBEJS_REFRESH_WORKER = 'true';
       process.env.CUBEJS_CUBESTORE_HOST = '127.0.0.1';
       process.env.CUBEJS_CUBESTORE_PORT = `${env.store.port}`;
@@ -46,7 +46,7 @@ export function testSequence(type: string): void {
       const drivers = await getDriver(type);
       source = drivers.source;
       storage = drivers.storage;
-      query = getCreateQueries(type);
+      query = getCreateQueries(type, 'core');
       await Promise.all(query.map(async (q) => {
         await source.query(q);
       }));
@@ -56,7 +56,11 @@ export function testSequence(type: string): void {
     });
   
     afterAll(async () => {
-      await Promise.all(['ecommerce', 'customers', 'products'].map(async (t) => {
+      await Promise.all([
+        'ecommerce_core',
+        'customers_core',
+        'products_core',
+      ].map(async (t) => {
         await source.dropTable(t);
       }));
       await source.release();

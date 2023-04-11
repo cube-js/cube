@@ -9,9 +9,9 @@ export type Cast = {
   CREATE_SUB_SUFFIX: string,
 };
 
-function create(table: string, query: string, cast: Cast): string {
+function create(table: string, query: string, cast: Cast, suf?: string): string {
   return `
-  ${cast.CREATE_TBL_PREFIX}${table}${cast.CREATE_TBL_SUFFIX}
+  ${cast.CREATE_TBL_PREFIX}${suf ? `${table}_${suf}` : table}${cast.CREATE_TBL_SUFFIX}
   ${cast.CREATE_SUB_PREFIX}
   ${query}
   ${cast.CREATE_SUB_SUFFIX}
@@ -62,7 +62,7 @@ export const Customers = {
     select 'TS-21205' as customer_id, 'Customer 40' as customer_name union all
     select 'WB-21850' as customer_id, 'Customer 41' as customer_name
   `,
-  create: (cast: Cast) => create('customers', Customers.select(cast), cast),
+  create: (cast: Cast, suf?: string) => create('customers', Customers.select(cast), cast, suf),
 };
 
 export const Products = {
@@ -96,7 +96,7 @@ export const Products = {
     select 'Technology' as category, 'Machines' as sub_category, 'Lexmark 20R1285 X6650 Wireless All-in-One Printer' as product_name union all
     select 'Technology' as category, 'Machines' as sub_category, 'Okidata C610n Printer' as product_name
   `,
-  create: (cast: Cast) => create('products', Products.select(cast), cast),
+  create: (cast: Cast, suf?: string) => create('products', Products.select(cast), cast, suf),
 };
 
 export const ECommerce = {
@@ -149,5 +149,5 @@ export const ECommerce = {
       select 7293 as row_id, 'CA-2017-109183' as order_id, ${DATE_PREFIX}'2020-12-04'${DATE_SUFFIX} as order_date, 'LR-16915' as customer_id, 'Columbus' as city, 'Technology' as category, 'Machines' as sub_category, 'Okidata C610n Printer' as product_name, 649.00000 as sales, 2 as quantity, 0.50000 as discount, -272.58000 as profit
     `;
   },
-  create: (cast: Cast) => create('ecommerce', ECommerce.select(cast), cast),
+  create: (cast: Cast, suf?: string) => create('ecommerce', ECommerce.select(cast), cast, suf),
 };

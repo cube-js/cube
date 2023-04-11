@@ -10,10 +10,10 @@ import { getPackageJsonPath } from './getPackageJsonPath';
 import { getSchemaPath } from './getSchemaPath';
 import { Environment } from '../types/Environment';
 
-export async function runEnvironment(type: string): Promise<Environment> {
+export async function runEnvironment(type: string, suf?: string): Promise<Environment> {
   const fixtures = getFixtures(type);
   getTempPath();
-  getSchemaPath(type);
+  getSchemaPath(type, suf);
   getCubeJsPath(type);
   getPackageJsonPath(type);
   const [composePath, composeFile] = getComposePath(type);

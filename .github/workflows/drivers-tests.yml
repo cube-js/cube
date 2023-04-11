@@ -108,7 +108,7 @@ jobs:
       - name: Build packages
         run: yarn tsc
 
-      - name: Build/run tests
+      - name: Build tests
         run: |
           cd packages/cubejs-testing-drivers
           yarn tsc

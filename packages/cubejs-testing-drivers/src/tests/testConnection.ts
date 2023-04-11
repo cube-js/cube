@@ -33,7 +33,7 @@ export function testConnection(type: string): void {
     }
   
     beforeAll(async () => {
-      env = await runEnvironment(type);
+      env = await runEnvironment(type, 'driver');
       if (env.data) {
         process.env.CUBEJS_DB_HOST = '127.0.0.1';
         process.env.CUBEJS_DB_PORT = `${env.data.port}`;
@@ -51,14 +51,14 @@ export function testConnection(type: string): void {
     });
   
     execute('must creates a data source', async () => {
-      query = getCreateQueries(type);
+      query = getCreateQueries(type, 'driver');
       await Promise.all(query.map(async (q) => {
         await driver.query(q);
       }));
     });
 
     execute('must select from the data source', async () => {
-      query = getSelectQueries(type);
+      query = getSelectQueries(type, 'driver');
       const response = await Promise.all(
         query.map(async (q) => {
           const res = await driver.query(q);
@@ -104,7 +104,7 @@ export function testConnection(type: string): void {
     });
 
     execute('must stream from the data source', async () => {
-      query = getSelectQueries(type);
+      query = getSelectQueries(type, 'driver');
       const response = await Promise.all(
         query.map(async (q) => {
           const stream = driver.stream &&
@@ -131,7 +131,11 @@ export function testConnection(type: string): void {
     });
 
     execute('must delete the data source', async () => {
-      await Promise.all(['ecommerce', 'customers', 'products'].map(async (t) => {
+      await Promise.all([
+        'ecommerce_driver',
+        'customers_driver',
+        'products_driver',
+      ].map(async (t) => {
         await driver.dropTable(t);
       }));
     });

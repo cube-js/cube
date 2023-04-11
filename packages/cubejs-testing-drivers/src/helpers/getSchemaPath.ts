@@ -8,7 +8,7 @@ import { getFixtures } from './getFixtures';
 /**
  * Returns schema yaml file by data source type.
  */
-export function getSchemaPath(type: string): [path: string, file: string] {
+export function getSchemaPath(type: string, suf?: string): [path: string, file: string] {
   const _path = path.resolve(process.cwd(), './.temp/schema');
   const _file = 'ecommerce.yaml';
   const { preAggregations } = getFixtures(type);
@@ -21,6 +21,7 @@ export function getSchemaPath(type: string): [path: string, file: string] {
       name: 'Products' | 'Customers' | 'ECommerce',
       [prop: string]: unknown
     }) => {
+      cube.sql = suf ? `${cube.sql}_${suf}` : cube.sql;
       const pre_aggregations: {
         [x: string]: unknown;
         name: string;
