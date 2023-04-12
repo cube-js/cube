@@ -731,6 +731,7 @@ class ApiGateway {
    * TODO (buntarb): selector object validator.
    */
   private async preAggregationsJobs(req: Request, res: Response) {
+    // req.header("name");
     const response = this.resToResultFn(res);
     const started = new Date();
     const context = <RequestContext>req.context;
