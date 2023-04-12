@@ -1,7 +1,7 @@
 import { camelizeCube } from '../../src/compiler/utils';
 
 describe('Test Utils', () => {
-  it('camelizeObject', () => {
+  it('camelizeObject (js)', () => {
     const res = camelizeCube({
       sql_table: 'tbl',
       measures: {
@@ -44,6 +44,38 @@ describe('Test Utils', () => {
 
         }
       }
+    });
+  });
+
+  it('camelizeObject (yaml)', () => {
+    const res = camelizeCube({
+      sql_table: 'tbl',
+      measures: [{
+        // we should not camelize measure names
+        name: 'my_measure_name',
+        drill_members: ['pkey', 'createdAt'],
+        rolling_window: {
+          trailing: '1 month',
+        }
+      }],
+      joins: {
+
+      },
+    });
+
+    expect(res).toEqual({
+      sqlTable: 'tbl',
+      measures: [{
+        // we should not camelize measure names
+        name: 'my_measure_name',
+        drillMembers: ['pkey', 'createdAt'],
+        rollingWindow: {
+          trailing: '1 month',
+        }
+      }],
+      joins: {
+
+      },
     });
   });
 });
