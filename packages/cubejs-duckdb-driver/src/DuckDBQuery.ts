@@ -26,4 +26,8 @@ export class DuckDBQuery extends BaseQuery {
   public timeGroupedColumn(granularity: string, dimension: string) {
     return GRANULARITY_TO_INTERVAL[granularity](dimension);
   }
+
+  public countDistinctApprox(sql: string) {
+    return `approx_count_distinct(${sql})`;
+  }
 }

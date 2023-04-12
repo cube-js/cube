@@ -508,7 +508,7 @@ export class QueryCache {
     return this.queue[dataSource];
   }
 
-  private async csvQuery(client, q) {
+  protected async csvQuery(client, q) {
     const headers = q.lambdaTypes.map(c => c.name);
     const writer = csvWriter({
       headers,

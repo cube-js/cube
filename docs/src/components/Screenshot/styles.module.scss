@@ -1,0 +1,35 @@
+@import "../../../static/styles/variables.scss";
+
+.screenshot {
+  position: relative;
+  display: inline-block;
+  text-align: center;
+  padding-top: calc(1vw + 1.5rem);
+  background: #ccc linear-gradient(#ddd, #bbb 4vw, #eee 4.15vw);
+  border-radius: .4vw .4vw 0 0;
+  width: 50vw;
+  /*width: 100vh;*/
+  max-width: 100%;
+  //height: 35vw;
+
+  &:before {
+    content: "•••";
+    position: absolute;
+    top: 0;
+    left: 0.5vw;
+    font-size: 3.2vw;
+    line-height: 2vw;
+    color: #ddd;
+    //letter-spacing: .3vw;
+  }
+
+  > img {
+    margin: 0 !important;
+    display: block;
+    width: 400%;
+    //margin: -46.5vw 0 0 -150%;
+    border: 0;
+    //height: calc(4 * (35vw - 4vw));
+    //transform: scale(.25);
+  }
+}

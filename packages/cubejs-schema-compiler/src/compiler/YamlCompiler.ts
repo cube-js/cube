@@ -31,6 +31,10 @@ export class YamlCompiler {
     }
 
     const yamlObj = YAML.load(file.content);
+    if (!yamlObj) {
+      return;
+    }
+
     for (const key of Object.keys(yamlObj)) {
       if (key === 'cubes') {
         (yamlObj.cubes || []).forEach(({ name, ...cube }) => {
