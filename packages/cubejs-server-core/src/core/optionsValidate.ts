@@ -64,7 +64,7 @@ const schemaOptions = Joi.object().keys({
   contextToAppId: Joi.func(),
   contextToOrchestratorId: Joi.func(),
   contextToDataSourceId: Joi.func(),
-  contextToPermissions: Joi.func(),
+  contextToApiScopes: Joi.func(),
   repositoryFactory: Joi.func(),
   checkAuth: Joi.func(),
   checkAuthMiddleware: Joi.func(),
