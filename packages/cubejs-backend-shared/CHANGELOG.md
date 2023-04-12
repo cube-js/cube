@@ -3,6 +3,63 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.32.23](https://github.com/cube-js/cube/compare/v0.32.22...v0.32.23) (2023-04-10)
+
+
+### Bug Fixes
+
+* Fix typo in driver name, DuckDB ([c53a31c](https://github.com/cube-js/cube/commit/c53a31c37b6b70fa3c5e2fc0da97eb958e9fec5d))
+
+
+
+
+
+## [0.32.22](https://github.com/cube-js/cube/compare/v0.32.21...v0.32.22) (2023-04-10)
+
+
+### Features
+
+* **ducksdb-driver:** Initial support ([#6403](https://github.com/cube-js/cube/issues/6403)) ([00e41bf](https://github.com/cube-js/cube/commit/00e41bfe8084e9dc7831ff14e2302199af2a8fe3))
+
+
+
+
+
+## [0.32.17](https://github.com/cube-js/cube/compare/v0.32.16...v0.32.17) (2023-03-29)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+
+
+
+
+## [0.32.16](https://github.com/cube-js/cube.js/compare/v0.32.15...v0.32.16) (2023-03-27)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+
+
+
+
+## [0.32.15](https://github.com/cube-js/cube.js/compare/v0.32.14...v0.32.15) (2023-03-24)
+
+
+### Features
+
+* **playground:** BI connection guides, frontend integration snippets ([#6341](https://github.com/cube-js/cube.js/issues/6341)) ([8fdeb1b](https://github.com/cube-js/cube.js/commit/8fdeb1b882d959f9e8aec0ae963e5a0b1995e517))
+
+
+
+
+
+## [0.32.12](https://github.com/cube-js/cube.js/compare/v0.32.11...v0.32.12) (2023-03-22)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+
+
+
+
 ## [0.32.2](https://github.com/cube-js/cube.js/compare/v0.32.1...v0.32.2) (2023-03-07)
 
 

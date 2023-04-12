@@ -1,0 +1,53 @@
+---
+title: Add a pre-aggregation
+permalink: /getting-started/core/add-a-pre-aggregation
+category: Getting Started
+subCategory: Cube Core
+menuOrder: 5
+---
+
+In this step, we'll add a pre-aggregation to optimize the performance of a
+specific query. Pre-aggregations are a caching technique that massively reduces
+query time from seconds to milliseconds. They are extremely useful for speeding
+up queries that are run frequently.
+
+From the <Btn>Build</Btn> tab, execute a query:
+
+<div style="text-align: center">
+  <img
+    alt="Cube Developer Playground Screen showing query results"
+    src="https://ucarecdn.com/899566a9-932b-46bc-8af0-2247b921ab64/"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+Just above the results, click on <Btn>Query was not accelerated with
+pre-aggregation</Btn> to bring up the Rollup Designer:
+
+<div style="text-align: center">
+  <img
+    alt="Cube Developer Playground Screen showing Rollup Designer"
+    src="https://ucarecdn.com/e5f8114a-c826-4d0a-84cc-7df33dff323f/"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+The Rollup Designer will automatically suggest a pre-aggregation for the query;
+click&nbsp;<Btn>Add to the Data Schema</Btn> and then retry the query in the
+Playground. This time, the query should be accelerated with a pre-aggregation:
+
+<div style="text-align: center">
+  <img
+    alt="Cube Developer Playground Screen querying a pre-aggregation"
+    src="https://ucarecdn.com/ff4312c2-e039-463b-8304-d57b4f69565f/"
+    style="border: none"
+    width="80%"
+  />
+</div>
+
+And with that, we conclude our Getting Started with Cube guide. If you'd like to
+learn more about Cube, [check out this page][next].
+
+[next]: /getting-started/core/learn-more

@@ -42,6 +42,7 @@ use arrow::record_batch::RecordBatch;
 use compaction::{merge_chunks, merge_replay_handles};
 use datafusion::cube_ext;
 use datafusion::cube_ext::util::lexcmp_array_rows;
+use deepsize::DeepSizeOf;
 use futures::future::join_all;
 use itertools::Itertools;
 use log::trace;
@@ -53,7 +54,7 @@ use tokio::task::JoinHandle;
 
 pub const ROW_GROUP_SIZE: usize = 16384; // TODO config
 
-#[derive(Serialize, Deserialize, Hash, Eq, PartialEq, Debug)]
+#[derive(Serialize, Deserialize, Hash, Eq, PartialEq, Debug, DeepSizeOf)]
 pub struct DataFrame {
     columns: Vec<Column>,
     data: Vec<Row>,
@@ -722,10 +723,6 @@ impl ChunkStore {
         ))
     }
     async fn report_in_memory_metrics(&self) -> Result<(), CubeError> {
-        let server_name = self.config.server_name();
-        let host_name = server_name.split(":").next().unwrap_or("undefined");
-        let tags = vec![format!("cube_host:{}", host_name)];
-
         let memory_chunks = self.memory_chunks.read().await;
         let chunks_len = memory_chunks.len();
         let chunks_rows = memory_chunks
@@ -741,9 +738,9 @@ impl ChunkStore {
                     .sum::<usize>()
             })
             .sum::<usize>();
-        app_metrics::IN_MEMORY_CHUNKS_COUNT.report_with_tags(chunks_len as i64, Some(&tags));
-        app_metrics::IN_MEMORY_CHUNKS_ROWS.report_with_tags(chunks_rows, Some(&tags));
-        app_metrics::IN_MEMORY_CHUNKS_MEMORY.report_with_tags(chunks_memory as i64, Some(&tags));
+        app_metrics::IN_MEMORY_CHUNKS_COUNT.report(chunks_len as i64);
+        app_metrics::IN_MEMORY_CHUNKS_ROWS.report(chunks_rows);
+        app_metrics::IN_MEMORY_CHUNKS_MEMORY.report(chunks_memory as i64);
         Ok(())
     }
 }
@@ -781,7 +778,7 @@ mod tests {
             let store = WALStore::new(
                 RocksMetaStore::new(
                     Path::new(path),
-                    BaseRocksStoreFs::new(remote_fs.clone(), "metastore", config.config_obj()),
+                    BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
                     config.config_obj(),
                 )
                 .unwrap(),
@@ -873,7 +870,7 @@ mod tests {
             );
             let meta_store = RocksMetaStore::new(
                 Path::new(path),
-                BaseRocksStoreFs::new(remote_fs.clone(), "metastore", config.config_obj()),
+                BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
                 config.config_obj(),
             )
             .unwrap();
@@ -972,7 +969,7 @@ mod tests {
             );
             let meta_store = RocksMetaStore::new(
                 Path::new(path),
-                BaseRocksStoreFs::new(remote_fs.clone(), "metastore", config.config_obj()),
+                BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
                 config.config_obj(),
             )
             .unwrap();

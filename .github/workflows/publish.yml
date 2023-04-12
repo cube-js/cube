@@ -149,7 +149,7 @@ jobs:
 
   native:
     runs-on: ${{ matrix.os-version }}
-    timeout-minutes: 60
+    timeout-minutes: 90
     env:
       NODE_PRE_GYP_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     name: Build ${{ matrix.os-version }} ${{ matrix.node-version }}
@@ -241,7 +241,7 @@ jobs:
           - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
             platforms: linux/amd64,linux/arm64
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
       - name: Check out the repo
         uses: actions/checkout@v3
@@ -609,7 +609,7 @@ jobs:
             cross: true
             # Unable to recognise the format of the input file `rust/cubestore/target/aarch64-unknown-linux-gnu/release/cubestored'
             strip: false
-            # UPX is broken, issue https://github.com/cube-js/cube.js/issues/4474
+            # UPX is broken, issue https://github.com/cube-js/cube/issues/4474
             compress: false
       fail-fast: false
     steps:

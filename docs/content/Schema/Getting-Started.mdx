@@ -1,18 +1,10 @@
 ---
-title: Getting Started with Data Modeling
-menuTitle: Getting Started
+title: Getting started with data modeling
+menuTitle: Getting started
 permalink: /schema/getting-started
-category: Reference
+category: Data Modeling
 menuOrder: 1
-proofread: 06/18/2019
-redirect_from:
-  - /getting-started-cubejs-schema
 ---
-
-<InfoBox>
-  We're excited to expand the beta of YAML and Python support in Cube data modeling. <br />
-  Please <a href="https://forms.gle/4CZRRKK8nD4PvtxZA"> reach out to us </a> if you’d like to sign up for early access.
-</InfoBox>
 
 A Cube Data Schema is used to model raw data into meaningful business
 definitions and pre-aggregate data for optimal results. The data schema is
@@ -41,11 +33,11 @@ allows building well-organized and reusable SQL.
 
 ## 1. Creating a Cube
 
-In Cube, [cubes][ref-schema-cube] are used to organize entities and
-connections between entities. Usually one cube is created for each table in the
-database, such as `users`, `orders`, `products`, etc. In the `sql` parameter of
-the cube we define a base table for this cube. In our case, the base table is
-simply our `users` table.
+In Cube, [cubes][ref-schema-cube] are used to organize entities and connections
+between entities. Usually one cube is created for each table in the database,
+such as `users`, `orders`, `products`, etc. In the `sql` parameter of the cube
+we define a base table for this cube. In our case, the base table is simply our
+`users` table.
 
 <CodeTabs>
 
@@ -207,8 +199,8 @@ FROM users
 
 Since the `filters` property is an array, you can apply as many filters as
 required. `paying_count` can be used with dimensions the same way as a simple
-`count`. We can group `paying_count` by `city` and `companyName` simply by adding
-these dimensions alongside measures in the requested query.
+`count`. We can group `paying_count` by `city` and `companyName` simply by
+adding these dimensions alongside measures in the requested query.
 
 ## 4. Using Calculated Measures
 

@@ -19,14 +19,6 @@ import { AppContextConsumer, PlaygroundContext } from './components/AppContext';
 import { useAppContext } from './hooks';
 import { LivePreviewContextProvider } from './components/LivePreviewContext/LivePreviewContextProvider';
 
-const selectedTab = (pathname) => {
-  if (pathname === '/template-gallery') {
-    return ['/dashboard'];
-  } else {
-    return [pathname];
-  }
-};
-
 const StyledLayoutContent = styled(Layout.Content)`
   height: 100%;
 `;
@@ -114,7 +106,7 @@ class App extends Component<RouteComponentProps, AppState> {
         <Layout>
           <GlobalStyles />
 
-          <Header selectedKeys={selectedTab(location.pathname)} />
+          <Header selectedKeys={[location.pathname]} />
 
           <StyledLayoutContent>
             {fatalError ? (

@@ -1,11 +1,11 @@
 {
   "name": "@cubejs-client/playground",
   "author": "Cube Dev, Inc.",
-  "version": "0.32.0",
+  "version": "0.32.24",
   "engines": {},
   "repository": {
     "type": "git",
-    "url": "https://github.com/cube-js/cube.js.git",
+    "url": "https://github.com/cube-js/cube.git",
     "directory": "packages/cubejs-playground"
   },
   "module": "lib/playground/index.js",
@@ -62,8 +62,8 @@
     "@ant-design/icons": "^4.7.0",
     "@babel/cli": "^7.5.5",
     "@babel/plugin-proposal-optional-chaining": "^7.11.0",
-    "@cubejs-client/core": "^0.32.0",
-    "@cubejs-client/react": "^0.32.0",
+    "@cubejs-client/core": "^0.32.22",
+    "@cubejs-client/react": "^0.32.22",
     "@types/flexsearch": "^0.7.3",
     "@types/jest": "^26.0.20",
     "@types/node": "^14",

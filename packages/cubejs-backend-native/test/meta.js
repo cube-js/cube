@@ -67,6 +67,15 @@ module.exports = {
             ],
             "dimensions": [
                 {
+                    "name": "KibanaSampleDataEcommerce.id",
+                    "title": "Ecommerce Order Id",
+                    "type": "number",
+                    "shortTitle": "Order Id",
+                    "suggestFilterValues": true,
+                    "isVisible": true,
+                    "primaryKey": true,
+                },
+                {
                     "name": "KibanaSampleDataEcommerce.order_date",
                     "title": "Ecommerce Order Date",
                     "type": "time",

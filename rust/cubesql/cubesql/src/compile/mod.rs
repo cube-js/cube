@@ -14,6 +14,7 @@ use datafusion::{
         optimizer::{OptimizerConfig, OptimizerRule},
         projection_drop_out::ProjectionDropOut,
     },
+    physical_plan::ExecutionPlan,
     prelude::*,
     scalar::ScalarValue,
     sql::{parser::Statement as DFStatement, planner::SqlToRel},
@@ -1478,9 +1479,21 @@ impl fmt::Debug for QueryPlan {
 }
 
 impl QueryPlan {
-    pub fn as_logical_plan(self) -> LogicalPlan {
+    pub fn as_logical_plan(&self) -> LogicalPlan {
         match self {
-            QueryPlan::DataFusionSelect(_, plan, _) => plan,
+            QueryPlan::DataFusionSelect(_, plan, _) => plan.clone(),
+            QueryPlan::MetaOk(_, _) | QueryPlan::MetaTabular(_, _) => {
+                panic!("This query doesnt have a plan, because it already has values for response")
+            }
+        }
+    }
+
+    pub async fn as_physical_plan(&self) -> Result<Arc<dyn ExecutionPlan>, CubeError> {
+        match self {
+            QueryPlan::DataFusionSelect(_, plan, ctx) => DataFrame::new(ctx.state.clone(), plan)
+                .create_physical_plan()
+                .await
+                .map_err(|e| CubeError::user(e.to_string())),
             QueryPlan::MetaOk(_, _) | QueryPlan::MetaTabular(_, _) => {
                 panic!("This query doesnt have a plan, because it already has values for response")
             }
@@ -1683,6 +1696,28 @@ mod tests {
                     "KibanaSampleDataEcommerce.minPrice".to_string(),
                     "KibanaSampleDataEcommerce.avgPrice".to_string(),
                 ]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn test_select_number() {
+        let query_plan = convert_select_to_query_plan(
+            "SELECT MEASURE(someNumber) as s1, SUM(someNumber) as s2, MIN(someNumber) as s3, MAX(someNumber) as s4, COUNT(someNumber) as s5 FROM NumberCube".to_string(),
+            DatabaseProtocol::PostgreSQL).await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["NumberCube.someNumber".to_string(),]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
                 time_dimensions: None,
@@ -3732,16 +3767,8 @@ ORDER BY \"COUNT(count)\" DESC"
     async fn test_select_error() {
         let variants = vec![
             (
-                "SELECT COUNT(maxPrice) FROM KibanaSampleDataEcommerce".to_string(),
-                CompilationError::user("Error during rewrite: Measure aggregation type doesn't match. The aggregation type for 'maxPrice' is 'MAX()' but 'COUNT()' was provided. Please check logs for additional information.".to_string()),
-            ),
-            (
-                "SELECT COUNT(someNumber) FROM NumberCube".to_string(),
-                CompilationError::user("Error during rewrite: Measure aggregation type doesn't match. The aggregation type for 'someNumber' is 'MEASURE()' but 'COUNT()' was provided. Please check logs for additional information.".to_string()),
-            ),
-            (
-                "SELECT COUNT(order_date) FROM KibanaSampleDataEcommerce".to_string(),
-                CompilationError::user("Error during rewrite: Dimension 'order_date' was used with the aggregate function 'COUNT()'. Please use a measure instead. Please check logs for additional information.".to_string()),
+                "SELECT AVG(maxPrice) FROM KibanaSampleDataEcommerce".to_string(),
+                CompilationError::user("Error during rewrite: Measure aggregation type doesn't match. The aggregation type for 'maxPrice' is 'MAX()' but 'AVG()' was provided. Please check logs for additional information.".to_string()),
             ),
         ];
 
@@ -10398,6 +10425,55 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_quicksight_dense_rank() -> Result<(), CubeError> {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            r#"
+            SELECT "faabeaae-5980-4f8f-a5ba-12f56f191f1e.order_date", "isotherrow_1", "faabeaae-5980-4f8f-a5ba-12f56f191f1e.avgPrice_avg", "$otherbucket_group_count", "count"
+            FROM (
+            SELECT "$f4" AS "faabeaae-5980-4f8f-a5ba-12f56f191f1e.order_date", "$f5", "$f6" AS "isotherrow_1", SUM("$weighted_avg_unit_4") AS "faabeaae-5980-4f8f-a5ba-12f56f191f1e.avgPrice_avg", COUNT(*) AS "$otherbucket_group_count", SUM("count") AS "count"
+            FROM (
+            SELECT "count", CASE WHEN "$RANK_1" > 2500 THEN NULL ELSE "faabeaae-5980-4f8f-a5ba-12f56f191f1e.order_date" END AS "$f4", CASE WHEN "$RANK_1" > 2500 THEN NULL ELSE "$RANK_1" END AS "$f5", CASE WHEN "$RANK_1" > 2500 THEN 1 ELSE 0 END AS "$f6", CAST("$weighted_avg_count_3" AS FLOAT) / NULLIF(CAST(SUM("$weighted_avg_count_3") OVER (PARTITION BY CASE WHEN "$RANK_1" > 2500 THEN NULL ELSE "faabeaae-5980-4f8f-a5ba-12f56f191f1e.order_date" END, CASE WHEN "$RANK_1" > 2500 THEN NULL ELSE "$RANK_1" END, CASE WHEN "$RANK_1" > 2500 THEN 1 ELSE 0 END) AS FLOAT), 0) * "faabeaae-5980-4f8f-a5ba-12f56f191f1e.avgPrice_avg" AS "$weighted_avg_unit_4"
+            FROM (
+            SELECT "order_date" AS "faabeaae-5980-4f8f-a5ba-12f56f191f1e.order_date", COUNT(*) AS "count", AVG("avgPrice") AS "faabeaae-5980-4f8f-a5ba-12f56f191f1e.avgPrice_avg", DENSE_RANK() OVER (ORDER BY AVG("avgPrice") DESC NULLS LAST, "order_date" NULLS FIRST) AS "$RANK_1", COUNT("avgPrice") AS "$weighted_avg_count_3"
+            FROM "public"."KibanaSampleDataEcommerce"
+            GROUP BY "order_date"
+            ) AS "t"
+            ) AS "t0"
+            GROUP BY "$f4", "$f5", "$f6"
+            ORDER BY "$f5" NULLS FIRST
+            ) AS "t1"
+            ;"#.to_string(),
+            DatabaseProtocol::PostgreSQL,
+        ).await;
+
+        let logical_plan = query_plan.as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![
+                    "KibanaSampleDataEcommerce.count".to_string(),
+                    "KibanaSampleDataEcommerce.avgPrice".to_string()
+                ]),
+                segments: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+            }
+        );
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!("Physical plan: {:?}", physical_plan);
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_localtimestamp() -> Result<(), CubeError> {
         // TODO: the value will be different with the introduction of TZ support
         insta::assert_snapshot!(
@@ -16914,6 +16990,46 @@ ORDER BY \"COUNT(count)\" DESC"
                     ]),
                     and: None
                 }])
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_date_trunc_column_equals_literal() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                avg("avgPrice") AS "avgPrice"
+            FROM public."KibanaSampleDataEcommerce"
+            WHERE
+                DATE_TRUNC('week', "order_date") = str_to_date('2022-11-14 00:00:00.000000', 'YYYY-MM-DD HH24:MI:SS.US')
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.avgPrice".to_string()]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: None,
+                    date_range: Some(json!(vec![
+                        "2022-11-14T00:00:00.000Z".to_string(),
+                        "2022-11-20T23:59:59.999Z".to_string(),
+                    ]))
+                }]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
             }
         )
     }

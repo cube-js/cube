@@ -673,7 +673,7 @@ export class RefreshScheduler {
                   const job = await orchestratorApi.executeQuery({
                     preAggregations: dependencies.concat([partition]),
                     continueWait: true,
-                    renewQuery: true,
+                    renewQuery: false,
                     forceBuildPreAggregations: true,
                     orphanedTimeout: 60 * 60,
                     requestId: context.requestId,

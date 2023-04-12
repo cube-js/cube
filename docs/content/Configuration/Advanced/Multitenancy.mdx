@@ -3,7 +3,7 @@ title: Multitenancy
 permalink: /config/multitenancy
 category: Configuration
 subCategory: Advanced
-menuOrder: 2
+menuOrder: 3
 ---
 
 Cube supports multitenancy out of the box, both on database and data schema
@@ -40,10 +40,9 @@ instead of multitenancy. Multitenancy is designed for cases where you need to
 serve different datasets for multiple users, or tenants which aren't related to
 each other.
 
-On the other hand, multiple data sources can be used for scenarios where users
-need to access the same data but from different databases. The multitenancy and
-multiple data sources features aren't mutually exclusive and can be used
-together.
+On the other hand, multitenancy can be used for scenarios where users need to
+access the same data but from different databases. The multitenancy and multiple
+data sources features aren't mutually exclusive and can be used together.
 
 <WarningBox>
 
@@ -348,13 +347,6 @@ there is no way for Cube to know how to generate a context without the required
 input.
 
 </WarningBox>
-
-## Connecting to Redis
-
-When configured for multitenancy, Cube uses a separate connection pool for each
-configured tenant. This means that the `CUBEJS_REDIS_POOL_MIN` and
-`CUBEJS_REDIS_POOL_MAX` environment variables specify the minimum and maximum
-number of Redis connections **per-tenant**.
 
 [ref-config]: /config
 [ref-config-opts]: /config#options-reference

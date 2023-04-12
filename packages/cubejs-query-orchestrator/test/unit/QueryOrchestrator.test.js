@@ -128,8 +128,8 @@ class MockDriver {
 }
 
 class ExternalMockDriver extends MockDriver {
-  constructor() {
-    super();
+  constructor({ schemaData } = {}) {
+    super({ schemaData });
     this.indexes = [];
     this.csvFiles = [];
   }
@@ -223,7 +223,7 @@ describe('QueryOrchestrator', () => {
     const csvMockDriverLocal = new MockDriver({ csvImport: 'true' });
     const mockDriverUnloadWithoutTempTableSupportLocal = new MockDriverUnloadWithoutTempTableSupport();
     const streamingSourceMockDriverLocal = new StreamingSourceMockDriver();
-    const externalMockDriverLocal = new ExternalMockDriver();
+    const externalMockDriverLocal = new ExternalMockDriver({ schemaData });
 
     const redisPrefix = `ORCHESTRATOR_TEST_${testCount++}`;
     const driverFactory = (dataSource) => {
@@ -1678,5 +1678,10 @@ describe('QueryOrchestrator', () => {
       });
       expect(data['Foo.query']).toMatch(/orders_d/);
     }));
+  });
+
+  test('fetch table schema from external db', async () => {
+    const schema = await queryOrchestrator.fetchSchema(undefined, true);
+    expect(schema).toEqual(schemaData);
   });
 });

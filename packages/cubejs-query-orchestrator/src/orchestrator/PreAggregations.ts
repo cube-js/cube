@@ -22,8 +22,8 @@ import {
   DriverInterface,
   InlineTable,
   SaveCancelFn,
-  StreamOptions,
-  UnloadOptions
+  StreamOptions, TableStructure,
+  UnloadOptions,
 } from '@cubejs-backend/base-driver';
 import { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
 import { PreAggTableToTempTable, Query, QueryBody, QueryCache, QueryTuple, QueryWithParams } from './QueryCache';
@@ -263,6 +263,8 @@ class PreAggregationLoadCache {
 
   private tables: { [redisKey: string]: TableCacheEntry[] };
 
+  private tableColumnTypes: { [cacheKey: string]: { [tableName: string]: TableStructure } };
+
   // TODO this is in memory cache structure as well however it depends on
   // data source only and load cache is per data source for now.
   // Make it per data source key in case load cache scope is broaden.
@@ -290,10 +292,11 @@ class PreAggregationLoadCache {
     this.tablePrefixes = options.tablePrefixes;
     this.versionEntries = {};
     this.tables = {};
+    this.tableColumnTypes = {};
   }
 
   protected async tablesFromCache(preAggregation, forceRenew?) {
-    let tables = forceRenew ? null : await this.queryCache.getCacheDriver().get(this.tablesRedisKey(preAggregation));
+    let tables = forceRenew ? null : await this.queryCache.getCacheDriver().get(this.tablesCachePrefixKey(preAggregation));
     if (!tables) {
       tables = await this.preAggregations.getLoadCacheQueue(this.dataSource).executeInQueue(
         'query',
@@ -315,7 +318,7 @@ class PreAggregationLoadCache {
 
     const newTables = await this.fetchTablesNoCache(preAggregation);
     await this.queryCache.getCacheDriver().set(
-      this.tablesRedisKey(preAggregation),
+      this.tablesCachePrefixKey(preAggregation),
       newTables,
       this.preAggregations.options.preAggregationsSchemaCacheExpire || 60 * 60
     );
@@ -332,12 +335,12 @@ class PreAggregationLoadCache {
     return client.getTablesQuery(preAggregation.preAggregationsSchema);
   }
 
-  public tablesRedisKey(preAggregation: PreAggregationDescription) {
+  public tablesCachePrefixKey(preAggregation: PreAggregationDescription) {
     return this.queryCache.getKey('SQL_PRE_AGGREGATIONS_TABLES', `${preAggregation.dataSource}${preAggregation.preAggregationsSchema}${preAggregation.external ? '_EXT' : ''}`);
   }
 
   protected async getTablesQuery(preAggregation) {
-    const redisKey = this.tablesRedisKey(preAggregation);
+    const redisKey = this.tablesCachePrefixKey(preAggregation);
     if (!this.tables[redisKey]) {
       const tables = this.preAggregations.options.skipExternalCacheAndQueue && preAggregation.external ?
         await this.fetchTablesNoCache(preAggregation) :
@@ -348,6 +351,22 @@ class PreAggregationLoadCache {
       this.tables[redisKey] = tables;
     }
     return this.tables[redisKey];
+  }
+
+  protected async getTableColumnTypes(preAggregation: PreAggregationDescription, tableName: string): Promise<TableStructure> {
+    const prefixKey = this.tablesCachePrefixKey(preAggregation);
+    if (!this.tableColumnTypes[prefixKey]?.[tableName]) {
+      if (!this.preAggregations.options.skipExternalCacheAndQueue && preAggregation.external) {
+        throw new Error(`Lambda union with source data feature is supported only by external rollups stored in Cube Store but was invoked for '${preAggregation.preAggregationId}'`);
+      }
+      const client = await this.externalDriverFactory();
+      const columnTypes = await client.tableColumnTypes(tableName);
+      if (!this.tableColumnTypes[prefixKey]) {
+        this.tableColumnTypes[prefixKey] = {};
+      }
+      this.tableColumnTypes[prefixKey][tableName] = columnTypes;
+    }
+    return this.tableColumnTypes[prefixKey][tableName];
   }
 
   private async calculateVersionEntries(preAggregation): Promise<VersionEntriesObj> {
@@ -394,7 +413,7 @@ class PreAggregationLoadCache {
     if (this.tablePrefixes && !this.tablePrefixes.find(p => preAggregation.tableName.split('.')[1].startsWith(p))) {
       throw new Error(`Load cache tries to load table ${preAggregation.tableName} outside of tablePrefixes filter: ${this.tablePrefixes.join(', ')}`);
     }
-    const redisKey = this.tablesRedisKey(preAggregation);
+    const redisKey = this.tablesCachePrefixKey(preAggregation);
     if (!this.versionEntries[redisKey]) {
       this.versionEntries[redisKey] = this.calculateVersionEntries(preAggregation).catch(e => {
         delete this.versionEntries[redisKey];
@@ -450,6 +469,7 @@ class PreAggregationLoadCache {
   protected async reset(preAggregation) {
     await this.tablesFromCache(preAggregation, true);
     this.tables = {};
+    this.tableColumnTypes = {};
     this.queryStageState = undefined;
     this.versionEntries = {};
   }
@@ -1655,8 +1675,9 @@ export class PreAggregationPartitionRangeLoader {
 
       if (this.preAggregation.rollupLambdaId) {
         if (this.lambdaQuery && loadResults.length > 0) {
-          const { buildRangeEnd } = loadResults[loadResults.length - 1];
-          lambdaTable = await this.downloadLambdaTable(buildRangeEnd);
+          const { buildRangeEnd, targetTableName } = loadResults[loadResults.length - 1];
+          const lambdaTypes = await this.loadCache.getTableColumnTypes(this.preAggregation, targetTableName);
+          lambdaTable = await this.downloadLambdaTable(buildRangeEnd, lambdaTypes);
         }
         const rollupLambdaResults = this.preAggregationsTablesToTempTables.filter(tempTableResult => tempTableResult[1].rollupLambdaId === this.preAggregation.rollupLambdaId);
         const filteredResults = loadResults.filter(
@@ -1708,7 +1729,7 @@ export class PreAggregationPartitionRangeLoader {
   /**
    * Downloads the lambda table from the source DB.
    */
-  private async downloadLambdaTable(fromDate: string): Promise<InlineTable> {
+  private async downloadLambdaTable(fromDate: string, lambdaTypes: TableStructure): Promise<InlineTable> {
     const { sqlAndParams, cacheKeyQueries } = this.lambdaQuery;
     const [query, params] = sqlAndParams;
     const values = params.map((p) => {
@@ -1733,6 +1754,7 @@ export class PreAggregationPartitionRangeLoader {
         dataSource: this.dataSource,
         external: false,
         useCsvQuery: true,
+        lambdaTypes,
       }
     );
     if (data.rowCount === this.options.maxSourceRowLimit) {
@@ -2393,7 +2415,7 @@ export class PreAggregations {
       preAggregations.map(
         async preAggregation => {
           const { dataSource, preAggregationsSchema } = preAggregation;
-          const cacheKey = getLoadCacheByDataSource(dataSource, preAggregationsSchema).tablesRedisKey(preAggregation);
+          const cacheKey = getLoadCacheByDataSource(dataSource, preAggregationsSchema).tablesCachePrefixKey(preAggregation);
           if (!firstByCacheKey[cacheKey]) {
             firstByCacheKey[cacheKey] = getLoadCacheByDataSource(dataSource, preAggregationsSchema).getVersionEntries(preAggregation);
             const res = await firstByCacheKey[cacheKey];

@@ -3,6 +3,231 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.32.24](https://github.com/cube-js/cube/compare/v0.32.23...v0.32.24) (2023-04-10)
+
+
+### Reverts
+
+* Revert "feat(docker): Install DuckDB as built-in driver" ([99ea6c1](https://github.com/cube-js/cube/commit/99ea6c15333b3d0c19011cb58ed8a8d10e6b0d3c))
+
+
+
+
+
+## [0.32.23](https://github.com/cube-js/cube/compare/v0.32.22...v0.32.23) (2023-04-10)
+
+
+### Bug Fixes
+
+* Fix typo in driver name, DuckDB ([c53a31c](https://github.com/cube-js/cube/commit/c53a31c37b6b70fa3c5e2fc0da97eb958e9fec5d))
+
+
+### Features
+
+* **docker:** Install DuckDB as built-in driver ([41a0ca1](https://github.com/cube-js/cube/commit/41a0ca11047ed907db354c3f6e49c3e097a584b9))
+
+
+
+
+
+## [0.32.22](https://github.com/cube-js/cube/compare/v0.32.21...v0.32.22) (2023-04-10)
+
+
+### Bug Fixes
+
+* Correct the syntax error in the ClickHouse cast method ([#6154](https://github.com/cube-js/cube/issues/6154)) Thanks [@fxx-real](https://github.com/fxx-real)! ([b5ccf18](https://github.com/cube-js/cube/commit/b5ccf18cd56ee9cc9d8c1c9bb5ffd519c00d0f3c))
+
+
+### Features
+
+* **ducksdb-driver:** Initial support ([#6403](https://github.com/cube-js/cube/issues/6403)) ([00e41bf](https://github.com/cube-js/cube/commit/00e41bfe8084e9dc7831ff14e2302199af2a8fe3))
+* **prestodb-driver:** Add schema filter to informationSchemaQuery ([#6382](https://github.com/cube-js/cube/issues/6382)) Thanks [@maatumo](https://github.com/maatumo) ! ([cbf4620](https://github.com/cube-js/cube/commit/cbf4620bd8b0f5bfa0f02006dee007102258744a))
+* **schema-compiler:** Yaml - report error on misconfiguration (object instead of array) ([#6407](https://github.com/cube-js/cube/issues/6407)) ([29e3778](https://github.com/cube-js/cube/commit/29e37780c9c4f320c868880266dc73f55840987f))
+
+
+
+
+
+## [0.32.21](https://github.com/cube-js/cube/compare/v0.32.20...v0.32.21) (2023-04-06)
+
+
+### Bug Fixes
+
+* **cubestore:** Query Cache - correct size calculation (complex TableValue) ([#6400](https://github.com/cube-js/cube/issues/6400)) ([b0e3c88](https://github.com/cube-js/cube/commit/b0e3c88e33fdcbb9555faf791b01df4eed884686))
+* **databricks-jdbc:** startsWith, endsWith, contains filters ([#6401](https://github.com/cube-js/cube/issues/6401)) ([7eeea60](https://github.com/cube-js/cube/commit/7eeea60353f332bd83ae91c10efa47e2371beea3))
+
+
+### Features
+
+* **cubestore:** Introduce system.query_cache table ([#6399](https://github.com/cube-js/cube/issues/6399)) ([a5e4bd3](https://github.com/cube-js/cube/commit/a5e4bd393c05518e041ca52d386b1bace672be22))
+
+
+
+
+
+## [0.32.20](https://github.com/cube-js/cube/compare/v0.32.19...v0.32.20) (2023-04-05)
+
+
+### Features
+
+* **cubestore:** Query cache - limits by time_to_idle and max_capacity ([#6132](https://github.com/cube-js/cube/issues/6132)) ([edd220f](https://github.com/cube-js/cube/commit/edd220f0e76d43b05d482ff457c710d9ab4c2393))
+* **cubestore:** Separate configuration for count of metastore and cachestore snapshots ([#6388](https://github.com/cube-js/cube/issues/6388)) ([df73851](https://github.com/cube-js/cube/commit/df738513e06a3c4199255ae58ab9f52db1a4f2ef))
+* **questdb-driver:** Add SSL support ([#6395](https://github.com/cube-js/cube/issues/6395)) ([e9a4458](https://github.com/cube-js/cube/commit/e9a445807638f01c3762430339a84f5fe8518a50))
+
+
+
+
+
+## [0.32.19](https://github.com/cube-js/cube/compare/v0.32.18...v0.32.19) (2023-04-03)
+
+
+### Features
+
+* **cubesql:** Support `date_trunc = literal date` filter ([#6376](https://github.com/cube-js/cube/issues/6376)) ([0ef53cb](https://github.com/cube-js/cube/commit/0ef53cb978e8995185a731985944b08f1f24949e))
+* **cubestore:** Increase default TRANSPORT_MAX_FRAME_SIZE to 32Mb ([#6381](https://github.com/cube-js/cube/issues/6381)) ([73f7ea9](https://github.com/cube-js/cube/commit/73f7ea9a79882cdcdeff9a7bc916077f86489852))
+* **schema-compiler:** Support new aliases for join.relationship ([#6367](https://github.com/cube-js/cube/issues/6367)) ([34a18d8](https://github.com/cube-js/cube/commit/34a18d8936d6e3e27d0dcba2456dbac3f03b0d76))
+* Support quarter(s) in dateRange for timeDimensions ([#6385](https://github.com/cube-js/cube/issues/6385)) ([5a08721](https://github.com/cube-js/cube/commit/5a087216dfd95be29d414ec83f4494de8e3a1fb2))
+
+
+
+
+
+## [0.32.18](https://github.com/cube-js/cube/compare/v0.32.17...v0.32.18) (2023-04-02)
+
+
+### Bug Fixes
+
+* **athena-driver:** Correct handling for NULL values ([#6171](https://github.com/cube-js/cube/issues/6171)) ([a1f4cd4](https://github.com/cube-js/cube/commit/a1f4cd498e84dde91d736cc87825ae3a8095f9bf))
+* **playground:** SQL API default port 15432 ([416a9de](https://github.com/cube-js/cube/commit/416a9de677cb9a1a48f426a74e755b78c18e0952))
+
+
+### Features
+
+* Cube based includes and meta exposure ([#6380](https://github.com/cube-js/cube/issues/6380)) ([ead4ac0](https://github.com/cube-js/cube/commit/ead4ac0b3b78c074f29fcdec3f86282bce42c45a))
+* **cubestore:** Allow to configure max message_size/frame_size for transport ([#6369](https://github.com/cube-js/cube/issues/6369)) ([be7d40b](https://github.com/cube-js/cube/commit/be7d40bcf3be29b2fc0edfe2983162c4b0cafbce))
+* **schema-compiler:** Introduce public field (alias for shown) ([#6361](https://github.com/cube-js/cube/issues/6361)) ([6d0c66a](https://github.com/cube-js/cube/commit/6d0c66aad43d51dd23cc3b0cbd6ba3454581afd6))
+
+
+
+
+
+## [0.32.17](https://github.com/cube-js/cube/compare/v0.32.16...v0.32.17) (2023-03-29)
+
+
+### Bug Fixes
+
+* **deps:** Upgrade minimist, @xmldom/xmldom, refs [#6340](https://github.com/cube-js/cube/issues/6340) ([#6364](https://github.com/cube-js/cube/issues/6364)) ([04a1c9a](https://github.com/cube-js/cube/commit/04a1c9a04ca2eaae841024eb797e7ee549e98445))
+* **deps:** Upgrade moment, moment-timezone, refs [#6340](https://github.com/cube-js/cube/issues/6340) ([#6365](https://github.com/cube-js/cube/issues/6365)) ([d967cf3](https://github.com/cube-js/cube/commit/d967cf3fcf5d3f92ee32e47925fd1090f381a9c5))
+
+
+### Features
+
+* **schema-compiler:** Introduce support for sqlTable (syntactic sugar) ([#6360](https://github.com/cube-js/cube/issues/6360)) ([c73b368](https://github.com/cube-js/cube/commit/c73b368ca20735c63d01d2364b1c2f26d3b24cc5))
+* **sqlite-driver:** Upgrade sqlite3 from 5.0.11 to 5.1.6, refs [#6340](https://github.com/cube-js/cube/issues/6340) ([#6287](https://github.com/cube-js/cube/issues/6287)) ([4ec1da3](https://github.com/cube-js/cube/commit/4ec1da361afa9146b4ac955addd89120cfe23e2d))
+
+
+### Reverts
+
+* Revert "docs(schema): replace camel-case properties with snake-case" ([4731f4a](https://github.com/cube-js/cube/commit/4731f4ae16c1568f6a0956bc89f79f9a81f53e06))
+* Revert "docs: use snake-case property names" ([eb97883](https://github.com/cube-js/cube/commit/eb97883d75985bea7abce5bf3cc434473297cc96))
+
+
+
+
+
+## [0.32.16](https://github.com/cube-js/cube/compare/v0.32.15...v0.32.16) (2023-03-27)
+
+**Note:** Version bump only for package cubejs
+
+
+
+
+
+## [0.32.15](https://github.com/cube-js/cube/compare/v0.32.14...v0.32.15) (2023-03-24)
+
+
+### Bug Fixes
+
+* **cubesql:** Allow any aggregation for number measure as it can be a wildcard ([48f8828](https://github.com/cube-js/cube/commit/48f882867b020ca4a0d058ff147e61ef9bea9555))
+* **cubestore-driver:** Fix informationSchemaQuery ([#6338](https://github.com/cube-js/cube/issues/6338)) ([387020d](https://github.com/cube-js/cube/commit/387020d13ae3e82bac7b55699880e16f79940016))
+* **cubestore:** RocksStore - specify TTL for WAL to protect logs uploading ([#6345](https://github.com/cube-js/cube/issues/6345)) ([3a9cba4](https://github.com/cube-js/cube/commit/3a9cba478387dd4712b9ea3c566db159a32302d5))
+
+
+### Features
+
+* **cubestore:** Use XXH3 checksum alg for RocksDB ([#6339](https://github.com/cube-js/cube/issues/6339)) ([866f965](https://github.com/cube-js/cube/commit/866f965044536dac72c74160f9da6abc923e3dfb))
+* **playground:** BI connection guides, frontend integration snippets ([#6341](https://github.com/cube-js/cube/issues/6341)) ([8fdeb1b](https://github.com/cube-js/cube/commit/8fdeb1b882d959f9e8aec0ae963e5a0b1995e517))
+
+
+
+
+
+## [0.32.14](https://github.com/cube-js/cube/compare/v0.32.13...v0.32.14) (2023-03-23)
+
+
+### Bug Fixes
+
+* **cubestore:** Create table failed: Internal: Directory not empty (os error 39) for local dir storage ([103cabe](https://github.com/cube-js/cube/commit/103cabec6e4d6c59ad1890a3dbe42f7d092eeb6e))
+* Use last rollup table types to avoid type guessing for unionWithSourceData lambda queries ([#6337](https://github.com/cube-js/cube/issues/6337)) ([15badfe](https://github.com/cube-js/cube/commit/15badfeb2e1829e81dd914db3bbfd33f105e36ea))
+
+
+
+
+
+## [0.32.13](https://github.com/cube-js/cube/compare/v0.32.12...v0.32.13) (2023-03-22)
+
+
+### Bug Fixes
+
+* **cubestore-driver:** Queue - correct APM events ([#6251](https://github.com/cube-js/cube/issues/6251)) ([f4fdfc0](https://github.com/cube-js/cube/commit/f4fdfc03278e64c709e91e7df6cf1a9c936a041c))
+* **cubestore:** A single-character boolean value in csv is parsed incorrectly ([#6325](https://github.com/cube-js/cube/issues/6325)) ([ce8f3e2](https://github.com/cube-js/cube/commit/ce8f3e21ec675181ec47174428f14c8ddb7f3bf1))
+
+
+
+
+
+## [0.32.12](https://github.com/cube-js/cube/compare/v0.32.11...v0.32.12) (2023-03-22)
+
+
+### Bug Fixes
+
+* **cubesql:** Support quicksight AVG Rebase window exprs: Physical plan does not support logical expression SUM(x) PARTITION BY ([#6328](https://github.com/cube-js/cube/issues/6328)) ([5a5d7e4](https://github.com/cube-js/cube/commit/5a5d7e497f05c69541e04df0a464c85eb9a5f506))
+* **cubestore:** If job has been scheduled to non-existent node it'd hang around forever ([#6242](https://github.com/cube-js/cube/issues/6242)) ([69ef0b6](https://github.com/cube-js/cube/commit/69ef0b697bbe87a00687137bff318bb0cfc88015))
+* **cubestore:** Retying download from external locations ([#6321](https://github.com/cube-js/cube/issues/6321)) ([50841d9](https://github.com/cube-js/cube/commit/50841d92b7e84d3feec7372119eb540327a4d233))
+
+
+### Features
+
+* **cubestore-driver:** Support timestamp(3) as a column type ([#6324](https://github.com/cube-js/cube/issues/6324)) ([71dbca4](https://github.com/cube-js/cube/commit/71dbca4ed1fb706d36af322d2659435465804825))
+* **server-core, query-orchestrator:** sql-runner - supp… ([#6142](https://github.com/cube-js/cube/issues/6142)) ([32c603d](https://github.com/cube-js/cube/commit/32c603d50f462bf3cf9ce852dc9dcf23fc271cf3))
+
+
+
+
+
+## [0.32.11](https://github.com/cube-js/cube.js/compare/v0.32.10...v0.32.11) (2023-03-21)
+
+
+### Bug Fixes
+
+* **cubesql:** Ignore timestamps which can't be represented as nanoseconds instead of failing ([e393b06](https://github.com/cube-js/cube.js/commit/e393b0601fb663b03158ea03143a30eb0086ebbf))
+* **cubesql:** Quicksight AVG measures support ([#6323](https://github.com/cube-js/cube.js/issues/6323)) ([ada0afd](https://github.com/cube-js/cube.js/commit/ada0afd17b42a54fbecac69b849abf40158991c1))
+
+
+
+
+
+## [0.32.10](https://github.com/cube-js/cube.js/compare/v0.32.9...v0.32.10) (2023-03-20)
+
+
+### Bug Fixes
+
+* Refresh Scheduler - empty securityContext in driverFactory ([#6316](https://github.com/cube-js/cube.js/issues/6316)) ([dd4c9d5](https://github.com/cube-js/cube.js/commit/dd4c9d5a508de03b076850daed78afa18e99eb4f))
+
+
+
+
+
 ## [0.32.9](https://github.com/cube-js/cube.js/compare/v0.32.8...v0.32.9) (2023-03-18)
 
 

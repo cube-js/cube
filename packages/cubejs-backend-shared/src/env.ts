@@ -393,7 +393,7 @@ const variables: Record<string, (...args: any) => any> = {
   }) => (
     process.env[keyByDataSource('CUBEJS_DB_PASS', dataSource)]
   ),
-  
+
   /**
    * Database name.
    */
@@ -416,7 +416,7 @@ const variables: Record<string, (...args: any) => any> = {
     }
     return val;
   },
-  
+
   /**
    * Database name.
    * @deprecated
@@ -447,7 +447,7 @@ const variables: Record<string, (...args: any) => any> = {
     }
     return val;
   },
-  
+
   /**
    * Database name.
    * @deprecated
@@ -625,7 +625,7 @@ const variables: Record<string, (...args: any) => any> = {
   }) => (
     process.env[keyByDataSource('CUBEJS_DB_EXPORT_BUCKET_CSV_ESCAPE_SYMBOL', dataSource)]
   ),
-  
+
   /**
    * Export bucket storage type.
    */
@@ -1352,6 +1352,20 @@ const variables: Record<string, (...args: any) => any> = {
     ];
   },
 
+  /** ****************************************************************
+   * duckdb                                                         *
+   ***************************************************************** */
+
+  duckdbHttpFs: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_DUCKDB_HTTP_FS', dataSource)
+    ]
+  ),
+
   /**
    * Presto catalog.
    */
@@ -1512,6 +1526,14 @@ const variables: Record<string, (...args: any) => any> = {
     const port = asFalseOrPort(process.env.CUBEJS_PG_SQL_PORT || 'false', 'CUBEJS_PG_SQL_PORT');
     if (port) {
       return port;
+    }
+
+    const isDevMode = get('CUBEJS_DEV_MODE')
+      .default('false')
+      .asBoolStrict();
+
+    if (isDevMode) {
+      return 15432;
     }
 
     return undefined;

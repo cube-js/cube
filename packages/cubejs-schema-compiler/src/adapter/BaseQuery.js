@@ -1418,11 +1418,18 @@ class BaseQuery {
       }
       return this.preAggregations.originalSqlPreAggregationTable(foundPreAggregation);
     }
-    const evaluatedSql = this.evaluateSql(cube, this.cubeEvaluator.cubeFromPath(cube).sql);
+
+    const fromPath = this.cubeEvaluator.cubeFromPath(cube);
+    if (fromPath.sqlTable) {
+      return this.evaluateSql(cube, fromPath.sqlTable);
+    }
+
+    const evaluatedSql = this.evaluateSql(cube, fromPath.sql);
     const selectAsterisk = evaluatedSql.match(/^\s*select\s+\*\s+from\s+([a-zA-Z0-9_\-`".*]+)\s*$/i);
     if (selectAsterisk) {
       return selectAsterisk[1];
     }
+
     return `(${evaluatedSql})`;
   }
 
@@ -2022,18 +2029,15 @@ class BaseQuery {
     return evaluateSql;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  hllInit(sql) {
+  hllInit(_sql) {
     throw new UserError('Distributed approximate distinct count is not supported by this DB');
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  hllMerge(sql) {
+  hllMerge(_sql) {
     throw new UserError('Distributed approximate distinct count is not supported by this DB');
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  hllCardinality(sql) {
+  hllCardinality(_sql) {
     throw new UserError('Distributed approximate distinct count is not supported by this DB');
   }
 

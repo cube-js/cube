@@ -1,5 +1,5 @@
 ---
-title: Lambda Pre-Aggregations
+title: Lambda pre-aggregations
 permalink: /caching/pre-aggregations/lambda-pre-aggregations
 category: Caching
 menuOrder: 4
@@ -9,20 +9,15 @@ Lambda pre-aggregations follow the
 [Lambda architecture](https://en.wikipedia.org/wiki/Lambda_architecture) design
 to union real-time and batch data. Cube acts as a serving layer and uses
 pre-aggregations as a batch layer and source data or other pre-aggregations,
-usually [streaming][streaming-pre-agg], as a speed layer.
+usually [streaming][streaming-pre-agg], as a speed layer. Due to this design,
+lambda pre-aggregations **only** work with data that is newer than the existing
+batched pre-aggregations.
 
 <WarningBox>
 
 Lambda pre-aggregations only work with Cube Store.
 
-Additionally, we’re going to remove support for external storages, other than
-Cube Store, later this year. [Cube Store will replace
-Redis][cube-blog-replace-redis] and, therefore will be a required component to
-run Cube even without pre-aggregations.
-
 </WarningBox>
-
-[cube-blog-replace-redis]: https://cube.dev/blog/replacing-redis-with-cube-store
 
 ## Use cases
 
@@ -37,7 +32,7 @@ data source.
 <div style="text-align: center">
   <img
     alt="Lambda pre-aggregation batch and source diagram"
-    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Caching/lambda-batch-source.png"
+    src="https://ucarecdn.com/a304a8a3-0eb4-4580-a425-052fa353ad69/"
     style="border: none"
     width="100%"
   />
@@ -95,7 +90,7 @@ data comes from a [streaming pre-aggregation][streaming-pre-agg].
 <div style="text-align: center">
   <img
     alt="Lambda pre-aggregation batch and streaming diagram"
-    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Caching/lambda-batch-streaming.png"
+    src="https://ucarecdn.com/88b1be0f-c2ff-4af2-b5f2-50a6a34760c2/"
     style="border: none"
     width="100%"
   />

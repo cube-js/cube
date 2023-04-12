@@ -14,7 +14,9 @@ use crate::config::processing_loop::ProcessingLoop;
 use crate::http::HttpServer;
 use crate::import::limits::ConcurrencyLimits;
 use crate::import::{ImportService, ImportServiceImpl};
-use crate::metastore::{BaseRocksStoreFs, MetaStore, MetaStoreRpcClient, RocksMetaStore};
+use crate::metastore::{
+    BaseRocksStoreFs, MetaStore, MetaStoreRpcClient, RocksMetaStore, RocksStoreConfig,
+};
 use crate::mysql::{MySqlServer, SqlAuthDefaultImpl, SqlAuthService};
 use crate::queryplanner::query_executor::{QueryExecutor, QueryExecutorImpl};
 use crate::queryplanner::{QueryPlanner, QueryPlannerImpl};
@@ -24,6 +26,7 @@ use crate::remotefs::queue::QueueRemoteFs;
 use crate::remotefs::s3::S3RemoteFs;
 use crate::remotefs::{LocalDirRemoteFs, RemoteFs};
 use crate::scheduler::SchedulerImpl;
+use crate::sql::cache::SqlResultCache;
 use crate::sql::{SqlService, SqlServiceImpl};
 use crate::store::compaction::{CompactionService, CompactionServiceImpl};
 use crate::store::{ChunkDataStore, ChunkStore, WALDataStore, WALStore};
@@ -392,7 +395,11 @@ pub trait ConfigObj: DIService {
 
     fn metastore_bind_address(&self) -> &Option<String>;
 
+    fn metastore_rocksdb_config(&self) -> &RocksStoreConfig;
+
     fn metastore_remote_address(&self) -> &Option<String>;
+
+    fn cachestore_rocksdb_config(&self) -> &RocksStoreConfig;
 
     fn download_concurrency(&self) -> u64;
 
@@ -414,7 +421,9 @@ pub trait ConfigObj: DIService {
 
     fn malloc_trim_every_secs(&self) -> u64;
 
-    fn max_cached_queries(&self) -> usize;
+    fn query_cache_max_capacity_bytes(&self) -> u64;
+
+    fn query_cache_time_to_idle_secs(&self) -> Option<u64>;
 
     fn metadata_cache_max_capacity_bytes(&self) -> u64;
 
@@ -436,10 +445,17 @@ pub trait ConfigObj: DIService {
 
     fn metastore_snapshots_lifetime(&self) -> u64;
 
+    fn minimum_cachestore_snapshots_count(&self) -> u64;
+
+    fn cachestore_snapshots_lifetime(&self) -> u64;
+
     fn max_disk_space(&self) -> u64;
     fn max_disk_space_per_worker(&self) -> u64;
 
     fn disk_space_cache_duration_secs(&self) -> u64;
+
+    fn transport_max_message_size(&self) -> usize;
+    fn transport_max_frame_size(&self) -> usize;
 }
 
 #[derive(Debug, Clone)]
@@ -478,6 +494,8 @@ pub struct ConfigObjImpl {
     pub worker_bind_address: Option<String>,
     pub metastore_bind_address: Option<String>,
     pub metastore_remote_address: Option<String>,
+    pub metastore_rocks_store_config: RocksStoreConfig,
+    pub cachestore_rocks_store_config: RocksStoreConfig,
     pub upload_concurrency: u64,
     pub download_concurrency: u64,
     pub connection_timeout: u64,
@@ -487,7 +505,8 @@ pub struct ConfigObjImpl {
     pub enable_topk: bool,
     pub enable_startup_warmup: bool,
     pub malloc_trim_every_secs: u64,
-    pub max_cached_queries: usize,
+    pub query_cache_max_capacity_bytes: u64,
+    pub query_cache_time_to_idle_secs: Option<u64>,
     pub metadata_cache_max_capacity_bytes: u64,
     pub metadata_cache_time_to_idle_secs: u64,
     pub stream_replay_check_interval_secs: u64,
@@ -497,9 +516,13 @@ pub struct ConfigObjImpl {
     pub skip_kafka_parsing_errors: bool,
     pub minimum_metastore_snapshots_count: u64,
     pub metastore_snapshots_lifetime: u64,
+    pub minimum_cachestore_snapshots_count: u64,
+    pub cachestore_snapshots_lifetime: u64,
     pub max_disk_space: u64,
     pub max_disk_space_per_worker: u64,
     pub disk_space_cache_duration_secs: u64,
+    pub transport_max_message_size: usize,
+    pub transport_max_frame_size: usize,
 }
 
 crate::di_service!(ConfigObjImpl, [ConfigObj]);
@@ -626,6 +649,14 @@ impl ConfigObj for ConfigObjImpl {
         &self.metastore_remote_address
     }
 
+    fn metastore_rocksdb_config(&self) -> &RocksStoreConfig {
+        &self.metastore_rocks_store_config
+    }
+
+    fn cachestore_rocksdb_config(&self) -> &RocksStoreConfig {
+        &self.cachestore_rocks_store_config
+    }
+
     fn download_concurrency(&self) -> u64 {
         self.download_concurrency
     }
@@ -664,8 +695,11 @@ impl ConfigObj for ConfigObjImpl {
     fn malloc_trim_every_secs(&self) -> u64 {
         self.malloc_trim_every_secs
     }
-    fn max_cached_queries(&self) -> usize {
-        self.max_cached_queries
+    fn query_cache_max_capacity_bytes(&self) -> u64 {
+        self.query_cache_max_capacity_bytes
+    }
+    fn query_cache_time_to_idle_secs(&self) -> Option<u64> {
+        self.query_cache_time_to_idle_secs
     }
     fn metadata_cache_max_capacity_bytes(&self) -> u64 {
         self.metadata_cache_max_capacity_bytes
@@ -704,6 +738,14 @@ impl ConfigObj for ConfigObjImpl {
         self.metastore_snapshots_lifetime
     }
 
+    fn minimum_cachestore_snapshots_count(&self) -> u64 {
+        self.minimum_cachestore_snapshots_count
+    }
+
+    fn cachestore_snapshots_lifetime(&self) -> u64 {
+        self.cachestore_snapshots_lifetime
+    }
+
     fn max_disk_space(&self) -> u64 {
         self.max_disk_space
     }
@@ -714,6 +756,14 @@ impl ConfigObj for ConfigObjImpl {
 
     fn disk_space_cache_duration_secs(&self) -> u64 {
         self.disk_space_cache_duration_secs
+    }
+
+    fn transport_max_message_size(&self) -> usize {
+        self.transport_max_message_size
+    }
+
+    fn transport_max_frame_size(&self) -> usize {
+        self.transport_max_frame_size
     }
 }
 
@@ -755,6 +805,45 @@ where
     env_optparse(name).unwrap_or(default)
 }
 
+pub fn env_parse_size(name: &str, default: usize, max: Option<usize>, min: Option<usize>) -> usize {
+    let v = match env::var(name).ok() {
+        None => {
+            return default;
+        }
+        Some(v) => v,
+    };
+
+    let n = match parse_size::parse_size(&v) {
+        Ok(n) => n as usize,
+        Err(e) => panic!(
+            "could not parse environment variable '{}' with '{}' value: {}",
+            name, v, e
+        ),
+    };
+
+    if let Some(max) = max {
+        if n > max {
+            panic!(
+                "wrong configuration for environment variable '{}' with '{}' value: greater then max size {}",
+                name, v,
+                humansize::format_size(max, humansize::DECIMAL)
+            )
+        }
+    };
+
+    if let Some(min) = min {
+        if n < min {
+            panic!(
+                "wrong configuration for environment variable '{}' with '{}' value: lower then min size {}",
+                name, v,
+                humansize::format_size(min, humansize::DECIMAL)
+            )
+        }
+    };
+
+    n
+}
+
 fn env_optparse<T>(name: &str) -> Option<T>
 where
     T: FromStr,
@@ -772,6 +861,12 @@ where
 impl Config {
     pub fn default() -> Config {
         let query_timeout = env_parse("CUBESTORE_QUERY_TIMEOUT", 120);
+        let query_cache_time_to_idle_secs = env_parse(
+            "CUBESTORE_QUERY_CACHE_TIME_TO_IDLE",
+            // 1 hour
+            60 * 60,
+        );
+
         Config {
             injector: Injector::new(),
             config_obj: Arc::new(ConfigObjImpl {
@@ -881,6 +976,8 @@ impl Config {
                     env_optparse::<u16>("CUBESTORE_META_PORT").map(|v| format!("0.0.0.0:{}", v))
                 }),
                 metastore_remote_address: env::var("CUBESTORE_META_ADDR").ok(),
+                metastore_rocks_store_config: RocksStoreConfig::metastore_default(),
+                cachestore_rocks_store_config: RocksStoreConfig::cachestore_default(),
                 upload_concurrency: env_parse("CUBESTORE_MAX_ACTIVE_UPLOADS", 4),
                 download_concurrency: env_parse("CUBESTORE_MAX_ACTIVE_DOWNLOADS", 8),
                 max_ingestion_data_frames: env_parse("CUBESTORE_MAX_DATA_FRAMES", 4),
@@ -895,7 +992,17 @@ impl Config {
                 enable_topk: env_bool("CUBESTORE_ENABLE_TOPK", true),
                 enable_startup_warmup: env_bool("CUBESTORE_STARTUP_WARMUP", true),
                 malloc_trim_every_secs: env_parse("CUBESTORE_MALLOC_TRIM_EVERY_SECS", 30),
-                max_cached_queries: env_parse("CUBESTORE_MAX_CACHED_QUERIES", 10_000),
+                query_cache_max_capacity_bytes: env_parse_size(
+                    "CUBESTORE_QUERY_CACHE_MAX_CAPACITY",
+                    512 << 20,
+                    Some(16384 << 20),
+                    Some(0),
+                ) as u64,
+                query_cache_time_to_idle_secs: if query_cache_time_to_idle_secs == 0 {
+                    None
+                } else {
+                    Some(query_cache_time_to_idle_secs)
+                },
                 metadata_cache_max_capacity_bytes: env_parse(
                     "CUBESTORE_METADATA_CACHE_MAX_CAPACITY_BYTES",
                     0,
@@ -929,12 +1036,32 @@ impl Config {
                     "CUBESTORE_METASTORE_SNAPSHOTS_LIFETIME",
                     24 * 60 * 60,
                 ),
+                minimum_cachestore_snapshots_count: env_parse(
+                    "CUBESTORE_MINIMUM_CACHESTORE_SNAPSHOTS_COUNT",
+                    5,
+                ),
+                cachestore_snapshots_lifetime: env_parse(
+                    "CUBESTORE_CACHESTORE_SNAPSHOTS_LIFETIME",
+                    60 * 60,
+                ),
                 max_disk_space: env_parse("CUBESTORE_MAX_DISK_SPACE_GB", 0) * 1024 * 1024 * 1024,
                 max_disk_space_per_worker: env_parse("CUBESTORE_MAX_DISK_SPACE_PER_WORKER_GB", 0)
                     * 1024
                     * 1024
                     * 1024,
                 disk_space_cache_duration_secs: 300,
+                transport_max_message_size: env_parse_size(
+                    "CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE",
+                    64 << 20,
+                    Some(256 << 20),
+                    Some(16 << 20),
+                ),
+                transport_max_frame_size: env_parse_size(
+                    "CUBESTORE_TRANSPORT_MAX_FRAME_SIZE",
+                    32 << 20,
+                    Some(256 << 20),
+                    Some(4 << 20),
+                ),
             }),
         }
     }
@@ -981,6 +1108,8 @@ impl Config {
                 worker_bind_address: None,
                 metastore_bind_address: None,
                 metastore_remote_address: None,
+                metastore_rocks_store_config: RocksStoreConfig::metastore_default(),
+                cachestore_rocks_store_config: RocksStoreConfig::cachestore_default(),
                 upload_concurrency: 4,
                 download_concurrency: 8,
                 max_ingestion_data_frames: 4,
@@ -991,7 +1120,8 @@ impl Config {
                 enable_topk: true,
                 enable_startup_warmup: true,
                 malloc_trim_every_secs: 0,
-                max_cached_queries: 10_000,
+                query_cache_max_capacity_bytes: 512 << 20,
+                query_cache_time_to_idle_secs: Some(600),
                 metadata_cache_max_capacity_bytes: 0,
                 metadata_cache_time_to_idle_secs: 1_000,
                 meta_store_log_upload_interval: 30,
@@ -1004,9 +1134,13 @@ impl Config {
                 skip_kafka_parsing_errors: false,
                 minimum_metastore_snapshots_count: 3,
                 metastore_snapshots_lifetime: 24 * 3600,
+                minimum_cachestore_snapshots_count: 3,
+                cachestore_snapshots_lifetime: 3600,
                 max_disk_space: 0,
                 max_disk_space_per_worker: 0,
                 disk_space_cache_duration_secs: 0,
+                transport_max_message_size: 64 << 20,
+                transport_max_frame_size: 16 << 20,
             }),
         }
     }
@@ -1234,9 +1368,8 @@ impl Config {
                 .register("cachestore_fs", async move |i| {
                     // TODO metastore works with non queue remote fs as it requires loops to be started prior to load_from_remote call
                     let original_remote_fs = i.get_service("original_remote_fs").await;
-                    let arc: Arc<dyn DIService> = BaseRocksStoreFs::new(
+                    let arc: Arc<dyn DIService> = BaseRocksStoreFs::new_for_cachestore(
                         original_remote_fs,
-                        "cachestore",
                         i.get_service_typed().await,
                     );
 
@@ -1308,9 +1441,8 @@ impl Config {
                 .register("metastore_fs", async move |i| {
                     // TODO metastore works with non queue remote fs as it requires loops to be started prior to load_from_remote call
                     let original_remote_fs = i.get_service("original_remote_fs").await;
-                    let arc: Arc<dyn DIService> = BaseRocksStoreFs::new(
+                    let arc: Arc<dyn DIService> = BaseRocksStoreFs::new_for_metastore(
                         original_remote_fs,
-                        "metastore",
                         i.get_service_typed().await,
                     );
 
@@ -1483,12 +1615,19 @@ impl Config {
             })
             .await;
 
+        let query_cache = Arc::new(SqlResultCache::new(
+            self.config_obj.query_cache_max_capacity_bytes(),
+            self.config_obj.query_cache_time_to_idle_secs(),
+        ));
+
+        let query_cache_to_move = query_cache.clone();
         self.injector
             .register_typed::<dyn QueryPlanner, _, _, _>(async move |i| {
                 QueryPlannerImpl::new(
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
+                    query_cache_to_move,
                 )
             })
             .await;
@@ -1515,6 +1654,7 @@ impl Config {
             })
             .await;
 
+        let query_cache_to_move = query_cache.clone();
         self.injector
             .register_typed::<dyn SqlService, _, _, _>(async move |i| {
                 let c = i.get_service_typed::<dyn ConfigObj>().await;
@@ -1532,7 +1672,7 @@ impl Config {
                     c.wal_split_threshold() as usize,
                     Duration::from_secs(c.query_timeout()),
                     Duration::from_secs(c.import_job_timeout() * 2),
-                    c.max_cached_queries(),
+                    query_cache_to_move,
                 )
             })
             .await;
@@ -1569,6 +1709,8 @@ impl Config {
                         Duration::from_secs(config.check_ws_orphaned_messages_interval_secs()),
                         Duration::from_secs(config.drop_ws_processing_messages_after_secs()),
                         Duration::from_secs(config.drop_ws_complete_messages_after_secs()),
+                        config.transport_max_message_size(),
+                        config.transport_max_frame_size(),
                     )
                 })
                 .await;

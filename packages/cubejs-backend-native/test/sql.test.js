@@ -2,6 +2,7 @@ const mysql = require('mysql2/promise');
 
 const native = require('../dist/js/index');
 const meta_fixture = require('./meta');
+const { FakeRowStream } = require('@cubejs-backend/testing-shared');
 
 let logger = jest.fn(({ event }) => {
   if (!event.error.includes('load - strange response, success which contains error')) {
@@ -42,10 +43,11 @@ describe('SQLInterface', () => {
   jest.setTimeout(10 * 1000);
 
   it('SHOW FULL TABLES FROM `db`', async () => {
-    const load = jest.fn(async ({ request, session }) => {
+    const load = jest.fn(async ({ request, session, query }) => {
       console.log('[js] load',  {
         request,
-        session
+        session,
+        query
       });
 
       expect(session).toEqual({
@@ -56,6 +58,18 @@ describe('SQLInterface', () => {
       // It's just an emulation that ApiGateway returns error
       return {
         error: 'This error should be passed back to MySQL client'
+      };
+    });
+
+    const stream = jest.fn(async ({ request, session, query }) => {
+      console.log('[js] stream',  {
+        request,
+        session,
+        query
+      });
+
+      return {
+        stream: new FakeRowStream(query),
       };
     });
 
@@ -94,10 +108,6 @@ describe('SQLInterface', () => {
       }
 
       throw new Error('Please specify user');
-    });
-
-    const stream = jest.fn(async ({ request, session }) => {
-      // TODO:
     });
 
     const instance = await native.registerInterface({
@@ -200,13 +210,24 @@ describe('SQLInterface', () => {
 
       {
         try {
-          await connection.query('select * from KibanaSampleDataEcommerce');
+          // limit is used to router query to load method instead of stream
+          await connection.query('select * from KibanaSampleDataEcommerce LIMIT 1000');
 
           throw new Error('Error was not passed from transport to the client');
         } catch (e) {
           expect(e.sqlState).toEqual('HY000');
           expect(e.sqlMessage).toContain('This error should be passed back to MySQL client');
         }
+      }
+
+      if (process.env.CUBESQL_STREAM_MODE === 'true') {
+        const [result, _columns] = await connection.query({
+          sql: 'select id, order_date from KibanaSampleDataEcommerce order by order_date desc limit 50001',
+          rowsAsArray: false,
+        });
+        expect(result.length).toEqual(50001);
+        expect(result[0].id).toEqual(0);
+        expect(result[50000].id).toEqual(50000);
       }
 
       {

@@ -694,6 +694,9 @@ impl MetaStore for MetaStoreMock {
     async fn insert_chunks(&self, _chunks: Vec<Chunk>) -> Result<Vec<IdRow<Chunk>>, CubeError> {
         panic!("MetaStore mock!")
     }
+    async fn get_jobs_on_non_exists_nodes(&self) -> Result<Vec<IdRow<Job>>, CubeError> {
+        panic!("MetaStore mock!")
+    }
 }
 
 crate::di_service!(MetaStoreMock, [MetaStore]);

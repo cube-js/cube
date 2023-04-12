@@ -3,6 +3,59 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.32.19](https://github.com/cube-js/cube/compare/v0.32.18...v0.32.19) (2023-04-03)
+
+
+### Features
+
+* **cubesql:** Support `date_trunc = literal date` filter ([#6376](https://github.com/cube-js/cube/issues/6376)) ([0ef53cb](https://github.com/cube-js/cube/commit/0ef53cb978e8995185a731985944b08f1f24949e))
+
+
+
+
+
+## [0.32.17](https://github.com/cube-js/cube/compare/v0.32.16...v0.32.17) (2023-03-29)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+
+
+
+
+## [0.32.15](https://github.com/cube-js/cube.js/compare/v0.32.14...v0.32.15) (2023-03-24)
+
+
+### Bug Fixes
+
+* **cubesql:** Allow any aggregation for number measure as it can be a wildcard ([48f8828](https://github.com/cube-js/cube.js/commit/48f882867b020ca4a0d058ff147e61ef9bea9555))
+
+
+
+
+
+## [0.32.12](https://github.com/cube-js/cube.js/compare/v0.32.11...v0.32.12) (2023-03-22)
+
+
+### Bug Fixes
+
+* **cubesql:** Support quicksight AVG Rebase window exprs: Physical plan does not support logical expression SUM(x) PARTITION BY ([#6328](https://github.com/cube-js/cube.js/issues/6328)) ([5a5d7e4](https://github.com/cube-js/cube.js/commit/5a5d7e497f05c69541e04df0a464c85eb9a5f506))
+
+
+
+
+
+## [0.32.11](https://github.com/cube-js/cube.js/compare/v0.32.10...v0.32.11) (2023-03-21)
+
+
+### Bug Fixes
+
+* **cubesql:** Ignore timestamps which can't be represented as nanoseconds instead of failing ([e393b06](https://github.com/cube-js/cube.js/commit/e393b0601fb663b03158ea03143a30eb0086ebbf))
+* **cubesql:** Quicksight AVG measures support ([#6323](https://github.com/cube-js/cube.js/issues/6323)) ([ada0afd](https://github.com/cube-js/cube.js/commit/ada0afd17b42a54fbecac69b849abf40158991c1))
+
+
+
+
+
 ## [0.32.9](https://github.com/cube-js/cube.js/compare/v0.32.8...v0.32.9) (2023-03-18)
 
 

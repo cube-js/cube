@@ -1,5 +1,6 @@
 const native = require('../dist/js/index');
 const meta_fixture = require('./meta');
+const { FakeRowStream } = require('@cubejs-backend/testing-shared');
 
 (async () => {
     const load = async ({ request, session, query }) => {
@@ -28,7 +29,9 @@ const meta_fixture = require('./meta');
         query ,
       });
 
-      throw new Error('stream is not implemented');
+      return {
+        stream: new FakeRowStream(query),
+      };
     };
 
     const checkAuth = async ({ request, user }) => {

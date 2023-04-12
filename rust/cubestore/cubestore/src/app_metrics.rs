@@ -10,7 +10,10 @@ pub static STARTUPS: Counter = metrics::counter("cs.startup");
 /// Incoming SQL queries that do data reads.
 pub static DATA_QUERIES: Counter = metrics::counter("cs.sql.query.data");
 pub static DATA_QUERIES_CACHE_HIT: Counter = metrics::counter("cs.sql.query.data.cache.hit");
+// Approximate number of entries in this cache.
 pub static DATA_QUERIES_CACHE_SIZE: Gauge = metrics::gauge("cs.sql.query.data.cache.size");
+// Approximate total weighted size of entries in this cache.
+pub static DATA_QUERIES_CACHE_WEIGHT: Gauge = metrics::gauge("cs.sql.query.data.cache.weight");
 pub static DATA_QUERY_TIME_MS: Histogram = metrics::histogram("cs.sql.query.data.ms");
 /// Incoming SQL queries that only read metadata or do trivial computations.
 pub static META_QUERIES: Counter = metrics::counter("cs.sql.query.meta");
@@ -50,3 +53,6 @@ pub static METASTORE_INNER_WRITE_OPERATION: Histogram =
     metrics::histogram("cs.metastore.inner_write_operation.ms");
 pub static METASTORE_READ_OUT_QUEUE_OPERATION: Histogram =
     metrics::histogram("cs.metastore.read_out_queue_operation.ms");
+
+/// RemoteFs metrics
+pub static REMOTE_FS_OPERATION_CORE: Counter = metrics::counter("cs.remote_fs.operations.core");

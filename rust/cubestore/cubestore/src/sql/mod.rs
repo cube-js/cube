@@ -73,6 +73,7 @@ use crate::{
 use data::create_array_builder;
 use datafusion::cube_ext::catch_unwind::async_try_with_catch_unwind;
 use datafusion::physical_plan::parquet::NoopParquetMetadataCache;
+use deepsize::DeepSizeOf;
 use std::mem::take;
 
 pub mod cache;
@@ -118,7 +119,7 @@ pub struct QueryPlans {
     pub worker: Arc<dyn ExecutionPlan>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Hash, Eq, PartialEq, Debug)]
+#[derive(Serialize, Deserialize, Clone, Hash, Eq, PartialEq, Debug, DeepSizeOf)]
 pub struct InlineTable {
     pub id: u64,
     pub name: String,
@@ -173,7 +174,7 @@ pub struct SqlServiceImpl {
     rows_per_chunk: usize,
     query_timeout: Duration,
     create_table_timeout: Duration,
-    cache: SqlResultCache,
+    cache: Arc<SqlResultCache>,
 }
 
 crate::di_service!(SqlServiceImpl, [SqlService]);
@@ -194,11 +195,10 @@ impl SqlServiceImpl {
         rows_per_chunk: usize,
         query_timeout: Duration,
         create_table_timeout: Duration,
-        max_cached_queries: usize,
+        cache: Arc<SqlResultCache>,
     ) -> Arc<SqlServiceImpl> {
         Arc::new(SqlServiceImpl {
             cachestore: CacheStoreSqlService::new(cachestore, query_planner.clone()),
-            cache: SqlResultCache::new(max_cached_queries),
             db,
             chunk_store,
             limits,
@@ -211,6 +211,7 @@ impl SqlServiceImpl {
             query_timeout,
             create_table_timeout,
             remote_fs,
+            cache,
         })
     }
 
@@ -1813,6 +1814,7 @@ mod tests {
     use crate::remotefs::queue::QueueRemoteFs;
     use crate::scheduler::SchedulerImpl;
     use crate::table::data::{cmp_min_rows, cmp_row_key_heap};
+    use crate::table::TableValue;
     use regex::Regex;
 
     #[tokio::test]
@@ -1834,13 +1836,13 @@ mod tests {
             );
             let meta_store = RocksMetaStore::new(
                 &Path::new(path).join("metastore"),
-                BaseRocksStoreFs::new(remote_fs.clone(), "metastore", config.config_obj()),
+                BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
                 config.config_obj(),
             )
             .unwrap();
             let cache_store = RocksCacheStore::new(
                 &Path::new(path).join("cachestore"),
-                BaseRocksStoreFs::new(remote_fs.clone(), "cachestore", config.config_obj()),
+                BaseRocksStoreFs::new_for_cachestore(remote_fs.clone(), config.config_obj()),
                 config.config_obj(),
             )
             .unwrap();
@@ -1868,7 +1870,10 @@ mod tests {
                 rows_per_chunk,
                 query_timeout,
                 query_timeout,
-                10_000, // max_cached_queries
+                Arc::new(SqlResultCache::new(
+                    config.config_obj().query_cache_max_capacity_bytes(),
+                    config.config_obj().query_cache_time_to_idle_secs(),
+                )),
             );
             let i = service.exec_query("CREATE SCHEMA foo").await.unwrap();
             assert_eq!(
@@ -1906,13 +1911,13 @@ mod tests {
             );
             let meta_store = RocksMetaStore::new(
                 &Path::new(path).join("metastore"),
-                BaseRocksStoreFs::new(remote_fs.clone(), "metastore", config.config_obj()),
+                BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
                 config.config_obj(),
             )
             .unwrap();
             let cache_store = RocksCacheStore::new(
                 &Path::new(path).join("cachestore"),
-                BaseRocksStoreFs::new(remote_fs.clone(), "cachestore", config.config_obj()),
+                BaseRocksStoreFs::new_for_cachestore(remote_fs.clone(), config.config_obj()),
                 config.config_obj(),
             )
             .unwrap();
@@ -1940,7 +1945,10 @@ mod tests {
                 rows_per_chunk,
                 query_timeout,
                 query_timeout,
-                10_000, // max_cached_queries
+                Arc::new(SqlResultCache::new(
+                    config.config_obj().query_cache_max_capacity_bytes(),
+                    config.config_obj().query_cache_time_to_idle_secs(),
+                )),
             );
             let i = service.exec_query("CREATE SCHEMA Foo").await.unwrap();
             assert_eq!(
@@ -2007,13 +2015,13 @@ mod tests {
             );
             let meta_store = RocksMetaStore::new(
                 &Path::new(path).join("metastore"),
-                BaseRocksStoreFs::new(remote_fs.clone(), "metastore", config.config_obj()),
+                BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
                 config.config_obj(),
             )
             .unwrap();
             let cache_store = RocksCacheStore::new(
                 &Path::new(path).join("cachestore"),
-                BaseRocksStoreFs::new(remote_fs.clone(), "cachestore", config.config_obj()),
+                BaseRocksStoreFs::new_for_cachestore(remote_fs.clone(), config.config_obj()),
                 config.config_obj(),
             )
             .unwrap();
@@ -2041,7 +2049,10 @@ mod tests {
                 rows_per_chunk,
                 query_timeout,
                 query_timeout,
-                10_000, // max_cached_queries
+                Arc::new(SqlResultCache::new(
+                    config.config_obj().query_cache_max_capacity_bytes(),
+                    config.config_obj().query_cache_time_to_idle_secs(),
+                )),
             );
             let i = service.exec_query("CREATE SCHEMA Foo").await.unwrap();
             assert_eq!(
@@ -2298,8 +2309,8 @@ mod tests {
                                         union all \
                                         select * from foo.b \
                                         ) \
-                             union all 
-                             select * from 
+                             union all
+                             select * from
                                 ( \
                                         select * from foo.a1 \
                                         union all \
@@ -2336,8 +2347,8 @@ mod tests {
                          select * from ( \
                                         select * from foo.a\
                                         ) \
-                             union all 
-                             select * from 
+                             union all
+                             select * from
                                 ( \
                                         select * from foo.a1 \
                                         union all \
@@ -2372,8 +2383,8 @@ mod tests {
                          select * from ( \
                                         select * from foo.a where 1 = 0\
                                         ) \
-                             union all 
-                             select * from 
+                             union all
+                             select * from
                                 ( \
                                         select * from foo.a1 \
                                         union all \

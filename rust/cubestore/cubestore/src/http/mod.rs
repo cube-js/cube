@@ -50,6 +50,8 @@ pub struct HttpServer {
     worker_loop: WorkerLoop,
     drop_orphaned_messages_loop: WorkerLoop,
     cancel_token: CancellationToken,
+    max_message_size: usize,
+    max_frame_size: usize,
 }
 
 crate::di_service!(HttpServer, []);
@@ -81,6 +83,8 @@ impl HttpServer {
         check_orphaned_messages_interval: Duration,
         drop_processing_messages_after: Duration,
         drop_complete_messages_after: Duration,
+        max_message_size: usize,
+        max_frame_size: usize,
     ) -> Arc<Self> {
         Arc::new(Self {
             bind_address,
@@ -89,6 +93,8 @@ impl HttpServer {
             check_orphaned_messages_interval,
             drop_processing_messages_after,
             drop_complete_messages_after,
+            max_message_size,
+            max_frame_size,
             worker_loop: WorkerLoop::new("HttpServer message processing"),
             drop_orphaned_messages_loop: WorkerLoop::new("HttpServer drop orphaned messages"),
             cancel_token: CancellationToken::new(),
@@ -121,14 +127,16 @@ impl HttpServer {
         let context_filter = tx_to_move_filter.and(auth_filter.clone());
 
         let context_filter_to_move = context_filter.clone();
+        let max_frame_size = self.max_frame_size.clone();
+        let max_message_size = self.max_message_size.clone();
 
         let query_route = warp::path!("ws")
             .and(context_filter_to_move)
             .and(warp::ws::ws())
-            .and_then(|tx: mpsc::Sender<(mpsc::Sender<Arc<HttpMessage>>, SqlQueryContext, HttpMessage)>, sql_query_context: SqlQueryContext, ws: Ws| async move {
+            .and_then(move |tx: mpsc::Sender<(mpsc::Sender<Arc<HttpMessage>>, SqlQueryContext, HttpMessage)>, sql_query_context: SqlQueryContext, ws: Ws| async move {
                 let tx_to_move = tx.clone();
                 let sql_query_context = sql_query_context.clone();
-                Result::<_, Rejection>::Ok(ws.on_upgrade(async move |mut web_socket| {
+                Result::<_, Rejection>::Ok(ws.max_frame_size(max_frame_size).max_message_size(max_message_size).on_upgrade(async move |mut web_socket| {
                     let (response_tx, mut response_rx) = mpsc::channel::<Arc<HttpMessage>>(10000);
                     loop {
                         tokio::select! {
@@ -818,7 +826,7 @@ impl HttpMessage {
 #[cfg(test)]
 mod tests {
     use crate::codegen::{HttpMessageArgs, HttpQuery, HttpQueryArgs, HttpTable, HttpTableArgs};
-    use crate::config::init_test_logger;
+    use crate::config::{init_test_logger, Config};
     use crate::http::{HttpCommand, HttpMessage, HttpServer};
     use crate::metastore::{Column, ColumnType};
     use crate::mysql::MockSqlAuthService;
@@ -1018,6 +1026,9 @@ mod tests {
         };
         let mut auth = MockSqlAuthService::new();
         auth.expect_authenticate().return_const(Ok(None));
+
+        let config = Config::test("ws_test").config_obj();
+
         let http_server = Arc::new(HttpServer::new(
             "127.0.0.1:53031".to_string(),
             Arc::new(auth),
@@ -1025,6 +1036,8 @@ mod tests {
             Duration::from_millis(100),
             Duration::from_millis(10000),
             Duration::from_millis(1000),
+            config.transport_max_message_size(),
+            config.transport_max_frame_size(),
         ));
         {
             let http_server = http_server.clone();
