@@ -1036,7 +1036,7 @@ describe('OptsHandler class', () => {
     }
   );
 
-  test('must set default permissions if not specified', async () => {
+  test('must set default api scopes if fn and env not specified', async () => {
     process.env.NODE_ENV = 'production';
     process.env.CUBEJS_DEV_MODE = 'false';
     process.env.CUBEJS_PRE_AGGREGATIONS_BUILDER = 'false';
@@ -1051,22 +1051,49 @@ describe('OptsHandler class', () => {
         password: 'password',
         database: 'database',
       }),
-      // contextToPermissions: async ()
     });
 
     const gateway = <any>core.apiGateway();
-    const permissions = await gateway.contextToPermFn();
+    const permissions = await gateway.contextToApiScopesFn();
     expect(permissions).toBeDefined();
     expect(Array.isArray(permissions)).toBeTruthy();
     expect(permissions).toEqual(['liveliness', 'graphql', 'meta', 'data']);
   });
 
-  test('must throw if contextToPermissions returns wrong type', async () => {
+  test('must set env api scopes if fn not specified', async () => {
+    process.env.NODE_ENV = 'production';
+    process.env.CUBEJS_DEV_MODE = 'false';
+    process.env.CUBEJS_PRE_AGGREGATIONS_BUILDER = 'false';
+    process.env.CUBEJS_DEFAULT_API_SCOPES = 'graphql,meta';
+
+    const core = new CubejsServerCoreExposed({
+      ...conf,
+      apiSecret: '44b87d4309471e5d9d18738450db0e49',
+      scheduledRefreshTimer: false,
+      driverFactory: () => ({
+        type: 'postgres',
+        user: 'user',
+        password: 'password',
+        database: 'database',
+      }),
+    });
+
+    const gateway = <any>core.apiGateway();
+    const permissions = await gateway.contextToApiScopesFn();
+
+    expect(permissions).toBeDefined();
+    expect(Array.isArray(permissions)).toBeTruthy();
+    expect(permissions).toEqual(['graphql', 'meta']);
+
+    delete process.env.CUBEJS_DEFAULT_API_SCOPES;
+  });
+
+  test('must throw if contextToApiScopes returns wrong type', async () => {
     process.env.NODE_ENV = 'production';
     process.env.CUBEJS_DEV_MODE = 'false';
     process.env.CUBEJS_PRE_AGGREGATIONS_BUILDER = 'false';
 
-    type Permission =
+    type ApiScopes =
       'liveliness' |
       'graphql' |
       'meta' |
@@ -1082,25 +1109,25 @@ describe('OptsHandler class', () => {
         password: 'password',
         database: 'database',
       }),
-      contextToPermissions: async () => new Promise((resolve) => {
-        resolve('jobs' as unknown as Permission[]);
+      contextToApiScopes: async () => new Promise((resolve) => {
+        resolve('jobs' as unknown as ApiScopes[]);
       }),
     });
 
     const gateway = <any>core.apiGateway();
     expect(async () => {
-      await gateway.contextToPermFn();
+      await gateway.contextToApiScopesFn();
     }).rejects.toThrow(
-      'A user-defined contextToPermissions function returns an inconsistent type.'
+      'A user-defined contextToApiScopes function returns an inconsistent type.'
     );
   });
 
-  test('must throw if contextToPermissions returns wrong permission value', async () => {
+  test('must throw if contextToApiScopes returns wrong permission value', async () => {
     process.env.NODE_ENV = 'production';
     process.env.CUBEJS_DEV_MODE = 'false';
     process.env.CUBEJS_PRE_AGGREGATIONS_BUILDER = 'false';
 
-    type Permission =
+    type ApiScopes =
       'liveliness' |
       'graphql' |
       'meta' |
@@ -1116,20 +1143,20 @@ describe('OptsHandler class', () => {
         password: 'password',
         database: 'database',
       }),
-      contextToPermissions: async () => new Promise((resolve) => {
-        resolve(['liveliness', 'graphql', 'meta', 'data', 'job'] as unknown as Permission[]);
+      contextToApiScopes: async () => new Promise((resolve) => {
+        resolve(['liveliness', 'graphql', 'meta', 'data', 'job'] as unknown as ApiScopes[]);
       }),
     });
 
     const gateway = <any>core.apiGateway();
     expect(async () => {
-      await gateway.contextToPermFn();
+      await gateway.contextToApiScopesFn();
     }).rejects.toThrow(
-      'A user-defined contextToPermissions function returns a wrong permission: job'
+      'A user-defined contextToApiScopes function returns a wrong scope: job'
     );
   });
 
-  test('must set permissions if specified', async () => {
+  test('must set api scopes if specified', async () => {
     process.env.NODE_ENV = 'production';
     process.env.CUBEJS_DEV_MODE = 'false';
     process.env.CUBEJS_PRE_AGGREGATIONS_BUILDER = 'false';
@@ -1144,13 +1171,13 @@ describe('OptsHandler class', () => {
         password: 'password',
         database: 'database',
       }),
-      contextToPermissions: async () => new Promise((resolve) => {
+      contextToApiScopes: async () => new Promise((resolve) => {
         resolve(['liveliness', 'graphql', 'meta', 'data', 'jobs']);
       }),
     });
 
     const gateway = <any>core.apiGateway();
-    const permissions = await gateway.contextToPermFn();
+    const permissions = await gateway.contextToApiScopesFn();
     expect(permissions).toBeDefined();
     expect(Array.isArray(permissions)).toBeTruthy();
     expect(permissions).toEqual(['liveliness', 'graphql', 'meta', 'data', 'jobs']);

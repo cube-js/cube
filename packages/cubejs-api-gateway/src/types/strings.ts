@@ -99,9 +99,9 @@ type QueryOrderType =
   'desc';
 
 /**
- * Permission data type.
+ * ApiScopes data type.
  */
-type Permission =
+type ApiScopes =
   'liveliness' |
   'graphql' |
   'meta' |
@@ -119,5 +119,5 @@ export {
   FilterOperator,
   QueryTimeDimensionGranularity,
   QueryOrderType,
-  Permission,
+  ApiScopes,
 };
