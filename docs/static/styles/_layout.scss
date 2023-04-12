@@ -102,12 +102,12 @@ a {
   gap: 28px;
   padding-top: 48px;
   margin-bottom: 24px;
-  
+
   @media screen and (max-width: 576px) {
     flex-flow: column;
     gap: 4px;
   }
-  
+
   h1 {
     margin: 0;
     padding: 0;
@@ -126,7 +126,7 @@ a {
     line-height: 30px;
     color: $dark-04;
   }
-  
+
   .releaseLink {
     font-family: inherit;
     font-weight: 400;
@@ -719,7 +719,7 @@ span.group-header {
   padding: 0 1rem;
   position: sticky;
   top: 0;
-  z-index: 1;
+  z-index: 999999999;
   width: 100%;
   filter: drop-shadow(0px 0px 15px rgba(67, 67, 107, 0.1));
   height: $header-max-height;
