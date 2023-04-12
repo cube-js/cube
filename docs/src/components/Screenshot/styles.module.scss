@@ -33,3 +33,11 @@
     //transform: scale(.25);
   }
 }
+
+.highlight {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  background-size: contain;
+  z-index: 9999;
+}
