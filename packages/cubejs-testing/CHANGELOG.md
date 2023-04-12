@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.32.25](https://github.com/cube-js/cube/compare/v0.32.24...v0.32.25) (2023-04-12)
+
+
+### Features
+
+* **api-gateway, server-core:** Renamed Permissions to ApiScopes ([#6397](https://github.com/cube-js/cube/issues/6397)) ([800a96b](https://github.com/cube-js/cube/commit/800a96b68e5aa9bbeb2c52edaab0698832a18619))
+
+
+
+
+
 ## [0.32.23](https://github.com/cube-js/cube/compare/v0.32.22...v0.32.23) (2023-04-10)
 
 
