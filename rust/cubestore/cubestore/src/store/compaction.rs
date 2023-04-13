@@ -415,12 +415,8 @@ impl CompactionService for CompactionServiceImpl {
                 .min(16);
             let new_partitions_count_by_file_size =
                 if let Some(partition_file_size) = partition.get_row().file_size() {
-                    if pending_rows > self.config.min_partition_split_threshold() {
-                        let threshold = self.config.partition_size_split_threshold_bytes();
-                        (div_ceil(partition_file_size, threshold) as usize).min(16)
-                    } else {
-                        1
-                    }
+                    let threshold = self.config.partition_size_split_threshold_bytes();
+                    (div_ceil(partition_file_size, threshold) as usize).min(16)
                 } else {
                     1
                 };
@@ -1427,10 +1423,6 @@ mod tests {
         config
             .expect_partition_size_split_threshold_bytes()
             .returning(|| 100 * 1024 * 1024);
-
-        config
-            .expect_min_partition_split_threshold()
-            .returning(|| 10);
 
         config
             .expect_compaction_chunks_total_size_threshold()
