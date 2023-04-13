@@ -308,6 +308,8 @@ to dynamically set a repository with schema files depending on the `appId`:
 **cube.js:**
 
 ```javascript
+const { FileRepository } = require('@cubejs-backend/server-core');
+
 module.exports = {
   contextToAppId: ({ securityContext }) =>
     `CUBEJS_APP_${securityContext.appId}_${securityContext.userId}`,
