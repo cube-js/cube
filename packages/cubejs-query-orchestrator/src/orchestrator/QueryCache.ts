@@ -912,7 +912,7 @@ export class QueryCache {
             // Most likely it'll cause race condition of refreshing data with different refreshKey values.
             renewedAgo + inMemoryCacheDisablePeriod > renewalThreshold * 1000 ||
             inMemoryValue.renewalKey !== renewalKey
-          )
+          ) || renewedAgo > expiration * 1000
         ) {
           this.memoryCache.del(redisKey);
         } else {
