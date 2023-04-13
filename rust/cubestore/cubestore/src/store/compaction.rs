@@ -1889,7 +1889,6 @@ mod tests {
         Config::test("partition_split_by_file_size")
             .update_config(|mut c| {
                 c.partition_split_threshold = 2000;
-                c.in_memory_chunks_compaction_period_ms = 100000;
                 c.partition_size_split_threshold_bytes = 10000;
                 c
             })
