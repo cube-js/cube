@@ -54,6 +54,6 @@ export class DruidQuery extends BaseQuery {
   }
 
   public countDistinctApprox(sql) {
-    return `APPROX_COUNT_DISTINCT_DS_THETA(${sql})`
+    return `APPROX_COUNT_DISTINCT_DS_THETA(${sql})`;
   }
 }
