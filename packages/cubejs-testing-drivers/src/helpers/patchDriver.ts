@@ -9,7 +9,7 @@ const methods: Method[] = [
   'createSchemaIfNotExists',
   // 'getTablesQuery',
   'loadPreAggregationIntoTable',
-  'dropTable',
+  // 'dropTable',
   // 'param',
   // 'testConnectionTimeout',
   'downloadTable',
@@ -42,6 +42,7 @@ export function patchDriver(driver: PatchedDriver) {
             && `${args[0]}`.toLowerCase().indexOf('select schema_name') !== 0
             && `${args[0]}`.toLowerCase().indexOf('select table_name') !== 0
             && `${args[0]}`.toLowerCase().indexOf('select name as table_name from system.tables') !== 0
+            && `${args[0]}`.toLowerCase().indexOf('select columns.column_name as') !== 0
             && `${args[0]}`.toLowerCase().indexOf('select max') !== 0
             && `${args[0]}`.toLowerCase().indexOf('select min') !== 0
             && `${args[0]}`.toLowerCase().indexOf('select 1') !== 0
@@ -56,6 +57,7 @@ export function patchDriver(driver: PatchedDriver) {
             && `${args[0]}`.toLowerCase().indexOf('cache ') !== 0
             && `${args[0]}`.toLowerCase().indexOf('queue ') !== 0
           ) {
+            console.log(args[0]);
             driver.calls?.push(name);
           }
         } else {

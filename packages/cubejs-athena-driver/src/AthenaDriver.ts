@@ -20,7 +20,8 @@ import {
   DownloadTableCSVData,
   DriverInterface,
   QueryOptions, StreamOptions,
-  StreamTableData
+  StreamTableData,
+  TableStructure,
 } from '@cubejs-backend/base-driver';
 import * as SqlString from 'sqlstring';
 import { AthenaClientConfig } from '@aws-sdk/client-athena/dist-types/AthenaClient';
@@ -43,6 +44,23 @@ interface AthenaDriverOptions extends AthenaClientConfig {
    */
   exportBucketCsvEscapeSymbol?: string
 }
+
+type AthenaType =
+  | 'boolean'
+  | 'tinyint'
+  | 'smallint'
+  | 'int'
+  | 'integer'
+  | 'bigint'
+  | 'float'
+  | 'double'
+  | 'decimal'
+  | 'char'
+  | 'varchar'
+  | 'string'
+  | 'binary'
+  | 'date'
+  | 'timestamp';
 
 type AthenaDriverOptionsInitialized = Required<AthenaDriverOptions, 'pollTimeout' | 'pollMaxInterval'>;
 
@@ -181,13 +199,103 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     return rows;
   }
 
-  public async stream(query: string, values: unknown[], options: StreamOptions): Promise<StreamTableData> {
+  /**
+   * Returns stream table object that includes query result stream and
+   * query fields types.
+   */
+  public async stream(
+    query: string,
+    values: unknown[],
+    options: StreamOptions,
+  ): Promise<StreamTableData> {
+    const types = await this.getQueryFieldsTypes(query, values);
     const qid = await this.startQuery(query, values);
     await this.waitForSuccess(qid);
-    const rowStream = stream.Readable.from(this.lazyRowIterator(qid, query), { highWaterMark: options.highWaterMark });
+    const rowStream = stream.Readable.from(
+      this.lazyRowIterator(qid, query),
+      {
+        highWaterMark: options.highWaterMark,
+      }
+    );
     return {
-      rowStream
+      rowStream,
+      types,
+      release: async () => {
+        // TODO (buntarb): Canceling is missed in the iterator.
+      }
     };
+  }
+
+  /**
+   * Returns query fields types.
+   */
+  public async getQueryFieldsTypes(
+    query: string,
+    values: unknown[],
+  ): Promise<TableStructure> {
+    const result: { [name: string]: AthenaType } = {};
+    const expl: {[key: string]: string}[] = await this.query(`EXPLAIN ${query}`, values);
+    expl
+      .filter((itm) => itm['Query Plan'] && itm['Query Plan'].indexOf(':=') >= 0)
+      .forEach((itm) => {
+        let val: string = itm['Query Plan'];
+        [, val] = val.split(':=');
+        val = val.trim();
+        [val] = val.split('(');
+        if (val.indexOf(':')) {
+          const [field, type] = val.split(':');
+          result[field] = <AthenaType>type;
+        }
+      });
+    return this.mapFields(result);
+  }
+
+  /**
+   * Converts Athena to generic types and returns an array of queried
+   * fields meta info.
+   */
+  public mapFields(fields: { [name: string]: AthenaType }): TableStructure {
+    return Object.keys(fields).map((field) => {
+      let type;
+      switch (fields[field]) {
+        case 'boolean':
+          type = 'boolean';
+          break;
+        // integers
+        case 'tinyint':
+        case 'smallint':
+        case 'int':
+        case 'integer':
+        case 'bigint':
+          type = 'int';
+          break;
+        // float
+        case 'float':
+          type = 'float';
+          break;
+        // double
+        case 'double':
+          type = 'double';
+          break;
+        // strings
+        case 'char':
+        case 'varchar':
+        case 'string':
+        case 'binary':
+          type = 'text';
+          break;
+        // date and time
+        case 'date':
+        case 'timestamp':
+          type = 'date';
+          break;
+        // unknown
+        default:
+          type = fields[field];
+          break;
+      }
+      return { name: field, type };
+    });
   }
 
   public async loadPreAggregationIntoTable(
@@ -318,7 +426,10 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     );
   }
 
-  protected async* lazyRowIterator<R extends unknown>(qid: AthenaQueryId, query: string): AsyncGenerator<R> {
+  protected async* lazyRowIterator<R extends unknown>(
+    qid: AthenaQueryId,
+    query: string,
+  ): AsyncGenerator<R> {
     let isFirstBatch = true;
     let columnInfo: { Name: string }[] = [];
     for (

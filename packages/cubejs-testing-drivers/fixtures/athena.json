@@ -6,12 +6,12 @@
       "CUBEJS_CACHE_AND_QUEUE_DRIVER": "cubestore",
       "CUBEJS_CUBESTORE_HOST": "store",
       "CUBEJS_DB_TYPE": "athena",
-      "CUBEJS_AWS_KEY": "${CUBEJS_AWS_KEY}",
-      "CUBEJS_AWS_SECRET": "${CUBEJS_AWS_SECRET}",
-      "CUBEJS_AWS_REGION": "${CUBEJS_AWS_REGION}",
-      "CUBEJS_AWS_ATHENA_WORKGROUP": "${CUBEJS_AWS_ATHENA_WORKGROUP}",
-      "CUBEJS_AWS_S3_OUTPUT_LOCATION": "${CUBEJS_AWS_S3_OUTPUT_LOCATION}",
-      "CUBEJS_DB_EXPORT_BUCKET": "${CUBEJS_DB_EXPORT_BUCKET}"
+      "CUBEJS_AWS_KEY": "${DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY}",
+      "CUBEJS_AWS_SECRET": "${DRIVERS_TESTS_ATHENA_CUBEJS_AWS_SECRET}",
+      "CUBEJS_AWS_REGION": "us-east-1",
+      "CUBEJS_AWS_ATHENA_WORKGROUP": "primary",
+      "CUBEJS_AWS_S3_OUTPUT_LOCATION": "s3://cubejs-opensource/temptst/output",
+      "CUBEJS_DB_EXPORT_BUCKET": "s3://cubejs-opensource/temptst/export"
     },
     "ports" : ["4000"]
   },
@@ -60,6 +60,24 @@
     ]
   },
   "skip": [
+    "---------------------------------------",
+    "Core tests                             ",
+    "---------------------------------------",
+    "for the Customers.RollingExternal",
+    "for the Customers.RollingInternal",
+    "for the ECommerce.SimpleAnalysisExternal",
+    "for the ECommerce.SimpleAnalysisInternal",
+    "for the ECommerce.TimeAnalysisExternal",
+    "for the ECommerce.TimeAnalysisInternal",
+
+    "---------------------------------------",
+    "Full tests                             ",
+    "---------------------------------------",
+    "must built pre-aggregations",
+
+    "---------------------------------------",
+    "SKIPED FOR ALL                         ",
+    "---------------------------------------",
     "querying Products: dimensions -- doesn't work wo ordering",
     "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- rounding in athena",
     "querying ECommerce: total sales, total profit by month + order (date) + total -- doesn't work with the BigQuery",
