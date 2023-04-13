@@ -136,6 +136,8 @@ class ApiGateway {
 
   protected readonly playgroundAuthSecret?: string;
 
+  protected readonly event: (name: string, props?: object) => void;
+
   public constructor(
     protected readonly apiSecret: string,
     protected readonly compilerApi: any,
@@ -166,6 +168,8 @@ class ApiGateway {
     this.requestLoggerMiddleware = options.requestLoggerMiddleware || this.requestLogger;
     this.contextRejectionMiddleware = options.contextRejectionMiddleware || (async (req, res, next) => next());
     this.wsContextAcceptor = options.wsContextAcceptor || (() => ({ accepted: true }));
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
+    this.event = options.event || function () {};
   }
 
   public initApp(app: ExpressApplication) {
@@ -794,6 +798,9 @@ class ApiGateway {
         default:
           throw new Error(`The '${query.action}' action type doesn't supported.`);
       }
+      this.event(`pre_aggregations_jobs_${query.action}`, {
+        source: req.header('source') || 'unknown',
+      });
       response(result, { status: 200 });
     } catch (e) {
       this.handleError({ e, context, query, res: response, started });

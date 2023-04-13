@@ -70,6 +70,7 @@ interface ApiGatewayOptions {
    */
   checkAuthMiddleware?: CheckAuthMiddlewareFn;
   contextToApiScopes?: ContextToApiScopesFn;
+  event?: (name: string, props?: object) => void;
 }
 
 export {

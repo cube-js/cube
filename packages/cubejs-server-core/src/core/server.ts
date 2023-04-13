@@ -457,6 +457,7 @@ export class CubejsServerCore {
         scheduledRefreshTimeZones: this.options.scheduledRefreshTimeZones,
         serverCoreVersion: this.coreServerVersion,
         contextToApiScopes: this.options.contextToApiScopes,
+        event: this.event,
       }
     ));
   }
