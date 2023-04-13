@@ -4,7 +4,7 @@ import { parse } from '@babel/parser';
 import babelGenerator from '@babel/generator';
 import babelTraverse from '@babel/traverse';
 
-import { FileContent } from '@cubejs-backend/shared';
+import type { FileContent } from '@cubejs-backend/shared';
 
 import { CubePropContextTranspiler, transpiledFields, transpiledFieldsPatterns } from './transpilers';
 import { PythonParser } from '../parser/PythonParser';
