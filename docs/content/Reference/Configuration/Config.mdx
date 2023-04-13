@@ -72,7 +72,9 @@ interface CubejsConfiguration {
 }
 
 interface OrchestratorOptions {
+  continueWaitTimeout: number;
   redisPrefix: string;
+  rollupOnlyMode: boolean;
   queryCacheOptions: {
     refreshKeyRenewalThreshold: number;
     backgroundRenew: boolean;
@@ -87,7 +89,6 @@ interface OrchestratorOptions {
 
 interface QueueOptions {
   concurrency: number;
-  continueWaitTimeout: number;
   executionTimeout: number;
   orphanedTimeout: number;
   heartBeatInterval: number;
@@ -690,6 +691,7 @@ You can pass this object to set advanced options for Cube Query Orchestrator.
 
 | Option                                       | Description                                                                                                                                                                                                                                                                                                                                                                                   | Default Value           |
 | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| continueWaitTimeout                          | Long polling interval                                                                                                                                                                                                                                                                                                                                                                         | `5`                     |
 | redisPrefix                                  | Prefix to be set an all Redis keys                                                                                                                                                                                                                                                                                                                                                            | `STANDALONE`            |
 | rollupOnlyMode                               | When enabled, an error will be thrown if a query can't be served from a pre-aggregation (rollup)                                                                                                                                                                                                                                                                                              | `false`                 |
 | queryCacheOptions                            | Query cache options for DB queries                                                                                                                                                                                                                                                                                                                                                            | `{}`                    |
@@ -773,7 +775,6 @@ Timeout and interval options' values are in seconds.
 | Option              | Description                                                                                                                                                                                                                        | Default Value |
 | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
 | concurrency         | Maximum number of queries to be processed simultaneosly. For drivers with connection pool `CUBEJS_DB_MAX_POOL` should be adjusted accordingly. Typically pool size should be at least twice of total concurrency among all queues. | `2`           |
-| continueWaitTimeout | Long polling interval                                                                                                                                                                                                              | `5`           |
 | executionTimeout    | Total timeout of single query                                                                                                                                                                                                      | `600`         |
 | orphanedTimeout     | Query will be marked for cancellation if not requested during this period.                                                                                                                                                         | `120`         |
 | heartBeatInterval   | Worker heartbeat interval. If `4*heartBeatInterval` time passes without reporting, the query gets cancelled.                                                                                                                       | `30`          |
