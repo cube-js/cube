@@ -47,25 +47,6 @@ mode does the following:
 - Logs incorrect/invalid configuration for `externalRefresh` /`waitForRenew`
   instead of throwing errors
 
-## Configuring CORS
-
-The Cube REST API supports Cross-Origin Resource Sharing (CORS) for all API
-requests. By default, the middleware allows requests from any origin (`*`). To
-change the allowed domain, you can do the following:
-
-```javascript
-module.exports = {
-  http: {
-    cors: {
-      origin: 'https://myapp.com',
-    },
-  },
-};
-```
-
-Please consult the Configuration Reference [for more
-options][link-config-cors-opts].
-
 ## Concurrency and pooling
 
 <InfoBox>
@@ -85,7 +66,6 @@ default, you must ensure that the new value is greater than the number of
 concurrent connections used by Cube's query queues and refresh scheduler.
 
 [link-config]: /config
-[link-config-cors-opts]: /config#http
 [link-dev-playground]: /dev-tools/dev-playground
 [link-env-vars]: /reference/environment-variables
 [link-scheduled-refresh]: /schema/reference/pre-aggregations#scheduled-refresh
