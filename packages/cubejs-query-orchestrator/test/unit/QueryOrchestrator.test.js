@@ -808,6 +808,40 @@ describe('QueryOrchestrator', () => {
     ).toBe(true);
   });
 
+  test('in memory expire', async () => {
+    const query = (id) => ({
+      query: 'SELECT * FROM orders',
+      values: [],
+      cacheKeyQueries: {
+        queries: [
+          ['SELECT NOW()', [], {
+            renewalThreshold: 21600,
+          }],
+          ['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\'))', [], {
+            renewalThreshold: 21600,
+          }]
+        ]
+      },
+      preAggregations: [{
+        preAggregationsSchema: 'stb_pre_aggregations',
+        tableName: 'stb_pre_aggregations.orders_d20201103',
+        loadSql: ['CREATE TABLE stb_pre_aggregations.orders_d20201103 AS SELECT * FROM public.orders', []],
+        invalidateKeyQueries: [['SELECT NOW() as now', [], {
+          renewalThreshold: 86400,
+        }]]
+      }],
+      expireSecs: 2,
+      requestId: `in memory expire ${id}`,
+    });
+    await queryOrchestrator.fetchQuery(query(0));
+    await queryOrchestrator.fetchQuery(query(1));
+    await mockDriver.delay(2000);
+    await queryOrchestrator.fetchQuery(query(2));
+    expect(
+      mockDriver.executedQueries.filter(q => q.match(/timestamptz/)).length
+    ).toBe(2);
+  });
+
   test('load cache should respect external flag', async () => {
     const preAggregationsLoadCacheByDataSource = {};
     const externalPreAggregation = {

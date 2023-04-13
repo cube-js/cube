@@ -18,7 +18,7 @@ import {
   RequestLoggerMiddlewareFn,
   ContextRejectionMiddlewareFn,
   ContextAcceptorFn,
-  ContextToPermissionsFn,
+  ContextToApiScopesFn,
 } from '../interfaces';
 
 type UserBackgroundContext = {
@@ -69,7 +69,8 @@ interface ApiGatewayOptions {
    * @deprecated Use checkAuth property instead.
    */
   checkAuthMiddleware?: CheckAuthMiddlewareFn;
-  contextToPermissions?: ContextToPermissionsFn;
+  contextToApiScopes?: ContextToApiScopesFn;
+  event?: (name: string, props?: object) => void;
 }
 
 export {

@@ -19,7 +19,7 @@ import type {
 } from 'express';
 import {
   QueryType,
-  Permission,
+  ApiScopes,
 } from './types/strings';
 import {
   QueryType as QueryTypeEnum, ResultType
@@ -44,7 +44,7 @@ import {
   CheckAuthInternalOptions,
   JWTOptions,
   CheckAuthFn,
-  ContextToPermissionsFn,
+  ContextToApiScopesFn,
 } from './types/auth';
 import {
   Query,
@@ -117,9 +117,9 @@ class ApiGateway {
 
   public readonly checkAuthSystemFn: CheckAuthFn;
 
-  protected readonly contextToPermFn: ContextToPermissionsFn;
+  protected readonly contextToApiScopesFn: ContextToApiScopesFn;
 
-  protected readonly contextToPermDefFn: ContextToPermissionsFn =
+  protected readonly contextToApiScopesDefFn: ContextToApiScopesFn =
     async () => ['liveliness', 'graphql', 'meta', 'data'];
 
   protected readonly checkAuthMiddleware: CheckAuthMiddlewareFn;
@@ -135,6 +135,8 @@ class ApiGateway {
   protected readonly releaseListeners: (() => any)[] = [];
 
   protected readonly playgroundAuthSecret?: string;
+
+  protected readonly event: (name: string, props?: object) => void;
 
   public constructor(
     protected readonly apiSecret: string,
@@ -158,7 +160,7 @@ class ApiGateway {
 
     this.checkAuthFn = this.createCheckAuthFn(options);
     this.checkAuthSystemFn = this.createCheckAuthSystemFn();
-    this.contextToPermFn = this.createContextToPermissionsFn(options);
+    this.contextToApiScopesFn = this.createContextToApiScopesFn(options);
     this.checkAuthMiddleware = options.checkAuthMiddleware
       ? this.wrapCheckAuthMiddleware(options.checkAuthMiddleware)
       : this.checkAuth;
@@ -166,6 +168,8 @@ class ApiGateway {
     this.requestLoggerMiddleware = options.requestLoggerMiddleware || this.requestLogger;
     this.contextRejectionMiddleware = options.contextRejectionMiddleware || (async (req, res, next) => next());
     this.wsContextAcceptor = options.wsContextAcceptor || (() => ({ accepted: true }));
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
+    this.event = options.event || function () {};
   }
 
   public initApp(app: ExpressApplication) {
@@ -178,11 +182,11 @@ class ApiGateway {
     ];
 
     /** **************************************************************
-     * Liveliness permission                                         *
+     * Liveliness scope                                              *
      *************************************************************** */
 
     // @todo Should we pass requestLoggerMiddleware?
-    // @todo Should we add permission assert here?
+    // @todo Should we add scope assert here?
 
     const guestMiddlewares = [];
 
@@ -190,7 +194,7 @@ class ApiGateway {
     app.get('/livez', guestMiddlewares, cachedHandler(this.liveness));
 
     /** **************************************************************
-     * Graphql permission                                            *
+     * Graphql scope                                                 *
      *************************************************************** */
 
     app.use(
@@ -199,7 +203,7 @@ class ApiGateway {
         ...userMiddlewares,
         async (req, res, next) => {
           try {
-            await this.assertPermission(
+            await this.assertApiScope(
               'graphql',
               req?.context?.securityContext
             );
@@ -236,7 +240,7 @@ class ApiGateway {
     );
 
     /** **************************************************************
-     * Data permission                                               *
+     * Data scope                                                    *
      *************************************************************** */
 
     app.get(`${this.basePath}/v1/load`, userMiddlewares, (async (req, res) => {
@@ -300,7 +304,7 @@ class ApiGateway {
     }));
 
     /** **************************************************************
-     * Meta permission                                               *
+     * Meta scope                                                    *
      *************************************************************** */
 
     app.get(
@@ -327,7 +331,7 @@ class ApiGateway {
         ...userMiddlewares,
         async (req, res, next) => {
           try {
-            await this.assertPermission(
+            await this.assertApiScope(
               'meta',
               req?.context?.securityContext
             );
@@ -353,7 +357,7 @@ class ApiGateway {
     );
 
     /** **************************************************************
-     * Jobs permission                                               *
+     * Jobs scope                                                    *
      *************************************************************** */
 
     app.get(
@@ -375,7 +379,7 @@ class ApiGateway {
     );
 
     /** **************************************************************
-     * Private API (no permissions)                                  *
+     * Private API (no scopes)                                       *
      *************************************************************** */
 
     if (this.playgroundAuthSecret) {
@@ -473,7 +477,7 @@ class ApiGateway {
   }) {
     const requestStarted = new Date();
     try {
-      await this.assertPermission('jobs', context.securityContext);
+      await this.assertApiScope('jobs', context.securityContext);
       const refreshScheduler = this.refreshScheduler();
       res(await refreshScheduler.runScheduledRefresh(context, {
         ...this.parseQueryParam(queryingOptions || {}),
@@ -507,7 +511,7 @@ class ApiGateway {
     const requestStarted = new Date();
 
     try {
-      await this.assertPermission('meta', context.securityContext);
+      await this.assertApiScope('meta', context.securityContext);
       const metaConfig = await this.getCompilerApi(context).metaConfig({
         requestId: context.requestId,
       });
@@ -527,7 +531,7 @@ class ApiGateway {
     const requestStarted = new Date();
 
     try {
-      await this.assertPermission('meta', context.securityContext);
+      await this.assertApiScope('meta', context.securityContext);
       const metaConfigExtended = await this.getCompilerApi(context).metaConfigExtended({
         requestId: context.requestId,
       });
@@ -737,7 +741,7 @@ class ApiGateway {
     const query = <PreAggsJobsRequest>req.body;
     let result;
     try {
-      await this.assertPermission('jobs', req?.context?.securityContext);
+      await this.assertApiScope('jobs', req?.context?.securityContext);
       switch (query.action) {
         case 'post':
           if (
@@ -794,6 +798,9 @@ class ApiGateway {
         default:
           throw new Error(`The '${query.action}' action type doesn't supported.`);
       }
+      this.event(`pre_aggregations_jobs_${query.action}`, {
+        source: req.header('source') || 'unknown',
+      });
       response(result, { status: 200 });
     } catch (e) {
       this.handleError({ e, context, query, res: response, started });
@@ -1158,7 +1165,7 @@ class ApiGateway {
     const requestStarted = new Date();
 
     try {
-      await this.assertPermission('data', context.securityContext);
+      await this.assertApiScope('data', context.securityContext);
 
       query = this.parseQueryParam(query);
       const [queryType, normalizedQueries] = await this.getNormalizedQueries(query, context);
@@ -1246,7 +1253,7 @@ class ApiGateway {
     const requestStarted = new Date();
 
     try {
-      await this.assertPermission('data', context.securityContext);
+      await this.assertApiScope('data', context.securityContext);
 
       const [queryType, normalizedQueries] = await this.getNormalizedQueries(query, context);
 
@@ -1484,7 +1491,7 @@ class ApiGateway {
     const requestStarted = new Date();
 
     try {
-      await this.assertPermission('data', context.securityContext);
+      await this.assertApiScope('data', context.securityContext);
 
       query = this.parseQueryParam(request.query);
       let resType: ResultType = ResultType.DEFAULT;
@@ -1960,49 +1967,56 @@ class ApiGateway {
     };
   }
 
-  protected createContextToPermissionsFn(
+  protected createContextToApiScopesFn(
     options: ApiGatewayOptions,
-  ): ContextToPermissionsFn {
-    return options.contextToPermissions
-      ? async (securityContext?: any, defaultPermissions?: Permission[]) => {
-        const permissions = options.contextToPermissions &&
-            await options.contextToPermissions(
+  ): ContextToApiScopesFn {
+    return options.contextToApiScopes
+      ? async (securityContext?: any, defaultApiScopes?: ApiScopes[]) => {
+        const scopes = options.contextToApiScopes &&
+            await options.contextToApiScopes(
               securityContext,
-              defaultPermissions,
+              defaultApiScopes,
             );
-        if (!permissions || !Array.isArray(permissions)) {
+        if (!scopes || !Array.isArray(scopes)) {
           throw new Error(
-            'A user-defined contextToPermissions function returns an inconsistent type.'
+            'A user-defined contextToApiScopes function returns an inconsistent type.'
           );
         } else {
-          permissions.forEach((p) => {
+          scopes.forEach((p) => {
             if (['liveliness', 'graphql', 'meta', 'data', 'jobs'].indexOf(p) === -1) {
               throw new Error(
-                `A user-defined contextToPermissions function returns a wrong permission: ${p}`
+                `A user-defined contextToApiScopes function returns a wrong scope: ${p}`
               );
             }
           });
         }
-        return permissions;
+        return scopes;
       }
-      : this.contextToPermDefFn;
+      : async () => {
+        const defaultApiScope = getEnv('defaultApiScope');
+        if (defaultApiScope) {
+          return defaultApiScope;
+        } else {
+          return this.contextToApiScopesDefFn();
+        }
+      };
   }
 
-  protected async assertPermission(
-    permission: Permission,
+  protected async assertApiScope(
+    scope: ApiScopes,
     securityContext?: any,
   ): Promise<void> {
-    const permissions =
-      await this.contextToPermFn(
+    const scopes =
+      await this.contextToApiScopesFn(
         securityContext || {},
-        await this.contextToPermDefFn(),
+        await this.contextToApiScopesDefFn(),
       );
-    const permited = permissions.indexOf(permission) >= 0;
+    const permited = scopes.indexOf(scope) >= 0;
     if (!permited) {
       throw new CubejsHandlerError(
         403,
         'Forbidden',
-        `Permission is missed: ${permission}`
+        `Api scope is missed: ${scope}`
       );
     }
   }

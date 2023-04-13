@@ -8,6 +8,7 @@
   background: #ccc linear-gradient(#ddd, #bbb 4vw, #eee 4.15vw);
   border-radius: .4vw .4vw 0 0;
   width: 50vw;
+  margin-bottom: 24px;
   /*width: 100vh;*/
   max-width: 100%;
   //height: 35vw;
@@ -32,4 +33,12 @@
     //height: calc(4 * (35vw - 4vw));
     //transform: scale(.25);
   }
+}
+
+.highlight {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  background-size: contain;
+  z-index: 9999;
 }
