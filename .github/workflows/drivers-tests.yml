@@ -79,16 +79,6 @@ jobs:
         with:
           node-version: 16.x
 
-      # - name: Restore cache
-      #   uses: actions/cache@v3
-      #   with:
-      #     path: |
-      #       ~/.npm
-      #       **/node_modules
-      #       packages/**/node_modules
-      #     key: yarn-cache-${{ hashFiles('**/yarn.lock') }}
-      #     restore-keys: yarn-cache-
-
       - name: Configure `yarn`
         run: yarn policies set-version v1.22.19
 
@@ -116,6 +106,11 @@ jobs:
 
       - name: Run tests
         env:
+            # Athena
+            DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY: ${{ secrets.DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY }}
+            DRIVERS_TESTS_ATHENA_CUBEJS_AWS_SECRET: ${{ secrets.DRIVERS_TESTS_ATHENA_CUBEJS_AWS_SECRET }}
+
+            # Databricks
             DRIVERS_TESTS_CUBEJS_DB_DATABRICKS_URL: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_DATABRICKS_URL }}
             DRIVERS_TESTS_CUBEJS_DB_DATABRICKS_TOKEN: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_DATABRICKS_TOKEN }}
             DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_KEY: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_KEY }}
