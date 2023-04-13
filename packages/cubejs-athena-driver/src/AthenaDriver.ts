@@ -4,6 +4,7 @@
  * @fileoverview The `AthenaDriver` and related types declaration.
  */
 
+import { EventEmitter } from 'events';
 import {
   getEnv,
   assertDataSource,
@@ -11,17 +12,29 @@ import {
   pausePromise,
   Required,
 } from '@cubejs-backend/shared';
-import { Athena, GetQueryResultsCommandOutput, StartQueryExecutionCommandInput } from '@aws-sdk/client-athena';
+import {
+  Athena,
+  GetQueryResultsCommandOutput,
+  ColumnInfo,
+  StartQueryExecutionCommandInput,
+} from '@aws-sdk/client-athena';
 import { S3, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import * as stream from 'stream';
 import {
-  BaseDriver, DatabaseStructure,
+  BaseDriver,
+  DatabaseStructure,
   DownloadTableCSVData,
   DriverInterface,
-  QueryOptions, StreamOptions,
-  StreamTableData,
+  QueryOptions,
+  StreamOptions,
   TableStructure,
+  Row,
+  Rows,
+  DownloadTableMemoryData,
+  StreamTableDataWithTypes,
+  DownloadQueryResultsResult,
+  DownloadQueryResultsOptions,
 } from '@cubejs-backend/base-driver';
 import * as SqlString from 'sqlstring';
 import { AthenaClientConfig } from '@aws-sdk/client-athena/dist-types/AthenaClient';
@@ -91,6 +104,8 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
 
   private schema: string;
 
+  private emitter = new EventEmitter();
+
   /**
    * Class constructor.
    */
@@ -129,7 +144,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       config.secretAccessKey ||
       getEnv('athenaAwsSecret', { dataSource });
 
-    const { schema, ...restConfig } = config;
+    const { schema, readOnly, ...restConfig } = config;
 
     this.schema = schema ||
       getEnv('dbName', { dataSource }) ||
@@ -137,6 +152,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
 
     this.config = {
       ...restConfig,
+      readOnly: typeof readOnly === 'undefined' ? true : readOnly,
       credentials: accessKeyId && secretAccessKey
         ? { accessKeyId, secretAccessKey }
         : undefined,
@@ -165,7 +181,8 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
         config.pollMaxInterval ||
         getEnv('dbPollMaxInterval', { dataSource })
       ) * 1000,
-      exportBucketCsvEscapeSymbol: getEnv('dbExportBucketCsvEscapeSymbol', { dataSource }),
+      exportBucketCsvEscapeSymbol:
+        getEnv('dbExportBucketCsvEscapeSymbol', { dataSource }),
     };
     if (this.config.exportBucket) {
       this.config.exportBucket = AthenaDriver.normalizeS3Path(this.config.exportBucket);
@@ -188,8 +205,71 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     });
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  public async query<R = unknown>(query: string, values: unknown[], options?: QueryOptions): Promise<R[]> {
+  /**
+   * Executes a query and returns either query result memory data or
+   * query result stream, depending on options.
+   */
+  public async downloadQueryResults(
+    query: string,
+    values: unknown[],
+    options: DownloadQueryResultsOptions,
+  ): Promise<DownloadQueryResultsResult> {
+    if (!options.streamImport) {
+      return this.memory(query, values);
+    } else {
+      return this.stream(query, values, options);
+    }
+  }
+
+  /**
+   * Executes query and returns table memory data that includes rows
+   * and queried fields types.
+   */
+  public async memory(
+    query: string,
+    values: unknown[],
+  ): Promise<DownloadTableMemoryData & { types: TableStructure }> {
+    const qid = await this.startQuery(query, values);
+    await this.waitForSuccess(qid);
+    const iter = this.lazyRowIterator(qid, query, true);
+    const types = <TableStructure><unknown>((await iter.next()).value);
+    const rows: Row[] = [];
+    for await (const row of iter) {
+      rows.push(<Row>row);
+    }
+    return { types, rows };
+  }
+
+  /**
+   * Returns stream table object that includes query result stream and
+   * queried fields types.
+   */
+  public async stream(
+    query: string,
+    values: unknown[],
+    options: StreamOptions,
+  ): Promise<StreamTableDataWithTypes> {
+    const qid = await this.startQuery(query, values);
+    await this.waitForSuccess(qid);
+    const iter = this.lazyRowIterator(qid, query, true);
+    const types = <TableStructure><unknown>((await iter.next()).value);
+    return {
+      rowStream: stream.Readable.from(iter, {
+        highWaterMark: options.highWaterMark,
+      }),
+      types,
+      release: async () => { /* canceling is missed in the iter */ },
+    };
+  }
+
+  /**
+   * Executes query and rerutns queried raws.
+   */
+  public async query<R = unknown>(
+    query: string,
+    values: unknown[],
+    _options?: QueryOptions,
+  ): Promise<R[]> {
     const qid = await this.startQuery(query, values);
     await this.waitForSuccess(qid);
     const rows: R[] = [];
@@ -200,64 +280,65 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
   }
 
   /**
-   * Returns stream table object that includes query result stream and
-   * query fields types.
+   * Executes query and returns async generator that yields queried
+   * rows.
    */
-  public async stream(
+  protected async* lazyRowIterator<R extends unknown>(
+    qid: AthenaQueryId,
     query: string,
-    values: unknown[],
-    options: StreamOptions,
-  ): Promise<StreamTableData> {
-    const types = await this.getQueryFieldsTypes(query, values);
-    const qid = await this.startQuery(query, values);
-    await this.waitForSuccess(qid);
-    const rowStream = stream.Readable.from(
-      this.lazyRowIterator(qid, query),
-      {
-        highWaterMark: options.highWaterMark,
-      }
-    );
-    return {
-      rowStream,
-      types,
-      release: async () => {
-        // TODO (buntarb): Canceling is missed in the iterator.
-      }
-    };
-  }
-
-  /**
-   * Returns query fields types.
-   */
-  public async getQueryFieldsTypes(
-    query: string,
-    values: unknown[],
-  ): Promise<TableStructure> {
-    const result: { [name: string]: AthenaType } = {};
-    const expl: {[key: string]: string}[] = await this.query(`EXPLAIN ${query}`, values);
-    expl
-      .filter((itm) => itm['Query Plan'] && itm['Query Plan'].indexOf(':=') >= 0)
-      .forEach((itm) => {
-        let val: string = itm['Query Plan'];
-        [, val] = val.split(':=');
-        val = val.trim();
-        [val] = val.split('(');
-        if (val.indexOf(':')) {
-          const [field, type] = val.split(':');
-          result[field] = <AthenaType>type;
+    withTypes?: boolean,
+  ): AsyncGenerator<R> {
+    let isFirstBatch = true;
+    let columnInfo: { Name: string }[] = [];
+    for (
+      let results: GetQueryResultsCommandOutput | undefined =
+        await this.athena.getQueryResults(qid);
+      results;
+      results = results.NextToken
+        ? (await this.athena.getQueryResults({ ...qid, NextToken: results.NextToken }))
+        : undefined
+    ) {
+      let rows = results.ResultSet?.Rows ?? [];
+      if (isFirstBatch) {
+        if (withTypes) {
+          yield this.mapTypes(
+            <ColumnInfo[]>results.ResultSet?.ResultSetMetadata?.ColumnInfo
+          ) as R;
         }
-      });
-    return this.mapFields(result);
+        isFirstBatch = false;
+        // Athena returns the columns names in first row, skip it.
+        rows = rows.slice(1);
+        columnInfo = /SHOW COLUMNS/.test(query) // Fix for getColumns method
+          ? [{ Name: 'column' }]
+          : checkNonNullable(
+            'ColumnInfo',
+            results.ResultSet?.ResultSetMetadata?.ColumnInfo,
+          ).map(info => ({ Name: checkNonNullable('Name', info.Name) }));
+      }
+      for (const row of rows) {
+        const fields: Record<string, any> = {};
+        columnInfo
+          .forEach((c, j) => {
+            const r = row.Data;
+            fields[c.Name] = (
+              r === null ||
+              r === undefined ||
+              r[j].VarCharValue === undefined
+            ) ? null : r[j].VarCharValue;
+          });
+        yield fields as R;
+      }
+    }
   }
 
   /**
    * Converts Athena to generic types and returns an array of queried
    * fields meta info.
    */
-  public mapFields(fields: { [name: string]: AthenaType }): TableStructure {
-    return Object.keys(fields).map((field) => {
+  public mapTypes(fields: ColumnInfo[]): TableStructure {
+    return fields.map((field) => {
       let type;
-      switch (fields[field]) {
+      switch (field.Type) {
         case 'boolean':
           type = 'boolean';
           break;
@@ -291,10 +372,10 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
           break;
         // unknown
         default:
-          type = fields[field];
+          type = 'text';
           break;
       }
-      return { name: field, type };
+      return { name: <string>field.Name, type };
     });
   }
 
@@ -424,42 +505,6 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     throw new Error(
       `Athena job timeout reached ${this.config.pollTimeout}ms`
     );
-  }
-
-  protected async* lazyRowIterator<R extends unknown>(
-    qid: AthenaQueryId,
-    query: string,
-  ): AsyncGenerator<R> {
-    let isFirstBatch = true;
-    let columnInfo: { Name: string }[] = [];
-    for (
-      let results: GetQueryResultsCommandOutput | undefined = await this.athena.getQueryResults(qid);
-      results;
-      results = results.NextToken
-        ? (await this.athena.getQueryResults({ ...qid, NextToken: results.NextToken }))
-        : undefined
-    ) {
-      let rows = results.ResultSet?.Rows ?? [];
-      if (isFirstBatch) {
-        isFirstBatch = false;
-        // Athena returns the columns names in first row, skip it.
-        rows = rows.slice(1);
-        columnInfo = /SHOW COLUMNS/.test(query) // Fix for getColumns method
-          ? [{ Name: 'column' }]
-          : checkNonNullable('ColumnInfo', results.ResultSet?.ResultSetMetadata?.ColumnInfo)
-            .map(info => ({ Name: checkNonNullable('Name', info.Name) }));
-      }
-
-      for (const row of rows) {
-        const fields: Record<string, any> = {};
-        columnInfo
-          .forEach((c, j) => {
-            const r = row.Data;
-            fields[c.Name] = (r === null || r === undefined || r[j].VarCharValue === undefined) ? null : r[j].VarCharValue;
-          });
-        yield fields as R;
-      }
-    }
   }
 
   protected async viewsSchema(tablesSchema: DatabaseStructure): Promise<DatabaseStructure> {

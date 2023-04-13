@@ -51,6 +51,7 @@ jobs:
         node: 
           - 16.x
         database:
+          - athena
           - clickhouse
           - databricks-jdbc
           - mssql

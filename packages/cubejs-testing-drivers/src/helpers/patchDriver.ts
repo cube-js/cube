@@ -57,7 +57,6 @@ export function patchDriver(driver: PatchedDriver) {
             && `${args[0]}`.toLowerCase().indexOf('cache ') !== 0
             && `${args[0]}`.toLowerCase().indexOf('queue ') !== 0
           ) {
-            console.log(args[0]);
             driver.calls?.push(name);
           }
         } else {

@@ -3,9 +3,8 @@
 exports[`Sequence with the @cubejs-backend/athena-driver for the Customers.RollingExternal 1`] = `
 Array [
   Array [
-    "createSchemaIfNotExists",
-    "loadPreAggregationIntoTable",
-    "tableColumnTypes",
+    "downloadQueryResults",
+    "stream",
   ],
   Array [
     "createSchemaIfNotExists",
@@ -23,54 +22,23 @@ Array [
 ]
 `;
 
+exports[`Sequence with the @cubejs-backend/athena-driver for the ECommerce.SimpleAnalysisExternal 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+    "stream",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+  ],
+]
+`;
+
 exports[`Sequence with the @cubejs-backend/athena-driver for the ECommerce.SimpleAnalysisInternal 1`] = `
 Array [
   Array [
     "loadPreAggregationIntoTable",
   ],
   Array [],
-]
-`;
-
-exports[`Sequence with the @cubejs-backend/athena-driver for the ECommerce.TimeAnalysisInternal 1`] = `
-Array [
-  Array [
-    "createSchemaIfNotExists",
-    "loadPreAggregationIntoTable",
-    "loadPreAggregationIntoTable",
-    "tableColumnTypes",
-    "tableColumnTypes",
-    "createSchemaIfNotExists",
-    "createSchemaIfNotExists",
-    "createSchemaIfNotExists",
-    "loadPreAggregationIntoTable",
-    "loadPreAggregationIntoTable",
-    "loadPreAggregationIntoTable",
-    "tableColumnTypes",
-    "tableColumnTypes",
-    "tableColumnTypes",
-    "createSchemaIfNotExists",
-    "createSchemaIfNotExists",
-    "loadPreAggregationIntoTable",
-    "loadPreAggregationIntoTable",
-    "tableColumnTypes",
-    "tableColumnTypes",
-    "loadPreAggregationIntoTable",
-    "loadPreAggregationIntoTable",
-    "loadPreAggregationIntoTable",
-    "loadPreAggregationIntoTable",
-    "loadPreAggregationIntoTable",
-    "loadPreAggregationIntoTable",
-  ],
-  Array [
-    "uploadTableWithIndexes",
-    "uploadTableWithIndexes",
-    "uploadTableWithIndexes",
-    "uploadTableWithIndexes",
-    "uploadTableWithIndexes",
-    "uploadTableWithIndexes",
-    "uploadTableWithIndexes",
-    "uploadTableWithIndexes",
-  ],
 ]
 `;
