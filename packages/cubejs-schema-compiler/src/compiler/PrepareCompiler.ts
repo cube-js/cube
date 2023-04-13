@@ -19,7 +19,8 @@ import { CompilerCache } from './CompilerCache';
 import { YamlCompiler } from './YamlCompiler';
 
 export type PrepareCompilerOptions = {
-  allowJsDuplicatePropsInSchema?: boolean
+  allowNodeRequire?: boolean;
+  allowJsDuplicatePropsInSchema?: boolean;
   maxQueryCacheSize?: number;
   maxQueryCacheAge?: number;
   compileContext?: any;
