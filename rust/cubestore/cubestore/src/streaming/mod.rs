@@ -1,4 +1,5 @@
 pub mod kafka;
+mod traffic_sender;
 
 mod buffered_stream;
 use crate::config::injection::DIService;
@@ -38,6 +39,7 @@ use std::time::{Duration, SystemTime};
 use stream_debug::MockStreamingSource;
 use tracing::Instrument;
 use warp::hyper::body::Bytes;
+use traffic_sender::TrafficSender;
 
 #[async_trait]
 pub trait StreamingService: DIService + Send + Sync {
@@ -673,13 +675,11 @@ impl KSqlStreamingSource {
         tail_bytes: &mut Bytes,
         bytes: Result<Bytes, reqwest::Error>,
         columns: Vec<Column>,
-        trace_obj: &Option<String>,
+        traffic_sender: &mut Arc<TrafficSender>,
     ) -> Result<Vec<Row>, CubeError> {
         let mut rows = Vec::new();
         let b = bytes?;
-        if let Some(trace_o) = trace_obj {
-            incoming_traffic_agent_event(trace_o, b.len() as u64)?;
-        }
+        traffic_sender.process_event(b.len() as u64)?;
         let string = String::from_utf8_lossy(&b);
         let mut concat = Cursor::new(Vec::new());
         concat.write_all(tail_bytes)?;
@@ -866,6 +866,8 @@ impl StreamingSource for KSqlStreamingSource {
             )
             .await?;
         let column_to_move = columns.clone();
+        let mut traffic_sender = TrafficSender::new(self.trace_obj.clone());
+            
         let trace_obj = self.trace_obj.clone();
         Ok(Box::pin(
             res.bytes_stream()
@@ -880,7 +882,7 @@ impl StreamingSource for KSqlStreamingSource {
                             tail_bytes,
                             bytes,
                             column_to_move.clone(),
-                            &trace_obj,
+                            &mut traffic_sender,
                         )
                         .map_err(|e| {
                             CubeError::internal(format!(
