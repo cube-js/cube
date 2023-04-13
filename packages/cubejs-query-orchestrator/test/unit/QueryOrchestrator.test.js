@@ -117,10 +117,6 @@ class MockDriver {
   capabilities() {
     return {};
   }
-  
-  tablesSchema() {
-    return this.schemaData;
-  }
 
   async streamQuery(sql) {
     return Readable.from((await this.query(sql)).map(r => (typeof r === 'string' ? { query: r } : r)));
@@ -128,8 +124,8 @@ class MockDriver {
 }
 
 class ExternalMockDriver extends MockDriver {
-  constructor({ schemaData } = {}) {
-    super({ schemaData });
+  constructor() {
+    super();
     this.indexes = [];
     this.csvFiles = [];
   }
@@ -223,7 +219,7 @@ describe('QueryOrchestrator', () => {
     const csvMockDriverLocal = new MockDriver({ csvImport: 'true' });
     const mockDriverUnloadWithoutTempTableSupportLocal = new MockDriverUnloadWithoutTempTableSupport();
     const streamingSourceMockDriverLocal = new StreamingSourceMockDriver();
-    const externalMockDriverLocal = new ExternalMockDriver({ schemaData });
+    const externalMockDriverLocal = new ExternalMockDriver();
 
     const redisPrefix = `ORCHESTRATOR_TEST_${testCount++}`;
     const driverFactory = (dataSource) => {
@@ -1636,11 +1632,6 @@ describe('QueryOrchestrator', () => {
     expect(mockDriver.tables).toContainEqual(expect.stringMatching(/orders_delay/));
   });
 
-  test('fetch table schema', async () => {
-    const schema = await queryOrchestrator.fetchSchema('foo');
-    expect(schema).toEqual(schemaData);
-  });
-
   test('streaming simple', async () => {
     const query = (id) => ({
       query: `SELECT * FROM stb_pre_aggregations.orders_d WHERE id = ${id}`,
@@ -1712,10 +1703,5 @@ describe('QueryOrchestrator', () => {
       });
       expect(data['Foo.query']).toMatch(/orders_d/);
     }));
-  });
-
-  test('fetch table schema from external db', async () => {
-    const schema = await queryOrchestrator.fetchSchema(undefined, true);
-    expect(schema).toEqual(schemaData);
   });
 });
