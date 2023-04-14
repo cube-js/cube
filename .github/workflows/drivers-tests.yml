@@ -35,6 +35,7 @@ jobs:
       - name: Configure `yarn`
         run: yarn policies set-version v1.22.19
 
+      # Building project
       - name: Install dependencies
         uses: nick-invision/retry@v2
         env:
@@ -57,7 +58,10 @@ jobs:
           cd packages/cubejs-testing-drivers
           yarn tsc
 
-      # Building project
+      - uses: actions/upload-artifact@v3
+        with:
+          name: build
+          path: .
 
       # Building docker
       - name: Login to DockerHub
@@ -122,6 +126,16 @@ jobs:
       - name: Configure `yarn`
         run: yarn policies set-version v1.22.19
 
+      - name: Copy built project
+        uses: actions/download-artifact@v3
+        with:
+          name: build
+          path: ./build
+
+      - name: Review built project
+        run: ls -R
+        working-directory: ./build
+
       # - name: Install dependencies
       #   uses: nick-invision/retry@v2
       #   env:
@@ -156,6 +170,6 @@ jobs:
             DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_KEY: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_KEY }}
             DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET }}
         run: |
-          cd packages/cubejs-testing-drivers
+          cd ./build/packages/cubejs-testing-drivers
           export DEBUG=testcontainers
           yarn ${{ matrix.database }}-${{ matrix.suite }}
