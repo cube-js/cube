@@ -5,11 +5,11 @@ on:
     branches:
       - 'master'
     paths:
-      - '.github/workflows/drivers.yml'
+      - '.github/workflows/drivers-tests.yml'
       - 'packages/**'
   pull_request:
     paths:
-      - '.github/workflows/drivers.yml'
+      - '.github/workflows/drivers-tests.yml'
       - 'packages/**'
 
 jobs:
@@ -20,6 +20,46 @@ jobs:
       - name: Check out the repo
         uses: actions/checkout@v3
 
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2022-06-22
+          override: true
+          components: rustfmt
+
+      - name: Install Node.js 16.x
+        uses: actions/setup-node@v3
+        with:
+          node-version: 16.x
+
+      - name: Configure `yarn`
+        run: yarn policies set-version v1.22.19
+
+      - name: Install dependencies
+        uses: nick-invision/retry@v2
+        env:
+          CUBESTORE_SKIP_POST_INSTALL: true
+        with:
+          max_attempts: 3
+          retry_on: error
+          retry_wait_seconds: 15
+          timeout_minutes: 20
+          command: yarn install --frozen-lockfile
+
+      - name: Build client
+        run: yarn build
+
+      - name: Build packages
+        run: yarn tsc
+
+      - name: Build tests
+        run: |
+          cd packages/cubejs-testing-drivers
+          yarn tsc
+
+      # Building project
+
+      # Building docker
       - name: Login to DockerHub
         uses: docker/login-action@v1
         with:
@@ -82,27 +122,27 @@ jobs:
       - name: Configure `yarn`
         run: yarn policies set-version v1.22.19
 
-      - name: Install dependencies
-        uses: nick-invision/retry@v2
-        env:
-          CUBESTORE_SKIP_POST_INSTALL: true
-        with:
-          max_attempts: 3
-          retry_on: error
-          retry_wait_seconds: 15
-          timeout_minutes: 20
-          command: yarn install --frozen-lockfile
+      # - name: Install dependencies
+      #   uses: nick-invision/retry@v2
+      #   env:
+      #     CUBESTORE_SKIP_POST_INSTALL: true
+      #   with:
+      #     max_attempts: 3
+      #     retry_on: error
+      #     retry_wait_seconds: 15
+      #     timeout_minutes: 20
+      #     command: yarn install --frozen-lockfile
 
-      - name: Build client
-        run: yarn build
+      # - name: Build client
+      #   run: yarn build
 
-      - name: Build packages
-        run: yarn tsc
+      # - name: Build packages
+      #   run: yarn tsc
 
-      - name: Build tests
-        run: |
-          cd packages/cubejs-testing-drivers
-          yarn tsc
+      # - name: Build tests
+      #   run: |
+      #     cd packages/cubejs-testing-drivers
+      #     yarn tsc
 
       - name: Run tests
         env:
