@@ -1,9 +1,11 @@
 import YAML from 'js-yaml';
-import { camelize } from 'inflection';
 import * as t from '@babel/types';
 import { parse } from '@babel/parser';
 import babelGenerator from '@babel/generator';
 import babelTraverse from '@babel/traverse';
+
+import type { FileContent } from '@cubejs-backend/shared';
+
 import { CubePropContextTranspiler, transpiledFields, transpiledFieldsPatterns } from './transpilers';
 import { PythonParser } from '../parser/PythonParser';
 import { CubeSymbols } from './CubeSymbols';
@@ -11,6 +13,7 @@ import { DataSchemaCompiler } from './DataSchemaCompiler';
 import { nonStringFields } from './CubeValidator';
 import { CubeDictionary } from './CubeDictionary';
 import { ErrorReporter } from './ErrorReporter';
+import { camelizeCube } from './utils';
 
 type EscapeStateStack = {
   inFormattedStr?: boolean;
@@ -25,7 +28,7 @@ export class YamlCompiler {
   public constructor(private cubeSymbols: CubeSymbols, private cubeDictionary: CubeDictionary) {
   }
 
-  public compileYamlFile(file, errorsReport: ErrorReporter, cubes, contexts, exports, asyncModules, toCompile, compiledFiles) {
+  public compileYamlFile(file: FileContent, errorsReport: ErrorReporter, cubes, contexts, exports, asyncModules, toCompile, compiledFiles) {
     if (!file.content.trim()) {
       return;
     }
@@ -65,36 +68,18 @@ export class YamlCompiler {
   }
 
   private transformYamlCubeObj(cubeObj, errorsReport: ErrorReporter) {
-    cubeObj = this.camelizeObj(cubeObj);
+    camelizeCube(cubeObj);
+
     cubeObj.measures = this.yamlArrayToObj(cubeObj.measures || [], 'measure', errorsReport);
     cubeObj.dimensions = this.yamlArrayToObj(cubeObj.dimensions || [], 'dimension', errorsReport);
     cubeObj.segments = this.yamlArrayToObj(cubeObj.segments || [], 'segment', errorsReport);
     cubeObj.preAggregations = this.yamlArrayToObj(cubeObj.preAggregations || [], 'segment', errorsReport);
     cubeObj.joins = this.yamlArrayToObj(cubeObj.joins || [], 'join', errorsReport);
+
     return this.transpileYaml(cubeObj, [], cubeObj.name, errorsReport);
   }
 
-  private camelizeObj(cubeObjPart: any): any {
-    if (typeof cubeObjPart === 'object') {
-      if (Array.isArray(cubeObjPart)) {
-        for (let i = 0; i < cubeObjPart.length; i++) {
-          cubeObjPart[i] = this.camelizeObj(cubeObjPart[i]);
-        }
-      } else {
-        for (const key of Object.keys(cubeObjPart)) {
-          cubeObjPart[key] = this.camelizeObj(cubeObjPart[key]);
-          const camelizedKey = camelize(key, true);
-          if (camelizedKey !== key) {
-            cubeObjPart[camelizedKey] = cubeObjPart[key];
-            delete cubeObjPart[key];
-          }
-        }
-      }
-    }
-    return cubeObjPart;
-  }
-
-  private transpileYaml(obj, propertyPath, cubeName, errorsReport) {
+  private transpileYaml(obj, propertyPath, cubeName, errorsReport: ErrorReporter) {
     if (transpiledFields.has(propertyPath[propertyPath.length - 1])) {
       for (const p of transpiledFieldsPatterns) {
         const fullPath = propertyPath.join('.');
@@ -185,12 +170,12 @@ export class YamlCompiler {
     return result.join('');
   }
 
-  private parsePythonIntoArrowFunction(codeString, cubeName, originalObj, errorsReport) {
+  private parsePythonIntoArrowFunction(codeString, cubeName, originalObj, errorsReport: ErrorReporter) {
     const ast = this.parsePythonAndTranspileToJs(codeString, errorsReport);
     return this.astIntoArrowFunction(ast, codeString, cubeName);
   }
 
-  private parsePythonAndTranspileToJs(codeString, errorsReport) {
+  private parsePythonAndTranspileToJs(codeString, errorsReport: ErrorReporter) {
     try {
       const pythonParser = new PythonParser(codeString);
       return pythonParser.transpileToJs();
