@@ -25,13 +25,15 @@ query {
 
 ## `CubeQueryArgs`
 
-| Key          | Schema                                | Description                                                                                                                                      |
-| ------------ | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `where`      | [`RootWhereInput`](#root-where-input) | Represents a SQL `WHERE` clause                                                                                                                  |
-| `limit`      | `Int`                                 | A row limit for your query. The default value is `10000`. The maximum allowed limit is `50000`                                                   |
-| `offset`     | `Int`                                 | The number of initial rows to be skipped for your query. The default value is `0`                                                                |
-| `timezone`   | `String`                              | The timezone to use for the query. The default value is `UTC`                                                                                    |
-| `renewQuery` | `Boolean`                             | If `renewQuery` is set to `true`, Cube will renew all `refreshKey` for queries and query results in the foreground. The default value is `false` |
+| Key          | Schema                                | Description                                                                                                                                                                                                            |
+| ------------ | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `where`      | [`RootWhereInput`](#root-where-input) | Represents a SQL `WHERE` clause                                                                                                                                                                                        |
+| `limit`      | `Int`                                 | A row limit for your query. The default value is `10000`. The maximum allowed limit is `50000`. If you'd like to request more rows than the maximum allowed limit, consider using [pagination][ref-recipe-pagination]. |
+| `offset`     | `Int`                                 | The number of initial rows to be skipped for your query. The default value is `0`                                                                                                                                      |
+| `timezone`   | `String`                              | The timezone to use for the query. The default value is `UTC`                                                                                                                                                          |
+| `renewQuery` | `Boolean`                             | If `renewQuery` is set to `true`, Cube will renew all `refreshKey` for queries and query results in the foreground. The default value is `false`                                                                       |
+
+[ref-recipe-pagination]: /recipes/pagination
 
 ## `RootWhereInput`
 

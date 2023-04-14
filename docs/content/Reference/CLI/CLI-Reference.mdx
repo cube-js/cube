@@ -13,7 +13,7 @@ The `create` command generates barebones Cube app.
 ### <--{"id" : "create"}--> Usage
 
 ```bash{promptUser: user}
-cubejs create APP-NAME -d DB-TYPE [-t TEMPLATE]
+npx cubejs-cli create APP-NAME -d DB-TYPE [-t TEMPLATE]
 ```
 
 ### <--{"id" : "create"}--> Flags
@@ -29,13 +29,13 @@ Create app called `demo-app` using default (`docker`) template and `mysql`
 database:
 
 ```bash{promptUser: user}
-cubejs create demo-app -d mysql
+npx cubejs-cli create demo-app -d mysql
 ```
 
 Create app called `demo-app` using `express` template and `mysql` database:
 
 ```bash{promptUser: user}
-cubejs create demo-app -t express -d mysql
+npx cubejs-cli create demo-app -t express -d mysql
 ```
 
 ## server
@@ -52,19 +52,19 @@ The `server` command starts Cube in production mode.
 Default start:
 
 ```bash{promptUser: user}
-cubejs server
+npx cubejs-cli server
 ```
 
 With debug information:
 
 ```bash{promptUser: user}
-cubejs server --debug
+npx cubejs-cli server --debug
 ```
 
 ### <--{"id" : "server"}--> Usage
 
 ```bash{promptUser: user}
-cubejs server
+npx cubejs-cli server
 ```
 
 ## generate
@@ -76,7 +76,7 @@ an active [database connection](/config/databases).
 ### <--{"id" : "generate"}--> Usage
 
 ```bash{promptUser: user}
-cubejs generate -t TABLE-NAMES
+npx cubejs-cli generate -t TABLE-NAMES
 ```
 
 ### <--{"id" : "generate"}--> Flags
@@ -90,7 +90,7 @@ cubejs generate -t TABLE-NAMES
 Generate schema files for tables `orders` and `customers`:
 
 ```bash{promptUser: user}
-cubejs generate -t orders,customers
+npx cubejs-cli generate -t orders,customers
 ```
 
 ## token
@@ -106,7 +106,7 @@ security best practices._
 ### <--{"id" : "token"}--> Usage
 
 ```bash{promptUser: user}
-cubejs token -e TOKEN-EXPIRY -s SECRET -p FOO=BAR -u BAZ=QUX
+npx cubejs-cli token -e TOKEN-EXPIRY -s SECRET -p FOO=BAR -u BAZ=QUX
 ```
 
 ### <--{"id" : "token"}--> Flags
@@ -123,7 +123,7 @@ cubejs token -e TOKEN-EXPIRY -s SECRET -p FOO=BAR -u BAZ=QUX
 Generate token with 1 day expiry and payload `{ 'appId': 1, 'userId': 2 }`:
 
 ```bash{promptUser: user}
-cubejs token -e "1 day" -p appId=1 -p userId=2
+npx cubejs-cli token -e "1 day" -p appId=1 -p userId=2
 ```
 
 ## validate
@@ -133,7 +133,7 @@ The `validate` command checks models in a Cube project for validation errors.
 ### Usage
 
 ```bash{promptUser: user}
-cubejs validate
+npx cubejs-cli validate
 ```
 
 ### Example

@@ -136,6 +136,7 @@ export class CubeEvaluator extends CubeSymbols {
    */
   prepareMembers(members, cube, errorReporter) {
     members = members || {};
+
     for (const memberName of Object.keys(members)) {
       let ownedByCube = true;
 

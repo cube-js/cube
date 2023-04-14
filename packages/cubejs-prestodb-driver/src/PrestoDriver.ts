@@ -16,7 +16,10 @@ import {
   getEnv,
   assertDataSource,
 } from '@cubejs-backend/shared';
+
 import { Transform, TransformCallback } from 'stream';
+import type { ConnectionOptions as TLSConnectionOptions } from 'tls';
+
 import {
   map, zipObj, prop, concat
 } from 'ramda';
@@ -32,7 +35,7 @@ export type PrestoDriverConfiguration = {
   user?: string;
   // eslint-disable-next-line camelcase
   basic_auth?: { user: string, password: string };
-  ssl?: string;
+  ssl?: string | TLSConnectionOptions;
   dataSource?: string;
 };
 

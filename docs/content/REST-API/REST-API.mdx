@@ -38,6 +38,28 @@ you can still use it to pass a security context.
 curl -H "Authorization: EXAMPLE-API-TOKEN" https://example.com/cubejs-api/v1/sql
 ```
 
+### <--{"id" : "Prerequisites"}--> Configuring CORS
+
+REST API supports [Cross-Origin Resource Sharing (CORS)][cors].
+
+By default, requests from any origin (`*`) are allowed. To allow requests from a
+specific domain only, use the following configuration in the `cube.js` file:
+
+```javascript
+module.exports = {
+  http: {
+    cors: {
+      origin: 'https://example.com',
+    },
+  },
+};
+```
+
+Please see [configuration options][ref-config-cors] for details.
+
+[cors]: https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS
+[ref-config-cors]: /config#http
+
 ### <--{"id" : "Prerequisites"}--> Continue wait
 
 If the request takes too long to be processed, Cube Backend responds with

@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.32.26](https://github.com/cube-js/cube/compare/v0.32.25...v0.32.26) (2023-04-13)
+
+
+### Bug Fixes
+
+* Ensure expired in memory cache value can't be used even in case renewalThreshold hasn't been met ([64f5878](https://github.com/cube-js/cube/commit/64f58789b6eab44d25f8d4305b3e8b299f4735bb))
+
+
+
+
+
 ## [0.32.25](https://github.com/cube-js/cube/compare/v0.32.24...v0.32.25) (2023-04-12)
 
 **Note:** Version bump only for package @cubejs-backend/query-orchestrator

@@ -1,4 +1,5 @@
 import R from 'ramda';
+import pLimit from 'p-limit';
 import { v4 as uuidv4 } from 'uuid';
 import crypto from 'crypto';
 import { Required } from '@cubejs-backend/shared';
@@ -35,7 +36,8 @@ type PreAggregationsQueryingOptions = {
     partitions?: string[]
   }[],
   forceBuildPreAggregations?: boolean,
-  throwErrors?: boolean
+  throwErrors?: boolean,
+  preAggregationLoadConcurrency?: number,
 };
 
 type RefreshQueries = {
@@ -382,7 +384,9 @@ export class RefreshScheduler {
       preAggregationIds: Object.keys(preAggregationsQueryingOptions)
     });
 
-    return Promise.all(preAggregations.map(async preAggregation => {
+    const loadConcurrency = pLimit(queryingOptions.preAggregationLoadConcurrency || 1);
+
+    return Promise.all(preAggregations.map(preAggregation => async () => {
       const { timezones } = queryingOptions;
       const { partitions: partitionsFilter, cacheOnly } = preAggregationsQueryingOptions[preAggregation.id] || {};
 
@@ -459,7 +463,7 @@ export class RefreshScheduler {
         errors,
         partitionsWithDependencies
       };
-    }));
+    }).map(loadConcurrency));
   }
 
   protected async roundRobinRefreshPreAggregationsQueryIterator(context, compilerApi: CompilerApi, queryingOptions, queriesCache: { [key: string]: Promise<PreAggregationDescription[][]> }) {

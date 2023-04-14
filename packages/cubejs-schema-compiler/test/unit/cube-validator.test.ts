@@ -439,4 +439,71 @@ describe('Cube Validation', () => {
 
     expect(validationResult.error).toBeFalsy();
   });
+
+  test('cube - aliases test', async () => {
+    const cubeA = {
+      name: 'CubeA',
+      sql_table: () => 'public.Users',
+      public: true,
+      refresh_key: {
+        sql: () => `SELECT MAX(created_at) FROM orders`,
+      },
+      measures: {
+        id: {
+          sql: () => 'id',
+          type: 'count',
+          drill_members: () => ['pkey', 'createdAt'],
+          rolling_window: {
+            trailing: '1 month',
+          }
+        },
+      },
+      dimensions: {
+        pkey: {
+          shown: true,
+          sql: () => 'id',
+          type: 'number',
+          subQuery: true,
+          primary_key: true,
+          propagate_filters_to_sub_query: true
+        },
+        createdAt: {
+          sql: () => 'created',
+          type: 'time',
+        },
+      },
+      pre_aggregations: {
+        main: {
+          type: 'originalSql',
+          time_dimension: () => 'createdAt',
+          partition_granularity: 'day',
+          refresh_key: {
+            sql: () => `SELECT MAX(created_at) FROM orders`,
+          },
+        }
+      },
+      data_source: 'default',
+      rewrite_queries: true,
+      sql_alias: 'myalias',
+      fileName: 'fileName',
+    };
+
+    const cubeSymbols = new CubeSymbols();
+    cubeSymbols.compile([cubeA], {
+      inContext: () => false,
+      error: (message, _e) => {
+        console.log(message);
+      }
+    });
+
+    const cubeValidator = new CubeValidator(cubeSymbols);
+    const validationResult = cubeValidator.validate(cubeSymbols.getCubeDefinition('CubeA'), {
+      inContext: () => false,
+      error: (message, _e) => {
+        console.log(message);
+      }
+    });
+
+    expect(validationResult.error).toBeFalsy();
+  });
 });

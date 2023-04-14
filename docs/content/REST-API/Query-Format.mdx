@@ -35,7 +35,8 @@ A Query has the following properties:
 - `segments`: An array of segments. A segment is a named filter, created in the
   Data Schema.
 - `limit`: A row limit for your query. The default value is `10000`. The maximum
-  allowed limit is `50000`.
+  allowed limit is `50000`. If you'd like to request more rows than the maximum
+  allowed limit, consider using [pagination][ref-recipe-pagination].
 - `offset`: The number of initial rows to be skipped for your query. The default
   value is `0`.
 - `order`: An object, where the keys are measures or dimensions to order by and
@@ -590,6 +591,7 @@ date. If you need the current date also you can use `from N days ago to now` or
 }
 ```
 
+[ref-recipe-pagination]: /recipes/pagination
 [ref-client-core-resultset-drilldown]:
   /@cubejs-client-core#result-set-drill-down
 [ref-schema-ref-preaggs-refreshkey]:
