@@ -893,7 +893,7 @@ impl Config {
                     100 * 1024 * 1024,
                     None,
                     Some(32 << 20),
-                ),
+                ) as u64,
                 max_partition_split_threshold: env_parse(
                     "CUBESTORE_PARTITION_MAX_SPLIT_THRESHOLD",
                     1048576 * 8,
