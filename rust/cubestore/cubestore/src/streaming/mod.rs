@@ -13,7 +13,6 @@ use crate::store::ChunkDataStore;
 use crate::streaming::kafka::{KafkaClientService, KafkaStreamingSource};
 use crate::table::data::{append_row, create_array_builders};
 use crate::table::{Row, TableValue, TimestampValue};
-use crate::telemetry::incoming_traffic_agent_event;
 use crate::util::decimal::Decimal;
 use crate::{app_metrics, CubeError};
 use arrow::array::ArrayBuilder;
@@ -38,8 +37,8 @@ use std::time::{Duration, SystemTime};
 #[cfg(debug_assertions)]
 use stream_debug::MockStreamingSource;
 use tracing::Instrument;
-use warp::hyper::body::Bytes;
 use traffic_sender::TrafficSender;
+use warp::hyper::body::Bytes;
 
 #[async_trait]
 pub trait StreamingService: DIService + Send + Sync {
@@ -675,7 +674,7 @@ impl KSqlStreamingSource {
         tail_bytes: &mut Bytes,
         bytes: Result<Bytes, reqwest::Error>,
         columns: Vec<Column>,
-        traffic_sender: &mut Arc<TrafficSender>,
+        traffic_sender: &Arc<TrafficSender>,
     ) -> Result<Vec<Row>, CubeError> {
         let mut rows = Vec::new();
         let b = bytes?;
@@ -866,9 +865,8 @@ impl StreamingSource for KSqlStreamingSource {
             )
             .await?;
         let column_to_move = columns.clone();
-        let mut traffic_sender = TrafficSender::new(self.trace_obj.clone());
-            
-        let trace_obj = self.trace_obj.clone();
+        let traffic_sender = TrafficSender::new(self.trace_obj.clone());
+
         Ok(Box::pin(
             res.bytes_stream()
                 .scan(
@@ -882,7 +880,7 @@ impl StreamingSource for KSqlStreamingSource {
                             tail_bytes,
                             bytes,
                             column_to_move.clone(),
-                            &mut traffic_sender,
+                            &traffic_sender,
                         )
                         .map_err(|e| {
                             CubeError::internal(format!(
