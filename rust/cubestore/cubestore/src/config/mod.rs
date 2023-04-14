@@ -888,9 +888,11 @@ impl Config {
                     "CUBESTORE_PARTITION_SPLIT_THRESHOLD",
                     1048576 * 2,
                 ),
-                partition_size_split_threshold_bytes: env_parse(
-                    "CUBESTORE_PARTITION_SIZE_SPLIT_THRESHOLD_BYTES",
+                partition_size_split_threshold_bytes: env_parse_size(
+                    "CUBESTORE_PARTITION_SIZE_SPLIT_THRESHOLD",
                     100 * 1024 * 1024,
+                    None,
+                    Some(32 << 20)
                 ),
                 max_partition_split_threshold: env_parse(
                     "CUBESTORE_PARTITION_MAX_SPLIT_THRESHOLD",
