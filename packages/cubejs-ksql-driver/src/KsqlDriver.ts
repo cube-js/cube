@@ -10,7 +10,7 @@ import {
 } from '@cubejs-backend/shared';
 import {
   BaseDriver, DriverCapabilities,
-  DriverInterface,
+  DriverInterface, QueryOptions,
 } from '@cubejs-backend/base-driver';
 import { Kafka } from 'kafkajs';
 import sqlstring, { format as formatSql } from 'sqlstring';
@@ -320,7 +320,7 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
 
   public dropTable(tableName: string, options: any): Promise<any> {
     return this.dropTableMutex.runExclusive(
-      async () => super.dropTable(this.quoteIdentifier(this.tableDashName(tableName)), options)
+      async () => this.query(`DROP TABLE ${this.quoteIdentifier(this.tableDashName(tableName))} DELETE TOPIC`, [], options)
     );
   }
 
