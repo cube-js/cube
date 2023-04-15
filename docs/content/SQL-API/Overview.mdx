@@ -193,7 +193,7 @@ time dimension date ranges whenever it's possible.
 Cube tries to push down all `ORDER BY` statements into Cube Query.
 
 If it can't be done ordering part would be done in a post-processing phase. In
-case there are more than 50k rows in the result set, incorrect results can be
+case there are more than 50,000 rows in the result set, incorrect results can be
 received in this case. Please use `EXPLAIN` in order to check if it's the case.
 
 Consider the following query.
@@ -223,14 +223,14 @@ see below, the sorting operation is done after Cube query and projection.
 +--- CubeScanExecutionPlan
 ```
 
-Because of the default limit in Cube queries (50k rows), there is a possibility
-of a wrong result if there are more than 50k rows. Given that queries to Cube
-are usually aggregated, it is rare that they may return more than 50k rows, but
+Because of the default limit in Cube queries (50,000 rows), there is a possibility
+of a wrong result if there are more than 50,000 rows. Given that queries to Cube
+are usually aggregated, it is rare that they may return more than 50,000 rows, but
 keep that limitation in mind when designing your queries.
 
 ### <--{"id" : "Querying cube tables"}--> Limit
 
-Limit push down is supported by Cube however, a limit over 50k can't be
+Limit push down is supported by Cube however, a limit over 50,000 can't be
 overridden. In future versions, paging and streaming would be used to avoid this
 limitation.
 

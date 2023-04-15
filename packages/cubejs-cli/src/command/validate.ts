@@ -16,7 +16,9 @@ async function validate(options) {
   
   try {
     const repo = new FileRepository(schemaPath);
-    await compile(repo);
+    await compile(repo, {
+      allowNodeRequire: true,
+    });
   } catch (error: any) {
     console.log('❌ Cube Schema validation failed');
     displayError(error.messages);

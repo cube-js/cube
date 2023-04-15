@@ -3,6 +3,37 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.32.27](https://github.com/cube-js/cube/compare/v0.32.26...v0.32.27) (2023-04-14)
+
+
+### Bug Fixes
+
+* Do not use in memory cache for more than 5 minutes to avoid any long term discrepancies with upstream cache ([aea2daf](https://github.com/cube-js/cube/commit/aea2daf38ddde61fd3f00a886b7679bef060948f))
+* **ksql-driver:** Drop table with the topic to avoid orphaned topics ([b113841](https://github.com/cube-js/cube/commit/b113841ad52a52b4ea65192277819fce50725f02))
+* Limit pre-aggregations API memory usage by introducing partition loading concurrency ([f565371](https://github.com/cube-js/cube/commit/f565371fe9d05267bbacd37369dbc25780e4da19))
+
+
+
+
+
+## [0.32.26](https://github.com/cube-js/cube/compare/v0.32.25...v0.32.26) (2023-04-13)
+
+
+### Bug Fixes
+
+* **cli:** Validate command - allow node require ([#6416](https://github.com/cube-js/cube/issues/6416)) ([ead63d8](https://github.com/cube-js/cube/commit/ead63d823253e8cd42e9353a09d4481e5e889d0b))
+* Ensure expired in memory cache value can't be used even in case renewalThreshold hasn't been met ([64f5878](https://github.com/cube-js/cube/commit/64f58789b6eab44d25f8d4305b3e8b299f4735bb))
+* re-export FileRepository ([#6425](https://github.com/cube-js/cube/issues/6425)) ([52c9252](https://github.com/cube-js/cube/commit/52c92529c5c13994b81b7af616fdf329cb50a0f6))
+
+
+### Features
+
+* **schema-compiler:** JS - support snake_case for any properties ([#6396](https://github.com/cube-js/cube/issues/6396)) ([f1b4c0b](https://github.com/cube-js/cube/commit/f1b4c0bfb2e8b8ad20853af6232388c6d764a780))
+
+
+
+
+
 ## [0.32.25](https://github.com/cube-js/cube/compare/v0.32.24...v0.32.25) (2023-04-12)
 
 

@@ -4,6 +4,7 @@ import { camelize } from 'inflection';
 
 import { UserError } from './UserError';
 import { DynamicReference } from './DynamicReference';
+import { camelizeCube } from './utils';
 
 const FunctionRegex = /function\s+\w+\(([A-Za-z0-9_,]*)|\(([\s\S]*?)\)\s*=>|\(?(\w+)\)?\s*=>/;
 const CONTEXT_SYMBOLS = {
@@ -41,6 +42,7 @@ export class CubeSymbols {
       const cubeDefinition = this.cubeDefinitions[cubeName];
       this.builtCubes[cubeName] = this.createCube(cubeDefinition);
     }
+
     return this.builtCubes[cubeName];
   }
 
@@ -48,6 +50,7 @@ export class CubeSymbols {
     let measures;
     let dimensions;
     let segments;
+
     const cubeObject = Object.assign({
       allDefinitions(type) {
         if (cubeDefinition.extends) {
@@ -118,6 +121,8 @@ export class CubeSymbols {
       errorReporter.error(`${duplicateNames.join(', ')} defined more than once`);
     }
 
+    camelizeCube(cube);
+
     this.camelCaseTypes(cube.joins);
     this.camelCaseTypes(cube.measures);
     this.camelCaseTypes(cube.dimensions);
@@ -137,10 +142,14 @@ export class CubeSymbols {
     );
   }
 
+  /**
+   * @private
+   */
   camelCaseTypes(obj) {
     if (!obj) {
       return;
     }
+
     // eslint-disable-next-line no-restricted-syntax
     for (const member of Object.values(obj)) {
       if (member.type && member.type.indexOf('_') !== -1) {

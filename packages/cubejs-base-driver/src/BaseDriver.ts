@@ -5,6 +5,8 @@
  */
 
 import * as stream from 'stream';
+import type { ConnectionOptions as TLSConnectionOptions } from 'tls';
+
 import {
   getEnv,
   keyByDataSource,
@@ -149,43 +151,38 @@ export abstract class BaseDriver implements DriverInterface {
    `;
   }
 
-  /**
-   * Returns SSL options.
-   */
-  protected getSslOptions(dataSource: string) {
-    let ssl;
-
-    const sslOptions = [{
-      name: 'ca',
-      canBeFile: true,
-      envKey: keyByDataSource('CUBEJS_DB_SSL_CA', dataSource),
-      validate: isSslCert,
-    }, {
-      name: 'cert',
-      canBeFile: true,
-      envKey: keyByDataSource('CUBEJS_DB_SSL_CERT', dataSource),
-      validate: isSslCert,
-    }, {
-      name: 'key',
-      canBeFile: true,
-      envKey: keyByDataSource('CUBEJS_DB_SSL_KEY', dataSource),
-      validate: isSslKey,
-    }, {
-      name: 'ciphers',
-      envKey: keyByDataSource('CUBEJS_DB_SSL_CIPHERS', dataSource),
-    }, {
-      name: 'passphrase',
-      envKey: keyByDataSource('CUBEJS_DB_SSL_PASSPHRASE', dataSource),
-    }, {
-      name: 'servername',
-      envKey: keyByDataSource('CUBEJS_DB_SSL_SERVERNAME', dataSource),
-    }];
-
+  protected getSslOptions(dataSource: string): TLSConnectionOptions | undefined {
     if (
       getEnv('dbSsl', { dataSource }) ||
       getEnv('dbSslRejectUnauthorized', { dataSource })
     ) {
-      ssl = sslOptions.reduce(
+      const sslOptions = [{
+        name: 'ca',
+        canBeFile: true,
+        envKey: keyByDataSource('CUBEJS_DB_SSL_CA', dataSource),
+        validate: isSslCert,
+      }, {
+        name: 'cert',
+        canBeFile: true,
+        envKey: keyByDataSource('CUBEJS_DB_SSL_CERT', dataSource),
+        validate: isSslCert,
+      }, {
+        name: 'key',
+        canBeFile: true,
+        envKey: keyByDataSource('CUBEJS_DB_SSL_KEY', dataSource),
+        validate: isSslKey,
+      }, {
+        name: 'ciphers',
+        envKey: keyByDataSource('CUBEJS_DB_SSL_CIPHERS', dataSource),
+      }, {
+        name: 'passphrase',
+        envKey: keyByDataSource('CUBEJS_DB_SSL_PASSPHRASE', dataSource),
+      }, {
+        name: 'servername',
+        envKey: keyByDataSource('CUBEJS_DB_SSL_SERVERNAME', dataSource),
+      }];
+
+      const ssl: TLSConnectionOptions = sslOptions.reduce(
         (agg, { name, envKey, canBeFile, validate }) => {
           const value = process.env[envKey];
           if (value) {
@@ -227,9 +224,11 @@ export abstract class BaseDriver implements DriverInterface {
       );
 
       ssl.rejectUnauthorized = getEnv('dbSslRejectUnauthorized', { dataSource });
+
+      return ssl;
     }
 
-    return ssl;
+    return undefined;
   }
 
   abstract testConnection(): Promise<void>;
