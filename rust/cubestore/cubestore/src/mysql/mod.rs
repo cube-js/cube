@@ -64,6 +64,7 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Backend {
                     inline_tables: InlineTables::new(),
                     trace_obj: None,
                     process_id: None,
+                    parameters: None,
                 },
                 query,
             )
