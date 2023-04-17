@@ -493,6 +493,12 @@ export class CubeEvaluator extends CubeSymbols {
     return path.split('.');
   }
 
+  parsePathAnyType(path) {
+    // Should throw UserError in case of parse error
+    this.byPathAnyType(path);
+    return path.split('.');
+  }
+
   collectUsedCubeReferences(cube, sqlFn) {
     const cubeEvaluator = this;
 
