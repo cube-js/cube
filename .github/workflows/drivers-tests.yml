@@ -61,7 +61,7 @@ jobs:
       - name: Pack built project
         uses: edgarrc/action-7z@v1
         with:
-          args: 7z a build.7z .
+          args: 7z a ./build.7z .
 
       - name: Upload built project
         uses: actions/upload-artifact@v3
