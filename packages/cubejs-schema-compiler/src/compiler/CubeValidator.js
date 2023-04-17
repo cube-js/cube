@@ -40,7 +40,11 @@ const regexTimeInterval = Joi.string().custom((value, helper) => {
 const timeInterval =
   Joi.alternatives([
     regexTimeInterval,
-    Joi.any().valid('unbounded')
+    Joi.any().valid('unbounded'),
+    Joi.object().keys({
+      sql: Joi.func().required(),
+      granularity: Joi.string().valid('minute', 'hour', 'day', 'week', 'month', 'year').required()
+    })
   ]);
 
 const everyInterval = Joi.string().custom((value, helper) => {

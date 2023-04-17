@@ -109,7 +109,7 @@ export class BaseMeasure {
     const { rollingWindow } = this.measureDefinition();
     if (rollingWindow) {
       return this.query.rollingWindowDateJoinCondition(
-        rollingWindow.trailing, rollingWindow.leading, rollingWindow.offset
+        rollingWindow.trailing, rollingWindow.leading, rollingWindow.offset, this.cube().name
       );
     }
     return null;
@@ -133,6 +133,9 @@ export class BaseMeasure {
   granularityFromInterval(interval) {
     if (!interval) {
       return undefined;
+    }
+    if (interval.sql) {
+      return interval.granularity;
     }
     if (interval.match(/day/)) {
       return 'day';

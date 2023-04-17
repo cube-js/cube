@@ -622,31 +622,72 @@ class BaseQuery {
       d => [
         d,
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        (dateFrom, dateTo, dateField, dimensionDateFrom, dimensionDateTo) => `${dateField} >= ${dimensionDateFrom} AND ${dateField} <= ${dateTo}`
+        (dateFrom, dateTo, dateField, dimensionDateFrom, dimensionDateTo) => `${dateField} >= ${dimensionDateFrom} AND ${dateField} <= ${dateTo}`,
+        []
       ]
     );
   }
 
-  rollingWindowDateJoinCondition(trailingInterval, leadingInterval, offset) {
+  rollingWindowDateJoinCondition(trailingInterval, leadingInterval, offset, cubeName) {
     offset = offset || 'end';
+
+    const references = R.pipe(
+      R.map(i => {
+        if (i && i.sql) {
+          const fieldReferencesUsed = [];
+          const { cubeEvaluator } = this;
+          cubeEvaluator.collectUsedCubeReferences(cubeName, i.sql, { fieldReferencesUsed });
+          return fieldReferencesUsed;
+        }
+
+        return null;
+      }),
+      R.uniq,
+      R.filter(R.identity),
+      R.flatten
+    )([trailingInterval, leadingInterval]);
+
     return this.timeDimensions.map(
       d => [d, (dateFrom, dateTo, dateField, dimensionDateFrom, dimensionDateTo, isFromStartToEnd) => {
         // dateFrom based window
         const conditions = [];
-        if (trailingInterval !== 'unbounded') {
+        if (trailingInterval && trailingInterval.sql) {
+          const fn = () => this.evaluateSql(cubeName, trailingInterval.sql);
+          const context = {
+            interval: {
+              startDate: dateFrom,
+              endDate: dateTo,
+              dateField
+            }
+          };
+          const evaluated = this.evaluateSymbolSqlWithContext(fn, context);
+          conditions.push(`${evaluated}`);
+        } else if (trailingInterval !== 'unbounded') {
           const startDate = isFromStartToEnd || offset === 'start' ? dateFrom : dateTo;
           const trailingStart = trailingInterval ? this.subtractInterval(startDate, trailingInterval) : startDate;
           const sign = offset === 'start' ? '>=' : '>';
           conditions.push(`${dateField} ${sign} ${trailingStart}`);
         }
-        if (leadingInterval !== 'unbounded') {
+
+        if (leadingInterval && leadingInterval.sql) {
+          const fn = () => this.evaluateSql(cubeName, leadingInterval.sql);
+          const context = {
+            interval: {
+              startDate: dateFrom,
+              endDate: dateTo,
+              dateField
+            }
+          };
+          const evaluated = this.evaluateSymbolSqlWithContext(fn, context);
+          conditions.push(`${evaluated}`);
+        } else if (leadingInterval !== 'unbounded') {
           const endDate = isFromStartToEnd || offset === 'end' ? dateTo : dateFrom;
           const leadingEnd = leadingInterval ? this.addInterval(endDate, leadingInterval) : endDate;
           const sign = offset === 'end' ? '<=' : '<';
           conditions.push(`${dateField} ${sign} ${leadingEnd}`);
         }
         return conditions.length ? conditions.join(' AND ') : '1 = 1';
-      }]
+      }, references]
     );
   }
 
@@ -961,6 +1002,17 @@ class BaseQuery {
 
   overTimeSeriesQuery(baseQueryFn, cumulativeMeasure, fromRollup) {
     const dateJoinCondition = cumulativeMeasure.dateJoinCondition();
+    
+    // TODO: Move this to compiler.
+    const referencedJoinDimensions = R.pipe(
+      R.map(i => i[2]),
+      R.uniq,
+      R.flatten,
+      R.map(this.newDimension.bind(this))
+    )(
+      dateJoinCondition
+    );
+    
     const cumulativeMeasures = [cumulativeMeasure];
     if (!this.timeDimensions.find(d => d.granularity)) {
       const filters = this.segments.concat(this.filters).concat(this.dateFromStartToEndConditionSql(dateJoinCondition, fromRollup, false));
@@ -968,23 +1020,35 @@ class BaseQuery {
     }
     const dateSeriesSql = this.timeDimensions.map(d => this.dateSeriesSql(d)).join(', ');
     const filters = this.segments.concat(this.filters).concat(this.dateFromStartToEndConditionSql(dateJoinCondition, fromRollup, true));
+
+    // TODO: This method deserves a better name.
     const baseQuery = this.groupedUngroupedSelect(
       () => baseQueryFn(cumulativeMeasures, filters),
       cumulativeMeasure.shouldUngroupForCumulative(),
       !cumulativeMeasure.shouldUngroupForCumulative() && this.minGranularity(
         cumulativeMeasure.windowGranularity(), this.timeDimensions.find(d => d.granularity).granularity
-      ) || undefined
+      ) || undefined,
+      referencedJoinDimensions
     );
+
     const baseQueryAlias = this.cubeAlias('base');
+
+    const dateJoinRenderedReferenceContext = {
+      renderedReference: R.pipe(
+        R.map(d => [d.dimension, `${baseQueryAlias}.${d.aliasName()}`]),
+        R.fromPairs,
+      )(referencedJoinDimensions),
+    };
+
     const dateJoinConditionSql =
       dateJoinCondition.map(
-        ([d, f]) => f(
+        ([d, f]) => this.evaluateSymbolSqlWithContext(() => f(
           `${d.dateSeriesAliasName()}.${this.escapeColumnName('date_from')}`,
           `${d.dateSeriesAliasName()}.${this.escapeColumnName('date_to')}`,
           `${baseQueryAlias}.${d.aliasName()}`,
           `'${d.dateFromFormatted()}'`,
           `'${d.dateToFormatted()}'`
-        )
+        ), dateJoinRenderedReferenceContext)
       ).join(' AND ');
 
     return this.overTimeSeriesSelect(
@@ -1364,10 +1428,10 @@ class BaseQuery {
       }));
   }
 
-  groupedUngroupedSelect(select, ungrouped, granularityOverride) {
+  groupedUngroupedSelect(select, ungrouped, granularityOverride, referencedDimensions = []) {
     return this.evaluateSymbolSqlWithContext(
       select,
-      { ungrouped, granularityOverride, overTimeSeriesAggregate: true }
+      { ungrouped, granularityOverride, referencedDimensions, overTimeSeriesAggregate: true }
     );
   }
 
@@ -1644,7 +1708,7 @@ class BaseQuery {
    * @returns {Array<BaseDimension>}
    */
   dimensionsForSelect() {
-    return this.dimensions.concat(this.timeDimensions);
+    return this.dimensions.concat(this.timeDimensions).concat(this.safeEvaluateSymbolContext().referencedDimensions || []);
   }
 
   dimensionSql(dimension) {
@@ -2749,13 +2813,25 @@ class BaseQuery {
         filterParams: this.filtersProxy(),
         sqlUtils: {
           convertTz: this.convertTz.bind(this)
-        }
+        },
+        interval: this.lazyEvaluateSymbolContextProxy('interval'),
       }, R.map(
         (symbols) => this.contextSymbolsProxy(symbols),
         this.contextSymbols
       ));
     }
     return this.parametrizedContextSymbolsValue;
+  }
+
+  lazyEvaluateSymbolContextProxy(symbol) {
+    return new Proxy(this, {
+      get: (target, name) => {
+        if (name === '_objectWithResolvedProperties') {
+          return true;
+        }
+        return target.safeEvaluateSymbolContext()[symbol][name];
+      }
+    });
   }
 
   static emptyParametrizedContextSymbols(cubeEvaluator, allocateParam) {

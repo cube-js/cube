@@ -493,7 +493,7 @@ export class CubeEvaluator extends CubeSymbols {
     return path.split('.');
   }
 
-  collectUsedCubeReferences(cube, sqlFn) {
+  collectUsedCubeReferences(cube, sqlFn, context = {}) {
     const cubeEvaluator = this;
 
     const cubeReferencesUsed = [];
@@ -512,7 +512,11 @@ export class CubeEvaluator extends CubeSymbols {
       return cubeEvaluator.pathFromArray([referencedCube, name]);
     }, {
       // eslint-disable-next-line no-shadow
-      sqlResolveFn: (symbol, cube, n) => cubeEvaluator.pathFromArray([cube, n]),
+      sqlResolveFn: (symbol, cube, n) => {
+        const path = cubeEvaluator.pathFromArray([cube, n]);
+        if (Array.isArray(context.fieldReferencesUsed)) context.fieldReferencesUsed.push(path);
+        return path;
+      },
       contextSymbols: BaseQuery.emptyParametrizedContextSymbols(this, () => '$empty_param$'),
       cubeReferencesUsed,
     });
