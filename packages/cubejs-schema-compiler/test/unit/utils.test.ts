@@ -100,6 +100,10 @@ describe('Test Utils', () => {
         meta: {
           dont_camelize_field: true,
         }
+      }, {
+        // meta as name
+        name: 'meta',
+        drill_members: ['pkey', 'createdAt'],
       }],
       joins: {
 
@@ -118,6 +122,10 @@ describe('Test Utils', () => {
         meta: {
           dont_camelize_field: true,
         }
+      }, {
+        // meta as name
+        name: 'meta',
+        drillMembers: ['pkey', 'createdAt'],
       }],
       joins: {
 
