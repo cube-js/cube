@@ -1,8 +1,14 @@
 import inflection from 'inflection';
 import { CubeMembers, SchemaContext } from '../ScaffoldingTemplate';
 import { CubeDescriptor, DatabaseSchema, MemberType, ScaffoldingSchema, TableName, TableSchema, } from '../ScaffoldingSchema';
-import { MemberReference } from '../descriptors/MemberReference';
 import { ValueWithComments } from '../descriptors/ValueWithComments';
+import { toSnakeCase } from '../utils';
+
+const JOIN_RELATIONSHIP_MAP = {
+  hasOne: 'one_to_one',
+  hasMany: 'one_to_many',
+  belongsTo: 'many_to_one',
+}
 
 export type SchemaFile = {
   fileName: string;
@@ -11,18 +17,18 @@ export type SchemaFile = {
 
 export abstract class BaseSchemaFormatter {
   protected readonly scaffoldingSchema: ScaffoldingSchema;
-  
+
   public constructor(
     protected readonly dbSchema: DatabaseSchema,
     protected readonly driver: any,
   ) {
     this.scaffoldingSchema = new ScaffoldingSchema(dbSchema, driver);
   }
-  
+
   public abstract fileExtension(): string;
-  
+
   protected abstract cubeReference(cube: string): string;
-  
+
   protected abstract renderFile(fileDescriptor: Record<string, unknown>): string;
 
   public generateFilesByTableNames(
@@ -40,7 +46,7 @@ export abstract class BaseSchemaFormatter {
       ),
     }));
   }
-  
+
   public generateFilesByCubeDescriptors(
     cubeDescriptors: CubeDescriptor[],
     schemaContext: SchemaContext = {}
@@ -70,10 +76,7 @@ export abstract class BaseSchemaFormatter {
   }
 
   protected memberName(member) {
-    return inflection.camelize(
-      member.title.replace(/[^A-Za-z0-9]+/g, '_').toLowerCase(),
-      true
-    );
+    return toSnakeCase(member.title.replace(/[^A-Za-z0-9]+/g, '_').toLowerCase())
   }
 
   protected escapeName(name) {
@@ -86,19 +89,19 @@ export abstract class BaseSchemaFormatter {
   protected eligibleIdentifier(name: string) {
     return !!name.match(/^[a-z0-9_]+$/);
   }
-  
+
   public schemaDescriptorForTable(tableSchema: TableSchema, schemaContext: SchemaContext = {}) {
     return {
       cube: tableSchema.cube,
-      sql: `SELECT * FROM ${tableSchema.schema?.length ? `${this.escapeName(tableSchema.schema)}.` : ''}${this.escapeName(tableSchema.table)}`, // TODO escape
-      preAggregations: new ValueWithComments(null, [
+      sql_table: `${tableSchema.schema?.length ? `${this.escapeName(tableSchema.schema)}.` : ''}${this.escapeName(tableSchema.table)}`,
+      pre_aggregations: new ValueWithComments(null, [
         'Pre-Aggregations definitions go here',
         'Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started'
       ]),
       joins: tableSchema.joins.map(j => ({
         [j.cubeToJoin]: {
           sql: `${this.cubeReference('CUBE')}.${this.escapeName(j.thisTableColumn)} = ${this.cubeReference(j.cubeToJoin)}.${this.escapeName(j.columnToJoin)}`,
-          relationship: j.relationship
+          relationship: JOIN_RELATIONSHIP_MAP[j.relationship]
         }
       })).reduce((a, b) => ({ ...a, ...b }), {}),
       measures: tableSchema.measures.map(m => ({
@@ -110,7 +113,6 @@ export abstract class BaseSchemaFormatter {
       })).reduce((a, b) => ({ ...a, ...b }), {
         count: {
           type: 'count',
-          drillMembers: (tableSchema.drillMembers || []).map(m => new MemberReference(this.memberName(m)))
         }
       }),
       dimensions: tableSchema.dimensions.map(m => ({
@@ -118,13 +120,13 @@ export abstract class BaseSchemaFormatter {
           sql: this.sqlForMember(m),
           type: m.type ?? m.types[0],
           title: this.memberTitle(m),
-          primaryKey: m.isPrimaryKey ? true : undefined
+          primary_key: m.isPrimaryKey ? true : undefined
         }
       })).reduce((a, b) => ({ ...a, ...b }), {}),
-      ...schemaContext
+      ...Object.fromEntries(Object.entries(schemaContext).map(([key, value]) => ([toSnakeCase(key), value])))
     };
   }
-  
+
   protected schemaForTablesByCubeDescriptors(cubeDescriptors: CubeDescriptor[]) {
     const tableNames = cubeDescriptors.map(({ tableName }) => tableName);
     const generatedSchemaForTables = this.scaffoldingSchema.generateForTables(

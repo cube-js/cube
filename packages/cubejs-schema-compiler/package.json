@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/schema-compiler",
-  "description": "Cube.js schema compiler",
+  "description": "Cube schema compiler",
   "author": "Cube Dev, Inc.",
   "version": "0.32.27",
   "repository": {

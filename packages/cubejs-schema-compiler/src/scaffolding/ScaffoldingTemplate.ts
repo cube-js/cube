@@ -1,13 +1,12 @@
 import { MemberReference } from './descriptors/MemberReference';
 import { ValueWithComments } from './descriptors/ValueWithComments';
-import { JavaScriptSchemaFormatter, YamlSchemaFormatter } from './formatters';
+import { BaseSchemaFormatter, JavaScriptSchemaFormatter, YamlSchemaFormatter } from './formatters';
 import {
   CubeDescriptor,
   CubeDescriptorMember,
   DatabaseSchema,
   TableName,
 } from './ScaffoldingSchema';
-import { BaseSchemaFormatter } from './formatters/BaseSchemaFormatter';
 
 export type SchemaContext = {
   dataSource?: string;

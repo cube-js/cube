@@ -1,6 +1,7 @@
 import inflection from 'inflection';
 import R from 'ramda';
 import { UserError } from '../compiler';
+import { toSnakeCase } from './utils';
 
 enum ColumnType {
   Time = 'time',
@@ -79,23 +80,6 @@ const MEASURE_DICTIONARY = [
   'value',
 ];
 
-const DRILL_MEMBERS_DICTIONARY = [
-  'id',
-  'name',
-  'title',
-  'firstname',
-  'first_name',
-  'lastname',
-  'last_name',
-  'createdat',
-  'created_at',
-  'created',
-  'timestamp',
-  'city',
-  'country',
-  'date',
-];
-
 const idRegex = '_id$|id$';
 
 export type DatabaseSchema = Record<string, Record<string, any>>;
@@ -153,7 +137,7 @@ export class ScaffoldingSchema {
         ...R.pick(['name', 'title', 'types', 'isPrimaryKey', 'included', 'isId'], value)
       });
     }
-    
+
     return cubes.map((cube) => ({
       cube: cube.cube,
       tableName: cube.tableName,
@@ -208,15 +192,14 @@ export class ScaffoldingSchema {
     const [schema, table] = this.parseTableName(tableName);
     const tableDefinition = this.resolveTableDefinition(tableName);
     const dimensions = this.dimensions(tableDefinition);
-    
+
     return {
-      cube: inflection.camelize(table),
+      cube: toSnakeCase(table),
       tableName,
       schema,
       table,
       measures: this.numberMeasures(tableDefinition),
       dimensions,
-      drillMembers: this.drillMembers(dimensions),
       joins: includeJoins ? this.joins(tableName, tableDefinition) : []
     };
   }
@@ -308,7 +291,7 @@ export class ScaffoldingSchema {
             return null;
           }
           return {
-            cubeToJoin: inflection.camelize(definition.table),
+            cubeToJoin: toSnakeCase(definition.table),
             columnToJoin: columnForJoin.name,
             tableName: definition.tableName
           };
@@ -323,14 +306,6 @@ export class ScaffoldingSchema {
         }));
       })
       .filter(R.identity));
-  }
-
-  protected drillMembers(dimensions: Dimension[]) {
-    return dimensions.filter(d => this.fromDrillMembersDictionary(d));
-  }
-
-  protected fromDrillMembersDictionary(dimension) {
-    return !!DRILL_MEMBERS_DICTIONARY.find(word => dimension.name.toLowerCase().includes(word));
   }
 
   protected timeColumnIndex(column): number {
