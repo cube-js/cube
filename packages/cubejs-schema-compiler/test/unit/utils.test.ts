@@ -15,9 +15,19 @@ describe('Test Utils', () => {
             dont_camelize_field: true,
           }
         },
+        // meta as name
+        meta: {
+          drill_members: ['pkey', 'createdAt'],
+        }
       },
       dimensions: {
         my_dim: {
+          meta: {
+            dont_camelize_field: true,
+          }
+        },
+        // meta as name
+        meta: {
           meta: {
             dont_camelize_field: true,
           }
@@ -46,10 +56,20 @@ describe('Test Utils', () => {
           meta: {
             dont_camelize_field: true,
           }
+        },
+        // meta as name
+        meta: {
+          drillMembers: ['pkey', 'createdAt'],
         }
       },
       dimensions: {
         my_dim: {
+          meta: {
+            dont_camelize_field: true,
+          }
+        },
+        // meta as name
+        meta: {
           meta: {
             dont_camelize_field: true,
           }

@@ -1,6 +1,6 @@
 import { camelize } from 'inflection';
 
-function camelizeObjectPart(obj: unknown, deep: boolean = true, camelizeKeys: boolean = true): unknown {
+function camelizeObjectPart(obj: unknown, deep: boolean, camelizeKeys: boolean, level = 0): unknown {
   if (!obj) {
     return obj;
   }
@@ -11,12 +11,12 @@ function camelizeObjectPart(obj: unknown, deep: boolean = true, camelizeKeys: bo
 
   if (Array.isArray(obj)) {
     for (let i = 0; i < obj.length; i++) {
-      obj[i] = camelizeObjectPart(obj[i]);
+      obj[i] = camelizeObjectPart(obj[i], true, true, level + 1);
     }
   } else if (typeof obj === 'object') {
     for (const key of Object.keys(obj)) {
-      if (deep && key !== 'meta') {
-        obj[key] = camelizeObjectPart(obj[key], deep, true);
+      if (deep && !(level === 1 && key === 'meta')) {
+        obj[key] = camelizeObjectPart(obj[key], deep, true, level + 1);
       }
 
       if (camelizeKeys) {
