@@ -1,9 +1,17 @@
+import { brotliCompress, brotliDecompress } from 'zlib';
+import { promisify } from 'util';
+
 import { createCancelablePromise, getEnv, MaybeCancelablePromise } from '@cubejs-backend/shared';
 import { CacheDriverInterface } from '@cubejs-backend/base-driver';
 
 import { CubeStoreDriver } from './CubeStoreDriver';
 
+const brotliCompressAsync = promisify(brotliCompress);
+const brotliDecompressAsync = promisify(brotliDecompress);
+
 export class CubeStoreCacheDriver implements CacheDriverInterface {
+  protected readonly compression: boolean = getEnv('cubestoreCompression');
+
   public constructor(
     protected connectionFactory: () => Promise<CubeStoreDriver>,
   ) {}
@@ -66,21 +74,54 @@ export class CubeStoreCacheDriver implements CacheDriverInterface {
       sendParameters: getEnv('cubestoreSendableParameters')
     });
     if (rows && rows.length === 1) {
-      return JSON.parse(rows[0].value);
+      console.log(rows);
+      return this.deserializePayload(rows[0].value);
     }
 
     return null;
   }
 
-  public async set(key: string, value, expiration) {
-    const strValue = JSON.stringify(value);
-    await (await this.getConnection()).query('CACHE SET TTL ? ? ?', [expiration, key, strValue], {
+  protected async deserializePayload(value: string) {
+    if (value === null) {
+      return value;
+    }
+
+    if (this.compression) {
+      console.log(value);
+
+      const payload = await brotliDecompressAsync(Buffer.from(value), {});
+      return JSON.parse(payload.toString('utf-8'));
+    }
+
+    return JSON.parse(value);
+  }
+
+  protected async serializePayload(value: unknown) {
+    const payload = JSON.stringify(value);
+
+    if (this.compression) {
+      const buffer = await brotliCompressAsync(Buffer.from(JSON.stringify(value)), {});
+
+      console.log('utf length', buffer.toString('utf-8').length);
+      console.log('binary length', buffer.toString('binary').length);
+      console.log('base64 length', buffer.toString('base64').length);
+
+      return buffer;
+    }
+
+    return payload;
+  }
+
+  public async set(key: string, value: unknown, expiration: number) {
+    const payload = await this.serializePayload(value);
+    console.log(payload);
+    await (await this.getConnection()).query('CACHE SET TTL ? ? ?', [expiration, key, payload], {
       sendParameters: getEnv('cubestoreSendableParameters')
     });
 
     return {
       key,
-      bytes: Buffer.byteLength(strValue),
+      bytes: Buffer.byteLength(payload),
     };
   }
 

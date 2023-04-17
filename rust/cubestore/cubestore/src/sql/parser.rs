@@ -297,6 +297,21 @@ impl<'a> CubeStoreParser<'a> {
         }
     }
 
+    fn parse_literal_binary(&mut self) -> Result<String, ParserError> {
+        if let Token::Placeholder(placeholder) = self.parser.peek_token() {
+            match self.unwrap_placeholder(&placeholder)? {
+                QueryParameter::StringValue(s) => Ok(s),
+                QueryParameter::BinaryValue(s) => Ok(s),
+                other => Err(ParserError::ParserError(format!(
+                    "Wrong parameters type, actual: {}, expected: binary parameter",
+                    other.get_type()
+                ))),
+            }
+        } else {
+            self.parser.parse_literal_string()
+        }
+    }
+
     fn parse_identifier(&mut self) -> Result<Ident, ParserError> {
         if let Token::Placeholder(placeholder) = self.parser.peek_token() {
             match self.unwrap_placeholder(&placeholder)? {

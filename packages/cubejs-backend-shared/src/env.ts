@@ -1561,6 +1561,22 @@ const variables: Record<string, (...args: any) => any> = {
   cubestoreSendableParameters: () => get('CUBEJS_CUBESTORE_SENDABLE_PARAMETERS')
     .default('false')
     .asBoolStrict(),
+  cubestoreCompression: () => {
+    const cubestoreCompression = get('CUBEJS_CUBESTORE_COMPRESSION')
+      .default('false')
+      .asBoolStrict();
+
+    // eslint-disable-next-line no-use-before-define
+    if (cubestoreCompression && !getEnv('cubestoreSendableParameters')) {
+      throw new InvalidConfiguration(
+        'CUBEJS_CUBESTORE_COMPRESSION',
+        true,
+        'CUBEJS_CUBESTORE_SENDABLE_PARAMETERS is required when compression is enabled'
+      );
+    }
+
+    return cubestoreCompression;
+  },
   preAggregationsQueueEventsBus: () => get('CUBEJS_PRE_AGGREGATIONS_QUEUE_EVENTS_BUS')
     .default('false')
     .asBoolStrict(),
