@@ -6,11 +6,31 @@ on:
       - 'master'
     paths:
       - '.github/workflows/drivers-tests.yml'
-      - 'packages/**'
+
+      - 'packages/cubejs-query-orchestrator/src/**'
+      - 'packages/cubejs-base-driver/src/**'
+      - 'packages/cubejs-jdbc-driver/src/**'
+
+      - 'packages/cubejs-athena-driver/src/**'
+      - 'packages/cubejs-clickhouse-driver/src/**'
+      - 'packages/cubejs-databricks-jdbc-driver/src/**'
+      - 'packages/cubejs-mssql-driver/src/**'
+      - 'packages/cubejs-mysql-driver/src/**'
+      - 'packages/cubejs-postgres-driver/src/**'
   pull_request:
     paths:
       - '.github/workflows/drivers-tests.yml'
-      - 'packages/**'
+
+      - 'packages/cubejs-query-orchestrator/src/**'
+      - 'packages/cubejs-base-driver/src/**'
+      - 'packages/cubejs-jdbc-driver/src/**'
+
+      - 'packages/cubejs-athena-driver/src/**'
+      - 'packages/cubejs-clickhouse-driver/src/**'
+      - 'packages/cubejs-databricks-jdbc-driver/src/**'
+      - 'packages/cubejs-mssql-driver/src/**'
+      - 'packages/cubejs-mysql-driver/src/**'
+      - 'packages/cubejs-postgres-driver/src/**'
 
 jobs:
   build:
