@@ -1342,7 +1342,7 @@ mod tests {
 
     fn parse(s: &str, schema: &Schema) -> Expr {
         let sql_expr;
-        let parsed = CubeStoreParser::new(&format!("SELECT {}", s))
+        let parsed = CubeStoreParser::new(&format!("SELECT {}", s), vec![])
             .unwrap()
             .parse_statement()
             .unwrap();

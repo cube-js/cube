@@ -63,6 +63,7 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Backend {
                     user: self.user.clone(),
                     inline_tables: InlineTables::new(),
                     trace_obj: None,
+                    parameters: None,
                 },
                 query,
             )

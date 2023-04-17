@@ -383,11 +383,11 @@ impl SqlService for CacheStoreSqlService {
 
     async fn exec_query_with_context(
         &self,
-        ctx: SqlQueryContext,
+        mut ctx: SqlQueryContext,
         query: &str,
     ) -> Result<Arc<DataFrame>, CubeError> {
         let stmt = {
-            let mut parser = CubeStoreParser::new(query)?;
+            let mut parser = CubeStoreParser::new(query, ctx.parameters.take())?;
             parser.parse_statement()?
         };
 
