@@ -20,55 +20,6 @@ jobs:
       - name: Check out the repo
         uses: actions/checkout@v3
 
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly-2022-06-22
-          override: true
-          components: rustfmt
-
-      - name: Install Node.js 16.x
-        uses: actions/setup-node@v3
-        with:
-          node-version: 16.x
-
-      - name: Configure `yarn`
-        run: yarn policies set-version v1.22.19
-
-      # Building project
-      - name: Install dependencies
-        uses: nick-invision/retry@v2
-        env:
-          CUBESTORE_SKIP_POST_INSTALL: true
-        with:
-          max_attempts: 3
-          retry_on: error
-          retry_wait_seconds: 15
-          timeout_minutes: 20
-          command: yarn install --frozen-lockfile
-
-      - name: Build client
-        run: yarn build
-
-      - name: Build packages
-        run: yarn tsc
-
-      - name: Build tests
-        run: |
-          cd packages/cubejs-testing-drivers
-          yarn tsc
-
-      - name: Pack built project
-        uses: edgarrc/action-7z@v1
-        with:
-          args: 7z a ./build.7z .
-
-      - name: Upload built project
-        uses: actions/upload-artifact@v3
-        with:
-          name: build
-          path: ./built.7z
-
       # Building docker
       - name: Login to DockerHub
         uses: docker/login-action@v1
@@ -132,42 +83,27 @@ jobs:
       - name: Configure `yarn`
         run: yarn policies set-version v1.22.19
 
-      - name: Download built project
-        uses: actions/download-artifact@v3
+      - name: Install dependencies
+        uses: nick-invision/retry@v2
+        env:
+          CUBESTORE_SKIP_POST_INSTALL: true
         with:
-          name: build
-          path: ./built.7z
+          max_attempts: 3
+          retry_on: error
+          retry_wait_seconds: 15
+          timeout_minutes: 20
+          command: yarn install --frozen-lockfile
 
-      - name: Unpack built project
-        uses: edgarrc/action-7z@v1
-        with:
-          args: 7z x ./built.7z -o ./built
+      - name: Build client
+        run: yarn build
 
-      - name: Review built project
-        run: ls -R
-        working-directory: ./built
+      - name: Build packages
+        run: yarn tsc
 
-      # - name: Install dependencies
-      #   uses: nick-invision/retry@v2
-      #   env:
-      #     CUBESTORE_SKIP_POST_INSTALL: true
-      #   with:
-      #     max_attempts: 3
-      #     retry_on: error
-      #     retry_wait_seconds: 15
-      #     timeout_minutes: 20
-      #     command: yarn install --frozen-lockfile
-
-      # - name: Build client
-      #   run: yarn build
-
-      # - name: Build packages
-      #   run: yarn tsc
-
-      # - name: Build tests
-      #   run: |
-      #     cd packages/cubejs-testing-drivers
-      #     yarn tsc
+      - name: Build tests
+        run: |
+          cd packages/cubejs-testing-drivers
+          yarn tsc
 
       - name: Run tests
         env:
