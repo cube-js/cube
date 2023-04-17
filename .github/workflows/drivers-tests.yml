@@ -58,10 +58,16 @@ jobs:
           cd packages/cubejs-testing-drivers
           yarn tsc
 
-      - uses: actions/upload-artifact@v3
+      - name: Pack built project
+        uses: edgarrc/action-7z@v1
+        with:
+          args: 7z a build.7z .
+
+      - name: Upload built project
+        uses: actions/upload-artifact@v3
         with:
           name: build
-          path: .
+          path: ./built.7z
 
       # Building docker
       - name: Login to DockerHub
@@ -126,15 +132,20 @@ jobs:
       - name: Configure `yarn`
         run: yarn policies set-version v1.22.19
 
-      - name: Copy built project
+      - name: Download built project
         uses: actions/download-artifact@v3
         with:
           name: build
-          path: ./build
+          path: ./built.7z
+
+      - name: Unpack built project
+        uses: edgarrc/action-7z@v1
+        with:
+          args: 7z x ./built.7z -o ./built
 
       - name: Review built project
         run: ls -R
-        working-directory: ./build
+        working-directory: ./built
 
       # - name: Install dependencies
       #   uses: nick-invision/retry@v2
@@ -170,6 +181,6 @@ jobs:
             DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_KEY: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_KEY }}
             DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET }}
         run: |
-          cd ./build/packages/cubejs-testing-drivers
+          cd ./built/packages/cubejs-testing-drivers
           export DEBUG=testcontainers
           yarn ${{ matrix.database }}-${{ matrix.suite }}
