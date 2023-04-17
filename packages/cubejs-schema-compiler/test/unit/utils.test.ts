@@ -10,6 +10,16 @@ describe('Test Utils', () => {
           drill_members: ['pkey', 'createdAt'],
           rolling_window: {
             trailing: '1 month',
+          },
+          meta: {
+            dont_camelize_field: true,
+          }
+        },
+      },
+      dimensions: {
+        my_dim: {
+          meta: {
+            dont_camelize_field: true,
           }
         }
       },
@@ -32,6 +42,16 @@ describe('Test Utils', () => {
           drillMembers: ['pkey', 'createdAt'],
           rollingWindow: {
             trailing: '1 month',
+          },
+          meta: {
+            dont_camelize_field: true,
+          }
+        }
+      },
+      dimensions: {
+        my_dim: {
+          meta: {
+            dont_camelize_field: true,
           }
         }
       },
@@ -56,6 +76,9 @@ describe('Test Utils', () => {
         drill_members: ['pkey', 'createdAt'],
         rolling_window: {
           trailing: '1 month',
+        },
+        meta: {
+          dont_camelize_field: true,
         }
       }],
       joins: {
@@ -71,6 +94,9 @@ describe('Test Utils', () => {
         drillMembers: ['pkey', 'createdAt'],
         rollingWindow: {
           trailing: '1 month',
+        },
+        meta: {
+          dont_camelize_field: true,
         }
       }],
       joins: {

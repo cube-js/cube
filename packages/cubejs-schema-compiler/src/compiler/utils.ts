@@ -15,7 +15,7 @@ function camelizeObjectPart(obj: unknown, deep: boolean = true, camelizeKeys: bo
     }
   } else if (typeof obj === 'object') {
     for (const key of Object.keys(obj)) {
-      if (deep) {
+      if (deep && key !== 'meta') {
         obj[key] = camelizeObjectPart(obj[key], deep, true);
       }
 
