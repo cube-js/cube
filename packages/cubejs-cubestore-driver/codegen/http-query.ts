@@ -2,6 +2,7 @@
 
 import * as flatbuffers from 'flatbuffers';
 
+import { HttpParameter } from './http-parameter.js';
 import { HttpTable } from './http-table.js';
 
 
@@ -47,8 +48,18 @@ inlineTablesLength():number {
   return offset ? this.bb!.__vector_len(this.bb_pos + offset) : 0;
 }
 
+parameters(index: number, obj?:HttpParameter):HttpParameter|null {
+  const offset = this.bb!.__offset(this.bb_pos, 10);
+  return offset ? (obj || new HttpParameter()).__init(this.bb!.__indirect(this.bb!.__vector(this.bb_pos + offset) + index * 4), this.bb!) : null;
+}
+
+parametersLength():number {
+  const offset = this.bb!.__offset(this.bb_pos, 10);
+  return offset ? this.bb!.__vector_len(this.bb_pos + offset) : 0;
+}
+
 static startHttpQuery(builder:flatbuffers.Builder) {
-  builder.startObject(3);
+  builder.startObject(4);
 }
 
 static addQuery(builder:flatbuffers.Builder, queryOffset:flatbuffers.Offset) {
@@ -75,16 +86,33 @@ static startInlineTablesVector(builder:flatbuffers.Builder, numElems:number) {
   builder.startVector(4, numElems, 4);
 }
 
+static addParameters(builder:flatbuffers.Builder, parametersOffset:flatbuffers.Offset) {
+  builder.addFieldOffset(3, parametersOffset, 0);
+}
+
+static createParametersVector(builder:flatbuffers.Builder, data:flatbuffers.Offset[]):flatbuffers.Offset {
+  builder.startVector(4, data.length, 4);
+  for (let i = data.length - 1; i >= 0; i--) {
+    builder.addOffset(data[i]!);
+  }
+  return builder.endVector();
+}
+
+static startParametersVector(builder:flatbuffers.Builder, numElems:number) {
+  builder.startVector(4, numElems, 4);
+}
+
 static endHttpQuery(builder:flatbuffers.Builder):flatbuffers.Offset {
   const offset = builder.endObject();
   return offset;
 }
 
-static createHttpQuery(builder:flatbuffers.Builder, queryOffset:flatbuffers.Offset, traceObjOffset:flatbuffers.Offset, inlineTablesOffset:flatbuffers.Offset):flatbuffers.Offset {
+static createHttpQuery(builder:flatbuffers.Builder, queryOffset:flatbuffers.Offset, traceObjOffset:flatbuffers.Offset, inlineTablesOffset:flatbuffers.Offset, parametersOffset:flatbuffers.Offset):flatbuffers.Offset {
   HttpQuery.startHttpQuery(builder);
   HttpQuery.addQuery(builder, queryOffset);
   HttpQuery.addTraceObj(builder, traceObjOffset);
   HttpQuery.addInlineTables(builder, inlineTablesOffset);
+  HttpQuery.addParameters(builder, parametersOffset);
   return HttpQuery.endHttpQuery(builder);
 }
 }

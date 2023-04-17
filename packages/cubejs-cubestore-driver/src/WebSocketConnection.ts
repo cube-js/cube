@@ -4,12 +4,18 @@ import { InlineTable } from '@cubejs-backend/base-driver';
 import { getEnv } from '@cubejs-backend/shared';
 import { v4 as uuidv4 } from 'uuid';
 import {
+  BinaryValue,
+  BoolValue, Float64Value,
   HttpCommand,
   HttpError,
   HttpMessage,
+  HttpParameter,
+  HttpParameterValue,
   HttpQuery,
   HttpResultSet,
-  HttpTable
+  HttpTable,
+  Int64Value,
+  StringValue,
 } from '../codegen';
 
 export class WebSocketConnection {
@@ -186,13 +192,81 @@ export class WebSocketConnection {
     });
   }
 
-  public async query(query: string, inlineTables: InlineTable[], queryTracingObj?: any): Promise<any[]> {
+  protected serializeParameter(builder: flatbuffers.Builder, parameter: unknown) {
+    switch (typeof parameter) {
+      case 'object':
+      {
+        if (Buffer.isBuffer(parameter)) {
+          const valueOffset = BinaryValue.createVVector(builder, parameter);
+          const httpParameterValueOffset = BinaryValue.createBinaryValue(builder, valueOffset);
+
+          return HttpParameter.createHttpParameter(
+            builder,
+            HttpParameterValue.BinaryValue,
+            httpParameterValueOffset
+          );
+        } else {
+          throw new Error(`Parameter with type: object is not supported`);
+        }
+      }
+      case 'boolean':
+      {
+        const httpParameterValueOffset = BoolValue.createBoolValue(
+          builder,
+          parameter
+        );
+
+        return HttpParameter.createHttpParameter(
+          builder,
+          HttpParameterValue.BoolValue,
+          httpParameterValueOffset
+        );
+      }
+      case 'number':
+      {
+        if (Number.isInteger(parameter)) {
+          const httpParameterValueOffset = Int64Value.createInt64Value(builder, BigInt(parameter));
+
+          return HttpParameter.createHttpParameter(
+            builder,
+            HttpParameterValue.Int64Value,
+            httpParameterValueOffset
+          );
+        } else {
+          const httpParameterValueOffset = Float64Value.createFloat64Value(builder, parameter);
+
+          return HttpParameter.createHttpParameter(
+            builder,
+            HttpParameterValue.Float64Value,
+            httpParameterValueOffset
+          );
+        }
+      }
+      case 'string':
+      {
+        const valueOffset = builder.createString(parameter);
+        const httpParameterValueOffset = StringValue.createStringValue(builder, valueOffset);
+
+        return HttpParameter.createHttpParameter(
+          builder,
+          HttpParameterValue.StringValue,
+          httpParameterValueOffset
+        );
+      }
+      default:
+        throw new Error(`Parameter with type: ${typeof parameter} is not supported`);
+    }
+  }
+
+  public async query(query: string, inlineTables: InlineTable[], queryTracingObj?: any, parameters?: any): Promise<any[]> {
     const builder = new flatbuffers.Builder(1024);
     const queryOffset = builder.createString(query);
+
     let traceObjOffset: number | null = null;
     if (queryTracingObj) {
       traceObjOffset = builder.createString(JSON.stringify(queryTracingObj));
     }
+
     let inlineTablesOffset: number | null = null;
     if (inlineTables && inlineTables.length > 0) {
       const inlineTableOffsets: number[] = [];
@@ -221,14 +295,36 @@ export class WebSocketConnection {
       }
       inlineTablesOffset = HttpQuery.createInlineTablesVector(builder, inlineTableOffsets);
     }
+
+    let parametersOffset: flatbuffers.Offset | null = null;
+    if (parameters) {
+      const httpParameterValues: flatbuffers.Offset[] = [];
+
+      for (const parameter of parameters) {
+        httpParameterValues.push(this.serializeParameter(builder, parameter));
+      }
+
+      parametersOffset = HttpQuery.createParametersVector(
+        builder,
+        httpParameterValues
+      );
+    }
+
     HttpQuery.startHttpQuery(builder);
     HttpQuery.addQuery(builder, queryOffset);
+
     if (traceObjOffset) {
       HttpQuery.addTraceObj(builder, traceObjOffset);
     }
+
     if (inlineTablesOffset) {
       HttpQuery.addInlineTables(builder, inlineTablesOffset);
     }
+
+    if (parametersOffset) {
+      HttpQuery.addParameters(builder, parametersOffset);
+    }
+
     const httpQueryOffset = HttpQuery.endHttpQuery(builder);
     const messageId = this.messageCounter++;
     const connectionIdOffset = builder.createString(this.connectionId);

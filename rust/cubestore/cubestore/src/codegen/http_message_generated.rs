@@ -1920,7 +1920,7 @@ impl<'a> HttpParameter<'a> {
         }
     }
     #[inline]
-    pub fn value(&self) -> Option<flatbuffers::Table<'a>> {
+    pub fn value(&self) -> flatbuffers::Table<'a> {
         // Safety:
         // Created from valid Table for this object
         // which contains a valid value in this slot
@@ -1930,18 +1930,18 @@ impl<'a> HttpParameter<'a> {
                     HttpParameter::VT_VALUE,
                     None,
                 )
+                .unwrap()
         }
     }
     #[inline]
     #[allow(non_snake_case)]
     pub fn value_as_int_64_value(&self) -> Option<Int64Value<'a>> {
         if self.value_type() == HttpParameterValue::Int64Value {
-            self.value().map(|t| {
-                // Safety:
-                // Created from a valid Table for this object
-                // Which contains a valid union in this slot
-                unsafe { Int64Value::init_from_table(t) }
-            })
+            let u = self.value();
+            // Safety:
+            // Created from a valid Table for this object
+            // Which contains a valid union in this slot
+            Some(unsafe { Int64Value::init_from_table(u) })
         } else {
             None
         }
@@ -1951,12 +1951,11 @@ impl<'a> HttpParameter<'a> {
     #[allow(non_snake_case)]
     pub fn value_as_bool_value(&self) -> Option<BoolValue<'a>> {
         if self.value_type() == HttpParameterValue::BoolValue {
-            self.value().map(|t| {
-                // Safety:
-                // Created from a valid Table for this object
-                // Which contains a valid union in this slot
-                unsafe { BoolValue::init_from_table(t) }
-            })
+            let u = self.value();
+            // Safety:
+            // Created from a valid Table for this object
+            // Which contains a valid union in this slot
+            Some(unsafe { BoolValue::init_from_table(u) })
         } else {
             None
         }
@@ -1966,12 +1965,11 @@ impl<'a> HttpParameter<'a> {
     #[allow(non_snake_case)]
     pub fn value_as_string_value(&self) -> Option<StringValue<'a>> {
         if self.value_type() == HttpParameterValue::StringValue {
-            self.value().map(|t| {
-                // Safety:
-                // Created from a valid Table for this object
-                // Which contains a valid union in this slot
-                unsafe { StringValue::init_from_table(t) }
-            })
+            let u = self.value();
+            // Safety:
+            // Created from a valid Table for this object
+            // Which contains a valid union in this slot
+            Some(unsafe { StringValue::init_from_table(u) })
         } else {
             None
         }
@@ -1981,12 +1979,11 @@ impl<'a> HttpParameter<'a> {
     #[allow(non_snake_case)]
     pub fn value_as_binary_value(&self) -> Option<BinaryValue<'a>> {
         if self.value_type() == HttpParameterValue::BinaryValue {
-            self.value().map(|t| {
-                // Safety:
-                // Created from a valid Table for this object
-                // Which contains a valid union in this slot
-                unsafe { BinaryValue::init_from_table(t) }
-            })
+            let u = self.value();
+            // Safety:
+            // Created from a valid Table for this object
+            // Which contains a valid union in this slot
+            Some(unsafe { BinaryValue::init_from_table(u) })
         } else {
             None
         }
@@ -1996,12 +1993,11 @@ impl<'a> HttpParameter<'a> {
     #[allow(non_snake_case)]
     pub fn value_as_float_64_value(&self) -> Option<Float64Value<'a>> {
         if self.value_type() == HttpParameterValue::Float64Value {
-            self.value().map(|t| {
-                // Safety:
-                // Created from a valid Table for this object
-                // Which contains a valid union in this slot
-                unsafe { Float64Value::init_from_table(t) }
-            })
+            let u = self.value();
+            // Safety:
+            // Created from a valid Table for this object
+            // Which contains a valid union in this slot
+            Some(unsafe { Float64Value::init_from_table(u) })
         } else {
             None
         }
@@ -2011,12 +2007,11 @@ impl<'a> HttpParameter<'a> {
     #[allow(non_snake_case)]
     pub fn value_as_null_value(&self) -> Option<NullValue<'a>> {
         if self.value_type() == HttpParameterValue::NullValue {
-            self.value().map(|t| {
-                // Safety:
-                // Created from a valid Table for this object
-                // Which contains a valid union in this slot
-                unsafe { NullValue::init_from_table(t) }
-            })
+            let u = self.value();
+            // Safety:
+            // Created from a valid Table for this object
+            // Which contains a valid union in this slot
+            Some(unsafe { NullValue::init_from_table(u) })
         } else {
             None
         }
@@ -2035,7 +2030,7 @@ impl flatbuffers::Verifiable for HttpParameter<'_> {
                 Self::VT_VALUE_TYPE,
                 "value",
                 Self::VT_VALUE,
-                false,
+                true,
                 |key, v, pos| match key {
                     HttpParameterValue::Int64Value => v
                         .verify_union_variant::<flatbuffers::ForwardsUOffset<Int64Value>>(
@@ -2083,7 +2078,7 @@ impl<'a> Default for HttpParameterArgs {
     fn default() -> Self {
         HttpParameterArgs {
             value_type: HttpParameterValue::NONE,
-            value: None,
+            value: None, // required field
         }
     }
 }
@@ -2117,6 +2112,7 @@ impl<'a: 'b, 'b> HttpParameterBuilder<'a, 'b> {
     #[inline]
     pub fn finish(self) -> flatbuffers::WIPOffset<HttpParameter<'a>> {
         let o = self.fbb_.end_table(self.start_);
+        self.fbb_.required(o, HttpParameter::VT_VALUE, "value");
         flatbuffers::WIPOffset::new(o.value())
     }
 }
