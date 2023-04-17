@@ -117,6 +117,6 @@ jobs:
             DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_KEY: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_KEY }}
             DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET }}
         run: |
-          cd ./built/packages/cubejs-testing-drivers
+          cd ./packages/cubejs-testing-drivers
           export DEBUG=testcontainers
           yarn ${{ matrix.database }}-${{ matrix.suite }}
