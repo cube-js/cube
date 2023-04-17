@@ -20,7 +20,7 @@ function create(table: string, query: string, cast: Cast, suf?: string): string 
 }
 
 export const Customers = {
-  select: (cast: Cast) => `
+  select: (_cast: Cast) => `
     select 'AH-10465' as customer_id, 'Customer 1' as customer_name union all
     select 'AJ-10780' as customer_id, 'Customer 2' as customer_name union all
     select 'AS-10225' as customer_id, 'Customer 3' as customer_name union all
@@ -67,7 +67,7 @@ export const Customers = {
 };
 
 export const Products = {
-  select: (cast: Cast) => `
+  select: (_cast: Cast) => `
     select 'Furniture' as category, 'Tables' as sub_category, 'Anderson Hickey Conga Table Tops & Accessories' as product_name union all
     select 'Furniture' as category, 'Tables' as sub_category, 'Balt Solid Wood Rectangular Table' as product_name union all
     select 'Furniture' as category, 'Bookcases' as sub_category, 'DMI Eclipse Executive Suite Bookcases' as product_name union all

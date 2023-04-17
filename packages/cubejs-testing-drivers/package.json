@@ -16,6 +16,11 @@
     "athena-driver": "jest --forceExit --runInBand --verbose -i dist/test/athena-driver.test.js",
     "athena-core": "jest --forceExit --runInBand --verbose -i dist/test/athena-core.test.js",
     "athena-full": "jest --forceExit --runInBand --verbose -i dist/test/athena-full.test.js",
+
+    "bigquery-driver": "jest --forceExit --runInBand --verbose -i dist/test/bigquery-driver.test.js",
+    "bigquery-core": "jest --forceExit --runInBand --verbose -i dist/test/bigquery-core.test.js",
+    "bigquery-full": "jest --forceExit --runInBand --verbose -i dist/test/bigquery-full.test.js",
+
     "clickhouse-driver": "jest --forceExit --runInBand --verbose -i dist/test/clickhouse-driver.test.js",
     "clickhouse-core": "jest --forceExit --runInBand --verbose -i dist/test/clickhouse-core.test.js",
     "clickhouse-full": "jest --forceExit --runInBand --verbose -i dist/test/clickhouse-full.test.js",

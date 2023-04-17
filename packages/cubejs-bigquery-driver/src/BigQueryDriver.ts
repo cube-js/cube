@@ -112,6 +112,7 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
         getEnv('dbExportBucket', { dataSource }) ||
         getEnv('bigqueryExportBucket', { dataSource }),
       location: getEnv('bigqueryLocation', { dataSource }),
+      readOnly: true,
       ...config,
       pollTimeout: (
         config.pollTimeout ||
