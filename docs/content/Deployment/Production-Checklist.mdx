@@ -101,13 +101,26 @@ There's no one-size-fits-all when it comes to sizing Cube cluster, and its resou
 Resources required by Cube depend a lot on the amount of traffic Cube needs to serve and the amount of data it needs to process.
 The following sizing estimates are based on default settings and are very generic, which may not fit your Cube use case, so you should always tweak resources based on consumption patterns you see.
 
-Every Cube API instance should have at least 3GB of RAM and 2 CPU cores allocated for it.
+### <--{"id" : "Appropriate cluster sizing"}--> Memory and CPU
+
 Each Cube cluster should contain at least 2 Cube API instances.
+Every Cube API instance should have at least 3GB of RAM and 2 CPU cores allocated for it.
+
 Refresh workers tend to be much more CPU and memory intensive, so at least 6GB of RAM is recommended.
-Please note that to take advantage of all available RAM, the Node.js heap size should be adjusted accordingly.
+Please note that to take advantage of all available RAM, the Node.js heap size should be adjusted accordingly
+by using the [`--max-old-space-size` option][node-heap-size]:
+
+```sh
+NODE_OPTIONS="--max-old-space-size=6144"
+```
+
+[node-heap-size]: https://nodejs.org/api/cli.html#--max-old-space-sizesize-in-megabytes
+
 The Cube Store router node should have at least 6GB of RAM and 4 CPU cores allocated for it.
 Every Cube Store worker node should have at least 8GB of RAM and 4 CPU cores allocated for it.
 The Cube Store cluster should have at least two worker nodes.
+
+### <--{"id" : "Appropriate cluster sizing"}--> RPS and data volume
 
 Depending on schema size, every Core Cube API instance can serve 1 to 10 requests per second.
 Every Core Cube Store router node can serve 50-100 queries per second.
