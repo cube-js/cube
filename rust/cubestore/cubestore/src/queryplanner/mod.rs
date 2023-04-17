@@ -728,7 +728,11 @@ pub mod tests {
     use pretty_assertions::assert_eq;
 
     fn initial_plan(s: &str, ctx: MetaStoreSchemaProvider) -> LogicalPlan {
-        let statement = match CubeStoreParser::new(s).unwrap().parse_statement().unwrap() {
+        let statement = match CubeStoreParser::new(s, None)
+            .unwrap()
+            .parse_statement()
+            .unwrap()
+        {
             Statement::Statement(s) => s,
             other => panic!("not a statement, actual {:?}", other),
         };
