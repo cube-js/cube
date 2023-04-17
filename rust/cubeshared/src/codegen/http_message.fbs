@@ -47,7 +47,7 @@ table NullValue { }
 union HttpParameterValue { Int64Value, BoolValue, StringValue, BinaryValue, Float64Value, NullValue }
 
 table HttpParameter {
-    value: HttpParameterValue;
+    value: HttpParameterValue (required);
 }
 
 table HttpColumnValue {
