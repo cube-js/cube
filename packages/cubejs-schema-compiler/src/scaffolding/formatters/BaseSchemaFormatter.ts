@@ -8,7 +8,7 @@ const JOIN_RELATIONSHIP_MAP = {
   hasOne: 'one_to_one',
   hasMany: 'one_to_many',
   belongsTo: 'many_to_one',
-}
+};
 
 export type SchemaFile = {
   fileName: string;
@@ -76,7 +76,7 @@ export abstract class BaseSchemaFormatter {
   }
 
   protected memberName(member) {
-    return toSnakeCase(member.title.replace(/[^A-Za-z0-9]+/g, '_').toLowerCase())
+    return toSnakeCase(member.title.replace(/[^A-Za-z0-9]+/g, '_').toLowerCase());
   }
 
   protected escapeName(name) {
