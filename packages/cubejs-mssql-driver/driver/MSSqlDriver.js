@@ -10,6 +10,7 @@ const {
 } = require('@cubejs-backend/shared');
 const sql = require('mssql');
 const { BaseDriver } = require('@cubejs-backend/base-driver');
+const QueryStream = require('./QueryStream');
 
 
 const GenericTypeToMSSql = {
@@ -93,6 +94,127 @@ class MSSqlDriver extends BaseDriver {
     return this.initialConnectPromise.then((pool) => pool.request().query('SELECT 1 as number'));
   }
 
+  /**
+   * Executes query in streaming mode.
+   *
+   * @param {string} query 
+   * @param {Array} values 
+   * @param {{ highWaterMark: number? }} options
+   * @return {Promise<StreamTableDataWithTypes>}
+   */
+  async stream(
+    query,
+    values,
+    options,
+  ) {
+    const pool = await this.initialConnectPromise;
+    const request = pool.request();
+
+    request.stream = true;
+    (values || []).forEach((v, i) => {
+      request.input(`_${i + 1}`, v);
+    });
+    request.query(query);
+
+    const stream = new QueryStream(request, options?.highWaterMark);
+    const fields = await new Promise((resolve, reject) => {
+      request.on('recordset', (columns) => {
+        resolve(this.mapFields(columns));
+      });
+      request.on('error', (err) => {
+        reject(err);
+      });
+    });
+    return {
+      rowStream: stream,
+      types: fields,
+      release: async () => {},
+    };
+  }
+
+  /**
+   * @param {{
+   *   [name: string]: {
+   *     index: number,
+   *     name: string,
+   *     type: *,
+   *     nullable: boolean,
+   *     caseSensitive: boolean,
+   *     identity: boolean,
+   *     readOnly: boolean,
+   *     length: number?,
+   *     scale: number?,
+   *     precision: number?
+   *   }
+   * }} fields 
+   */
+  mapFields(fields) {
+    return Object.keys(fields).map((field) => {
+      let type;
+      switch (fields[field].type) {
+        case sql.Bit:
+          type = 'boolean';
+          break;
+        // integers
+        case sql.Int:
+        case sql.SmallInt:
+        case sql.TinyInt:
+          type = 'int';
+          break;
+        // float
+        case sql.Real:
+        case sql.Money:
+        case sql.SmallMoney:
+        case sql.Numeric:
+          type = 'float';
+          break;
+        // double
+        case sql.Float:
+        case sql.Decimal:
+          type = 'double';
+          break;
+        // strings
+        case sql.Char:
+        case sql.NChar:
+        case sql.Text:
+        case sql.VarChar:
+        case sql.NVarChar:
+        case sql.Xml:
+          type = 'text';
+          break;
+        // date and time
+        case sql.Time:
+          type = 'date';
+          break;
+        case sql.Date:
+          type = 'date';
+          break;
+        case sql.DateTime:
+        case sql.DateTime2:
+        case sql.SmallDateTime:
+        case sql.DateTimeOffset:
+          type = 'date';
+          break;
+        // others
+        case sql.UniqueIdentifier:
+        case sql.Variant:
+        case sql.Binary:
+        case sql.VarBinary:
+        case sql.Image:
+        case sql.UDT:
+        case sql.Geography:
+        case sql.Geometry:
+          type = 'string';
+          break;
+        // unknown
+        default:
+          type = 'string';
+          break;
+      }
+      return { name: fields[field].name, type };
+    });
+  }
+
   query(query, values) {
     let cancelFn = null;
     const promise = this.initialConnectPromise.then((pool) => {
@@ -159,7 +281,11 @@ class MSSqlDriver extends BaseDriver {
     `;
   }
 
-  async downloadQueryResults(query, values) {
+  async downloadQueryResults(query, values, options) {
+    if ((options || {}).streamImport) {
+      return this.stream(query, values, options);
+    }
+
     const result = await this.query(query, values);
     const types = Object.keys(result.columns).map((key) => ({
       name: result.columns[key].name,

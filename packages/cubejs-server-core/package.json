@@ -26,8 +26,7 @@
     "lint": "eslint src/* test/* --ext .ts,.js",
     "lint:fix": "eslint --fix src/* test/* --ext .ts,.js",
     "test": "npm run unit",
-    "unit": "jest --runInBand --coverage dist/test",
-    "tst": "clear && yarn tsc && jest --runInBand --coverage dist/test/unit/OptsHandler.test.js"
+    "unit": "jest --runInBand --coverage dist/test"
   },
   "dependencies": {
     "@cubejs-backend/api-gateway": "^0.32.27",

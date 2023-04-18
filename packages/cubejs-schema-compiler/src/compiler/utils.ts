@@ -1,22 +1,18 @@
 import { camelize } from 'inflection';
 
-function camelizeObjectPart(obj: unknown, deep: boolean = true, camelizeKeys: boolean = true): unknown {
+function camelizeObjectPart(obj: unknown, camelizeKeys: boolean, level = 0): unknown {
   if (!obj) {
-    return obj;
-  }
-
-  if (!deep && !camelizeKeys) {
     return obj;
   }
 
   if (Array.isArray(obj)) {
     for (let i = 0; i < obj.length; i++) {
-      obj[i] = camelizeObjectPart(obj[i]);
+      obj[i] = camelizeObjectPart(obj[i], true, level + 1);
     }
   } else if (typeof obj === 'object') {
     for (const key of Object.keys(obj)) {
-      if (deep) {
-        obj[key] = camelizeObjectPart(obj[key], deep, true);
+      if (!(level === 1 && key === 'meta')) {
+        obj[key] = camelizeObjectPart(obj[key], true, level + 1);
       }
 
       if (camelizeKeys) {
@@ -33,10 +29,17 @@ function camelizeObjectPart(obj: unknown, deep: boolean = true, camelizeKeys: bo
 }
 
 export function camelizeCube(cube: any): unknown {
-  camelizeObjectPart(cube, false, true);
-  camelizeObjectPart(cube.measures, true, false);
-  camelizeObjectPart(cube.dimensions, true, false);
-  camelizeObjectPart(cube.preAggregations, true, false);
+  for (const key of Object.keys(cube)) {
+    const camelizedKey = camelize(key, true);
+    if (camelizedKey !== key) {
+      cube[camelizedKey] = cube[key];
+      delete cube[key];
+    }
+  }
+
+  camelizeObjectPart(cube.measures, false);
+  camelizeObjectPart(cube.dimensions, false);
+  camelizeObjectPart(cube.preAggregations, false);
 
   return cube;
 }

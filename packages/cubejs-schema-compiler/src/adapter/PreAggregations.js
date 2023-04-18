@@ -816,7 +816,7 @@ export class PreAggregations {
   cubesFromPreAggregation(preAggObj) {
     return R.uniq(
       preAggObj.references.measures.map(m => this.query.cubeEvaluator.parsePath('measures', m)).concat(
-        preAggObj.references.dimensions.map(m => this.query.cubeEvaluator.parsePath('dimensions', m))
+        preAggObj.references.dimensions.map(m => this.query.cubeEvaluator.parsePathAnyType(m))
       ).map(p => p[0])
     );
   }

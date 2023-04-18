@@ -40,11 +40,10 @@ Worker** builds and refreshes pre-aggregations in the background. **Cube Store**
 ingests pre-aggregations built by Refresh Worker and responds to queries from
 API instances.
 
-API instances and Refresh Worker can be configured via [environment
-variables][ref-config-env] or [cube.js configuration file][ref-config-js]. They
-also need access to the data schema files.
-
-Cube Store cluster can be configured via environment variables.
+API instances and Refresh Workers can be configured via [environment
+variables][ref-config-env] or the [`cube.js` configuration file][ref-config-js].
+They also need access to the data schema files. Cube Store clusters can be
+configured via environment variables.
 
 You can find an example Docker Compose configuration for a Cube deployment in
 the platform-specific guide for [Docker][ref-deploy-docker].
@@ -81,37 +80,28 @@ Cube Store is the purpose-built pre-aggregations storage for Cube.
 Cube Store uses a distributed query engine architecture. In every Cube Store
 cluster:
 
-- a one or many router nodes handle incoming connections, manages database
-  metadata, builds query plans, and orchestrates their execution
-- multiple worker nodes ingest warmed up data and execute queries in parallel
+- a one or many [router nodes](#cube-store-cube-store-router) handle incoming
+  connections, manages database metadata, builds query plans, and orchestrates
+  their execution
+- multiple [worker nodes](#cube-store-cube-store-worker) ingest warmed up data
+  and execute queries in parallel
 - a local or cloud-based blob storage keeps pre-aggregated data in columnar
   format
 
-![Cube Store architecture diagram](https://cubedev-blog-images.s3.us-east-2.amazonaws.com/db0e1aeb-3101-4280-b4a4-902e21bcd9a0.png)
-
-More information on Cube Store architecture can be found in
-[this presentation](https://docs.google.com/presentation/d/1oQ-koloag0UcL-bUHOpBXK4txpqiGl41rxhgDVrw7gw/).
+<div style="text-align: center">
+  <img
+    alt="Cube Store Router with two Cube Store Workers"
+    src="https://cubedev-blog-images.s3.us-east-2.amazonaws.com/db0e1aeb-3101-4280-b4a4-902e21bcd9a0.png"
+    style="border: none"
+    width="100%"
+  />
+</div>
 
 By default, Cube Store listens on the port `3030` for queries coming from Cube.
 The port could be changed by setting `CUBESTORE_HTTP_PORT` environment variable.
 In a case of using custom port, please make sure to change
 `CUBEJS_CUBESTORE_PORT` environment variable for Cube API Instances and Refresh
 Worker.
-
-### <--{"id" : "Cube Store"}--> Scaling
-
-Although Cube Store _can_ be run in single-instance mode, this is often
-unsuitable for production deployments. For high concurrency and data throughput,
-we **strongly** recommend running Cube Store as a cluster of multiple instances
-instead. Because the storage layer is decoupled from the query processing
-engine, you can horizontally scale your Cube Store cluster for as much
-concurrency as you require.
-
-Cube Store has two "kinds" of nodes:
-
-- The **router** node handles incoming client connections, manages database
-  metadata and serves simple queries
-- Multiple **worker** nodes which execute SQL queries received from Cube
 
 Both the router and worker use the [Cube Store Docker image][dh-cubestore]. The
 following environment variables should be used to manage the roles:
@@ -123,6 +113,61 @@ following environment variables should be used to manage the roles:
 | `CUBESTORE_WORKERS`     | Yes                | Yes                |
 | `CUBESTORE_WORKER_PORT` | -                  | Yes                |
 | `CUBESTORE_META_ADDR`   | -                  | Yes                |
+
+<InfoBox>
+
+Looking for a deeper dive on Cube Store architecture? Check out
+[this presentation](https://docs.google.com/presentation/d/1oQ-koloag0UcL-bUHOpBXK4txpqiGl41rxhgDVrw7gw/)
+by our CTO, [Pavel][gh-pavel].
+
+</InfoBox>
+
+### <--{"id" : "Cube Store"}--> Cube Store Router
+
+<div style="text-align: center">
+  <img
+    alt="Cube Store Router with two Cube Store Workers"
+    src="https://ucarecdn.com/bfc4f46a-09c2-4e2d-a8e8-8bb6177bb5ff/"
+    style="border: none"
+    width="100%"
+  />
+</div>
+
+The Router in a Cube Store cluster is responsible for receiving queries from
+Cube, managing metadata for the Cube Store cluster, and query planning and
+distribution for the Workers. It also [provides a MySQL-compatible
+interface][ref-caching-inspect-sql] that can be used to query pre-aggregations
+from Cube Store directly. Cube **only** communicates with the Router, and does
+not interact with Workers directly.
+
+[ref-caching-inspect-sql]:
+  /caching/using-pre-aggregations#inspecting-pre-aggregations
+
+### <--{"id" : "Cube Store"}--> Cube Store Worker
+
+<div style="text-align: center">
+  <img
+    alt="Cube Store Router with two Cube Store Workers"
+    src="https://ucarecdn.com/bedc67d5-b8ab-447f-8d7a-0176487e02a5/"
+    style="border: none"
+    width="100%"
+  />
+</div>
+
+Workers in a Cube Store cluster receive and execute subqueries from the Router,
+and directly interact with the underlying distributed storage for insertions,
+selections and pre-aggregation warmup. Workers **do not** interact with each
+other directly, and instead rely on the Router to distribute queries and manage
+any associated metadata.
+
+### <--{"id" : "Cube Store"}--> Scaling
+
+Although Cube Store _can_ be run in single-instance mode, this is often
+unsuitable for production deployments. For high concurrency and data throughput,
+we **strongly** recommend running Cube Store as a cluster of multiple instances
+instead. Because the storage layer is decoupled from the query processing
+engine, you can horizontally scale your Cube Store cluster for as much
+concurrency as you require.
 
 A sample Docker Compose stack setting Cube Store cluster up might look like:
 
@@ -205,10 +250,10 @@ services:
 
 ## Redis
 
-Earlier, [Redis][redis] was used in production deployments as storage
-for in-memory cache and query queue. Since version v0.32.0, Cube Store is used
-for that purpose. It is still possible to [configure][ref-config-redis] Cube to
-use Redis; however, it is strongly not recommended. Please check the [blog
+Earlier, [Redis][redis] was used in production deployments as storage for
+in-memory cache and query queue. Since version v0.32.0, Cube Store is used for
+that purpose. It is still possible to [configure][ref-config-redis] Cube to use
+Redis; however, it is strongly not recommended. Please check the [blog
 post][blog-details] for details.
 
 <WarningBox>
@@ -235,3 +280,4 @@ guide][blog-migration-guide].
 [blog-details]: https://cube.dev/blog/how-you-win-by-using-cube-store-part-1
 [blog-migration-guide]:
   https://cube.dev/blog/how-you-win-by-using-cube-store-part-1#how-to-migrate-to-cube-store
+[gh-pavel]: https://github.com/paveltiunov
