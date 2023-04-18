@@ -16,8 +16,8 @@
     "eslint": ">=7.21"
   },
   "dependencies": {
-    "@typescript-eslint/eslint-plugin": "^4.16.1",
-    "@typescript-eslint/parser": "^4.16.1",
+    "@typescript-eslint/eslint-plugin": "^5.59",
+    "@typescript-eslint/parser": "^5.59",
     "eslint": "^7.21.0",
     "eslint-config-airbnb-base": "^14.2.1",
     "eslint-plugin-import": "^2.22.1",
