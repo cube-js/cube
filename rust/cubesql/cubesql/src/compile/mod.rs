@@ -42,18 +42,19 @@ use self::{
         information_schema::mysql::ext::CubeColumnMySqlExt,
         provider::CubeContext,
         udf::{
-            create_array_lower_udf, create_array_upper_udf, create_connection_id_udf,
-            create_convert_tz_udf, create_cube_regclass_cast_udf, create_current_schema_udf,
-            create_current_schemas_udf, create_current_setting_udf, create_current_timestamp_udf,
-            create_current_user_udf, create_date_add_udf, create_date_sub_udf,
-            create_date_to_timestamp_udf, create_date_udf, create_dateadd_udf, create_datediff_udf,
-            create_dayofmonth_udf, create_dayofweek_udf, create_dayofyear_udf, create_db_udf,
-            create_ends_with_udf, create_format_type_udf, create_generate_series_udtf,
-            create_generate_subscripts_udtf, create_has_schema_privilege_udf, create_hour_udf,
-            create_if_udf, create_instr_udf, create_interval_mul_udf, create_isnull_udf,
-            create_json_build_object_udf, create_least_udf, create_locate_udf, create_makedate_udf,
-            create_measure_udaf, create_minute_udf, create_pg_backend_pid_udf,
-            create_pg_datetime_precision_udf, create_pg_expandarray_udtf,
+            create_array_lower_udf, create_array_to_string_udf, create_array_upper_udf,
+            create_connection_id_udf, create_convert_tz_udf, create_cube_regclass_cast_udf,
+            create_current_schema_udf, create_current_schemas_udf, create_current_setting_udf,
+            create_current_timestamp_udf, create_current_user_udf, create_date_add_udf,
+            create_date_sub_udf, create_date_to_timestamp_udf, create_date_udf, create_dateadd_udf,
+            create_datediff_udf, create_dayofmonth_udf, create_dayofweek_udf, create_dayofyear_udf,
+            create_db_udf, create_ends_with_udf, create_format_type_udf,
+            create_generate_series_udtf, create_generate_subscripts_udtf,
+            create_has_schema_privilege_udf, create_hour_udf, create_if_udf, create_instr_udf,
+            create_interval_mul_udf, create_isnull_udf, create_json_build_object_udf,
+            create_least_udf, create_locate_udf, create_makedate_udf, create_measure_udaf,
+            create_minute_udf, create_pg_backend_pid_udf, create_pg_datetime_precision_udf,
+            create_pg_encoding_to_char_udf, create_pg_expandarray_udtf,
             create_pg_get_constraintdef_udf, create_pg_get_expr_udf,
             create_pg_get_serial_sequence_udf, create_pg_get_userbyid_udf,
             create_pg_is_other_temp_schema, create_pg_my_temp_schema,
@@ -1178,6 +1179,8 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_sha1_udf());
         ctx.register_udf(create_current_setting_udf());
         ctx.register_udf(create_quote_ident_udf());
+        ctx.register_udf(create_pg_encoding_to_char_udf());
+        ctx.register_udf(create_array_to_string_udf());
 
         // udaf
         ctx.register_udaf(create_measure_udaf());
@@ -8157,6 +8160,33 @@ ORDER BY \"COUNT(count)\" DESC"
                     test LIKE 't\\%e%'
                 ORDER BY attname
                 "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_psql_list() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "psql_list",
+            execute_query(
+                r#"
+                SELECT
+                    d.datname as "Name",
+                    pg_catalog.pg_get_userbyid(d.datdba) as "Owner",
+                    pg_catalog.pg_encoding_to_char(d.encoding) as "Encoding",
+                    d.datcollate as "Collate",
+                    d.datctype as "Ctype",
+                    NULL as "ICU Locale",
+                    'libc' AS "Locale Provider",
+                    pg_catalog.array_to_string(d.datacl, E'\n') AS "Access privileges"
+                FROM pg_catalog.pg_database d
+                ORDER BY 1
+                ;"#
                 .to_string(),
                 DatabaseProtocol::PostgreSQL
             )
