@@ -47,6 +47,9 @@ export function testSequence(type: string): void {
       source = drivers.source;
       storage = drivers.storage;
       query = getCreateQueries(type, 'core');
+      if (fixtures.cast.USE_SCHEMA) {
+        await source.query(fixtures.cast.USE_SCHEMA);
+      }
       await Promise.all(query.map(async (q) => {
         await source.query(q);
       }));
