@@ -3038,3 +3038,68 @@ pub fn create_quote_ident_udf() -> ScalarUDF {
         &fun,
     )
 }
+
+pub fn create_pg_encoding_to_char_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        let encoding_ids = downcast_primitive_arg!(args[0], "encoding_id", Int32Type);
+
+        let result = encoding_ids
+            .iter()
+            .map(|oid| match oid {
+                Some(0) => Some("SQL_ASCII".to_string()),
+                Some(6) => Some("UTF8".to_string()),
+                Some(_) => Some("".to_string()),
+                _ => None,
+            })
+            .collect::<StringArray>();
+
+        Ok(Arc::new(result))
+    });
+
+    create_udf(
+        "pg_encoding_to_char",
+        vec![DataType::Int32],
+        Arc::new(DataType::Utf8),
+        Volatility::Immutable,
+        fun,
+    )
+}
+
+pub fn create_array_to_string_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 2);
+
+        let input_arr = downcast_list_arg!(args[0], "strs");
+        let join_strs = downcast_string_arg!(args[1], "join_str", i32);
+
+        let mut builder = StringBuilder::new(input_arr.len());
+
+        for i in 0..input_arr.len() {
+            if input_arr.is_null(i) || join_strs.is_null(i) {
+                builder.append_null()?;
+                continue;
+            }
+
+            let array = input_arr.value(i);
+            let join_str = join_strs.value(i);
+            let strings = downcast_string_arg!(array, "str", i32);
+            let joined_string =
+                itertools::Itertools::intersperse(strings.iter().filter_map(|s| s), join_str)
+                    .collect::<String>();
+            builder.append_value(joined_string)?;
+        }
+
+        Ok(Arc::new(builder.finish()) as ArrayRef)
+    });
+
+    create_udf(
+        "array_to_string",
+        vec![
+            DataType::List(Box::new(Field::new("item", DataType::Utf8, true))),
+            DataType::Utf8,
+        ],
+        Arc::new(DataType::Utf8),
+        Volatility::Immutable,
+        fun,
+    )
+}
