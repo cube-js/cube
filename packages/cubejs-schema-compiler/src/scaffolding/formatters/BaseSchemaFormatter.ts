@@ -161,7 +161,6 @@ export abstract class BaseSchemaFormatter {
         ...generatedDescriptor,
         ...descriptor,
         ...cubeMembers,
-        drillMembers: generatedDescriptor?.drillMembers?.filter((dm) => dimensionNames.includes(dm.name)),
       };
     });
   }
