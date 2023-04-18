@@ -124,10 +124,10 @@ export function testConnection(type: string): void {
 
     execute('must download query from the data source via memory', async () => {
       query = getSelectQueries(type, 'driver');
+      expect(driver.downloadQueryResults).toBeDefined();
       const response = await Promise.all(
         query.map(async (q) => {
           const memory = <DownloadTableMemoryData>(
-            driver.downloadQueryResults &&
             await driver.downloadQueryResults(q, [], {
               streamImport: false,
               highWaterMark: 100,
@@ -147,10 +147,10 @@ export function testConnection(type: string): void {
 
     execute('must download query from the data source via stream', async () => {
       query = getSelectQueries(type, 'driver');
+      expect(driver.downloadQueryResults).toBeDefined();
       const response = await Promise.all(
         query.map(async (q) => {
           const stream = <StreamTableDataWithTypes>(
-            driver.downloadQueryResults &&
             await driver.downloadQueryResults(q, [], {
               streamImport: true,
               highWaterMark: 16000,

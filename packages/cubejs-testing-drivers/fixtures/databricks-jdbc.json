@@ -38,6 +38,7 @@
     "---------------------------------------",
     "Driver tests                           ",
     "---------------------------------------",
+    "must download query from the data source via memory",
     "must download query from the data source via stream",
 
     "---------------------------------------",
