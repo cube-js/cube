@@ -11,12 +11,12 @@ on:
       - 'packages/cubejs-base-driver/src/**'
       - 'packages/cubejs-jdbc-driver/src/**'
 
-      - 'packages/cubejs-athena-driver/src/**'
-      - 'packages/cubejs-clickhouse-driver/src/**'
-      - 'packages/cubejs-databricks-jdbc-driver/src/**'
-      - 'packages/cubejs-mssql-driver/src/**'
-      - 'packages/cubejs-mysql-driver/src/**'
-      - 'packages/cubejs-postgres-driver/src/**'
+      - 'packages/cubejs-athena-driver/**'
+      - 'packages/cubejs-clickhouse-driver/**'
+      - 'packages/cubejs-databricks-jdbc-driver/**'
+      - 'packages/cubejs-mssql-driver/**'
+      - 'packages/cubejs-mysql-driver/**'
+      - 'packages/cubejs-postgres-driver/**'
   pull_request:
     paths:
       - '.github/workflows/drivers-tests.yml'
@@ -25,12 +25,12 @@ on:
       - 'packages/cubejs-base-driver/src/**'
       - 'packages/cubejs-jdbc-driver/src/**'
 
-      - 'packages/cubejs-athena-driver/src/**'
-      - 'packages/cubejs-clickhouse-driver/src/**'
-      - 'packages/cubejs-databricks-jdbc-driver/src/**'
-      - 'packages/cubejs-mssql-driver/src/**'
-      - 'packages/cubejs-mysql-driver/src/**'
-      - 'packages/cubejs-postgres-driver/src/**'
+      - 'packages/cubejs-athena-driver/**'
+      - 'packages/cubejs-clickhouse-driver/**'
+      - 'packages/cubejs-databricks-jdbc-driver/**'
+      - 'packages/cubejs-mssql-driver/**'
+      - 'packages/cubejs-mysql-driver/**'
+      - 'packages/cubejs-postgres-driver/**'
 
 jobs:
   build:
