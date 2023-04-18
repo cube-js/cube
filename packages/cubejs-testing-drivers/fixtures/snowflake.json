@@ -27,7 +27,8 @@
     "CREATE_TBL_PREFIX": "CREATE TABLE ",
     "CREATE_TBL_SUFFIX": " AS ",
     "CREATE_SUB_PREFIX": "(",
-    "CREATE_SUB_SUFFIX": ");"
+    "CREATE_SUB_SUFFIX": ");",
+    "USE_SCHEMA": "USE SCHEMA public;"
   },
   "preAggregations": {
     "Products": [],
@@ -54,9 +55,7 @@
     "---------------------------------------",
     "must built pre-aggregations",
     "querying Customers: dimentions + order + total + offset",
-    "querying Customers: dimentions + order + limit + total + offset",
     "querying ECommerce: dimentions + order + total + offset",
-    "querying ECommerce: dimentions + order + limit + total + offset",
 
     "---------------------------------------",
     "SKIPED FOR ALL                         ",

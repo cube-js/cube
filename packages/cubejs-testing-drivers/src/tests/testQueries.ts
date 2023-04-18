@@ -14,13 +14,13 @@ export function testQueries(type: string): void {
   describe(`Queries with the @cubejs-backend/${type}-driver`, () => {
     jest.setTimeout(60 * 5 * 1000);
 
+    const fixtures = getFixtures(type);
     let client: CubejsApi;
     let driver: BaseDriver;
     let query: string[];
     let env: Environment;
 
     function execute(name: string, test: () => Promise<void>) {
-      const fixtures = getFixtures(type);
       if (fixtures.skip && fixtures.skip.indexOf(name) >= 0) {
         it.skip(name, test);
       } else {
@@ -46,12 +46,18 @@ export function testQueries(type: string): void {
       driver = (await getDriver(type)).source;
       query = getCreateQueries(type);
 
+      if (fixtures.cast.USE_SCHEMA) {
+        await driver.query(fixtures.cast.USE_SCHEMA);
+      }
       await Promise.all(query.map(async (q) => {
         await driver.query(q);
       }));
     });
   
     afterAll(async () => {
+      if (fixtures.cast.USE_SCHEMA) {
+        await driver.query(fixtures.cast.USE_SCHEMA);
+      }
       await Promise.all(['ecommerce', 'customers', 'products'].map(async (t) => {
         await driver.dropTable(t);
       }));

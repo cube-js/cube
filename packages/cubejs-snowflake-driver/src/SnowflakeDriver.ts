@@ -14,7 +14,13 @@ import {
   DriverInterface,
   GenericDataBaseType,
   StreamTableData,
+  TableStructure,
   UnloadOptions,
+  StreamOptions,
+  StreamTableDataWithTypes,
+  DownloadTableMemoryData,
+  DownloadQueryResultsResult,
+  DownloadQueryResultsOptions,
 } from '@cubejs-backend/base-driver';
 import * as crypto from 'crypto';
 import { formatToTimeZone } from 'date-fns-timezone';
@@ -143,6 +149,7 @@ interface SnowflakeDriverOptions {
   exportBucket?: SnowflakeDriverExportBucket,
   executionTimeout?: number,
   application: string,
+  readOnly?: boolean,
 
   /**
    * The export bucket CSV file escape symbol.
@@ -205,6 +212,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     }
 
     this.config = {
+      readOnly: true,
       account: getEnv('snowflakeAccount', { dataSource }),
       region: getEnv('snowflakeRegion', { dataSource }),
       warehouse: getEnv('snowflakeWarehouse', { dataSource }),
@@ -224,6 +232,10 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       application: 'CubeDev_Cube',
       ...config
     };
+  }
+
+  public readOnly(): boolean {
+    return !!this.config.readOnly;
   }
 
   protected createExportBucket(
@@ -505,12 +517,83 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     throw new Error('Unable to UNLOAD table, there are no files in GCS storage');
   }
 
+  /**
+   * Executes a query and returns either query result memory data or
+   * query result stream, depending on options.
+   */
+  public async downloadQueryResults(
+    query: string,
+    values: unknown[],
+    options: DownloadQueryResultsOptions,
+  ): Promise<DownloadQueryResultsResult> {
+    if (!options.streamImport) {
+      return this.memory(query, values);
+    } else {
+      return this.stream(query, values, options);
+    }
+  }
+
+  /**
+   * Executes query and returns table memory data that includes rows
+   * and queried fields types.
+   */
+  public async memory(
+    query: string,
+    values: unknown[],
+  ): Promise<DownloadTableMemoryData & { types: TableStructure }> {
+    const connection = await this.getConnection();
+    return new Promise((resolve, reject) => connection.execute({
+      sqlText: query,
+      binds: <string[] | undefined>values,
+      fetchAsString: ['Number'],
+      complete: (err, stmt, rows) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+        const hydrationMap = this.generateHydrationMap(stmt.getColumns());
+        const types: {name: string, type: string}[] =
+          stmt.getColumns().map((column) => {
+            const type = {
+              name: column.getName().toLowerCase(),
+              type: '',
+            };
+            if (column.isNumber()) {
+              // @ts-ignore
+              if (column.getPrecision() === 0) {
+                type.type = 'int';
+              } else {
+                type.type = 'decimal';
+              }
+            } else {
+              type.type = this.toGenericType(column.getType());
+            }
+            return type;
+          });
+        if (rows && rows.length && Object.keys(hydrationMap).length) {
+          for (const row of rows) {
+            for (const [field, toValue] of Object.entries(hydrationMap)) {
+              if (row.hasOwnProperty(field)) {
+                row[field] = toValue(row[field]);
+              }
+            }
+          }
+        }
+        resolve({ types, rows: rows || [] });
+      }
+    }));
+  }
+
+  /**
+   * Returns stream table object that includes query result stream and
+   * queried fields types.
+   */
   public async stream(
     query: string,
     values: unknown[],
-  ): Promise<StreamTableData> {
+    _options: StreamOptions,
+  ): Promise<StreamTableDataWithTypes> {
     const connection = await this.getConnection();
-
     const stmt = await new Promise<Statement>((resolve, reject) => connection.execute({
       sqlText: query,
       binds: <string[] | undefined>values,
@@ -530,22 +613,39 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
         resolve(statement);
       }
     }));
-
+    const types: {name: string, type: string}[] =
+      stmt.getColumns().map((column) => {
+        const type = {
+          name: column.getName().toLowerCase(),
+          type: '',
+        };
+        if (column.isNumber()) {
+          // @ts-ignore
+          if (column.getPrecision() === 0) {
+            type.type = 'int';
+          } else {
+            type.type = 'decimal';
+          }
+        } else {
+          type.type = this.toGenericType(column.getType());
+        }
+        return type;
+      });
     const hydrationMap = this.generateHydrationMap(stmt.getColumns());
     if (Object.keys(hydrationMap).length) {
       const rowStream = new HydrationStream(hydrationMap);
       stmt.streamRows().pipe(rowStream);
-
       return {
         rowStream,
+        types,
         release: async () => {
           //
         }
       };
     }
-
     return {
       rowStream: stmt.streamRows(),
+      types,
       release: async () => {
         //
       }

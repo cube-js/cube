@@ -1,5 +1,9 @@
 import { jest, expect, beforeAll, afterAll } from '@jest/globals';
-import { BaseDriver } from '@cubejs-backend/base-driver';
+import {
+  BaseDriver,
+  DownloadTableMemoryData,
+  StreamTableDataWithTypes,
+} from '@cubejs-backend/base-driver';
 import { Environment } from '../types/Environment';
 import {
   getFixtures,
@@ -13,6 +17,7 @@ export function testConnection(type: string): void {
   describe(`Raw @cubejs-backend/${type}-driver`, () => {
     jest.setTimeout(60 * 5 * 1000);
 
+    const fixtures = getFixtures(type);
     let driver: BaseDriver & {
       stream?: (
         query: string,
@@ -24,7 +29,6 @@ export function testConnection(type: string): void {
     let env: Environment;
 
     function execute(name: string, test: () => Promise<void>) {
-      const fixtures = getFixtures(type);
       if (fixtures.skip && fixtures.skip.indexOf(name) >= 0) {
         it.skip(name, test);
       } else {
@@ -52,9 +56,9 @@ export function testConnection(type: string): void {
   
     execute('must creates a data source', async () => {
       query = getCreateQueries(type, 'driver');
-      // /////////////////////////////////////////////////////////////
-      await driver.query('USE SCHEMA public;');
-      // /////////////////////////////////////////////////////////////
+      if (fixtures.cast.USE_SCHEMA) {
+        await driver.query(fixtures.cast.USE_SCHEMA);
+      }
       await Promise.all(query.map(async (q) => {
         await driver.query(q);
       }));
@@ -118,12 +122,40 @@ export function testConnection(type: string): void {
       expect(response[2].length).toBe(44);
     });
 
-    execute('must stream from the data source', async () => {
+    execute('must download query from the data source via memory', async () => {
       query = getSelectQueries(type, 'driver');
       const response = await Promise.all(
         query.map(async (q) => {
-          const stream = driver.stream &&
-            await driver.stream(q, [], { highWaterMark: 16000 });
+          const memory = <DownloadTableMemoryData>(
+            driver.downloadQueryResults &&
+            await driver.downloadQueryResults(q, [], {
+              streamImport: false,
+              highWaterMark: 100,
+            })
+          );
+          return {
+            types: memory.types,
+            data: memory.rows,
+          };
+        })
+      );
+      expect(response.length).toBe(3);
+      expect(response[0].data.length).toBe(28);
+      expect(response[1].data.length).toBe(41);
+      expect(response[2].data.length).toBe(44);
+    });
+
+    execute('must download query from the data source via stream', async () => {
+      query = getSelectQueries(type, 'driver');
+      const response = await Promise.all(
+        query.map(async (q) => {
+          const stream = <StreamTableDataWithTypes>(
+            driver.downloadQueryResults &&
+            await driver.downloadQueryResults(q, [], {
+              streamImport: true,
+              highWaterMark: 16000,
+            })
+          );
           const { types } = stream;
           const data: unknown[] = [];
           await new Promise((resolve) => {
@@ -132,7 +164,9 @@ export function testConnection(type: string): void {
               data.push(row);
             });
             rowStream.on('end', () => {
-              stream.release();
+              if (stream.release) {
+                stream.release();
+              }
               resolve({ types, data });
             });
           });
@@ -146,9 +180,9 @@ export function testConnection(type: string): void {
     });
 
     execute('must delete the data source', async () => {
-      // /////////////////////////////////////////////////////////////
-      await driver.query('USE SCHEMA public;');
-      // /////////////////////////////////////////////////////////////
+      if (fixtures.cast.USE_SCHEMA) {
+        await driver.query(fixtures.cast.USE_SCHEMA);
+      }
       await Promise.all([
         'ecommerce_driver',
         'customers_driver',
