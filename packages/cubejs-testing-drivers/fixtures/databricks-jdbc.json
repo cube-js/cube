@@ -38,7 +38,7 @@
     "---------------------------------------",
     "Driver tests                           ",
     "---------------------------------------",
-    "must stream from the data source",
+    "must download query from the data source via stream",
 
     "---------------------------------------",
     "Core tests                             ",

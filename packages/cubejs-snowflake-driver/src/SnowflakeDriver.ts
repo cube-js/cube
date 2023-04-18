@@ -13,7 +13,6 @@ import {
   BaseDriver, DownloadTableCSVData,
   DriverInterface,
   GenericDataBaseType,
-  StreamTableData,
   TableStructure,
   UnloadOptions,
   StreamOptions,
