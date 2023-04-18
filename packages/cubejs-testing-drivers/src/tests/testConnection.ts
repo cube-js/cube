@@ -56,6 +56,9 @@ export function testConnection(type: string): void {
   
     execute('must creates a data source', async () => {
       query = getCreateQueries(type, 'driver');
+      // /////////////////////////////////////////////////////////////
+      await driver.query('USE SCHEMA public;');
+      // /////////////////////////////////////////////////////////////
       await Promise.all(query.map(async (q) => {
         await driver.query(q);
       }));
