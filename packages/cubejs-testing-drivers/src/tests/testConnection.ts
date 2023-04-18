@@ -52,6 +52,9 @@ export function testConnection(type: string): void {
   
     execute('must creates a data source', async () => {
       query = getCreateQueries(type, 'driver');
+      // /////////////////////////////////////////////////////////////
+      await driver.query('USE SCHEMA public;');
+      // /////////////////////////////////////////////////////////////
       await Promise.all(query.map(async (q) => {
         await driver.query(q);
       }));
@@ -67,8 +70,12 @@ export function testConnection(type: string): void {
       );
       expect(response.length).toBe(3);
 
-      response[0].forEach(item => {
-        expect(item).toMatchSnapshot({
+      response[0].forEach((item: any) => {
+        const i: any = {};
+        Object.keys(item).forEach((key) => {
+          i[key.toLowerCase()] = item[key];
+        });
+        expect(i).toMatchSnapshot({
           category: expect.any(String),
           product_name: expect.any(String),
           sub_category: expect.any(String),
@@ -76,16 +83,24 @@ export function testConnection(type: string): void {
       });
       expect(response[0].length).toBe(28);
 
-      response[1].forEach(item => {
-        expect(item).toMatchSnapshot({
+      response[1].forEach((item: any) => {
+        const i: any = {};
+        Object.keys(item).forEach((key) => {
+          i[key.toLowerCase()] = item[key];
+        });
+        expect(i).toMatchSnapshot({
           customer_id: expect.any(String),
           customer_name: expect.any(String),
         });
       });
       expect(response[1].length).toBe(41);
 
-      response[2].forEach(item => {
-        expect(item).toMatchSnapshot({
+      response[2].forEach((item: any) => {
+        const i: any = {};
+        Object.keys(item).forEach((key) => {
+          i[key.toLowerCase()] = item[key];
+        });
+        expect(i).toMatchSnapshot({
           row_id: expect.anything(), // can be String or Number
           order_id: expect.any(String),
           order_date: expect.anything(), // can be String or Date
@@ -131,6 +146,9 @@ export function testConnection(type: string): void {
     });
 
     execute('must delete the data source', async () => {
+      // /////////////////////////////////////////////////////////////
+      await driver.query('USE SCHEMA public;');
+      // /////////////////////////////////////////////////////////////
       await Promise.all([
         'ecommerce_driver',
         'customers_driver',

@@ -46,6 +46,7 @@ util.construct_hostname = (region: any, account: any) => {
 type HydrationConfiguration = {
   types: string[], toValue: (column: Column) => ((value: any) => any) | null
 };
+
 type UnloadResponse = {
   // eslint-disable-next-line camelcase
   rows_unloaded: string
