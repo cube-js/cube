@@ -18,7 +18,7 @@ base64 = "0.13.0"
 bumpalo = "3.6.1"
 tokio = { version = "1.0", features = ["full", "rt"] }
 warp = { version = "0.3.3" }
-sqlparser = { git = 'https://github.com/cube-js/sqlparser-rs.git', rev = "a65390c81ffcc34eac2bd35c837c5683d44ec1e0" }
+sqlparser = { git = 'https://github.com/cube-js/sqlparser-rs.git', rev = "4388f6712dae5073c2d71d74f64cae2edd418066" }
 serde_derive = "1.0.115"
 serde = "1.0.115"
 serde_bytes = "0.11.5"
