@@ -155,6 +155,9 @@ const variables: Record<string, (...args: any) => any> = {
   rollupOnlyMode: () => get('CUBEJS_ROLLUP_ONLY')
     .default('false')
     .asBoolStrict(),
+  schemaPath: () => get('CUBEJS_SCHEMA_PATH')
+    .default('schema')
+    .asString(),
   refreshWorkerMode: () => {
     const refreshWorkerMode = get('CUBEJS_REFRESH_WORKER').asBool();
     if (refreshWorkerMode !== undefined) {
@@ -1408,7 +1411,7 @@ const variables: Record<string, (...args: any) => any> = {
   redisUseIORedis: () => get('CUBEJS_REDIS_USE_IOREDIS')
     .default('false')
     .asBoolStrict(),
-  redisАcquireTimeout: () => get('CUBEJS_REDIS_ACQUIRE_TIMEOUT')
+  redisAcquireTimeout: () => get('CUBEJS_REDIS_ACQUIRE_TIMEOUT')
     .default('5000')
     .asInt(),
   allowUngroupedWithoutPrimaryKey: () => get('CUBEJS_ALLOW_UNGROUPED_WITHOUT_PRIMARY_KEY')
