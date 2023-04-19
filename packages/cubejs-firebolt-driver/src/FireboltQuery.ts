@@ -26,7 +26,7 @@ export class FireboltQuery extends BaseQuery {
     return `${value}::timestampntz`;
   }
 
-  seriesSql(timeDimension: any) {
+  public seriesSql(timeDimension: any) {
     const values = timeDimension.timeSeries().map(
       ([from, to]: [string, string]) => `select '${from}' f, '${to}' t`
     ).join(' UNION ALL ');
