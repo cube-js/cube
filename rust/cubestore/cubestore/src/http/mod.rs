@@ -758,7 +758,9 @@ impl HttpMessage {
         rows
     }
 
-    pub async fn read(http_message: crate::codegen::HttpMessage) -> Result<Self, CubeError> {
+    pub async fn read<'a>(
+        http_message: crate::codegen::HttpMessage<'a>,
+    ) -> Result<Self, CubeError> {
         Ok(HttpMessage {
             message_id: http_message.message_id(),
             connection_id: http_message.connection_id().map(|s| s.to_string()),

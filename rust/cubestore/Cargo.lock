@@ -1261,7 +1261,7 @@ dependencies = [
  "serde_json",
  "simple_logger",
  "smallvec 1.8.0",
- "sqlparser 0.9.0 (git+https://github.com/cube-js/sqlparser-rs.git?rev=4388f6712dae5073c2d71d74f64cae2edd418066)",
+ "sqlparser",
  "tarpc",
  "tempfile",
  "tokio 1.18.1",
@@ -1314,7 +1314,7 @@ dependencies = [
 [[package]]
 name = "datafusion"
 version = "4.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube#bbb4456d1ad9661ee1c448382ede66714ea80b86"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube#a32192bfeb1ba94a76545efae2411ce8bb9d7b58"
 dependencies = [
  "ahash 0.7.4",
  "arrow",
@@ -1339,7 +1339,7 @@ dependencies = [
  "serde_derive",
  "sha2 0.9.5",
  "smallvec 1.8.0",
- "sqlparser 0.9.0 (git+https://github.com/cube-js/sqlparser-rs.git?rev=4e0053a81407e419d68ee0831708e89b8f54c0f6)",
+ "sqlparser",
  "tokio 1.18.1",
  "tokio-stream",
  "tracing",
@@ -4571,14 +4571,6 @@ checksum = "6e63cff320ae2c57904679ba7cb63280a3dc4613885beafb148ee7bf9aa9042d"
 name = "sqlparser"
 version = "0.9.0"
 source = "git+https://github.com/cube-js/sqlparser-rs.git?rev=4388f6712dae5073c2d71d74f64cae2edd418066#4388f6712dae5073c2d71d74f64cae2edd418066"
-dependencies = [
- "log",
-]
-
-[[package]]
-name = "sqlparser"
-version = "0.9.0"
-source = "git+https://github.com/cube-js/sqlparser-rs.git?rev=4e0053a81407e419d68ee0831708e89b8f54c0f6#4e0053a81407e419d68ee0831708e89b8f54c0f6"
 dependencies = [
  "log",
 ]
