@@ -100,6 +100,7 @@ impl MetaStore for MetaStoreMock {
         _unique_key_column_names: Option<Vec<String>>,
         _aggregates: Option<Vec<(String, String)>>,
         _partition_split_threshold: Option<u64>,
+        _trace_obj: Option<String>,
     ) -> Result<IdRow<Table>, CubeError> {
         panic!("MetaStore mock!")
     }
@@ -695,6 +696,9 @@ impl MetaStore for MetaStoreMock {
         panic!("MetaStore mock!")
     }
     async fn get_jobs_on_non_exists_nodes(&self) -> Result<Vec<IdRow<Job>>, CubeError> {
+        panic!("MetaStore mock!")
+    }
+    async fn get_trace_obj_by_table_id(&self, _table_id: u64) -> Result<Option<String>, CubeError> {
         panic!("MetaStore mock!")
     }
 }
