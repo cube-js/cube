@@ -36,6 +36,7 @@ import {
   WarningBox,
 } from '../components/AlertBox/AlertBox';
 import { LoomVideo } from '../components/LoomVideo/LoomVideo';
+import { YouTubeVideo } from '../components/YouTubeVideo/YouTubeVideo';
 import { Grid } from '../components/Grid/Grid';
 import { GridItem } from '../components/Grid/GridItem';
 import ScrollSpyH2 from '../components/Headers/ScrollSpyH2';
@@ -58,6 +59,7 @@ const components = {
   SuccessBox,
   WarningBox,
   LoomVideo,
+  YouTubeVideo,
   Grid,
   GridItem,
   GitHubCodeBlock,
