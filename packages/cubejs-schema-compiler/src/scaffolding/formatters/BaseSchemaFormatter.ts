@@ -1,6 +1,13 @@
 import inflection from 'inflection';
 import { CubeMembers, SchemaContext } from '../ScaffoldingTemplate';
-import { CubeDescriptor, DatabaseSchema, MemberType, ScaffoldingSchema, TableName, TableSchema, } from '../ScaffoldingSchema';
+import {
+  CubeDescriptor,
+  DatabaseSchema,
+  MemberType,
+  ScaffoldingSchema,
+  TableName,
+  TableSchema,
+} from '../ScaffoldingSchema';
 import { ValueWithComments } from '../descriptors/ValueWithComments';
 import { toSnakeCase } from '../utils';
 
@@ -15,14 +22,19 @@ export type SchemaFile = {
   content: string;
 };
 
+export type SchemaFormatterOptions = {
+  snakeCase: boolean;
+};
+
 export abstract class BaseSchemaFormatter {
   protected readonly scaffoldingSchema: ScaffoldingSchema;
 
   public constructor(
-    protected readonly dbSchema: DatabaseSchema,
-    protected readonly driver: any,
+      protected readonly dbSchema: DatabaseSchema,
+      protected readonly driver: any,
+      protected readonly options: SchemaFormatterOptions
   ) {
-    this.scaffoldingSchema = new ScaffoldingSchema(dbSchema, driver);
+    this.scaffoldingSchema = new ScaffoldingSchema(dbSchema, this.options);
   }
 
   public abstract fileExtension(): string;
@@ -41,9 +53,7 @@ export abstract class BaseSchemaFormatter {
 
     return schemaForTables.map((tableSchema) => ({
       fileName: `${tableSchema.cube}.${this.fileExtension()}`,
-      content: this.renderFile(
-        this.schemaDescriptorForTable(tableSchema, schemaContext)
-      ),
+      content: this.renderFile(this.schemaDescriptorForTable(tableSchema, schemaContext)),
     }));
   }
 
@@ -53,30 +63,32 @@ export abstract class BaseSchemaFormatter {
   ): SchemaFile[] {
     return this.schemaForTablesByCubeDescriptors(cubeDescriptors).map((tableSchema) => ({
       fileName: `${tableSchema.cube}.${this.fileExtension()}`,
-      content: this.renderFile(
-        this.schemaDescriptorForTable(tableSchema, schemaContext)
-      ),
+      content: this.renderFile(this.schemaDescriptorForTable(tableSchema, schemaContext)),
     }));
   }
 
   protected sqlForMember(m) {
     return `${
       this.escapeName(m.name) !== m.name || !this.eligibleIdentifier(m.name)
-        ?
-        `${this.cubeReference('CUBE')}.`
+        ? `${this.cubeReference('CUBE')}.`
         : ''
     }${this.escapeName(m.name)}`;
   }
 
   protected memberTitle(m) {
-    return inflection.titleize(inflection.underscore(this.memberName(m))) !==
-      m.title
+    return inflection.titleize(inflection.underscore(this.memberName(m))) !== m.title
       ? m.title
       : undefined;
   }
 
   protected memberName(member) {
-    return toSnakeCase(member.title.replace(/[^A-Za-z0-9]+/g, '_').toLowerCase());
+    const title = member.title.replace(/[^A-Za-z0-9]+/g, '_').toLowerCase();
+
+    if (this.options.snakeCase) {
+      return toSnakeCase(title);
+    }
+
+    return inflection.camelize(title, true);
   }
 
   protected escapeName(name) {
@@ -91,39 +103,70 @@ export abstract class BaseSchemaFormatter {
   }
 
   public schemaDescriptorForTable(tableSchema: TableSchema, schemaContext: SchemaContext = {}) {
+    const table = `${
+      tableSchema.schema?.length ? `${this.escapeName(tableSchema.schema)}.` : ''
+    }${this.escapeName(tableSchema.table)}`;
+
+    const sqlOption = this.options.snakeCase
+      ? {
+        sql_table: table,
+      }
+      : {
+        sql: `SELECT * FROM ${table}`,
+      };
+
     return {
       cube: tableSchema.cube,
-      sql_table: `${tableSchema.schema?.length ? `${this.escapeName(tableSchema.schema)}.` : ''}${this.escapeName(tableSchema.table)}`,
-      pre_aggregations: new ValueWithComments(null, [
-        'Pre-Aggregations definitions go here',
-        'Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started'
-      ]),
-      joins: tableSchema.joins.map(j => ({
-        [j.cubeToJoin]: {
-          sql: `${this.cubeReference('CUBE')}.${this.escapeName(j.thisTableColumn)} = ${this.cubeReference(j.cubeToJoin)}.${this.escapeName(j.columnToJoin)}`,
-          relationship: JOIN_RELATIONSHIP_MAP[j.relationship]
-        }
-      })).reduce((a, b) => ({ ...a, ...b }), {}),
-      measures: tableSchema.measures.map(m => ({
-        [this.memberName(m)]: {
-          sql: this.sqlForMember(m),
-          type: m.type ?? m.types[0],
-          title: this.memberTitle(m)
-        }
-      })).reduce((a, b) => ({ ...a, ...b }), {
-        count: {
-          type: 'count',
-        }
-      }),
-      dimensions: tableSchema.dimensions.map(m => ({
-        [this.memberName(m)]: {
-          sql: this.sqlForMember(m),
-          type: m.type ?? m.types[0],
-          title: this.memberTitle(m),
-          primary_key: m.isPrimaryKey ? true : undefined
-        }
-      })).reduce((a, b) => ({ ...a, ...b }), {}),
-      ...Object.fromEntries(Object.entries(schemaContext).map(([key, value]) => ([toSnakeCase(key), value])))
+      ...sqlOption,
+      [this.options.snakeCase ? 'pre_aggregations' : 'preAggregations']: new ValueWithComments(
+        null,
+        [
+          'Pre-Aggregations definitions go here',
+          'Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started',
+        ]
+      ),
+      joins: tableSchema.joins
+        .map((j) => ({
+          [j.cubeToJoin]: {
+            sql: `${this.cubeReference('CUBE')}.${this.escapeName(
+              j.thisTableColumn
+            )} = ${this.cubeReference(j.cubeToJoin)}.${this.escapeName(j.columnToJoin)}`,
+            relationship: this.options.snakeCase
+              ? JOIN_RELATIONSHIP_MAP[j.relationship]
+              : j.relationship,
+          },
+        }))
+        .reduce((a, b) => ({ ...a, ...b }), {}),
+      measures: tableSchema.measures
+        .map((m) => ({
+          [this.memberName(m)]: {
+            sql: this.sqlForMember(m),
+            type: m.type ?? m.types[0],
+            title: this.memberTitle(m),
+          },
+        }))
+        .reduce((a, b) => ({ ...a, ...b }), {
+          count: {
+            type: 'count',
+          },
+        }),
+      dimensions: tableSchema.dimensions
+        .map((m) => ({
+          [this.memberName(m)]: {
+            sql: this.sqlForMember(m),
+            type: m.type ?? m.types[0],
+            title: this.memberTitle(m),
+            [this.options.snakeCase ? 'primary_key' : 'primaryKey']: m.isPrimaryKey
+              ? true
+              : undefined,
+          },
+        }))
+        .reduce((a, b) => ({ ...a, ...b }), {}),
+      ...(this.options.snakeCase
+        ? Object.fromEntries(
+          Object.entries(schemaContext).map(([key, value]) => [toSnakeCase(key), value])
+        )
+        : schemaContext),
     };
   }
 

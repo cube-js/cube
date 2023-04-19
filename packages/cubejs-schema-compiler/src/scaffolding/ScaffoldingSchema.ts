@@ -86,6 +86,7 @@ export type DatabaseSchema = Record<string, Record<string, any>>;
 
 type ScaffoldingSchemaOptions = {
   includeNonDictionaryMeasures?: boolean;
+  snakeCase?: boolean;
 };
 
 export class ScaffoldingSchema {
@@ -194,7 +195,7 @@ export class ScaffoldingSchema {
     const dimensions = this.dimensions(tableDefinition);
 
     return {
-      cube: toSnakeCase(table),
+      cube: this.options.snakeCase ? toSnakeCase(table) : inflection.camelize(table),
       tableName,
       schema,
       table,
@@ -291,7 +292,7 @@ export class ScaffoldingSchema {
             return null;
           }
           return {
-            cubeToJoin: toSnakeCase(definition.table),
+            cubeToJoin: this.options.snakeCase ? toSnakeCase(definition.table) : inflection.camelize(definition.table),
             columnToJoin: columnForJoin.name,
             tableName: definition.tableName
           };

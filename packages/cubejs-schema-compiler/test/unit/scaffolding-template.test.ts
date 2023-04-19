@@ -1,4 +1,7 @@
-import { ScaffoldingTemplate, SchemaFormat } from '../../src/scaffolding/ScaffoldingTemplate';
+import {
+  ScaffoldingTemplate,
+  SchemaFormat,
+} from '../../src/scaffolding/ScaffoldingTemplate';
 
 const driver = {
   quoteIdentifier: (name) => `"${name}"`,
@@ -92,6 +95,147 @@ describe('ScaffoldingTemplate', () => {
   describe('JavaScript formatter', () => {
     it('template', () => {
       const template = new ScaffoldingTemplate(dbSchema, driver);
+
+      expect(
+        template.generateFilesByTableNames([
+          'public.orders',
+          ['public', 'customers'],
+          'public.accounts',
+        ])
+      ).toEqual([
+        {
+          fileName: 'Orders.js',
+          content: `cube(\`Orders\`, {
+  sql: \`SELECT * FROM public.orders\`,
+  
+  preAggregations: {
+    // Pre-Aggregations definitions go here
+    // Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started
+  },
+  
+  joins: {
+    Customers: {
+      sql: \`\${CUBE}."customerId" = \${Customers}.id\`,
+      relationship: \`belongsTo\`
+    }
+  },
+  
+  measures: {
+    count: {
+      type: \`count\`
+    },
+    
+    amount: {
+      sql: \`amount\`,
+      type: \`sum\`
+    }
+  },
+  
+  dimensions: {
+    id: {
+      sql: \`id\`,
+      type: \`number\`,
+      primaryKey: true
+    }
+  }
+});
+`,
+        },
+        {
+          fileName: 'Customers.js',
+          content: `cube(\`Customers\`, {
+  sql: \`SELECT * FROM public.customers\`,
+  
+  preAggregations: {
+    // Pre-Aggregations definitions go here
+    // Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started
+  },
+  
+  joins: {
+    Accounts: {
+      sql: \`\${CUBE}."accountId" = \${Accounts}.id\`,
+      relationship: \`belongsTo\`
+    }
+  },
+  
+  measures: {
+    count: {
+      type: \`count\`
+    },
+    
+    visitCount: {
+      sql: \`visit_count\`,
+      type: \`sum\`
+    }
+  },
+  
+  dimensions: {
+    id: {
+      sql: \`id\`,
+      type: \`number\`,
+      primaryKey: true
+    },
+    
+    name: {
+      sql: \`name\`,
+      type: \`string\`
+    }
+  }
+});
+`,
+        },
+        {
+          fileName: 'Accounts.js',
+          content: `cube(\`Accounts\`, {
+  sql: \`SELECT * FROM public.accounts\`,
+  
+  preAggregations: {
+    // Pre-Aggregations definitions go here
+    // Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started
+  },
+  
+  joins: {
+    
+  },
+  
+  measures: {
+    count: {
+      type: \`count\`
+    },
+    
+    failurecount: {
+      sql: \`\${CUBE}."failureCount"\`,
+      type: \`sum\`
+    }
+  },
+  
+  dimensions: {
+    id: {
+      sql: \`id\`,
+      type: \`number\`,
+      primaryKey: true
+    },
+    
+    username: {
+      sql: \`username\`,
+      type: \`string\`
+    },
+    
+    password: {
+      sql: \`password\`,
+      type: \`string\`
+    }
+  }
+});
+`,
+        },
+      ]);
+    });
+
+    it('template with snake case', () => {
+      const template = new ScaffoldingTemplate(dbSchema, driver, {
+        snakeCase: true,
+      });
 
       expect(
         template.generateFilesByTableNames([
@@ -252,7 +396,10 @@ describe('ScaffoldingTemplate', () => {
             ],
           },
         },
-        mySqlDriver
+        mySqlDriver,
+        {
+          snakeCase: true
+        }
       );
 
       expect(template.generateFilesByTableNames(['public.someOrders'])).toEqual(
@@ -320,7 +467,10 @@ describe('ScaffoldingTemplate', () => {
             ],
           },
         },
-        bigQueryDriver
+        bigQueryDriver,
+        {
+          snakeCase: true
+        }
       );
       expect(template.generateFilesByTableNames(['public.orders'])).toEqual([
         {
@@ -390,7 +540,10 @@ describe('ScaffoldingTemplate', () => {
             ],
           },
         },
-        bigQueryDriver
+        bigQueryDriver,
+        {
+          snakeCase: true
+        }
       );
 
       expect(
@@ -441,11 +594,10 @@ describe('ScaffoldingTemplate', () => {
 
   describe('Yaml formatter', () => {
     it('generates schema for base driver', () => {
-      const template = new ScaffoldingTemplate(
-        dbSchema,
-        driver,
-        SchemaFormat.Yaml
-      );
+      const template = new ScaffoldingTemplate(dbSchema, driver, {
+        format: SchemaFormat.Yaml,
+        snakeCase: true
+      });
 
       expect(
         template.generateFilesByTableNames([
@@ -546,14 +698,13 @@ describe('ScaffoldingTemplate', () => {
           },
         },
         mySqlDriver,
-        SchemaFormat.Yaml
+        {
+          format: SchemaFormat.Yaml,
+          snakeCase: true
+        }
       );
 
-      expect(
-        template.generateFilesByTableNames([
-          'public.accounts',
-        ])
-      ).toEqual([
+      expect(template.generateFilesByTableNames(['public.accounts'])).toEqual([
         {
           fileName: 'accounts.yml',
           content: `cubes:
