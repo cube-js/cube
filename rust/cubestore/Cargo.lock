@@ -1261,7 +1261,7 @@ dependencies = [
  "serde_json",
  "simple_logger",
  "smallvec 1.8.0",
- "sqlparser",
+ "sqlparser 0.9.0 (git+https://github.com/cube-js/sqlparser-rs.git?rev=4388f6712dae5073c2d71d74f64cae2edd418066)",
  "tarpc",
  "tempfile",
  "tokio 1.18.1",
@@ -1339,7 +1339,7 @@ dependencies = [
  "serde_derive",
  "sha2 0.9.5",
  "smallvec 1.8.0",
- "sqlparser",
+ "sqlparser 0.9.0 (git+https://github.com/cube-js/sqlparser-rs.git?rev=4e0053a81407e419d68ee0831708e89b8f54c0f6)",
  "tokio 1.18.1",
  "tokio-stream",
  "tracing",
@@ -4566,6 +4566,14 @@ name = "spin"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6e63cff320ae2c57904679ba7cb63280a3dc4613885beafb148ee7bf9aa9042d"
+
+[[package]]
+name = "sqlparser"
+version = "0.9.0"
+source = "git+https://github.com/cube-js/sqlparser-rs.git?rev=4388f6712dae5073c2d71d74f64cae2edd418066#4388f6712dae5073c2d71d74f64cae2edd418066"
+dependencies = [
+ "log",
+]
 
 [[package]]
 name = "sqlparser"
