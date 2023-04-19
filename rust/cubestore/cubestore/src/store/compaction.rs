@@ -405,7 +405,7 @@ impl CompactionService for CompactionServiceImpl {
                 .sum::<u64>()
                 + partition.get_row().main_table_row_count();
             // Split partitions ahead for more than actual compaction size. The trade off here is partition accuracy vs write amplification
-            let new_partitions_count = (div_ceil(
+            let new_partitions_count_by_rows = (div_ceil(
                 pending_rows,
                 table
                     .get_row()
@@ -413,6 +413,17 @@ impl CompactionService for CompactionServiceImpl {
             ) as usize)
                 // Do not allow to much of new partitions to limit partition accuracy trade off
                 .min(16);
+            let new_partitions_count_by_file_size =
+                if let Some(partition_file_size) = partition.get_row().file_size() {
+                    let threshold = self.config.partition_size_split_threshold_bytes();
+                    (div_ceil(partition_file_size, threshold) as usize).min(16)
+                } else {
+                    1
+                };
+
+            let new_partitions_count =
+                new_partitions_count_by_rows.max(new_partitions_count_by_file_size);
+
             for _ in 0..new_partitions_count {
                 new_partitions.push(
                     self.meta_store
@@ -1411,6 +1422,10 @@ mod tests {
         config.expect_partition_split_threshold().returning(|| 20);
 
         config
+            .expect_partition_size_split_threshold_bytes()
+            .returning(|| 100 * 1024 * 1024);
+
+        config
             .expect_compaction_chunks_total_size_threshold()
             .returning(|| 30);
 
@@ -1862,6 +1877,62 @@ mod tests {
         let _ = DB::destroy(&Options::default(), path);
         let _ = fs::remove_dir_all(chunk_store_path.clone());
         let _ = fs::remove_dir_all(chunk_remote_store_path.clone());
+    }
+
+    #[tokio::test]
+    async fn partition_split_by_file_size() {
+        Config::test("partition_split_by_file_size")
+            .update_config(|mut c| {
+                c.partition_split_threshold = 2000;
+                c.partition_size_split_threshold_bytes = 10000;
+                c
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
+                let _ = service.exec_query("CREATE SCHEMA test").await.unwrap();
+                let compaction_service = services
+                    .injector
+                    .get_service_typed::<dyn CompactionService>()
+                    .await;
+                service
+                    .exec_query("create table test.a (a varchar(255), b varchar(255))")
+                    .await
+                    .unwrap();
+                let values = (0..1000)
+                    .map(|i| format!("('{}{}', '{}{}')", i, "a".repeat(10), i, "b".repeat(10)))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                let query = format!("insert into test.a (a, b) values {}", values);
+                service.exec_query(&query).await.unwrap();
+                compaction_service.compact(1).await.unwrap();
+                let partitions = services
+                    .meta_store
+                    .get_active_partitions_by_index_id(1)
+                    .await
+                    .unwrap();
+                assert_eq!(partitions.len(), 1);
+                let values = (0..10)
+                    .map(|_| format!("('{}', '{}')", "a".repeat(10), "b".repeat(10)))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                let query = format!("insert into test.a (a, b) values {}", values);
+
+                service.exec_query(&query).await.unwrap();
+                compaction_service
+                    .compact(partitions[0].get_id())
+                    .await
+                    .unwrap();
+                let partitions = services
+                    .meta_store
+                    .get_active_partitions_by_index_id(1)
+                    .await
+                    .unwrap();
+                assert!(partitions.len() > 1);
+                for p in partitions.iter() {
+                    assert!(p.get_row().file_size().unwrap() <= 10000);
+                }
+            })
+            .await;
     }
 }
 
