@@ -1222,7 +1222,9 @@ export class PreAggregationLoader {
     let tableData: DownloadTableData;
 
     if (externalDriverCapabilities.csvImport && client.unload && await client.isUnloadSupported(this.getUnloadOptions())) {
-      tableData = await saveCancelFn(client.unload(table, this.getUnloadOptions()));
+      tableData = await saveCancelFn(
+        client.unload(table, this.getUnloadOptions()),
+      );
     } else if (externalDriverCapabilities.streamImport && client.stream) {
       tableData = await saveCancelFn(
         client.stream(`SELECT * FROM ${table}`, [], this.getStreamingOptions())
@@ -1258,7 +1260,12 @@ export class PreAggregationLoader {
 
     let tableData: DownloadTableData;
     if (externalDriverCapabilities.csvImport && client.unload && await client.isUnloadSupported(this.getUnloadOptions())) {
-      return saveCancelFn(client.unload(table, { ...this.getUnloadOptions(), query: { sql, params } }));
+      return saveCancelFn(
+        client.unload(
+          table,
+          { ...this.getUnloadOptions(), query: { sql, params } },
+        )
+      );
     } else if (externalDriverCapabilities.streamImport && client.stream) {
       tableData = await saveCancelFn(
         client.stream(sql, params, this.getStreamingOptions())
