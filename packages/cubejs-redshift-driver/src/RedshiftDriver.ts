@@ -70,6 +70,7 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
     } = {}
   ) {
     super(options);
+    console.log(JSON.stringify(this.pool, undefined, 2));
   }
 
   /**

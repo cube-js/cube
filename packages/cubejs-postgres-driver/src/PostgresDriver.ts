@@ -115,6 +115,8 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
+
+    console.log(getEnv('dbUser', { dataSource }), getEnv('dbPass', { dataSource }));
     
     this.pool = new Pool({
       idleTimeoutMillis: 30000,
@@ -193,6 +195,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     try {
       await this.pool.query('SELECT $1::int AS number', ['1']);
     } catch (e) {
+      console.error(e);
       if ((e as Error).toString().indexOf('no pg_hba.conf entry for host') !== -1) {
         throw new Error(`Please use CUBEJS_DB_SSL=true to connect: ${(e as Error).toString()}`);
       }
