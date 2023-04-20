@@ -1,19 +1,19 @@
 import fs from 'fs-extra';
 import path from 'path';
 import { CommanderStatic } from 'commander';
-import { FileRepository } from '@cubejs-backend/shared';
+import { FileRepository, getEnv } from '@cubejs-backend/shared';
 import { compile } from '@cubejs-backend/schema-compiler';
 
 import { displayError } from '../utils';
 
 async function validate(options) {
-  const schemaPath = options.schemaPath || 'schema';
-  
+  const schemaPath = options.schemaPath || getEnv('schemaPath');
+
   if (!fs.existsSync(path.join(process.cwd(), schemaPath))) {
     displayError(`Schema path not found at "${path.join(process.cwd(), schemaPath)}". Please run validate command from project directory.`);
     return;
   }
-  
+
   try {
     const repo = new FileRepository(schemaPath);
     await compile(repo, {
@@ -24,7 +24,7 @@ async function validate(options) {
     displayError(error.messages);
     return;
   }
-  
+
   console.log('✅ Cube Schema is valid');
 }
 

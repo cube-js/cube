@@ -33,7 +33,8 @@ const sharedDotEnvVars = env => `CUBEJS_DEV_MODE=true
 CUBEJS_DB_TYPE=${env.dbType}
 CUBEJS_API_SECRET=${env.apiSecret}
 CUBEJS_EXTERNAL_DEFAULT=true
-CUBEJS_SCHEDULED_REFRESH_DEFAULT=true`;
+CUBEJS_SCHEDULED_REFRESH_DEFAULT=true
+CUBEJS_SCHEMA_PATH=model`;
 
 const defaultDotEnvVars = env => `# Cube environment variables: https://cube.dev/docs/reference/environment-variables
 ${sharedDotEnvVars(env)}

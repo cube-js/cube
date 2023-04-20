@@ -380,22 +380,62 @@ pub fn create_ucase_udf() -> ScalarUDF {
 
 pub fn create_isnull_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
-        assert!(args.len() == 1);
+        let result = match args.len() {
+            1 => {
+                let len = args[0].len();
+                let mut builder = BooleanBuilder::new(len);
+                for i in 0..len {
+                    builder.append_value(args[0].is_null(i))?;
+                }
 
-        let len = args[0].len();
-        let mut builder = BooleanBuilder::new(len);
-        for i in 0..len {
-            builder.append_value(args[0].is_null(i))?;
-        }
+                Arc::new(builder.finish()) as ArrayRef
+            }
+            2 => {
+                if args[0].data_type() != &DataType::Utf8 || args[1].data_type() != &DataType::Utf8
+                {
+                    return Err(DataFusionError::Internal(format!(
+                        "isnull with 2 arguments supports only (Utf8, Utf8), actual: ({}, {})",
+                        args[0].data_type(),
+                        args[1].data_type(),
+                    )));
+                }
 
-        Ok(Arc::new(builder.finish()) as ArrayRef)
+                let exprs = downcast_string_arg!(&args[0], "expr", i32);
+                let replacements = downcast_string_arg!(&args[1], "replacement", i32);
+
+                let result = exprs
+                    .iter()
+                    .zip(replacements.iter())
+                    .map(|(expr, replacement)| if expr.is_some() { expr } else { replacement })
+                    .collect::<StringArray>();
+
+                Arc::new(result)
+            }
+            _ => {
+                return Err(DataFusionError::Internal(format!(
+                    "isnull accepts 1 or 2 arguments, actual: {}",
+                    args.len(),
+                )))
+            }
+        };
+        Ok(result)
     });
 
-    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Boolean)));
+    let return_type: ReturnTypeFunction = Arc::new(move |types| match types.len() {
+        1 => Ok(Arc::new(DataType::Boolean)),
+        2 => Ok(Arc::new(types[0].clone())),
+        _ => Err(DataFusionError::Internal(format!(
+            "isnull accepts 1 or 2 arguments, actual: {}",
+            types.len(),
+        ))),
+    });
 
     ScalarUDF::new(
         "isnull",
-        &Signature::any(1, Volatility::Immutable),
+        &Signature::one_of(
+            vec![TypeSignature::Any(1), TypeSignature::Any(2)],
+            Volatility::Immutable,
+        ),
         &return_type,
         &fun,
     )
@@ -3034,6 +3074,91 @@ pub fn create_quote_ident_udf() -> ScalarUDF {
     ScalarUDF::new(
         "quote_ident",
         &Signature::exact(vec![DataType::Utf8], Volatility::Immutable),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_pg_encoding_to_char_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        let encoding_ids = downcast_primitive_arg!(args[0], "encoding_id", Int32Type);
+
+        let result = encoding_ids
+            .iter()
+            .map(|oid| match oid {
+                Some(0) => Some("SQL_ASCII".to_string()),
+                Some(6) => Some("UTF8".to_string()),
+                Some(_) => Some("".to_string()),
+                _ => None,
+            })
+            .collect::<StringArray>();
+
+        Ok(Arc::new(result))
+    });
+
+    create_udf(
+        "pg_encoding_to_char",
+        vec![DataType::Int32],
+        Arc::new(DataType::Utf8),
+        Volatility::Immutable,
+        fun,
+    )
+}
+
+pub fn create_array_to_string_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 2);
+
+        let input_arr = downcast_list_arg!(args[0], "strs");
+        let join_strs = downcast_string_arg!(args[1], "join_str", i32);
+
+        let mut builder = StringBuilder::new(input_arr.len());
+
+        for i in 0..input_arr.len() {
+            if input_arr.is_null(i) || join_strs.is_null(i) {
+                builder.append_null()?;
+                continue;
+            }
+
+            let array = input_arr.value(i);
+            let join_str = join_strs.value(i);
+            let strings = downcast_string_arg!(array, "str", i32);
+            let joined_string =
+                itertools::Itertools::intersperse(strings.iter().filter_map(|s| s), join_str)
+                    .collect::<String>();
+            builder.append_value(joined_string)?;
+        }
+
+        Ok(Arc::new(builder.finish()) as ArrayRef)
+    });
+
+    create_udf(
+        "array_to_string",
+        vec![
+            DataType::List(Box::new(Field::new("item", DataType::Utf8, true))),
+            DataType::Utf8,
+        ],
+        Arc::new(DataType::Utf8),
+        Volatility::Immutable,
+        fun,
+    )
+}
+
+// https://docs.aws.amazon.com/redshift/latest/dg/r_CHARINDEX.html
+pub fn create_charindex_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 2);
+
+        return Err(DataFusionError::NotImplemented(format!(
+            "charindex is not implemented, it's stub"
+        )));
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int32)));
+
+    ScalarUDF::new(
+        "charindex",
+        &Signature::exact(vec![DataType::Utf8, DataType::Utf8], Volatility::Immutable),
         &return_type,
         &fun,
     )

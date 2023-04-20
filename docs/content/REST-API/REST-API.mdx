@@ -22,9 +22,6 @@ security context, which can be used in the
 [`queryRewrite`][ref-config-queryrewrite] property in your [`cube.js`
 configuration file][ref-config-js].
 
-[ref-config-queryrewrite]: /config#query-rewrite
-[ref-config-js]: /config
-
 The API Token is passed via the Authorization Header. The token itself is a
 [JSON Web Token](https://jwt.io), the [Security section](security) describes how
 to generate it.
@@ -40,7 +37,7 @@ curl -H "Authorization: EXAMPLE-API-TOKEN" https://example.com/cubejs-api/v1/sql
 
 ### <--{"id" : "Prerequisites"}--> Configuring CORS
 
-REST API supports [Cross-Origin Resource Sharing (CORS)][cors].
+REST API supports [Cross-Origin Resource Sharing (CORS)][mdn-cors].
 
 By default, requests from any origin (`*`) are allowed. To allow requests from a
 specific domain only, use the following configuration in the `cube.js` file:
@@ -56,9 +53,6 @@ module.exports = {
 ```
 
 Please see [configuration options][ref-config-cors] for details.
-
-[cors]: https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS
-[ref-config-cors]: /config#http
 
 ### <--{"id" : "Prerequisites"}--> Continue wait
 
@@ -77,7 +71,7 @@ Possible reasons of **Continue wait**:
 
 - The query requested is heavy, and it takes some time for the database to
   process it. Clients should wait for its completion, continuously sending the
-  same REST API request. [continueWaitTimeout](config#queue-options) can be
+  same REST API request. [`continueWaitTimeout`][ref-conf-queue-opts] can be
   adjusted in order to change the time Cube waits before returning
   `Continue wait` message.
 - There are many queries requested and Cube backend queues them to save database
@@ -126,4 +120,9 @@ example, the following query will retrieve rows 101-200 from the `Orders` cube:
 }
 ```
 
+[mdn-cors]: https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS
+[ref-config-js]: /config
+[ref-config-queryrewrite]: /config#query-rewrite
+[ref-conf-queue-opts]: /config#queue-options
 [ref-api-ref-query-format]: /query-format#query-properties
+[ref-config-cors]: /config#http

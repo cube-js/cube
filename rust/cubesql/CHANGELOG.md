@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.32.28](https://github.com/cube-js/cube/compare/v0.32.27...v0.32.28) (2023-04-19)
+
+
+### Features
+
+* **cubesql:** Support new Thoughtspot introspection ([a04c83a](https://github.com/cube-js/cube/commit/a04c83a070ddbd2924528ce5e7ecf10c7b4f235c))
+* **cubesql:** Support psql's `\list` command ([0b30def](https://github.com/cube-js/cube/commit/0b30def71aa5bb53dbc59ddb6a4b63bd59eda95a))
+
+
+
+
+
 ## [0.32.19](https://github.com/cube-js/cube/compare/v0.32.18...v0.32.19) (2023-04-03)
 
 

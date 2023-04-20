@@ -1487,6 +1487,18 @@ impl RewriteRules for SplitRules {
                     Some("?outer_column"),
                 ),
             ),
+            // Redshift CHARINDEX to STRPOS
+            rewrite(
+                "redshift-charindex-to-strpos",
+                udf_expr(
+                    "charindex",
+                    vec!["?substring", "?string"],
+                ),
+                fun_expr(
+                    "Strpos",
+                    vec!["?string", "?substring"],
+                ),
+            ),
             //
             rewrite(
                 "split-push-down-to-char-date-trunc-literal-inner-replacer",

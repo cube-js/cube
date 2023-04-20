@@ -446,7 +446,7 @@ describe('Cube Validation', () => {
       sql_table: () => 'public.Users',
       public: true,
       refresh_key: {
-        sql: () => `SELECT MAX(created_at) FROM orders`,
+        sql: () => 'SELECT MAX(created_at) FROM orders',
       },
       measures: {
         id: {
@@ -478,7 +478,7 @@ describe('Cube Validation', () => {
           time_dimension: () => 'createdAt',
           partition_granularity: 'day',
           refresh_key: {
-            sql: () => `SELECT MAX(created_at) FROM orders`,
+            sql: () => 'SELECT MAX(created_at) FROM orders',
           },
         }
       },

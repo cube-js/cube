@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(r#\"\n                SELECT\n                    charindex('d', 'abcdefg') d,\n                    charindex('h', 'abcdefg') none\n                ;\"#.to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++---+------+
+| d | none |
++---+------+
+| 4 | 0    |
++---+------+

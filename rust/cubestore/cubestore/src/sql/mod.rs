@@ -355,6 +355,7 @@ impl SqlServiceImpl {
                             .collect()
                     }),
                     None,
+                    None,
                 )
                 .await;
         }
@@ -393,6 +394,16 @@ impl SqlServiceImpl {
             None
         };
 
+        let has_streaming_locations = locations.as_ref().map_or(false, |locations| {
+            locations.iter().any(|l| Table::is_stream_location(l))
+        });
+
+        let trace_obj_to_save = if has_streaming_locations {
+            trace_obj.clone()
+        } else {
+            None
+        };
+
         let table = self
             .db
             .create_table(
@@ -414,6 +425,7 @@ impl SqlServiceImpl {
                         .collect()
                 }),
                 partition_split_threshold,
+                trace_obj_to_save,
             )
             .await?;
 
@@ -3852,6 +3864,41 @@ mod tests {
                 .exec_query("CREATE TABLE test.events_by_type_fail_2 (`EVENT` text, `KSQL_COL_0` int) WITH (select_statement = 'SELECT * FROM (SELECT * FROM EVENTS_BY_TYPE WHERE time >= \\'2022-01-01\\' AND time < \\'2022-02-01\\')') unique key (`EVENT`) location 'stream://ksql/EVENTS_BY_TYPE'")
                 .await
                 .expect_err("Validation should fail");
+        }).await;
+    }
+
+    #[tokio::test]
+    async fn trace_obj_for_streaming_table() {
+        Config::test("trace_obj_for_streaming_table").start_test(async move |services| {
+            let service = services.sql_service;
+            let meta_store = services.meta_store;
+
+            let _ = service.exec_query("CREATE SCHEMA test").await.unwrap();
+
+            service
+                .exec_query("CREATE SOURCE OR UPDATE ksql AS 'ksql' VALUES (user = 'foo', password = 'bar', url = 'http://foo.com')").await.unwrap();
+            let context = SqlQueryContext::default().with_trace_obj(Some("{\"test\":\"context\"}".to_string()));
+
+            let _ = service
+                .exec_query_with_context(context, "CREATE TABLE test.table_1 (`EVENT` text, `KSQL_COL_0` int) unique key (`EVENT`) location 'stream://ksql/EVENTS_BY_TYPE'")
+                .await
+                .unwrap();
+
+            let table = meta_store.get_table("test".to_string(), "table_1".to_string()).await.unwrap();
+            let trace_obj = meta_store.get_trace_obj_by_table_id(table.get_id()).await.unwrap();
+            assert!(trace_obj.is_some());
+            assert_eq!(trace_obj.unwrap(), "{\"test\":\"context\"}".to_string());
+
+            let _ = service
+                .exec_query("CREATE TABLE test.table_2 (`EVENT` text, `KSQL_COL_0` int) unique key (`EVENT`)")
+                .await
+                .unwrap();
+
+            let table = meta_store.get_table("test".to_string(), "table_2".to_string()).await.unwrap();
+            let trace_obj = meta_store.get_trace_obj_by_table_id(table.get_id()).await.unwrap();
+            println!("tobj {:?}", trace_obj);
+            assert!(trace_obj.is_none());
+
         }).await;
     }
 }

@@ -128,7 +128,9 @@ class MSSqlDriver extends BaseDriver {
     return {
       rowStream: stream,
       types: fields,
-      release: async () => {},
+      release: async () => {
+        request.cancel();
+      },
     };
   }
 
