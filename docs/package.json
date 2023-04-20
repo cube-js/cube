@@ -66,7 +66,7 @@
     "gatsby-plugin-root-import": "^2.0.5",
     "gatsby-plugin-s3": "^0.2.5",
     "gatsby-plugin-sass": "^4",
-    "gatsby-plugin-sharp": "^3",
+    "gatsby-plugin-sharp": "^4",
     "gatsby-plugin-sitemap": "^3",
     "gatsby-remark-copy-linked-files": "^3",
     "gatsby-remark-find-replace": "^0.3.0",
