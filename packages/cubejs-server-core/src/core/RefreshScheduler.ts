@@ -294,7 +294,7 @@ export class RefreshScheduler {
     } catch (e: any) {
       if (e.error !== 'Continue wait') {
         this.serverCore.logger('Refresh Scheduler Error', {
-          error: e.error || e.stack || e.toString(),
+          error: e.stack || e.error || e.toString(),
           securityContext: context.securityContext,
           requestId: context.requestId
         });

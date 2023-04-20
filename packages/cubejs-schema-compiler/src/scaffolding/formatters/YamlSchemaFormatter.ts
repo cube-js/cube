@@ -14,9 +14,9 @@ function isPlainObject(value) {
 
 export class YamlSchemaFormatter extends BaseSchemaFormatter {
   public fileExtension(): string {
-    return 'yaml';
+    return 'yml';
   }
-  
+
   protected cubeReference(cube: string): string {
     return `{${cube}}`;
   }
@@ -26,11 +26,7 @@ export class YamlSchemaFormatter extends BaseSchemaFormatter {
 
     return `cubes:\n  - name: ${cube}${this.render(
       {
-        sql: new ValueWithComments(sql, [
-          'preAggregations:',
-          'Pre-Aggregations definitions go here',
-          'Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started',
-        ]),
+        ...(sql ? { sql } : null),
         ...descriptor,
       },
       2
@@ -106,12 +102,12 @@ export class YamlSchemaFormatter extends BaseSchemaFormatter {
 
     return `${Array.isArray(parent) ? '' : ' '}${this.escapedValue(value)}`;
   }
-  
+
   private escapedValue(value: string | number | boolean): string | number | boolean {
     if (typeof value !== 'string') {
       return value;
     }
-    
+
     return value.match(/[{}]/) ? `"${value.replace(/"/g, '\\"')}"` : value;
   }
 }

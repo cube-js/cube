@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.32.28](https://github.com/cube-js/cube/compare/v0.32.27...v0.32.28) (2023-04-19)
+
+
+### Bug Fixes
+
+* **schema-compiler:** Incorrect camelize for meta ([#6444](https://github.com/cube-js/cube/issues/6444)) ([c82844e](https://github.com/cube-js/cube/commit/c82844e130b31722fa338022b740ac7285c01190))
+* segment not found for path if rollup with segment is used within `rollupJoin` ([6a3ca80](https://github.com/cube-js/cube/commit/6a3ca8032151d530a30bab88c024c451d4141c01))
+
+
+### Features
+
+* using snake case for model files, model templates updates ([#6447](https://github.com/cube-js/cube/issues/6447)) ([37e3180](https://github.com/cube-js/cube/commit/37e3180d4218b342ee0c2fe0ef90464aa6633b54))
+
+
+
+
+
 ## [0.32.27](https://github.com/cube-js/cube/compare/v0.32.26...v0.32.27) (2023-04-14)
 
 **Note:** Version bump only for package @cubejs-backend/schema-compiler

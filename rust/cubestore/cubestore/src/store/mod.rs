@@ -825,6 +825,7 @@ mod tests {
                     None,
                     None,
                     None,
+                    None,
                 )
                 .await
                 .unwrap();
@@ -911,6 +912,7 @@ mod tests {
                     None,
                     vec![],
                     true,
+                    None,
                     None,
                     None,
                     None,
@@ -1024,6 +1026,7 @@ mod tests {
                     None,
                     None,
                     Some(vec![("sum".to_string(), "sum_int".to_string())]),
+                    None,
                     None,
                 )
                 .await

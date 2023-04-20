@@ -167,11 +167,10 @@ pub fn parse_sql_to_statements(
     );
     let query = query.replace("AND TABLE_TYPE IN ( 'TABLE', 'VIEW', 'EXTERNAL TABLE')", "");
     let query = query.replace(
-        // REGEXP_REPLACE
         // Subquery must have alias
         // Incorrect alias for subquery
         "FROM (select lbv_cols.schemaname, lbv_cols.tablename, lbv_cols.columnname,REGEXP_REPLACE(REGEXP_REPLACE(lbv_cols.columntype,'\\\\(.*\\\\)'),'^_.+','ARRAY') as columntype_rep,columntype, lbv_cols.columnnum from pg_get_late_binding_view_cols() lbv_cols( schemaname name, tablename name, columnname name, columntype text, columnnum int)) lbv_columns   WHERE",
-        "FROM (select schemaname, tablename, columnname,columntype as columntype_rep,columntype, columnnum from get_late_binding_view_cols_unpacked) as lbv_columns   WHERE",
+        "FROM (select schemaname, tablename, columnname,REGEXP_REPLACE(REGEXP_REPLACE(columntype,'\\\\(.*\\\\)'),'^_.+','ARRAY') as columntype_rep,columntype, columnnum from get_late_binding_view_cols_unpacked) as lbv_columns   WHERE",
     );
     let query = query.replace(
         // Subquery must have alias
