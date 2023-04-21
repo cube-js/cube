@@ -602,7 +602,32 @@ cube(`Companies`, {
 });
 ```
 
-It is recommended to prefer the [`sql_table`](#parameters-sql-table) property over the `sql` property for all cubes that are supposed to use queries like this: `SELECT * FROM table`.
+It is recommended to prefer the [`sql_table`](#parameters-sql-table) property
+over the `sql` property for all cubes that are supposed to use queries like
+this: `SELECT * FROM table`.
+
+### <--{"id" : "Parameters"}--> sql_table
+
+The `sql_table` property is used as a concise way for defining a cube that uses
+a query like this: `SELECT * FROM table`. Instead of using the
+[`sql`](#parameters-sql) property, use `sql_table` with the table name that this
+cube will query.
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  sql_table: `public.orders`,
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    sql_table: public.orders
+```
+
+</CodeTabs>
 
 ### <--{"id" : "Parameters"}--> sqlAlias
 
@@ -632,26 +657,6 @@ cubes:
 
 It'll generate aliases for members such as `ofacts__count`. `sqlAlias` affects
 all member names including pre-aggregation table names.
-
-### <--{"id" : "Parameters"}--> sql_table
-
-The `sql_table` property is used as a concise way for defining a cube that uses a query like this: `SELECT * FROM table`. Instead of using the [`sql`](#parameters-sql) property, use `sql_table` with the table name that this cube will query.
-
-<CodeTabs>
-
-```javascript
-cube(`Orders`, {
-  sql_table: `public.orders`,
-});
-```
-
-```yaml
-cubes:
-  - name: Orders
-    sql_table: public.orders
-```
-
-</CodeTabs>
 
 ### <--{"id" : "Parameters"}--> title
 
