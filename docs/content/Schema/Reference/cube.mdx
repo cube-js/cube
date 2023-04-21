@@ -118,7 +118,7 @@ cube(`Users`, {
   joins: {
     Contacts: {
       sql: `${CUBE}.contact_id = ${Contacts.id}`,
-      relationship: `hasOne`,
+      relationship: `one_to_one`,
     },
   },
 
@@ -156,7 +156,7 @@ cubes:
     joins:
       - name: Contacts
         sql: "{CUBE.contact_id} = {Contacts.id}"
-        relationship: has_one
+        relationship: one_to_one
     dimensions:
       - name: name
         sql: "COALESCE({CUBE.name}, {Contacts.name})"
