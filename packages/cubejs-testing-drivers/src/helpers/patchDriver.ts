@@ -18,6 +18,7 @@ const methods: Method[] = [
   'tableColumnTypes',
   'queryColumnTypes',
   'createTable',
+  'unload',
   // 'setLogger',
   // 'release',
   // 'capabilities',

@@ -4,7 +4,6 @@
  * @fileoverview The `AthenaDriver` and related types declaration.
  */
 
-import { EventEmitter } from 'events';
 import {
   getEnv,
   assertDataSource,
@@ -27,10 +26,11 @@ import {
   DownloadTableCSVData,
   DriverInterface,
   QueryOptions,
+  UnloadOptions,
   StreamOptions,
   TableStructure,
+  DriverCapabilities,
   Row,
-  Rows,
   DownloadTableMemoryData,
   StreamTableDataWithTypes,
   DownloadQueryResultsResult,
@@ -57,23 +57,6 @@ interface AthenaDriverOptions extends AthenaClientConfig {
    */
   exportBucketCsvEscapeSymbol?: string
 }
-
-type AthenaType =
-  | 'boolean'
-  | 'tinyint'
-  | 'smallint'
-  | 'int'
-  | 'integer'
-  | 'bigint'
-  | 'float'
-  | 'double'
-  | 'decimal'
-  | 'char'
-  | 'varchar'
-  | 'string'
-  | 'binary'
-  | 'date'
-  | 'timestamp';
 
 type AthenaDriverOptionsInitialized = Required<AthenaDriverOptions, 'pollTimeout' | 'pollMaxInterval'>;
 
@@ -103,8 +86,6 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
   private athena: Athena;
 
   private schema: string;
-
-  private emitter = new EventEmitter();
 
   /**
    * Class constructor.
@@ -144,15 +125,17 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       config.secretAccessKey ||
       getEnv('athenaAwsSecret', { dataSource });
 
-    const { schema, readOnly, ...restConfig } = config;
+    const { schema, ...restConfig } = config;
 
     this.schema = schema ||
       getEnv('dbName', { dataSource }) ||
       getEnv('dbSchema', { dataSource });
 
     this.config = {
+      readOnly: true,
+
       ...restConfig,
-      readOnly: typeof readOnly === 'undefined' ? true : readOnly,
+
       credentials: accessKeyId && secretAccessKey
         ? { accessKeyId, secretAccessKey }
         : undefined,
@@ -185,20 +168,30 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
         getEnv('dbExportBucketCsvEscapeSymbol', { dataSource }),
     };
     if (this.config.exportBucket) {
-      this.config.exportBucket = AthenaDriver.normalizeS3Path(this.config.exportBucket);
+      this.config.exportBucket =
+        AthenaDriver.normalizeS3Path(this.config.exportBucket);
     }
 
     this.athena = new Athena(this.config);
   }
 
+  /**
+   * Driver read-only flag.
+   */
   public readOnly(): boolean {
     return !!this.config.readOnly;
   }
 
-  public async isUnloadSupported() {
-    return this.config.exportBucket !== undefined;
+  /**
+   * Returns driver's capabilities object.
+   */
+  public capabilities(): DriverCapabilities {
+    return { unloadWithoutTempTable: true };
   }
 
+  /**
+   * Test driver's connection.
+   */
   public async testConnection() {
     await this.athena.getWorkGroup({
       WorkGroup: this.config.workGroup
@@ -332,6 +325,104 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
   }
 
   /**
+   * Save pre-aggregation data into a temp table.
+   */
+  public async loadPreAggregationIntoTable(
+    preAggregationTableName: string,
+    loadSql: string,
+    params: any,
+  ): Promise<any> {
+    if (this.config.S3OutputLocation === undefined) {
+      throw new Error('Unload is not configured. Please define CUBEJS_AWS_S3_OUTPUT_LOCATION env var ');
+    }
+
+    const qid = await this.startQuery(loadSql, params);
+    await this.waitForSuccess(qid);
+  }
+
+  /**
+   * Determines whether export bucket feature is configured or not.
+   */
+  public async isUnloadSupported() {
+    return this.config.exportBucket !== undefined;
+  }
+
+  /**
+   * Returns to the Cubestore an object with links to unloaded to the
+   * export bucket data.
+   */
+  public async unload(tableName: string, options: UnloadOptions): Promise<DownloadTableCSVData> {
+    if (!this.config.exportBucket) {
+      throw new Error('Export bucket is not configured.');
+    }
+    const types = options.query
+      ? await this.unloadWithSql(tableName, options.query.sql)
+      : await this.unloadWithTable(tableName);
+    const csvFile = await this.getCsvFiles(tableName);
+    return {
+      exportBucketCsvEscapeSymbol: this.config.exportBucketCsvEscapeSymbol,
+      csvFile,
+      types,
+      csvNoHeader: true
+    };
+  }
+
+  /**
+   * Unload data from a SQL query to an export bucket.
+   */
+  private async unloadWithSql(
+    tableName: string,
+    sql: string,
+  ): Promise<TableStructure> {
+    const columns = await this.queryColumnTypes(sql);
+    const unloadSql = `
+      UNLOAD (${sql})
+      TO '${this.config.exportBucket}/${tableName}'
+      WITH (
+        format = 'TEXTFILE',
+        field_delimiter = ',',
+        compression='GZIP'
+      )`;
+    const qid = await this.startQuery(unloadSql, []);
+    await this.waitForSuccess(qid);
+    await this.athena.getQueryResults(qid);
+    return columns;
+  }
+
+  /**
+   * Unload data from a temp table to an export bucket.
+   */
+  private async unloadWithTable(tableName: string): Promise<TableStructure> {
+    const types = await this.tableColumnTypes(tableName);
+    const columns = types.map(t => t.name).join(', ');
+    const unloadSql = `
+      UNLOAD (SELECT ${columns} FROM ${tableName})
+      TO '${this.config.exportBucket}/${tableName}'
+      WITH (
+        format = 'TEXTFILE',
+        field_delimiter = ',',
+        compression='GZIP'
+      )`;
+    const qid = await this.startQuery(unloadSql, []);
+    await this.waitForSuccess(qid);
+    return types;
+  }
+
+  /**
+   * Returns an array of queried fields meta info.
+   */
+  public async queryColumnTypes(sql: string): Promise<TableStructure> {
+    const unloadSql = `${sql} LIMIT 0`;
+    const qid = await this.startQuery(unloadSql, []);
+    await this.waitForSuccess(qid);
+    const results = await this.athena.getQueryResults(qid);
+    const columns = this.mapTypes(
+      <ColumnInfo[]>results.ResultSet?.ResultSetMetadata?.ColumnInfo,
+    );
+    return columns;
+  }
+
+  /**
    * Converts Athena to generic types and returns an array of queried
    * fields meta info.
    */
@@ -379,69 +470,35 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     });
   }
 
-  public async loadPreAggregationIntoTable(
-    preAggregationTableName: string,
-    loadSql: string,
-    params: any,
-  ): Promise<any> {
-    if (this.config.S3OutputLocation === undefined) {
-      throw new Error('Unload is not configured. Please define CUBEJS_AWS_S3_OUTPUT_LOCATION env var ');
-    }
-
-    const qid = await this.startQuery(loadSql, params);
-    await this.waitForSuccess(qid);
-  }
-
-  public async unload(tableName: string): Promise<DownloadTableCSVData> {
-    if (this.config.exportBucket === undefined) {
-      throw new Error('Unload is not configured');
-    }
-
-    const types = await this.tableColumnTypes(tableName);
-    const columns = types.map(t => t.name).join(', ');
-    const path = `${this.config.exportBucket}/${tableName}`;
-
-    const unloadSql = `
-      UNLOAD (SELECT ${columns} FROM ${tableName})
-      TO '${path}'
-      WITH (format = 'TEXTFILE', field_delimiter = ',', compression='GZIP')
-    `;
-    const qid = await this.startQuery(unloadSql, []);
-    await this.waitForSuccess(qid);
-
+  /**
+   * Returns an array of signed URLs of the unloaded csv files.
+   */
+  private async getCsvFiles(tableName: string): Promise<string[]> {
     const client = new S3({
       credentials: this.config.credentials,
       region: this.config.region,
     });
-    const { bucket, prefix } = AthenaDriver.splitS3Path(path);
+    const { bucket, prefix } = AthenaDriver.splitS3Path(
+      `${this.config.exportBucket}/${tableName}`
+    );
     const list = await client.listObjectsV2({
       Bucket: bucket,
-      // skip leading /
-      Prefix: prefix.slice(1),
+      Prefix: prefix.slice(1), // skip leading
     });
-    if (list.Contents === undefined) {
-      return {
-        exportBucketCsvEscapeSymbol: this.config.exportBucketCsvEscapeSymbol,
-        csvFile: [],
-        types,
-      };
+    if (!list.Contents) {
+      return [];
+    } else {
+      const files = await Promise.all(
+        list.Contents.map(async (file) => {
+          const command = new GetObjectCommand({
+            Bucket: bucket,
+            Key: file.Key,
+          });
+          return getSignedUrl(client, command, { expiresIn: 3600 });
+        })
+      );
+      return files;
     }
-    const csvFile = await Promise.all(
-      list.Contents.map(async (file) => {
-        const command = new GetObjectCommand({
-          Bucket: bucket,
-          Key: file.Key,
-        });
-        return getSignedUrl(client, command, { expiresIn: 3600 });
-      })
-    );
-
-    return {
-      exportBucketCsvEscapeSymbol: this.config.exportBucketCsvEscapeSymbol,
-      csvFile,
-      types,
-      csvNoHeader: true
-    };
   }
 
   public informationSchemaQuery() {

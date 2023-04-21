@@ -183,12 +183,24 @@ export interface DriverInterface {
   downloadQueryResults: (query: string, values: unknown[], options: DownloadQueryResultsOptions) => Promise<DownloadQueryResultsResult>;
   // Download table
   downloadTable: (table: string, options: ExternalDriverCompatibilities & StreamingSourceOptions) => Promise<DownloadTableMemoryData | DownloadTableCSVData>;
-  // Some drivers can implement streaming from SQL
+  
+  /**
+   * Returns stream table object that includes query result stream and
+   * queried fields types.
+   */
   stream?: (table: string, values: unknown[], options: StreamOptions) => Promise<StreamTableData>;
-  // Some drivers can implement UNLOAD data to external storage
+  
+  /**
+   * Returns to the Cubestore an object with links to unloaded to an
+   * export bucket data.
+   */
   unload?: (table: string, options: UnloadOptions) => Promise<DownloadTableCSVData>;
-  // Some drivers can implement UNLOAD data to external storage
+  
+  /**
+   * Determines whether export bucket feature is configured or not.
+   */
   isUnloadSupported?: (options: UnloadOptions) => Promise<boolean>;
+  
   // Current timestamp, defaults to new Date().getTime()
   nowTimestamp(): number;
   // Shutdown the driver
