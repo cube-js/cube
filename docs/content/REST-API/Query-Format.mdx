@@ -522,8 +522,8 @@ provides a convenient shortcut to pass a dimension and a filter as a
   operators are used. It requires, for example, that the end date range date
   `2020-01-01` is padded to `2020-01-01T23:59:59.999`. If only one date is
   specified it's equivalent to passing two of the same dates as a date range.
-  You can also pass a string with a [relative date range][ref-relative-date-range],
-  for example, `last quarter`.
+  You can also pass a string with a [relative date
+  range][ref-relative-date-range], for example, `last quarter`.
 - `compareDateRange`: An array of date ranges to compare a measure change over
   previous period
 - `granularity`: A granularity for a time dimension. It supports the following
@@ -564,8 +564,8 @@ const resultSet = cubejsApi.load({
 
 ### <--{"id" : "Time Dimension Format"}--> Relative date range
 
-You can also use a string with a relative date range in the `dateRange` property,
-for example:
+You can also use a string with a relative date range in the `dateRange`
+property, for example:
 
 ```javascript
 {
@@ -582,15 +582,17 @@ for example:
 ```
 
 Some of supported formats:
-* `today`, `yesterday`, or `tomorrow`
-* `last year`, `last quarter`, or `last 360 days`
-* `next month` or `last 6 months` (current date not included)
-* `from 7 days ago to now` or `from now to 2 weeks from now` (current date included)
+
+- `today`, `yesterday`, or `tomorrow`
+- `last year`, `last quarter`, or `last 360 days`
+- `next month` or `last 6 months` (current date not included)
+- `from 7 days ago to now` or `from now to 2 weeks from now` (current date
+  included)
 
 <InfoBox>
 
-Cube uses the [Chrono][chrono-website] library to parse relative dates.
-Please refer to its documentation for more examples.
+Cube uses the [Chrono][chrono-website] library to parse relative dates. Please
+refer to its documentation for more examples.
 
 </InfoBox>
 
