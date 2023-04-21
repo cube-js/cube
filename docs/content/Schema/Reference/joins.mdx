@@ -265,7 +265,7 @@ handle row multiplication issues.
 
 Let's imagine you want to calculate `Order Amount` by `Order Item Product Name`.
 In this case, `Order` rows will be multiplied by the `Order Item` join due to
-the `has_many` relationship. In order to produce correct results, Cube will
+the `one_to_many` relationship. In order to produce correct results, Cube will
 select distinct primary keys from `Order` first and then will join these primary
 keys with `Order` to get the correct `Order Amount` sum result. Please note that
 `primaryKey` should be defined in the `dimensions` section.
