@@ -23,7 +23,7 @@ cube(`Users`, {
 
   joins: {
     Organizations: {
-      relationship: `belongsTo`,
+      relationship: `many_to_one`,
       sql: `${Users.organization_id} = ${Organizations.id}`,
     },
   },

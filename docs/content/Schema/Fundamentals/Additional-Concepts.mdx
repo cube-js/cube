@@ -34,12 +34,12 @@ cube(`Orders`, {
 
   joins: {
     Users: {
-      relationship: `belongsTo`,
+      relationship: `many_to_one`,
       sql: `${CUBE}.user_id = ${Users.id}`,
     },
 
     Products: {
-      relationship: `belongsTo`,
+      relationship: `many_to_one`,
       sql: `${CUBE}.product_id = ${Products.id}`,
     },
   },

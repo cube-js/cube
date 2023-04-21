@@ -14,7 +14,7 @@ supports three kinds of relationships often found in SQL databases:
 
 - `hasOne`/`has_one`
 - `hasMany`/`has_many`
-- `belongsTo`/`belongs_to`
+- `many_to_one`
 
 To use an example, let's use two cubes, `Customers` and `Orders`:
 
@@ -140,7 +140,7 @@ However, if we have guest checkouts, that would mean we would have orders with
 no matching customer. Looking back at the `hasMany` relationship and its'
 resulting SQL, any guest checkouts would be excluded from the results. To remedy
 this, we'll remove the join from the `Customers` cube and instead define a join
-with a `belongsTo` relationship on the `Orders` cube:
+with a `many_to_one` relationship on the `Orders` cube:
 
 <CodeTabs>
 
@@ -148,7 +148,7 @@ with a `belongsTo` relationship on the `Orders` cube:
 cube('Orders', {
   joins: {
     Customers: {
-      relationship: `belongsTo`,
+      relationship: `many_to_one`,
       sql: `${CUBE}.customer_id = ${Customers.id}`,
     },
   },
@@ -160,7 +160,7 @@ cubes:
   - name: Orders
     joins:
       - name: Customers
-        relationship: belongs_to
+        relationship: many_to_one
         sql: "{CUBE}.customer_id = {Customers.id}"
 ```
 
@@ -254,7 +254,7 @@ cube(`Posts`, {
 
   joins: {
     PostTopics: {
-      relationship: `belongsTo`,
+      relationship: `many_to_one`,
       sql: `${CUBE}.id = ${PostTopics.post_id}`,
     },
   },
@@ -505,7 +505,7 @@ cube(`Emails`, {
 
   joins: {
     Campaigns: {
-      relationship: `belongsTo`,
+      relationship: `many_to_one`,
       sql: `${CUBE}.campaign_id = ${Campaigns.id}
       AND ${CUBE}.customer_name = ${Campaigns.customerName}`,
     },
@@ -697,7 +697,7 @@ cube('Orders', {
 
   joins: {
     Customers: {
-      relationship: `belongsTo`,
+      relationship: `many_to_one`,
       sql: `${CUBE}.customer_id = ${Customers.id}`,
     },
   },

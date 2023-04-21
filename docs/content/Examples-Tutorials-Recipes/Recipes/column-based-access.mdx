@@ -28,7 +28,7 @@ cube(`Products`, {
 
   joins: {
     Suppliers: {
-      relationship: `belongsTo`,
+      relationship: `many_to_one`,
       sql: `${CUBE}.supplier_id = ${Suppliers.id}`,
     },
   },

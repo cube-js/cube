@@ -582,7 +582,7 @@ cube(`Orders`, {
   joins: {
     Users: {
       sql: `${CUBE.user_id} = ${Users.id}`,
-      relationship: `belongsTo`
+      relationship: `many_to_one`
     },
   },
 });

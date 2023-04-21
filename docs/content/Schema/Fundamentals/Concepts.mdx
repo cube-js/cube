@@ -331,7 +331,7 @@ cube('Orders', {
 
   joins: {
     LineItems: {
-      relationship: `belongsTo`,
+      relationship: `many_to_one`,
       // Here we use the `CUBE` global to refer to the current cube,
       // so the following is equivalent to `Orders.id = LineItems.order_id`
       sql: `${CUBE}.id = ${LineItems.order_id}`,
@@ -348,14 +348,14 @@ cubes:
         # Here we use the `CUBE` global to refer to the current cube,
         # so the following is equivalent to `Orders.id = LineItems.order_id`
         sql: "{CUBE}.id = {LineItems.order_id}"
-        relationship: belongs_to
+        relationship: many_to_one
 ```
 
 </CodeTabs>
 
 There are three kinds of join relationships:
 
-- `belongsTo`/`belongs_to`
+- `many_to_one`
 - `hasOne`/`has_one`
 - `hasMany`/`has_many`
 

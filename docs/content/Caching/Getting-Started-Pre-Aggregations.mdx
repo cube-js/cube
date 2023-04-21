@@ -197,7 +197,7 @@ cube(`LineItems`, {
   joins: {
     Orders: {
       sql: `${CUBE}.order_id = ${Orders.id}`,
-      relationship: `belongsTo`,
+      relationship: `many_to_one`,
     },
   },
 
