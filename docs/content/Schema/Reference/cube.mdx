@@ -602,8 +602,7 @@ cube(`Companies`, {
 });
 ```
 
-You can also specify a table name instead of a SQL statement using the
-[`sql_table`](#parameters-sql-table) property.
+It is recommended to prefer the [`sql_table`](#parameters-sql-table) property over the `sql` property for all cubes that are supposed to use queries like this: `SELECT * FROM table`.
 
 ### <--{"id" : "Parameters"}--> sqlAlias
 
