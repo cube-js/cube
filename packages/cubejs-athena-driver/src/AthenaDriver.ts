@@ -4,7 +4,6 @@
  * @fileoverview The `AthenaDriver` and related types declaration.
  */
 
-import { EventEmitter } from 'events';
 import {
   getEnv,
   assertDataSource,
