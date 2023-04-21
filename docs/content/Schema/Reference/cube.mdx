@@ -635,9 +635,7 @@ all member names including pre-aggregation table names.
 
 ### <--{"id" : "Parameters"}--> sql_table
 
-The `sql_table` property can be used instead of [`sql`](#parameters-sql) to
-directly specify the name of a table from the data source that will be queried
-by this cube.
+The `sql_table` property is used as a concise way for defining a cube that uses a query like this: `SELECT * FROM table`. Instead of using the [`sql`](#parameters-sql) property, use `sql_table` with the table name that this cube will query.
 
 <CodeTabs>
 
