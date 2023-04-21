@@ -177,7 +177,7 @@ cubes:
 </CodeTabs>
 
 Referencing a foreign cube in the `sql` parameter instructs Cube to build an
-implicit join to this cube. Using the schema above, we'll use a query as an
+implicit join to this cube. Using the data model above, we'll use a query as an
 example:
 
 ```json
@@ -230,7 +230,7 @@ cube(`Contacts`, {
 
 ### <--{"id" : "Parameters"}--> dataSource
 
-Each cube in schema can have its own `dataSource` name to support scenarios
+Each cube can have its own `dataSource` name to support scenarios
 where data should be fetched from multiple databases. The value of the
 `dataSource` parameter will be passed to the
 [`driverFactory()`][ref-config-driverfactory] function as part of the `context`
@@ -336,7 +336,7 @@ cubes:
 
 You can also omit the cube name while defining a cube in JavaScript. This way,
 Cube doesn't register this cube globally; instead it returns a reference which
-you can use while combining cubes. It makes sense to use it for dynamic schema
+you can use while combining cubes. It makes sense to use it for dynamic data model
 generation and reusing with `extends`. Previous example without defining
 `OrderFacts` cube globally:
 
@@ -971,7 +971,7 @@ cubes:
 ### <--{"id" : "Context Variables"}--> Compile context
 
 There's a global `COMPILE_CONTEXT` that captured as
-[`RequestContext`][ref-config-req-ctx] at the time of schema compilation. It
+[`RequestContext`][ref-config-req-ctx] at the time of data model compilation. It
 contains `securityContext` and any other variables provided by
 [`extendContext`][ref-config-ext-ctx].
 

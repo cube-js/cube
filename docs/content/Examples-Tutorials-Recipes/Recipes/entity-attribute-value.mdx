@@ -2,7 +2,7 @@
 title: Implementing Entity-Attribute-Value Model (EAV)
 permalink: /recipes/entity-attribute-value
 category: Examples & Tutorials
-subCategory: Data schema
+subCategory: Data modeling
 menuOrder: 4
 ---
 
@@ -16,7 +16,7 @@ same set of associated attributes, thus making the entity-attribute-value
 relation a sparse matrix. In the cube, we'd like every attribute to be modeled
 as a dimension.
 
-## Data schema
+## Data modeling
 
 Let's explore the `Users` cube that contains the entities:
 
@@ -95,7 +95,7 @@ their orders in any of these statuses. In terms of the EAV model:
 
 Let's explore some possible ways to model that.
 
-### <--{"id" : "Data schema"}--> Static attributes
+### <--{"id" : "Data modeling"}--> Static attributes
 
 We already know that the following statuses are present in the dataset:
 `completed`, `processing`, and `shipped`. Let's assume this set of statuses is
@@ -179,7 +179,7 @@ The drawback is that when the set of statuses changes, we'll need to amend the
 cube definition in several places: update selected values and joins in SQL as
 well as update the dimensions. Let's see how to work around that.
 
-### <--{"id" : "Data schema"}--> Static attributes, DRY version
+### <--{"id" : "Data modeling"}--> Static attributes, DRY version
 
 We can embrace the
 [Don't Repeat Yourself](https://en.wikipedia.org/wiki/Don%27t_repeat_yourself)
@@ -240,7 +240,7 @@ The new `UsersStatuses_DRY` cube is functionally identical to the
 data. However, there's still a static list of statuses present in the cube's
 source code. Let's work around that next.
 
-### <--{"id" : "Data schema"}--> Dynamic attributes
+### <--{"id" : "Data modeling"}--> Dynamic attributes
 
 We can eliminate the list of statuses from the cube's code by loading this list
 from an external source, e.g., the data source. Here's the code from the
@@ -276,7 +276,7 @@ exports.fetchStatuses = async () => {
 
 In the cube file, we will use the `fetchStatuses` function to load the list of
 statuses. We will also wrap the cube definition with the `asyncModule` built-in
-function that allows the data schema to be created
+function that allows the data model to be created
 [dynamically](https://cube.dev/docs/schema/advanced/dynamic-schema-creation).
 
 ```javascript

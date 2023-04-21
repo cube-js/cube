@@ -34,7 +34,7 @@ has both `teacher_id` and `student_id`, which are actually references to the
 | 100    | 31             | 1              | Multiplication and the meaning of the Factors |
 | 101    | 31             | 2              | Division as an Unknown Factor Problem         |
 
-The best way to design such a schema is by using what we call **Polymorphic
+The best way to design such a data model is by using what we call **Polymorphic
 Cubes**. It relies on the [`extends`][ref-schema-ref-cubes-extends] feature and
 prevents you from duplicating code, while preserving the correct domain logic.
 Learn more about using [`extends` here][ref-schema-advanced-extend].

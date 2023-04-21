@@ -7,9 +7,9 @@ menuOrder: 1
 ---
 
 A Cube Data Schema is used to model raw data into meaningful business
-definitions and pre-aggregate data for optimal results. The data schema is
+definitions and pre-aggregate data for optimal results. The data model is
 exposed through the [querying API][ref-backend-restapi] that allows end-users to
-query a wide variety of analytical queries without modifying the schema itself.
+query a wide variety of analytical queries without modifying the data model itself.
 
 Let’s use a users table with the following columns as an example:
 
@@ -28,7 +28,7 @@ We can start with a set of simple questions about users we want to answer:
 - What is the percentage of paying users out of the total?
 - How many users, paying or not, are from different cities and companies?
 
-We don’t need to write SQL queries for every question, since the data schema
+We don’t need to write SQL queries for every question, since the data model
 allows building well-organized and reusable SQL.
 
 ## 1. Creating a Cube

@@ -83,7 +83,7 @@ The name of the AWS Athena catalog to use for queries.
 ## `CUBEJS_DB_SCHEMA`
 
 The name of the schema to use as `information_schema` filter. Reduces count of
-tables loaded during schema generation.
+tables loaded during data model generation.
 
 | Possible Values     | Default in Development | Default in Production |
 | ------------------- | ---------------------- | --------------------- |
@@ -560,7 +560,7 @@ touch within [`CUBEJS_TOUCH_PRE_AGG_TIMEOUT`](#cubejs-touch-pre-agg-timeout).
 Pre-aggregations are touched whenever they are rebuilt or a Refresh Worker
 checks its freshness. The first drop will be initiated when the Refresh Worker
 is able to check freshness for every `scheduledRefresh: true` pre-aggregation.
-If you have multiple Refresh Workers with different schema versions sharing the
+If you have multiple Refresh Workers with different data model versions sharing the
 same Cube Store cluster, then touches from both refresh workers are respected.
 
 | Possible Values | Default in Development | Default in Production |
@@ -841,11 +841,11 @@ for][ref-config-sched-refresh-timer]. Used in conjunction with
 
 ## `CUBEJS_SCHEMA_PATH`
 
-The path where Cube loads schemas from.
+The path where Cube loads data models from.
 
 | Possible Values                      | Default in Development | Default in Production |
 | ------------------------------------ | ---------------------- | --------------------- |
-| A valid path containing Cube schemas | `schema`               | `schema`              |
+| A valid path containing Cube data models | `schema`               | `schema`              |
 
 ## `CUBEJS_SQL_PASSWORD`
 

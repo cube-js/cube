@@ -8,7 +8,7 @@ menuOrder: 3
 The SQL API supports joins through `__cubeJoinField` virtual column, which is
 available in every cube table. Join can also be done through `CROSS JOIN`. Usage
 of `__cubeJoinField` in a join instructs Cube to perform join as it's defined in
-a data schema. Cube generates the correct joining conditions for the underlying
+a data model. Cube generates the correct joining conditions for the underlying
 data source.
 
 For example, the following query joins the `Orders` and `Products` tables under

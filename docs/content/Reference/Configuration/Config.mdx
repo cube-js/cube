@@ -134,7 +134,7 @@ Called only once per [`appId`][self-opts-ctx-to-appid].
 
 ### <--{"id" : "Options Reference"}--> schemaPath
 
-Path to schema files. The default value is `/schema`.
+Path to data model files. The default value is `/schema`.
 
 ### <--{"id" : "Options Reference"}--> basePath
 
@@ -198,7 +198,7 @@ module.exports = {
 It is a [Multitenancy Setup][ref-multitenancy] option.
 
 `contextToAppId` is a function to determine an App ID which is used as caching
-key for various in-memory structures like schema compilation results, connection
+key for various in-memory structures like data model compilation results, connection
 pool, etc.
 
 Called on each request.
@@ -247,9 +247,9 @@ module.exports = {
 
 ### <--{"id" : "Options Reference"}--> repositoryFactory
 
-This option allows to customize the repository for Cube data schema files. It is
+This option allows to customize the repository for Cube data model files. It is
 a function, which accepts a context object and can dynamically select
-repositories with schema files based on
+repositories with data model files based on
 [`SchemaFileRepository`][self-schemafilerepo] contract. Learn more about it in
 [Multitenancy guide][ref-multitenancy].
 
@@ -419,12 +419,12 @@ module.exports = {
 
 ### <--{"id" : "Options Reference"}--> schemaVersion
 
-Schema version can be used to tell Cube schema should be recompiled in case
-schema code depends on dynamic definitions fetched from some external database
+Schema version can be used to tell Cube that the data model should be recompiled in case
+it depends on dynamic definitions fetched from some external database
 or API. This method is called on each request however `RequestContext` parameter
 is reused per application ID as determined by
 [`contextToAppId`][self-opts-ctx-to-appid]. If the returned string is different,
-the schema will be recompiled. It can be used in both multi-tenant and single
+the data model will be recompiled. It can be used in both multi-tenant and single
 tenant environments.
 
 ```javascript
@@ -552,7 +552,7 @@ values that your extendContext object key can have.
 
 `extendContext` is applied only to requests that go through API. It isn't
 applied to refresh worker execution. If you're looking for a way to provide
-global environment variables for your schema please see [Execution environment
+global environment variables for your data model, please see [Execution environment
 docs][ref-exec-environment-globals].
 
 </WarningBox>
@@ -566,7 +566,7 @@ module.exports = {
 };
 ```
 
-You can use the custom value from extend context in your data schema like this:
+You can use the custom value from extend context in your data model like this:
 
 ```javascript
 const { activeOrganization } = COMPILE_CONTEXT;
@@ -578,18 +578,18 @@ cube(`Users`, {
 
 ### <--{"id" : "Options Reference"}--> compilerCacheSize
 
-Maximum number of compiled schemas to persist with in-memory cache. Defaults to
+Maximum number of compiled data models to persist with in-memory cache. Defaults to
 250, but optimum value will depend on deployed environment. When the max is
-reached, will start dropping the least recently used schemas from the cache.
+reached, will start dropping the least recently used data models from the cache.
 
 ### <--{"id" : "Options Reference"}--> maxCompilerCacheKeepAlive
 
-Maximum length of time in ms to keep compiled schemas in memory. Default keeps
-schemas in memory indefinitely.
+Maximum length of time in ms to keep compiled data models in memory. Default keeps
+data models in memory indefinitely.
 
 ### <--{"id" : "Options Reference"}--> updateCompilerCacheKeepAlive
 
-Providing `updateCompilerCacheKeepAlive: true` keeps frequently used schemas in
+Providing `updateCompilerCacheKeepAlive: true` keeps frequently used data models in
 memory by reseting their `maxCompilerCacheKeepAlive` every time they are
 accessed.
 
@@ -601,7 +601,7 @@ check for `ungrouped` queries.
 ### <--{"id" : "Options Reference"}--> telemetry
 
 Cube collects high-level anonymous usage statistics for servers started in
-development mode. It doesn't track any credentials, schema contents or queries
+development mode. It doesn't track any credentials, data model contents or queries
 issued. This statistics is used solely for the purpose of constant cube.js
 improvement.
 
@@ -727,7 +727,7 @@ module.exports = {
 ### <--{"id" : "Options Reference"}--> allowJsDuplicatePropsInSchema
 
 Boolean to enable or disable a check duplicate property names in all objects of
-a schema. The default value is `false`, and it is means the compiler would use
+a data model. The default value is `false`, and it is means the compiler would use
 the additional transpiler for check duplicates.
 
 ### <--{"id" : "Options Reference"}--> initApp
@@ -796,7 +796,7 @@ and sets it to `req.securityContext`.
 
 The default implementation of the `SchemaFileRepository` contract is defined by
 the [`FileRepository`][gh-cube-filerepo] class. When using
-[`FileRepository`][gh-cube-filerepo], all schema files must be within the same
+[`FileRepository`][gh-cube-filerepo], all data model files must be within the same
 directory.
 
 </WarningBox>
@@ -805,8 +805,8 @@ directory.
   https://github.com/cube-js/cube/blob/master/packages/cubejs-server-core/src/core/FileRepository.ts
 
 The `SchemaFileRepository` contract defines an async `dataSchemaFiles` function
-which returns the files to compile for a schema. Returned by
-[repositoryFactory][self-repofactory]. The [`FileRepository`][gh-cube-filerepo]
+which returns the files to compile for a data model. Returned by
+[`repositoryFactory`][self-repofactory]. The [`FileRepository`][gh-cube-filerepo]
 implementation of the `SchemaFileRepository` contract accepts a
 [`schemaPath`][self-schemapath] in its constructor.
 
