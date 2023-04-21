@@ -573,7 +573,7 @@ recipe][ref-recipe-control-access-cubes-views].
 
 The `sql` parameter specifies the SQL that will be used to generate a table that
 will be queried by a cube. It can be any valid SQL query, but usually it takes
-the form of a `select * from my_table` query. Please note that you don't need to
+the form of a `SELECT * FROM my_table` query. Please note that you don't need to
 use `GROUP BY` in a SQL query on the cube level. This query should return a
 plain table, without aggregations.
 
@@ -601,6 +601,33 @@ cube(`Companies`, {
   sql: `SELECT users.company_name, users.company_id FROM ${Users.sql()} AS users`,
 });
 ```
+
+It is recommended to prefer the [`sql_table`](#parameters-sql-table) property
+over the `sql` property for all cubes that are supposed to use queries like
+this: `SELECT * FROM table`.
+
+### <--{"id" : "Parameters"}--> sql_table
+
+The `sql_table` property is used as a concise way for defining a cube that uses
+a query like this: `SELECT * FROM table`. Instead of using the
+[`sql`](#parameters-sql) property, use `sql_table` with the table name that this
+cube will query.
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  sql_table: `public.orders`,
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    sql_table: public.orders
+```
+
+</CodeTabs>
 
 ### <--{"id" : "Parameters"}--> sqlAlias
 
