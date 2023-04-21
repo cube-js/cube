@@ -367,7 +367,7 @@ cubes:
         rollups: [Users.users_rollup, CUBE.orders_rollup]
     joins:
       - name: Users
-        relationship: belongs_to
+        relationship: many_to_one
         sql: "{CUBE.user_id} = {Users.id}"
     measures:
       - name: count

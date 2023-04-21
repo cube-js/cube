@@ -76,10 +76,10 @@ cubes:
 
     joins:
       - name: Users
-        relationship: belongs_to
+        relationship: many_to_one
         sql: "{CUBE}.user_id = {Users}.id"
       - name: Products
-        relationship: belongs_to
+        relationship: many_to_one
         sql: "{CUBE}.product_id = {Products}.id"
 
     measures:

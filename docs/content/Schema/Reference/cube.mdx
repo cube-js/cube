@@ -61,7 +61,7 @@ cubes:
     sql: SELECT * FROM USERS
     joins:
       - name: Organizations
-        relationship: belongs_to
+        relationship: many_to_one
         sql: "{CUBE.organization_id} = {Organizations.id}"
     measures:
       - name: count

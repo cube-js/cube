@@ -297,7 +297,7 @@ cubes:
     sql: SELECT * FROM posts
     joins:
       - name: PostTopics
-        relationship: belongs_to
+        relationship: many_to_one
         sql: "{CUBE}.id = {PostTopics.post_id}"
 
   - name: Topics
@@ -566,7 +566,7 @@ cubes:
     sql: SELECT * FROM emails
     joins:
       - name: Campaigns
-        relationship: belongs_to
+        relationship: many_to_one
         sql: "{CUBE}.campaign_id = {Campaigns.id} AND {CUBE}.customer_name = {Campaigns.customer_name}"
     measures:
       - name: count
@@ -736,7 +736,7 @@ cubes:
     sql: SELECT * FROM orders
     joins:
       - name: Customers
-        relationship: belongs_to
+        relationship: many_to_one
         sql: "{CUBE}.customer_id = {Customers.id}"
     measures:
       - name: count
