@@ -10,14 +10,14 @@ menuOrder: 3
 
 We need to access the data from different data sources for different tenants.
 For example, we are the platform for the online website builder, and each client
-can only view their data. The same data schema is used for all clients.
+can only view their data. The same data model is used for all clients.
 
 ## Configuration
 
 Each client has its own database. In this recipe, the `Mango Inc` tenant keeps
 its data in the remote `ecom` database while the `Avocado Inc` tenant works with
 the local database (bootstrapped in the `docker-compose.yml` file) which has the
-same schema.
+same data model.
 
 To enable multitenancy, use the
 [`contextToAppId`](https://cube.dev/docs/config#options-reference-context-to-app-id)
@@ -69,8 +69,8 @@ module.exports = {
 ## Query
 
 To get users for different tenants, we will send two identical requests with
-different JWTs. Also we send a query with unknown tenant to show that he cannot
-access to the data schema of other tenants.
+different JWTs. Also, we send a query with unknown tenant to show that he cannot
+access to the data model of other tenants.
 
 ```javascript
 // JWT payload for "Avocado Inc"

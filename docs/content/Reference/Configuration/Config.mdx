@@ -198,8 +198,8 @@ module.exports = {
 It is a [Multitenancy Setup][ref-multitenancy] option.
 
 `contextToAppId` is a function to determine an App ID which is used as caching
-key for various in-memory structures like schema compilation results, connection
-pool, etc.
+key for various in-memory structures like data model compilation results,
+connection pool, etc.
 
 Called on each request.
 
@@ -247,9 +247,9 @@ module.exports = {
 
 ### <--{"id" : "Options Reference"}--> repositoryFactory
 
-This option allows to customize the repository for Cube data schema files. It is
+This option allows to customize the repository for Cube data model files. It is
 a function, which accepts a context object and can dynamically select
-repositories with schema files based on
+repositories with data model files based on
 [`SchemaFileRepository`][self-schemafilerepo] contract. Learn more about it in
 [Multitenancy guide][ref-multitenancy].
 
@@ -419,13 +419,13 @@ module.exports = {
 
 ### <--{"id" : "Options Reference"}--> schemaVersion
 
-Schema version can be used to tell Cube schema should be recompiled in case
-schema code depends on dynamic definitions fetched from some external database
-or API. This method is called on each request however `RequestContext` parameter
-is reused per application ID as determined by
+Schema version can be used to tell Cube that the data model should be recompiled
+in case it depends on dynamic definitions fetched from some external database or
+API. This method is called on each request however `RequestContext` parameter is
+reused per application ID as determined by
 [`contextToAppId`][self-opts-ctx-to-appid]. If the returned string is different,
-the schema will be recompiled. It can be used in both multi-tenant and single
-tenant environments.
+the data model will be recompiled. It can be used in both multi-tenant and
+single tenant environments.
 
 ```javascript
 const tenantIdToDbVersion = {};
@@ -552,8 +552,8 @@ values that your extendContext object key can have.
 
 `extendContext` is applied only to requests that go through API. It isn't
 applied to refresh worker execution. If you're looking for a way to provide
-global environment variables for your schema please see [Execution environment
-docs][ref-exec-environment-globals].
+global environment variables for your data model, please see [Execution
+environment docs][ref-exec-environment-globals].
 
 </WarningBox>
 
@@ -566,7 +566,7 @@ module.exports = {
 };
 ```
 
-You can use the custom value from extend context in your data schema like this:
+You can use the custom value from extend context in your data model like this:
 
 ```javascript
 const { activeOrganization } = COMPILE_CONTEXT;
@@ -578,19 +578,19 @@ cube(`Users`, {
 
 ### <--{"id" : "Options Reference"}--> compilerCacheSize
 
-Maximum number of compiled schemas to persist with in-memory cache. Defaults to
-250, but optimum value will depend on deployed environment. When the max is
-reached, will start dropping the least recently used schemas from the cache.
+Maximum number of compiled data models to persist with in-memory cache. Defaults
+to 250, but optimum value will depend on deployed environment. When the max is
+reached, will start dropping the least recently used data models from the cache.
 
 ### <--{"id" : "Options Reference"}--> maxCompilerCacheKeepAlive
 
-Maximum length of time in ms to keep compiled schemas in memory. Default keeps
-schemas in memory indefinitely.
+Maximum length of time in ms to keep compiled data models in memory. Default
+keeps data models in memory indefinitely.
 
 ### <--{"id" : "Options Reference"}--> updateCompilerCacheKeepAlive
 
-Providing `updateCompilerCacheKeepAlive: true` keeps frequently used schemas in
-memory by reseting their `maxCompilerCacheKeepAlive` every time they are
+Providing `updateCompilerCacheKeepAlive: true` keeps frequently used data models
+in memory by reseting their `maxCompilerCacheKeepAlive` every time they are
 accessed.
 
 ### <--{"id" : "Options Reference"}--> allowUngroupedWithoutPrimaryKey
@@ -601,9 +601,9 @@ check for `ungrouped` queries.
 ### <--{"id" : "Options Reference"}--> telemetry
 
 Cube collects high-level anonymous usage statistics for servers started in
-development mode. It doesn't track any credentials, schema contents or queries
-issued. This statistics is used solely for the purpose of constant cube.js
-improvement.
+development mode. It doesn't track any credentials, data model contents or
+queries issued. This statistics is used solely for the purpose of constant
+cube.js improvement.
 
 You can opt out of it any time by setting `telemetry` option to `false` or,
 alternatively, by setting `CUBEJS_TELEMETRY` environment variable to `false`.
@@ -727,8 +727,8 @@ module.exports = {
 ### <--{"id" : "Options Reference"}--> allowJsDuplicatePropsInSchema
 
 Boolean to enable or disable a check duplicate property names in all objects of
-a schema. The default value is `false`, and it is means the compiler would use
-the additional transpiler for check duplicates.
+a data model. The default value is `false`, and it is means the compiler would
+use the additional transpiler for check duplicates.
 
 ### <--{"id" : "Options Reference"}--> initApp
 
@@ -772,12 +772,12 @@ system-level settings. Please use `CUBEJS_DB_QUERY_TIMEOUT` and
 
 Timeout and interval options' values are in seconds.
 
-| Option              | Description                                                                                                                                                                                                                        | Default Value |
-| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
-| concurrency         | Maximum number of queries to be processed simultaneosly. For drivers with connection pool `CUBEJS_DB_MAX_POOL` should be adjusted accordingly. Typically pool size should be at least twice of total concurrency among all queues. | `2`           |
-| executionTimeout    | Total timeout of single query                                                                                                                                                                                                      | `600`         |
-| orphanedTimeout     | Query will be marked for cancellation if not requested during this period.                                                                                                                                                         | `120`         |
-| heartBeatInterval   | Worker heartbeat interval. If `4*heartBeatInterval` time passes without reporting, the query gets cancelled.                                                                                                                       | `30`          |
+| Option            | Description                                                                                                                                                                                                                        | Default Value |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
+| concurrency       | Maximum number of queries to be processed simultaneosly. For drivers with connection pool `CUBEJS_DB_MAX_POOL` should be adjusted accordingly. Typically pool size should be at least twice of total concurrency among all queues. | `2`           |
+| executionTimeout  | Total timeout of single query                                                                                                                                                                                                      | `600`         |
+| orphanedTimeout   | Query will be marked for cancellation if not requested during this period.                                                                                                                                                         | `120`         |
+| heartBeatInterval | Worker heartbeat interval. If `4*heartBeatInterval` time passes without reporting, the query gets cancelled.                                                                                                                       | `30`          |
 
 ## RequestContext
 
@@ -796,8 +796,8 @@ and sets it to `req.securityContext`.
 
 The default implementation of the `SchemaFileRepository` contract is defined by
 the [`FileRepository`][gh-cube-filerepo] class. When using
-[`FileRepository`][gh-cube-filerepo], all schema files must be within the same
-directory.
+[`FileRepository`][gh-cube-filerepo], all data model files must be within the
+same directory.
 
 </WarningBox>
 

@@ -46,8 +46,8 @@ cube('Orders', {
     customer_id: {
       sql: `customer_id`,
       type: `number`,
-    }
-  }
+    },
+  },
 });
 ```
 
@@ -167,9 +167,9 @@ cubes:
 
 </CodeTabs>
 
-In the above schema, our `Orders` cube defines the relationship between itself
-and the `Customer` cube. The same JSON query now results in the following SQL
-query:
+In the above data model, our `Orders` cube defines the relationship between
+itself and the `Customer` cube. The same JSON query now results in the following
+SQL query:
 
 ```
 SELECT
@@ -345,7 +345,7 @@ cubes:
   - name: PostTopics
     dimensions:
       - name: id
-        sql: "CONCAT({CUBE}.post_id, {CUBE}.topic_id)"
+        sql: 'CONCAT({CUBE}.post_id, {CUBE}.topic_id)'
         type: number
         primary_key: true
 ```
@@ -483,7 +483,7 @@ cubes:
 
 </CodeTabs>
 
-The following diagram shows our data schema with the `Campaigns` cube:
+The following diagram shows our data model with the `Campaigns` cube:
 
 <div style="text-align: center">
   <img
@@ -568,7 +568,9 @@ cubes:
     joins:
       - name: Campaigns
         relationship: many_to_one
-        sql: "{CUBE}.campaign_id = {Campaigns.id} AND {CUBE}.customer_name = {Campaigns.customer_name}"
+        sql:
+          '{CUBE}.campaign_id = {Campaigns.id} AND {CUBE}.customer_name =
+          {Campaigns.customer_name}'
     measures:
       - name: count
         type: count
@@ -588,7 +590,9 @@ cubes:
     joins:
       - name: Transactions
         relationship: one_to_many
-        sql: "{CUBE}.customer_name = {Transactions.customer_name} AND {CUBE}.campaign_id = {Transactions.campaign_id}"
+        sql:
+          '{CUBE}.customer_name = {Transactions.customer_name} AND
+          {CUBE}.campaign_id = {Transactions.campaign_id}'
     dimensions:
       - name: id
         sql: id
@@ -759,7 +763,7 @@ cubes:
 
 </CodeTabs>
 
-After adding the join to the schema, we can query the cube as follows:
+After adding the join to the data model, we can query the cube as follows:
 
 ```json
 {
@@ -902,7 +906,7 @@ views:
     measures:
       - name: count
         # Note the nested path to Orders.count
-        sql: "{Users.Orders.count}"
+        sql: '{Users.Orders.count}'
         type: number
 ```
 
@@ -1073,6 +1077,8 @@ cubes:
 </CodeTabs>
 
 [ref-schema-ref-joins]: /schema/reference/joins
-[ref-schema-ref-joins-relationship]: /schema/reference/joins#parameters-relationship
-[self-many-to-many-no-assoc-table]: #many-to-many-relationship-without-an-associative-table
+[ref-schema-ref-joins-relationship]:
+  /schema/reference/joins#parameters-relationship
+[self-many-to-many-no-assoc-table]:
+  #many-to-many-relationship-without-an-associative-table
 [self-join-direction]: /schema/fundamentals/joins#directions-of-joins

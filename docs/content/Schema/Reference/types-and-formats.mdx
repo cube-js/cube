@@ -72,7 +72,7 @@ cubes:
   - name: Orders
     measures:
       - name: last_order
-        sql: "MAX(created_at)"
+        sql: 'MAX(created_at)'
         type: time
     dimensions:
       - name: created_at
@@ -84,7 +84,8 @@ cubes:
 
 ### <--{"id" : "Measure Types"}--> boolean
 
-The `boolean` measure type can be used to condense data into a single boolean value.
+The `boolean` measure type can be used to condense data into a single boolean
+value.
 
 The example below adds an `is_completed` measure which only returns `true` if
 **all** orders have the `completed` status:
@@ -139,7 +140,7 @@ cubes:
   - name: Orders
     measures:
       - name: purchases_ratio
-        sql: "{purchases} / {count} * 100.0"
+        sql: '{purchases} / {count} * 100.0'
         type: number
         format: percent
 ```
@@ -167,7 +168,7 @@ cubes:
   - name: Orders
     measures:
       - name: ratio
-        sql: "SUM({CUBE}.amount) / count(*)"
+        sql: 'SUM({CUBE}.amount) / count(*)'
         type: number
 ```
 
@@ -311,7 +312,7 @@ cubes:
   - name: Orders
     measures:
       - name: revenue
-        sql: "{chargesAmount}"
+        sql: '{chargesAmount}'
         type: sum
 ```
 
@@ -392,7 +393,7 @@ cubes:
   - name: Orders
     measures:
       - name: avg_transaction
-        sql: "{transaction_amount}"
+        sql: '{transaction_amount}'
         type: avg
 ```
 
@@ -511,7 +512,7 @@ cubes:
   - name: Orders
     measures:
       - name: purchase_conversion
-        sql: "{purchase}/{checkout}*100.0"
+        sql: '{purchase}/{checkout}*100.0'
         type: number
         format: percent
 ```
@@ -558,9 +559,10 @@ This section describes the various types that can be assigned to a
 In order to be able to create time series charts, Cube needs to identify time
 dimension which is a timestamp column in your database.
 
-You can define several time dimensions in schemas and apply each when creating
-charts. Note that type of target column should be `TIMESTAMP`. Please use [this
-guide][ref-string-time-dims] if your datetime information is stored as a string.
+You can define several time dimensions in data models and apply each when
+creating charts. Note that type of target column should be `TIMESTAMP`. Please
+use [this guide][ref-string-time-dims] if your datetime information is stored as
+a string.
 
 <CodeTabs>
 
@@ -706,9 +708,9 @@ cubes:
       - name: location
         type: geo
         latitude:
-          sql: "{CUBE}.latitude"
+          sql: '{CUBE}.latitude'
         longitude:
-          sql: "{CUBE}.longitude"
+          sql: '{CUBE}.longitude'
 ```
 
 </CodeTabs>

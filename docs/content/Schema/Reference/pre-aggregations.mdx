@@ -442,7 +442,7 @@ scenarios where real-time data is required.
 
 [Lambda pre-aggregations][ref-caching-lambda-preaggs] can be used to combine
 data from a data source and a pre-aggregation, or even from multiple
-pre-aggregations across different schema-compatible cubes.
+pre-aggregations across different data model-compatible cubes.
 
 ### <--{"id" : "Parameters"}--> measures
 
@@ -528,7 +528,7 @@ cubes:
 
 The `timeDimension` property can be any [`dimension`][ref-schema-dimensions] of
 type [`time`][ref-schema-types-dim-time]. All other measures and dimensions in
-the schema are aggregated This property is an extremely useful tool for
+the data model are aggregated. This property is an extremely useful tool for
 improving performance with massive datasets.
 
 <CodeTabs>

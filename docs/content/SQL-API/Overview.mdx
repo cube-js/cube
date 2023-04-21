@@ -223,10 +223,10 @@ see below, the sorting operation is done after Cube query and projection.
 +--- CubeScanExecutionPlan
 ```
 
-Because of the default limit in Cube queries (50,000 rows), there is a possibility
-of a wrong result if there are more than 50,000 rows. Given that queries to Cube
-are usually aggregated, it is rare that they may return more than 50,000 rows, but
-keep that limitation in mind when designing your queries.
+Because of the default limit in Cube queries (50,000 rows), there is a
+possibility of a wrong result if there are more than 50,000 rows. Given that
+queries to Cube are usually aggregated, it is rare that they may return more
+than 50,000 rows, but keep that limitation in mind when designing your queries.
 
 ### <--{"id" : "Querying cube tables"}--> Limit
 
@@ -236,14 +236,15 @@ limitation.
 
 ## Enabling SQL API in Cube Cloud
 
-To enable the SQL API in Cube Cloud, click&nbsp;<Btn>Deploy SQL API</Btn> from the&nbsp;<Btn>Overview</Btn> page, then click <Btn>How to connect your BI tool</Btn>. You
-should then see the following screen:
+To enable the SQL API in Cube Cloud, click&nbsp;<Btn>Deploy SQL API</Btn> from
+the&nbsp;<Btn>Overview</Btn> page, then click <Btn>How to connect your BI
+tool</Btn>. You should then see the following screen:
 
 ![SQL API details modal|690x428](https://ucarecdn.com/67508334-1641-43ec-9d50-a8f64629992b/)
 
 ## Examples
 
-Consider the following schema.
+Consider the following data model:
 
 ```javascript
 cube(`Orders`, {
@@ -395,7 +396,7 @@ cube('Orders', {
 })
 ```
 
-As we can see, we have a mix of measure types in the above schema. To query
+As we can see, we have a mix of measure types in the above data model. To query
 them, we could use the following SQL statements:
 
 ```sql
@@ -423,8 +424,8 @@ SELECT MAX(maxValue) FROM Orders
 
 ### <--{"id" : "Examples"}--> Querying Segments
 
-Any segments defined in a schema can also be used in Cube SQL queries. Looking
-at the schema below, we have one segment `isCompleted`:
+Any segments defined in a data model can also be used in Cube SQL queries.
+Looking at the data model below, we have one segment `isCompleted`:
 
 ```javascript
 cube('Orders', {

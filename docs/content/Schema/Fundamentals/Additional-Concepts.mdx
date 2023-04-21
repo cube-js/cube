@@ -18,7 +18,7 @@ tables. See [`ResultSet.drillDown()`][ref-cubejs-client-ref-resultset-drilldown]
 on how to use this feature on the client side.
 
 A drilldown is defined on the [measure][ref-schema-ref-measures] level in your
-data schema. It’s defined as a list of dimensions called **drill members**. Once
+data model. It’s defined as a list of dimensions called **drill members**. Once
 defined, these drill members will always be used to show underlying data when
 drilling into that measure.
 
@@ -223,7 +223,7 @@ cubes:
 
     measures:
       - name: average_deal_amount
-        sql: "{CUBE.deals_amount}"
+        sql: '{CUBE.deals_amount}'
         type: avg
 
     dimensions:
@@ -232,7 +232,7 @@ cubes:
         type: string
         primary_key: true
       - name: deals_amount
-        sql: "{Deals.amount}"
+        sql: '{Deals.amount}'
         type: number
         sub_query: true
 ```
@@ -243,7 +243,7 @@ A subquery requires referencing at least one [measure][ref-schema-ref-measures]
 in its definition. Generally speaking, all the columns used to define a subquery
 dimension should first be defined as [measures][ref-schema-ref-measures] on
 their respective cubes and then referenced from a subquery dimension over a
-[join][ref-schema-ref-joins]. For example the following schema will **not**
+[join][ref-schema-ref-joins]. For example the following data model will **not**
 work:
 
 <CodeTabs>
@@ -284,7 +284,7 @@ cubes:
   - name: SalesManagers
     dimensions:
       - name: deals_amount
-        sql: "SUM({Deals}.amount)" # Doesn't work, because `amount` is not a measure on `Deals`
+        sql: 'SUM({Deals}.amount)' # Doesn't work, because `amount` is not a measure on `Deals`
         type: number
         subQuery: true
 ```
@@ -326,7 +326,7 @@ cubes:
   - name: SalesManagers
     measures:
       - name: average_deals_amount
-        sql: "{CUBE.deals_amount}"
+        sql: '{CUBE.deals_amount}'
         type: avg
     dimensions:
       - name: id
@@ -334,7 +334,7 @@ cubes:
         type: string
         primary_key: true
       - name: deals_amount
-        sql: "{Deals.amount}"
+        sql: '{Deals.amount}'
         type: number
         sub_query: true
 ```

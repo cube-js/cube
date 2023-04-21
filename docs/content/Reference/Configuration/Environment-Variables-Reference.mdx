@@ -83,7 +83,7 @@ The name of the AWS Athena catalog to use for queries.
 ## `CUBEJS_DB_SCHEMA`
 
 The name of the schema to use as `information_schema` filter. Reduces count of
-tables loaded during schema generation.
+tables loaded during data model generation.
 
 | Possible Values     | Default in Development | Default in Production |
 | ------------------- | ---------------------- | --------------------- |
@@ -93,9 +93,9 @@ tables loaded during schema generation.
 
 The cache and queue driver to use for the Cube deployment.
 
-| Possible Values   | Default in Development | Default in Production |
-| ----------------- | ---------------------- | --------------------- |
-| `cubestore`, `memory` | `memory`               | `cubestore`               |
+| Possible Values       | Default in Development | Default in Production |
+| --------------------- | ---------------------- | --------------------- |
+| `cubestore`, `memory` | `memory`               | `cubestore`           |
 
 ## `CUBEJS_CONCURRENCY`
 
@@ -560,8 +560,9 @@ touch within [`CUBEJS_TOUCH_PRE_AGG_TIMEOUT`](#cubejs-touch-pre-agg-timeout).
 Pre-aggregations are touched whenever they are rebuilt or a Refresh Worker
 checks its freshness. The first drop will be initiated when the Refresh Worker
 is able to check freshness for every `scheduledRefresh: true` pre-aggregation.
-If you have multiple Refresh Workers with different schema versions sharing the
-same Cube Store cluster, then touches from both refresh workers are respected.
+If you have multiple Refresh Workers with different data model versions sharing
+the same Cube Store cluster, then touches from both refresh workers are
+respected.
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
@@ -712,8 +713,8 @@ pre-aggregations.
 
 <WarningBox>
 
-This environment variable is deprecated. Update to v0.32.0 or later
-to use Cube Store instead of Redis.
+This environment variable is deprecated. Update to v0.32.0 or later to use Cube
+Store instead of Redis.
 
 </WarningBox>
 
@@ -727,8 +728,8 @@ The password used to connect to the Redis server.
 
 <WarningBox>
 
-This environment variable is deprecated. Update to v0.32.0 or later
-to use Cube Store instead of Redis.
+This environment variable is deprecated. Update to v0.32.0 or later to use Cube
+Store instead of Redis.
 
 </WarningBox>
 
@@ -744,8 +745,8 @@ than [`CUBEJS_REDIS_POOL_MIN`](#cubejs-redis-pool-min).
 
 <WarningBox>
 
-This environment variable is deprecated. Update to v0.32.0 or later
-to use Cube Store instead of Redis.
+This environment variable is deprecated. Update to v0.32.0 or later to use Cube
+Store instead of Redis.
 
 </WarningBox>
 
@@ -761,8 +762,8 @@ than [`CUBEJS_REDIS_POOL_MAX`](#cubejs-redis-pool-max).
 
 <WarningBox>
 
-This environment variable is deprecated. Update to v0.32.0 or later
-to use Cube Store instead of Redis.
+This environment variable is deprecated. Update to v0.32.0 or later to use Cube
+Store instead of Redis.
 
 </WarningBox>
 
@@ -777,8 +778,8 @@ authentication.
 
 <WarningBox>
 
-This environment variable is deprecated. Update to v0.32.0 or later
-to use Cube Store instead of Redis.
+This environment variable is deprecated. Update to v0.32.0 or later to use Cube
+Store instead of Redis.
 
 </WarningBox>
 
@@ -792,8 +793,8 @@ The host URL for a Redis server.
 
 <WarningBox>
 
-This environment variable is deprecated. Update to v0.32.0 or later
-to use Cube Store instead of Redis.
+This environment variable is deprecated. Update to v0.32.0 or later to use Cube
+Store instead of Redis.
 
 </WarningBox>
 
@@ -841,11 +842,11 @@ for][ref-config-sched-refresh-timer]. Used in conjunction with
 
 ## `CUBEJS_SCHEMA_PATH`
 
-The path where Cube loads schemas from.
+The path where Cube loads data models from.
 
-| Possible Values                      | Default in Development | Default in Production |
-| ------------------------------------ | ---------------------- | --------------------- |
-| A valid path containing Cube schemas | `schema`               | `schema`              |
+| Possible Values                          | Default in Development | Default in Production |
+| ---------------------------------------- | ---------------------- | --------------------- |
+| A valid path containing Cube data models | `schema`               | `schema`              |
 
 ## `CUBEJS_SQL_PASSWORD`
 
