@@ -47,6 +47,10 @@ type CreateTableOptions = {
   sealAt?: string
 };
 
+type CubeStoreQueryOptions = QueryOptions & {
+  sendParameters?: true,
+};
+
 export class CubeStoreDriver extends BaseDriver implements DriverInterface {
   protected readonly config: any;
 
@@ -74,9 +78,16 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     await this.query('SELECT 1', []);
   }
 
-  public async query<R = any>(query: string, values: any[], options?: QueryOptions): Promise<R[]> {
-    const { inlineTables, ...queryTracingObj } = options ?? {};
-    return this.connection.query(formatSql(query, values || []), inlineTables ?? [], { ...queryTracingObj, instance: getEnv('instanceId') });
+  public async query<R = any>(query: string, values: any[], options?: CubeStoreQueryOptions): Promise<R[]> {
+    const { inlineTables, sendParameters, ...queryTracingObj } = options ?? {};
+
+    if (!sendParameters) {
+      query = formatSql(query, values || []);
+    }
+
+    const tracingObj = { ...queryTracingObj, instance: getEnv('instanceId') };
+
+    return this.connection.query(query, inlineTables ?? [], tracingObj, sendParameters ? values : undefined);
   }
 
   public async release() {

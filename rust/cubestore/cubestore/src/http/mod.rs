@@ -6,12 +6,14 @@ use warp::{Filter, Rejection, Reply};
 
 use crate::codegen::{
     root_as_http_message, HttpColumnValue, HttpColumnValueArgs, HttpError, HttpErrorArgs,
-    HttpMessageArgs, HttpQuery, HttpQueryArgs, HttpResultSet, HttpResultSetArgs, HttpRow,
-    HttpRowArgs,
+    HttpMessageArgs, HttpParameterValue, HttpQuery, HttpQueryArgs, HttpResultSet,
+    HttpResultSetArgs, HttpRow, HttpRowArgs,
 };
 use crate::metastore::{Column, ColumnType, ImportFormat};
 use crate::mysql::SqlAuthService;
-use crate::sql::{InlineTable, InlineTables, SqlQueryContext, SqlService};
+use crate::sql::{
+    InlineTable, InlineTables, QueryParameter, QueryParameters, SqlQueryContext, SqlService,
+};
 use crate::store::DataFrame;
 use crate::table::{Row, TableValue};
 use crate::util::WorkerLoop;
@@ -117,6 +119,7 @@ impl HttpServer {
                         Ok(user) => Ok(SqlQueryContext {
                             user,
                             inline_tables: InlineTables::new(),
+                            parameters: None,
                             trace_obj: None,
                         }),
                         Err(_) => Err(warp::reject::custom(CubeRejection::NotAuthorized)),
@@ -155,12 +158,32 @@ impl HttpServer {
                                     }
                                     Ok(msg) => {
                                         if msg.is_binary() {
-                                            match HttpMessage::read(msg.into_bytes()).await {
-                                                Err(e) => error!("Websocket message read error: {:?}", e),
+                                            let message_buffer = msg.into_bytes();
+                                            let http_message = match root_as_http_message(&message_buffer) {
+                                                Err(e) => {
+                                                    error!("Websocket message deserialization error: {:?}", e);
+                                                    continue;
+                                                },
+                                                Ok(http_message) => http_message,
+                                            };
+
+                                            let message_id = http_message.message_id();
+                                            let connection_id = http_message.connection_id().map(|s| s.to_string());
+
+                                            match HttpMessage::read(http_message).await {
+                                                Err(e) => {
+                                                    error!("Websocket message read error: {:?}", e);
+
+                                                    let send_res = web_socket.send(
+                                                        Message::binary(HttpMessage { message_id, connection_id, command: HttpCommand::Error { error: e.to_string() } }.bytes())
+                                                    ).await;
+                                                    if let Err(e) = send_res {
+                                                        error!("Websocket message send error: {:?}", e)
+                                                    }
+                                                    break;
+                                                },
                                                 Ok(msg) => {
                                                     trace!("Received web socket message");
-                                                    let message_id = msg.message_id;
-                                                    let connection_id = msg.connection_id.clone();
                                                     // TODO use timeout instead of try send for burst control however try_send is safer for now
                                                     if let Err(e) = tx_to_move.try_send((response_tx.clone(), sql_query_context.clone(), msg)) {
                                                         error!("Websocket channel error: {:?}", e);
@@ -514,12 +537,14 @@ impl HttpServer {
                 query,
                 inline_tables,
                 trace_obj,
+                parameters,
             } => Ok(HttpCommand::ResultSet {
                 data_frame: sql_service
                     .exec_query_with_context(
                         sql_query_context
                             .with_trace_obj(trace_obj)
-                            .with_inline_tables(&inline_tables),
+                            .with_inline_tables(&inline_tables)
+                            .with_parameters(&parameters),
                         &query,
                     )
                     .await?,
@@ -572,6 +597,7 @@ pub enum HttpCommand {
         query: String,
         inline_tables: InlineTables,
         trace_obj: Option<String>,
+        parameters: Option<QueryParameters>,
     },
     ResultSet {
         data_frame: Arc<DataFrame>,
@@ -596,6 +622,7 @@ impl HttpMessage {
                     query,
                     inline_tables,
                     trace_obj,
+                    parameters: _p,
                 } => {
                     let query_offset = builder.create_string(&query);
                     let trace_obj_offset = trace_obj.as_ref().map(|o| builder.create_string(o));
@@ -609,6 +636,8 @@ impl HttpMessage {
                                 query: Some(query_offset),
                                 inline_tables: None,
                                 trace_obj: trace_obj_offset,
+                                // TODO
+                                parameters: None,
                             },
                         )
                         .as_union_value(),
@@ -724,14 +753,16 @@ impl HttpMessage {
         rows
     }
 
-    pub async fn read(buffer: Vec<u8>) -> Result<Self, CubeError> {
-        let http_message = root_as_http_message(buffer.as_slice())?;
+    pub async fn read<'a>(
+        http_message: crate::codegen::HttpMessage<'a>,
+    ) -> Result<Self, CubeError> {
         Ok(HttpMessage {
             message_id: http_message.message_id(),
             connection_id: http_message.connection_id().map(|s| s.to_string()),
             command: match http_message.command_type() {
                 crate::codegen::HttpCommand::HttpQuery => {
                     let query = http_message.command_as_http_query().unwrap();
+
                     let mut inline_tables = Vec::new();
                     if let Some(query_inline_tables) = query.inline_tables() {
                         for inline_table in query_inline_tables.iter() {
@@ -771,10 +802,53 @@ impl HttpMessage {
                             ));
                         }
                     };
+
+                    let parameters = if let Some(http_params) = query.parameters() {
+                        let mut res = Vec::new();
+
+                        for http_param in http_params.iter() {
+                            let value = match http_param.value_type() {
+                                HttpParameterValue::Int64Value => QueryParameter::Int64Value(
+                                    http_param.value_as_int_64_value().unwrap().v(),
+                                ),
+                                HttpParameterValue::StringValue => QueryParameter::StringValue(
+                                    http_param
+                                        .value_as_string_value()
+                                        .unwrap()
+                                        .v()
+                                        .unwrap()
+                                        .to_string(),
+                                ),
+                                HttpParameterValue::BinaryValue => QueryParameter::BinaryValue(
+                                    http_param
+                                        .value_as_binary_value()
+                                        .unwrap()
+                                        .v()
+                                        .unwrap()
+                                        .iter()
+                                        .collect::<Vec<i8>>(),
+                                ),
+                                value_type => {
+                                    return Err(CubeError::internal(format!(
+                                        "Unsupported type: {:?}",
+                                        value_type
+                                    )))
+                                }
+                            };
+
+                            res.push(value);
+                        }
+
+                        Some(res)
+                    } else {
+                        None
+                    };
+
                     HttpCommand::Query {
                         query: query.query().unwrap().to_string(),
-                        inline_tables,
                         trace_obj: query.trace_obj().map(|q| q.to_string()),
+                        inline_tables,
+                        parameters,
                     }
                 }
                 crate::codegen::HttpCommand::HttpResultSet => {
@@ -868,6 +942,7 @@ mod tests {
                 query: "test query".to_string(),
                 inline_tables: vec![],
                 trace_obj: Some("test trace".to_string()),
+                parameters: None,
             },
             connection_id: Some("foo".to_string()),
         };
@@ -936,6 +1011,7 @@ mod tests {
                 query: Some(query_offset),
                 inline_tables: Some(inline_tables_offset),
                 trace_obj: None,
+                parameters: None,
             },
         );
         let args = HttpMessageArgs {
@@ -959,7 +1035,8 @@ mod tests {
                         "table".to_string(),
                         Arc::new(DataFrame::new(columns, rows.clone()))
                     )],
-                    trace_obj: None
+                    trace_obj: None,
+                    parameters: None
                 },
                 connection_id: Some("foo".to_string()),
             }
@@ -1061,6 +1138,7 @@ mod tests {
                             query: "foo".to_string(),
                             inline_tables: vec![],
                             trace_obj: None,
+                            parameters: None,
                         },
                         connection_id,
                     }
