@@ -143,6 +143,11 @@ export class YamlCompiler {
       } else if (str[i] === '"' && peek().inStr) {
         result.push(str[i]);
         stateStack.pop();
+      } else if (str[i] === '`' && stateStack.length === 0) {
+        result.push('\\`');
+      } else if (str[i] === '`' && peek().inStr) {
+        result.push(str[i]);
+        stateStack.pop();
       } else if (str[i] === '{' && str[i + 1] === '{' && peek()?.inFormattedStr) {
         result.push('{{');
         i += 1;
