@@ -256,7 +256,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
   }
 
   /**
-   * Executes query and rerutns queried raws.
+   * Executes query and rerutns queried rows.
    */
   public async query<R = unknown>(
     query: string,
@@ -363,7 +363,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       exportBucketCsvEscapeSymbol: this.config.exportBucketCsvEscapeSymbol,
       csvFile,
       types,
-      csvNoHeader: true
+      csvNoHeader: true,
     };
   }
 

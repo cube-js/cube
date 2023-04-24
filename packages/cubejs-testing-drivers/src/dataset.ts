@@ -7,6 +7,7 @@ export type Cast = {
   CREATE_TBL_SUFFIX: string,
   CREATE_SUB_PREFIX: string,
   CREATE_SUB_SUFFIX: string,
+  USE_SCHEMA: string,
 };
 
 function create(table: string, query: string, cast: Cast, suf?: string): string {

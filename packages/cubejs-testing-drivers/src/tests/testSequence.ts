@@ -16,6 +16,7 @@ export function testSequence(type: string): void {
   describe(`Sequence with the @cubejs-backend/${type}-driver`, () => {
     jest.setTimeout(60 * 5 * 1000);
 
+    const fixtures = getFixtures(type);
     let core: CubejsServerCoreExposed;
     let source: PatchedDriver;
     let storage: PatchedDriver;
@@ -23,7 +24,6 @@ export function testSequence(type: string): void {
     let env: Environment;
 
     function execute(name: string, test: () => Promise<void>) {
-      const fixtures = getFixtures(type);
       if (fixtures.skip && fixtures.skip.indexOf(name) >= 0) {
         it.skip(name, test);
       } else {
@@ -47,6 +47,9 @@ export function testSequence(type: string): void {
       source = drivers.source;
       storage = drivers.storage;
       query = getCreateQueries(type, 'core');
+      if (fixtures.cast.USE_SCHEMA) {
+        await source.query(fixtures.cast.USE_SCHEMA);
+      }
       await Promise.all(query.map(async (q) => {
         await source.query(q);
       }));
@@ -56,6 +59,9 @@ export function testSequence(type: string): void {
     });
   
     afterAll(async () => {
+      if (fixtures.cast.USE_SCHEMA) {
+        await source.query(fixtures.cast.USE_SCHEMA);
+      }
       await Promise.all([
         'ecommerce_core',
         'customers_core',

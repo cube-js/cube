@@ -31,7 +31,10 @@
     "postgres-driver": "jest --forceExit --runInBand --verbose -i dist/test/postgres-driver.test.js",
     "postgres-core": "jest --forceExit --runInBand --verbose -i dist/test/postgres-core.test.js",
     "postgres-full": "jest --forceExit --runInBand --verbose -i dist/test/postgres-full.test.js",
-    "tst": "clear && yarn tsc && yarn athena-core"
+    "snowflake-driver": "jest --forceExit --runInBand --verbose -i dist/test/snowflake-driver.test.js",
+    "snowflake-core": "jest --forceExit --runInBand --verbose -i dist/test/snowflake-core.test.js",
+    "snowflake-full": "jest --forceExit --runInBand --verbose -i dist/test/snowflake-full.test.js", 
+    "tst": "clear && yarn tsc && yarn snowflake-core"
   },
   "files": [
     "dist/src"

@@ -5,17 +5,17 @@
       "CUBEJS_API_SECRET": "mysupersecret",
       "CUBEJS_CACHE_AND_QUEUE_DRIVER": "cubestore",
       "CUBEJS_CUBESTORE_HOST": "store",
-      "CUBEJS_DB_TYPE": "databricks-jdbc",
-      "CUBEJS_DB_NAME": "drivers_tests",
-      "CUBEJS_DB_DATABRICKS_TOKEN": "${DRIVERS_TESTS_CUBEJS_DB_DATABRICKS_TOKEN}",
-      "CUBEJS_DB_DATABRICKS_URL": "${DRIVERS_TESTS_CUBEJS_DB_DATABRICKS_URL}",
-      "CUBEJS_DB_DATABRICKS_ACCEPT_POLICY": "true",
-      "CUBEJS_DB_EXPORT_BUCKET_TYPE": "s3",
-      "CUBEJS_DB_EXPORT_BUCKET": "s3://databricks-drivers-tests-preaggs",
-      "CUBEJS_DB_EXPORT_BUCKET_AWS_KEY": "${DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_KEY}",
-      "CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET": "${DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET}",
-      "CUBEJS_DB_EXPORT_BUCKET_AWS_REGION": "us-east-1",
-      "CUBEJS_PRE_AGGREGATIONS_SCHEMA": "drivers_tests_preaggs"
+
+      "CUBEJS_DB_TYPE": "snowflake",
+      "CUBEJS_DB_USER": "${DRIVERS_TESTS_CUBEJS_DB_USER}",
+      "CUBEJS_DB_PASS": "${DRIVERS_TESTS_CUBEJS_DB_PASS}",
+      "CUBEJS_DB_NAME": "DEMO_DB",
+      "CUBEJS_PRE_AGGREGATIONS_SCHEMA": "drivers_tests_preaggs",
+
+      "CUBEJS_DB_SNOWFLAKE_ACCOUNT": "qna80818.us-east-1",
+      "CUBEJS_DB_SNOWFLAKE_REGION": "us-east-1",
+      "CUBEJS_DB_SNOWFLAKE_WAREHOUSE": "COMPUTE_WH",
+      "CUBEJS_DB_SNOWFLAKE_ROLE": "PUBLIC"
     },
     "ports" : ["4000"]
   },
@@ -23,11 +23,12 @@
     "SELECT_PREFIX": "",
     "SELECT_SUFFIX": "",
     "DATE_PREFIX": "to_date(",
-    "DATE_SUFFIX": ", 'y-M-d')",
+    "DATE_SUFFIX": ", 'YYYY-MM-DD')",
     "CREATE_TBL_PREFIX": "CREATE TABLE ",
     "CREATE_TBL_SUFFIX": " AS ",
     "CREATE_SUB_PREFIX": "(",
-    "CREATE_SUB_SUFFIX": ");"
+    "CREATE_SUB_SUFFIX": ");",
+    "USE_SCHEMA": "USE SCHEMA public;"
   },
   "preAggregations": {
     "Products": [],
@@ -38,8 +39,6 @@
     "---------------------------------------",
     "Driver tests                           ",
     "---------------------------------------",
-    "must download query from the data source via memory",
-    "must download query from the data source via stream",
 
     "---------------------------------------",
     "Core tests                             ",
@@ -56,9 +55,7 @@
     "---------------------------------------",
     "must built pre-aggregations",
     "querying Customers: dimentions + order + total + offset",
-    "querying Customers: dimentions + order + limit + total + offset",
     "querying ECommerce: dimentions + order + total + offset",
-    "querying ECommerce: dimentions + order + limit + total + offset",
 
     "---------------------------------------",
     "SKIPED FOR ALL                         ",

@@ -17,6 +17,7 @@ on:
       - 'packages/cubejs-mssql-driver/**'
       - 'packages/cubejs-mysql-driver/**'
       - 'packages/cubejs-postgres-driver/**'
+      - 'packages/cubejs-snowflake-driver/**'
   pull_request:
     paths:
       - '.github/workflows/drivers-tests.yml'
@@ -31,6 +32,7 @@ on:
       - 'packages/cubejs-mssql-driver/**'
       - 'packages/cubejs-mysql-driver/**'
       - 'packages/cubejs-postgres-driver/**'
+      - 'packages/cubejs-snowflake-driver/**'
 
 jobs:
   build:
@@ -78,6 +80,7 @@ jobs:
           - mssql
           - mysql
           - postgres
+          - snowflake
         suite:
           - driver
           - core
@@ -136,6 +139,10 @@ jobs:
             DRIVERS_TESTS_CUBEJS_DB_DATABRICKS_TOKEN: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_DATABRICKS_TOKEN }}
             DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_KEY: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_KEY }}
             DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET }}
+
+            # Snowflake
+            DRIVERS_TESTS_CUBEJS_DB_USER: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_USER }}
+            DRIVERS_TESTS_CUBEJS_DB_PASS: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_PASS }}
         run: |
           cd ./packages/cubejs-testing-drivers
           export DEBUG=testcontainers
