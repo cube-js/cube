@@ -230,7 +230,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     }
 
     this.config = {
-      readOnly: false,
+      readOnly: true,
       account: getEnv('snowflakeAccount', { dataSource }),
       region: getEnv('snowflakeRegion', { dataSource }),
       warehouse: getEnv('snowflakeWarehouse', { dataSource }),
@@ -263,7 +263,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
    * Returns driver's capabilities object.
    */
   public capabilities(): DriverCapabilities {
-    return { unloadWithoutTempTable: false };
+    return { unloadWithoutTempTable: true };
   }
 
   protected createExportBucket(
@@ -391,7 +391,6 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
    * Determines whether export bucket feature is configured or not.
    */
   public async isUnloadSupported() {
-    // console.log('isUnloadSupported');
     if (!this.config.exportBucket) {
       return false;
     }
@@ -403,7 +402,6 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
    * export bucket data.
    */
   public async unload(tableName: string, options: UnloadOptions): Promise<DownloadTableCSVData> {
-    // console.log('unload');
     if (!this.config.exportBucket) {
       throw new Error('Export bucket is not configured.');
     }
@@ -426,7 +424,6 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     tableName: string,
     options: UnloadOptions,
   ): Promise<TableStructure> {
-    // console.log('unloadWithSql');
     if (!options.query) {
       throw new Error('Unload query is missed.');
     } else {
@@ -447,7 +444,6 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       if (!result) {
         throw new Error('Missing `COPY INTO` query result.');
       }
-      // console.log(JSON.stringify(result, undefined, 2));
       return types;
     }
   }
@@ -456,10 +452,9 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
    * Returns an array of queried fields meta info.
    */
   public async queryColumnTypes(sql: string): Promise<TableStructure> {
-    // console.log('queryColumnTypes');
     const connection = await this.getConnection();
     return new Promise((resolve, reject) => connection.execute({
-      sqlText: `${sql} LIMIT 0`,
+      sqlText: `${sql} WHERE 1 != 1`,
       binds: [],
       fetchAsString: ['Number'],
       complete: (err, stmt) => {
@@ -485,7 +480,6 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
             }
             return type;
           });
-        // console.log(types);
         resolve(types);
       },
     }));
@@ -498,7 +492,6 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     tableName: string,
     options: UnloadOptions,
   ): Promise<TableStructure> {
-    // console.log('unloadWithTable');
     const types = await this.tableColumnTypes(tableName);
     const connection = await this.getConnection();
     const { bucketType, bucketName } =
@@ -523,7 +516,6 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
    * Returns an array of table fields meta info.
    */
   public async tableColumnTypes(table: string) {
-    // console.log('tableColumnTypes');
     const [schema, name] = table.split('.');
     const columns = await this.query<{
       COLUMN_NAME: string,
@@ -557,7 +549,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     const { bucketType } =
       <SnowflakeDriverExportBucket> this.config.exportBucket;
     const optionsToExport: Record<string, string> = {
-      HEADER: 'true',
+      HEADER: 'false',
       INCLUDE_QUERY_ID: 'true',
       MAX_FILE_SIZE: (options.maxFileSize * 1024 * 1024).toFixed(),
       FILE_FORMAT: '(' +
