@@ -38,4 +38,23 @@ describe('Yaml Schema Testing', () => {
 
     await compiler.compile();
   });
+
+  it('escapes backticks', async () => {
+    const { compiler } = prepareYamlCompiler(
+      `cubes:
+  - name: Users
+    sql: SELECT * FROM e2e.users
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primaryKey: true
+      - name: c2
+        sql: "{CUBE}.\`C2\`"
+        type: string
+      `
+    );
+
+    await compiler.compile();
+  });
 });

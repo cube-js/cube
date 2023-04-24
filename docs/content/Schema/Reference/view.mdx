@@ -114,6 +114,25 @@ pre-aggregations defined by the underlying cubes.
 
 ## Parameters
 
+### <--{"id" : "Parameters"}--> name
+
+The `name` parameter serves as the identifier of a view. It must be unique among
+_all cubes and views_ within a deployment and follow the [naming
+conventions][ref-naming].
+
+<CodeTabs>
+
+```javascript
+view(`active_users`, {});
+```
+
+```yaml
+views:
+  - name: active_users
+```
+
+</CodeTabs>
+
 ### <--{"id" : "Parameters"}--> description
 
 A description of the view allows your team to better understand what its purpose
@@ -205,3 +224,4 @@ recipe][ref-recipe-control-access-cubes-views].
 [ref-recipe-control-access-cubes-views]:
   /recipes/controlling-access-to-cubes-and-views
 [ref-schema-joins-direction]: /schema/fundamentals/joins#directions-of-joins
+[ref-naming]: /data-modeling/syntax#naming

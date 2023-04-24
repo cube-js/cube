@@ -887,6 +887,32 @@ If `true`, then send telemetry to Cube.
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | `true`                 | `true`                |
 
+## `CUBESTORE_METRICS_FORMAT`
+
+Define which metrics collector format.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `statsd`, `dogstatsd` | `statsd`                 | `statsd`                |
+
+
+## `CUBESTORE_METRICS_ADDRESS`
+
+Required IP address to send metrics.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A valid IP address | `127.0.0.1`                 | `127.0.0.1`                |
+
+
+## `CUBESTORE_METRICS_PORT`
+
+Required port to send where collector server accept UDP connections.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A valid port number | `8125`                 | `8125`                |
+
 ## `CUBEJS_TOUCH_PRE_AGG_TIMEOUT`
 
 The number of seconds without a touch before pre-aggregation is considered

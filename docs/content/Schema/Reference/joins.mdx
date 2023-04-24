@@ -55,11 +55,15 @@ parameter. Quite frequently, `FULL OUTER JOIN` is used to solve [Data
 Blending][ref-schema-data-blenging] or similar problems. In that case, it's best
 practice to have a separate cube for such an operation.
 
-## Naming
+## Parameters
 
-The name of a join should match the [name of the joined
-cube][ref-schema-cube-naming]. For example when a `products` cube is being
-joined to an `orders` cube, the join would be defined as follows:
+### <--{"id" : "Parameters"}--> name
+
+The name must match the name of the joined cube and, thus, follow the [naming
+conventions][ref-naming].
+
+For example, when the `products` cube is joined on to the `orders` cube, we
+would define the join as follows:
 
 <CodeTabs>
 
@@ -84,8 +88,6 @@ cubes:
 ```
 
 </CodeTabs>
-
-## Parameters
 
 ### <--{"id" : "Parameters"}--> relationship
 
@@ -489,11 +491,11 @@ Joins `a → b` and `b → c` will be resolved automatically. Cube uses the
 requested members.
 
 [ref-restapi-query-filter-op-set]: /query-format#set
-[ref-schema-cube-naming]: /schema/reference/cube#naming
 [ref-schema-fundamentals-join-dir]:
   /schema/fundamentals/joins#directions-of-joins
 [ref-schema-cube-sql]: /schema/reference/cube#parameters-sql
 [ref-schema-data-blenging]: /schema/advanced/data-blending#data-blending
+[ref-naming]: /data-modeling/syntax#naming
 [wiki-djikstra-alg]: https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm
 [wiki-left-join]: https://en.wikipedia.org/wiki/Join_(SQL)#Left_outer_join
 [wiki-1-1]: https://en.wikipedia.org/wiki/One-to-one_(data_model)

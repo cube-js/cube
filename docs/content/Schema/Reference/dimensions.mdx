@@ -16,19 +16,18 @@ have dimensions like `country`, `age`, `occupation`, etc.
 
 Any dimension should have the following properties: `name`, `sql` and `type`.
 
-## Naming
+## Parameters
 
-You can name a dimension by following the same rules as for measure, so each
-name should:
+### <--{"id" : "Parameters"}--> name
 
-- Be unique within a cube
-- Start with a lowercase letter
-- Consist of numbers, letters and `_`
+The `name` parameter serves as the identifier of a dimension. It must be unique
+among all dimensions, measures, and segments within a cube and follow the
+[naming conventions][ref-naming].
 
 <CodeTabs>
 
 ```javascript
-cube(`Products`, {
+cube(`products`, {
   dimensions: {
     price: {
       sql: `price`,
@@ -45,19 +44,19 @@ cube(`Products`, {
 
 ```yaml
 cubes:
-  - name: Products
+  - name: products
+
     dimensions:
       - name: price
         sql: price
         type: number
+
       - name: brand_name
         sql: brand_name
         type: string
 ```
 
 </CodeTabs>
-
-## Parameters
 
 ### <--{"id" : "Parameters"}--> case
 
@@ -399,3 +398,4 @@ cubes:
   /schema/reference/types-and-formats#dimensions-types
 [ref-subquery]: /schema/fundamentals/additional-concepts#subquery
 [self-subquery]: #sub-query
+[ref-naming]: /data-modeling/syntax#naming

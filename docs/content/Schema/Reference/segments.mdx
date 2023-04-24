@@ -91,6 +91,63 @@ After defining a segment, you can pass it in [query object][ref-backend-query]:
 }
 ```
 
+## Parameters
+
+### <--{"id" : "Parameters"}--> name
+
+The `name` parameter serves as the identifier of a segment. It must be unique
+among all segments, dimensions, and measures within a cube and follow the
+[naming conventions][ref-naming].
+
+<CodeTabs>
+
+```javascript
+cube(`users`, {
+  segments: {
+    sf_users: {
+      sql: `${CUBE}.location = 'San Francisco'`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: users
+    segments:
+      - name: sf_users
+        sql: "{CUBE}.location = 'San Francisco'"
+```
+
+</CodeTabs>
+
+### <--{"id" : "Parameters"}--> sql
+
+The `sql` parameter defines how a segment would filter out a subset of data. It
+takes any SQL expression that would be valid within a `WHERE` statement.
+
+<CodeTabs>
+
+```javascript
+cube(`users`, {
+  segments: {
+    sf_users: {
+      sql: `${CUBE}.location = 'San Francisco'`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: users
+    segments:
+      - name: sf_users
+        sql: "{CUBE}.location = 'San Francisco'"
+```
+
+</CodeTabs>
+
 ## Segments vs Dimension Filters
 
 As segments are simply predefined filters, it can be difficult to determine when
@@ -188,3 +245,4 @@ cubes:
 
 [ref-backend-query]: /query-format
 [ref-schema-gen]: /recipes/schema-generation
+[ref-naming]: /data-modeling/syntax#naming

@@ -522,8 +522,8 @@ provides a convenient shortcut to pass a dimension and a filter as a
   operators are used. It requires, for example, that the end date range date
   `2020-01-01` is padded to `2020-01-01T23:59:59.999`. If only one date is
   specified it's equivalent to passing two of the same dates as a date range.
-  You can also pass a string instead of array with relative date range, for
-  example: `last quarter`, `last 360 days`, or `next 2 months`.
+  You can also pass a string with a [relative date
+  range][ref-relative-date-range], for example, `last quarter`.
 - `compareDateRange`: An array of date ranges to compare a measure change over
   previous period
 - `granularity`: A granularity for a time dimension. It supports the following
@@ -562,34 +562,39 @@ const resultSet = cubejsApi.load({
 // ...
 ```
 
-You can also set a relative `dateRange`, e.g. `today`, `yesterday`, `tomorrow`,
-`last year`, `next month`, or `last 6 months`.
+### <--{"id" : "Time Dimension Format"}--> Relative date range
+
+You can also use a string with a relative date range in the `dateRange`
+property, for example:
 
 ```javascript
 {
-  measures: ['Stories.count'],
+  measures: [
+    'stories.count'
+  ],
   timeDimensions: [{
-    dimension: 'Stories.time',
+    dimension: 'stories.time',
+    // Relative date range
     dateRange: 'last week',
     granularity: 'day'
   }]
 }
 ```
 
-Be aware that e.g. `Last 7 days` or `Next 2 weeks` do not include the current
-date. If you need the current date also you can use `from N days ago to now` or
-`from now to N days from now`.
+Some of supported formats:
 
-```javascript
-{
-  measures: ['Stories.count'],
-  timeDimensions: [{
-    dimension: 'Stories.time',
-    dateRange: 'from 6 days ago to now',
-    granularity: 'day'
-  }]
-}
-```
+- `today`, `yesterday`, or `tomorrow`
+- `last year`, `last quarter`, or `last 360 days`
+- `next month` or `last 6 months` (current date not included)
+- `from 7 days ago to now` or `from now to 2 weeks from now` (current date
+  included)
+
+<InfoBox>
+
+Cube uses the [Chrono][chrono-website] library to parse relative dates. Please
+refer to its documentation for more examples.
+
+</InfoBox>
 
 [ref-recipe-pagination]: /recipes/pagination
 [ref-client-core-resultset-drilldown]:
@@ -602,3 +607,5 @@ date. If you need the current date also you can use `from N days ago to now` or
   /schema/reference/pre-aggregations#parameters-dimensions
 [ref-schema-ref-preaggs-time-dimension]:
   /schema/reference/pre-aggregations#parameters-time-dimension
+[ref-relative-date-range]: #relative-date-range
+[chrono-website]: https://github.com/wanasit/chrono
