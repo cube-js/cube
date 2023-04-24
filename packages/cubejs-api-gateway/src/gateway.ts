@@ -2009,7 +2009,7 @@ class ApiGateway {
     const scopes =
       await this.contextToApiScopesFn(
         securityContext || {},
-        await this.contextToApiScopesDefFn(),
+        getEnv('defaultApiScope') || await this.contextToApiScopesDefFn(),
       );
     const permited = scopes.indexOf(scope) >= 0;
     if (!permited) {
