@@ -292,7 +292,7 @@ cube('Orders', {
 
   joins: {
     Users: {
-      relationship: `belongsTo`,
+      relationship: `many_to_one`,
       // Make sure the join uses dimensions on the cube, rather than
       // the column names from the underlying SQL
       sql: `${CUBE.user_id} = ${Users.id}`,
@@ -365,7 +365,7 @@ cubes:
         rollups: [Users.users_rollup, CUBE.orders_rollup]
     joins:
       - name: Users
-        relationship: belongs_to
+        relationship: many_to_one
         sql: '{CUBE.user_id} = {Users.id}'
     measures:
       - name: count

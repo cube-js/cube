@@ -20,13 +20,7 @@ time.
 cube('MyCube', {
   joins: {
     TargetCubeName: {
-      relationship:
-        `belongsTo` ||
-        `hasMany` ||
-        `hasOne` ||
-        `belongs_to` ||
-        `has_many` ||
-        `has_one`,
+      relationship: `one_to_one` || `one_to_many` || `many_to_one`,
       sql: `SQL ON clause`,
     },
   },
@@ -38,7 +32,7 @@ cubes:
   - name: MyCube
     joins:
       - name: TargetCubeName
-        relationship: belongsTo || hasMany || hasOne
+        relationship: one_to_one || one_to_many || many_to_one
         sql: SQL ON clause
 ```
 
@@ -77,7 +71,7 @@ would define the join as follows:
 cube(`orders`, {
   joins: {
     products: {
-      relationship: `belongsTo`,
+      relationship: `many_to_one`,
       sql: `${CUBE.id} = ${products.order_id}`,
     },
   },
@@ -89,7 +83,7 @@ cubes:
   - name: orders
     joins:
       - name: products
-        relationship: belongs_to
+        relationship: many_to_one
         sql: '{CUBE.id} = {products.order_id}'
 ```
 
@@ -97,40 +91,59 @@ cubes:
 
 ### <--{"id" : "Parameters"}--> relationship
 
-`relationship` enables you to describe the join relationship between joined
-cubes. It’s important to properly define the type of relationship in order for
-Cube to accurately calculate measures. The relationship does not need to be
-defined on both cubes, but the definition can affect the [join
-direction][ref-schema-fundamentals-join-dir].
+The `relationship` property is used to describe the type of the relationship
+between joined cubes. It’s important to properly define the type of relationship
+so Cube can accurately calculate measures.
+
+The cube that declares the join is considered _left_ in terms of the [left
+join][wiki-left-join] semantics, and the joined cube is considered _right_. It
+means that all rows of the _left_ cube are selected, while only those rows of
+the _right_ cube that match the condition are selected as well. For more
+information and specific examples, please see [join
+directions][ref-schema-fundamentals-join-dir].
 
 <InfoBox>
 
-It is very important to define the correct order of cubes in a join. It affects
-data in the result-set greatly. The basic cube represents the left entity in a
-join, all others would be right. That means that all rows of the left cube are
-selected, while rows of the right depend on the condition. For more information
-and specific examples, please read about [join directions
-here][ref-schema-fundamentals-join-dir].
+The join does not need to be defined on both cubes, but the definition can
+affect the [join direction][ref-schema-fundamentals-join-dir].
 
 </InfoBox>
 
-The three possible values for a relationship are:
+You can use the following types of relationships:
 
-#### hasOne
+- `one_to_one` for [one-to-one][wiki-1-1] relationships
+- `one_to_many` for [one-to-many][wiki-1-m] relationships
+- `many_to_one` for the opposite of [one-to-many][wiki-1-m] relationships
 
-A `hasOne` relationship indicates a one-to-one connection with another cube.
-This relationship indicates that the one row in the cube can match only one row
-in the joined cube. For example, in a model containing users and user profiles,
-the users cube would have the following join:
+<WarningBox>
+
+The types of relationships listed above were introduced in v0.32.19 for clarity as
+they are commonly used in the data space. The following aliases were used before and
+are still valid, so there's no need to update existing data models:
+
+- `one_to_one` was known as `has_one` or `hasOne`
+- `one_to_many` was known as `has_many` or `hasMany`
+- `many_to_one` was known as `belongs_to` or `belongsTo`
+
+</WarningBox>
+
+#### One-to-one
+
+The `one_to_one` type indicates a [one-to-one][wiki-1-1] relationship between
+the declaring cube and the joined cube. It means that one row in the declaring
+cube can match only one row in the joined cube.
+
+For example, in a data model containing `users` and their `profiles`, the
+`users` cube would declare the following join:
 
 <CodeTabs>
 
 ```javascript
-cube('Users', {
+cube(`users`, {
   joins: {
-    Profile: {
-      relationship: `hasOne`,
-      sql: `${CUBE}.id = ${Profile.user_id}`,
+    profiles: {
+      relationship: `one_to_one`,
+      sql: `${CUBE}.id = ${profiles.user_id}`,
     },
   },
 });
@@ -138,31 +151,32 @@ cube('Users', {
 
 ```yaml
 cubes:
-  - name: Users
+  - name: users
     joins:
-      - name: Profile
-        relationship: has_one
-        sql: "{Users}.id = {Profile.user_id}"
+      - name: profiles
+        relationship: one_to_one
+        sql: '{users}.id = {profiles.user_id}'
 ```
 
 </CodeTabs>
 
-#### hasMany
+#### One-to-many
 
-A `hasMany` relationship indicates a one-to-many connection with another cube.
-You'll often find this relationship on the "other side" of a `belongsTo`
-relationship. This relationship indicates that the one row in the cube can match
-many rows in the joined cube. For example, in a model containing authors and
-books, the authors cube would have the following join:
+The `one_to_many` type indicates a [one-to-many][wiki-1-m] relationship between
+the declaring cube and the joined cube. It means that one row in the declaring
+cube can match many rows in the joined cube.
+
+For example, in a data model containing `authors` and the `books` they have
+written, the `authors` cube would declare the following join:
 
 <CodeTabs>
 
 ```javascript
-cube('Authors', {
+cube(`authors`, {
   joins: {
-    Books: {
-      relationship: `hasMany`,
-      sql: `${CUBE}.id = ${Books.author_id}`,
+    books: {
+      relationship: `one_to_many`,
+      sql: `${CUBE}.id = ${books.author_id}`,
     },
   },
 });
@@ -170,32 +184,34 @@ cube('Authors', {
 
 ```yaml
 cubes:
-  - name: Authors
+  - name: authors
     joins:
-      - name: Books
-        relationship: has_many
-        sql: "{Authors}.id = {Books.author_id}"
+      - name: books
+        relationship: one_to_many
+        sql: '{authors}.id = {books.author_id}'
 ```
 
 </CodeTabs>
 
-#### belongsTo
+#### Many-to-one
 
-A `belongsTo` relationship indicates a many-to-one connection with another cube.
-You’ll often find this relationship on the “other side” of a `hasMany`
-relationship. This relationship indicates that the one row of the declaring cube
-matches a row in the joined instance, while the joined instance can have many
-rows in the declaring cube. For example, in a model containing orders and
-customers, the orders cube would have the following join:
+The `many_to_one` type indicates the many-to-one relationship between the
+declaring cube and the joined cube. You’ll often find this type of relationship
+on the opposite side of the [one-to-many][wiki-1-m] relationship. It means that
+one row in the declaring cube matches a single row in the joined cube, while a
+row in the joined cube can match many rows in the declaring cube.
+
+For example, in a data model containing `orders` and `customers` who made them,
+the `orders` cube would have the following join:
 
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube(`orders`, {
   joins: {
-    Customers: {
-      relationship: `belongsTo`,
-      sql: `${CUBE}.customer_id = ${Customers.id}`,
+    customers: {
+      relationship: `many_to_one`,
+      sql: `${CUBE}.customer_id = ${customers.id}`,
     },
   },
 });
@@ -203,11 +219,11 @@ cube('Orders', {
 
 ```yaml
 cubes:
-  - name: Orders
+  - name: orders
     joins:
-      - name: Customers
-        relationship: belongsTo
-        sql: "{Orders}.customer_id = {Customers.id}"
+      - name: customers
+        relationship: many_to_one
+        sql: '{orders}.customer_id = {customers.id}'
 ```
 
 </CodeTabs>
@@ -221,13 +237,13 @@ example below:
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube(`orders`, {
   joins: {
-    Customers: {
-      relationship: `belongsTo`,
-      // The `customer_id` field on `Orders` corresponds to the
-      // `id` field on `Customers`
-      sql: `${CUBE}.customer_id = ${Customers.id}`,
+    customers: {
+      relationship: `many_to_one`,
+      // The `customer_id` column of the `orders` cube corresponds to the
+      // `id` dimension of the `customers` cube
+      sql: `${CUBE}.customer_id = ${customers.id}`,
     },
   },
 });
@@ -235,11 +251,11 @@ cube('Orders', {
 
 ```yaml
 cubes:
-  - name: Orders
+  - name: orders
     joins:
-      - name: Customers
-        relationship: belongs_to
-        sql: "{Orders}.customer_id = {Customers.id}"
+      - name: customers
+        relationship: many_to_one
+        sql: '{orders}.customer_id = {customers.id}'
 ```
 
 </CodeTabs>
@@ -252,7 +268,7 @@ handle row multiplication issues.
 
 Let's imagine you want to calculate `Order Amount` by `Order Item Product Name`.
 In this case, `Order` rows will be multiplied by the `Order Item` join due to
-the `hasMany` relationship. In order to produce correct results, Cube will
+the `one_to_many` relationship. In order to produce correct results, Cube will
 select distinct primary keys from `Order` first and then will join these primary
 keys with `Order` to get the correct `Order Amount` sum result. Please note that
 `primaryKey` should be defined in the `dimensions` section.
@@ -260,12 +276,12 @@ keys with `Order` to get the correct `Order Amount` sum result. Please note that
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube('orders', {
   dimensions: {
-    customerId: {
+    customer_id: {
       sql: `id`,
       type: `number`,
-      primaryKey: true,
+      primary_key: true,
     },
   },
 });
@@ -273,7 +289,7 @@ cube('Orders', {
 
 ```yaml
 cubes:
-  - name: Orders
+  - name: orders
     dimensions:
       - name: customer_id
         sql: id
@@ -285,7 +301,7 @@ cubes:
 
 <InfoBox>
 
-Setting `primaryKey` to `true` will change the default value of the `shown`
+Setting `primary_key` to `true` will change the default value of the `shown`
 parameter to `false`. If you still want `shown` to be `true` — set it manually.
 
 </InfoBox>
@@ -293,12 +309,12 @@ parameter to `false`. If you still want `shown` to be `true` — set it manually
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube(`orders`, {
   dimensions: {
-    customerId: {
+    customer_id: {
       sql: `id`,
       type: `number`,
-      primaryKey: true,
+      primary_key: true,
       shown: true,
     },
   },
@@ -307,7 +323,7 @@ cube('Orders', {
 
 ```yaml
 cubes:
-  - name: Orders
+  - name: orders
     dimensions:
       - name: customer_id
         sql: id
@@ -331,12 +347,12 @@ depending on your database.
 <CodeTabs>
 
 ```javascript
-cube('Users', {
+cube(`users`, {
   dimensions: {
     id: {
       sql: `${CUBE}.user_id || '-' || ${CUBE}.signup_week || '-' || ${CUBE}.activity_week`,
       type: `string`,
-      primaryKey: true,
+      primary_key: true,
     },
   },
 });
@@ -344,7 +360,7 @@ cube('Users', {
 
 ```yaml
 cubes:
-  - name: Users
+  - name: users
     dimensions:
       - name: id
         sql:  "{CUBE}.user_id || '-' || {CUBE}.signup_week || '-' || {CUBE}.activity_week"
@@ -365,7 +381,7 @@ as an alias for a basic cube. Take a look at the following example:
 <CodeTabs>
 
 ```javascript
-cube('Users', {
+cube(`users`, {
   dimensions: {
     name: {
       sql: `${CUBE}.name`,
@@ -377,10 +393,10 @@ cube('Users', {
 
 ```yaml
 cubes:
-  - name: Users
+  - name: users
     dimensions:
       - name: name
-        sql: "{CUBE}.name"
+        sql: '{CUBE}.name'
         type: string
 ```
 
@@ -390,22 +406,22 @@ cubes:
 
 <WarningBox>
 
-Join graph is directed and `A-B` join is different from `B-A`. [Learn more about
-it here][ref-schema-fundamentals-join-dir].
+Join graph is directed and `a → b` join is different from `b → a`. [Learn more
+about it here][ref-schema-fundamentals-join-dir].
 
 </WarningBox>
 
-Cube automatically takes care of transitive joins. For example if you have the
-following schema:
+Cube automatically takes care of transitive joins. For example, consider the
+following data model:
 
 <CodeTabs>
 
 ```javascript
-cube(`A`, {
+cube(`a`, {
   joins: {
-    B: {
-      sql: `${A}.b_id = ${B}.id`,
-      relationship: `belongsTo`,
+    b: {
+      sql: `${a}.b_id = ${b.id}`,
+      relationship: `many_to_one`,
     },
   },
 
@@ -416,11 +432,11 @@ cube(`A`, {
   },
 });
 
-cube(`B`, {
+cube(`b`, {
   joins: {
-    C: {
-      sql: `${B}.c_id = ${C}.id`,
-      relationship: `belongsTo`,
+    c: {
+      sql: `${b}.c_id = ${c.id}`,
+      relationship: `many_to_one`,
     },
   },
 });
@@ -437,20 +453,22 @@ cube(`C`, {
 
 ```yaml
 cubes:
-  - name: A
+  - name: a
     joins:
-      - name: B
-        sql: "{A}.b_id = {B}.id"
-        relationship: belongs_to
+      - name: b
+        sql: '{a}.b_id = {b.id}'
+        relationship: many_to_one
     measures:
       - name: count
         type: count
-  - name: B
+
+  - name: c
     joins:
-      - name: C
-        sql: "{B}.c_id = {C}.id"
-        relationship: belongs_to
-  - name: C
+      - name: c
+        sql: '{b}.c_id = {c.id}'
+        relationship: many_to_one
+
+  - name: c
     dimensions:
       - name: category
         sql: category
@@ -459,18 +477,18 @@ cubes:
 
 </CodeTabs>
 
-and the following query:
+Assume that the following query is run:
 
 ```json
 {
-  "measures": ["A.count"],
-  "dimensions": ["C.category"]
+  "measures": ["a.count"],
+  "dimensions": ["c.category"]
 }
 ```
 
-Joins `A-B` and `B-C` will be resolved automatically. Cube uses [Dijkstra
-algorithm][wiki-djikstra-alg] to find join path between cubes given requested
-members.
+Joins `a → b` and `b → c` will be resolved automatically. Cube uses the
+[Dijkstra algorithm][wiki-djikstra-alg] to find a join path between cubes given
+requested members.
 
 [ref-restapi-query-filter-op-set]: /query-format#set
 [ref-schema-fundamentals-join-dir]:
@@ -479,3 +497,6 @@ members.
 [ref-schema-data-blenging]: /schema/advanced/data-blending#data-blending
 [ref-naming]: /data-modeling/syntax#naming
 [wiki-djikstra-alg]: https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm
+[wiki-left-join]: https://en.wikipedia.org/wiki/Join_(SQL)#Left_outer_join
+[wiki-1-1]: https://en.wikipedia.org/wiki/One-to-one_(data_model)
+[wiki-1-m]: https://en.wikipedia.org/wiki/One-to-many_(data_model)

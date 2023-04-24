@@ -23,7 +23,7 @@ cube(`Users`, {
 
   joins: {
     Organizations: {
-      relationship: `belongsTo`,
+      relationship: `many_to_one`,
       sql: `${Users.organization_id} = ${Organizations.id}`,
     },
   },
@@ -61,7 +61,7 @@ cubes:
     sql: SELECT * FROM USERS
     joins:
       - name: Organizations
-        relationship: belongs_to
+        relationship: many_to_one
         sql: "{CUBE.organization_id} = {Organizations.id}"
     measures:
       - name: count
@@ -106,7 +106,7 @@ cube(`Users`, {
   joins: {
     Contacts: {
       sql: `${CUBE}.contact_id = ${Contacts.id}`,
-      relationship: `hasOne`,
+      relationship: `one_to_one`,
     },
   },
 
@@ -144,7 +144,7 @@ cubes:
     joins:
       - name: Contacts
         sql: "{CUBE.contact_id} = {Contacts.id}"
-        relationship: has_one
+        relationship: one_to_one
     dimensions:
       - name: name
         sql: "COALESCE({CUBE.name}, {Contacts.name})"
