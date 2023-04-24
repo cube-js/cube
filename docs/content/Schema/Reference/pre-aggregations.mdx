@@ -26,25 +26,24 @@ Pre-aggregations can be defined in the `preAggregations` available on each cube.
 A more in-depth diagram detailing how pre-aggregations are selected can be
 [found here][ref-caching-preaggs-selecting-preaggs].
 
-## Naming
+Pre-aggregations must have, at minimum, a name and a type. Pre-aggregations must
+include all dimensions, measures, and filters you will query with.
 
-Pre-aggregations must have, at minimum, a name and a type. This name, along with
-the [name of the cube][ref-schema-cube-naming] will be used as a prefix for
-pre-aggregation tables created in the database.
+## Parameters
 
-Pre-aggregation names should:
+### <--{"id" : "Parameters"}--> name
 
-- Be unique within a cube
-- Start with a lowercase letter
-- Consist of numbers, letters and `_`
+The `name` parameter serves as the identifier of a pre-aggregation. It must be
+unique among all pre-aggregations within a cube and follow the [naming
+conventions][ref-naming].
 
 <CodeTabs>
 
 ```javascript
-cube(`Orders`, {
-  sql: `SELECT * FROM orders`,
+cube(`orders`, {
+  sql_table: `orders`,
 
-  preAggregations: {
+  pre_aggregations: {
     orders_by_status: {
       dimensions: [CUBE.status],
       measures: [CUBE.count],
@@ -55,8 +54,9 @@ cube(`Orders`, {
 
 ```yaml
 cubes:
-  - name: Orders
-    sql: SELECT * FROM orders
+  - name: orders
+    sql_table: orders
+
     pre_aggregations:
       - name: orders_by_status
         dimensions: [CUBE.status]
@@ -65,10 +65,8 @@ cubes:
 
 </CodeTabs>
 
-Pre-aggregations must include all dimensions, measures, and filters you will
-query with.
-
-## Parameters
+This `name`, along with the name of the cube, will be used as a prefix for
+pre-aggregation tables created in the database.
 
 ### <--{"id" : "Parameters"}--> type
 
@@ -348,7 +346,7 @@ cubes:
         type: number
         primary_key: true
       - name: name
-        sql: "{CUBE}.first_name || {CUBE}.last_name"
+        sql: '{CUBE}.first_name || {CUBE}.last_name'
         type: string
 
   - name: Orders
@@ -368,7 +366,7 @@ cubes:
     joins:
       - name: Users
         relationship: belongs_to
-        sql: "{CUBE.user_id} = {Users.id}"
+        sql: '{CUBE.user_id} = {Users.id}'
     measures:
       - name: count
         type: count
@@ -783,7 +781,7 @@ cubes:
       - name: main
         measures: [CUBE.count]
         refresh_key:
-          sql: "SELECT MAX(created_at) FROM orders"
+          sql: 'SELECT MAX(created_at) FROM orders'
 ```
 
 </CodeTabs>
@@ -862,7 +860,7 @@ cubes:
         measures: [CUBE.count]
         refresh_key:
           every: 1 hour
-          sql: "SELECT MAX(created_at) FROM orders"
+          sql: 'SELECT MAX(created_at) FROM orders'
 ```
 
 </CodeTabs>
@@ -1083,11 +1081,8 @@ cube(`Orders`, {
 cubes:
   - name: Orders
     sql: >
-      SELECT * FROM orders1
-      UNION ALL
-      SELECT * FROM orders2
-      UNION ALL
-      SELECT * FROM orders3
+      SELECT * FROM orders1 UNION ALL SELECT * FROM orders2 UNION ALL SELECT *
+      FROM orders3
     pre_aggregations:
       - name: main
         type: originalSql
@@ -1498,12 +1493,12 @@ cubes:
   /deployment/production-checklist#set-up-refresh-worker
 [ref-recipe-funnels]: /recipes/funnels
 [ref-sqlalias]: /schema/reference/cube#sql-alias
-[ref-schema-cube-naming]: /schema/reference/cube#naming
 [ref-schema-ref-cube-datasource]: /schema/reference/cube#parameters-data-source
 [ref-schema-dimensions]: /schema/reference/dimensions
 [ref-schema-measures]: /schema/reference/measures
 [ref-schema-segments]: /schema/reference/segments
 [ref-schema-types-dim-time]: /schema/reference/types-and-formats#types-time
+[ref-naming]: /data-modeling/syntax#naming
 [self-granularity]: #granularity
 [self-incremental]: #refresh-key-incremental
 [self-origsql-preaggs]: #use-original-sql-pre-aggregations
