@@ -319,7 +319,6 @@ impl StreamingService for StreamingServiceImpl {
 
             app_metrics::STREAMING_ROWS_READ.add_with_tags(rows.len() as i64, Some(&tags));
             app_metrics::STREAMING_ROUNDTRIP_ROWS.report_with_tags(rows.len() as i64, Some(&tags));
-            //println!("{:?}", rows);
             for row in rows {
                 let row = row?;
                 append_row(&mut builders, table_cols, &row);

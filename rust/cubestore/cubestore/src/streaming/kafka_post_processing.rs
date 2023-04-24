@@ -44,7 +44,6 @@ impl KafkaPostProcessPlan {
                 .map(|c| c.clone().into())
                 .collect::<Vec<_>>(),
         ));
-        println!("!!! schema {:?}", source_schema);
         Self {
             projection_plan,
             filter_plan,

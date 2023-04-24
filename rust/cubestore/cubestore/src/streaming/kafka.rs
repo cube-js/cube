@@ -79,8 +79,6 @@ impl KafkaStreamingSource {
                 (None, columns, unique_key_columns, seq_column_index)
             };
 
-        println!("!!! un cols {:?}", unique_key_columns);
-
         Ok(KafkaStreamingSource {
             table_id,
             unique_key_columns,
