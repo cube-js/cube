@@ -1,12 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AvailableCube } from '@cubejs-client/react';
-import { ButtonProps, Input, Menu as AntdMenu } from 'antd';
+import { ButtonProps, Input, Menu as AntdMenu, Tag } from 'antd';
 import styled from 'styled-components';
 import FlexSearch from 'flexsearch';
 import { CubeMember, BaseCubeMember } from '@cubejs-client/core';
 
 import ButtonDropdown from './ButtonDropdown';
-import { useDeepMemo } from '../hooks/deep-memo';
+import { useDeepMemo, useLocalStorage } from '../hooks';
 import { getNameMemberPairs } from '../shared/members';
 
 const Menu = styled(AntdMenu)`
@@ -84,17 +84,26 @@ export default function MemberMenu({
   const [search, setSearch] = useState<string>('');
   const [filteredKeys, setFilteredKeys] = useState<string[]>([]);
 
-  const hasMembers = availableCubes.some(
-    (cube) => cube.members.filter(visibilityFilter).length > 0
+  const [modelsVisibility] = useLocalStorage('modelsVisibility', 'all');
+
+  const filteredModels = useMemo(() => {
+    return modelsVisibility === 'all'
+      ? availableCubes
+      : availableCubes.filter((model) => model.public !== false);
+  }, [modelsVisibility, availableCubes]);
+  
+  const hasMembers = filteredModels.some(
+    // (cube) => cube.members.filter(visibilityFilter).length > 0
+    (cube) => cube.members.length > 0
   );
 
   const indexedMembers = useDeepMemo(() => {
-    getNameMemberPairs(availableCubes).forEach(([name, { title }]) =>
+    getNameMemberPairs(filteredModels).forEach(([name, { title }]) =>
       index.add(name as any, title)
     );
 
-    return Object.fromEntries(getNameMemberPairs(availableCubes));
-  }, [availableCubes]);
+    return Object.fromEntries(getNameMemberPairs(filteredModels));
+  }, [filteredModels]);
 
   useEffect(() => {
     let currentSearch = search;
@@ -115,8 +124,8 @@ export default function MemberMenu({
   }, [index, search]);
 
   const members = search
-    ? filterMembersByKeys(availableCubes, filteredKeys)
-    : availableCubes;
+    ? filterMembersByKeys(filteredModels, filteredKeys)
+    : filteredModels;
 
   return (
     <ButtonDropdown
@@ -190,14 +199,26 @@ export default function MemberMenu({
               </SearchMenuItem>
 
               {members.map((cube) => {
-                const members = cube.members.filter(visibilityFilter);
+                const members = cube.members;//.filter(visibilityFilter);
 
-                if (!members.length) {
-                  return null;
-                }
+                // if (!members.length) {
+                //   return null;
+                // }
 
                 return (
-                  <Menu.ItemGroup key={cube.cubeName} title={cube.cubeTitle}>
+                  <Menu.ItemGroup
+                    key={cube.cubeName}
+                    title={
+                      <span>
+                        {cube.cubeTitle}{' '}
+                        <Tag
+                          color={cube.type === 'view' ? '#389e0d' : '#2db7f5'}
+                        >
+                          {cube.type}
+                        </Tag>
+                      </span>
+                    }
+                  >
                     {members.map((m) => (
                       <Menu.Item key={m.name} data-testid={m.name}>
                         {m.shortTitle}

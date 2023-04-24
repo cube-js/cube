@@ -490,10 +490,9 @@ class ApiGateway {
     }
   }
 
-  private filterVisibleItemsInMeta(_context: RequestContext, metaConfig: any) {
+  private filterVisibleItemsInMeta(context: RequestContext, metaConfig: any) {
     function visibilityFilter(item) {
-      // Hidden items shouldn't be accessible through API everywhere for consistency.
-      return item.isVisible;
+      return getEnv('devMode') || context.signedWithPlaygroundAuthSecret || item.isVisible || item.public;
     }
 
     return metaConfig
