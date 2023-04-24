@@ -50,7 +50,7 @@ separate file:
 [ref-import-export]: /recipes/export-import
 
 ```javascript
-// schema/utils.js
+// model/utils.js
 export const convertStringPropToFunction = (propNames, dimensionDefinition) => {
   let newResult = { ...dimensionDefinition };
   propNames.forEach((propName) => {
@@ -103,7 +103,7 @@ generate schemas from that data:
   /schema/reference/execution-environment#cube-js-globals-cube-and-others
 
 ```javascript
-// schema/DynamicSchema.js
+// model/cubes/DynamicSchema.js
 const fetch = require('node-fetch');
 import {
   convertStringPropToFunction,
@@ -185,7 +185,7 @@ In an example scenario where all tenants share the same cube, but see different
 dimensions and measures, you could do the following:
 
 ```javascript
-// schema/DynamicSchema.js
+// model/cubes/DynamicSchema.js
 const fetch = require('node-fetch');
 import {
   convertStringPropToFunction,
@@ -245,7 +245,7 @@ For an example scenario where schemas may use either MySQL or Postgres
 databases, you could do the following:
 
 ```javascript
-// schema/DynamicSchema.js
+// model/cubes/DynamicSchema.js
 const fetch = require('node-fetch');
 import {
   convertStringPropToFunction,

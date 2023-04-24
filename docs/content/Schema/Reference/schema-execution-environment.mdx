@@ -27,7 +27,7 @@ packages such as `Funnels` unlike standard Node.js `require()`.
 
 Data schema JavaScript code doesn't have access to any standard Node.js globals
 like `process` or `console`. In order to access `process.env`, utility functions
-can be added outside the `schema/` directory:
+can be added outside the `model/` directory:
 
 **tablePrefix.js:**
 
@@ -35,7 +35,7 @@ can be added outside the `schema/` directory:
 exports.tableSchema = () => process.env.TABLE_SCHEMA;
 ```
 
-**schema/Users.js**:
+**model/cubes/Users.js**:
 
 ```javascript
 import { tableSchema } from '../tablePrefix';
