@@ -91,7 +91,7 @@ export default function MemberMenu({
       ? availableCubes
       : availableCubes.filter((model) => model.public !== false);
   }, [modelsVisibility, availableCubes]);
-  
+
   const hasMembers = filteredModels.some(
     // (cube) => cube.members.filter(visibilityFilter).length > 0
     (cube) => cube.members.length > 0
@@ -199,7 +199,7 @@ export default function MemberMenu({
               </SearchMenuItem>
 
               {members.map((cube) => {
-                const members = cube.members;//.filter(visibilityFilter);
+                const members = cube.members; //.filter(visibilityFilter);
 
                 // if (!members.length) {
                 //   return null;
@@ -209,14 +209,18 @@ export default function MemberMenu({
                   <Menu.ItemGroup
                     key={cube.cubeName}
                     title={
-                      <span>
-                        {cube.cubeTitle}{' '}
-                        <Tag
-                          color={cube.type === 'view' ? '#D26E0B' : '#7A77FF'}
-                        >
-                          {cube.type}
-                        </Tag>
-                      </span>
+                      cube.type ? (
+                        <span>
+                          {cube.cubeTitle}{' '}
+                          <Tag
+                            color={cube.type === 'view' ? '#D26E0B' : '#7A77FF'}
+                          >
+                            {cube.type}
+                          </Tag>
+                        </span>
+                      ) : (
+                        cube.cubeTitle
+                      )
                     }
                   >
                     {members.map((m) => (
