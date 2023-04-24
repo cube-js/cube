@@ -62,7 +62,7 @@
     "ramda": "^0.28.0",
     "testcontainers": "^9.3.0",
     "typescript": "~4.9.5",
-    "yaml": "^1.10.2",
+    "yaml": "^2.2.2",
     "yargs": "^17.7.1"
   },
   "publishConfig": {
