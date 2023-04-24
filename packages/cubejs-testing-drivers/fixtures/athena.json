@@ -6,12 +6,13 @@
       "CUBEJS_CACHE_AND_QUEUE_DRIVER": "cubestore",
       "CUBEJS_CUBESTORE_HOST": "store",
       "CUBEJS_DB_TYPE": "athena",
+      "CUBEJS_DB_EXPORT_BUCKET": "s3://athena-drivers-tests-preaggs/bucket",
+      "CUBEJS_PRE_AGGREGATIONS_SCHEMA": "drivers_tests_preaggs",
       "CUBEJS_AWS_KEY": "${DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY}",
       "CUBEJS_AWS_SECRET": "${DRIVERS_TESTS_ATHENA_CUBEJS_AWS_SECRET}",
       "CUBEJS_AWS_REGION": "us-east-1",
       "CUBEJS_AWS_ATHENA_WORKGROUP": "primary",
-      "CUBEJS_AWS_S3_OUTPUT_LOCATION": "s3://cubejs-opensource/temptst/output",
-      "CUBEJS_DB_EXPORT_BUCKET": "s3://cubejs-opensource/temptst/export"
+      "CUBEJS_AWS_S3_OUTPUT_LOCATION": "s3://athena-drivers-tests-preaggs/output"
     },
     "ports" : ["4000"]
   },

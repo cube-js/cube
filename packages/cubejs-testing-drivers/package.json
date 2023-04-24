@@ -31,7 +31,7 @@
     "postgres-driver": "jest --forceExit --runInBand --verbose -i dist/test/postgres-driver.test.js",
     "postgres-core": "jest --forceExit --runInBand --verbose -i dist/test/postgres-core.test.js",
     "postgres-full": "jest --forceExit --runInBand --verbose -i dist/test/postgres-full.test.js",
-    "tst": "clear && yarn tsc && yarn databricks-jdbc-driver"
+    "tst": "clear && yarn tsc && yarn athena-core"
   },
   "files": [
     "dist/src"

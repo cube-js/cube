@@ -24,9 +24,11 @@ export type Method =
   | 'wrapQueryWithLimit'
   | 'query'
   | 'testConnection'
-  | 'stream';
+  | 'stream'
+  | 'unload';
 
 export type PatchedDriver = BaseDriver & {
+  unload?: (...args: any[]) => any,
   stream?: (...args: any[]) => any,
   calls?: Method[],
 };
