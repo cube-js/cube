@@ -454,7 +454,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   public async queryColumnTypes(sql: string): Promise<TableStructure> {
     const connection = await this.getConnection();
     return new Promise((resolve, reject) => connection.execute({
-      sqlText: `${sql} WHERE 1 != 1`,
+      sqlText: `${sql} LIMIT 0`,
       binds: [],
       fetchAsString: ['Number'],
       complete: (err, stmt) => {
