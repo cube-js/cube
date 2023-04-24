@@ -212,7 +212,7 @@ export default function MemberMenu({
                       <span>
                         {cube.cubeTitle}{' '}
                         <Tag
-                          color={cube.type === 'view' ? '#389e0d' : '#2db7f5'}
+                          color={cube.type === 'view' ? '#D26E0B' : '#7A77FF'}
                         >
                           {cube.type}
                         </Tag>
