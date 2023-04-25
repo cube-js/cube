@@ -3,6 +3,30 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.32.29](https://github.com/cube-js/cube/compare/v0.32.28...v0.32.29) (2023-04-25)
+
+
+### Bug Fixes
+
+* **api-gateway:** passing defaultApiScope env to the contextToApiScopesFn ([#6485](https://github.com/cube-js/cube/issues/6485)) ([b2da950](https://github.com/cube-js/cube/commit/b2da950509e48bdfcd5d6f282f81a00b3794d559))
+* **schema-compiler:** yml backtick escaping ([#6478](https://github.com/cube-js/cube/issues/6478)) ([39a9ac0](https://github.com/cube-js/cube/commit/39a9ac0e9a641efeeca0e99d286962aa007551cd))
+* **server-core:** Display refresh scheduler interval error as warning ([#6473](https://github.com/cube-js/cube/issues/6473)) ([771f661](https://github.com/cube-js/cube/commit/771f661cadfe9c19bcaad9fe232f7f4901f0778b))
+
+
+### Features
+
+* **athena-driver:** read-only unload ([#6469](https://github.com/cube-js/cube/issues/6469)) ([d3fee7c](https://github.com/cube-js/cube/commit/d3fee7cbefe5c415573c4d2507b7e61a48f0c91a))
+* **cubestore:** Split partitions by filesize ([#6435](https://github.com/cube-js/cube/issues/6435)) ([5854add](https://github.com/cube-js/cube/commit/5854add7a65c39e05ba71c2a558032671797ec26))
+* **cubestore:** Traffic tracing for streaming ([#6379](https://github.com/cube-js/cube/issues/6379)) ([37a33e6](https://github.com/cube-js/cube/commit/37a33e65234740a8028c340334510facbea896d7))
+* Make configurable cubestore metrics address ([#6437](https://github.com/cube-js/cube/issues/6437)) Thanks [@fbalicchia](https://github.com/fbalicchia) ! ([16d0bcb](https://github.com/cube-js/cube/commit/16d0bcb1489c512f91c21970e21769c9882bfedc))
+* **schema-compiler:** Support public/shown for segments ([#6491](https://github.com/cube-js/cube/issues/6491)) ([df6160c](https://github.com/cube-js/cube/commit/df6160cc62f8ab2fccbfb85f2916040aec218fc3))
+* semanticLayerSync configs option ([#6483](https://github.com/cube-js/cube/issues/6483)) ([d3b8ed7](https://github.com/cube-js/cube/commit/d3b8ed7401f98429eca42227ef4cfe1f29f90d8e))
+* **snowflake-driver:** streaming export, read-only unload ([#6452](https://github.com/cube-js/cube/issues/6452)) ([67565b9](https://github.com/cube-js/cube/commit/67565b975c16f93070de0346056c6a3865bc9fd8))
+
+
+
+
+
 ## [0.32.28](https://github.com/cube-js/cube/compare/v0.32.27...v0.32.28) (2023-04-19)
 
 
