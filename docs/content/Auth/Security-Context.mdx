@@ -127,36 +127,39 @@ SELECT
 LIMIT 10000
 ```
 
-## Using permissions
+## Using Scopes
 
-Starting from version v0.32.5, a "permission" security feature was established.
+Starting from version v0.32.5, a "scope" security feature was introduced.
 This feature aims to allow users to configure access to specific APIs based on
 the claims provided in the JWT token.
 
-To configure permissions new `contextToApiScopes` function should be provided
-in the `cube.js` file. This function takes two optional parameters,
-`securityContext` and `defaultPermissions`, and returns a promise that must be
-resolved with the array of allowed permissions.
+Provide a new `contextToApiScopes` function in the `cube.js` file 
+to modify the scopes provisioned to users. 
+This function takes two optional parameters,
+`securityContext` and `defaultScopes`, and returns a promise that must be
+resolved with the array of allowed scopes.
 
-The `defaultPermissions` parameter is an array that contains all possible
-permissions but the `jobs`, and the Cube uses its value if no
-`contextToApiScopes` function was provided:
+The `defaultScopes` parameter is an array that contains the allowed 
+scopes, by default it contains every scope except `jobs`. 
+Cube uses this parameter if no `contextToApiScopes` function was provided.
 
 ```javascript
-console.log(defaultPermissions); // ['graphql', 'meta', 'data']
+console.log(defaultScopes); // ['graphql', 'meta', 'data']
 ```
 
-The default implementation of full access to Cube's APIs could look like this:
+A possible implementation of a `contextToApiScopes` function with 
+full access to Cube's APIs, with the exception of an Admin user that is able
+to trigger pre-aggregation builds could look like this:
 
 ```javascript
 async function contextToApiScopes(
   securityContext?: any,
-  defaultPermissions?: string[],
+  defaultScopes?: string[],
 ): Promise<string[]> {
   if (securityContext && securityContext.isAdmin) {
-    defaultPermissions.push('jobs');
+    defaultScopes.push('jobs');
   }
-  return defaultPermissions;
+  return defaultScopes;
 }
 ```
 
