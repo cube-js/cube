@@ -10,7 +10,9 @@
       "CUBEJS_PRE_AGGREGATIONS_SCHEMA": "dev_pre_aggregations",
       "CUBEJS_DB_BQ_PROJECT_ID": "cube-open-source",
       "CUBEJS_DB_BQ_CREDENTIALS": "${DRIVERS_TESTS_CUBEJS_DB_BQ_CREDENTIALS}",
-      "CUBEJS_DB_EXPORT_BUCKET": "cube-open-source-export-bucket"
+
+      "CUBEJS_DB_EXPORT_BUCKET": "cube-open-source-export-bucket",
+      "CUBEJS_DB_EXPORT_BUCKET_TYPE": "gcp"
     },
     "ports" : ["4000"]
   },

@@ -24,33 +24,35 @@ import {
   DownloadTableCSVData,
   DriverInterface,
   QueryOptions,
+  UnloadOptions,
   StreamTableDataWithTypes,
   DownloadQueryResultsOptions,
   DownloadQueryResultsResult,
   DownloadTableMemoryData,
   TableStructure,
   Row,
+  DriverCapabilities,
 } from '@cubejs-backend/base-driver';
 import { Query } from '@google-cloud/bigquery/build/src/bigquery';
 import { HydrationStream } from './HydrationStream';
 
 const BQTypeToGenericType: Record<string, string> = {
-  ARRAY: 'text', // ?
-  BIGNUMERIC: 'double', // ?
-  BOOL: 'boolean',
-  BYTES: 'text', // ?
-  DATE: 'date',
-  DATETIME: 'timestamp',
-  FLOAT64: 'double',
-  GEOGRAPHY: 'text', // ?
-  INT64: 'bigint',
-  INTERVAL: 'text', // ?
-  JSON: 'text', // ?
-  NUMERIC: 'double', // ?
-  STRING: 'text',
-  STRUCT: 'text',
-  TIME: 'timestamp',
-  TIMESTAMP: 'timestamp',
+  array: 'text', // ?
+  bignumeric: 'double', // ?
+  bool: 'boolean',
+  bytes: 'text', // ?
+  date: 'date',
+  datetime: 'timestamp',
+  float64: 'double',
+  geography: 'text', // ?
+  int64: 'bigint',
+  interval: 'text', // ?
+  json: 'text', // ?
+  numeric: 'double', // ?
+  string: 'text',
+  struct: 'text',
+  time: 'timestamp',
+  timestamp: 'timestamp',
 };
 
 interface BigQueryDriverOptions extends BigQueryOptions {
@@ -140,7 +142,9 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
         getEnv('bigqueryExportBucket', { dataSource }),
       location: getEnv('bigqueryLocation', { dataSource }),
       readOnly: true,
+
       ...config,
+      
       pollTimeout: (
         config.pollTimeout ||
         getEnv('dbPollTimeout', { dataSource }) ||
@@ -150,7 +154,8 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
         config.pollMaxInterval ||
         getEnv('dbPollMaxInterval', { dataSource })
       ) * 1000,
-      exportBucketCsvEscapeSymbol: getEnv('dbExportBucketCsvEscapeSymbol', { dataSource }),
+      exportBucketCsvEscapeSymbol:
+        getEnv('dbExportBucketCsvEscapeSymbol', { dataSource }),
     };
 
     getEnv('dbExportBucketType', {
@@ -182,12 +187,120 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
   }
 
   /**
+   * Returns driver's capabilities object.
+   */
+  public capabilities(): DriverCapabilities {
+    return { unloadWithoutTempTable: true };
+  }
+
+  /**
    * Test driver's connection.
    */
   public async testConnection() {
     await this.bigquery.query({
       query: 'SELECT ? AS number', params: ['1']
     });
+  }
+
+  /**
+   * Determines whether export bucket feature is configured or not.
+   */
+  public async isUnloadSupported() {
+    return this.bucket !== null;
+  }
+
+  /**
+   * Returns to the Cubestore an object with links to unloaded to the
+   * export bucket data.
+   */
+  public async unload(
+    table: string,
+    options: UnloadOptions,
+  ): Promise<DownloadTableCSVData> {
+    if (!this.bucket) {
+      throw new Error('Export bucket misconfigured.');
+    }
+    const types = options.query
+      ? await this.unloadWithSql(table, options)
+      : await this.unloadWithTable(table);
+    const csvFile = await this.getCsvFiles(table);
+    return {
+      types,
+      csvFile,
+      csvNoHeader: false,
+      exportBucketCsvEscapeSymbol:
+        this.options.exportBucketCsvEscapeSymbol,
+    };
+  }
+
+  /**
+   * Unload data from a SQL query to an export bucket.
+   */
+  private async unloadWithSql(
+    table: string,
+    options: UnloadOptions,
+  ): Promise<TableStructure> {
+    if (!this.bucket) {
+      throw new Error('Export bucket misconfigured.');
+    }
+    if (!options.query) {
+      throw new Error('Unload query is missed.');
+    }
+    const types = await this.queryColumnTypes(options.query.sql);
+    const unloadSql = `
+    EXPORT DATA
+    OPTIONS (
+      uri='gs://${this.options.exportBucket}/${table}/*.csv.gz',
+      format='CSV',
+      overwrite=true,
+      header=true,
+      field_delimiter=',',
+      compression='GZIP'
+    ) AS
+    ${options.query.sql}`;
+    await this.query(unloadSql, []);
+    return types;
+  }
+
+  /**
+   * Unload data from a temp table to an export bucket.
+   * : Promise<TableStructure>
+   */
+  private async unloadWithTable(table: string) {
+    if (!this.bucket) {
+      throw new Error('Export bucket misconfigured.');
+    }
+    const types = await this.tableColumnTypes(table);
+    const [schema, tableName] = table.split('.');
+    const bigQueryTable = this.bigquery
+      .dataset(schema)
+      .table(tableName);
+    const [job] = await bigQueryTable.createExtractJob(
+      this.bucket.file(`${table}/*.csv.gz`),
+      { format: 'CSV', gzip: true },
+    );
+    await this.waitForJobResult(job, { table }, false);
+    return types;
+  }
+
+  /**
+   * Returns an array of signed URLs of the unloaded csv files.
+   */
+  private async getCsvFiles(table: string): Promise<string[]> {
+    if (!this.bucket) {
+      throw new Error('Export bucket misconfigured.');
+    }
+    const [files] = await this.bucket.getFiles({
+      prefix: `${table}/`,
+    });
+    const csvFiles = await Promise.all(files.map(async file => {
+      const [url] = await file.getSignedUrl({
+        action: 'read',
+        expires: new Date(new Date().getTime() + 60 * 60 * 1000),
+      });
+      return url;
+    }));
+    return csvFiles;
   }
 
   /**
@@ -256,10 +369,12 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
       parameterMode: 'positional',
       useLegacySql: false
     }, {}))[0][0];
+    const cols = Object.keys(row)
+      .map((f) => (`bqutil.fn.typeof(${f}) AS ${f}`))
+      .join(', ');
     const typesSql = `
       WITH ORIGIN AS (${rowSql})
-      SELECT
-        ${Object.keys(row).map((f) => (`bqutil.fn.typeof(${f}) AS ${f}`)).join(', ')}
+      SELECT ${cols}
       FROM ORIGIN`;
     const types = (await this.runQueryJob({
       query: typesSql,
@@ -274,23 +389,52 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
   }
 
   /**
+   * Returns an array of table fields meta info.
+   */
+  public async tableColumnTypes(table: string) {
+    const [schema, name] = table.split('.');
+    const [bigQueryTable] = await this.bigquery
+      .dataset(schema)
+      .table(name)
+      .getMetadata();
+    return bigQueryTable.schema.fields.map((c: any) => ({
+      name: c.name,
+      type: this.toGenericType(c.type),
+    }));
+  }
+
+  /**
    * Returns generic type for the provided BQ type.
    */
   public toGenericType(type: string) {
-    return BQTypeToGenericType[type];
+    return BQTypeToGenericType[type.toLowerCase()] ||
+      super.toGenericType(type.toLowerCase());
   }
 
-  public async query<R = unknown>(query: string, values: unknown[], options?: QueryOptions): Promise<R[]> {
+  /**
+   * Executes query and returns queried rows.
+   */
+  public async query<R = unknown>(
+    query: string,
+    values: unknown[],
+    options?: QueryOptions,
+  ): Promise<R[]> {
     const data = await this.runQueryJob({
       query,
       params: values,
       parameterMode: 'positional',
       useLegacySql: false
     }, options);
-
     return <any>(
       data[0] && data[0].map(
-        row => R.map(value => (value && value.value && typeof value.value === 'string' ? value.value : value), row)
+        row => R.map(
+          value => (
+            value && value.value && typeof value.value === 'string'
+              ? value.value
+              : value
+          ),
+          row,
+        ),
       )
     );
   }
@@ -349,43 +493,8 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     }
   }
 
-  public async tableColumnTypes(table: string) {
-    const [schema, name] = table.split('.');
-    const [bigQueryTable] = await this.bigquery.dataset(schema).table(name).getMetadata();
-    return bigQueryTable.schema.fields.map((c: any) => ({ name: c.name, type: this.toGenericType(c.type) }));
-  }
-
   public async createSchemaIfNotExists(schemaName: string): Promise<void> {
     await this.bigquery.dataset(schemaName).get({ autoCreate: true });
-  }
-
-  public async isUnloadSupported() {
-    return this.bucket !== null;
-  }
-
-  public async unload(table: string): Promise<DownloadTableCSVData> {
-    if (!this.bucket) {
-      throw new Error('Unload is not configured');
-    }
-
-    const destination = this.bucket.file(`${table}-*.csv.gz`);
-    const [schema, tableName] = table.split('.');
-    const bigQueryTable = this.bigquery.dataset(schema).table(tableName);
-    const [job] = await bigQueryTable.createExtractJob(destination, { format: 'CSV', gzip: true });
-    await this.waitForJobResult(job, { table }, false);
-    const [files] = await this.bucket.getFiles({ prefix: `${table}-` });
-    const urls = await Promise.all(files.map(async file => {
-      const [url] = await file.getSignedUrl({
-        action: 'read',
-        expires: new Date(new Date().getTime() + 60 * 60 * 1000),
-      });
-      return url;
-    }));
-
-    return {
-      exportBucketCsvEscapeSymbol: this.options.exportBucketCsvEscapeSymbol,
-      csvFile: urls,
-    };
   }
 
   public async loadPreAggregationIntoTable(

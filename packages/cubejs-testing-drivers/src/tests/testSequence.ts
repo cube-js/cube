@@ -47,9 +47,6 @@ export function testSequence(type: string): void {
       source = drivers.source;
       storage = drivers.storage;
       query = getCreateQueries(type, 'core');
-      if (fixtures.cast.USE_SCHEMA) {
-        await source.query(fixtures.cast.USE_SCHEMA);
-      }
       await Promise.all(query.map(async (q) => {
         await source.query(q);
       }));
@@ -59,9 +56,6 @@ export function testSequence(type: string): void {
     });
 
     afterAll(async () => {
-      if (fixtures.cast.USE_SCHEMA) {
-        await source.query(fixtures.cast.USE_SCHEMA);
-      }
       const tables = Object
         .keys(fixtures.tables)
         .map((key: string) => `${fixtures.tables[
