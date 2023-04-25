@@ -74,6 +74,8 @@
     "Full tests                             ",
     "---------------------------------------",
     "must built pre-aggregations",
+    "querying Customers: dimentions + order + total + offset",
+    "querying ECommerce: dimentions + order + total + offset",
 
     "---------------------------------------",
     "SKIPED FOR ALL                         ",
