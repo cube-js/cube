@@ -345,10 +345,17 @@ cubes:
 
 </CodeTabs>
 
-### <--{"id" : "Parameters"}--> shown
+### <--{"id" : "Parameters"}--> public
 
-You can manage the visibility of the measure using the `shown` parameter. The
-default value of `shown` is `true`.
+<InfoBox>
+
+In previous versions of Cube, this property was called `shown`.
+
+</InfoBox>
+
+The `public` property is used to manage the visibility of a measure. Valid
+values for `public` are `true` and `false`. When set to `false`, this measure
+**cannot** be queried through the API. Defaults to `true`.
 
 <CodeTabs>
 
@@ -360,7 +367,7 @@ cube(`orders`, {
     orders_count: {
       sql: `id`,
       type: `count`,
-      shown: false,
+      public: false,
     },
   },
 });
@@ -375,7 +382,7 @@ cubes:
       - name: orders_count
         sql: id
         type: count
-        shown: false
+        public: false
 ```
 
 </CodeTabs>
