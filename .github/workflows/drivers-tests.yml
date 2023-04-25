@@ -75,6 +75,7 @@ jobs:
           - 16.x
         database:
           - athena
+          - bigquery
           - clickhouse
           - databricks-jdbc
           - mssql
