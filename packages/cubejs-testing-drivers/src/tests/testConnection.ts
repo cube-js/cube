@@ -183,13 +183,16 @@ export function testConnection(type: string): void {
       if (fixtures.cast.USE_SCHEMA) {
         await driver.query(fixtures.cast.USE_SCHEMA);
       }
-      await Promise.all([
-        'ecommerce_driver',
-        'customers_driver',
-        'products_driver',
-      ].map(async (t) => {
-        await driver.dropTable(t);
-      }));
+      const tables = Object
+        .keys(fixtures.tables)
+        .map((key: string) => `${fixtures.tables[
+            <'products' | 'customers' | 'ecommerce'>key
+        ]}_driver`);
+      await Promise.all(
+        tables.map(async (t) => {
+          await driver.dropTable(t);
+        })
+      );
     });
   });
 }

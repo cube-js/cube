@@ -32,6 +32,11 @@
     "CREATE_SUB_PREFIX": "(",
     "CREATE_SUB_SUFFIX": ") SUBQUERY;"
   },
+  "tables": {
+    "products": "products",
+    "customers": "customers",
+    "ecommerce": "ecommerce"
+  },
   "preAggregations": {
     "Products": [],
     "Customers": [

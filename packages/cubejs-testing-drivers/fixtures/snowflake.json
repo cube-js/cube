@@ -30,6 +30,11 @@
     "CREATE_SUB_SUFFIX": ");",
     "USE_SCHEMA": "USE SCHEMA public;"
   },
+  "tables": {
+    "products": "products",
+    "customers": "customers",
+    "ecommerce": "ecommerce"
+  },
   "preAggregations": {
     "Products": [],
     "Customers": [],

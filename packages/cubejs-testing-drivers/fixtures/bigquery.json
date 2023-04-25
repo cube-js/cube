@@ -6,8 +6,8 @@
       "CUBEJS_CACHE_AND_QUEUE_DRIVER": "cubestore",
       "CUBEJS_CUBESTORE_HOST": "store",
       "CUBEJS_DB_TYPE": "bigquery",
-      "-CUBEJS_DB_NAME-": "drivers_tests",
-      "CUBEJS_PRE_AGGREGATIONS_SCHEMA": "drivers_tests_preaggs",
+      "CUBEJS_DB_NAME": "test",
+      "CUBEJS_PRE_AGGREGATIONS_SCHEMA": "dev_pre_aggregations",
       "CUBEJS_DB_BQ_PROJECT_ID": "cube-open-source",
       "CUBEJS_DB_BQ_CREDENTIALS": "${DRIVERS_TESTS_CUBEJS_DB_BQ_CREDENTIALS}",
       "CUBEJS_DB_EXPORT_BUCKET": "cube-open-source-export-bucket"
@@ -17,12 +17,17 @@
   "cast": {
     "SELECT_PREFIX": "",
     "SELECT_SUFFIX": "",
-    "DATE_PREFIX": "date_parse(",
-    "DATE_SUFFIX": ", '%Y-%m-%d')",
-    "CREATE_TBL_PREFIX": "CREATE TABLE `test.",
-    "CREATE_TBL_SUFFIX": "` AS ",
+    "DATE_PREFIX": "PARSE_DATE('%Y-%m-%d', ",
+    "DATE_SUFFIX": ")",
+    "CREATE_TBL_PREFIX": "CREATE TABLE ",
+    "CREATE_TBL_SUFFIX": " AS ",
     "CREATE_SUB_PREFIX": "(",
     "CREATE_SUB_SUFFIX": ");"
+  },
+  "tables": {
+    "products": "test.products",
+    "customers": "test.customers",
+    "ecommerce": "test.ecommerce"
   },
   "preAggregations": {
     "Products": [],

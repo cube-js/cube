@@ -20,11 +20,38 @@ import {
 } from '@google-cloud/bigquery';
 import { Bucket, Storage } from '@google-cloud/storage';
 import {
-  BaseDriver, DownloadTableCSVData,
-  DriverInterface, QueryOptions, StreamTableData,
+  BaseDriver,
+  DownloadTableCSVData,
+  DriverInterface,
+  QueryOptions,
+  StreamTableDataWithTypes,
+  DownloadQueryResultsOptions,
+  DownloadQueryResultsResult,
+  DownloadTableMemoryData,
+  TableStructure,
+  Row,
 } from '@cubejs-backend/base-driver';
 import { Query } from '@google-cloud/bigquery/build/src/bigquery';
 import { HydrationStream } from './HydrationStream';
+
+const BQTypeToGenericType: Record<string, string> = {
+  ARRAY: 'text', // ?
+  BIGNUMERIC: 'double', // ?
+  BOOL: 'boolean',
+  BYTES: 'text', // ?
+  DATE: 'date',
+  DATETIME: 'timestamp',
+  FLOAT64: 'double',
+  GEOGRAPHY: 'text', // ?
+  INT64: 'bigint',
+  INTERVAL: 'text', // ?
+  JSON: 'text', // ?
+  NUMERIC: 'double', // ?
+  STRING: 'text',
+  STRUCT: 'text',
+  TIME: 'timestamp',
+  TIMESTAMP: 'timestamp',
+};
 
 interface BigQueryDriverOptions extends BigQueryOptions {
   readOnly?: boolean
@@ -147,14 +174,110 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     ];
   }
 
+  /**
+   * Driver read-only flag.
+   */
+  public readOnly() {
+    return !!this.options.readOnly;
+  }
+
+  /**
+   * Test driver's connection.
+   */
   public async testConnection() {
     await this.bigquery.query({
       query: 'SELECT ? AS number', params: ['1']
     });
   }
 
-  public readOnly() {
-    return !!this.options.readOnly;
+  /**
+   * Executes a query and returns either query result memory data or
+   * query result stream, depending on options.
+   */
+  public async downloadQueryResults(
+    query: string,
+    values: unknown[],
+    options: DownloadQueryResultsOptions,
+  ): Promise<DownloadQueryResultsResult> {
+    if (!options.streamImport) {
+      return this.memory(query, values);
+    } else {
+      return this.stream(query, values);
+    }
+  }
+
+  /**
+   * Executes query and returns table memory data that includes rows
+   * and queried fields types.
+   */
+  public async memory(
+    query: string,
+    values: unknown[],
+  ): Promise<DownloadTableMemoryData & { types: TableStructure }> {
+    const types = await this.queryColumnTypes(query);
+    const rows: Row[] = await this.query(query, values);
+    return { types, rows };
+  }
+
+  /**
+   * Returns stream table object that includes query result stream and
+   * queried fields types.
+   */
+  public async stream(
+    query: string,
+    values: unknown[]
+  ): Promise<StreamTableDataWithTypes> {
+    const types = await this.queryColumnTypes(query);
+    const stream = await this.bigquery.createQueryStream({
+      query,
+      params: values,
+      parameterMode: 'positional',
+      useLegacySql: false
+    });
+    const rowStream = new HydrationStream();
+    stream.pipe(rowStream);
+    return {
+      rowStream,
+      types,
+      release: async () => {
+        //
+      }
+    };
+  }
+
+  /**
+   * Returns an array of queried fields meta info.
+   */
+  public async queryColumnTypes(sql: string): Promise<TableStructure> {
+    const rowSql = `${sql} LIMIT 1`;
+    const row = (await this.runQueryJob({
+      query: rowSql,
+      params: [],
+      parameterMode: 'positional',
+      useLegacySql: false
+    }, {}))[0][0];
+    const typesSql = `
+      WITH ORIGIN AS (${rowSql})
+      SELECT
+        ${Object.keys(row).map((f) => (`bqutil.fn.typeof(${f}) AS ${f}`)).join(', ')}
+      FROM ORIGIN`;
+    const types = (await this.runQueryJob({
+      query: typesSql,
+      params: [],
+      parameterMode: 'positional',
+      useLegacySql: false
+    }, {}))[0][0];
+    return Object.keys(types).map((f) => ({
+      name: f,
+      type: this.toGenericType(types[f]),
+    }));
+  }
+
+  /**
+   * Returns generic type for the provided BQ type.
+   */
+  public toGenericType(type: string) {
+    return BQTypeToGenericType[type];
   }
 
   public async query<R = unknown>(query: string, values: unknown[], options?: QueryOptions): Promise<R[]> {
@@ -238,25 +361,6 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
 
   public async isUnloadSupported() {
     return this.bucket !== null;
-  }
-
-  public async stream(
-    query: string,
-    values: unknown[]
-  ): Promise<StreamTableData> {
-    const stream = await this.bigquery.createQueryStream({
-      query,
-      params: values,
-      parameterMode: 'positional',
-      useLegacySql: false
-    });
-
-    const rowStream = new HydrationStream();
-    stream.pipe(rowStream);
-
-    return {
-      rowStream,
-    };
   }
 
   public async unload(table: string): Promise<DownloadTableCSVData> {
