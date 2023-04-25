@@ -139,7 +139,7 @@ function QueryTabsRenderer({
               size="small"
               onClick={() => toggleModal()}
             >
-              Add Rollup to Schema
+              Add Rollup to Data Model
             </Button>
           ) : null}
         </Space>

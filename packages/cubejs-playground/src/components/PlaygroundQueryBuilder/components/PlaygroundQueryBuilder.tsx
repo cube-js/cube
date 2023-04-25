@@ -13,7 +13,7 @@ import {
   VizState,
 } from '@cubejs-client/react';
 import { Col, Row, Space } from 'antd';
-import { PlaySquareOutlined } from '@ant-design/icons';
+import { SyncOutlined } from '@ant-design/icons';
 import React, { RefObject, useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
 
@@ -329,7 +329,7 @@ export function PlaygroundQueryBuilder({
           // @ts-ignore
           parsedDateRange = query.timeDimensions[0].dateRange;
         }
-        
+
         const queriesEqual = areQueriesEqual(
           validateQuery(query),
           validateQuery(queryRef.current)
@@ -484,7 +484,7 @@ export function PlaygroundQueryBuilder({
 
                     {resultSetExists && queriesEqual ? (
                       <Button
-                        icon={<PlaySquareOutlined />}
+                        icon={<SyncOutlined />}
                         onClick={async () => {
                           await refreshToken();
 
