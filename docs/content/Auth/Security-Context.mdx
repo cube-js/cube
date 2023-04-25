@@ -133,14 +133,14 @@ Starting from version v0.32.5, a "permission" security feature was established.
 This feature aims to allow users to configure access to specific APIs based on
 the claims provided in the JWT token.
 
-To configure permissions new `contextToPermissions` function should be provided
+To configure permissions new `contextToApiScopes` function should be provided
 in the `cube.js` file. This function takes two optional parameters,
 `securityContext` and `defaultPermissions`, and returns a promise that must be
 resolved with the array of allowed permissions.
 
 The `defaultPermissions` parameter is an array that contains all possible
 permissions but the `jobs`, and the Cube uses its value if no
-`contextToPermissions` function was provided:
+`contextToApiScopes` function was provided:
 
 ```javascript
 console.log(defaultPermissions); // ['graphql', 'meta', 'data']
@@ -149,7 +149,7 @@ console.log(defaultPermissions); // ['graphql', 'meta', 'data']
 The default implementation of full access to Cube's APIs could look like this:
 
 ```javascript
-async function contextToPermissions(
+async function contextToApiScopes(
   securityContext?: any,
   defaultPermissions?: string[],
 ): Promise<string[]> {
