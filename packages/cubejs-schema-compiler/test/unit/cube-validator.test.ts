@@ -48,6 +48,16 @@ describe('Cube Validation', () => {
           primaryKey: true
         },
       },
+      segments: {
+        firstSegment: {
+          public: false,
+          sql: () => 'test',
+        },
+        secondSegment: {
+          shown: false,
+          sql: () => 'test',
+        }
+      },
       fileName: 'fileName',
     };
 
