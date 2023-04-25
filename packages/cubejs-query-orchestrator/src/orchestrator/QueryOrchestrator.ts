@@ -481,13 +481,4 @@ export class QueryOrchestrator {
   public async updateRefreshEndReached() {
     return this.preAggregations.updateRefreshEndReached();
   }
-
-  public async fetchSchema(dataSource?: string, external?: boolean) {
-    return this.queryCache.queryWithRetryAndRelease('', [], {
-      cacheKey: [`Fetch schema for ${dataSource}`, []],
-      dataSource,
-      external,
-      tablesSchema: true
-    });
-  }
 }
