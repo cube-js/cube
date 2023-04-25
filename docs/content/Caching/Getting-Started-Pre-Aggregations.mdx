@@ -167,8 +167,8 @@ receives via the API. The process for selection is summarized below:
 
    - The pre-aggregation contains all dimensions, filter dimensions and leaf
      measures from the query
-   - The measures aren't multiplied ([via a `hasMany`
-     relation][ref-schema-joins-hasmany])
+   - The measures aren't multiplied ([via a `one_to_many`
+     relationship][ref-schema-joins-rel])
 
 3. If no, then check if
 
@@ -197,7 +197,7 @@ cube(`LineItems`, {
   joins: {
     Orders: {
       sql: `${CUBE}.order_id = ${Orders.id}`,
-      relationship: `belongsTo`,
+      relationship: `many_to_one`,
     },
   },
 
@@ -425,7 +425,7 @@ To recap what we've learnt so far:
 
 - **Additive measures** are measures whose values can be added together
 
-- **Multiplied measures** are measures that define `hasMany` relations
+- **Multiplied measures** are measures that define `one_to_many` relationships
 
 - **Leaf measures** are measures that do not reference any other measures in
   their definition
@@ -488,7 +488,7 @@ Some extra considerations for pre-aggregation selection:
   /caching/using-pre-aggregations#pre-aggregations-storage
 [ref-schema-dims]: /schema/reference/dimensions
 [ref-schema-joins]: /schema/reference/joins
-[ref-schema-joins-hasmany]: /schema/reference/joins#relationship
+[ref-schema-joins-rel]: /schema/reference/joins#relationship
 [ref-schema-preaggs]: /schema/reference/pre-aggregations
 [ref-schema-preaggs-origsql]:
   /schema/reference/pre-aggregations#type-originalsql

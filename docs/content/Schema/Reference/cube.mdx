@@ -23,7 +23,7 @@ cube(`Users`, {
 
   joins: {
     Organizations: {
-      relationship: `belongsTo`,
+      relationship: `many_to_one`,
       sql: `${Users.organization_id} = ${Organizations.id}`,
     },
   },
@@ -61,7 +61,7 @@ cubes:
     sql: SELECT * FROM USERS
     joins:
       - name: Organizations
-        relationship: belongs_to
+        relationship: many_to_one
         sql: "{CUBE.organization_id} = {Organizations.id}"
     measures:
       - name: count
@@ -81,18 +81,6 @@ cubes:
 ```
 
 </CodeTabs>
-
-## Naming
-
-There are certain rules to follow for a cube and cube member names:
-
-- Be unique within the project
-- Start with a letter
-- Consist of numbers, letters and `_`
-
-As a convention, cube names start with upper case letters and member names with
-lower case letters. As in JavaScript, [camel case][wiki-camelcase] is used for
-multi-word cube and member names.
 
 ## Members and Referencing
 
@@ -118,7 +106,7 @@ cube(`Users`, {
   joins: {
     Contacts: {
       sql: `${CUBE}.contact_id = ${Contacts.id}`,
-      relationship: `hasOne`,
+      relationship: `one_to_one`,
     },
   },
 
@@ -156,7 +144,7 @@ cubes:
     joins:
       - name: Contacts
         sql: "{CUBE.contact_id} = {Contacts.id}"
-        relationship: has_one
+        relationship: one_to_one
     dimensions:
       - name: name
         sql: "COALESCE({CUBE.name}, {Contacts.name})"
@@ -227,6 +215,28 @@ cube(`Contacts`, {
 ```
 
 ## Parameters
+
+### <--{"id" : "Parameters"}--> name
+
+The `name` parameter serves as the identifier of a cube. It must be unique among
+_all cubes and views_ within a deployment and follow the [naming
+conventions][ref-naming].
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  sql_table: orders,
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    sql_table: orders
+```
+
+</CodeTabs>
 
 ### <--{"id" : "Parameters"}--> dataSource
 
@@ -1043,4 +1053,4 @@ cubes:
 [ref-restapi-meta]: /rest-api#v-1-meta
 [ref-restapi-sql]: /rest-api#v-1-sql
 [ref-sec-ctx]: /security/context
-[wiki-camelcase]: https://en.wikipedia.org/wiki/Camel_case
+[ref-naming]: /data-modeling/syntax#naming

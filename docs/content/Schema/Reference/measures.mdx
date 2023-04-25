@@ -15,19 +15,18 @@ aggregation over a certain column in your database table.
 
 Any measure should have the following properties: `name`, `sql` and `type`.
 
-## Naming
+## Parameters
 
-When you give a name to a measure, there are certain rules to follow. Each
-measure should:
+### <--{"id" : "Parameters"}--> name
 
-- Be unique within a cube
-- Start with a lowercase letter
-- Consist of numbers, letters and `_`
+The `name` parameter serves as the identifier of a measure. It must be unique
+among all measures, dimensions, and segments within a cube and follow the
+[naming conventions][ref-naming].
 
 <CodeTabs>
 
 ```javascript
-cube(`Orders`, {
+cube(`orders`, {
   measures: {
     count: {
       sql: `id`,
@@ -44,19 +43,19 @@ cube(`Orders`, {
 
 ```yaml
 cubes:
-  - name: Orders
+  - name: orders
+
     measures:
       - name: count
         sql: id
         type: count
+
       - name: total_amount
         sql: amount
         type: sum
 ```
 
 </CodeTabs>
-
-## Parameters
 
 ### <--{"id" : "Parameters"}--> description
 
@@ -459,7 +458,7 @@ cubes:
   - name: Orders
     measures:
       - name: purchases_to_created_account_ratio
-        sql: "{purchases} / {Users.count} * 100.0"
+        sql: '{purchases} / {Users.count} * 100.0'
         type: number
         format: percent
 ```
@@ -474,3 +473,4 @@ join will be created automatically.
 [ref-schema-ref-types-formats-measures-formats]:
   /schema/reference/types-and-formats#measures-formats
 [ref-drilldowns]: /schema/fundamentals/additional-concepts#drilldowns
+[ref-naming]: /data-modeling/syntax#naming

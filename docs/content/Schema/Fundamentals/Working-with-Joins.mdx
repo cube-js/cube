@@ -10,11 +10,12 @@ redirect_from:
 ---
 
 A join creates a relationship between two cubes in your Cube project. Cube
-supports three kinds of relationships often found in SQL databases:
+supports three [types of join relationships][ref-schema-ref-joins-relationship]
+often found in SQL databases:
 
-- `hasOne`/`has_one`
-- `hasMany`/`has_many`
-- `belongsTo`/`belongs_to`
+- `one_to_one`
+- `one_to_many`
+- `many_to_one`
 
 To use an example, let's use two cubes, `Customers` and `Orders`:
 
@@ -83,7 +84,7 @@ We could add a join to the `Customers` cube:
 cube('Customers', {
   joins: {
     Orders: {
-      relationship: `hasMany`,
+      relationship: `one_to_many`,
       sql: `${CUBE}.id = ${Orders.customer_id}`,
     },
   },
@@ -95,7 +96,7 @@ cubes:
   - name: Customers
     joins:
       - name: Orders
-        relationship: has_many
+        relationship: one_to_many
         sql: "{CUBE}.id = {Orders.customer_id}"
 ```
 
@@ -137,10 +138,10 @@ LIMIT
 ```
 
 However, if we have guest checkouts, that would mean we would have orders with
-no matching customer. Looking back at the `hasMany` relationship and its'
+no matching customer. Looking back at the `one_to_many` relationship and its'
 resulting SQL, any guest checkouts would be excluded from the results. To remedy
 this, we'll remove the join from the `Customers` cube and instead define a join
-with a `belongsTo` relationship on the `Orders` cube:
+with a `many_to_one` relationship on the `Orders` cube:
 
 <CodeTabs>
 
@@ -148,7 +149,7 @@ with a `belongsTo` relationship on the `Orders` cube:
 cube('Orders', {
   joins: {
     Customers: {
-      relationship: `belongsTo`,
+      relationship: `many_to_one`,
       sql: `${CUBE}.customer_id = ${Customers.id}`,
     },
   },
@@ -160,7 +161,7 @@ cubes:
   - name: Orders
     joins:
       - name: Customers
-        relationship: belongs_to
+        relationship: many_to_one
         sql: "{CUBE}.customer_id = {Customers.id}"
 ```
 
@@ -194,7 +195,7 @@ retrieved.
 <InfoBox>
 
 In Cube, joins only need to be defined from one direction. In the above example,
-we explicitly _removed_ the `hasMany` relationship from the `Customer` cube; not
+we explicitly _removed_ the `one_to_many` relationship from the `Customer` cube; not
 doing so would cause the query to fail as Cube would be unable to determine a
 valid join path. [Click here][self-join-direction] to learn more about how the
 direction of joins affects query results.
@@ -240,7 +241,7 @@ and declare the relationships from it to `Topics` cube and from `Posts` to
 
 <InfoBox>
 
-The following example uses the `hasMany` relationship on the `PostTopics` cube;
+The following example uses the `one_to_many` relationship on the `PostTopics` cube;
 this causes the direction of joins to be `Posts -> PostTopics -> Topics`. [Read
 more about direction of joins here][self-join-direction].
 
@@ -254,7 +255,7 @@ cube(`Posts`, {
 
   joins: {
     PostTopics: {
-      relationship: `belongsTo`,
+      relationship: `many_to_one`,
       sql: `${CUBE}.id = ${PostTopics.post_id}`,
     },
   },
@@ -277,7 +278,7 @@ cube(`PostTopics`, {
 
   joins: {
     Topic: {
-      relationship: `hasMany`,
+      relationship: `one_to_many`,
       sql: `${CUBE}.topic_id = ${Topics.id}`,
     },
   },
@@ -297,7 +298,7 @@ cubes:
     sql: SELECT * FROM posts
     joins:
       - name: PostTopics
-        relationship: belongs_to
+        relationship: many_to_one
         sql: "{CUBE}.id = {PostTopics.post_id}"
 
   - name: Topics
@@ -312,7 +313,7 @@ cubes:
     sql: SELECT * FROM post_topics
     joins:
       - name: Topic
-        relationship: has_many
+        relationship: one_to_many
         sql: "{CUBE}.topic_id = {Topics.id}"
     dimensions:
       - name: post_id
@@ -494,7 +495,7 @@ The following diagram shows our data schema with the `Campaigns` cube:
 </div>
 
 The last piece is to finally declare a many-to-many relationship. This should be
-done by declaring a [`hasMany` relationship][ref-schema-ref-joins-relationship]
+done by declaring a [`one_to_many` relationship][ref-schema-ref-joins-relationship]
 on the associative cube, `Campaigns` in our case.
 
 <CodeTabs>
@@ -505,7 +506,7 @@ cube(`Emails`, {
 
   joins: {
     Campaigns: {
-      relationship: `belongsTo`,
+      relationship: `many_to_one`,
       sql: `${CUBE}.campaign_id = ${Campaigns.id}
       AND ${CUBE}.customer_name = ${Campaigns.customerName}`,
     },
@@ -539,7 +540,7 @@ cube(`Emails`, {
 cube(`Campaigns`, {
   joins: {
     Transactions: {
-      relationship: `hasMany`,
+      relationship: `one_to_many`,
       sql: `${CUBE}.customer_name = ${Transactions.customerName}
       AND ${CUBE}.campaign_id = ${Transactions.campaignId}`,
     },
@@ -566,7 +567,7 @@ cubes:
     sql: SELECT * FROM emails
     joins:
       - name: Campaigns
-        relationship: belongs_to
+        relationship: many_to_one
         sql: "{CUBE}.campaign_id = {Campaigns.id} AND {CUBE}.customer_name = {Campaigns.customer_name}"
     measures:
       - name: count
@@ -586,7 +587,7 @@ cubes:
   - name: Campaigns
     joins:
       - name: Transactions
-        relationship: has_many
+        relationship: one_to_many
         sql: "{CUBE}.customer_name = {Transactions.customer_name} AND {CUBE}.campaign_id = {Transactions.campaign_id}"
     dimensions:
       - name: id
@@ -697,7 +698,7 @@ cube('Orders', {
 
   joins: {
     Customers: {
-      relationship: `belongsTo`,
+      relationship: `many_to_one`,
       sql: `${CUBE}.customer_id = ${Customers.id}`,
     },
   },
@@ -736,7 +737,7 @@ cubes:
     sql: SELECT * FROM orders
     joins:
       - name: Customers
-        relationship: belongs_to
+        relationship: many_to_one
         sql: "{CUBE}.customer_id = {Customers.id}"
     measures:
       - name: count
@@ -786,7 +787,7 @@ cube('Customers', {
 
   joins: {
     Orders: {
-      relationship: `hasMany`,
+      relationship: `one_to_many`,
       sql: `${CUBE}.id = ${Orders.customer_id}`,
     },
   },
@@ -820,7 +821,7 @@ cubes:
     sql: SELECT * FROM customers
     joins:
       - name: Orders
-        relationship: has_many
+        relationship: one_to_many
         sql: "{CUBE}.id = {Orders.customer_id}"
     measures:
       - name: count
@@ -935,11 +936,11 @@ cube(`OrganizationUsers`, {
   joins: {
     Users: {
       sql: `${CUBE}.user_id = ${Users.id}`,
-      relationship: `hasMany`,
+      relationship: `one_to_many`,
     },
     Organizations: {
       sql: `${CUBE}.organization_id = ${Organizations.id}`,
-      relationship: `hasMany`,
+      relationship: `one_to_many`,
     },
   },
 
@@ -984,10 +985,10 @@ cubes:
     joins:
       - name: Users
         sql: "{CUBE}.user_id = {Users.id}"
-        relationship: has_many
+        relationship: one_to_many
       - name: Organizations
         sql: "{CUBE}.organization_id = {Organizations.id}"
-        relationship: has_many
+        relationship: one_to_many
     dimensions:
       - name: id
         # Joins require a primary key, so we'll create one on-the-fly
@@ -1032,7 +1033,7 @@ cube(`Users`, {
   joins: {
     OrganizationUsers: {
       sql: `${OrganizationUsers.user_id} = ${Users.id}`,
-      relationship: `hasMany`,
+      relationship: `one_to_many`,
     },
   },
 
@@ -1045,7 +1046,7 @@ cube(`OrganizationUsers`, {
   joins: {
     Organizations: {
       sql: `${OrganizationUsers.organization_id} = ${Organizations.id}`,
-      relationship: `hasMany`,
+      relationship: `one_to_many`,
     },
   },
 });
@@ -1057,7 +1058,7 @@ cubes:
     joins:
       - name: OrganizationUsers
         sql: "{OrganizationUsers.user_id} = {Users.id}"
-        relationship: has_many
+        relationship: one_to_many
     measures:
       - name: type
         type: count
@@ -1066,7 +1067,7 @@ cubes:
     joins:
       - name: Organizations
         sql: "{OrganizationUsers.organization_id} = {Organizations.id}"
-        relationship: has_many
+        relationship: one_to_many
 ```
 
 </CodeTabs>
