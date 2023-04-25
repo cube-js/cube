@@ -164,6 +164,9 @@ export class DevServer {
       const schemaPath = options.schemaPath || 'schema';
 
       await fs.emptyDir(path.join(schemaPath, 'cubes'));
+      await fs.emptyDir(path.join(schemaPath, 'views'));
+      
+      await fs.writeFile(path.join(schemaPath, 'views', '.gitkeep'), '');
       await Promise.all(files.map(file => fs.writeFile(path.join(schemaPath, 'cubes', file.fileName), file.content)));
 
       res.json({ files });
@@ -504,6 +507,7 @@ export class DevServer {
       variables.CUBEJS_EXTERNAL_DEFAULT = 'true';
       variables.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'true';
       variables.CUBEJS_DEV_MODE = 'true';
+      variables.CUBEJS_SCHEMA_PATH = 'model';
       variables = Object.entries(variables).map(([key, value]) => ([key, value].join('=')));
 
       const repositoryPath = path.join(process.cwd(), options.schemaPath);
