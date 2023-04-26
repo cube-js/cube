@@ -17,7 +17,10 @@ conventions][self-naming], and be defined using a supported
 ## Folder structure
 
 Data model files should be placed inside the `model` folder. You can use the
-[`schemaPath` configuration option][ref-config-model-path] to override this.
+[`schemaPath` configuration option][ref-config-model-path] to override the
+folder name or the [`repositoryFactory` configuration
+option][ref-config-repository-factory] to dynamically define the folder name and
+data model file contents.
 
 It's recommended to place each cube or view in a separate file, in `model/cubes`
 and `model/views` folders, respectively. Example:
@@ -108,5 +111,6 @@ YAML syntax is very similar to JavaScript syntax, with a few key differences:
 [self-naming]: #naming
 [self-syntax]: #code-syntax
 [ref-config-model-path]: /config#options-reference-schema-path
+[ref-config-repository-factory]: /config#options-reference-repository-factory
 [wiki-snake-case]: https://en.wikipedia.org/wiki/Snake_case
 [wiki-yaml]: https://en.wikipedia.org/wiki/YAML
