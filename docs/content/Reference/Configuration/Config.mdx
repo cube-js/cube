@@ -134,7 +134,7 @@ Called only once per [`appId`][self-opts-ctx-to-appid].
 
 ### <--{"id" : "Options Reference"}--> schemaPath
 
-Path to schema files. The default value is `/schema`.
+Path to data model files. The default value is `/model`.
 
 ### <--{"id" : "Options Reference"}--> basePath
 
@@ -258,10 +258,10 @@ Called only once per [`appId`][self-opts-ctx-to-appid].
 ```javascript
 const { FileRepository } = require('@cubejs-backend/server-core');
 
-// using built-in SchemaFileRepository implementation and supplying the path to schema files
+// using built-in SchemaFileRepository implementation and supplying the path to model files
 module.exports = {
   repositoryFactory: ({ securityContext }) =>
-    new FileRepository(`schema/${securityContext.appId}`),
+    new FileRepository(`model/${securityContext.appId}`),
 };
 
 // supplying your own SchemaFileRepository implementation to return array of files
@@ -805,10 +805,11 @@ directory.
   https://github.com/cube-js/cube/blob/master/packages/cubejs-server-core/src/core/FileRepository.ts
 
 The `SchemaFileRepository` contract defines an async `dataSchemaFiles` function
-which returns the files to compile for a schema. Returned by
-[repositoryFactory][self-repofactory]. The [`FileRepository`][gh-cube-filerepo]
-implementation of the `SchemaFileRepository` contract accepts a
-[`schemaPath`][self-schemapath] in its constructor.
+which returns the files to compile for a data model. Returned by
+[`repositoryFactory`][self-repofactory]. The
+[`FileRepository`][gh-cube-filerepo] implementation of the
+`SchemaFileRepository` contract accepts a [`schemaPath`][self-schemapath] in its
+constructor.
 
 ```javascript
 class ApiFileRepository {

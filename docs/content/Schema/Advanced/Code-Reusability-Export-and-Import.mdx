@@ -100,24 +100,24 @@ You may need to import from parent directories as Cube flattens nested
 directories. The example below shows a correct way to import a helper function,
 which is located in a parent directory.
 
-```shell
+```tree
 .
 ├── README.md
 ├── cube.js
 ├── package.json
-└── schema
-    ├── schema_utils.js
+└── model
+    ├── utils.js
     └── Sales
         └── Orders.js
 ```
 
 ```javascript
-// in schema/Sales/Orders.js
+// in model/Sales/Orders.js
 import { capitalize } from './schema_utils';
 ```
 
 ```javascript
-// in schema/schema_utils.js
+// in model/utils.js
 export const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 ```
 
@@ -127,15 +127,15 @@ A common use-case is to disable pre-aggregations unless running in "production"
 or "staging" environments. The best approach is to add an environment variable
 and make it available in schema files.
 
-In the example bellow we have the following file structure:
+In the example below we have the following file structure:
 
-```shell
+```tree
 .
 ├── README.md
 ├── cube.js
 ├── package.json
 ├── utils.js
-└── schema
+└── model
     └── Sales
         └── Orders.js
 ```
@@ -147,7 +147,7 @@ exports.environment = () => environment;
 ```
 In the schema file, the definition will change depending on the value of the environment value.
 ```javascript
-// in schema/Sales/Orders.js
+// in model/Sales/Orders.js
 import {environment} from '../utils'
 
 cube(`Orders`, {

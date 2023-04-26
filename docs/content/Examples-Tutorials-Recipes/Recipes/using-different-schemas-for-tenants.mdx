@@ -17,11 +17,13 @@ tenant.
 We have a folder structure as follows:
 
 ```tree
-schema/
+model/
 ├── avocado/
-│   └── Products.js
+│   └── cubes
+│       └── Products.js
 └── mango/
-    └── Products.js
+    └── cubes
+        └── Products.js
 ```
 
 Let's configure Cube to use a specific data schema path for each tenant. We'll
@@ -31,8 +33,8 @@ pass the tenant name as a part of
 
 We'll also need to override the
 [`contextToAppId`](https://cube.dev/docs/config#context-to-app-id) function to
-control how the schema compilation result is cached and provide the tenant names
-via the
+control how the data model compilation result is cached and provide the tenant
+names via the
 [`scheduledRefreshContexts`](https://cube.dev/docs/config#scheduled-refresh-contexts)
 function so a refresh worker can find all existing schemas and build
 pre-aggregations for them, if needed.
@@ -47,7 +49,7 @@ module.exports = {
     `CUBEJS_APP_${securityContext.tenant}`,
 
   repositoryFactory: ({ securityContext }) =>
-    new FileRepository(`schema/${securityContext.tenant}`),
+    new FileRepository(`model/${securityContext.tenant}`),
 
   scheduledRefreshContexts: () => [
     { securityContext: { tenant: 'avocado' } },
@@ -62,15 +64,15 @@ In this example, we'd like to get products with odd `id` values for the
 `avocado` tenant and with even `id` values the `mango` tenant:
 
 ```javascript
-// schema/avocado
-cube(`Products`, {
+// model/avocado/Product.js
+cube(`products`, {
   sql: `SELECT * FROM public.Products WHERE MOD (id, 2) = 1`,
 
   ...
 });
 
-// schema/mango
-cube(`Products`, {
+// model/mango/Product.js
+cube(`products`, {
   sql: `SELECT * FROM public.Products WHERE MOD (id, 2) = 0`,
 
   ...

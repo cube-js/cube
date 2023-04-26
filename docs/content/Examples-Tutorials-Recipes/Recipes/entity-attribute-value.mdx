@@ -247,7 +247,7 @@ from an external source, e.g., the data source. Here's the code from the
 `fetch.js` file that defines the `fetchStatuses` function that would load the
 statuses from the database. Note that it uses the `pg` package (Node.js client
 for Postgres) and reuses the credentials from Cube. Let's keep this file outside
-the `schema` folder:
+the `model/` folder:
 
 ```javascript
 const { Pool } = require('pg');

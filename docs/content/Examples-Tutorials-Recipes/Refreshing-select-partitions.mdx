@@ -11,9 +11,9 @@ menuOrder: 6
 We have a dataset with orders and we want to aggregate data while having decent
 performance. Orders have a creation time, so we can use
 [partitioning](https://cube.dev/docs/caching/using-pre-aggregations#partitioning)
-by time to optimize pre-aggregations build and refresh time. The problem is that the
-order's status can change after a long period. In this case, we want to rebuild only
-partitions associated with this order.
+by time to optimize pre-aggregations build and refresh time. The problem is that
+the order's status can change after a long period. In this case, we want to
+rebuild only partitions associated with this order.
 
 In the recipe below, we'll learn how to use the
 [`refreshKey`](https://cube.dev/docs/schema/reference/pre-aggregations#parameters-refresh-key-sql)
@@ -58,8 +58,8 @@ preAggregations: {
 As you can see, we defined custom a
 [`refreshKey`](https://cube.dev/docs/schema/reference/pre-aggregations#parameters-refresh-key-sql)
 that will check for new values of the `updated_at` property. The refresh key is
-evaluated for each partition separately. For example, if we update orders
-from august and update their `updated_at` property, the current refresh key will
+evaluated for each partition separately. For example, if we update orders from
+august and update their `updated_at` property, the current refresh key will
 update **for all partitions**. There is how it looks in the Cube logs:
 
 ```bash
@@ -84,7 +84,7 @@ Note that the query for two partitions is the same. It's the reason why **all
 partitions** will be updated.
 
 How do we fix this and update only the partition for august? We can use the
-[`FITER_PARAMS`](https://cube.dev/docs/schema/reference/cube#filter-params) for
+[`FILTER_PARAMS`](https://cube.dev/docs/schema/reference/cube#filter-params) for
 that!
 
 Let's update our pre-aggregation definition:
@@ -105,8 +105,8 @@ preAggregations: {
   },
 ```
 
-Cube will filter data by the `created_at` property and then apply the refresh key for the `updated_at` property.
-Here's how it looks in the Cube logs:
+Cube will filter data by the `created_at` property and then apply the refresh
+key for the `updated_at` property. Here's how it looks in the Cube logs:
 
 ```bash
 Executing SQL: e1155b2f-859b-4e61-a760-17af891f5f0b
@@ -131,7 +131,8 @@ Executing SQL: e1155b2f-859b-4e61-a760-17af891f5f0b
 ```
 
 Note that Cube checks the refresh key value using a date range over the
-`created_at` property. With this refresh key, only one partition will be updated.
+`created_at` property. With this refresh key, only one partition will be
+updated.
 
 ## Result
 

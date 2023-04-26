@@ -9,9 +9,28 @@ redirect_from:
   - /schema/getting-started/yaml
 ---
 
-Entities within the data model (e.g., cubes, views, measures, dimensions, etc.)
-should follow [naming conventions][self-naming] and be defined using a supported
+Entities within the data model (e.g., cubes, views, etc.) should be placed under
+the `model` [folder][self-folder-structure], follow [naming
+conventions][self-naming], and be defined using a supported
 [syntax][self-syntax].
+
+## Folder structure
+
+Data model files should be placed inside the `model` folder. You can use the
+[`schemaPath` configuration option][ref-config-model-path] to override this.
+
+It's recommended to place each cube or view in a separate file, in `model/cubes`
+and `model/views` folders, respectively. Example:
+
+```tree
+model
+├── cubes
+│   ├── orders.yml
+│   ├── products.yml
+│   └── users.yml
+└── views
+    └── revenue.yml
+```
 
 ## Naming
 
@@ -33,7 +52,7 @@ Good examples of names:
 
 ## Model syntax
 
-Cube supports two ways to define data models: with [YAML][wiki-yaml] or
+Cube supports two ways to define data model files: with [YAML][wiki-yaml] or
 JavaScript syntax.
 
 <InfoBox>
@@ -42,10 +61,10 @@ YAML syntax is supported since v0.31.0.
 
 </InfoBox>
 
-YAML data models are placed in `.yml` files in the `schema/` folder, whereas
-JavaScript data models are placed in `.js` files in the same folder.
+YAML data model files should have the `.yml` extension, whereas JavaScript data
+model files should end with `.js`.
 
-It's recommended to use YAML syntax by default; opt to JavaScript syntax when
+It's recommended to use YAML syntax by default. Opt to JavaScript syntax when
 you need to have a
 [dynamic data model](/schema/advanced/dynamic-schema-creation).
 
@@ -85,7 +104,9 @@ YAML syntax is very similar to JavaScript syntax, with a few key differences:
 - In YAML syntax, string values only need to have quotes around them if they
   contain special values, e.g., `"{CUBE}.user_id = {Users.id}"`.
 
+[self-folder-structure]: #folder-structure
 [self-naming]: #naming
 [self-syntax]: #code-syntax
+[ref-config-model-path]: /config#options-reference-schema-path
 [wiki-snake-case]: https://en.wikipedia.org/wiki/Snake_case
 [wiki-yaml]: https://en.wikipedia.org/wiki/YAML
