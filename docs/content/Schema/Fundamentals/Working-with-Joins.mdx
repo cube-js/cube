@@ -22,7 +22,7 @@ To use an example, let's use two cubes, `Customers` and `Orders`:
 <CodeTabs>
 
 ```javascript
-cube('Customers', {
+cube("Customers", {
   dimensions: {
     id: {
       primaryKey: true,
@@ -36,7 +36,7 @@ cube('Customers', {
   },
 });
 
-cube('Orders', {
+cube("Orders", {
   dimensions: {
     id: {
       primaryKey: true,
@@ -81,7 +81,7 @@ We could add a join to the `Customers` cube:
 <CodeTabs>
 
 ```javascript
-cube('Customers', {
+cube("Customers", {
   joins: {
     Orders: {
       relationship: `one_to_many`,
@@ -146,7 +146,7 @@ with a `many_to_one` relationship on the `Orders` cube:
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   joins: {
     Customers: {
       relationship: `many_to_one`,
@@ -195,9 +195,9 @@ retrieved.
 <InfoBox>
 
 In Cube, joins only need to be defined from one direction. In the above example,
-we explicitly _removed_ the `one_to_many` relationship from the `Customer` cube; not
-doing so would cause the query to fail as Cube would be unable to determine a
-valid join path. [Click here][self-join-direction] to learn more about how the
+we explicitly _removed_ the `one_to_many` relationship from the `Customer` cube;
+not doing so would cause the query to fail as Cube would be unable to determine
+a valid join path. [Click here][self-join-direction] to learn more about how the
 direction of joins affects query results.
 
 </InfoBox>
@@ -241,9 +241,9 @@ and declare the relationships from it to `Topics` cube and from `Posts` to
 
 <InfoBox>
 
-The following example uses the `one_to_many` relationship on the `PostTopics` cube;
-this causes the direction of joins to be `Posts -> PostTopics -> Topics`. [Read
-more about direction of joins here][self-join-direction].
+The following example uses the `one_to_many` relationship on the `PostTopics`
+cube; this causes the direction of joins to be `Posts -> PostTopics -> Topics`.
+[Read more about direction of joins here][self-join-direction].
 
 </InfoBox>
 
@@ -345,7 +345,7 @@ cubes:
   - name: PostTopics
     dimensions:
       - name: id
-        sql: 'CONCAT({CUBE}.post_id, {CUBE}.topic_id)'
+        sql: "CONCAT({CUBE}.post_id, {CUBE}.topic_id)"
         type: number
         primary_key: true
 ```
@@ -495,8 +495,9 @@ The following diagram shows our data model with the `Campaigns` cube:
 </div>
 
 The last piece is to finally declare a many-to-many relationship. This should be
-done by declaring a [`one_to_many` relationship][ref-schema-ref-joins-relationship]
-on the associative cube, `Campaigns` in our case.
+done by declaring a [`one_to_many`
+relationship][ref-schema-ref-joins-relationship] on the associative cube,
+`Campaigns` in our case.
 
 <CodeTabs>
 
@@ -569,8 +570,7 @@ cubes:
       - name: Campaigns
         relationship: many_to_one
         sql:
-          '{CUBE}.campaign_id = {Campaigns.id} AND {CUBE}.customer_name =
-          {Campaigns.customer_name}'
+          "{CUBE}.campaign_id = {Campaigns.id} AND {CUBE}.customer_name = {Campaigns.customer_name}"
     measures:
       - name: count
         type: count
@@ -591,8 +591,7 @@ cubes:
       - name: Transactions
         relationship: one_to_many
         sql:
-          '{CUBE}.customer_name = {Transactions.customer_name} AND
-          {CUBE}.campaign_id = {Transactions.campaign_id}'
+          "{CUBE}.customer_name = {Transactions.customer_name} AND {CUBE}.campaign_id = {Transactions.campaign_id}"
     dimensions:
       - name: id
         sql: id
@@ -613,13 +612,13 @@ result set. As an example, let's take two cubes, `Orders` and `Customers`:
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   sql: `SELECT * FROM orders`,
 
   measures: {
     count: {
-      sql: 'id',
-      type: 'count',
+      sql: "id",
+      type: "count",
     },
   },
 
@@ -636,13 +635,13 @@ cube('Orders', {
   },
 });
 
-cube('Customers', {
+cube("Customers", {
   sql: `SELECT * FROM customers`,
 
   measures: {
     count: {
-      sql: 'id',
-      type: 'count',
+      sql: "id",
+      type: "count",
     },
   },
 
@@ -697,7 +696,7 @@ the `Customers` cube so that we do not lose data from anonymous orders:
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   sql: `SELECT * FROM orders`,
 
   joins: {
@@ -709,13 +708,13 @@ cube('Orders', {
 
   measures: {
     count: {
-      sql: 'id',
-      type: 'count',
+      sql: "id",
+      type: "count",
     },
 
     total_revenue: {
-      sql: 'revenue',
-      type: 'sum',
+      sql: "revenue",
+      type: "sum",
     },
   },
 
@@ -786,7 +785,7 @@ instance, we declare the join in the `Customers` cube:
 <CodeTabs>
 
 ```javascript
-cube('Customers', {
+cube("Customers", {
   sql: `SELECT * FROM customers`,
 
   joins: {
@@ -798,8 +797,8 @@ cube('Customers', {
 
   measures: {
     count: {
-      sql: 'id',
-      type: 'count',
+      sql: "id",
+      type: "count",
     },
   },
 
@@ -871,13 +870,13 @@ Views can also be used in Cube to represent the previous two scenarios:
 <CodeTabs>
 
 ```javascript
-view('TotalRevenuePerCustomer', {
+view("TotalRevenuePerCustomer", {
   description: `Total revenue per customer`,
 
   includes: [Orders.total_revenue, Users.company],
 });
 
-view('CustomersWithoutOrders', {
+view("CustomersWithoutOrders", {
   description: `Customers without orders`,
 
   includes: [Users.company],
@@ -906,7 +905,7 @@ views:
     measures:
       - name: count
         # Note the nested path to Orders.count
-        sql: '{Users.Orders.count}'
+        sql: "{Users.Orders.count}"
         type: number
 ```
 

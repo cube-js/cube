@@ -248,7 +248,7 @@ cubes:
         filters:
           - sql: "{CUBE}.paying = 'true'"
       - name: paying_percentage
-        sql: '100.0 * {paying_count} / {count}'
+        sql: "100.0 * {paying_count} / {count}"
         type: number
         format: percent
 ```

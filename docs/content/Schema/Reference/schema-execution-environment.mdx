@@ -39,7 +39,7 @@ exports.tableSchema = () => process.env.TABLE_SCHEMA;
 **model/cubes/Users.js**:
 
 ```javascript
-import { tableSchema } from '../tablePrefix';
+import { tableSchema } from "../tablePrefix";
 
 cube(`Users`, {
   sql: `SELECT * FROM ${tableSchema()}.users`,
@@ -88,8 +88,8 @@ Later, you can `import` into the cube, wherever needed:
 
 ```javascript
 // in Users.js
-import { TEST_USER_IDS } from './constants';
-import usersSql from './usersSql';
+import { TEST_USER_IDS } from "./constants";
+import usersSql from "./usersSql";
 
 cube(`Users`, {
   sql: usersSql(`users`),
@@ -103,7 +103,7 @@ cube(`Users`, {
 
   segments: {
     excludeTestUsers: {
-      sql: `${CUBE}.id NOT IN (${TEST_USER_IDS.join(', ')})`,
+      sql: `${CUBE}.id NOT IN (${TEST_USER_IDS.join(", ")})`,
     },
   },
 });

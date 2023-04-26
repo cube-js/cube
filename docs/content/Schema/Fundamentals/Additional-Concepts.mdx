@@ -223,7 +223,7 @@ cubes:
 
     measures:
       - name: average_deal_amount
-        sql: '{CUBE.deals_amount}'
+        sql: "{CUBE.deals_amount}"
         type: avg
 
     dimensions:
@@ -232,7 +232,7 @@ cubes:
         type: string
         primary_key: true
       - name: deals_amount
-        sql: '{Deals.amount}'
+        sql: "{Deals.amount}"
         type: number
         sub_query: true
 ```
@@ -284,7 +284,7 @@ cubes:
   - name: SalesManagers
     dimensions:
       - name: deals_amount
-        sql: 'SUM({Deals}.amount)' # Doesn't work, because `amount` is not a measure on `Deals`
+        sql: "SUM({Deals}.amount)" # Doesn't work, because `amount` is not a measure on `Deals`
         type: number
         subQuery: true
 ```
@@ -326,7 +326,7 @@ cubes:
   - name: SalesManagers
     measures:
       - name: average_deals_amount
-        sql: '{CUBE.deals_amount}'
+        sql: "{CUBE.deals_amount}"
         type: avg
     dimensions:
       - name: id
@@ -334,7 +334,7 @@ cubes:
         type: string
         primary_key: true
       - name: deals_amount
-        sql: '{Deals.amount}'
+        sql: "{Deals.amount}"
         type: number
         sub_query: true
 ```

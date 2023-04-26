@@ -45,7 +45,7 @@ your database using the [`sql` property][ref-schema-ref-sql]:
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   sql: `SELECT * FROM orders`,
 });
 ```
@@ -64,7 +64,7 @@ queries too:
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   sql: `
 SELECT
   *
@@ -100,7 +100,7 @@ Dimensions represent the properties of a **single** data point in the cube.
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   dimensions: {
     id: {
       sql: `id`,
@@ -141,7 +141,7 @@ represented as follows:
 <CodeTabs>
 
 ```javascript
-cube('LineItems', {
+cube("LineItems", {
   dimensions: {
     id: {
       sql: `id`,
@@ -191,7 +191,7 @@ We can add the necessary time dimensions to both data models as follows:
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   dimensions: {
     created_at: {
       sql: `created_at`,
@@ -211,10 +211,10 @@ cubes:
   - name: Orders
     dimensions:
       - name: created_at
-        sql: 'created_at'
+        sql: "created_at"
         type: time
       - name: completed_at
-        sql: 'completed_at'
+        sql: "completed_at"
         type: time
 ```
 
@@ -223,7 +223,7 @@ cubes:
 <CodeTabs>
 
 ```javascript
-cube('LineItems', {
+cube("LineItems", {
   dimensions: {
     created_at: {
       sql: `created_at`,
@@ -257,7 +257,7 @@ following:
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   measures: {
     count: {
       type: `count`,
@@ -282,7 +282,7 @@ of line items sold:
 <CodeTabs>
 
 ```javascript
-cube('LineItems', {
+cube("LineItems", {
   measures: {
     total: {
       sql: `price`,
@@ -325,7 +325,7 @@ In the following example, we are left-joining the `LineItems` cube onto our
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   joins: {
     LineItems: {
       relationship: `many_to_one`,
@@ -365,7 +365,7 @@ following:
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   segments: {
     only_completed: {
       sql: `${CUBE}.status = 'completed'`,
@@ -393,13 +393,13 @@ schema, they are defined under the `preAggregations` property:
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   preAggregations: {
     main: {
       measures: [CUBE.count],
       dimensions: [CUBE.status],
       timeDimension: CUBE.created_at,
-      granularity: 'day',
+      granularity: "day",
     },
   },
 });

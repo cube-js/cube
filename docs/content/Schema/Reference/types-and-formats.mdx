@@ -22,7 +22,7 @@ below, we create a `string` measure by converting a numerical value to a string:
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   measures: {
     high_or_low: {
       type: `string`,
@@ -51,7 +51,7 @@ below, we create a `time` measure from an existing dimension:
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   measures: {
     last_order: {
       sql: `MAX(created_at)`,
@@ -72,7 +72,7 @@ cubes:
   - name: Orders
     measures:
       - name: last_order
-        sql: 'MAX(created_at)'
+        sql: "MAX(created_at)"
         type: time
     dimensions:
       - name: created_at
@@ -93,7 +93,7 @@ The example below adds an `is_completed` measure which only returns `true` if
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   measures: {
     is_completed: {
       sql: `BOOL_AND(status = 'completed')`,
@@ -124,7 +124,7 @@ Measures][ref-schema-ref-calc-measures].
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   measures: {
     purchases_ratio: {
       sql: `${purchases} / ${count} * 100.0`,
@@ -140,7 +140,7 @@ cubes:
   - name: Orders
     measures:
       - name: purchases_ratio
-        sql: '{purchases} / {count} * 100.0'
+        sql: "{purchases} / {count} * 100.0"
         type: number
         format: percent
 ```
@@ -153,7 +153,7 @@ expression:
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   measures: {
     ratio: {
       sql: `sum(${CUBE}.amount) / count(*)`,
@@ -168,7 +168,7 @@ cubes:
   - name: Orders
     measures:
       - name: ratio
-        sql: 'SUM({CUBE}.amount) / count(*)'
+        sql: "SUM({CUBE}.amount) / count(*)"
         type: number
 ```
 
@@ -188,7 +188,7 @@ count. [Learn more about Drill Downs][ref-drilldowns].
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   measures: {
     numberOfUsers: {
       type: `count`,
@@ -225,11 +225,11 @@ results in a table column, or interpolated JavaScript expression.
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   measures: {
     uniqueUserCount: {
       sql: `user_id`,
-      type: 'countDistinct',
+      type: "countDistinct",
     },
   },
 });
@@ -262,11 +262,11 @@ The `sql` parameter is required and can take any valid SQL expression.
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   measures: {
     uniqueUserCount: {
       sql: `user_id`,
-      type: 'countDistinctApprox',
+      type: "countDistinctApprox",
     },
   },
 });
@@ -297,7 +297,7 @@ function.
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   measures: {
     revenue: {
       sql: `${chargesAmount}`,
@@ -312,7 +312,7 @@ cubes:
   - name: Orders
     measures:
       - name: revenue
-        sql: '{chargesAmount}'
+        sql: "{chargesAmount}"
         type: sum
 ```
 
@@ -321,7 +321,7 @@ cubes:
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   measures: {
     revenue: {
       sql: `amount`,
@@ -345,7 +345,7 @@ cubes:
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   measures: {
     revenue: {
       sql: `fee * 0.1`,
@@ -378,7 +378,7 @@ that results in a numeric table column, or interpolated JavaScript expression.
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   measures: {
     avg_transaction: {
       sql: `${transaction_amount}`,
@@ -393,7 +393,7 @@ cubes:
   - name: Orders
     measures:
       - name: avg_transaction
-        sql: '{transaction_amount}'
+        sql: "{transaction_amount}"
         type: avg
 ```
 
@@ -406,7 +406,7 @@ Type of measure `min` is calculated as a minimum of values defined in `sql`.
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   measures: {
     date_first_purchase: {
       sql: `date_purchase`,
@@ -434,7 +434,7 @@ Type of measure `max` is calculated as a maximum of values defined in `sql`.
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   measures: {
     date_last_purchase: {
       sql: `date_purchase`,
@@ -463,7 +463,7 @@ Type of measure `runningTotal` is calculated as summation of values defined in
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   measures: {
     total_subscriptions: {
       sql: `subscription_amount`,
@@ -496,7 +496,7 @@ see as output.
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   measures: {
     purchase_conversion: {
       sql: `${purchase}/${checkout}*100.0`,
@@ -512,7 +512,7 @@ cubes:
   - name: Orders
     measures:
       - name: purchase_conversion
-        sql: '{purchase}/{checkout}*100.0'
+        sql: "{purchase}/{checkout}*100.0"
         type: number
         format: percent
 ```
@@ -526,7 +526,7 @@ cubes:
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   measures: {
     total_amount: {
       sql: `amount`,
@@ -567,7 +567,7 @@ a string.
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   dimensions: {
     completed_at: {
       sql: `completed_at`,
@@ -600,7 +600,7 @@ The following model creates a field `full_name` by combining 2 fields:
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   dimensions: {
     full_name: {
       sql: `CONCAT(${first_name}, ' ', ${last_name})`,
@@ -628,7 +628,7 @@ cubes:
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   dimensions: {
     amount: {
       sql: `amount`,
@@ -657,7 +657,7 @@ boolean. For example:
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   dimensions: {
     is_enabled: {
       sql: `is_enabled`,
@@ -686,7 +686,7 @@ it requires to set two fields: latitude and longitude.
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   dimensions: {
     location: {
       type: `geo`,
@@ -708,9 +708,9 @@ cubes:
       - name: location
         type: geo
         latitude:
-          sql: '{CUBE}.latitude'
+          sql: "{CUBE}.latitude"
         longitude:
-          sql: '{CUBE}.longitude'
+          sql: "{CUBE}.longitude"
 ```
 
 </CodeTabs>
@@ -725,7 +725,7 @@ cubes:
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   dimensions: {
     image: {
       sql: `CONCAT('https://img.example.com/id/', ${id})`,
@@ -757,7 +757,7 @@ can take any valid SQL expression.
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   dimensions: {
     image: {
       sql: `id`,
@@ -791,7 +791,7 @@ The `sql` parameter is required and can take any valid SQL expression.
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   dimensions: {
     orderLink: {
       sql: `'http://myswebsite.com/orders/' || id`,
@@ -836,7 +836,7 @@ cubes:
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   dimensions: {
     amount: {
       sql: `amount`,
@@ -866,7 +866,7 @@ cubes:
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   dimensions: {
     open_rate: {
       sql: `COALESCE(100.0 * ${uniq_open_count} / NULLIF(${delivered_count}, 0), 0)`,
@@ -883,7 +883,7 @@ cubes:
     dimensions:
       - name: open_rate
         sql:
-          'COALESCE(100.0 * {uniq_open_count} / NULLIF({delivered_count}, 0), 0)'
+          "COALESCE(100.0 * {uniq_open_count} / NULLIF({delivered_count}, 0), 0)"
         type: number
         format: percent
 ```
