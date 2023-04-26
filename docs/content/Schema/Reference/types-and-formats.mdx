@@ -512,7 +512,7 @@ cubes:
   - name: Orders
     measures:
       - name: purchase_conversion
-        sql: "{purchase}/{checkout}*100.0"
+        sql: "{purchase} / {checkout} * 100.0"
         type: number
         format: percent
 ```

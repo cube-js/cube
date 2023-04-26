@@ -569,8 +569,7 @@ cubes:
     joins:
       - name: Campaigns
         relationship: many_to_one
-        sql:
-          "{CUBE}.campaign_id = {Campaigns.id} AND {CUBE}.customer_name = {Campaigns.customer_name}"
+        sql: "{CUBE}.campaign_id = {Campaigns.id} AND {CUBE}.customer_name = {Campaigns.customer_name}"
     measures:
       - name: count
         type: count
@@ -590,8 +589,7 @@ cubes:
     joins:
       - name: Transactions
         relationship: one_to_many
-        sql:
-          "{CUBE}.customer_name = {Transactions.customer_name} AND {CUBE}.campaign_id = {Transactions.campaign_id}"
+        sql: "{CUBE}.customer_name = {Transactions.customer_name} AND {CUBE}.campaign_id = {Transactions.campaign_id}"
     dimensions:
       - name: id
         sql: id
