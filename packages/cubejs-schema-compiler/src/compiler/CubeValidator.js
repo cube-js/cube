@@ -449,6 +449,16 @@ const MeasuresSchema = Joi.object().pattern(identifierRegex, Joi.alternatives().
   ]
 ));
 
+const SegmentsSchema = Joi.object().pattern(identifierRegex, Joi.object().keys({
+  aliases: Joi.array().items(Joi.string()),
+  sql: Joi.func().required(),
+  title: Joi.string(),
+  description: Joi.string(),
+  meta: Joi.any(),
+  shown: Joi.boolean().strict(),
+  public: Joi.boolean().strict(),
+}));
+
 /* *****************************
  * ATTENTION:
  * In case of adding/removing/changing any Joi.func() field that needs to be transpiled,
@@ -512,13 +522,7 @@ const baseSchema = {
       sql: Joi.func().required()
     })
   )),
-  segments: Joi.object().pattern(identifierRegex, Joi.object().keys({
-    aliases: Joi.array().items(Joi.string()),
-    sql: Joi.func().required(),
-    title: Joi.string(),
-    description: Joi.string(),
-    meta: Joi.any()
-  })),
+  segments: SegmentsSchema,
   preAggregations: PreAggregationsAlternatives,
 };
 

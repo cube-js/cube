@@ -1,12 +1,12 @@
-import { Component, FunctionComponent, lazy, Suspense } from 'react';
+import { Component, FunctionComponent, Suspense } from 'react';
 import {
   CodeOutlined,
   CodeSandboxOutlined,
   CopyOutlined,
   DownOutlined,
   PlusOutlined,
+  ThunderboltOutlined,
   QuestionCircleOutlined,
-  SyncOutlined,
 } from '@ant-design/icons';
 import { Dropdown, Menu, Modal } from 'antd';
 import { getParameters } from 'codesandbox-import-utils/lib/api/define';
@@ -414,7 +414,7 @@ class ChartContainer extends Component<
 
             <Button
               data-testid="cache-btn"
-              icon={<SyncOutlined />}
+              icon={<ThunderboltOutlined />}
               size="small"
               type={activeTab === 'cache' ? 'primary' : 'default'}
               disabled={!!frameworkItem?.placeholder || isFetchingMeta}

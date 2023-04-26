@@ -147,6 +147,7 @@ const schemaOptions = Joi.object().keys({
   canSwitchSqlUser: Joi.func(),
   sqlUser: Joi.string(),
   sqlPassword: Joi.string(),
+  semanticLayerSync: Joi.func(),
   // Additional system flags
   serverless: Joi.boolean(),
   allowNodeRequire: Joi.boolean(),

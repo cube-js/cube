@@ -431,7 +431,6 @@ export class QueryCache {
       lambdaTypes,
       persistent,
       aliasNameToMember,
-      tablesSchema,
     }: {
       cacheKey: CacheKey,
       dataSource: string,
@@ -443,7 +442,6 @@ export class QueryCache {
       lambdaTypes?: TableStructure,
       persistent?: boolean,
       aliasNameToMember?: { [alias: string]: string },
-      tablesSchema?: boolean,
     }
   ) {
     const queue = external
@@ -458,7 +456,6 @@ export class QueryCache {
       inlineTables,
       useCsvQuery,
       lambdaTypes,
-      tablesSchema,
     };
 
     const opt = {
@@ -487,8 +484,6 @@ export class QueryCache {
             this.logger('Executing SQL', { ...req });
             if (req.useCsvQuery) {
               return this.csvQuery(client, req);
-            } else if (req.tablesSchema) {
-              return client.tablesSchema();
             } else {
               return client.query(req.query, req.values, req);
             }
@@ -555,10 +550,6 @@ export class QueryCache {
         `SQL_QUERY_EXT_${this.redisPrefix}`,
         this.options.externalDriverFactory,
         (client, q) => {
-          if (q.tablesSchema) {
-            return client.tablesSchema();
-          }
-
           this.logger('Executing SQL', {
             ...q
           });
