@@ -41,6 +41,7 @@ function transformCube(cube: any, cubeDefinitions: any) {
     sql: stringifyMemberSql(cubeDefinitions[cube?.name]?.sql),
     fileName: cubeDefinitions[cube?.name]?.fileName,
     refreshKey: cubeDefinitions[cube?.name]?.refreshKey,
+    isView: !!cubeDefinitions[cube?.name]?.isView,
   };
 }
 
