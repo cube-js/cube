@@ -7,14 +7,54 @@
       "CUBEJS_CUBESTORE_HOST": "store",
 
       "CUBEJS_DB_TYPE": "redshift",
-      "CUBEJS_DB_HOST": "13.52.50.81",
+      "CUBEJS_DB_HOST": "drivers-tests.czlcrrl9hnb3.us-west-1.redshift.amazonaws.com",
       "CUBEJS_DB_PORT": "5439",
       "CUBEJS_DB_NAME": "dev",
       "CUBEJS_DB_USER": "${DRIVERS_TESTS_REDSHIFT_CUBEJS_DB_USER}",
       "CUBEJS_DB_PASS": "${DRIVERS_TESTS_REDSHIFT_CUBEJS_DB_PASS}",
-      "CUBEJS_PRE_AGGREGATIONS_SCHEMA": "drivers_tests_preaggs"
+      "CUBEJS_PRE_AGGREGATIONS_SCHEMA": "drivers_tests_preaggs",
+
+      "CUBEJS_DB_EXPORT_BUCKET_TYPE": "s3",
+      "CUBEJS_DB_EXPORT_BUCKET": "redshift-drivers-tests-preaggs",
+      "CUBEJS_DB_EXPORT_BUCKET_AWS_REGION": "us-west-1",
+      "CUBEJS_DB_EXPORT_BUCKET_AWS_KEY": "${DRIVERS_TESTS_REDSHIFT_CUBEJS_DB_EXPORT_BUCKET_AWS_KEY}",
+      "CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET": "${DRIVERS_TESTS_REDSHIFT_CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET}"
     },
     "ports" : ["4000"]
+  },
+  "preAggregations": {
+    "Products": [],
+    "Customers": [
+      {
+        "name": "RA",
+        "measures": ["CUBE.count", "CUBE.runningTotal"]
+      }
+    ],
+    "ECommerce": [
+      {
+        "name": "SA",
+        "dimensions": ["CUBE.productName"],
+        "measures": [
+          "CUBE.totalQuantity",
+          "CUBE.avgDiscount",
+          "CUBE.totalSales",
+          "CUBE.totalProfit"
+        ]
+      },
+      {
+        "name": "TA",
+        "time_dimension": "CUBE.orderDate",
+        "granularity": "month",
+        "partition_granularity": "month",
+        "dimensions": ["CUBE.productName"],
+        "measures": [
+          "CUBE.totalQuantity",
+          "CUBE.avgDiscount",
+          "CUBE.totalSales",
+          "CUBE.totalProfit"
+        ]
+      }
+    ]
   },
   "cast": {
     "SELECT_PREFIX": "",
@@ -26,10 +66,10 @@
     "CREATE_SUB_PREFIX": "(",
     "CREATE_SUB_SUFFIX": ");"
   },
-  "preAggregations": {
-    "Products": [],
-    "Customers": [],
-    "ECommerce": []
+  "tables": {
+    "products": "products",
+    "customers": "customers",
+    "ecommerce": "ecommerce"
   },
   "skip": [
     "---------------------------------------",
@@ -39,9 +79,7 @@
     "---------------------------------------",
     "Core tests                             ",
     "---------------------------------------",
-    "for the Customers.RollingExternal",
     "for the Customers.RollingInternal",
-    "for the ECommerce.SimpleAnalysisExternal",
     "for the ECommerce.SimpleAnalysisInternal",
     "for the ECommerce.TimeAnalysisInternal",
     "for the ECommerce.TimeAnalysisExternal",

@@ -116,8 +116,6 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
       config.dataSource ||
       assertDataSource('default');
 
-    console.log(getEnv('dbUser', { dataSource }), getEnv('dbPass', { dataSource }));
-    
     this.pool = new Pool({
       idleTimeoutMillis: 30000,
       max:
@@ -348,6 +346,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     }
 
     const res = await this.queryResponse(query, values);
+    console.log(JSON.stringify(res, undefined, 2));
     return {
       rows: res.rows,
       types: this.mapFields(res.fields),
