@@ -64,15 +64,15 @@ In this example, we'd like to get products with odd `id` values for the
 `avocado` tenant and with even `id` values the `mango` tenant:
 
 ```javascript
-// model/avocado
-cube(`Products`, {
+// model/avocado/Product.js
+cube(`products`, {
   sql: `SELECT * FROM public.Products WHERE MOD (id, 2) = 1`,
 
   ...
 });
 
-// model/mango
-cube(`Products`, {
+// model/mango/Product.js
+cube(`products`, {
   sql: `SELECT * FROM public.Products WHERE MOD (id, 2) = 0`,
 
   ...
