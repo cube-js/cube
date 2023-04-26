@@ -203,7 +203,8 @@ export default function MemberMenu({
                           <Tag
                             color={cube.type === 'view' ? '#D26E0B' : '#7A77FF'}
                             style={{
-                              padding: '0 4px'
+                              padding: '0 4px',
+                              lineHeight: 1.5
                             }}
                           >
                             {cube.type}
