@@ -3023,6 +3023,7 @@ pub fn create_current_setting_udf() -> ScalarUDF {
                     Ok(Some(match setting_name.to_ascii_lowercase().as_str() {
                         "max_index_keys" => "32".to_string(), // Taken from PostgreSQL
                         "search_path" => "\"$user\", public".to_string(), // Taken from PostgreSQL
+                        "server_version_num" => "140002".to_string(), // Matches 14.2
                         setting_name => Err(DataFusionError::Execution(format!(
                             "unrecognized configuration parameter \"{}\"",
                             setting_name
