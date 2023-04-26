@@ -1,6 +1,6 @@
 import { LockOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import { CubeProvider } from '@cubejs-client/react';
-import { Card, Radio, Space } from 'antd';
+import { Card, Space } from 'antd';
 import { useLayoutEffect } from 'react';
 import { useHistory } from 'react-router-dom';
 import styled from 'styled-components';
@@ -10,12 +10,11 @@ import { useCloud } from '../../cloud';
 import {
   useAppContext,
   useCubejsApi,
-  useLocalStorage,
-  useSecurityContext,
+  useSecurityContext
 } from '../../hooks';
 import {
-  useRollupDesignerContext,
   RollupDesignerContext,
+  useRollupDesignerContext,
 } from '../../rollup-designer';
 import { ChartRendererStateProvider } from '../QueryTabs/ChartRendererStateProvider';
 import { QueryTabs, QueryTabsProps } from '../QueryTabs/QueryTabs';
@@ -122,11 +121,6 @@ function QueryTabsRenderer({
   const { setQuery, toggleModal } = useRollupDesignerContext();
   const { isAddRollupButtonVisible } = useCloud();
 
-  const [modelsVisibility, setModelsVisibility] = useLocalStorage(
-    'modelsVisibility',
-    'all'
-  );
-
   const params = new URLSearchParams(location.search);
   const query = JSON.parse(params.get('query') || 'null');
 
@@ -135,17 +129,6 @@ function QueryTabsRenderer({
       query={query}
       sidebar={
         <Space direction="horizontal">
-          <Radio.Group
-            value={modelsVisibility}
-            size="small"
-            onChange={(event) => {
-              setModelsVisibility(event.target.value);
-            }}
-          >
-            <Radio.Button value="all">Show All</Radio.Button>
-            <Radio.Button value="public">Only Public</Radio.Button>
-          </Radio.Group>
-
           <Button
             data-testid="security-context-btn"
             icon={<LockOutlined />}

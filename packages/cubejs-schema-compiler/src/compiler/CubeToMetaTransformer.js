@@ -31,15 +31,13 @@ export class CubeToMetaTransformer {
    * @protected
    */
   transform(cube) {
-    const isVisible = this.isVisible(cube, true);
     const cubeTitle = cube.title || this.titleize(cube.name);
 
     return {
-      isVisible,
+      isVisible: this.isVisible(cube, true),
       config: {
         name: cube.name,
         type: cube.isView ? 'view' : 'cube',
-        public: isVisible,
         title: cubeTitle,
         description: cube.description,
         connectedComponent: this.joinGraph.connectedComponents()[cube.name],

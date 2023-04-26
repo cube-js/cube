@@ -1,12 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AvailableCube } from '@cubejs-client/react';
 import { ButtonProps, Input, Menu as AntdMenu, Tag } from 'antd';
 import styled from 'styled-components';
 import FlexSearch from 'flexsearch';
+import { LockOutlined } from '@ant-design/icons';
 import { CubeMember, BaseCubeMember } from '@cubejs-client/core';
 
 import ButtonDropdown from './ButtonDropdown';
-import { useDeepMemo, useLocalStorage } from '../hooks';
+import { useDeepMemo } from '../hooks';
 import { getNameMemberPairs } from '../shared/members';
 
 const Menu = styled(AntdMenu)`
@@ -63,10 +64,6 @@ function filterMembersByKeys(
     });
 }
 
-function visibilityFilter({ isVisible }: CubeMember) {
-  return isVisible === undefined || isVisible;
-}
-
 type MemberDropdownProps = {
   availableCubes: AvailableCube<CubeMember>[];
   showNoMembersPlaceholder?: boolean;
@@ -84,26 +81,17 @@ export default function MemberMenu({
   const [search, setSearch] = useState<string>('');
   const [filteredKeys, setFilteredKeys] = useState<string[]>([]);
 
-  const [modelsVisibility] = useLocalStorage('modelsVisibility', 'all');
-
-  const filteredModels = useMemo(() => {
-    return modelsVisibility === 'all'
-      ? availableCubes
-      : availableCubes.filter((model) => model.public !== false);
-  }, [modelsVisibility, availableCubes]);
-
-  const hasMembers = filteredModels.some(
-    // (cube) => cube.members.filter(visibilityFilter).length > 0
+  const hasMembers = availableCubes.some(
     (cube) => cube.members.length > 0
   );
 
   const indexedMembers = useDeepMemo(() => {
-    getNameMemberPairs(filteredModels).forEach(([name, { title }]) =>
+    getNameMemberPairs(availableCubes).forEach(([name, { title }]) =>
       index.add(name as any, title)
     );
 
-    return Object.fromEntries(getNameMemberPairs(filteredModels));
-  }, [filteredModels]);
+    return Object.fromEntries(getNameMemberPairs(availableCubes));
+  }, [availableCubes]);
 
   useEffect(() => {
     let currentSearch = search;
@@ -124,8 +112,8 @@ export default function MemberMenu({
   }, [index, search]);
 
   const members = search
-    ? filterMembersByKeys(filteredModels, filteredKeys)
-    : filteredModels;
+    ? filterMembersByKeys(availableCubes, filteredKeys)
+    : availableCubes;
 
   return (
     <ButtonDropdown
@@ -199,11 +187,9 @@ export default function MemberMenu({
               </SearchMenuItem>
 
               {members.map((cube) => {
-                const members = cube.members; //.filter(visibilityFilter);
-
-                // if (!members.length) {
-                //   return null;
-                // }
+                if (!cube.members.length) {
+                  return null;
+                }
 
                 return (
                   <Menu.ItemGroup
@@ -212,6 +198,8 @@ export default function MemberMenu({
                       cube.type ? (
                         <span>
                           {cube.cubeTitle}{' '}
+                          {cube.public === false ? <LockOutlined /> : null}
+                          {' '}
                           <Tag
                             color={cube.type === 'view' ? '#D26E0B' : '#7A77FF'}
                           >
@@ -223,9 +211,9 @@ export default function MemberMenu({
                       )
                     }
                   >
-                    {members.map((m) => (
+                    {cube.members.map((m) => (
                       <Menu.Item key={m.name} data-testid={m.name}>
-                        {m.shortTitle}
+                        {m.shortTitle}{' '}{m.isVisible === false ? <LockOutlined /> : null}
                       </Menu.Item>
                     ))}
                   </Menu.ItemGroup>
