@@ -434,7 +434,7 @@ export function PlaygroundQueryBuilder({
                   {hasPrivateFields ? (
                     <Alert
                       type="warning"
-                      message="Some of the fields you have selected are private and will not be available for quering on production."
+                      message="Some of the fields you have selected are private and will not be available for querying in production."
                       style={{ marginTop: 16 }}
                     />
                   ) : null}
