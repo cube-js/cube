@@ -45,12 +45,18 @@ under **Data Source**:
 
 ## Using a Security Context
 
-The SQL Runner also allows executing queries using a specific security context,
-which is particularly convenient for debugging queries that rely on specific
-claims in a JWT, for example. The SQL Runner can be configured to use predefined
-security contexts from
+The SQL Runner also allows executing queries against [configured data
+sources][ref-conf-ref-driverfactory] using a specific security context, which is
+particularly convenient for debugging [queries in a multi-tenant
+configuration][ref-recipe-multi-src-same-model]. The SQL Runner can be
+configured to use predefined security contexts from
 [`scheduledRefreshContexts`][ref-conf-scheduled-refresh-ctx] in the `cube.js`
 configuration file, or a custom context can be provided as a JSON string.
+Specifying a security context is optional, and if none is provided, the query
+will be executed with the default security context.
+
+[ref-conf-ref-driverfactory]: /config#options-reference-driver-factory
+[ref-recipe-multi-src-same-model]: /recipes/multiple-sources-same-schema
 
 ### <--{"id" : "Using a Security Context"}--> Scheduled Refresh Contexts
 
