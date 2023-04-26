@@ -1,5 +1,5 @@
 ---
-title: Using Different Schemas for Tenants
+title: Using Different Data Models for Tenants
 permalink: /recipes/using-different-schemas-for-tenants
 category: Examples & Tutorials
 subCategory: Access control
@@ -33,8 +33,8 @@ pass the tenant name as a part of
 
 We'll also need to override the
 [`contextToAppId`](https://cube.dev/docs/config#context-to-app-id) function to
-control how the data model compilation result is cached and provide the tenant names
-via the
+control how the data model compilation result is cached and provide the tenant
+names via the
 [`scheduledRefreshContexts`](https://cube.dev/docs/config#scheduled-refresh-contexts)
 function so a refresh worker can find all existing data models and build
 pre-aggregations for them, if needed.
