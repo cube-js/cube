@@ -6,13 +6,14 @@ import {
   Query,
   validateQuery,
   TransformedQuery,
+  getQueryMembers,
 } from '@cubejs-client/core';
 import {
   QueryBuilder,
   SchemaChangeProps,
   VizState,
 } from '@cubejs-client/react';
-import { Col, Row, Space } from 'antd';
+import { Alert, Col, Row, Space } from 'antd';
 import { SyncOutlined } from '@ant-design/icons';
 import React, { RefObject, useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
@@ -36,7 +37,7 @@ import MemberGroup from '../../../QueryBuilder/MemberGroup';
 import SelectChartType from '../../../QueryBuilder/SelectChartType';
 import TimeGroup from '../../../QueryBuilder/TimeGroup';
 import { UIFramework } from '../../../types';
-import { dispatchPlaygroundEvent } from '../../../utils';
+import { containsPrivateFields, dispatchPlaygroundEvent } from '../../../utils';
 import {
   useChartRendererState,
   useChartRendererStateMethods,
@@ -330,6 +331,11 @@ export function PlaygroundQueryBuilder({
           parsedDateRange = query.timeDimensions[0].dateRange;
         }
 
+        const hasPrivateFields = containsPrivateFields(
+          getQueryMembers(query),
+          meta
+        );
+
         const queriesEqual = areQueriesEqual(
           validateQuery(query),
           validateQuery(queryRef.current)
@@ -424,6 +430,14 @@ export function PlaygroundQueryBuilder({
                       />
                     </Section>
                   </Row>
+
+                  {hasPrivateFields ? (
+                    <Alert
+                      type="warning"
+                      message="Some of the fields you have selected are private and will not be available for querying in production."
+                      style={{ marginTop: 16 }}
+                    />
+                  ) : null}
                 </Card>
 
                 <SectionRow

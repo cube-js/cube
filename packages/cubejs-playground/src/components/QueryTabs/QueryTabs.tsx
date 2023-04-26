@@ -6,7 +6,7 @@ import {
 } from '@cubejs-client/core';
 import { Input, Tabs } from 'antd';
 import equals from 'fast-deep-equal';
-import React, { ReactNode, useEffect, useState } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import styled from 'styled-components';
 
 import { event } from '../../events';
