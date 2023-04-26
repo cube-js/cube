@@ -20,7 +20,7 @@ function create(table: string, query: string, cast: Cast, suf?: string): string 
 }
 
 export const Customers = {
-  select: (cast: Cast) => `
+  select: (_cast: Cast) => `
     select 'AH-10465' as customer_id, 'Customer 1' as customer_name union all
     select 'AJ-10780' as customer_id, 'Customer 2' as customer_name union all
     select 'AS-10225' as customer_id, 'Customer 3' as customer_name union all
@@ -63,11 +63,11 @@ export const Customers = {
     select 'TS-21205' as customer_id, 'Customer 40' as customer_name union all
     select 'WB-21850' as customer_id, 'Customer 41' as customer_name
   `,
-  create: (cast: Cast, suf?: string) => create('customers', Customers.select(cast), cast, suf),
+  create: (cast: Cast, name: string, suf?: string) => create(name, Customers.select(cast), cast, suf),
 };
 
 export const Products = {
-  select: (cast: Cast) => `
+  select: (_cast: Cast) => `
     select 'Furniture' as category, 'Tables' as sub_category, 'Anderson Hickey Conga Table Tops & Accessories' as product_name union all
     select 'Furniture' as category, 'Tables' as sub_category, 'Balt Solid Wood Rectangular Table' as product_name union all
     select 'Furniture' as category, 'Bookcases' as sub_category, 'DMI Eclipse Executive Suite Bookcases' as product_name union all
@@ -97,7 +97,7 @@ export const Products = {
     select 'Technology' as category, 'Machines' as sub_category, 'Lexmark 20R1285 X6650 Wireless All-in-One Printer' as product_name union all
     select 'Technology' as category, 'Machines' as sub_category, 'Okidata C610n Printer' as product_name
   `,
-  create: (cast: Cast, suf?: string) => create('products', Products.select(cast), cast, suf),
+  create: (cast: Cast, name: string, suf?: string) => create(name, Products.select(cast), cast, suf),
 };
 
 export const ECommerce = {
@@ -150,5 +150,5 @@ export const ECommerce = {
       select 7293 as row_id, 'CA-2017-109183' as order_id, ${DATE_PREFIX}'2020-12-04'${DATE_SUFFIX} as order_date, 'LR-16915' as customer_id, 'Columbus' as city, 'Technology' as category, 'Machines' as sub_category, 'Okidata C610n Printer' as product_name, 649.00000 as sales, 2 as quantity, 0.50000 as discount, -272.58000 as profit
     `;
   },
-  create: (cast: Cast, suf?: string) => create('ecommerce', ECommerce.select(cast), cast, suf),
+  create: (cast: Cast, name: string, suf?: string) => create(name, ECommerce.select(cast), cast, suf),
 };
