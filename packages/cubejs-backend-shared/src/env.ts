@@ -1528,6 +1528,10 @@ const variables: Record<string, (...args: any) => any> = {
     return undefined;
   },
   pgSqlPort: () => {
+    if (process.env.CUBEJS_PG_SQL_PORT === 'false') {
+      return undefined;
+    }
+    
     const port = asFalseOrPort(process.env.CUBEJS_PG_SQL_PORT || 'false', 'CUBEJS_PG_SQL_PORT');
     if (port) {
       return port;

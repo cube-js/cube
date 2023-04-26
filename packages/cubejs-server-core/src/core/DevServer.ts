@@ -510,7 +510,7 @@ export class DevServer {
       variables.CUBEJS_SCHEMA_PATH = 'model';
       variables = Object.entries(variables).map(([key, value]) => ([key, value].join('=')));
 
-      const repositoryPath = path.join(process.cwd(), options.schemaPath);
+      const repositoryPath = path.join(process.cwd(), 'model');
 
       if (!fs.existsSync(repositoryPath)) {
         fs.mkdirSync(repositoryPath);
