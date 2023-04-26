@@ -193,7 +193,6 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     try {
       await this.pool.query('SELECT $1::int AS number', ['1']);
     } catch (e) {
-      console.error(e);
       if ((e as Error).toString().indexOf('no pg_hba.conf entry for host') !== -1) {
         throw new Error(`Please use CUBEJS_DB_SSL=true to connect: ${(e as Error).toString()}`);
       }
@@ -346,7 +345,6 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     }
 
     const res = await this.queryResponse(query, values);
-    console.log(JSON.stringify(res, undefined, 2));
     return {
       rows: res.rows,
       types: this.mapFields(res.fields),
