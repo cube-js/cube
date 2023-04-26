@@ -3995,7 +3995,7 @@ async fn topk_hll(service: Box<dyn SqlClient>) {
                          GROUP BY 1 \
                          HAVING cardinality(merge(hits)) < 9000
                          ORDER BY 2 DESC \
-                         LIMIT 3",
+                         LIMIT 2",
         )
         .await
         .unwrap();
