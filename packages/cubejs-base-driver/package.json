@@ -38,7 +38,7 @@
     "@types/node": "^14",
     "@types/ramda": "^0.27.32",
     "jest": "^26.6.3",
-    "typescript": "~4.9.5"
+    "typescript": "~5.0.4"
   },
   "license": "Apache-2.0",
   "eslintConfig": {
