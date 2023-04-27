@@ -11,7 +11,7 @@ context claims to evaluate access control rules. Inbound JWTs are decoded and
 verified using industry-standard [JSON Web Key Sets (JWKS)][link-auth0-jwks].
 
 For access control or authorization, Cube allows you to define granular access
-control rules for every cube in your data schema. Cube uses both the request and
+control rules for every cube in your data model. Cube uses both the request and
 security context claims in the JWT token to generate a SQL query, which includes
 row-level constraints from the access control rules.
 
@@ -132,11 +132,11 @@ LIMIT 10000
 In the example below `user_id`, `company_id`, `sub` and `iat` will be injected
 into the security context and will be accessible in both the [Security
 Context][ref-schema-sec-ctx] and [`COMPILE_CONTEXT`][ref-cubes-compile-ctx]
-global variable in the Cube Data Schema.
+global variable in the Cube data model.
 
 <InfoBox>
 
-`COMPILE_CONTEXT` is used by Cube at schema compilation time, which allows
+`COMPILE_CONTEXT` is used by Cube at data model compilation time, which allows
 changing the underlying dataset completely; the Security Context is only used at
 query execution time, which simply filters the dataset with a `WHERE` clause.
 
@@ -151,8 +151,8 @@ query execution time, which simply filters the dataset with a `WHERE` clause.
 }
 ```
 
-With the same JWT payload as before, we can modify schemas before they are
-compiled. The following schema will ensure users only see results for their
+With the same JWT payload as before, we can modify models before they are
+compiled. The following cube will ensure users only see results for their
 `company_id` in a multi-tenant deployment:
 
 ```javascript

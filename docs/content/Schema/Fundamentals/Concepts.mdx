@@ -45,7 +45,7 @@ your database using the [`sql` property][ref-schema-ref-sql]:
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   sql: `SELECT * FROM orders`,
 });
 ```
@@ -64,7 +64,7 @@ queries too:
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   sql: `
 SELECT
   *
@@ -100,19 +100,18 @@ Dimensions represent the properties of a **single** data point in the cube.
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
-
+cube("Orders", {
   dimensions: {
     id: {
       sql: `id`,
       type: `number`,
       // Here we explicitly let Cube know this field is the primary key
       // This is required for de-duplicating results when using joins
-      primaryKey: true
+      primaryKey: true,
     },
     status: {
       sql: `status`,
-      type: `string`
+      type: `string`,
     },
   },
 });
@@ -142,21 +141,20 @@ represented as follows:
 <CodeTabs>
 
 ```javascript
-cube('LineItems', {
-
+cube("LineItems", {
   dimensions: {
     id: {
       sql: `id`,
       type: `number`,
       // Again, we explicitly let Cube know this field is the primary key
       // This is required for de-duplicating results when using joins
-      primaryKey: true
+      primaryKey: true,
     },
 
     order_id: {
       sql: `order_id`,
       type: `number`,
-    }
+    },
   },
 });
 ```
@@ -188,16 +186,16 @@ Time-based properties should be represented as dimensions with type `time`. Time
 dimensions allow grouping the result set by a unit of time (e.g. hours, days,
 weeks). In analytics, this is also known as "granularity".
 
-We can add the necessary time dimensions to both schemas as follows:
+We can add the necessary time dimensions to both data models as follows:
 
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   dimensions: {
     created_at: {
       sql: `created_at`,
-      type: `time`
+      type: `time`,
     },
 
     completed_at: {
@@ -213,10 +211,10 @@ cubes:
   - name: Orders
     dimensions:
       - name: created_at
-        sql: 'created_at'
+        sql: "created_at"
         type: time
       - name: completed_at
-        sql: 'completed_at'
+        sql: "completed_at"
         type: time
 ```
 
@@ -225,11 +223,11 @@ cubes:
 <CodeTabs>
 
 ```javascript
-cube('LineItems', {
+cube("LineItems", {
   dimensions: {
     created_at: {
       sql: `created_at`,
-      type: `time`
+      type: `time`,
     },
   },
 });
@@ -259,7 +257,7 @@ following:
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   measures: {
     count: {
       type: `count`,
@@ -284,14 +282,14 @@ of line items sold:
 <CodeTabs>
 
 ```javascript
-cube('LineItems', {
+cube("LineItems", {
   measures: {
     total: {
       sql: `price`,
       type: `sum`,
     },
   },
-})
+});
 ```
 
 ```yaml
@@ -327,8 +325,7 @@ In the following example, we are left-joining the `LineItems` cube onto our
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
-
+cube("Orders", {
   joins: {
     LineItems: {
       relationship: `many_to_one`,
@@ -358,7 +355,7 @@ There are the three [types of join relationships][ref-schema-ref-joins-types]:
 
 ## Segments
 
-Segments are filters that are predefined in the schema instead of [a Cube
+Segments are filters that are predefined in the data model instead of [a Cube
 query][ref-backend-query-filters]. They allow simplifying Cube queries and make
 it easy to re-use common filters across a variety of queries.
 
@@ -368,10 +365,10 @@ following:
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   segments: {
     only_completed: {
-      sql: `${CUBE}.status = 'completed'`
+      sql: `${CUBE}.status = 'completed'`,
     },
   },
 });
@@ -396,13 +393,13 @@ schema, they are defined under the `preAggregations` property:
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   preAggregations: {
     main: {
       measures: [CUBE.count],
       dimensions: [CUBE.status],
       timeDimension: CUBE.created_at,
-      granularity: 'day',
+      granularity: "day",
     },
   },
 });

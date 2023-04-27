@@ -241,7 +241,7 @@ and an `orders_with_users_rollup` pre-aggregation. Note the following:
 
 ```javascript
 cube(`Users`, {
-  dataSource: 'postgres',
+  dataSource: "postgres",
   sql: `SELECT * FROM public.users`,
 
   preAggregations: {
@@ -270,8 +270,8 @@ cube(`Users`, {
   },
 });
 
-cube('Orders', {
-  dataSource: 'mssql',
+cube("Orders", {
+  dataSource: "mssql",
   sql: `SELECT * FROM orders`,
 
   preAggregations: {
@@ -346,7 +346,7 @@ cubes:
         type: number
         primary_key: true
       - name: name
-        sql: '{CUBE}.first_name || {CUBE}.last_name'
+        sql: "{CUBE}.first_name || {CUBE}.last_name"
         type: string
 
   - name: Orders
@@ -366,7 +366,7 @@ cubes:
     joins:
       - name: Users
         relationship: many_to_one
-        sql: '{CUBE.user_id} = {Users.id}'
+        sql: "{CUBE.user_id} = {Users.id}"
     measures:
       - name: count
         type: count
@@ -399,7 +399,7 @@ directly:
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   sql: `SELECT * FROM orders`,
 
   preAggregations: {
@@ -442,7 +442,8 @@ scenarios where real-time data is required.
 
 [Lambda pre-aggregations][ref-caching-lambda-preaggs] can be used to combine
 data from a data source and a pre-aggregation, or even from multiple
-pre-aggregations across different schema-compatible cubes.
+pre-aggregations across different cubes that share the same dimensions
+and measures.
 
 ### <--{"id" : "Parameters"}--> measures
 
@@ -452,7 +453,7 @@ cube][ref-schema-measures] that should be included in the pre-aggregation:
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   sql: `SELECT * FROM orders`,
 
   measures: {
@@ -491,7 +492,7 @@ cube][ref-schema-dimensions] that should be included in the pre-aggregation:
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   sql: `SELECT * FROM orders`,
 
   dimensions: {
@@ -528,13 +529,13 @@ cubes:
 
 The `timeDimension` property can be any [`dimension`][ref-schema-dimensions] of
 type [`time`][ref-schema-types-dim-time]. All other measures and dimensions in
-the schema are aggregated This property is an extremely useful tool for
+the data model are aggregated. This property is an extremely useful tool for
 improving performance with massive datasets.
 
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   sql: `SELECT * FROM orders`,
 
   measures: {
@@ -601,7 +602,7 @@ data by week and persist it to Cube Store.
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   sql: `SELECT * FROM orders`,
 
   preAggregations: {
@@ -691,7 +692,7 @@ The `partitionGranularity` defines the granularity for each
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   sql: `SELECT * FROM orders`,
 
   preAggregations: {
@@ -781,7 +782,7 @@ cubes:
       - name: main
         measures: [CUBE.count]
         refresh_key:
-          sql: 'SELECT MAX(created_at) FROM orders'
+          sql: "SELECT MAX(created_at) FROM orders"
 ```
 
 </CodeTabs>
@@ -860,7 +861,7 @@ cubes:
         measures: [CUBE.count]
         refresh_key:
           every: 1 hour
-          sql: 'SELECT MAX(created_at) FROM orders'
+          sql: "SELECT MAX(created_at) FROM orders"
 ```
 
 </CodeTabs>
@@ -1388,7 +1389,7 @@ cube(`Orders`, {
       type: `originalSql`,
       indexes: {
         timestampIndex: {
-          columns: ['timestamp'],
+          columns: ["timestamp"],
         },
       },
     },

@@ -17,7 +17,7 @@ time.
 <CodeTabs>
 
 ```javascript
-cube('MyCube', {
+cube("MyCube", {
   joins: {
     TargetCubeName: {
       relationship: `one_to_one` || `one_to_many` || `many_to_one`,
@@ -84,7 +84,7 @@ cubes:
     joins:
       - name: products
         relationship: many_to_one
-        sql: '{CUBE.id} = {products.order_id}'
+        sql: "{CUBE.id} = {products.order_id}"
 ```
 
 </CodeTabs>
@@ -117,9 +117,9 @@ You can use the following types of relationships:
 
 <WarningBox>
 
-The types of relationships listed above were introduced in v0.32.19 for clarity as
-they are commonly used in the data space. The following aliases were used before and
-are still valid, so there's no need to update existing data models:
+The types of relationships listed above were introduced in v0.32.19 for clarity
+as they are commonly used in the data space. The following aliases were used
+before and are still valid, so there's no need to update existing data models:
 
 - `one_to_one` was known as `has_one` or `hasOne`
 - `one_to_many` was known as `has_many` or `hasMany`
@@ -155,7 +155,7 @@ cubes:
     joins:
       - name: profiles
         relationship: one_to_one
-        sql: '{users}.id = {profiles.user_id}'
+        sql: "{users}.id = {profiles.user_id}"
 ```
 
 </CodeTabs>
@@ -188,7 +188,7 @@ cubes:
     joins:
       - name: books
         relationship: one_to_many
-        sql: '{authors}.id = {books.author_id}'
+        sql: "{authors}.id = {books.author_id}"
 ```
 
 </CodeTabs>
@@ -223,7 +223,7 @@ cubes:
     joins:
       - name: customers
         relationship: many_to_one
-        sql: '{orders}.customer_id = {customers.id}'
+        sql: "{orders}.customer_id = {customers.id}"
 ```
 
 </CodeTabs>
@@ -255,7 +255,7 @@ cubes:
     joins:
       - name: customers
         relationship: many_to_one
-        sql: '{orders}.customer_id = {customers.id}'
+        sql: "{orders}.customer_id = {customers.id}"
 ```
 
 </CodeTabs>
@@ -276,7 +276,7 @@ keys with `Order` to get the correct `Order Amount` sum result. Please note that
 <CodeTabs>
 
 ```javascript
-cube('orders', {
+cube("orders", {
   dimensions: {
     customer_id: {
       sql: `id`,
@@ -363,7 +363,7 @@ cubes:
   - name: users
     dimensions:
       - name: id
-        sql:  "{CUBE}.user_id || '-' || {CUBE}.signup_week || '-' || {CUBE}.activity_week"
+        sql: "{CUBE}.user_id || '-' || {CUBE}.signup_week || '-' || {CUBE}.activity_week"
         type: string
         primary_key: true
 ```
@@ -396,7 +396,7 @@ cubes:
   - name: users
     dimensions:
       - name: name
-        sql: '{CUBE}.name'
+        sql: "{CUBE}.name"
         type: string
 ```
 
@@ -456,7 +456,7 @@ cubes:
   - name: a
     joins:
       - name: b
-        sql: '{a}.b_id = {b.id}'
+        sql: "{a}.b_id = {b.id}"
         relationship: many_to_one
     measures:
       - name: count
@@ -465,7 +465,7 @@ cubes:
   - name: c
     joins:
       - name: c
-        sql: '{b}.c_id = {c.id}'
+        sql: "{b}.c_id = {c.id}"
         relationship: many_to_one
 
   - name: c

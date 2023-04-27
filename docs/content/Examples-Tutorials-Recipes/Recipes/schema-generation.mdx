@@ -8,9 +8,10 @@ redirect_from:
   - /schema-generation
 ---
 
-Cube Schema is Javascript code, which means the full power of this language can
-be used to configure your schema definitions. In this guide we generate several
-measure definitions based on an array of strings.
+Cube supports two ways to define data model files: with YAML or JavaScript
+syntax. If you opt for JavaScript syntax, you can use the full power of this
+programming language to configure your data model. In this guide we generate
+several measure definitions based on an array of strings.
 
 One example, based on a real world scenario, is when you have a single `events`
 table containing an `event_type` and `user_id` column. Based on this table you
@@ -59,5 +60,5 @@ code. This configuration can be reused using
 
 Please refer to
 [asyncModule](/schema/reference/execution-environment#async-module)
-documentation to learn how to use databases and other data sources for schema
-generation.
+documentation to learn how to use databases and other data sources for data
+model generation.

@@ -1,5 +1,5 @@
 ---
-title: Using Different Schemas for Tenants
+title: Using Different Data Models for Tenants
 permalink: /recipes/using-different-schemas-for-tenants
 category: Examples & Tutorials
 subCategory: Access control
@@ -8,8 +8,8 @@ menuOrder: 2
 
 ## Use case
 
-We want to provide different data schemas to different tenants. In the recipe
-below, we'll learn how to switch between multiple data schemas based on the
+We want to provide different data models to different tenants. In the recipe
+below, we'll learn how to switch between multiple data models based on the
 tenant.
 
 ## Configuration
@@ -26,7 +26,7 @@ model/
         └── Products.js
 ```
 
-Let's configure Cube to use a specific data schema path for each tenant. We'll
+Let's configure Cube to use a specific data model path for each tenant. We'll
 pass the tenant name as a part of
 [`securityContext`](https://cube.dev/docs/security/context#top) into the
 [`repositoryFactory`](https://cube.dev/docs/config#repository-factory) function.
@@ -36,7 +36,7 @@ We'll also need to override the
 control how the data model compilation result is cached and provide the tenant
 names via the
 [`scheduledRefreshContexts`](https://cube.dev/docs/config#scheduled-refresh-contexts)
-function so a refresh worker can find all existing schemas and build
+function so a refresh worker can find all existing data models and build
 pre-aggregations for them, if needed.
 
 Our `cube.js` file will look like this:
@@ -58,7 +58,7 @@ module.exports = {
 };
 ```
 
-## Data schema
+## Data modeling
 
 In this example, we'd like to get products with odd `id` values for the
 `avocado` tenant and with even `id` values the `mango` tenant:

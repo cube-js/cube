@@ -99,7 +99,7 @@ drill downs][ref-drilldowns].
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   measures: {
     revenue: {
       type: `sum`,
@@ -205,7 +205,7 @@ cube(`Orders`, {
       type: `sum`,
       sql: `price`,
       meta: {
-        any: 'value',
+        any: "value",
       },
     },
   },
@@ -458,7 +458,7 @@ cubes:
   - name: Orders
     measures:
       - name: purchases_to_created_account_ratio
-        sql: '{purchases} / {Users.count} * 100.0'
+        sql: "{purchases} / {Users.count} * 100.0"
         type: number
         format: percent
 ```
