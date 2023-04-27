@@ -109,7 +109,7 @@ describe('ScaffoldingTemplate', () => {
   sql: \`SELECT * FROM public.orders\`,
   
   preAggregations: {
-    // Pre-Aggregations definitions go here
+    // Pre-aggregation definitions go here
     // Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started
   },
   
@@ -147,7 +147,7 @@ describe('ScaffoldingTemplate', () => {
   sql: \`SELECT * FROM public.customers\`,
   
   preAggregations: {
-    // Pre-Aggregations definitions go here
+    // Pre-aggregation definitions go here
     // Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started
   },
   
@@ -190,7 +190,7 @@ describe('ScaffoldingTemplate', () => {
   sql: \`SELECT * FROM public.accounts\`,
   
   preAggregations: {
-    // Pre-Aggregations definitions go here
+    // Pre-aggregation definitions go here
     // Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started
   },
   
@@ -250,7 +250,7 @@ describe('ScaffoldingTemplate', () => {
   sql_table: \`public.orders\`,
   
   pre_aggregations: {
-    // Pre-Aggregations definitions go here
+    // Pre-aggregation definitions go here
     // Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started
   },
   
@@ -288,7 +288,7 @@ describe('ScaffoldingTemplate', () => {
   sql_table: \`public.customers\`,
   
   pre_aggregations: {
-    // Pre-Aggregations definitions go here
+    // Pre-aggregation definitions go here
     // Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started
   },
   
@@ -331,7 +331,7 @@ describe('ScaffoldingTemplate', () => {
   sql_table: \`public.accounts\`,
   
   pre_aggregations: {
-    // Pre-Aggregations definitions go here
+    // Pre-aggregation definitions go here
     // Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started
   },
   
@@ -410,7 +410,7 @@ describe('ScaffoldingTemplate', () => {
   sql_table: \`public.\\\`someOrders\\\`\`,
   
   pre_aggregations: {
-    // Pre-Aggregations definitions go here
+    // Pre-aggregation definitions go here
     // Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started
   },
   
@@ -479,7 +479,7 @@ describe('ScaffoldingTemplate', () => {
   sql_table: \`public.orders\`,
   
   pre_aggregations: {
-    // Pre-Aggregations definitions go here
+    // Pre-aggregation definitions go here
     // Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started
   },
   
@@ -554,6 +554,8 @@ describe('ScaffoldingTemplate', () => {
           content: `cube(\`orders\`, {
   sql_table: \`public.orders\`,
   
+  data_source: \`testDataSource\`,
+  
   pre_aggregations: {
     main: {
       type: \`originalSql\`
@@ -582,9 +584,7 @@ describe('ScaffoldingTemplate', () => {
       type: \`string\`,
       title: \`Some.dimension.inside\`
     }
-  },
-  
-  data_source: \`testDataSource\`
+  }
 });
 `,
         },
@@ -611,24 +611,30 @@ describe('ScaffoldingTemplate', () => {
           content: `cubes:
   - name: orders
     sql_table: public.orders
+
     pre_aggregations:
-      # Pre-Aggregations definitions go here
+      # Pre-aggregation definitions go here
       # Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started
+
     joins:
       - name: customers
         sql: "{CUBE}.\\"customerId\\" = {customers}.id"
         relationship: many_to_one
+
     measures:
       - name: count
         type: count
+
       - name: amount
         sql: amount
         type: sum
+
     dimensions:
       - name: id
         sql: id
         type: number
         primary_key: true
+
 `,
         },
         {
@@ -636,27 +642,34 @@ describe('ScaffoldingTemplate', () => {
           content: `cubes:
   - name: customers
     sql_table: public.customers
+
     pre_aggregations:
-      # Pre-Aggregations definitions go here
+      # Pre-aggregation definitions go here
       # Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started
+
     joins:
       - name: accounts
         sql: "{CUBE}.\\"accountId\\" = {accounts}.id"
         relationship: many_to_one
+
     measures:
       - name: count
         type: count
+
       - name: visit_count
         sql: visit_count
         type: sum
+
     dimensions:
       - name: id
         sql: id
         type: number
         primary_key: true
+
       - name: name
         sql: name
         type: string
+
 `,
         },
         {
@@ -664,27 +677,35 @@ describe('ScaffoldingTemplate', () => {
           content: `cubes:
   - name: accounts
     sql_table: public.accounts
+
     pre_aggregations:
-      # Pre-Aggregations definitions go here
+      # Pre-aggregation definitions go here
       # Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started
+
     joins: []
+
     measures:
       - name: count
         type: count
+
       - name: failurecount
         sql: "{CUBE}.\\"failureCount\\""
         type: sum
+
     dimensions:
       - name: id
         sql: id
         type: number
         primary_key: true
+
       - name: username
         sql: username
         type: string
+
       - name: password
         sql: password
         type: string
+
 `,
         },
       ]);
@@ -710,27 +731,35 @@ describe('ScaffoldingTemplate', () => {
           content: `cubes:
   - name: accounts
     sql_table: public.accounts
+
     pre_aggregations:
-      # Pre-Aggregations definitions go here
+      # Pre-aggregation definitions go here
       # Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started
+
     joins: []
+
     measures:
       - name: count
         type: count
+
       - name: failurecount
         sql: "{CUBE}.\`failureCount\`"
         type: sum
+
     dimensions:
       - name: id
         sql: id
         type: number
         primary_key: true
+
       - name: username
         sql: username
         type: string
+
       - name: password
         sql: password
         type: string
+
 `,
         },
       ]);

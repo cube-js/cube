@@ -22,6 +22,7 @@ services:
       CUBEJS_DEV_MODE: "true"
       CUBEJS_WEB_SOCKETS: "true"
       CUBEJS_API_SECRET: mysupersecret
+      CUBEJS_SCHEMA_PATH: schema
     volumes:
       - ./multidb/cube.js:/cube/conf/cube.js
       - ./multidb/schema:/cube/conf/schema
