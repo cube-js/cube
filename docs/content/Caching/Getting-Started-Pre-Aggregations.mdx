@@ -40,7 +40,7 @@ layer][ref-caching-preaggs-cubestore].
 ## Pre-Aggregations without Time Dimension
 
 To illustrate pre-aggregations with an example, let's use a sample e-commerce
-database. We have a schema representing all our `Orders`:
+database. We have a data model representing all our `Orders`:
 
 ```javascript
 cube(`Orders`, {
@@ -106,9 +106,9 @@ cube(`Orders`, {
 
 ## Pre-Aggregations with Time Dimension
 
-Using the same schema as before, we are now finding that users frequently query
-for the number of orders completed per day, and that this query is performing
-poorly. This query might look something like:
+Using the same data model as before, we are now finding that users frequently
+query for the number of orders completed per day, and that this query is
+performing poorly. This query might look something like:
 
 ```json
 {
@@ -118,7 +118,7 @@ poorly. This query might look something like:
 ```
 
 In order to improve the performance of this query, we can add another
-pre-aggregation definition to the `Orders` schema:
+pre-aggregation definition to the `Orders` cube:
 
 ```javascript
 cube(`Orders`, {
@@ -245,7 +245,7 @@ fields and still get a correct result:
 | 2021-01-22 00:00:00.000000 | 13           | 150       |
 
 This means that `quantity` and `price` are both **additive measures**, and we
-can represent them in the `LineItems` schema as follows:
+can represent them in the `LineItems` cube as follows:
 
 ```javascript
 cube(`LineItems`, {
@@ -340,7 +340,7 @@ $$
 We can clearly see that `523` **does not** equal `762.204545454545455`, and we
 cannot treat the `profit_margin` column the same as we would any other additive
 measure. Armed with the above knowledge, we can add the `profit_margin` field to
-our schema **as a [dimension][ref-schema-dims]**:
+our cube **as a [dimension][ref-schema-dims]**:
 
 ```javascript
 cube(`LineItems`, {
@@ -437,17 +437,15 @@ To recap what we've learnt so far:
   `count`, `sum`, `min`, `max` or `countDistinctApprox`
 
 Cube looks for matching pre-aggregations in the order they are defined in a
-cube's schema file. Each defined pre-aggregation is then tested for a match
+cube's data model file. Each defined pre-aggregation is then tested for a match
 based on the criteria in the flowchart below:
 
-<div
-  style="text-align: center"
->
+<div style="text-align: center">
   <img
-  alt="Pre-Aggregation Selection Flowchart"
-  src="https://ucarecdn.com/f986b0cb-a9ea-47b7-a743-ca9a4644c246/"
-  style="border: none"
-  width="100%"
+    alt="Pre-Aggregation Selection Flowchart"
+    src="https://ucarecdn.com/f986b0cb-a9ea-47b7-a743-ca9a4644c246/"
+    style="border: none"
+    width="100%"
   />
 </div>
 
@@ -470,7 +468,7 @@ Some extra considerations for pre-aggregation selection:
   `['2020-01-01T00:00:00.000', '2020-01-01T23:59:59.999']`. Date ranges are
   inclusive, and the minimum granularity is `second`.
 
-- The order in which pre-aggregations are defined in schemas matter; the first
+- The order in which pre-aggregations are defined in models matter; the first
   matching pre-aggregation for a query is the one that is used. Both the
   measures and dimensions of any cubes specified in the query are checked to
   find a matching `rollup`.

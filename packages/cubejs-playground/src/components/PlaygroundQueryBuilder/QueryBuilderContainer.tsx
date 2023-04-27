@@ -7,8 +7,15 @@ import styled from 'styled-components';
 
 import { Button, CubeLoader } from '../../atoms';
 import { useCloud } from '../../cloud';
-import { useAppContext, useCubejsApi, useSecurityContext } from '../../hooks';
-import { useRollupDesignerContext, RollupDesignerContext } from '../../rollup-designer';
+import {
+  useAppContext,
+  useCubejsApi,
+  useSecurityContext
+} from '../../hooks';
+import {
+  RollupDesignerContext,
+  useRollupDesignerContext,
+} from '../../rollup-designer';
 import { ChartRendererStateProvider } from '../QueryTabs/ChartRendererStateProvider';
 import { QueryTabs, QueryTabsProps } from '../QueryTabs/QueryTabs';
 import {

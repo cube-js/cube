@@ -1,15 +1,15 @@
-import fs from 'fs-extra';
-import path from 'path';
+import { getFixtures } from './getFixtures';
 
 /**
  * Returns select sql queries.
  */
 export function getSelectQueries(type: string, suf?: string): string[] {
-  const schemas = JSON.parse(fs.readFileSync(
-    path.resolve(process.cwd(), './fixtures/_schemas.json'),
-    'utf-8'
-  ));
-  return schemas.cubes.map((cube: { sql: string }) => (
-    suf ? `${cube.sql}_${suf}` : cube.sql
-  ));
+  const { tables } = getFixtures(type);
+  return Object
+    .keys(tables)
+    .map((key: string) => {
+      let name = tables[<'products' | 'customers' | 'ecommerce'>key];
+      name = suf ? `${name}_${suf}` : name;
+      return `select * from ${name}`;
+    });
 }

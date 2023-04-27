@@ -501,19 +501,10 @@ export class OptsHandler {
     if (options.devServer && !options.apiSecret) {
       options.apiSecret = crypto.randomBytes(16).toString('hex');
       displayCLIWarning(
-        `Option apiSecret is required in dev mode. Cube.js has generated it as ${
+        `Option apiSecret is required in dev mode. Cube has generated it as ${
           options.apiSecret
         }`
       );
-    }
-
-    // Create schema directory to protect error on new project with dev mode
-    // (docker flow)
-    if (options.devServer) {
-      const repositoryPath = path.join(process.cwd(), options.schemaPath);
-      if (!fs.existsSync(repositoryPath)) {
-        fs.mkdirSync(repositoryPath);
-      }
     }
 
     if (!options.devServer || this.configuredForQueryProcessing()) {

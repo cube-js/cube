@@ -1,7 +1,6 @@
 {
   "cube": {
     "environment": {
-      "CUBEJS_DEV_MODE": "true",
       "CUBEJS_API_SECRET": "mysupersecret",
       "CUBEJS_CACHE_AND_QUEUE_DRIVER": "cubestore",
       "CUBEJS_CUBESTORE_HOST": "store",
@@ -27,8 +26,12 @@
     "CREATE_TBL_PREFIX": "CREATE TABLE ",
     "CREATE_TBL_SUFFIX": " AS ",
     "CREATE_SUB_PREFIX": "(",
-    "CREATE_SUB_SUFFIX": ");",
-    "USE_SCHEMA": "USE SCHEMA public;"
+    "CREATE_SUB_SUFFIX": ");"
+  },
+  "tables": {
+    "products": "public.products",
+    "customers": "public.customers",
+    "ecommerce": "public.ecommerce"
   },
   "preAggregations": {
     "Products": [],

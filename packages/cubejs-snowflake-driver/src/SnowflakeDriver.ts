@@ -401,7 +401,10 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
    * Returns to the Cubestore an object with links to unloaded to the
    * export bucket data.
    */
-  public async unload(tableName: string, options: UnloadOptions): Promise<DownloadTableCSVData> {
+  public async unload(
+    tableName: string,
+    options: UnloadOptions,
+  ): Promise<DownloadTableCSVData> {
     if (!this.config.exportBucket) {
       throw new Error('Export bucket is not configured.');
     }

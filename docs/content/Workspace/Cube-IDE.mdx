@@ -8,18 +8,18 @@ redirect_from:
   - /cloud/dev-tools/cube-ide
 ---
 
-With the Cube IDE, you can write and test and your Cube data schemas from your
+With the Cube IDE, you can write and test and your Cube data models from your
 browser.
 
 <SuccessBox>
 
-Cube IDE is available in Cube Cloud on [all tiers](https://cube.dev/pricing). 
+Cube IDE is available in Cube Cloud on [all tiers](https://cube.dev/pricing).
 
 </SuccessBox>
 
-Cube Cloud can create branch-based development API instances to quickly
-test changes in the data schema in your frontend applications before pushing
-them into production.
+Cube Cloud can create branch-based development API instances to quickly test
+changes in the data model in your frontend applications before pushing them into
+production.
 
 <LoomVideo url="https://www.loom.com/embed/101b6291b0ba4d1d8982faa3b8c5bd55" />
 
@@ -28,11 +28,11 @@ them into production.
 In development mode, you can safely make changes to your project without
 affecting production deployment. Development mode uses a separate Git branch and
 allows testing your changes in Playground or via a separate API endpoint
-specific to this branch. This development API hot-reloads your schema changes,
-allowing you to quickly test API changes from your applications.
+specific to this branch. This development API hot-reloads your data model
+changes, allowing you to quickly test API changes from your applications.
 
-To enter development mode, navigate to the **Schema** page and click **Enter
-Development Mode**.
+To enter development mode, navigate to the <Btn>Data Model</Btn> screen and
+click <Btn>Enter Development Mode</Btn>.
 
 <div style="text-align: center">
   <img
@@ -60,7 +60,7 @@ screen. It provides several useful controls and indicators:
 </div>
 
 You can exit development mode by clicking <Btn>Exit</Btn> in the grey banner. If
-you've been editing a schema and navigate away, Cube Cloud will warn you if
+you've been editing a data model and navigate away, Cube Cloud will warn you if
 there are any unsaved changes:
 
 ![Unsaved changes warning modal|690x431](https://ucarecdn.com/67b8e943-0043-4398-84fc-91d83765ed10/)
@@ -91,8 +91,8 @@ want to delete, then open the switcher and click <Btn>Remove Branch</Btn>:
 ## Generating models
 
 Cube Cloud supports generating models from a data source after the initial
-deployment creation. The <Btn>Generate Schema</Btn> on the <Btn>Schema</Btn>
-page will let you re-generate models from your source database, or alternatively
-add rollups to existing schemas:
+deployment creation. The <Btn>Generate Data Model</Btn> on the <Btn>Data
+Model</Btn> page will let you re-generate models from your source database, or
+alternatively add rollups to existing data models:
 
-![Generate rollups or schema modal|690x428](https://ucarecdn.com/b83b8b21-7894-4363-9b0e-5f390b50cd6f/)
+![Generate rollups or data model modal|690x428](https://ucarecdn.com/b83b8b21-7894-4363-9b0e-5f390b50cd6f/)

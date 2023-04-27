@@ -56,9 +56,6 @@ export function testConnection(type: string): void {
   
     execute('must creates a data source', async () => {
       query = getCreateQueries(type, 'driver');
-      if (fixtures.cast.USE_SCHEMA) {
-        await driver.query(fixtures.cast.USE_SCHEMA);
-      }
       await Promise.all(query.map(async (q) => {
         await driver.query(q);
       }));
@@ -180,16 +177,16 @@ export function testConnection(type: string): void {
     });
 
     execute('must delete the data source', async () => {
-      if (fixtures.cast.USE_SCHEMA) {
-        await driver.query(fixtures.cast.USE_SCHEMA);
-      }
-      await Promise.all([
-        'ecommerce_driver',
-        'customers_driver',
-        'products_driver',
-      ].map(async (t) => {
-        await driver.dropTable(t);
-      }));
+      const tables = Object
+        .keys(fixtures.tables)
+        .map((key: string) => `${fixtures.tables[
+            <'products' | 'customers' | 'ecommerce'>key
+        ]}_driver`);
+      await Promise.all(
+        tables.map(async (t) => {
+          await driver.dropTable(t);
+        })
+      );
     });
   });
 }

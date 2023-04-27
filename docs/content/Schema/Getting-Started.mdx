@@ -6,10 +6,11 @@ category: Data Modeling
 menuOrder: 1
 ---
 
-A Cube Data Schema is used to model raw data into meaningful business
-definitions and pre-aggregate data for optimal results. The data schema is
+A Cube data model is used to transform raw data into meaningful business
+definitions and pre-aggregate data for optimal results. The data model is
 exposed through the [querying API][ref-backend-restapi] that allows end-users to
-query a wide variety of analytical queries without modifying the schema itself.
+query a wide variety of analytical queries without modifying the data model
+itself.
 
 Let’s use a users table with the following columns as an example:
 
@@ -28,7 +29,7 @@ We can start with a set of simple questions about users we want to answer:
 - What is the percentage of paying users out of the total?
 - How many users, paying or not, are from different cities and companies?
 
-We don’t need to write SQL queries for every question, since the data schema
+We don’t need to write SQL queries for every question, since the data model
 allows building well-organized and reusable SQL.
 
 ## 1. Creating a Cube
@@ -274,7 +275,7 @@ As with other measures, `paying_percentage` can be used with dimensions.
 1. [Examples][ref-examples]
 2. [Query format][ref-backend-query-format]
 3. [REST API][ref-backend-restapi]
-4. [Schema reference documentation][ref-schema-cube]
+4. [Data model reference documentation][ref-schema-cube]
 
 [ref-backend-restapi]: /rest-api
 [ref-schema-cube]: /schema/reference/cube

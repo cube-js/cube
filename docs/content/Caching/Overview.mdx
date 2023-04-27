@@ -49,8 +49,8 @@ more about read-only support and pre-aggregation build strategies.
 
 </InfoBox>
 
-Pre-aggregations are defined in the data schema. You can learn more about
-defining pre-aggregations in [schema reference][ref-schema-ref-preaggs].
+Pre-aggregations are defined in the data model. You can learn more about
+defining pre-aggregations in [data modeling reference][ref-schema-ref-preaggs].
 
 ```javascript
 cube(`Orders`, {
@@ -142,10 +142,9 @@ The default values for `refreshKey` are
 - `every: '10 second'` for all other databases.
 
 +You can use a custom SQL query to check if a refresh is required by changing
-the [`refreshKey`][ref-schema-ref-cube-refresh-key] property in a cube's Data
-Schema. Often, a `MAX(updated_at_timestamp)` for OLTP data is a viable option,
-or examining a metadata table for whatever system is managing the data to see
-when it last ran.
+the [`refreshKey`][ref-schema-ref-cube-refresh-key] property in a cube. Often, a
+`MAX(updated_at_timestamp)` for OLTP data is a viable option, or examining a
+metadata table for whatever system is managing the data to see when it last ran.
 
 ### <--{"id" : "In-memory Cache"}--> Disabling the cache
 

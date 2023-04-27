@@ -71,7 +71,7 @@ The following static `label` example will create a `size` dimension with values
 <CodeTabs>
 
 ```javascript
-cube('Products', {
+cube("Products", {
   dimensions: {
     size: {
       type: `string`,
@@ -115,7 +115,7 @@ The `label` property can be defined dynamically as an object with a `sql`
 property in JavaScript models:
 
 ```javascript
-cube('Products', {
+cube("Products", {
   dimensions: {
     size: {
       type: `string`,
@@ -152,7 +152,7 @@ You can add details to a dimension's definition via the `description` property:
 <CodeTabs>
 
 ```javascript
-cube('Products', {
+cube("Products", {
   dimensions: {
     comment: {
       type: `string`,
@@ -182,13 +182,13 @@ Custom metadata. Can be used to pass any information to the frontend.
 <CodeTabs>
 
 ```javascript
-cube('Products', {
+cube("Products", {
   dimensions: {
     users_count: {
       sql: `${Users.count}`,
       type: `number`,
       meta: {
-        any: 'value',
+        any: "value",
       },
     },
   },
@@ -225,7 +225,7 @@ parameter to `false`. If you still want `shown` to be `true`, set it manually.
 <CodeTabs>
 
 ```javascript
-cube('Products', {
+cube("Products", {
   dimensions: {
     id: {
       sql: `id`,
@@ -256,7 +256,7 @@ passed to the [subquery][self-subquery].
 <CodeTabs>
 
 ```javascript
-cube('Products', {
+cube("Products", {
   dimensions: {
     users_count: {
       sql: `${Users.count}`,
@@ -289,7 +289,7 @@ default value of `shown` is `true`.
 <CodeTabs>
 
 ```javascript
-cube('Products', {
+cube("Products", {
   dimensions: {
     comment: {
       type: `string`,
@@ -338,7 +338,7 @@ an advanced concept and you can learn more about it [here][ref-subquery].
 <CodeTabs>
 
 ```javascript
-cube('Products', {
+cube("Products", {
   dimensions: {
     users_count: {
       sql: `${Users.count}`,
@@ -370,7 +370,7 @@ order to override default behavior, please use the `title` property:
 <CodeTabs>
 
 ```javascript
-cube('Products', {
+cube("Products", {
   dimensions: {
     meta_value: {
       type: `string`,

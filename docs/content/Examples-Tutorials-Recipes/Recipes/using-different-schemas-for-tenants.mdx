@@ -1,5 +1,5 @@
 ---
-title: Using Different Schemas for Tenants
+title: Using Different Data Models for Tenants
 permalink: /recipes/using-different-schemas-for-tenants
 category: Examples & Tutorials
 subCategory: Access control
@@ -8,8 +8,8 @@ menuOrder: 2
 
 ## Use case
 
-We want to provide different data schemas to different tenants. In the recipe
-below, we'll learn how to switch between multiple data schemas based on the
+We want to provide different data models to different tenants. In the recipe
+below, we'll learn how to switch between multiple data models based on the
 tenant.
 
 ## Configuration
@@ -17,24 +17,26 @@ tenant.
 We have a folder structure as follows:
 
 ```tree
-schema/
+model/
 ├── avocado/
-│   └── Products.js
+│   └── cubes
+│       └── Products.js
 └── mango/
-    └── Products.js
+    └── cubes
+        └── Products.js
 ```
 
-Let's configure Cube to use a specific data schema path for each tenant. We'll
+Let's configure Cube to use a specific data model path for each tenant. We'll
 pass the tenant name as a part of
 [`securityContext`](https://cube.dev/docs/security/context#top) into the
 [`repositoryFactory`](https://cube.dev/docs/config#repository-factory) function.
 
 We'll also need to override the
 [`contextToAppId`](https://cube.dev/docs/config#context-to-app-id) function to
-control how the schema compilation result is cached and provide the tenant names
-via the
+control how the data model compilation result is cached and provide the tenant
+names via the
 [`scheduledRefreshContexts`](https://cube.dev/docs/config#scheduled-refresh-contexts)
-function so a refresh worker can find all existing schemas and build
+function so a refresh worker can find all existing data models and build
 pre-aggregations for them, if needed.
 
 Our `cube.js` file will look like this:
@@ -47,7 +49,7 @@ module.exports = {
     `CUBEJS_APP_${securityContext.tenant}`,
 
   repositoryFactory: ({ securityContext }) =>
-    new FileRepository(`schema/${securityContext.tenant}`),
+    new FileRepository(`model/${securityContext.tenant}`),
 
   scheduledRefreshContexts: () => [
     { securityContext: { tenant: 'avocado' } },
@@ -56,21 +58,21 @@ module.exports = {
 };
 ```
 
-## Data schema
+## Data modeling
 
 In this example, we'd like to get products with odd `id` values for the
 `avocado` tenant and with even `id` values the `mango` tenant:
 
 ```javascript
-// schema/avocado
-cube(`Products`, {
+// model/avocado/Product.js
+cube(`products`, {
   sql: `SELECT * FROM public.Products WHERE MOD (id, 2) = 1`,
 
   ...
 });
 
-// schema/mango
-cube(`Products`, {
+// model/mango/Product.js
+cube(`products`, {
   sql: `SELECT * FROM public.Products WHERE MOD (id, 2) = 0`,
 
   ...

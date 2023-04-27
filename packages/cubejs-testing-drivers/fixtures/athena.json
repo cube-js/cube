@@ -1,7 +1,6 @@
 {
   "cube": {
     "environment": {
-      "CUBEJS_DEV_MODE": "true",
       "CUBEJS_API_SECRET": "mysupersecret",
       "CUBEJS_CACHE_AND_QUEUE_DRIVER": "cubestore",
       "CUBEJS_CUBESTORE_HOST": "store",
@@ -25,6 +24,11 @@
     "CREATE_TBL_SUFFIX": " AS ",
     "CREATE_SUB_PREFIX": "(",
     "CREATE_SUB_SUFFIX": ");"
+  },
+  "tables": {
+    "products": "products",
+    "customers": "customers",
+    "ecommerce": "ecommerce"
   },
   "preAggregations": {
     "Products": [],

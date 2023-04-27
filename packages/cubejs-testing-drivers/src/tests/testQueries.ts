@@ -45,22 +45,20 @@ export function testQueries(type: string): void {
       });
       driver = (await getDriver(type)).source;
       query = getCreateQueries(type);
-
-      if (fixtures.cast.USE_SCHEMA) {
-        await driver.query(fixtures.cast.USE_SCHEMA);
-      }
       await Promise.all(query.map(async (q) => {
         await driver.query(q);
       }));
     });
   
     afterAll(async () => {
-      if (fixtures.cast.USE_SCHEMA) {
-        await driver.query(fixtures.cast.USE_SCHEMA);
-      }
-      await Promise.all(['ecommerce', 'customers', 'products'].map(async (t) => {
-        await driver.dropTable(t);
-      }));
+      const tables = Object
+        .keys(fixtures.tables)
+        .map((key: string) => fixtures.tables[<'products' | 'customers' | 'ecommerce'>key]);
+      await Promise.all(
+        tables.map(async (t) => {
+          await driver.dropTable(t);
+        })
+      );
       await driver.release();
       await env.stop();
     });

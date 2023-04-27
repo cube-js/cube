@@ -206,7 +206,7 @@ const ordersJs = `cube(\`Orders\`, {
   \`,
 
   preAggregations: {
-    // Pre-Aggregations definitions go here
+    // Pre-aggregation definitions go here
     // Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started
   },
 

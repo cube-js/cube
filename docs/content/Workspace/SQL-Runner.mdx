@@ -1,0 +1,96 @@
+---
+title: SQL Runner
+permalink: /cloud/sql-runner
+category: Workspace
+menuOrder: 6
+---
+
+The SQL Runner is a tool that allows you to execute SQL queries from Cube Cloud
+on your data source or Cube Store. It can be used to inform the development of
+the data model, for ad-hoc querying as well as debugging SQL queries generated
+by Cube to execute against the data source.
+
+<SuccessBox>
+
+The SQL Runner is available in Cube Cloud on
+[all tiers](https://cube.dev/pricing).
+
+</SuccessBox>
+
+<Screenshot src="https://ucarecdn.com/6d443059-b990-4735-81c1-78a490aa2f25/" />
+
+## Executing queries
+
+To execute a query, enter the SQL query in the text area under **SQL Editor**
+and click <Btn>▶ Run</Btn>. The query results will be displayed under
+**Results**, along with the row count and query execution time:
+
+<Screenshot
+  highlight="inset(12% 2% 1% 41% round 10px)"
+  src="https://ucarecdn.com/2f910abf-5b94-43cd-87f8-14c86bd98f77/"
+/>
+
+## Querying a data source vs Cube Store
+
+The SQL Runner can run queries against any configured data sources, which is
+helpful for diagnosing database-specific issues. It can also run queries against
+Cube Store, which is useful for testing pre-aggregations directly to see if they
+return expected results. You can switch data source(s) by clicking the dropdown
+under **Data Source**:
+
+<Screenshot
+  highlight="inset(25% 60% 53% 6% round 10px)"
+  src="https://ucarecdn.com/5bd43e2c-c8e6-4300-a89b-036398e92175/"
+/>
+
+## Using a Security Context
+
+The SQL Runner also allows executing queries against [configured data
+sources][ref-conf-ref-driverfactory] using a specific security context, which is
+particularly convenient for debugging [queries in a multi-tenant
+configuration][ref-recipe-multi-src-same-model]. The SQL Runner can be
+configured to use predefined security contexts from
+[`scheduledRefreshContexts`][ref-conf-scheduled-refresh-ctx] in the `cube.js`
+configuration file, or a custom context can be provided as a JSON string.
+
+Specifying a security context is optional, and if none is provided, the query
+will be executed with the default security context. If one is provided, then the
+**Schema Explorer** will reload to reflect the data source available to the
+security context.
+
+[ref-conf-ref-driverfactory]: /config#options-reference-driver-factory
+[ref-recipe-multi-src-same-model]: /recipes/multiple-sources-same-schema
+
+### <--{"id" : "Using a Security Context"}--> Scheduled Refresh Contexts
+
+If you have configured
+[`scheduledRefreshContexts`][ref-conf-scheduled-refresh-ctx] in your deployment,
+you can choose a context to execute the query with. Click the dropdown under
+**Security Context**, then use the <Btn>Scheduled Refresh Contexts</Btn> tab to
+select an existing context:
+
+<Screenshot src="https://ucarecdn.com/f3664be8-8214-4b27-88bb-f8cd85fc934f/" />
+
+### <--{"id" : "Using a Security Context"}--> Custom Contexts
+
+The SQL Runner also allows providing an ad-hoc security context as a JSON
+string. From the same dropdown under **Security Context**, click the <Btn>Custom
+Context</Btn> tab and enter a valid JSON string and click <Btn>Apply</Btn>:
+
+<Screenshot src="https://ucarecdn.com/955fa2c7-31c5-459e-adfb-498fbaf7bbb6/" />
+
+## Viewing schema details
+
+The Schema Explorer allows you to view details of the data source's schema,
+including tables and their columns and types. This is useful for ensuring that
+properties of data models match the underlying schema (i.e. a `number` property
+in a data model should be a `numeric`).
+
+<Screenshot
+  highlight="inset(37% 60% 0% 6% round 10px)"
+  src="https://ucarecdn.com/c2735f7c-d5e7-4b6b-903b-8d0db07b668e/"
+/>
+
+[cubecloud-signup]: https://cubecloud.dev/auth/signup
+[ref-conf-scheduled-refresh-ctx]:
+  /config#options-reference-scheduled-refresh-contexts

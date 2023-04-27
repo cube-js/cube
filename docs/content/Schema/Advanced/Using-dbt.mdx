@@ -31,7 +31,7 @@ asyncModule(async () => {
 
 ## Connect dbt Cloud to Cube
 
-Create a `config.js` file as a sibling to the `schema/` folder in your Cube
+Create a `config.js` file as a sibling to the `model/` folder in your Cube
 project:
 
 ```javascript
@@ -39,7 +39,7 @@ exports.dbtJobId = 65806;
 exports.dbtApiKey = 'YOUR_KEY_HERE';
 ```
 
-Create a file called `dbt.js` in the `schema/` folder and enter the following
+Create a file called `dbt.js` in the `model/` folder and enter the following
 code snippet:
 
 ```javascript

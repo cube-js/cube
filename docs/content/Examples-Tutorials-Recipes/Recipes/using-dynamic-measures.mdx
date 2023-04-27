@@ -2,7 +2,7 @@
 title: Using Dynamic Measures
 permalink: /recipes/referencing-dynamic-measures
 category: Examples & Tutorials
-subCategory: Data schema
+subCategory: Data modeling
 menuOrder: 4
 ---
 
@@ -12,11 +12,11 @@ We want to understand the distribution of orders by their statuses. Let's
 imagine that new order statuses can be added in the future, or we get a list of
 statuses from an external API. To calculate the orders percentage distribution,
 we need to create several [measures](/schema/fundamentals/concepts#measures)
-that refer to each other. But we don't want to manually change the schema for
+that refer to each other. But we don't want to manually change the data model for
 each new status. To solve this, we will create a
 [schema dynamically](/schema/advanced/dynamic-schema-creation).
 
-## Data schema
+## Data modeling
 
 To calculate the number of orders as a percentage, we need to know the total
 number of orders and the number of orders with the desired status. We'll create

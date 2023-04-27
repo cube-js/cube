@@ -303,10 +303,6 @@ class ApiGateway {
       });
     }));
 
-    /** **************************************************************
-     * Meta scope                                                    *
-     *************************************************************** */
-
     app.get(
       `${this.basePath}/v1/meta`,
       userMiddlewares,
@@ -490,15 +486,15 @@ class ApiGateway {
     }
   }
 
-  private filterVisibleItemsInMeta(_context: RequestContext, metaConfig: any) {
+  private filterVisibleItemsInMeta(context: RequestContext, metaConfig: any) {
     function visibilityFilter(item) {
-      // Hidden items shouldn't be accessible through API everywhere for consistency.
-      return item.isVisible;
+      return getEnv('devMode') || context.signedWithPlaygroundAuthSecret || item.isVisible;
     }
 
     return metaConfig
       .map((cube) => ({
         config: {
+          public: cube.isVisible,
           ...cube.config,
           measures: cube.config.measures?.filter(visibilityFilter),
           dimensions: cube.config.dimensions?.filter(visibilityFilter),
@@ -1917,14 +1913,13 @@ class ApiGateway {
           req.securityContext = await checkAuthFn(auth, secret);
           req.signedWithPlaygroundAuthSecret = Boolean(internalOptions?.isPlaygroundCheckAuth);
         } catch (e) {
+          this.log({
+            type: (e as Error).message,
+            token: auth,
+            error: (e as Error).stack || (e as Error).toString()
+          }, <any>req);
           if (this.enforceSecurityChecks) {
             throw new CubejsHandlerError(403, 'Forbidden', 'Invalid token');
-          } else {
-            this.log({
-              type: (e as Error).message,
-              token: auth,
-              error: (e as Error).stack || (e as Error).toString()
-            }, <any>req);
           }
         }
       } else if (this.enforceSecurityChecks) {

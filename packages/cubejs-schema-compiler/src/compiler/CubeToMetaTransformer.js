@@ -37,6 +37,7 @@ export class CubeToMetaTransformer {
       isVisible: this.isVisible(cube, true),
       config: {
         name: cube.name,
+        type: cube.isView ? 'view' : 'cube',
         title: cubeTitle,
         description: cube.description,
         connectedComponent: this.joinGraph.connectedComponents()[cube.name],

@@ -7385,6 +7385,20 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_pgcatalog_pgextension_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pgcatalog_pgextension_postgres",
+            execute_query(
+                "SELECT * FROM pg_catalog.pg_extension".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_constraint_column_usage_postgres() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "constraint_column_usage_postgres",
@@ -9476,6 +9490,54 @@ ORDER BY \"COUNT(count)\" DESC"
             "grafana_insubquery_where_tables",
             execute_query(
                 r#"SELECT quote_ident(table_name) AS "table" FROM information_schema.tables WHERE quote_ident(table_schema) NOT IN ('information_schema', 'pg_catalog', '_timescaledb_cache', '_timescaledb_catalog', '_timescaledb_internal', '_timescaledb_config', 'timescaledb_information', 'timescaledb_experimental') AND table_type = 'BASE TABLE' AND quote_ident(table_schema) IN (SELECT CASE WHEN TRIM(s[i]) = '"$user"' THEN user ELSE TRIM(s[i]) END FROM generate_series(array_lower(string_to_array(current_setting('search_path'), ','), 1), array_upper(string_to_array(current_setting('search_path'), ','), 1)) AS i, string_to_array(current_setting('search_path'), ',') AS s)"#.to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_insubquery_where_tables_spacing() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "grafana_insubquery_where_tables_spacing",
+            execute_query(
+                "select quote_ident(table_name) as \"table\" from information_schema.tables\
+            \n    where quote_ident(table_schema) not in ('information_schema',\
+            \n                             'pg_catalog',\
+            \n                             '_timescaledb_cache',\
+            \n                             '_timescaledb_catalog',\
+            \n                             '_timescaledb_internal',\
+            \n                             '_timescaledb_config',\
+            \n                             'timescaledb_information',\
+            \n                             'timescaledb_experimental')\
+            \n      and \
+            \n          quote_ident(table_schema) IN (\
+            \n          SELECT\
+            \n            CASE WHEN trim(s[i]) = '\"$user\"' THEN user ELSE trim(s[i]) END\
+            \n          FROM\
+            \n            generate_series(\
+            \n              array_lower(string_to_array(current_setting('search_path'),','),1),\
+            \n              array_upper(string_to_array(current_setting('search_path'),','),1)\
+            \n            ) as i,\
+            \n            string_to_array(current_setting('search_path'),',') s\
+            \n          )"
+                    .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_grafana_pg_version_introspection() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "grafana_pg_version_introspection",
+            execute_query(
+                "SELECT current_setting('server_version_num')::int/100 as version".to_string(),
                 DatabaseProtocol::PostgreSQL
             )
             .await?

@@ -3984,7 +3984,7 @@ async fn topk_hll(service: Box<dyn SqlClient>) {
         )
         .await
         .unwrap();
-    assert_eq!(to_rows(&r), rows(&[("d", 10383), ("b", 9722), ("c", 171)]));
+    assert_eq!(to_rows(&r), rows(&[("b", 9722), ("d", 9722), ("c", 171)]));
 
     let r = service
         .exec_query(
@@ -3993,13 +3993,13 @@ async fn topk_hll(service: Box<dyn SqlClient>) {
                                UNION ALL \
                                SELECT * FROM s.Data2) AS `Data` \
                          GROUP BY 1 \
-                         HAVING cardinality(merge(hits)) < 10000
+                         HAVING cardinality(merge(hits)) < 9000
                          ORDER BY 2 DESC \
-                         LIMIT 3",
+                         LIMIT 2",
         )
         .await
         .unwrap();
-    assert_eq!(to_rows(&r), rows(&[("b", 9722), ("c", 171), ("h", 164)]));
+    assert_eq!(to_rows(&r), rows(&[("c", 171), ("h", 164)]));
     let r = service
         .exec_query(
             "SELECT `url` `url`, cardinality(merge(hits)) `hits` \

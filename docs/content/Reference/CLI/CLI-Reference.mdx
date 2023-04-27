@@ -69,7 +69,7 @@ npx cubejs-cli server
 
 ## generate
 
-The `generate` command helps to build data schema for existing database tables.
+The `generate` command helps to build data models for existing database tables.
 You can only run `generate` from the Cube app directory. This command requires
 an active [database connection](/config/databases).
 
@@ -81,13 +81,13 @@ npx cubejs-cli generate -t TABLE-NAMES
 
 ### <--{"id" : "generate"}--> Flags
 
-| Parameter               | Description                                            | Values                      |
-| ----------------------- | ------------------------------------------------------ | --------------------------- |
-| `-t, --tables <tables>` | Comma delimited list of tables to generate schema for. | `TABLE-NAME-1,TABLE-NAME-2` |
+| Parameter               | Description                                                 | Values                      |
+| ----------------------- | ----------------------------------------------------------- | --------------------------- |
+| `-t, --tables <tables>` | Comma delimited list of tables to generate data models for. | `TABLE-NAME-1,TABLE-NAME-2` |
 
 ### <--{"id" : "generate"}--> Example
 
-Generate schema files for tables `orders` and `customers`:
+Generate data model files for tables `orders` and `customers`:
 
 ```bash{promptUser: user}
 npx cubejs-cli generate -t orders,customers
