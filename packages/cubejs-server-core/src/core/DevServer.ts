@@ -506,8 +506,6 @@ export class DevServer {
 
       const envs = dotenv.parse(fs.readFileSync(path.join(process.cwd(), '.env')));
       
-      console.log('>>>', 'read2', envs);
-      
       const schemaPath = envs.CUBEJS_SCHEMA_PATH || 'model';
       
       variables.CUBEJS_EXTERNAL_DEFAULT = 'true';

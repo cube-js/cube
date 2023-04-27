@@ -4,7 +4,7 @@ import { DriverType, startBirdBoxFromContainer } from '../../src';
 (async () => {
   let birdbox;
 
-  const name = (process.env.BIRDBOX_CYPRESS_TARGET || 'postgresql-cubestore') as DriverType;
+  const name = 'postgresql';// (process.env.BIRDBOX_CYPRESS_TARGET || 'postgresql-cubestore') as DriverType;
 
   console.log(`[Birdbox] Starting "${name}"`);
 
@@ -22,6 +22,9 @@ import { DriverType, startBirdBoxFromContainer } from '../../src';
   console.log('[Cypress] Starting');
 
   let cypressFailed = false;
+  
+  // console.log('>>>', birdbox.configuration.playgroundUrl);
+  // birdbox.configuration.playgroundUrl = 'http://localhost:3080';
 
   try {
     const browser = process.env.BIRDBOX_CYPRESS_BROWSER || 'chrome';

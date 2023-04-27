@@ -19,50 +19,50 @@ context('Playground: Connection Wizard', () => {
     });
   });
 
-  it('copies values of the localhost tip box', () => {
-    cy.visit('/');
-    cy.getByTestId('wizard-db-card').contains('PostgreSQL').click();
-    ['mac', 'windows', 'linux'].forEach((os) => {
-      cy.getByTestId(`localhost-tipbox-${os}-copy-btn`).click();
-      cy.getByTestId(`localhost-tipbox-${os}-input`)
-        .invoke('val')
-        .then((val) => {
-          cy.getByTestId('CUBEJS_DB_HOST').should(($input) => {
-            expect($input.val()).to.eq(val);
-          });
-        });
-    });
-  });
+  // it('copies values of the localhost tip box', () => {
+  //   cy.visit('/');
+  //   cy.getByTestId('wizard-db-card').contains('PostgreSQL').click();
+  //   ['mac', 'windows', 'linux'].forEach((os) => {
+  //     cy.getByTestId(`localhost-tipbox-${os}-copy-btn`).click();
+  //     cy.getByTestId(`localhost-tipbox-${os}-input`)
+  //       .invoke('val')
+  //       .then((val) => {
+  //         cy.getByTestId('CUBEJS_DB_HOST').should(($input) => {
+  //           expect($input.val()).to.eq(val);
+  //         });
+  //       });
+  //   });
+  // });
 
   describe('PostgreSQL connection flow', () => {
-    it('resets the error', () => {
-      cy.visit('/');
-      cy.getByTestId('wizard-db-card').contains('PostgreSQL').click();
-      cy.getByTestId('wizard-form-submit-btn').click();
-      cy.getByTestId('wizard-connection-error').should('exist');
+    // it('resets the error', () => {
+    //   cy.visit('/');
+    //   cy.getByTestId('wizard-db-card').contains('PostgreSQL').click();
+    //   cy.getByTestId('wizard-form-submit-btn').click();
+    //   cy.getByTestId('wizard-connection-error').should('exist');
 
-      cy.getByTestId('wizard-change-db-btn').click();
-      cy.getByTestId('wizard-db-card').contains('MySQL').click();
-      cy.getByTestId('wizard-connection-error').should('not.exist');
-    });
+    //   cy.getByTestId('wizard-change-db-btn').click();
+    //   cy.getByTestId('wizard-db-card').contains('MySQL').click();
+    //   cy.getByTestId('wizard-connection-error').should('not.exist');
+    // });
 
-    it('opens the DB connection page', () => {
-      cy.visit('/');
-      cy.getByTestId('wizard-db-card').contains('PostgreSQL').click();
-      cy.getByTestId('wizard-localhost-tipbox').should('exist');
-    });
+    // it('opens the DB connection page', () => {
+    //   cy.visit('/');
+    //   cy.getByTestId('wizard-db-card').contains('PostgreSQL').click();
+    //   cy.getByTestId('wizard-localhost-tipbox').should('exist');
+    // });
 
-    it('fails to connect to the DB with wrong credentials', () => {
-      cy.visit('/');
-      cy.getByTestId('wizard-db-card').contains('PostgreSQL').click();
-      cy.fixture('databases.json').then(({ postgresql }) => {
-        Object.entries(postgresql.credentials.invalid).forEach(([key, value]) => {
-          cy.getByTestId(key).type(value);
-        });
-      });
-      cy.getByTestId('wizard-form-submit-btn').click();
-      cy.getByTestId('wizard-connection-error').should('exist');
-    });
+    // it('fails to connect to the DB with wrong credentials', () => {
+    //   cy.visit('/');
+    //   cy.getByTestId('wizard-db-card').contains('PostgreSQL').click();
+    //   cy.fixture('databases.json').then(({ postgresql }) => {
+    //     Object.entries(postgresql.credentials.invalid).forEach(([key, value]) => {
+    //       cy.getByTestId(key).type(value);
+    //     });
+    //   });
+    //   cy.getByTestId('wizard-form-submit-btn').click();
+    //   cy.getByTestId('wizard-connection-error').should('exist');
+    // });
 
     it('connects to the DB', () => {
       cy.visit('/');

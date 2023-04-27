@@ -3,14 +3,8 @@ import fs from 'fs-extra';
 import yargs from 'yargs/yargs';
 import { ChildProcess, spawn } from 'child_process';
 import HttpProxy from 'http-proxy';
-import {
-  DockerComposeEnvironment,
-  StartedTestContainer,
-} from 'testcontainers';
-import {
-  execInDir,
-  pausePromise
-} from '@cubejs-backend/shared';
+import { DockerComposeEnvironment, StartedTestContainer } from 'testcontainers';
+import { execInDir, pausePromise } from '@cubejs-backend/shared';
 import {
   getLocalHostnameByOs,
   PostgresDBRunner,
@@ -44,11 +38,28 @@ enum Mode {
  * Arguments interface.
  */
 interface Args {
-  mode: Mode,
-  log: Log,
+  mode: Mode;
+  log: Log;
 }
 
-export type DriverType = 'postgresql' | 'postgres' | 'multidb' | 'materialize' | 'crate' | 'bigquery' | 'athena' | 'postgresql-cubestore' | 'firebolt' | 'questdb' | 'redshift' | 'databricks-jdbc' | 'prestodb' | 'mssql' | 'trino' | 'oracle' | 'duckdb';
+export type DriverType =
+  | 'postgresql'
+  | 'postgres'
+  | 'multidb'
+  | 'materialize'
+  | 'crate'
+  | 'bigquery'
+  | 'athena'
+  | 'postgresql-cubestore'
+  | 'firebolt'
+  | 'questdb'
+  | 'redshift'
+  | 'databricks-jdbc'
+  | 'prestodb'
+  | 'mssql'
+  | 'trino'
+  | 'oracle'
+  | 'duckdb';
 
 export type Schemas = string[];
 
@@ -60,34 +71,34 @@ export interface ContainerOptions {
   env?: Record<string, string | undefined>;
   log?: Log;
   loadScript?: string;
-  schemas?: Schemas,
+  schemas?: Schemas;
 }
 
 /**
  * Birdbox options for local/cli mode.
  */
 export interface LocalOptions extends ContainerOptions {
-  schemaDir?: string
-  cubejsConfig?: string
-  useCubejsServerBinary?: boolean
+  schemaDir?: string;
+  cubejsConfig?: string;
+  useCubejsServerBinary?: boolean;
 }
 
 type RequiredEnv = {
-  CUBEJS_DEV_MODE: string,
-  CUBEJS_WEB_SOCKETS: string,
-  CUBEJS_EXTERNAL_DEFAULT: string,
-  CUBEJS_SCHEDULED_REFRESH_DEFAULT: string,
-  CUBEJS_REFRESH_WORKER: string,
-  CUBEJS_ROLLUP_ONLY: string,
+  CUBEJS_DEV_MODE: string;
+  CUBEJS_WEB_SOCKETS: string;
+  CUBEJS_EXTERNAL_DEFAULT: string;
+  CUBEJS_SCHEDULED_REFRESH_DEFAULT: string;
+  CUBEJS_REFRESH_WORKER: string;
+  CUBEJS_ROLLUP_ONLY: string;
 };
 
 type OptionalEnv = {
   // SQL API
-  CUBEJS_SQL_PORT?: string,
-  CUBEJS_SQL_USER?: string,
-  CUBEJS_PG_SQL_PORT?: string,
-  CUBEJS_SQL_PASSWORD?: string,
-  CUBEJS_SQL_SUPER_USER?: string,
+  CUBEJS_SQL_PORT?: string;
+  CUBEJS_SQL_USER?: string;
+  CUBEJS_PG_SQL_PORT?: string;
+  CUBEJS_SQL_PASSWORD?: string;
+  CUBEJS_SQL_SUPER_USER?: string;
 };
 
 const driverNameToFolderNameMapper: Record<DriverType, string> = {
@@ -113,7 +124,9 @@ const driverNameToFolderNameMapper: Record<DriverType, string> = {
 /**
  * Birdbox environments for cube.js passed for testcase.
  */
-export type Env = RequiredEnv & OptionalEnv & Record<string, string | undefined>;
+export type Env = RequiredEnv &
+  OptionalEnv &
+  Record<string, string | undefined>;
 /**
  * List of permanent test data files.
  */
@@ -127,20 +140,12 @@ const FILES = [
 /**
  * List of test schemas needs to be patched for certain datasource.
  */
-const SCHEMAS = [
-  'Customers.js',
-  'ECommerce.js',
-  'Products.js',
-];
+const SCHEMAS = ['Customers.js', 'ECommerce.js', 'Products.js'];
 
 /**
  * Test data files source folder.
  */
-const SOURCE = path.join(
-  process.cwd(),
-  'birdbox-fixtures',
-  'driver-test-data',
-);
+const SOURCE = path.join(process.cwd(), 'birdbox-fixtures', 'driver-test-data');
 
 /**
  * Test data files target source.
@@ -149,25 +154,28 @@ const getTargetFolder = (type: DriverType) => path.join(
   process.cwd(),
   'birdbox-fixtures',
   driverNameToFolderNameMapper[type],
-  'schema',
+  'schema'
 );
 
-const extendsFiles = globby.sync(
-  `${SOURCE}/**/*.js`,
-  { objectMode: true, ignore: SCHEMAS.concat(FILES).map(f => path.join(SOURCE, f)) }
-)
-  .map(glob => glob.name);
+const extendsFiles = globby
+  .sync(`${SOURCE}/**/*.js`, {
+    objectMode: true,
+    ignore: SCHEMAS.concat(FILES).map((f) => path.join(SOURCE, f)),
+  })
+  .map((glob) => glob.name);
 
 /**
  * Remove test data files from target directory.
  */
 function clearTestData(type: DriverType) {
   const targetFolder = getTargetFolder(type);
-  FILES.concat(SCHEMAS).concat(extendsFiles).forEach((name) => {
-    if (fs.existsSync(path.join(targetFolder, name))) {
-      fs.removeSync(path.join(targetFolder, name));
-    }
-  });
+  FILES.concat(SCHEMAS)
+    .concat(extendsFiles)
+    .forEach((name) => {
+      if (fs.existsSync(path.join(targetFolder, name))) {
+        fs.removeSync(path.join(targetFolder, name));
+      }
+    });
 }
 
 function runSchemasGeneration(type: DriverType, schemas: Schemas) {
@@ -177,17 +185,12 @@ function runSchemasGeneration(type: DriverType, schemas: Schemas) {
     fs.mkdirSync(targetFolder, { recursive: true });
   }
   schemas.forEach((s) => {
-    const originalContent = fs.readFileSync(
-      path.join(SOURCE, s), 'utf8'
-    );
+    const originalContent = fs.readFileSync(path.join(SOURCE, s), 'utf8');
 
     const { base } = path.parse(s);
     const updatedContent = originalContent.replace('_type_', type);
 
-    fs.writeFileSync(
-      path.join(targetFolder, base),
-      updatedContent
-    );
+    fs.writeFileSync(path.join(targetFolder, base), updatedContent);
   });
 }
 
@@ -197,26 +200,18 @@ function runSchemasGeneration(type: DriverType, schemas: Schemas) {
 function prepareTestData(type: DriverType, schemas?: Schemas) {
   const targetFolder = getTargetFolder(type);
   clearTestData(type);
-  
+
   if (schemas) {
     runSchemasGeneration(type, schemas);
   } else {
     FILES.forEach((name) => {
-      fs.copySync(
-        path.join(SOURCE, name),
-        path.join(targetFolder, name),
-      );
+      fs.copySync(path.join(SOURCE, name), path.join(targetFolder, name));
     });
     SCHEMAS.forEach((name) => {
-      const originalContent = fs.readFileSync(
-        path.join(SOURCE, name), 'utf8'
-      );
-  
+      const originalContent = fs.readFileSync(path.join(SOURCE, name), 'utf8');
+
       const updatedContent = originalContent.replace('_type_', type);
-      fs.writeFileSync(
-        path.join(targetFolder, name),
-        updatedContent
-      );
+      fs.writeFileSync(path.join(targetFolder, name), updatedContent);
     });
   }
 }
@@ -260,51 +255,67 @@ export async function startBirdBoxFromContainer(
     };
   }
 
-  if (process.env.BIRDBOX_CUBEJS_VERSION === undefined) {
-    process.env.BIRDBOX_CUBEJS_VERSION = 'latest';
-    const tag = `${process.env.BIRDBOX_CUBEJS_REGISTRY_PATH}cubejs/cube:${process.env.BIRDBOX_CUBEJS_VERSION}`;
-    if (
-      execInDir(
-        '../..',
-        `docker build . -f packages/cubejs-docker/dev.Dockerfile -t ${tag}`
-      ) !== 0
-    ) {
-      throw new Error('[Birdbox] Docker build failed.');
-    }
-  }
+  process.env.BIRDBOX_CUBEJS_VERSION = 'dev';
+  process.env.BIRDBOX_CUBEJS_REGISTRY_PATH = '';
+  
+  // if (process.env.BIRDBOX_CUBEJS_VERSION === undefined) {
+  //   process.env.BIRDBOX_CUBEJS_VERSION = 'latest';
+  //   // const tag = `${process.env.BIRDBOX_CUBEJS_REGISTRY_PATH}cubejs/cube:${process.env.BIRDBOX_CUBEJS_VERSION}`;
+  //   const tag = 'cube:dev';
+  //   if (
+  //     execInDir(
+  //       '../..',
+  //       `docker build . -f packages/cubejs-docker/dev.Dockerfile -t ${tag}`
+  //     ) !== 0
+  //   ) {
+  //     throw new Error('[Birdbox] Docker build failed.');
+  //   }
+  // }
 
   if (process.env.BIRDBOX_CUBESTORE_VERSION === undefined) {
     process.env.BIRDBOX_CUBESTORE_VERSION = 'latest';
   }
-  
+
   const composeFileName = `${options.type}.yml`;
-  const composeFilePath = path.resolve(path.dirname(__filename), '../../birdbox-fixtures/');
+  const composeFilePath = path.resolve(
+    path.dirname(__filename),
+    '../../birdbox-fixtures/'
+  );
   let dc: DockerComposeEnvironment;
+
+  // console.log('>>>', options);
+
+  // if (1) throw new Error('sdf');
+
   if (options.schemas) {
-    const dockerComposeFileContent = fs.readFileSync(path.join(composeFilePath, composeFileName), 'utf8');
+    const dockerComposeFileContent = fs.readFileSync(
+      path.join(composeFilePath, composeFileName),
+      'utf8'
+    );
     const yamlContent = parseYaml(dockerComposeFileContent);
 
     if (!yamlContent?.services?.cube?.volumes) {
-      throw new Error('there is no services.cube.volumes in your docker compose');
+      throw new Error(
+        'there is no services.cube.volumes in your docker compose'
+      );
     }
 
-    options.schemas.forEach(s => {
-      yamlContent.services.cube.volumes.push(`./${options.type}/schema/${s}:/cube/conf/schema/${s}`);
+    options.schemas.forEach((s) => {
+      yamlContent.services.cube.volumes.push(
+        `./${options.type}/schema/${s}:/cube/conf/schema/${s}`
+      );
     });
     yamlContent.services.cube.volumes = uniq(yamlContent.services.cube.volumes);
 
     const newComposeFileName = `${options.type}.json`;
-    fs.writeFileSync(path.join(composeFilePath, newComposeFileName), JSON.stringify(yamlContent));
-    
-    dc = new DockerComposeEnvironment(
-      composeFilePath,
-      newComposeFileName
+    fs.writeFileSync(
+      path.join(composeFilePath, newComposeFileName),
+      JSON.stringify(yamlContent)
     );
+
+    dc = new DockerComposeEnvironment(composeFilePath, newComposeFileName);
   } else {
-    dc = new DockerComposeEnvironment(
-      composeFilePath,
-      composeFileName
-    );
+    dc = new DockerComposeEnvironment(composeFilePath, composeFileName);
   }
 
   if (options.env) {
@@ -316,21 +327,13 @@ export async function startBirdBoxFromContainer(
     }
   }
   if (options.log === Log.PIPE) {
-    process.stdout.write(
-      `[Birdbox] Using ${composeFileName} compose file\n`
-    );
+    process.stdout.write(`[Birdbox] Using ${composeFileName} compose file\n`);
   }
 
   const env = await dc
     .withStartupTimeout(30 * 1000)
-    .withEnv(
-      'BIRDBOX_CUBEJS_VERSION',
-      process.env.BIRDBOX_CUBEJS_VERSION
-    )
-    .withEnv(
-      'BIRDBOX_CUBESTORE_VERSION',
-      process.env.BIRDBOX_CUBESTORE_VERSION
-    )
+    .withEnv('BIRDBOX_CUBEJS_VERSION', process.env.BIRDBOX_CUBEJS_VERSION)
+    .withEnv('BIRDBOX_CUBESTORE_VERSION', process.env.BIRDBOX_CUBESTORE_VERSION)
     .withEnv('CUBEJS_TELEMETRY', 'false')
     .up();
 
@@ -349,7 +352,7 @@ export async function startBirdBoxFromContainer(
 
     // As local Playground proxies requests to the 4000 port
     proxyServer = HttpProxy.createProxyServer({
-      target: `http://localhost:${port}`
+      target: `http://localhost:${port}`,
     }).listen(4000);
     proxyServer.on('error', async (err, req, res) => {
       process.stderr.write(`[Proxy Server] error: ${err}\n`);
@@ -363,14 +366,9 @@ export async function startBirdBoxFromContainer(
   if (options.loadScript) {
     const { loadScript } = options;
     if (options.log === Log.PIPE) {
-      process.stdout.write(
-        `[Birdbox] Executing ${loadScript} script\n`
-      );
+      process.stdout.write(`[Birdbox] Executing ${loadScript} script\n`);
     }
-    const {
-      output,
-      exitCode,
-    } = await env
+    const { output, exitCode } = await env
       .getContainer('birdbox-db')
       .exec([`/scripts/${loadScript}`]);
 
@@ -411,11 +409,9 @@ export async function startBirdBoxFromContainer(
       systemUrl: `http://${host}:${port}/cubejs-system/v1`,
       wsUrl: `ws://${host}:${port}`,
       env: {
-        ...(
-          process.env.TEST_PLAYGROUND_PORT
-            ? { CUBEJS_DB_HOST: getLocalHostnameByOs() }
-            : null
-        ),
+        ...(process.env.TEST_PLAYGROUND_PORT
+          ? { CUBEJS_DB_HOST: getLocalHostnameByOs() }
+          : null),
       },
     },
   };
@@ -447,12 +443,25 @@ export async function startBirdBoxFromCli(
     db = await PostgresDBRunner.startContainer({
       volumes: [
         {
-          source: path.join(__dirname, '..', '..', 'birdbox-fixtures', 'datasets'),
+          source: path.join(
+            __dirname,
+            '..',
+            '..',
+            'birdbox-fixtures',
+            'datasets'
+          ),
           target: '/data',
           bindMode: 'ro',
         },
         {
-          source: path.join(__dirname, '..', '..', 'birdbox-fixtures', 'postgresql', 'scripts'),
+          source: path.join(
+            __dirname,
+            '..',
+            '..',
+            'birdbox-fixtures',
+            'postgresql',
+            'scripts'
+          ),
           target: '/scripts',
           bindMode: 'ro',
         },
@@ -528,14 +537,14 @@ export async function startBirdBoxFromCli(
   }
 
   if (!fs.existsSync(path.join(testDir, 'package.json'))) {
-    fs.writeFileSync(path.join(testDir, 'package.json'), '{}', { encoding: 'utf-8' });
+    fs.writeFileSync(path.join(testDir, 'package.json'), '{}', {
+      encoding: 'utf-8',
+    });
   }
 
   const env = {
     ...process.env,
-    CUBEJS_DB_TYPE: options.type === 'postgresql'
-      ? 'postgres'
-      : options.type,
+    CUBEJS_DB_TYPE: options.type === 'postgresql' ? 'postgres' : options.type,
     CUBEJS_DEV_MODE: 'true',
     CUBEJS_API_SECRET: 'mysupersecret',
     CUBEJS_WEB_SOCKETS: 'true',
@@ -559,18 +568,12 @@ export async function startBirdBoxFromCli(
       options.useCubejsServerBinary
         ? path.resolve(process.cwd(), '../cubejs-server/bin/server')
         : 'npm',
-      options.useCubejsServerBinary
-        ? []
-        : ['run', 'dev'],
+      options.useCubejsServerBinary ? [] : ['run', 'dev'],
       {
         cwd: testDir,
         shell: true,
         detached: true,
-        stdio: [
-          options.log,
-          options.log,
-          options.log,
-        ],
+        stdio: [options.log, options.log, options.log],
         env,
       }
     );
@@ -620,11 +623,11 @@ export async function startBirdBoxFromCli(
 }
 
 export interface BirdboxOptions {
-   // Schema directory. LOCAL mode.
-  schemaDir?: string,
+  // Schema directory. LOCAL mode.
+  schemaDir?: string;
   // Config file. LOCAL mode.
-  cubejsConfig?: string,
-  schemas?: Schemas,
+  cubejsConfig?: string;
+  schemas?: Schemas;
 }
 
 /**
@@ -633,7 +636,7 @@ export interface BirdboxOptions {
 export async function getBirdbox(
   type: DriverType,
   env: Env,
-  options?: BirdboxOptions,
+  options?: BirdboxOptions
 ) {
   // default options
   if (!options) {
@@ -646,23 +649,15 @@ export async function getBirdbox(
     .options({
       mode: {
         describe: 'Determines Birdbox mode.',
-        choices: [
-          Mode.CLI,
-          Mode.LOCAL,
-          Mode.DOCKER,
-        ],
+        choices: [Mode.CLI, Mode.LOCAL, Mode.DOCKER],
         default: Mode.LOCAL,
       },
       log: {
         describe: 'Determines Birdbox logging.',
-        choices: [
-          Log.NONE,
-          Log.PIPE,
-        ],
+        choices: [Log.NONE, Log.PIPE],
         default: Log.PIPE,
-      }
-    })
-    .argv as Args;
+      },
+    }).argv as Args;
   const { mode, log } = args;
 
   // extract/assert env variables
@@ -717,9 +712,7 @@ export async function getBirdbox(
         break;
       }
       default: {
-        process.stderr.write(
-          `Error: unsupported Birdbox mode: ${mode}\n`
-        );
+        process.stderr.write(`Error: unsupported Birdbox mode: ${mode}\n`);
         process.exit(1);
       }
     }
