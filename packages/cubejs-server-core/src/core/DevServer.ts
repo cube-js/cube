@@ -504,13 +504,19 @@ export class DevServer {
         variables.CUBEJS_API_SECRET = options.apiSecret;
       }
 
+      const envs = dotenv.parse(fs.readFileSync(path.join(process.cwd(), '.env')));
+      
+      console.log('>>>', 'read2', envs);
+      
+      const schemaPath = envs.CUBEJS_SCHEMA_PATH || 'model';
+      
       variables.CUBEJS_EXTERNAL_DEFAULT = 'true';
       variables.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'true';
       variables.CUBEJS_DEV_MODE = 'true';
-      variables.CUBEJS_SCHEMA_PATH = 'model';
+      variables.CUBEJS_SCHEMA_PATH = schemaPath;
       variables = Object.entries(variables).map(([key, value]) => ([key, value].join('=')));
 
-      const repositoryPath = path.join(process.cwd(), 'model');
+      const repositoryPath = path.join(process.cwd(), schemaPath);
 
       if (!fs.existsSync(repositoryPath)) {
         fs.mkdirSync(repositoryPath);
