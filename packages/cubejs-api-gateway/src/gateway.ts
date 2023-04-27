@@ -1917,14 +1917,13 @@ class ApiGateway {
           req.securityContext = await checkAuthFn(auth, secret);
           req.signedWithPlaygroundAuthSecret = Boolean(internalOptions?.isPlaygroundCheckAuth);
         } catch (e) {
+          this.log({
+            type: (e as Error).message,
+            token: auth,
+            error: (e as Error).stack || (e as Error).toString()
+          }, <any>req);
           if (this.enforceSecurityChecks) {
             throw new CubejsHandlerError(403, 'Forbidden', 'Invalid token');
-          } else {
-            this.log({
-              type: (e as Error).message,
-              token: auth,
-              error: (e as Error).stack || (e as Error).toString()
-            }, <any>req);
           }
         }
       } else if (this.enforceSecurityChecks) {
