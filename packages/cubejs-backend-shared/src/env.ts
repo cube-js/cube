@@ -1527,25 +1527,26 @@ const variables: Record<string, (...args: any) => any> = {
 
     return undefined;
   },
-  pgSqlPort: () =>
-  // if (process.env.CUBEJS_PG_SQL_PORT === 'false') {
-  //   return undefined;
-  // }
+  pgSqlPort: () => {
+    if (process.env.CUBEJS_PG_SQL_PORT === 'false') {
+      return undefined;
+    }
     
-  // const port = asFalseOrPort(process.env.CUBEJS_PG_SQL_PORT || 'false', 'CUBEJS_PG_SQL_PORT');
-  // if (port) {
-  //   return port;
-  // }
+    const port = asFalseOrPort(process.env.CUBEJS_PG_SQL_PORT || 'false', 'CUBEJS_PG_SQL_PORT');
+    if (port) {
+      return port;
+    }
 
-  // const isDevMode = get('CUBEJS_DEV_MODE')
-  //   .default('false')
-  //   .asBoolStrict();
+    const isDevMode = get('CUBEJS_DEV_MODE')
+      .default('false')
+      .asBoolStrict();
 
-  // if (isDevMode) {
-  //   return 15432;
-  // }
+    if (isDevMode) {
+      return 15432;
+    }
 
-    undefined,
+    return undefined;
+  },
   sqlNonce: () => {
     if (process.env.CUBEJS_SQL_NONCE) {
       if (process.env.CUBEJS_SQL_NONCE.length < 14) {
