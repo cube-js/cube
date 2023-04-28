@@ -152,6 +152,15 @@ impl SchedulerImpl {
 
     pub async fn reconcile(&self) -> Result<(), CubeError> {
         if let Err(e) = warn_long_fut(
+            "Removing jobs on non-existing nodes",
+            Duration::from_millis(5000),
+            self.remove_jobs_on_non_exists_nodes(),
+        )
+        .await
+        {
+            error!("Error removing orphaned jobs: {}", e);
+        }
+        if let Err(e) = warn_long_fut(
             "Removing orphaned jobs",
             Duration::from_millis(5000),
             self.remove_orphaned_jobs(),
@@ -541,6 +550,15 @@ impl SchedulerImpl {
         let not_ready_tables = self.meta_store.not_ready_tables(1800).await?;
         for table in not_ready_tables.into_iter() {
             self.meta_store.drop_table(table.get_id()).await?;
+        }
+        Ok(())
+    }
+
+    async fn remove_jobs_on_non_exists_nodes(&self) -> Result<(), CubeError> {
+        let jobs_to_remove = self.meta_store.get_jobs_on_non_exists_nodes().await?;
+        for job in jobs_to_remove.into_iter() {
+            log::info!("Removing job {:?} on non-existing node", job);
+            self.meta_store.delete_job(job.get_id()).await?;
         }
         Ok(())
     }
@@ -1317,5 +1335,125 @@ impl DataGCLoop {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::Config;
+    use std::fs;
+
+    #[tokio::test]
+    async fn test_remove_jobs_on_non_exists_nodes() {
+        let config = Config::test("remove_jobs_on_non_exists_nodes");
+
+        let _ = fs::remove_dir_all(config.local_dir());
+        let _ = fs::remove_dir_all(config.remote_dir());
+
+        let services = config.configure().await;
+        services.start_processing_loops().await.unwrap();
+        let meta_store = services.meta_store.clone();
+        meta_store
+            .add_job(Job::new(
+                RowKey::Table(TableId::Partitions, 1),
+                JobType::PartitionCompaction,
+                "not_existis_node".to_string(),
+            ))
+            .await
+            .unwrap();
+        let exists_job = meta_store
+            .add_job(Job::new(
+                RowKey::Table(TableId::Partitions, 2),
+                JobType::PartitionCompaction,
+                config.config_obj().server_name().to_string(),
+            ))
+            .await
+            .unwrap()
+            .unwrap();
+        let all_jobs = meta_store.all_jobs().await.unwrap();
+        assert_eq!(all_jobs.len(), 2);
+        let scheduler = services.injector.get_service_typed::<SchedulerImpl>().await;
+        scheduler.remove_jobs_on_non_exists_nodes().await.unwrap();
+        let all_jobs = meta_store.all_jobs().await.unwrap();
+        assert_eq!(all_jobs.len(), 1);
+        assert_eq!(all_jobs[0].get_id(), exists_job.get_id());
+        services.stop_processing_loops().await.unwrap();
+        let _ = fs::remove_dir_all(config.local_dir());
+        let _ = fs::remove_dir_all(config.remote_dir());
+    }
+
+    #[tokio::test]
+    async fn test_remove_jobs_on_non_exists_nodes_several_workers() {
+        let config = Config::test("remove_jobs_on_non_exists_nodes_several_workers").update_config(
+            |mut config| {
+                config.select_workers = vec!["worker1".to_string(), "worker2".to_string()];
+                config
+            },
+        );
+
+        let _ = fs::remove_dir_all(config.local_dir());
+        let _ = fs::remove_dir_all(config.remote_dir());
+
+        let services = config.configure().await;
+        services.start_processing_loops().await.unwrap();
+        let meta_store = services.meta_store.clone();
+        let mut existing_ids = Vec::new();
+        existing_ids.push(
+            meta_store
+                .add_job(Job::new(
+                    RowKey::Table(TableId::Partitions, 2),
+                    JobType::PartitionCompaction,
+                    "worker1".to_string(),
+                ))
+                .await
+                .unwrap()
+                .unwrap()
+                .get_id(),
+        );
+
+        existing_ids.push(
+            meta_store
+                .add_job(Job::new(
+                    RowKey::Table(TableId::Partitions, 3),
+                    JobType::PartitionCompaction,
+                    "worker2".to_string(),
+                ))
+                .await
+                .unwrap()
+                .unwrap()
+                .get_id(),
+        );
+
+        meta_store
+            .add_job(Job::new(
+                RowKey::Table(TableId::Partitions, 1),
+                JobType::PartitionCompaction,
+                "not_existis_node".to_string(),
+            ))
+            .await
+            .unwrap();
+
+        meta_store
+            .add_job(Job::new(
+                RowKey::Table(TableId::Partitions, 4),
+                JobType::PartitionCompaction,
+                "not_existis_node2".to_string(),
+            ))
+            .await
+            .unwrap();
+        existing_ids.sort();
+        let all_jobs = meta_store.all_jobs().await.unwrap();
+        assert_eq!(all_jobs.len(), 4);
+        let scheduler = services.injector.get_service_typed::<SchedulerImpl>().await;
+        scheduler.remove_jobs_on_non_exists_nodes().await.unwrap();
+        let all_jobs = meta_store.all_jobs().await.unwrap();
+        assert_eq!(all_jobs.len(), 2);
+        let mut job_ids = all_jobs.into_iter().map(|j| j.get_id()).collect::<Vec<_>>();
+        job_ids.sort();
+        assert_eq!(job_ids, existing_ids);
+        services.stop_processing_loops().await.unwrap();
+        let _ = fs::remove_dir_all(config.local_dir());
+        let _ = fs::remove_dir_all(config.remote_dir());
     }
 }

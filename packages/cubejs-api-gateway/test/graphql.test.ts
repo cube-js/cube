@@ -127,7 +127,7 @@ describe('GraphQL Schema', () => {
     ));
     expectValidSchema(schema);
   });
-  
+
   const queries = fs.readFileSync(GRAPHQL_QUERIES_PATH, 'utf-8').split('\n\n');
 
   queries.forEach((query, index) => {

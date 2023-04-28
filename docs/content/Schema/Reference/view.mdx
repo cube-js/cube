@@ -2,8 +2,8 @@
 title: Views
 permalink: /schema/reference/view
 scope: cubejs
-category: Data Schema
-menuOrder: 8.1
+category: Data Modeling
+menuOrder: 21
 subCategory: Reference
 ---
 
@@ -65,7 +65,7 @@ cube through nested joins:
 
 ```javascript
 view(`CompletedOrders`, {
-  description: 'Count of completed orders',
+  description: "Count of completed orders",
   includes: [Orders.completed_count],
 
   measures: {
@@ -113,6 +113,25 @@ Views also do not define any pre-aggregations, instead they re-use
 pre-aggregations defined by the underlying cubes.
 
 ## Parameters
+
+### <--{"id" : "Parameters"}--> name
+
+The `name` parameter serves as the identifier of a view. It must be unique among
+_all cubes and views_ within a deployment and follow the [naming
+conventions][ref-naming].
+
+<CodeTabs>
+
+```javascript
+view(`active_users`, {});
+```
+
+```yaml
+views:
+  - name: active_users
+```
+
+</CodeTabs>
 
 ### <--{"id" : "Parameters"}--> description
 
@@ -205,3 +224,4 @@ recipe][ref-recipe-control-access-cubes-views].
 [ref-recipe-control-access-cubes-views]:
   /recipes/controlling-access-to-cubes-and-views
 [ref-schema-joins-direction]: /schema/fundamentals/joins#directions-of-joins
+[ref-naming]: /data-modeling/syntax#naming

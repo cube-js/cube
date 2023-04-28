@@ -73,6 +73,7 @@ use crate::{
 use data::create_array_builder;
 use datafusion::cube_ext::catch_unwind::async_try_with_catch_unwind;
 use datafusion::physical_plan::parquet::NoopParquetMetadataCache;
+use deepsize::DeepSizeOf;
 use std::mem::take;
 
 pub mod cache;
@@ -118,7 +119,7 @@ pub struct QueryPlans {
     pub worker: Arc<dyn ExecutionPlan>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Hash, Eq, PartialEq, Debug)]
+#[derive(Serialize, Deserialize, Clone, Hash, Eq, PartialEq, Debug, DeepSizeOf)]
 pub struct InlineTable {
     pub id: u64,
     pub name: String,
@@ -173,7 +174,7 @@ pub struct SqlServiceImpl {
     rows_per_chunk: usize,
     query_timeout: Duration,
     create_table_timeout: Duration,
-    cache: SqlResultCache,
+    cache: Arc<SqlResultCache>,
 }
 
 crate::di_service!(SqlServiceImpl, [SqlService]);
@@ -194,11 +195,10 @@ impl SqlServiceImpl {
         rows_per_chunk: usize,
         query_timeout: Duration,
         create_table_timeout: Duration,
-        max_cached_queries: usize,
+        cache: Arc<SqlResultCache>,
     ) -> Arc<SqlServiceImpl> {
         Arc::new(SqlServiceImpl {
             cachestore: CacheStoreSqlService::new(cachestore, query_planner.clone()),
-            cache: SqlResultCache::new(max_cached_queries),
             db,
             chunk_store,
             limits,
@@ -211,6 +211,7 @@ impl SqlServiceImpl {
             query_timeout,
             create_table_timeout,
             remote_fs,
+            cache,
         })
     }
 
@@ -354,6 +355,7 @@ impl SqlServiceImpl {
                             .collect()
                     }),
                     None,
+                    None,
                 )
                 .await;
         }
@@ -392,6 +394,16 @@ impl SqlServiceImpl {
             None
         };
 
+        let has_streaming_locations = locations.as_ref().map_or(false, |locations| {
+            locations.iter().any(|l| Table::is_stream_location(l))
+        });
+
+        let trace_obj_to_save = if has_streaming_locations {
+            trace_obj.clone()
+        } else {
+            None
+        };
+
         let table = self
             .db
             .create_table(
@@ -413,6 +425,7 @@ impl SqlServiceImpl {
                         .collect()
                 }),
                 partition_split_threshold,
+                trace_obj_to_save,
             )
             .await?;
 
@@ -1813,6 +1826,7 @@ mod tests {
     use crate::remotefs::queue::QueueRemoteFs;
     use crate::scheduler::SchedulerImpl;
     use crate::table::data::{cmp_min_rows, cmp_row_key_heap};
+    use crate::table::TableValue;
     use regex::Regex;
 
     #[tokio::test]
@@ -1834,13 +1848,13 @@ mod tests {
             );
             let meta_store = RocksMetaStore::new(
                 &Path::new(path).join("metastore"),
-                BaseRocksStoreFs::new(remote_fs.clone(), "metastore", config.config_obj()),
+                BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
                 config.config_obj(),
             )
             .unwrap();
             let cache_store = RocksCacheStore::new(
                 &Path::new(path).join("cachestore"),
-                BaseRocksStoreFs::new(remote_fs.clone(), "cachestore", config.config_obj()),
+                BaseRocksStoreFs::new_for_cachestore(remote_fs.clone(), config.config_obj()),
                 config.config_obj(),
             )
             .unwrap();
@@ -1868,7 +1882,10 @@ mod tests {
                 rows_per_chunk,
                 query_timeout,
                 query_timeout,
-                10_000, // max_cached_queries
+                Arc::new(SqlResultCache::new(
+                    config.config_obj().query_cache_max_capacity_bytes(),
+                    config.config_obj().query_cache_time_to_idle_secs(),
+                )),
             );
             let i = service.exec_query("CREATE SCHEMA foo").await.unwrap();
             assert_eq!(
@@ -1906,13 +1923,13 @@ mod tests {
             );
             let meta_store = RocksMetaStore::new(
                 &Path::new(path).join("metastore"),
-                BaseRocksStoreFs::new(remote_fs.clone(), "metastore", config.config_obj()),
+                BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
                 config.config_obj(),
             )
             .unwrap();
             let cache_store = RocksCacheStore::new(
                 &Path::new(path).join("cachestore"),
-                BaseRocksStoreFs::new(remote_fs.clone(), "cachestore", config.config_obj()),
+                BaseRocksStoreFs::new_for_cachestore(remote_fs.clone(), config.config_obj()),
                 config.config_obj(),
             )
             .unwrap();
@@ -1940,7 +1957,10 @@ mod tests {
                 rows_per_chunk,
                 query_timeout,
                 query_timeout,
-                10_000, // max_cached_queries
+                Arc::new(SqlResultCache::new(
+                    config.config_obj().query_cache_max_capacity_bytes(),
+                    config.config_obj().query_cache_time_to_idle_secs(),
+                )),
             );
             let i = service.exec_query("CREATE SCHEMA Foo").await.unwrap();
             assert_eq!(
@@ -2007,13 +2027,13 @@ mod tests {
             );
             let meta_store = RocksMetaStore::new(
                 &Path::new(path).join("metastore"),
-                BaseRocksStoreFs::new(remote_fs.clone(), "metastore", config.config_obj()),
+                BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
                 config.config_obj(),
             )
             .unwrap();
             let cache_store = RocksCacheStore::new(
                 &Path::new(path).join("cachestore"),
-                BaseRocksStoreFs::new(remote_fs.clone(), "cachestore", config.config_obj()),
+                BaseRocksStoreFs::new_for_cachestore(remote_fs.clone(), config.config_obj()),
                 config.config_obj(),
             )
             .unwrap();
@@ -2041,7 +2061,10 @@ mod tests {
                 rows_per_chunk,
                 query_timeout,
                 query_timeout,
-                10_000, // max_cached_queries
+                Arc::new(SqlResultCache::new(
+                    config.config_obj().query_cache_max_capacity_bytes(),
+                    config.config_obj().query_cache_time_to_idle_secs(),
+                )),
             );
             let i = service.exec_query("CREATE SCHEMA Foo").await.unwrap();
             assert_eq!(
@@ -2298,8 +2321,8 @@ mod tests {
                                         union all \
                                         select * from foo.b \
                                         ) \
-                             union all 
-                             select * from 
+                             union all
+                             select * from
                                 ( \
                                         select * from foo.a1 \
                                         union all \
@@ -2336,8 +2359,8 @@ mod tests {
                          select * from ( \
                                         select * from foo.a\
                                         ) \
-                             union all 
-                             select * from 
+                             union all
+                             select * from
                                 ( \
                                         select * from foo.a1 \
                                         union all \
@@ -2372,8 +2395,8 @@ mod tests {
                          select * from ( \
                                         select * from foo.a where 1 = 0\
                                         ) \
-                             union all 
-                             select * from 
+                             union all
+                             select * from
                                 ( \
                                         select * from foo.a1 \
                                         union all \
@@ -3841,6 +3864,41 @@ mod tests {
                 .exec_query("CREATE TABLE test.events_by_type_fail_2 (`EVENT` text, `KSQL_COL_0` int) WITH (select_statement = 'SELECT * FROM (SELECT * FROM EVENTS_BY_TYPE WHERE time >= \\'2022-01-01\\' AND time < \\'2022-02-01\\')') unique key (`EVENT`) location 'stream://ksql/EVENTS_BY_TYPE'")
                 .await
                 .expect_err("Validation should fail");
+        }).await;
+    }
+
+    #[tokio::test]
+    async fn trace_obj_for_streaming_table() {
+        Config::test("trace_obj_for_streaming_table").start_test(async move |services| {
+            let service = services.sql_service;
+            let meta_store = services.meta_store;
+
+            let _ = service.exec_query("CREATE SCHEMA test").await.unwrap();
+
+            service
+                .exec_query("CREATE SOURCE OR UPDATE ksql AS 'ksql' VALUES (user = 'foo', password = 'bar', url = 'http://foo.com')").await.unwrap();
+            let context = SqlQueryContext::default().with_trace_obj(Some("{\"test\":\"context\"}".to_string()));
+
+            let _ = service
+                .exec_query_with_context(context, "CREATE TABLE test.table_1 (`EVENT` text, `KSQL_COL_0` int) unique key (`EVENT`) location 'stream://ksql/EVENTS_BY_TYPE'")
+                .await
+                .unwrap();
+
+            let table = meta_store.get_table("test".to_string(), "table_1".to_string()).await.unwrap();
+            let trace_obj = meta_store.get_trace_obj_by_table_id(table.get_id()).await.unwrap();
+            assert!(trace_obj.is_some());
+            assert_eq!(trace_obj.unwrap(), "{\"test\":\"context\"}".to_string());
+
+            let _ = service
+                .exec_query("CREATE TABLE test.table_2 (`EVENT` text, `KSQL_COL_0` int) unique key (`EVENT`)")
+                .await
+                .unwrap();
+
+            let table = meta_store.get_table("test".to_string(), "table_2".to_string()).await.unwrap();
+            let trace_obj = meta_store.get_trace_obj_by_table_id(table.get_id()).await.unwrap();
+            println!("tobj {:?}", trace_obj);
+            assert!(trace_obj.is_none());
+
         }).await;
     }
 }

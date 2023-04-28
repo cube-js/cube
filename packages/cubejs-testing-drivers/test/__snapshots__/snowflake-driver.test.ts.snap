@@ -1,0 +1,1260 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 1`] = `
+Object {
+  "category": Any<String>,
+  "product_name": Any<String>,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 2`] = `
+Object {
+  "category": Any<String>,
+  "product_name": Any<String>,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 3`] = `
+Object {
+  "category": Any<String>,
+  "product_name": Any<String>,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 4`] = `
+Object {
+  "category": Any<String>,
+  "product_name": Any<String>,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 5`] = `
+Object {
+  "category": Any<String>,
+  "product_name": Any<String>,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 6`] = `
+Object {
+  "category": Any<String>,
+  "product_name": Any<String>,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 7`] = `
+Object {
+  "category": Any<String>,
+  "product_name": Any<String>,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 8`] = `
+Object {
+  "category": Any<String>,
+  "product_name": Any<String>,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 9`] = `
+Object {
+  "category": Any<String>,
+  "product_name": Any<String>,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 10`] = `
+Object {
+  "category": Any<String>,
+  "product_name": Any<String>,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 11`] = `
+Object {
+  "category": Any<String>,
+  "product_name": Any<String>,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 12`] = `
+Object {
+  "category": Any<String>,
+  "product_name": Any<String>,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 13`] = `
+Object {
+  "category": Any<String>,
+  "product_name": Any<String>,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 14`] = `
+Object {
+  "category": Any<String>,
+  "product_name": Any<String>,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 15`] = `
+Object {
+  "category": Any<String>,
+  "product_name": Any<String>,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 16`] = `
+Object {
+  "category": Any<String>,
+  "product_name": Any<String>,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 17`] = `
+Object {
+  "category": Any<String>,
+  "product_name": Any<String>,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 18`] = `
+Object {
+  "category": Any<String>,
+  "product_name": Any<String>,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 19`] = `
+Object {
+  "category": Any<String>,
+  "product_name": Any<String>,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 20`] = `
+Object {
+  "category": Any<String>,
+  "product_name": Any<String>,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 21`] = `
+Object {
+  "category": Any<String>,
+  "product_name": Any<String>,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 22`] = `
+Object {
+  "category": Any<String>,
+  "product_name": Any<String>,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 23`] = `
+Object {
+  "category": Any<String>,
+  "product_name": Any<String>,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 24`] = `
+Object {
+  "category": Any<String>,
+  "product_name": Any<String>,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 25`] = `
+Object {
+  "category": Any<String>,
+  "product_name": Any<String>,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 26`] = `
+Object {
+  "category": Any<String>,
+  "product_name": Any<String>,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 27`] = `
+Object {
+  "category": Any<String>,
+  "product_name": Any<String>,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 28`] = `
+Object {
+  "category": Any<String>,
+  "product_name": Any<String>,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 29`] = `
+Object {
+  "customer_id": Any<String>,
+  "customer_name": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 30`] = `
+Object {
+  "customer_id": Any<String>,
+  "customer_name": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 31`] = `
+Object {
+  "customer_id": Any<String>,
+  "customer_name": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 32`] = `
+Object {
+  "customer_id": Any<String>,
+  "customer_name": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 33`] = `
+Object {
+  "customer_id": Any<String>,
+  "customer_name": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 34`] = `
+Object {
+  "customer_id": Any<String>,
+  "customer_name": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 35`] = `
+Object {
+  "customer_id": Any<String>,
+  "customer_name": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 36`] = `
+Object {
+  "customer_id": Any<String>,
+  "customer_name": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 37`] = `
+Object {
+  "customer_id": Any<String>,
+  "customer_name": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 38`] = `
+Object {
+  "customer_id": Any<String>,
+  "customer_name": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 39`] = `
+Object {
+  "customer_id": Any<String>,
+  "customer_name": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 40`] = `
+Object {
+  "customer_id": Any<String>,
+  "customer_name": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 41`] = `
+Object {
+  "customer_id": Any<String>,
+  "customer_name": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 42`] = `
+Object {
+  "customer_id": Any<String>,
+  "customer_name": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 43`] = `
+Object {
+  "customer_id": Any<String>,
+  "customer_name": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 44`] = `
+Object {
+  "customer_id": Any<String>,
+  "customer_name": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 45`] = `
+Object {
+  "customer_id": Any<String>,
+  "customer_name": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 46`] = `
+Object {
+  "customer_id": Any<String>,
+  "customer_name": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 47`] = `
+Object {
+  "customer_id": Any<String>,
+  "customer_name": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 48`] = `
+Object {
+  "customer_id": Any<String>,
+  "customer_name": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 49`] = `
+Object {
+  "customer_id": Any<String>,
+  "customer_name": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 50`] = `
+Object {
+  "customer_id": Any<String>,
+  "customer_name": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 51`] = `
+Object {
+  "customer_id": Any<String>,
+  "customer_name": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 52`] = `
+Object {
+  "customer_id": Any<String>,
+  "customer_name": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 53`] = `
+Object {
+  "customer_id": Any<String>,
+  "customer_name": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 54`] = `
+Object {
+  "customer_id": Any<String>,
+  "customer_name": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 55`] = `
+Object {
+  "customer_id": Any<String>,
+  "customer_name": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 56`] = `
+Object {
+  "customer_id": Any<String>,
+  "customer_name": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 57`] = `
+Object {
+  "customer_id": Any<String>,
+  "customer_name": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 58`] = `
+Object {
+  "customer_id": Any<String>,
+  "customer_name": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 59`] = `
+Object {
+  "customer_id": Any<String>,
+  "customer_name": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 60`] = `
+Object {
+  "customer_id": Any<String>,
+  "customer_name": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 61`] = `
+Object {
+  "customer_id": Any<String>,
+  "customer_name": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 62`] = `
+Object {
+  "customer_id": Any<String>,
+  "customer_name": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 63`] = `
+Object {
+  "customer_id": Any<String>,
+  "customer_name": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 64`] = `
+Object {
+  "customer_id": Any<String>,
+  "customer_name": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 65`] = `
+Object {
+  "customer_id": Any<String>,
+  "customer_name": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 66`] = `
+Object {
+  "customer_id": Any<String>,
+  "customer_name": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 67`] = `
+Object {
+  "customer_id": Any<String>,
+  "customer_name": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 68`] = `
+Object {
+  "customer_id": Any<String>,
+  "customer_name": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 69`] = `
+Object {
+  "customer_id": Any<String>,
+  "customer_name": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 70`] = `
+Object {
+  "category": Any<String>,
+  "city": Any<String>,
+  "customer_id": Any<String>,
+  "discount": Anything,
+  "order_date": Anything,
+  "order_id": Any<String>,
+  "product_name": Any<String>,
+  "profit": Anything,
+  "quantity": Anything,
+  "row_id": Anything,
+  "sales": Anything,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 71`] = `
+Object {
+  "category": Any<String>,
+  "city": Any<String>,
+  "customer_id": Any<String>,
+  "discount": Anything,
+  "order_date": Anything,
+  "order_id": Any<String>,
+  "product_name": Any<String>,
+  "profit": Anything,
+  "quantity": Anything,
+  "row_id": Anything,
+  "sales": Anything,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 72`] = `
+Object {
+  "category": Any<String>,
+  "city": Any<String>,
+  "customer_id": Any<String>,
+  "discount": Anything,
+  "order_date": Anything,
+  "order_id": Any<String>,
+  "product_name": Any<String>,
+  "profit": Anything,
+  "quantity": Anything,
+  "row_id": Anything,
+  "sales": Anything,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 73`] = `
+Object {
+  "category": Any<String>,
+  "city": Any<String>,
+  "customer_id": Any<String>,
+  "discount": Anything,
+  "order_date": Anything,
+  "order_id": Any<String>,
+  "product_name": Any<String>,
+  "profit": Anything,
+  "quantity": Anything,
+  "row_id": Anything,
+  "sales": Anything,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 74`] = `
+Object {
+  "category": Any<String>,
+  "city": Any<String>,
+  "customer_id": Any<String>,
+  "discount": Anything,
+  "order_date": Anything,
+  "order_id": Any<String>,
+  "product_name": Any<String>,
+  "profit": Anything,
+  "quantity": Anything,
+  "row_id": Anything,
+  "sales": Anything,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 75`] = `
+Object {
+  "category": Any<String>,
+  "city": Any<String>,
+  "customer_id": Any<String>,
+  "discount": Anything,
+  "order_date": Anything,
+  "order_id": Any<String>,
+  "product_name": Any<String>,
+  "profit": Anything,
+  "quantity": Anything,
+  "row_id": Anything,
+  "sales": Anything,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 76`] = `
+Object {
+  "category": Any<String>,
+  "city": Any<String>,
+  "customer_id": Any<String>,
+  "discount": Anything,
+  "order_date": Anything,
+  "order_id": Any<String>,
+  "product_name": Any<String>,
+  "profit": Anything,
+  "quantity": Anything,
+  "row_id": Anything,
+  "sales": Anything,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 77`] = `
+Object {
+  "category": Any<String>,
+  "city": Any<String>,
+  "customer_id": Any<String>,
+  "discount": Anything,
+  "order_date": Anything,
+  "order_id": Any<String>,
+  "product_name": Any<String>,
+  "profit": Anything,
+  "quantity": Anything,
+  "row_id": Anything,
+  "sales": Anything,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 78`] = `
+Object {
+  "category": Any<String>,
+  "city": Any<String>,
+  "customer_id": Any<String>,
+  "discount": Anything,
+  "order_date": Anything,
+  "order_id": Any<String>,
+  "product_name": Any<String>,
+  "profit": Anything,
+  "quantity": Anything,
+  "row_id": Anything,
+  "sales": Anything,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 79`] = `
+Object {
+  "category": Any<String>,
+  "city": Any<String>,
+  "customer_id": Any<String>,
+  "discount": Anything,
+  "order_date": Anything,
+  "order_id": Any<String>,
+  "product_name": Any<String>,
+  "profit": Anything,
+  "quantity": Anything,
+  "row_id": Anything,
+  "sales": Anything,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 80`] = `
+Object {
+  "category": Any<String>,
+  "city": Any<String>,
+  "customer_id": Any<String>,
+  "discount": Anything,
+  "order_date": Anything,
+  "order_id": Any<String>,
+  "product_name": Any<String>,
+  "profit": Anything,
+  "quantity": Anything,
+  "row_id": Anything,
+  "sales": Anything,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 81`] = `
+Object {
+  "category": Any<String>,
+  "city": Any<String>,
+  "customer_id": Any<String>,
+  "discount": Anything,
+  "order_date": Anything,
+  "order_id": Any<String>,
+  "product_name": Any<String>,
+  "profit": Anything,
+  "quantity": Anything,
+  "row_id": Anything,
+  "sales": Anything,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 82`] = `
+Object {
+  "category": Any<String>,
+  "city": Any<String>,
+  "customer_id": Any<String>,
+  "discount": Anything,
+  "order_date": Anything,
+  "order_id": Any<String>,
+  "product_name": Any<String>,
+  "profit": Anything,
+  "quantity": Anything,
+  "row_id": Anything,
+  "sales": Anything,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 83`] = `
+Object {
+  "category": Any<String>,
+  "city": Any<String>,
+  "customer_id": Any<String>,
+  "discount": Anything,
+  "order_date": Anything,
+  "order_id": Any<String>,
+  "product_name": Any<String>,
+  "profit": Anything,
+  "quantity": Anything,
+  "row_id": Anything,
+  "sales": Anything,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 84`] = `
+Object {
+  "category": Any<String>,
+  "city": Any<String>,
+  "customer_id": Any<String>,
+  "discount": Anything,
+  "order_date": Anything,
+  "order_id": Any<String>,
+  "product_name": Any<String>,
+  "profit": Anything,
+  "quantity": Anything,
+  "row_id": Anything,
+  "sales": Anything,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 85`] = `
+Object {
+  "category": Any<String>,
+  "city": Any<String>,
+  "customer_id": Any<String>,
+  "discount": Anything,
+  "order_date": Anything,
+  "order_id": Any<String>,
+  "product_name": Any<String>,
+  "profit": Anything,
+  "quantity": Anything,
+  "row_id": Anything,
+  "sales": Anything,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 86`] = `
+Object {
+  "category": Any<String>,
+  "city": Any<String>,
+  "customer_id": Any<String>,
+  "discount": Anything,
+  "order_date": Anything,
+  "order_id": Any<String>,
+  "product_name": Any<String>,
+  "profit": Anything,
+  "quantity": Anything,
+  "row_id": Anything,
+  "sales": Anything,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 87`] = `
+Object {
+  "category": Any<String>,
+  "city": Any<String>,
+  "customer_id": Any<String>,
+  "discount": Anything,
+  "order_date": Anything,
+  "order_id": Any<String>,
+  "product_name": Any<String>,
+  "profit": Anything,
+  "quantity": Anything,
+  "row_id": Anything,
+  "sales": Anything,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 88`] = `
+Object {
+  "category": Any<String>,
+  "city": Any<String>,
+  "customer_id": Any<String>,
+  "discount": Anything,
+  "order_date": Anything,
+  "order_id": Any<String>,
+  "product_name": Any<String>,
+  "profit": Anything,
+  "quantity": Anything,
+  "row_id": Anything,
+  "sales": Anything,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 89`] = `
+Object {
+  "category": Any<String>,
+  "city": Any<String>,
+  "customer_id": Any<String>,
+  "discount": Anything,
+  "order_date": Anything,
+  "order_id": Any<String>,
+  "product_name": Any<String>,
+  "profit": Anything,
+  "quantity": Anything,
+  "row_id": Anything,
+  "sales": Anything,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 90`] = `
+Object {
+  "category": Any<String>,
+  "city": Any<String>,
+  "customer_id": Any<String>,
+  "discount": Anything,
+  "order_date": Anything,
+  "order_id": Any<String>,
+  "product_name": Any<String>,
+  "profit": Anything,
+  "quantity": Anything,
+  "row_id": Anything,
+  "sales": Anything,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 91`] = `
+Object {
+  "category": Any<String>,
+  "city": Any<String>,
+  "customer_id": Any<String>,
+  "discount": Anything,
+  "order_date": Anything,
+  "order_id": Any<String>,
+  "product_name": Any<String>,
+  "profit": Anything,
+  "quantity": Anything,
+  "row_id": Anything,
+  "sales": Anything,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 92`] = `
+Object {
+  "category": Any<String>,
+  "city": Any<String>,
+  "customer_id": Any<String>,
+  "discount": Anything,
+  "order_date": Anything,
+  "order_id": Any<String>,
+  "product_name": Any<String>,
+  "profit": Anything,
+  "quantity": Anything,
+  "row_id": Anything,
+  "sales": Anything,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 93`] = `
+Object {
+  "category": Any<String>,
+  "city": Any<String>,
+  "customer_id": Any<String>,
+  "discount": Anything,
+  "order_date": Anything,
+  "order_id": Any<String>,
+  "product_name": Any<String>,
+  "profit": Anything,
+  "quantity": Anything,
+  "row_id": Anything,
+  "sales": Anything,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 94`] = `
+Object {
+  "category": Any<String>,
+  "city": Any<String>,
+  "customer_id": Any<String>,
+  "discount": Anything,
+  "order_date": Anything,
+  "order_id": Any<String>,
+  "product_name": Any<String>,
+  "profit": Anything,
+  "quantity": Anything,
+  "row_id": Anything,
+  "sales": Anything,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 95`] = `
+Object {
+  "category": Any<String>,
+  "city": Any<String>,
+  "customer_id": Any<String>,
+  "discount": Anything,
+  "order_date": Anything,
+  "order_id": Any<String>,
+  "product_name": Any<String>,
+  "profit": Anything,
+  "quantity": Anything,
+  "row_id": Anything,
+  "sales": Anything,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 96`] = `
+Object {
+  "category": Any<String>,
+  "city": Any<String>,
+  "customer_id": Any<String>,
+  "discount": Anything,
+  "order_date": Anything,
+  "order_id": Any<String>,
+  "product_name": Any<String>,
+  "profit": Anything,
+  "quantity": Anything,
+  "row_id": Anything,
+  "sales": Anything,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 97`] = `
+Object {
+  "category": Any<String>,
+  "city": Any<String>,
+  "customer_id": Any<String>,
+  "discount": Anything,
+  "order_date": Anything,
+  "order_id": Any<String>,
+  "product_name": Any<String>,
+  "profit": Anything,
+  "quantity": Anything,
+  "row_id": Anything,
+  "sales": Anything,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 98`] = `
+Object {
+  "category": Any<String>,
+  "city": Any<String>,
+  "customer_id": Any<String>,
+  "discount": Anything,
+  "order_date": Anything,
+  "order_id": Any<String>,
+  "product_name": Any<String>,
+  "profit": Anything,
+  "quantity": Anything,
+  "row_id": Anything,
+  "sales": Anything,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 99`] = `
+Object {
+  "category": Any<String>,
+  "city": Any<String>,
+  "customer_id": Any<String>,
+  "discount": Anything,
+  "order_date": Anything,
+  "order_id": Any<String>,
+  "product_name": Any<String>,
+  "profit": Anything,
+  "quantity": Anything,
+  "row_id": Anything,
+  "sales": Anything,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 100`] = `
+Object {
+  "category": Any<String>,
+  "city": Any<String>,
+  "customer_id": Any<String>,
+  "discount": Anything,
+  "order_date": Anything,
+  "order_id": Any<String>,
+  "product_name": Any<String>,
+  "profit": Anything,
+  "quantity": Anything,
+  "row_id": Anything,
+  "sales": Anything,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 101`] = `
+Object {
+  "category": Any<String>,
+  "city": Any<String>,
+  "customer_id": Any<String>,
+  "discount": Anything,
+  "order_date": Anything,
+  "order_id": Any<String>,
+  "product_name": Any<String>,
+  "profit": Anything,
+  "quantity": Anything,
+  "row_id": Anything,
+  "sales": Anything,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 102`] = `
+Object {
+  "category": Any<String>,
+  "city": Any<String>,
+  "customer_id": Any<String>,
+  "discount": Anything,
+  "order_date": Anything,
+  "order_id": Any<String>,
+  "product_name": Any<String>,
+  "profit": Anything,
+  "quantity": Anything,
+  "row_id": Anything,
+  "sales": Anything,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 103`] = `
+Object {
+  "category": Any<String>,
+  "city": Any<String>,
+  "customer_id": Any<String>,
+  "discount": Anything,
+  "order_date": Anything,
+  "order_id": Any<String>,
+  "product_name": Any<String>,
+  "profit": Anything,
+  "quantity": Anything,
+  "row_id": Anything,
+  "sales": Anything,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 104`] = `
+Object {
+  "category": Any<String>,
+  "city": Any<String>,
+  "customer_id": Any<String>,
+  "discount": Anything,
+  "order_date": Anything,
+  "order_id": Any<String>,
+  "product_name": Any<String>,
+  "profit": Anything,
+  "quantity": Anything,
+  "row_id": Anything,
+  "sales": Anything,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 105`] = `
+Object {
+  "category": Any<String>,
+  "city": Any<String>,
+  "customer_id": Any<String>,
+  "discount": Anything,
+  "order_date": Anything,
+  "order_id": Any<String>,
+  "product_name": Any<String>,
+  "profit": Anything,
+  "quantity": Anything,
+  "row_id": Anything,
+  "sales": Anything,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 106`] = `
+Object {
+  "category": Any<String>,
+  "city": Any<String>,
+  "customer_id": Any<String>,
+  "discount": Anything,
+  "order_date": Anything,
+  "order_id": Any<String>,
+  "product_name": Any<String>,
+  "profit": Anything,
+  "quantity": Anything,
+  "row_id": Anything,
+  "sales": Anything,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 107`] = `
+Object {
+  "category": Any<String>,
+  "city": Any<String>,
+  "customer_id": Any<String>,
+  "discount": Anything,
+  "order_date": Anything,
+  "order_id": Any<String>,
+  "product_name": Any<String>,
+  "profit": Anything,
+  "quantity": Anything,
+  "row_id": Anything,
+  "sales": Anything,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 108`] = `
+Object {
+  "category": Any<String>,
+  "city": Any<String>,
+  "customer_id": Any<String>,
+  "discount": Anything,
+  "order_date": Anything,
+  "order_id": Any<String>,
+  "product_name": Any<String>,
+  "profit": Anything,
+  "quantity": Anything,
+  "row_id": Anything,
+  "sales": Anything,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 109`] = `
+Object {
+  "category": Any<String>,
+  "city": Any<String>,
+  "customer_id": Any<String>,
+  "discount": Anything,
+  "order_date": Anything,
+  "order_id": Any<String>,
+  "product_name": Any<String>,
+  "profit": Anything,
+  "quantity": Anything,
+  "row_id": Anything,
+  "sales": Anything,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 110`] = `
+Object {
+  "category": Any<String>,
+  "city": Any<String>,
+  "customer_id": Any<String>,
+  "discount": Anything,
+  "order_date": Anything,
+  "order_id": Any<String>,
+  "product_name": Any<String>,
+  "profit": Anything,
+  "quantity": Anything,
+  "row_id": Anything,
+  "sales": Anything,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 111`] = `
+Object {
+  "category": Any<String>,
+  "city": Any<String>,
+  "customer_id": Any<String>,
+  "discount": Anything,
+  "order_date": Anything,
+  "order_id": Any<String>,
+  "product_name": Any<String>,
+  "profit": Anything,
+  "quantity": Anything,
+  "row_id": Anything,
+  "sales": Anything,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 112`] = `
+Object {
+  "category": Any<String>,
+  "city": Any<String>,
+  "customer_id": Any<String>,
+  "discount": Anything,
+  "order_date": Anything,
+  "order_id": Any<String>,
+  "product_name": Any<String>,
+  "profit": Anything,
+  "quantity": Anything,
+  "row_id": Anything,
+  "sales": Anything,
+  "sub_category": Any<String>,
+}
+`;
+
+exports[`Raw @cubejs-backend/snowflake-driver must select from the data source 113`] = `
+Object {
+  "category": Any<String>,
+  "city": Any<String>,
+  "customer_id": Any<String>,
+  "discount": Anything,
+  "order_date": Anything,
+  "order_id": Any<String>,
+  "product_name": Any<String>,
+  "profit": Anything,
+  "quantity": Anything,
+  "row_id": Anything,
+  "sales": Anything,
+  "sub_category": Any<String>,
+}
+`;

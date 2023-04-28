@@ -3,6 +3,209 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.32.29](https://github.com/cube-js/cube/compare/v0.32.28...v0.32.29) (2023-04-25)
+
+
+### Bug Fixes
+
+* **schema-compiler:** yml backtick escaping ([#6478](https://github.com/cube-js/cube/issues/6478)) ([39a9ac0](https://github.com/cube-js/cube/commit/39a9ac0e9a641efeeca0e99d286962aa007551cd))
+
+
+### Features
+
+* **schema-compiler:** Support public/shown for segments ([#6491](https://github.com/cube-js/cube/issues/6491)) ([df6160c](https://github.com/cube-js/cube/commit/df6160cc62f8ab2fccbfb85f2916040aec218fc3))
+
+
+
+
+
+## [0.32.28](https://github.com/cube-js/cube/compare/v0.32.27...v0.32.28) (2023-04-19)
+
+
+### Bug Fixes
+
+* **schema-compiler:** Incorrect camelize for meta ([#6444](https://github.com/cube-js/cube/issues/6444)) ([c82844e](https://github.com/cube-js/cube/commit/c82844e130b31722fa338022b740ac7285c01190))
+* segment not found for path if rollup with segment is used within `rollupJoin` ([6a3ca80](https://github.com/cube-js/cube/commit/6a3ca8032151d530a30bab88c024c451d4141c01))
+
+
+### Features
+
+* using snake case for model files, model templates updates ([#6447](https://github.com/cube-js/cube/issues/6447)) ([37e3180](https://github.com/cube-js/cube/commit/37e3180d4218b342ee0c2fe0ef90464aa6633b54))
+
+
+
+
+
+## [0.32.27](https://github.com/cube-js/cube/compare/v0.32.26...v0.32.27) (2023-04-14)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.32.26](https://github.com/cube-js/cube/compare/v0.32.25...v0.32.26) (2023-04-13)
+
+
+### Bug Fixes
+
+* **cli:** Validate command - allow node require ([#6416](https://github.com/cube-js/cube/issues/6416)) ([ead63d8](https://github.com/cube-js/cube/commit/ead63d823253e8cd42e9353a09d4481e5e889d0b))
+
+
+### Features
+
+* **schema-compiler:** JS - support snake_case for any properties ([#6396](https://github.com/cube-js/cube/issues/6396)) ([f1b4c0b](https://github.com/cube-js/cube/commit/f1b4c0bfb2e8b8ad20853af6232388c6d764a780))
+
+
+
+
+
+## [0.32.25](https://github.com/cube-js/cube/compare/v0.32.24...v0.32.25) (2023-04-12)
+
+
+### Bug Fixes
+
+* **schema-compiler:** Yaml - crash on fully commented file ([#6413](https://github.com/cube-js/cube/issues/6413)) ([29d2eae](https://github.com/cube-js/cube/commit/29d2eaed8c2d8fe7575be732bc21acbf8dadafbb))
+
+
+### Features
+
+* **duckdb-driver:** Support countDistinctApprox ([#6409](https://github.com/cube-js/cube/issues/6409)) ([6b1fadb](https://github.com/cube-js/cube/commit/6b1fadb0954ce349a55b88a158d236c2ca31ecfc))
+
+
+
+
+
+## [0.32.23](https://github.com/cube-js/cube/compare/v0.32.22...v0.32.23) (2023-04-10)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.32.22](https://github.com/cube-js/cube/compare/v0.32.21...v0.32.22) (2023-04-10)
+
+
+### Bug Fixes
+
+* Correct the syntax error in the ClickHouse cast method ([#6154](https://github.com/cube-js/cube/issues/6154)) Thanks [@fxx-real](https://github.com/fxx-real)! ([b5ccf18](https://github.com/cube-js/cube/commit/b5ccf18cd56ee9cc9d8c1c9bb5ffd519c00d0f3c))
+
+
+### Features
+
+* **schema-compiler:** Yaml - report error on misconfiguration (object instead of array) ([#6407](https://github.com/cube-js/cube/issues/6407)) ([29e3778](https://github.com/cube-js/cube/commit/29e37780c9c4f320c868880266dc73f55840987f))
+
+
+
+
+
+## [0.32.21](https://github.com/cube-js/cube/compare/v0.32.20...v0.32.21) (2023-04-06)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.32.20](https://github.com/cube-js/cube/compare/v0.32.19...v0.32.20) (2023-04-05)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.32.19](https://github.com/cube-js/cube/compare/v0.32.18...v0.32.19) (2023-04-03)
+
+
+### Features
+
+* **schema-compiler:** Support new aliases for join.relationship ([#6367](https://github.com/cube-js/cube/issues/6367)) ([34a18d8](https://github.com/cube-js/cube/commit/34a18d8936d6e3e27d0dcba2456dbac3f03b0d76))
+
+
+
+
+
+## [0.32.18](https://github.com/cube-js/cube/compare/v0.32.17...v0.32.18) (2023-04-02)
+
+
+### Features
+
+* Cube based includes and meta exposure ([#6380](https://github.com/cube-js/cube/issues/6380)) ([ead4ac0](https://github.com/cube-js/cube/commit/ead4ac0b3b78c074f29fcdec3f86282bce42c45a))
+* **schema-compiler:** Introduce public field (alias for shown) ([#6361](https://github.com/cube-js/cube/issues/6361)) ([6d0c66a](https://github.com/cube-js/cube/commit/6d0c66aad43d51dd23cc3b0cbd6ba3454581afd6))
+
+
+
+
+
+## [0.32.17](https://github.com/cube-js/cube/compare/v0.32.16...v0.32.17) (2023-03-29)
+
+
+### Features
+
+* **schema-compiler:** Introduce support for sqlTable (syntactic sugar) ([#6360](https://github.com/cube-js/cube/issues/6360)) ([c73b368](https://github.com/cube-js/cube/commit/c73b368ca20735c63d01d2364b1c2f26d3b24cc5))
+
+
+
+
+
+## [0.32.16](https://github.com/cube-js/cube/compare/v0.32.15...v0.32.16) (2023-03-27)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.32.15](https://github.com/cube-js/cube/compare/v0.32.14...v0.32.15) (2023-03-24)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.32.14](https://github.com/cube-js/cube/compare/v0.32.13...v0.32.14) (2023-03-23)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.32.13](https://github.com/cube-js/cube/compare/v0.32.12...v0.32.13) (2023-03-22)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.32.12](https://github.com/cube-js/cube/compare/v0.32.11...v0.32.12) (2023-03-22)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.32.10](https://github.com/cube-js/cube.js/compare/v0.32.9...v0.32.10) (2023-03-20)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.32.8](https://github.com/cube-js/cube.js/compare/v0.32.7...v0.32.8) (2023-03-17)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
 ## [0.32.7](https://github.com/cube-js/cube.js/compare/v0.32.6...v0.32.7) (2023-03-14)
 
 

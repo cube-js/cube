@@ -2,6 +2,7 @@ use crate::metastore::table::{Table, TablePath};
 use crate::metastore::{Chunk, IdRow, Index, Partition};
 use crate::queryplanner::panic::PanicWorkerNode;
 use crate::queryplanner::planning::{ClusterSendNode, PlanningMeta, Snapshots};
+use crate::queryplanner::providers::InfoSchemaQueryCacheTableProvider;
 use crate::queryplanner::query_executor::{CubeTable, InlineTableId, InlineTableProvider};
 use crate::queryplanner::topk::{ClusterAggregateTopK, SortColumn};
 use crate::queryplanner::udfs::aggregate_udf_by_kind;
@@ -592,10 +593,17 @@ impl SerializedLogicalPlan {
                     })
                     .collect::<Vec<_>>();
 
-                SerializedLogicalPlan::Union {
-                    inputs,
-                    schema: schema.clone(),
-                    alias: alias.clone(),
+                if inputs.is_empty() {
+                    SerializedLogicalPlan::EmptyRelation {
+                        produce_one_row: false,
+                        schema: schema.clone(),
+                    }
+                } else {
+                    SerializedLogicalPlan::Union {
+                        inputs,
+                        schema: schema.clone(),
+                        alias: alias.clone(),
+                    }
                 }
             }
             SerializedLogicalPlan::TableScan {
@@ -1193,6 +1201,10 @@ impl SerializedPlan {
                         .as_any()
                         .downcast_ref::<InfoSchemaTableProvider>()
                         .is_none()
+                        && source
+                            .as_any()
+                            .downcast_ref::<InfoSchemaQueryCacheTableProvider>()
+                            .is_none()
                     {
                         self.seen_data_scans = true;
                         return Ok(false);

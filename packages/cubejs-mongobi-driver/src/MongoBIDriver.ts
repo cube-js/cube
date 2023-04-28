@@ -75,7 +75,9 @@ export class MongoBIDriver extends BaseDriver implements DriverInterface {
       port: getEnv('dbPort', { dataSource }),
       user: getEnv('dbUser', { dataSource }),
       password: getEnv('dbPass', { dataSource }),
-      ssl: this.getSslOptions(dataSource),
+      // mysql2 uses own typings for ssl property, which is not correct
+      // Types of property 'pfx' are incompatible. Skipping validation with any cast
+      ssl: this.getSslOptions(dataSource) as any,
       authPlugins: {
         mysql_clear_password: () => async () => {
           const password =

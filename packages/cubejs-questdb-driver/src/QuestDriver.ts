@@ -94,6 +94,7 @@ export class QuestDriver<Config extends QuestDriverConfiguration = QuestDriverCo
       port: getEnv('dbPort', { dataSource }),
       user: getEnv('dbUser', { dataSource }),
       password: getEnv('dbPass', { dataSource }),
+      ssl: this.getSslOptions(dataSource),
       ...config
     });
     this.pool.on('error', (err) => {

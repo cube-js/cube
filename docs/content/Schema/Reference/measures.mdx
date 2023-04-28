@@ -2,9 +2,9 @@
 title: Measures
 permalink: /schema/reference/measures
 scope: cubejs
-category: Data Schema
+category: Data Modeling
 subCategory: Reference
-menuOrder: 9
+menuOrder: 22
 proofread: 06/18/2019
 redirect_from:
   - /measures
@@ -15,19 +15,18 @@ aggregation over a certain column in your database table.
 
 Any measure should have the following properties: `name`, `sql` and `type`.
 
-## Naming
+## Parameters
 
-When you give a name to a measure, there are certain rules to follow. Each
-measure should:
+### <--{"id" : "Parameters"}--> name
 
-- Be unique within a cube
-- Start with a lowercase letter
-- Consist of numbers, letters and `_`
+The `name` parameter serves as the identifier of a measure. It must be unique
+among all measures, dimensions, and segments within a cube and follow the
+[naming conventions][ref-naming].
 
 <CodeTabs>
 
 ```javascript
-cube(`Orders`, {
+cube(`orders`, {
   measures: {
     count: {
       sql: `id`,
@@ -44,19 +43,19 @@ cube(`Orders`, {
 
 ```yaml
 cubes:
-  - name: Orders
+  - name: orders
+
     measures:
       - name: count
         sql: id
         type: count
+
       - name: total_amount
         sql: amount
         type: sum
 ```
 
 </CodeTabs>
-
-## Parameters
 
 ### <--{"id" : "Parameters"}--> description
 
@@ -92,7 +91,7 @@ cubes:
 
 Using the `drillMembers` parameter, you can define a set of [drill
 down][ref-drilldowns] fields for the measure. `drillMembers` is defined as an
-array of dimensions. Cube.js automatically injects dimensions’ names and other
+array of dimensions. Cube automatically injects dimensions’ names and other
 cubes’ names with dimensions in the context, so you can reference these
 variables in the `drillMembers` array. [Learn more about how to define and use
 drill downs][ref-drilldowns].
@@ -100,7 +99,7 @@ drill downs][ref-drilldowns].
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   measures: {
     revenue: {
       type: `sum`,
@@ -206,7 +205,7 @@ cube(`Orders`, {
       type: `sum`,
       sql: `price`,
       meta: {
-        any: 'value',
+        any: "value",
       },
     },
   },
@@ -374,8 +373,8 @@ cubes:
 ### <--{"id" : "Parameters"}--> title
 
 You can use the `title` parameter to change a measure’s displayed name. By
-default, Cube.js will humanize your measure key to create a display name. In
-order to override default behavior, please use the `title` parameter.
+default, Cube will humanize your measure key to create a display name. In order
+to override default behavior, please use the `title` parameter.
 
 <CodeTabs>
 
@@ -474,3 +473,4 @@ join will be created automatically.
 [ref-schema-ref-types-formats-measures-formats]:
   /schema/reference/types-and-formats#measures-formats
 [ref-drilldowns]: /schema/fundamentals/additional-concepts#drilldowns
+[ref-naming]: /data-modeling/syntax#naming

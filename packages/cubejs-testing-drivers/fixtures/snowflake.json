@@ -1,0 +1,71 @@
+{
+  "cube": {
+    "environment": {
+      "CUBEJS_API_SECRET": "mysupersecret",
+      "CUBEJS_CACHE_AND_QUEUE_DRIVER": "cubestore",
+      "CUBEJS_CUBESTORE_HOST": "store",
+
+      "CUBEJS_DB_TYPE": "snowflake",
+      "CUBEJS_DB_USER": "${DRIVERS_TESTS_CUBEJS_DB_USER}",
+      "CUBEJS_DB_PASS": "${DRIVERS_TESTS_CUBEJS_DB_PASS}",
+      "CUBEJS_DB_NAME": "DEMO_DB",
+      "CUBEJS_PRE_AGGREGATIONS_SCHEMA": "drivers_tests_preaggs",
+
+      "CUBEJS_DB_SNOWFLAKE_ACCOUNT": "qna80818.us-east-1",
+      "CUBEJS_DB_SNOWFLAKE_REGION": "us-east-1",
+      "CUBEJS_DB_SNOWFLAKE_WAREHOUSE": "COMPUTE_WH",
+      "CUBEJS_DB_SNOWFLAKE_ROLE": "PUBLIC"
+    },
+    "ports" : ["4000"]
+  },
+  "cast": {
+    "SELECT_PREFIX": "",
+    "SELECT_SUFFIX": "",
+    "DATE_PREFIX": "to_date(",
+    "DATE_SUFFIX": ", 'YYYY-MM-DD')",
+    "CREATE_TBL_PREFIX": "CREATE TABLE ",
+    "CREATE_TBL_SUFFIX": " AS ",
+    "CREATE_SUB_PREFIX": "(",
+    "CREATE_SUB_SUFFIX": ");"
+  },
+  "tables": {
+    "products": "public.products",
+    "customers": "public.customers",
+    "ecommerce": "public.ecommerce"
+  },
+  "preAggregations": {
+    "Products": [],
+    "Customers": [],
+    "ECommerce": []
+  },
+  "skip": [
+    "---------------------------------------",
+    "Driver tests                           ",
+    "---------------------------------------",
+
+    "---------------------------------------",
+    "Core tests                             ",
+    "---------------------------------------",
+    "for the Customers.RollingExternal",
+    "for the Customers.RollingInternal",
+    "for the ECommerce.SimpleAnalysisExternal",
+    "for the ECommerce.SimpleAnalysisInternal",
+    "for the ECommerce.TimeAnalysisInternal",
+    "for the ECommerce.TimeAnalysisExternal",
+
+    "---------------------------------------",
+    "Full tests                             ",
+    "---------------------------------------",
+    "must built pre-aggregations",
+    "querying Customers: dimentions + order + total + offset",
+    "querying ECommerce: dimentions + order + total + offset",
+
+    "---------------------------------------",
+    "SKIPED FOR ALL                         ",
+    "---------------------------------------",
+    "querying Products: dimensions -- doesn't work wo ordering",
+    "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- rounding in athena",
+    "querying ECommerce: total sales, total profit by month + order (date) + total -- doesn't work with the BigQuery",
+    "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- noisy test"
+  ]
+}

@@ -13,13 +13,13 @@
     "dev": "yarn start",
     "start": "GATSBY_ENV=development gatsby develop",
     "deploy": "gatsby-plugin-s3 deploy",
-    "lint:markdown": "markdownlint-cli2 content/**/*.md",
+    "lint:markdown": "markdownlint-cli2 content/**/*.md content/**/*.mdx",
     "lint:text": "textlint content/**/*.md",
     "lint": "echo 'Happy linting one day!!'",
     "typecheck": "tsc"
   },
   "dependencies": {
-    "@cube-dev/purple-banner": "^2.0.6",
+    "@cube-dev/purple-banner": "2.0.19",
     "@cubejs-client/core": "^0.27.41",
     "@docsearch/react": "^3.3.0",
     "@percy/cli": "^1.0.0-beta.70",

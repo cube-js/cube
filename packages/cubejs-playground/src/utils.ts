@@ -127,7 +127,10 @@ export function codeSandboxDefinition(
                 ...memo,
                 [name]: version,
                 ...(peerDependencies[name]
-                  ? { [peerDependencies[name]]: fixes[peerDependencies[name]] || 'latest' }
+                  ? {
+                      [peerDependencies[name]]:
+                        fixes[peerDependencies[name]] || 'latest',
+                    }
                   : null),
               };
             }, {}),
@@ -245,4 +248,29 @@ export function prettifyObject(value: Object) {
     .replaceAll(/([^\\]|)'/g, `\\'`)
     .replaceAll(/"/g, `'`)
     .replaceAll(/\[[\s]+\]/g, '[]');
+}
+
+export function containsPrivateFields(queryMembers: string[], meta: any) {
+  if (!meta) {
+    return false;
+  }
+
+  return queryMembers.some((member) => {
+    const [cube] = member.split('.');
+    const config = meta.cubes.find((c) => c.name === cube);
+
+    if (config) {
+      if (config.public === false) {
+        return true;
+      }
+
+      return [
+        ...config.measures,
+        ...config.dimensions,
+        ...config.segments,
+      ].some((m) => {
+        return m.name === member && m.isVisible === false;
+      });
+    }
+  });
 }

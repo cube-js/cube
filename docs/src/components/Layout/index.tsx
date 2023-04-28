@@ -67,7 +67,7 @@ const fixNodeCategory = (node: MarkdownNode): MarkdownNode => ({
 
 // @TODO Move this entire thing into a Gatsby plugin
 const parseResults = (
-  nodes: LayoutQueryResponse['allMarkdownRemark']['edges']
+  nodes: LayoutQueryResponse['allMdx']['edges']
 ) => {
   let allNodes = nodes.reduce((categories, { node }) => {
     const newNode = fixNodeCategory(node);

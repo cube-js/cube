@@ -1,0 +1,44 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Sequence with the @cubejs-backend/athena-driver for the Customers.RollingExternal 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+    "stream",
+  ],
+  Array [
+    "createSchemaIfNotExists",
+    "uploadTableWithIndexes",
+  ],
+]
+`;
+
+exports[`Sequence with the @cubejs-backend/athena-driver for the Customers.RollingInternal 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+  ],
+  Array [],
+]
+`;
+
+exports[`Sequence with the @cubejs-backend/athena-driver for the ECommerce.SimpleAnalysisExternal 1`] = `
+Array [
+  Array [
+    "downloadQueryResults",
+    "stream",
+  ],
+  Array [
+    "uploadTableWithIndexes",
+  ],
+]
+`;
+
+exports[`Sequence with the @cubejs-backend/athena-driver for the ECommerce.SimpleAnalysisInternal 1`] = `
+Array [
+  Array [
+    "loadPreAggregationIntoTable",
+  ],
+  Array [],
+]
+`;

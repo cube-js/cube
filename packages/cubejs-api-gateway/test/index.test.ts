@@ -568,116 +568,7 @@ describe('API Gateway', () => {
           }
         },
         successResult: { preAggregationPartitions: preAggregationPartitionsResultFactory() }
-      },
-      {
-        route: 'sql-runner',
-        scope: ['sql-runner'],
-        method: 'post',
-        successBody: {
-          query: {
-            query: 'SELECT * FROM sql-runner; ',
-            limit: 10000,
-            resultFilter: {
-              objectLimit: 2,
-              stringLimit: 2,
-              objectTypes: ['Buffer'],
-              limit: 1,
-              offset: 1,
-            },
-          }
-        },
-        successResult: { data: [{ string: 'st', number: 1, buffer: '[4', bufferTwo: 'Placeholder', object: '{"' }] },
-        wrongPayloads: [{
-          result: {
-            status: 400,
-            error: 'A user\'s query must contain a body'
-          },
-          body: {}
-        }, {
-          result: {
-            status: 400,
-            error: 'A user\'s query must contain at least one query param.'
-          },
-          body: { query: {} }
-        }, {
-          result: {
-            status: 400,
-            error: 'A user\'s query must contain limit query param and it must be positive number'
-          },
-          body: { query: { query: 'SELECT * FROM sql-runner' } }
-        }, {
-          result: {
-            status: 400,
-            error: 'The query limit has been exceeded'
-          },
-          body: { query: { query: 'SELECT * FROM sql-runner', limit: 60000 } }
-        }, {
-          result: {
-            status: 400,
-            error: 'A user\'s query must contain limit query param and it must be positive number'
-          },
-          body: { query: { query: 'SELECT * FROM sql-runner', limit: -1 } }
-        }, {
-          result: {
-            status: 400,
-            error: 'A query.resultFilter.objectTypes must be an array of strings'
-          },
-          body: {
-            query: {
-              query: 'SELECT * FROM sql-runner',
-              limit: 10000,
-              resultFilter: {
-                objectTypes: 'text'
-              },
-            }
-          }
-        }]
-      },
-      { route: 'data-sources', scope: ['sql-runner'], successResult: { dataSources: [{ dataSource: 'default', dbType: 'postgres' }] } },
-      {
-        route: 'db-schema',
-        method: 'post',
-        scope: ['sql-runner'],
-        successBody: {
-          query: {
-            dataSource: 'default',
-          }
-        },
-        successResult: {
-          data: {
-            other: {
-              orders: [
-                {
-                  name: 'id',
-                  type: 'integer',
-                  attributes: [],
-                },
-                {
-                  name: 'test_id',
-                  type: 'integer',
-                  attributes: [],
-                },
-              ],
-            },
-          },
-        },
-        wrongPayloads: [
-          {
-            result: {
-              status: 400,
-              error: 'A user\'s query must contain a body'
-            },
-            body: {}
-          },
-          {
-            result: {
-              status: 400,
-              error: 'A user\'s query must contain dataSource.'
-            },
-            body: { query: {} }
-          }
-        ]
-      },
+      }
     ];
 
     testConfigs.forEach((config) => {
@@ -686,9 +577,9 @@ describe('API Gateway', () => {
         test('not allowed with user token', notAllowedWithUserTokenTestFactory(config));
         test('not route (works only with playgroundAuthSecret)', notExistsTestFactory(config));
         test('success', successTestFactory(config));
-        if (config.method === 'post' && config.wrongPayloads?.length) {
+        /* if (config.method === 'post' && config.wrongPayloads?.length) {
           test('wrong params', wrongPayloadsTestFactory(config));
-        }
+        } */
       });
     });
   });

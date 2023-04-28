@@ -1,0 +1,102 @@
+{
+  "cube": {
+    "environment": {
+      "CUBEJS_API_SECRET": "mysupersecret",
+      "CUBEJS_CACHE_AND_QUEUE_DRIVER": "cubestore",
+      "CUBEJS_CUBESTORE_HOST": "store",
+      "CUBEJS_DB_TYPE": "clickhouse",
+      "CUBEJS_DB_HOST": "data",
+      "CUBEJS_DB_NAME": "test",
+      "CUBEJS_DB_USER": "test",
+      "CUBEJS_DB_PASS": "test"
+    },
+    "depends_on": ["data"],
+    "links": ["data"],
+    "ports" : ["4000"]
+  },
+  "data": {
+    "image": "clickhouse/clickhouse-server",
+    "environment": {
+      "CLICKHOUSE_DB": "test",
+      "CLICKHOUSE_USER": "test",
+      "CLICKHOUSE_PASSWORD": "test",
+      "CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT": 1
+    },
+    "ports" : ["8123"]
+  },
+  "cast": {
+    "SELECT_PREFIX": "",
+    "SELECT_SUFFIX": "",
+    "DATE_PREFIX": "toDateTime(",
+    "DATE_SUFFIX": ")",
+    "CREATE_TBL_PREFIX": "CREATE TABLE ",
+    "CREATE_TBL_SUFFIX": " ENGINE = Memory AS ",
+    "CREATE_SUB_PREFIX": "",
+    "CREATE_SUB_SUFFIX": ""
+  },
+  "tables": {
+    "products": "products",
+    "customers": "customers",
+    "ecommerce": "ecommerce"
+  },
+  "preAggregations": {
+    "Products": [],
+    "Customers": [
+      {
+        "name": "RA",
+        "measures": ["CUBE.count", "CUBE.runningTotal"],
+        "indexes": {
+          "category_index": {
+            "columns": [
+              "CUBE.count",
+              "CUBE.runningTotal"
+            ]
+          }
+        }
+      }
+    ],
+    "ECommerce": [
+      {
+        "name": "SA",
+        "dimensions": ["CUBE.productName"],
+        "measures": [
+          "CUBE.totalQuantity",
+          "CUBE.avgDiscount",
+          "CUBE.totalSales",
+          "CUBE.totalProfit"
+        ],
+        "indexes": {
+          "category_index": {
+            "columns": ["CUBE.productName"]
+          }
+        }
+      },
+      {
+        "name": "TA",
+        "time_dimension": "CUBE.orderDate",
+        "granularity": "month",
+        "partition_granularity": "month",
+        "dimensions": ["CUBE.productName"],
+        "measures": [
+          "CUBE.totalQuantity",
+          "CUBE.avgDiscount",
+          "CUBE.totalSales",
+          "CUBE.totalProfit"
+        ],
+        "indexes": {
+          "category_index": {
+            "columns": ["CUBE.productName"]
+          }
+        }
+      }
+    ]
+  },
+  "skip": [
+    "SKIPED FOR ALL",
+    "---------------------------------------",
+    "querying Products: dimensions -- doesn't work wo ordering",
+    "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- rounding in athena",
+    "querying ECommerce: total sales, total profit by month + order (date) + total -- doesn't work with the BigQuery",
+    "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- noisy test"
+  ]
+}

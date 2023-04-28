@@ -22,6 +22,7 @@ services:
       # defaults
       CUBEJS_DEV_MODE: "true"
       CUBEJS_API_SECRET: mysupersecret
+      CUBEJS_SCHEMA_PATH: schema
     volumes:
       - ./databricks-jdbc/cube.js:/cube/conf/cube.js
     ports:

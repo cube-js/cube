@@ -2,49 +2,48 @@
 title: Pre-aggregations
 permalink: /schema/reference/pre-aggregations
 scope: cubejs
-category: Data Schema
+category: Data Modeling
 subCategory: Reference
-menuOrder: 14
+menuOrder: 26
 redirect_from:
   - /pre-aggregations
 ---
 
-Pre-aggregations are materialized query results persisted as tables. Cube.js has
-an ability to analyze queries against a defined set of pre-aggregation rules in
+Pre-aggregations are materialized query results persisted as tables. Cube has an
+ability to analyze queries against a defined set of pre-aggregation rules in
 order to choose the optimal one that will be used to create pre-aggregation
 table.
 
-If Cube.js finds a suitable pre-aggregation rule, database querying becomes a
+If Cube finds a suitable pre-aggregation rule, database querying becomes a
 multi-stage process:
 
-1. Cube.js checks if an up-to-date copy of the pre-aggregation exists.
+1. Cube checks if an up-to-date copy of the pre-aggregation exists.
 
-2. Cube.js will execute a query against the pre-aggregated tables instead of the
+2. Cube will execute a query against the pre-aggregated tables instead of the
    raw data.
 
 Pre-aggregations can be defined in the `preAggregations` available on each cube.
 A more in-depth diagram detailing how pre-aggregations are selected can be
 [found here][ref-caching-preaggs-selecting-preaggs].
 
-## Naming
+Pre-aggregations must have, at minimum, a name and a type. Pre-aggregations must
+include all dimensions, measures, and filters you will query with.
 
-Pre-aggregations must have, at minimum, a name and a type. This name, along with
-the [name of the cube][ref-schema-cube-naming] will be used as a prefix for
-pre-aggregation tables created in the database.
+## Parameters
 
-Pre-aggregation names should:
+### <--{"id" : "Parameters"}--> name
 
-- Be unique within a cube
-- Start with a lowercase letter
-- Consist of numbers, letters and `_`
+The `name` parameter serves as the identifier of a pre-aggregation. It must be
+unique among all pre-aggregations within a cube and follow the [naming
+conventions][ref-naming].
 
 <CodeTabs>
 
 ```javascript
-cube(`Orders`, {
-  sql: `SELECT * FROM orders`,
+cube(`orders`, {
+  sql_table: `orders`,
 
-  preAggregations: {
+  pre_aggregations: {
     orders_by_status: {
       dimensions: [CUBE.status],
       measures: [CUBE.count],
@@ -55,8 +54,9 @@ cube(`Orders`, {
 
 ```yaml
 cubes:
-  - name: Orders
-    sql: SELECT * FROM orders
+  - name: orders
+    sql_table: orders
+
     pre_aggregations:
       - name: orders_by_status
         dimensions: [CUBE.status]
@@ -65,10 +65,8 @@ cubes:
 
 </CodeTabs>
 
-Pre-aggregations must include all dimensions, measures, and filters you will
-query with.
-
-## Parameters
+This `name`, along with the name of the cube, will be used as a prefix for
+pre-aggregation tables created in the database.
 
 ### <--{"id" : "Parameters"}--> type
 
@@ -112,7 +110,7 @@ multiple cubes. In case of multiple cubes being involved, the join query will be
 built according to the standard rules of cubes joining.
 
 Rollups are selected for querying based on properties found in queries made to
-the Cube.js REST API. A thorough explanation can be found under [Getting Started
+the Cube REST API. A thorough explanation can be found under [Getting Started
 with Pre-Aggregations][ref-caching-preaggs-target].
 
 <CodeTabs>
@@ -181,7 +179,7 @@ cube(`CompletedOrders`, {
 
   preAggregations: {
     main: {
-      type: `originalSql`
+      type: `originalSql`,
     },
   },
 });
@@ -209,9 +207,10 @@ version.
 
 <WarningBox>
 
-Rollup join can be used only to join two tables, and one can't contain more than one partition so that the join can operate correctly.
-It means that at least one table should be less than 1M of rows.
-There's work in progress to remove those limitations.
+Rollup join can be used only to join two tables, and one can't contain more than
+one partition so that the join can operate correctly. It means that at least one
+table should be less than 1M of rows. There's work in progress to remove those
+limitations.
 
 </WarningBox>
 
@@ -221,11 +220,11 @@ to them.
 
 <WarningBox>
 
-`rollupJoin` is ephemeral pre-aggregation that relies on referenced rollups
- when queries are executed. 
-Setting [`scheduledRefresh`](#parameters-scheduled-refresh) to `true` is 
-unnecessary for `rollupJoin` and will result in an error.
-Appropriate freshness controls should be set on referenced rollups instead.
+`rollupJoin` is ephemeral pre-aggregation that relies on referenced rollups when
+queries are executed. Setting
+[`scheduledRefresh`](#parameters-scheduled-refresh) to `true` is unnecessary for
+`rollupJoin` and will result in an error. Appropriate freshness controls should
+be set on referenced rollups instead.
 
 </WarningBox>
 
@@ -242,7 +241,7 @@ and an `orders_with_users_rollup` pre-aggregation. Note the following:
 
 ```javascript
 cube(`Users`, {
-  dataSource: 'postgres',
+  dataSource: "postgres",
   sql: `SELECT * FROM public.users`,
 
   preAggregations: {
@@ -271,8 +270,8 @@ cube(`Users`, {
   },
 });
 
-cube('Orders', {
-  dataSource: 'mssql',
+cube("Orders", {
+  dataSource: "mssql",
   sql: `SELECT * FROM orders`,
 
   preAggregations: {
@@ -293,7 +292,7 @@ cube('Orders', {
 
   joins: {
     Users: {
-      relationship: `belongsTo`,
+      relationship: `many_to_one`,
       // Make sure the join uses dimensions on the cube, rather than
       // the column names from the underlying SQL
       sql: `${CUBE.user_id} = ${Users.id}`,
@@ -366,7 +365,7 @@ cubes:
         rollups: [Users.users_rollup, CUBE.orders_rollup]
     joins:
       - name: Users
-        relationship: belongs_to
+        relationship: many_to_one
         sql: "{CUBE.user_id} = {Users.id}"
     measures:
       - name: count
@@ -400,7 +399,7 @@ directly:
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   sql: `SELECT * FROM orders`,
 
   preAggregations: {
@@ -414,6 +413,7 @@ cube('Orders', {
 });
 ```
 
+```yaml
 cubes:
   - name: Orders
     sql: SELECT * FROM orders
@@ -442,7 +442,8 @@ scenarios where real-time data is required.
 
 [Lambda pre-aggregations][ref-caching-lambda-preaggs] can be used to combine
 data from a data source and a pre-aggregation, or even from multiple
-pre-aggregations across different schema-compatible cubes.
+pre-aggregations across different cubes that share the same dimensions
+and measures.
 
 ### <--{"id" : "Parameters"}--> measures
 
@@ -452,7 +453,7 @@ cube][ref-schema-measures] that should be included in the pre-aggregation:
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   sql: `SELECT * FROM orders`,
 
   measures: {
@@ -491,7 +492,7 @@ cube][ref-schema-dimensions] that should be included in the pre-aggregation:
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   sql: `SELECT * FROM orders`,
 
   dimensions: {
@@ -528,13 +529,13 @@ cubes:
 
 The `timeDimension` property can be any [`dimension`][ref-schema-dimensions] of
 type [`time`][ref-schema-types-dim-time]. All other measures and dimensions in
-the schema are aggregated This property is an extremely useful tool for
+the data model are aggregated. This property is an extremely useful tool for
 improving performance with massive datasets.
 
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   sql: `SELECT * FROM orders`,
 
   measures: {
@@ -595,13 +596,13 @@ pre-aggregation definition.
 ### <--{"id" : "Parameters"}--> granularity
 
 The `granularity` property defines the granularity of data _within_ the
-pre-aggregation. If set to `week`, for example, then Cube.js will pre-aggregate
-the data by week and persist it to Cube Store.
+pre-aggregation. If set to `week`, for example, then Cube will pre-aggregate the
+data by week and persist it to Cube Store.
 
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   sql: `SELECT * FROM orders`,
 
   preAggregations: {
@@ -691,7 +692,7 @@ The `partitionGranularity` defines the granularity for each
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
+cube("Orders", {
   sql: `SELECT * FROM orders`,
 
   preAggregations: {
@@ -742,7 +743,7 @@ cause out of memory.
 
 ### <--{"id" : "Parameters"}--> refreshKey
 
-Cube.js can also take care of keeping pre-aggregations up to date with the
+Cube can also take care of keeping pre-aggregations up to date with the
 `refreshKey` property. By default, it is set to `every: '1 hour'`.
 
 <InfoBox>
@@ -1030,11 +1031,11 @@ cubes:
 
 ### <--{"id" : "Parameters"}--> useOriginalSqlPreAggregations
 
-Cube.js supports multi-stage pre-aggregations by reusing original SQL
+Cube supports multi-stage pre-aggregations by reusing original SQL
 pre-aggregations in rollups through the `useOriginalSqlPreAggregations`
 property. It is helpful in cases where you want to re-use a heavy SQL query
 calculation in multiple `rollup` pre-aggregations. Without
-`useOriginalSqlPreAggregations` enabled, Cube.js will always re-execute all
+`useOriginalSqlPreAggregations` enabled, Cube will always re-execute all
 underlying SQL calculations every time it builds new rollup tables.
 
 <WarningBox>
@@ -1081,11 +1082,8 @@ cube(`Orders`, {
 cubes:
   - name: Orders
     sql: >
-      SELECT * FROM orders1
-      UNION ALL
-      SELECT * FROM orders2
-      UNION ALL
-      SELECT * FROM orders3
+      SELECT * FROM orders1 UNION ALL SELECT * FROM orders2 UNION ALL SELECT *
+      FROM orders3
     pre_aggregations:
       - name: main
         type: originalSql
@@ -1118,7 +1116,7 @@ starting with most recent ones in time and checks if the
 [`refreshKey`][self-refreshkey] has changed. If a change was detected, then that
 partition will be refreshed.
 
-In development mode, Cube.js runs the background refresh by default and will
+In development mode, Cube runs the background refresh by default and will
 refresh all pre-aggregations which have `scheduledRefresh: true`.
 
 Please consult [Production Checklist][ref-production-checklist-refresh] for best
@@ -1161,15 +1159,25 @@ cubes:
 
 <WarningBox>
 
-Currently `buildRangeStart` and `buildRangeEnd` doesn't have any effect on pre-aggregations without `partitionGranularity`.
-This behavior can be changed in future versions.
+Currently `buildRangeStart` and `buildRangeEnd` doesn't have any effect on
+pre-aggregations without `partitionGranularity`. This behavior can be changed in
+future versions.
+
+</WarningBox>
+
+<WarningBox>
+
+Cube will **not** return results outside of the defined build range. Data will
+**only** be queried within this range, which can lead to an empty result set,
+depending on the query. Consider using [Lambda
+pre-aggregations][self-rolluplambda] if you want to query data outside of the
+build range.
 
 </WarningBox>
 
 The build range defines what partitions should be built by a scheduled refresh.
-Data will **never** be queried beyond this range. By default, the build range is
-defined as the minimum and maximum values possible for the
-[`timeDimension`][self-timedimension] used in the rollup.
+By default, the build range is defined as the minimum and maximum values
+possible for the [`timeDimension`][self-timedimension] used in the rollup.
 
 <InfoBox>
 
@@ -1289,12 +1297,11 @@ is of type `rollupLambda`, and then set `unionWithSourceData` to `true`:
 
 ```javascript
 cube(`Orders`, {
-
   preAggregations: {
     lambda: {
       type: `rollupLambda`,
       unionWithSourceData: true,
-      rollups: [Orders.main]
+      rollups: [Orders.main],
     },
   },
 });
@@ -1382,7 +1389,7 @@ cube(`Orders`, {
       type: `originalSql`,
       indexes: {
         timestampIndex: {
-          columns: ['timestamp'],
+          columns: ["timestamp"],
         },
       },
     },
@@ -1431,7 +1438,6 @@ definition:
 
 ```javascript
 cube(`Orders`, {
-
   preAggregations: {
     categoryAndDate: {
       measures: [CUBE.count],
@@ -1488,12 +1494,12 @@ cubes:
   /deployment/production-checklist#set-up-refresh-worker
 [ref-recipe-funnels]: /recipes/funnels
 [ref-sqlalias]: /schema/reference/cube#sql-alias
-[ref-schema-cube-naming]: /schema/reference/cube#naming
 [ref-schema-ref-cube-datasource]: /schema/reference/cube#parameters-data-source
 [ref-schema-dimensions]: /schema/reference/dimensions
 [ref-schema-measures]: /schema/reference/measures
 [ref-schema-segments]: /schema/reference/segments
 [ref-schema-types-dim-time]: /schema/reference/types-and-formats#types-time
+[ref-naming]: /data-modeling/syntax#naming
 [self-granularity]: #granularity
 [self-incremental]: #refresh-key-incremental
 [self-origsql-preaggs]: #use-original-sql-pre-aggregations

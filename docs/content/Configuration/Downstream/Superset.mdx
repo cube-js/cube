@@ -40,10 +40,9 @@ below with your connection credentials:
 ### <--{"id" : "Enable Cube SQL API"}--> Self-hosted Cube
 
 You need to set the following environment variables to enable the Cube SQL API.
-These credentials will be required to connect to Cube from Superset
-later.
+These credentials will be required to connect to Cube from Superset later.
 
-```bash
+```dotenv
 CUBEJS_PG_SQL_PORT=5432
 CUBEJS_SQL_USER=myusername
 CUBEJS_SQL_PASSWORD=mypassword
@@ -59,7 +58,7 @@ a new database:
 <div style="text-align: center">
   <img
     alt="Apache Superset: databases page"
-    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Configuration/Downstream/apache-superset-1.png"
+    src="https://ucarecdn.com/cb3fe91a-6ce2-4c0e-8997-fdb2d4507beb/"
     style="border: none"
     width="100%"
   />
@@ -70,7 +69,7 @@ a new database:
 Your cubes will be exposed as tables, where both your measures and dimensions
 are columns.
 
-Let's use the following Cube data schema:
+Let's use the following Cube data model:
 
 ```javascript
 cube(`Orders`, {
@@ -102,7 +101,7 @@ create datasets based on tables. Let's create one from `Orders` table:
 <div style="text-align: center">
   <img
     alt="Apache Superset: SQL Editor page with successful query"
-    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Configuration/Downstream/apache-superset-4.png"
+    src="https://ucarecdn.com/eebd3839-03db-4492-a7e4-a7cc1d9ffc73/"
     style="border: none"
     width="100%"
   />
@@ -114,7 +113,7 @@ Now, we can explore this dataset. Let's create a new chart of type line with
 <div style="text-align: center">
   <img
     alt="Apache Superset: SQL Editor page with successful query"
-    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Configuration/Downstream/apache-superset-5.png"
+    src="https://ucarecdn.com/c509c6fb-f633-4ded-ae94-d4768978c47a/"
     style="border: none"
     width="100%"
   />
@@ -125,7 +124,7 @@ a time grain of `month`.
 
 The `COUNT(*)` aggregate function is being mapped to a measure of type
 [count](/schema/reference/types-and-formats#measures-types-count) in Cube's
-**Orders** schema file.
+**Orders** data model file.
 
 ## Additional Configuration
 
@@ -136,8 +135,7 @@ To allow queries from Superset to match pre-aggregations in Cube, [the
 must be set to `true` in the pre-aggregation definition. This is because
 Superset uses loose date ranges when generating SQL queries.
 
-[ref-cube-getting-started-docker]: https://cube.dev/docs/getting-started/docker
-[ref-getting-started]: /cloud/getting-started
+[ref-getting-started]: /getting-started/cloud/overview
 [ref-schema-ref-preagg-allownonstrict]:
   /schema/reference/pre-aggregations#allow-non-strict-date-range-match
 [superset]: https://superset.apache.org/

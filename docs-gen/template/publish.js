@@ -104,8 +104,8 @@ const tagValue = (doclet, tagOriginalTitle) => {
 const generateModuleSection = (doclet) => `---
 title: '${doclet.name}'
 permalink: ${tagValue(doclet, 'permalink')}
-category: ${tagValue(doclet, 'category')}
-subCategory: Reference
+category: Reference
+subCategory: ${tagValue(doclet, 'subCategory')}
 menuOrder: ${tagValue(doclet, 'menuOrder')}
 ---
 

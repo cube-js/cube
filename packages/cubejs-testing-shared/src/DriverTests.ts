@@ -34,6 +34,8 @@ export class DriverTests {
       SELECT 2 AS id, 200 AS amount, 'new' AS status
       UNION ALL
       SELECT 3 AS id, 400 AS amount, 'processed' AS status
+      UNION ALL
+      SELECT 4 AS id, 500 AS amount, NULL AS status
     ) AS data
     ORDER BY 1
   `;
@@ -42,13 +44,17 @@ export class DriverTests {
     { id: 1, amount: 100, status: 'new' },
     { id: 2, amount: 200, status: 'new' },
     { id: 3, amount: 400, status: 'processed' },
+    { id: 4, amount: 500, status: null },
   ];
 
-  public static CSV_ROWS = dedent`
-    orders__status,orders__amount
-    new,300
-    processed,400
-  `;
+  protected getExpectedCsvRows() {
+    return dedent`
+      orders__status,orders__amount
+      new,300
+      processed,400
+      ,500
+    `;
+  }
 
   public async testQuery() {
     const rows = await this.driver.query(DriverTests.QUERY, []);
@@ -70,7 +76,7 @@ export class DriverTests {
       SELECT orders.status AS orders__status, sum(orders.amount) AS orders__amount        
       FROM (${DriverTests.QUERY}) AS orders
       GROUP BY 1
-      ORDER BY 1
+      ORDER BY 2
     `;
     const tableName = await this.createUnloadTable(query);
     assert(this.driver.unload);
@@ -78,8 +84,8 @@ export class DriverTests {
     expect(data.csvFile.length).toEqual(1);
     const string = await downloadAndGunzip(data.csvFile[0]);
     const expectedRows = this.options.csvNoHeader
-      ? DriverTests.skipFirstLine(DriverTests.CSV_ROWS)
-      : DriverTests.CSV_ROWS;
+      ? DriverTests.skipFirstLine(this.getExpectedCsvRows())
+      : this.getExpectedCsvRows();
     expect(string.trim()).toEqual(expectedRows);
   }
 
@@ -168,15 +174,17 @@ export class DriverTests {
     return text.split('\n').slice(1).join('\n');
   }
 
-  private static rowsToString(rows: Record<string, any>[]): Record<string, string>[] {
-    const result: Record<string, string>[] = [];
+  private static rowsToString(rows: Record<string, any>[]): Record<string, string | null>[] {
+    const result: Record<string, string | null>[] = [];
+
     for (const row of rows) {
       const newRow: Record<string, string> = {};
       for (const k of Object.keys(row)) {
-        newRow[k] = row[k].toString();
+        newRow[k] = row[k] === null ? null : row[k].toString();
       }
       result.push(newRow);
     }
+
     return result;
   }
 }

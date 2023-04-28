@@ -101,13 +101,13 @@ export class CubejsServerCore {
    */
   public static getDriverMaxPool = getDriverMaxPool;
 
-  public readonly repository: FileRepository;
+  public repository: FileRepository;
 
   protected devServer: DevServer | undefined;
 
   protected readonly orchestratorStorage: OrchestratorStorage = new OrchestratorStorage();
 
-  protected readonly repositoryFactory: ((context: RequestContext) => SchemaFileRepository) | (() => FileRepository);
+  protected repositoryFactory: ((context: RequestContext) => SchemaFileRepository) | (() => FileRepository);
 
   protected contextToDbType: DbTypeAsyncFn;
 
@@ -345,8 +345,8 @@ export class CubejsServerCore {
         () => this.handleScheduledRefreshInterval({}),
         {
           interval: scheduledRefreshTimer,
-          onDuplicatedExecution: (intervalId) => this.logger('Refresh Scheduler Interval Error', {
-            error: `Previous interval #${intervalId} was not finished with ${scheduledRefreshTimer} interval`
+          onDuplicatedExecution: (intervalId) => this.logger('Refresh Scheduler Interval', {
+            warning: `Previous interval #${intervalId} was not finished with ${scheduledRefreshTimer} interval`
           }),
           onDuplicatedStateResolved: (intervalId, elapsed) => this.logger('Refresh Scheduler Long Execution', {
             warning: `Interval #${intervalId} finished after ${formatDuration(elapsed)}`
@@ -372,6 +372,7 @@ export class CubejsServerCore {
     this.driver = null;
     this.options.externalDbType = this.options.externalDbType ||
       <DatabaseType | undefined>process.env.CUBEJS_EXT_DB_TYPE;
+    this.options.schemaPath = process.env.CUBEJS_SCHEMA_PATH || this.options.schemaPath;
     this.contextToExternalDbType = wrapToFnIfNeeded(this.options.externalDbType);
   }
 
@@ -452,11 +453,12 @@ export class CubejsServerCore {
         extendContext: this.options.extendContext,
         playgroundAuthSecret: getEnv('playgroundAuthSecret'),
         jwt: this.options.jwt,
-        refreshScheduler: () => new RefreshScheduler(this),
+        refreshScheduler: this.getRefreshScheduler.bind(this),
         scheduledRefreshContexts: this.options.scheduledRefreshContexts,
         scheduledRefreshTimeZones: this.options.scheduledRefreshTimeZones,
         serverCoreVersion: this.coreServerVersion,
-        contextToPermissions: this.options.contextToPermissions,
+        contextToApiScopes: this.options.contextToApiScopes,
+        event: this.event,
       }
     ));
   }
@@ -527,6 +529,9 @@ export class CubejsServerCore {
 
     this.reloadEnvVariables();
 
+    this.repository = new FileRepository(this.options.schemaPath);
+    this.repositoryFactory = this.options.repositoryFactory || (() => this.repository);
+    
     this.startScheduledRefreshTimer();
   }
 
@@ -546,10 +551,11 @@ export class CubejsServerCore {
 
     let externalPreAggregationsDriverPromise: Promise<BaseDriver> | null = null;
 
+    const contextToDbType: DbTypeAsyncFn = this.contextToDbType.bind(this);
     const externalDbType = this.contextToExternalDbType(context);
 
-    // orchestrator options can be empty, if user didnt define it.
-    // so we are adding default and configuring queues concurrencies.
+    // orchestrator options can be empty, if user didn't define it.
+    // so we are adding default and configuring queues concurrency.
     const orchestratorOptions =
       this.optsHandler.getOrchestratorInitializedOptions(
         context,
@@ -638,8 +644,12 @@ export class CubejsServerCore {
             }
           })();
         }),
-        contextToDbType: this.contextToDbType.bind(this),
-        contextToExternalDbType: this.contextToExternalDbType.bind(this),
+        contextToDbType: async (dataSource) => contextToDbType({
+          ...context,
+          dataSource
+        }),
+        // speedup with cache
+        contextToExternalDbType: () => externalDbType,
         redisPrefix: orchestratorId,
         skipExternalCacheAndQueue: externalDbType === 'cubestore',
         cacheAndQueueDriver: this.options.cacheAndQueueDriver,

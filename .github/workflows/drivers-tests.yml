@@ -1,0 +1,153 @@
+name: 'Drivers tests'
+
+on:
+  push:
+    branches:
+      - 'master'
+    paths:
+      - '.github/workflows/drivers-tests.yml'
+
+      - 'packages/cubejs-query-orchestrator/src/**'
+      - 'packages/cubejs-base-driver/src/**'
+      - 'packages/cubejs-jdbc-driver/src/**'
+
+      - 'packages/cubejs-athena-driver/**'
+      - 'packages/cubejs-clickhouse-driver/**'
+      - 'packages/cubejs-databricks-jdbc-driver/**'
+      - 'packages/cubejs-mssql-driver/**'
+      - 'packages/cubejs-mysql-driver/**'
+      - 'packages/cubejs-postgres-driver/**'
+      - 'packages/cubejs-snowflake-driver/**'
+  pull_request:
+    paths:
+      - '.github/workflows/drivers-tests.yml'
+
+      - 'packages/cubejs-query-orchestrator/src/**'
+      - 'packages/cubejs-base-driver/src/**'
+      - 'packages/cubejs-jdbc-driver/src/**'
+
+      - 'packages/cubejs-athena-driver/**'
+      - 'packages/cubejs-clickhouse-driver/**'
+      - 'packages/cubejs-databricks-jdbc-driver/**'
+      - 'packages/cubejs-mssql-driver/**'
+      - 'packages/cubejs-mysql-driver/**'
+      - 'packages/cubejs-postgres-driver/**'
+      - 'packages/cubejs-snowflake-driver/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v3
+
+      # Building docker
+      - name: Login to DockerHub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+        with:
+          version: v0.10.3
+
+      - name: Build and push
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: ./packages/cubejs-docker/testing-drivers.Dockerfile
+          tags: cubejs/cube:testing-drivers
+          push: true
+
+  tests:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 30
+    needs: [build]
+    strategy:
+      matrix:
+        node: 
+          - 16.x
+        database:
+          - athena
+          - bigquery
+          - clickhouse
+          - databricks-jdbc
+          - mssql
+          - mysql
+          - postgres
+          - snowflake
+        suite:
+          - driver
+          - core
+          - full
+      fail-fast: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2022-06-22
+          override: true
+          components: rustfmt
+
+      - name: Install Node.js 16.x
+        uses: actions/setup-node@v3
+        with:
+          node-version: 16.x
+
+      - name: Configure `yarn`
+        run: yarn policies set-version v1.22.19
+
+      - name: Install dependencies
+        uses: nick-invision/retry@v2
+        env:
+          CUBESTORE_SKIP_POST_INSTALL: true
+        with:
+          max_attempts: 3
+          retry_on: error
+          retry_wait_seconds: 15
+          timeout_minutes: 20
+          command: yarn install --frozen-lockfile
+
+      - name: Build client
+        run: yarn build
+
+      - name: Build packages
+        run: yarn tsc
+
+      - name: Build tests
+        run: |
+          cd packages/cubejs-testing-drivers
+          yarn tsc
+
+      - name: Run tests
+        env:
+            # Athena
+            DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY: ${{ secrets.DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY }}
+            DRIVERS_TESTS_ATHENA_CUBEJS_AWS_SECRET: ${{ secrets.DRIVERS_TESTS_ATHENA_CUBEJS_AWS_SECRET }}
+
+            # BigQuery
+            DRIVERS_TESTS_CUBEJS_DB_BQ_CREDENTIALS: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_BQ_CREDENTIALS }}
+
+            # Databricks
+            DRIVERS_TESTS_CUBEJS_DB_DATABRICKS_URL: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_DATABRICKS_URL }}
+            DRIVERS_TESTS_CUBEJS_DB_DATABRICKS_TOKEN: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_DATABRICKS_TOKEN }}
+            DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_KEY: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_KEY }}
+            DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET }}
+
+            # Snowflake
+            DRIVERS_TESTS_CUBEJS_DB_USER: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_USER }}
+            DRIVERS_TESTS_CUBEJS_DB_PASS: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_PASS }}
+        run: |
+          cd ./packages/cubejs-testing-drivers
+          export DEBUG=testcontainers
+          yarn ${{ matrix.database }}-${{ matrix.suite }}

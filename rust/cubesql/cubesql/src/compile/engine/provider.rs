@@ -45,12 +45,12 @@ use super::information_schema::postgres::{
     InfoSchemaTestingBlockingProvider, InfoSchemaTestingDatasetProvider, PgCatalogAmProvider,
     PgCatalogAttrdefProvider, PgCatalogAttributeProvider, PgCatalogClassProvider,
     PgCatalogConstraintProvider, PgCatalogDatabaseProvider, PgCatalogDependProvider,
-    PgCatalogDescriptionProvider, PgCatalogEnumProvider, PgCatalogIndexProvider,
-    PgCatalogMatviewsProvider, PgCatalogNamespaceProvider, PgCatalogProcProvider,
-    PgCatalogRangeProvider, PgCatalogRolesProvider, PgCatalogSequenceProvider,
-    PgCatalogSettingsProvider, PgCatalogStatActivityProvider, PgCatalogStatioUserTablesProvider,
-    PgCatalogStatsProvider, PgCatalogTableProvider, PgCatalogTypeProvider, PgCatalogUserProvider,
-    PgPreparedStatementsProvider,
+    PgCatalogDescriptionProvider, PgCatalogEnumProvider, PgCatalogExtensionProvider,
+    PgCatalogIndexProvider, PgCatalogMatviewsProvider, PgCatalogNamespaceProvider,
+    PgCatalogProcProvider, PgCatalogRangeProvider, PgCatalogRolesProvider,
+    PgCatalogSequenceProvider, PgCatalogSettingsProvider, PgCatalogStatActivityProvider,
+    PgCatalogStatioUserTablesProvider, PgCatalogStatsProvider, PgCatalogTableProvider,
+    PgCatalogTypeProvider, PgCatalogUserProvider, PgPreparedStatementsProvider,
 };
 
 use super::information_schema::redshift::{
@@ -336,6 +336,8 @@ impl DatabaseProtocol {
             "pg_catalog.pg_stats".to_string()
         } else if let Some(_) = any.downcast_ref::<PgCatalogUserProvider>() {
             "pg_catalog.pg_user".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogExtensionProvider>() {
+            "pg_catalog.pg_extension".to_string()
         } else if let Some(_) = any.downcast_ref::<RedshiftSvvTablesTableProvider>() {
             "public.svv_tables".to_string()
         } else if let Some(_) = any.downcast_ref::<RedshiftSvvExternalSchemasTableProvider>() {
@@ -565,6 +567,7 @@ impl DatabaseProtocol {
                         &context.session_state.user().unwrap_or("test".to_string()),
                     )))
                 }
+                "pg_extension" => return Some(Arc::new(PgCatalogExtensionProvider::new())),
                 _ => return None,
             },
             _ => return None,

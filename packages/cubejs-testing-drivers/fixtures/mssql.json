@@ -1,0 +1,94 @@
+{
+  "cube": {
+    "environment": {
+      "CUBEJS_API_SECRET": "mysupersecret",
+      "CUBEJS_CACHE_AND_QUEUE_DRIVER": "cubestore",
+      "CUBEJS_CUBESTORE_HOST": "store",
+      "CUBEJS_DB_TYPE": "mssql",
+      "CUBEJS_DB_HOST": "data",
+      "CUBEJS_DB_USER": "sa",
+      "CUBEJS_DB_PASS": "123-Strong-Password-321"
+    },
+    "depends_on": ["data"],
+    "links": ["data"],
+    "ports" : ["4000"]
+  },
+  "data": {
+    "image": "mcr.microsoft.com/mssql/server:2019-latest",
+    "environment": {
+      "MSSQL_SA_PASSWORD": "123-Strong-Password-321",
+      "ACCEPT_EULA": "Y"
+    },
+    "ports" : ["1433"]
+  },
+  "cast": {
+    "SELECT_PREFIX": "",
+    "SELECT_SUFFIX": "",
+    "DATE_PREFIX": "convert(DATETIME, ",
+    "DATE_SUFFIX": ")",
+    "CREATE_TBL_PREFIX": "SELECT * INTO ",
+    "CREATE_TBL_SUFFIX": " FROM ",
+    "CREATE_SUB_PREFIX": "(",
+    "CREATE_SUB_SUFFIX": ") SUBQUERY;"
+  },
+  "tables": {
+    "products": "products",
+    "customers": "customers",
+    "ecommerce": "ecommerce"
+  },
+  "preAggregations": {
+    "Products": [],
+    "Customers": [
+      {
+        "name": "RA",
+        "measures": ["CUBE.count", "CUBE.runningTotal"]
+      }
+    ],
+    "ECommerce": [
+      {
+        "name": "SA",
+        "dimensions": ["CUBE.productName"],
+        "measures": [
+          "CUBE.totalQuantity",
+          "CUBE.avgDiscount",
+          "CUBE.totalSales",
+          "CUBE.totalProfit"
+        ]
+      },
+      {
+        "name": "TA",
+        "time_dimension": "CUBE.orderDate",
+        "granularity": "month",
+        "partition_granularity": "month",
+        "dimensions": ["CUBE.productName"],
+        "measures": [
+          "CUBE.totalQuantity",
+          "CUBE.avgDiscount",
+          "CUBE.totalSales",
+          "CUBE.totalProfit"
+        ]
+      }
+    ]
+  },
+  "skip": [
+    "SKIPED FOR MS SQL (total not supported)",
+    "---------------------------------------",
+    "querying Customers: dimentions + total",
+    "querying Customers: dimentions + order + limit + total",
+    "querying Customers: dimentions + order + total + offset",
+    "querying Customers: dimentions + order + limit + total + offset",
+    "querying Products: dimentions + order + total",
+    "querying Products: dimentions + order + limit + total",
+    "querying ECommerce: dimentions + total",
+    "querying ECommerce: dimentions + order + limit + total",
+    "querying ECommerce: dimentions + order + total + offset",
+    "querying ECommerce: dimentions + order + limit + total + offset",
+
+    "SKIPED FOR ALL",
+    "---------------------------------------",
+    "querying Products: dimensions -- doesn't work wo ordering",
+    "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- rounding in athena",
+    "querying ECommerce: total sales, total profit by month + order (date) + total -- doesn't work with the BigQuery",
+    "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- noisy test"
+  ]
+}

@@ -3,6 +3,97 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.32.29](https://github.com/cube-js/cube/compare/v0.32.28...v0.32.29) (2023-04-25)
+
+**Note:** Version bump only for package @cubejs-backend/mssql-driver
+
+
+
+
+
+## [0.32.28](https://github.com/cube-js/cube/compare/v0.32.27...v0.32.28) (2023-04-19)
+
+
+### Bug Fixes
+
+* **mssql-driver:** release stream connection ([#6453](https://github.com/cube-js/cube/issues/6453)) ([7113fa1](https://github.com/cube-js/cube/commit/7113fa1247f3761c9fde5f8d1af8de6036350e72))
+
+
+
+
+
+## [0.32.26](https://github.com/cube-js/cube/compare/v0.32.25...v0.32.26) (2023-04-13)
+
+**Note:** Version bump only for package @cubejs-backend/mssql-driver
+
+
+
+
+
+## [0.32.25](https://github.com/cube-js/cube/compare/v0.32.24...v0.32.25) (2023-04-12)
+
+**Note:** Version bump only for package @cubejs-backend/mssql-driver
+
+
+
+
+
+## [0.32.23](https://github.com/cube-js/cube/compare/v0.32.22...v0.32.23) (2023-04-10)
+
+**Note:** Version bump only for package @cubejs-backend/mssql-driver
+
+
+
+
+
+## [0.32.22](https://github.com/cube-js/cube/compare/v0.32.21...v0.32.22) (2023-04-10)
+
+**Note:** Version bump only for package @cubejs-backend/mssql-driver
+
+
+
+
+
+## [0.32.17](https://github.com/cube-js/cube/compare/v0.32.16...v0.32.17) (2023-03-29)
+
+**Note:** Version bump only for package @cubejs-backend/mssql-driver
+
+
+
+
+
+## [0.32.16](https://github.com/cube-js/cube/compare/v0.32.15...v0.32.16) (2023-03-27)
+
+**Note:** Version bump only for package @cubejs-backend/mssql-driver
+
+
+
+
+
+## [0.32.15](https://github.com/cube-js/cube/compare/v0.32.14...v0.32.15) (2023-03-24)
+
+**Note:** Version bump only for package @cubejs-backend/mssql-driver
+
+
+
+
+
+## [0.32.14](https://github.com/cube-js/cube/compare/v0.32.13...v0.32.14) (2023-03-23)
+
+**Note:** Version bump only for package @cubejs-backend/mssql-driver
+
+
+
+
+
+## [0.32.12](https://github.com/cube-js/cube/compare/v0.32.11...v0.32.12) (2023-03-22)
+
+**Note:** Version bump only for package @cubejs-backend/mssql-driver
+
+
+
+
+
 ## [0.32.2](https://github.com/cube-js/cube.js/compare/v0.32.1...v0.32.2) (2023-03-07)
 
 

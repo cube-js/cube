@@ -8,7 +8,7 @@ import {
   QueryRewriteFn,
   CheckSQLAuthFn,
   CanSwitchSQLUserFn,
-  ContextToPermissionsFn,
+  ContextToApiScopesFn,
 } from '@cubejs-backend/api-gateway';
 import { BaseDriver, RedisPoolOptions, CacheAndQueryDriverType } from '@cubejs-backend/query-orchestrator';
 import { BaseQuery } from '@cubejs-backend/schema-compiler';
@@ -159,6 +159,12 @@ export type ExternalDialectFactoryFn = (context: RequestContext) => BaseQuery;
 
 export type LoggerFn = (msg: string, params: Record<string, any>) => void;
 
+export type BiToolSyncConfig = {
+  type: string;
+  active?: boolean;
+  config: Record<string, any>;
+};
+
 export interface CreateOptions {
   dbType?: DatabaseType | DbTypeFn;
   externalDbType?: DatabaseType | ExternalDbTypeFn;
@@ -174,7 +180,7 @@ export interface CreateOptions {
   cacheAndQueueDriver?: CacheAndQueryDriverType;
   contextToAppId?: ContextToAppIdFn;
   contextToOrchestratorId?: ContextToOrchestratorIdFn;
-  contextToPermissions?: ContextToPermissionsFn;
+  contextToApiScopes?: ContextToApiScopesFn;
   repositoryFactory?: (context: RequestContext) => SchemaFileRepository;
   checkAuthMiddleware?: CheckAuthMiddlewareFn;
   checkAuth?: CheckAuthFn;
@@ -208,6 +214,7 @@ export interface CreateOptions {
   // Internal flag, that we use to detect serverless env
   serverless?: boolean;
   allowNodeRequire?: boolean;
+  semanticLayerSync?: () => Promise<BiToolSyncConfig[]> | BiToolSyncConfig[];
 }
 
 export interface DriverDecoratedOptions extends CreateOptions {

@@ -1,6 +1,6 @@
 /* eslint-disable global-require,no-restricted-syntax */
 import dotenv from '@cubejs-backend/dotenv';
-import { CubePreAggregationConverter, CubeSchemaConverter, ScaffoldingTemplate, SchemaFormat, YamlSchemaFormatter } from '@cubejs-backend/schema-compiler';
+import { CubePreAggregationConverter, CubeSchemaConverter, ScaffoldingTemplate, SchemaFormat } from '@cubejs-backend/schema-compiler';
 import spawn from 'cross-spawn';
 import path from 'path';
 import fs from 'fs-extra';
@@ -154,13 +154,21 @@ export class DevServer {
       if (!Object.values(SchemaFormat).includes(req.body.format)) {
         throw new Error(`Unknown schema format. Must be one of ${Object.values(SchemaFormat)}`);
       }
-      
-      const scaffoldingTemplate = new ScaffoldingTemplate(tablesSchema, driver, req.body.format);
+
+      const scaffoldingTemplate = new ScaffoldingTemplate(tablesSchema, driver, {
+        format: req.body.format,
+        snakeCase: true
+      });
       const files = scaffoldingTemplate.generateFilesByTableNames(req.body.tables, { dataSource });
 
       const schemaPath = options.schemaPath || 'schema';
 
-      await Promise.all(files.map(file => fs.writeFile(path.join(schemaPath, file.fileName), file.content)));
+      await fs.emptyDir(path.join(schemaPath, 'cubes'));
+      await fs.emptyDir(path.join(schemaPath, 'views'));
+      
+      await fs.writeFile(path.join(schemaPath, 'views', '.gitkeep'), '');
+      await Promise.all(files.map(file => fs.writeFile(path.join(schemaPath, 'cubes', file.fileName), file.content)));
+
       res.json({ files });
     }));
 
@@ -495,13 +503,22 @@ export class DevServer {
       if (!variables.CUBEJS_API_SECRET) {
         variables.CUBEJS_API_SECRET = options.apiSecret;
       }
-
+      
+      let envs: Record<string, string> = {};
+      const envPath = path.join(process.cwd(), '.env');
+      if (fs.existsSync(envPath)) {
+        envs = dotenv.parse(fs.readFileSync(envPath));
+      }
+      
+      const schemaPath = envs.CUBEJS_SCHEMA_PATH || process.env.CUBEJS_SCHEMA_PATH || 'model';
+      
       variables.CUBEJS_EXTERNAL_DEFAULT = 'true';
       variables.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'true';
       variables.CUBEJS_DEV_MODE = 'true';
+      variables.CUBEJS_SCHEMA_PATH = schemaPath;
       variables = Object.entries(variables).map(([key, value]) => ([key, value].join('=')));
 
-      const repositoryPath = path.join(process.cwd(), options.schemaPath);
+      const repositoryPath = path.join(process.cwd(), schemaPath);
 
       if (!fs.existsSync(repositoryPath)) {
         fs.mkdirSync(repositoryPath);

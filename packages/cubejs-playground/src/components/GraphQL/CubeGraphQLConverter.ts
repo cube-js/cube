@@ -250,7 +250,7 @@ export class CubeGraphQLConverter {
       const memberName = f.member || f.dimension;
       if (!this.types[memberName]) {
         throw new Error(
-          `Unknown member type for "${memberName}". Make sure "${memberName}" exists in the schema.`
+          `Unknown member type for "${memberName}". Make sure "${memberName}" exists in the data model.`
         );
       }
 

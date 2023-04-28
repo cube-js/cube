@@ -1,0 +1,22 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`snowflake int column data type: preAggTableTypes 1`] = `
+Array [
+  Object {
+    "name": "orders__status",
+    "type": "text",
+  },
+  Object {
+    "name": "orders__total_amount",
+    "type": "int",
+  },
+]
+`;
+
+exports[`snowflake int column data type: query 1`] = `
+Array [
+  Object {
+    "Orders.totalAmount": "1700",
+  },
+]
+`;

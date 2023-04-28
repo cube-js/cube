@@ -38,8 +38,8 @@ Cube SQL API has been tested with
 - Jupyter notebook
 - Hightouch
 
-Please see [this GitHub issue](https://github.com/cube-js/cube.js/issues/3906)
-for the tools roadmap and to suggest and vote for tools of your interest.
+Please see [this GitHub issue](https://github.com/cube-js/cube/issues/3906) for
+the tools roadmap and to suggest and vote for tools of your interest.
 
 ## Querying Fundamentals
 
@@ -159,7 +159,7 @@ or not.
 Whenever you use a non-aggregated query you need to provide only column names in
 SQL:
 
-```
+```sql
 SELECT status, count FROM Orders
 ```
 
@@ -175,7 +175,7 @@ standard SQL `GROUP BY` operation consistency check enforced by SQL API as well.
 
 </WarningBox>
 
-```
+```sql
 SELECT status, SUM(count) FROM Orders GROUP BY 1
 SELECT status, MEASURE(count) FROM Orders GROUP BY 1
 ```
@@ -193,7 +193,7 @@ time dimension date ranges whenever it's possible.
 Cube tries to push down all `ORDER BY` statements into Cube Query.
 
 If it can't be done ordering part would be done in a post-processing phase. In
-case there are more than 50k rows in the result set, incorrect results can be
+case there are more than 50,000 rows in the result set, incorrect results can be
 received in this case. Please use `EXPLAIN` in order to check if it's the case.
 
 Consider the following query.
@@ -216,27 +216,35 @@ query, Cube can't push down `ORDER`.
 You can run `EXPLAIN` against the above query to look at the plan. As you can
 see below, the sorting operation is done after Cube query and projection.
 
-```
+```bash
 + GlobalLimitExec: skip=None, fetch=100
 +- SortExec: [transformed_amount@1 DESC]
 +-- ProjectionExec: expr=[status@0 as status, SUM(orders.total_value)@1 + CAST(2 AS Float64) as transformed_amount]
 +--- CubeScanExecutionPlan
 ```
 
-Because of the default limit in Cube queries (50k rows), there is a possibility
-of a wrong result if there are more than 50k rows. Given that queries to Cube
-are usually aggregated, it is rare that they may return more than 50k rows, but
-keep that limitation in mind when designing your queries.
+Because of the default limit in Cube queries (50,000 rows), there is a
+possibility of a wrong result if there are more than 50,000 rows. Given that
+queries to Cube are usually aggregated, it is rare that they may return more
+than 50,000 rows, but keep that limitation in mind when designing your queries.
 
 ### <--{"id" : "Querying cube tables"}--> Limit
 
-Limit push down is supported by Cube however, a limit over 50k can't be
+Limit push down is supported by Cube however, a limit over 50,000 can't be
 overridden. In future versions, paging and streaming would be used to avoid this
 limitation.
 
+## Enabling SQL API in Cube Cloud
+
+To enable the SQL API in Cube Cloud, click&nbsp;<Btn>Deploy SQL API</Btn> from
+the&nbsp;<Btn>Overview</Btn> page, then click <Btn>How to connect your BI
+tool</Btn>. You should then see the following screen:
+
+![SQL API details modal|690x428](https://ucarecdn.com/67508334-1641-43ec-9d50-a8f64629992b/)
+
 ## Examples
 
-Consider the following schema.
+Consider the following data model:
 
 ```javascript
 cube(`Orders`, {
@@ -267,7 +275,7 @@ columns.
 
 To get the count of orders grouped by status we can run the following query.
 
-```
+```sql
 cube=> SELECT count, status FROM Orders;
  count |   status
 -------+------------
@@ -282,7 +290,7 @@ query. We can also provide the `GROUP BY` statement to control how results are
 grouped. In the following example, we group orders by created month and also by
 status within every month.
 
-```
+```sql
 cube=> SELECT MEASURE(count), status, DATE_TRUNC('month', createdAt) date FROM Orders GROUP BY date, status ORDER BY date asc;
  measure(Orders.count) |   status   |            date
 -----------------------+------------+----------------------------
@@ -324,7 +332,7 @@ Because measures are already aggregated in Cube there is no need to apply
 aggregate functions to them in SQL API if you don't have a `GROUP BY` statement
 in query.
 
-```
+```sql
 cube=> SELECT count FROM Orders;
  count
 -------
@@ -339,7 +347,7 @@ match the type of the measure.
 `count` measure in our example is of type `count`, It means we can apply
 `COUNT()` aggregate function to it. The below query is similar to the above one.
 
-```
+```sql
 cube=> SELECT COUNT(count) FROM Orders;
  COUNT(Orders.count)
 ---------------------
@@ -350,7 +358,7 @@ cube=> SELECT COUNT(count) FROM Orders;
 There's also universal aggregate function `MEASURE()` that matches any measure
 type.
 
-```
+```sql
 cube=> SELECT MEASURE(count) FROM Orders;
  measure(Orders.count)
 -----------------------
@@ -388,7 +396,7 @@ cube('Orders', {
 })
 ```
 
-As we can see, we have a mix of measure types in the above schema. To query
+As we can see, we have a mix of measure types in the above data model. To query
 them, we could use the following SQL statements:
 
 ```sql
@@ -416,8 +424,8 @@ SELECT MAX(maxValue) FROM Orders
 
 ### <--{"id" : "Examples"}--> Querying Segments
 
-Any segments defined in a schema can also be used in Cube SQL queries. Looking
-at the schema below, we have one segment `isCompleted`:
+Any segments defined in a data model can also be used in Cube SQL queries.
+Looking at the data model below, we have one segment `isCompleted`:
 
 ```javascript
 cube('Orders', {

@@ -9,7 +9,7 @@ menuOrder: 1
 <div style="text-align: center">
   <img
     alt="Request vs Cube caching layers"
-    src="https://ucarecdn.com/4c037618-4cf9-48a7-abcb-da8922048cdd/"
+    src="https://ucarecdn.com/532e9ffd-390c-42b4-9f56-f6080c587414/"
     style="border: none"
     width="100%"
   />
@@ -49,8 +49,8 @@ more about read-only support and pre-aggregation build strategies.
 
 </InfoBox>
 
-Pre-aggregations are defined in the data schema. You can learn more about
-defining pre-aggregations in [schema reference][ref-schema-ref-preaggs].
+Pre-aggregations are defined in the data model. You can learn more about
+defining pre-aggregations in [data modeling reference][ref-schema-ref-preaggs].
 
 ```javascript
 cube(`Orders`, {
@@ -142,10 +142,9 @@ The default values for `refreshKey` are
 - `every: '10 second'` for all other databases.
 
 +You can use a custom SQL query to check if a refresh is required by changing
-the [`refreshKey`][ref-schema-ref-cube-refresh-key] property in a cube's Data
-Schema. Often, a `MAX(updated_at_timestamp)` for OLTP data is a viable option,
-or examining a metadata table for whatever system is managing the data to see
-when it last ran.
+the [`refreshKey`][ref-schema-ref-cube-refresh-key] property in a cube. Often, a
+`MAX(updated_at_timestamp)` for OLTP data is a viable option, or examining a
+metadata table for whatever system is managing the data to see when it last ran.
 
 ### <--{"id" : "In-memory Cache"}--> Disabling the cache
 
@@ -193,7 +192,6 @@ every pre-aggregation's details: the list of queries it serves and all its
 versions.
 
 [link-cube-cloud]: https://cube.dev/cloud
-[link-redis]: https://redis.io
 [ref-config-preagg-schema]: /config#pre-aggregations-schema
 [ref-dev-playground]: /dev-tools/dev-playground
 [ref-development-mode]: /configuration/overview#development-mode
@@ -202,4 +200,3 @@ versions.
   /deployment/production-checklist#set-up-refresh-worker
 [ref-schema-ref-cube-refresh-key]: /schema/reference/cube#refresh-key
 [ref-schema-ref-preaggs]: /schema/reference/pre-aggregations
-[replace-redis]: https://cube.dev/blog/replacing-redis-with-cube-store

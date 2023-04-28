@@ -3,6 +3,218 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.32.29](https://github.com/cube-js/cube/compare/v0.32.28...v0.32.29) (2023-04-25)
+
+
+### Bug Fixes
+
+* **server-core:** Display refresh scheduler interval error as warning ([#6473](https://github.com/cube-js/cube/issues/6473)) ([771f661](https://github.com/cube-js/cube/commit/771f661cadfe9c19bcaad9fe232f7f4901f0778b))
+
+
+### Features
+
+* semanticLayerSync configs option ([#6483](https://github.com/cube-js/cube/issues/6483)) ([d3b8ed7](https://github.com/cube-js/cube/commit/d3b8ed7401f98429eca42227ef4cfe1f29f90d8e))
+
+
+
+
+
+## [0.32.28](https://github.com/cube-js/cube/compare/v0.32.27...v0.32.28) (2023-04-19)
+
+
+### Features
+
+* **playground:** use snake case for data models ([398993a](https://github.com/cube-js/cube/commit/398993ad9772a52ad377542937614148c597ca72))
+* using snake case for model files, model templates updates ([#6447](https://github.com/cube-js/cube/issues/6447)) ([37e3180](https://github.com/cube-js/cube/commit/37e3180d4218b342ee0c2fe0ef90464aa6633b54))
+
+
+
+
+
+## [0.32.27](https://github.com/cube-js/cube/compare/v0.32.26...v0.32.27) (2023-04-14)
+
+
+### Bug Fixes
+
+* Limit pre-aggregations API memory usage by introducing partition loading concurrency ([f565371](https://github.com/cube-js/cube/commit/f565371fe9d05267bbacd37369dbc25780e4da19))
+
+
+
+
+
+## [0.32.26](https://github.com/cube-js/cube/compare/v0.32.25...v0.32.26) (2023-04-13)
+
+
+### Bug Fixes
+
+* re-export FileRepository ([#6425](https://github.com/cube-js/cube/issues/6425)) ([52c9252](https://github.com/cube-js/cube/commit/52c92529c5c13994b81b7af616fdf329cb50a0f6))
+
+
+
+
+
+## [0.32.25](https://github.com/cube-js/cube/compare/v0.32.24...v0.32.25) (2023-04-12)
+
+
+### Bug Fixes
+
+* **server-core:** turn off the jobs API renewQuery flag ([#6414](https://github.com/cube-js/cube/issues/6414)) ([81dddb1](https://github.com/cube-js/cube/commit/81dddb1ecb6d5e5d97c6fe3dd277ff3b5f651b51))
+
+
+### Features
+
+* **api-gateway, server-core:** Orchestration API telemetry ([#6419](https://github.com/cube-js/cube/issues/6419)) ([af0854d](https://github.com/cube-js/cube/commit/af0854d0d8cdc05eab2df090a2d0314a3d27fc23))
+* **api-gateway, server-core:** Renamed Permissions to ApiScopes ([#6397](https://github.com/cube-js/cube/issues/6397)) ([800a96b](https://github.com/cube-js/cube/commit/800a96b68e5aa9bbeb2c52edaab0698832a18619))
+
+
+
+
+
+## [0.32.24](https://github.com/cube-js/cube/compare/v0.32.23...v0.32.24) (2023-04-10)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.32.23](https://github.com/cube-js/cube/compare/v0.32.22...v0.32.23) (2023-04-10)
+
+
+### Bug Fixes
+
+* Fix typo in driver name, DuckDB ([c53a31c](https://github.com/cube-js/cube/commit/c53a31c37b6b70fa3c5e2fc0da97eb958e9fec5d))
+
+
+
+
+
+## [0.32.22](https://github.com/cube-js/cube/compare/v0.32.21...v0.32.22) (2023-04-10)
+
+
+### Features
+
+* **ducksdb-driver:** Initial support ([#6403](https://github.com/cube-js/cube/issues/6403)) ([00e41bf](https://github.com/cube-js/cube/commit/00e41bfe8084e9dc7831ff14e2302199af2a8fe3))
+
+
+
+
+
+## [0.32.21](https://github.com/cube-js/cube/compare/v0.32.20...v0.32.21) (2023-04-06)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.32.20](https://github.com/cube-js/cube/compare/v0.32.19...v0.32.20) (2023-04-05)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.32.19](https://github.com/cube-js/cube/compare/v0.32.18...v0.32.19) (2023-04-03)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.32.18](https://github.com/cube-js/cube/compare/v0.32.17...v0.32.18) (2023-04-02)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.32.17](https://github.com/cube-js/cube/compare/v0.32.16...v0.32.17) (2023-03-29)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.32.16](https://github.com/cube-js/cube/compare/v0.32.15...v0.32.16) (2023-03-27)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.32.15](https://github.com/cube-js/cube/compare/v0.32.14...v0.32.15) (2023-03-24)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.32.14](https://github.com/cube-js/cube/compare/v0.32.13...v0.32.14) (2023-03-23)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.32.13](https://github.com/cube-js/cube/compare/v0.32.12...v0.32.13) (2023-03-22)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.32.12](https://github.com/cube-js/cube/compare/v0.32.11...v0.32.12) (2023-03-22)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.32.11](https://github.com/cube-js/cube.js/compare/v0.32.10...v0.32.11) (2023-03-21)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.32.10](https://github.com/cube-js/cube.js/compare/v0.32.9...v0.32.10) (2023-03-20)
+
+
+### Bug Fixes
+
+* Refresh Scheduler - empty securityContext in driverFactory ([#6316](https://github.com/cube-js/cube.js/issues/6316)) ([dd4c9d5](https://github.com/cube-js/cube.js/commit/dd4c9d5a508de03b076850daed78afa18e99eb4f))
+
+
+
+
+
+## [0.32.9](https://github.com/cube-js/cube.js/compare/v0.32.8...v0.32.9) (2023-03-18)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.32.8](https://github.com/cube-js/cube.js/compare/v0.32.7...v0.32.8) (2023-03-17)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
 ## [0.32.7](https://github.com/cube-js/cube.js/compare/v0.32.6...v0.32.7) (2023-03-14)
 
 **Note:** Version bump only for package @cubejs-backend/server-core

@@ -170,8 +170,8 @@ export default function ChartRenderer({
     if (queryHasMissingMembers) {
       return (
         <div>
-          At least one of the query members is missing from your data schema.
-          Please update your query or data schema.
+          At least one of the query members is missing from your data model.
+          Please update your query or data model.
         </div>
       );
     }

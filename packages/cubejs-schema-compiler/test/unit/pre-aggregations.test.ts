@@ -1,11 +1,9 @@
-import { CubeValidator } from '../../src/compiler/CubeValidator';
-import { CubeSymbols } from '../../src/compiler/CubeSymbols';
 import { prepareCompiler } from './PrepareCompiler';
 
 describe('pre-aggregations', () => {
   it('rollupJoin scheduledRefresh', async () => {
     process.env.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'true';
-    const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(
+    const { compiler, cubeEvaluator } = prepareCompiler(
       `
         cube(\`Users\`, {
           sql: \`SELECT * FROM public.users\`,

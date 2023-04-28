@@ -1,6 +1,7 @@
-require('dotenv').config({
-  path: `.env.${process.env.NODE_ENV}`,
-});
+require('dotenv')
+  .config({
+    path: `.env.${process.env.NODE_ENV}`,
+  });
 
 const PACKAGE_VERSION = require('../lerna.json').version;
 
@@ -35,7 +36,7 @@ const config = {
       resolve: `gatsby-plugin-google-tagmanager`,
       options: {
         id: 'GTM-52W7VM2',
-        routeChangeEventName: 'pageview'
+        routeChangeEventName: 'pageview',
       },
     },
     {
@@ -77,6 +78,61 @@ const config = {
             options: {
               inlineCodeMarker: null,
               noInlineHighlight: true,
+              aliases: {
+                dotenv: 'bash',
+              },
+              prompt: {
+                user: 'user',
+                host: 'localhost',
+                global: false,
+              },
+              languageExtensions: [
+                {
+                  language: 'tree',
+                  extend: 'json',
+                  definition: {
+                    'entry-line': [
+                      {
+                        pattern: /\|-- |├── /,
+                        alias: 'line-h',
+                      },
+                      {
+                        pattern: /\|   |│   /,
+                        alias: 'line-v',
+                      },
+                      {
+                        pattern: /`-- |└── /,
+                        alias: 'line-v-last',
+                      },
+                      {
+                        pattern: / {4}/,
+                        alias: 'line-v-gap',
+                      },
+                    ],
+                    'entry-dir': {
+                      pattern: /.*[\/](?!\w).*/,
+                      inside: {
+                        // symlink
+                        'operator': / -> /,
+                      },
+                    },
+                    'entry-symlink': {
+                      pattern: /.*\S.* (-> .*)/,
+                      inside: {
+                        'operator': / -> /,
+                        'file': /(.*)/,
+                      },
+                    },
+                    'entry-name': {
+                      pattern: /.*\S.*/,
+                      inside: {
+                        // symlink
+                        'operator': / -> /,
+                      },
+                    },
+                  },
+                },
+              ],
             },
           },
           {
@@ -89,7 +145,11 @@ const config = {
             },
           },
         ],
-        remarkPlugins: [require('remark-math'), require('remark-html-katex')],
+        remarkPlugins: [
+          require('remark-math'),
+          require('remark-html-katex'),
+          require('./src/remark/plugins/link-environment-variables'),
+        ],
       },
     },
     {
@@ -100,7 +160,7 @@ const config = {
         },
       },
     },
-    'gatsby-plugin-netlify'
+    'gatsby-plugin-netlify',
     // 'gatsby-plugin-percy',
   ],
 };

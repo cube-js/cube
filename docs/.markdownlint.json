@@ -4,8 +4,19 @@
   "no-inline-html": {
     "allowed_elements": [
       "a",
+      "br",
+      "code",
+      "div",
       "img",
-      "p"
+      "iframe",
+      "p",
+      "pre",
+      "sup",
+      "CodeTabs",
+      "Grid",
+      "InfoBox",
+      "LoomVideo",
+      "WarningBox"
     ]
   },
   "no-trailing-punctuation": ""

@@ -74,7 +74,9 @@ enum_from_primitive! {
         ReplayHandles = 0x0B00,
         CacheItems = 0x0C00,
         QueueItems = 0x0D00,
-        QueueResults = 0x0E00
+        QueueResults = 0x0E00,
+        TraceObjects = 0x0F00
+
     }
 }
 
@@ -95,6 +97,7 @@ impl TableId {
             TableId::CacheItems => true,
             TableId::QueueItems => true,
             TableId::QueueResults => true,
+            TableId::TraceObjects => false,
         }
     }
 }
@@ -491,8 +494,53 @@ macro_rules! meta_store_table_impl {
     };
 }
 
+#[derive(Debug, Clone)]
+pub enum RocksStoreChecksumType {
+    NoChecksum = 0,
+    CRC32c = 1,
+    XXHash = 2,
+    XXHash64 = 3,
+    XXH3 = 4, // Supported since RocksDB 6.27
+}
+
+impl RocksStoreChecksumType {
+    pub fn as_rocksdb_enum(&self) -> rocksdb::ChecksumType {
+        match &self {
+            RocksStoreChecksumType::NoChecksum => rocksdb::ChecksumType::NoChecksum,
+            RocksStoreChecksumType::CRC32c => rocksdb::ChecksumType::CRC32c,
+            RocksStoreChecksumType::XXHash => rocksdb::ChecksumType::XXHash,
+            RocksStoreChecksumType::XXHash64 => rocksdb::ChecksumType::XXHash64,
+            RocksStoreChecksumType::XXH3 => rocksdb::ChecksumType::XXH3,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct RocksStoreConfig {
+    pub checksum_type: RocksStoreChecksumType,
+    pub cache_capacity: usize,
+}
+
+impl RocksStoreConfig {
+    pub fn metastore_default() -> Self {
+        Self {
+            // Supported since RocksDB 6.27
+            checksum_type: RocksStoreChecksumType::XXH3,
+            cache_capacity: 8 * 1024 * 1024,
+        }
+    }
+
+    pub fn cachestore_default() -> Self {
+        Self {
+            // Supported since RocksDB 6.27
+            checksum_type: RocksStoreChecksumType::XXH3,
+            cache_capacity: 8 * 1024 * 1024,
+        }
+    }
+}
+
 pub trait RocksStoreDetails: Send + Sync {
-    fn open_db(&self, path: &Path) -> Result<DB, CubeError>;
+    fn open_db(&self, path: &Path, config: &Arc<dyn ConfigObj>) -> Result<DB, CubeError>;
 
     fn migrate(&self, table_ref: DbTableRef) -> Result<(), CubeError>;
 
@@ -554,7 +602,7 @@ impl RocksStore {
         config: Arc<dyn ConfigObj>,
         details: Arc<dyn RocksStoreDetails>,
     ) -> Result<Self, CubeError> {
-        let db = details.open_db(path)?;
+        let db = details.open_db(path, &config)?;
         let db_arc = Arc::new(db);
 
         let (rw_loop_tx, mut rw_loop_rx) = tokio::sync::mpsc::channel::<
@@ -1025,7 +1073,7 @@ mod tests {
         let details = Arc::new(RocksMetaStoreDetails {});
         let rocks_store = RocksStore::new(
             store_path.join("metastore").as_path(),
-            BaseRocksStoreFs::new(remote_fs.clone(), "metastore", config.config_obj()),
+            BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
             config.config_obj(),
             details,
         )?;
@@ -1085,6 +1133,9 @@ mod tests {
                 "error - task 3".to_string()
             );
         }
+
+        let _ = fs::remove_dir_all(store_path.clone());
+        let _ = fs::remove_dir_all(remote_store_path.clone());
 
         Ok(())
     }

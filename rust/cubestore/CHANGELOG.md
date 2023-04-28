@@ -3,6 +3,183 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.32.29](https://github.com/cube-js/cube/compare/v0.32.28...v0.32.29) (2023-04-25)
+
+
+### Features
+
+* **cubestore:** Split partitions by filesize ([#6435](https://github.com/cube-js/cube/issues/6435)) ([5854add](https://github.com/cube-js/cube/commit/5854add7a65c39e05ba71c2a558032671797ec26))
+* **cubestore:** Traffic tracing for streaming ([#6379](https://github.com/cube-js/cube/issues/6379)) ([37a33e6](https://github.com/cube-js/cube/commit/37a33e65234740a8028c340334510facbea896d7))
+* Make configurable cubestore metrics address ([#6437](https://github.com/cube-js/cube/issues/6437)) Thanks [@fbalicchia](https://github.com/fbalicchia) ! ([16d0bcb](https://github.com/cube-js/cube/commit/16d0bcb1489c512f91c21970e21769c9882bfedc))
+
+
+
+
+
+## [0.32.28](https://github.com/cube-js/cube/compare/v0.32.27...v0.32.28) (2023-04-19)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.32.25](https://github.com/cube-js/cube/compare/v0.32.24...v0.32.25) (2023-04-12)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.32.23](https://github.com/cube-js/cube/compare/v0.32.22...v0.32.23) (2023-04-10)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.32.22](https://github.com/cube-js/cube/compare/v0.32.21...v0.32.22) (2023-04-10)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.32.21](https://github.com/cube-js/cube/compare/v0.32.20...v0.32.21) (2023-04-06)
+
+
+### Bug Fixes
+
+* **cubestore:** Query Cache - correct size calculation (complex TableValue) ([#6400](https://github.com/cube-js/cube/issues/6400)) ([b0e3c88](https://github.com/cube-js/cube/commit/b0e3c88e33fdcbb9555faf791b01df4eed884686))
+
+
+### Features
+
+* **cubestore:** Introduce system.query_cache table ([#6399](https://github.com/cube-js/cube/issues/6399)) ([a5e4bd3](https://github.com/cube-js/cube/commit/a5e4bd393c05518e041ca52d386b1bace672be22))
+
+
+
+
+
+## [0.32.20](https://github.com/cube-js/cube/compare/v0.32.19...v0.32.20) (2023-04-05)
+
+
+### Features
+
+* **cubestore:** Query cache - limits by time_to_idle and max_capacity ([#6132](https://github.com/cube-js/cube/issues/6132)) ([edd220f](https://github.com/cube-js/cube/commit/edd220f0e76d43b05d482ff457c710d9ab4c2393))
+* **cubestore:** Separate configuration for count of metastore and cachestore snapshots ([#6388](https://github.com/cube-js/cube/issues/6388)) ([df73851](https://github.com/cube-js/cube/commit/df738513e06a3c4199255ae58ab9f52db1a4f2ef))
+
+
+
+
+
+## [0.32.19](https://github.com/cube-js/cube/compare/v0.32.18...v0.32.19) (2023-04-03)
+
+
+### Features
+
+* **cubestore:** Increase default TRANSPORT_MAX_FRAME_SIZE to 32Mb ([#6381](https://github.com/cube-js/cube/issues/6381)) ([73f7ea9](https://github.com/cube-js/cube/commit/73f7ea9a79882cdcdeff9a7bc916077f86489852))
+
+
+
+
+
+## [0.32.18](https://github.com/cube-js/cube.js/compare/v0.32.17...v0.32.18) (2023-04-02)
+
+
+### Features
+
+* **cubestore:** Allow to configure max message_size/frame_size for transport ([#6369](https://github.com/cube-js/cube.js/issues/6369)) ([be7d40b](https://github.com/cube-js/cube.js/commit/be7d40bcf3be29b2fc0edfe2983162c4b0cafbce))
+
+
+
+
+
+## [0.32.17](https://github.com/cube-js/cube/compare/v0.32.16...v0.32.17) (2023-03-29)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.32.16](https://github.com/cube-js/cube.js/compare/v0.32.15...v0.32.16) (2023-03-27)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.32.15](https://github.com/cube-js/cube.js/compare/v0.32.14...v0.32.15) (2023-03-24)
+
+
+### Bug Fixes
+
+* **cubestore:** RocksStore - specify TTL for WAL to protect logs uploading ([#6345](https://github.com/cube-js/cube.js/issues/6345)) ([3a9cba4](https://github.com/cube-js/cube.js/commit/3a9cba478387dd4712b9ea3c566db159a32302d5))
+
+
+### Features
+
+* **cubestore:** Use XXH3 checksum alg for RocksDB ([#6339](https://github.com/cube-js/cube.js/issues/6339)) ([866f965](https://github.com/cube-js/cube.js/commit/866f965044536dac72c74160f9da6abc923e3dfb))
+
+
+
+
+
+## [0.32.14](https://github.com/cube-js/cube.js/compare/v0.32.13...v0.32.14) (2023-03-23)
+
+
+### Bug Fixes
+
+* **cubestore:** Create table failed: Internal: Directory not empty (os error 39) for local dir storage ([103cabe](https://github.com/cube-js/cube.js/commit/103cabec6e4d6c59ad1890a3dbe42f7d092eeb6e))
+
+
+
+
+
+## [0.32.13](https://github.com/cube-js/cube.js/compare/v0.32.12...v0.32.13) (2023-03-22)
+
+
+### Bug Fixes
+
+* **cubestore:** A single-character boolean value in csv is parsed incorrectly ([#6325](https://github.com/cube-js/cube.js/issues/6325)) ([ce8f3e2](https://github.com/cube-js/cube.js/commit/ce8f3e21ec675181ec47174428f14c8ddb7f3bf1))
+
+
+
+
+
+## [0.32.12](https://github.com/cube-js/cube.js/compare/v0.32.11...v0.32.12) (2023-03-22)
+
+
+### Bug Fixes
+
+* **cubestore:** If job has been scheduled to non-existent node it'd hang around forever ([#6242](https://github.com/cube-js/cube.js/issues/6242)) ([69ef0b6](https://github.com/cube-js/cube.js/commit/69ef0b697bbe87a00687137bff318bb0cfc88015))
+* **cubestore:** Retying download from external locations ([#6321](https://github.com/cube-js/cube.js/issues/6321)) ([50841d9](https://github.com/cube-js/cube.js/commit/50841d92b7e84d3feec7372119eb540327a4d233))
+
+
+
+
+
+## [0.32.8](https://github.com/cube-js/cube.js/compare/v0.32.7...v0.32.8) (2023-03-17)
+
+
+### Bug Fixes
+
+* **cubestore:** Panic: index out of bounds: the len is 0 but the index is 0 ([#6311](https://github.com/cube-js/cube.js/issues/6311)) ([41dbbc0](https://github.com/cube-js/cube.js/commit/41dbbc03365f6067e85a09e8d5cafbfc6fe39990))
+
+
+### Features
+
+* **cubestore:** RocksStore - panic protection for broken rw loop ([#6293](https://github.com/cube-js/cube.js/issues/6293)) ([1f2db32](https://github.com/cube-js/cube.js/commit/1f2db32c289c119468f4cbe522fa40bab1a00068))
+
+
+
+
+
 ## [0.32.5](https://github.com/cube-js/cube.js/compare/v0.32.4...v0.32.5) (2023-03-13)
 
 

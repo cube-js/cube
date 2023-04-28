@@ -28,7 +28,7 @@ import {
   CheckSQLAuthSuccessResponse,
   CheckSQLAuthFn,
   CanSwitchSQLUserFn,
-  ContextToPermissionsFn,
+  ContextToApiScopesFn,
 } from './types/auth';
 
 import {
@@ -67,7 +67,7 @@ export {
   ExtendContextFn,
   ResponseResultFn,
   QueryRequest,
-  ContextToPermissionsFn,
+  ContextToApiScopesFn,
 };
 
 /**

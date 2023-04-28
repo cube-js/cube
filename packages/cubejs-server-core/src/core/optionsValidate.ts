@@ -64,7 +64,7 @@ const schemaOptions = Joi.object().keys({
   contextToAppId: Joi.func(),
   contextToOrchestratorId: Joi.func(),
   contextToDataSourceId: Joi.func(),
-  contextToPermissions: Joi.func(),
+  contextToApiScopes: Joi.func(),
   repositoryFactory: Joi.func(),
   checkAuth: Joi.func(),
   checkAuthMiddleware: Joi.func(),
@@ -147,6 +147,7 @@ const schemaOptions = Joi.object().keys({
   canSwitchSqlUser: Joi.func(),
   sqlUser: Joi.string(),
   sqlPassword: Joi.string(),
+  semanticLayerSync: Joi.func(),
   // Additional system flags
   serverless: Joi.boolean(),
   allowNodeRequire: Joi.boolean(),

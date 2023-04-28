@@ -44,6 +44,7 @@ use crate::metastore::{
 use crate::queryplanner::optimizations::rewrite_plan::{rewrite_plan, PlanRewriter};
 use crate::queryplanner::panic::{plan_panic_worker, PanicWorkerNode};
 use crate::queryplanner::partition_filter::PartitionFilter;
+use crate::queryplanner::providers::InfoSchemaQueryCacheTableProvider;
 use crate::queryplanner::query_executor::{ClusterSendExec, CubeTable, InlineTableProvider};
 use crate::queryplanner::serialized_plan::{
     IndexSnapshot, InlineSnapshot, PartitionSnapshot, SerializedPlan,
@@ -860,6 +861,13 @@ impl ChooseIndex<'_> {
                 } else if let Some(_) = source.as_any().downcast_ref::<InfoSchemaTableProvider>() {
                     return Err(DataFusionError::Plan(
                         "Unexpected table source: InfoSchemaTableProvider".to_string(),
+                    ));
+                } else if let Some(_) = source
+                    .as_any()
+                    .downcast_ref::<InfoSchemaQueryCacheTableProvider>()
+                {
+                    return Err(DataFusionError::Plan(
+                        "Unexpected table source: InfoSchemaQueryCacheTableProvider".to_string(),
                     ));
                 } else {
                     return Err(DataFusionError::Plan("Unexpected table source".to_string()));

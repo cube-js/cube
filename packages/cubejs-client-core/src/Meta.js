@@ -80,6 +80,8 @@ class Meta {
             {
               cubeName: cube.name,
               cubeTitle: cube.title,
+              type: cube.type,
+              public: cube.public,
               members
             },
           ];

@@ -25,6 +25,7 @@ impl V1CubeMetaMeasureExt for V1CubeMetaMeasure {
 
                 agg_type.eq(&"countDistinct".to_string())
                     || agg_type.eq(&"countDistinctApprox".to_string())
+                    || agg_type.eq(&"number".to_string())
             } else if expect_agg_type.eq(&"sum".to_string()) {
                 let agg_type = self.agg_type.as_ref().unwrap();
 
@@ -42,7 +43,9 @@ impl V1CubeMetaMeasureExt for V1CubeMetaMeasure {
                     || agg_type.eq(&"boolean".to_string())
                     || agg_type.eq(expect_agg_type)
             } else {
-                self.agg_type.as_ref().unwrap().eq(expect_agg_type)
+                let agg_type = self.agg_type.as_ref().unwrap();
+
+                agg_type.eq(&"number".to_string()) || agg_type.eq(expect_agg_type)
             }
         } else {
             false

@@ -3,6 +3,7 @@ use crate::config::ConfigObj;
 use crate::metastore::table::StreamOffset;
 use crate::metastore::Column;
 use crate::sql::MySqlDialectWithBackTicks;
+use crate::streaming::traffic_sender::TrafficSender;
 use crate::streaming::{parse_json_payload_and_key, StreamingSource};
 use crate::table::{Row, TableValue};
 use crate::CubeError;
@@ -60,6 +61,7 @@ pub struct KafkaStreamingSource {
     kafka_client: Arc<dyn KafkaClientService>,
     use_ssl: bool,
     post_filter: Option<Arc<dyn ExecutionPlan>>,
+    trace_obj: Option<String>,
 }
 
 impl KafkaStreamingSource {
@@ -76,6 +78,7 @@ impl KafkaStreamingSource {
         partition: usize,
         kafka_client: Arc<dyn KafkaClientService>,
         use_ssl: bool,
+        trace_obj: Option<String>,
     ) -> Self {
         let post_filter = if let Some(select_statement) = select_statement {
             let planner = KafkaFilterPlanner {
@@ -110,6 +113,7 @@ impl KafkaStreamingSource {
             kafka_client,
             use_ssl,
             post_filter,
+            trace_obj,
         }
     }
 }
@@ -508,6 +512,7 @@ impl StreamingSource for KafkaStreamingSource {
         let column_to_move = columns.clone();
         let unique_key_columns = self.unique_key_columns.clone();
         let seq_column_to_move = seq_column.clone();
+        let traffic_sender = TrafficSender::new(self.trace_obj.clone());
         let stream = self
             .kafka_client
             .create_message_stream(
@@ -529,6 +534,7 @@ impl StreamingSource for KafkaStreamingSource {
                 self.use_ssl,
                 Arc::new(move |m| -> Result<_, _> {
                     if let Some(payload_str) = m.payload().map(|p| String::from_utf8_lossy(p)) {
+                        traffic_sender.process_event(payload_str.len() as u64)?;
                         let payload = json::parse(payload_str.as_ref()).map_err(|e| {
                             CubeError::user(format!("Can't parse '{}' payload: {}", payload_str, e))
                         })?;

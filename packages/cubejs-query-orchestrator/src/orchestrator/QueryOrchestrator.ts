@@ -54,7 +54,7 @@ function detectQueueAndCacheDriver(options: QueryOrchestratorOptions): CacheAndQ
 }
 
 export class QueryOrchestrator {
-  protected readonly queryCache: QueryCache;
+  protected queryCache: QueryCache;
 
   protected readonly preAggregations: PreAggregations;
 
@@ -64,7 +64,7 @@ export class QueryOrchestrator {
 
   private queueEventsBus: RedisQueueEventsBus | LocalQueueEventsBus;
 
-  private readonly cacheAndQueueDriver: string;
+  protected readonly cacheAndQueueDriver: string;
 
   public constructor(
     protected readonly redisPrefix: string,
@@ -172,7 +172,17 @@ export class QueryOrchestrator {
    * Force reconcile queue logic to be executed.
    */
   public async forceReconcile(datasource = 'default') {
-    await this.queryCache.forceReconcile(datasource);
+    // pre-aggregations queue reconcile
+    const preaggsQueue = await this.preAggregations.getQueue(datasource);
+    if (preaggsQueue) {
+      await preaggsQueue.reconcileQueue();
+    }
+
+    // queries queue reconcile
+    const queryQueue = await this.queryCache.getQueue(datasource);
+    if (queryQueue) {
+      await queryQueue.reconcileQueue();
+    }
   }
 
   /**
@@ -470,9 +480,5 @@ export class QueryOrchestrator {
 
   public async updateRefreshEndReached() {
     return this.preAggregations.updateRefreshEndReached();
-  }
-
-  public async fetchSchema(dataSource: string) {
-    return this.queryCache.fetchSchema(dataSource);
   }
 }

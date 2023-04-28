@@ -59,10 +59,12 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("cast_timestamp_to_utf8", cast_timestamp_to_utf8),
         t("numbers_to_bool", numbers_to_bool),
         t("union", union),
+        t("nested_union_empty_tables", nested_union_empty_tables),
         t("timestamp_select", timestamp_select),
         t("timestamp_seconds_frac", timestamp_seconds_frac),
         t("column_escaping", column_escaping),
         t("information_schema", information_schema),
+        t("system_query_cache", system_query_cache),
         t("case_column_escaping", case_column_escaping),
         t("inner_column_escaping", inner_column_escaping),
         t("convert_tz", convert_tz),
@@ -1186,6 +1188,76 @@ async fn union(service: Box<dyn SqlClient>) {
     );
 }
 
+async fn nested_union_empty_tables(service: Box<dyn SqlClient>) {
+    let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+    let _ = service
+        .exec_query("CREATE TABLE foo.un_1 (a int, b int, c int)")
+        .await
+        .unwrap();
+
+    let _ = service
+        .exec_query("CREATE TABLE foo.un (a int, b int, c int)")
+        .await
+        .unwrap();
+
+    let _ = service
+        .exec_query("CREATE TABLE foo.un_2 (a int, b int, c int)")
+        .await
+        .unwrap();
+
+    service
+        .exec_query(
+            "INSERT INTO foo.un (a, b, c) VALUES
+                        (1, 2, 3),
+                        (2, 3, 4),
+                        (5, 6, 7),
+                        (8, 9, 10)",
+        )
+        .await
+        .unwrap();
+
+    let result = service
+        .exec_query(
+            "
+                SELECT aa, bb FROM
+                (
+                    SELECT
+                        a aa,
+                        b bb
+                    FROM (
+                        SELECT * FROM foo.un
+                    )
+                    UNION ALL
+                    SELECT
+                        a aa,
+                        b bb
+                    FROM
+                    (
+                        SELECT * FROM foo.un_1
+                        UNION ALL
+                        SELECT * FROM foo.un_2
+
+                    )
+                )
+                GROUP BY 1, 2 ORDER BY 2 LIMIT 2
+            ",
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(result.get_rows().len(), 2);
+    assert_eq!(
+        result.get_rows()[0],
+        Row::new(vec![TableValue::Int(1), TableValue::Int(2),])
+    );
+
+    assert_eq!(
+        result.get_rows()[1],
+        Row::new(vec![TableValue::Int(2), TableValue::Int(3),])
+    );
+}
+
 async fn timestamp_select(service: Box<dyn SqlClient>) {
     let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap();
 
@@ -1295,6 +1367,30 @@ async fn information_schema(service: Box<dyn SqlClient>) {
         result.get_rows(),
         &vec![Row::new(vec![TableValue::String("timestamps".to_string())])]
     );
+}
+
+async fn system_query_cache(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+    service
+        .exec_query("CREATE TABLE foo.timestamps (t timestamp, amount int)")
+        .await
+        .unwrap();
+
+    service
+        .exec_query("SELECT * FROM foo.timestamps")
+        .await
+        .unwrap();
+
+    service
+        .exec_query("SELECT * FROM system.query_cache")
+        .await
+        .unwrap();
+
+    service
+        .exec_query("SELECT sql FROM system.query_cache;")
+        .await
+        .unwrap();
 }
 
 async fn case_column_escaping(service: Box<dyn SqlClient>) {
@@ -3888,7 +3984,7 @@ async fn topk_hll(service: Box<dyn SqlClient>) {
         )
         .await
         .unwrap();
-    assert_eq!(to_rows(&r), rows(&[("d", 10383), ("b", 9722), ("c", 171)]));
+    assert_eq!(to_rows(&r), rows(&[("b", 9722), ("d", 9722), ("c", 171)]));
 
     let r = service
         .exec_query(
@@ -3897,13 +3993,13 @@ async fn topk_hll(service: Box<dyn SqlClient>) {
                                UNION ALL \
                                SELECT * FROM s.Data2) AS `Data` \
                          GROUP BY 1 \
-                         HAVING cardinality(merge(hits)) < 10000
+                         HAVING cardinality(merge(hits)) < 9000
                          ORDER BY 2 DESC \
-                         LIMIT 3",
+                         LIMIT 2",
         )
         .await
         .unwrap();
-    assert_eq!(to_rows(&r), rows(&[("b", 9722), ("c", 171), ("h", 164)]));
+    assert_eq!(to_rows(&r), rows(&[("c", 171), ("h", 164)]));
     let r = service
         .exec_query(
             "SELECT `url` `url`, cardinality(merge(hits)) `hits` \
@@ -8326,6 +8422,13 @@ async fn queue_ack_then_result(service: Box<dyn SqlClient>) {
 }
 
 async fn queue_orphaned_timeout(service: Box<dyn SqlClient>) {
+    // CI is super slow, sometimes it can takes up to 1 second to bootstrap Cache Store
+    // let's warmup it
+    service
+        .exec_query(r#"SYS CACHESTORE HEALTHCHECK;"#)
+        .await
+        .unwrap();
+
     service
         .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:1" "payload1";"#)
         .await

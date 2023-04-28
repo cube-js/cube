@@ -23,6 +23,7 @@ services:
       # defaults
       CUBEJS_DEV_MODE: "true"
       CUBEJS_API_SECRET: mysupersecret
+      CUBEJS_SCHEMA_PATH: schema
     volumes:
       - ./postgresql/single/cube.js:/cube/conf/cube.js
       - ./postgresql/schema/Orders.js:/cube/conf/schema/Orders.js

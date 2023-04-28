@@ -14,6 +14,7 @@ services:
       CUBEJS_WEB_SOCKETS: "true"
       CUBEJS_API_SECRET: mysupersecret
       CUBEJS_CACHE_AND_QUEUE_DRIVER: memory
+      CUBEJS_SCHEMA_PATH: schema
     depends_on:
       - db
     links:

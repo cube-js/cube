@@ -34,10 +34,48 @@ function createApiGateway(
   };
 }
 
-describe('Gateway permissions', () => {
+describe('Gateway Api Scopes', () => {
+  test('CUBEJS_DEFAULT_API_SCOPES', async () => {
+    process.env.CUBEJS_DEFAULT_API_SCOPES = '';
+    
+    let res: request.Response;
+    const { app, apiGateway } = createApiGateway();
+
+    res = await request(app)
+      .get('/cubejs-api/graphql')
+      .set('Authorization', AUTH_TOKEN)
+      .expect(403);
+    expect(res.body && res.body.error)
+      .toStrictEqual('Api scope is missed: graphql');
+
+    res = await request(app)
+      .get('/cubejs-api/v1/meta')
+      .set('Authorization', AUTH_TOKEN)
+      .expect(403);
+    expect(res.body && res.body.error)
+      .toStrictEqual('Api scope is missed: meta');
+
+    res = await request(app)
+      .get('/cubejs-api/v1/load')
+      .set('Authorization', AUTH_TOKEN)
+      .expect(403);
+    expect(res.body && res.body.error)
+      .toStrictEqual('Api scope is missed: data');
+
+    res = await request(app)
+      .post('/cubejs-api/v1/pre-aggregations/jobs')
+      .set('Authorization', AUTH_TOKEN)
+      .expect(403);
+    expect(res.body && res.body.error)
+      .toStrictEqual('Api scope is missed: jobs');
+
+    delete process.env.CUBEJS_DEFAULT_API_SCOPES;
+    apiGateway.release();
+  });
+
   test('Liveliness declined', async () => {
     const { app, apiGateway } = createApiGateway({
-      contextToPermissions: async () => new Promise((resolve) => {
+      contextToApiScopes: async () => new Promise((resolve) => {
         resolve(['graphql', 'meta', 'data', 'jobs']);
       }),
     });
@@ -57,7 +95,7 @@ describe('Gateway permissions', () => {
 
   test('GraphQL declined', async () => {
     const { app, apiGateway } = createApiGateway({
-      contextToPermissions: async () => new Promise((resolve) => {
+      contextToApiScopes: async () => new Promise((resolve) => {
         resolve(['liveliness', 'meta', 'data', 'jobs']);
       }),
     });
@@ -68,14 +106,14 @@ describe('Gateway permissions', () => {
       .expect(403);
 
     expect(res.body && res.body.error)
-      .toStrictEqual('Permission is missed: graphql');
+      .toStrictEqual('Api scope is missed: graphql');
 
     apiGateway.release();
   });
 
   test('Meta declined', async () => {
     const { app, apiGateway } = createApiGateway({
-      contextToPermissions: async () => new Promise((resolve) => {
+      contextToApiScopes: async () => new Promise((resolve) => {
         resolve(['liveliness', 'graphql', 'data', 'jobs']);
       }),
     });
@@ -86,7 +124,7 @@ describe('Gateway permissions', () => {
       .expect(403);
 
     expect(res1.body && res1.body.error)
-      .toStrictEqual('Permission is missed: meta');
+      .toStrictEqual('Api scope is missed: meta');
 
     const res2 = await request(app)
       .post('/cubejs-api/v1/pre-aggregations/can-use')
@@ -94,14 +132,14 @@ describe('Gateway permissions', () => {
       .expect(403);
 
     expect(res2.body && res2.body.error)
-      .toStrictEqual('Permission is missed: meta');
+      .toStrictEqual('Api scope is missed: meta');
 
     apiGateway.release();
   });
 
   test('Data declined', async () => {
     const { app, apiGateway } = createApiGateway({
-      contextToPermissions: async () => new Promise((resolve) => {
+      contextToApiScopes: async () => new Promise((resolve) => {
         resolve(['liveliness', 'graphql', 'meta', 'jobs']);
       }),
     });
@@ -112,7 +150,7 @@ describe('Gateway permissions', () => {
       .expect(403);
 
     expect(res1.body && res1.body.error)
-      .toStrictEqual('Permission is missed: data');
+      .toStrictEqual('Api scope is missed: data');
 
     const res2 = await request(app)
       .post('/cubejs-api/v1/load')
@@ -120,7 +158,7 @@ describe('Gateway permissions', () => {
       .expect(403);
 
     expect(res2.body && res2.body.error)
-      .toStrictEqual('Permission is missed: data');
+      .toStrictEqual('Api scope is missed: data');
 
     const res3 = await request(app)
       .get('/cubejs-api/v1/subscribe')
@@ -128,7 +166,7 @@ describe('Gateway permissions', () => {
       .expect(403);
 
     expect(res3.body && res3.body.error)
-      .toStrictEqual('Permission is missed: data');
+      .toStrictEqual('Api scope is missed: data');
 
     const res4 = await request(app)
       .get('/cubejs-api/v1/sql')
@@ -136,7 +174,7 @@ describe('Gateway permissions', () => {
       .expect(403);
 
     expect(res4.body && res4.body.error)
-      .toStrictEqual('Permission is missed: data');
+      .toStrictEqual('Api scope is missed: data');
 
     const res5 = await request(app)
       .post('/cubejs-api/v1/sql')
@@ -145,7 +183,7 @@ describe('Gateway permissions', () => {
       .expect(403);
 
     expect(res5.body && res5.body.error)
-      .toStrictEqual('Permission is missed: data');
+      .toStrictEqual('Api scope is missed: data');
 
     const res6 = await request(app)
       .get('/cubejs-api/v1/dry-run')
@@ -153,7 +191,7 @@ describe('Gateway permissions', () => {
       .expect(403);
 
     expect(res6.body && res6.body.error)
-      .toStrictEqual('Permission is missed: data');
+      .toStrictEqual('Api scope is missed: data');
 
     const res7 = await request(app)
       .post('/cubejs-api/v1/dry-run')
@@ -162,14 +200,14 @@ describe('Gateway permissions', () => {
       .expect(403);
 
     expect(res7.body && res7.body.error)
-      .toStrictEqual('Permission is missed: data');
+      .toStrictEqual('Api scope is missed: data');
 
     apiGateway.release();
   });
 
   test('Jobs declined', async () => {
     const { app, apiGateway } = createApiGateway({
-      contextToPermissions: async () => new Promise((resolve) => {
+      contextToApiScopes: async () => new Promise((resolve) => {
         resolve(['liveliness', 'graphql', 'data', 'meta']);
       }),
     });
@@ -180,7 +218,7 @@ describe('Gateway permissions', () => {
       .expect(403);
 
     expect(res1.body && res1.body.error)
-      .toStrictEqual('Permission is missed: jobs');
+      .toStrictEqual('Api scope is missed: jobs');
 
     const res2 = await request(app)
       .get('/cubejs-api/v1/run-scheduled-refresh')
@@ -188,7 +226,7 @@ describe('Gateway permissions', () => {
       .expect(403);
 
     expect(res2.body && res2.body.error)
-      .toStrictEqual('Permission is missed: jobs');
+      .toStrictEqual('Api scope is missed: jobs');
 
     apiGateway.release();
   });

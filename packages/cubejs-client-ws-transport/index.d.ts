@@ -1,8 +1,8 @@
 /**
  * @title @cubejs-client/ws-transport
  * @permalink /@cubejs-client-ws-transport
- * @menuCategory Frontend Integrations
- * @subcategory Reference
+ * @menuCategory Reference
+ * @subcategory Frontend
  * @menuOrder 5
  * @description WebSocket transport for Cube.js client
  */

@@ -55,19 +55,35 @@ pub trait MetaStoreFs: Send + Sync {
 pub struct BaseRocksStoreFs {
     remote_fs: Arc<dyn RemoteFs>,
     name: &'static str,
-    config: Arc<dyn ConfigObj>,
+    minimum_snapshots_count: u64,
+    snapshots_lifetime: u64,
 }
 
 impl BaseRocksStoreFs {
-    pub fn new(
+    pub fn new_for_metastore(
         remote_fs: Arc<dyn RemoteFs>,
-        name: &'static str,
         config: Arc<dyn ConfigObj>,
     ) -> Arc<Self> {
+        let minimum_snapshots_count = config.minimum_metastore_snapshots_count();
+        let snapshots_lifetime = config.metastore_snapshots_lifetime();
         Arc::new(Self {
             remote_fs,
-            name,
-            config,
+            name: "metastore",
+            minimum_snapshots_count,
+            snapshots_lifetime,
+        })
+    }
+    pub fn new_for_cachestore(
+        remote_fs: Arc<dyn RemoteFs>,
+        config: Arc<dyn ConfigObj>,
+    ) -> Arc<Self> {
+        let minimum_snapshots_count = config.minimum_cachestore_snapshots_count();
+        let snapshots_lifetime = config.cachestore_snapshots_lifetime();
+        Arc::new(Self {
+            remote_fs,
+            name: "cachestore",
+            minimum_snapshots_count,
+            snapshots_lifetime,
         })
     }
 
@@ -136,8 +152,8 @@ impl BaseRocksStoreFs {
             })
             .collect::<Vec<_>>();
 
-        let lifetime_ms = (self.config.metastore_snapshots_lifetime() as u128) * 1000;
-        let min_snapshots_count = self.config.minimum_metastore_snapshots_count() as usize;
+        let lifetime_ms = (self.snapshots_lifetime as u128) * 1000;
+        let min_snapshots_count = self.minimum_snapshots_count as usize;
 
         let mut snapshots_list = candidates
             .iter()

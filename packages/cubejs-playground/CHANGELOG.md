@@ -3,6 +3,60 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.32.24](https://github.com/cube-js/cube/compare/v0.32.23...v0.32.24) (2023-04-10)
+
+**Note:** Version bump only for package @cubejs-client/playground
+
+
+
+
+
+## [0.32.22](https://github.com/cube-js/cube/compare/v0.32.21...v0.32.22) (2023-04-10)
+
+**Note:** Version bump only for package @cubejs-client/playground
+
+
+
+
+
+## [0.32.18](https://github.com/cube-js/cube/compare/v0.32.17...v0.32.18) (2023-04-02)
+
+
+### Bug Fixes
+
+* **playground:** SQL API default port 15432 ([416a9de](https://github.com/cube-js/cube/commit/416a9de677cb9a1a48f426a74e755b78c18e0952))
+
+
+
+
+
+## [0.32.17](https://github.com/cube-js/cube/compare/v0.32.16...v0.32.17) (2023-03-29)
+
+**Note:** Version bump only for package @cubejs-client/playground
+
+
+
+
+
+## [0.32.15](https://github.com/cube-js/cube/compare/v0.32.14...v0.32.15) (2023-03-24)
+
+
+### Features
+
+* **playground:** BI connection guides, frontend integration snippets ([#6341](https://github.com/cube-js/cube/issues/6341)) ([8fdeb1b](https://github.com/cube-js/cube/commit/8fdeb1b882d959f9e8aec0ae963e5a0b1995e517))
+
+
+
+
+
+## [0.32.12](https://github.com/cube-js/cube/compare/v0.32.11...v0.32.12) (2023-03-22)
+
+**Note:** Version bump only for package @cubejs-client/playground
+
+
+
+
+
 # [0.32.0](https://github.com/cube-js/cube.js/compare/v0.31.69...v0.32.0) (2023-03-02)
 
 **Note:** Version bump only for package @cubejs-client/playground

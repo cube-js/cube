@@ -1,4 +1,3 @@
-import { PostgresQuery } from '../../src/adapter/PostgresQuery';
 import { prepareCompiler } from './PrepareCompiler';
 
 describe('Test Speed', () => {

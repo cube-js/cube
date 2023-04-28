@@ -117,10 +117,6 @@ class MockDriver {
   capabilities() {
     return {};
   }
-  
-  tablesSchema() {
-    return this.schemaData;
-  }
 
   async streamQuery(sql) {
     return Readable.from((await this.query(sql)).map(r => (typeof r === 'string' ? { query: r } : r)));
@@ -806,6 +802,40 @@ describe('QueryOrchestrator', () => {
         queryOrchestrator.queryCache.queryRedisKey(query.preAggregations[0].invalidateKeyQueries[0].slice(0, 2))
       )
     ).toBe(true);
+  });
+
+  test('in memory expire', async () => {
+    const query = (id) => ({
+      query: 'SELECT * FROM orders',
+      values: [],
+      cacheKeyQueries: {
+        queries: [
+          ['SELECT NOW()', [], {
+            renewalThreshold: 21600,
+          }],
+          ['SELECT date_trunc(\'hour\', (NOW()::timestamptz AT TIME ZONE \'UTC\'))', [], {
+            renewalThreshold: 21600,
+          }]
+        ]
+      },
+      preAggregations: [{
+        preAggregationsSchema: 'stb_pre_aggregations',
+        tableName: 'stb_pre_aggregations.orders_d20201103',
+        loadSql: ['CREATE TABLE stb_pre_aggregations.orders_d20201103 AS SELECT * FROM public.orders', []],
+        invalidateKeyQueries: [['SELECT NOW() as now', [], {
+          renewalThreshold: 86400,
+        }]]
+      }],
+      expireSecs: 2,
+      requestId: `in memory expire ${id}`,
+    });
+    await queryOrchestrator.fetchQuery(query(0));
+    await queryOrchestrator.fetchQuery(query(1));
+    await mockDriver.delay(2000);
+    await queryOrchestrator.fetchQuery(query(2));
+    expect(
+      mockDriver.executedQueries.filter(q => q.match(/timestamptz/)).length
+    ).toBe(2);
   });
 
   test('load cache should respect external flag', async () => {
@@ -1600,11 +1630,6 @@ describe('QueryOrchestrator', () => {
     }
     await Promise.all(promises);
     expect(mockDriver.tables).toContainEqual(expect.stringMatching(/orders_delay/));
-  });
-
-  test('fetch table schema', async () => {
-    const schema = await queryOrchestrator.fetchSchema('foo');
-    expect(schema).toEqual(schemaData);
   });
 
   test('streaming simple', async () => {

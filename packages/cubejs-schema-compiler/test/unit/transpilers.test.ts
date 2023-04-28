@@ -56,4 +56,17 @@ describe('Transpilers', () => {
 
     expect(warnings[0]).toMatch(/Warning: USER_CONTEXT was deprecated in favor of SECURITY_CONTEXT. in main.js/);
   });
+
+  it('CubePropContextTranspiler', async () => {
+    const { compiler } = prepareCompiler(`
+        let { securityContext } = COMPILE_CONTEXT;
+
+        cube(\`Test\`, {
+          sql_table: 'public.user_\${securityContext.tenantId}',
+          dimensions: {}
+        })
+    `);
+
+    await compiler.compile();
+  });
 });

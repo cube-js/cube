@@ -1871,6 +1871,60 @@ impl RewriteRules for FilterRules {
                     "?date_sub_interval",
                 ),
             ),
+            transforming_rewrite(
+                "filter-date-trunc-eq-literal-date",
+                filter_replacer(
+                    binary_expr(
+                        fun_expr(
+                            "DateTrunc",
+                            vec![literal_expr("?granularity"), column_expr("?column")],
+                        ),
+                        "=",
+                        literal_expr("?date"),
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                filter_replacer(
+                    binary_expr(
+                        binary_expr(
+                            column_expr("?column"),
+                            ">=",
+                            fun_expr(
+                                "DateTrunc",
+                                vec![literal_expr("?granularity"), literal_expr("?date")],
+                            ),
+                        ),
+                        "AND",
+                        binary_expr(
+                            column_expr("?column"),
+                            "<",
+                            fun_expr(
+                                "DateTrunc",
+                                vec![
+                                    literal_expr("?granularity"),
+                                    udf_expr(
+                                        "date_add",
+                                        vec![
+                                            literal_expr("?date"),
+                                            literal_expr("?date_add_interval"),
+                                        ],
+                                    ),
+                                ],
+                            ),
+                        ),
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                self.transform_date_trunc_eq_literal_date(
+                    "?granularity",
+                    "?date",
+                    "?date_add_interval",
+                ),
+            ),
             rewrite(
                 "between-move-interval-beyond-equal-sign",
                 between_expr(
@@ -3692,6 +3746,44 @@ impl FilterRules {
                             );
 
                             return true;
+                        }
+                    }
+                }
+            }
+            false
+        }
+    }
+
+    fn transform_date_trunc_eq_literal_date(
+        &self,
+        granularity_var: &'static str,
+        date_var: &'static str,
+        date_add_interval_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let granularity_var = var!(granularity_var);
+        let date_var = var!(date_var);
+        let date_add_interval_var = var!(date_add_interval_var);
+        move |egraph, subst| {
+            for granularity in var_iter!(egraph[subst[granularity_var]], LiteralExprValue) {
+                if let ScalarValue::Utf8(Some(granularity)) = granularity {
+                    if let Some(date_add_interval) =
+                        utils::granularity_str_to_interval(&granularity)
+                    {
+                        for date in var_iter!(egraph[subst[date_var]], LiteralExprValue) {
+                            if let ScalarValue::TimestampNanosecond(Some(date), None) = date {
+                                if let Some(true) =
+                                    utils::is_literal_date_trunced(*date, &granularity)
+                                {
+                                    subst.insert(
+                                        date_add_interval_var,
+                                        egraph.add(LogicalPlanLanguage::LiteralExprValue(
+                                            LiteralExprValue(date_add_interval),
+                                        )),
+                                    );
+
+                                    return true;
+                                }
+                            }
                         }
                     }
                 }

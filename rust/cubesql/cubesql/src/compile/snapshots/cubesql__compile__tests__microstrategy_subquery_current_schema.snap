@@ -1,0 +1,8 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"SELECT t.oid FROM pg_catalog.pg_type AS t JOIN pg_catalog.pg_namespace AS n ON t.typnamespace = n.oid WHERE t.typname = 'citext' AND (n.nspname = (SELECT current_schema()) OR n.nspname = 'public')\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++-----+
+| oid |
++-----+
++-----+
