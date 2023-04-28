@@ -254,6 +254,12 @@ pub fn parse_sql_to_statements(
         "WHERE quote_ident(table_schema) IN (current_user, current_schema()) AND table_type = 'BASE TABLE'"
     );
 
+    // psqlODBC
+    let query = query.replace(
+        "select NULL, NULL, NULL",
+        "select NULL, NULL AS NULL2, NULL AS NULL3",
+    );
+
     if let Some(qtrace) = qtrace {
         qtrace.set_replaced_query(&query)
     }
