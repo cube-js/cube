@@ -217,7 +217,7 @@ jobs:
       - name: Copy/paste OpenSSL to Archive (hotfix for Windows)
         if: ${{ startsWith(matrix.os, 'windows') }}
         run: cp C:/vcpkg/packages/openssl_x64-windows/bin/*.dll cubestore-archive/bin
-      - name: Create archive for release
+      - name: Create archive for release (tar.gz)
         run: |
           mv rust/cubestore/target/${{ matrix.target }}/release/${{ matrix.executable_name }} cubestore-archive/bin/${{ matrix.executable_name }}
           cd cubestore-archive
@@ -226,4 +226,16 @@ jobs:
         with:
           path: cubestore-archive/cubestored-${{ matrix.target }}.tar.gz
           name: cubestored-${{ matrix.target }}.tar.gz
+          retention-days: 1
+      - name: Remove archive
+        run: rm -rf cubestore-archive
+      - name: Create archive for release (tar.zst)
+        run: |
+          mv rust/cubestore/target/${{ matrix.target }}/release/${{ matrix.executable_name }} cubestore-archive/bin/${{ matrix.executable_name }}
+          cd cubestore-archive
+          tar --zstd -cvf cubestored-${{ matrix.target }}.tar.zst *
+      - uses: actions/upload-artifact@v2
+        with:
+          path: cubestore-archive/cubestored-${{ matrix.target }}.tar.zst
+          name: cubestored-${{ matrix.target }}.tar.zst
           retention-days: 1
