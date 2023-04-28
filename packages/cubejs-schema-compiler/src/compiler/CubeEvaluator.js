@@ -203,16 +203,16 @@ export class CubeEvaluator extends CubeSymbols {
         includes = Object.keys(membersObj).map(memberName => ({ member: `${fullPath}.${memberName}` }));
       } else {
         includes = cubeInclude.includes.map(include => {
-          const member = include.name || include;
+          const member = include.alias || include;
           if (member.indexOf('.') !== -1) {
             errorReporter.error(`Paths aren't allowed in cube includes but '${member}' provided as include member`);
           }
           let name = include.alias || member;
           name = cubeInclude.prefix ? `${cubeName}_${name}` : name;
-          if (include.member) {
-            const resolvedMember = this.symbols[cubeReference]?.cubeObj()?.[type]?.[include.member];
+          if (include.name) {
+            const resolvedMember = this.symbols[cubeReference]?.cubeObj()?.[type]?.[include.name];
             return resolvedMember ? {
-              member: `${fullPath}.${include.member}`,
+              member: `${fullPath}.${include.name}`,
               name,
             } : undefined;
           } else {
