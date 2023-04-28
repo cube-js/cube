@@ -6008,6 +6008,16 @@ ORDER BY \"COUNT(count)\" DESC"
             .await?
         );
 
+        // psqlodbc
+        insta::assert_snapshot!(
+            "show_max_identifier_length",
+            execute_query(
+                "show max_identifier_length;".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
         Ok(())
     }
 
@@ -17687,5 +17697,19 @@ ORDER BY \"COUNT(count)\" DESC"
                 filters: None,
             }
         )
+    }
+
+    #[tokio::test]
+    async fn test_psqlodbc_null() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "psqlodbc_null",
+            execute_query(
+                "select NULL, NULL, NULL".to_string(),
+                DatabaseProtocol::PostgreSQL,
+            )
+            .await?
+        );
+
+        Ok(())
     }
 }
