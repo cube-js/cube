@@ -52,6 +52,8 @@
     "smoke:athena:snapshot": "jest --verbose --updateSnapshot -i dist/test/smoke-athena.test.js",
     "smoke:bigquery": "jest --verbose -i dist/test/smoke-bigquery.test.js",
     "smoke:bigquery:snapshot": "jest --verbose --updateSnapshot -i dist/test/smoke-bigquery.test.js",
+    "smoke:snowflake": "jest --verbose -i dist/test/smoke-snowflake.test.js",
+    "smoke:snowflake:snapshot": "jest --verbose --updateSnapshot -i dist/test/smoke-snowflake.test.js",
     "smoke:crate": "jest --verbose -i dist/test/smoke-crate.test.js",
     "smoke:crate:snapshot": "jest --verbose --updateSnapshot -i dist/test/smoke-crate.test.js",
     "smoke:firebolt": "jest --verbose -i dist/test/smoke-firebolt.test.js",
