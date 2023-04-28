@@ -346,14 +346,17 @@ cubes:
         
 views:
   - name: orders_view
+
     cubes:
       - cube: orders
         prefix: true
         includes:
           - count
-          - member: time
-            name: date
+          - name: time
+            alias: date
+
       - cube: orders.customers
+        alias: asliased_customers
         includes:
           - name
     `);
