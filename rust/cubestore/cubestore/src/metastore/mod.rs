@@ -3842,7 +3842,10 @@ impl MetaStore for RocksMetaStore {
                 )?
                 .into_iter()
                 .filter(|j| j.get_row().is_long_term() == long_term)
+                //We use min_by instead of the max_by because of min_by returns the first element
+                //if priority is equal while max_by returns the last element
                 .min_by(|a, b| b.get_row().priority().cmp(&a.get_row().priority()));
+
             if let Some(job) = next_job {
                 if let JobStatus::ProcessingBy(node) = job.get_row().status() {
                     return Err(CubeError::internal(format!(
