@@ -5,9 +5,16 @@
  */
 
 import { getEnv } from '@cubejs-backend/shared';
-import { PostgresDriver, PostgresDriverConfiguration } from '@cubejs-backend/postgres-driver';
-import { DownloadTableCSVData, UnloadOptions } from '@cubejs-backend/base-driver';
-import crypto from 'crypto';
+import {
+  PostgresDriver,
+  PostgresDriverConfiguration,
+} from '@cubejs-backend/postgres-driver';
+import {
+  DownloadTableCSVData,
+  UnloadOptions,
+  TableStructure,
+  DriverCapabilities,
+} from '@cubejs-backend/base-driver';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { S3, GetObjectCommand } from '@aws-sdk/client-s3';
 
@@ -79,10 +86,16 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
     dataSource: string,
   ): Partial<RedshiftDriverConfiguration> {
     return {
-      // @todo It's not possible to support UNLOAD in readOnly mode, because we need column types (CREATE TABLE?)
-      readOnly: false,
+      readOnly: true,
       exportBucket: this.getExportBucket(dataSource),
     };
+  }
+
+  /**
+   * Returns driver's capabilities object.
+   */
+  public capabilities(): DriverCapabilities {
+    return { unloadWithoutTempTable: true };
   }
 
   protected getExportBucket(
@@ -144,29 +157,120 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
     // @todo Implement for Redshift, column \"typcategory\" does not exist in pg_type
   }
 
+  /**
+   * Determines whether export bucket feature is configured or not.
+   */
   public async isUnloadSupported() {
     if (this.config.exportBucket) {
       return true;
     }
-
     return false;
   }
 
-  public async unload(tableName: string, options: UnloadOptions): Promise<DownloadTableCSVData> {
+  /**
+   * Returns to the Cubestore an object with links to unloaded to the
+   * export bucket data.
+   */
+  public async unload(
+    table: string,
+    options: UnloadOptions,
+  ): Promise<DownloadTableCSVData> {
     if (!this.config.exportBucket) {
       throw new Error('Unload is not configured');
     }
+    const types = options.query
+      ? await this.unloadWithSql(table, options)
+      : await this.unloadWithTable(table, options);
+    const csvFile = await this.getCsvFiles(table);
+    return {
+      exportBucketCsvEscapeSymbol:
+        this.config.exportBucketCsvEscapeSymbol,
+      csvFile,
+      types
+    };
+  }
 
-    const types = await this.tableColumnTypes(tableName);
-    const columns = types.map(t => t.name).join(', ');
-
-    const { bucketType, bucketName, region, unloadArn, keyId, secretKey } = this.config.exportBucket;
-
+  /**
+   * Unload data from a SQL query to an export bucket.
+   */
+  private async unloadWithSql(
+    table: string,
+    options: UnloadOptions,
+  ): Promise<TableStructure> {
+    if (!this.config.exportBucket) {
+      throw new Error('Export bucket is not configured.');
+    }
+    if (!options.query) {
+      throw new Error('Unload query is missed.');
+    }
+    const types = await this.queryColumnTypes(options.query.sql);
+    const {
+      bucketType,
+      bucketName,
+      region,
+      unloadArn,
+      keyId,
+      secretKey,
+    } = this.config.exportBucket;
+    const optionsToExport = {
+      REGION: `'${region}'`,
+      HEADER: '',
+      FORMAT: 'CSV',
+      GZIP: '',
+      MAXFILESIZE: `${options.maxFileSize}MB`
+    };
+    const optionsPart = Object.entries(optionsToExport)
+      .map(([key, value]) => `${key} ${value}`)
+      .join(' ');
     const conn = await this.pool.connect();
-
     try {
-      const exportPathName = crypto.randomBytes(10).toString('hex');
+      await this.prepareConnection(conn, {
+        executionTimeout: this.config.executionTimeout
+          ? this.config.executionTimeout * 1000
+          : 600000,
+      });
+      const baseQuery = `
+        UNLOAD ('${options.query.sql}')
+        TO '${bucketType}://${bucketName}/${table}/'
+      `;
+      const credentialQuery = unloadArn
+        ? `iam_role '${unloadArn}'`
+        : 'CREDENTIALS ' +
+          `'aws_access_key_id=${keyId};` +
+          `aws_secret_access_key=${secretKey}'`;
+      const unloadQuery =
+        `${baseQuery} ${credentialQuery} ${optionsPart}`;
+      await conn.query({
+        text: unloadQuery,
+      });
+    } finally {
+      await conn.release();
+    }
+    return types;
+  }
 
+  /**
+   * Unload data from a temp table to an export bucket.
+   */
+  private async unloadWithTable(
+    table: string,
+    options: UnloadOptions,
+  ): Promise<TableStructure> {
+    if (!this.config.exportBucket) {
+      throw new Error('Export bucket is not configured.');
+    }
+    const types = await this.tableColumnTypes(table);
+    const columns = types.map(t => t.name).join(', ');
+    const {
+      bucketType,
+      bucketName,
+      region,
+      unloadArn,
+      keyId,
+      secretKey,
+    } = this.config.exportBucket;
+    const conn = await this.pool.connect();
+    try {
       const optionsToExport = {
         REGION: `'${region}'`,
         HEADER: '',
@@ -177,88 +281,87 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
       const optionsPart = Object.entries(optionsToExport)
         .map(([key, value]) => `${key} ${value}`)
         .join(' ');
-
       await this.prepareConnection(conn, {
-        executionTimeout: this.config.executionTimeout ? this.config.executionTimeout * 1000 : 600000,
+        executionTimeout: this.config.executionTimeout
+          ? this.config.executionTimeout * 1000
+          : 600000,
       });
-
-      let unloadTotalRows: number | null = null;
-
-      /**
-       * @link https://github.com/brianc/node-postgres/blob/pg%408.6.0/packages/pg-protocol/src/messages.ts#L211
-       * @link https://github.com/brianc/node-postgres/blob/pg%408.6.0/packages/pg-protocol/src/parser.ts#L357
-       *
-       * message: 'UNLOAD completed, 0 record(s) unloaded successfully.',
-       */
-      conn.addListener('notice', (e: any) => {
-        if (e.message && e.message.startsWith('UNLOAD completed')) {
-          const matches = e.message.match(/\d+/);
-          if (matches) {
-            unloadTotalRows = parseInt(matches[0], 10);
-          } else {
-            throw new Error('Unable to detect number of unloaded records');
-          }
-        }
-      });
-
       const baseQuery = `
-        UNLOAD ('SELECT ${columns} FROM ${tableName}')
-        TO '${bucketType}://${bucketName}/${exportPathName}/'
+        UNLOAD ('SELECT ${columns} FROM ${table}')
+        TO '${bucketType}://${bucketName}/${table}/'
       `;
-      
-      // Prefer the unloadArn if it is present
       const credentialQuery = unloadArn
         ? `iam_role '${unloadArn}'`
-        : `CREDENTIALS 'aws_access_key_id=${keyId};aws_secret_access_key=${secretKey}'`;
-
-      const unloadQuery = `${baseQuery} ${credentialQuery} ${optionsPart}`;
-
-      // Unable to extract number of extracted rows, because it's done in protocol notice
+        : 'CREDENTIALS ' +
+          `'aws_access_key_id=${keyId};` +
+          `aws_secret_access_key=${secretKey}'`;
+      const unloadQuery =
+        `${baseQuery} ${credentialQuery} ${optionsPart}`;
       await conn.query({
         text: unloadQuery,
       });
-
-      if (unloadTotalRows === 0) {
-        return {
-          exportBucketCsvEscapeSymbol: this.config.exportBucketCsvEscapeSymbol,
-          csvFile: [],
-          types
-        };
-      }
-
-      const client = new S3({
-        credentials: (keyId && secretKey) ? {
-          accessKeyId: keyId,
-          secretAccessKey: secretKey,
-        } : undefined,
-        region,
-      });
-      const list = await client.listObjectsV2({
-        Bucket: bucketName,
-        Prefix: exportPathName,
-      });
-      if (list && list.Contents) {
-        const csvFile = await Promise.all(
-          list.Contents.map(async (file) => {
-            const command = new GetObjectCommand({
-              Bucket: bucketName,
-              Key: file.Key,
-            });
-            return getSignedUrl(client, command, { expiresIn: 3600 });
-          })
-        );
-
-        return {
-          exportBucketCsvEscapeSymbol: this.config.exportBucketCsvEscapeSymbol,
-          csvFile,
-          types
-        };
-      }
-
-      throw new Error('Unable to UNLOAD table, there are no files in S3 storage');
     } finally {
-      conn.removeAllListeners('notice');
+      await conn.release();
+    }
+    return types;
+  }
 
+  /**
+   * Returns an array of signed URLs of the unloaded csv files.
+   */
+  private async getCsvFiles(table: string): Promise<string[]> {
+    if (!this.config.exportBucket) {
+      throw new Error('Export bucket is not configured.');
+    }
+    const {
+      bucketName,
+      region,
+      keyId,
+      secretKey,
+    } = this.config.exportBucket;
+    const client = new S3({
+      credentials: (keyId && secretKey) ? {
+        accessKeyId: keyId,
+        secretAccessKey: secretKey,
+      } : undefined,
+      region,
+    });
+    const list = await client.listObjectsV2({
+      Bucket: bucketName,
+      Prefix: table,
+    });
+    if (!list || !list.Contents) {
+      return [];
+    } else {
+      const csvFile = await Promise.all(
+        list.Contents.map(async (file) => {
+          const command = new GetObjectCommand({
+            Bucket: bucketName,
+            Key: file.Key,
+          });
+          return getSignedUrl(client, command, { expiresIn: 3600 });
+        })
+      );
+      return csvFile;
+    }
+  }
+
+  /**
+   * Returns an array of queried fields meta info.
+   */
+  public async queryColumnTypes(sql: string): Promise<TableStructure> {
+    const conn = await this.pool.connect();
+    const typesSql = `${sql} LIMIT 0`;
+    try {
+      await this.prepareConnection(conn);
+      const result = await conn.query({
+        text: typesSql,
+      });
+      return result.fields.map((field) => ({
+        name: field.name,
+        type: this.toGenericType(field.format),
+      }));
+    } finally {
       await conn.release();
     }
   }

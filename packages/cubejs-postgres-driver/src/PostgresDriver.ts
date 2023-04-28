@@ -115,7 +115,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
-    
+
     this.pool = new Pool({
       idleTimeoutMillis: 30000,
       max:

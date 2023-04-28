@@ -34,10 +34,13 @@
     "postgres-driver": "jest --forceExit --runInBand --verbose -i dist/test/postgres-driver.test.js",
     "postgres-core": "jest --forceExit --runInBand --verbose -i dist/test/postgres-core.test.js",
     "postgres-full": "jest --forceExit --runInBand --verbose -i dist/test/postgres-full.test.js",
+    "redshift-driver": "jest --forceExit --runInBand --verbose -i dist/test/redshift-driver.test.js",
+    "redshift-core": "jest --forceExit --runInBand --verbose -i dist/test/redshift-core.test.js",
+    "redshift-full": "jest --forceExit --runInBand --verbose -i dist/test/redshift-full.test.js",
     "snowflake-driver": "jest --forceExit --runInBand --verbose -i dist/test/snowflake-driver.test.js",
     "snowflake-core": "jest --forceExit --runInBand --verbose -i dist/test/snowflake-core.test.js",
     "snowflake-full": "jest --forceExit --runInBand --verbose -i dist/test/snowflake-full.test.js", 
-    "tst": "clear && yarn tsc && yarn bigquery-core"
+    "tst": "clear && yarn tsc && yarn redshift-core"
   },
   "files": [
     "dist/src"
