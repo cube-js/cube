@@ -1,6 +1,7 @@
 import { jest, expect, beforeAll, afterAll } from '@jest/globals';
 import { BaseDriver } from '@cubejs-backend/base-driver';
 import cubejs, { CubejsApi } from '@cubejs-client/core';
+import { sign } from 'jsonwebtoken';
 import { Environment } from '../types/Environment';
 import {
   getFixtures,
@@ -27,6 +28,7 @@ export function testQueries(type: string): void {
         it(name, test);
       }
     }
+    const apiToken = sign({}, 'mysupersecret');
 
     beforeAll(async () => {
       env = await runEnvironment(type);
@@ -40,7 +42,7 @@ export function testQueries(type: string): void {
         process.env.CUBEJS_DB_HOST = '127.0.0.1';
         process.env.CUBEJS_DB_PORT = `${env.data.port}`;
       }
-      client = cubejs('mysupersecret', {
+      client = cubejs(apiToken, {
         apiUrl: `http://127.0.0.1:${env.cube.port}/cubejs-api/v1`,
       });
       driver = (await getDriver(type)).source;
@@ -65,19 +67,19 @@ export function testQueries(type: string): void {
 
     // MUST be the first test in the list!
     execute('must built pre-aggregations', async () => {
-      await buildPreaggs(env.cube.port, 'mysupersecret', {
+      await buildPreaggs(env.cube.port, apiToken, {
         timezones: ['UTC'],
         preAggregations: ['Customers.RAExternal'],
         contexts: [{ securityContext: { tenant: 't1' } }],
       });
 
-      await buildPreaggs(env.cube.port, 'mysupersecret', {
+      await buildPreaggs(env.cube.port, apiToken, {
         timezones: ['UTC'],
         preAggregations: ['ECommerce.SAExternal'],
         contexts: [{ securityContext: { tenant: 't1' } }],
       });
       
-      await buildPreaggs(env.cube.port, 'mysupersecret', {
+      await buildPreaggs(env.cube.port, apiToken, {
         timezones: ['UTC'],
         preAggregations: ['ECommerce.TAExternal'],
         contexts: [{ securityContext: { tenant: 't1' } }],
