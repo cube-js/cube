@@ -3,6 +3,29 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.32.30](https://github.com/cube-js/cube/compare/v0.32.29...v0.32.30) (2023-04-28)
+
+
+### Bug Fixes
+
+* Always log authentication errors for debugging purpose ([2c309b7](https://github.com/cube-js/cube/commit/2c309b7d8122c19397a649e51d4b2a032361f8ee))
+* **cubejs-playground:** SL-58 CC-1686 text and icon fixes ([#6490](https://github.com/cube-js/cube/issues/6490)) ([1fa96f0](https://github.com/cube-js/cube/commit/1fa96f04b7068887c0541f2fcfba51400b8ddc3c))
+* **cubesql:** Resolve Grafana introspection issues ([db32377](https://github.com/cube-js/cube/commit/db32377f6e6d45c8c16b12ee7e51fdf1e9687fc9))
+* **cubestore:** Error in Sparse HLL entry parsing ([#6498](https://github.com/cube-js/cube/issues/6498)) ([9719cdc](https://github.com/cube-js/cube/commit/9719cdcc39461948e85ea7f2c4bdae377a8dba83))
+* model style guide, views folder ([#6493](https://github.com/cube-js/cube/issues/6493)) ([1fa7f99](https://github.com/cube-js/cube/commit/1fa7f994551e05fd2ef417bd2ee7f472881bc2bc))
+* **snowflake-driver:** Int is exported to pre-aggregations as decimal… ([#6513](https://github.com/cube-js/cube/issues/6513)) ([3710b11](https://github.com/cube-js/cube/commit/3710b113160d4b0f53b40d6b31ae9c901aa51571))
+
+
+### Features
+
+* **bigquery-driver:** CI, read-only, streaming and unloading ([#6495](https://github.com/cube-js/cube/issues/6495)) ([4c07431](https://github.com/cube-js/cube/commit/4c07431033df7554ffb6f9d5f64eca156267b3e3))
+* **gateway:** GraphQL snake case support ([#6480](https://github.com/cube-js/cube/issues/6480)) ([45a46d0](https://github.com/cube-js/cube/commit/45a46d0556c07842830bf55447f4f575fc158ef6))
+* **playground:** cube type tag, public cubes ([#6482](https://github.com/cube-js/cube/issues/6482)) ([cede7a7](https://github.com/cube-js/cube/commit/cede7a71f7d2e8d9dc221669b6b1714ee146d8ea))
+
+
+
+
+
 ## [0.32.29](https://github.com/cube-js/cube/compare/v0.32.28...v0.32.29) (2023-04-25)
 
 

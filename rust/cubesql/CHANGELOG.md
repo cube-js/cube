@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.32.30](https://github.com/cube-js/cube.js/compare/v0.32.29...v0.32.30) (2023-04-28)
+
+
+### Bug Fixes
+
+* **cubesql:** Resolve Grafana introspection issues ([db32377](https://github.com/cube-js/cube.js/commit/db32377f6e6d45c8c16b12ee7e51fdf1e9687fc9))
+
+
+
+
+
 ## [0.32.28](https://github.com/cube-js/cube/compare/v0.32.27...v0.32.28) (2023-04-19)
 
 

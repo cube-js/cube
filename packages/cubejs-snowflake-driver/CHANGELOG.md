@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.32.30](https://github.com/cube-js/cube/compare/v0.32.29...v0.32.30) (2023-04-28)
+
+
+### Bug Fixes
+
+* **snowflake-driver:** Int is exported to pre-aggregations as decimal… ([#6513](https://github.com/cube-js/cube/issues/6513)) ([3710b11](https://github.com/cube-js/cube/commit/3710b113160d4b0f53b40d6b31ae9c901aa51571))
+
+
+### Features
+
+* **bigquery-driver:** CI, read-only, streaming and unloading ([#6495](https://github.com/cube-js/cube/issues/6495)) ([4c07431](https://github.com/cube-js/cube/commit/4c07431033df7554ffb6f9d5f64eca156267b3e3))
+
+
+
+
+
 ## [0.32.29](https://github.com/cube-js/cube/compare/v0.32.28...v0.32.29) (2023-04-25)
 
 
