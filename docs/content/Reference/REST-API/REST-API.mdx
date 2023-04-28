@@ -33,7 +33,7 @@ Example request:
 curl \
   -H "Authorization: EXAMPLE-API-TOKEN" \
   -G \
-  --data-urlencode 'query={"measures":["Users.count"]}' \
+  --data-urlencode 'query={"measures":["users.count"]}' \
   http://localhost:4000/cubejs-api/v1/load
 
 # Request with http method POST
@@ -42,39 +42,37 @@ curl \
  -X POST  \
  -H "Content-Type: application/json" \
  -H "Authorization: EXAMPLE-API-TOKEN" \
- --data '{"query": {"measures":["Users.count"]}}' \
+ --data '{"query": {"measures":["users.count"]}}' \
  http://localhost:4000/cubejs-api/v1/load
 ```
 
 Example response:
 
-```javascript
+```json
 {
-  query:{
-    measures:[
-      "Users.count"
-    ],
-    filters:[],
-    timezone:"UTC",
-    dimensions:[],
-    timeDimensions:[]
+  "query": {
+    "measures": ["users.count"],
+    "filters": [],
+    "timezone": "UTC",
+    "dimensions": [],
+    "timeDimensions": []
   },
-  data:[
+  "data": [
     {
-      "Users.count":"700"
+      "users.count": "700"
     }
   ],
-  annotation:{
-    measures:{
-      "Users.count":{
-        title:"Users Count",
-        shortTitle:"Count",
-        type:"number"
+  "annotation": {
+    "measures": {
+      "users.count": {
+        "title": "Users Count",
+        "shortTitle": "Count",
+        "type": "number"
       }
     },
-    dimensions:{},
-    segments:{},
-    timeDimensions:{}
+    "dimensions": {},
+    "segments": {},
+    "timeDimensions": {}
   }
 }
 ```
@@ -111,41 +109,35 @@ Example request:
 curl \
   -H "Authorization: EXAMPLE-API-TOKEN" \
   -G \
-  --data-urlencode 'query={"measures":["Users.count"],
-  "timeDimensions":[{"dimension": "Users.createdAt","granularity":"day","dateRange":["2019-03-01","2019-03-31"]}]}' \
+  --data-urlencode 'query={"measures":["users.count"],
+  "timeDimensions":[{"dimension": "users.createdAt","granularity":"day","dateRange":["2019-03-01","2019-03-31"]}]}' \
   http://localhost:4000/cubejs-api/v1/sql
 ```
 
 Example response:
 
-```javascript
+```json
 {
-  sql:{
-    sql:[
+  "sql": {
+    "sql": [
       "SELECT\n      date_trunc('day', (users.created_at::timestamptz AT TIME ZONE 'UTC')) \"users.created_at_date\", count(users.id) \"users.count\"\n    FROM\n      public.users AS users\n  WHERE (users.created_at >= $1::timestamptz AND users.created_at <= $2::timestamptz) GROUP BY 1 ORDER BY 1 ASC LIMIT 10000",
-      [
-        "2019-03-01T00:00:00Z",
-        "2019-03-31T23:59:59Z"
-      ]
+      ["2019-03-01T00:00:00Z", "2019-03-31T23:59:59Z"]
     ],
-    timeDimensionAlias:"users.created_at_date",
-    timeDimensionField:"Users.createdAt",
-    order:[
+    "timeDimensionAlias": "users.created_at_date",
+    "timeDimensionField": "users.createdAt",
+    "order": [
       {
-        id:"Users.createdAt",
-        desc:false
+        "id": "users.createdAt",
+        "desc": false
       }
     ],
-    cacheKeyQueries:{
-      queries:[
-        [
-          "select max(users.created_at) from public.users AS users",
-          []
-        ]
+    "cacheKeyQueries": {
+      "queries": [
+        ["select max(users.created_at) from public.users AS users", []]
       ],
-      renewalThreshold:21600
+      "renewalThreshold": 21600
     },
-    preAggregations:[]
+    "preAggregations": []
   }
 }
 ```
@@ -176,37 +168,37 @@ curl \
 
 Example response:
 
-```javascript
+```json
 {
-  cubes: [
+  "cubes": [
     {
-      name: 'Users',
-      title: 'Users',
-      connectedComponent: 1,
-      measures: [
+      "name": "Users",
+      "title": "Users",
+      "connectedComponent": 1,
+      "measures": [
         {
-          name: 'Users.count',
-          title: 'Users Count',
-          shortTitle: 'Count',
-          aliasName: 'users.count',
-          type: 'number',
-          aggType: 'count',
-          drillMembers: ['Users.id', 'Users.city', 'Users.createdAt'],
-        },
+          "name": "users.count",
+          "title": "Users Count",
+          "shortTitle": "Count",
+          "aliasName": "users.count",
+          "type": "number",
+          "aggType": "count",
+          "drillMembers": ["users.id", "users.city", "users.createdAt"]
+        }
       ],
-      dimensions: [
+      "dimensions": [
         {
-          name: 'Users.city',
-          title: 'Users City',
-          type: 'string',
-          aliasName: 'users.city',
-          shortTitle: 'City',
-          suggestFilterValues: true,
-        },
+          "name": "users.city",
+          "title": "Users City",
+          "type": "string",
+          "aliasName": "users.city",
+          "shortTitle": "City",
+          "suggestFilterValues": true
+        }
       ],
-      segments: [],
-    },
-  ];
+      "segments": []
+    }
+  ]
 }
 ```
 
@@ -265,7 +257,7 @@ Example request:
 
 ```bash{outputLines: 2-5}
 curl \
-  -d '{"action": "post", "selector": { "preAggregations": ["Orders.ordersByStatus"]}}' \
+  -d '{"action": "post", "selector": { "preAggregations": ["orders.category_and_date"]}}' \
   -H "Authorization: EXAMPLE-API-TOKEN" \
   -X POST \
   https://localhost:4000/cubejs-system/v1/pre-aggregations/jobs
@@ -312,8 +304,8 @@ Example response:
     "table": "prod_pre_aggregations.orders_category_and_date_hod0x3hf_03krd5ns_1hop3hn",
     "status": "processing",
     "selector": {
-      "cubes": ["Orders"],
-      "preAggregations": ["Orders.categoryAndDate"],
+      "cubes": ["orders"],
+      "preAggregations": ["orders.category_and_date"],
       "contexts": [
         {
           "securityContext": {
@@ -330,8 +322,8 @@ Example response:
     "table": "prod_pre_aggregations.orders_category_and_date_mzfp445f_r2h2isa5_1hop3hn",
     "status": "processing",
     "selector": {
-      "cubes": ["Orders"],
-      "preAggregations": ["Orders.categoryAndDate"],
+      "cubes": ["orders"],
+      "preAggregations": ["orders.category_and_date"],
       "contexts": [
         {
           "securityContext": {
@@ -348,8 +340,8 @@ Example response:
     "table": "prod_pre_aggregations.orders_category_and_date_hod0x3hf_03krd5ns_1hop3hn",
     "status": "missing_partition",
     "selector": {
-      "cubes": ["Orders"],
-      "preAggregations": ["Orders.categoryAndDate"],
+      "cubes": ["orders"],
+      "preAggregations": ["orders.category_and_date"],
       "contexts": [
         {
           "securityContext": {
@@ -366,8 +358,8 @@ Example response:
     "table": "prod_pre_aggregations.orders_category_and_date_mzfp445f_r2h2isa5_1hop3hn",
     "status": "missing_partition",
     "selector": {
-      "cubes": ["Orders"],
-      "preAggregations": ["Orders.categoryAndDate"],
+      "cubes": ["orders"],
+      "preAggregations": ["orders.category_and_date"],
       "contexts": [
         {
           "securityContext": {
@@ -400,8 +392,8 @@ Example response with `resType: object`:
     "table": "prod_pre_aggregations.orders_category_and_date_hod0x3hf_03krd5ns_1hop3hn",
     "status": "processing",
     "selector": {
-      "cubes": ["Orders"],
-      "preAggregations": ["Orders.categoryAndDate"],
+      "cubes": ["orders"],
+      "preAggregations": ["orders.category_and_date"],
       "contexts": [
         {
           "securityContext": {
@@ -417,8 +409,8 @@ Example response with `resType: object`:
     "table": "prod_pre_aggregations.orders_category_and_date_mzfp445f_r2h2isa5_1hop3hn",
     "status": "processing",
     "selector": {
-      "cubes": ["Orders"],
-      "preAggregations": ["Orders.categoryAndDate"],
+      "cubes": ["orders"],
+      "preAggregations": ["orders.category_and_date"],
       "contexts": [
         {
           "securityContext": {
@@ -434,8 +426,8 @@ Example response with `resType: object`:
     "table": "prod_pre_aggregations.orders_category_and_date_hod0x3hf_03krd5ns_1hop3hn",
     "status": "missing_partition",
     "selector": {
-      "cubes": ["Orders"],
-      "preAggregations": ["Orders.categoryAndDate"],
+      "cubes": ["orders"],
+      "preAggregations": ["orders.category_and_date"],
       "contexts": [
         {
           "securityContext": {
@@ -451,8 +443,8 @@ Example response with `resType: object`:
     "table": "prod_pre_aggregations.orders_category_and_date_mzfp445f_r2h2isa5_1hop3hn",
     "status": "missing_partition",
     "selector": {
-      "cubes": ["Orders"],
-      "preAggregations": ["Orders.categoryAndDate"],
+      "cubes": ["orders"],
+      "preAggregations": ["orders.category_and_date"],
       "contexts": [
         {
           "securityContext": {
