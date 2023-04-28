@@ -41,9 +41,6 @@
       "path": "packages/cubejs-testing"
     },
     {
-      "path": "packages/cubejs-testing-drivers"
-    },
-    {
       "path": "packages/cubejs-druid-driver"
     },
     {
@@ -105,6 +102,9 @@
     },
     {
       "path": "packages/cubejs-server"
+    },
+    {
+      "path": "packages/cubejs-testing-drivers"
     },
     {
       "path": "packages/cubejs-cli"
