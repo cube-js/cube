@@ -1459,15 +1459,18 @@ class ApiGateway {
         stream: await this.getAdapterApi(context).streamQuery(q),
       };
       return _stream;
-    } catch (e) {
-      // TODO handle error log
-      this.log({
-        type: 'Streaming Error',
+    } catch (err: any) {
+      const e = err.message === 'Continue wait' ? { error: 'Continue wait' } : err;
+      this.handleError({
+        e,
+        context,
         query,
-        error: (<Error>e).message,
-        duration: this.duration(requestStarted),
-      }, context);
-      throw e;
+        res: (errorObj) => {
+          throw errorObj;
+        },
+        requestStarted
+      });
+      return null;
     }
   }
 

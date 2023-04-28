@@ -117,7 +117,10 @@ function wrapNativeFunctionWithChannelCallback(
 };
 
 const errorString = (err: any) =>
-  err.message || err.stack?.toString() || typeof err === 'string' ? err.toString() : JSON.stringify(err);
+  err.error ||
+    err.message ||
+    err.stack?.toString() ||
+    (typeof err === 'string' ? err.toString() : JSON.stringify(err));
 
 // TODO: Refactor - define classes
 function wrapNativeFunctionWithStream(
