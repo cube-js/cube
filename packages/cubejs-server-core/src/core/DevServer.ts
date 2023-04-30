@@ -503,10 +503,14 @@ export class DevServer {
       if (!variables.CUBEJS_API_SECRET) {
         variables.CUBEJS_API_SECRET = options.apiSecret;
       }
-
-      const envs = dotenv.parse(fs.readFileSync(path.join(process.cwd(), '.env')));
       
-      const schemaPath = envs.CUBEJS_SCHEMA_PATH || 'model';
+      let envs: Record<string, string> = {};
+      const envPath = path.join(process.cwd(), '.env');
+      if (fs.existsSync(envPath)) {
+        envs = dotenv.parse(fs.readFileSync(envPath));
+      }
+      
+      const schemaPath = envs.CUBEJS_SCHEMA_PATH || process.env.CUBEJS_SCHEMA_PATH || 'model';
       
       variables.CUBEJS_EXTERNAL_DEFAULT = 'true';
       variables.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'true';

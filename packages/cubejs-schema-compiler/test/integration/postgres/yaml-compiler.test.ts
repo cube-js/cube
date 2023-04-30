@@ -346,14 +346,18 @@ cubes:
         
 views:
   - name: orders_view
+
     cubes:
       - cube: orders
         prefix: true
         includes:
           - count
-          - member: time
-            name: date
+          - name: time
+            alias: date
+
       - cube: orders.customers
+        alias: aliased_customers
+        prefix: true
         includes:
           - name
     `);
@@ -361,7 +365,7 @@ views:
 
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
       measures: ['orders_view.orders_count'],
-      dimensions: ['orders_view.name'],
+      dimensions: ['orders_view.aliased_customers_name'],
       timeDimensions: [{
         dimension: 'orders_view.orders_date',
         granularity: 'day',
@@ -374,12 +378,13 @@ views:
     console.log(query.buildSqlAndParams());
 
     const res = await dbRunner.evaluateQueryWithPreAggregations(query);
+
     console.log(JSON.stringify(res));
 
     expect(res).toEqual(
       [{
         orders_view__orders_count: '1',
-        orders_view__name: 'Foo',
+        orders_view__aliased_customers_name: 'Foo',
         orders_view__orders_date_day: '2022-01-01T00:00:00.000Z',
       }]
     );

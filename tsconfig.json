@@ -104,6 +104,9 @@
       "path": "packages/cubejs-server"
     },
     {
+      "path": "packages/cubejs-testing-drivers"
+    },
+    {
       "path": "packages/cubejs-cli"
     },
     {

@@ -181,16 +181,17 @@ impl TransportService for NodeBridgeTransport {
     ) -> Result<CubeStreamReceiver, CubeError> {
         trace!("[transport] Request ->");
 
+        let request_id = Uuid::new_v4().to_string();
+        let mut span_counter: u32 = 1;
         loop {
             let native_auth = ctx
                 .as_any()
                 .downcast_ref::<NativeAuthContext>()
                 .expect("Unable to cast AuthContext to NativeAuthContext");
 
-            let request_id = Uuid::new_v4().to_string();
             let extra = serde_json::to_string(&LoadRequest {
                 request: TransportRequest {
-                    id: format!("{}-span-{}", request_id, 1),
+                    id: format!("{}-span-{}", request_id, span_counter),
                     meta: Some(meta.clone()),
                 },
                 query: query.clone(),
@@ -211,6 +212,7 @@ impl TransportService for NodeBridgeTransport {
 
             if let Err(e) = &res {
                 if e.message.to_lowercase().contains("continue wait") {
+                    span_counter += 1;
                     continue;
                 }
             }

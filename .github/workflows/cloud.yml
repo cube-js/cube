@@ -7,6 +7,7 @@ on:
     paths:
       - '.github/actions/integration/athena.sh'
       - '.github/actions/integration/bigquery.sh'
+      - '.github/actions/integration/snowflake.sh'
       - '.github/workflows/cloud.yml'
       - 'packages/cubejs-testing/**'
       - 'packages/cubejs-testing-shared/**'
@@ -17,6 +18,7 @@ on:
       # drivers
       - 'packages/cubejs-athena-driver/**'
       - 'packages/cubejs-bigquery-driver/**'
+      - 'packages/cubejs-snowflake-driver/**'
       - 'lerna.json'
       - 'package.json'
       - 'yarn.lock'
@@ -29,7 +31,7 @@ jobs:
     strategy:
       matrix:
         node-version: [ 16.x ]
-        db: [ 'athena', 'bigquery' ]
+        db: [ 'athena', 'bigquery', 'snowflake' ]
       fail-fast: false
 
     steps:
@@ -67,6 +69,8 @@ jobs:
         run: yarn policies set-version v1.22.19
       - name: Yarn install
         run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
+      - name: Build client
+        run: yarn build
       - name: Lerna tsc
         run: yarn tsc
       - name: Run Integration tests for ${{ matrix.db }} matrix
@@ -75,4 +79,6 @@ jobs:
           CUBEJS_DB_BQ_CREDENTIALS: ${{ secrets.CUBEJS_DB_BQ_CREDENTIALS }}
           CUBEJS_AWS_KEY: ${{ secrets.CUBEJS_AWS_KEY }}
           CUBEJS_AWS_SECRET: ${{ secrets.CUBEJS_AWS_SECRET }}
+          CUBEJS_DB_USER: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_USER }}
+          CUBEJS_DB_PASS: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_PASS }}
         run: ./.github/actions/integration/${{ matrix.db }}.sh
