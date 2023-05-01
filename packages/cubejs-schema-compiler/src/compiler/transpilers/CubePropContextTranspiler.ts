@@ -16,7 +16,8 @@ export const transpiledFieldsPatterns: Array<RegExp> = [
   /^(preAggregations|pre_aggregations)\.[_a-zA-Z][_a-zA-Z0-9]*\.(timeDimensionReference|timeDimension|time_dimension|segments|dimensions|measures|rollups|segmentReferences|dimensionReferences|measureReferences|rollupReferences)$/,
   /^contextMembers$/,
   /^includes$/,
-  /^excludes$/
+  /^excludes$/,
+  /^cubes\.[0-9]+\.joinPath$/,
 ];
 
 export const transpiledFields: Set<String> = new Set<String>();
