@@ -455,16 +455,15 @@ cubes:
         measures:
           - name: count
             type: count
-    `, 
-      {} ,
-      { 
-        compileContext: { 
-          authInfo: null,
-          securityContext: { can_see_orders: true },
-          requestId: 'XXX'
-        }
+    `,
+    {},
+    {
+      compileContext: {
+        authInfo: null,
+        securityContext: { can_see_orders: true },
+        requestId: 'XXX'
       }
-    );
+    });
 
     await compiler.compile();
 

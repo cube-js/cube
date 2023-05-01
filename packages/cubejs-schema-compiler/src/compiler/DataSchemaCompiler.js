@@ -245,7 +245,7 @@ export class DataSchemaCompiler {
   // Alias "securityContext" with "security_context" (snake case version)
   // to support snake case based data models
   cloneCompileContextWithGetterAlias(compileContext) {
-    let clone = R.clone(compileContext || {});
+    const clone = R.clone(compileContext || {});
     clone.security_context = compileContext.securityContext;
     return clone;
   }
