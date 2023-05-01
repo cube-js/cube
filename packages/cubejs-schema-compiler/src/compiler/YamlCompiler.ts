@@ -110,14 +110,8 @@ export class YamlCompiler {
     }
     if (typeof obj === 'object') {
       if (Array.isArray(obj)) {
-        console.log('if array recursive')
-        console.log(propertyPath)
-        console.log(JSON.stringify(obj))
         return t.arrayExpression(obj.map((value, i) => this.transpileYaml(value, propertyPath.concat(i.toString()), cubeName, errorsReport)));
       } else {
-        console.log('if object recursive')
-        console.log(propertyPath)
-        console.log(JSON.stringify(obj))
         const properties: any[] = [];
         for (const propKey of Object.keys(obj)) {
           const ast = this.transpileYaml(obj[propKey], propertyPath.concat(propKey), cubeName, errorsReport);
@@ -126,7 +120,7 @@ export class YamlCompiler {
         return t.objectExpression(properties);
       }
     } else {
-      //console.log(`DUMP CONTEXT ${JSON.stringify(context)}`)
+      // console.log(`DUMP CONTEXT ${JSON.stringify(context)}`)
       throw new Error(`Unexpected input during yaml transpiling: ${JSON.stringify(obj)}, ${typeof obj}, ${cubeName}, ${propertyPath}, ${JSON.stringify(transpiledFields)}`);
     }
   }
