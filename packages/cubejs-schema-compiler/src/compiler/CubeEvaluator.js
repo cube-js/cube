@@ -193,7 +193,7 @@ export class CubeEvaluator extends CubeSymbols {
    */
   membersFromCubes(cubes, type, errorReporter) {
     return R.unnest(cubes.map(cubeInclude => {
-      const fullPath = this.evaluateReferences(null, cubeInclude.cube, { collectJoinHints: true });
+      const fullPath = this.evaluateReferences(null, cubeInclude.joinPath, { collectJoinHints: true });
       const split = fullPath.split('.');
       const cubeReference = split[split.length - 1];
       const cubeName = cubeInclude.alias || cubeReference;
