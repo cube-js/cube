@@ -58,7 +58,7 @@ const Header: React.FC<Props> = (props) => (
           {/*  Community*/}
           {/*</Button>*/}
           <Button
-            href="https://cubejs-community.herokuapp.com/"
+            href="https://slack.cube.dev/"
             target="_blank"
             className={styles.headerButton}
           >
