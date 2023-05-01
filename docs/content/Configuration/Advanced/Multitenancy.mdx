@@ -173,15 +173,21 @@ should be used when users need access to different databases. For example, if
 you provide SaaS ecommerce hosting and each of your customers have a separate
 database, then each e-commerce store should be modeled as a separate tenant.
 
-```javascript
-const {
-  securityContext: { userId },
-} = COMPILE_CONTEXT;
+<CodeTabs>
 
+```yaml
+cubes:
+  - name: products
+    sql_table: "{COMPILE_CONTEXT.securityContext.userId}.products"
+```
+
+```javascript
 cube(`products`, {
-  sql: `SELECT * FROM ${userId}.products`,
+  sql_table: `${COMPILE_CONTEXT.securityContext.userId}.products`
 });
 ```
+
+</CodeTabs>
 
 ### <--{"id" : "Multitenancy"}--> Running in Production
 
