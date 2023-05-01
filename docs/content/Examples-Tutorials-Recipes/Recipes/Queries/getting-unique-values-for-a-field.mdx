@@ -17,9 +17,26 @@ dropdown. In the recipe below, we'll learn how to get unique values for
 
 To filter users by city, we need to define the appropriate dimension:
 
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: users
+    sql_table: users
+
+    dimensions:
+      - name: city
+        sql: city
+        type: string
+
+      - name: state
+        sql: state
+        type: string
+```
+
 ```javascript
-cube(`Users`, {
-  sql: `SELECT * FROM public.users`,
+cube(`users`, {
+  sql_table: `users`,
 
   dimensions: {
     city: {
@@ -35,14 +52,16 @@ cube(`Users`, {
 });
 ```
 
+</CodeTabs>
+
 ## Query
 
 It is enough to include only a dimension in the query to get all unique values
 of that dimension:
 
-```javascript
+```json
 {
-  "dimensions": ["Users.city"]
+  "dimensions": ["users.city"]
 }
 ```
 
@@ -51,51 +70,50 @@ of that dimension:
 We got the unique values of the `city` dimension, and now we can use them in the
 dropdown on the dashboard:
 
-```javascript
+```json
 [
   {
-    'Users.city': 'Austin',
+    "users.city": "Austin"
   },
   {
-    'Users.city': 'Chicago',
+    "users.city": "Chicago"
   },
   {
-    'Users.city': 'Los Angeles',
+    "users.city": "Los Angeles"
   },
   {
-    'Users.city': 'Mountain View',
-  },
-];
+    "users.city": "Mountain View"
+  }
+]
 ```
 
 ## Choosing dimensions
 
 In case we need to choose a dimension or render dropdowns for all dimensions, we
-can fetch the list of dimensions for all cubes from the `/meta`
-[endpoint](https://cube.dev/docs/rest-api#api-reference-v-1-meta):
+can fetch the list of dimensions for all cubes from the [`/meta`
+endpoint](https://cube.dev/docs/rest-api#api-reference-v-1-meta):
 
 ```bash{promptUser: user}
 curl http://localhost:4000/cubejs-api/v1/meta
 ```
 
-```javascript
-// Information about cubes, dimensions included
+```json
 {
   "cubes": [
     {
-      "name": "Users",
+      "name": "users",
       "title": "Users",
       "measures": [],
       "dimensions": [
         {
-          "name": "Users.city",
+          "name": "users.city",
           "title": "Users City",
           "type": "string",
           "shortTitle": "City",
           "suggestFilterValues": true
         },
         {
-          "name": "Users.state",
+          "name": "users.state",
           "title": "Users State",
           "type": "string",
           "shortTitle": "State",

@@ -23,8 +23,73 @@ BigQuery][self-config-google-bigquery]).
 
 Let's use an example of a cube with a nested SQL query:
 
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: users_with_organizations
+    sql: >
+      WITH users AS (
+          SELECT
+            md5(company) AS organization_id,
+            id AS user_id,
+            created_at
+          FROM public.users
+      ),
+      organizations AS (
+        (
+          SELECT
+            md5(company) AS id,
+            company AS name,
+            MIN(created_at)
+          FROM
+            public.users
+          GROUP BY
+            1,
+            2
+        )
+      )
+      SELECT
+        users.*,
+        organizations.name AS org_name
+      FROM
+        users
+      LEFT JOIN organizations
+        ON users.organization_id = organizations.id
+
+    pre_aggregations:
+      - name: main
+        dimensions:
+          - id
+          - organization_id
+        time_dimension: created_at
+        refresh_key:
+          every: 1 day
+          incremental: true
+        granularity: day
+        partition_granularity: month
+        build_range_start:
+          sql: SELECT DATE('2021-01-01')
+        build_range_end:
+          sql: SELECT NOW()
+
+    dimensions:
+      - name: id
+        primary_key: true
+        sql: user_id
+        type: number
+
+      - name: organization_id
+        sql: organization_id
+        type: string
+
+      - name: created_at
+        sql: created_at
+        type: time
+```
+
 ```javascript
-cube('UsersWithOrganizations', {
+cube('users_with_organizations', {
 
   sql: `
 WITH users AS (
@@ -56,25 +121,40 @@ LEFT JOIN organizations
   ON users.organization_id = organizations.id
 `,
 
-  preAggregations: {
+  pre_aggregations: {
     main: {
-      dimensions: [CUBE.id, CUBE.organizationId]
-      timeDimension: CUBE.createdAt,
-      refreshKey: {
+      dimensions: [CUBE.id, CUBE.organization_id]
+      time_dimension: CUBE.createdAt,
+      refresh_key: {
         every: `1 day`,
         incremental: true,
       },
       granularity: `day`,
-      partitionGranularity: `month`,
-      buildRangeStart: { sql: `SELECT DATE('2021-01-01')` },
-      buildRangeEnd: { sql: `SELECT NOW()` },
+      partition_granularity: `month`,
+      build_range_start: { sql: `SELECT DATE('2021-01-01')` },
+      build_range_end: { sql: `SELECT NOW()` },
     },
   },
 
-  ...,
-
+  dimensions: {
+    id: {
+      primary_key: true,
+      sql: `user_id`,
+      type: `number`
+    },
+    organization_id: {
+      sql: `organization_id`,
+      type: `string`
+    },
+    created_at: {
+      sql: `created_at`,
+      type: `time`
+    }
+  }
 });
 ```
+
+</CodeTabs>
 
 The cube above pre-aggregates the results of the `sql` property, and is
 configured to incrementally build them as long as the date range is not before
@@ -87,11 +167,49 @@ only applies the date range to the final result of the SQL query defined in
 
 In order to do the above, we'll "push down" the predicates to the inner SQL
 query using [`FILTER_PARAMS`][ref-schema-ref-cube-filterparam] in conjunction
-with the [`buildRangeStart` and `buildRangeStart`
+with the [`build_range_start` and `build_range_end`
 properties][ref-schema-ref-preagg-buildrange]:
 
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: users_with_organizations
+    sql: >
+      WITH users AS (
+          SELECT
+            md5(company) AS organization_id,
+            id AS user_id,
+            created_at
+          FROM public.users
+          WHERE {FILTER_PARAMS.users_with_organizations.created_at.filter('created_at')}
+      ),
+      organizations AS (
+        (
+          SELECT
+            md5(company) AS id,
+            company AS name,
+            MIN(created_at)
+          FROM
+            public.users
+          GROUP BY
+            1,
+            2
+        )
+      )
+      SELECT
+        users.*,
+        organizations.name AS org_name
+      FROM
+        users
+      LEFT JOIN organizations
+        ON users.organization_id = organizations.id
+
+  # ...
+```
+
 ```javascript
-cube('UsersWithOrganizations', {
+cube('users_with_organizations', {
   sql: `
 WITH users AS (
     SELECT
@@ -99,7 +217,7 @@ WITH users AS (
       id AS user_id,
       created_at
     FROM public.users
-    WHERE ${FILTER_PARAMS.UsersWithOrganizations.createdAt.filter('created_at')}
+    WHERE ${FILTER_PARAMS.users_with_organizations.created_at.filter('created_at')}
 ),
 organizations AS (
   (
@@ -122,16 +240,20 @@ FROM
 LEFT JOIN organizations
   ON users.organization_id = organizations.id
 `,
+
+  // ...
 });
 ```
+
+</CodeTabs>
 
 ## Result
 
 By adding `FILTER_PARAMS` to the subquery inside the `sql` property, we now
 limit the initial size of the dataset by applying the filter as early as
 possible. When the pre-aggregations are incrementally built, the same filter is
-used to apply the build ranges as defined by `buildRangeStart` and
-`buildRangeEnd`.
+used to apply the build ranges as defined by `build_range_start` and
+`build_range_end`.
 
 [ref-schema-ref-preagg-buildrange]:
   /schema/reference/pre-aggregations#parameters-build-range-start-and-build-range-end
