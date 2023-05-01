@@ -277,7 +277,7 @@ cube('orders', {
     main: {
       measures: [order_total],
       dimensions: [product_name, product_category, zip_code],
-      timeDimension: timestamp,
+      time_dimension: timestamp,
       granularity: `hour`,
       partition_granularity: `day`,
       allow_non_strict_date_range_match: true,
