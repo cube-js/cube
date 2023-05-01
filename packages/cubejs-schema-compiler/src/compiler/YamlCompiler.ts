@@ -80,22 +80,20 @@ export class YamlCompiler {
   }
 
   private transpileYaml(obj, propertyPath, cubeName, errorsReport: ErrorReporter) {
-    if (transpiledFields.has(propertyPath[propertyPath.length - 1])) {
-      for (const p of transpiledFieldsPatterns) {
-        const fullPath = propertyPath.join('.');
-        if (fullPath.match(p)) {
-          if (typeof obj === 'string' && ['sql', 'sqlTable'].includes(propertyPath[propertyPath.length - 1])) {
-            return this.parsePythonIntoArrowFunction(`f"${this.escapeDoubleQuotes(obj)}"`, cubeName, obj, errorsReport);
-          } else if (typeof obj === 'string') {
-            return this.parsePythonIntoArrowFunction(obj, cubeName, obj, errorsReport);
-          } else if (Array.isArray(obj)) {
-            const resultAst = t.program([t.expressionStatement(t.arrayExpression(obj.map(code => {
-              const ast = this.parsePythonAndTranspileToJs(code, errorsReport);
-              return ast?.body[0]?.expression;
-            }).filter(ast => !!ast)))]);
-            return this.astIntoArrowFunction(resultAst, '', cubeName);
-          }
-        }
+    const fullPath = propertyPath.join('.');
+    const isInTranspiledFieldsPatterns = transpiledFieldsPatterns.some(pattern => fullPath.match(pattern));
+
+    if (isInTranspiledFieldsPatterns) {
+      if (typeof obj === 'string' && ['sql', 'sqlTable'].includes(propertyPath[propertyPath.length - 1])) {
+        return this.parsePythonIntoArrowFunction(`f"${this.escapeDoubleQuotes(obj)}"`, cubeName, obj, errorsReport);
+      } else if (typeof obj === 'string') {
+        return this.parsePythonIntoArrowFunction(obj, cubeName, obj, errorsReport);
+      } else if (Array.isArray(obj)) {
+        const resultAst = t.program([t.expressionStatement(t.arrayExpression(obj.map(code => {
+          const ast = this.parsePythonAndTranspileToJs(code, errorsReport);
+          return ast?.body[0]?.expression;
+        }).filter(ast => !!ast)))]);
+        return this.astIntoArrowFunction(resultAst, '', cubeName);
       }
     } else if (propertyPath[propertyPath.length - 1] === 'extends') {
       const ast = this.parsePythonAndTranspileToJs(obj, errorsReport);
@@ -112,8 +110,14 @@ export class YamlCompiler {
     }
     if (typeof obj === 'object') {
       if (Array.isArray(obj)) {
+        console.log('if array recursive')
+        console.log(propertyPath)
+        console.log(JSON.stringify(obj))
         return t.arrayExpression(obj.map((value, i) => this.transpileYaml(value, propertyPath.concat(i.toString()), cubeName, errorsReport)));
       } else {
+        console.log('if object recursive')
+        console.log(propertyPath)
+        console.log(JSON.stringify(obj))
         const properties: any[] = [];
         for (const propKey of Object.keys(obj)) {
           const ast = this.transpileYaml(obj[propKey], propertyPath.concat(propKey), cubeName, errorsReport);
@@ -122,7 +126,8 @@ export class YamlCompiler {
         return t.objectExpression(properties);
       }
     } else {
-      throw new Error(`Unexpected input during yaml transpiling: ${JSON.stringify(obj)}`);
+      //console.log(`DUMP CONTEXT ${JSON.stringify(context)}`)
+      throw new Error(`Unexpected input during yaml transpiling: ${JSON.stringify(obj)}, ${typeof obj}, ${cubeName}, ${propertyPath}, ${JSON.stringify(transpiledFields)}`);
     }
   }
 

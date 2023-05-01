@@ -120,7 +120,7 @@ cube(`ECommerce`, {
 
 view(`ECommerceView`, {
   cubes: [{
-    cube: ECommerce,
+    name: ECommerce,
     includes: `*`,
     excludes: [`orderDate`]
   }]
