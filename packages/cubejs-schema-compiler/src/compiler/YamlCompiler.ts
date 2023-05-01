@@ -120,7 +120,6 @@ export class YamlCompiler {
         return t.objectExpression(properties);
       }
     } else {
-      // console.log(`DUMP CONTEXT ${JSON.stringify(context)}`)
       throw new Error(`Unexpected input during yaml transpiling: ${JSON.stringify(obj)}, ${typeof obj}, ${cubeName}, ${propertyPath}, ${JSON.stringify(transpiledFields)}`);
     }
   }
