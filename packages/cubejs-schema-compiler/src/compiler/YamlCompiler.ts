@@ -80,20 +80,22 @@ export class YamlCompiler {
   }
 
   private transpileYaml(obj, propertyPath, cubeName, errorsReport: ErrorReporter) {
-    const fullPath = propertyPath.join('.');
-    const isInTranspiledFieldsPatterns = transpiledFieldsPatterns.some(pattern => fullPath.match(pattern));
-
-    if (isInTranspiledFieldsPatterns) {
-      if (typeof obj === 'string' && ['sql', 'sqlTable'].includes(propertyPath[propertyPath.length - 1])) {
-        return this.parsePythonIntoArrowFunction(`f"${this.escapeDoubleQuotes(obj)}"`, cubeName, obj, errorsReport);
-      } else if (typeof obj === 'string') {
-        return this.parsePythonIntoArrowFunction(obj, cubeName, obj, errorsReport);
-      } else if (Array.isArray(obj)) {
-        const resultAst = t.program([t.expressionStatement(t.arrayExpression(obj.map(code => {
-          const ast = this.parsePythonAndTranspileToJs(code, errorsReport);
-          return ast?.body[0]?.expression;
-        }).filter(ast => !!ast)))]);
-        return this.astIntoArrowFunction(resultAst, '', cubeName);
+    if (transpiledFields.has(propertyPath[propertyPath.length - 1])) {
+      for (const p of transpiledFieldsPatterns) {
+        const fullPath = propertyPath.join('.');
+        if (fullPath.match(p)) {
+          if (typeof obj === 'string' && ['sql', 'sqlTable'].includes(propertyPath[propertyPath.length - 1])) {
+            return this.parsePythonIntoArrowFunction(`f"${this.escapeDoubleQuotes(obj)}"`, cubeName, obj, errorsReport);
+          } else if (typeof obj === 'string') {
+            return this.parsePythonIntoArrowFunction(obj, cubeName, obj, errorsReport);
+          } else if (Array.isArray(obj)) {
+            const resultAst = t.program([t.expressionStatement(t.arrayExpression(obj.map(code => {
+              const ast = this.parsePythonAndTranspileToJs(code, errorsReport);
+              return ast?.body[0]?.expression;
+            }).filter(ast => !!ast)))]);
+            return this.astIntoArrowFunction(resultAst, '', cubeName);
+          }
+        }
       }
     } else if (propertyPath[propertyPath.length - 1] === 'extends') {
       const ast = this.parsePythonAndTranspileToJs(obj, errorsReport);

@@ -348,14 +348,14 @@ views:
   - name: orders_view
 
     cubes:
-      - name: orders
+      - join_path: orders
         prefix: true
         includes:
           - count
           - name: time
             alias: date
 
-      - name: orders.customers
+      - join_path: orders.customers
         alias: aliased_customers
         prefix: true
         includes:
