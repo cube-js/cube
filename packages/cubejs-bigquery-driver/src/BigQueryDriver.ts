@@ -20,7 +20,7 @@ import {
 } from '@google-cloud/bigquery';
 import { Bucket, Storage } from '@google-cloud/storage';
 import {
-  BaseDriver, DownloadTableCSVData,
+  BaseDriver, DownloadQueryResultsOptions, DownloadQueryResultsResult, DownloadTableCSVData,
   DriverInterface, QueryOptions, StreamTableData,
 } from '@cubejs-backend/base-driver';
 import { Query } from '@google-cloud/bigquery/build/src/bigquery';
@@ -237,6 +237,14 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
 
   public async isUnloadSupported() {
     return this.bucket !== null;
+  }
+
+  public async downloadQueryResults(query: string, values: unknown[], options: DownloadQueryResultsOptions): Promise<DownloadQueryResultsResult> {
+    if (options.streamImport) {
+      return this.stream(query, values, options);
+    }
+
+    return super.downloadQueryResults(query, values, options);
   }
 
   public async stream(
