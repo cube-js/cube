@@ -37,8 +37,8 @@ import {
   DriverCapabilities
 } from './driver.interface';
 
-const sortByKeys = (unordered) => {
-  const ordered = {};
+const sortByKeys = (unordered: any) => {
+  const ordered: any = {};
 
   Object.keys(unordered).sort().forEach((key) => {
     ordered[key] = unordered[key];
@@ -47,7 +47,7 @@ const sortByKeys = (unordered) => {
   return ordered;
 };
 
-const DbTypeToGenericType = {
+const DbTypeToGenericType: Record<string, string> = {
   'timestamp without time zone': 'timestamp',
   'character varying': 'text',
   varchar: 'text',
@@ -78,7 +78,7 @@ const DB_INT_MAX = 2147483647;
 const DB_INT_MIN = -2147483648;
 
 // Order of keys is important here: from more specific to less specific
-const DbTypeValueMatcher = {
+const DbTypeValueMatcher: Record<string, ((v: any) => boolean)> = {
   timestamp: (v) => v instanceof Date || v.toString().match(/^\d\d\d\d-\d\d-\d\dT\d\d:\d\d:\d\d/),
   date: (v) => v instanceof Date || v.toString().match(/^\d\d\d\d-\d\d-\d\d$/),
   int: (v) => {
@@ -268,7 +268,7 @@ export abstract class BaseDriver implements DriverInterface {
     return false;
   }
 
-  protected informationColumnsSchemaReducer(result, i) {
+  protected informationColumnsSchemaReducer(result: any, i: any) {
     let schema = (result[i.table_schema] || {});
     const tables = (schema[i.table_name] || []);
 
@@ -306,7 +306,7 @@ export abstract class BaseDriver implements DriverInterface {
     );
   }
 
-  public loadPreAggregationIntoTable(_preAggregationTableName: string, loadSql: string, params, options) {
+  public loadPreAggregationIntoTable(_preAggregationTableName: string, loadSql: string, params: any, options: any) {
     return this.query(loadSql, params, options);
   }
 
@@ -407,15 +407,15 @@ export abstract class BaseDriver implements DriverInterface {
     return `"${identifier}"`;
   }
 
-  protected cancelCombinator(fn) {
+  protected cancelCombinator(fn: any) {
     return cancelCombinator(fn);
   }
 
-  public setLogger(logger) {
+  public setLogger(logger: any) {
     this.logger = logger;
   }
 
-  protected reportQueryUsage(usage, queryOptions) {
+  protected reportQueryUsage(usage: any, queryOptions: any) {
     if (this.logger) {
       this.logger('SQL Query Usage', {
         ...usage,
@@ -424,7 +424,7 @@ export abstract class BaseDriver implements DriverInterface {
     }
   }
 
-  protected databasePoolError(error) {
+  protected databasePoolError(error: any) {
     if (this.logger) {
       this.logger('Database Pool Error', {
         error: (error.stack || error).toString()

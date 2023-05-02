@@ -8,7 +8,7 @@ class BaseDriverImplementedMock extends BaseDriver {
   // eslint-disable-next-line @typescript-eslint/no-empty-function
   public async testConnection(): Promise<void> {}
 
-  public async query(_query, _values) {
+  public async query(_query: string, _values: unknown[]) {
     return this.response;
   }
 }
