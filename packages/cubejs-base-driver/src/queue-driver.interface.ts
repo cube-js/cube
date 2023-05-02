@@ -6,6 +6,7 @@ export interface QueryKeyHash extends String {
   __type: 'QueryKeyHash'
 }
 
+export type GetActiveAndToProcessResponse = [active: string[], toProcess: string[]];
 export type AddToQueueResponse = [added: number, _b: any, _c: any, queueSize: number, addedToQueueTime: number];
 export type QueryStageStateResponse = [active: string[], toProcess: string[]] | [active: string[], toProcess: string[], defs: Record<string, QueryDef>];
 export type RetrieveForProcessingSuccess = [
@@ -74,11 +75,11 @@ export interface QueueDriverConnectionInterface {
   release(): void;
   //
   getQueriesToCancel(): Promise<string[]>
-  getActiveAndToProcess(): Promise<[active: string[], toProcess: string[]]>;
+  getActiveAndToProcess(): Promise<GetActiveAndToProcessResponse>;
 }
 
 export interface QueueDriverInterface {
   redisHash(queryKey: QueryKey): QueryKeyHash;
   createConnection(): Promise<QueueDriverConnectionInterface>;
-  release(connection: QueueDriverConnectionInterface): void;
+  release(connection: QueueDriverConnectionInterface): Promise<void>;
 }
