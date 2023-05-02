@@ -498,7 +498,7 @@ cube][ref-schema-measures] that should be included in the pre-aggregation:
 cube(`orders`, {
   sql_table: `orders`,
 
-  preAggregations: {
+  pre_aggregations: {
     users_rollup: {
       measures: [CUBE.count],
     },
