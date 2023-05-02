@@ -1034,14 +1034,14 @@ value for different users. It may change however for different tenants.
 
 ```javascript
 cube(`users`, {
-  sql_table: `user_${COMPILE_CONTEXT.securityContext.deployment_id}.users`,
+  sql_table: `user_${COMPILE_CONTEXT.security_context.deployment_id}.users`,
 });
 ```
 
 ```yaml
 cubes:
   - name: users
-    sql_table: "user_{COMPILE_CONTEXT.securityContext.deployment_id}.users"
+    sql_table: "user_{COMPILE_CONTEXT.security_context.deployment_id}.users"
 ```
 
 </CodeTabs>

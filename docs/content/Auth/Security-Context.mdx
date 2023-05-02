@@ -160,7 +160,7 @@ compiled. The following cube will ensure users only see results for their
 ```yaml
 cubes:
   - name: orders
-    sql_table: "{COMPILE_CONTEXT.securityContext.company_id}.orders"
+    sql_table: "{COMPILE_CONTEXT.security_context.company_id}.orders"
 
     measures:
       - name: count
@@ -169,7 +169,7 @@ cubes:
 
 ```javascript
 cube(`orders`, {
-  sql_table: `${COMPILE_CONTEXT.securityContext.company_id}.orders`,
+  sql_table: `${COMPILE_CONTEXT.security_context.company_id}.orders`,
 
   measures: {
     count: {

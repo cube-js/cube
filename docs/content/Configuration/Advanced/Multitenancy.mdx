@@ -94,13 +94,13 @@ module.exports = {
       return {
         type: 'athena',
         database: dataSource,
-        
+
         // ...
       };
     } else if (dataSource === 'googleAnalytics') {
       return {
         type: 'bigquery',
-        
+
         // ...
       };
     } else if (dataSource === 'financials') {
@@ -114,7 +114,7 @@ module.exports = {
     } else {
       return {
         type: 'postgres',
-        
+
         // ...
       };
     }
@@ -178,12 +178,12 @@ database, then each e-commerce store should be modeled as a separate tenant.
 ```yaml
 cubes:
   - name: products
-    sql_table: "{COMPILE_CONTEXT.securityContext.userId}.products"
+    sql_table: "{COMPILE_CONTEXT.security_context.userId}.products"
 ```
 
 ```javascript
 cube(`products`, {
-  sql_table: `${COMPILE_CONTEXT.securityContext.userId}.products`
+  sql_table: `${COMPILE_CONTEXT.security_context.userId}.products`
 });
 ```
 
