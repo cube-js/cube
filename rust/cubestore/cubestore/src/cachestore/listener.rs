@@ -12,7 +12,7 @@ impl RocksCacheStoreListener {
         Self { receiver }
     }
 
-    pub async fn wait_for_queue_ack(
+    pub async fn wait_for_queue_ack_by_path(
         mut self,
         path: String,
     ) -> Result<Option<QueueResultAckEvent>, CubeError> {
