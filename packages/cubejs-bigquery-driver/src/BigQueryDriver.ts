@@ -20,7 +20,7 @@ import {
 } from '@google-cloud/bigquery';
 import { Bucket, Storage } from '@google-cloud/storage';
 import {
-  BaseDriver, DownloadTableCSVData,
+  BaseDriver, DownloadQueryResultsOptions, DownloadQueryResultsResult, DownloadTableCSVData,
   DriverInterface, QueryOptions, StreamTableData,
 } from '@cubejs-backend/base-driver';
 import { Query } from '@google-cloud/bigquery/build/src/bigquery';
