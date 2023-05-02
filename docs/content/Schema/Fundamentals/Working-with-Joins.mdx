@@ -97,7 +97,7 @@ cube(`customers`, {
   // ...
 
   joins: {
-    crders: {
+    orders: {
       relationship: `one_to_many`,
       sql: `${CUBE}.id = ${orders.customer_id}`,
     },
