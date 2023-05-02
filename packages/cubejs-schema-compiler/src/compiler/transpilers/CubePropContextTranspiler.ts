@@ -17,7 +17,7 @@ export const transpiledFieldsPatterns: Array<RegExp> = [
   /^contextMembers$/,
   /^includes$/,
   /^excludes$/,
-  /^cubes\.[0-9]+\.cube$/,
+  /^cubes\.[0-9]+\.joinPath$/,
 ];
 
 export const transpiledFields: Set<String> = new Set<String>();

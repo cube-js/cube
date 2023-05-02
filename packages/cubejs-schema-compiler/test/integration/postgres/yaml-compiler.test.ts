@@ -348,14 +348,14 @@ views:
   - name: orders_view
 
     cubes:
-      - cube: orders
+      - join_path: orders
         prefix: true
         includes:
           - count
           - name: time
             alias: date
 
-      - cube: orders.customers
+      - join_path: orders.customers
         alias: aliased_customers
         prefix: true
         includes:
@@ -443,5 +443,42 @@ cubes:
         active_users__weekly_active: '1',
       }]
     );
+  });
+
+  it('COMPILE_CONTEXT', async () => {
+    const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
+    cubes:
+      - name: orders
+        sql: "SELECT 1 as id, 'completed' as status"
+        public: COMPILE_CONTEXT.security_context.can_see_orders
+
+        measures:
+          - name: count
+            type: count
+    `,
+    {},
+    {
+      compileContext: {
+        authInfo: null,
+        securityContext: { can_see_orders: true },
+        requestId: 'XXX'
+      }
+    });
+
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'orders.count'
+      ],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles'
+    });
+
+    return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
+      expect(res).toEqual(
+        [{ orders__count: '1' }]
+      );
+    });
   });
 });
