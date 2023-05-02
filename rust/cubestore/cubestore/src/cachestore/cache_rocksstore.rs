@@ -710,7 +710,7 @@ impl CacheStore for RocksCacheStore {
                     Ok(())
                 } else {
                     trace!(
-                        "Unable to update heartbeat for queue item with path: {}",
+                        "Unable to update heartbeat, unknown path: {}",
                         path
                     );
 
@@ -821,7 +821,7 @@ impl CacheStore for RocksCacheStore {
 
                     Ok(())
                 } else {
-                    warn!("Unable ack queue, unknown path: {}", path);
+                    warn!("Unable to ack queue, unknown path: {}", path);
 
                     Ok(())
                 }
@@ -896,7 +896,7 @@ impl CacheStore for RocksCacheStore {
 
                     queue_schema.update(id_row.id, new, id_row.get_row(), batch_pipe)?;
                 } else {
-                    warn!("Unable merge extra, unknown path: {}", path);
+                    warn!("Unable to merge extra, unknown path: {}", path);
                 }
 
                 Ok(())
