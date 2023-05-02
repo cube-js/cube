@@ -421,7 +421,7 @@ export class RedisQueueDriver extends BaseQueueDriver implements QueueDriverInte
     });
   }
 
-  public async release(connection: RedisQueueDriverConnection) {
+  public release(connection: RedisQueueDriverConnection) {
     this.redisPool.release(connection.getRedisClient());
   }
 }

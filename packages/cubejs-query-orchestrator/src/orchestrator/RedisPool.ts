@@ -81,7 +81,9 @@ export class RedisPool {
 
   public release(client: AsyncRedisClient) {
     if (this.pool) {
-      this.pool.release(client);
+      this.pool.release(client).catch(() => {
+        // nothing to do
+      });
     } else if (client) {
       client.quit();
     }

@@ -81,5 +81,5 @@ export interface QueueDriverConnectionInterface {
 export interface QueueDriverInterface {
   redisHash(queryKey: QueryKey): QueryKeyHash;
   createConnection(): Promise<QueueDriverConnectionInterface>;
-  release(connection: QueueDriverConnectionInterface): Promise<void>;
+  release(connection: QueueDriverConnectionInterface): void;
 }
