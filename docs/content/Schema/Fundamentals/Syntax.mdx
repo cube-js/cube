@@ -76,11 +76,11 @@ you need to have a
 ```javascript
 cube(`orders`, {
   sql: `
-    SELECT * FROM
+    SELECT *
+    FROM
       orders,
       line_items
-    WHERE
-      orders.id = line_items.order_id
+    WHERE orders.id = line_items.order_id
   `,
 });
 ```
@@ -89,11 +89,9 @@ cube(`orders`, {
 cubes:
   - name: orders
     sql: >
-      SELECT * FROM
-        orders,
-        line_items
-      WHERE
-        orders.id = line_items.order_id
+      SELECT *
+      FROM orders, line_items
+      WHERE orders.id = line_items.order_id
 ```
 
 </CodeTabs>
@@ -103,9 +101,9 @@ cubes:
 YAML syntax is very similar to JavaScript syntax, with a few key differences:
 
 - In YAML syntax, cubes, views, and context variables should be wrapped in `{}`,
-  e.g., `{FILTER_PARAMS.Orders.created_at.filter('created_at')}`.
+  e.g., `{FILTER_PARAMS.orders.created_at.filter('created_at')}`.
 - In YAML syntax, string values only need to have quotes around them if they
-  contain special values, e.g., `"{CUBE}.user_id = {Users.id}"`.
+  contain special values, e.g., `"{CUBE}.user_id = {users.id}"`.
 
 [self-folder-structure]: #folder-structure
 [self-naming]: #naming

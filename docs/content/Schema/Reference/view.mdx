@@ -23,31 +23,35 @@ paths.
 
 Views **can not** have their own members. Instead, use the `includes` property
 to include measures and dimensions from other cubes into the view. In the
-example below, we create a new view `ActiveUsers` which is made up of properties
-from the `Users` cube:
+example below, we create a new view `active_users` which is made up of properties
+from the `users` cube:
 
 <CodeTabs>
 
 ```javascript
-view(`ActiveUsers`, {
+view(`active_users`, {
   description: `14 days rolling count of active users`,
+
   includes: [
     // Measure
-    Users.rolling_count,
+    users.rolling_count,
+
     // Dimensions
-    Users.city,
-    Users.created_at,
+    users.city,
+    users.created_at,
   ],
 });
 ```
 
 ```yaml
 views:
-  - name: ActiveUsers
+  - name: active_users
     description: 14 days rolling count of active users
+
     includes:
       # Measures
       - users.rolling_count
+
       # Dimensions
       - users.city
       - users.created_at
@@ -64,36 +68,41 @@ cube through nested joins:
 <CodeTabs>
 
 ```javascript
-view(`CompletedOrders`, {
-  description: "Count of completed orders",
-  includes: [Orders.completed_count],
+view(`completed_orders`, {
+  description: `Count of completed orders`,
 
-  measures: {
-    count: {
-      sql: `${Orders.completed_count}`,
-      type: `number`,
-    },
-  },
+  includes: [
+    orders.completed_count
+  ],
 
-  // In the example below we are controlling the join path with a nested path
-  // to the underlying member.
-  dimensions: {
-    userCity: {
-      sql: `${Orders.Users.city}`,
-      type: `string`,
-    },
-  },
+  cubes: {
+    // Setting an explicit join path to the included member.
+    "orders.users": {
+      includes: [
+        {
+          name: `city`,
+          alias: `user_city`
+        }
+      ]
+    }
+  }
 });
 ```
 
 ```yaml
 views:
-  - name: CompletedOrders
+  - name: completed_orders
+    description: Count of completed orders
+
     includes:
-      # Measures
-      - Orders.completed_count
-      # Dimensions
-      - Orders.Users.city
+      - orders.completed_count
+
+    cubes:
+      - name: orders.users
+        
+        includes:
+          - name: city
+            alias: user_city
 ```
 
 </CodeTabs>
@@ -102,11 +111,9 @@ Views can be queried the same way as cubes; the example below show how to query
 the above view with SQL API:
 
 ```sql
-SELECT
-  count,
-  userCountry
-FROM CompletedOrders
-GROUP BY 2
+SELECT user_city, completed_count
+FROM completed_orders
+GROUP BY 1
 ```
 
 Views also do not define any pre-aggregations, instead they re-use
@@ -142,14 +149,14 @@ ensures that data is interpreted correctly by users.
 <CodeTabs>
 
 ```javascript
-view(`ActiveUsers`, {
+view(`active_users`, {
   description: `14 days rolling count of active users`,
 });
 ```
 
 ```yaml
 views:
-  - name: ActiveUsers
+  - name: active_users
     description: 14 days rolling count of active users
 ```
 
@@ -162,24 +169,28 @@ The `includes` property is used to bulk add measures or dimensions to a view.
 <CodeTabs>
 
 ```javascript
-view(`ActiveUsers`, {
+view(`active_users`, {
   description: `14 days rolling count of active users`,
+
   includes: [
-    // Measure
-    Users.rolling_count,
+    // Measures
+    users.rolling_count,
+
     // Dimensions
-    Users.city,
-    Users.created_at,
+    users.city,
+    users.created_at,
   ],
 });
 ```
 
 ```yaml
 views:
-  - name: ActiveUsers
+  - name: active_users
+
     includes:
       # Measures
       - users.rolling_count
+
       # Dimensions
       - users.city
       - users.created_at
@@ -195,24 +206,30 @@ for `shown` are `true` and `false`.
 <CodeTabs>
 
 ```javascript
-view(`ARR`, {
+view(`arr`, {
   description: `Annual Recurring Revenue`,
   shown: true,
-  includes: [Revenue.arr, Revenue.date, Customers.plan],
+
+  includes: [
+    revenue.arr,
+    revenue.date,
+    customers.plan
+  ],
 });
 ```
 
 ```yaml
 views:
-  - name: ARR
+  - name: arr
     description: Annual Recurring Revenue
-    shown: COMPILE_CONTEXT.permissions['finance'],
+    shown: "{COMPILE_CONTEXT.permissions.is_finance}",
+    
     includes:
       # Measures
-      - Revenue.arr
+      - revenue.arr
       # Dimensions
-      - Revenue.date
-      - Customers.plan
+      - revenue.date
+      - customers.plan
 ```
 
 </CodeTabs>

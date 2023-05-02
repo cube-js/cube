@@ -17,7 +17,8 @@ treated as a segment:
 <CodeTabs>
 
 ```javascript
-cube(`Users`, {
+cube(`users`, {
+  // ...
   segments: {
     sf_users: {
       sql: `${CUBE}.location = 'San Francisco'`,
@@ -28,7 +29,9 @@ cube(`Users`, {
 
 ```yaml
 cubes:
-  - name: Users
+  - name: users
+    # ...
+
     segments:
       - name: sf_users
         sql: "{CUBE}.location = 'San Francisco'"
@@ -41,10 +44,15 @@ Or use segments to implement cross-column `OR` logic:
 <CodeTabs>
 
 ```javascript
-cube(`Users`, {
+cube(`users`, {
+  // ...
+
   segments: {
     sf_users: {
-      sql: `${CUBE}.location = 'San Francisco' or ${CUBE}.state = 'CA'`,
+      sql: `
+        ${CUBE}.location = 'San Francisco' OR
+        ${CUBE}.state = 'CA'
+      `,
     },
   },
 });
@@ -52,15 +60,19 @@ cube(`Users`, {
 
 ```yaml
 cubes:
-  - name: Users
+  - name: users
+    # ...
+
     segments:
       - name: sf_users
-        sql: "{CUBE}.location = 'San Francisco' or {CUBE}.state = 'CA'"
+        sql: >
+          {CUBE}.location = 'San Francisco' OR
+          {CUBE}.state = 'CA'
 ```
 
 </CodeTabs>
 
-As with other cube member definitions segments can be
+As with other cube member definitions, segments can be
 [generated][ref-schema-gen]:
 
 ```javascript
@@ -69,7 +81,9 @@ const userSegments = {
   ny_users: ["New York City", "NY"],
 };
 
-cube(`Users`, {
+cube(`users`, {
+  // ...
+
   segments: {
     ...Object.keys(userSegments)
       .map((segment) => ({
@@ -86,8 +100,8 @@ After defining a segment, you can pass it in [query object][ref-backend-query]:
 
 ```json
 {
-  "measures": ["Users.count"],
-  "segments": ["Users.sf_users"]
+  "measures": ["users.count"],
+  "segments": ["users.sf_users"]
 }
 ```
 
@@ -103,6 +117,8 @@ among all segments, dimensions, and measures within a cube and follow the
 
 ```javascript
 cube(`users`, {
+  // ...
+
   segments: {
     sf_users: {
       sql: `${CUBE}.location = 'San Francisco'`,
@@ -114,6 +130,8 @@ cube(`users`, {
 ```yaml
 cubes:
   - name: users
+    # ...
+
     segments:
       - name: sf_users
         sql: "{CUBE}.location = 'San Francisco'"
@@ -130,6 +148,8 @@ takes any SQL expression that would be valid within a `WHERE` statement.
 
 ```javascript
 cube(`users`, {
+  // ...
+
   segments: {
     sf_users: {
       sql: `${CUBE}.location = 'San Francisco'`,
@@ -141,6 +161,8 @@ cube(`users`, {
 ```yaml
 cubes:
   - name: users
+    # ...
+
     segments:
       - name: sf_users
         sql: "{CUBE}.location = 'San Francisco'"
@@ -151,14 +173,16 @@ cubes:
 ## Segments vs Dimension Filters
 
 As segments are simply predefined filters, it can be difficult to determine when
-to use segments instead of dimension filters.
+to use segments instead of filters on dimensions.
 
 Let's consider an example:
 
 <CodeTabs>
 
 ```javascript
-cube(`Users`, {
+cube(`users`, {
+  // ...
+
   dimensions: {
     location: {
       sql: `location`,
@@ -176,11 +200,14 @@ cube(`Users`, {
 
 ```yaml
 cubes:
-  - name: Users
+  - name: users
+    # ...
+
     dimensions:
       - name: location
         sql: location
         type: string
+
     segments:
       - name: sf_users
         sql: "{CUBE}.location = 'San Francisco'"
@@ -192,14 +219,12 @@ In this case following queries are equivalent:
 
 ```json
 {
-  "measures": ["Users.count"],
-  "filters": [
-    {
-      "member": "Users.location",
-      "operator": "equals",
-      "values": ["San Francisco"]
-    }
-  ]
+  "measures": ["users.count"],
+  "filters": [{
+    "member": "users.location",
+    "operator": "equals",
+    "values": ["San Francisco"]
+  }]
 }
 ```
 
@@ -207,14 +232,14 @@ and
 
 ```json
 {
-  "measures": ["Users.count"],
-  "segments": ["Users.sf_users"]
+  "measures": ["users.count"],
+  "segments": ["users.sf_users"]
 }
 ```
 
-This case is a bad candidate for segment usage and dimension filter works better
-here. `Users.location` filter value can change a lot for user queries and
-`Users.sf_users` segment won't be used much in this case.
+This case is a bad candidate for segment usage and a filter on a dimension works better
+here. `users.location` filter value can change a lot for user queries and
+`users.sf_users` segment won't be used much in this case.
 
 A good candidate case for a segment is when you have a complex filtering
 expression which can be reused for a lot of user queries. For example:
@@ -222,10 +247,15 @@ expression which can be reused for a lot of user queries. For example:
 <CodeTabs>
 
 ```javascript
-cube(`Users`, {
+cube(`users`, {
+  // ...
+
   segments: {
     sf_ny_users: {
-      sql: `${CUBE}.location = 'San Francisco' OR ${CUBE}.location like '%New York%'`,
+      sql: `
+        ${CUBE}.location = 'San Francisco' OR
+        ${CUBE}.location like '%New York%'
+      `,
     },
   },
 });
@@ -233,12 +263,14 @@ cube(`Users`, {
 
 ```yaml
 cubes:
-  - name: Users
+  - name: users
+    # ...
+
     segments:
       - name: sf_ny_users
-        sql:
-          "{CUBE}.location = 'San Francisco' OR {CUBE}.location like '%New
-          York%'"
+        sql: >
+          {CUBE}.location = 'San Francisco' OR
+          {CUBE}.location like '%New York%'
 ```
 
 </CodeTabs>
