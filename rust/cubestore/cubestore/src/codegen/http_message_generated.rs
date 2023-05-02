@@ -108,6 +108,122 @@ impl<'a> flatbuffers::Verifiable for HttpCommand {
 impl flatbuffers::SimpleToVerifyInSlice for HttpCommand {}
 pub struct HttpCommandUnionTableOffset {}
 
+#[deprecated(
+    since = "2.0.0",
+    note = "Use associated constants instead. This will no longer be generated in 2021."
+)]
+pub const ENUM_MIN_HTTP_PARAMETER_VALUE: u8 = 0;
+#[deprecated(
+    since = "2.0.0",
+    note = "Use associated constants instead. This will no longer be generated in 2021."
+)]
+pub const ENUM_MAX_HTTP_PARAMETER_VALUE: u8 = 6;
+#[deprecated(
+    since = "2.0.0",
+    note = "Use associated constants instead. This will no longer be generated in 2021."
+)]
+#[allow(non_camel_case_types)]
+pub const ENUM_VALUES_HTTP_PARAMETER_VALUE: [HttpParameterValue; 7] = [
+    HttpParameterValue::NONE,
+    HttpParameterValue::Int64Value,
+    HttpParameterValue::BoolValue,
+    HttpParameterValue::StringValue,
+    HttpParameterValue::BinaryValue,
+    HttpParameterValue::Float64Value,
+    HttpParameterValue::NullValue,
+];
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+#[repr(transparent)]
+pub struct HttpParameterValue(pub u8);
+#[allow(non_upper_case_globals)]
+impl HttpParameterValue {
+    pub const NONE: Self = Self(0);
+    pub const Int64Value: Self = Self(1);
+    pub const BoolValue: Self = Self(2);
+    pub const StringValue: Self = Self(3);
+    pub const BinaryValue: Self = Self(4);
+    pub const Float64Value: Self = Self(5);
+    pub const NullValue: Self = Self(6);
+
+    pub const ENUM_MIN: u8 = 0;
+    pub const ENUM_MAX: u8 = 6;
+    pub const ENUM_VALUES: &'static [Self] = &[
+        Self::NONE,
+        Self::Int64Value,
+        Self::BoolValue,
+        Self::StringValue,
+        Self::BinaryValue,
+        Self::Float64Value,
+        Self::NullValue,
+    ];
+    /// Returns the variant's name or "" if unknown.
+    pub fn variant_name(self) -> Option<&'static str> {
+        match self {
+            Self::NONE => Some("NONE"),
+            Self::Int64Value => Some("Int64Value"),
+            Self::BoolValue => Some("BoolValue"),
+            Self::StringValue => Some("StringValue"),
+            Self::BinaryValue => Some("BinaryValue"),
+            Self::Float64Value => Some("Float64Value"),
+            Self::NullValue => Some("NullValue"),
+            _ => None,
+        }
+    }
+}
+impl core::fmt::Debug for HttpParameterValue {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        if let Some(name) = self.variant_name() {
+            f.write_str(name)
+        } else {
+            f.write_fmt(format_args!("<UNKNOWN {:?}>", self.0))
+        }
+    }
+}
+impl<'a> flatbuffers::Follow<'a> for HttpParameterValue {
+    type Inner = Self;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        let b = flatbuffers::read_scalar_at::<u8>(buf, loc);
+        Self(b)
+    }
+}
+
+impl flatbuffers::Push for HttpParameterValue {
+    type Output = HttpParameterValue;
+    #[inline]
+    unsafe fn push(&self, dst: &mut [u8], _written_len: usize) {
+        flatbuffers::emplace_scalar::<u8>(dst, self.0);
+    }
+}
+
+impl flatbuffers::EndianScalar for HttpParameterValue {
+    type Scalar = u8;
+    #[inline]
+    fn to_little_endian(self) -> u8 {
+        self.0.to_le()
+    }
+    #[inline]
+    #[allow(clippy::wrong_self_convention)]
+    fn from_little_endian(v: u8) -> Self {
+        let b = u8::from_le(v);
+        Self(b)
+    }
+}
+
+impl<'a> flatbuffers::Verifiable for HttpParameterValue {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        u8::run_verifier(v, pos)
+    }
+}
+
+impl flatbuffers::SimpleToVerifyInSlice for HttpParameterValue {}
+pub struct HttpParameterValueUnionTableOffset {}
+
 pub enum HttpMessageOffset {}
 #[derive(Copy, Clone, PartialEq)]
 
@@ -414,6 +530,7 @@ impl<'a> HttpQuery<'a> {
     pub const VT_QUERY: flatbuffers::VOffsetT = 4;
     pub const VT_TRACE_OBJ: flatbuffers::VOffsetT = 6;
     pub const VT_INLINE_TABLES: flatbuffers::VOffsetT = 8;
+    pub const VT_PARAMETERS: flatbuffers::VOffsetT = 10;
 
     #[inline]
     pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
@@ -425,6 +542,9 @@ impl<'a> HttpQuery<'a> {
         args: &'args HttpQueryArgs<'args>,
     ) -> flatbuffers::WIPOffset<HttpQuery<'bldr>> {
         let mut builder = HttpQueryBuilder::new(_fbb);
+        if let Some(x) = args.parameters {
+            builder.add_parameters(x);
+        }
         if let Some(x) = args.inline_tables {
             builder.add_inline_tables(x);
         }
@@ -470,6 +590,19 @@ impl<'a> HttpQuery<'a> {
             >>(HttpQuery::VT_INLINE_TABLES, None)
         }
     }
+    #[inline]
+    pub fn parameters(
+        &self,
+    ) -> Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<HttpParameter<'a>>>> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab.get::<flatbuffers::ForwardsUOffset<
+                flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<HttpParameter>>,
+            >>(HttpQuery::VT_PARAMETERS, None)
+        }
+    }
 }
 
 impl flatbuffers::Verifiable for HttpQuery<'_> {
@@ -488,6 +621,9 @@ impl flatbuffers::Verifiable for HttpQuery<'_> {
             .visit_field::<flatbuffers::ForwardsUOffset<
                 flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<HttpTable>>,
             >>("inline_tables", Self::VT_INLINE_TABLES, false)?
+            .visit_field::<flatbuffers::ForwardsUOffset<
+                flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<HttpParameter>>,
+            >>("parameters", Self::VT_PARAMETERS, false)?
             .finish();
         Ok(())
     }
@@ -500,6 +636,11 @@ pub struct HttpQueryArgs<'a> {
             flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<HttpTable<'a>>>,
         >,
     >,
+    pub parameters: Option<
+        flatbuffers::WIPOffset<
+            flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<HttpParameter<'a>>>,
+        >,
+    >,
 }
 impl<'a> Default for HttpQueryArgs<'a> {
     #[inline]
@@ -508,6 +649,7 @@ impl<'a> Default for HttpQueryArgs<'a> {
             query: None,
             trace_obj: None,
             inline_tables: None,
+            parameters: None,
         }
     }
 }
@@ -540,6 +682,16 @@ impl<'a: 'b, 'b> HttpQueryBuilder<'a, 'b> {
         );
     }
     #[inline]
+    pub fn add_parameters(
+        &mut self,
+        parameters: flatbuffers::WIPOffset<
+            flatbuffers::Vector<'b, flatbuffers::ForwardsUOffset<HttpParameter<'b>>>,
+        >,
+    ) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(HttpQuery::VT_PARAMETERS, parameters);
+    }
+    #[inline]
     pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> HttpQueryBuilder<'a, 'b> {
         let start = _fbb.start_table();
         HttpQueryBuilder {
@@ -560,6 +712,7 @@ impl core::fmt::Debug for HttpQuery<'_> {
         ds.field("query", &self.query());
         ds.field("trace_obj", &self.trace_obj());
         ds.field("inline_tables", &self.inline_tables());
+        ds.field("parameters", &self.parameters());
         ds.finish()
     }
 }
@@ -1128,6 +1281,912 @@ impl core::fmt::Debug for HttpRow<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let mut ds = f.debug_struct("HttpRow");
         ds.field("values", &self.values());
+        ds.finish()
+    }
+}
+pub enum Int64ValueOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+pub struct Int64Value<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for Int64Value<'a> {
+    type Inner = Int64Value<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> Int64Value<'a> {
+    pub const VT_V: flatbuffers::VOffsetT = 4;
+
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        Int64Value { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+        args: &'args Int64ValueArgs,
+    ) -> flatbuffers::WIPOffset<Int64Value<'bldr>> {
+        let mut builder = Int64ValueBuilder::new(_fbb);
+        builder.add_v(args.v);
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn v(&self) -> i64 {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe { self._tab.get::<i64>(Int64Value::VT_V, Some(0)).unwrap() }
+    }
+}
+
+impl flatbuffers::Verifiable for Int64Value<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        v.visit_table(pos)?
+            .visit_field::<i64>("v", Self::VT_V, false)?
+            .finish();
+        Ok(())
+    }
+}
+pub struct Int64ValueArgs {
+    pub v: i64,
+}
+impl<'a> Default for Int64ValueArgs {
+    #[inline]
+    fn default() -> Self {
+        Int64ValueArgs { v: 0 }
+    }
+}
+
+pub struct Int64ValueBuilder<'a: 'b, 'b> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b> Int64ValueBuilder<'a, 'b> {
+    #[inline]
+    pub fn add_v(&mut self, v: i64) {
+        self.fbb_.push_slot::<i64>(Int64Value::VT_V, v, 0);
+    }
+    #[inline]
+    pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> Int64ValueBuilder<'a, 'b> {
+        let start = _fbb.start_table();
+        Int64ValueBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<Int64Value<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for Int64Value<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("Int64Value");
+        ds.field("v", &self.v());
+        ds.finish()
+    }
+}
+pub enum BoolValueOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+pub struct BoolValue<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for BoolValue<'a> {
+    type Inner = BoolValue<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> BoolValue<'a> {
+    pub const VT_V: flatbuffers::VOffsetT = 4;
+
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        BoolValue { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+        args: &'args BoolValueArgs,
+    ) -> flatbuffers::WIPOffset<BoolValue<'bldr>> {
+        let mut builder = BoolValueBuilder::new(_fbb);
+        builder.add_v(args.v);
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn v(&self) -> bool {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe { self._tab.get::<bool>(BoolValue::VT_V, Some(false)).unwrap() }
+    }
+}
+
+impl flatbuffers::Verifiable for BoolValue<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        v.visit_table(pos)?
+            .visit_field::<bool>("v", Self::VT_V, false)?
+            .finish();
+        Ok(())
+    }
+}
+pub struct BoolValueArgs {
+    pub v: bool,
+}
+impl<'a> Default for BoolValueArgs {
+    #[inline]
+    fn default() -> Self {
+        BoolValueArgs { v: false }
+    }
+}
+
+pub struct BoolValueBuilder<'a: 'b, 'b> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b> BoolValueBuilder<'a, 'b> {
+    #[inline]
+    pub fn add_v(&mut self, v: bool) {
+        self.fbb_.push_slot::<bool>(BoolValue::VT_V, v, false);
+    }
+    #[inline]
+    pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> BoolValueBuilder<'a, 'b> {
+        let start = _fbb.start_table();
+        BoolValueBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<BoolValue<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for BoolValue<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("BoolValue");
+        ds.field("v", &self.v());
+        ds.finish()
+    }
+}
+pub enum StringValueOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+pub struct StringValue<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for StringValue<'a> {
+    type Inner = StringValue<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> StringValue<'a> {
+    pub const VT_V: flatbuffers::VOffsetT = 4;
+
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        StringValue { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+        args: &'args StringValueArgs<'args>,
+    ) -> flatbuffers::WIPOffset<StringValue<'bldr>> {
+        let mut builder = StringValueBuilder::new(_fbb);
+        if let Some(x) = args.v {
+            builder.add_v(x);
+        }
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn v(&self) -> &'a str {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<&str>>(StringValue::VT_V, None)
+                .unwrap()
+        }
+    }
+}
+
+impl flatbuffers::Verifiable for StringValue<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        v.visit_table(pos)?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>("v", Self::VT_V, true)?
+            .finish();
+        Ok(())
+    }
+}
+pub struct StringValueArgs<'a> {
+    pub v: Option<flatbuffers::WIPOffset<&'a str>>,
+}
+impl<'a> Default for StringValueArgs<'a> {
+    #[inline]
+    fn default() -> Self {
+        StringValueArgs {
+            v: None, // required field
+        }
+    }
+}
+
+pub struct StringValueBuilder<'a: 'b, 'b> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b> StringValueBuilder<'a, 'b> {
+    #[inline]
+    pub fn add_v(&mut self, v: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(StringValue::VT_V, v);
+    }
+    #[inline]
+    pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> StringValueBuilder<'a, 'b> {
+        let start = _fbb.start_table();
+        StringValueBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<StringValue<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        self.fbb_.required(o, StringValue::VT_V, "v");
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for StringValue<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("StringValue");
+        ds.field("v", &self.v());
+        ds.finish()
+    }
+}
+pub enum BinaryValueOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+pub struct BinaryValue<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for BinaryValue<'a> {
+    type Inner = BinaryValue<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> BinaryValue<'a> {
+    pub const VT_V: flatbuffers::VOffsetT = 4;
+
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        BinaryValue { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+        args: &'args BinaryValueArgs<'args>,
+    ) -> flatbuffers::WIPOffset<BinaryValue<'bldr>> {
+        let mut builder = BinaryValueBuilder::new(_fbb);
+        if let Some(x) = args.v {
+            builder.add_v(x);
+        }
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn v(&self) -> flatbuffers::Vector<'a, i8> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, i8>>>(
+                    BinaryValue::VT_V,
+                    None,
+                )
+                .unwrap()
+        }
+    }
+}
+
+impl flatbuffers::Verifiable for BinaryValue<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        v.visit_table(pos)?
+            .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, i8>>>(
+                "v",
+                Self::VT_V,
+                true,
+            )?
+            .finish();
+        Ok(())
+    }
+}
+pub struct BinaryValueArgs<'a> {
+    pub v: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, i8>>>,
+}
+impl<'a> Default for BinaryValueArgs<'a> {
+    #[inline]
+    fn default() -> Self {
+        BinaryValueArgs {
+            v: None, // required field
+        }
+    }
+}
+
+pub struct BinaryValueBuilder<'a: 'b, 'b> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b> BinaryValueBuilder<'a, 'b> {
+    #[inline]
+    pub fn add_v(&mut self, v: flatbuffers::WIPOffset<flatbuffers::Vector<'b, i8>>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(BinaryValue::VT_V, v);
+    }
+    #[inline]
+    pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> BinaryValueBuilder<'a, 'b> {
+        let start = _fbb.start_table();
+        BinaryValueBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<BinaryValue<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        self.fbb_.required(o, BinaryValue::VT_V, "v");
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for BinaryValue<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("BinaryValue");
+        ds.field("v", &self.v());
+        ds.finish()
+    }
+}
+pub enum Float64ValueOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+pub struct Float64Value<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for Float64Value<'a> {
+    type Inner = Float64Value<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> Float64Value<'a> {
+    pub const VT_V: flatbuffers::VOffsetT = 4;
+
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        Float64Value { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+        args: &'args Float64ValueArgs,
+    ) -> flatbuffers::WIPOffset<Float64Value<'bldr>> {
+        let mut builder = Float64ValueBuilder::new(_fbb);
+        builder.add_v(args.v);
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn v(&self) -> f64 {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe { self._tab.get::<f64>(Float64Value::VT_V, Some(0.0)).unwrap() }
+    }
+}
+
+impl flatbuffers::Verifiable for Float64Value<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        v.visit_table(pos)?
+            .visit_field::<f64>("v", Self::VT_V, false)?
+            .finish();
+        Ok(())
+    }
+}
+pub struct Float64ValueArgs {
+    pub v: f64,
+}
+impl<'a> Default for Float64ValueArgs {
+    #[inline]
+    fn default() -> Self {
+        Float64ValueArgs { v: 0.0 }
+    }
+}
+
+pub struct Float64ValueBuilder<'a: 'b, 'b> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b> Float64ValueBuilder<'a, 'b> {
+    #[inline]
+    pub fn add_v(&mut self, v: f64) {
+        self.fbb_.push_slot::<f64>(Float64Value::VT_V, v, 0.0);
+    }
+    #[inline]
+    pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> Float64ValueBuilder<'a, 'b> {
+        let start = _fbb.start_table();
+        Float64ValueBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<Float64Value<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for Float64Value<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("Float64Value");
+        ds.field("v", &self.v());
+        ds.finish()
+    }
+}
+pub enum NullValueOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+pub struct NullValue<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for NullValue<'a> {
+    type Inner = NullValue<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> NullValue<'a> {
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        NullValue { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+        _args: &'args NullValueArgs,
+    ) -> flatbuffers::WIPOffset<NullValue<'bldr>> {
+        let mut builder = NullValueBuilder::new(_fbb);
+        builder.finish()
+    }
+}
+
+impl flatbuffers::Verifiable for NullValue<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        v.visit_table(pos)?.finish();
+        Ok(())
+    }
+}
+pub struct NullValueArgs {}
+impl<'a> Default for NullValueArgs {
+    #[inline]
+    fn default() -> Self {
+        NullValueArgs {}
+    }
+}
+
+pub struct NullValueBuilder<'a: 'b, 'b> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b> NullValueBuilder<'a, 'b> {
+    #[inline]
+    pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> NullValueBuilder<'a, 'b> {
+        let start = _fbb.start_table();
+        NullValueBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<NullValue<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for NullValue<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("NullValue");
+        ds.finish()
+    }
+}
+pub enum HttpParameterOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+pub struct HttpParameter<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for HttpParameter<'a> {
+    type Inner = HttpParameter<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> HttpParameter<'a> {
+    pub const VT_VALUE_TYPE: flatbuffers::VOffsetT = 4;
+    pub const VT_VALUE: flatbuffers::VOffsetT = 6;
+
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        HttpParameter { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+        args: &'args HttpParameterArgs,
+    ) -> flatbuffers::WIPOffset<HttpParameter<'bldr>> {
+        let mut builder = HttpParameterBuilder::new(_fbb);
+        if let Some(x) = args.value {
+            builder.add_value(x);
+        }
+        builder.add_value_type(args.value_type);
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn value_type(&self) -> HttpParameterValue {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<HttpParameterValue>(
+                    HttpParameter::VT_VALUE_TYPE,
+                    Some(HttpParameterValue::NONE),
+                )
+                .unwrap()
+        }
+    }
+    #[inline]
+    pub fn value(&self) -> flatbuffers::Table<'a> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<flatbuffers::Table<'a>>>(
+                    HttpParameter::VT_VALUE,
+                    None,
+                )
+                .unwrap()
+        }
+    }
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn value_as_int_64_value(&self) -> Option<Int64Value<'a>> {
+        if self.value_type() == HttpParameterValue::Int64Value {
+            let u = self.value();
+            // Safety:
+            // Created from a valid Table for this object
+            // Which contains a valid union in this slot
+            Some(unsafe { Int64Value::init_from_table(u) })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn value_as_bool_value(&self) -> Option<BoolValue<'a>> {
+        if self.value_type() == HttpParameterValue::BoolValue {
+            let u = self.value();
+            // Safety:
+            // Created from a valid Table for this object
+            // Which contains a valid union in this slot
+            Some(unsafe { BoolValue::init_from_table(u) })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn value_as_string_value(&self) -> Option<StringValue<'a>> {
+        if self.value_type() == HttpParameterValue::StringValue {
+            let u = self.value();
+            // Safety:
+            // Created from a valid Table for this object
+            // Which contains a valid union in this slot
+            Some(unsafe { StringValue::init_from_table(u) })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn value_as_binary_value(&self) -> Option<BinaryValue<'a>> {
+        if self.value_type() == HttpParameterValue::BinaryValue {
+            let u = self.value();
+            // Safety:
+            // Created from a valid Table for this object
+            // Which contains a valid union in this slot
+            Some(unsafe { BinaryValue::init_from_table(u) })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn value_as_float_64_value(&self) -> Option<Float64Value<'a>> {
+        if self.value_type() == HttpParameterValue::Float64Value {
+            let u = self.value();
+            // Safety:
+            // Created from a valid Table for this object
+            // Which contains a valid union in this slot
+            Some(unsafe { Float64Value::init_from_table(u) })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn value_as_null_value(&self) -> Option<NullValue<'a>> {
+        if self.value_type() == HttpParameterValue::NullValue {
+            let u = self.value();
+            // Safety:
+            // Created from a valid Table for this object
+            // Which contains a valid union in this slot
+            Some(unsafe { NullValue::init_from_table(u) })
+        } else {
+            None
+        }
+    }
+}
+
+impl flatbuffers::Verifiable for HttpParameter<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        v.visit_table(pos)?
+            .visit_union::<HttpParameterValue, _>(
+                "value_type",
+                Self::VT_VALUE_TYPE,
+                "value",
+                Self::VT_VALUE,
+                true,
+                |key, v, pos| match key {
+                    HttpParameterValue::Int64Value => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<Int64Value>>(
+                            "HttpParameterValue::Int64Value",
+                            pos,
+                        ),
+                    HttpParameterValue::BoolValue => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<BoolValue>>(
+                            "HttpParameterValue::BoolValue",
+                            pos,
+                        ),
+                    HttpParameterValue::StringValue => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<StringValue>>(
+                            "HttpParameterValue::StringValue",
+                            pos,
+                        ),
+                    HttpParameterValue::BinaryValue => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<BinaryValue>>(
+                            "HttpParameterValue::BinaryValue",
+                            pos,
+                        ),
+                    HttpParameterValue::Float64Value => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<Float64Value>>(
+                            "HttpParameterValue::Float64Value",
+                            pos,
+                        ),
+                    HttpParameterValue::NullValue => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<NullValue>>(
+                            "HttpParameterValue::NullValue",
+                            pos,
+                        ),
+                    _ => Ok(()),
+                },
+            )?
+            .finish();
+        Ok(())
+    }
+}
+pub struct HttpParameterArgs {
+    pub value_type: HttpParameterValue,
+    pub value: Option<flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>>,
+}
+impl<'a> Default for HttpParameterArgs {
+    #[inline]
+    fn default() -> Self {
+        HttpParameterArgs {
+            value_type: HttpParameterValue::NONE,
+            value: None, // required field
+        }
+    }
+}
+
+pub struct HttpParameterBuilder<'a: 'b, 'b> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b> HttpParameterBuilder<'a, 'b> {
+    #[inline]
+    pub fn add_value_type(&mut self, value_type: HttpParameterValue) {
+        self.fbb_.push_slot::<HttpParameterValue>(
+            HttpParameter::VT_VALUE_TYPE,
+            value_type,
+            HttpParameterValue::NONE,
+        );
+    }
+    #[inline]
+    pub fn add_value(&mut self, value: flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(HttpParameter::VT_VALUE, value);
+    }
+    #[inline]
+    pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> HttpParameterBuilder<'a, 'b> {
+        let start = _fbb.start_table();
+        HttpParameterBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<HttpParameter<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        self.fbb_.required(o, HttpParameter::VT_VALUE, "value");
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for HttpParameter<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("HttpParameter");
+        ds.field("value_type", &self.value_type());
+        match self.value_type() {
+            HttpParameterValue::Int64Value => {
+                if let Some(x) = self.value_as_int_64_value() {
+                    ds.field("value", &x)
+                } else {
+                    ds.field(
+                        "value",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            HttpParameterValue::BoolValue => {
+                if let Some(x) = self.value_as_bool_value() {
+                    ds.field("value", &x)
+                } else {
+                    ds.field(
+                        "value",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            HttpParameterValue::StringValue => {
+                if let Some(x) = self.value_as_string_value() {
+                    ds.field("value", &x)
+                } else {
+                    ds.field(
+                        "value",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            HttpParameterValue::BinaryValue => {
+                if let Some(x) = self.value_as_binary_value() {
+                    ds.field("value", &x)
+                } else {
+                    ds.field(
+                        "value",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            HttpParameterValue::Float64Value => {
+                if let Some(x) = self.value_as_float_64_value() {
+                    ds.field("value", &x)
+                } else {
+                    ds.field(
+                        "value",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            HttpParameterValue::NullValue => {
+                if let Some(x) = self.value_as_null_value() {
+                    ds.field("value", &x)
+                } else {
+                    ds.field(
+                        "value",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            _ => {
+                let x: Option<()> = None;
+                ds.field("value", &x)
+            }
+        };
         ds.finish()
     }
 }

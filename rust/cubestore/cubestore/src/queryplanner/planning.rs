@@ -2258,7 +2258,11 @@ pub mod tests {
     }
 
     fn initial_plan(s: &str, i: &TestIndices) -> LogicalPlan {
-        let statement = match CubeStoreParser::new(s).unwrap().parse_statement().unwrap() {
+        let statement = match CubeStoreParser::new(s, None)
+            .unwrap()
+            .parse_statement()
+            .unwrap()
+        {
             Statement::Statement(s) => s,
             other => panic!("not a statement, actual {:?}", other),
         };

@@ -1,4 +1,4 @@
-import { createCancelablePromise, MaybeCancelablePromise } from '@cubejs-backend/shared';
+import { createCancelablePromise, getEnv, MaybeCancelablePromise } from '@cubejs-backend/shared';
 import { CacheDriverInterface } from '@cubejs-backend/base-driver';
 
 import { CubeStoreDriver } from './CubeStoreDriver';
@@ -62,7 +62,9 @@ export class CubeStoreCacheDriver implements CacheDriverInterface {
   public async get(key: string) {
     const rows = await (await this.getConnection()).query('CACHE GET ?', [
       key
-    ]);
+    ], {
+      sendParameters: getEnv('cubestoreSendableParameters')
+    });
     if (rows && rows.length === 1) {
       return JSON.parse(rows[0].value);
     }
@@ -72,7 +74,9 @@ export class CubeStoreCacheDriver implements CacheDriverInterface {
 
   public async set(key: string, value, expiration) {
     const strValue = JSON.stringify(value);
-    await (await this.getConnection()).query('CACHE SET TTL ? ? ?', [expiration, key, strValue]);
+    await (await this.getConnection()).query('CACHE SET TTL ? ? ?', [expiration, key, strValue], {
+      sendParameters: getEnv('cubestoreSendableParameters')
+    });
 
     return {
       key,

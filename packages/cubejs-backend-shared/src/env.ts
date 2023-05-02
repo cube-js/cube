@@ -1565,6 +1565,9 @@ const variables: Record<string, (...args: any) => any> = {
   livePreview: () => get('CUBEJS_LIVE_PREVIEW')
     .default('true')
     .asBoolStrict(),
+  cubestoreSendableParameters: () => get('CUBEJS_CUBESTORE_SENDABLE_PARAMETERS')
+    .default('false')
+    .asBoolStrict(),
   preAggregationsQueueEventsBus: () => get('CUBEJS_PRE_AGGREGATIONS_QUEUE_EVENTS_BUS')
     .default('false')
     .asBoolStrict(),
