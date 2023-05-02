@@ -4,7 +4,14 @@ import {
   QueueDriverInterface,
   QueueDriverConnectionInterface,
   QueueDriverOptions,
-  GetActiveAndToProcessResponse, QueryDef, QueryKeyHash, QueryStageStateResponse,
+  GetActiveAndToProcessResponse,
+  QueryDef,
+  QueryKeyHash,
+  QueryStageStateResponse,
+  QueryKey,
+  AddToQueueQuery,
+  AddToQueueOptions,
+  AddToQueueResponse,
 } from '@cubejs-backend/base-driver';
 
 import { BaseQueueDriver } from './BaseQueueDriver';
@@ -89,7 +96,15 @@ export class RedisQueueDriverConnection implements QueueDriverConnectionInterfac
    * Adds specified by the queryKey query to the queue, returns tuple
    * with the operation result.
    */
-  public addToQueue(keyScore, queryKey, orphanedTime, queryHandler, query, priority, options) {
+  public async addToQueue(
+    keyScore: number,
+    queryKey: QueryKey,
+    orphanedTime: any,
+    queryHandler: any,
+    query: AddToQueueQuery,
+    priority: number,
+    options: AddToQueueOptions
+  ): Promise<AddToQueueResponse> {
     const data = {
       queryHandler,
       query,
