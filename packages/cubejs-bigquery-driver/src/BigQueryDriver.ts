@@ -239,14 +239,6 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     return this.bucket !== null;
   }
 
-  public async downloadQueryResults(query: string, values: unknown[], options: DownloadQueryResultsOptions): Promise<DownloadQueryResultsResult> {
-    if (options.streamImport) {
-      return this.stream(query, values, options);
-    }
-
-    return super.downloadQueryResults(query, values, options);
-  }
-
   public async stream(
     query: string,
     values: unknown[]
