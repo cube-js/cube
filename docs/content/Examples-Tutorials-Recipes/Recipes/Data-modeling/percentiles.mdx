@@ -68,13 +68,17 @@ included.
 ```yaml
 cubes:
   - name: users
+    # ...
+
     measures:
       - name: avg_age
         type: avg
         sql: age
+
       - name: median_age
         type: number
         sql: PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY age)
+
       - name: p95_age
         type: number
         sql: PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY age)

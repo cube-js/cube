@@ -35,20 +35,24 @@ age:
 ```yaml
 cubes:
   - name: users
+    # ...
+
     measures:
       - name: distinct_ages
         sql: age
         type: count_distinct
+
       - name: avg_age
         sql: age
         type: avg
+
       - name: p90_age
         sql: PERCENTILE_CONT(0.9) WITHIN GROUP (ORDER BY age)
         type: number
 ```
 
 ```javascript
-cube("users", {
+cube(`users`, {
   measures: {
     distinct_ages: {
       sql: `age`,
@@ -79,6 +83,7 @@ definition:
 ```yaml
 cubes:
   - name: users
+
     pre_aggregations:
       - name: main
         measures:
@@ -90,7 +95,7 @@ cubes:
 ```
 
 ```javascript
-cube("users", {
+cube(`users`, {
   // ...
   pre_aggregations: {
     main: {
@@ -155,6 +160,7 @@ For example, the `distinct_ages` measure can be rewritten as follows:
 ```yaml
 cubes:
   - name: users
+
     measures:
       - name: distinct_ages
         sql: age
@@ -162,7 +168,7 @@ cubes:
 ```
 
 ```javascript
-cube("users", {
+cube(`users`, {
   measures: {
     distinct_ages: {
       sql: `age`,
@@ -188,28 +194,33 @@ For example, the `avg_age` measure can be rewritten as follows:
 ```yaml
 cubes:
   - name: users
+
     measures:
       - name: avg_age
         sql: "{age_sum} / {count}"
         type: number
+
       - name: age_sum
         sql: age
         type: sum
+
       - name: count
         type: count
 ```
 
 ```javascript
-cube("users", {
+cube(`users`, {
   measures: {
     avg_age: {
       sql: `${age_sum} / ${count}`,
       type: `number`,
     },
+
     age_sum: {
       sql: `age`,
       type: `sum`,
     },
+
     count: {
       type: `count`,
     },

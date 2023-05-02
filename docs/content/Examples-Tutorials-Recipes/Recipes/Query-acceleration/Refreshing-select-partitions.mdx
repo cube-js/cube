@@ -44,6 +44,8 @@ Partitions will be split monthly by the `created_at` dimension.
 ```yaml
 cubes:
   - name: orders
+    # ...
+
     pre_aggregations:
       - name: orders
         type: rollup
@@ -60,7 +62,7 @@ cubes:
 ```
 
 ```javascript
-cube("orders", {
+cube(`orders`, {
   pre_aggregations: {
     orders: {
       type: `rollup`,
@@ -117,6 +119,8 @@ Let's update our pre-aggregation definition:
 ```yaml
 cubes:
   - name: orders
+    # ...
+
     pre_aggregations:
       - name: orders
         type: rollup
@@ -129,11 +133,14 @@ cubes:
         granularity: day
         partition_granularity: month # this is where we specify the partition
         refreshKey:
-          sql: "SELECT max(updated_at) FROM public.orders WHERE {FILTER_PARAMS.orders.created_at.filter('created_at')}"
+          sql: >
+            SELECT max(updated_at)
+            FROM public.orders
+            WHERE {FILTER_PARAMS.orders.created_at.filter('created_at')}
 ```
 
 ```javascript
-cube("orders", {
+cube(`orders`, {
   pre_aggregations: {
     orders: {
       type: `rollup`,
@@ -142,7 +149,10 @@ cube("orders", {
       granularity: `day`,
       partition_granularity: `month`,
       refresh_key: {
-        sql: `SELECT max(updated_at) FROM public.orders WHERE ${FILTER_PARAMS.orders.created_at.filter('created_at')}`
+        sql: `
+          SELECT max(updated_at)
+          FROM public.orders
+          WHERE ${FILTER_PARAMS.orders.created_at.filter('created_at')}`
       },
     },
   },

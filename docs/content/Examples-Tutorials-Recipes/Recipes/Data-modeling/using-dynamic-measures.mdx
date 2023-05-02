@@ -9,6 +9,7 @@ menuOrder: 4
 <InfoBox>
 
 This functionality only works with data models written in JavaScript, not YAML.
+For more information, check out the [Data Modeling Syntax][ref-modeling-syntax] page.
 
 </InfoBox>
 
@@ -34,8 +35,8 @@ const statuses = ['processing', 'shipped', 'completed'];
 
 const createTotalByStatusMeasure = (status) => ({
   [`total_${status}_orders`]: {
-    type: `count`,
     title: `Total ${status} orders`,
+    type: `count`,
     filters: [
       {
         sql: (CUBE) => `${CUBE}."status" = '${status}'`,
@@ -46,13 +47,13 @@ const createTotalByStatusMeasure = (status) => ({
 
 const createPercentageMeasure = (status) => ({
   [`percentage_of_${status}`]: {
+    title: `Percentage of ${status} orders`,
     type: `number`,
     format: `percent`,
-    title: `Percentage of ${status} orders`,
     sql: (CUBE) =>
-      `ROUND(${CUBE[`total_${status}_orders`]}::numeric / ${
+      `ROUND(${CUBE[`total_${status}_orders`]}::NUMERIC / ${
         CUBE.total_orders
-      }::numeric * 100.0, 2)`,
+      }::NUMERIC * 100.0, 2)`,
   },
 });
 
@@ -99,3 +100,5 @@ Please feel free to check out the
 [full source code](https://github.com/cube-js/cube/tree/master/examples/recipes/referencing-dynamic-measures)
 or run it with the `docker-compose up` command. You'll see the result, including
 queried data, in the console.
+
+[ref-modeling-syntax]: /data-modeling/syntax

@@ -31,7 +31,9 @@ measure parameter.
 ```yaml
 cubes:
   - name: active_users
-    sql: SELECT user_id, created_at FROM public.orders
+    sql: >
+      SELECT user_id, created_at
+      FROM public.orders
 
     measures:
       - name: monthly_active_users
@@ -69,7 +71,8 @@ cubes:
 
 ```javascript
 cube(`active_users`, {
-  sql: `SELECT user_id, created_at FROM public.orders`,
+  sql: `SELECT user_id, created_at
+    FROM public.orders`,
 
   measures: {
     monthly_active_users: {

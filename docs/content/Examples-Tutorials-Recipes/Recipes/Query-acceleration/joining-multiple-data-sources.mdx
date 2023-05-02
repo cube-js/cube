@@ -63,6 +63,7 @@ dimension in the `products` cube, and the `id` dimension in the `suppliers` cube
 cubes:
   - name: products
     # ...
+
     pre_aggregations:
       - name: products_rollup
         type: rollup
@@ -73,6 +74,7 @@ cubes:
           category_index:
             columns:
               - supplier_id
+
     joins:
       suppliers:
         sql: "{supplier_id} = ${suppliers.id}"
@@ -114,6 +116,7 @@ cube('products', {
 cubes:
   - name: suppliers
     # ...
+
     pre_aggregations:
       - name: suppliers_rollup
         type: rollup
@@ -155,6 +158,8 @@ aggregating data from multiple data sources:
 ```yaml
 cubes:
   - name: products
+    # ...
+
     pre_aggregations:
       - name: combined_rollup
         type: rollup_join

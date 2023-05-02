@@ -397,25 +397,30 @@ Let's look at more measures types:
 cubes:
   - name: orders
     # ...
+
     measures:
       - name: count
         type: count
+
       - name: distinct_count
         type: count_distinct
         sql: id
+
       - name: approx_distinct_count
         type: count_distinct_approx
         sql: id
+
       - name: min_value
         type: min
         sql: min_value
+
       - name: max_value
         type: max
         sql: max_value
 ```
 
 ```javascript
-cube("orders", {
+cube(`orders`, {
   // ...,
 
   measures: {

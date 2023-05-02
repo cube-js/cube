@@ -32,6 +32,7 @@ ensure that your database driver is not configured with `readOnly: true`.
 cubes:
   - name: orders
     sql: "<YOUR_EXPENSIVE_SQL_QUERY HERE>"
+
     pre_aggregations:
       - name: base
         type: original_sql

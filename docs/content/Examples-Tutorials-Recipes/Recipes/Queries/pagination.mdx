@@ -23,13 +23,16 @@ We have the following data model:
 cubes:
   - name: Orders
     sql_table: orders
+
     measures:
       - name: count
         type: count
+
     dimensions:
       - name: number
         sql: number
         type: number
+
       - name: created_at
         sql: created_at
         type: time

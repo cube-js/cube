@@ -372,9 +372,9 @@ module.exports = {
   queryRewrite: (query, { securityContext }) => {
     if (securityContext.filterByRegion) {
       query.filters.push({
-        member: "Regions.id",
+        member: "regions.id",
         operator: "equals",
-        values: [securityContext.regionId],
+        values: [securityContext.region_id],
       });
     }
     return query;

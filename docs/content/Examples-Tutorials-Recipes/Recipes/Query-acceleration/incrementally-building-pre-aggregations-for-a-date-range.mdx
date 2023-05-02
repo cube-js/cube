@@ -30,11 +30,11 @@ cubes:
   - name: users_with_organizations
     sql: >
       WITH users AS (
-          SELECT
-            md5(company) AS organization_id,
-            id AS user_id,
-            created_at
-          FROM public.users
+        SELECT
+          md5(company) AS organization_id,
+          id AS user_id,
+          created_at
+        FROM public.users
       ),
       organizations AS (
         (
@@ -75,9 +75,9 @@ cubes:
 
     dimensions:
       - name: id
-        primary_key: true
         sql: user_id
         type: number
+        primary_key: true
 
       - name: organization_id
         sql: organization_id
@@ -92,39 +92,39 @@ cubes:
 cube('users_with_organizations', {
 
   sql: `
-WITH users AS (
+    WITH users AS (
+      SELECT
+        md5(company) AS organization_id,
+        id AS user_id,
+        created_at
+      FROM public.users
+    ),
+    organizations AS (
+      (
+        SELECT
+          md5(company) AS id,
+          company AS name,
+          MIN(created_at)
+        FROM
+          public.users
+        GROUP BY
+          1,
+          2
+      )
+    )
     SELECT
-      md5(company) AS organization_id,
-      id AS user_id,
-      created_at
-    FROM public.users
-),
-organizations AS (
-  (
-    SELECT
-      md5(company) AS id,
-      company AS name,
-      MIN(created_at)
+      users.*,
+      organizations.name AS org_name
     FROM
-      public.users
-    GROUP BY
-      1,
-      2
-  )
-)
-SELECT
-  users.*,
-  organizations.name AS org_name
-FROM
-  users
-LEFT JOIN organizations
-  ON users.organization_id = organizations.id
-`,
+      users
+    LEFT JOIN organizations
+      ON users.organization_id = organizations.id
+    `,
 
   pre_aggregations: {
     main: {
       dimensions: [CUBE.id, CUBE.organization_id]
-      time_dimension: CUBE.createdAt,
+      time_dimension: CUBE.created_at,
       refresh_key: {
         every: `1 day`,
         incremental: true,
@@ -138,14 +138,16 @@ LEFT JOIN organizations
 
   dimensions: {
     id: {
-      primary_key: true,
       sql: `user_id`,
       type: `number`
+      primary_key: true,
     },
+
     organization_id: {
       sql: `organization_id`,
       type: `string`
     },
+
     created_at: {
       sql: `created_at`,
       type: `time`
@@ -177,12 +179,12 @@ cubes:
   - name: users_with_organizations
     sql: >
       WITH users AS (
-          SELECT
-            md5(company) AS organization_id,
-            id AS user_id,
-            created_at
-          FROM public.users
-          WHERE {FILTER_PARAMS.users_with_organizations.created_at.filter('created_at')}
+        SELECT
+          md5(company) AS organization_id,
+          id AS user_id,
+          created_at
+        FROM public.users
+        WHERE {FILTER_PARAMS.users_with_organizations.created_at.filter('created_at')}
       ),
       organizations AS (
         (

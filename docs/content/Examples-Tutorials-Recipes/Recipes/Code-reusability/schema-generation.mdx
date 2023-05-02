@@ -11,6 +11,7 @@ redirect_from:
 <InfoBox>
 
 This functionality only works with data models written in JavaScript, not YAML.
+For more information, check out the [Data Modeling Syntax][ref-modeling-syntax] page.
 
 </InfoBox>
 
@@ -29,7 +30,7 @@ It can be done as simple as
 const events = ['app_engagement', 'login', 'purchase'];
 
 cube(`events`, {
-  sql: `SELECT * FROM events`,
+  sql_table: `events`,
 
   measures: Object.assign(
     {
@@ -39,8 +40,8 @@ cube(`events`, {
     },
     events
       .map((e) => ({
-        [`${e}_userCount`]: {
-          type: `countDistinct`,
+        [`${e}_user_count`]: {
+          type: `count_distinct`,
           sql: `user_id`,
           filters: [
             {
@@ -68,3 +69,5 @@ Please refer to the
 [`asyncModule()`](/schema/reference/execution-environment#async-module)
 documentation to learn how to use databases and other data sources for data
 model generation.
+
+[ref-modeling-syntax]: /data-modeling/syntax

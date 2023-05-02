@@ -86,9 +86,9 @@ cube(`suppliers`, {
 
   dimensions: {
     id: {
-      primary_key: true,
       sql: `id`,
       type: `string`,
+      primary_key: true,
     },
 
     email: {
@@ -136,7 +136,7 @@ module.exports = {
 To get the supplier's products, we will send two identical requests with
 different emails inside JWTs.
 
-```javascript
+```json
 {
   "iat": 1000000000,
   "exp": 5000000000,
@@ -144,7 +144,7 @@ different emails inside JWTs.
 }
 ```
 
-```javascript
+```json
 {
   "iat": 1000000000,
   "exp": 5000000000,

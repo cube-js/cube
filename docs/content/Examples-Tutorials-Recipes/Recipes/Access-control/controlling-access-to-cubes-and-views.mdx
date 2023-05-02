@@ -33,31 +33,31 @@ module.exports = {
 <CodeTabs>
 
 ```yaml
-# Orders.yml
+# orders.yml
 cubes:
   - name: orders
     sql_table: orders
     public: false
     # ...
 
-# Users.yml
+# users.yml
 cubes:
   - name: users
     sql_table: users
     public: false
     # ...
 
-# TotalRevenuePerCustomer.yml
+# total_revenue_per_customer.yml
 views:
   - name: total_revenue_per_customer
-    public: COMPILE_CONTEXT.securityContext.isFinance
+    public: COMPILE_CONTEXT.security_context.isFinance
     includes:
       - orders.total_revenue
       - users.company
 ```
 
 ```javascript
-// Orders.js
+// orders.js
 cube(`orders`, {
   sql_table: `orders`,
   public: false,
@@ -65,7 +65,7 @@ cube(`orders`, {
   // ...
 });
 
-// Users.js
+// users.js
 cube(`users`, {
   sql_table: `users`,
   public: false,
@@ -73,10 +73,10 @@ cube(`users`, {
   // ...
 });
 
-// TotalRevenuePerCustomer.js
+// total_revenue_per_customer.js
 view('total_revenue_per_customer', {
   description: `Total revenue per customer`,
-  public: COMPILE_CONTEXT.isFinance,
+  public: COMPILE_CONTEXT.security_context.isFinance,
 
   includes: [
     orders.total_revenue,

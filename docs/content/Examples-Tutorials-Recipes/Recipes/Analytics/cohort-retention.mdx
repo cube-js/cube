@@ -134,24 +134,24 @@ can calculate monthly `percentage_of_active`.
 ```yaml
 cubes:
   - name: monthly_retention
-    # ..
+    # ...
     measures:
       - name: total_count
         sql: user_id
         type: count_distinct
-        shown: false
+        public: false
 
       - name: total_active_count
         sql: user_id
         type: count_distinct
+        filters:
+          - sql: monthly_pageviews > 0
         drill_members:
           - users.id
           - users.email
-        filters:
-          - sql: monthly_pageviews > 0
 
       - name: percentage_of_active
-        sql: "100.0 * {total_active_count} / nullif({total_count}, 0)"
+        sql: "100.0 * {total_active_count} / NULLIF({total_count}, 0)"
         type: number
         format: percent
         drill_members:
@@ -164,22 +164,23 @@ cubes:
 ```javascript
 cube(`monthly_retention`, {
   // ...
+
   measures: {
     total_count: {
       sql: `user_id`,
       type: `count_distinct`,
-      shown: false,
+      public: false,
     },
 
     total_active_count: {
       sql: `user_id`,
       type: `count_distinct`,
-      drill_members: [users.id, users.email],
       filters: [{ sql: `${CUBE}.monthly_pageviews > 0` }],
+      drill_members: [users.id, users.email],
     },
 
     percentage_of_active: {
-      sql: `100.0 * ${total_active_count} / nullif(${total_count}, 0)`,
+      sql: `100.0 * ${total_active_count} / NULLIF(${total_count}, 0)`,
       type: `number`,
       format: `percent`,
       drill_members: [users.email, bots.team, bots.last_seen, percentage_of_active],
@@ -199,7 +200,7 @@ show how the percentage of active users is changing.
 ```yaml
 cubes:
   - name: monthly_retention
-    # ..
+    # ...
     dimensions:
       - name: months_since_signup
         sql: "DATEDIFF('month', signup_month, activity_month)"
@@ -213,6 +214,7 @@ cubes:
 ```javascript
 cube(`monthly_retention`, {
   // ...
+
   dimensions: {
     months_since_signup: {
       sql: `DATEDIFF('month', ${CUBE}.signup_month, ${CUBE}.activity_month)`,

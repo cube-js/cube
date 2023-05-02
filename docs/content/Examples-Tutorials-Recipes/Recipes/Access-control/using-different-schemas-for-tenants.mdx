@@ -70,13 +70,18 @@ This is the `products` cube for the `avocado` tenant:
 ```yaml
 cubes:
   - name: products
-    sql: SELECT * FROM public.Products WHERE MOD (id, 2) = 1
+    sql: >
+      SELECT *
+      FROM public.Products
+      WHERE MOD (id, 2) = 1
 ```
 
 ```javascript
 
 cube(`products`, {
-  sql: `SELECT * FROM public.Products WHERE MOD (id, 2) = 1`,
+  sql: `SELECT *
+    FROM public.Products
+    WHERE MOD (id, 2) = 1`,
 
   // ...
 });
@@ -91,12 +96,17 @@ This is the `products` cube for the `mango` tenant:
 ```yaml
 cubes:
   - name: products
-    sql: SELECT * FROM public.Products WHERE MOD (id, 2) = 0
+    sql: >
+      SELECT *
+      FROM public.Products
+      WHERE MOD (id, 2) = 0
 ```
 
 ```javascript
 cube(`products`, {
-  sql: `SELECT * FROM public.Products WHERE MOD (id, 2) = 0`,
+  sql: `SELECT *
+    FROM public.Products
+    WHERE MOD (id, 2) = 0`,
 
   // ...
 });
@@ -144,8 +154,8 @@ We will receive different data for each tenant, as expected:
   {
     "products.id": 5,
     "products.name": "Handcrafted Rubber Chicken",
-  },
-];
+  }
+]
 ```
 
 ```json5
@@ -162,8 +172,8 @@ We will receive different data for each tenant, as expected:
   {
     "products.id": 6,
     "products.name": "Handcrafted Plastic Chair",
-  },
-];
+  }
+]
 ```
 
 ## Source code
