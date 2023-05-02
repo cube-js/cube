@@ -119,15 +119,10 @@ export class MssqlQuery extends BaseQuery {
   }
 
   overTimeSeriesSelect(cumulativeMeasures, dateSeriesSql, baseQuery, dateJoinConditionSql, baseQueryAlias) {
-    const forGroupBy = this.timeDimensions.map(
-      (t) => `${t.dateSeriesAliasName()}.${this.escapeColumnName('date_from')}`
-    );
     const forSelect = this.overTimeSeriesForSelect(cumulativeMeasures);
-    return (
-      `SELECT ${forSelect} FROM ${dateSeriesSql}` +
+    return `SELECT ${forSelect} FROM ${dateSeriesSql}` +
       ` LEFT JOIN (${baseQuery}) ${this.asSyntaxJoin} ${baseQueryAlias} ON ${dateJoinConditionSql}` +
-      ` GROUP BY ${forGroupBy}`
-    );
+      this.groupByClause();
   }
 
   nowTimestampSql() {
