@@ -424,7 +424,7 @@ export abstract class BaseDriver implements DriverInterface {
     }
   }
 
-  protected databasePoolError(error: Error) {
+  protected databasePoolError(error: any) {
     if (this.logger) {
       this.logger('Database Pool Error', {
         error: (error.stack || error).toString()
