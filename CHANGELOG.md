@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.32.31](https://github.com/cube-js/cube/compare/v0.32.30...v0.32.31) (2023-05-02)
+
+
+### Bug Fixes
+
+* **bigquery-driver:** Revert read-only implementation as `LIMIT 1` queries generate too much usage ([#6523](https://github.com/cube-js/cube/issues/6523)) ([f023484](https://github.com/cube-js/cube/commit/f02348408103f7eeb9d6cd8bea959549a78fe943))
+* **cubesql:** Streaming error logging ([e27a525](https://github.com/cube-js/cube/commit/e27a5252380a55682f450bf057767074394179a2))
+
+
+### Features
+
+* **cubesql:** psqlodbc driver support ([fcfc7ea](https://github.com/cube-js/cube/commit/fcfc7ea9f8bfd027aa549d139b9ed12b773594ec))
+* Support snake case security_context in COMPILE_CONTEXT ([#6519](https://github.com/cube-js/cube/issues/6519)) ([feb3fe3](https://github.com/cube-js/cube/commit/feb3fe389462fc4cf3947f8ecf2146c3fe102b9e))
+
+
+
+
+
 ## [0.32.30](https://github.com/cube-js/cube/compare/v0.32.29...v0.32.30) (2023-04-28)
 
 

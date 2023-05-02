@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.32.31](https://github.com/cube-js/cube/compare/v0.32.30...v0.32.31) (2023-05-02)
+
+
+### Bug Fixes
+
+* **cubesql:** Streaming error logging ([e27a525](https://github.com/cube-js/cube/commit/e27a5252380a55682f450bf057767074394179a2))
+
+
+
+
+
 ## [0.32.30](https://github.com/cube-js/cube/compare/v0.32.29...v0.32.30) (2023-04-28)
 
 **Note:** Version bump only for package @cubejs-backend/native
