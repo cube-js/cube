@@ -139,6 +139,36 @@ cubes:
 
 </CodeTabs>
 
+### <--{"id" : "Parameters"}--> public
+
+The `public` property is used to manage the visibility of a segment. Valid
+values for `public` are `true` and `false`. When set to `false`, this segment
+**cannot** be queried through the API. Defaults to `true`.
+
+<CodeTabs>
+
+```javascript
+cube(`users`, {
+  segments: {
+    sf_users: {
+      sql: `${CUBE}.location = 'San Francisco'`,
+      public: false,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: users
+    segments:
+      - name: sf_users
+        sql: "{CUBE}.location = 'San Francisco'"
+        public: false
+```
+
+</CodeTabs>
+
 ### <--{"id" : "Parameters"}--> sql
 
 The `sql` parameter defines how a segment would filter out a subset of data. It

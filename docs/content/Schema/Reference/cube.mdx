@@ -64,12 +64,12 @@ cubes:
       - name: organizations
         relationship: many_to_one
         sql: "{CUBE.organization_id} = {organizations.id}"
-    
+
     measures:
       - name: count
         type: count
         sql: id
-    
+
     dimensions:
       - name: organization_id
         sql: organization_id
@@ -79,7 +79,7 @@ cubes:
       - name: created_at
         sql: created_at
         type: time
-      
+
       - name: country
         sql: country
         type: string
@@ -339,7 +339,7 @@ cube(`extended_order_facts`, {
 cubes:
   - name: order_facts
     sql_table: orders
-    
+
     measures:
       - name: count
         type: count
@@ -385,6 +385,40 @@ cube(`extended_order_facts`, {
   },
 });
 ```
+
+### <--{"id" : "Parameters"}--> public
+
+<InfoBox>
+
+In previous versions of Cube, this property was called `shown`.
+
+</InfoBox>
+
+The `public` property is used to manage the visibility of a cube. Valid values
+for `public` are `true` and `false`. When set to `false`, this cube **cannot**
+be queried through the API. Defaults to `true`.
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  sql_table: `public.orders`,
+  public: false,
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    sql_table: public.orders
+    public: false
+```
+
+</CodeTabs>
+
+To learn more about using `public` to control visibility based on security
+context, read the [Controlling access to cubes and views
+recipe][ref-recipe-control-access-cubes-views].
 
 ### <--{"id" : "Parameters"}--> refresh_key
 
@@ -569,33 +603,6 @@ cubes:
 ```
 
 </CodeTabs>
-
-### <--{"id" : "Parameters"}--> shown
-
-The `shown` property is used to manage the visibility of a cube. Valid values
-for `shown` are `true` and `false`.
-
-<CodeTabs>
-
-```javascript
-cube(`orders`, {
-  sql_table: `orders`,
-  shown: false,
-});
-```
-
-```yaml
-cubes:
-  - name: orders
-    sql_table: orders
-    shown: false
-```
-
-</CodeTabs>
-
-To learn more about using `shown` to control visibility based on security
-context, read the [Controlling access to cubes and views
-recipe][ref-recipe-control-access-cubes-views].
 
 ### <--{"id" : "Parameters"}--> sql
 
@@ -1027,14 +1034,14 @@ value for different users. It may change however for different tenants.
 
 ```javascript
 cube(`users`, {
-  sql_table: `user_${COMPILE_CONTEXT.securityContext.deployment_id}.users`,
+  sql_table: `user_${COMPILE_CONTEXT.security_context.deployment_id}.users`,
 });
 ```
 
 ```yaml
 cubes:
   - name: users
-    sql_table: "user_{COMPILE_CONTEXT.securityContext.deployment_id}.users"
+    sql_table: "user_{COMPILE_CONTEXT.security_context.deployment_id}.users"
 ```
 
 </CodeTabs>

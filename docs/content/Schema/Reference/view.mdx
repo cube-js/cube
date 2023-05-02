@@ -198,17 +198,24 @@ views:
 
 </CodeTabs>
 
-### <--{"id" : "Parameters"}--> shown
+### <--{"id" : "Parameters"}--> public
 
-The `shown` property is used to manage the visibility of a view. Valid values
-for `shown` are `true` and `false`.
+<InfoBox>
+
+In previous versions of Cube, this property was called `shown`.
+
+</InfoBox>
+
+The `public` property is used to manage the visibility of a view. Valid values
+for `public` are `true` and `false`. When set to `false`, this view **cannot**
+be queried through the API. Defaults to `true`.
 
 <CodeTabs>
 
 ```javascript
 view(`arr`, {
   description: `Annual Recurring Revenue`,
-  shown: true,
+  public: COMPILE_CONTEXT.security_context.is_finance,
 
   includes: [
     revenue.arr,
@@ -222,7 +229,7 @@ view(`arr`, {
 views:
   - name: arr
     description: Annual Recurring Revenue
-    shown: "{COMPILE_CONTEXT.permissions.is_finance}",
+    public: COMPILE_CONTEXT.security_context.is_finance
     
     includes:
       # Measures
@@ -234,7 +241,7 @@ views:
 
 </CodeTabs>
 
-To learn more about using `shown` to control visibility based on security
+To learn more about using `public` to control visibility based on security
 context, read the [Controlling access to cubes and views
 recipe][ref-recipe-control-access-cubes-views].
 
