@@ -709,10 +709,7 @@ impl CacheStore for RocksCacheStore {
                     queue_schema.update(id_row.id, new, id_row.get_row(), batch_pipe)?;
                     Ok(())
                 } else {
-                    trace!(
-                        "Unable to update heartbeat, unknown path: {}",
-                        path
-                    );
+                    trace!("Unable to update heartbeat, unknown path: {}", path);
 
                     Ok(())
                 }
