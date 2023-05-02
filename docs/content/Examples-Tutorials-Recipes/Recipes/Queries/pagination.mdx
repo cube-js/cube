@@ -17,9 +17,30 @@ number. Every page will have 5 orders.
 
 We have the following data model:
 
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: Orders
+    sql_table: orders
+
+    measures:
+      - name: count
+        type: count
+
+    dimensions:
+      - name: number
+        sql: number
+        type: number
+
+      - name: created_at
+        sql: created_at
+        type: time
+```
+
 ```javascript
 cube(`Orders`, {
-  sql: `SELECT * FROM public.orders`,
+  sql_table: `orders`,
 
   measures: {
     count: {
@@ -33,13 +54,15 @@ cube(`Orders`, {
       type: `number`,
     },
 
-    createdAt: {
+    created_at: {
       sql: `created_at`,
       type: `time`,
     },
   },
 });
 ```
+
+</CodeTabs>
 
 ## Query
 
@@ -49,7 +72,7 @@ To select orders that belong to a particular page, we can use the `limit` and
 ```json
 {
   "measures": [
-    "Orders.count"
+    "orders.count"
   ]
 }
 ```
@@ -59,10 +82,10 @@ Then, let's retrieve first batch (page) of five orders:
 ```json
 {
   "dimensions": [
-    "Orders.number"
+    "orders.number"
   ],
   "order": {
-    "Orders.number": "asc"
+    "orders.number": "asc"
   },
   "limit": 5
 }
@@ -73,10 +96,10 @@ Now, let's retrieve the second batch (page) of five orders:
 ```json
 {
   "dimensions": [
-    "Orders.number"
+    "orders.number"
   ],
   "order": {
-    "Orders.number": "asc"
+    "orders.number": "asc"
   },
   "limit": 5,
   "offset": 5
@@ -92,7 +115,7 @@ We have received five orders per query and can use them as we want.
 
 [
   {
-    'Orders.count': '10000',
+    'orders.count': '10000',
   },
 ];
 ```
@@ -102,19 +125,19 @@ We have received five orders per query and can use them as we want.
 
 [
   {
-    'Orders.number': 1,
+    'orders.number': 1,
   },
   {
-    'Orders.number': 2,
+    'orders.number': 2,
   },
   {
-    'Orders.number': 3,
+    'orders.number': 3,
   },
   {
-    'Orders.number': 4,
+    'orders.number': 4,
   },
   {
-    'Orders.number': 5,
+    'orders.number': 5,
   },
 ];
 ```
@@ -124,19 +147,19 @@ We have received five orders per query and can use them as we want.
 
 [
   {
-    'Orders.number': 6,
+    'orders.number': 6,
   },
   {
-    'Orders.number': 7,
+    'orders.number': 7,
   },
   {
-    'Orders.number': 8,
+    'orders.number': 8,
   },
   {
-    'Orders.number': 9,
+    'orders.number': 9,
   },
   {
-    'Orders.number': 10,
+    'orders.number': 10,
   },
 ];
 ```

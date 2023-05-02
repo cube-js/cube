@@ -1,5 +1,5 @@
 ---
-title: Security Context
+title: Security context
 permalink: /security/context
 category: Authentication & Authorization
 menuOrder: 2
@@ -38,11 +38,11 @@ with filters. For example, let's take the following query:
 
 ```json
 {
-  "dimensions": ["Orders.status"],
-  "measures": ["Orders.count", "Orders.total"],
+  "dimensions": ["orders.status"],
+  "measures": ["orders.count", "orders.total"],
   "timeDimensions": [
     {
-      "dimension": "Orders.createdAt",
+      "dimension": "orders.createdAt",
       "dateRange": ["2015-01-01", "2015-12-31"],
       "granularity": "month"
     }
@@ -84,7 +84,7 @@ module.exports = {
     }
 
     query.filters.push({
-      member: 'Orders.userId',
+      member: 'orders.user_id',
       operator: 'equals',
       values: [securityContext.user_id],
     });
@@ -112,7 +112,7 @@ Authorization HTTP header.
 curl \
   -H "Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1Ijp7ImlkIjo0Mn0sImlhdCI6MTU1NjAyNTM1MiwiZXhwIjoxNTU4NjE3MzUyfQ._8QBL6nip6SkIrFzZzGq2nSF8URhl5BSSSGZYp7IJZ4" \
   -G \
-  --data-urlencode 'query={"measures":["Orders.count"]}' \
+  --data-urlencode 'query={"measures":["orders.count"]}' \
   http://localhost:4000/cubejs-api/v1/load
 ```
 
@@ -155,23 +155,33 @@ With the same JWT payload as before, we can modify models before they are
 compiled. The following cube will ensure users only see results for their
 `company_id` in a multi-tenant deployment:
 
-```javascript
-const {
-  securityContext: { company_id },
-} = COMPILE_CONTEXT;
+<CodeTabs>
 
-cube(`Orders`, {
-  sql: `SELECT * FROM ${company_id}.orders`,
+```yaml
+cubes:
+  - name: orders
+    sql_table: "{COMPILE_CONTEXT.securityContext.company_id}.orders"
+
+    measures:
+      - name: count
+        type: count
+```
+
+```javascript
+cube(`orders`, {
+  sql_table: `${COMPILE_CONTEXT.securityContext.company_id}.orders`,
 
   measures: {
     count: {
-      type: `count`,
-    },
-  },
-});
+      type: `count`
+    }
+  }
+})
 ```
 
-### <--{"id" : "Using COMPILE_CONTEXT"}--> Usage with Pre-Aggregations
+</CodeTabs>
+
+### <--{"id" : "Using COMPILE_CONTEXT"}--> Usage with pre-aggregations
 
 To generate pre-aggregations that rely on `COMPILE_CONTEXT`, [configure
 `scheduledRefreshContexts` in your `cube.js` configuration

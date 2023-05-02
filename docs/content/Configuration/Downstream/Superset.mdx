@@ -29,13 +29,7 @@ Click **How to connect your BI tool** link on the Overview page, navigate to the
 SQL API tab and enable it. Once enabled, you should see the screen like the one
 below with your connection credentials:
 
-<div style="text-align: center">
-  <img
-    src="https://cubedev-blog-images.s3.us-east-2.amazonaws.com/bac4cfb4-d89c-46fa-a7d4-552c2ece4a18.GIF"
-    style="border: none"
-    width="80%"
-  />
-</div>
+<Screenshot src="https://cubedev-blog-images.s3.us-east-2.amazonaws.com/bac4cfb4-d89c-46fa-a7d4-552c2ece4a18.GIF" />
 
 ### <--{"id" : "Enable Cube SQL API"}--> Self-hosted Cube
 
@@ -55,14 +49,10 @@ Apache Superset connects to Cube as to a Postgres database.
 In Apache Superset, go to **Data > Databases**, then click **+ Database** to add
 a new database:
 
-<div style="text-align: center">
-  <img
-    alt="Apache Superset: databases page"
-    src="https://ucarecdn.com/cb3fe91a-6ce2-4c0e-8997-fdb2d4507beb/"
-    style="border: none"
-    width="100%"
-  />
-</div>
+<Screenshot
+  alt="Apache Superset: databases page"
+  src="https://ucarecdn.com/cb3fe91a-6ce2-4c0e-8997-fdb2d4507beb/"
+/>
 
 ## Querying data
 
@@ -71,9 +61,30 @@ are columns.
 
 Let's use the following Cube data model:
 
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    sql_table: orders
+
+    measures:
+      - name: count
+        type: count
+
+    dimensions:
+      - name: status
+        sql: status
+        type: string
+
+      - name: created
+        sql: created_at
+        type: time
+```
+
 ```javascript
-cube(`Orders`, {
-  sql: `SELECT * FROM public.orders`,
+cube(`orders`, {
+  sql_table: `orders`,
 
   measures: {
     count: {
@@ -87,7 +98,7 @@ cube(`Orders`, {
       type: `string`,
     },
 
-    created: {
+    created_at: {
       sql: `created_at`,
       type: `time`,
     },
@@ -95,31 +106,25 @@ cube(`Orders`, {
 });
 ```
 
-Using the SQL API, `Orders` will be exposed as a table. In Superset, we can
-create datasets based on tables. Let's create one from `Orders` table:
+</CodeTabs>
 
-<div style="text-align: center">
-  <img
-    alt="Apache Superset: SQL Editor page with successful query"
-    src="https://ucarecdn.com/eebd3839-03db-4492-a7e4-a7cc1d9ffc73/"
-    style="border: none"
-    width="100%"
-  />
-</div>
+Using the SQL API, `orders` will be exposed as a table. In Superset, we can
+create datasets based on tables. Let's create one from `orders` table:
+
+<Screenshot
+  alt="Apache Superset: SQL Editor page with successful query"
+  src="https://ucarecdn.com/eebd3839-03db-4492-a7e4-a7cc1d9ffc73/"
+/>
 
 Now, we can explore this dataset. Let's create a new chart of type line with
-**Orders** dataset.
+"Orders" dataset.
 
-<div style="text-align: center">
-  <img
-    alt="Apache Superset: SQL Editor page with successful query"
-    src="https://ucarecdn.com/c509c6fb-f633-4ded-ae94-d4768978c47a/"
-    style="border: none"
-    width="100%"
-  />
-</div>
+<Screenshot
+  alt="Apache Superset: SQL Editor page with successful query"
+  src="https://ucarecdn.com/c509c6fb-f633-4ded-ae94-d4768978c47a/"
+/>
 
-We can select the `COUNT(*)` as a metric and `createdAt` as the time column with
+We can select the `COUNT(*)` as a metric and `created_at` as the time column with
 a time grain of `month`.
 
 The `COUNT(*)` aggregate function is being mapped to a measure of type
@@ -131,7 +136,7 @@ The `COUNT(*)` aggregate function is being mapped to a measure of type
 ### <--{"id" : "Additional Configuration"}--> Pre-Aggregations
 
 To allow queries from Superset to match pre-aggregations in Cube, [the
-`allowNonStrictDateRangeMatch` property][ref-schema-ref-preagg-allownonstrict]
+`allow_non_strict_date_range_match` property][ref-schema-ref-preagg-allownonstrict]
 must be set to `true` in the pre-aggregation definition. This is because
 Superset uses loose date ranges when generating SQL queries.
 

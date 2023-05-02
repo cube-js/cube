@@ -41,8 +41,8 @@ exports.tableSchema = () => process.env.TABLE_SCHEMA;
 ```javascript
 import { tableSchema } from "../tablePrefix";
 
-cube(`Users`, {
-  sql: `SELECT * FROM ${tableSchema()}.users`,
+cube(`users`, {
+  sql_table: `${tableSchema()}.users`,
 
   // ...
 });
@@ -87,11 +87,11 @@ Later, you can `import` into the cube, wherever needed:
 **Users.js**:
 
 ```javascript
-// in Users.js
+// in users.js
 import { TEST_USER_IDS } from "./constants";
 import usersSql from "./usersSql";
 
-cube(`Users`, {
+cube(`users`, {
   sql: usersSql(`users`),
   measures: {
     /* ... */
@@ -125,15 +125,15 @@ definition that undergo reference resolve transpiling process:
 - `measures`
 - `dimensions`
 - `segments`
-- `timeDimension`
-- `drillMembers`
-- `contextMembers`
+- `time_dimension`
+- `drill_members`
+- `context_members`
 
 Each of these properties inside `cube` and `context` definitions are transpiled
 to functions with resolved arguments. For example:
 
 ```javascript
-cube(`Users`, {
+cube(`users`, {
   // ...
 
   measures: {
@@ -142,7 +142,7 @@ cube(`Users`, {
     },
 
     ratio: {
-      sql: `sum(${CUBE}.amount) / ${count}`,
+      sql: `SUM(${CUBE}.amount) / ${count}`,
       type: `number`,
     },
   },
@@ -152,7 +152,7 @@ cube(`Users`, {
 is transpiled to:
 
 ```javascript
-cube(`Users`, {
+cube(`users`, {
   // ...
 
   measures: {
@@ -161,7 +161,7 @@ cube(`Users`, {
     },
 
     ratio: {
-      sql: (CUBE, count) => `sum(${CUBE}.amount) / ${count}`,
+      sql: (CUBE, count) => `SUM(${CUBE}.amount) / ${count}`,
       type: `number`,
     },
   },
@@ -177,7 +177,7 @@ const measureRatioDefinition = {
   type: `number`,
 };
 
-cube(`Users`, {
+cube(`users`, {
   // ...
 
   measures: {

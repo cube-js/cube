@@ -43,18 +43,19 @@ Later, you can `import` into the cube whenever needed:
 // in Users.js
 import { TEST_USER_IDS } from './constants';
 
-cube(`Users`, {
-  sql: `...`,
+cube(`users`, {
+  // ...
+
   measures: {
-    /* ... */
+    // ...
   },
 
   dimensions: {
-    /* ... */
+    // ...
   },
 
   segments: {
-    excludeTestUsers: {
+    exclude_test_users: {
       sql: `${CUBE}.id NOT IN (${TEST_USER_IDS.join(', ')})`,
     },
   },
@@ -80,9 +81,8 @@ export const parseDateWithTimeZone = (column) =>
 // in events.js
 import { parseDateWithTimeZone } from './helpers';
 
-cube(`Events`, {
-  sql: `SELECT * FROM events`,
-
+cube(`events`, {
+  sql_table: `events`,
   // ...
 
   dimensions: {
@@ -107,12 +107,12 @@ which is located in a parent directory.
 ├── package.json
 └── model
     ├── utils.js
-    └── Sales
-        └── Orders.js
+    └── sales
+        └── orders.js
 ```
 
 ```javascript
-// in model/Sales/Orders.js
+// in model/sales/orders.js
 import { capitalize } from './schema_utils';
 ```
 
@@ -136,8 +136,8 @@ In the example below we have the following file structure:
 ├── package.json
 ├── utils.js
 └── model
-    └── Sales
-        └── Orders.js
+    └── sales
+        └── orders.js
 ```
 
 In the `utils.js` file we read the environment variable and expose it. We will
@@ -156,17 +156,18 @@ In the data model file, the definition will change depending on the value of the
 environment value.
 
 ```javascript
-// in model/Sales/Orders.js
-import {environment} from '../utils'
+// in model/sales/orders.js
+import { environment } from '../utils'
+const isProdOrStaging = ["prod", "staging"].includes(environment())
 
-cube(`Orders`, {
-      ...
-      preAggregations: ["prod", "staging"].includes(environment()) ? {
-         main: {
-         ...
-         }
-      } : {}, // no pre-aggregations unless environment is prod or stagging.
-      ...
+cube(`orders`, {
+  // ...
+
+  pre_aggregations: isProdOrStaging ? {
+    main: {
+      // ...
+    }
+  } : {}, // No pre-aggregations unless environment is prod or stagging
 });
 ```
 

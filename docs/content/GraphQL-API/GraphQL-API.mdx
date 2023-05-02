@@ -13,11 +13,32 @@ browser. After generating data models and running query you should see the
 GraphiQL interface if you click 'GraphiQL' button. If you click the 'Docs'
 button in the top-right, you can explore the introspected schema.
 
-As an example, let's use the `Orders` cube from the example eCommerce database:
+As an example, let's use the `orders` cube from the example eCommerce database:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    sql_table: orders
+
+    measures:
+      - name: count
+        type: count
+
+    dimensions:
+      - name: status
+        sql: status
+        type: string
+
+      - name: created_at
+        sql: created_at
+        type: time
+```
 
 ```javascript
-cube(`Orders`, {
-  sql: `SELECT * FROM public.orders`,
+cube(`orders`, {
+  sql_table: `orders`,
 
   measures: {
     count: {
@@ -31,13 +52,15 @@ cube(`Orders`, {
       type: `string`,
     },
 
-    createdAt: {
+    created_at: {
       sql: `created_at`,
       type: `time`,
     },
   },
 });
 ```
+
+</CodeTabs>
 
 A GraphQL query to return the number of orders by status would look something
 like this:
@@ -48,7 +71,7 @@ like this:
     orders {
       count
       status
-      createdAt {
+      created_at {
         day
       }
     }
@@ -60,11 +83,11 @@ The equivalent query to the REST API endpoint would look like this:
 
 ```json
 {
-  "measures": ["Orders.count"],
-  "dimensions": ["Orders.status", "Orders.createdAt"],
+  "measures": ["orders.count"],
+  "dimensions": ["orders.status"],
   "timeDimensions": [
     {
-      "dimension": "Orders.createdAt",
+      "dimension": "orders.created_at",
       "granularity": "day"
     }
   ]
@@ -80,7 +103,7 @@ the query:
 {
   cube {
     orders {
-      createdAt {
+      created_at {
         month
       }
     }
@@ -95,7 +118,7 @@ you prefer to not specify a granularity, then use `value`:
 {
   cube {
     orders {
-      createdAt {
+      created_at {
         value
       }
     }
@@ -113,12 +136,12 @@ added to the query as follows:
 query {
   cube(limit: 100, offset: 50, timezone: "America/Los_Angeles") {
     orders(
-      orderBy: { createdAt: asc, count: desc }
+      orderBy: { created_at: asc, count: desc }
       where: { status: { equals: "completed" } }
     ) {
       count
       status
-      createdAt
+      created_at
     }
   }
 }
@@ -138,12 +161,12 @@ The GraphQL API supports `@skip` and `@include` directives too:
 query GetOrders($byStatus: Boolean) {
   cube(limit: 100, offset: 50, timezone: "America/Los_Angeles") {
     orders(
-      orderBy: { createdAt: asc, count: desc }
+      orderBy: { created_at: asc, count: desc }
       where: { status: { equals: "completed" } }
     ) {
       count
       status @include(if: $byStatus)
-      createdAt
+      created_at
     }
   }
 }
@@ -151,8 +174,8 @@ query GetOrders($byStatus: Boolean) {
 
 ### <--{"id" : "Getting started"}--> Querying multiple cubes
 
-Using the same `Orders` cube as before, let's try and get the numbers of
-products for each order status too. We can do this by adding the `Products` cube
+Using the same `orders` cube as before, let's try and get the numbers of
+products for each order status too. We can do this by adding the `products` cube
 to our query as follows:
 
 ```graphql
@@ -161,7 +184,7 @@ to our query as follows:
     orders {
       status
       count
-      createdAt {
+      created_at {
         month
       }
     }
@@ -171,3 +194,5 @@ to our query as follows:
   }
 }
 ```
+
+[ref-schema-ref-preagg-granularity]: /schema/reference/pre-aggregations#parameters-granularity

@@ -6,6 +6,13 @@ subCategory: Data modeling
 menuOrder: 4
 ---
 
+<InfoBox>
+
+This functionality only works with data models written in JavaScript, not YAML.
+For more information, check out the [Data Modeling Syntax][ref-modeling-syntax] page.
+
+</InfoBox>
+
 ## Use case
 
 We want to understand the distribution of orders by their statuses. Let's
@@ -27,9 +34,9 @@ refers to another measure.
 const statuses = ['processing', 'shipped', 'completed'];
 
 const createTotalByStatusMeasure = (status) => ({
-  [`Total_${status}_orders`]: {
-    type: `count`,
+  [`total_${status}_orders`]: {
     title: `Total ${status} orders`,
+    type: `count`,
     filters: [
       {
         sql: (CUBE) => `${CUBE}."status" = '${status}'`,
@@ -39,23 +46,23 @@ const createTotalByStatusMeasure = (status) => ({
 });
 
 const createPercentageMeasure = (status) => ({
-  [`Percentage_of_${status}`]: {
+  [`percentage_of_${status}`]: {
+    title: `Percentage of ${status} orders`,
     type: `number`,
     format: `percent`,
-    title: `Percentage of ${status} orders`,
     sql: (CUBE) =>
-      `ROUND(${CUBE[`Total_${status}_orders`]}::numeric / ${
-        CUBE.totalOrders
-      }::numeric * 100.0, 2)`,
+      `ROUND(${CUBE[`total_${status}_orders`]}::NUMERIC / ${
+        CUBE.total_orders
+      }::NUMERIC * 100.0, 2)`,
   },
 });
 
-cube(`Orders`, {
-  sql: `SELECT * FROM public.orders`,
+cube(`orders`, {
+  sql_table: `orders`,
 
   measures: Object.assign(
     {
-      totalOrders: {
+      total_orders: {
         type: `count`,
         title: `Total orders`,
       },
@@ -80,9 +87,9 @@ distribution and easily create new measures just by adding a new status.
 ```javascript
 [
   {
-    'Orders.Percentage_of_processing': '33.54',
-    'Orders.Percentage_of_shipped': '33.00',
-    'Orders.Percentage_of_completed': '33.46',
+    'orders.percentage_of_processing': '33.54',
+    'orders.percentage_of_shipped': '33.00',
+    'orders.percentage_of_completed': '33.46',
   },
 ];
 ```
@@ -93,3 +100,5 @@ Please feel free to check out the
 [full source code](https://github.com/cube-js/cube/tree/master/examples/recipes/referencing-dynamic-measures)
 or run it with the `docker-compose up` command. You'll see the result, including
 queried data, in the console.
+
+[ref-modeling-syntax]: /data-modeling/syntax

@@ -27,6 +27,8 @@ among all measures, dimensions, and segments within a cube and follow the
 
 ```javascript
 cube(`orders`, {
+  // ...
+
   measures: {
     count: {
       sql: `id`,
@@ -44,6 +46,7 @@ cube(`orders`, {
 ```yaml
 cubes:
   - name: orders
+    # ...
 
     measures:
       - name: count
@@ -64,7 +67,9 @@ You can add details to a measure’s definition via the `description` parameter:
 <CodeTabs>
 
 ```javascript
-cube(`Orders`, {
+cube(`orders`, {
+  // ...
+
   measures: {
     orders_count: {
       sql: `id`,
@@ -77,34 +82,44 @@ cube(`Orders`, {
 
 ```yaml
 cubes:
-  - name: Orders
+  - name: orders
+    # ...
+
     measures:
       - name: orders_count
+        description: count of all orders
         sql: id
         type: count
-        description: count of all orders
 ```
 
 </CodeTabs>
 
-### <--{"id" : "Parameters"}--> drillMembers
+### <--{"id" : "Parameters"}--> drill_members
 
-Using the `drillMembers` parameter, you can define a set of [drill
-down][ref-drilldowns] fields for the measure. `drillMembers` is defined as an
+Using the `drill_members` parameter, you can define a set of [drill
+down][ref-drilldowns] fields for the measure. `drill_members` is defined as an
 array of dimensions. Cube automatically injects dimensions’ names and other
 cubes’ names with dimensions in the context, so you can reference these
-variables in the `drillMembers` array. [Learn more about how to define and use
+variables in the `drill_members` array. [Learn more about how to define and use
 drill downs][ref-drilldowns].
 
 <CodeTabs>
 
 ```javascript
-cube("Orders", {
+cube(`orders`, {
+  // ...
+
   measures: {
     revenue: {
       type: `sum`,
       sql: `price`,
-      drillMembers: [id, price, status, Products.name, Products.id],
+      drill_members: [
+        id,
+        price,
+        status,
+        products.name,
+        products.id
+      ],
     },
   },
 });
@@ -112,7 +127,9 @@ cube("Orders", {
 
 ```yaml
 cubes:
-  - name: Orders
+  - name: orders
+    # ...
+
     measures:
       - name: revenue
         type: sum
@@ -121,8 +138,8 @@ cubes:
           - id
           - price
           - status
-          - Products.name
-          - Products.id
+          - products.name
+          - products.id
 ```
 
 </CodeTabs>
@@ -135,7 +152,9 @@ the `filters` parameter. The syntax looks like the following:
 <CodeTabs>
 
 ```javascript
-cube(`Orders`, {
+cube(`orders`, {
+  // ...
+
   measures: {
     orders_completed_count: {
       sql: `id`,
@@ -148,7 +167,9 @@ cube(`Orders`, {
 
 ```yaml
 cubes:
-  - name: Orders
+  - name: orders
+    # ...
+
     measures:
       - name: orders_completed_count
         sql: id
@@ -169,11 +190,13 @@ full list of supported formats.
 <CodeTabs>
 
 ```javascript
-cube(`Orders`, {
+cube(`orders`, {
+  // ...
+
   measures: {
     total: {
       sql: `amount`,
-      type: `runningTotal`,
+      type: `running_total`,
       format: `currency`,
     },
   },
@@ -182,7 +205,9 @@ cube(`Orders`, {
 
 ```yaml
 cubes:
-  - name: Orders
+  - name: orders
+    # ...
+
     measures:
       - name: total
         sql: amount
@@ -199,7 +224,9 @@ Custom metadata. Can be used to pass any information to the frontend.
 <CodeTabs>
 
 ```javascript
-cube(`Orders`, {
+cube(`orders`, {
+  // ...
+
   measures: {
     revenue: {
       type: `sum`,
@@ -214,7 +241,9 @@ cube(`Orders`, {
 
 ```yaml
 cubes:
-  - name: Orders
+  - name: orders
+    # ...
+
     measures:
       - name: revenue
         type: sum
@@ -225,15 +254,15 @@ cubes:
 
 </CodeTabs>
 
-### <--{"id" : "Parameters"}--> rollingWindow
+### <--{"id" : "Parameters"}--> rolling_window
 
 If you want to calculate some metric within a window, for example a week or a
-month, you should use a `rollingWindow` parameter. The `trailing` and `leading`
+month, you should use a `rolling_window` parameter. The `trailing` and `leading`
 parameters define window size.
 
 <WarningBox>
 
-`rollingWindow` only works for a query where there's a single `timeDimension`
+`rolling_window` only works for a query where there's a single `timeDimension`
 with a defined date range.
 
 </WarningBox>
@@ -253,12 +282,14 @@ range. By default, the `leading` and `trailing` parameters are set to zero and
 <CodeTabs>
 
 ```javascript
-cube(`Orders`, {
+cube(`orders`, {
+  // ...
+
   measures: {
     rolling_count_month: {
       sql: `id`,
       type: `count`,
-      rollingWindow: {
+      rolling_window: {
         trailing: `1 month`,
       },
     },
@@ -268,7 +299,9 @@ cube(`Orders`, {
 
 ```yaml
 cubes:
-  - name: Orders
+  - name: orders
+    # ...
+
     measures:
       - name: rolling_count_month
         sql: id
@@ -284,11 +317,13 @@ Here's an example of an `unbounded` window that's used for cumulative counts:
 <CodeTabs>
 
 ```javascript
-cube(`Orders`, {
+cube(`orders`, {
+  // ...
+
   measures: {
     cumulative_count: {
       type: `count`,
-      rollingWindow: {
+      rolling_window: {
         trailing: `unbounded`,
       },
     },
@@ -298,7 +333,9 @@ cube(`Orders`, {
 
 ```yaml
 cubes:
-  - name: Orders
+  - name: orders
+    # ...
+
     measures:
       - name: cumulative_count
         type: count
@@ -316,7 +353,9 @@ default value of `shown` is `true`.
 <CodeTabs>
 
 ```javascript
-cube(`Orders`, {
+cube(`orders`, {
+  // ...
+
   measures: {
     orders_count: {
       sql: `id`,
@@ -329,7 +368,9 @@ cube(`Orders`, {
 
 ```yaml
 cubes:
-  - name: Orders
+  - name: orders
+    # ...
+
     measures:
       - name: orders_count
         sql: id
@@ -349,10 +390,12 @@ the corresponding sql parameter.
 <CodeTabs>
 
 ```javascript
-cube(`Orders`, {
+cube(`orders`, {
+  // ...
+
   measures: {
     users_count: {
-      sql: `count(*)`,
+      sql: `COUNT(*)`,
       type: `number`,
     },
   },
@@ -361,10 +404,12 @@ cube(`Orders`, {
 
 ```yaml
 cubes:
-  - name: Orders
+  - name: orders
+    # ...
+
     measures:
       - name: users_count
-        sql: count(*)
+        sql: "COUNT(*)"
         type: number
 ```
 
@@ -379,12 +424,14 @@ to override default behavior, please use the `title` parameter.
 <CodeTabs>
 
 ```javascript
-cube(`Orders`, {
+cube(`orders`, {
+  // ...
+
   measures: {
     orders_count: {
+      title: `Number of Orders Placed`,
       sql: `id`,
       type: `count`,
-      title: `Number of Orders Placed`,
     },
   },
 });
@@ -392,12 +439,14 @@ cube(`Orders`, {
 
 ```yaml
 cubes:
-  - name: Orders
+  - name: orders
+    # ...
+
     measures:
       - name: orders_count
+        title: Number of Orders Placed
         sql: id
         type: count
-        title: Number of Orders Placed
 ```
 
 </CodeTabs>
@@ -412,7 +461,9 @@ types.
 <CodeTabs>
 
 ```javascript
-cube(`Orders`, {
+cube(`orders`, {
+  // ...
+
   measures: {
     orders_count: {
       sql: `id`,
@@ -424,7 +475,9 @@ cube(`Orders`, {
 
 ```yaml
 cubes:
-  - name: Orders
+  - name: orders
+    # ...
+
     measures:
       - name: orders_count
         sql: id
@@ -433,7 +486,7 @@ cubes:
 
 </CodeTabs>
 
-## Calculated Measures
+## Calculated measures
 
 In the case where you need to specify a formula for measure calculating with
 other measures, you can compose a formula in `sql`. For example, to calculate
@@ -442,10 +495,12 @@ the conversion of buyers of all users.
 <CodeTabs>
 
 ```javascript
-cube(`Orders`, {
+cube(`orders`, {
+  // ...
+
   measures: {
     purchases_to_created_account_ratio: {
-      sql: `${purchases} / ${Users.count} * 100.0`,
+      sql: `${purchases} / ${users.count} * 100.0`,
       type: `number`,
       format: `percent`,
     },
@@ -455,10 +510,12 @@ cube(`Orders`, {
 
 ```yaml
 cubes:
-  - name: Orders
+  - name: orders
+    # ...
+
     measures:
       - name: purchases_to_created_account_ratio
-        sql: "{purchases} / {Users.count} * 100.0"
+        sql: "{purchases} / {users.count} * 100.0"
         type: number
         format: percent
 ```

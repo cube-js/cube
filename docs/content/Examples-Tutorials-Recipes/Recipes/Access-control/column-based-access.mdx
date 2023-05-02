@@ -19,17 +19,35 @@ To implement column-based access, we will use supplier's email from a
 [`queryRewrite`](https://cube.dev/docs/security/context#using-query-rewrite)
 extension point to manage data access.
 
-We have `Products` and `Suppliers` cubes with a `many_to_one` relationship from
+We have `products` and `suppliers` cubes with a `many_to_one` relationship from
 products to suppliers:
 
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: products
+    sql_table: products
+
+    joins:
+      - name: suppliers
+        relationship: many_to_one
+        sql: "{CUBE}.supplier_id = {suppliers.id}"
+
+    dimensions:
+      - name: name
+        sql: name
+        type: string
+```
+
 ```javascript
-cube(`Products`, {
-  sql: `SELECT * FROM public.products`,
+cube(`products`, {
+  sql_table: `products`,
 
   joins: {
-    Suppliers: {
+    suppliers: {
       relationship: `many_to_one`,
-      sql: `${CUBE}.supplier_id = ${Suppliers.id}`,
+      sql: `${CUBE}.supplier_id = ${suppliers.id}`,
     },
   },
 
@@ -42,15 +60,35 @@ cube(`Products`, {
 });
 ```
 
+</CodeTabs>
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: suppliers
+    sql_table: suppliers
+
+    dimensions:
+      - name: id
+        sql: id
+        type: string
+        primary_key: true
+
+      - name: email
+        sql: email
+        type: string
+```
+
 ```javascript
-cube(`Suppliers`, {
-  sql: `SELECT * FROM public.suppliers`,
+cube(`suppliers`, {
+  sql_table: `suppliers`,
 
   dimensions: {
     id: {
-      primaryKey: true,
       sql: `id`,
       type: `string`,
+      primary_key: true,
     },
 
     email: {
@@ -61,10 +99,12 @@ cube(`Suppliers`, {
 });
 ```
 
+</CodeTabs>
+
 ## Configuration
 
 Let's add the supplier email filter if a query includes any dimensions or
-measures from the `Products` cube:
+measures from the `products` cube:
 
 ```javascript
 module.exports = {
@@ -74,13 +114,13 @@ module.exports = {
       ...(query.measures || []),
     ].map((e) => e.split('.')[0]);
 
-    if (cubeNames.includes('Products')) {
+    if (cubeNames.includes('products')) {
       if (!securityContext.email) {
         throw new Error('No email found in Security Context!');
       }
 
       query.filters.push({
-        member: `Suppliers.email`,
+        member: `suppliers.email`,
         operator: 'equals',
         values: [securityContext.email],
       });
@@ -96,7 +136,7 @@ module.exports = {
 To get the supplier's products, we will send two identical requests with
 different emails inside JWTs.
 
-```javascript
+```json
 {
   "iat": 1000000000,
   "exp": 5000000000,
@@ -104,7 +144,7 @@ different emails inside JWTs.
 }
 ```
 
-```javascript
+```json
 {
   "iat": 1000000000,
   "exp": 5000000000,
@@ -120,10 +160,10 @@ We have received different data depending on the supplier's email.
 // purus.accumsan@Proin.org
 [
   {
-    'Products.name': 'Awesome Soft Salad',
+    'products.name': 'Awesome Soft Salad',
   },
   {
-    'Products.name': 'Rustic Granite Gloves',
+    'products.name': 'Rustic Granite Gloves',
   },
 ];
 ```
@@ -132,7 +172,7 @@ We have received different data depending on the supplier's email.
 // gravida.sit.amet@risus.net
 [
   {
-    'Products.name': 'Incredible Granite Cheese',
+    'products.name': 'Incredible Granite Cheese',
   },
 ];
 ```

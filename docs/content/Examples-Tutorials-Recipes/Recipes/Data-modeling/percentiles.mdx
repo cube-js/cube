@@ -26,30 +26,30 @@ respectively.
 
 ## Data modeling
 
-Let's explore the data in the `Users` cube that contains various demographic
+Let's explore the data in the `users` cube that contains various demographic
 information about users, including their age:
 
 ```javascript
 [
   {
-    'Users.name': 'Abbott, Breanne',
-    'Users.age': 52,
+    'users.name': 'Abbott, Breanne',
+    'users.age': 52,
   },
   {
-    'Users.name': 'Abbott, Dallas',
-    'Users.age': 43,
+    'users.name': 'Abbott, Dallas',
+    'users.age': 43,
   },
   {
-    'Users.name': 'Abbott, Gia',
-    'Users.age': 36,
+    'users.name': 'Abbott, Gia',
+    'users.age': 36,
   },
   {
-    'Users.name': 'Abbott, Tom',
-    'Users.age': 39,
+    'users.name': 'Abbott, Tom',
+    'users.age': 39,
   },
   {
-    'Users.name': 'Abbott, Ward',
-    'Users.age': 67,
+    'users.name': 'Abbott, Ward',
+    'users.age': 67,
   },
 ];
 ```
@@ -63,42 +63,67 @@ However, almost every database has them under names of `PERCENTILE_CONT` and
 [BigQuery](https://cloud.google.com/bigquery/docs/reference/standard-sql/functions-and-operators#aggregate_functions)
 included.
 
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: users
+    # ...
+
+    measures:
+      - name: avg_age
+        type: avg
+        sql: age
+
+      - name: median_age
+        type: number
+        sql: PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY age)
+
+      - name: p95_age
+        type: number
+        sql: PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY age)
+```
+
 ```javascript
+cube("users", {
   measures: {
-    avgAge: {
+    avg_age: {
       sql: `age`,
       type: `avg`,
     },
 
-    medianAge: {
+    median_age: {
       sql: `PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY age)`,
       type: `number`,
     },
 
-    p95Age: {
+    p95_age: {
       sql: `PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY age)`,
       type: `number`,
     },
   },
+});
 ```
+
+</CodeTabs>
 
 ## Result
 
 Using the measures defined above, we can explore statistics about the age of our
 users.
 
-```javascript
+```json
 [
   {
-    'Users.avgAge': '52.3100000000000000',
-    'Users.medianAge': 53,
-    'Users.p95Age': 82,
-  },
-];
+    "users.avg_age": "52.3100000000000000",
+    "users.median_age": 53,
+    "users.p95_age": 82
+  }
+]
 ```
 
 For this particular dataset, the average age closely matches the median age, and
-95&thinsp;% of all users are younger than 82 years.
+95% of all users are younger than 82 years.
 
 ## Source code
 

@@ -62,7 +62,7 @@ interface CubejsConfiguration {
     subject?: string;
     claimsNamespace?: string;
   };
-  cacheAndQueueDriver: 'memory' | 'cubestore';
+  cacheAndQueueDriver: "memory" | "cubestore";
   orchestratorOptions:
     | OrchestratorOptions
     | ((context: RequestContext) => OrchestratorOptions);
@@ -166,7 +166,7 @@ Set a custom database driver. The function accepts context object as an argument
 to allow dynamically loading database drivers, which is usually used in
 [Multitenancy Applications][ref-multitenancy].
 
-Called once per [`dataSource`][ref-schema-ref-datasource]. Can return a
+Called once per [`data_source`][ref-schema-ref-datasource]. Can return a
 `Promise` which resolves to a `DriverConfig`. `DriverConfig` consists of a
 `type` field corresponding to database type and options passed to a driver
 constructor.
@@ -174,7 +174,7 @@ constructor.
 ```javascript
 module.exports = {
   driverFactory: ({ dataSource }) => ({
-    type: 'postgres',
+    type: "postgres",
     database: dataSource,
   }),
 };
@@ -184,12 +184,12 @@ Drivers can also be instantiated directly in case custom driver implementations
 are used.
 
 ```javascript
-const PostgresDriver = require('@cubejs-backend/postgres-driver');
+const PostgresDriver = require("@cubejs-backend/postgres-driver");
 
 module.exports = {
   driverFactory: ({ dataSource }) =>
     new PostgresDriver({ database: dataSource }),
-  dbType: ({ dataSource }) => 'postgres',
+  dbType: ({ dataSource }) => "postgres",
 };
 ```
 
@@ -256,7 +256,7 @@ repositories with data model files based on
 Called only once per [`appId`][self-opts-ctx-to-appid].
 
 ```javascript
-const { FileRepository } = require('@cubejs-backend/server-core');
+const { FileRepository } = require("@cubejs-backend/server-core");
 
 // using built-in SchemaFileRepository implementation and supplying the path to model files
 module.exports = {
@@ -270,7 +270,7 @@ module.exports = {
     return {
       dataSchemaFiles: async () =>
         await Promise.resolve([
-          { fileName: 'file.js', content: 'contents of file' },
+          { fileName: "file.js", content: "contents of file" },
         ]),
     };
   },
@@ -312,14 +312,14 @@ For example, you can use `checkSqlAuth` to validate username and password.
 ```javascript
 module.exports = {
   checkSqlAuth: (req, username) => {
-    if (username === 'fooUser') {
+    if (username === "fooUser") {
       return {
-        password: 'mypassword',
+        password: "mypassword",
         securityContext: {},
       };
     }
 
-    throw new Error('Incorrect user name or password');
+    throw new Error("Incorrect user name or password");
   },
 };
 ```
@@ -337,12 +337,12 @@ For example, you can use `canSwitchSqlUser` to define your custom logic:
 ```javascript
 module.exports = {
   canSwitchSqlUser: async (current, username) => {
-    if (current === 'admin') {
+    if (current === "admin") {
       return true;
     }
 
-    if (current === 'service') {
-      return username !== 'admin';
+    if (current === "service") {
+      return username !== "admin";
     }
 
     return false;
@@ -372,9 +372,9 @@ module.exports = {
   queryRewrite: (query, { securityContext }) => {
     if (securityContext.filterByRegion) {
       query.filters.push({
-        member: 'Regions.id',
-        operator: 'equals',
-        values: [securityContext.regionId],
+        member: "regions.id",
+        operator: "equals",
+        values: [securityContext.region_id],
       });
     }
     return query;
@@ -445,8 +445,8 @@ pre-aggregations or refresh keys, nor how frequently Cube accesses the database.
 Setting this value to `30s` doesn't mean pre-aggregations or in-memory cache
 would be refreshed every 30 seconds but instead refresh key is checked for
 freshness every 30 seconds in the background. Please consult the [cube
-`refreshKey` documentation][ref-schema-cube-ref-refresh-key] and
-[pre-aggregation `refreshKey` documentation][ref-pre-aggregations-refresh-key]
+`refresh_key` documentation][ref-schema-cube-ref-refresh-key] and
+[pre-aggregation `refresh_key` documentation][ref-pre-aggregations-refresh-key]
 on how to set data refresh intervals.
 
 </WarningBox>
@@ -490,7 +490,7 @@ format e.g. `America/Los_Angeles`. The default value is `UTC`.
 ```javascript
 module.exports = {
   // You can define one or multiple timezones based on your requirements
-  scheduledRefreshTimeZones: ['America/Vancouver', 'America/Toronto'],
+  scheduledRefreshTimeZones: ["America/Vancouver", "America/Toronto"],
 };
 ```
 
@@ -524,14 +524,14 @@ module.exports = {
   scheduledRefreshContexts: async () => [
     {
       securityContext: {
-        myappid: 'demoappid',
-        bucket: 'demo',
+        myappid: "demoappid",
+        bucket: "demo",
       },
     },
     {
       securityContext: {
-        myappid: 'demoappid2',
-        bucket: 'demo2',
+        myappid: "demoappid2",
+        bucket: "demo2",
       },
     },
   ],
@@ -625,8 +625,8 @@ with options [from here][link-express-cors-opts]:
 module.exports = {
   http: {
     cors: {
-      origin: '*',
-      methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+      origin: "*",
+      methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
       preflightContinue: false,
       optionsSuccessStatus: 204,
       maxAge: 86400,
@@ -689,19 +689,19 @@ these values can result in application instability and/or downtime.
 
 You can pass this object to set advanced options for Cube Query Orchestrator.
 
-| Option                                       | Description                                                                                                                                                                                                                                                                                                                                                                                   | Default Value           |
-| -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
-| continueWaitTimeout                          | Long polling interval                                                                                                                                                                                                                                                                                                                                                                         | `5`                     |
-| redisPrefix                                  | Prefix to be set an all Redis keys                                                                                                                                                                                                                                                                                                                                                            | `STANDALONE`            |
-| rollupOnlyMode                               | When enabled, an error will be thrown if a query can't be served from a pre-aggregation (rollup)                                                                                                                                                                                                                                                                                              | `false`                 |
-| queryCacheOptions                            | Query cache options for DB queries                                                                                                                                                                                                                                                                                                                                                            | `{}`                    |
-| queryCacheOptions.refreshKeyRenewalThreshold | Time in seconds to cache the result of [`refreshKey`][ref-schema-cube-ref-refresh-key] check                                                                                                                                                                                                                                                                                                  | `defined by DB dialect` |
-| queryCacheOptions.backgroundRenew            | Controls whether to wait in foreground for refreshed query data if `refreshKey` value has been changed. Refresh key queries or pre-aggregations are never awaited in foreground and always processed in background unless cache is empty. If `true` it immediately returns values from cache if available without [refreshKey][ref-schema-cube-ref-refresh-key] check to renew in foreground. | `false`                 |
-| queryCacheOptions.queueOptions               | Query queue options for DB queries                                                                                                                                                                                                                                                                                                                                                            | `{}`                    |
-| preAggregationsOptions                       | Query cache options for pre-aggregations                                                                                                                                                                                                                                                                                                                                                      | `{}`                    |
-| preAggregationsOptions.maxPartitions         | The maximum number of partitions each pre-aggregation in a cube can use.                                                                                                                                                                                                                                                                                                                      | `10000`                 |
-| preAggregationsOptions.queueOptions          | Query queue options for pre-aggregations                                                                                                                                                                                                                                                                                                                                                      | `{}`                    |
-| preAggregationsOptions.externalRefresh       | When running a separate instance of Cube to refresh pre-aggregations in the background, this option can be set on the API instance to prevent it from trying to check for rollup data being current - it won't try to create or refresh them when this option is `true`                                                                                                                       | `false`                 |
+| Option                                       | Description                                                                                                                                                                                                                                                                                                                                                                                       | Default Value           |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| continueWaitTimeout                          | Long polling interval                                                                                                                                                                                                                                                                                                                                                                             | `5`                     |
+| redisPrefix                                  | Prefix to be set an all Redis keys                                                                                                                                                                                                                                                                                                                                                                | `STANDALONE`            |
+| rollupOnlyMode                               | When enabled, an error will be thrown if a query can't be served from a pre-aggregation (rollup)                                                                                                                                                                                                                                                                                                  | `false`                 |
+| queryCacheOptions                            | Query cache options for DB queries                                                                                                                                                                                                                                                                                                                                                                | `{}`                    |
+| queryCacheOptions.refreshKeyRenewalThreshold | Time in seconds to cache the result of [`refresh_key`][ref-schema-cube-ref-refresh-key] check                                                                                                                                                                                                                                                                                                     | `defined by DB dialect` |
+| queryCacheOptions.backgroundRenew            | Controls whether to wait in foreground for refreshed query data if `refresh_key` value has been changed. Refresh key queries or pre-aggregations are never awaited in foreground and always processed in background unless cache is empty. If `true` it immediately returns values from cache if available without [`refresh_key`][ref-schema-cube-ref-refresh-key] check to renew in foreground. | `false`                 |
+| queryCacheOptions.queueOptions               | Query queue options for DB queries                                                                                                                                                                                                                                                                                                                                                                | `{}`                    |
+| preAggregationsOptions                       | Query cache options for pre-aggregations                                                                                                                                                                                                                                                                                                                                                          | `{}`                    |
+| preAggregationsOptions.maxPartitions         | The maximum number of partitions each pre-aggregation in a cube can use.                                                                                                                                                                                                                                                                                                                          | `10000`                 |
+| preAggregationsOptions.queueOptions          | Query queue options for pre-aggregations                                                                                                                                                                                                                                                                                                                                                          | `{}`                    |
+| preAggregationsOptions.externalRefresh       | When running a separate instance of Cube to refresh pre-aggregations in the background, this option can be set on the API instance to prevent it from trying to check for rollup data being current - it won't try to create or refresh them when this option is `true`                                                                                                                           | `false`                 |
 
 To set options for `queryCache` and `preAggregations`, set an object with key
 queueOptions. `queryCacheOptions` are used while querying database tables, while
@@ -744,7 +744,7 @@ solutions.
 
 ```typescript
 const myCustomMiddleware = (req, res, next) => {
-  req.foo = 'bar';
+  req.foo = "bar";
   next();
 };
 
@@ -815,7 +815,7 @@ constructor.
 class ApiFileRepository {
   async dataSchemaFiles() {
     const fileContents = await callExternalApiForFileContents();
-    return [{ fileName: 'apiFile', content: fileContents }];
+    return [{ fileName: "apiFile", content: fileContents }];
   }
 }
 

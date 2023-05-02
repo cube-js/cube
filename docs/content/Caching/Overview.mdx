@@ -52,31 +52,60 @@ more about read-only support and pre-aggregation build strategies.
 Pre-aggregations are defined in the data model. You can learn more about
 defining pre-aggregations in [data modeling reference][ref-schema-ref-preaggs].
 
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    sql_table: orders
+
+    measures:
+      - name: total_amount
+        sql: amount
+        type: sum
+
+    dimensions:
+      - name: created_at
+        sql: created_at
+        type: time
+
+    pre_aggregations:
+      - name: amount_by_created
+        measures:
+          - total_amount
+        time_dimension: created_at
+        granularity: month
+```
+
 ```javascript
-cube(`Orders`, {
+cube(`orders`, {
+  sql_table: `orders`,
+
   measures: {
-    totalAmount: {
+    total_amount: {
       sql: `amount`,
       type: `sum`,
     },
   },
 
   dimensions: {
-    createdAt: {
+    created_at: {
       sql: `created_at`,
       type: `time`,
     },
   },
 
-  preAggregations: {
-    amountByCreated: {
-      measures: [totalAmount],
-      timeDimension: createdAt,
+  pre_aggregations: {
+    amount_by_created: {
+      measures: [total_amount],
+      time_dimension: created_at,
       granularity: `month`,
     },
   },
 });
 ```
+
+</CodeTabs>
 
 ## In-memory Cache
 
@@ -87,7 +116,7 @@ Upon receiving an incoming request, Cube first checks the cache using this key.
 If nothing is found in the cache, the query is executed in the database and the
 result set is returned as well as updating the cache.
 
-If an existing value is present in the cache and the `refreshKey` value for the
+If an existing value is present in the cache and the `refresh_key` value for the
 query hasn't changed, the cached value will be returned. Otherwise, an SQL query
 will be executed against either the pre-aggregations storage or the source
 database to populate the cache with the results and return them.
@@ -101,25 +130,59 @@ isn't any different, the cached result is valid and can be returned skipping an
 expensive query, but if there is a difference, the query needs to be re-run and
 its result cached.
 
-To aid with this, Cube defines a `refreshKey` for each cube. [Refresh
+To aid with this, Cube defines a `refresh_key` for each cube. [Refresh
 keys][ref-schema-ref-cube-refresh-key] are evaluated by Cube to assess if the
 data needs to be refreshed.
 
+The following `refresh_key` tells Cube to refresh data every 5 minutes:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    refresh_key:
+      every: 5 minute
+```
+
 ```javascript
-cube(`Orders`, {
-  // This refreshKey tells Cube to refresh data every 5 minutes
-  refreshKey: {
+cube(`orders`, {
+  refresh_key: {
     every: `5 minute`,
   },
+});
+```
 
-  // With this refreshKey Cube will only refresh the data if
-  // the value of previous MAX(created_at) changed
-  // By default Cube will check this refreshKey every 10 seconds
-  refreshKey: {
+</CodeTabs>
+
+With the following `refresh_key`, Cube will only refresh the data if the value of
+`MAX(created_at)` changes. By default, Cube will check this `refresh_key`
+every 10 seconds:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    refresh_key:
+      sql: SELECT MAX(created_at) FROM orders
+```
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  refresh_key: {
     sql: `SELECT MAX(created_at) FROM orders`,
   },
 });
 ```
+
+</CodeTabs>
 
 By default, Cube will check and invalidate the cache in the background when in
 [development mode][ref-development-mode]. In production environments, we
@@ -136,13 +199,13 @@ recommend always enabling background refresh.
 
 ### <--{"id" : "In-memory Cache"}--> Default Refresh Keys
 
-The default values for `refreshKey` are
+The default values for `refresh_key` are
 
-- `every: '2 minute'` for BigQuery, Athena, Snowflake, and Presto.
-- `every: '10 second'` for all other databases.
+- `every: 2 minute` for BigQuery, Athena, Snowflake, and Presto.
+- `every: 10 second` for all other databases.
 
-+You can use a custom SQL query to check if a refresh is required by changing
-the [`refreshKey`][ref-schema-ref-cube-refresh-key] property in a cube. Often, a
+You can use a custom SQL query to check if a refresh is required by changing
+the [`refresh_key`][ref-schema-ref-cube-refresh-key] property in a cube. Often, a
 `MAX(updated_at_timestamp)` for OLTP data is a viable option, or examining a
 metadata table for whatever system is managing the data to see when it last ran.
 
@@ -160,9 +223,9 @@ wasn't initiated earlier by another client. Only Refresh Key freshness
 guarantees are provided in this case.
 
 For situations like real-time analytics or responding to live user changes to
-underlying data, the `refreshKey` query cache can prevent fresh data from
+underlying data, the `refresh_key` query cache can prevent fresh data from
 showing up immediately. For these situations, the cache can effectively be
-disabled by setting the [`refreshKey.every`][ref-schema-ref-cube-refresh-key]
+disabled by setting the [`refresh_key.every`][ref-schema-ref-cube-refresh-key]
 parameter to something very low, like `1 second`.
 
 ## Inspecting Queries
@@ -173,7 +236,7 @@ Cloud][link-cube-cloud].
 
 [Developer Playground][ref-dev-playground] can be used to inspect a single
 query. To do that, click the "cache" button after executing the query. It will
-show you the information about the `refreshKey` for the query and whether the
+show you the information about the `refresh_key` for the query and whether the
 query uses any pre-aggregations. To inspect multiple queries or list existing
 pre-aggregations, you can use [Cube Cloud][link-cube-cloud].
 

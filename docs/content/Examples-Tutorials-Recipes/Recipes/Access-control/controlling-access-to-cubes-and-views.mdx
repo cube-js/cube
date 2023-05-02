@@ -30,34 +30,62 @@ module.exports = {
 
 ## Data modeling
 
+<CodeTabs>
+
+```yaml
+# orders.yml
+cubes:
+  - name: orders
+    sql_table: orders
+    public: false
+    # ...
+
+# users.yml
+cubes:
+  - name: users
+    sql_table: users
+    public: false
+    # ...
+
+# total_revenue_per_customer.yml
+views:
+  - name: total_revenue_per_customer
+    public: COMPILE_CONTEXT.security_context.isFinance
+    includes:
+      - orders.total_revenue
+      - users.company
+```
+
 ```javascript
-// Orders.js
-cube(`Orders`, {
-  sql: `SELECT * FROM public.orders`,
-  shown: false,
+// orders.js
+cube(`orders`, {
+  sql_table: `orders`,
+  public: false,
 
-  ...,
+  // ...
 });
 
-// Users.js
-cube(`Users`, {
-  sql: `SELECT * FROM public.users`,
-  shown: false,
+// users.js
+cube(`users`, {
+  sql_table: `users`,
+  public: false,
 
-  ...,
+  // ...
 });
 
-// TotalRevenuePerCustomer.js
-view('TotalRevenuePerCustomer', {
+// total_revenue_per_customer.js
+view('total_revenue_per_customer', {
   description: `Total revenue per customer`,
-  shown: COMPILE_CONTEXT.permissions.isFinance,
+  public: COMPILE_CONTEXT.security_context.isFinance,
 
   includes: [
-    Orders.totalRevenue,
-    Users.company,
+    orders.total_revenue,
+    users.company,
   ],
 });
 ```
+
+</CodeTabs>
 
 ## Query
 
@@ -78,12 +106,12 @@ The `/meta` endpoint shows the available cubes and views:
 {
   "cubes": [
     {
-      "name": "TotalRevenuePerCustomer",
+      "name": "total_revenue_per_customer",
       "title": "Total Revenue Per Customer",
       "description": "Total revenue per customer",
       "measures": [
         {
-          "name": "TotalRevenuePerCustomer.totalRevenue",
+          "name": "total_revenue_per_customer.total_revenue",
           "title": "Total Revenue Per Customer Total Revenue",
           "shortTitle": "Total Revenue",
           "cumulativeTotal": false,
@@ -100,7 +128,7 @@ The `/meta` endpoint shows the available cubes and views:
       ],
       "dimensions": [
         {
-          "name": "TotalRevenuePerCustomer.company",
+          "name": "total_revenue_per_customer.company",
           "title": "Total Revenue Per Customer Company",
           "type": "string",
           "shortTitle": "Company",

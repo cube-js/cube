@@ -46,7 +46,7 @@ specific domain only, use the following configuration in the `cube.js` file:
 module.exports = {
   http: {
     cors: {
-      origin: 'https://example.com',
+      origin: "https://example.com",
     },
   },
 };
@@ -61,11 +61,11 @@ If the request takes too long to be processed, Cube Backend responds with
 mechanism in Cube is implemented. Clients should continuously retry the same
 query in a loop until they get a successful result. Subsequent calls to the Cube
 endpoints are idempotent and don't lead to scheduling new database queries if
-not required by `refreshKey`. Also, receiving `Continue wait` doesn't mean the
-database query has been canceled, and it's actually still being processed by the
-Cube. Database queries that weren't started and are no longer waited by the
-client's long polling loop will be marked as orphaned and removed from the
-querying queue.
+not required by the [`refresh_key`][ref-schema-ref-cube-refresh-key]. Also,
+receiving `Continue wait` doesn't mean the database query has been canceled, and
+it's actually still being processed by the Cube. Database queries that weren't
+started and are no longer waited by the client's long polling loop will be
+marked as orphaned and removed from the querying queue.
 
 Possible reasons of **Continue wait**:
 
@@ -126,3 +126,4 @@ example, the following query will retrieve rows 101-200 from the `Orders` cube:
 [ref-conf-queue-opts]: /config#queue-options
 [ref-api-ref-query-format]: /query-format#query-properties
 [ref-config-cors]: /config#http
+[ref-schema-ref-cube-refresh-key]: /schema/reference/cube#refresh-key

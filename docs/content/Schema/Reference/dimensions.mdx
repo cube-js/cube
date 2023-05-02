@@ -11,7 +11,7 @@ redirect_from:
 ---
 
 The `dimensions` property contains a set of dimensions. You can think about a
-dimension as an attribute related to a measure, e.g. the measure `userCount` can
+dimension as an attribute related to a measure, e.g. the measure `user_count` can
 have dimensions like `country`, `age`, `occupation`, etc.
 
 Any dimension should have the following properties: `name`, `sql` and `type`.
@@ -71,7 +71,9 @@ The following static `label` example will create a `size` dimension with values
 <CodeTabs>
 
 ```javascript
-cube("Products", {
+cube(`products`, {
+  // ...
+
   dimensions: {
     size: {
       type: `string`,
@@ -91,7 +93,9 @@ cube("Products", {
 
 ```yaml
 cubes:
-  - name: Products
+  - name: products
+    # ...
+
     dimensions:
       - name: size
         type: string
@@ -115,7 +119,9 @@ The `label` property can be defined dynamically as an object with a `sql`
 property in JavaScript models:
 
 ```javascript
-cube("Products", {
+cube(`products`, {
+  // ...
+
   dimensions: {
     size: {
       type: `string`,
@@ -152,12 +158,14 @@ You can add details to a dimension's definition via the `description` property:
 <CodeTabs>
 
 ```javascript
-cube("Products", {
+cube(`products`, {
+  // ...
+
   dimensions: {
     comment: {
-      type: `string`,
-      sql: `comments`,
       description: `Comments for orders`,
+      sql: `comments`,
+      type: `string`,
     },
   },
 });
@@ -165,12 +173,14 @@ cube("Products", {
 
 ```yaml
 cubes:
-  - name: Products
+  - name: products
+    # ...
+
     dimensions:
       - name: comment
-        type: string
-        sql: comments
         description: Comments for orders
+        sql: comments
+        type: string
 ```
 
 </CodeTabs>
@@ -182,10 +192,12 @@ Custom metadata. Can be used to pass any information to the frontend.
 <CodeTabs>
 
 ```javascript
-cube("Products", {
+cube(`products`, {
+  // ...
+
   dimensions: {
     users_count: {
-      sql: `${Users.count}`,
+      sql: `${users.count}`,
       type: `number`,
       meta: {
         any: "value",
@@ -197,10 +209,12 @@ cube("Products", {
 
 ```yaml
 cubes:
-  - name: Products
+  - name: products
+    # ...
+
     dimensions:
       - name: users_count
-        sql: "{Users.count}"
+        sql: "{users.count}"
         type: number
         meta:
           any: value
@@ -217,7 +231,7 @@ A primary key is used to make [joins][ref-schema-ref-joins] work properly.
 
 <WarningBox>
 
-Setting `primaryKey` to `true` will change the default value of `shown`
+Setting `primary_key` to `true` will change the default value of `shown`
 parameter to `false`. If you still want `shown` to be `true`, set it manually.
 
 </WarningBox>
@@ -225,12 +239,14 @@ parameter to `false`. If you still want `shown` to be `true`, set it manually.
 <CodeTabs>
 
 ```javascript
-cube("Products", {
+cube(`products`, {
+  // ...
+
   dimensions: {
     id: {
       sql: `id`,
       type: `number`,
-      primaryKey: true,
+      primary_key: true,
     },
   },
 });
@@ -238,7 +254,9 @@ cube("Products", {
 
 ```yaml
 cubes:
-  - name: Products
+  - name: products
+    # ...
+
     dimensions:
       - name: id
         sql: id
@@ -248,7 +266,7 @@ cubes:
 
 </CodeTabs>
 
-### <--{"id" : "Parameters"}--> propagateFiltersToSubQuery
+### <--{"id" : "Parameters"}--> propagate_filters_to_sub_query
 
 When this statement is set to `true`, the filters applied to the query will be
 passed to the [subquery][self-subquery].
@@ -256,13 +274,15 @@ passed to the [subquery][self-subquery].
 <CodeTabs>
 
 ```javascript
-cube("Products", {
+cube(`products`, {
+  // ...
+
   dimensions: {
     users_count: {
-      sql: `${Users.count}`,
+      sql: `${users.count}`,
       type: `number`,
-      subQuery: true,
-      propagateFiltersToSubQuery: true,
+      sub_query: true,
+      propagate_filters_to_sub_query: true,
     },
   },
 });
@@ -270,13 +290,15 @@ cube("Products", {
 
 ```yaml
 cubes:
-  - name: Products
+  - name: products
+    # ...
+
     dimensions:
       - name: users_count
-        sql: "{Users.count}"
+        sql: "{users.count}"
         type: number
-        subQuery: true
-        propagateFiltersToSubQuery: true
+        sub_query: true
+        propagate_filters_to_sub_query: true
 ```
 
 </CodeTabs>
@@ -289,11 +311,13 @@ default value of `shown` is `true`.
 <CodeTabs>
 
 ```javascript
-cube("Products", {
+cube(`products`, {
+  // ...
+
   dimensions: {
     comment: {
-      type: `string`,
       sql: `comments`,
+      type: `string`,
       shown: false,
     },
   },
@@ -302,11 +326,13 @@ cube("Products", {
 
 ```yaml
 cubes:
-  - name: Products
+  - name: products
+    # ...
+
     dimensions:
       - name: comment
-        type: string
         sql: comments
+        type: string
         shown: false
 ```
 
@@ -319,8 +345,23 @@ the `type` of the dimension. Please refer to the [Dimension Types
 Guide][ref-schema-ref-types-formats-dimension-types] for detailed information on
 the corresponding `sql` parameter.
 
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    dimensions:
+      - name: created_at
+        sql: created_at
+        type: time
+```
+
 ```javascript
-cube(`Orders`, {
+cube(`orders`, {
+  // ...
+
   dimensions: {
     created_at: {
       sql: `created_at`,
@@ -330,20 +371,24 @@ cube(`Orders`, {
 });
 ```
 
-### <--{"id" : "Parameters"}--> subQuery
+</CodeTabs>
 
-The `subQuery` statement allows you to reference a measure in a dimension. It's
+### <--{"id" : "Parameters"}--> sub_query
+
+The `sub_query` statement allows you to reference a measure in a dimension. It's
 an advanced concept and you can learn more about it [here][ref-subquery].
 
 <CodeTabs>
 
 ```javascript
-cube("Products", {
+cube(`products`, {
+  // ...
+
   dimensions: {
     users_count: {
-      sql: `${Users.count}`,
+      sql: `${users.count}`,
       type: `number`,
-      subQuery: true,
+      sub_query: true,
     },
   },
 });
@@ -351,12 +396,14 @@ cube("Products", {
 
 ```yaml
 cubes:
-  - name: Products
+  - name: products
+    # ...
+
     dimensions:
-      - name: usersCount
-        sql: "{Users.count}"
+      - name: users_count
+        sql: "{users.count}"
         type: number
-        subQuery: true
+        sub_query: true
 ```
 
 </CodeTabs>
@@ -370,12 +417,14 @@ order to override default behavior, please use the `title` property:
 <CodeTabs>
 
 ```javascript
-cube("Products", {
+cube(`products`, {
+  // ...
+
   dimensions: {
     meta_value: {
-      type: `string`,
-      sql: `meta_value`,
       title: `Size`,
+      sql: `meta_value`,
+      type: `string`,
     },
   },
 });
@@ -383,12 +432,14 @@ cube("Products", {
 
 ```yaml
 cubes:
-  - name: Products
+  - name: products
+    # ...
+
     dimensions:
       - name: meta_value
-        type: string
-        sql: meta_value
         title: Size
+        sql: meta_value
+        type: string
 ```
 
 </CodeTabs>

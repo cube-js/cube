@@ -13,25 +13,42 @@ section][ref-schema-ref-preaggs].
 ## Refresh Strategy
 
 Refresh strategy can be customized by setting the
-[`refreshKey`][ref-schema-ref-preaggs-refresh-key] property for the
+[`refresh_key`][ref-schema-ref-preaggs-refresh-key] property for the
 pre-aggregation.
 
-The default value of [`refreshKey`][ref-schema-ref-preaggs-refresh-key] is
-`every: '1 hour'`. It can be redefined either by overriding the default value of
+The default value of [`refresh_key`][ref-schema-ref-preaggs-refresh-key] is
+`every: 1 hour`. It can be redefined either by overriding the default value of
 the [`every` property][ref-schema-ref-preaggs-refresh-key-every]:
 
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    pre_aggregations:
+      - name: amount_by_created
+        type: rollup
+        measures:
+          - amount
+        time_dimension: created_at
+        granularity: month
+        refresh_key:
+          every: 12 hour
+```
+
 ```javascript
-cube(`Orders`, {
+cube(`orders`, {
+  // ...
 
-  ...,
-
-  preAggregations: {
+  pre_aggregations: {
     amount_by_created: {
       type: `rollup`,
       measures: [amount],
-      timeDimension: created_at,
+      time_dimension: created_at,
       granularity: `month`,
-      refreshKey: {
+      refresh_key: {
         every: `12 hour`,
       },
     },
@@ -39,20 +56,39 @@ cube(`Orders`, {
 });
 ```
 
+</CodeTabs>
+
 Or by providing a [`sql` property][ref-schema-ref-preaggs-refresh-key-sql]
-instead, and leaving `every` unchanged from its' default value:
+instead, and leaving `every` unchanged from its default value:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    pre_aggregations:
+      - name: amount_by_created
+        measures:
+          - amount
+        time_dimension: created_at
+        granularity: month
+        refresh_key:
+          # every will default to `10 seconds` here
+          sql: SELECT MAX(created_at) FROM orders
+```
 
 ```javascript
-cube(`Orders`, {
+cube(`orders`, {
+  // ...
 
-  ...,
-
-  preAggregations: {
+  pre_aggregations: {
     amount_by_created: {
       measures: [amount],
-      timeDimension: created_at,
+      time_dimension: created_at,
       granularity: `month`,
-      refreshKey: {
+      refresh_key: {
         // every will default to `10 seconds` here
         sql: `SELECT MAX(created_at) FROM orders`,
       },
@@ -61,19 +97,38 @@ cube(`Orders`, {
 });
 ```
 
+</CodeTabs>
+
 Or both `every` and `sql` can be defined together:
 
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    pre_aggregations:
+      - name: amount_by_created
+        measures:
+          - amount
+        time_dimension: created_at
+        granularity: month
+        refresh_key:
+          every: 12 hour
+          sql: SELECT MAX(created_at) FROM orders
+```
+
 ```javascript
-cube(`Orders`, {
+cube(`orders`, {
+  // ...
 
-  ...,
-
-  preAggregations: {
+  pre_aggregations: {
     amount_by_created: {
       measures: [amount],
-      timeDimension: created_at,
+      time_dimension: created_at,
       granularity: `month`,
-      refreshKey: {
+      refresh_key: {
         every: `12 hour`,
         sql: `SELECT MAX(created_at) FROM orders`,
       },
@@ -81,6 +136,8 @@ cube(`Orders`, {
   },
 });
 ```
+
+</CodeTabs>
 
 When `every` and `sql` are used together, Cube will run the query from the `sql`
 property on an interval defined by the `every` property. If the query returns
@@ -114,34 +171,57 @@ like [BigQuery](/config/databases/google-bigquery) or
 [AWS Athena](/config/databases/aws-athena).
 
 Any `rollup` pre-aggregation can be partitioned by time using the
-`partitionGranularity` property in [a pre-aggregation
+`partition_granularity` property in [a pre-aggregation
 definition][ref-schema-ref-preaggs]. In the example below, the
-`partitionGranularity` is set to `month`, which means Cube will generate
+`partition_granularity` is set to `month`, which means Cube will generate
 separate tables for each month's worth of data. Once built, it will continue to
 refresh on a daily basis the last 3 months of data.
 
-```typescript
-cube(`Orders`, {
-  sql: `select * from orders`,
+<CodeTabs>
 
-  ...,
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    pre_aggregations:
+      - name: category_and_date
+        measures:
+          - count
+          - revenue
+        dimensions:
+          - category
+        time_dimension: created_at
+        granularity: day
+        partition_granularity: month
+        refresh_key:
+          every: 1 day
+          incremental: true
+          update_window: 3 months
+```
+
+```javascript
+cube(`orders`, {
+  // ...
 
   preAggregations: {
     category_and_date: {
-      measures: [Orders.count, revenue],
+      measures: [count, revenue],
       dimensions: [category],
-      timeDimension: created_at,
+      time_dimension: created_at,
       granularity: `day`,
-      partitionGranularity: `month`,
-      refreshKey: {
+      partition_granularity: `month`,
+      refresh_key: {
         every: `1 day`,
         incremental: true,
-        updateWindow: `3 months`
+        update_window: `3 months`
       }
     },
   },
 });
 ```
+
+</CodeTabs>
 
 ## Using Indexes
 
@@ -190,25 +270,26 @@ The pre-aggregation code would look as follows:
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
-  sql: `SELECT * FROM Orders`,
-  preAggregations: {
+cube('orders', {
+  // ...
+
+  pre_aggregations: {
     main: {
-      measures: [CUBE.order_total],
-      dimensions: [CUBE.product_name, CUBE.product_category, CUBE.zip_code],
-      timeDimension: CUBE.timestamp,
+      measures: [order_total],
+      dimensions: [product_name, product_category, zip_code],
+      time_dimension: timestamp,
       granularity: `hour`,
-      partitionGranularity: `day`,
-      allowNonStrictDateRangeMatch: true,
-      refreshKey: {
+      partition_granularity: `day`,
+      allow_non_strict_date_range_match: true,
+      refresh_key: {
         every: `1 hour`,
-        updateWindow: `1 day`,
         incremental: true,
+        update_window: `1 day`,
       },
-      buildRangeStart: {
-        sql: `SELECT date_sub(NOW(), 365)`,
+      build_range_start: {
+        sql: `SELECT DATE_SUB(NOW(), 365)`,
       },
-      buildRangeEnd: {
+      build_range_end: {
         sql: `SELECT NOW()`,
       },
     },
@@ -218,22 +299,27 @@ cube('Orders', {
 
 ```yaml
 cubes:
-  - name: Orders
-    sql: SELECT * FROM orders
+  - name: orders
+    # ...
+
     pre_aggregations:
       - name: main
-        measures: [CUBE.order_total]
-        dimensions: [CUBE.product_name, CUBE.product_category, CUBE.zip_code]
-        time_dimension: CUBE.timestamp
+        measures:
+          - order_total
+        dimensions:
+          - product_name
+          - product_category
+          - zip_code
+        time_dimension: timestamp
         granularity: hour
         partition_granularity: day
-        allowNonStrictDateRangeMatch: true
+        allow_non_strict_date_range_match: true
         refresh_key:
           every: 1 hour
-          update_window: 1 day
           incremental: true
+          update_window: 1 day
         build_range_start:
-          sql: SELECT date_sub(NOW(), 365)
+          sql: SELECT DATE_SUB(NOW(), 365)
         build_range_end:
           sql: SELECT NOW()
 ```
@@ -246,11 +332,11 @@ queries being the filter values:
 ```JSON
 {
   "measures": [
-    "Orders.order_total"
+    "orders.order_total"
   ],
   "timeDimensions": [
     {
-      "dimension": "Orders.timestamp",
+      "dimension": "orders.timestamp",
       "granularity": "hour",
       "dateRange": [
         "2022-12-14T06:00:00.000",
@@ -258,22 +344,19 @@ queries being the filter values:
       ]
     }
   ],
-  "order": [
-    [
-      "Orders.timestamp",
-      "asc"
-    ]
-  ],
+  "order": {
+    "orders.timestamp": "asc"
+  },
   "filters": [
     {
-      "member": "Orders.product_category",
+      "member": "orders.product_category",
       "operator": "equals",
       "values": [
         "Electronics"
       ]
     },
     {
-      "member": "Orders.product_name",
+      "member": "orders.product_name",
       "operator": "equals",
       "values": [
         "Keyboard",
@@ -282,7 +365,7 @@ queries being the filter values:
     }
   ],
   "dimensions": [
-    "Orders.zip_code"
+    "orders.zip_code"
   ],
   "limit": 10000
 }
@@ -296,31 +379,16 @@ define an index as follows:
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
-  sql: `SELECT * FROM Orders;`,
-  preAggregations: {
+cube('orders', {
+  // ...
+
+  pre_aggregations: {
     main: {
-      measures: [CUBE.order_total],
-      dimensions: [CUBE.product_name, CUBE.product_category, CUBE.zip_code],
-      timeDimension: CUBE.timestamp,
-      granularity: `hour`,
-      partitionGranularity: `day`,
-      allowNonStrictDateRangeMatch: true,
-      refreshKey: {
-        every: `1 hour`,
-        updateWindow: `1 day`,
-        incremental: true,
-      },
-      buildRangeStart: {
-        sql: `SELECT date_sub(NOW(), 365)`,
-      },
-      buildRangeEnd: {
-        sql: `SELECT NOW()`,
-      },
-      // New Index
+      // ...
+
       indexes: {
         category_productname_zipcode_index: {
-          columns: [CUBE.product_category, CUBE.product_name, CUBE.zip_code],
+          columns: [product_category, product_name, zip_code],
         },
       },
     },
@@ -330,28 +398,19 @@ cube('Orders', {
 
 ```yaml
 cubes:
-  - name: Orders
-    sql: SELECT * FROM orders
+  - name: orders
+    # ...
+
     pre_aggregations:
       - name: main
-        measures: [CUBE.order_total]
-        dimensions: [CUBE.product_name, CUBE.product_category, CUBE.zip_code]
-        time_dimension: CUBE.timestamp
-        granularity: hour
-        partition_granularity: day
-        allowNonStrictDateRangeMatch: true
-        refresh_key:
-          every: 1 hour
-          update_window: 1 day
-          incremental: true
-        build_range_start:
-          sql: SELECT date_sub(NOW(), 365)
-        build_range_end:
-          sql: SELECT NOW()
-        # new index
+        # ...
+        
         indexes:
           - name: category_productname_zipcode_index
-            columns: [CUBE.product_category, CUBE.product_name, CUBE.zip_code]
+            columns:
+              - product_category
+              - product_name
+              - zip_code
 ```
 
 </CodeTabs>
@@ -370,46 +429,30 @@ The columns are ordered from **lowest** to **highest** selectivity. We can
 expect there to be a lower number of product categories, hence a lower number of
 unique records resulting in a lower selectivity. Although `zip_code` may have
 lower or higher selectivity, the dimensions used to filter must come first than
-the dimensions in the GROUP BY part of the query.
+the dimensions in the `GROUP BY` part of the query.
 
 ### Aggregated indexes
 
-Aggregated indexes be defined as well. You can read more about them
+Aggregated indexes can be defined as well. You can read more about them
 [here][ref-schema-ref-preaggs-index].
 
-**Example:**
+Example:
 
 <CodeTabs>
 
 ```javascript
-cube('Orders', {
-  sql: `SELECT * FROM Orders;`,
-  preAggregations: {
+cube('orders', {
+  // ...
+
+  pre_aggregations: {
     main: {
-      measures: [CUBE.order_total],
-      dimensions: [CUBE.product_name, CUBE.product_category, CUBE.zip_code],
-      timeDimension: CUBE.timestamp,
-      granularity: `hour`,
-      partitionGranularity: `day`,
-      allowNonStrictDateRangeMatch: true,
-      refreshKey: {
-        every: `1 hour`,
-        updateWindow: `1 day`,
-        incremental: true,
-      },
-      buildRangeStart: {
-        sql: `SELECT date_sub(NOW(), 365)`,
-      },
-      buildRangeEnd: {
-        sql: `SELECT NOW()`,
-      },
+      // ...
+
       indexes: {
-        category_productname_zipcode_index: {
-          columns: [CUBE.product_category, CUBE.product_name, CUBE.zip_code],
-        },
-        // New Index
+        // ...
+        
         zip_code_index: {
-          columns: [CUBE.zip_code],
+          columns: [zip_code],
           type: `aggregate`,
         },
       },
@@ -420,30 +463,19 @@ cube('Orders', {
 
 ```yaml
 cubes:
-  - name: Orders
-    sql: SELECT * FROM orders
+  - name: orders
+    # ...
+    
     pre_aggregations:
       - name: main
-        measures: [CUBE.order_total]
-        dimensions: [CUBE.product_name, CUBE.product_category, CUBE.zip_code]
-        time_dimension: CUBE.timestamp
-        granularity: hour
-        partition_granularity: day
-        allowNonStrictDateRangeMatch: true
-        refresh_key:
-          every: 1 hour
-          update_window: 1 day
-          incremental: true
-        build_range_start:
-          sql: SELECT date_sub(NOW(), 365)
-        build_range_end:
-          sql: SELECT NOW()
+        # ...
+
         indexes:
-          - name: category_productname_zipcode_index
-            columns: [CUBE.product_category, CUBE.product_name, CUBE.zip_code]
-          # new index
+          # ...
+
           - name: zip_code_index
-            columns: [CUBE.zip_code]
+            columns:
+              - zip_code
             type: aggregate
 ```
 
@@ -546,8 +578,8 @@ Alternatively, you can store pre-aggregations **internally** in the source
 database. To store a pre-aggregation internally, set `external: false` in
 pre-aggregation definition.
 
-Please note, that [originalSql][ref-original-sql] pre-aggregations are stored
-**internally** by default. It is not recommended to store `originalSql`
+Please note, that [original_sql][ref-original-sql] pre-aggregations are stored
+**internally** by default. It is not recommended to store `original_sql`
 pre-aggregations in Cube Store.
 
 ## Joins between pre-aggregations
@@ -564,37 +596,63 @@ When making a query that joins data from two different cubes, Cube can use
 pre-aggregations instead of running the base SQL queries. To get started, first
 ensure both cubes have valid pre-aggregations:
 
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    pre_aggregations:
+      - name: orders_rollup
+        measures:
+          - CUBE.count
+        dimensions:
+          - CUBE.user_id
+          - CUBE.status
+        time_dimension: CUBE.created_at
+        granularity: day
+
+    joins:
+      - name: users
+        sql: "{CUBE.user_id} = ${users.id}"
+        relationship: many_to_one
+
+  - name: users
+    # ...
+
+    pre_aggregations:
+      - name: users_rollup
+        dimensions:
+          - CUBE.id
+          - CUBE.name
+```
+
 ```javascript
-// Orders
-cube(`Orders`, {
-  sql: `SELECT * FROM public.orders`,
+cube(`orders`, {
+  // ...
 
-  ...,
-
-  preAggregations: {
+  pre_aggregations: {
     orders_rollup: {
       measures: [CUBE.count],
       dimensions: [CUBE.user_id, CUBE.status],
-      timeDimension: CUBE.created_at,
+      time_dimension: CUBE.created_at,
       granularity: `day`,
     },
   },
 
   joins: {
-    Users: {
-      sql: `${CUBE.user_id} = ${Users.id}`,
+    users: {
+      sql: `${CUBE.user_id} = ${users.id}`,
       relationship: `many_to_one`
     },
   },
 });
 
-// Users
-cube(`Users`, {
-  sql: `SELECT * FROM public.users`,
+cube(`users`, {
+  // ...
 
-  ...,
-
-  preAggregations: {
+  pre_aggregations: {
     users_rollup: {
       dimensions: [CUBE.id, CUBE.name],
     },
@@ -602,18 +660,38 @@ cube(`Users`, {
 });
 ```
 
+</CodeTabs>
+
 Before we continue, let's add an index to the `orders_rollup` pre-aggregation so
-that the `rollupJoin` pre-aggregation can work correctly:
+that the `rollup_join` pre-aggregation can work correctly:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    pre_aggregations:
+      - name: orders_rollup
+        # ...
+
+        indexes:
+          - name: user_index
+            columns:
+              - CUBE.user_id
+```
 
 ```javascript
-cube(`Orders`, {
-  ...,
+cube(`orders`, {
+  // ...
 
-  preAggregations: {
+  pre_aggregations: {
     orders_rollup: {
-      ...,
+      // ...
+
       indexes: {
-        userIndex: {
+        user_index: {
           columns: [CUBE.user_id],
         },
       },
@@ -622,41 +700,70 @@ cube(`Orders`, {
 });
 ```
 
-Now we can add a new pre-aggregation of type `rollupJoin` to the `Orders` cube:
+</CodeTabs>
+
+Now we can add a new pre-aggregation of type `rollup_join` to the `orders` cube:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    pre_aggregations:
+      # ...
+
+      - name: orders_with_users_rollup
+        type: rollup_join
+        measures:
+          - CUBE.count
+        dimensions:
+          - users.name
+        time_dimension: CUBE.created_at
+        granularity: day
+        rollups:
+          - users.users_rollup
+          - CUBE.orders_rollup
+```
 
 ```javascript
-cube(`Orders`, {
-  ...,
+cube(`orders`, {
+  // ...
 
-  preAggregations: {
+  pre_aggregations: {
+    // ...
+
     orders_with_users_rollup: {
-      type: `rollupJoin`,
+      type: `rollup_join`,
       measures: [CUBE.count],
-      dimensions: [Users.name],
-      timeDimension: CUBE.created_at,
+      dimensions: [users.name],
+      time_dimension: CUBE.created_at,
       granularity: `day`,
-      rollups: [Users.users_rollup, CUBE.orders_rollup],
+      rollups: [users.users_rollup, CUBE.orders_rollup],
     },
   },
 });
 ```
 
+</CodeTabs>
+
 With all of the above set up, making a query such as the following will now use
-`Orders.orders_rollup` and `Users.users_rollup`, avoiding a database request:
+`orders.orders_rollup` and `users.users_rollup`, avoiding a database request:
 
 ```json
 {
-  "dimensions": ["Users.name"],
+  "dimensions": ["users.name"],
   "timeDimensions": [
     {
-      "dimension": "Orders.created_at",
+      "dimension": "orders.created_at",
       "dateRange": "This month"
     }
   ],
   "order": {
-    "Orders.count": "desc"
+    "orders.count": "desc"
   },
-  "measures": ["Orders.count"]
+  "measures": ["orders.count"]
 }
 ```
 
@@ -757,7 +864,7 @@ condition. Streaming pre-aggregations follow the “push” model — Cube
 **subscribes to the updates** from the data source and always keeps
 pre-aggregation up to date.
 
-You don’t need to define `refreshKey` for streaming pre-aggregations. Whether
+You don’t need to define `refresh_key` for streaming pre-aggregations. Whether
 pre-aggregation is streaming or not is defined by the data source.
 
 Currently, Cube supports only one streaming data source -

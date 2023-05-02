@@ -17,9 +17,11 @@ time.
 <CodeTabs>
 
 ```javascript
-cube("MyCube", {
+cube(`my_cube`, {
+  // ...
+
   joins: {
-    TargetCubeName: {
+    target_cube: {
       relationship: `one_to_one` || `one_to_many` || `many_to_one`,
       sql: `SQL ON clause`,
     },
@@ -29,9 +31,11 @@ cube("MyCube", {
 
 ```yaml
 cubes:
-  - name: MyCube
+  - name: my_cube
+    # ...
+
     joins:
-      - name: TargetCubeName
+      - name: target_cube
         relationship: one_to_one || one_to_many || many_to_one
         sql: SQL ON clause
 ```
@@ -69,6 +73,8 @@ would define the join as follows:
 
 ```javascript
 cube(`orders`, {
+  // ...
+
   joins: {
     products: {
       relationship: `many_to_one`,
@@ -81,6 +87,8 @@ cube(`orders`, {
 ```yaml
 cubes:
   - name: orders
+    # ...
+
     joins:
       - name: products
         relationship: many_to_one
@@ -140,6 +148,8 @@ For example, in a data model containing `users` and their `profiles`, the
 
 ```javascript
 cube(`users`, {
+  // ...
+
   joins: {
     profiles: {
       relationship: `one_to_one`,
@@ -152,6 +162,8 @@ cube(`users`, {
 ```yaml
 cubes:
   - name: users
+    # ...
+
     joins:
       - name: profiles
         relationship: one_to_one
@@ -173,6 +185,8 @@ written, the `authors` cube would declare the following join:
 
 ```javascript
 cube(`authors`, {
+  // ...
+
   joins: {
     books: {
       relationship: `one_to_many`,
@@ -185,6 +199,8 @@ cube(`authors`, {
 ```yaml
 cubes:
   - name: authors
+    # ...
+
     joins:
       - name: books
         relationship: one_to_many
@@ -208,6 +224,8 @@ the `orders` cube would have the following join:
 
 ```javascript
 cube(`orders`, {
+  // ...
+
   joins: {
     customers: {
       relationship: `many_to_one`,
@@ -220,6 +238,8 @@ cube(`orders`, {
 ```yaml
 cubes:
   - name: orders
+    # ...
+
     joins:
       - name: customers
         relationship: many_to_one
@@ -238,6 +258,8 @@ example below:
 
 ```javascript
 cube(`orders`, {
+  // ...
+
   joins: {
     customers: {
       relationship: `many_to_one`,
@@ -252,6 +274,8 @@ cube(`orders`, {
 ```yaml
 cubes:
   - name: orders
+    # ...
+
     joins:
       - name: customers
         relationship: many_to_one
@@ -260,9 +284,9 @@ cubes:
 
 </CodeTabs>
 
-## Setting a Primary Key
+## Setting a primary key
 
-In order for a join to work, it is necessary to define a `primaryKey` as
+In order for a join to work, it is necessary to define a `primary_key` as
 specified below. It is a requirement when a join is defined so that Cube can
 handle row multiplication issues.
 
@@ -271,12 +295,14 @@ In this case, `Order` rows will be multiplied by the `Order Item` join due to
 the `one_to_many` relationship. In order to produce correct results, Cube will
 select distinct primary keys from `Order` first and then will join these primary
 keys with `Order` to get the correct `Order Amount` sum result. Please note that
-`primaryKey` should be defined in the `dimensions` section.
+`primary_key` should be defined in the `dimensions` section.
 
 <CodeTabs>
 
 ```javascript
-cube("orders", {
+cube(`orders`, {
+  // ...
+
   dimensions: {
     customer_id: {
       sql: `id`,
@@ -290,6 +316,8 @@ cube("orders", {
 ```yaml
 cubes:
   - name: orders
+    # ...
+
     dimensions:
       - name: customer_id
         sql: id
@@ -310,6 +338,8 @@ parameter to `false`. If you still want `shown` to be `true` — set it manually
 
 ```javascript
 cube(`orders`, {
+  // ...
+
   dimensions: {
     customer_id: {
       sql: `id`,
@@ -324,6 +354,8 @@ cube(`orders`, {
 ```yaml
 cubes:
   - name: orders
+    # ...
+
     dimensions:
       - name: customer_id
         sql: id
@@ -337,17 +369,19 @@ cubes:
 If you don't have a single column in a cube's table that can act as a primary
 key, you can create a composite primary key as shown below.
 
-<WarningBox>
+<InfoBox>
 
 The example uses Postgres string concatenation; note that SQL may be different
 depending on your database.
 
-</WarningBox>
+</InfoBox>
 
 <CodeTabs>
 
 ```javascript
 cube(`users`, {
+  // ...
+
   dimensions: {
     id: {
       sql: `${CUBE}.user_id || '-' || ${CUBE}.signup_week || '-' || ${CUBE}.activity_week`,
@@ -361,6 +395,8 @@ cube(`users`, {
 ```yaml
 cubes:
   - name: users
+    # ...
+
     dimensions:
       - name: id
         sql: "{CUBE}.user_id || '-' || {CUBE}.signup_week || '-' || {CUBE}.activity_week"
@@ -373,7 +409,7 @@ cubes:
 ## CUBE reference
 
 When you have several joined cubes, you should accurately use columns’ names to
-avoid any mistakes. One way to make no mistakes is to use the `${CUBE}`
+avoid any mistakes. One way to make no mistakes is to use the `CUBE`
 reference. It allows you to specify columns’ names in cubes without any
 ambiguity. During the implementation of the query, this reference will be used
 as an alias for a basic cube. Take a look at the following example:
@@ -382,6 +418,8 @@ as an alias for a basic cube. Take a look at the following example:
 
 ```javascript
 cube(`users`, {
+  // ...
+
   dimensions: {
     name: {
       sql: `${CUBE}.name`,
@@ -394,6 +432,8 @@ cube(`users`, {
 ```yaml
 cubes:
   - name: users
+    # ...
+
     dimensions:
       - name: name
         sql: "{CUBE}.name"
@@ -418,6 +458,8 @@ following data model:
 
 ```javascript
 cube(`a`, {
+  // ...
+
   joins: {
     b: {
       sql: `${a}.b_id = ${b.id}`,
@@ -433,6 +475,8 @@ cube(`a`, {
 });
 
 cube(`b`, {
+  // ...
+
   joins: {
     c: {
       sql: `${b}.c_id = ${c.id}`,
@@ -441,7 +485,9 @@ cube(`b`, {
   },
 });
 
-cube(`C`, {
+cube(`c`, {
+  // ...
+
   dimensions: {
     category: {
       sql: `category`,
@@ -454,21 +500,28 @@ cube(`C`, {
 ```yaml
 cubes:
   - name: a
+    # ...
+
     joins:
       - name: b
         sql: "{a}.b_id = {b.id}"
         relationship: many_to_one
+
     measures:
       - name: count
         type: count
 
-  - name: c
+  - name: b
+    # ...
+
     joins:
       - name: c
         sql: "{b}.c_id = {c.id}"
         relationship: many_to_one
 
   - name: c
+    # ...
+    
     dimensions:
       - name: category
         sql: category

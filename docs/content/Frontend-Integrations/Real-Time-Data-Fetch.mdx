@@ -57,10 +57,10 @@ const cubejsApi = cubejs({
 // Create a subscription
 const subscription = cubejsApi.subscribe(
   {
-    measures: ['Logs.count'],
+    measures: ['logs.count'],
     timeDimensions: [
       {
-        dimension: 'Logs.time',
+        dimension: 'logs.time',
         granularity: 'hour',
         dateRange: 'last 1440 minutes',
       },
@@ -108,8 +108,8 @@ const Chart = ({ query }) => {
 ## Refresh Rate
 
 As in the case of a regular data fetch, real-time data fetch obeys
-[refreshKey refresh rules](caching#refresh-keys). In order to provide a desired
-refresh rate `refreshKey` should reflect the rate of change of the underlying
+[`refresh_key` refresh rules](caching#refresh-keys). In order to provide a desired
+refresh rate, `refresh_key` should reflect the rate of change of the underlying
 data set; the querying time should also be much less than the desired refresh
-rate. Please use the [refreshKey every](/schema/reference/cube#refresh-key)
+rate. Please use the [`every`](/schema/reference/cube#refresh-key)
 parameter to adjust the refresh interval.

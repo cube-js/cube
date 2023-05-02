@@ -16,7 +16,7 @@ with itself and reshape the dataset!
 
 ## Data modeling
 
-Let's explore the `Users` cube data that contains various information about
+Let's explore the `users` cube data that contains various information about
 users, including city and gender:
 
 | id  | city     | gender | name            |
@@ -28,15 +28,70 @@ users, including city and gender:
 
 To calculate the ratio between the number of women in a particular city and the
 total number of people in the country, we need to define three measures. One of
-them can recieve the city value from the filter in a query. Cube will apply this
+them can receive the city value from the filter in a query. Cube will apply this
 filter via the `WHERE` clause to the dataset. So, we need to reshape the dataset
 so that applying this filter wouldn’t affect the calculations. In this use case,
 we can join the data table with itself to multiply the `city` column — applying
 the filter would remove the multiplication while still allowing to access the
 filter value:
 
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: users
+    sql: >
+      WITH data AS (
+        SELECT
+          users.id AS id,
+          users.city AS city,
+          users.gender AS gender
+        FROM public.users
+      ),
+      cities AS (
+        SELECT city
+        FROM data
+      ),
+      grouped AS (
+        SELECT
+          cities.city AS city_filter,
+          data.id AS id,
+          data.city AS city,
+          data.gender AS gender
+        FROM cities, data
+        GROUP BY 1, 2, 3, 4
+      )
+      SELECT *
+      FROM grouped
+
+    measures:
+      - name: total_number_of_women
+        sql: id
+        type: count
+        filters:
+          - sql: "gender = 'female'"
+
+      - name: number_of_people_of_any_gender_in_the_city:
+        sql: id
+        type: count
+        filters:
+          - sql: "city = city_filter"
+
+      - name: ratio
+        title: Ratio Women in the City to Total Number of People
+        sql: >
+          1.0 * {number_of_people_of_any_gender_in_the_city} /
+          {total_number_of_women}
+        type: number
+
+    dimensions:
+      - name: city_filter
+        sql: city_filter
+        type: string
+```
+
 ```javascript
-cube(`Users`, {
+cube(`users`, {
   sql: `
     WITH data AS (
       SELECT
@@ -66,13 +121,13 @@ cube(`Users`, {
   `,
 
   measures: {
-    totalNumberOfWomen: {
+    total_number_of_women: {
       sql: 'id',
       type: 'count',
       filters: [{ sql: `${CUBE}.gender = 'female'` }],
     },
 
-    numberOfPeopleOfAnyGenderInTheCity: {
+    number_of_people_of_any_gender_in_the_city: {
       sql: 'id',
       type: 'count',
       filters: [{ sql: `${CUBE}.city = ${CUBE}.city_filter` }],
@@ -80,13 +135,15 @@ cube(`Users`, {
 
     ratio: {
       title: 'Ratio Women in the City to Total Number of People',
-      sql: `1.0 * ${CUBE.numberOfPeopleOfAnyGenderInTheCity} / ${CUBE.totalNumberOfWomen}`,
+      sql: `
+        1.0 * ${CUBE.number_of_people_of_any_gender_in_the_city} /
+        ${CUBE.total_number_of_women}`,
       type: `number`,
     },
   },
 
   dimensions: {
-    cityFilter: {
+    city_filter: {
       sql: `city_filter`,
       type: `string`,
     },
@@ -94,21 +151,23 @@ cube(`Users`, {
 });
 ```
 
+</CodeTabs>
+
 ## Query
 
 To get the ratio result depending on the city, we need to pass the value via a
 filter in the query:
 
-```javascript
+```json
 {
   "measures": [
-    "Users.totalNumberOfWomen",
-    "Users.numberOfPeopleOfAnyGenderInTheCity",
-    "Users.ratio"
+    "users.total_number_of_women",
+    "users.number_of_people_of_any_gender_in_the_city",
+    "users.ratio"
   ],
   "filters": [
     {
-      "member": "Users.cityFilter",
+      "member": "users.city_filter",
       "operator": "equals",
       "values": ["Seattle"]
     }
@@ -121,14 +180,14 @@ filter in the query:
 By joining the data table with itself and using the dimensions defined above, we
 can get the ratio we wanted to achieve:
 
-```javascript
+```json
 [
   {
-    'Users.totalNumberOfWomen': '259',
-    'Users.numberOfPeopleOfAnyGenderInTheCity': '99',
-    'Users.ratio': '0.38223938223938223938',
-  },
-];
+    "users.total_number_of_women": "259",
+    "users.number_of_people_of_any_gender_in_the_city": "99",
+    "users.ratio": "0.38223938223938223938"
+  }
+]
 ```
 
 ## Source code
