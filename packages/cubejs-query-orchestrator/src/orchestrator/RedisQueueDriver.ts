@@ -92,15 +92,11 @@ export class RedisQueueDriverConnection implements QueueDriverConnectionInterfac
     return [active, toProcess];
   }
 
-  /**
-   * Adds specified by the queryKey query to the queue, returns tuple
-   * with the operation result.
-   */
   public async addToQueue(
     keyScore: number,
     queryKey: QueryKey,
-    orphanedTime: any,
-    queryHandler: any,
+    orphanedTime: number,
+    queryHandler: string,
     query: AddToQueueQuery,
     priority: number,
     options: AddToQueueOptions

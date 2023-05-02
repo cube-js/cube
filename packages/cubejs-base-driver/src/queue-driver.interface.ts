@@ -52,7 +52,19 @@ export interface QueueDriverConnectionInterface {
   redisHash(queryKey: QueryKey): QueryKeyHash;
   getResultBlocking(queryKey: QueryKey): Promise<unknown>;
   getResult(queryKey: QueryKey): Promise<any>;
-  addToQueue(keyScore: number, queryKey: QueryKey, orphanedTime: any, queryHandler: any, query: AddToQueueQuery, priority: number, options: AddToQueueOptions): Promise<AddToQueueResponse>;
+  /**
+   * Adds specified by the queryKey query to the queue, returns tuple
+   * with the operation result.
+   *
+   * @param keyScore Redis specific thing
+   * @param queryKey
+   * @param orphanedTime
+   * @param queryHandler Our queue allow to use different handlers. For example query, cvsQuery, etc.
+   * @param query
+   * @param priority
+   * @param options
+   */
+  addToQueue(keyScore: number, queryKey: QueryKey, orphanedTime: number, queryHandler: string, query: AddToQueueQuery, priority: number, options: AddToQueueOptions): Promise<AddToQueueResponse>;
   // Return query keys which was sorted by priority and time
   getToProcessQueries(): Promise<string[]>;
   getActiveQueries(): Promise<string[]>;
