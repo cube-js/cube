@@ -48,6 +48,8 @@ export interface QueueDriverOptions {
   processUid?: string;
 }
 
+export type ProcessingId = string | number;
+
 export interface QueueDriverConnectionInterface {
   redisHash(queryKey: QueryKey): QueryKeyHash;
   getResultBlocking(queryKey: QueryKey): Promise<unknown>;
@@ -80,7 +82,7 @@ export interface QueueDriverConnectionInterface {
   // multiple nodes tries to process the same query
   retrieveForProcessing(hash: QueryKeyHash, processingId: number | string): Promise<RetrieveForProcessingResponse>;
   freeProcessingLock(hash: QueryKeyHash, processingId: string | number, activated: unknown): Promise<void>;
-  optimisticQueryUpdate(hash: QueryKeyHash, toUpdate, processingId): Promise<boolean>;
+  optimisticQueryUpdate(hash: QueryKeyHash, toUpdate: unknown, processingId: ProcessingId): Promise<boolean>;
   cancelQuery(queryKey: QueryKey): Promise<QueryDef | null>;
   getQueryAndRemove(hash: QueryKeyHash): Promise<[QueryDef]>;
   setResultAndRemoveQuery(hash: QueryKeyHash, executionResult: any, processingId: any): Promise<unknown>;
