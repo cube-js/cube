@@ -28,8 +28,6 @@ function where you can select a data source based on the tenant name.
 tenant name in the `tenant` property of the `securityContext`.
 
 ```javascript
-const PostgresDriver = require('@cubejs-backend/postgres-driver');
-
 module.exports = {
   // Provides distinct identifiers for each tenant which are used as caching keys
   contextToAppId: ({ securityContext }) =>
@@ -42,23 +40,25 @@ module.exports = {
     }
 
     if (securityContext.tenant === 'Avocado Inc') {
-      return new PostgresDriver({
+      return {
+        type: 'postgres',
         database: 'localDB',
         host: 'postgres',
         user: 'postgres',
         password: 'example',
         port: '5432',
-      });
+      };
     }
 
     if (securityContext.tenant === 'Mango Inc') {
-      return new PostgresDriver({
+      return {
+        type: 'postgres',
         database: 'ecom',
         host: 'demo-db.cube.dev',
         user: 'cube',
         password: '12345',
         port: '5432',
-      });
+      };
     }
 
     throw new Error('Unknown tenant in Security Context');
@@ -72,7 +72,7 @@ To get users for different tenants, we will send two identical requests with
 different JWTs. Also, we send a query with unknown tenant to show that he cannot
 access to the data model of other tenants.
 
-```javascript
+```json5
 // JWT payload for "Avocado Inc"
 {
   "sub": "1234567890",
@@ -82,7 +82,7 @@ access to the data model of other tenants.
 }
 ```
 
-```javascript
+```json5
 // JWT payload for "Mango Inc"
 {
   "sub": "1234567890",
@@ -92,7 +92,7 @@ access to the data model of other tenants.
 }
 ```
 
-```javascript
+```json5
 // JWT payload for "Peach Inc"
 {
   "sub": "1234567890",
@@ -107,45 +107,45 @@ access to the data model of other tenants.
 We have received different data from different data sources depending on the
 tenant's name:
 
-```javascript
+```json5
 // Avocado Inc last users:
 [
   {
-    'Users.id': 700,
-    'Users.name': 'Freddy Gulgowski',
+    "Users.id": 700,
+    "Users.name": "Freddy Gulgowski",
   },
   {
-    'Users.id': 699,
-    'Users.name': 'Julie Crooks',
+    "Users.id": 699,
+    "Users.name": "Julie Crooks",
   },
   {
-    'Users.id': 698,
-    'Users.name': 'Macie Ryan',
+    "Users.id": 698,
+    "Users.name": "Macie Ryan",
   },
-];
+]
 ```
 
-```javascript
+```json5
 // Mango Inc last users:
 [
   {
-    'Users.id': 705,
-    'Users.name': 'Zora Vallery',
+    "Users.id": 705,
+    "Users.name": "Zora Vallery",
   },
   {
-    'Users.id': 704,
-    'Users.name': 'Fawn Danell',
+    "Users.id": 704,
+    "Users.name": "Fawn Danell",
   },
   {
-    'Users.id': 703,
-    'Users.name': 'Moyra Denney',
+    "Users.id": 703,
+    "Users.name": "Moyra Denney",
   },
 ];
 ```
 
-```javascript
+```json5
 // Peach Inc error:
-{"error":"Error: Unknown tenant in Security Context"}
+{"error": "Error: Unknown tenant in Security Context"}
 ```
 
 ## Source code

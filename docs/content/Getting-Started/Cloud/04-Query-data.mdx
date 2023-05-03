@@ -24,11 +24,11 @@ Navigate to the <Btn>Playground</Btn> page in Cube Cloud:
 />
 
 Next, you will select the measures and dimensions you want to query, and then
-run the query. Let's do this for the `Orders` cube you generated in the previous
+run the query. Let's do this for the `orders` cube you generated in the previous
 step.
 
 Click <Btn>+ Measure</Btn> to display the available measures and add
-`Orders.count`, then click <Btn>Run</Btn>:
+`orders.count`, then click <Btn>Run</Btn>:
 
 <Screenshot
   alt="Cube Cloud Deployment Developer Playground Screen with a selected measure"
@@ -36,7 +36,7 @@ Click <Btn>+ Measure</Btn> to display the available measures and add
 />
 
 Next, click <Btn>+ Dimension</Btn> for available dimensions, add
-`Orders.status`, and then click <Btn>Run</Btn> again:
+`orders.status`, and then click <Btn>Run</Btn> again:
 
 <Screenshot
   alt="Cube Cloud Deployment Developer Playground Screen with selected measures and dimensions"
@@ -102,7 +102,7 @@ psql (14.5, server 14.2 (Cube SQL))
 SSL connection (protocol: TLSv1.3, cipher: TLS_AES_256_GCM_SHA384, bits: 256, compression: off)
 Type "help" for help.
 
-fierce-bear=> SELECT COUNT(*) FROM Orders;
+fierce-bear=> SELECT COUNT(*) FROM orders;
  COUNT(UInt8(1))
 -----------------
            10000

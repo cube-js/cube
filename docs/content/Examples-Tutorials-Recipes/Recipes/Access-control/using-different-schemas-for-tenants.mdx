@@ -63,27 +63,62 @@ module.exports = {
 In this example, we'd like to get products with odd `id` values for the
 `avocado` tenant and with even `id` values the `mango` tenant:
 
+This is the `products` cube for the `avocado` tenant:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: products
+    sql: >
+      SELECT *
+      FROM public.Products
+      WHERE MOD (id, 2) = 1
+```
+
 ```javascript
-// model/avocado/Product.js
+
 cube(`products`, {
-  sql: `SELECT * FROM public.Products WHERE MOD (id, 2) = 1`,
+  sql: `SELECT *
+    FROM public.Products
+    WHERE MOD (id, 2) = 1`,
 
-  ...
-});
-
-// model/mango/Product.js
-cube(`products`, {
-  sql: `SELECT * FROM public.Products WHERE MOD (id, 2) = 0`,
-
-  ...
+  // ...
 });
 ```
+
+</CodeTabs>
+
+This is the `products` cube for the `mango` tenant:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: products
+    sql: >
+      SELECT *
+      FROM public.Products
+      WHERE MOD (id, 2) = 0
+```
+
+```javascript
+cube(`products`, {
+  sql: `SELECT *
+    FROM public.Products
+    WHERE MOD (id, 2) = 0`,
+
+  // ...
+});
+```
+
+</CodeTabs>
 
 ## Query
 
 To fetch the products, we will send two identical queries with different JWTs:
 
-```javascript
+```json
 {
   "sub": "1234567890",
   "tenant": "Avocado",
@@ -92,7 +127,7 @@ To fetch the products, we will send two identical queries with different JWTs:
 }
 ```
 
-```javascript
+```json5
 {
   "sub": "1234567890",
   "tenant": "Mango",
@@ -105,40 +140,40 @@ To fetch the products, we will send two identical queries with different JWTs:
 
 We will receive different data for each tenant, as expected:
 
-```javascript
+```json5
 // Avocado products
 [
   {
-    'Products.id': 1,
-    'Products.name': 'Generic Fresh Keyboard',
+    "products.id": 1,
+    "products.name": "Generic Fresh Keyboard",
   },
   {
-    'Products.id': 3,
-    'Products.name': 'Practical Wooden Keyboard',
+    "products.id": 3,
+    "products.name": "Practical Wooden Keyboard",
   },
   {
-    'Products.id': 5,
-    'Products.name': 'Handcrafted Rubber Chicken',
-  },
-];
+    "products.id": 5,
+    "products.name": "Handcrafted Rubber Chicken",
+  }
+]
 ```
 
-```javascript
+```json5
 // Mango products:
 [
   {
-    'Products.id': 2,
-    'Products.name': 'Gorgeous Cotton Sausages',
+    "products.id": 2,
+    "products.name": "Gorgeous Cotton Sausages",
   },
   {
-    'Products.id': 4,
-    'Products.name': 'Handmade Wooden Soap',
+    "products.id": 4,
+    "products.name": "Handmade Wooden Soap",
   },
   {
-    'Products.id': 6,
-    'Products.name': 'Handcrafted Plastic Chair',
-  },
-];
+    "products.id": 6,
+    "products.name": "Handcrafted Plastic Chair",
+  }
+]
 ```
 
 ## Source code

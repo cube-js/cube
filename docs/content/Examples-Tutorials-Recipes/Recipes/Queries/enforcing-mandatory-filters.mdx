@@ -27,7 +27,7 @@ sure we only show orders created after December 30th, 2019.
 module.exports = {
   queryRewrite: (query) => {
     query.filters.push({
-      member: `Orders.createdAt`,
+      member: `orders.created_at`,
       operator: 'afterDate',
       values: ['2019-12-30'],
     });
@@ -45,10 +45,10 @@ To get the orders we will send two queries with filters by status:
 # Completed orders
 curl cube:4000/cubejs-api/v1/load \
   -H "Authorization: eeyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoib3BlcmF0b3IiLCJpYXQiOjE2Mjg3NDUwNDUsImV4cCI6MTgwMTU0NTA0NX0.VErb2t7Bc43ryRwaOiEgXuU5KiolCT-69eI_i2pRq4o" \
-  'query={"measures": [], "order": [["Users.createdAt", "asc"]], "dimensions": ["Orders.number", "Orders.createdAt"],
+  'query={"measures": [], "order": [["Users.created_at", "asc"]], "dimensions": ["orders.number", "orders.created_at"],
     "filters": [
       {
-        "member": "Orders.status",
+        "member": "orders.status",
         "operator": "equals",
         "values": ["completed"]
       }
@@ -61,10 +61,10 @@ curl cube:4000/cubejs-api/v1/load \
 # Shipped orders
 curl cube:4000/cubejs-api/v1/load \
   -H "Authorization: eeyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoib3BlcmF0b3IiLCJpYXQiOjE2Mjg3NDUwNDUsImV4cCI6MTgwMTU0NTA0NX0.VErb2t7Bc43ryRwaOiEgXuU5KiolCT-69eI_i2pRq4o" \
-  'query={"measures": [], "order": [["Orders.createdAt", "asc"]], "dimensions": ["Orders.number", "Orders.createdAt"],
+  'query={"measures": [], "order": [["orders.created_at", "asc"]], "dimensions": ["orders.number", "orders.created_at"],
     "filters": [
       {
-        "member": "Orders.status",
+        "member": "orders.status",
         "operator": "equals",
         "values": ["shipped"]
       }
@@ -82,24 +82,24 @@ Completed orders:
 ```javascript
 [
   {
-    'Orders.number': 78,
-    'Orders.createdAt': '2020-01-01T00:00:00.000',
+    'orders.number': 78,
+    'orders.created_at': '2020-01-01T00:00:00.000',
   },
   {
-    'Orders.number': 43,
-    'Orders.createdAt': '2020-01-02T00:00:00.000',
+    'orders.number': 43,
+    'orders.created_at': '2020-01-02T00:00:00.000',
   },
   {
-    'Orders.number': 87,
-    'Orders.createdAt': '2020-01-04T00:00:00.000',
+    'orders.number': 87,
+    'orders.created_at': '2020-01-04T00:00:00.000',
   },
   {
-    'Orders.number': 45,
-    'Orders.createdAt': '2020-01-04T00:00:00.000',
+    'orders.number': 45,
+    'orders.created_at': '2020-01-04T00:00:00.000',
   },
   {
-    'Orders.number': 28,
-    'Orders.createdAt': '2020-01-05T00:00:00.000',
+    'orders.number': 28,
+    'orders.created_at': '2020-01-05T00:00:00.000',
   },
 ];
 ```
@@ -109,24 +109,24 @@ Shipped orders:
 ```javascript
 [
   {
-    'Orders.number': 57,
-    'Orders.createdAt': '2019-12-31T00:00:00.000',
+    'orders.number': 57,
+    'orders.created_at': '2019-12-31T00:00:00.000',
   },
   {
-    'Orders.number': 38,
-    'Orders.createdAt': '2020-01-01T00:00:00.000',
+    'orders.number': 38,
+    'orders.created_at': '2020-01-01T00:00:00.000',
   },
   {
-    'Orders.number': 10,
-    'Orders.createdAt': '2020-01-02T00:00:00.000',
+    'orders.number': 10,
+    'orders.created_at': '2020-01-02T00:00:00.000',
   },
   {
-    'Orders.number': 19,
-    'Orders.createdAt': '2020-01-02T00:00:00.000',
+    'orders.number': 19,
+    'orders.created_at': '2020-01-02T00:00:00.000',
   },
   {
-    'Orders.number': 15,
-    'Orders.createdAt': '2020-01-02T00:00:00.000',
+    'orders.number': 15,
+    'orders.created_at': '2020-01-02T00:00:00.000',
   },
 ];
 ```

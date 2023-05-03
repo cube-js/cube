@@ -230,7 +230,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     }
 
     this.config = {
-      readOnly: true,
+      readOnly: false,
       account: getEnv('snowflakeAccount', { dataSource }),
       region: getEnv('snowflakeRegion', { dataSource }),
       warehouse: getEnv('snowflakeWarehouse', { dataSource }),

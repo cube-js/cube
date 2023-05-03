@@ -40,7 +40,7 @@ Each `asyncModule` call will be invoked only once per data model compilation.
 When creating data models via `asyncModule()`, it is important to be aware of
 the following differences compared to statically defined ones with `cube()`:
 
-- The `sql` and `drillMembers` properties for both dimensions and measures must
+- The `sql` and `drill_members` properties for both dimensions and measures must
   be of type `() => string` and `() => string[]` accordingly
 
 Cube supports importing JavaScript logic from other files in a data model, so it
@@ -84,7 +84,7 @@ export const transformMeasures = (measures) => {
     return {
       ...result,
       [dimensionName]: convertStringPropToFunction(
-        ['sql', 'drillMembers'],
+        ['sql', 'drill_members'],
         dimensionDefinition
       ),
     };
@@ -119,20 +119,22 @@ asyncModule(async () => {
   console.log(dynamicCubes);
   // [
   //   {
-  //      dimensions: {
-  //        color: {
-  //          sql: `color`,
-  //          type: `string`,
-  //        },
-  //      },
+  //      name: 'dynamic_cube_model',
+  //      sql_table: 'my_table',
+  //
   //      measures: {
   //        price: {
   //          sql: `price`,
   //          type: `number`,
   //        }
   //      },
-  //      title: 'DynamicCubeSchema',
-  //      sql: 'SELECT * FROM public.my_table',
+  //
+  //      dimensions: {
+  //        color: {
+  //          sql: `color`,
+  //          type: `string`,
+  //        },
+  //      },
   //   },
   // ]
 
@@ -140,13 +142,13 @@ asyncModule(async () => {
     const dimensions = transformDimensions(dynamicCube.dimensions);
     const measures = transformMeasures(dynamicCube.measures);
 
-    cube(dynamicCube.title, {
+    cube(dynamicCube.name, {
       sql: dynamicCube.sql,
       dimensions,
       measures,
-      preAggregations: {
+      pre_aggregations: {
         main: {
-          ...
+          // ...
         },
       },
     });
@@ -214,14 +216,14 @@ asyncModule(async () => {
     const dimensions = transformDimensions(allowedDimensions);
     const measures = transformMeasures(allowedMeasures);
 
-    cube(dynamicCube.title, {
+    cube(dynamicCube.name, {
       sql: dynamicCube.sql,
       title: `${dynamicCube.title}-${tenantId}`,
       dimensions,
       measures,
-      preAggregations: {
+      pre_aggregations: {
         main: {
-          ...
+          // ...
         },
       },
     });
@@ -229,10 +231,10 @@ asyncModule(async () => {
 });
 ```
 
-## Usage with dataSource
+## Usage with data_source
 
 When using multiple databases, you'll need to ensure you set the
-[`dataSource`][ref-schema-datasource] property for any asynchronously-created
+[`data_source`][ref-schema-datasource] property for any asynchronously-created
 schemas, as well as ensuring the corresponding database drivers are set up with
 [`driverFactory()`][ref-config-driverfactory] in your [`cube.js` configuration
 file][ref-config].
@@ -262,14 +264,14 @@ asyncModule(async () => {
     const dimensions = transformDimensions(dynamicCube.dimensions);
     const measures = transformMeasures(dynamicCube.measures);
 
-    cube(dynamicCube.title, {
-      dataSource: dynamicCube.dataSource,
+    cube(dynamicCube.name, {
+      data_source: dynamicCube.data_source,
       sql: dynamicCube.sql,
       dimensions,
       measures,
-      preAggregations: {
+      pre_aggregations: {
         main: {
-          ...
+          // ...
         },
       },
     });

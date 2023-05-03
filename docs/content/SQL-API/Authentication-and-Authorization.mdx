@@ -16,14 +16,14 @@ user will be authenticated with provided security context.
 ```javascript
 module.exports = {
   checkSqlAuth: async (req, username) => {
-    if (username === 'fooUser') {
+    if (username === "fooUser") {
       return {
-        password: 'mypassword',
+        password: "mypassword",
         securityContext: {},
       };
     }
 
-    throw new Error('Incorrect user name or password');
+    throw new Error("Incorrect user name or password");
   },
 };
 ```
@@ -57,7 +57,7 @@ file][ref-config-js].
 You can change security context for specific query via virtual filter on:
 
 ```sql
-SELECT * FROM Orders WHERE __user = 'anotheruser';
+SELECT * FROM orders WHERE __user = 'anotheruser';
 ```
 
 [ref-config-check-sql-auth]: /config#check-sql-auth

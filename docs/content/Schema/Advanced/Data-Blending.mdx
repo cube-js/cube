@@ -20,16 +20,38 @@ together.
 
 For an example omnichannel store which has both online and offline sales, let's
 calculate summary metrics for revenue, customer count, etc. We have
-`RetailOrders` cube for offline sales:
+`retail_orders` cube for offline sales:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: retail_orders
+    sql_table: retail_orders
+
+    measures:
+      - name: customer_count
+        sql: customer_id
+        type: count_distinct
+
+      - name: revenue
+        sql: amount
+        type: sum
+
+    dimensions:
+      - name: created_at
+        sql: created_at
+        type: time
+```
 
 ```javascript
-cube(`RetailOrders`, {
-  sql: `SELECT * FROM retail_orders`,
+cube(`retail_orders`, {
+  sql_table: `retail_orders`,
 
   measures: {
-    customerCount: {
+    customer_count: {
       sql: `customer_id`,
-      type: `countDistinct`,
+      type: `count_distinct`,
     },
 
     revenue: {
@@ -39,7 +61,7 @@ cube(`RetailOrders`, {
   },
 
   dimensions: {
-    createdAt: {
+    created_at: {
       sql: `created_at`,
       type: `time`,
     },
@@ -47,16 +69,40 @@ cube(`RetailOrders`, {
 });
 ```
 
-An `OnlineOrders` cube for online sales:
+</CodeTabs>
+
+An `online_orders` cube for online sales:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: online_orders
+    sql_table: online_orders
+
+    measures:
+      - name: customer_count
+        sql: user_id
+        type: count_distinct
+
+      - name: revenue
+        sql: amount
+        type: sum
+
+    dimensions:
+      - name: created_at
+        sql: created_at
+        type: time
+```
 
 ```javascript
-cube(`OnlineOrders`, {
-  sql: `SELECT * FROM online_orders`,
+cube(`online_orders`, {
+  sql_table: `online_orders`,
 
   measures: {
-    customerCount: {
+    customer_count: {
       sql: `user_id`,
-      type: `countDistinct`,
+      type: `count_distinct`,
     },
 
     revenue: {
@@ -66,38 +112,40 @@ cube(`OnlineOrders`, {
   },
 
   dimensions: {
-    createdAt: {
+    created_at: {
       sql: `created_at`,
       type: `time`,
     },
   },
 });
 ```
+
+</CodeTabs>
 
 Given the above cubes, a data blending cube can be introduced as follows:
 
 ```javascript
-cube(`AllSales`, {
+cube(`all_sales`, {
   sql: `
-SELECT
-  amount,
-  user_id AS customer_id,
-  created_at,
-  'OnlineOrders' AS row_type
-FROM ${OnlineOrders.sql()}
-UNION ALL
-SELECT
-  amount,
-  customer_id,
-  created_at,
-  'Orders' AS row_type
-FROM ${RetailOrders.sql()}
+    SELECT
+      amount,
+      user_id AS customer_id,
+      created_at,
+      'online' AS row_type
+    FROM (${online_orders.sql()}) AS online
+    UNION ALL
+    SELECT
+      amount,
+      customer_id,
+      created_at,
+      'retail' AS row_type
+    FROM (${retail_orders.sql()}) AS retail
  `,
 
   measures: {
-    customerCount: {
+    customer_count: {
       sql: `customer_id`,
-      type: `countDistinct`,
+      type: `count_distinct`,
     },
 
     revenue: {
@@ -105,32 +153,35 @@ FROM ${RetailOrders.sql()}
       type: `sum`,
     },
 
-    onlineRevenue: {
+    online_revenue: {
       sql: `amount`,
       type: `sum`,
-      filters: [{ sql: `${CUBE}.row_type = 'OnlineOrders'` }],
+      filters: [{ sql: `${CUBE}.row_type = 'online'` }],
     },
 
-    offlineRevenue: {
+    offline_revenue: {
       sql: `amount`,
       type: `sum`,
-      filters: [{ sql: `${CUBE}.row_type = 'RetailOrders'` }],
+      filters: [{ sql: `${CUBE}.row_type = 'retail'` }],
     },
 
-    onlineRevenuePercentage: {
-      sql: `${onlineRevenue} / NULLIF(${onlineRevenue} + ${offlineRevenue}, 0)`,
+    online_revenue_percentage: {
+      sql: `
+        ${online_revenue} /
+        NULLIF(${online_revenue} + ${offline_revenue}, 0)
+      `,
       type: `number`,
       format: `percent`,
     },
   },
 
   dimensions: {
-    createdAt: {
+    created_at: {
       sql: `created_at`,
       type: `time`,
     },
 
-    revenueType: {
+    revenue_type: {
       sql: `row_type`,
       type: `string`,
     },
@@ -141,7 +192,7 @@ FROM ${RetailOrders.sql()}
 Another use case of the Data Blending approach would be when you want to chart
 some measures (business related) together and see how they correlate.
 
-Provided we have the aforementioned tables `OnlineOrders` and `RetailOrders`
+Provided we have the aforementioned tables `online_orders` and `retail_orders`
 let's assume that we want to chart those measures together and see how they
 correlate. You can simply pass the queries to the Cube client, and it will merge
 the results which will let you easily display it on the chart.
@@ -158,24 +209,20 @@ const cubejsApi = cubejs(CUBEJS_TOKEN, {
 
 const queries = [
   {
-    measures: ['OnlineOrders.revenue'],
-    timeDimensions: [
-      {
-        dimension: 'OnlineOrders.createdAt',
-        granularity: 'day',
-        dateRange: ['2020-08-01', '2020-08-07'],
-      },
-    ],
+    measures: ['online_orders.revenue'],
+    timeDimensions: [{
+      dimension: 'online_orders.created_at',
+      granularity: 'day',
+      dateRange: ['2020-08-01', '2020-08-07'],
+    }],
   },
   {
-    measures: ['RetailOrders.revenue'],
-    timeDimensions: [
-      {
-        dimension: 'RetailOrders.createdAt',
-        granularity: 'day',
-        dateRange: ['2020-08-01', '2020-08-07'],
-      },
-    ],
+    measures: ['retail_orders.revenue'],
+    timeDimensions: [{
+      dimension: 'retail_orders.created_at',
+      granularity: 'day',
+      dateRange: ['2020-08-01', '2020-08-07'],
+    }],
   },
 ];
 

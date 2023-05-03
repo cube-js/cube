@@ -8,7 +8,6 @@
     "outDir": "dist",
     "rootDir": ".",
     "baseUrl": ".",
-    "allowJs": true,
-    "noImplicitAny": false
+    "allowJs": true
   },
 }

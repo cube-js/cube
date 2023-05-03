@@ -20,60 +20,106 @@ MAU. To get these metrics, we need to use a rolling time frame to calculate a
 daily count of how many users interacted with the product or website in the
 prior day, 7 days, or 30 days. Also, we can build other metrics on top of these
 basic metrics. For example, the WAU to MAU ratio, which we can add by using
-already defined `weeklyActiveUsers` and `monthlyActiveUsers`.
+already defined `weekly_active_users` and `monthly_active_users`.
 
 To calculate daily, weekly, or monthly active users we’re going to use the
-[`rollingWindow`](https://cube.dev/docs/schema/reference/measures#parameters-rolling-window)
+[`rolling_window`](https://cube.dev/docs/schema/reference/measures#parameters-rolling-window)
 measure parameter.
 
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: active_users
+    sql: >
+      SELECT user_id, created_at
+      FROM public.orders
+
+    measures:
+      - name: monthly_active_users
+        type: count_distinct
+        sql: user_id
+        rolling_window:
+          trailing: 30 day
+          offset: start
+
+      - name: weekly_active_users
+        type: count_distinct
+        sql: user_id
+        rolling_window:
+          trailing: 7 day
+          offset: start
+
+      - name: daily_active_users
+        type: count_distinct
+        sql: user_id
+        rolling_window:
+          trailing: 1 day
+          offset: start
+
+      - name: wau_to_mau
+        title: WAU to MAU
+        type: number
+        sql: "100.000 * {weekly_active_users} / NULLIF({monthly_active_users}, 0)"
+        format: percent
+
+    dimensions:
+      - name: created_at
+        type: time
+        sql: created_at
+```
+
 ```javascript
-cube(`ActiveUsers`, {
-  sql: `SELECT user_id, created_at FROM public.orders`,
+cube(`active_users`, {
+  sql: `SELECT user_id, created_at
+    FROM public.orders`,
 
   measures: {
-    monthlyActiveUsers: {
+    monthly_active_users: {
       sql: `user_id`,
-      type: `countDistinct`,
-      rollingWindow: {
+      type: `count_distinct`,
+      rolling_window: {
         trailing: `30 day`,
         offset: `start`,
       },
     },
 
-    weeklyActiveUsers: {
+    weekly_active_users: {
       sql: `user_id`,
-      type: `countDistinct`,
-      rollingWindow: {
+      type: `count_distinct`,
+      rolling_window: {
         trailing: `7 day`,
         offset: `start`,
       },
     },
 
-    dailyActiveUsers: {
+    daily_active_users: {
       sql: `user_id`,
-      type: `countDistinct`,
-      rollingWindow: {
+      type: `count_distinct`,
+      rolling_window: {
         trailing: `1 day`,
         offset: `start`,
       },
     },
 
-    wauToMau: {
+    wau_to_mau: {
       title: `WAU to MAU`,
-      sql: `100.000 * ${weeklyActiveUsers} / NULLIF(${monthlyActiveUsers}, 0)`,
+      sql: `100.000 * ${weekly_active_users} / NULLIF(${monthly_active_users}, 0)`,
       type: `number`,
       format: `percent`,
     },
   },
 
   dimensions: {
-    createdAt: {
+    created_at: {
       sql: `created_at`,
       type: `time`,
     },
   },
 });
 ```
+
+</CodeTabs>
 
 ## Query
 
@@ -83,14 +129,14 @@ We should set a `timeDimensions` with the `dateRange`.
 curl cube:4000/cubejs-api/v1/load \
   'query={
     "measures": [
-      "ActiveUsers.monthlyActiveUsers",
-      "ActiveUsers.weeklyActiveUsers",
-      "ActiveUsers.dailyActiveUsers",
-      "ActiveUsers.wauToMau"
+      "active_users.monthly_active_users",
+      "active_users.weekly_active_users",
+      "active_users.daily_active_users",
+      "active_users.wau_to_mau"
     ],
     "timeDimensions": [
       {
-        "dimension": "ActiveUsers.createdAt",
+        "dimension": "active_users.created_at",
         "dateRange": [
           "2020-01-01",
           "2020-12-31"
@@ -104,14 +150,14 @@ curl cube:4000/cubejs-api/v1/load \
 
 We got the data with our daily, weekly, and monthly active users.
 
-```javascript
+```json
 {
   "data": [
     {
-      "ActiveUsers.monthlyActiveUsers": "22",
-      "ActiveUsers.weeklyActiveUsers": "4",
-      "ActiveUsers.dailyActiveUsers": "0",
-      "ActiveUsers.wauToMau": "18.1818181818181818"
+      "active_users.monthly_active_users": "22",
+      "active_users.weekly_active_users": "4",
+      "active_users.daily_active_users": "0",
+      "active_users.wau_to_mau": "18.1818181818181818"
     }
   ]
 }

@@ -11,12 +11,12 @@ of `__cubeJoinField` in a join instructs Cube to perform join as it's defined in
 a data model. Cube generates the correct joining conditions for the underlying
 data source.
 
-For example, the following query joins the `Orders` and `Products` tables under
-the hood with `Orders.product_id = Products.id`, exactly the same way as the
+For example, the following query joins the `orders` and `products` tables under
+the hood with `orders.product_id = products.id`, exactly the same way as the
 REST API query does:
 
 ```sql
-cube=> SELECT p.name, SUM(o.count) FROM Orders o LEFT JOIN Products p ON o.__cubeJoinField = p.__cubeJoinField GROUP BY 1 LIMIT 5;
+cube=> SELECT p.name, SUM(o.count) FROM orders o LEFT JOIN products p ON o.__cubeJoinField = p.__cubeJoinField GROUP BY 1 LIMIT 5;
            name           | SUM(o.count)
 --------------------------+--------------
  Tasty Plastic Mouse      |          121
@@ -30,7 +30,7 @@ cube=> SELECT p.name, SUM(o.count) FROM Orders o LEFT JOIN Products p ON o.__cub
 Or through `CROSS JOIN`:
 
 ```sql
-cube=> SELECT p.name, sum(o.count) FROM Orders o CROSS JOIN Products p GROUP BY 1 LIMIT 5;
+cube=> SELECT p.name, sum(o.count) FROM orders o CROSS JOIN products p GROUP BY 1 LIMIT 5;
            name           | SUM(o.count)
 --------------------------+--------------
  Tasty Plastic Mouse      |          121
@@ -45,15 +45,15 @@ In the resulting query plan, you won't see any joins as you can't see those for
 REST API queries either:
 
 ```sql
-cube=> EXPLAIN SELECT p.name, sum(o.count) FROM Orders o LEFT JOIN Products p ON o.__cubeJoinField = p.__cubeJoinField GROUP BY 1 LIMIT 5;
+cube=> EXPLAIN SELECT p.name, sum(o.count) FROM orders o LEFT JOIN products p ON o.__cubeJoinField = p.__cubeJoinField GROUP BY 1 LIMIT 5;
    plan_type   |         plan
 ---------------+-----------------------
  logical_plan  | CubeScan: request={  +
                |   "measures": [      +
-               |     "Orders.count"   +
+               |     "orders.count"   +
                |   ],                 +
                |   "dimensions": [    +
-               |     "Products.name"  +
+               |     "products.name"  +
                |   ],                 +
                |   "segments": [],    +
                |   "limit": 5         +
@@ -71,8 +71,8 @@ tables as a dataset SQL. For example:
 
 ```sql
 SELECT o.count as count, p.name as product_name, p.description as product_description
-FROM Orders o
-CROSS JOIN Products p;
+FROM orders o
+CROSS JOIN products p;
 ```
 
 Please note we use aliasing to avoid name clashing between cube members in a
@@ -82,8 +82,8 @@ Cube, pushing down all operations to Cube query:
 ```sql
 cube=> SELECT product_name, SUM(count) FROM (
   SELECT o.count as count, p.name as product_name, p.description as product_description
-  FROM Orders o CROSS
-  JOIN Products p
+  FROM orders o CROSS
+  JOIN products p
 ) joined
 GROUP BY 1
 ORDER BY 2 DESC
@@ -103,8 +103,8 @@ We can see this by introspecting the `EXPLAIN` plan for this query:
 ```sql
 cube=> EXPLAIN SELECT product_name, SUM(count) FROM (
   SELECT o.count as count, p.name as product_name, p.description as product_description
-  FROM Orders o
-  CROSS JOIN Products p
+  FROM orders o
+  CROSS JOIN products p
 ) joined
 GROUP BY 1
 ORDER BY 2 DESC
@@ -113,15 +113,15 @@ LIMIT 5;
 ---------------+-----------------------
  logical_plan  | CubeScan: request={  +
                |   "measures": [      +
-               |     "Orders.count"   +
+               |     "orders.count"   +
                |   ],                 +
                |   "dimensions": [    +
-               |     "Products.name"  +
+               |     "products.name"  +
                |   ],                 +
                |   "segments": [],    +
                |   "order": [         +
                |     [                +
-               |       "Orders.count",+
+               |       "orders.count",+
                |       "desc"         +
                |     ]                +
                |   ],                 +
@@ -137,27 +137,37 @@ evaluated in the final query as it isn't used in any way.
 
 ## Proxy Dimensions and Views
 
-As an alternative to achieve joins it is also possible to define proxy dimension
-or measure inside a cube or a view. This is the preferred way of joining as it
-provides you control over the joining path for complex use cases.
+As an alternative to achieve joins, it is also possible to define proxy
+dimension or measure inside a cube or a view. This is the preferred way of
+joining as it provides you control over the joining path for complex use cases.
+
+<CodeTabs>
+
+```yaml
+views:
+  - name: orders_users
+    includes:
+      - orders
+      # This is a proxy dimension
+      - orders.users.city
+```
 
 ```javascript
-view(`OrdersUsers`, {
-  includes: [Orders],
-  dimensions: {
-    // this is proxy dimension
-    user_city: {
-      sql: `${Users.city}`,
-      type: `string`,
-    },
-  },
+view(`orders_users`, {
+  includes: [
+    orders,
+    // This is a proxy dimension
+    orders.users.city,
+  ],
 });
 ```
+
+</CodeTabs>
 
 Now, it is possible to get orders count by users city with the following query.
 
 ```sql
-cube=> SELECT count, user_city FROM OrdersUsers;
+cube=> SELECT count, city FROM orders_users;
  count |   user_city
 -------+---------------
   1416 | Los Angeles

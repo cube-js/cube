@@ -40,11 +40,11 @@ rows to a small subset of the original dataset.
 ### Example
 
 ```sql
-SELECT COUNT(*), Orders.status, Users.city
-FROM Orders
-  CROSS JOIN Users
+SELECT COUNT(*), orders.status, users.city
+FROM orders
+  CROSS JOIN users
 WHERE city IN ('San Francisco', 'Los Angeles')
-GROUP BY Orders.status, Users.city
+GROUP BY orders.status, users.city
 HAVING status = 'shipped'
 LIMIT 1 OFFSET 1;
 ```
@@ -71,8 +71,8 @@ number of rows it actually returned.
 ```sql
 EXPLAIN WITH cte AS (
   SELECT o.count as count, p.name as product_name, p.description as product_description
-  FROM Orders o
-    CROSS JOIN Products p
+  FROM orders o
+    CROSS JOIN products p
 )
 SELECT COUNT(*) FROM cte;
    plan_type   |                                plan
@@ -81,11 +81,11 @@ SELECT COUNT(*) FROM cte;
                |   Aggregate: groupBy=[[]], aggr=[[COUNT(UInt8(1))]]                +
                |     CubeScan: request={                                            +
                |   "measures": [                                                    +
-               |     "Orders.count"                                                 +
+               |     "orders.count"                                                 +
                |   ],                                                               +
                |   "dimensions": [                                                  +
-               |     "Products.name",                                               +
-               |     "Products.description"                                         +
+               |     "products.name",                                               +
+               |     "products.description"                                         +
                |   ],                                                               +
                |   "segments": []                                                   +
                | }
@@ -102,8 +102,8 @@ with `ANALYZE`:
 ```sql
 EXPLAIN ANALYZE WITH cte AS (
   SELECT o.count as count, p.name as product_name, p.description as product_description
-  FROM Orders o
-    CROSS JOIN Products p
+  FROM orders o
+    CROSS JOIN products p
 )
 SELECT COUNT(*) FROM cte;
      plan_type     |                                                                                plan

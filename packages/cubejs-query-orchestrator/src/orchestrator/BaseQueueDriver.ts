@@ -16,5 +16,5 @@ export abstract class BaseQueueDriver implements QueueDriverInterface {
 
   abstract createConnection(): Promise<QueueDriverConnectionInterface>;
 
-  abstract release(connection: QueueDriverConnectionInterface): Promise<void>;
+  abstract release(connection: QueueDriverConnectionInterface): void;
 }

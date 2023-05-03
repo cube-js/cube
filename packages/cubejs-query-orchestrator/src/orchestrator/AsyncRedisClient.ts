@@ -11,7 +11,7 @@ interface Multi extends Commands<Multi> {
   execAsync: <T = any>() => Promise<T>,
 }
 
-interface AsyncRedisClient extends RedisClient {
+export interface AsyncRedisClient extends RedisClient {
   evalAsync: Commands<Promise<any>>['eval'],
   brpopAsync: Commands<Promise<any>>['brpop'],
   delAsync: Commands<Promise<any>>['del'],

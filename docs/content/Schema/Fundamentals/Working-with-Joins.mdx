@@ -17,18 +17,21 @@ often found in SQL databases:
 - `one_to_many`
 - `many_to_one`
 
-To use an example, let's use two cubes, `Customers` and `Orders`:
+To use an example, let's use two cubes, `customers` and `orders`:
 
 <CodeTabs>
 
 ```javascript
-cube("Customers", {
+cube(`customers`, {
+  // ...
+
   dimensions: {
     id: {
-      primaryKey: true,
       sql: `id`,
       type: `number`,
+      primary_key: true,
     },
+
     company: {
       sql: `company`,
       type: `string`,
@@ -36,13 +39,16 @@ cube("Customers", {
   },
 });
 
-cube("Orders", {
+cube(`orders`, {
+  // ...
+
   dimensions: {
     id: {
-      primaryKey: true,
       sql: `id`,
       type: `number`,
+      primary_key: true,
     },
+
     customer_id: {
       sql: `customer_id`,
       type: `number`,
@@ -53,22 +59,28 @@ cube("Orders", {
 
 ```yaml
 cubes:
-  - name: Customers
+  - name: customers
+    # ...
+
     dimensions:
       - name: id
         sql: id
         type: number
         primary_key: true
+
       - name: company
         sql: company
         type: string
 
   - name: Orders
+    # ...
+
     dimensions:
       - name: id
         sql: id
         type: number
         primary_key: true
+
       - name: customer_id
         sql: customer_id
         type: number
@@ -76,16 +88,18 @@ cubes:
 
 </CodeTabs>
 
-We could add a join to the `Customers` cube:
+We could add a join to the `customers` cube:
 
 <CodeTabs>
 
 ```javascript
-cube("Customers", {
+cube(`customers`, {
+  // ...
+
   joins: {
-    Orders: {
+    orders: {
       relationship: `one_to_many`,
-      sql: `${CUBE}.id = ${Orders.customer_id}`,
+      sql: `${CUBE}.id = ${orders.customer_id}`,
     },
   },
 });
@@ -93,11 +107,13 @@ cube("Customers", {
 
 ```yaml
 cubes:
-  - name: Customers
+  - name: customers
+    # ...
+
     joins:
-      - name: Orders
+      - name: orders
         relationship: one_to_many
-        sql: "{CUBE}.id = {Orders.customer_id}"
+        sql: "{CUBE}.id = {orders.customer_id}"
 ```
 
 </CodeTabs>
@@ -107,14 +123,12 @@ query:
 
 ```json
 {
-  "dimensions": ["Orders.status", "Customers.company"],
-  "timeDimensions": [
-    {
-      "dimension": "Orders.created_at"
-    }
-  ],
-  "order": [["Customers.company", "asc"]],
-  "measures": ["Orders.count"]
+  "dimensions": ["orders.status", "customers.company"],
+  "measures": ["orders.count"],
+  "timeDimensions": [{
+    "dimension": "orders.created_at"
+  }],
+  "order": {"customers.company": "asc"}
 }
 ```
 
@@ -127,30 +141,29 @@ SELECT
   count("orders".id) "orders__count"
 FROM
   public.customers AS "customers"
-  LEFT JOIN public.orders AS "orders" ON "customers".id = "orders".customer_id
-GROUP BY
-  1,
-  2
-ORDER BY
-  2 ASC
-LIMIT
-  10000
+  LEFT JOIN public.orders AS "orders"
+    ON "customers".id = "orders".customer_id
+GROUP BY 1, 2
+ORDER BY 2 ASC
+LIMIT 10000
 ```
 
 However, if we have guest checkouts, that would mean we would have orders with
 no matching customer. Looking back at the `one_to_many` relationship and its'
 resulting SQL, any guest checkouts would be excluded from the results. To remedy
-this, we'll remove the join from the `Customers` cube and instead define a join
-with a `many_to_one` relationship on the `Orders` cube:
+this, we'll remove the join from the `customers` cube and instead define a join
+with a `many_to_one` relationship on the `orders` cube:
 
 <CodeTabs>
 
 ```javascript
-cube("Orders", {
+cube(`orders`, {
+  // ...
+
   joins: {
-    Customers: {
+    customers: {
       relationship: `many_to_one`,
-      sql: `${CUBE}.customer_id = ${Customers.id}`,
+      sql: `${CUBE}.customer_id = ${customers.id}`,
     },
   },
 });
@@ -158,34 +171,33 @@ cube("Orders", {
 
 ```yaml
 cubes:
-  - name: Orders
+  - name: orders
+    # ...
+
     joins:
-      - name: Customers
+      - name: customers
         relationship: many_to_one
-        sql: "{CUBE}.customer_id = {Customers.id}"
+        sql: "{CUBE}.customer_id = {customers.id}"
 ```
 
 </CodeTabs>
 
-In the above data model, our `Orders` cube defines the relationship between
-itself and the `Customer` cube. The same JSON query now results in the following
+In the above data model, our `orders` cube defines the relationship between
+itself and the `customer` cube. The same JSON query now results in the following
 SQL query:
 
-```
+```sql
 SELECT
   "orders".status "orders__status",
   "customers".company "customers__company",
   count("orders".id) "orders__count"
 FROM
   public.orders AS "orders"
-  LEFT JOIN public.customers AS "customers" ON "orders".customer_id = "customers".id
-GROUP BY
-  1,
-  2
-ORDER BY
-  2 ASC
-LIMIT
-  10000
+  LEFT JOIN public.customers AS "customers"
+    ON "orders".customer_id = "customers".id
+GROUP BY 1, 2
+ORDER BY 2 ASC
+LIMIT 10000
 ```
 
 As we can see, the base table in the query is `orders`, and `customers` is in
@@ -195,7 +207,7 @@ retrieved.
 <InfoBox>
 
 In Cube, joins only need to be defined from one direction. In the above example,
-we explicitly _removed_ the `one_to_many` relationship from the `Customer` cube;
+we explicitly _removed_ the `one_to_many` relationship from the `customer` cube;
 not doing so would cause the query to fail as Cube would be unable to determine
 a valid join path. [Click here][self-join-direction] to learn more about how the
 direction of joins affects query results.
@@ -207,9 +219,9 @@ direction of joins affects query results.
 A many-to-many relationship occurs when multiple records in a cube are
 associated with multiple records in another cube.
 
-For example, let's say we have two cubes, `Topics` and `Posts`, pointing to the
-`topics` and `posts` tables in our database respectively. A `Post` can have more
-than one `Topic`, and a `Topic` may have more than one `Post`.
+For example, let's say we have two cubes, `topics` and `posts`, pointing to the
+`topics` and `posts` tables in our database, respectively. A `post` can have more
+than one `topic`, and a `topic` may have more than one `post`.
 
 In a database, you would most likely have an associative table (also known as a
 junction table or cross-reference table). In our example, this table name might
@@ -235,14 +247,14 @@ relationships.
 </div>
 
 In the same way the `post_topics` table was specifically created to handle this
-association in the database, we need to create an associative cube `PostTopics`,
-and declare the relationships from it to `Topics` cube and from `Posts` to
-`PostTopics`.
+association in the database, we need to create an associative cube `post_topics`,
+and declare the relationships from it to `topics` cube and from `posts` to
+`post_topics`.
 
 <InfoBox>
 
-The following example uses the `one_to_many` relationship on the `PostTopics`
-cube; this causes the direction of joins to be `Posts -> PostTopics -> Topics`.
+The following example uses the `one_to_many` relationship on the `post_topics`
+cube; this causes the direction of joins to be `posts → post_topics → topics`.
 [Read more about direction of joins here][self-join-direction].
 
 </InfoBox>
@@ -250,36 +262,36 @@ cube; this causes the direction of joins to be `Posts -> PostTopics -> Topics`.
 <CodeTabs>
 
 ```javascript
-cube(`Posts`, {
-  sql: `SELECT * FROM posts`,
+cube(`posts`, {
+  sql_table: `posts`,
 
   joins: {
-    PostTopics: {
+    post_topics: {
       relationship: `many_to_one`,
-      sql: `${CUBE}.id = ${PostTopics.post_id}`,
+      sql: `${CUBE}.id = ${post_topics.post_id}`,
     },
   },
 });
 
-cube(`Topics`, {
-  sql: `SELECT * FROM topics`,
+cube(`topics`, {
+  sql_table: `topics`,
 
   dimensions: {
     post_id: {
       sql: `id`,
-      primaryKey: true,
       type: `string`,
+      primary_key: true,
     },
   },
 });
 
-cube(`PostTopics`, {
-  sql: `SELECT * FROM post_topics`,
+cube(`post_topics`, {
+  sql_table: `post_topics`,
 
   joins: {
-    Topic: {
+    topic: {
       relationship: `one_to_many`,
-      sql: `${CUBE}.topic_id = ${Topics.id}`,
+      sql: `${CUBE}.topic_id = ${topics.id}`,
     },
   },
 
@@ -294,27 +306,31 @@ cube(`PostTopics`, {
 
 ```yaml
 cubes:
-  - name: Posts
-    sql: SELECT * FROM posts
-    joins:
-      - name: PostTopics
-        relationship: many_to_one
-        sql: "{CUBE}.id = {PostTopics.post_id}"
+  - name: posts
+    sql_table: posts
 
-  - name: Topics
-    sql: SELECT * FROM topics
+    joins:
+      - name: post_topics
+        relationship: many_to_one
+        sql: "{CUBE}.id = {post_topics.post_id}"
+
+  - name: topics
+    sql_table: topics
+
     dimensions:
       - name: post_id
         sql: id
-        primary_key: true
         type: string
+        primary_key: true
 
-  - name: PostTopics
-    sql: SELECT * FROM post_topics
+  - name: post_topics
+    sql_table: post_topics
+
     joins:
-      - name: Topic
+      - name: topic
         relationship: one_to_many
-        sql: "{CUBE}.topic_id = {Topics.id}"
+        sql: "{CUBE}.topic_id = {topics.id}"
+
     dimensions:
       - name: post_id
         sql: post_id
@@ -329,12 +345,14 @@ using SQL:
 <CodeTabs>
 
 ```javascript
-cube(`PostTopics`, {
+cube(`post_topics`, {
+  // ...
+
   dimensions: {
     id: {
       sql: `CONCAT(${CUBE}.post_id, ${CUBE}.topic_id)`,
       type: `number`,
-      primaryKey: true,
+      primary_key: true,
     },
   },
 });
@@ -342,7 +360,9 @@ cube(`PostTopics`, {
 
 ```yaml
 cubes:
-  - name: PostTopics
+  - name: post_topics
+    # ...
+
     dimensions:
       - name: id
         sql: "CONCAT({CUBE}.post_id, {CUBE}.topic_id)"
@@ -359,18 +379,18 @@ is a many-to-many relationship. In this case, the solution is to extract some
 data from existing tables and create a virtual (not backed by a real table in
 the database) associative cube.
 
-Let’s consider the following example. We have tables `Emails` and
-`Transactions`. The goal is to calculate the amount of transactions per
-campaign. Both `Emails` and `Transactions` have a `campaign_id` column. We don’t
-have a campaigns table, but data about campaigns is part of the `Emails` table.
+Let’s consider the following example. We have tables `emails` and
+`transactions`. The goal is to calculate the amount of transactions per
+campaign. Both `emails` and `transactions` have a `campaign_id` column. We don’t
+have a campaigns table, but data about campaigns is part of the `emails` table.
 
-Let’s take a look at the `Emails` cube first:
+Let’s take a look at the `emails` cube first:
 
 <CodeTabs>
 
 ```javascript
-cube(`Emails`, {
-  sql: `SELECT * FROM emails`,
+cube(`emails`, {
+  sql_table: `emails`,
 
   measures: {
     count: {
@@ -382,7 +402,7 @@ cube(`Emails`, {
     id: {
       sql: `id`,
       type: `number`,
-      primaryKey: true,
+      primary_key: true,
     },
 
     campaign_name: {
@@ -400,19 +420,23 @@ cube(`Emails`, {
 
 ```yaml
 cubes:
-  - name: Emails
-    sql: SELECT * FROM emails
+  - name: emails
+    sql_table: emails
+
     measures:
       - name: count
         type: count
+
     dimensions:
       - name: id
         sql: id
         type: number
         primary_key: true
+
       - name: campaign_name
         sql: campaign_name
         type: string
+
       - name: campaign_id
         sql: campaign_id
         type: number
@@ -420,21 +444,21 @@ cubes:
 
 </CodeTabs>
 
-We can extract campaigns data into a virtual `Campaigns` cube:
+We can extract campaigns data into a virtual `campaigns` cube:
 
 <CodeTabs>
 
 ```javascript
-cube(`Campaigns`, {
+cube(`campaigns`, {
   sql: `
-SELECT
-  campaign_id,
-  campaign_name,
-  customer_name,
-  MIN(created_at) AS started_at
-FROM emails
-GROUP BY 1, 2, 3
-`,
+    SELECT
+      campaign_id,
+      campaign_name,
+      customer_name,
+      MIN(created_at) AS started_at
+    FROM emails
+    GROUP BY 1, 2, 3
+  `,
 
   measures: {
     count: {
@@ -446,7 +470,7 @@ GROUP BY 1, 2, 3
     id: {
       sql: `campaign_id`,
       type: `string`,
-      primaryKey: true,
+      primary_key: true,
     },
 
     name: {
@@ -459,7 +483,7 @@ GROUP BY 1, 2, 3
 
 ```yaml
 cubes:
-  - name: Campaigns
+  - name: campaigns
     sql: >
       SELECT
         campaign_id,
@@ -468,14 +492,17 @@ cubes:
         MIN(created_at) AS started_at
       FROM emails
       GROUP BY 1, 2, 3
+
     measures:
       - name: count
         type: count
+
     dimensions:
       - name: id
         sql: campaign_id
         type: string
         primary_key: true
+
       - name: name
         sql: campaign_name
         type: string
@@ -497,19 +524,19 @@ The following diagram shows our data model with the `Campaigns` cube:
 The last piece is to finally declare a many-to-many relationship. This should be
 done by declaring a [`one_to_many`
 relationship][ref-schema-ref-joins-relationship] on the associative cube,
-`Campaigns` in our case.
+`campaigns` in our case.
 
 <CodeTabs>
 
 ```javascript
-cube(`Emails`, {
-  sql: `select * emails`,
+cube(`emails`, {
+  sql_table: `emails`,
 
   joins: {
-    Campaigns: {
+    campaigns: {
       relationship: `many_to_one`,
-      sql: `${CUBE}.campaign_id = ${Campaigns.id}
-      AND ${CUBE}.customer_name = ${Campaigns.customerName}`,
+      sql: `${CUBE}.campaign_id = ${campaigns.id}
+      AND ${CUBE}.customer_name = ${campaigns.customer_name}`,
     },
   },
 
@@ -523,7 +550,7 @@ cube(`Emails`, {
     id: {
       sql: `id`,
       type: `number`,
-      primaryKey: true,
+      primary_key: true,
     },
 
     campaign_name: {
@@ -538,12 +565,12 @@ cube(`Emails`, {
   },
 });
 
-cube(`Campaigns`, {
+cube(`campaigns`, {
   joins: {
-    Transactions: {
+    transactions: {
       relationship: `one_to_many`,
-      sql: `${CUBE}.customer_name = ${Transactions.customerName}
-      AND ${CUBE}.campaign_id = ${Transactions.campaignId}`,
+      sql: `${CUBE}.customer_name = ${transactions.customer_name}
+      AND ${CUBE}.campaign_id = ${transactions.campaign_id}`,
     },
   },
 
@@ -551,7 +578,7 @@ cube(`Campaigns`, {
     id: {
       sql: `id`,
       type: `number`,
-      primaryKey: true,
+      primary_key: true,
     },
 
     customer_name: {
@@ -564,37 +591,49 @@ cube(`Campaigns`, {
 
 ```yaml
 cubes:
-  - name: Emails
-    sql: SELECT * FROM emails
+  - name: emails
+    sql_table: emails
+
     joins:
-      - name: Campaigns
+      - name: campaigns
         relationship: many_to_one
-        sql: "{CUBE}.campaign_id = {Campaigns.id} AND {CUBE}.customer_name = {Campaigns.customer_name}"
+        sql: >
+          {CUBE}.campaign_id = {campaigns.id} AND
+          {CUBE}.customer_name = {campaigns.customer_name}
+
     measures:
       - name: count
         type: count
+
     dimensions:
       - name: id
         sql: id
         type: number
         primary_key: true
+
       - name: campaign_name
         sql: campaign_name
         type: string
+
       - name: campaign_id
         sql: campaign_id
         type: number
 
-  - name: Campaigns
+  - name: campaigns
+
     joins:
-      - name: Transactions
+      - name: transactions
         relationship: one_to_many
-        sql: "{CUBE}.customer_name = {Transactions.customer_name} AND {CUBE}.campaign_id = {Transactions.campaign_id}"
+        sql: >
+          {CUBE}.customer_name = {transactions.customer_name} AND
+          {CUBE}.campaign_id = {transactions.campaign_id}
+    
     dimensions:
       - name: id
         sql: id
         type: number
         primary_key: true
+
       - name: customer_name
         sql: customer_name
         type: string
@@ -605,18 +644,18 @@ cubes:
 ## Directions of joins
 
 The direction of [joins][ref-schema-ref-joins] greatly influences the final
-result set. As an example, let's take two cubes, `Orders` and `Customers`:
+result set. As an example, let's take two cubes, `orders` and `customers`:
 
 <CodeTabs>
 
 ```javascript
-cube("Orders", {
-  sql: `SELECT * FROM orders`,
+cube(`orders`, {
+  sql_table: `orders`,
 
   measures: {
     count: {
-      sql: "id",
-      type: "count",
+      sql: `id`,
+      type: `count`,
     },
   },
 
@@ -624,22 +663,23 @@ cube("Orders", {
     id: {
       sql: `id`,
       type: `number`,
-      primaryKey: true,
+      primary_key: true,
     },
-    customerId: {
+
+    customer_id: {
       sql: `customer_id`,
       type: `number`,
     },
   },
 });
 
-cube("Customers", {
-  sql: `SELECT * FROM customers`,
+cube(`customers`, {
+  sql_table: `customers`,
 
   measures: {
     count: {
-      sql: "id",
-      type: "count",
+      sql: `id`,
+      type: `count`,
     },
   },
 
@@ -647,7 +687,7 @@ cube("Customers", {
     id: {
       sql: `id`,
       type: `number`,
-      primaryKey: true,
+      primary_key: true,
     },
   },
 });
@@ -655,27 +695,32 @@ cube("Customers", {
 
 ```yaml
 cubes:
-  - name: Orders
-    sql: SELECT * FROM orders
+  - name: orders
+    sql_table: orders
+
     measures:
       - name: count
         sql: id
         type: count
+    
     dimensions:
       - name: id
         sql: id
         type: number
         primary_key: true
+    
       - name: customer_id
         sql: customer_id
         type: number
 
-  - name: Customers
-    sql: SELECT * FROM customers
+  - name: customers
+    sql_table: customers
+
     measures:
       - name: count
         sql: id
         type: count
+    
     dimensions:
       - name: id
         sql: id
@@ -688,31 +733,31 @@ cubes:
 The first case is to calculate the total revenue per customer. Let's name this
 metric `total_revenue`. We also need to be aware of the fact that orders can be
 placed without customer registration (anonymous customers/guest checkouts).
-Because of anonymous customers, we should start the join from the `Orders` onto
-the `Customers` cube so that we do not lose data from anonymous orders:
+Because of anonymous customers, we should start the join from the `orders` onto
+the `customers` cube so that we do not lose data from anonymous orders:
 
 <CodeTabs>
 
 ```javascript
-cube("Orders", {
-  sql: `SELECT * FROM orders`,
+cube(`orders`, {
+  sql_table: `orders`,
 
   joins: {
-    Customers: {
+    customers: {
       relationship: `many_to_one`,
-      sql: `${CUBE}.customer_id = ${Customers.id}`,
+      sql: `${CUBE}.customer_id = ${customers.id}`,
     },
   },
 
   measures: {
     count: {
-      sql: "id",
-      type: "count",
+      sql: `id`,
+      type: `count`,
     },
 
     total_revenue: {
-      sql: "revenue",
-      type: "sum",
+      sql: `revenue`,
+      type: `sum`,
     },
   },
 
@@ -720,8 +765,8 @@ cube("Orders", {
     id: {
       sql: `id`,
       type: `number`,
-      primaryKey: true,
-      shown: true,
+      primary_key: true,
+      public: true,
     },
 
     customer_id: {
@@ -734,25 +779,30 @@ cube("Orders", {
 
 ```yaml
 cubes:
-  - name: Orders
-    sql: SELECT * FROM orders
+  - name: orders
+    sql_table: orders
+
     joins:
-      - name: Customers
+      - name: customers
         relationship: many_to_one
-        sql: "{CUBE}.customer_id = {Customers.id}"
+        sql: "{CUBE}.customer_id = {customers.id}"
+
     measures:
       - name: count
         sql: id
         type: count
+      
       - name: total_revenue
         sql: revenue
         type: sum
+    
     dimensions:
       - name: id
         sql: id
         type: number
         primary_key: true
-        shown: true
+        public: true
+
       - name: customer_id
         sql: customer_id
         type: number
@@ -764,39 +814,37 @@ After adding the join to the data model, we can query the cube as follows:
 
 ```json
 {
-  "dimensions": ["Users.company"],
-  "measures": ["Orders.total_revenue"],
-  "timeDimensions": [
-    {
-      "dimension": "Orders.created_at"
-    }
-  ]
+  "dimensions": ["users.company"],
+  "measures": ["orders.total_revenue"],
+  "timeDimensions": [{
+    "dimension": "orders.created_at"
+  }]
 }
 ```
 
 The second case is to find customers without any orders. Let's call this metric
-`count`. In this case we should join the `Customers` cube with the `Orders` cube
+`count`. In this case we should join the `customers` cube with the `orders` cube
 to find customers with 0 orders placed. The reverse order of joins would result
 in a dataset without data for customers with no orders. Therefore, in this
-instance, we declare the join in the `Customers` cube:
+instance, we declare the join in the `customers` cube:
 
 <CodeTabs>
 
 ```javascript
-cube("Customers", {
-  sql: `SELECT * FROM customers`,
+cube(`customers`, {
+  sql_table: `customers`,
 
   joins: {
-    Orders: {
+    orders: {
       relationship: `one_to_many`,
-      sql: `${CUBE}.id = ${Orders.customer_id}`,
+      sql: `${CUBE}.id = ${orders.customer_id}`,
     },
   },
 
   measures: {
     count: {
-      sql: "id",
-      type: "count",
+      sql: `id`,
+      type: `count`,
     },
   },
 
@@ -804,8 +852,8 @@ cube("Customers", {
     id: {
       sql: `id`,
       type: `number`,
-      primaryKey: true,
-      shown: true,
+      primary_key: true,
+      public: true,
     },
 
     customer_id: {
@@ -818,22 +866,26 @@ cube("Customers", {
 
 ```yaml
 cubes:
-  - name: Customers
-    sql: SELECT * FROM customers
+  - name: customers
+    sql_table: customers
+
     joins:
-      - name: Orders
+      - name: orders
         relationship: one_to_many
-        sql: "{CUBE}.id = {Orders.customer_id}"
+        sql: "{CUBE}.id = {orders.customer_id}"
+
     measures:
       - name: count
         sql: id
         type: count
+
     dimensions:
       - name: id
         sql: id
         type: number
         primary_key: true
-        shown: true
+        public: true
+
       - name: customer_id
         sql: customer_id
         type: number
@@ -845,19 +897,15 @@ We can then query the cube as follows:
 
 ```json
 {
-  "dimensions": ["Users.company"],
-  "timeDimensions": [
-    {
-      "dimension": "Orders.created_at"
-    }
-  ],
-  "filters": [
-    {
-      "member": "Orders.count",
-      "operator": "equals",
-      "values": ["0"]
-    }
-  ]
+  "dimensions": ["users.company"],
+  "timeDimensions": [{
+    "dimension": "orders.created_at"
+  }],
+  "filters": [{
+    "member": "orders.count",
+    "operator": "equals",
+    "values": ["0"]
+  }]
 }
 ```
 
@@ -868,43 +916,42 @@ Views can also be used in Cube to represent the previous two scenarios:
 <CodeTabs>
 
 ```javascript
-view("TotalRevenuePerCustomer", {
+view(`total_revenue_per_customer", {
   description: `Total revenue per customer`,
 
-  includes: [Orders.total_revenue, Users.company],
+  includes: [
+    orders.total_revenue,
+    users.company
+  ],
 });
 
-view("CustomersWithoutOrders", {
+view(`customers_without_orders`, {
   description: `Customers without orders`,
 
-  includes: [Users.company],
-
-  measures: {
-    count: {
-      // Note the nested path to Orders.count
-      sql: `${Users.Orders.count}`,
-    },
-  },
+  includes: [
+    users.company,
+    // Note the nested path to orders.count
+    users.orders.count
+  ]
 });
 ```
 
 ```yaml
 views:
-  - name: TotalRevenuePerCustomer
+  - name: total_revenue_per_customer
     description: Total revenue per customer
-    includes:
-      - Orders.total_revenue
-      - Users.company
 
-  - name: CustomersWithoutOrders
-    description: Customers without orders
     includes:
-      - Users.company
-    measures:
-      - name: count
-        # Note the nested path to Orders.count
-        sql: "{Users.Orders.count}"
-        type: number
+      - orders.total_revenue
+      - users.company
+
+  - name: customers_without_orders
+    description: Customers without orders
+
+    includes:
+      - users.company
+      # Note the nested path to orders.count
+      - users.orders.count
 ```
 
 </CodeTabs>
@@ -912,12 +959,14 @@ views:
 ### <--{"id" : "Directions of joins"}--> Transitive join pitfalls
 
 Let's consider an example where we have a many-to-many relationship between
-`Users` and `Organizations` through an `OrganizationUsers` cube:
+`users` and `organizations` through an `organization_users` cube:
 
 <CodeTabs>
 
 ```javascript
-cube(`Users`, {
+cube(`users`, {
+  // ...
+
   measures: {
     count: {
       type: `count`,
@@ -928,19 +977,22 @@ cube(`Users`, {
     id: {
       sql: `id`,
       type: `string`,
-      primaryKey: true,
+      primary_key: true,
     },
   },
 });
 
-cube(`OrganizationUsers`, {
+cube(`organization_users`, {
+  // ...
+
   joins: {
-    Users: {
-      sql: `${CUBE}.user_id = ${Users.id}`,
+    users: {
+      sql: `${CUBE}.user_id = ${users.id}`,
       relationship: `one_to_many`,
     },
-    Organizations: {
-      sql: `${CUBE}.organization_id = ${Organizations.id}`,
+
+    organizations: {
+      sql: `${CUBE}.organization_id = ${organizations.id}`,
       relationship: `one_to_many`,
     },
   },
@@ -950,18 +1002,21 @@ cube(`OrganizationUsers`, {
       // Joins require a primary key, so we'll create one on-the-fly
       sql: `CONCAT(${CUBE}.user_id, ':', ${CUBE}.organization_id)`,
       type: `string`,
-      primaryKey: true,
+      primary_key: true,
     },
   },
 });
 
-cube(`Organizations`, {
+cube(`organizations`, {
+  // ...
+
   dimensions: {
     id: {
       sql: `id`,
       type: `string`,
-      primaryKey: true,
+      primary_key: true,
     },
+
     name: {
       sql: `category`,
       type: `string`,
@@ -972,24 +1027,31 @@ cube(`Organizations`, {
 
 ```yaml
 cubes:
-  - name: Users
+  - name: users
+    # ...
+    
     measures:
       - name: count
         type: count
+    
     dimensions:
       - name: id
         sql: id
         type: string
         primary_key: true
 
-  - name: OrganizationUsers
+  - name: organization_users
+    # ...
+
     joins:
-      - name: Users
-        sql: "{CUBE}.user_id = {Users.id}"
+      - name: users
+        sql: "{CUBE}.user_id = {users.id}"
         relationship: one_to_many
-      - name: Organizations
-        sql: "{CUBE}.organization_id = {Organizations.id}"
+
+      - name: organizations
+        sql: "{CUBE}.organization_id = {organizations.id}"
         relationship: one_to_many
+
     dimensions:
       - name: id
         # Joins require a primary key, so we'll create one on-the-fly
@@ -997,12 +1059,15 @@ cubes:
         type: string
         primary_key: true
 
-  - name: Organizations
+  - name: organizations
+    # ...
+
     dimensions:
       - name: id
         sql: id
         type: string
         primary_key: true
+
       - name: name
         sql: category
         type: string
@@ -1014,26 +1079,28 @@ Let's try and execute a query:
 
 ```json
 {
-  "measures": ["Users.count"],
-  "dimensions": ["Organizations.name"]
+  "measures": ["users.count"],
+  "dimensions": ["organizations.name"]
 }
 ```
 
 You'll get an error:
-`Error: Can't find join path to join 'Users', 'Organizations'`. The problem is
-that joins are directed and if we try to connect `Users` and `Organizations`
-there's no path from `Users` to `Organizations` or either from `Organizations`
-to `Users`. One possible solution is to move the `Users-OrganizationUsers` join
-from `OrganizationUsers` cube to `Users`, although this affects the query
+`Error: Can't find join path to join 'users', 'organizations'`. The problem is
+that joins are directed and if we try to connect `users` and `organizations`
+there's no path from `users` to `organizations` or either from `organizations`
+to `users`. One possible solution is to move the `users → organization_users` join
+from `organization_users` cube to `users`, although this affects the query
 semantics and thus the final results:
 
 <CodeTabs>
 
 ```javascript
-cube(`Users`, {
+cube(`users`, {
+  // ...
+
   joins: {
-    OrganizationUsers: {
-      sql: `${OrganizationUsers.user_id} = ${Users.id}`,
+    organization_users: {
+      sql: `${organization_users.user_id} = ${users.id}`,
       relationship: `one_to_many`,
     },
   },
@@ -1043,10 +1110,12 @@ cube(`Users`, {
   },
 });
 
-cube(`OrganizationUsers`, {
+cube(`organization_users`, {
+  // ...
+
   joins: {
-    Organizations: {
-      sql: `${OrganizationUsers.organization_id} = ${Organizations.id}`,
+    organizations: {
+      sql: `${organization_users.organization_id} = ${organizations.id}`,
       relationship: `one_to_many`,
     },
   },
@@ -1056,18 +1125,23 @@ cube(`OrganizationUsers`, {
 ```yaml
 cubes:
   - name: Users
+    # ...
+
     joins:
-      - name: OrganizationUsers
-        sql: "{OrganizationUsers.user_id} = {Users.id}"
+      - name: organization_users
+        sql: "{organization_users.user_id} = {users.id}"
         relationship: one_to_many
+
     measures:
       - name: type
         type: count
 
-  - name: OrganizationUsers
+  - name: organization_users
+    # ...
+
     joins:
-      - name: Organizations
-        sql: "{OrganizationUsers.organization_id} = {Organizations.id}"
+      - name: organizations
+        sql: "{organization_users.organization_id} = {organizations.id}"
         relationship: one_to_many
 ```
 

@@ -22,7 +22,9 @@ below, we create a `string` measure by converting a numerical value to a string:
 <CodeTabs>
 
 ```javascript
-cube("Orders", {
+cube(`orders`, {
+  // ...
+
   measures: {
     high_or_low: {
       type: `string`,
@@ -34,7 +36,9 @@ cube("Orders", {
 
 ```yaml
 cubes:
-  - name: Orders
+  - name: orders
+    # ...
+
     measures:
       - name: high_or_low
         sql: "CASE WHEN {CUBE.number} > 100 THEN 'high' ELSE 'low' END"
@@ -51,13 +55,16 @@ below, we create a `time` measure from an existing dimension:
 <CodeTabs>
 
 ```javascript
-cube("Orders", {
+cube(`orders`, {
+  // ...
+
   measures: {
     last_order: {
       sql: `MAX(created_at)`,
       type: `time`,
     },
   },
+
   dimensions: {
     created_at: {
       sql: `created_at`,
@@ -69,11 +76,14 @@ cube("Orders", {
 
 ```yaml
 cubes:
-  - name: Orders
+  - name: orders
+    # ...
+
     measures:
       - name: last_order
         sql: "MAX(created_at)"
         type: time
+    
     dimensions:
       - name: created_at
         sql: created_at
@@ -93,7 +103,9 @@ The example below adds an `is_completed` measure which only returns `true` if
 <CodeTabs>
 
 ```javascript
-cube("Orders", {
+cube(`orders`, {
+  // ...
+
   measures: {
     is_completed: {
       sql: `BOOL_AND(status = 'completed')`,
@@ -105,7 +117,9 @@ cube("Orders", {
 
 ```yaml
 cubes:
-  - name: Orders
+  - name: orders
+    # ...
+
     measures:
       - name: is_completed
         sql: "BOOL_AND(status = 'completed')"
@@ -124,7 +138,9 @@ Measures][ref-schema-ref-calc-measures].
 <CodeTabs>
 
 ```javascript
-cube("Orders", {
+cube(`orders`, {
+  // ...
+
   measures: {
     purchases_ratio: {
       sql: `${purchases} / ${count} * 100.0`,
@@ -137,7 +153,9 @@ cube("Orders", {
 
 ```yaml
 cubes:
-  - name: Orders
+  - name: orders
+    # ...
+
     measures:
       - name: purchases_ratio
         sql: "{purchases} / {count} * 100.0"
@@ -153,10 +171,12 @@ expression:
 <CodeTabs>
 
 ```javascript
-cube("Orders", {
+cube(`orders`, {
+  // ...
+
   measures: {
     ratio: {
-      sql: `sum(${CUBE}.amount) / count(*)`,
+      sql: `SUM(${CUBE}.amount) / count(*)`,
       type: `number`,
     },
   },
@@ -165,7 +185,9 @@ cube("Orders", {
 
 ```yaml
 cubes:
-  - name: Orders
+  - name: orders
+    # ...
+
     measures:
       - name: ratio
         sql: "SUM({CUBE}.amount) / count(*)"
@@ -181,19 +203,21 @@ writing raw SQL, Cube.js will properly calculate counts even if your query’s
 joins will produce row multiplication. You do not need to include a `sql`
 parameter for this type.
 
-`drillMembers` parameter is commonly used with type `count`. It allows users to
+`drill_members` parameter is commonly used with type `count`. It allows users to
 click on the measure in the UI and inspect individual records that make up a
 count. [Learn more about Drill Downs][ref-drilldowns].
 
 <CodeTabs>
 
 ```javascript
-cube("Orders", {
+cube(`orders`, {
+  // ...
+
   measures: {
-    numberOfUsers: {
+    number_of_users: {
       type: `count`,
       // optional
-      drillMembers: [id, name, email, company],
+      drill_members: [id, name, email, company],
     },
   },
 });
@@ -201,9 +225,11 @@ cube("Orders", {
 
 ```yaml
 cubes:
-  - name: Orders
+  - name: orders
+    # ...
+
     measures:
-      - name: numberOfUsers
+      - name: number_of_users
         type: count
         drill_members:
           - id
@@ -214,7 +240,7 @@ cubes:
 
 </CodeTabs>
 
-### <--{"id" : "Measure Types"}--> countDistinct
+### <--{"id" : "Measure Types"}--> count_distinct
 
 Calculates the number of distinct values in a given field. It makes use of SQL’s
 `COUNT DISTINCT` function.
@@ -225,11 +251,13 @@ results in a table column, or interpolated JavaScript expression.
 <CodeTabs>
 
 ```javascript
-cube("Orders", {
+cube(`orders`, {
+  // ...
+
   measures: {
-    uniqueUserCount: {
+    unique_user_count: {
       sql: `user_id`,
-      type: "countDistinct",
+      type: `count_distinct`,
     },
   },
 });
@@ -237,19 +265,21 @@ cube("Orders", {
 
 ```yaml
 cubes:
-  - name: Orders
+  - name: orders
+    # ...
+
     measures:
-      - name: uniqueUserCount
+      - name: unique_user_count
         sql: user_id
-        type: countDistinct
+        type: count_distinct
 ```
 
 </CodeTabs>
 
-### <--{"id" : "Measure Types"}--> countDistinctApprox
+### <--{"id" : "Measure Types"}--> count_distinct_approx
 
 Calculates approximate number of distinct values in a given field. Unlike
-`countDistinct` measure type, `countDistinctApprox` is decomposable aggregate
+`count_distinct` measure type, `count_distinct_approx` is decomposable aggregate
 function or **additive**. This allows its usage in **additive** [rollup
 pre-aggregations][ref-schema-ref-preaggs-rollup] which are much more versatile
 than **non-additive** ones. It uses special SQL backend-dependent functions to
@@ -262,11 +292,13 @@ The `sql` parameter is required and can take any valid SQL expression.
 <CodeTabs>
 
 ```javascript
-cube("Orders", {
+cube(`orders`, {
+  // ...
+
   measures: {
-    uniqueUserCount: {
+    unique_user_count: {
       sql: `user_id`,
-      type: "countDistinctApprox",
+      type: `count_distinct_approx`,
     },
   },
 });
@@ -274,11 +306,13 @@ cube("Orders", {
 
 ```yaml
 cubes:
-  - name: Orders
+  - name: orders
+    # ...
+
     measures:
-      - name: uniqueUserCount
+      - name: unique_user_count
         sql: user_id
-        type: countDistinctApprox
+        type: count_distinct_approx
 ```
 
 </CodeTabs>
@@ -297,57 +331,21 @@ function.
 <CodeTabs>
 
 ```javascript
-cube("Orders", {
-  measures: {
-    revenue: {
-      sql: `${chargesAmount}`,
-      type: `sum`,
-    },
-  },
-});
-```
+cube(`orders`, {
+  // ...
 
-```yaml
-cubes:
-  - name: Orders
-    measures:
-      - name: revenue
-        sql: "{chargesAmount}"
-        type: sum
-```
-
-</CodeTabs>
-
-<CodeTabs>
-
-```javascript
-cube("Orders", {
   measures: {
     revenue: {
       sql: `amount`,
       type: `sum`,
     },
-  },
-});
-```
 
-```yaml
-cubes:
-  - name: Orders
-    measures:
-      - name: revenue
-        sql: amount
-        type: sum
-```
+    revenue_2: {
+      sql: `${charges_amount}`,
+      type: `sum`,
+    },
 
-</CodeTabs>
-
-<CodeTabs>
-
-```javascript
-cube("Orders", {
-  measures: {
-    revenue: {
+    revenue_3: {
       sql: `fee * 0.1`,
       type: `sum`,
     },
@@ -357,9 +355,19 @@ cube("Orders", {
 
 ```yaml
 cubes:
-  - name: Orders
+  - name: orders
+    # ...
+
     measures:
       - name: revenue
+        sql: amount
+        type: sum
+
+      - name: revenue_2
+        sql: "{charges_amount}"
+        type: sum
+
+      - name: revenue_3
         sql: fee * 0.1
         type: sum
 ```
@@ -378,7 +386,9 @@ that results in a numeric table column, or interpolated JavaScript expression.
 <CodeTabs>
 
 ```javascript
-cube("Orders", {
+cube(`orders`, {
+  // ...
+
   measures: {
     avg_transaction: {
       sql: `${transaction_amount}`,
@@ -390,7 +400,9 @@ cube("Orders", {
 
 ```yaml
 cubes:
-  - name: Orders
+  - name: orders
+    # ...
+
     measures:
       - name: avg_transaction
         sql: "{transaction_amount}"
@@ -406,7 +418,9 @@ Type of measure `min` is calculated as a minimum of values defined in `sql`.
 <CodeTabs>
 
 ```javascript
-cube("Orders", {
+cube(`orders`, {
+  // ...
+
   measures: {
     date_first_purchase: {
       sql: `date_purchase`,
@@ -418,7 +432,9 @@ cube("Orders", {
 
 ```yaml
 cubes:
-  - name: Orders
+  - name: orders
+    # ...
+
     measures:
       - name: date_first_purchase
         sql: date_purchase
@@ -434,7 +450,9 @@ Type of measure `max` is calculated as a maximum of values defined in `sql`.
 <CodeTabs>
 
 ```javascript
-cube("Orders", {
+cube(`orders`, {
+  // ...
+
   measures: {
     date_last_purchase: {
       sql: `date_purchase`,
@@ -446,7 +464,9 @@ cube("Orders", {
 
 ```yaml
 cubes:
-  - name: Orders
+  - name: orders
+    # ...
+
     measures:
       - name: date_last_purchase
         sql: date_purchase
@@ -455,19 +475,21 @@ cubes:
 
 </CodeTabs>
 
-### <--{"id" : "Measure Types"}--> runningTotal
+### <--{"id" : "Measure Types"}--> running_total
 
-Type of measure `runningTotal` is calculated as summation of values defined in
+Type of measure `running_total` is calculated as summation of values defined in
 `sql`. Use it to calculate cumulative measures.
 
 <CodeTabs>
 
 ```javascript
-cube("Orders", {
+cube(`orders`, {
+  // ...
+
   measures: {
     total_subscriptions: {
       sql: `subscription_amount`,
-      type: `runningTotal`,
+      type: `running_total`,
     },
   },
 });
@@ -475,11 +497,13 @@ cube("Orders", {
 
 ```yaml
 cubes:
-  - name: Orders
+  - name: orders
+    # ...
+
     measures:
       - name: total_subscriptions
         sql: subscription_amount
-        type: runningTotal
+        type: running_total
 ```
 
 </CodeTabs>
@@ -496,10 +520,12 @@ see as output.
 <CodeTabs>
 
 ```javascript
-cube("Orders", {
+cube(`orders`, {
+  // ...
+
   measures: {
     purchase_conversion: {
-      sql: `${purchase}/${checkout}*100.0`,
+      sql: `${purchase} / ${checkout} * 100.0`,
       type: `number`,
       format: `percent`,
     },
@@ -509,7 +535,9 @@ cube("Orders", {
 
 ```yaml
 cubes:
-  - name: Orders
+  - name: orders
+    # ...
+
     measures:
       - name: purchase_conversion
         sql: "{purchase} / {checkout} * 100.0"
@@ -526,11 +554,13 @@ cubes:
 <CodeTabs>
 
 ```javascript
-cube("Orders", {
+cube(`orders`, {
+  // ...
+
   measures: {
     total_amount: {
       sql: `amount`,
-      type: `runningTotal`,
+      type: `running_total`,
       format: `currency`,
     },
   },
@@ -539,11 +569,13 @@ cube("Orders", {
 
 ```yaml
 cubes:
-  - name: Orders
+  - name: orders
+    # ...
+
     measures:
       - name: total_amount
         sql: amount
-        type: runningTotal
+        type: running_total
         format: currency
 ```
 
@@ -567,7 +599,9 @@ a string.
 <CodeTabs>
 
 ```javascript
-cube("Orders", {
+cube(`orders`, {
+  // ...
+
   dimensions: {
     completed_at: {
       sql: `completed_at`,
@@ -579,7 +613,9 @@ cube("Orders", {
 
 ```yaml
 cubes:
-  - name: Orders
+  - name: orders
+    # ...
+
     dimensions:
       - name: completed_at
         sql: completed_at
@@ -600,7 +636,9 @@ The following model creates a field `full_name` by combining 2 fields:
 <CodeTabs>
 
 ```javascript
-cube("Orders", {
+cube(`orders`, {
+  // ...
+
   dimensions: {
     full_name: {
       sql: `CONCAT(${first_name}, ' ', ${last_name})`,
@@ -612,10 +650,12 @@ cube("Orders", {
 
 ```yaml
 cubes:
-  - name: Orders
+  - name: orders
+    # ...
+
     dimensions:
-      - name: fullName
-        sql: "CONCAT({firstName}, ' ', {lastName})"
+      - name: full_name
+        sql: "CONCAT({first_name}, ' ', {last_name})"
         type: string
 ```
 
@@ -628,7 +668,9 @@ cubes:
 <CodeTabs>
 
 ```javascript
-cube("Orders", {
+cube(`orders`, {
+  // ...
+
   dimensions: {
     amount: {
       sql: `amount`,
@@ -640,7 +682,9 @@ cube("Orders", {
 
 ```yaml
 cubes:
-  - name: Orders
+  - name: orders
+    # ...
+
     dimensions:
       - name: amount
         sql: amount
@@ -657,7 +701,9 @@ boolean. For example:
 <CodeTabs>
 
 ```javascript
-cube("Orders", {
+cube(`orders`, {
+  // ...
+
   dimensions: {
     is_enabled: {
       sql: `is_enabled`,
@@ -669,7 +715,9 @@ cube("Orders", {
 
 ```yaml
 cubes:
-  - name: Orders
+  - name: orders
+    # ...
+
     dimensions:
       - name: is_enabled
         sql: is_enabled
@@ -686,7 +734,9 @@ it requires to set two fields: latitude and longitude.
 <CodeTabs>
 
 ```javascript
-cube("Orders", {
+cube(`orders`, {
+  // ...
+
   dimensions: {
     location: {
       type: `geo`,
@@ -703,7 +753,9 @@ cube("Orders", {
 
 ```yaml
 cubes:
-  - name: Orders
+  - name: orders
+    # ...
+
     dimensions:
       - name: location
         type: geo
@@ -717,20 +769,22 @@ cubes:
 
 ## Dimension Formats
 
-### <--{"id" : "Dimension Formats"}--> imageUrl
+### <--{"id" : "Dimension Formats"}--> image_url
 
-`imageUrl` is used for displaying images in table visualization. In this case
+`image_url` is used for displaying images in table visualization. In this case
 `sql` parameter should contain full path to the image.
 
 <CodeTabs>
 
 ```javascript
-cube("Orders", {
+cube(`orders`, {
+  // ...
+
   dimensions: {
     image: {
       sql: `CONCAT('https://img.example.com/id/', ${id})`,
       type: `string`,
-      format: `imageUrl`,
+      format: `image_url`,
     },
   },
 });
@@ -738,12 +792,14 @@ cube("Orders", {
 
 ```yaml
 cubes:
-  - name: Orders
+  - name: orders
+    # ...
+
     dimensions:
       - name: image
         sql: "CONCAT('https://img.example.com/id/', {id})"
         type: string
-        format: imageUrl
+        format: image_url
 ```
 
 </CodeTabs>
@@ -757,7 +813,9 @@ can take any valid SQL expression.
 <CodeTabs>
 
 ```javascript
-cube("Orders", {
+cube(`orders`, {
+  // ...
+
   dimensions: {
     image: {
       sql: `id`,
@@ -770,7 +828,9 @@ cube("Orders", {
 
 ```yaml
 cubes:
-  - name: Orders
+  - name: orders
+    # ...
+
     dimensions:
       - name: image
         sql: id
@@ -791,15 +851,17 @@ The `sql` parameter is required and can take any valid SQL expression.
 <CodeTabs>
 
 ```javascript
-cube("Orders", {
+cube(`orders`, {
+  // ...
+
   dimensions: {
-    orderLink: {
+    order_link: {
       sql: `'http://myswebsite.com/orders/' || id`,
       type: `string`,
       format: `link`,
     },
 
-    crmLink: {
+    crm_link: {
       sql: `'https://na1.salesforce.com/' || id`,
       type: `string`,
       format: {
@@ -813,13 +875,16 @@ cube("Orders", {
 
 ```yaml
 cubes:
-  - name: Orders
+  - name: orders
+    # ...
+
     dimensions:
-      - name: orderLink
+      - name: order_link
         sql: "'http://myswebsite.com/orders/' || id"
         type: string
         format: link
-      - name: crmLink
+
+      - name: crm_link
         sql: "'https://na1.salesforce.com/' || id"
         type: string
         format:
@@ -836,7 +901,9 @@ cubes:
 <CodeTabs>
 
 ```javascript
-cube("Orders", {
+cube(`orders`, {
+  // ...
+
   dimensions: {
     amount: {
       sql: `amount`,
@@ -849,7 +916,9 @@ cube("Orders", {
 
 ```yaml
 cubes:
-  - name: Orders
+  - name: orders
+    # ...
+
     dimensions:
       - name: amount
         sql: amount
@@ -866,7 +935,9 @@ cubes:
 <CodeTabs>
 
 ```javascript
-cube("Orders", {
+cube(`orders`, {
+  // ...
+
   dimensions: {
     open_rate: {
       sql: `COALESCE(100.0 * ${uniq_open_count} / NULLIF(${delivered_count}, 0), 0)`,
@@ -879,11 +950,12 @@ cube("Orders", {
 
 ```yaml
 cubes:
-  - name: Orders
+  - name: orders
+    # ...
+
     dimensions:
       - name: open_rate
-        sql:
-          "COALESCE(100.0 * {uniq_open_count} / NULLIF({delivered_count}, 0), 0)"
+        sql: "COALESCE(100.0 * {uniq_open_count} / NULLIF({delivered_count}, 0), 0)"
         type: number
         format: percent
 ```

@@ -44,7 +44,7 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
   public async addToQueue(
     keyScore: number,
     queryKey: QueryKey,
-    orphanedTime: any,
+    orphanedTime: number,
     queryHandler: string,
     query: AddToQueueQuery,
     priority: number,

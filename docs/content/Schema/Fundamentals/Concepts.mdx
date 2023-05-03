@@ -40,53 +40,45 @@ A cube represents a dataset in Cube, and is conceptually similar to a [view in
 SQL][wiki-view-sql]. Cubes are typically declared in separate files with one
 cube per file. Within each cube are definitions of [dimensions][self-dimensions]
 and [measures][self-measures]. Typically, a cube points to a single table in
-your database using the [`sql` property][ref-schema-ref-sql]:
+your database using the [`sql_table` property][ref-schema-ref-sql-table]:
 
 <CodeTabs>
 
 ```javascript
-cube("Orders", {
-  sql: `SELECT * FROM orders`,
+cube(`orders`, {
+  sql_table: `orders`
 });
 ```
 
 ```yaml
 cubes:
-  - name: Orders
-    sql: SELECT * FROM orders
+  - name: orders
+    sql_table: orders
 ```
 
 </CodeTabs>
 
-The `sql` property of a cube is flexible enough to accommodate more complex SQL
-queries too:
+You can also use the [`sql` property][ref-schema-ref-sql] to accommodate more complex SQL queries:
 
 <CodeTabs>
 
 ```javascript
-cube("Orders", {
+cube(`orders`, {
   sql: `
-SELECT
-  *
-FROM
-  orders,
-  line_items
-WHERE
-  orders.id = line_items.order_id
-  `,
+    SELECT *
+    FROM orders, line_items
+    WHERE orders.id = line_items.order_id
+  `
 });
 ```
 
 ```yaml
 cubes:
-  - name: Orders
+  - name: orders
     sql: >
       SELECT *
-      FROM
-        orders,
-        line_items
-      WHERE
-        orders.id = line_items.order_id
+      FROM orders, line_items
+      WHERE orders.id = line_items.order_id
 ```
 
 </CodeTabs>
@@ -95,20 +87,23 @@ cubes:
 
 Dimensions represent the properties of a **single** data point in the cube.
 [The `orders` table](#top) contains only dimensions, so representing them in the
-`Orders` cube is straightforward:
+`orders` cube is straightforward:
 
 <CodeTabs>
 
 ```javascript
-cube("Orders", {
+cube(`orders`, {
+  // ...
+
   dimensions: {
     id: {
       sql: `id`,
       type: `number`,
       // Here we explicitly let Cube know this field is the primary key
       // This is required for de-duplicating results when using joins
-      primaryKey: true,
+      primary_key: true,
     },
+
     status: {
       sql: `status`,
       type: `string`,
@@ -119,7 +114,8 @@ cube("Orders", {
 
 ```yaml
 cubes:
-  - name: Orders
+  - name: orders
+    # ...
 
     dimensions:
       - name: id
@@ -128,6 +124,7 @@ cubes:
         # Here we explicitly let Cube know this field is the primary key
         # This is required for de-duplicating results when using joins
         primary_key: true
+
       - name: status
         sql: status
         type: string
@@ -141,14 +138,16 @@ represented as follows:
 <CodeTabs>
 
 ```javascript
-cube("LineItems", {
+cube(`line_items`, {
+  // ...
+
   dimensions: {
     id: {
       sql: `id`,
       type: `number`,
       // Again, we explicitly let Cube know this field is the primary key
       // This is required for de-duplicating results when using joins
-      primaryKey: true,
+      primary_key: true,
     },
 
     order_id: {
@@ -161,7 +160,8 @@ cube("LineItems", {
 
 ```yaml
 cubes:
-  - name: LineItems
+  - name: line_items
+    # ...
 
     dimensions:
       - name: id
@@ -170,6 +170,7 @@ cubes:
         # Again, we explicitly let Cube know this field is the primary key
         # This is required for de-duplicating results when using joins
         primary_key: true
+
       - name: order_id
         sql: order_id
         type: number
@@ -191,7 +192,9 @@ We can add the necessary time dimensions to both data models as follows:
 <CodeTabs>
 
 ```javascript
-cube("Orders", {
+cube(`orders`, {
+  // ...
+
   dimensions: {
     created_at: {
       sql: `created_at`,
@@ -208,13 +211,16 @@ cube("Orders", {
 
 ```yaml
 cubes:
-  - name: Orders
+  - name: orders
+    # ...
+
     dimensions:
       - name: created_at
-        sql: "created_at"
+        sql: created_at
         type: time
+
       - name: completed_at
-        sql: "completed_at"
+        sql: completed_at
         type: time
 ```
 
@@ -223,7 +229,9 @@ cubes:
 <CodeTabs>
 
 ```javascript
-cube("LineItems", {
+cube(`line_items`, {
+  // ...
+
   dimensions: {
     created_at: {
       sql: `created_at`,
@@ -235,7 +243,9 @@ cube("LineItems", {
 
 ```yaml
 cubes:
-  - name: LineItems
+  - name: line_items
+    # ...
+
     dimensions:
       - name: created_at
         sql: created_at
@@ -251,13 +261,15 @@ Time dimensions are essential to enabling performance boosts such as
 ## Measures
 
 Measures represent the properties of a **set of data points** in the cube. To
-add a measure called `count` to our `Orders` cube, for example, we can do the
+add a measure called `count` to our `orders` cube, for example, we can do the
 following:
 
 <CodeTabs>
 
 ```javascript
-cube("Orders", {
+cube(`orders`, {
+  // ...
+
   measures: {
     count: {
       type: `count`,
@@ -268,7 +280,9 @@ cube("Orders", {
 
 ```yaml
 cubes:
-  - name: Orders
+  - name: orders
+    # ...
+
     measures:
       - name: count
         type: count
@@ -282,7 +296,9 @@ of line items sold:
 <CodeTabs>
 
 ```javascript
-cube("LineItems", {
+cube(`line_items`, {
+  // ...
+
   measures: {
     total: {
       sql: `price`,
@@ -294,7 +310,9 @@ cube("LineItems", {
 
 ```yaml
 cubes:
-  - name: LineItems
+  - name: line_items
+    # ...
+
     measures:
       - name: total
         sql: price
@@ -319,19 +337,21 @@ filter for `IS NOT NULL` on the required column.
 
 </InfoBox>
 
-In the following example, we are left-joining the `LineItems` cube onto our
-`Orders` cube:
+In the following example, we are left-joining the `line_items` cube onto our
+`orders` cube:
 
 <CodeTabs>
 
 ```javascript
-cube("Orders", {
+cube(`orders`, {
+  // ...
+
   joins: {
-    LineItems: {
+    line_items: {
       relationship: `many_to_one`,
       // Here we use the `CUBE` global to refer to the current cube,
-      // so the following is equivalent to `Orders.id = LineItems.order_id`
-      sql: `${CUBE}.id = ${LineItems.order_id}`,
+      // so the following is equivalent to `orders.id = line_items.order_id`
+      sql: `${CUBE}.id = ${line_items.order_id}`,
     },
   },
 });
@@ -339,12 +359,14 @@ cube("Orders", {
 
 ```yaml
 cubes:
-  - name: Orders
+  - name: orders
+    # ...
+
     joins:
-      - name: LineItems
+      - name: line_items
         # Here we use the `CUBE` global to refer to the current cube,
-        # so the following is equivalent to `Orders.id = LineItems.order_id`
-        sql: "{CUBE}.id = {LineItems.order_id}"
+        # so the following is equivalent to `orders.id = line_items.order_id`
+        sql: "{CUBE}.id = {line_items.order_id}"
         relationship: many_to_one
 ```
 
@@ -365,7 +387,9 @@ following:
 <CodeTabs>
 
 ```javascript
-cube("Orders", {
+cube(`orders`, {
+  // ...
+
   segments: {
     only_completed: {
       sql: `${CUBE}.status = 'completed'`,
@@ -376,7 +400,9 @@ cube("Orders", {
 
 ```yaml
 cubes:
-  - name: Orders
+  - name: orders
+    # ...
+
     segments:
       - name: only_completed
         sql: "{CUBE}.status = 'completed'"
@@ -384,22 +410,24 @@ cubes:
 
 </CodeTabs>
 
-## Pre-Aggregations
+## Pre-aggregations
 
 Pre-aggregations are a powerful way of caching frequently-used, expensive
 queries and keeping the cache up-to-date on a periodic basis. Within a data
-schema, they are defined under the `preAggregations` property:
+schema, they are defined under the `pre_aggregations` property:
 
 <CodeTabs>
 
 ```javascript
-cube("Orders", {
-  preAggregations: {
+cube(`orders`, {
+  // ...
+
+  pre_aggregations: {
     main: {
       measures: [CUBE.count],
       dimensions: [CUBE.status],
       timeDimension: CUBE.created_at,
-      granularity: "day",
+      granularity: `day`,
     },
   },
 });
@@ -407,11 +435,15 @@ cube("Orders", {
 
 ```yaml
 cubes:
-  - name: Orders
+  - name: orders
+    # ...
+
     pre_aggregations:
       - name: main
-        measures: [CUBE.count]
-        dimensions: [CUBE.status]
+        measures:
+          - count
+        dimensions:
+          - status
         time_dimension: created_at
         granularity: day
 ```
@@ -429,6 +461,7 @@ Pre-Aggregations][ref-caching-preaggs-intro].
 [ref-schema-measure-types]: /schema/reference/types-and-formats#measures-types
 [ref-schema-ref-joins-types]: /schema/reference/joins#relationship
 [ref-schema-ref-sql]: /schema/reference/cube#sql
+[ref-schema-ref-sql-table]: /schema/reference/cube#sql-table
 [ref-tutorial-incremental-preagg]: /incremental-pre-aggregations
 [self-dimensions]: #dimensions
 [self-measures]: #measures

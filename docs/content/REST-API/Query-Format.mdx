@@ -14,7 +14,7 @@ dimension `email` in the Cube `Users` would have the name `Users.email`.
 
 In the case of dimension of type `time` granularity could be optionally added to
 the name, in the following format `CUBE_NAME.TIME_DIMENSION_NAME.GRANULARITY`,
-ex: `Stories.time.month`.
+ex: `stories.time.month`.
 
 Supported granularities: `second`, `minute`, `hour`, `day`, `week`, `month`,
 `quarter` and `year`.
@@ -68,27 +68,31 @@ A Query has the following properties:
   measures without aggregation and time dimensions will be truncated as usual
   however not grouped by.
 
-```javascript
+```json
 {
-  measures: ['Stories.count'],
-  dimensions: ['Stories.category'],
-  filters: [{
-    member: 'Stories.isDraft',
-    operator: 'equals',
-    values: ['No']
-  }],
-  timeDimensions: [{
-    dimension: 'Stories.time',
-    dateRange: ['2015-01-01', '2015-12-31'],
-    granularity: 'month'
-  }],
-  limit: 100,
-  offset: 50,
-  order: {
-    'Stories.time': 'asc',
-    'Stories.count': 'desc'
+  "measures": ["stories.count"],
+  "dimensions": ["stories.category"],
+  "filters": [
+    {
+      "member": "stories.isDraft",
+      "operator": "equals",
+      "values": ["No"]
+    }
+  ],
+  "timeDimensions": [
+    {
+      "dimension": "stories.time",
+      "dateRange": ["2015-01-01", "2015-12-31"],
+      "granularity": "month"
+    }
+  ],
+  "limit": 100,
+  "offset": 50,
+  "order": {
+    "stories.time": "asc",
+    "stories.count": "desc"
   },
-  timezone: 'America/Los_Angeles'
+  "timezone": "America/Los_Angeles"
 }
 ```
 
@@ -107,15 +111,13 @@ default using the following rules:
 Also you can control the ordering of the `order` specification, Cube support
 alternative order format - array of tuples:
 
-```javascript
+```json
 {
-  ...,
-  order: [
-      ['Stories.time', 'asc'],
-      ['Stories.count', 'asc']
+  "order": [
+      ["stories.time", "asc"],
+      ["stories.count", "asc"]
     ]
-  },
-  ...
+  }
 }
 ```
 
@@ -124,7 +126,7 @@ alternative order format - array of tuples:
 A filter is a Javascript object with the following properties:
 
 - `member`: Dimension or measure to be used in the filter, for example:
-  `Stories.isDraft`. See below on difference between filtering dimensions vs
+  `stories.isDraft`. See below on difference between filtering dimensions vs
   filtering measures.
 - `operator`: An operator to be used in the filter. Only some operators are
   available for measures. For dimensions the available operators depend on the
@@ -154,11 +156,11 @@ Use it when you need an exact match. It supports multiple values.
 - Applied to measures.
 - Dimension types: `string`, `number`, `time`.
 
-```javascript
+```json
 {
-  member: "Users.country",
-  operator: "equals",
-  values: ["US", "Germany", "Israel"]
+  "member": "users.country",
+  "operator": "equals",
+  "values": ["US", "Germany", "Israel"]
 }
 ```
 
@@ -169,11 +171,11 @@ The opposite operator of `equals`. It supports multiple values.
 - Applied to measures.
 - Dimension types: `string`, `number`, `time`.
 
-```javascript
+```json
 {
-  member: "Users.country",
-  operator: "notEquals",
-  values: ["France"]
+  "member": "users.country",
+  "operator": "notEquals",
+  "values": ["France"]
 }
 ```
 
@@ -187,7 +189,7 @@ surrounded by `%`. It supports multiple values.
 
 ```json
 {
-  "member": "Posts.title",
+  "member": "posts.title",
   "operator": "contains",
   "values": ["serverless", "aws"]
 }
@@ -199,22 +201,22 @@ The opposite operator of `contains`. It supports multiple values.
 
 - Dimension types: `string`.
 
-```javascript
+```json
 {
-  member: "Posts.title",
-  operator: "notContains",
-  values: ["ruby"]
+  "member": "posts.title",
+  "operator": "notContains",
+  "values": ["ruby"]
 }
 ```
 
-This opertor adds `IS NULL` check to include `NULL` values unless you add `null`
-to `values`. For example:
+This operator adds `IS NULL` check to include `NULL` values unless you add
+`null` to `values`. For example:
 
-```javascript
+```json
 {
-  member: "Posts.title",
-  operator: "notContains",
-  values: ["ruby", null]
+  "member": "posts.title",
+  "operator": "notContains",
+  "values": ["ruby", null]
 }
 ```
 
@@ -226,11 +228,11 @@ operator with `%` at the start of each value. It supports multiple values.
 
 - Dimension types: `string`.
 
-```javascript
+```json
 {
-  member: "Posts.title",
-  operator: "startsWith",
-  values: ["ruby"]
+  "member": "posts.title",
+  "operator": "startsWith",
+  "values": ["ruby"]
 }
 ```
 
@@ -242,11 +244,11 @@ at the end. In the majority of SQL backends, it uses the `ILIKE` operator with
 
 - Dimension types: `string`.
 
-```javascript
+```json
 {
-  member: "Posts.title",
-  operator: "endsWith",
-  values: ["ruby"]
+  "member": "posts.title",
+  "operator": "endsWith",
+  "values": ["ruby"]
 }
 ```
 
@@ -258,11 +260,11 @@ of type `number`.
 - Applied to measures.
 - Dimension types: `number`.
 
-```javascript
+```json
 {
-  member: "Posts.upvotesCount",
-  operator: "gt",
-  values: ["100"]
+  "member": "posts.upvotes_count",
+  "operator": "gt",
+  "values": ["100"]
 }
 ```
 
@@ -274,11 +276,11 @@ or dimensions of type `number`.
 - Applied to measures.
 - Dimension types: `number`.
 
-```javascript
+```json
 {
-  member: "Posts.upvotesCount",
-  operator: "gte",
-  values: ["100"]
+  "member": "posts.upvotes_count",
+  "operator": "gte",
+  "values": ["100"]
 }
 ```
 
@@ -290,11 +292,11 @@ type `number`.
 - Applied to measures.
 - Dimension types: `number`.
 
-```javascript
+```json
 {
-  member: "Posts.upvotesCount",
-  operator: "lt",
-  values: ["10"]
+  "member": "posts.upvotes_count",
+  "operator": "lt",
+  "values": ["10"]
 }
 ```
 
@@ -306,11 +308,11 @@ dimensions of type `number`.
 - Applied to measures.
 - Dimension types: `number`.
 
-```javascript
+```json
 {
-  member: "Posts.upvotesCount",
-  operator: "lte",
-  values: ["10"]
+  "member": "posts.upvotes_count",
+  "operator": "lte",
+  "values": ["10"]
 }
 ```
 
@@ -322,10 +324,10 @@ don't need to pass `values` for this operator.
 - Applied to measures.
 - Dimension types: `number`, `string`, `time`.
 
-```javascript
+```json
 {
-  member: "Posts.authorName",
-  operator: "set"
+  "member": "posts.author_name",
+  "operator": "set"
 }
 ```
 
@@ -337,10 +339,10 @@ An opposite to the `set` operator. It checks whether the value of the member
 - Applied to measures.
 - Dimension types: `number`, `string`, `time`.
 
-```javascript
+```json
 {
-  member: "Posts.authorName",
-  operator: "notSet"
+  "member": "posts.author_name",
+  "operator": "notSet"
 }
 ```
 
@@ -363,16 +365,16 @@ date range. The values must be an array of dates with the following format
 'YYYY-MM-DD'. If only one date specified the filter would be set exactly to this
 date.
 
-There is a convient way to use date filters with grouping -
-[learn more about timeDimensions query property here](#time-dimensions-format)
+There is a convenient way to use date filters with grouping -
+[learn more about the `timeDimensions` property here](#time-dimensions-format)
 
 - Dimension types: `time`.
 
-```javascript
+```json
 {
-  member: "Posts.time",
-  operator: "inDateRange",
-  values: ['2015-01-01', '2015-12-31']
+  "member": "posts.time",
+  "operator": "inDateRange",
+  "values": ["2015-01-01", "2015-12-31"]
 }
 ```
 
@@ -393,11 +395,11 @@ dates. The values format is the same as for `inDateRange`.
 
 - Dimension types: `time`.
 
-```javascript
+```json
 {
-  member: "Posts.time",
-  operator: "notInDateRange",
-  values: ['2015-01-01', '2015-12-31']
+  "member": "posts.time",
+  "operator": "notInDateRange",
+  "values": ["2015-01-01", "2015-12-31"]
 }
 ```
 
@@ -413,16 +415,16 @@ just missing the filtered time dimension in
 
 </WarningBox>
 
-Use it when you want to retreive all results before some specific date. The
+Use it when you want to retrieve all results before some specific date. The
 values should be an array of one element in `YYYY-MM-DD` format.
 
 - Dimension types: `time`.
 
-```javascript
+```json
 {
-  member: "Posts.time",
-  operator: "beforeDate",
-  values: ['2015-01-01']
+  "member": "posts.time",
+  "operator": "beforeDate",
+  "values": ["2015-01-01"]
 }
 ```
 
@@ -442,11 +444,11 @@ The same as `beforeDate`, but is used to get all results after a specific date.
 
 - Dimension types: `time`.
 
-```javascript
+```json
 {
-  member: "Posts.time",
-  operator: "afterDate",
-  values: ['2015-01-01']
+  "member": "posts.time",
+  "operator": "afterDate",
+  "values": ["2015-01-01"]
 }
 ```
 
@@ -478,29 +480,29 @@ only one of the following properties:
 - `or` An array with one or more filters or other logical operators
 - `and` An array with one or more filters or other logical operators
 
-```javascript
+```json
 {
-  or: [
+  "or": [
     {
-      member: 'visitors.source',
-      operator: 'equals',
-      values: ['some'],
+      "member": "visitors.source",
+      "operator": "equals",
+      "values": ["some"]
     },
     {
-      and: [
+      "and": [
         {
-          member: 'visitors.source',
-          operator: 'equals',
-          values: ['other'],
+          "member": "visitors.source",
+          "operator": "equals",
+          "values": ["other"]
         },
         {
-          member: 'visitor_checkins.cardsCount',
-          operator: 'equals',
-          values: ['0'],
-        },
-      ],
-    },
-  ];
+          "member": "visitor_checkins.cards_count",
+          "operator": "equals",
+          "values": ["0"]
+        }
+      ]
+    }
+  ]
 }
 ```
 
@@ -531,14 +533,16 @@ provides a convenient shortcut to pass a dimension and a filter as a
   If you pass `null` to the granularity, Cube will only perform filtering by a
   specified time dimension, without grouping.
 
-```javascript
+```json
 {
-  measures: ['Stories.count'],
-  timeDimensions: [{
-    dimension: 'Stories.time',
-    dateRange: ['2015-01-01', '2015-12-31'],
-    granularity: 'month'
-  }]
+  "measures": ["stories.count"],
+  "timeDimensions": [
+    {
+      "dimension": "stories.time",
+      "dateRange": ["2015-01-01", "2015-12-31"],
+      "granularity": "month"
+    }
+  ]
 }
 ```
 
@@ -549,17 +553,16 @@ two or more date ranges where each of them is in the same format as a
 
 ```javascript
 // ...
-const resultSet = cubejsApi.load({
-  measures: ['Stories.count'],
+const resultSet = await cubejsApi.load({
+  measures: ["stories.count"],
   timeDimensions: [
     {
-      dimension: 'Stories.time',
-      compareDateRange: ['this week', ['2020-05-21', '2020-05-28']],
-      granularity: 'month',
+      dimension: "stories.time",
+      compareDateRange: ["this week", ["2020-05-21", "2020-05-28"]],
+      granularity: "month",
     },
   ],
 });
-// ...
 ```
 
 ### <--{"id" : "Time Dimension Format"}--> Relative date range
@@ -567,17 +570,16 @@ const resultSet = cubejsApi.load({
 You can also use a string with a relative date range in the `dateRange`
 property, for example:
 
-```javascript
+```json
 {
-  measures: [
-    'stories.count'
-  ],
-  timeDimensions: [{
-    dimension: 'stories.time',
-    // Relative date range
-    dateRange: 'last week',
-    granularity: 'day'
-  }]
+  "measures": ["stories.count"],
+  "timeDimensions": [
+    {
+      "dimension": "stories.time",
+      "dateRange": "last week",
+      "granularity": "day"
+    }
+  ]
 }
 ```
 

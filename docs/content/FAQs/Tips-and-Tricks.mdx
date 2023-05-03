@@ -54,7 +54,7 @@ module.exports = {
       throw new Error('No id found in Security Context!');
     } else {
       query.filters.push({
-        member: 'Orders.tenantId',
+        member: 'orders.tenant_id',
         operator: 'equals',
         values: [securityContext.tenantId],
       });
@@ -99,7 +99,7 @@ module.exports = {
       throw new Error('No id found in Security Context!');
     } else {
       query.filters.push({
-        member: 'Orders.tenantId',
+        member: 'orders.tenant_id',
         operator: 'equals',
         values: [securityContext.tenantId],
       });

@@ -40,38 +40,65 @@ layer][ref-caching-preaggs-cubestore].
 ## Pre-Aggregations without Time Dimension
 
 To illustrate pre-aggregations with an example, let's use a sample e-commerce
-database. We have a data model representing all our `Orders`:
+database. We have a data model representing all our `orders`:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    sql_table: orders
+
+    measures:
+      - name: count
+        type: count
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: status
+        sql: status
+        type: string
+
+      - name: completed_at
+        sql: completed_at
+        type: time
+```
 
 ```javascript
-cube(`Orders`, {
-  sql: `SELECT * FROM public.orders`,
+cube(`orders`, {
+  sql_table: `orders`,
 
   measures: {
     count: {
       type: `count`,
-      drillMembers: [id, createdAt],
     },
   },
 
   dimensions: {
+    id: {
+      sql: `id`,
+      type: `number`,
+      primary_key: true,
+    },
+
     status: {
       sql: `status`,
       type: `string`,
     },
 
-    id: {
-      sql: `id`,
-      type: `number`,
-      primaryKey: true,
-    },
-
-    completedAt: {
+    completed_at: {
       sql: `completed_at`,
       type: `time`,
     },
   },
 });
 ```
+
+</CodeTabs>
 
 Some sample data from this table might look like:
 
@@ -89,20 +116,38 @@ might look something like:
 
 ```json
 {
-  "dimensions": ["Orders.status"]
+  "dimensions": ["orders.status"]
 }
 ```
 
+In that case, we can add the following pre-aggregation to the `orders` cube:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    pre_aggregations:
+      - name: order_statuses
+        dimensions:
+          - status
+```
+
 ```javascript
-cube(`Orders`, {
-  // Same content as before, but including the following:
-  preAggregations: {
-    orderStatuses: {
+cube(`orders`, {
+  // ...
+
+  pre_aggregations: {
+    order_statuses: {
       dimensions: [status],
     },
   },
 });
 ```
+
+</CodeTabs>
 
 ## Pre-Aggregations with Time Dimension
 
@@ -112,26 +157,44 @@ performing poorly. This query might look something like:
 
 ```json
 {
-  "measures": ["Orders.count"],
-  "timeDimensions": ["Orders.completedAt"]
+  "measures": ["orders.count"],
+  "timeDimensions": ["orders.completed_at"]
 }
 ```
 
 In order to improve the performance of this query, we can add another
-pre-aggregation definition to the `Orders` cube:
+pre-aggregation definition to the `orders` cube:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    pre_aggregations:
+      - name: orders_by_completed_at
+        measures:
+          - count
+        time_dimension: completed_at
+        granularity: month
+```
 
 ```javascript
-cube(`Orders`, {
-  // Same content as before, but including the following:
-  preAggregations: {
-    ordersByCompletedAt: {
+cube(`orders`, {
+  // ...
+
+  pre_aggregations: {
+    orders_by_completed_at: {
       measures: [count],
-      timeDimension: completedAt,
+      time_dimension: completed_at,
       granularity: `month`,
     },
   },
 });
 ```
+
+</CodeTabs>
 
 Note that we have added a `granularity` property with a value of `month` to this
 definition. This allows Cube to aggregate the dataset to a single entry for each
@@ -161,7 +224,7 @@ Cube selects the best available pre-aggregation based on the incoming queries it
 receives via the API. The process for selection is summarized below:
 
 1. Are all measures of type `count`, `sum`, `min`, `max` or
-   `countDistinctApprox`?
+   `count_distinct_approx`?
 
 2. If yes, then check if
 
@@ -186,17 +249,44 @@ data. However, there are some rules that apply when Cube uses the
 pre-aggregation. The **additivity** of fields specified in both the query and in
 the pre-aggregation determines this.
 
-So what is additivity? Let's add another cube called `LineItems` to the previous
-example to demonstrate. The `LineItems` **belong to** the `Orders` cube, and are
+So what is additivity? Let's add another cube called `line_items` to the previous
+example to demonstrate. Many `line_items` can belong to any order from the `orders` cube, and are
 [joined][ref-schema-joins] as such:
 
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: line_items
+    sql_table: line_items
+
+    joins:
+      - name: orders
+        sql: "{CUBE}.order_id = {orders.id}"
+        relationship: many_to_one
+
+    measures:
+      - name: count
+        type: count
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: created_at
+        sql: created_at
+        type: time
+```
+
 ```javascript
-cube(`LineItems`, {
-  sql: `SELECT * FROM public.line_items`,
+cube(`line_items`, {
+  sql_table: `line_items`,
 
   joins: {
-    Orders: {
-      sql: `${CUBE}.order_id = ${Orders.id}`,
+    orders: {
+      sql: `${CUBE}.order_id = ${orders.id}`,
       relationship: `many_to_one`,
     },
   },
@@ -204,7 +294,6 @@ cube(`LineItems`, {
   measures: {
     count: {
       type: `count`,
-      drillMembers: [id, createdAt],
     },
   },
 
@@ -212,16 +301,18 @@ cube(`LineItems`, {
     id: {
       sql: `id`,
       type: `number`,
-      primaryKey: true,
+      primary_key: true,
     },
 
-    createdAt: {
+    created_at: {
       sql: `created_at`,
       type: `time`,
     },
   },
 });
 ```
+
+</CodeTabs>
 
 Some sample data from the `line_items` table might look like:
 
@@ -245,33 +336,61 @@ fields and still get a correct result:
 | 2021-01-22 00:00:00.000000 | 13           | 150       |
 
 This means that `quantity` and `price` are both **additive measures**, and we
-can represent them in the `LineItems` cube as follows:
+can represent them in the `line_items` cube as follows:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: line_items
+    # ...
+
+    measures:
+      # ...
+
+      - name: quantity
+        sql: quantity
+        type: sum
+
+      - name: price
+        type: sum
+        sql: price
+        format: currency
+  
+    # ...
+```
 
 ```javascript
-cube(`LineItems`, {
-  ...,
+cube(`line_items`, {
+  // ...
+
   measures: {
-    ...,
+    // ...
+
     quantity: {
       sql: `quantity`,
       type: `sum`,
     },
+
     price: {
       type: `sum`,
       sql: `price`,
       format: `currency`,
     },
   },
-  ...,
+  
+  // ...
 });
 ```
 
+</CodeTabs>
+
 Because neither `quantity` and `price` reference any other measures in our
-`LineItems` cube, we can also say that they are **additive leaf measures**. Any
+`line_items` cube, we can also say that they are **additive leaf measures**. Any
 query requesting only these two measures can be called a **leaf measure
 additive** query. Additive leaf measures can only be of the following
 [types][ref-schema-types-measure]: `count`, `sum`, `min`, `max` or
-`countDistinctApprox`.
+`count_distinct_approx`.
 
 [ref-schema-types-measure]: /types-and-formats#measures-types
 
@@ -342,38 +461,83 @@ cannot treat the `profit_margin` column the same as we would any other additive
 measure. Armed with the above knowledge, we can add the `profit_margin` field to
 our cube **as a [dimension][ref-schema-dims]**:
 
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: line_items
+    # ...
+  
+    dimensions:
+      # ...
+
+      - name: profit_margin
+        sql: profit_margin
+        type: number
+        format: percent
+
+    # ...
+```
+
 ```javascript
-cube(`LineItems`, {
-  ...,
+cube(`line_items`, {
+  // ...
+  
   dimensions: {
-    ...,
-    profitMargin: {
+    // ...
+
+    profit_margin: {
       sql: `profit_margin`,
       type: `number`,
       format: 'percentage',
     },
   },
-  ...,
+
+  // ...
 });
 ```
+
+</CodeTabs>
 
 Another approach might be to calculate the profit margin dynamically, and
 instead saving the "cost" price. Because the cost price is an additive measure,
 we are able to store it in a pre-aggregation:
 
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: line_items
+    # ...
+
+    measures:
+      # ...
+
+      - name: cost
+        sql: "{CUBE.price} / (1 + {CUBE.profit_margin}"
+        type: sum
+
+    # ...
+```
+
 ```javascript
-cube(`LineItems`, {
-  ...,
+cube(`line_items`, {
+  // ...
+
   measures: {
-    ...,
+    // ...
+
     cost: {
-      sql: `${CUBE.price} / (1 + ${CUBE.profitMargin})`,
+      sql: `${CUBE.price} / (1 + ${CUBE.profit_margin})`,
       type: `sum`,
     },
   },
-  ...,
+
+  // ...
 });
 ```
+
+</CodeTabs>
 
 Another example of a non-additive measure would be a distinct count of
 `product_id`. If we took the distinct count of products sold over a month, and
@@ -381,43 +545,96 @@ then tried to sum the distinct count of products for each individual day and
 compared them, we would not get the same results. We can add the measure like
 this:
 
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: line_items
+    # ...
+
+    measures:
+      # ...
+
+      - name: count_distinct_products
+        sql: product_id
+        type: count_distinct
+
+    # ...
+```
+
 ```javascript
-cube(`LineItems`, {
-  ...,
+cube(`line_items`, {
+  // ...
+
   measures: {
-    ...,
-    countDistinctProducts: {
+    // ...
+
+    count_distinct_products: {
       sql: `product_id`,
-      type: `countDistinct`,
+      type: `count_distinct`,
     },
   },
-  ...,
+
+  // ...
 });
 ```
+
+</CodeTabs>
 
 However the above cannot be used in for a pre-aggregation. We can instead change
-the `type` to `countDistinctApprox`, and then use the measure in a
+the `type` to `count_distinct_approx`, and then use the measure in a
 pre-aggregation definition:
 
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: line_items
+    # ...
+
+    measures:
+      # ...
+
+      - name: count_distinct_products
+        sql: product_id
+        type: count_distinct_approx
+
+    pre_aggregations:
+      - name: my_rollup
+        # ...
+
+        measures:
+          - count_distinct_products
+
+    # ...
+```
+
 ```javascript
-cube(`LineItems`, {
-  ...,
+cube(`line_items`, {
+  // ...
+
   measures: {
-    ...,
-    countDistinctProducts: {
+    // ...
+
+    count_distinct_products: {
       sql: `product_id`,
-      type: `countDistinctApprox`,
+      type: `count_distinct_approx`,
     },
   },
-  preAggregations: {
-    myRollup: {
-      ...,
-      measures: [ CUBE.countDistinctProducts ],
+
+  pre_aggregations: {
+    my_rollup: {
+      // ...
+
+      measures: [ count_distinct_products ],
     }
   },
-  ...,
+
+  // ...
 });
 ```
+
+</CodeTabs>
 
 ### <--{"id" : "Ensuring pre-aggregations are targeted by queries"}--> Selecting the pre-aggregation
 
@@ -434,7 +651,7 @@ To recap what we've learnt so far:
   measures in their definition
 
 - A query is **leaf measure additive** if all of its leaf measures are one of:
-  `count`, `sum`, `min`, `max` or `countDistinctApprox`
+  `count`, `sum`, `min`, `max` or `count_distinct_approx`
 
 Cube looks for matching pre-aggregations in the order they are defined in a
 cube's data model file. Each defined pre-aggregation is then tested for a match
@@ -473,11 +690,11 @@ Some extra considerations for pre-aggregation selection:
   measures and dimensions of any cubes specified in the query are checked to
   find a matching `rollup`.
 
-- `rollup` pre-aggregations **always** have priority over `originalSql`. Thus,
-  if you have both `originalSql` and `rollup` defined, Cube will try to match
-  `rollup` pre-aggregations before trying to match `originalSql`. You can
+- `rollup` pre-aggregations **always** have priority over `original_sql`. Thus,
+  if you have both `original_sql` and `rollup` defined, Cube will try to match
+  `rollup` pre-aggregations before trying to match `original_sql`. You can
   instruct Cube to use the original SQL pre-aggregations by using
-  [`useOriginalSqlPreAggregations`][ref-schema-preaggs-origsql].
+  [`use_original_sql_pre_aggregations`][ref-schema-preaggs-origsql].
 
 [ref-caching-preaggs-cubestore]:
   /caching/using-pre-aggregations#pre-aggregations-storage

@@ -12,6 +12,7 @@ exposed through the [querying API][ref-backend-restapi] that allows end-users to
 query a wide variety of analytical queries without modifying the data model
 itself.
 
+
 Let’s use a users table with the following columns as an example:
 
 | id  | paying | city          | company_name |
@@ -36,22 +37,22 @@ allows building well-organized and reusable SQL.
 
 In Cube, [cubes][ref-schema-cube] are used to organize entities and connections
 between entities. Usually one cube is created for each table in the database,
-such as `users`, `orders`, `products`, etc. In the `sql` parameter of the cube
+such as `users`, `orders`, `products`, etc. In the `sql_table` parameter of the cube
 we define a base table for this cube. In our case, the base table is simply our
 `users` table.
 
 <CodeTabs>
 
 ```javascript
-cube(`Users`, {
-  sql: `SELECT * FROM users`,
+cube(`users`, {
+  sql_table: `users`,
 });
 ```
 
 ```yaml
 cubes:
-  - name: Users
-    sql: SELECT * FROM users
+  - name: users
+    sql_table: users
 ```
 
 </CodeTabs>
@@ -77,8 +78,8 @@ Let's go ahead and create our first measure and two dimensions:
 <CodeTabs>
 
 ```javascript
-cube(`Users`, {
-  sql: `SELECT * FROM users`,
+cube(`users`, {
+  sql_table: `users`,
 
   measures: {
     count: {
@@ -103,16 +104,19 @@ cube(`Users`, {
 
 ```yaml
 cubes:
-  - name: Users
-    sql: SELECT * FROM users
+  - name: users
+    sql_table: users
+
     measures:
       - name: count
         sql: id
         type: count
+
     dimensions:
       - name: city
         sql: city
         type: string
+
       - name: company_name
         sql: company_name
         type: string
@@ -121,20 +125,23 @@ cubes:
 </CodeTabs>
 
 Let's break down the above code snippet piece-by-piece. After defining the base
-table for the cube (with the `sql` property), we create a `count` measure in the
-`measures` block. [The type][ref-schema-types-formats] `count` and sql `id`
+table for the cube (with the `sql_table` property), we create a `count` measure in the
+`measures` block. The `count` [type][ref-schema-types-formats] and sql `id`
 means that when this measure will be requested via an API, Cube will generate
 and execute the following SQL:
 
 ```sql
-SELECT count(id) from users;
+SELECT COUNT(id) AS count
+FROM users;
 ```
 
 When we apply a city dimension to the measure to see "Where are users based?",
 Cube will generate SQL with a `GROUP BY` clause:
 
 ```sql
-SELECT city, count(id) from users GROUP BY 1;
+SELECT city, COUNT(id) AS count
+FROM users
+GROUP BY 1;
 ```
 
 You can add as many dimensions as you want to your query when you perform
@@ -148,7 +155,7 @@ accomplish this, we will introduce **measure filters**:
 <CodeTabs>
 
 ```javascript
-cube(`Users`, {
+cube(`users`, {
   measures: {
     count: {
       sql: `id`,
@@ -161,21 +168,27 @@ cube(`Users`, {
       filters: [{ sql: `${CUBE}.paying = 'true'` }],
     },
   },
+
+  // ...
 });
 ```
 
 ```yaml
 cubes:
-  - name: Users
+  - name: users
+
     measures:
       - name: count
         sql: id
         type: count
+
       - name: paying_count
         sql: id
         type: count
         filters:
           - sql: "{CUBE}.paying = 'true'"
+
+    # ...
 ```
 
 </CodeTabs>
@@ -192,9 +205,9 @@ users. When this measure is requested, Cube will generate the following SQL:
 
 ```sql
 SELECT
-  count(
+  COUNT(
     CASE WHEN (users.paying = 'true') THEN users.id END
-  ) "users.paying_count"
+  ) AS paying_count
 FROM users
 ```
 
@@ -213,7 +226,7 @@ new measure to our cube called `paying_percentage`:
 <CodeTabs>
 
 ```javascript
-cube(`Users`, {
+cube(`users`, {
   measures: {
     count: {
       sql: `id`,
@@ -232,25 +245,32 @@ cube(`Users`, {
       format: `percent`,
     },
   },
+
+  // ...
 });
 ```
 
 ```yaml
 cubes:
-  - name: Users
+  - name: users
+
     measures:
       - name: count
         sql: id
         type: count
+
       - name: paying_count
         sql: id
         type: count
         filters:
           - sql: "{CUBE}.paying = 'true'"
+
       - name: paying_percentage
         sql: "100.0 * {paying_count} / {count}"
         type: number
         format: percent
+
+    # ...
 ```
 
 </CodeTabs>
@@ -262,9 +282,9 @@ measure via an API, the following SQL will be generated:
 
 ```sql
 SELECT
-  100.0 * count(
+  100.0 * COUNT(
     CASE WHEN (users.paying = 'true') THEN users.id END
-  ) / count(users.id) "users.paying_percentage"
+  ) / COUNT(users.id) AS paying_percentage
 FROM users
 ```
 

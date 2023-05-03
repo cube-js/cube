@@ -2,7 +2,7 @@ import { CancelablePromiseCancel, MaybeCancelablePromise } from '@cubejs-backend
 
 export type SaveCancelFn = <T>(promise: MaybeCancelablePromise<T>) => Promise<T>;
 
-export function cancelCombinator(fn) {
+export function cancelCombinator(fn: any) {
   const cancelFnArray: CancelablePromiseCancel[] = [];
 
   const saveCancelFn: SaveCancelFn = (promise) => {

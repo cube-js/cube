@@ -1,13 +1,45 @@
+/* eslint-disable no-use-before-define */
 import R from 'ramda';
-import { QueueDriverInterface, QueueDriverConnectionInterface } from '@cubejs-backend/base-driver';
+import {
+  QueueDriverInterface,
+  QueueDriverConnectionInterface,
+  QueueDriverOptions,
+  GetActiveAndToProcessResponse,
+  QueryDef,
+  QueryKeyHash,
+  QueryStageStateResponse,
+  QueryKey,
+  AddToQueueQuery,
+  AddToQueueOptions,
+  AddToQueueResponse,
+} from '@cubejs-backend/base-driver';
 
 import { BaseQueueDriver } from './BaseQueueDriver';
+import { RedisPool } from './RedisPool';
 
-/**
- * @implements {QueueDriverConnectionInterface}
- */
-export class RedisQueueDriverConnection {
-  constructor(driver, options) {
+// TODO: Use real type
+type AsyncRedisClient = any;
+
+interface RedisQueueDriverConnectionOptions extends QueueDriverOptions {
+  redisClient: AsyncRedisClient,
+}
+
+export class RedisQueueDriverConnection implements QueueDriverConnectionInterface {
+  protected readonly redisClient: AsyncRedisClient;
+
+  protected readonly driver: RedisQueueDriver;
+
+  protected readonly redisQueuePrefix: string;
+
+  protected readonly heartBeatTimeout: number;
+
+  protected readonly concurrency: number;
+
+  protected readonly getQueueEventsBus: any;
+
+  protected readonly continueWaitTimeout: number;
+
+  public constructor(driver: RedisQueueDriver, options: RedisQueueDriverConnectionOptions) {
     this.driver = driver;
     this.redisClient = options.redisClient;
     this.redisQueuePrefix = options.redisQueuePrefix;
@@ -17,11 +49,15 @@ export class RedisQueueDriverConnection {
     this.getQueueEventsBus = options.getQueueEventsBus;
   }
 
-  async getResultBlocking(queryKey) {
+  public getRedisClient() {
+    return this.redisClient;
+  }
+
+  public async getResultBlocking(queryKey) {
     return this.getResultBlockingByHash(this.redisHash(queryKey));
   }
 
-  async getResultBlockingByHash(queryKeyHash) {
+  public async getResultBlockingByHash(queryKeyHash) {
     // Double redisHash apply is being used here
     const resultListKey = this.resultListKey(queryKeyHash);
     if (!(await this.redisClient.hgetAsync([this.queriesDefKey(), queryKeyHash]))) {
@@ -35,13 +71,13 @@ export class RedisQueueDriverConnection {
     return result && JSON.parse(result[1]);
   }
 
-  async getResult(queryKey) {
+  public async getResult(queryKey) {
     const resultListKey = this.resultListKey(queryKey);
     const result = await this.redisClient.rpopAsync(resultListKey);
     return result && JSON.parse(result);
   }
 
-  async getQueriesToCancel() {
+  public async getQueriesToCancel() {
     return (
       await this.getStalledQueries()
     ).concat(
@@ -49,29 +85,22 @@ export class RedisQueueDriverConnection {
     );
   }
 
-  async getActiveAndToProcess() {
+  public async getActiveAndToProcess(): Promise<GetActiveAndToProcessResponse> {
     const active = await this.getActiveQueries();
     const toProcess = await this.getToProcessQueries();
 
     return [active, toProcess];
   }
 
-  /**
-   * Adds specified by the queryKey query to the queue, returns tuple
-   * with the operation result.
-   *
-   * @typedef {[added: number, _b: *, _c: *, toProcessLength: number, addedTime: number]} AddedTuple
-   *
-   * @param {number} keyScore
-   * @param {*} queryKey
-   * @param {number} orphanedTime
-   * @param {string} queryHandler (for the regular query is eq to 'query')
-   * @param {*} query
-   * @param {number} priority
-   * @param {*} options
-   * @returns {AddedTuple}
-   */
-  addToQueue(keyScore, queryKey, orphanedTime, queryHandler, query, priority, options) {
+  public async addToQueue(
+    keyScore: number,
+    queryKey: QueryKey,
+    orphanedTime: number,
+    queryHandler: string,
+    query: AddToQueueQuery,
+    priority: number,
+    options: AddToQueueOptions
+  ): Promise<AddToQueueResponse> {
     const data = {
       queryHandler,
       query,
@@ -106,15 +135,15 @@ export class RedisQueueDriverConnection {
     return tx.execAsync().then(result => [...result, data.addedToQueueTime]);
   }
 
-  getToProcessQueries() {
+  public getToProcessQueries() {
     return this.redisClient.zrangeAsync([this.toProcessRedisKey(), 0, -1]);
   }
 
-  getActiveQueries() {
+  public getActiveQueries() {
     return this.redisClient.zrangeAsync([this.activeRedisKey(), 0, -1]);
   }
 
-  async getQueryAndRemove(queryKey) {
+  public async getQueryAndRemove(queryKey: QueryKeyHash): Promise<[QueryDef]> {
     const [query, ...restResult] = await this.redisClient.multi()
       .hget([this.queriesDefKey(), this.redisHash(queryKey)])
       .zrem([this.activeRedisKey(), this.redisHash(queryKey)])
@@ -124,10 +153,11 @@ export class RedisQueueDriverConnection {
       .hdel([this.queriesDefKey(), this.redisHash(queryKey)])
       .del(this.queryProcessingLockKey(queryKey))
       .execAsync();
-    return [JSON.parse(query), ...restResult];
+
+    return [JSON.parse(query), ...restResult] as any;
   }
 
-  async cancelQuery(queryKey) {
+  public async cancelQuery(queryKey) {
     const [query] = await this.getQueryAndRemove(queryKey);
 
     if (this.getQueueEventsBus) {
@@ -145,7 +175,7 @@ export class RedisQueueDriverConnection {
     return query;
   }
 
-  async setResultAndRemoveQuery(queryKey, executionResult, processingId) {
+  public async setResultAndRemoveQuery(queryKey, executionResult, processingId) {
     try {
       await this.redisClient.watchAsync(this.queryProcessingLockKey(queryKey));
       const currentProcessId = await this.redisClient.getAsync(this.queryProcessingLockKey(queryKey));
@@ -178,49 +208,51 @@ export class RedisQueueDriverConnection {
     }
   }
 
-  getOrphanedQueries() {
+  public getOrphanedQueries() {
     return this.redisClient.zrangebyscoreAsync(
       [this.recentRedisKey(), 0, new Date().getTime()]
     );
   }
 
-  getStalledQueries() {
+  public getStalledQueries() {
     return this.redisClient.zrangebyscoreAsync(
       [this.heartBeatRedisKey(), 0, (new Date().getTime() - this.heartBeatTimeout * 1000)]
     );
   }
 
-  async getQueryStageState(onlyKeys) {
+  public async getQueryStageState(onlyKeys: boolean): Promise<QueryStageStateResponse> {
     let request = this.redisClient.multi()
       .zrange([this.activeRedisKey(), 0, -1])
       .zrange([this.toProcessRedisKey(), 0, -1]);
+
     if (!onlyKeys) {
       request = request.hgetall(this.queriesDefKey());
     }
+
     const [active, toProcess, allQueryDefs] = await request.execAsync();
-    return [active, toProcess, R.map(q => JSON.parse(q), allQueryDefs || {})];
+    const defs: Record<string, QueryDef> = R.map(q => JSON.parse(q), allQueryDefs || {});
+
+    return [active, toProcess, defs];
   }
 
-  async getQueryDef(queryKey) {
+  public async getQueryDef(queryKey) {
     const query = await this.redisClient.hgetAsync([this.queriesDefKey(), queryKey]);
     return JSON.parse(query);
   }
 
   /**
    * Updates heart beat for the processing query by its `queryKey`.
-   *
-   * @param {string} queryKey
    */
-  updateHeartBeat(queryKey) {
+  public async updateHeartBeat(queryKey) {
     return this.redisClient.zaddAsync([this.heartBeatRedisKey(), new Date().getTime(), this.redisHash(queryKey)]);
   }
 
-  async getNextProcessingId() {
+  public async getNextProcessingId() {
     const id = await this.redisClient.incrAsync(this.processingIdKey());
     return id && id.toString();
   }
 
-  async retrieveForProcessing(queryKey, processingId) {
+  public async retrieveForProcessing(queryKey, processingId) {
     try {
       const lockKey = this.queryProcessingLockKey(queryKey);
       await this.redisClient.watchAsync(lockKey);
@@ -262,7 +294,7 @@ export class RedisQueueDriverConnection {
     }
   }
 
-  async freeProcessingLock(queryKey, processingId, activated) {
+  public async freeProcessingLock(queryKey, processingId, activated) {
     try {
       const lockKey = this.queryProcessingLockKey(queryKey);
       await this.redisClient.watchAsync(lockKey);
@@ -284,7 +316,7 @@ export class RedisQueueDriverConnection {
     }
   }
 
-  async optimisticQueryUpdate(queryKey, toUpdate, processingId) {
+  public async optimisticQueryUpdate(queryKey, toUpdate, processingId) {
     try {
       let query = await this.getQueryDef(queryKey);
       for (let i = 0; i < 10; i++) {
@@ -313,66 +345,71 @@ export class RedisQueueDriverConnection {
     }
   }
 
-  release() {
+  public release() {
     return this.redisClient.quit();
   }
 
-  toProcessRedisKey() {
+  protected toProcessRedisKey() {
     return this.queueRedisKey('QUEUE');
   }
 
-  recentRedisKey() {
+  protected recentRedisKey() {
     return this.queueRedisKey('RECENT');
   }
 
-  activeRedisKey() {
+  protected activeRedisKey() {
     return this.queueRedisKey('ACTIVE');
   }
 
-  heartBeatRedisKey() {
+  protected heartBeatRedisKey() {
     return this.queueRedisKey('HEART_BEAT');
   }
 
-  queryRedisKey(queryKey, suffix) {
+  protected queryRedisKey(queryKey, suffix) {
     return `${this.redisQueuePrefix}_${this.redisHash(queryKey)}_${suffix}`;
   }
 
-  queueRedisKey(suffix) {
+  protected queueRedisKey(suffix) {
     return `${this.redisQueuePrefix}_${suffix}`;
   }
 
-  queriesDefKey() {
+  protected queriesDefKey() {
     return this.queueRedisKey('QUERIES');
   }
 
-  processingIdKey() {
+  protected processingIdKey() {
     return this.queueRedisKey('PROCESSING_COUNTER');
   }
 
-  resultListKey(queryKey) {
+  protected resultListKey(queryKey) {
     return this.queryRedisKey(queryKey, 'RESULT');
   }
 
-  queryProcessingLockKey(queryKey) {
+  protected queryProcessingLockKey(queryKey) {
     return this.queryRedisKey(queryKey, 'LOCK');
   }
 
-  redisHash(queryKey) {
+  public redisHash(queryKey) {
     return this.driver.redisHash(queryKey);
   }
 }
 
-/**
- * @implements {QueueDriverInterface}
- */
-export class RedisQueueDriver extends BaseQueueDriver {
-  constructor(options) {
+interface RedisQueueDriverOptions extends QueueDriverOptions {
+  redisPool: RedisPool
+}
+
+export class RedisQueueDriver extends BaseQueueDriver implements QueueDriverInterface {
+  protected readonly redisPool: RedisPool;
+
+  protected readonly options: RedisQueueDriverOptions;
+
+  public constructor(options: RedisQueueDriverOptions) {
     super(options.processUid);
     this.redisPool = options.redisPool;
     this.options = options;
   }
 
-  async createConnection() {
+  public async createConnection() {
     const redisClient = await this.redisPool.getClient();
     return new RedisQueueDriverConnection(this, {
       redisClient,
@@ -380,7 +417,7 @@ export class RedisQueueDriver extends BaseQueueDriver {
     });
   }
 
-  release(connection) {
-    this.redisPool.release(connection.redisClient);
+  public release(connection: RedisQueueDriverConnection) {
+    this.redisPool.release(connection.getRedisClient());
   }
 }

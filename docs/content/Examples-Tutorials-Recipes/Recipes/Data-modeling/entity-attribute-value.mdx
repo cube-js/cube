@@ -18,16 +18,16 @@ as a dimension.
 
 ## Data modeling
 
-Let's explore the `Users` cube that contains the entities:
+Let's explore the `users` cube that contains the entities:
 
 ```javascript
-cube(`Users`, {
-  sql: `SELECT * FROM public.users`,
+cube(`users`, {
+  sql_table: `users`,
 
   joins: {
-    Orders: {
+    orders: {
       relationship: 'one_to_many',
-      sql: `${CUBE}.id = ${Orders.userId}`,
+      sql: `${CUBE}.id = ${orders.user_id}`,
     },
   },
 
@@ -40,17 +40,17 @@ cube(`Users`, {
 });
 ```
 
-The `Users` cube is joined with the `Orders` cube to reflect that there might be
+The `users` cube is joined with the `orders` cube to reflect that there might be
 many orders associated with a single user. The orders remain in various
 statuses, as reflected by the `status` dimension, and their creation dates are
-available via the `createdAt` dimension:
+available via the `created_at` dimension:
 
 ```javascript
-cube(`Orders`, {
-  sql: `SELECT * FROM public.orders`,
+cube(`orders`, {
+  sql_table: `orders`,
 
   dimensions: {
-    userId: {
+    user_id: {
       sql: `user_id`,
       type: `string`,
     },
@@ -60,7 +60,7 @@ cube(`Orders`, {
       type: `string`,
     },
 
-    createdAt: {
+    created_at: {
       sql: `created_at`,
       type: `time`,
     },
@@ -73,13 +73,13 @@ Currently, the dataset contains orders in the following statuses:
 ```javascript
 [
   {
-    'Orders.status': 'completed',
+    'orders.status': 'completed',
   },
   {
-    'Orders.status': 'processing',
+    'orders.status': 'processing',
   },
   {
-    'Orders.status': 'shipped',
+    'orders.status': 'shipped',
   },
 ];
 ```
@@ -105,7 +105,7 @@ Then, modeling the cube is as simple as defining a few joins (one join per
 attribute):
 
 ```javascript
-cube(`UsersStatuses_Joins`, {
+cube(`users_statuses_joins`, {
   sql: `
     SELECT
       users.first_name,
@@ -129,17 +129,17 @@ cube(`UsersStatuses_Joins`, {
       type: `string`,
     },
 
-    completedCreatedAt: {
+    completed_created_at: {
       sql: `cCreatedAt`,
       type: `time`,
     },
 
-    processingCreatedAt: {
+    processing_created_at: {
       sql: `pCreatedAt`,
       type: `time`,
     },
 
-    shippedCreatedAt: {
+    shipped_created_at: {
       sql: `sCreatedAt`,
       type: `time`,
     },
@@ -155,22 +155,22 @@ doesn't have orders in this status).
 ```javascript
 [
   {
-    'UsersStatuses_Joins.name': 'Ally Blanda',
-    'UsersStatuses_Joins.completedCreatedAt': '2019-03-05T00:00:00.000',
-    'UsersStatuses_Joins.processingCreatedAt': null,
-    'UsersStatuses_Joins.shippedCreatedAt': '2019-04-06T00:00:00.000',
+    'users_statuses_joins.name': 'Ally Blanda',
+    'users_statuses_joins.completed_created_at': '2019-03-05T00:00:00.000',
+    'users_statuses_joins.processing_created_at': null,
+    'users_statuses_joins.shipped_created_at': '2019-04-06T00:00:00.000',
   },
   {
-    'UsersStatuses_Joins.name': 'Cayla Mayert',
-    'UsersStatuses_Joins.completedCreatedAt': '2019-06-14T00:00:00.000',
-    'UsersStatuses_Joins.processingCreatedAt': '2021-05-20T00:00:00.000',
-    'UsersStatuses_Joins.shippedCreatedAt': null,
+    'users_statuses_joins.name': 'Cayla Mayert',
+    'users_statuses_joins.completed_created_at': '2019-06-14T00:00:00.000',
+    'users_statuses_joins.processing_created_at': '2021-05-20T00:00:00.000',
+    'users_statuses_joins.shipped_created_at': null,
   },
   {
-    'UsersStatuses_Joins.name': 'Concepcion Maggio',
-    'UsersStatuses_Joins.completedCreatedAt': null,
-    'UsersStatuses_Joins.processingCreatedAt': '2020-07-14T00:00:00.000',
-    'UsersStatuses_Joins.shippedCreatedAt': '2019-07-19T00:00:00.000',
+    'users_statuses_joins.name': 'Concepcion Maggio',
+    'users_statuses_joins.completed_created_at': null,
+    'users_statuses_joins.processing_created_at': '2020-07-14T00:00:00.000',
+    'users_statuses_joins.shipped_created_at': '2019-07-19T00:00:00.000',
   },
 ];
 ```
@@ -184,15 +184,15 @@ well as update the dimensions. Let's see how to work around that.
 We can embrace the
 [Don't Repeat Yourself](https://en.wikipedia.org/wiki/Don%27t_repeat_yourself)
 principle and eliminate the repetition by generating the cube definition
-dynamically based on the list of statuses. Let's move all repeated code patterns
-into handy functions and iterate over statuses in relevant parts of the cube's
-code.
+dynamically based on the list of statuses. Let's create a new JavaScript model
+so we can move all repeated code patterns into handy functions and iterate over
+statuses in relevant parts of the cube's code.
 
 ```javascript
 const statuses = ['completed', 'processing', 'shipped'];
 
 const createValue = (status, index) =>
-  `MIN(orders_${index}.created_at) AS createdAt_${index}`;
+  `MIN(orders_${index}.created_at) AS created_at_${index}`;
 
 const createJoin = (status, index) =>
   `LEFT JOIN public.orders AS orders_${index}
@@ -200,13 +200,13 @@ const createJoin = (status, index) =>
     AND orders_${index}.status = '${status}'`;
 
 const createDimension = (status, index) => ({
-  [`${status}CreatedAt`]: {
-    sql: (CUBE) => `createdAt_${index}`,
+  [`${status}_created_at`]: {
+    sql: (CUBE) => `created_at_${index}`,
     type: `time`,
   },
 });
 
-cube(`UsersStatuses_DRY`, {
+cube(`users_statuses_DRY`, {
   sql: `
     SELECT
       users.first_name,
@@ -235,8 +235,8 @@ cube(`UsersStatuses_DRY`, {
 });
 ```
 
-The new `UsersStatuses_DRY` cube is functionally identical to the
-`UsersStatuses_Joins` cube above. Querying this new cube would yield the same
+The new `users_statuses_DRY` cube is functionally identical to the
+`users_statuses_joins` cube above. Querying this new cube would yield the same
 data. However, there's still a static list of statuses present in the cube's
 source code. Let's work around that next.
 
@@ -246,8 +246,7 @@ We can eliminate the list of statuses from the cube's code by loading this list
 from an external source, e.g., the data source. Here's the code from the
 `fetch.js` file that defines the `fetchStatuses` function that would load the
 statuses from the database. Note that it uses the `pg` package (Node.js client
-for Postgres) and reuses the credentials from Cube. Let's keep this file outside
-the `model/` folder:
+for Postgres) and reuses the credentials from Cube.
 
 ```javascript
 const { Pool } = require('pg');
@@ -286,7 +285,7 @@ asyncModule(async () => {
   const statuses = await fetchStatuses();
 
   const createValue = (status, index) =>
-    `MIN(orders_${index}.created_at) AS createdAt_${index}`;
+    `MIN(orders_${index}.created_at) AS created_at_${index}`;
 
   const createJoin = (status, index) =>
     `LEFT JOIN public.orders AS orders_${index}
@@ -294,13 +293,13 @@ asyncModule(async () => {
       AND orders_${index}.status = '${status}'`;
 
   const createDimension = (status, index) => ({
-    [`${status}CreatedAt`]: {
-      sql: (CUBE) => `createdAt_${index}`,
+    [`${status}_created_at`]: {
+      sql: (CUBE) => `created_at_${index}`,
       type: `time`,
     },
   });
 
-  cube(`UsersStatuses_Dynamic`, {
+  cube(`users_statuses_dynamic`, {
     sql: `
       SELECT
         users.first_name,
@@ -330,7 +329,7 @@ asyncModule(async () => {
 });
 ```
 
-Again, the new `UsersStatuses_Dynamic` cube is functionally identical to the
+Again, the new `users_statuses_dynamic` cube is functionally identical to the
 previously created cubes. So, querying this new cube would yield the same data
 too.
 

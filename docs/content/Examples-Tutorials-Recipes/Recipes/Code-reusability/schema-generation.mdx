@@ -8,6 +8,13 @@ redirect_from:
   - /schema-generation
 ---
 
+<InfoBox>
+
+This functionality only works with data models written in JavaScript, not YAML.
+For more information, check out the [Data Modeling Syntax][ref-modeling-syntax] page.
+
+</InfoBox>
+
 Cube supports two ways to define data model files: with YAML or JavaScript
 syntax. If you opt for JavaScript syntax, you can use the full power of this
 programming language to configure your data model. In this guide we generate
@@ -22,8 +29,8 @@ It can be done as simple as
 ```javascript
 const events = ['app_engagement', 'login', 'purchase'];
 
-cube(`Events`, {
-  sql: `select * from events`,
+cube(`events`, {
+  sql_table: `events`,
 
   measures: Object.assign(
     {
@@ -33,8 +40,8 @@ cube(`Events`, {
     },
     events
       .map((e) => ({
-        [`${e}_userCount`]: {
-          type: `countDistinct`,
+        [`${e}_user_count`]: {
+          type: `count_distinct`,
           sql: `user_id`,
           filters: [
             {
@@ -49,16 +56,18 @@ cube(`Events`, {
 ```
 
 In this case we use standard Javascript functions
-[Object.assign](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/assign),
-[Array.map](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/map)
+[`Object.assign`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/assign),
+[`Array.map`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/map)
 and
-[Array.reduce](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/reduce)
+[`Array.reduce`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/reduce)
 to add user count measure definitions based on `events` array. This approach
 allows you to maintain list of events in very concise manner without boilerplate
 code. This configuration can be reused using
 [export / import feature](export-import).
 
-Please refer to
-[asyncModule](/schema/reference/execution-environment#async-module)
+Please refer to the
+[`asyncModule()`](/schema/reference/execution-environment#async-module)
 documentation to learn how to use databases and other data sources for data
 model generation.
+
+[ref-modeling-syntax]: /data-modeling/syntax

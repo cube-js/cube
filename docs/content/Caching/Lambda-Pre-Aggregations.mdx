@@ -39,48 +39,79 @@ data source.
 </div>
 
 First, you need to create pre-aggregations that will contain your batch data. In
-the following example, we call it **batch**. Please note, it must have a
-`timeDimension` and `partitionGranularity` specified. Cube will use these
+the following example, we call it `batch`. Please note, it must have a
+`time_dimension` and `partition_granularity` specified. Cube will use these
 properties to union batch data with freshly-retrieved source data.
 
-You may also control the batch part of your data with the `buildRangeStart` and
-`buildRangeEnd` properties of a pre-aggregation to determine a specific window
+You may also control the batch part of your data with the `build_range_start` and
+`build_range_end` properties of a pre-aggregation to determine a specific window
 for your batched data.
 
 Next, you need to create a lambda pre-aggregation. To do that, create
-pre-aggregation with type `rollupLambda`, specify rollups you would like to use
-with `rollups` property, and finally set `unionWithSourceData: true` to use
+pre-aggregation with type `rollup_lambda`, specify rollups you would like to use
+with `rollups` property, and finally set `union_with_source_data: true` to use
 source data as a real-time layer.
 
 Please make sure that the lambda pre-aggregation definition comes first when
 defining your pre-aggregations.
 
-```javascript
-cube('Users', {
-  ...,
+<CodeTabs>
 
-  preAggregations: {
+```yaml
+cubes:
+  - name: users
+    # ...
+
+    pre_aggregations:
+      - name: lambda
+        type: rollup_lambda
+        union_with_source_data: true
+        rollups:
+          - CUBE.batch
+
+      - name: batch
+        measures:
+          - users.count
+        dimensions:
+          - users.name
+        time_dimension: users.created_at
+        granularity: day
+        partition_granularity: day
+        build_range_start:
+          sql: SELECT '2020-01-01'
+        build_range_end:
+          sql: SELECT '2022-05-30'
+```
+
+```javascript
+cube('users', {
+  // ...
+
+  pre_aggregations: {
     lambda: {
-      type: `rollupLambda`,
-      unionWithSourceData: true,
-      rollups: [Users.batch]
+      type: `rollup_lambda`,
+      union_with_source_data: true,
+      rollups: [CUBE.batch]
     },
+
     batch: {
-      measures: [Users.count],
-      dimensions: [Users.name],
-      timeDimension: Users.createdAt,
+      measures: [users.count],
+      dimensions: [users.name],
+      time_dimension: users.created_at,
       granularity: `day`,
-      partitionGranularity: `day`,
-      buildRangeStart: {
+      partition_granularity: `day`,
+      build_range_start: {
         sql: `SELECT '2020-01-01'`
       },
-      buildRangeEnd: {
+      build_range_end: {
         sql: `SELECT '2022-05-30'`
-      }
-    }
+      },
+    },
   },
 })
 ```
+
+</CodeTabs>
 
 ### Batch and streaming data
 
@@ -97,51 +128,99 @@ data comes from a [streaming pre-aggregation][streaming-pre-agg].
 </div>
 
 You can use lambda pre-aggregations to combine data from multiple
-pre-aggregation, where one pre-aggregation can have batch data and another
+pre-aggregations, where one pre-aggregation can have batch data and another
 streaming.
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: streaming_users
+    # This cube uses a streaming SQL data source such as ksqlDB
+    # ...
+
+    pre_aggregations:
+      - name: streaming
+        type: rollup
+        measures:
+          - CUBE.count
+        dimensions:
+          - CUBE.name
+        time_dimension: CUBE.created_at
+      granularity: day,
+      partition_granularity: day
+
+  - name: users
+    # This cube uses a data source such as ClickHouse or BigQuery
+    # ...
+
+    pre_aggregations:
+      - name: batch_streaming_lambda
+        type: rollup_lambda
+        rollups:
+          - users.batch
+          - streaming_users.streaming
+
+      - name: batch
+        type: rollup
+        measures:
+          - users.count
+        dimensions:
+          - users.name
+        time_dimension: users.created_at
+        granularity: day
+        partition_granularity: day
+        build_range_start:
+          sql: SELECT '2020-01-01'
+        build_range_end:
+          sql: SELECT '2022-05-30'
+```
 
 ```javascript
 // This cube uses a streaming SQL data source such as ksqlDB
-cube('StreamingUsers', {
-  ...,
-  dataSource: 'ksql',
+cube('streaming_users', {
+  // ...
 
-  preAggregations: {
+  pre_aggregations: {
     streaming: {
       type: `rollup`,
-      measures: [StreamingUsers.count],
-      dimensions: [StreamingUsers.name],
-      timeDimension: StreamingUsers.createdAt,
+      measures: [CUBE.count],
+      dimensions: [CUBE.name],
+      time_dimension: CUBE.created_at,
       granularity: `day`,
-      partitionGranularity: `day`,
-    }
-  }
-});
-
-// This cube uses a data source such as Clickhouse or BigQuery
-cube('Users', {
-  ...,
-  preAggregations: {
-    batchStreamingLambda: {
-      type: `rollupLambda`,
-      rollups: [Users.batch, StreamingUsers.streaming]
-    },
-    batch: {
-      type: `rollup`,
-      measures: [Users.count],
-      dimensions: [Users.name],
-      timeDimension: Users.createdAt,
-      granularity: `day`,
-      partitionGranularity: `day`,
-      buildRangeStart: {
-        sql: `SELECT '2020-01-01'`
-      },
-      buildRangeEnd: {
-        sql: `SELECT '2022-05-30'`
-      }
+      partition_granularity: `day`,
     },
   },
-)
+});
+
+// This cube uses a data source such as ClickHouse or BigQuery
+cube('users', {
+  // ...
+
+  pre_aggregations: {
+    batch_streaming_lambda: {
+      type: `rollup_lambda`,
+      rollups: [users.batch, streaming_users.streaming]
+    },
+
+    batch: {
+      type: `rollup`,
+      measures: [users.count],
+      dimensions: [users.name],
+      time_dimension: users.created_at,
+      granularity: `day`,
+      partition_granularity: `day`,
+      build_range_start: {
+        sql: `SELECT '2020-01-01'`
+      },
+      build_range_end: {
+        sql: `SELECT '2022-05-30'`
+      },
+    },
+  },
+});
 ```
+
+</CodeTabs>
 
 [streaming-pre-agg]: /caching/using-pre-aggregations#streaming-pre-aggregations

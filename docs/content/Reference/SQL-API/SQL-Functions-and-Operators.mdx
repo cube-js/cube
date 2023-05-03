@@ -34,7 +34,7 @@ below for support:
 The example below uses `<` in a selection within a Cube query rewrite:
 
 ```sql
-SELECT COUNT(*) FROM Orders WHERE Orders.number < 1000;
+SELECT COUNT(*) FROM orders WHERE orders.number < 1000;
  COUNT(UInt8(1))
 -----------------
 (0 rows)
@@ -44,8 +44,8 @@ The example below uses `<` in post-processing with an outer query:
 
 ```sql
 SELECT COUNT(*)
-FROM (SELECT * FROM Orders) orders
-WHERE orders.number < 1000;
+FROM (SELECT * FROM orders) o
+WHERE o.number < 1000;
  COUNT(UInt8(1))
 -----------------
            10000
@@ -70,7 +70,7 @@ below for support:
 The example below uses `>` in a selection within a Cube query rewrite:
 
 ```sql
-SELECT COUNT(*) FROM Orders WHERE Orders.number > 1000;
+SELECT COUNT(*) FROM orders WHERE orders.number > 1000;
  COUNT(UInt8(1))
 -----------------
            10000
@@ -81,8 +81,8 @@ The example below uses `>` in post-processing with an outer query:
 
 ```sql
 SELECT COUNT(*)
-FROM (SELECT * FROM Orders) orders
-WHERE orders.number > 1000;
+FROM (SELECT * FROM orders) o
+WHERE o.number > 1000;
  COUNT(UInt8(1))
 -----------------
                0
@@ -107,7 +107,7 @@ below for support:
 The example below uses `<=` in a selection within a Cube query rewrite:
 
 ```sql
-SELECT COUNT(*) FROM Orders WHERE Orders.number <= 1000;
+SELECT COUNT(*) FROM orders WHERE orders.number <= 1000;
  COUNT(UInt8(1))
 -----------------
 (0 rows)
@@ -117,8 +117,8 @@ The example below uses `<=` in post-processing with an outer query:
 
 ```sql
 SELECT COUNT(*)
-FROM (SELECT * FROM Orders) orders
-WHERE orders.number <= 1000;
+FROM (SELECT * FROM orders) o
+WHERE o.number <= 1000;
  COUNT(UInt8(1))
 -----------------
            10000
@@ -143,7 +143,7 @@ below for support:
 The example below uses `>=` in a selection within a Cube query rewrite:
 
 ```sql
-SELECT COUNT(*) FROM Orders WHERE Orders.number >= 1000;
+SELECT COUNT(*) FROM orders WHERE orders.number >= 1000;
  COUNT(UInt8(1))
 -----------------
            10000
@@ -154,8 +154,8 @@ The example below uses `>=` in post-processing with an outer query:
 
 ```sql
 SELECT COUNT(*)
-FROM (SELECT * FROM Orders) orders
-WHERE orders.number >= 1000;
+FROM (SELECT * FROM orders) o
+WHERE o.number >= 1000;
  COUNT(UInt8(1))
 -----------------
                0
@@ -180,7 +180,7 @@ below for support:
 The example below uses `=` in a selection within a Cube query rewrite:
 
 ```sql
-SELECT COUNT(*) FROM Orders WHERE Orders.status = 'completed';
+SELECT COUNT(*) FROM orders WHERE orders.status = 'completed';
  COUNT(UInt8(1))
 -----------------
             3346
@@ -191,8 +191,8 @@ The example below uses `=` in post-processing with an outer query:
 
 ```sql
 SELECT COUNT(*)
-FROM (SELECT * FROM Orders) orders
-WHERE orders.status = 'completed';
+FROM (SELECT * FROM orders) o
+WHERE o.status = 'completed';
  COUNT(UInt8(1))
 -----------------
             3346
@@ -217,7 +217,7 @@ below for support:
 The example below uses `!=` in a selection within a Cube query rewrite:
 
 ```sql
-SELECT COUNT(*) FROM Orders WHERE Orders.status != 'completed';
+SELECT COUNT(*) FROM orders WHERE orders.status != 'completed';
  COUNT(UInt8(1))
 -----------------
             3346
@@ -228,8 +228,8 @@ The example below uses `<>` in post-processing with an outer query:
 
 ```sql
 SELECT COUNT(*)
-FROM (SELECT * FROM Orders) orders
-WHERE orders.status <> 'completed';
+FROM (SELECT * FROM orders) o
+WHERE o.status <> 'completed';
  COUNT(UInt8(1))
 -----------------
             6654
@@ -254,7 +254,7 @@ below for support:
 The example below uses `BETWEEN` in a selection within a Cube query rewrite:
 
 ```sql
-SELECT COUNT(*) FROM Orders WHERE Orders.number BETWEEN(Orders.status) 1 AND 100000;
+SELECT COUNT(*) FROM orders WHERE orders.number BETWEEN(orders.status) 1 AND 100000;
  COUNT(UInt8(1))
 -----------------
 (0 rows)
@@ -264,8 +264,8 @@ The example below uses `BETWEEN` in post-processing with an outer query:
 
 ```sql
 SELECT COUNT(*)
-FROM (SELECT * FROM Orders) orders
-WHERE orders.number BETWEEN 1 AND 100000;
+FROM (SELECT * FROM orders) o
+WHERE o.number BETWEEN 1 AND 100000;
  COUNT(UInt8(1))
 -----------------
            10000
@@ -289,8 +289,8 @@ Truncates a number to an integer (towards zero).
 The example below uses `TRUNC` in a projection within a Cube query rewrite:
 
 ```sql
-SELECT TRUNC(Orders.number) FROM Orders LIMIT 1;
- trunc(Orders.number)
+SELECT TRUNC(orders.number) FROM orders LIMIT 1;
+ trunc(orders.number)
 ----------------------
                504690
 (1 row)
@@ -299,10 +299,10 @@ SELECT TRUNC(Orders.number) FROM Orders LIMIT 1;
 The example below uses `TRUNC` in post-processing with an outer query:
 
 ```sql
-SELECT TRUNC(Orders.number)
-FROM (SELECT * FROM Orders) orders
+SELECT TRUNC(orders.number)
+FROM (SELECT * FROM orders) o
 LIMIT 1;
- trunc(Orders.number)
+ trunc(o.number)
 ----------------------
                504690
 (1 row)
@@ -326,7 +326,7 @@ The example below uses `||` in a selection within a Cube query rewrite:
 
 ```sql
 SELECT COUNT(*)
-FROM Orders
+FROM orders
 WHERE status = 'comple' || 'ted';
  COUNT(UInt8(1))
 -----------------
@@ -338,9 +338,9 @@ The example below uses `||` in post-processing with an outer query:
 
 ```sql
 SELECT (status || status)
-FROM (SELECT * FROM Orders) orders
+FROM (SELECT * FROM orders) o
 LIMIT 1;
- orders.status || orders.status
+ o.status || o.status
 --------------------------------
  processingprocessing
 (1 rows)
@@ -362,7 +362,7 @@ The example below uses `BIT_LENGTH` in post-processing with an outer query:
 
 ```sql
 SELECT BIT_LENGTH(status)
-FROM (SELECT * FROM Orders) orders
+FROM (SELECT * FROM orders) o
 LIMIT 1;
  bitlength(orders.status)
 --------------------------
@@ -387,7 +387,7 @@ The example below uses `CHAR_LENGTH` in post-processing with an outer query:
 
 ```sql
 SELECT CHAR_LENGTH(status)
-FROM (SELECT * FROM Orders) orders
+FROM (SELECT * FROM orders) o
 LIMIT 1;
  characterlength(orders.status)
 --------------------------------
@@ -410,7 +410,7 @@ Converts `string` to all lower case.
 The example below uses `LOWER` in a selection within a Cube query rewrite:
 
 ```sql
-SELECT COUNT(*) FROM Orders WHERE LOWER(Orders.status) = 'completed';
+SELECT COUNT(*) FROM orders WHERE LOWER(orders.status) = 'completed';
  COUNT(UInt8(1))
 -----------------
             3346
@@ -420,10 +420,10 @@ SELECT COUNT(*) FROM Orders WHERE LOWER(Orders.status) = 'completed';
 The example below uses `LOWER` in post-processing with an outer query:
 
 ```sql
-SELECT LOWER(Orders.status)
-FROM (SELECT * FROM Orders) orders
+SELECT LOWER(orders.status)
+FROM (SELECT * FROM orders) o
 LIMIT 1;
- lower(Orders.status)
+ lower(o.status)
 ----------------------
  processing
 (1 row)
@@ -445,7 +445,7 @@ The example below uses `OCTET_LENGTH` in post-processing with an outer query:
 
 ```sql
 SELECT OCTET_LENGTH(status)
-FROM (SELECT * FROM Orders) orders
+FROM (SELECT * FROM orders) o
 LIMIT 1;
  octetlength(orders.status)
 ----------------------------
@@ -470,8 +470,8 @@ or `count` must be specified.
 The example below uses `SUBSTRING` in a projection within a Cube query rewrite:
 
 ```sql
-SELECT SUBSTRING(Orders.status, 1, 3) FROM Orders LIMIT 1;
- substr(Orders.status,Int64(1),Int64(3))
+SELECT SUBSTRING(orders.status, 1, 3) FROM orders LIMIT 1;
+ substr(orders.status,Int64(1),Int64(3))
 -----------------------------------------
  com
 (1 row)
@@ -480,10 +480,10 @@ SELECT SUBSTRING(Orders.status, 1, 3) FROM Orders LIMIT 1;
 The example below uses `SUBSTRING` in post-processing with an outer query:
 
 ```sql
-SELECT SUBSTRING(Orders.status, 1, 3)
-FROM (SELECT * FROM Orders) orders
+SELECT SUBSTRING(orders.status, 1, 3)
+FROM (SELECT * FROM orders) o
 LIMIT 1;
- substr(Orders.status,Int64(1),Int64(3))
+ substr(o.status,Int64(1),Int64(3))
 -----------------------------------------
  com
 (1 row)
@@ -505,10 +505,10 @@ default) from the start, end, or both ends (`BOTH` is the default) of `string`.
 The example below uses `TRIM` in post-processing with an outer query:
 
 ```sql
-SELECT TRIM(LEADING 'p' FROM Orders.status)
-FROM (SELECT * FROM Orders) orders
+SELECT TRIM(LEADING 'p' FROM orders.status)
+FROM (SELECT * FROM orders) o
 LIMIT 1;
- ltrim(Orders.status,Utf8("p"))
+ ltrim(o.status,Utf8("p"))
 --------------------------------
  rocessing
 (1 row)
@@ -531,10 +531,10 @@ Converts `string` to all upper case.
 The example below uses `UPPER` in post-processing with an outer query:
 
 ```sql
-SELECT UPPER(Orders.status)
-FROM (SELECT * FROM Orders) orders
+SELECT UPPER(orders.status)
+FROM (SELECT * FROM orders) o
 LIMIT 1;
- upper(Orders.status)
+ upper(o.status)
 ----------------------
  PROCESSING
 (1 row)
@@ -555,7 +555,7 @@ Returns true if `string` starts with `prefix`.
 The example below uses `STARTS_WITH` in a selection within a Cube query rewrite:
 
 ```sql
-SELECT COUNT(*) FROM Orders WHERE STARTS_WITH(Orders.status, 'complete');
+SELECT COUNT(*) FROM orders WHERE STARTS_WITH(orders.status, 'complete');
  COUNT(UInt8(1))
 -----------------
             3346
@@ -565,10 +565,10 @@ SELECT COUNT(*) FROM Orders WHERE STARTS_WITH(Orders.status, 'complete');
 The example below uses `STARTS_WITH` in post-processing with an outer query:
 
 ```sql
-SELECT STARTS_WITH(Orders.status, 'complete')
-FROM (SELECT * FROM Orders) orders
+SELECT STARTS_WITH(orders.status, 'complete')
+FROM (SELECT * FROM orders) o
 LIMIT 1;
- startswith(Orders.status,Utf8("complete"))
+ startswith(o.status,Utf8("complete"))
 --------------------------------------------
  f
 (1 row)
@@ -592,8 +592,8 @@ The example below uses `LIKE` in a selection within a Cube query rewrite:
 
 ```sql
 SELECT COUNT(*)
-FROM Orders
-WHERE Orders.status LIKE 'completed';
+FROM orders
+WHERE orders.status LIKE 'completed';
  COUNT(UInt8(1))
 -----------------
             3346
@@ -616,8 +616,8 @@ Returns the substring of `string` that matches a POSIX regular expression
 The example below uses `REGEXP_SUBSTR` in post-processing with an outer query:
 
 ```sql
-SELECT REGEXP_SUBSTR(Orders.status, '\w+')
-FROM (SELECT * FROM Orders) orders
+SELECT REGEXP_SUBSTR(orders.status, '\w+')
+FROM (SELECT * FROM orders) o
 LIMIT 1;
 ```
 
@@ -646,7 +646,7 @@ Counts the number of rows. If `*` is specified, the count returned is the
 The example below uses `COUNT` in a projection within a Cube query rewrite:
 
 ```sql
-SELECT COUNT(*) FROM Orders;
+SELECT COUNT(*) FROM orders;
  COUNT(UInt8(1))
 -----------------
            10000
@@ -657,8 +657,8 @@ The example below uses `COUNT` with a measure of type `count` in a projection
 within a Cube query rewrite:
 
 ```sql
-SELECT COUNT(Orders.count) FROM Orders;
- COUNT(Orders.count)
+SELECT COUNT(orders.count) FROM orders;
+ COUNT(orders.count)
 ---------------------
                10000
 (1 row)
@@ -677,8 +677,8 @@ measures][ref-schema-ref-measure-types].
 The example below uses `MEASURE` in a projection within a Cube query rewrite:
 
 ```sql
-SELECT MEASURE(Orders.count) FROM Orders;
- measure(Orders.count)
+SELECT MEASURE(orders.count) FROM orders;
+ measure(orders.count)
 -----------------------
                  10000
 (1 row)
@@ -703,8 +703,8 @@ The example below uses `SUM` with a measure of type `sum` in a projection within
 a Cube query rewrite:
 
 ```sql
-SELECT SUM(number) FROM Orders;
- SUM(Orders.number)
+SELECT SUM(number) FROM orders;
+ SUM(orders.number)
 --------------------
              504690
 (1 row)
@@ -729,8 +729,8 @@ The example below uses `AVG` with a measure of type `avg` in a projection within
 a Cube query rewrite:
 
 ```sql
-SELECT AVG(avgNumber) FROM Orders;
- AVG(Orders.avgNumber)
+SELECT AVG(avgNumber) FROM orders;
+ AVG(orders.avgNumber)
 -----------------------
                 50.469
 (1 row)
@@ -756,8 +756,8 @@ The example below uses `MIN` with a measure of type `min` in a projection within
 a Cube query rewrite:
 
 ```sql
-SELECT MIN(minNumber) FROM Orders;
- MIN(Orders.minNumber)
+SELECT MIN(min_number) FROM orders;
+ MIN(orders.min_number)
 -----------------------
                      1
 (1 row)
@@ -783,8 +783,8 @@ The example below uses `MAX` with a measure of type `max` in a projection within
 a Cube query rewrite:
 
 ```sql
-SELECT MAX(maxNumber) FROM Orders;
- MAX(Orders.maxNumber)
+SELECT MAX(max_number) FROM orders;
+ MAX(orders.max_number)
 -----------------------
                    100
 (1 row)
@@ -810,8 +810,8 @@ The example below uses `TO_TIMESTAMP` in post-processing with an outer query:
 
 ```sql
 SELECT COUNT(*)
-FROM (SELECT * FROM Orders) orders
-WHERE TO_TIMESTAMP('2020-01-01 00:00:00', 'yyyy-MM-dd HH24:mi:ss') < Orders.createdAt;
+FROM (SELECT * FROM orders) o
+WHERE TO_TIMESTAMP('2020-01-01 00:00:00', 'yyyy-MM-dd HH24:mi:ss') < orders.createdAt;
  COUNT(UInt8(1))
 -----------------
             7945
@@ -834,8 +834,8 @@ The example below uses `LOCALTIMESTAMP` in post-processing with an outer query:
 
 ```sql
 SELECT COUNT(*)
-FROM (SELECT * FROM Orders) orders
-WHERE LOCALTIMESTAMP() > Orders.createdAt;
+FROM (SELECT * FROM orders) o
+WHERE LOCALTIMESTAMP() > orders.createdAt;
  COUNT(UInt8(1))
 -----------------
             7693
@@ -858,8 +858,8 @@ The example below uses `NOW` in post-processing with an outer query:
 
 ```sql
 SELECT COUNT(*)
-FROM (SELECT * FROM Orders) orders
-WHERE NOW() > Orders.createdAt;
+FROM (SELECT * FROM orders) o
+WHERE NOW() > orders.createdAt;
  COUNT(UInt8(1))
 -----------------
             7693
@@ -887,10 +887,10 @@ from `source`. The `EXTRACT` function returns values of type `numeric`.
 The example below uses `EXTRACT` in a projection within a Cube query rewrite:
 
 ```sql
-SELECT EXTRACT(YEAR FROM Orders.createdAt)
-FROM Orders
+SELECT EXTRACT(YEAR FROM orders.createdAt)
+FROM orders
 LIMIT 1;
- datepart(Utf8("year"),Orders.createdAt)
+ datepart(Utf8("year"),orders.createdAt)
 -----------------------------------------
                                     2019
 (1 row)
@@ -918,10 +918,10 @@ one set to zero (or one, for day and month).
 The example below uses `DATE_TRUNC` in a projection within a Cube query rewrite:
 
 ```sql
-SELECT DATE_TRUNC('month', Orders.createdAt)
-FROM Orders
+SELECT DATE_TRUNC('month', orders.createdAt)
+FROM orders
 LIMIT 1;
- datetrunc(Utf8("month"),Orders.createdAt)
+ datetrunc(Utf8("month"),orders.createdAt)
 -------------------------------------------
  2019-01-01 00:00:00.000000
 (1 row)
@@ -956,12 +956,12 @@ SELECT
     WHEN char_length(status) > 5 THEN 'big'
     ELSE 'small'
   END status,
-  SUM(number) as totalValue
+  SUM(number) as total_value
 from (
-  SELECT status, number FROM Orders
+  SELECT status, number FROM orders
 ) orders
 GROUP BY 1;
- status | totalValue
+ status | total_value
 --------+------------
  big    |     504690
 (1 row)
@@ -988,7 +988,7 @@ The example below uses `COALESCE` in post-processing with an outer query:
 SELECT
   COUNT(*),
   COALESCE(status, 'unknown') AS state
-FROM (SELECT * FROM Orders) orders
+FROM (SELECT * FROM orders) o
 GROUP BY 2;
  COUNT(UInt8(1)) |   state
 -----------------+------------
@@ -1014,10 +1014,10 @@ otherwise it returns `value1`.
 The example below uses `NULLIF` in post-processing with an outer query:
 
 ```sql
-SELECT NULLIF(Orders.status, 'completed'), COUNT(*)
-FROM (SELECT * FROM Orders) orders
+SELECT NULLIF(orders.status, 'completed'), COUNT(*)
+FROM (SELECT * FROM orders) o
 GROUP BY 1;
- nullif(Orders.status,Utf8("completed")) | COUNT(UInt8(1))
+ nullif(orders.status,Utf8("completed")) | COUNT(UInt8(1))
 -----------------------------------------+-----------------
  processing                              |            3354
                                          |            3346
@@ -1044,7 +1044,7 @@ values.
 The example below uses `IN` in a selection within a Cube query rewrite:
 
 ```sql
-SELECT COUNT(*) FROM Orders WHERE status IN ('shipped', 'completed');
+SELECT COUNT(*) FROM orders WHERE status IN ('shipped', 'completed');
  COUNT(UInt8(1))
 -----------------
             6646
@@ -1068,7 +1068,7 @@ matches **none** of the values.
 The example below uses `IN` in a selection within a Cube query rewrite:
 
 ```sql
-SELECT COUNT(*) FROM Orders WHERE status NOT IN ('shipped', 'completed');
+SELECT COUNT(*) FROM orders WHERE status NOT IN ('shipped', 'completed');
  COUNT(UInt8(1))
 -----------------
             3354
