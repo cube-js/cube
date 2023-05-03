@@ -788,6 +788,10 @@ impl CacheStore for CacheStoreMock {
         panic!("CacheStore mock!")
     }
 
+    async fn queue_heartbeat_by_id(&self, _id: u64) -> Result<(), CubeError> {
+        panic!("CacheStore mock!")
+    }
+
     async fn queue_heartbeat_by_path(&self, _path: String) -> Result<(), CubeError> {
         panic!("CacheStore mock!")
     }
@@ -820,6 +824,10 @@ impl CacheStore for CacheStoreMock {
         _path: String,
         _timeout: u64,
     ) -> Result<Option<QueueResultResponse>, CubeError> {
+        panic!("CacheStore mock!")
+    }
+
+    async fn queue_merge_extra_by_id(&self, _id: u64, _payload: String) -> Result<(), CubeError> {
         panic!("CacheStore mock!")
     }
 
