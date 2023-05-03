@@ -21,7 +21,7 @@ paths.
   />
 </div>
 
-Views **can not** have their own members. Instead, use the `cubes` or `includes` properties
+Views **can not** have their own members. Instead, use the `cubes` or `includes` parameters
 to include measures and dimensions from other cubes into the view. In the
 example below, we create a new view `active_users` which is made up of properties
 from the `users` cube:
@@ -221,16 +221,15 @@ views:
 ```
 </CodeTabs>
 
-When listing cubes to expose you need to provide a `join_path` parameter. It uses dot notation to describe the join path: `cube_1.cube_2.cube_3`. 
-For the root cube of the view just put the cube name as in the example above for `base_orders`. 
+When listing cubes to expose, you need to provide a `join_path` parameter. It uses dot notation to describe the join path: `cube_1.cube_2.cube_3`.
+For the root cube of the view, just put the cube name as in the example above for `base_orders`.
 
-The other required parameter inside `cubes` block is `includes`. You can simply list measures, dimensions or segments you'd like to include. 
-In case you need to rename some of them you can provide `name` and `alias` parameters. 
-Alternatively, you can use `excludes` parameter in conjuction with includes all defition `includes: *`.
+The other required parameter inside the `cubes` block is `includes`. You can simply list measures, dimensions, or segments you'd like to include.
+In case you need to rename some of them, you can provide `name` and `alias` parameters.
+Alternatively, you can use the `excludes` parameter in conjunction with the includes all definition `includes: *`.
 
-Optionally, if you'd like to prefix exposed measures, dimensions or segments with cube name, you can use `prefix: true` parameter. 
-It will prefix exposed measures and dimensions with cube name, e.g. `users_city`. You can use `alias` parameter to rename cube for the prefixing purpose.
-
+Optionally, if you'd like to prefix exposed measures, dimensions, or segments with the cube name, you can use the `prefix: true` parameter.
+It will prefix them with the cube name, e.g. `users_city`. You can use the `alias` parameter to rename the cube for the prefixing purpose.
 
 
 ### <--{"id" : "Parameters"}--> includes
