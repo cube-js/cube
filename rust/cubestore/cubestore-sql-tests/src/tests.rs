@@ -8084,7 +8084,7 @@ async fn queue_full_workflow(service: Box<dyn SqlClient>) {
         &vec![Row::new(vec![
             TableValue::String("1".to_string()),
             TableValue::Boolean(true),
-            TableValue::Int(0)
+            TableValue::Int(1)
         ])]
     );
 
@@ -8098,7 +8098,7 @@ async fn queue_full_workflow(service: Box<dyn SqlClient>) {
         &vec![Row::new(vec![
             TableValue::String("2".to_string()),
             TableValue::Boolean(true),
-            TableValue::Int(1)
+            TableValue::Int(2)
         ])]
     );
 
@@ -8112,7 +8112,7 @@ async fn queue_full_workflow(service: Box<dyn SqlClient>) {
         &vec![Row::new(vec![
             TableValue::String("3".to_string()),
             TableValue::Boolean(true),
-            TableValue::Int(2)
+            TableValue::Int(3)
         ])]
     );
 
@@ -8126,7 +8126,7 @@ async fn queue_full_workflow(service: Box<dyn SqlClient>) {
         &vec![Row::new(vec![
             TableValue::String("4".to_string()),
             TableValue::Boolean(true),
-            TableValue::Int(3)
+            TableValue::Int(4)
         ])]
     );
 
@@ -8140,7 +8140,7 @@ async fn queue_full_workflow(service: Box<dyn SqlClient>) {
         &vec![Row::new(vec![
             TableValue::String("5".to_string()),
             TableValue::Boolean(true),
-            TableValue::Int(4)
+            TableValue::Int(5)
         ])]
     );
 
@@ -8156,7 +8156,7 @@ async fn queue_full_workflow(service: Box<dyn SqlClient>) {
             &vec![Row::new(vec![
                 TableValue::String("1".to_string()),
                 TableValue::Boolean(false),
-                TableValue::Int(4)
+                TableValue::Int(5)
             ])]
         );
     }
