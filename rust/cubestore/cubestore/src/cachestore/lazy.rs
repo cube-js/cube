@@ -213,10 +213,6 @@ impl CacheStore for LazyRocksCacheStore {
         self.init().await?.queue_truncate().await
     }
 
-    async fn queue_get(&self, key: String) -> Result<Option<IdRow<QueueItem>>, CubeError> {
-        self.init().await?.queue_get(key).await
-    }
-
     async fn queue_to_cancel(
         &self,
         prefix: String,
@@ -241,43 +237,67 @@ impl CacheStore for LazyRocksCacheStore {
             .await
     }
 
-    async fn queue_cancel(&self, key: String) -> Result<Option<IdRow<QueueItem>>, CubeError> {
-        self.init().await?.queue_cancel(key).await
+    async fn queue_get_by_path(&self, path: String) -> Result<Option<IdRow<QueueItem>>, CubeError> {
+        self.init().await?.queue_get_by_path(path).await
     }
 
-    async fn queue_heartbeat(&self, key: String) -> Result<(), CubeError> {
-        self.init().await?.queue_heartbeat(key).await
-    }
-
-    async fn queue_retrieve(
+    async fn queue_cancel_by_path(
         &self,
-        key: String,
+        path: String,
+    ) -> Result<Option<IdRow<QueueItem>>, CubeError> {
+        self.init().await?.queue_cancel_by_path(path).await
+    }
+
+    async fn queue_heartbeat_by_path(&self, path: String) -> Result<(), CubeError> {
+        self.init().await?.queue_heartbeat_by_path(path).await
+    }
+
+    async fn queue_retrieve_by_path(
+        &self,
+        path: String,
         allow_concurrency: u32,
     ) -> Result<QueueRetrieveResponse, CubeError> {
         self.init()
             .await?
-            .queue_retrieve(key, allow_concurrency)
+            .queue_retrieve_by_path(path, allow_concurrency)
             .await
     }
 
-    async fn queue_ack(&self, key: String, result: Option<String>) -> Result<(), CubeError> {
-        self.init().await?.queue_ack(key, result).await
-    }
-
-    async fn queue_result(&self, key: String) -> Result<Option<QueueResultResponse>, CubeError> {
-        self.init().await?.queue_result(key).await
-    }
-
-    async fn queue_result_blocking(
+    async fn queue_ack_by_path(
         &self,
-        key: String,
+        path: String,
+        result: Option<String>,
+    ) -> Result<(), CubeError> {
+        self.init().await?.queue_ack_by_path(path, result).await
+    }
+
+    async fn queue_result_by_path(
+        &self,
+        path: String,
+    ) -> Result<Option<QueueResultResponse>, CubeError> {
+        self.init().await?.queue_result_by_path(path).await
+    }
+
+    async fn queue_result_blocking_by_path(
+        &self,
+        path: String,
         timeout: u64,
     ) -> Result<Option<QueueResultResponse>, CubeError> {
-        self.init().await?.queue_result_blocking(key, timeout).await
+        self.init()
+            .await?
+            .queue_result_blocking_by_path(path, timeout)
+            .await
     }
 
-    async fn queue_merge_extra(&self, key: String, payload: String) -> Result<(), CubeError> {
-        self.init().await?.queue_merge_extra(key, payload).await
+    async fn queue_merge_extra_by_path(
+        &self,
+        path: String,
+        payload: String,
+    ) -> Result<(), CubeError> {
+        self.init()
+            .await?
+            .queue_merge_extra_by_path(path, payload)
+            .await
     }
 
     async fn compaction(&self) -> Result<(), CubeError> {

@@ -268,6 +268,7 @@ impl QueueItem {
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
 pub enum QueueRetrieveResponse {
     Success {
+        id: u64,
         item: QueueItem,
         pending: u64,
         active: Vec<String>,
@@ -290,6 +291,7 @@ impl QueueRetrieveResponse {
     pub fn into_queue_retrieve_rows(self, extended: bool) -> Vec<Row> {
         match self {
             QueueRetrieveResponse::Success {
+                id,
                 item,
                 pending,
                 active,
@@ -306,6 +308,7 @@ impl QueueRetrieveResponse {
                 } else {
                     TableValue::Null
                 },
+                TableValue::String(id.to_string()),
             ])],
             QueueRetrieveResponse::LockFailed { pending, active }
             | QueueRetrieveResponse::NotEnoughConcurrency { pending, active }
@@ -320,6 +323,7 @@ impl QueueRetrieveResponse {
                         } else {
                             TableValue::Null
                         },
+                        TableValue::Null,
                     ])]
                 } else {
                     vec![]

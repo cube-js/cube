@@ -10,7 +10,8 @@ import {
   AddToQueueOptions,
   AddToQueueResponse,
   QueryKey,
-  QueryKeyHash
+  QueryKeyHash,
+  ProcessingId,
 } from '@cubejs-backend/base-driver';
 import { getProcessUid } from '@cubejs-backend/shared';
 
@@ -296,7 +297,7 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
     return null;
   }
 
-  public async setResultAndRemoveQuery(hash: QueryKeyHash, executionResult: any, _processingId: any): Promise<boolean> {
+  public async setResultAndRemoveQuery(hash: QueryKeyHash, executionResult: unknown, _processingId: ProcessingId): Promise<boolean> {
     await this.driver.query('QUEUE ACK ? ? ', [
       this.prefixKey(hash),
       executionResult ? JSON.stringify(executionResult) : executionResult

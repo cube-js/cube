@@ -195,7 +195,7 @@ impl CacheStoreSqlService {
                     Column::new("extra".to_string(), ColumnType::String, 1),
                 ];
 
-                let result = self.cachestore.queue_cancel(key.value).await?;
+                let result = self.cachestore.queue_cancel_by_path(key.value).await?;
                 let rows = if let Some(result) = result {
                     vec![result.into_row().into_queue_cancel_row()]
                 } else {
@@ -205,24 +205,24 @@ impl CacheStoreSqlService {
                 (Arc::new(DataFrame::new(columns, rows)), true)
             }
             QueueCommand::Heartbeat { key } => {
-                self.cachestore.queue_heartbeat(key.value).await?;
+                self.cachestore.queue_heartbeat_by_path(key.value).await?;
 
                 (Arc::new(DataFrame::new(vec![], vec![])), true)
             }
             QueueCommand::MergeExtra { key, payload } => {
                 self.cachestore
-                    .queue_merge_extra(key.value, payload)
+                    .queue_merge_extra_by_path(key.value, payload)
                     .await?;
 
                 (Arc::new(DataFrame::new(vec![], vec![])), true)
             }
             QueueCommand::Ack { key, result } => {
-                self.cachestore.queue_ack(key.value, result).await?;
+                self.cachestore.queue_ack_by_path(key.value, result).await?;
 
                 (Arc::new(DataFrame::new(vec![], vec![])), true)
             }
             QueueCommand::Get { key } => {
-                let result = self.cachestore.queue_get(key.value).await?;
+                let result = self.cachestore.queue_get_by_path(key.value).await?;
                 let rows = if let Some(result) = result {
                     vec![result.into_row().into_queue_get_row()]
                 } else {
@@ -302,7 +302,7 @@ impl CacheStoreSqlService {
             } => {
                 let result = self
                     .cachestore
-                    .queue_retrieve(key.value, concurrency)
+                    .queue_retrieve_by_path(key.value, concurrency)
                     .await?;
 
                 (
@@ -312,6 +312,7 @@ impl CacheStoreSqlService {
                             Column::new("extra".to_string(), ColumnType::String, 1),
                             Column::new("pending".to_string(), ColumnType::Int, 2),
                             Column::new("active".to_string(), ColumnType::String, 3),
+                            Column::new("id".to_string(), ColumnType::String, 4),
                         ],
                         result.into_queue_retrieve_rows(extended),
                     )),
@@ -319,7 +320,7 @@ impl CacheStoreSqlService {
                 )
             }
             QueueCommand::Result { key } => {
-                let ack_result = self.cachestore.queue_result(key.value).await?;
+                let ack_result = self.cachestore.queue_result_by_path(key.value).await?;
                 let rows = if let Some(ack_result) = ack_result {
                     vec![ack_result.into_queue_result_row()]
                 } else {
@@ -340,7 +341,7 @@ impl CacheStoreSqlService {
             QueueCommand::ResultBlocking { timeout, key } => {
                 let ack_result = self
                     .cachestore
-                    .queue_result_blocking(key.value, timeout)
+                    .queue_result_blocking_by_path(key.value, timeout)
                     .await?;
 
                 let rows = if let Some(ack_result) = ack_result {

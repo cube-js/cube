@@ -34,7 +34,8 @@ const menuOrder = [
   'Examples & Tutorials',
   'FAQs',
   'Release Notes',
-  'Reference',
+  'Style Guide',
+  'Reference'
 ];
 
 const nameRules: Record<string, string> = {
