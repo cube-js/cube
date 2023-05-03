@@ -99,7 +99,7 @@ views:
 
     cubes:
       - name: orders.users
-        
+
         includes:
           - name: city
             alias: user_city
@@ -202,7 +202,7 @@ views:
 
 <InfoBox>
 
-In previous versions of Cube, this property was called `shown`.
+Prior to v0.33, this property was called `shown`.
 
 </InfoBox>
 
@@ -230,7 +230,7 @@ views:
   - name: arr
     description: Annual Recurring Revenue
     public: COMPILE_CONTEXT.security_context.is_finance
-    
+
     includes:
       # Measures
       - revenue.arr
