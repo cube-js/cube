@@ -33,7 +33,6 @@ const menuOrder = [
   'Monitoring',
   'Examples & Tutorials',
   'FAQs',
-  'Release Notes',
   'Reference',
 ];
 
@@ -128,9 +127,7 @@ const MainMenu: React.FC<Props> = (props = defaultProps) => {
                       }
                     );
 
-                    return item === 'Release Notes'
-                      ? subItems.reverse().map(nodeParser)
-                      : subItems.map(nodeParser);
+                    return subItems.map(nodeParser);
                   }
                   return (
                     <Menu.ItemGroup key={subCategory} title={subCategory}>
