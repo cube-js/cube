@@ -838,12 +838,15 @@ impl CacheStore for RocksCacheStore {
         path: String,
         timeout: u64,
     ) -> Result<Option<QueueResultResponse>, CubeError> {
+        // It's an important to open listener at the beginning to protect race condition
+        // it will fix position (subscribe) of broadcast channel
+        let listener = self.get_listener().await;
+
         let store_in_result = self.lookup_queue_result_by_path(path.clone()).await?;
         if store_in_result.is_some() {
             return Ok(store_in_result);
         }
 
-        let listener = self.get_listener().await;
         let fut = tokio::time::timeout(
             Duration::from_millis(timeout),
             listener.wait_for_queue_ack_by_path(path),
