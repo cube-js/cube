@@ -282,6 +282,26 @@ be queried through the API. Defaults to `true`.
 
 <CodeTabs>
 
+```yaml
+views:
+  - name: orders
+    public: false
+```
+
+```javascript
+view(`orders`, {
+  public: false
+});
+```
+
+</CodeTabs>
+
+
+You can also use `COMPILE_CONTEXT` for dynamic visibility if necessary.
+
+
+<CodeTabs>
+
 ```javascript
 view(`arr`, {
   description: `Annual Recurring Revenue`,
