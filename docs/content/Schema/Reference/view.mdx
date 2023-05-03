@@ -100,7 +100,7 @@ the above view with SQL API:
 ```sql
 SELECT 
   users_city,
-  total_amount
+  MEASURE(total_amount)
 FROM orders
 GROUP BY 1
 ```
