@@ -756,10 +756,6 @@ impl CacheStore for CacheStoreMock {
         panic!("CacheStore mock!")
     }
 
-    async fn queue_get(&self, _key: String) -> Result<Option<IdRow<QueueItem>>, CubeError> {
-        panic!("CacheStore mock!")
-    }
-
     async fn queue_to_cancel(
         &self,
         _prefix: String,
@@ -778,39 +774,60 @@ impl CacheStore for CacheStoreMock {
         panic!("CacheStore mock!")
     }
 
-    async fn queue_cancel(&self, _key: String) -> Result<Option<IdRow<QueueItem>>, CubeError> {
-        panic!("CacheStore mock!")
-    }
-
-    async fn queue_heartbeat(&self, _key: String) -> Result<(), CubeError> {
-        panic!("CacheStore mock!")
-    }
-
-    async fn queue_retrieve(
+    async fn queue_get_by_path(
         &self,
-        _key: String,
+        _path: String,
+    ) -> Result<Option<IdRow<QueueItem>>, CubeError> {
+        panic!("CacheStore mock!")
+    }
+
+    async fn queue_cancel_by_path(
+        &self,
+        _path: String,
+    ) -> Result<Option<IdRow<QueueItem>>, CubeError> {
+        panic!("CacheStore mock!")
+    }
+
+    async fn queue_heartbeat_by_path(&self, _path: String) -> Result<(), CubeError> {
+        panic!("CacheStore mock!")
+    }
+
+    async fn queue_retrieve_by_path(
+        &self,
+        _path: String,
         _allow_concurrency: u32,
     ) -> Result<QueueRetrieveResponse, CubeError> {
         panic!("CacheStore mock!")
     }
 
-    async fn queue_ack(&self, _key: String, _result: Option<String>) -> Result<(), CubeError> {
-        panic!("CacheStore mock!")
-    }
-
-    async fn queue_result(&self, _key: String) -> Result<Option<QueueResultResponse>, CubeError> {
-        panic!("CacheStore mock!")
-    }
-
-    async fn queue_result_blocking(
+    async fn queue_ack_by_path(
         &self,
-        _key: String,
+        _path: String,
+        _result: Option<String>,
+    ) -> Result<(), CubeError> {
+        panic!("CacheStore mock!")
+    }
+
+    async fn queue_result_by_path(
+        &self,
+        _path: String,
+    ) -> Result<Option<QueueResultResponse>, CubeError> {
+        panic!("CacheStore mock!")
+    }
+
+    async fn queue_result_blocking_by_path(
+        &self,
+        _path: String,
         _timeout: u64,
     ) -> Result<Option<QueueResultResponse>, CubeError> {
         panic!("CacheStore mock!")
     }
 
-    async fn queue_merge_extra(&self, _key: String, _payload: String) -> Result<(), CubeError> {
+    async fn queue_merge_extra_by_path(
+        &self,
+        _key: String,
+        _payload: String,
+    ) -> Result<(), CubeError> {
         panic!("CacheStore mock!")
     }
 
