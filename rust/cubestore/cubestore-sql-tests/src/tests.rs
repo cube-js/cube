@@ -8157,21 +8157,14 @@ async fn queue_full_workflow(service: Box<dyn SqlClient>) {
             .exec_query(r#"QUEUE RETRIEVE CONCURRENCY 1 "STANDALONE#queue:3""#)
             .await
             .unwrap();
-        assert_eq!(
-            retrieve_response.get_columns(),
-            &vec![
-                Column::new("payload".to_string(), ColumnType::String, 0),
-                Column::new("extra".to_string(), ColumnType::String, 1),
-                Column::new("pending".to_string(), ColumnType::Int, 2),
-                Column::new("active".to_string(), ColumnType::String, 3),
-            ]
-        );
+        assert_queue_retrieve_columns(&retrieve_response);
         assert_eq!(
             retrieve_response.get_rows(),
             &vec![Row::new(vec![
                 TableValue::String("payload3".to_string()),
                 TableValue::Null,
                 TableValue::Int(4),
+                TableValue::String("3".to_string()),
                 TableValue::String("3".to_string()),
             ]),]
         );
@@ -8183,15 +8176,7 @@ async fn queue_full_workflow(service: Box<dyn SqlClient>) {
             .exec_query(r#"QUEUE RETRIEVE CONCURRENCY 1 "STANDALONE#queue:4""#)
             .await
             .unwrap();
-        assert_eq!(
-            retrieve_response.get_columns(),
-            &vec![
-                Column::new("payload".to_string(), ColumnType::String, 0),
-                Column::new("extra".to_string(), ColumnType::String, 1),
-                Column::new("pending".to_string(), ColumnType::Int, 2),
-                Column::new("active".to_string(), ColumnType::String, 3),
-            ]
-        );
+        assert_queue_retrieve_columns(&retrieve_response);
         assert_eq!(retrieve_response.get_rows().len(), 0);
     }
 
@@ -8288,6 +8273,19 @@ async fn queue_full_workflow(service: Box<dyn SqlClient>) {
     }
 }
 
+fn assert_queue_retrieve_columns(response: &Arc<DataFrame>) {
+    assert_eq!(
+        response.get_columns(),
+        &vec![
+            Column::new("payload".to_string(), ColumnType::String, 0),
+            Column::new("extra".to_string(), ColumnType::String, 1),
+            Column::new("pending".to_string(), ColumnType::Int, 2),
+            Column::new("active".to_string(), ColumnType::String, 3),
+            Column::new("id".to_string(), ColumnType::String, 4),
+        ]
+    );
+}
+
 async fn queue_retrieve_extended(service: Box<dyn SqlClient>) {
     service
         .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:1" "payload1";"#)
@@ -8309,21 +8307,14 @@ async fn queue_retrieve_extended(service: Box<dyn SqlClient>) {
             .exec_query(r#"QUEUE RETRIEVE CONCURRENCY 1 "STANDALONE#queue:1""#)
             .await
             .unwrap();
-        assert_eq!(
-            retrieve_response.get_columns(),
-            &vec![
-                Column::new("payload".to_string(), ColumnType::String, 0),
-                Column::new("extra".to_string(), ColumnType::String, 1),
-                Column::new("pending".to_string(), ColumnType::Int, 2),
-                Column::new("active".to_string(), ColumnType::String, 3),
-            ]
-        );
+        assert_queue_retrieve_columns(&retrieve_response);
         assert_eq!(
             retrieve_response.get_rows(),
             &vec![Row::new(vec![
                 TableValue::String("payload1".to_string()),
                 TableValue::Null,
                 TableValue::Int(2),
+                TableValue::String("1".to_string()),
                 TableValue::String("1".to_string()),
             ]),]
         );
@@ -8335,15 +8326,7 @@ async fn queue_retrieve_extended(service: Box<dyn SqlClient>) {
             .exec_query(r#"QUEUE RETRIEVE EXTENDED CONCURRENCY 1 "STANDALONE#queue:2""#)
             .await
             .unwrap();
-        assert_eq!(
-            retrieve_response.get_columns(),
-            &vec![
-                Column::new("payload".to_string(), ColumnType::String, 0),
-                Column::new("extra".to_string(), ColumnType::String, 1),
-                Column::new("pending".to_string(), ColumnType::Int, 2),
-                Column::new("active".to_string(), ColumnType::String, 3),
-            ]
-        );
+        assert_queue_retrieve_columns(&retrieve_response);
         assert_eq!(
             retrieve_response.get_rows(),
             &vec![Row::new(vec![
@@ -8351,6 +8334,7 @@ async fn queue_retrieve_extended(service: Box<dyn SqlClient>) {
                 TableValue::Null,
                 TableValue::Int(2),
                 TableValue::String("1".to_string()),
+                TableValue::Null,
             ]),]
         );
     }
@@ -8360,15 +8344,7 @@ async fn queue_retrieve_extended(service: Box<dyn SqlClient>) {
             .exec_query(r#"QUEUE RETRIEVE EXTENDED CONCURRENCY 2 "STANDALONE#queue:2""#)
             .await
             .unwrap();
-        assert_eq!(
-            retrieve_response.get_columns(),
-            &vec![
-                Column::new("payload".to_string(), ColumnType::String, 0),
-                Column::new("extra".to_string(), ColumnType::String, 1),
-                Column::new("pending".to_string(), ColumnType::Int, 2),
-                Column::new("active".to_string(), ColumnType::String, 3),
-            ]
-        );
+        assert_queue_retrieve_columns(&retrieve_response);
         assert_eq!(
             retrieve_response.get_rows(),
             &vec![Row::new(vec![
@@ -8376,6 +8352,7 @@ async fn queue_retrieve_extended(service: Box<dyn SqlClient>) {
                 TableValue::Null,
                 TableValue::Int(1),
                 TableValue::String("1,2".to_string()),
+                TableValue::String("2".to_string()),
             ]),]
         );
     }
