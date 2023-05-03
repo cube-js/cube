@@ -48,7 +48,7 @@ cube_project
 ## Cubes
 
 * Cubes should remain private; set [`public: false`][ref-public] for all cubes. Only views can be exposed to visualization tools.
-* A cube's name should represent business entiity and be plural. If a cube's name may clash with a view's name, add the `base_` prefix to the cube's name, e.g., `base_opportunities.yml`.
+* A cube's name should represent a business entity and be plural. If a cube's name may clash with a view's name, add the `base_` prefix to the cube's name, e.g., `base_opportunities.yml`.
 * If possible, use [`sql_table`][ref-sql-table] instead of `sql`, i.e., use `sql_table: schema.table` instead of `sql: SELECT * FROM schema.table`.
 * Use `many_to_one`, `one_to_many`, `one_to_one` [join relationship types][ref-join-rel] instead of `belongs_to`, `has_many`, `has_one`.
 * Applicable [cube parameters][ref-cube-params] should be ordered as follows:
