@@ -139,6 +139,7 @@ const MainMenu: React.FC<Props> = (props = defaultProps) => {
               </Menu.SubMenu>
             );
           })}
+          <MenuItem to="https://cube.dev/blog/category/changelog" title="Changelog" />
         </Menu>
       </div>
     </Col>
