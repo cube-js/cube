@@ -332,6 +332,7 @@ impl RocksCacheStore {
 
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
 pub struct QueueAddResponse {
+    pub id: u64,
     pub added: bool,
     pub pending: u64,
 }
@@ -572,15 +573,16 @@ impl CacheStore for RocksCacheStore {
                 let index_key = QueueItemIndexKey::ByPath(item.get_path());
                 let id_row_opt = queue_schema
                     .get_single_opt_row_by_index(&index_key, &QueueItemRocksIndex::ByPath)?;
-                let added = if id_row_opt.is_none() {
-                    queue_schema.insert(item, batch_pipe)?;
 
-                    true
+                let (id, added) = if let Some(row) = id_row_opt {
+                    (row.id, false)
                 } else {
-                    false
+                    let row = queue_schema.insert(item, batch_pipe)?;
+                    (row.id, true)
                 };
 
                 Ok(QueueAddResponse {
+                    id,
                     added,
                     pending: if added { pending + 1 } else { pending },
                 })

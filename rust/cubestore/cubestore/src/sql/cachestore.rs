@@ -173,10 +173,12 @@ impl CacheStoreSqlService {
                 (
                     Arc::new(DataFrame::new(
                         vec![
-                            Column::new("added".to_string(), ColumnType::Boolean, 0),
-                            Column::new("pending".to_string(), ColumnType::Int, 1),
+                            Column::new("id".to_string(), ColumnType::String, 0),
+                            Column::new("added".to_string(), ColumnType::Boolean, 1),
+                            Column::new("pending".to_string(), ColumnType::Int, 2),
                         ],
                         vec![Row::new(vec![
+                            TableValue::String(response.id.to_string()),
                             TableValue::Boolean(response.added),
                             TableValue::Int(response.pending as i64),
                         ])],
