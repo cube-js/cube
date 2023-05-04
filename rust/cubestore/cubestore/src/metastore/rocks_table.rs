@@ -469,6 +469,15 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
             {
                 let mut batch = WriteBatch::default();
 
+                log::trace!(
+                    "Migrating table {:?} from [{}, {}] to [{}, {}]",
+                    Self::table_id(),
+                    table_info.version,
+                    table_info.value_version,
+                    Self::T::version(),
+                    Self::T::value_version(),
+                );
+
                 self.migrate_table(&mut batch, table_info)?;
 
                 batch.put(
