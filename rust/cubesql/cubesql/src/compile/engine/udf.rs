@@ -3164,3 +3164,22 @@ pub fn create_charindex_udf() -> ScalarUDF {
         &fun,
     )
 }
+
+pub fn create_mod_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 2);
+
+        return Err(DataFusionError::NotImplemented(format!(
+            "mod is not implemented, it's stub"
+        )));
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int32)));
+
+    ScalarUDF::new(
+        "mod",
+        &Signature::any(2, Volatility::Immutable),
+        &return_type,
+        &fun,
+    )
+}
