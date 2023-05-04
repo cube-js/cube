@@ -6,7 +6,7 @@ subCategory: Advanced
 menuOrder: 35
 ---
 
-You can leverage Cube on top of your dbt models by simply pointing to your model in your database.
+You can leverage Cube on top of dbt models by pointing cubes to dbt models in your database.
 
 <CodeTabs>
 
@@ -24,10 +24,14 @@ cube(`orders`, {
 
 </CodeTabs>
 
+## Using dbt_metrics
 
-## Using dbt metrics
+<WarningBox>
 
-Cube used the `@cubejs-backend/dbt-schema-extension` package to read metric definitions from dbt.
+Previously, Cube provided the `@cubejs-backend/dbt-schema-extension` package to read metric definitions from dbt.
+Due to the [change in direction][dbt-deprecation] at dbt, we have deprecated this package as well.
+When a new `dbt_metrics` package becomes available, we will update and reintroduce our integration.
 
-We have __deprecated__ that package due to a change in direction at dbt. 
-When a new dbt metrics package becomes available, we will update and reintroduce our integration.
+</WarningBox>
+
+[dbt-deprecation]: https://docs.getdbt.com/blog/deprecating-dbt-metrics
