@@ -44,6 +44,8 @@ describe('snowflake', () => {
     const response = await client.load({
       measures: [
         'Orders.totalAmount',
+        'Orders.totalFloatAmount',
+        'Orders.totalDecimalAmount',
       ],
     });
     expect(response.rawData()).toMatchSnapshot('query');
