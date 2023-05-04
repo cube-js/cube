@@ -376,8 +376,10 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         Ok(())
     }
 
-    fn insert(
+    /// @internal Do not use this method directly, please use insert or insert_with_pk
+    fn do_insert(
         &self,
+        row_id: Option<u64>,
         row: Self::T,
         batch_pipe: &mut BatchPipe,
     ) -> Result<IdRow<Self::T>, CubeError> {
@@ -401,7 +403,13 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
             }
         }
 
-        let (row_id, inserted_row) = self.insert_row(serialized_row)?;
+        let row_id = if let Some(row_id) = row_id {
+            row_id
+        } else {
+            self.next_table_seq()?
+        };
+        let inserted_row = self.insert_row(row_id, serialized_row)?;
+
         batch_pipe.add_event(MetaStoreEvent::Insert(Self::table_id(), row_id));
         if self.snapshot().get(&inserted_row.key)?.is_some() {
             return Err(CubeError::internal(format!("Primary key constraint violation. Primary key already exists for a row id {}: {:?}", row_id, &row)));
@@ -417,6 +425,23 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         }
 
         Ok(IdRow::new(row_id, row))
+    }
+
+    fn insert_with_pk(
+        &self,
+        row_id: u64,
+        row: Self::T,
+        batch_pipe: &mut BatchPipe,
+    ) -> Result<IdRow<Self::T>, CubeError> {
+        self.do_insert(Some(row_id), row, batch_pipe)
+    }
+
+    fn insert(
+        &self,
+        row: Self::T,
+        batch_pipe: &mut BatchPipe,
+    ) -> Result<IdRow<Self::T>, CubeError> {
+        self.do_insert(None, row, batch_pipe)
     }
 
     fn migrate(&self) -> Result<(), CubeError> {
@@ -443,6 +468,15 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
                 || table_info.value_version != Self::T::value_version()
             {
                 let mut batch = WriteBatch::default();
+
+                log::trace!(
+                    "Migrating table {:?} from [{}, {}] to [{}, {}]",
+                    Self::table_id(),
+                    table_info.version,
+                    table_info.value_version,
+                    Self::T::version(),
+                    Self::T::value_version(),
+                );
 
                 self.migrate_table(&mut batch, table_info)?;
 
@@ -798,14 +832,14 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         Ok(next_seq)
     }
 
-    fn insert_row(&self, row: Vec<u8>) -> Result<(u64, KeyVal), CubeError> {
-        let next_seq = self.next_table_seq()?;
-        let t = RowKey::Table(Self::table_id(), next_seq);
+    fn insert_row(&self, row_id: u64, row: Vec<u8>) -> Result<KeyVal, CubeError> {
+        let t = RowKey::Table(Self::table_id(), row_id);
         let res = KeyVal {
             key: t.to_bytes(),
             val: row,
         };
-        Ok((next_seq, res))
+
+        Ok(res)
     }
 
     fn update_row(&self, row_id: u64, row: Vec<u8>) -> Result<KeyVal, CubeError> {
