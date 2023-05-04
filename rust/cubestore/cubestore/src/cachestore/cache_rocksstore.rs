@@ -825,7 +825,12 @@ impl CacheStore for RocksCacheStore {
 
                     if let Some(result) = result {
                         let queue_result = QueueResult::new(path.clone(), result.clone());
-                        let result_row = result_schema.insert(queue_result, batch_pipe)?;
+                        // QueueResult is a result of QueueItem, it's why we can use row_id of QueueItem
+                        let result_row = result_schema.insert_with_pk(
+                            item_row.get_id(),
+                            queue_result,
+                            batch_pipe,
+                        )?;
 
                         batch_pipe.add_event(MetaStoreEvent::AckQueueItem(QueueResultAckEvent {
                             path,
