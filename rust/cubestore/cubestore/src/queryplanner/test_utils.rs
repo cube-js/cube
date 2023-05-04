@@ -808,7 +808,7 @@ impl CacheStore for CacheStoreMock {
         &self,
         _path: String,
         _result: Option<String>,
-    ) -> Result<(), CubeError> {
+    ) -> Result<bool, CubeError> {
         panic!("CacheStore mock!")
     }
 
