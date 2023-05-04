@@ -119,10 +119,25 @@ export class MssqlQuery extends BaseQuery {
   }
 
   overTimeSeriesSelect(cumulativeMeasures, dateSeriesSql, baseQuery, dateJoinConditionSql, baseQueryAlias) {
+    // Group by time dimensions
+    const timeDimensionsColumns = this.timeDimensions.map(
+      (t) => `${t.dateSeriesAliasName()}.${this.escapeColumnName('date_from')}`
+    );
+  
+    // Group by regular dimensions
+    const dimensionColumns = R.flatten(
+      this.dimensions.map(s => s.selectColumns() && s.dimensionSql() && s.aliasName())
+    ).filter(s => !!s);
+  
+    // Combine time dimensions and regular dimensions for GROUP BY clause
+    const allGroupByColumns = timeDimensionsColumns.concat(dimensionColumns);
+  
     const forSelect = this.overTimeSeriesForSelect(cumulativeMeasures);
-    return `SELECT ${forSelect} FROM ${dateSeriesSql}` +
+    return (
+      `SELECT ${forSelect} FROM ${dateSeriesSql}` +
       ` LEFT JOIN (${baseQuery}) ${this.asSyntaxJoin} ${baseQueryAlias} ON ${dateJoinConditionSql}` +
-      this.groupByClause();
+      ` GROUP BY ${allGroupByColumns.join(', ')}`
+    );
   }
 
   nowTimestampSql() {

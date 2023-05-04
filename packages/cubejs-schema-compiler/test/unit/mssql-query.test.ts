@@ -119,7 +119,7 @@ describe('MssqlQuery', () => {
       const queryCloseIdx = queryString.indexOf(')', lastGroupByIdx + 1);
       const finalGroupBy = queryString.substring(lastGroupByIdx, queryCloseIdx);
 
-      expect(finalGroupBy).toEqual('GROUP BY dateadd(week, DATEDIFF(week, 0, TODATETIMEOFFSET("visitors_unbounded_count_cumulative__visitors".created_at, \'-07:00\'');
+      expect(finalGroupBy).toEqual("GROUP BY \"visitors.createdAt_series\".\"date_from\"");
     }));
 
     it('should group by both time and regular dimensions on rolling windows',
@@ -152,7 +152,7 @@ describe('MssqlQuery', () => {
       const queryCloseIdx = queryString.indexOf(')', lastGroupByIdx + 1);
       const finalGroupBy = queryString.substring(lastGroupByIdx, queryCloseIdx);
 
-      expect(finalGroupBy).toEqual('GROUP BY "visitors_unbounded_count_cumulative__visitors".role, dateadd(week, DATEDIFF(week, 0, TODATETIMEOFFSET("visitors_unbounded_count_cumulative__visitors".created_at, \'-07:00\'');
+      expect(finalGroupBy).toEqual("GROUP BY \"visitors.createdAt_series\".\"date_from\", \"visitors__role\"");
     }));
 
   it('should not include order by clauses in subqueries',
