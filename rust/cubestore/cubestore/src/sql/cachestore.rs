@@ -3,7 +3,7 @@ use crate::metastore::{Column, ColumnType};
 
 use crate::queryplanner::{QueryPlan, QueryPlanner};
 use crate::sql::parser::{
-    CacheCommand, CacheStoreCommand, CubeStoreParser, QueueCommand,
+    CacheCommand, CacheStoreCommand, CubeStoreParser, QueueCommand, QueueKey,
     Statement as CubeStoreStatement, SystemCommand,
 };
 use crate::sql::{QueryPlans, SqlQueryContext, SqlService};
@@ -207,14 +207,24 @@ impl CacheStoreSqlService {
                 (Arc::new(DataFrame::new(columns, rows)), true)
             }
             QueueCommand::Heartbeat { key } => {
-                self.cachestore.queue_heartbeat_by_path(key.value).await?;
+                match key {
+                    QueueKey::ById(id) => self.cachestore.queue_heartbeat_by_id(id).await?,
+                    QueueKey::ByPath(path) => self.cachestore.queue_heartbeat_by_path(path).await?,
+                }
 
                 (Arc::new(DataFrame::new(vec![], vec![])), true)
             }
             QueueCommand::MergeExtra { key, payload } => {
-                self.cachestore
-                    .queue_merge_extra_by_path(key.value, payload)
-                    .await?;
+                match key {
+                    QueueKey::ById(id) => {
+                        self.cachestore.queue_merge_extra_by_id(id, payload).await?
+                    }
+                    QueueKey::ByPath(path) => {
+                        self.cachestore
+                            .queue_merge_extra_by_path(path, payload)
+                            .await?
+                    }
+                }
 
                 (Arc::new(DataFrame::new(vec![], vec![])), true)
             }

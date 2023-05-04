@@ -248,6 +248,10 @@ impl CacheStore for LazyRocksCacheStore {
         self.init().await?.queue_cancel_by_path(path).await
     }
 
+    async fn queue_heartbeat_by_id(&self, id: u64) -> Result<(), CubeError> {
+        self.init().await?.queue_heartbeat_by_id(id).await
+    }
+
     async fn queue_heartbeat_by_path(&self, path: String) -> Result<(), CubeError> {
         self.init().await?.queue_heartbeat_by_path(path).await
     }
@@ -286,6 +290,13 @@ impl CacheStore for LazyRocksCacheStore {
         self.init()
             .await?
             .queue_result_blocking_by_path(path, timeout)
+            .await
+    }
+
+    async fn queue_merge_extra_by_id(&self, id: u64, payload: String) -> Result<(), CubeError> {
+        self.init()
+            .await?
+            .queue_merge_extra_by_id(id, payload)
             .await
     }
 
