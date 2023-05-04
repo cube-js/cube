@@ -271,7 +271,7 @@ impl CacheStore for LazyRocksCacheStore {
         &self,
         path: String,
         result: Option<String>,
-    ) -> Result<(), CubeError> {
+    ) -> Result<bool, CubeError> {
         self.init().await?.queue_ack_by_path(path, result).await
     }
 

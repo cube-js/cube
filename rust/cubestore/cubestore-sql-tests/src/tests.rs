@@ -8274,10 +8274,14 @@ async fn queue_full_workflow_v1(service: Box<dyn SqlClient>) {
         let ack = async move {
             tokio::time::sleep(Duration::from_millis(1000)).await;
 
-            service_to_move
+            let ack_result = service_to_move
                 .exec_query(r#"QUEUE ACK "STANDALONE#queue:3" "result:3""#)
                 .await
-                .unwrap()
+                .unwrap();
+            assert_eq!(
+                ack_result.get_rows(),
+                &vec![Row::new(vec![TableValue::Boolean(true)])]
+            )
         };
 
         let (blocking_res, _ack_res) = join!(blocking, ack);
@@ -8439,10 +8443,38 @@ async fn queue_ack_then_result(service: Box<dyn SqlClient>) {
         .await
         .unwrap();
 
-    service
+    let ack_result = service
         .exec_query(r#"QUEUE ACK "STANDALONE#queue:5555" "result:5555""#)
         .await
         .unwrap();
+    assert_eq!(
+        ack_result.get_rows(),
+        &vec![Row::new(vec![TableValue::Boolean(true)])]
+    );
+
+    // double ack for result
+    {
+        let ack_result = service
+            .exec_query(r#"QUEUE ACK "STANDALONE#queue:5555" "result:5555""#)
+            .await
+            .unwrap();
+        assert_eq!(
+            ack_result.get_rows(),
+            &vec![Row::new(vec![TableValue::Boolean(false)])]
+        );
+    }
+
+    // ack on unknown queue item
+    {
+        let ack_result = service
+            .exec_query(r#"QUEUE ACK "STANDALONE#queue:123456" "result:5555""#)
+            .await
+            .unwrap();
+        assert_eq!(
+            ack_result.get_rows(),
+            &vec![Row::new(vec![TableValue::Boolean(false)])]
+        );
+    }
 
     let result = service
         .exec_query(r#"QUEUE RESULT "STANDALONE#queue:5555""#)
@@ -8737,10 +8769,14 @@ async fn queue_multiple_result_blocking(service: Box<dyn SqlClient>) {
         let ack = async move {
             tokio::time::sleep(Duration::from_millis(1000)).await;
 
-            service_to_move
+            let ack_result = service_to_move
                 .exec_query(r#"QUEUE ACK "STANDALONE#queue:12345" "result:12345""#)
                 .await
-                .unwrap()
+                .unwrap();
+            assert_eq!(
+                ack_result.get_rows(),
+                &vec![Row::new(vec![TableValue::Boolean(true)])]
+            )
         };
 
         let (blocking1_res, blocking2_res, _ack_res) = join!(blocking1, blocking2, ack);

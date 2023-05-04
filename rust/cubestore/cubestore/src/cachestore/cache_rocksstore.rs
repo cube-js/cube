@@ -405,7 +405,7 @@ pub trait CacheStore: DIService + Send + Sync {
         &self,
         path: String,
         result: Option<String>,
-    ) -> Result<(), CubeError>;
+    ) -> Result<bool, CubeError>;
     async fn queue_result_by_path(
         &self,
         path: String,
@@ -811,7 +811,7 @@ impl CacheStore for RocksCacheStore {
         &self,
         path: String,
         result: Option<String>,
-    ) -> Result<(), CubeError> {
+    ) -> Result<bool, CubeError> {
         self.store
             .write_operation(move |db_ref, batch_pipe| {
                 let queue_schema = QueueItemRocksTable::new(db_ref.clone());
@@ -841,11 +841,11 @@ impl CacheStore for RocksCacheStore {
                         }));
                     }
 
-                    Ok(())
+                    Ok(true)
                 } else {
                     warn!("Unable to ack queue, unknown path: {}", path);
 
-                    Ok(())
+                    Ok(false)
                 }
             })
             .await
@@ -1078,7 +1078,7 @@ impl CacheStore for ClusterCacheStoreClient {
         &self,
         _path: String,
         _result: Option<String>,
-    ) -> Result<(), CubeError> {
+    ) -> Result<bool, CubeError> {
         panic!("CacheStore cannot be used on the worker node! queue_ack_by_path was used.")
     }
 

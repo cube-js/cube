@@ -229,9 +229,15 @@ impl CacheStoreSqlService {
                 (Arc::new(DataFrame::new(vec![], vec![])), true)
             }
             QueueCommand::Ack { key, result } => {
-                self.cachestore.queue_ack_by_path(key.value, result).await?;
+                let success = self.cachestore.queue_ack_by_path(key.value, result).await?;
 
-                (Arc::new(DataFrame::new(vec![], vec![])), true)
+                (
+                    Arc::new(DataFrame::new(
+                        vec![Column::new("success".to_string(), ColumnType::Boolean, 0)],
+                        vec![Row::new(vec![TableValue::Boolean(success)])],
+                    )),
+                    true,
+                )
             }
             QueueCommand::Get { key } => {
                 let result = self.cachestore.queue_get_by_path(key.value).await?;
