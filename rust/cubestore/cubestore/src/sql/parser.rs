@@ -235,10 +235,10 @@ impl<'a> CubeStoreParser<'a> {
 
                 Ok(QueueKey::ByPath(w.to_ident().value))
             }
-            Token::SingleQuotedString(s) => {
+            Token::SingleQuotedString(v) => {
                 self.parser.next_token();
 
-                Ok(QueueKey::ByPath(Ident::with_quote('\'', s).value))
+                Ok(QueueKey::ByPath(v))
             }
             _ => Ok(QueueKey::ById(self.parse_integer("id", false)?)),
         }
