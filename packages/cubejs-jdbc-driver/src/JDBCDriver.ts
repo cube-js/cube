@@ -172,7 +172,7 @@ export class JDBCDriver extends BaseDriver {
       softIdleTimeoutMillis: 30000,
       idleTimeoutMillis: 30000,
       testOnBorrow: true,
-      acquireTimeoutMillis: 20000,
+      acquireTimeoutMillis: 120000,
       ...(poolOptions || {})
     }) as ExtendedPool;
   }
