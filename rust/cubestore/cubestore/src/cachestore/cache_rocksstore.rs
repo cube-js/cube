@@ -269,8 +269,39 @@ impl RocksCacheStore {
                 let queue_result = result_schema.get_row_by_key(key.clone())?;
 
                 if let Some(queue_result) = queue_result {
-                    result_schema.try_delete(queue_result.get_id(), batch_pipe)?;
+                    if queue_result.get_row().is_deleted() {
+                        Ok(None)
+                    } else {
+                        let row_id = queue_result.get_id();
+                        let row = queue_result.into_row();
+                        let mut new_row = row.clone();
+                        new_row.deleted = true;
 
+                        // TODO: Partial update? Index?
+                        let queue_result =
+                            result_schema.update(row_id, new_row, &row, batch_pipe)?;
+
+                        Ok(Some(QueueResultResponse::Success {
+                            value: Some(queue_result.into_row().value),
+                        }))
+                    }
+                } else {
+                    Ok(None)
+                }
+            })
+            .await
+    }
+
+    async fn lookup_queue_result_blocking_by_key(
+        &self,
+        key: QueueKey,
+    ) -> Result<Option<QueueResultResponse>, CubeError> {
+        self.store
+            .read_operation(move |db_ref| {
+                let result_schema = QueueResultRocksTable::new(db_ref.clone());
+                let queue_result = result_schema.get_row_by_key(key.clone())?;
+
+                if let Some(queue_result) = queue_result {
                     Ok(Some(QueueResultResponse::Success {
                         value: Some(queue_result.row.value),
                     }))
@@ -376,6 +407,8 @@ pub trait CacheStore: DIService + Send + Sync {
 
     // queue
     async fn queue_all(&self) -> Result<Vec<IdRow<QueueItem>>, CubeError>;
+    async fn queue_results_all(&self) -> Result<Vec<IdRow<QueueResult>>, CubeError>;
+    async fn queue_results_multi_delete(&self, ids: Vec<u64>) -> Result<(), CubeError>;
     async fn queue_add(&self, item: QueueItem) -> Result<QueueAddResponse, CubeError>;
     async fn queue_truncate(&self) -> Result<(), CubeError>;
     async fn queue_to_cancel(
@@ -546,6 +579,26 @@ impl CacheStore for RocksCacheStore {
     async fn queue_all(&self) -> Result<Vec<IdRow<QueueItem>>, CubeError> {
         self.store
             .read_operation(move |db_ref| Ok(QueueItemRocksTable::new(db_ref).all_rows()?))
+            .await
+    }
+
+    async fn queue_results_all(&self) -> Result<Vec<IdRow<QueueResult>>, CubeError> {
+        self.store
+            .read_operation(move |db_ref| Ok(QueueResultRocksTable::new(db_ref).all_rows()?))
+            .await
+    }
+
+    async fn queue_results_multi_delete(&self, ids: Vec<u64>) -> Result<(), CubeError> {
+        self.store
+            .write_operation(move |db_ref, batch_pipe| {
+                let queue_result_schema = QueueResultRocksTable::new(db_ref);
+
+                for id in ids {
+                    queue_result_schema.try_delete(id, batch_pipe)?;
+                }
+
+                Ok(())
+            })
             .await
     }
 
@@ -792,7 +845,6 @@ impl CacheStore for RocksCacheStore {
                             id: item_row.get_id(),
                             path,
                             result: QueueResultAckEventResult::WithResult {
-                                row_id: result_row.get_id(),
                                 result: result_row.into_row().value,
                             },
                         }));
@@ -831,7 +883,9 @@ impl CacheStore for RocksCacheStore {
         // it will fix position (subscribe) of broadcast channel
         let listener = self.get_listener().await;
 
-        let store_in_result = self.lookup_queue_result_by_key(key.clone()).await?;
+        let store_in_result = self
+            .lookup_queue_result_blocking_by_key(key.clone())
+            .await?;
         if store_in_result.is_some() {
             return Ok(store_in_result);
         }
@@ -847,17 +901,10 @@ impl CacheStore for RocksCacheStore {
                     QueueResultAckEventResult::Empty => {
                         Ok(Some(QueueResultResponse::Success { value: None }))
                     }
-                    QueueResultAckEventResult::WithResult { row_id, result } => {
-                        self.store
-                            .write_operation(move |db_ref, batch_pipe| {
-                                let queue_schema = QueueResultRocksTable::new(db_ref.clone());
-                                queue_schema.try_delete(row_id, batch_pipe)?;
-
-                                Ok(Some(QueueResultResponse::Success {
-                                    value: Some(result),
-                                }))
-                            })
-                            .await
+                    QueueResultAckEventResult::WithResult { result } => {
+                        Ok(Some(QueueResultResponse::Success {
+                            value: Some(result),
+                        }))
                     }
                 },
                 Ok(None) => Ok(None),
@@ -950,6 +997,14 @@ impl CacheStore for ClusterCacheStoreClient {
 
     async fn queue_all(&self) -> Result<Vec<IdRow<QueueItem>>, CubeError> {
         panic!("CacheStore cannot be used on the worker node! queue_all was used.")
+    }
+
+    async fn queue_results_all(&self) -> Result<Vec<IdRow<QueueResult>>, CubeError> {
+        panic!("CacheStore cannot be used on the worker node! queue_results_all was used.")
+    }
+
+    async fn queue_results_multi_delete(&self, _ids: Vec<u64>) -> Result<(), CubeError> {
+        panic!("CacheStore cannot be used on the worker node! queue_results_multi_delete was used.")
     }
 
     async fn queue_add(&self, _item: QueueItem) -> Result<QueueAddResponse, CubeError> {

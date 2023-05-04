@@ -30,8 +30,8 @@ use crate::queryplanner::flatten_union::FlattenUnion;
 use crate::queryplanner::info_schema::{
     ColumnsInfoSchemaTableDef, SchemataInfoSchemaTableDef, SystemCacheTableDef,
     SystemChunksTableDef, SystemIndexesTableDef, SystemJobsTableDef, SystemPartitionsTableDef,
-    SystemQueueTableDef, SystemReplayHandlesTableDef, SystemSnapshotsTableDef,
-    SystemTablesTableDef, TablesInfoSchemaTableDef,
+    SystemQueueResultsTableDef, SystemQueueTableDef, SystemReplayHandlesTableDef,
+    SystemSnapshotsTableDef, SystemTablesTableDef, TablesInfoSchemaTableDef,
 };
 use crate::queryplanner::now::MaterializeNow;
 use crate::queryplanner::planning::{choose_index_ext, ClusterSendNode};
@@ -358,6 +358,11 @@ impl ContextProvider for MetaStoreSchemaProvider {
                 self.cache_store.clone(),
                 InfoSchemaTable::SystemQueue,
             ))),
+            ("system", "queue_results") => Some(Arc::new(InfoSchemaTableProvider::new(
+                self.meta_store.clone(),
+                self.cache_store.clone(),
+                InfoSchemaTable::SystemQueueResults,
+            ))),
             ("system", "replay_handles") => Some(Arc::new(InfoSchemaTableProvider::new(
                 self.meta_store.clone(),
                 self.cache_store.clone(),
@@ -412,6 +417,7 @@ pub enum InfoSchemaTable {
     SystemPartitions,
     SystemChunks,
     SystemQueue,
+    SystemQueueResults,
     SystemReplayHandles,
     SystemCache,
     SystemSnapshots,
@@ -479,6 +485,7 @@ impl InfoSchemaTable {
             InfoSchemaTable::SystemIndexes => Box::new(SystemIndexesTableDef),
             InfoSchemaTable::SystemChunks => Box::new(SystemChunksTableDef),
             InfoSchemaTable::SystemQueue => Box::new(SystemQueueTableDef),
+            InfoSchemaTable::SystemQueueResults => Box::new(SystemQueueResultsTableDef),
             InfoSchemaTable::SystemReplayHandles => Box::new(SystemReplayHandlesTableDef),
             InfoSchemaTable::SystemPartitions => Box::new(SystemPartitionsTableDef),
             InfoSchemaTable::SystemJobs => Box::new(SystemJobsTableDef),

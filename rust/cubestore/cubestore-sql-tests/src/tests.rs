@@ -239,6 +239,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("cache_prefix_keys", cache_prefix_keys),
         t("queue_full_workflow_v1", queue_full_workflow_v1),
         t("queue_full_workflow_v2", queue_full_workflow_v2),
+        t("queue_latest_result_v1", queue_latest_result_v1),
         t("queue_retrieve_extended", queue_retrieve_extended),
         t("queue_ack_then_result", queue_ack_then_result),
         t("queue_orphaned_timeout", queue_orphaned_timeout),
@@ -8106,6 +8107,69 @@ async fn limit_pushdown_unique_key(service: Box<dyn SqlClient>) {
             ]),
         ]
     );
+}
+
+// Testing new rescheduling for old results which works on top of TTL
+// With V1 API it should return latest result after each ACK
+async fn queue_latest_result_v1(service: Box<dyn SqlClient>) {
+    let service = Arc::new(service);
+
+    for interval_id in 1..5 {
+        let add_response = service
+            .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:1" "payload";"#)
+            .await
+            .unwrap();
+        assert_queue_add_columns(&add_response);
+        assert_eq!(
+            add_response.get_rows(),
+            &vec![Row::new(vec![
+                TableValue::String(interval_id.to_string()),
+                TableValue::Boolean(true),
+                TableValue::Int(1)
+            ])]
+        );
+
+        let retrieve_response = service
+            .exec_query(r#"QUEUE RETRIEVE CONCURRENCY 1 "STANDALONE#queue:1""#)
+            .await
+            .unwrap();
+        assert_queue_retrieve_columns(&retrieve_response);
+        assert_eq!(
+            retrieve_response.get_rows(),
+            &vec![Row::new(vec![
+                TableValue::String("payload".to_string()),
+                TableValue::Null,
+                TableValue::Int(0),
+                TableValue::String("1".to_string()),
+                // id
+                TableValue::String(interval_id.to_string()),
+            ]),]
+        );
+
+        let ack_res = service
+            .exec_query(&format!(
+                r#"QUEUE ACK "STANDALONE#queue:1" "result:{}""#,
+                interval_id
+            ))
+            .await
+            .unwrap();
+        assert_eq!(
+            ack_res.get_rows(),
+            &vec![Row::new(vec![TableValue::Boolean(true)])]
+        );
+
+        let blocking_res = service
+            .exec_query(r#"QUEUE RESULT_BLOCKING 5000 "STANDALONE#queue:1""#)
+            .await
+            .unwrap();
+        assert_eq!(
+            blocking_res.get_rows(),
+            &vec![Row::new(vec![
+                TableValue::String(format!("result:{}", interval_id)),
+                TableValue::String("success".to_string())
+            ]),]
+        );
+    }
 }
 
 async fn queue_full_workflow_v1(service: Box<dyn SqlClient>) {
