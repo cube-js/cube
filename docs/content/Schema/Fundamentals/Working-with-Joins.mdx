@@ -743,7 +743,7 @@ cubes:
 
 With the given data model, we have two valid analytics use cases that require different join directions.
 
-The first case is to calculate the total revenue per customer. 
+__The first case is to calculate the total revenue per customer.__
 To do this, we'll use the `total_revenue` measure that is defined on the orders cube. 
 We need to be aware that orders can be placed without customer registration (anonymous customers/guest checkouts). 
 Therefore, we should start the join from the `orders` cube onto the `customers` cube to ensure that we do not lose data from anonymous orders.
