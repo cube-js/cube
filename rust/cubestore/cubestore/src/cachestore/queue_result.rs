@@ -15,7 +15,11 @@ pub struct QueueResult {
     pub(crate) expire: DateTime<Utc>,
 }
 
-impl RocksEntity for QueueResult {}
+impl RocksEntity for QueueResult {
+    fn version() -> u32 {
+        2
+    }
+}
 
 impl QueueResult {
     pub fn new(path: String, value: String) -> Self {

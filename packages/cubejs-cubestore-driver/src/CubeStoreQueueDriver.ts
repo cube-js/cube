@@ -298,11 +298,15 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
   }
 
   public async setResultAndRemoveQuery(hash: QueryKeyHash, executionResult: unknown, _processingId: ProcessingId): Promise<boolean> {
-    await this.driver.query('QUEUE ACK ? ? ', [
+    const rows = await this.driver.query('QUEUE ACK ? ? ', [
       this.prefixKey(hash),
       executionResult ? JSON.stringify(executionResult) : executionResult
     ]);
+    if (rows && rows.length === 1) {
+      return rows[0].success === 'true';
+    }
 
+    // Backward compatibility for old Cube Store
     return true;
   }
 

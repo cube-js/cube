@@ -531,11 +531,10 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
               filters = whereArgToQueryFilters(whereArg, cubeName).concat(filters);
             }
 
-            // Relative date ranges such as "last quarter" can only be used in
-            // timeDimensions dateRange filter
+            // Push down all inDateRange filters to time dimensions to leverage pre-aggregations
             const dateRangeFilters = {};
             filters = filters.filter((f) => {
-              if (f.operator === 'inDateRange' && (typeof f.values === 'string' || f.values?.length === 1)) {
+              if (f.operator === 'inDateRange' && !dateRangeFilters[f.member]) {
                 dateRangeFilters[f.member] = f.values;
                 return false;
               }

@@ -114,35 +114,6 @@ a {
   }
 }
 
-.releaseNotesMeta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-
-  .releaseDate {
-    font-family: inherit;
-    font-weight: 400;
-    font-size: 17px;
-    line-height: 30px;
-    color: $dark-04;
-  }
-
-  .releaseLink {
-    font-family: inherit;
-    font-weight: 400;
-    font-size: 17px;
-    line-height: 30px;
-    text-decoration: none;
-    border-bottom: none !important;
-    color: $dark-04;
-    transition: color 0.2s ease;
-
-    &:hover {
-      color: $purple;
-    }
-  }
-}
-
 .searchBoxWrapper {
   display: flex;
   justify-content: flex-start;

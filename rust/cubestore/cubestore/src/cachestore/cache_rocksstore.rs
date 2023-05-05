@@ -394,6 +394,7 @@ pub trait CacheStore: DIService + Send + Sync {
         &self,
         path: String,
     ) -> Result<Option<IdRow<QueueItem>>, CubeError>;
+    async fn queue_heartbeat_by_id(&self, id: u64) -> Result<(), CubeError>;
     async fn queue_heartbeat_by_path(&self, path: String) -> Result<(), CubeError>;
     async fn queue_retrieve_by_path(
         &self,
@@ -404,7 +405,7 @@ pub trait CacheStore: DIService + Send + Sync {
         &self,
         path: String,
         result: Option<String>,
-    ) -> Result<(), CubeError>;
+    ) -> Result<bool, CubeError>;
     async fn queue_result_by_path(
         &self,
         path: String,
@@ -414,6 +415,7 @@ pub trait CacheStore: DIService + Send + Sync {
         path: String,
         timeout: u64,
     ) -> Result<Option<QueueResultResponse>, CubeError>;
+    async fn queue_merge_extra_by_id(&self, id: u64, payload: String) -> Result<(), CubeError>;
     async fn queue_merge_extra_by_path(
         &self,
         path: String,
@@ -696,6 +698,27 @@ impl CacheStore for RocksCacheStore {
             .await
     }
 
+    async fn queue_heartbeat_by_id(&self, id: u64) -> Result<(), CubeError> {
+        self.store
+            .write_operation(move |db_ref, batch_pipe| {
+                let queue_schema = QueueItemRocksTable::new(db_ref.clone());
+                let id_row_opt = queue_schema.get_row(id)?;
+
+                if let Some(id_row) = id_row_opt {
+                    let mut new = id_row.get_row().clone();
+                    new.update_heartbeat();
+
+                    queue_schema.update(id_row.id, new, id_row.get_row(), batch_pipe)?;
+                    Ok(())
+                } else {
+                    trace!("Unable to update heartbeat, unknown id: {}", id);
+
+                    Ok(())
+                }
+            })
+            .await
+    }
+
     async fn queue_heartbeat_by_path(&self, path: String) -> Result<(), CubeError> {
         self.store
             .write_operation(move |db_ref, batch_pipe| {
@@ -788,7 +811,7 @@ impl CacheStore for RocksCacheStore {
         &self,
         path: String,
         result: Option<String>,
-    ) -> Result<(), CubeError> {
+    ) -> Result<bool, CubeError> {
         self.store
             .write_operation(move |db_ref, batch_pipe| {
                 let queue_schema = QueueItemRocksTable::new(db_ref.clone());
@@ -802,7 +825,12 @@ impl CacheStore for RocksCacheStore {
 
                     if let Some(result) = result {
                         let queue_result = QueueResult::new(path.clone(), result.clone());
-                        let result_row = result_schema.insert(queue_result, batch_pipe)?;
+                        // QueueResult is a result of QueueItem, it's why we can use row_id of QueueItem
+                        let result_row = result_schema.insert_with_pk(
+                            item_row.get_id(),
+                            queue_result,
+                            batch_pipe,
+                        )?;
 
                         batch_pipe.add_event(MetaStoreEvent::AckQueueItem(QueueResultAckEvent {
                             path,
@@ -818,11 +846,11 @@ impl CacheStore for RocksCacheStore {
                         }));
                     }
 
-                    Ok(())
+                    Ok(true)
                 } else {
                     warn!("Unable to ack queue, unknown path: {}", path);
 
-                    Ok(())
+                    Ok(false)
                 }
             })
             .await
@@ -879,6 +907,25 @@ impl CacheStore for RocksCacheStore {
         } else {
             Ok(None)
         }
+    }
+
+    async fn queue_merge_extra_by_id(&self, id: u64, payload: String) -> Result<(), CubeError> {
+        self.store
+            .write_operation(move |db_ref, batch_pipe| {
+                let queue_schema = QueueItemRocksTable::new(db_ref.clone());
+                let id_row_opt = queue_schema.get_row(id)?;
+
+                if let Some(id_row) = id_row_opt {
+                    let new = id_row.get_row().merge_extra(payload)?;
+
+                    queue_schema.update(id_row.id, new, id_row.get_row(), batch_pipe)?;
+                } else {
+                    warn!("Unable to merge extra, unknown id: {}", id);
+                }
+
+                Ok(())
+            })
+            .await
     }
 
     async fn queue_merge_extra_by_path(
@@ -1006,18 +1053,22 @@ impl CacheStore for ClusterCacheStoreClient {
         &self,
         _path: String,
     ) -> Result<Option<IdRow<QueueItem>>, CubeError> {
-        panic!("CacheStore cannot be used on the worker node! queue_get was used.")
+        panic!("CacheStore cannot be used on the worker node! queue_get_by_path was used.")
     }
 
     async fn queue_cancel_by_path(
         &self,
         _path: String,
     ) -> Result<Option<IdRow<QueueItem>>, CubeError> {
-        panic!("CacheStore cannot be used on the worker node! queue_cancel was used.")
+        panic!("CacheStore cannot be used on the worker node! queue_cancel_by_path was used.")
+    }
+
+    async fn queue_heartbeat_by_id(&self, _id: u64) -> Result<(), CubeError> {
+        panic!("CacheStore cannot be used on the worker node! queue_heartbeat_by_id was used.")
     }
 
     async fn queue_heartbeat_by_path(&self, _path: String) -> Result<(), CubeError> {
-        panic!("CacheStore cannot be used on the worker node! queue_heartbeat was used.")
+        panic!("CacheStore cannot be used on the worker node! queue_heartbeat_by_path was used.")
     }
 
     async fn queue_retrieve_by_path(
@@ -1025,22 +1076,22 @@ impl CacheStore for ClusterCacheStoreClient {
         _path: String,
         _allow_concurrency: u32,
     ) -> Result<QueueRetrieveResponse, CubeError> {
-        panic!("CacheStore cannot be used on the worker node! queue_retrieve was used.")
+        panic!("CacheStore cannot be used on the worker node! queue_retrieve_by_path was used.")
     }
 
     async fn queue_ack_by_path(
         &self,
         _path: String,
         _result: Option<String>,
-    ) -> Result<(), CubeError> {
-        panic!("CacheStore cannot be used on the worker node! queue_ack was used.")
+    ) -> Result<bool, CubeError> {
+        panic!("CacheStore cannot be used on the worker node! queue_ack_by_path was used.")
     }
 
     async fn queue_result_by_path(
         &self,
         _path: String,
     ) -> Result<Option<QueueResultResponse>, CubeError> {
-        panic!("CacheStore cannot be used on the worker node! queue_result was used.")
+        panic!("CacheStore cannot be used on the worker node! queue_result_by_path was used.")
     }
 
     async fn queue_result_blocking_by_path(
@@ -1048,7 +1099,13 @@ impl CacheStore for ClusterCacheStoreClient {
         _path: String,
         _timeout: u64,
     ) -> Result<Option<QueueResultResponse>, CubeError> {
-        panic!("CacheStore cannot be used on the worker node! queue_result_blocking was used.")
+        panic!(
+            "CacheStore cannot be used on the worker node! queue_result_blocking_by_path was used."
+        )
+    }
+
+    async fn queue_merge_extra_by_id(&self, _id: u64, _payload: String) -> Result<(), CubeError> {
+        panic!("CacheStore cannot be used on the worker node! queue_merge_extra_by_id was used.")
     }
 
     async fn queue_merge_extra_by_path(
@@ -1056,7 +1113,7 @@ impl CacheStore for ClusterCacheStoreClient {
         _path: String,
         _payload: String,
     ) -> Result<(), CubeError> {
-        panic!("CacheStore cannot be used on the worker node! queue_merge_extra was used.")
+        panic!("CacheStore cannot be used on the worker node! queue_merge_extra_by_path was used.")
     }
 
     async fn compaction(&self) -> Result<(), CubeError> {

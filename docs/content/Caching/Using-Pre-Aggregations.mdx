@@ -242,15 +242,12 @@ the measure is low.
 The order in which columns are specified in the index is **very** important;
 suboptimal ordering can lead to diminished performance. To improve the
 performance of an index the main thing to consider is the order of the columns
-defined in it. The order of the columns should be defined in accordance with the
-[Index Selectivity](https://blog.toadworld.com/2018/09/05/unselective-indexes-selectivity).
-In a nutshell, index selectivity measures how many unique values a database has.
-An index is said to have a **higher** selectivity as the number of unique values
-goes up and a **lower** selectivity as the number of unique values goes down.
-Once we know the selectivity of the columns we'll be adding to the index, we
-need to place them from **lowest** to **highest** selectivity (this is probably
-contrary to what you've read about the topic in traditional row-based
-databases).
+defined in it. 
+
+The rule of thumb for index column order is:
+- Single value filters come first
+- `GROUP BY` columns come second
+- Everything else used in the query comes afterward
 
 **Example:**
 
@@ -388,7 +385,7 @@ cube('orders', {
 
       indexes: {
         category_productname_zipcode_index: {
-          columns: [product_category, product_name, zip_code],
+          columns: [product_category, zip_code, product_name],
         },
       },
     },
@@ -409,8 +406,8 @@ cubes:
           - name: category_productname_zipcode_index
             columns:
               - product_category
-              - product_name
               - zip_code
+              - product_name
 ```
 
 </CodeTabs>
@@ -425,11 +422,11 @@ Then the data within `category_productname_zipcode_index` would look like:
 | Furniture        | Plastic Chair | 88524    | 2023-01-01 11:00:00 | 3000        |
 | Electronics      | Keyboard      | 88524    | 2023-01-01 11:00:00 | 2000        |
 
-The columns are ordered from **lowest** to **highest** selectivity. We can
-expect there to be a lower number of product categories, hence a lower number of
-unique records resulting in a lower selectivity. Although `zip_code` may have
-lower or higher selectivity, the dimensions used to filter must come first than
-the dimensions in the `GROUP BY` part of the query.
+`product_category` column comes first as it's a single value filter. 
+Then `zip_code` as it's `GROUP BY` column.
+`product_name` comes last as it's a multiple value filter.
+
+It might sound counter-intuitive to have `GROUP BY` columns before filter ones, however Cube Store always performs scans on sorted data, and if `GROUP BY` matches index ordering, merge sort-based algorithms are used for querying, which are usually much faster than hash-based group by in case of index ordering doesn't match the query. If in doubt, always use `EXPLAIN` and `EXPLAIN ANALYZE` in Cube Store to figure out the final query plan.
 
 ### Aggregated indexes
 

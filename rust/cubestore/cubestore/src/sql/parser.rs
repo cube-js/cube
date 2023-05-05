@@ -91,6 +91,12 @@ pub enum CacheCommand {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub enum QueueKey {
+    ById(u64),
+    ByPath(String),
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum QueueCommand {
     Add {
         priority: i64,
@@ -116,14 +122,14 @@ pub enum QueueCommand {
         key: Ident,
     },
     Heartbeat {
-        key: Ident,
+        key: QueueKey,
     },
     Ack {
         key: Ident,
         result: Option<String>,
     },
     MergeExtra {
-        key: Ident,
+        key: QueueKey,
         payload: String,
     },
     Retrieve {
@@ -219,6 +225,22 @@ impl<'a> CubeStoreParser<'a> {
                 _ => Ok(Statement::Statement(self.parser.parse_statement()?)),
             },
             _ => Ok(Statement::Statement(self.parser.parse_statement()?)),
+        }
+    }
+
+    fn parse_queue_key(&mut self) -> Result<QueueKey, ParserError> {
+        match self.parser.peek_token() {
+            Token::Word(w) => {
+                self.parser.next_token();
+
+                Ok(QueueKey::ByPath(w.to_ident().value))
+            }
+            Token::SingleQuotedString(v) => {
+                self.parser.next_token();
+
+                Ok(QueueKey::ByPath(v))
+            }
+            _ => Ok(QueueKey::ById(self.parse_integer("id", false)?)),
         }
     }
 
@@ -416,7 +438,7 @@ impl<'a> CubeStoreParser<'a> {
                 key: self.parser.parse_identifier()?,
             },
             "heartbeat" => QueueCommand::Heartbeat {
-                key: self.parser.parse_identifier()?,
+                key: self.parse_queue_key()?,
             },
             "ack" => {
                 let key = self.parser.parse_identifier()?;
@@ -429,7 +451,7 @@ impl<'a> CubeStoreParser<'a> {
                 QueueCommand::Ack { key, result }
             }
             "merge_extra" => QueueCommand::MergeExtra {
-                key: self.parser.parse_identifier()?,
+                key: self.parse_queue_key()?,
                 payload: self.parser.parse_literal_string()?,
             },
             "get" => QueueCommand::Get {

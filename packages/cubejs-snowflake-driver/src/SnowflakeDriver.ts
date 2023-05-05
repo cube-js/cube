@@ -779,8 +779,10 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
         // @ts-ignore
         if (column.getScale() === 0) {
           type.type = 'int';
-        } else {
+        } else if (column.getScale() && column.getScale() <= 10) {
           type.type = 'decimal';
+        } else {
+          type.type = this.toGenericType(column.getType());
         }
       } else {
         type.type = this.toGenericType(column.getType());
