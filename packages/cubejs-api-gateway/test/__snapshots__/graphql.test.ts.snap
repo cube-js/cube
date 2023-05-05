@@ -73,16 +73,6 @@ Object {
   "dimensions": Array [
     "Orders.createdAt",
   ],
-  "filters": Array [
-    Object {
-      "member": "Orders.createdAt",
-      "operator": "inDateRange",
-      "values": Array [
-        "2022-01-01",
-        "2022-02-01",
-      ],
-    },
-  ],
   "measures": Array [
     "Orders.count",
   ],
@@ -91,6 +81,15 @@ Object {
       "Orders.createdAt",
       "asc",
     ],
+  ],
+  "timeDimensions": Array [
+    Object {
+      "dateRange": Array [
+        "2022-01-01",
+        "2022-02-01",
+      ],
+      "dimension": "Orders.createdAt",
+    },
   ],
 }
 `;
@@ -110,16 +109,6 @@ exports[`GraphQL Schema GraphQL query 3: query CubeQuery {
   }
 } 1`] = `
 Object {
-  "filters": Array [
-    Object {
-      "member": "Orders.createdAt",
-      "operator": "inDateRange",
-      "values": Array [
-        "2022-01-01",
-        "2022-02-01",
-      ],
-    },
-  ],
   "measures": Array [
     "Orders.count",
   ],
@@ -131,6 +120,10 @@ Object {
   ],
   "timeDimensions": Array [
     Object {
+      "dateRange": Array [
+        "2022-01-01",
+        "2022-02-01",
+      ],
       "dimension": "Orders.createdAt",
       "granularity": "day",
     },
