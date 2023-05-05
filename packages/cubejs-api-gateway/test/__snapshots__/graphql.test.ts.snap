@@ -89,7 +89,6 @@ Object {
         "2022-02-01",
       ],
       "dimension": "Orders.createdAt",
-      "granularity": "day",
     },
   ],
 }
