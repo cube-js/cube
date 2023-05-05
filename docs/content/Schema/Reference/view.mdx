@@ -100,7 +100,7 @@ the above view with SQL API:
 ```sql
 SELECT 
   users_city,
-  total_amount
+  MEASURE(total_amount)
 FROM orders
 GROUP BY 1
 ```
@@ -279,6 +279,27 @@ Prior to v0.33, this property was called `shown`.
 The `public` property is used to manage the visibility of a view. Valid values
 for `public` are `true` and `false`. When set to `false`, this view **cannot**
 be queried through the API. Defaults to `true`.
+
+<CodeTabs>
+
+```yaml
+views:
+  - name: orders
+    public: false
+```
+
+```javascript
+view(`orders`, {
+  public: false
+});
+```
+
+</CodeTabs>
+
+
+You can also use `COMPILE_CONTEXT` for dynamic visibility if necessary, check out our [Controlling access to cubes and views
+](https://cube.dev/docs/recipes/controlling-access-to-cubes-and-views) recipe.
+
 
 <CodeTabs>
 

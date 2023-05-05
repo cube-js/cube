@@ -372,7 +372,7 @@ cubes:
 
 </CodeTabs>
 
-### <--{"id" : "Many-to-many joins"}--> Many-to-many joins without an associative table
+### <--{"id" : "Many-to-many joins"}--> Using virtual associative cube
 
 Sometimes there is no associative table in the database, when in reality, there
 is a many-to-many relationship. In this case, the solution is to extract some
@@ -644,7 +644,9 @@ cubes:
 ## Directions of joins
 
 The direction of [joins][ref-schema-ref-joins] greatly influences the final
-result set. As an example, let's take two cubes, `orders` and `customers`:
+result set. It can be explicitly controlled on a [view][ref-schema-ref-view] level.
+
+As an example, let's take two cubes, `orders` and `customers`:
 
 <CodeTabs>
 
@@ -675,79 +677,6 @@ cube(`orders`, {
 
 cube(`customers`, {
   sql_table: `customers`,
-
-  measures: {
-    count: {
-      sql: `id`,
-      type: `count`,
-    },
-  },
-
-  dimensions: {
-    id: {
-      sql: `id`,
-      type: `number`,
-      primary_key: true,
-    },
-  },
-});
-```
-
-```yaml
-cubes:
-  - name: orders
-    sql_table: orders
-
-    measures:
-      - name: count
-        sql: id
-        type: count
-    
-    dimensions:
-      - name: id
-        sql: id
-        type: number
-        primary_key: true
-    
-      - name: customer_id
-        sql: customer_id
-        type: number
-
-  - name: customers
-    sql_table: customers
-
-    measures:
-      - name: count
-        sql: id
-        type: count
-    
-    dimensions:
-      - name: id
-        sql: id
-        type: number
-        primary_key: true
-```
-
-</CodeTabs>
-
-The first case is to calculate the total revenue per customer. Let's name this
-metric `total_revenue`. We also need to be aware of the fact that orders can be
-placed without customer registration (anonymous customers/guest checkouts).
-Because of anonymous customers, we should start the join from the `orders` onto
-the `customers` cube so that we do not lose data from anonymous orders:
-
-<CodeTabs>
-
-```javascript
-cube(`orders`, {
-  sql_table: `orders`,
-
-  joins: {
-    customers: {
-      relationship: `many_to_one`,
-      sql: `${CUBE}.customer_id = ${customers.id}`,
-    },
-  },
 
   measures: {
     count: {
@@ -766,12 +695,6 @@ cube(`orders`, {
       sql: `id`,
       type: `number`,
       primary_key: true,
-      public: true,
-    },
-
-    customer_id: {
-      sql: `customer_id`,
-      type: `number`,
     },
   },
 });
@@ -782,16 +705,11 @@ cubes:
   - name: orders
     sql_table: orders
 
-    joins:
-      - name: customers
-        relationship: many_to_one
-        sql: "{CUBE}.customer_id = {customers.id}"
-
     measures:
       - name: count
         sql: id
         type: count
-      
+
       - name: total_revenue
         sql: revenue
         type: sum
@@ -801,162 +719,125 @@ cubes:
         sql: id
         type: number
         primary_key: true
-        public: true
-
+    
       - name: customer_id
         sql: customer_id
         type: number
-```
 
-</CodeTabs>
-
-After adding the join to the data model, we can query the cube as follows:
-
-```json
-{
-  "dimensions": ["users.company"],
-  "measures": ["orders.total_revenue"],
-  "timeDimensions": [{
-    "dimension": "orders.created_at"
-  }]
-}
-```
-
-The second case is to find customers without any orders. Let's call this metric
-`count`. In this case we should join the `customers` cube with the `orders` cube
-to find customers with 0 orders placed. The reverse order of joins would result
-in a dataset without data for customers with no orders. Therefore, in this
-instance, we declare the join in the `customers` cube:
-
-<CodeTabs>
-
-```javascript
-cube(`customers`, {
-  sql_table: `customers`,
-
-  joins: {
-    orders: {
-      relationship: `one_to_many`,
-      sql: `${CUBE}.id = ${orders.customer_id}`,
-    },
-  },
-
-  measures: {
-    count: {
-      sql: `id`,
-      type: `count`,
-    },
-  },
-
-  dimensions: {
-    id: {
-      sql: `id`,
-      type: `number`,
-      primary_key: true,
-      public: true,
-    },
-
-    customer_id: {
-      sql: `customer_id`,
-      type: `number`,
-    },
-  },
-});
-```
-
-```yaml
-cubes:
   - name: customers
     sql_table: customers
-
-    joins:
-      - name: orders
-        relationship: one_to_many
-        sql: "{CUBE}.id = {orders.customer_id}"
 
     measures:
       - name: count
         sql: id
         type: count
-
+    
     dimensions:
       - name: id
         sql: id
         type: number
         primary_key: true
-        public: true
-
-      - name: customer_id
-        sql: customer_id
-        type: number
 ```
 
 </CodeTabs>
 
-We can then query the cube as follows:
+With the given data model, we have two valid analytics use cases that require different join directions.
 
-```json
-{
-  "dimensions": ["users.company"],
-  "timeDimensions": [{
-    "dimension": "orders.created_at"
-  }],
-  "filters": [{
-    "member": "orders.count",
-    "operator": "equals",
-    "values": ["0"]
-  }]
-}
-```
+__The first case is to calculate the total revenue per customer.__
+To do this, we'll use the `total_revenue` measure that is defined on the orders cube. 
+We need to be aware that orders can be placed without customer registration (anonymous customers/guest checkouts). 
+Therefore, we should start the join from the `orders` cube onto the `customers` cube to ensure that we do not lose data from anonymous orders.
 
-### <--{"id" : "Directions of joins"}--> Using views
-
-Views can also be used in Cube to represent the previous two scenarios:
 
 <CodeTabs>
-
-```javascript
-view(`total_revenue_per_customer", {
-  description: `Total revenue per customer`,
-
-  includes: [
-    orders.total_revenue,
-    users.company
-  ],
-});
-
-view(`customers_without_orders`, {
-  description: `Customers without orders`,
-
-  includes: [
-    users.company,
-    // Note the nested path to orders.count
-    users.orders.count
-  ]
-});
-```
 
 ```yaml
 views:
   - name: total_revenue_per_customer
     description: Total revenue per customer
 
-    includes:
-      - orders.total_revenue
-      - users.company
+    cubes:
+      - join_path: orders
+        includes:
+          - total_revenue
+          - created_at
 
-  - name: customers_without_orders
-    description: Customers without orders
+      - join_path: orders.customers
+        includes:
+          - company
+```
 
-    includes:
-      - users.company
-      # Note the nested path to orders.count
-      - users.orders.count
+```javascript
+view(`total_revenue_per_customer`, {
+
+});
 ```
 
 </CodeTabs>
 
-### <--{"id" : "Directions of joins"}--> Transitive join pitfalls
+
+We can query this view as follows:
+
+
+
+```json
+{
+  "dimensions": ["total_revenue_per_customer.company"],
+  "measures": ["total_revenue_per_customer.total_revenue"],
+  "timeDimensions": [{
+    "dimension": "total_revenue_per_customer.created_at"
+  }]
+}
+```
+
+
+__The second case is to find customers who have not placed any orders.__
+We will use the count measure on the customers cube for that. 
+In this case, we should join the customers cube with the orders cube to find customers with zero orders placed.
+The reverse order of joins would result in a dataset without data for customers with no orders.
+
+<CodeTabs>
+
+```yaml
+views:
+  - name: customers_without_orders
+    description: Customers without orders
+
+    cubes:
+      - join_path: customers
+        includes: 
+          - company
+
+      - join_path: customers.orders
+        prefix: true
+        includes: 
+          - created_at
+          - count
+```
+
+```javascript
+```
+</CodeTabs>
+
+
+
+We can then query the cube as follows:
+
+```json
+{
+  "dimensions": ["customers_without_orders.company"],
+  "timeDimensions": [{
+    "dimension": "customers_without_orders.orders_created_at"
+  }],
+  "filters": [{
+    "member": "customers_without_orders.orders_count",
+    "operator": "equals",
+    "values": ["0"]
+  }]
+}
+```
+
+## Transitive join pitfalls
 
 Let's consider an example where we have a many-to-many relationship between
 `users` and `organizations` through an `organization_users` cube:
@@ -1147,6 +1028,7 @@ cubes:
 
 </CodeTabs>
 
+[ref-schema-ref-view]: /schema/reference/view
 [ref-schema-ref-joins]: /schema/reference/joins
 [ref-schema-ref-joins-relationship]:
   /schema/reference/joins#parameters-relationship
