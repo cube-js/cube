@@ -186,6 +186,7 @@ Non-additive `avg` measures can be rewritten as
 [calculated measures](https://cube.dev/docs/schema/reference/measures#calculated-measures)
 that reference additive measures only. Then, this additive measures can be used
 in pre-aggregations.
+Please note, however, that you shouldn't include `avg_age` measure in your pre-aggregation as it renders it non-additive.
 
 For example, the `avg_age` measure can be rewritten as follows:
 
@@ -206,6 +207,15 @@ cubes:
 
       - name: count
         type: count
+
+    pre_aggregations:
+      - name: main
+        measures:
+          - age_sum
+          - count
+        dimensions:
+          - gender
+  
 ```
 
 ```javascript
@@ -223,6 +233,13 @@ cube(`users`, {
 
     count: {
       type: `count`,
+    },
+  },
+  
+  pre_aggregations: {
+    main: {
+      measures: [age_sum, count],
+      dimensions: [gender],
     },
   },
 });
