@@ -242,19 +242,12 @@ impl CacheStore for LazyRocksCacheStore {
         self.init().await?.queue_get_by_path(path).await
     }
 
-    async fn queue_cancel_by_path(
-        &self,
-        path: String,
-    ) -> Result<Option<IdRow<QueueItem>>, CubeError> {
-        self.init().await?.queue_cancel_by_path(path).await
+    async fn queue_cancel(&self, key: QueueKey) -> Result<Option<IdRow<QueueItem>>, CubeError> {
+        self.init().await?.queue_cancel(key).await
     }
 
-    async fn queue_heartbeat_by_id(&self, id: u64) -> Result<(), CubeError> {
-        self.init().await?.queue_heartbeat_by_id(id).await
-    }
-
-    async fn queue_heartbeat_by_path(&self, path: String) -> Result<(), CubeError> {
-        self.init().await?.queue_heartbeat_by_path(path).await
+    async fn queue_heartbeat(&self, key: QueueKey) -> Result<(), CubeError> {
+        self.init().await?.queue_heartbeat(key).await
     }
 
     async fn queue_retrieve_by_path(
@@ -287,22 +280,8 @@ impl CacheStore for LazyRocksCacheStore {
         self.init().await?.queue_result_blocking(key, timeout).await
     }
 
-    async fn queue_merge_extra_by_id(&self, id: u64, payload: String) -> Result<(), CubeError> {
-        self.init()
-            .await?
-            .queue_merge_extra_by_id(id, payload)
-            .await
-    }
-
-    async fn queue_merge_extra_by_path(
-        &self,
-        path: String,
-        payload: String,
-    ) -> Result<(), CubeError> {
-        self.init()
-            .await?
-            .queue_merge_extra_by_path(path, payload)
-            .await
+    async fn queue_merge_extra(&self, key: QueueKey, payload: String) -> Result<(), CubeError> {
+        self.init().await?.queue_merge_extra(key, payload).await
     }
 
     async fn compaction(&self) -> Result<(), CubeError> {

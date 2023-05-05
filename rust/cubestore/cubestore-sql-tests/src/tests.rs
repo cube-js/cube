@@ -8587,10 +8587,7 @@ async fn queue_full_workflow_v2(service: Box<dyn SqlClient>) {
 
     // cancel job
     {
-        let cancel_response = service
-            .exec_query(r#"QUEUE CANCEL "STANDALONE#queue:2""#)
-            .await
-            .unwrap();
+        let cancel_response = service.exec_query(r#"QUEUE CANCEL 2"#).await.unwrap();
         assert_eq!(
             cancel_response.get_rows(),
             &vec![Row::new(vec![

@@ -113,7 +113,7 @@ pub enum QueueCommand {
         sort_by_priority: bool,
     },
     Cancel {
-        key: Ident,
+        key: QueueKey,
     },
     Heartbeat {
         key: QueueKey,
@@ -429,7 +429,7 @@ impl<'a> CubeStoreParser<'a> {
                 }
             }
             "cancel" => QueueCommand::Cancel {
-                key: self.parser.parse_identifier()?,
+                key: self.parse_queue_key()?,
             },
             "heartbeat" => QueueCommand::Heartbeat {
                 key: self.parse_queue_key()?,

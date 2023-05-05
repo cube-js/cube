@@ -1,4 +1,4 @@
-use crate::cachestore::{CacheItem, CacheStore, QueueItem, QueueKey};
+use crate::cachestore::{CacheItem, CacheStore, QueueItem};
 use crate::metastore::{Column, ColumnType};
 
 use crate::queryplanner::{QueryPlan, QueryPlanner};
@@ -197,7 +197,7 @@ impl CacheStoreSqlService {
                     Column::new("extra".to_string(), ColumnType::String, 1),
                 ];
 
-                let result = self.cachestore.queue_cancel_by_path(key.value).await?;
+                let result = self.cachestore.queue_cancel(key).await?;
                 let rows = if let Some(result) = result {
                     vec![result.into_row().into_queue_cancel_row()]
                 } else {
@@ -207,24 +207,12 @@ impl CacheStoreSqlService {
                 (Arc::new(DataFrame::new(columns, rows)), true)
             }
             QueueCommand::Heartbeat { key } => {
-                match key {
-                    QueueKey::ById(id) => self.cachestore.queue_heartbeat_by_id(id).await?,
-                    QueueKey::ByPath(path) => self.cachestore.queue_heartbeat_by_path(path).await?,
-                }
+                self.cachestore.queue_heartbeat(key).await?;
 
                 (Arc::new(DataFrame::new(vec![], vec![])), true)
             }
             QueueCommand::MergeExtra { key, payload } => {
-                match key {
-                    QueueKey::ById(id) => {
-                        self.cachestore.queue_merge_extra_by_id(id, payload).await?
-                    }
-                    QueueKey::ByPath(path) => {
-                        self.cachestore
-                            .queue_merge_extra_by_path(path, payload)
-                            .await?
-                    }
-                }
+                self.cachestore.queue_merge_extra(key, payload).await?;
 
                 (Arc::new(DataFrame::new(vec![], vec![])), true)
             }
