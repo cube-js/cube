@@ -375,11 +375,7 @@ views:
       preAggregationsSchema: ''
     });
 
-    console.log(query.buildSqlAndParams());
-
     const res = await dbRunner.evaluateQueryWithPreAggregations(query);
-
-    console.log(JSON.stringify(res));
 
     expect(res).toEqual(
       [{

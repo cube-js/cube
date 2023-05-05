@@ -122,7 +122,7 @@ export class CubeSymbols {
     }
 
     camelizeCube(cube);
-
+    
     this.camelCaseTypes(cube.joins);
     this.camelCaseTypes(cube.measures);
     this.camelCaseTypes(cube.dimensions);

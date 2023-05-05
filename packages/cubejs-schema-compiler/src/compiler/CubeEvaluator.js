@@ -198,17 +198,17 @@ export class CubeEvaluator extends CubeSymbols {
       const cubeReference = split[split.length - 1];
       const cubeName = cubeInclude.alias || cubeReference;
       let includes;
+      const fullMemberName = (memberName) => (cubeInclude.prefix ? `${cubeName}_${memberName}` : memberName);
       if (cubeInclude.includes === '*') {
         const membersObj = this.symbols[cubeReference]?.cubeObj()?.[type] || {};
-        includes = Object.keys(membersObj).map(memberName => ({ member: `${fullPath}.${memberName}` }));
+        includes = Object.keys(membersObj).map(memberName => ({ member: `${fullPath}.${memberName}`, name: fullMemberName(memberName) }));
       } else {
         includes = cubeInclude.includes.map(include => {
           const member = include.alias || include;
           if (member.indexOf('.') !== -1) {
             errorReporter.error(`Paths aren't allowed in cube includes but '${member}' provided as include member`);
           }
-          let name = include.alias || member;
-          name = cubeInclude.prefix ? `${cubeName}_${name}` : name;
+          const name = fullMemberName(include.alias || member);
           if (include.name) {
             const resolvedMember = this.symbols[cubeReference]?.cubeObj()?.[type]?.[include.name];
             return resolvedMember ? {
