@@ -1,7 +1,8 @@
 use crate::cachestore::cache_rocksstore::QueueAddResponse;
 use crate::cachestore::queue_item::QueueRetrieveResponse;
 use crate::cachestore::{
-    CacheItem, CacheStore, QueueItem, QueueItemStatus, QueueResultResponse, RocksCacheStore,
+    CacheItem, CacheStore, QueueItem, QueueItemStatus, QueueKey, QueueResultResponse,
+    RocksCacheStore,
 };
 use crate::config::ConfigObj;
 use crate::metastore::{IdRow, MetaStoreEvent, MetaStoreFs};
@@ -267,12 +268,8 @@ impl CacheStore for LazyRocksCacheStore {
             .await
     }
 
-    async fn queue_ack_by_path(
-        &self,
-        path: String,
-        result: Option<String>,
-    ) -> Result<bool, CubeError> {
-        self.init().await?.queue_ack_by_path(path, result).await
+    async fn queue_ack(&self, key: QueueKey, result: Option<String>) -> Result<bool, CubeError> {
+        self.init().await?.queue_ack(key, result).await
     }
 
     async fn queue_result_by_path(
@@ -282,15 +279,12 @@ impl CacheStore for LazyRocksCacheStore {
         self.init().await?.queue_result_by_path(path).await
     }
 
-    async fn queue_result_blocking_by_path(
+    async fn queue_result_blocking(
         &self,
-        path: String,
+        key: QueueKey,
         timeout: u64,
     ) -> Result<Option<QueueResultResponse>, CubeError> {
-        self.init()
-            .await?
-            .queue_result_blocking_by_path(path, timeout)
-            .await
+        self.init().await?.queue_result_blocking(key, timeout).await
     }
 
     async fn queue_merge_extra_by_id(&self, id: u64, payload: String) -> Result<(), CubeError> {

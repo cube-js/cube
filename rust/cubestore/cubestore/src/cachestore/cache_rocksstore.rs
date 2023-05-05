@@ -261,16 +261,21 @@ impl RocksCacheStore {
 }
 
 impl RocksCacheStore {
-    async fn lookup_queue_result_by_path(
+    async fn lookup_queue_result_by_key(
         &self,
-        path: String,
+        key: QueueKey,
     ) -> Result<Option<QueueResultResponse>, CubeError> {
         self.store
             .write_operation(move |db_ref, batch_pipe| {
                 let result_schema = QueueResultRocksTable::new(db_ref.clone());
-                let index_key = QueueResultIndexKey::ByPath(path);
-                let queue_result = result_schema
-                    .get_single_opt_row_by_index(&index_key, &QueueResultRocksIndex::ByPath)?;
+                let queue_result = match key {
+                    QueueKey::ByPath(path) => {
+                        let index_key = QueueResultIndexKey::ByPath(path);
+                        result_schema
+                            .get_single_opt_row_by_index(&index_key, &QueueResultRocksIndex::ByPath)
+                    }
+                    QueueKey::ById(id) => result_schema.get_row(id),
+                }?;
 
                 if let Some(queue_result) = queue_result {
                     result_schema.try_delete(queue_result.get_id(), batch_pipe)?;
@@ -328,6 +333,12 @@ impl RocksCacheStore {
             })
             .collect()
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum QueueKey {
+    ById(u64),
+    ByPath(String),
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
@@ -401,18 +412,14 @@ pub trait CacheStore: DIService + Send + Sync {
         path: String,
         allow_concurrency: u32,
     ) -> Result<QueueRetrieveResponse, CubeError>;
-    async fn queue_ack_by_path(
-        &self,
-        path: String,
-        result: Option<String>,
-    ) -> Result<bool, CubeError>;
+    async fn queue_ack(&self, key: QueueKey, result: Option<String>) -> Result<bool, CubeError>;
     async fn queue_result_by_path(
         &self,
         path: String,
     ) -> Result<Option<QueueResultResponse>, CubeError>;
-    async fn queue_result_blocking_by_path(
+    async fn queue_result_blocking(
         &self,
-        path: String,
+        key: QueueKey,
         timeout: u64,
     ) -> Result<Option<QueueResultResponse>, CubeError>;
     async fn queue_merge_extra_by_id(&self, id: u64, payload: String) -> Result<(), CubeError>;
@@ -807,20 +814,23 @@ impl CacheStore for RocksCacheStore {
             .await
     }
 
-    async fn queue_ack_by_path(
-        &self,
-        path: String,
-        result: Option<String>,
-    ) -> Result<bool, CubeError> {
+    async fn queue_ack(&self, key: QueueKey, result: Option<String>) -> Result<bool, CubeError> {
         self.store
             .write_operation(move |db_ref, batch_pipe| {
                 let queue_schema = QueueItemRocksTable::new(db_ref.clone());
                 let result_schema = QueueResultRocksTable::new(db_ref.clone());
-                let index_key = QueueItemIndexKey::ByPath(path.clone());
-                let item_row = queue_schema
-                    .get_single_opt_row_by_index(&index_key, &QueueItemRocksIndex::ByPath)?;
+
+                let item_row = match &key {
+                    QueueKey::ByPath(path) => {
+                        let index_key = QueueItemIndexKey::ByPath(path.clone());
+                        queue_schema
+                            .get_single_opt_row_by_index(&index_key, &QueueItemRocksIndex::ByPath)
+                    }
+                    QueueKey::ById(id) => queue_schema.get_row(id.clone()),
+                }?;
 
                 if let Some(item_row) = item_row {
+                    let path = item_row.get_row().get_path();
                     queue_schema.delete(item_row.get_id(), batch_pipe)?;
 
                     if let Some(result) = result {
@@ -833,6 +843,7 @@ impl CacheStore for RocksCacheStore {
                         )?;
 
                         batch_pipe.add_event(MetaStoreEvent::AckQueueItem(QueueResultAckEvent {
+                            id: item_row.get_id(),
                             path,
                             result: QueueResultAckEventResult::WithResult {
                                 row_id: result_row.get_id(),
@@ -841,6 +852,7 @@ impl CacheStore for RocksCacheStore {
                         }));
                     } else {
                         batch_pipe.add_event(MetaStoreEvent::AckQueueItem(QueueResultAckEvent {
+                            id: item_row.get_id(),
                             path,
                             result: QueueResultAckEventResult::Empty {},
                         }));
@@ -848,7 +860,7 @@ impl CacheStore for RocksCacheStore {
 
                     Ok(true)
                 } else {
-                    warn!("Unable to ack queue, unknown path: {}", path);
+                    warn!("Unable to ack queue, unknown key: {:?}", key);
 
                     Ok(false)
                 }
@@ -860,26 +872,27 @@ impl CacheStore for RocksCacheStore {
         &self,
         path: String,
     ) -> Result<Option<QueueResultResponse>, CubeError> {
-        self.lookup_queue_result_by_path(path).await
+        self.lookup_queue_result_by_key(QueueKey::ByPath(path))
+            .await
     }
 
-    async fn queue_result_blocking_by_path(
+    async fn queue_result_blocking(
         &self,
-        path: String,
+        key: QueueKey,
         timeout: u64,
     ) -> Result<Option<QueueResultResponse>, CubeError> {
         // It's an important to open listener at the beginning to protect race condition
         // it will fix position (subscribe) of broadcast channel
         let listener = self.get_listener().await;
 
-        let store_in_result = self.lookup_queue_result_by_path(path.clone()).await?;
+        let store_in_result = self.lookup_queue_result_by_key(key.clone()).await?;
         if store_in_result.is_some() {
             return Ok(store_in_result);
         }
 
         let fut = tokio::time::timeout(
             Duration::from_millis(timeout),
-            listener.wait_for_queue_ack_by_path(path),
+            listener.wait_for_queue_ack_by_key(key),
         );
 
         if let Ok(res) = fut.await {
@@ -1079,12 +1092,8 @@ impl CacheStore for ClusterCacheStoreClient {
         panic!("CacheStore cannot be used on the worker node! queue_retrieve_by_path was used.")
     }
 
-    async fn queue_ack_by_path(
-        &self,
-        _path: String,
-        _result: Option<String>,
-    ) -> Result<bool, CubeError> {
-        panic!("CacheStore cannot be used on the worker node! queue_ack_by_path was used.")
+    async fn queue_ack(&self, _key: QueueKey, _result: Option<String>) -> Result<bool, CubeError> {
+        panic!("CacheStore cannot be used on the worker node! queue_ack was used.")
     }
 
     async fn queue_result_by_path(
@@ -1094,14 +1103,12 @@ impl CacheStore for ClusterCacheStoreClient {
         panic!("CacheStore cannot be used on the worker node! queue_result_by_path was used.")
     }
 
-    async fn queue_result_blocking_by_path(
+    async fn queue_result_blocking(
         &self,
-        _path: String,
+        _key: QueueKey,
         _timeout: u64,
     ) -> Result<Option<QueueResultResponse>, CubeError> {
-        panic!(
-            "CacheStore cannot be used on the worker node! queue_result_blocking_by_path was used."
-        )
+        panic!("CacheStore cannot be used on the worker node! queue_result_blocking was used.")
     }
 
     async fn queue_merge_extra_by_id(&self, _id: u64, _payload: String) -> Result<(), CubeError> {

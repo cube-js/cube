@@ -1,9 +1,9 @@
-use crate::cachestore::{CacheItem, CacheStore, QueueItem};
+use crate::cachestore::{CacheItem, CacheStore, QueueItem, QueueKey};
 use crate::metastore::{Column, ColumnType};
 
 use crate::queryplanner::{QueryPlan, QueryPlanner};
 use crate::sql::parser::{
-    CacheCommand, CacheStoreCommand, CubeStoreParser, QueueCommand, QueueKey,
+    CacheCommand, CacheStoreCommand, CubeStoreParser, QueueCommand,
     Statement as CubeStoreStatement, SystemCommand,
 };
 use crate::sql::{QueryPlans, SqlQueryContext, SqlService};
@@ -229,7 +229,7 @@ impl CacheStoreSqlService {
                 (Arc::new(DataFrame::new(vec![], vec![])), true)
             }
             QueueCommand::Ack { key, result } => {
-                let success = self.cachestore.queue_ack_by_path(key.value, result).await?;
+                let success = self.cachestore.queue_ack(key, result).await?;
 
                 (
                     Arc::new(DataFrame::new(
@@ -357,10 +357,7 @@ impl CacheStoreSqlService {
                 )
             }
             QueueCommand::ResultBlocking { timeout, key } => {
-                let ack_result = self
-                    .cachestore
-                    .queue_result_blocking_by_path(key.value, timeout)
-                    .await?;
+                let ack_result = self.cachestore.queue_result_blocking(key, timeout).await?;
 
                 let rows = if let Some(ack_result) = ack_result {
                     vec![ack_result.into_queue_result_row()]

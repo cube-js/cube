@@ -1,4 +1,4 @@
-use crate::cachestore::QueueItemStatus;
+use crate::cachestore::{QueueItemStatus, QueueKey};
 use sqlparser::ast::{
     HiveDistributionStyle, Ident, ObjectName, Query, SqlOption, Statement as SQLStatement, Value,
 };
@@ -91,12 +91,6 @@ pub enum CacheCommand {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum QueueKey {
-    ById(u64),
-    ByPath(String),
-}
-
-#[derive(Debug, Clone, PartialEq)]
 pub enum QueueCommand {
     Add {
         priority: i64,
@@ -125,7 +119,7 @@ pub enum QueueCommand {
         key: QueueKey,
     },
     Ack {
-        key: Ident,
+        key: QueueKey,
         result: Option<String>,
     },
     MergeExtra {
@@ -141,7 +135,7 @@ pub enum QueueCommand {
         key: Ident,
     },
     ResultBlocking {
-        key: Ident,
+        key: QueueKey,
         timeout: u64,
     },
     Truncate {},
@@ -441,7 +435,7 @@ impl<'a> CubeStoreParser<'a> {
                 key: self.parse_queue_key()?,
             },
             "ack" => {
-                let key = self.parser.parse_identifier()?;
+                let key = self.parse_queue_key()?;
                 let result = if self.parser.parse_keyword(Keyword::NULL) {
                     None
                 } else {
@@ -538,7 +532,7 @@ impl<'a> CubeStoreParser<'a> {
 
                 QueueCommand::ResultBlocking {
                     timeout,
-                    key: self.parser.parse_identifier()?,
+                    key: self.parse_queue_key()?,
                 }
             }
             "truncate" => QueueCommand::Truncate {},
