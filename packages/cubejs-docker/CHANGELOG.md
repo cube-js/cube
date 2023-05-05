@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.3](https://github.com/cube-js/cube.js/compare/v0.33.2...v0.33.3) (2023-05-05)
+
+
+### Features
+
+* **docker:** Security upgrade node from 16.19.1 to 16.20 ([#6547](https://github.com/cube-js/cube.js/issues/6547)) ([5523935](https://github.com/cube-js/cube.js/commit/55239350d8b629d55ec8ee61fd2c4a6f00057f88))
+
+
+
+
+
 ## [0.33.2](https://github.com/cube-js/cube/compare/v0.33.1...v0.33.2) (2023-05-04)
 
 **Note:** Version bump only for package @cubejs-backend/docker
