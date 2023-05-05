@@ -254,13 +254,6 @@ impl RemoteFs for GCSRemoteFs {
     }
 
     async fn list_with_metadata(&self, remote_prefix: &str) -> Result<Vec<RemoteFile>, CubeError> {
-        app_metrics::REMOTE_FS_OPERATION_CORE.add_with_tags(
-            1,
-            Some(&vec![
-                "operation:list".to_string(),
-                "driver:gcs".to_string(),
-            ]),
-        );
         let prefix = self.gcs_path(remote_prefix);
         let list = Object::list_prefix(self.bucket.as_str(), prefix.as_str()).await?;
         let leading_slash = Regex::new(format!("^{}", self.gcs_path("")).as_str()).unwrap();
@@ -281,6 +274,17 @@ impl RemoteFs for GCSRemoteFs {
             .flatten()
             .flatten()
             .collect::<Vec<_>>();
+        let mut pages_count = result.len() / 1_000;
+        if result.len() % 1_000 > 0 {
+            pages_count += 1;
+        }
+        app_metrics::REMOTE_FS_OPERATION_CORE.add_with_tags(
+            pages_count as i64,
+            Some(&vec![
+                "operation:list".to_string(),
+                "driver:gcs".to_string(),
+            ]),
+        );
         Ok(result)
     }
 
