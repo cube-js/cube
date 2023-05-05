@@ -1,4 +1,4 @@
-FROM node:16.20-bullseye-slim AS base
+FROM node:16.20.0-bullseye-slim AS base
 
 ARG IMAGE_VERSION=dev
 
