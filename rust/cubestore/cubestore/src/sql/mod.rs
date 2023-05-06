@@ -234,6 +234,7 @@ impl SqlServiceImpl {
         build_range_end: Option<DateTime<Utc>>,
         seal_at: Option<DateTime<Utc>>,
         select_statement: Option<String>,
+        source_table: Option<String>,
         stream_offset: Option<String>,
         indexes: Vec<Statement>,
         unique_key: Option<Vec<Ident>>,
@@ -347,6 +348,7 @@ impl SqlServiceImpl {
                     build_range_end,
                     seal_at,
                     select_statement,
+                    None,
                     stream_offset,
                     unique_key.map(|keys| keys.iter().map(|c| c.value.to_string()).collect()),
                     aggregates.map(|keys| {
@@ -404,6 +406,18 @@ impl SqlServiceImpl {
             None
         };
 
+        let source_columns = if let Some(source_table) = source_table {
+            let mut parser = CubeStoreParser::new(&source_table)?;
+            let cols = parser
+                .parse_streaming_source_table()
+                .map_err(|e| CubeError::user(format!("Unexpected source_table param: {}", e)))?;
+            let res = convert_columns_type(&cols)
+                .map_err(|e| CubeError::user(format!("Unexpected source_table param: {}", e)))?;
+            Some(res)
+        } else {
+            None
+        };
+
         let table = self
             .db
             .create_table(
@@ -417,6 +431,7 @@ impl SqlServiceImpl {
                 build_range_end,
                 seal_at,
                 select_statement,
+                source_columns,
                 stream_offset,
                 unique_key.map(|keys| keys.iter().map(|c| c.value.to_string()).collect()),
                 aggregates.map(|keys| {
@@ -1013,6 +1028,18 @@ impl SqlService for SqlServiceImpl {
                             option.value
                         ))),
                     })?;
+                let source_table = with_options
+                    .iter()
+                    .find(|&opt| opt.name.value == "source_table")
+                    .map_or(Result::Ok(None), |option| match &option.value {
+                        Value::SingleQuotedString(source_table) => {
+                            Result::Ok(Some(source_table.clone()))
+                        }
+                        _ => Result::Err(CubeError::user(format!(
+                            "Bad source_table {}",
+                            option.value
+                        ))),
+                    })?;
                 let stream_offset = with_options
                     .iter()
                     .find(|&opt| opt.name.value == "stream_offset")
@@ -1037,6 +1064,7 @@ impl SqlService for SqlServiceImpl {
                         build_range_end,
                         seal_at,
                         select_statement,
+                        source_table,
                         stream_offset,
                         indexes,
                         unique_key,
@@ -1994,6 +2022,7 @@ mod tests {
                 TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
+                TableValue::String("NULL".to_string()),
                 TableValue::String("".to_string()),
                 TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
@@ -2096,6 +2125,7 @@ mod tests {
                 TableValue::String("2022-10-05 01:00:00 UTC".to_string()),
                 TableValue::String("false".to_string()),
                 TableValue::String("SELECT * FROM test WHERE created_at > '2022-05-01 00:00:00'".to_string()),
+                TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
                 TableValue::String("".to_string()),
@@ -3864,6 +3894,58 @@ mod tests {
                 .exec_query("CREATE TABLE test.events_by_type_fail_2 (`EVENT` text, `KSQL_COL_0` int) WITH (select_statement = 'SELECT * FROM (SELECT * FROM EVENTS_BY_TYPE WHERE time >= \\'2022-01-01\\' AND time < \\'2022-02-01\\')') unique key (`EVENT`) location 'stream://ksql/EVENTS_BY_TYPE'")
                 .await
                 .expect_err("Validation should fail");
+        }).await;
+    }
+
+    #[tokio::test]
+    async fn create_stream_table_with_projection() {
+        Config::test("create_stream_table_with_projection").update_config(|mut c| {
+            c.partition_split_threshold = 2;
+            c
+        }).start_test(async move |services| {
+            let service = services.sql_service;
+            let metastore = services.meta_store;
+
+            let _ = service.exec_query("CREATE SCHEMA test").await.unwrap();
+
+            service
+                .exec_query("CREATE SOURCE OR UPDATE kafka AS 'kafka' VALUES (user = 'foo', password = 'bar', host = 'localhost:9092')")
+                .await
+                .unwrap();
+
+            let _ = service
+                .exec_query("CREATE TABLE test.events_1 (a int, b int) WITH (\
+                select_statement = 'SELECT a as a, b + c as b FROM EVENTS_BY_TYPE WHERE c > 10',\
+                source_table = 'CREATE TABLE events1 (a int, b int, c int)'
+                            ) unique key (`a`) location 'stream://kafka/EVENTS_BY_TYPE/0'")
+                .await
+                .unwrap();
+            let table = metastore.get_table("test".to_string(), "events_1".to_string()).await.unwrap();
+            assert_eq!(
+                table.get_row().source_columns(),
+                &Some(vec![
+                     Column::new("a".to_string(), ColumnType::Int, 0),
+                     Column::new("b".to_string(), ColumnType::Int, 1),
+                     Column::new("c".to_string(), ColumnType::Int, 2),
+                ])
+            );
+            let _ = service
+                .exec_query("CREATE TABLE test.events_1 (a int, b int) WITH (\
+                select_statement = 'SELECT a as a, b + c  as b FROM EVENTS_BY_TYPE WHERE c > 10',\
+                source_table = 'TABLE events1 (a int, b int, c int)'
+                            ) unique key (`a`) location 'stream://kafka/EVENTS_BY_TYPE/0'")
+                    .await
+                    .expect_err("Validation should fail");
+
+            let _ = service
+                .exec_query("CREATE TABLE test.events_1 (a int, b int) WITH (\
+                select_statement = 'SELECT a as a, b + c as b FROM EVENTS_BY_TYPE WHERE c > 10',\
+                source_table = 'CREATE TABLE events1 (a int, b int, c int'
+                            ) unique key (`a`) location 'stream://kafka/EVENTS_BY_TYPE/0'")
+                    .await
+                    .expect_err("Validation should fail");
+
+
         }).await;
     }
 

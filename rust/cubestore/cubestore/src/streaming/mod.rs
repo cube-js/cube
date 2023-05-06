@@ -1,4 +1,6 @@
 pub mod kafka;
+mod kafka_post_processing;
+mod topic_table_provider;
 mod traffic_sender;
 
 mod buffered_stream;
@@ -34,8 +36,6 @@ use std::io::{Cursor, Write};
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
-#[cfg(debug_assertions)]
-use stream_debug::MockStreamingSource;
 use tracing::Instrument;
 use traffic_sender::TrafficSender;
 use warp::hyper::body::Bytes;
@@ -92,11 +92,6 @@ impl StreamingServiceImpl {
             )));
         }
 
-        #[cfg(debug_assertions)]
-        if location_url.host_str() == Some("mockstream") {
-            return Ok(Arc::new(MockStreamingSource {}));
-        }
-
         let meta_source = self
             .meta_store
             .get_source_by_name(
@@ -115,6 +110,17 @@ impl StreamingServiceImpl {
         if partition.is_none() {
             table_name = location_url.path().to_string().replace("/", "");
         }
+        let seq_column = table
+            .get_row()
+            .seq_column()
+            .ok_or_else(|| {
+                CubeError::internal(format!(
+                    "Seq column is not defined for streaming table '{}'",
+                    table.get_row().get_table_name()
+                ))
+            })?
+            .clone();
+
         match meta_source.get_row().source_type() {
             SourceCredentials::KSql {
                 user,
@@ -130,23 +136,28 @@ impl StreamingServiceImpl {
                 partition,
                 ksql_client: self.ksql_client.clone(),
                 offset: table.get_row().stream_offset().clone(),
+                columns: table.get_row().get_columns().clone(),
+                seq_column_index: seq_column.get_index(),
+
             })),
             SourceCredentials::Kafka {
                 user,
                 password,
                 host,
                 use_ssl,
-            } => Ok(Arc::new(KafkaStreamingSource::new(
+            } => Ok(Arc::new(KafkaStreamingSource::try_new(
                 table.get_id(),
                 table.get_row().unique_key_columns()
                     .ok_or_else(|| CubeError::internal(format!("Streaming table without unique key columns: {:?}", table)))?
                     .into_iter().cloned().collect(),
+                seq_column,
                 table.get_row().get_columns().clone(),
                 user.clone(),
                 password.clone(),
                 table_name,
                 host.clone(),
                 table.get_row().select_statement().clone(),
+                table.get_row().source_columns().clone(),
                 table.get_row().stream_offset().clone(),
                 partition.ok_or_else(||
                     CubeError::internal(format!("Loading kafka streams without partition is not supported. Partition is expected to be present in location url but found '{}'", location_url))
@@ -154,7 +165,7 @@ impl StreamingServiceImpl {
                 self.kafka_client.clone(),
                 *use_ssl,
                 trace_obj,
-            ))),
+            )?)),
         }
     }
 
@@ -250,14 +261,7 @@ impl StreamingService for StreamingServiceImpl {
 
         let mut sealed = false;
 
-        let seq_column_index = table
-            .get_row()
-            .seq_column()
-            .expect(&format!(
-                "Streaming table {:?} with undefined seq column",
-                table
-            ))
-            .get_index();
+        let seq_column_index = source.source_seq_column_index();
 
         let mut last_init_seq_check = SystemTime::now();
         let mut round_trip_started: Option<SystemTime> = None;
@@ -307,7 +311,7 @@ impl StreamingService for StreamingServiceImpl {
 
             let rows = new_rows;
             debug!("Received {} rows for {}", rows.len(), location);
-            let table_cols = table.get_row().get_columns().as_slice();
+            let table_cols = source.source_columns().as_slice();
             let mut builders = create_array_builders(table_cols);
 
             let mut start_seq: Option<i64> = None;
@@ -315,7 +319,6 @@ impl StreamingService for StreamingServiceImpl {
 
             app_metrics::STREAMING_ROWS_READ.add_with_tags(rows.len() as i64, Some(&tags));
             app_metrics::STREAMING_ROUNDTRIP_ROWS.report_with_tags(rows.len() as i64, Some(&tags));
-
             for row in rows {
                 let row = row?;
                 append_row(&mut builders, table_cols, &row);
@@ -342,7 +345,7 @@ impl StreamingService for StreamingServiceImpl {
                 .create_replay_handle(table.get_id(), location_index, seq_pointer)
                 .await?;
             let data = finish(builders);
-            let data = source.apply_post_filter(data).await?;
+            let data = source.apply_post_processing(data).await?;
 
             let partition_started_at = SystemTime::now();
             let new_chunks = self
@@ -424,7 +427,11 @@ pub trait StreamingSource: Send + Sync {
         initial_seq_value: Option<i64>,
     ) -> Result<Pin<Box<dyn Stream<Item = Result<Row, CubeError>> + Send>>, CubeError>;
 
-    async fn apply_post_filter(&self, data: Vec<ArrayRef>) -> Result<Vec<ArrayRef>, CubeError> {
+    fn source_columns(&self) -> &Vec<Column>;
+
+    fn source_seq_column_index(&self) -> usize;
+
+    async fn apply_post_processing(&self, data: Vec<ArrayRef>) -> Result<Vec<ArrayRef>, CubeError> {
         Ok(data)
     }
 
@@ -446,6 +453,8 @@ pub struct KSqlStreamingSource {
     offset: Option<StreamOffset>,
     partition: Option<usize>,
     ksql_client: Arc<dyn KsqlClient>,
+    columns: Vec<Column>,
+    seq_column_index: usize,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -893,80 +902,17 @@ impl StreamingSource for KSqlStreamingSource {
         ))
     }
 
+    fn source_columns(&self) -> &Vec<Column> {
+        &self.columns
+    }
+
+    fn source_seq_column_index(&self) -> usize {
+        self.seq_column_index
+    }
+
     fn validate_table_location(&self) -> Result<(), CubeError> {
         self.query(None)?;
         Ok(())
-    }
-}
-
-#[cfg(debug_assertions)]
-mod stream_debug {
-    use super::*;
-    use crate::table::TimestampValue;
-    use async_std::task::{Context, Poll};
-    use chrono::{DateTime, Utc};
-
-    struct MockRowStream {
-        last_id: i64,
-        last_readed: DateTime<Utc>,
-    }
-
-    impl MockRowStream {
-        fn new(last_id: i64) -> Self {
-            Self {
-                last_id,
-                last_readed: Utc::now(),
-            }
-        }
-    }
-
-    impl Stream for MockRowStream {
-        type Item = Result<Row, CubeError>;
-
-        fn poll_next(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-            /* if Utc::now().signed_duration_since(self.last_readed).num_milliseconds() < 10 {
-            return Poll::Pending;
-            } */
-
-            let mut last_id = self.last_id;
-            last_id += 1;
-            let row = Row::new(vec![
-                TableValue::Int(last_id),
-                TableValue::Int(last_id % 10),
-                TableValue::Timestamp(TimestampValue::new(Utc::now().timestamp_nanos())),
-                TableValue::Int(last_id),
-            ]);
-            unsafe {
-                let self_mut = self.get_unchecked_mut();
-
-                self_mut.last_id = last_id;
-                self_mut.last_readed = Utc::now();
-            }
-            std::thread::sleep(Duration::from_millis(if rand::random::<u64>() % 200 == 7 {
-                500
-            } else {
-                0
-            }));
-            Poll::Ready(Some(Ok(row)))
-        }
-    }
-
-    pub struct MockStreamingSource {}
-
-    #[async_trait]
-    impl StreamingSource for MockStreamingSource {
-        async fn row_stream(
-            &self,
-            _columns: Vec<Column>,
-            _seq_column: Column,
-            initial_seq_value: Option<i64>,
-        ) -> Result<Pin<Box<dyn Stream<Item = Result<Row, CubeError>> + Send>>, CubeError> {
-            Ok(Box::pin(MockRowStream::new(initial_seq_value.unwrap_or(0))))
-        }
-
-        fn validate_table_location(&self) -> Result<(), CubeError> {
-            Ok(())
-        }
     }
 }
 
@@ -1599,6 +1545,250 @@ mod tests {
 
             let result = service
                 .exec_query("SELECT max(FILTER_ID) FROM test.events_by_type_1 ")
+                .await
+                .unwrap();
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(3600 + 600 - 1)])]);
+        })
+            .await;
+    }
+
+    #[tokio::test]
+    async fn streaming_projection_kafka_create_table() {
+        Config::test("streaming_projection_kafka_create_table").update_config(|mut c| {
+            c.stream_replay_check_interval_secs = 1;
+            c.compaction_in_memory_chunks_max_lifetime_threshold = 8;
+            c.partition_split_threshold = 1000000;
+            c.max_partition_split_threshold = 1000000;
+            c.compaction_chunks_count_threshold = 100;
+            c.compaction_chunks_total_size_threshold = 100000;
+            c.stale_stream_timeout = 1;
+            c.wal_split_threshold = 1638;
+            c
+        }).start_with_injector_override(async move |injector| {
+            injector.register_typed::<dyn KafkaClientService, _, _, _>(async move |_| {
+                Arc::new(MockKafkaClient)
+            })
+                .await
+        }, async move |services| {
+            //PARSE_TIMESTAMP('2023-01-24T23:59:59.999Z', 'yyyy-MM-dd''T''HH:mm:ss.SSSX', 'UTC')
+            let service = services.sql_service;
+
+            let _ = service.exec_query("CREATE SCHEMA test").await.unwrap();
+
+            service
+                .exec_query("CREATE SOURCE OR UPDATE kafka AS 'kafka' VALUES (user = 'foo', password = 'bar', host = 'localhost:9092')")
+                .await
+                .unwrap();
+
+            service
+                .exec_query("CREATE TABLE test.events_by_type_1 (`ANONYMOUSID` text, `MESSAGEID` text, `FILTER_ID` int, `TIMESTAMP` text) \
+                            WITH (\
+                                  stream_offset = 'earliest',
+                                  select_statement = 'SELECT \
+                                  *
+                                   FROM EVENTS_BY_TYPE \
+                            WHERE  PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') >= PARSE_TIMESTAMP(\\'1970-01-01T01:00:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
+                            AND
+                            PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') < PARSE_TIMESTAMP(\\'1970-01-01T01:10:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
+                            \
+                            '\
+                            ) \
+                            unique key (`ANONYMOUSID`, `MESSAGEID`, `FILTER_ID`, `TIMESTAMP`) INDEX by_anonymous(`ANONYMOUSID`, `TIMESTAMP`) location 'stream://kafka/EVENTS_BY_TYPE/0', 'stream://kafka/EVENTS_BY_TYPE/1'")
+                .await
+                .unwrap();
+
+            service
+                .exec_query("CREATE TABLE test.events_by_type_2 (`ANONYMOUSID` text, `MESSAGEID` text, `FILTER_ID` int, `TIMESTAMP` text) \
+                            WITH (\
+                                  stream_offset = 'earliest',
+                                  select_statement = 'SELECT \
+                                  ANONYMOUSID as ANONYMOUSID, MESSAGEID as MESSAGEID, FILTER_ID + 5 as FILTER_ID, TIMESTAMP as TIMESTAMP
+                                   FROM EVENTS_BY_TYPE \
+                            WHERE  PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') >= PARSE_TIMESTAMP(\\'1970-01-01T01:00:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
+                            AND
+                            PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') < PARSE_TIMESTAMP(\\'1970-01-01T01:10:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
+                            \
+                            '\
+                            ) \
+                            unique key (`ANONYMOUSID`, `MESSAGEID`) INDEX by_anonymous(`ANONYMOUSID`) location 'stream://kafka/EVENTS_BY_TYPE/0', 'stream://kafka/EVENTS_BY_TYPE/1'")
+                .await
+                .unwrap();
+
+            service
+                .exec_query("CREATE TABLE test.events_by_type_3 (`ANONYMOUSID` text, `MESSAGEID` text, `FILTER_ID` int, `TIMESTAMP` text) \
+                            WITH (\
+                                  stream_offset = 'earliest',
+                                  select_statement = 'SELECT \
+                                  ANONYMOUSID as ANONYMOUSID, MESSAGEID + 3 as MESSAGEID, FILTER_ID + 5 as FILTER_ID
+                                   FROM EVENTS_BY_TYPE \
+                            WHERE  PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') >= PARSE_TIMESTAMP(\\'1970-01-01T01:00:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
+                            AND
+                            PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') < PARSE_TIMESTAMP(\\'1970-01-01T01:10:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
+                            \
+                            '\
+                            ) \
+                            unique key (`ANONYMOUSID`, `MESSAGEID`) INDEX by_anonymous(`ANONYMOUSID`) location 'stream://kafka/EVENTS_BY_TYPE/0', 'stream://kafka/EVENTS_BY_TYPE/1'")
+                .await
+                .expect_err("Validation should fail");
+
+            let _ = service
+                .exec_query("CREATE TABLE test.events_by_type_4 (`an_id` text, `message_id` text, `filter_id` int, `minute_timestamp` timestamp) \
+                            WITH (\
+                                  stream_offset = 'earliest',
+                                  select_statement = 'SELECT \
+                                  ANONYMOUSID an_id,
+                                  MESSAGEID message_id,
+                                  FILTER_ID filter_id,
+                                  PARSE_TIMESTAMP(\
+                                    FORMAT_TIMESTAMP(\
+                                        CONVERT_TZ(\
+                                            PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\'), 
+                                            \\'UTC\\', 
+                                            \\'UTC\\' 
+                                        ), 
+                                        \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:00.000\\' 
+                                        ), 
+                                        \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSS\\', 
+                                        \\'UTC\\' 
+                                    ) minute_timestamp
+                                   FROM EVENTS_BY_TYPE \
+                            WHERE  PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') >= PARSE_TIMESTAMP(\\'1970-01-01T01:00:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
+                            AND
+                            PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') < PARSE_TIMESTAMP(\\'1970-01-01T01:10:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
+                            \
+                            ',\
+                            source_table='CREATE TABLE EVENTS_BY_TYPE (`ANONYMOUSID` text, `MESSAGEID` text, `FILTER_ID` int, `TIMESTAMP` text)'\
+                            ) \
+                            unique key (`message_id`, `an_id`) INDEX by_anonymous(`message_id`) location 'stream://kafka/EVENTS_BY_TYPE/0', 'stream://kafka/EVENTS_BY_TYPE/1'")
+                .await
+                .unwrap();
+
+            let _ = service
+                .exec_query("CREATE TABLE test.events_by_type_5 (`an_id` text, `message_id` text, `filter_id` float, `minute_timestamp` timestamp) \
+                            WITH (\
+                                  stream_offset = 'earliest',
+                                  select_statement = 'SELECT \
+                                  ANONYMOUSID an_id,
+                                  MESSAGEID message_id,
+                                  FILTER_ID filter_id,
+                                  PARSE_TIMESTAMP(\
+                                    FORMAT_TIMESTAMP(\
+                                        CONVERT_TZ(\
+                                            PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\'), 
+                                            \\'UTC\\', 
+                                            \\'UTC\\' 
+                                        ), 
+                                        \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:00.000\\' 
+                                        ), 
+                                        \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSS\\', 
+                                        \\'UTC\\' 
+                                    ) minute_timestamp
+                                   FROM EVENTS_BY_TYPE \
+                            WHERE  PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') >= PARSE_TIMESTAMP(\\'1970-01-01T01:00:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
+                            AND
+                            PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') < PARSE_TIMESTAMP(\\'1970-01-01T01:10:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
+                            \
+                            ',\
+                            source_table='CREATE TABLE EVENTS_BY_TYPE (`ANONYMOUSID` text, `MESSAGEID` text, `FILTER_ID` int, `TIMESTAMP` text)'\
+                            ) \
+                            unique key (`message_id`, `an_id`) INDEX by_anonymous(`message_id`) location 'stream://kafka/EVENTS_BY_TYPE/0', 'stream://kafka/EVENTS_BY_TYPE/1'")
+                .await
+                .expect_err("Validation should fail");
+        })
+            .await;
+    }
+    #[tokio::test]
+    async fn streaming_projection_kafka_timestamp_ops() {
+        Config::test("streaming_projection_kafka_timestamp_ops").update_config(|mut c| {
+            c.stream_replay_check_interval_secs = 1;
+            c.compaction_in_memory_chunks_max_lifetime_threshold = 8;
+            c.partition_split_threshold = 1000000;
+            c.max_partition_split_threshold = 1000000;
+            c.compaction_chunks_count_threshold = 100;
+            c.compaction_chunks_total_size_threshold = 100000;
+            c.stale_stream_timeout = 1;
+            c.wal_split_threshold = 1638;
+            c
+        }).start_with_injector_override(async move |injector| {
+            injector.register_typed::<dyn KafkaClientService, _, _, _>(async move |_| {
+                Arc::new(MockKafkaClient)
+            })
+                .await
+        }, async move |services| {
+            //PARSE_TIMESTAMP('2023-01-24T23:59:59.999Z', 'yyyy-MM-dd''T''HH:mm:ss.SSSX', 'UTC')
+            let service = services.sql_service;
+
+            let _ = service.exec_query("CREATE SCHEMA test").await.unwrap();
+
+            service
+                .exec_query("CREATE SOURCE OR UPDATE kafka AS 'kafka' VALUES (user = 'foo', password = 'bar', host = 'localhost:9092')")
+                .await
+                .unwrap();
+
+            let listener = services.cluster.job_result_listener();
+
+            let _ = service
+                .exec_query("CREATE TABLE test.events_by_type_1 (`an_id` text, `message_id` text, `filter_id` int, `minute_timestamp` timestamp) \
+                            WITH (\
+                                  stream_offset = 'earliest',
+                                  select_statement = 'SELECT \
+                                  ANONYMOUSID an_id,
+                                  MESSAGEID message_id,
+                                  FILTER_ID filter_id,
+                                  PARSE_TIMESTAMP(\
+                                    FORMAT_TIMESTAMP(\
+                                        CONVERT_TZ(\
+                                            PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\'), 
+                                            \\'UTC\\', 
+                                            \\'UTC\\' 
+                                        ), 
+                                        \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:00.000\\' 
+                                        ), 
+                                        \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSS\\', 
+                                        \\'UTC\\' 
+                                    ) minute_timestamp
+                                   FROM EVENTS_BY_TYPE \
+                            WHERE  PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') >= PARSE_TIMESTAMP(\\'1970-01-01T01:00:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
+                            AND
+                            PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') < PARSE_TIMESTAMP(\\'1970-01-01T01:10:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
+                            \
+                            ',\
+                            source_table='CREATE TABLE EVENTS_BY_TYPE (`ANONYMOUSID` text, `MESSAGEID` text, `FILTER_ID` int, `TIMESTAMP` text)'\
+                            ) \
+                            unique key (`message_id`, `an_id`) INDEX by_anonymous(`message_id`) location 'stream://kafka/EVENTS_BY_TYPE/0', 'stream://kafka/EVENTS_BY_TYPE/1'")
+                .await
+                .unwrap();
+
+            let wait = listener.wait_for_job_results(vec![
+                (RowKey::Table(TableId::Tables, 1), JobType::TableImportCSV("stream://kafka/EVENTS_BY_TYPE/0".to_string())),
+                (RowKey::Table(TableId::Tables, 1), JobType::TableImportCSV("stream://kafka/EVENTS_BY_TYPE/1".to_string())),
+            ]);
+            let _ = timeout(Duration::from_secs(15), wait).await;
+
+            let result = service
+                .exec_query("SELECT COUNT(*) FROM test.events_by_type_1")
+                .await
+                .unwrap();
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(20 * 60)])]);
+            let result = service
+                .exec_query("SELECT COUNT(*) FROM test.events_by_type_1 where minute_timestamp = to_timestamp('1970-01-01T01:06:00'))")
+                .await
+                .unwrap();
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(2 * 60)])]);
+            let result = service
+                .exec_query("SELECT minute_timestamp, count(*) FROM test.events_by_type_1 group by 1")
+                .await
+                .unwrap();
+            assert_eq!(result.get_rows().len(), 10);
+
+            let result = service
+                .exec_query("SELECT min(filter_id) FROM test.events_by_type_1 ")
+                .await
+                .unwrap();
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(3600)])]);
+
+            let result = service
+                .exec_query("SELECT max(filter_id) FROM test.events_by_type_1 ")
                 .await
                 .unwrap();
             assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(3600 + 600 - 1)])]);
