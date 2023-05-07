@@ -27,8 +27,6 @@ import {
 import { DatabricksQuery } from './DatabricksQuery';
 import { downloadJDBCDriver } from './installer';
 
-const { version } = require('../../package.json');
-
 export type DatabricksDriverConfiguration = JDBCDriverConfiguration &
   {
     /**
@@ -210,7 +208,7 @@ export class DatabricksDriver extends JDBCDriver {
           conf?.token ||
           getEnv('databrickToken', { dataSource }) ||
           '',
-        UserAgentEntry: `CubeDev+Cube/${version} (Databricks)`,
+        UserAgentEntry: `CubeDev_Cube`,
       },
       catalog:
         conf?.catalog ||

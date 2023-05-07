@@ -1,4 +1,4 @@
-FROM node:16.19.1-bullseye-slim as builder
+FROM node:16.20.0-bullseye-slim as builder
 
 WORKDIR /cube
 COPY . .
@@ -16,7 +16,7 @@ RUN apt-get update \
 # action. So, a process will use the root lock file here.
 RUN yarn install --prod && yarn cache clean
 
-FROM node:16.19.1-bullseye-slim
+FROM node:16.20.0-bullseye-slim
 
 ARG IMAGE_VERSION=unknown
 

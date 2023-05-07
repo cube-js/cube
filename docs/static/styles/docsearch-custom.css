@@ -21,3 +21,7 @@ button.DocSearch.DocSearch-Button {
 .DocSearch-Button-Keys {
   display: none;
 }
+
+.DocSearch {
+  z-index: 1000000000;
+}

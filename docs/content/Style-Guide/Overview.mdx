@@ -137,7 +137,7 @@ views:
   - name: orders
 
     cubes:
-      - cube: base_orders
+      - join_path: base_orders
         includes:
           # dimensions
           - status
@@ -149,17 +149,17 @@ views:
           - count
           - average_order_value
       
-      - cube: base_orders.line_items.products
+      - join_path: base_orders.line_items.products
         includes: 
           - name: name
             alias: product
 
-      - cube: base_orders.line_items.products.product_categories
+      - join_path: base_orders.line_items.products.product_categories
         includes: 
           - name: name
             alias: product_category
 
-      - cube: base_orders.users
+      - join_path: base_orders.users
         prefix: true
         includes: 
           - city

@@ -1,6 +1,7 @@
 use crate::cachestore::QueueItemStatus;
 use sqlparser::ast::{
-    HiveDistributionStyle, Ident, ObjectName, Query, SqlOption, Statement as SQLStatement, Value,
+    ColumnDef, HiveDistributionStyle, Ident, ObjectName, Query, SqlOption,
+    Statement as SQLStatement, Value,
 };
 use sqlparser::dialect::keywords::Keyword;
 use sqlparser::dialect::Dialect;
@@ -255,6 +256,23 @@ impl<'a> CubeStoreParser<'a> {
             self.parse_create_source()
         } else {
             Ok(Statement::Statement(self.parser.parse_create()?))
+        }
+    }
+
+    pub fn parse_streaming_source_table(&mut self) -> Result<Vec<ColumnDef>, ParserError> {
+        if self.parser.parse_keyword(Keyword::CREATE) && self.parser.parse_keyword(Keyword::TABLE) {
+            let statement = self.parser.parse_create_table_ext(false, false, false)?;
+            if let SQLStatement::CreateTable { columns, .. } = statement {
+                Ok(columns)
+            } else {
+                Err(ParserError::ParserError(
+                    "source_table param should be CREATE TABLE statement".to_string(),
+                ))
+            }
+        } else {
+            Err(ParserError::ParserError(
+                "source_table param should be CREATE TABLE statement".to_string(),
+            ))
         }
     }
 

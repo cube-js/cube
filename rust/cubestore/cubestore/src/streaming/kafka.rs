@@ -2,35 +2,15 @@ use crate::config::injection::DIService;
 use crate::config::ConfigObj;
 use crate::metastore::table::StreamOffset;
 use crate::metastore::Column;
-use crate::sql::MySqlDialectWithBackTicks;
+use crate::streaming::kafka_post_processing::{KafkaPostProcessPlan, KafkaPostProcessPlanner};
 use crate::streaming::traffic_sender::TrafficSender;
 use crate::streaming::{parse_json_payload_and_key, StreamingSource};
 use crate::table::{Row, TableValue};
 use crate::CubeError;
 use arrow::array::ArrayRef;
-use arrow::datatypes::{DataType, Schema, SchemaRef, TimeUnit};
-use arrow::record_batch::RecordBatch;
 use async_std::stream;
 use async_trait::async_trait;
-use chrono::DateTime;
-use datafusion::catalog::TableReference;
 use datafusion::cube_ext;
-use datafusion::datasource::datasource::Statistics;
-use datafusion::datasource::TableProvider;
-use datafusion::error::DataFusionError;
-use datafusion::logical_plan::Expr as DExpr;
-use datafusion::logical_plan::LogicalPlan;
-use datafusion::physical_plan::empty::EmptyExec;
-use datafusion::physical_plan::functions::Signature;
-use datafusion::physical_plan::memory::MemoryExec;
-use datafusion::physical_plan::udaf::AggregateUDF;
-use datafusion::physical_plan::udf::ScalarUDF;
-use datafusion::physical_plan::ColumnarValue;
-use datafusion::physical_plan::{collect, ExecutionPlan};
-use datafusion::prelude::ExecutionContext;
-use datafusion::scalar::ScalarValue;
-use datafusion::sql::parser::Statement as DFStatement;
-use datafusion::sql::planner::{ContextProvider, SqlToRel};
 use futures::Stream;
 use json::object::Object;
 use json::JsonValue;
@@ -39,10 +19,6 @@ use rdkafka::error::KafkaResult;
 use rdkafka::message::BorrowedMessage;
 use rdkafka::util::Timeout;
 use rdkafka::{ClientConfig, Message, Offset, TopicPartitionList};
-use sqlparser::ast::{Query, SetExpr, Statement};
-use sqlparser::parser::Parser;
-use sqlparser::tokenizer::Tokenizer;
-use std::any::Any;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
@@ -52,6 +28,8 @@ use tokio::sync::RwLock;
 pub struct KafkaStreamingSource {
     table_id: u64,
     unique_key_columns: Vec<Column>,
+    columns: Vec<Column>,
+    seq_column_index: usize,
     user: Option<String>,
     password: Option<String>,
     topic: String,
@@ -60,50 +38,52 @@ pub struct KafkaStreamingSource {
     partition: usize,
     kafka_client: Arc<dyn KafkaClientService>,
     use_ssl: bool,
-    post_filter: Option<Arc<dyn ExecutionPlan>>,
+    post_processing_plan: Option<KafkaPostProcessPlan>,
     trace_obj: Option<String>,
 }
 
 impl KafkaStreamingSource {
-    pub fn new(
+    pub fn try_new(
         table_id: u64,
         unique_key_columns: Vec<Column>,
+        seq_column: Column,
         columns: Vec<Column>,
         user: Option<String>,
         password: Option<String>,
         topic: String,
         host: String,
         select_statement: Option<String>,
+        source_columns: Option<Vec<Column>>,
         offset: Option<StreamOffset>,
         partition: usize,
         kafka_client: Arc<dyn KafkaClientService>,
         use_ssl: bool,
         trace_obj: Option<String>,
-    ) -> Self {
-        let post_filter = if let Some(select_statement) = select_statement {
-            let planner = KafkaFilterPlanner {
-                topic: topic.clone(),
-                columns,
+    ) -> Result<Self, CubeError> {
+        let (post_processing_plan, columns, unique_key_columns, seq_column_index) =
+            if let Some(select_statement) = select_statement {
+                let planner = KafkaPostProcessPlanner::new(
+                    topic.clone(),
+                    unique_key_columns.clone(),
+                    seq_column,
+                    columns.clone(),
+                    source_columns,
+                );
+                let plan = planner.build(select_statement.clone())?;
+                let columns = plan.source_columns().clone();
+                let seq_column_index = plan.source_seq_column_index();
+                let unique_columns = plan.source_unique_columns().clone();
+                (Some(plan), columns, unique_columns, seq_column_index)
+            } else {
+                let seq_column_index = seq_column.get_index();
+                (None, columns, unique_key_columns, seq_column_index)
             };
-            match planner.parse_select_statement(select_statement.clone()) {
-                Ok(p) => p,
-                Err(e) => {
-                    //FIXME May be we should stop execution here
-                    log::error!(
-                        "Error while parsing `select_statement`: {}. Select statement ignored",
-                        e
-                    );
 
-                    None
-                }
-            }
-        } else {
-            None
-        };
-
-        KafkaStreamingSource {
+        Ok(KafkaStreamingSource {
             table_id,
             unique_key_columns,
+            columns,
+            seq_column_index,
             user,
             password,
             topic,
@@ -112,198 +92,9 @@ impl KafkaStreamingSource {
             partition,
             kafka_client,
             use_ssl,
-            post_filter,
+            post_processing_plan,
             trace_obj,
-        }
-    }
-}
-
-pub struct KafkaFilterPlanner {
-    topic: String,
-    columns: Vec<Column>,
-}
-
-impl KafkaFilterPlanner {
-    fn parse_select_statement(
-        &self,
-        select_statement: String,
-    ) -> Result<Option<Arc<dyn ExecutionPlan>>, CubeError> {
-        let dialect = &MySqlDialectWithBackTicks {};
-        let mut tokenizer = Tokenizer::new(dialect, &select_statement);
-        let tokens = tokenizer.tokenize().unwrap();
-        let statement = Parser::new(tokens, dialect).parse_statement()?;
-
-        match &statement {
-            Statement::Query(box Query {
-                body: SetExpr::Select(s),
-                ..
-            }) => {
-                if s.selection.is_none() {
-                    return Ok(None);
-                }
-                let provider = TopicTableProvider::new(self.topic.clone(), &self.columns);
-                let query_planner = SqlToRel::new(&provider);
-                let logical_plan =
-                    query_planner.statement_to_plan(&DFStatement::Statement(statement.clone()))?;
-                let physical_filter = Self::make_physical_filter(&logical_plan)?;
-                Ok(physical_filter)
-            }
-            _ => Err(CubeError::user(format!(
-                "{} is not valid select query",
-                select_statement
-            ))),
-        }
-    }
-
-    /// Only Projection > Filter > TableScan plans are allowed
-    fn make_physical_filter(
-        plan: &LogicalPlan,
-    ) -> Result<Option<Arc<dyn ExecutionPlan>>, CubeError> {
-        match plan {
-            LogicalPlan::Projection { input, .. } => match input.as_ref() {
-                filter_plan @ LogicalPlan::Filter { input, .. } => match input.as_ref() {
-                    LogicalPlan::TableScan { .. } => {
-                        let plan_ctx = Arc::new(ExecutionContext::new());
-                        let phys_plan = plan_ctx.create_physical_plan(&filter_plan)?;
-                        Ok(Some(phys_plan))
-                    }
-                    _ => Ok(None),
-                },
-                _ => Ok(None),
-            },
-            _ => Ok(None),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-struct TopicTableProvider {
-    topic: String,
-    schema: SchemaRef,
-}
-
-impl TopicTableProvider {
-    pub fn new(topic: String, columns: &Vec<Column>) -> Self {
-        let schema = Arc::new(Schema::new(
-            columns.iter().map(|c| c.clone().into()).collect::<Vec<_>>(),
-        ));
-        Self { topic, schema }
-    }
-}
-
-impl ContextProvider for TopicTableProvider {
-    fn get_table_provider(&self, name: TableReference) -> Option<Arc<dyn TableProvider>> {
-        match name {
-            TableReference::Bare { table } if table == self.topic => Some(Arc::new(self.clone())),
-            _ => None,
-        }
-    }
-
-    fn get_function_meta(&self, name: &str) -> Option<Arc<ScalarUDF>> {
-        match name {
-            "parse_timestamp" | "PARSE_TIMESTAMP" => {
-                let meta = ScalarUDF {
-                    name: "PARSE_TIMESTAMP".to_string(),
-                    signature: Signature::Exact(vec![
-                        DataType::Utf8,
-                        DataType::Utf8,
-                        DataType::Utf8,
-                    ]),
-                    return_type: Arc::new(|_| {
-                        Ok(Arc::new(DataType::Timestamp(TimeUnit::Nanosecond, None)))
-                    }),
-
-                    fun: Arc::new(move |inputs| {
-                        if inputs.len() != 3 {
-                            return Err(DataFusionError::Execution(
-                                "Expected 3 arguments in PARSE_TIMESTAMP".to_string(),
-                            ));
-                        }
-                        match &inputs[1] {
-                            ColumnarValue::Scalar(ScalarValue::Utf8(Some(_))) => {}
-                            _ => {
-                                return Err(DataFusionError::Execution(
-                                    "Only scalar arguments are supported in PARSE_TIMESTAMP"
-                                        .to_string(),
-                                ));
-                            }
-                        };
-                        match &inputs[2] {
-                            ColumnarValue::Scalar(ScalarValue::Utf8(Some(s))) => {
-                                if s.to_lowercase() != "utc" {
-                                    return Err(DataFusionError::Execution(
-                                        "Only UTC timezone supported in PARSE_TIMESTAMP"
-                                            .to_string(),
-                                    ));
-                                }
-                            }
-                            _ => {
-                                return Err(DataFusionError::Execution(
-                                    "Only scalar arguments are supported in PARSE_TIMESTAMP"
-                                        .to_string(),
-                                ));
-                            }
-                        };
-                        match &inputs[0] {
-                            ColumnarValue::Scalar(ScalarValue::Utf8(Some(s))) => {
-                                let ts = match DateTime::parse_from_rfc3339(s) {
-                                    Ok(ts) => ts,
-                                    Err(e) => {
-                                        return Err(DataFusionError::Execution(format!(
-                                            "Error while parsing timestamp: {}",
-                                            e
-                                        )));
-                                    }
-                                };
-                                Ok(ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(
-                                    Some(ts.timestamp_nanos()),
-                                )))
-                            }
-                            _ => {
-                                return Err(DataFusionError::Execution(
-                                    "Only scalar arguments are supported in PARSE_TIMESTAMP"
-                                        .to_string(),
-                                ));
-                            }
-                        }
-                    }),
-                };
-                Some(Arc::new(meta))
-            }
-            _ => None,
-        }
-    }
-
-    fn get_aggregate_meta(&self, _name: &str) -> Option<Arc<AggregateUDF>> {
-        None
-    }
-}
-
-impl TableProvider for TopicTableProvider {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn schema(&self) -> SchemaRef {
-        self.schema.clone()
-    }
-
-    fn scan(
-        &self,
-        _projection: &Option<Vec<usize>>,
-        _batch_size: usize,
-        _filters: &[DExpr],
-        _limit: Option<usize>,
-    ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
-        Ok(Arc::new(EmptyExec::new(false, self.schema())))
-    }
-
-    fn statistics(&self) -> Statistics {
-        Statistics {
-            num_rows: None,
-            total_byte_size: None,
-            column_statistics: None,
-        }
+        })
     }
 }
 
@@ -505,13 +296,13 @@ crate::di_service!(KafkaClientServiceImpl, [KafkaClientService]);
 impl StreamingSource for KafkaStreamingSource {
     async fn row_stream(
         &self,
-        columns: Vec<Column>,
-        seq_column: Column,
+        _columns: Vec<Column>,
+        _seq_column: Column,
         initial_seq_value: Option<i64>,
     ) -> Result<Pin<Box<dyn Stream<Item = Result<Row, CubeError>> + Send>>, CubeError> {
-        let column_to_move = columns.clone();
+        let column_to_move = self.columns.clone();
         let unique_key_columns = self.unique_key_columns.clone();
-        let seq_column_to_move = seq_column.clone();
+        let seq_column_index_to_move = self.seq_column_index;
         let traffic_sender = TrafficSender::new(self.trace_obj.clone());
         let stream = self
             .kafka_client
@@ -567,7 +358,7 @@ impl StreamingSource for KafkaStreamingSource {
                                 key, payload_str, e
                             ))
                         })?;
-                        values[seq_column_to_move.get_index()] = TableValue::Int(m.offset());
+                        values[seq_column_index_to_move] = TableValue::Int(m.offset());
                         Ok(Some(Row::new(values)))
                     } else {
                         Ok(None)
@@ -579,20 +370,9 @@ impl StreamingSource for KafkaStreamingSource {
         Ok(stream)
     }
 
-    async fn apply_post_filter(&self, data: Vec<ArrayRef>) -> Result<Vec<ArrayRef>, CubeError> {
-        if let Some(post_filter) = &self.post_filter {
-            let schema = post_filter.children()[0].schema();
-            let batch = RecordBatch::try_new(schema.clone(), data)?;
-            let input = Arc::new(MemoryExec::try_new(&[vec![batch]], schema.clone(), None)?);
-            let filter = post_filter.with_new_children(vec![input])?;
-            let mut out_batches = collect(filter).await?;
-            let res = if out_batches.len() == 1 {
-                out_batches.pop().unwrap()
-            } else {
-                RecordBatch::concat(&schema, &out_batches)?
-            };
-
-            Ok(res.columns().to_vec())
+    async fn apply_post_processing(&self, data: Vec<ArrayRef>) -> Result<Vec<ArrayRef>, CubeError> {
+        if let Some(post_processing_plan) = &self.post_processing_plan {
+            post_processing_plan.apply(data).await
         } else {
             Ok(data)
         }
@@ -603,9 +383,322 @@ impl StreamingSource for KafkaStreamingSource {
             .await
     }
 
+    fn source_columns(&self) -> &Vec<Column> {
+        &self.columns
+    }
+
+    fn source_seq_column_index(&self) -> usize {
+        self.seq_column_index
+    }
+
     fn validate_table_location(&self) -> Result<(), CubeError> {
         // TODO
         // self.query(None)?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::metastore::{Column, ColumnType};
+    use crate::queryplanner::query_executor::batch_to_dataframe;
+    use crate::sql::MySqlDialectWithBackTicks;
+    use crate::streaming::topic_table_provider::TopicTableProvider;
+    use arrow::array::StringArray;
+    use arrow::record_batch::RecordBatch;
+    use datafusion::datasource::TableProvider;
+    use datafusion::physical_plan::collect;
+    use datafusion::physical_plan::memory::MemoryExec;
+    use datafusion::prelude::ExecutionContext;
+    use datafusion::sql::parser::Statement as DFStatement;
+    use datafusion::sql::planner::SqlToRel;
+    use sqlparser::parser::Parser;
+    use sqlparser::tokenizer::Tokenizer;
+
+    async fn run_single_value_query(select_statement: &str) -> TableValue {
+        let dialect = &MySqlDialectWithBackTicks {};
+        let mut tokenizer = Tokenizer::new(dialect, &select_statement);
+        let tokens = tokenizer.tokenize().unwrap();
+        let statement = Parser::new(tokens, dialect).parse_statement().unwrap();
+
+        let provider = TopicTableProvider::new("t".to_string(), &vec![]);
+        let query_planner = SqlToRel::new(&provider);
+
+        let logical_plan = query_planner
+            .statement_to_plan(&DFStatement::Statement(statement.clone()))
+            .unwrap();
+        let plan_ctx = Arc::new(ExecutionContext::new());
+        let phys_plan = plan_ctx.create_physical_plan(&logical_plan).unwrap();
+
+        let batches = collect(phys_plan).await.unwrap();
+        let res = batch_to_dataframe(&batches).unwrap();
+        res.get_rows()[0].values()[0].clone()
+    }
+
+    async fn run_array_query(select_statement: &str, input: Vec<String>) -> Vec<Row> {
+        let provider = TopicTableProvider::new(
+            "t".to_string(),
+            &vec![Column::new("a".to_string(), ColumnType::String, 0)],
+        );
+        let schema = provider.schema();
+        let batch =
+            RecordBatch::try_new(schema.clone(), vec![Arc::new(StringArray::from(input))]).unwrap();
+        let memery_input = vec![vec![batch]];
+        let inp = Arc::new(MemoryExec::try_new(&memery_input, schema.clone(), None).unwrap());
+
+        let dialect = &MySqlDialectWithBackTicks {};
+        let mut tokenizer = Tokenizer::new(dialect, &select_statement);
+        let tokens = tokenizer.tokenize().unwrap();
+        let statement = Parser::new(tokens, dialect).parse_statement().unwrap();
+
+        let query_planner = SqlToRel::new(&provider);
+
+        let logical_plan = query_planner
+            .statement_to_plan(&DFStatement::Statement(statement.clone()))
+            .unwrap();
+        let plan_ctx = Arc::new(ExecutionContext::new());
+        let phys_plan = plan_ctx.create_physical_plan(&logical_plan).unwrap();
+        let phys_plan = phys_plan.with_new_children(vec![inp]).unwrap();
+
+        let batches = collect(phys_plan).await.unwrap();
+        let res = batch_to_dataframe(&batches).unwrap();
+        res.get_rows().to_vec()
+    }
+
+    fn assert_timestamp_val(v: &TableValue, expected: &str) {
+        match v {
+            TableValue::Timestamp(v) => {
+                assert_eq!(&v.to_string(), expected);
+            }
+            _ => {
+                assert!(false);
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_scalar_parse_timestamp() {
+        let select_statement = "SELECT PARSE_TIMESTAMP('2023-06-05T03:00:00.300Z', 'yyyy-MM-dd''T''HH:mm:ss.SSSX', 'UTC')";
+        assert_timestamp_val(
+            &run_single_value_query(select_statement).await,
+            "2023-06-05T03:00:00.300Z",
+        );
+
+        let select_statement =
+            "SELECT PARSE_TIMESTAMP('2023-06-05 03:00:00', 'yyyy-MM-dd HH:mm:ss')";
+        assert_timestamp_val(
+            &run_single_value_query(select_statement).await,
+            "2023-06-05T03:00:00.000Z",
+        );
+
+        let select_statement = "SELECT PARSE_TIMESTAMP('2023-06-05T06:12:23', 'yyyy-MM-dd''T''HH:mm:ss', 'Europe/Istanbul')";
+        assert_timestamp_val(
+            &run_single_value_query(select_statement).await,
+            "2023-06-05T03:12:23.000Z",
+        );
+    }
+
+    #[tokio::test]
+    async fn test_array_parse_timestamp() {
+        let select_statement = "SELECT PARSE_TIMESTAMP(a, 'yyyy-MM-dd''T''HH:mm:ss', 'UTC') from t";
+        let res = run_array_query(
+            select_statement,
+            vec![
+                "2023-06-05T06:12:23".to_string(),
+                "2023-06-05T06:12:25".to_string(),
+                "2023-06-05T06:12:27".to_string(),
+            ],
+        )
+        .await;
+
+        assert_timestamp_val(&res[0].values()[0], "2023-06-05T06:12:23.000Z");
+        assert_timestamp_val(&res[1].values()[0], "2023-06-05T06:12:25.000Z");
+        assert_timestamp_val(&res[2].values()[0], "2023-06-05T06:12:27.000Z");
+
+        let select_statement =
+            "SELECT PARSE_TIMESTAMP(a, 'yyyy-MM-dd HH:mm:ss', 'Europe/Istanbul') from t";
+        let res = run_array_query(
+            select_statement,
+            vec![
+                "2023-06-05 06:12:23".to_string(),
+                "2023-06-05 06:12:25".to_string(),
+                "2023-06-05 06:12:27".to_string(),
+            ],
+        )
+        .await;
+
+        assert_timestamp_val(&res[0].values()[0], "2023-06-05T03:12:23.000Z");
+        assert_timestamp_val(&res[1].values()[0], "2023-06-05T03:12:25.000Z");
+        assert_timestamp_val(&res[2].values()[0], "2023-06-05T03:12:27.000Z");
+    }
+
+    #[tokio::test]
+    async fn test_scalar_convert_tz() {
+        let select_statement = "SELECT CONVERT_TZ_KSQL(PARSE_TIMESTAMP('2023-06-05T03:00:00.300Z', 'yyyy-MM-dd''T''HH:mm:ss.SSSX', 'UTC'), 'UTC', 'UTC')";
+
+        assert_timestamp_val(
+            &run_single_value_query(select_statement).await,
+            "2023-06-05T03:00:00.300Z",
+        );
+
+        let select_statement = "SELECT CONVERT_TZ_KSQL(PARSE_TIMESTAMP('2023-06-05T03:12:23.300Z', 'yyyy-MM-dd''T''HH:mm:ss.SSSX', 'UTC'), 'UTC', 'Europe/Istanbul')";
+        assert_timestamp_val(
+            &run_single_value_query(select_statement).await,
+            "2023-06-05T06:12:23.300Z",
+        );
+
+        let select_statement = "SELECT CONVERT_TZ_KSQL(PARSE_TIMESTAMP('2023-06-05T03:12:23.300Z', 'yyyy-MM-dd''T''HH:mm:ss.SSSX', 'UTC'), 'Asia/Krasnoyarsk', 'Europe/Istanbul')";
+        assert_timestamp_val(
+            &run_single_value_query(select_statement).await,
+            "2023-06-04T23:12:23.300Z",
+        );
+    }
+
+    #[tokio::test]
+    async fn test_array_convert_tz() {
+        let select_statement = "SELECT CONVERT_TZ_KSQL(PARSE_TIMESTAMP(a, 'yyyy-MM-dd''T''HH:mm:ss', 'UTC'), 'UTC', 'UTC') from t";
+        let res = run_array_query(
+            select_statement,
+            vec![
+                "2023-06-05T06:12:23".to_string(),
+                "2023-06-05T06:12:25".to_string(),
+                "2023-06-05T06:12:27".to_string(),
+            ],
+        )
+        .await;
+
+        assert_timestamp_val(&res[0].values()[0], "2023-06-05T06:12:23.000Z");
+        assert_timestamp_val(&res[1].values()[0], "2023-06-05T06:12:25.000Z");
+        assert_timestamp_val(&res[2].values()[0], "2023-06-05T06:12:27.000Z");
+
+        let select_statement = "SELECT CONVERT_TZ_KSQL(PARSE_TIMESTAMP(a, 'yyyy-MM-dd HH:mm:ss', 'UTC'), 'UTC', 'Europe/Istanbul') from t";
+        let res = run_array_query(
+            select_statement,
+            vec![
+                "2023-06-05 06:12:23".to_string(),
+                "2023-06-05 06:12:25".to_string(),
+                "2023-06-05 06:12:27".to_string(),
+            ],
+        )
+        .await;
+
+        assert_timestamp_val(&res[0].values()[0], "2023-06-05T09:12:23.000Z");
+        assert_timestamp_val(&res[1].values()[0], "2023-06-05T09:12:25.000Z");
+        assert_timestamp_val(&res[2].values()[0], "2023-06-05T09:12:27.000Z");
+
+        let select_statement = "SELECT CONVERT_TZ_KSQL(PARSE_TIMESTAMP(a, 'yyyy-MM-dd HH:mm:ss', 'UTC'), 'Europe/Istanbul', 'Asia/Krasnoyarsk') from t";
+        let res = run_array_query(
+            select_statement,
+            vec![
+                "2023-06-05 06:12:23".to_string(),
+                "2023-06-05 06:12:25".to_string(),
+                "2023-06-05 06:12:27".to_string(),
+            ],
+        )
+        .await;
+
+        assert_timestamp_val(&res[0].values()[0], "2023-06-05T10:12:23.000Z");
+        assert_timestamp_val(&res[1].values()[0], "2023-06-05T10:12:25.000Z");
+        assert_timestamp_val(&res[2].values()[0], "2023-06-05T10:12:27.000Z");
+    }
+
+    #[tokio::test]
+    async fn test_scalar_format_timestamp() {
+        let select_statement = "SELECT \
+                                FORMAT_TIMESTAMP(\
+                                        CONVERT_TZ_KSQL(\
+                                            PARSE_TIMESTAMP('2023-06-05T03:00:00.300Z', 'yyyy-MM-dd''T''HH:mm:ss.SSSX', 'UTC')\
+                                        , 'UTC', 'UTC')\
+                                     , 'yyyy-MM-dd HH:mm:ss')";
+
+        let res = &run_single_value_query(select_statement).await;
+        assert_eq!(res, &TableValue::String("2023-06-05 03:00:00".to_string()));
+
+        let select_statement = "SELECT \
+                                FORMAT_TIMESTAMP(\
+                                        CONVERT_TZ_KSQL(\
+                                            PARSE_TIMESTAMP('2023-06-05T03:24:50.300Z', 'yyyy-MM-dd''T''HH:mm:ss.SSSX', 'UTC')\
+                                        , 'UTC', 'Europe/Istanbul')\
+                                     , 'yyyy-MM-dd HH:mm:ss')";
+
+        let res = &run_single_value_query(select_statement).await;
+        assert_eq!(res, &TableValue::String("2023-06-05 06:24:50".to_string()));
+
+        let select_statement = "SELECT \
+                                FORMAT_TIMESTAMP(\
+                                        CONVERT_TZ_KSQL(\
+                                            PARSE_TIMESTAMP('2023-06-05T03:24:50.300Z', 'yyyy-MM-dd''T''HH:mm:ss.SSSX', 'UTC')\
+                                        , 'UTC', 'Europe/Istanbul')\
+                                     , 'yyyy-MM-dd''T''HH:mm:00.000')";
+
+        let res = &run_single_value_query(select_statement).await;
+        assert_eq!(
+            res,
+            &TableValue::String("2023-06-05T06:24:00.000".to_string())
+        );
+    }
+
+    #[tokio::test]
+    async fn test_array_format_timestamp() {
+        let select_statement = "SELECT \
+                                FORMAT_TIMESTAMP(\
+                                        CONVERT_TZ_KSQL(\
+                                            PARSE_TIMESTAMP(a, 'yyyy-MM-dd''T''HH:mm:ss', 'UTC')\
+                                        , 'UTC', 'UTC')\
+                                     , 'yyyy-MM-dd HH:mm:ss') from t";
+
+        let res = run_array_query(
+            select_statement,
+            vec![
+                "2023-06-05T06:12:23".to_string(),
+                "2023-06-05T06:12:25".to_string(),
+                "2023-06-05T06:12:27".to_string(),
+            ],
+        )
+        .await;
+
+        assert_eq!(
+            &res[0].values()[0],
+            &TableValue::String("2023-06-05 06:12:23".to_string())
+        );
+        assert_eq!(
+            &res[1].values()[0],
+            &TableValue::String("2023-06-05 06:12:25".to_string())
+        );
+        assert_eq!(
+            &res[2].values()[0],
+            &TableValue::String("2023-06-05 06:12:27".to_string())
+        );
+
+        let select_statement = "SELECT \
+                                FORMAT_TIMESTAMP(\
+                                        CONVERT_TZ_KSQL(\
+                                            PARSE_TIMESTAMP(a, 'yyyy-MM-dd''T''HH:mm:ss', 'UTC')\
+                                        , 'UTC', 'Europe/Istanbul')\
+                                     , 'yyyy-MM-dd''T''HH:00:00.000') from t";
+
+        let res = run_array_query(
+            select_statement,
+            vec![
+                "2023-06-05T06:12:23".to_string(),
+                "2023-06-05T07:13:25".to_string(),
+                "2023-06-05T06:12:27".to_string(),
+            ],
+        )
+        .await;
+
+        assert_eq!(
+            &res[0].values()[0],
+            &TableValue::String("2023-06-05T09:00:00.000".to_string())
+        );
+        assert_eq!(
+            &res[1].values()[0],
+            &TableValue::String("2023-06-05T10:00:00.000".to_string())
+        );
+        assert_eq!(
+            &res[2].values()[0],
+            &TableValue::String("2023-06-05T09:00:00.000".to_string())
+        );
     }
 }
