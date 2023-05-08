@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.4](https://github.com/cube-js/cube/compare/v0.33.3...v0.33.4) (2023-05-07)
+
+
+### Bug Fixes
+
+* **docs:** fix views example in style guide ([1296ddb](https://github.com/cube-js/cube/commit/1296ddb06d5e0ae151c8dc7ec7f0ad77e429333f))
+* join_path for JS schemas and * includes with prefix ([#6555](https://github.com/cube-js/cube/issues/6555)) ([c76bbef](https://github.com/cube-js/cube/commit/c76bbef36e5b6594bcb79174ceb672d8e2b870ff))
+
+
+### Features
+
+* **cubestore:** Projection in kafka streaming queries ([#6479](https://github.com/cube-js/cube/issues/6479)) ([e0495a9](https://github.com/cube-js/cube/commit/e0495a9f46dd8a78fce069b31382fdeec37da8d0))
+
+
+
+
+
 ## [0.33.3](https://github.com/cube-js/cube/compare/v0.33.2...v0.33.3) (2023-05-05)
 
 

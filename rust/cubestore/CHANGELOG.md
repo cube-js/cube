@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.4](https://github.com/cube-js/cube.js/compare/v0.33.3...v0.33.4) (2023-05-07)
+
+
+### Features
+
+* **cubestore:** Projection in kafka streaming queries ([#6479](https://github.com/cube-js/cube.js/issues/6479)) ([e0495a9](https://github.com/cube-js/cube.js/commit/e0495a9f46dd8a78fce069b31382fdeec37da8d0))
+
+
+
+
+
 ## [0.33.2](https://github.com/cube-js/cube/compare/v0.33.1...v0.33.2) (2023-05-04)
 
 
