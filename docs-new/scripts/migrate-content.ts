@@ -361,9 +361,8 @@ async function main() {
 
       const targetFilePath = `${TARGET}${target.path}/${target.fileName}.mdx`;
 
-      if (false) {
-        await rename(filePath, targetFilePath);
-      }
+      // uncomment when ready to move docs content
+      // await rename(filePath, targetFilePath);
 
       await writeFile(
         path.resolve(targetFilePath),
@@ -391,8 +390,6 @@ ${data.body
   );
 
   const promises = processNodes(Structure, "pages");
-
-  console.log(promises);
 
   await Promise.all(promises);
 }

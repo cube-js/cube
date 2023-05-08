@@ -1,38 +1,4 @@
 {
-  "../docs/content/Workspace/Inspecting-Queries.mdx": {
-    "origin": {
-      "title": "Query inspection",
-      "permalink": "/cloud/inspecting-queries",
-      "category": "Workspace",
-      "menuOrder": 4
-    },
-    "done": false,
-    "target": {
-      "path": "/workspace/",
-      "fileName": "query-inspection",
-      "title": "Query inspection",
-      "redirects": [
-        "/cloud/inspecting-queries"
-      ]
-    }
-  },
-  "../docs/content/Workspace/SQL-Runner.mdx": {
-    "origin": {
-      "title": "SQL Runner",
-      "permalink": "/cloud/sql-runner",
-      "category": "Workspace",
-      "menuOrder": 6
-    },
-    "done": false,
-    "target": {
-      "path": "/workspace/",
-      "fileName": "sql-runner",
-      "title": "SQL Runner",
-      "redirects": [
-        "/cloud/sql-runner"
-      ]
-    }
-  },
   "../docs/content/Cube.js-Introduction.mdx": {
     "origin": {
       "title": "Introduction",
@@ -49,6 +15,23 @@
       "title": "Introduction",
       "redirects": [
         "/cubejs-introduction"
+      ]
+    }
+  },
+  "../docs/content/Workspace/Inspecting-Queries.mdx": {
+    "origin": {
+      "title": "Query inspection",
+      "permalink": "/cloud/inspecting-queries",
+      "category": "Workspace",
+      "menuOrder": 4
+    },
+    "done": false,
+    "target": {
+      "path": "/workspace/",
+      "fileName": "query-inspection",
+      "title": "Query inspection",
+      "redirects": [
+        "/cloud/inspecting-queries"
       ]
     }
   },
@@ -75,58 +58,6 @@
       ]
     }
   },
-  "../docs/content/Workspace/Development-API.mdx": {
-    "origin": {
-      "title": "Development mode",
-      "permalink": "/cloud/workspace/development-api",
-      "category": "Workspace",
-      "menuOrder": 2
-    },
-    "done": false,
-    "target": {
-      "path": "/workspace/",
-      "fileName": "development-mode",
-      "title": "Development mode",
-      "redirects": [
-        "/cloud/workspace/development-api"
-      ]
-    }
-  },
-  "../docs/content/Workspace/Access Control.mdx": {
-    "origin": {
-      "title": "Access control",
-      "permalink": "/cloud/access-control/",
-      "category": "Workspace",
-      "menuOrder": 5
-    },
-    "done": false,
-    "target": {
-      "path": "/workspace/",
-      "fileName": "access-control",
-      "title": "Access control",
-      "redirects": [
-        "/cloud/access-control/"
-      ]
-    }
-  },
-  "../docs/content/Schema/Getting-Started.mdx": {
-    "origin": {
-      "title": "Getting started with data modeling",
-      "menuTitle": "Getting started",
-      "permalink": "/schema/getting-started",
-      "category": "Data Modeling",
-      "menuOrder": 1
-    },
-    "done": false,
-    "target": {
-      "path": "/data-modeling/",
-      "fileName": "getting-started-with-data-modeling",
-      "title": "Getting started with data modeling",
-      "redirects": [
-        "/schema/getting-started"
-      ]
-    }
-  },
   "../docs/content/Workspace/Developer-Playground.mdx": {
     "origin": {
       "title": "Playground",
@@ -148,38 +79,20 @@
       ]
     }
   },
-  "../docs/content/SQL-API/Overview.mdx": {
+  "../docs/content/Workspace/Development-API.mdx": {
     "origin": {
-      "title": "SQL API",
-      "menuTitle": "Overview",
-      "category": "SQL API",
-      "permalink": "/backend/sql",
-      "menuOrder": 1
-    },
-    "done": false,
-    "target": {
-      "path": "/sql-api/",
-      "fileName": "sql-api",
-      "title": "SQL API",
-      "redirects": [
-        "/backend/sql"
-      ]
-    }
-  },
-  "../docs/content/Workspace/CLI.mdx": {
-    "origin": {
-      "title": "CLI",
-      "permalink": "/using-the-cubejs-cli",
+      "title": "Development mode",
+      "permalink": "/cloud/workspace/development-api",
       "category": "Workspace",
-      "menuOrder": 51
+      "menuOrder": 2
     },
     "done": false,
     "target": {
       "path": "/workspace/",
-      "fileName": "cli",
-      "title": "CLI",
+      "fileName": "development-mode",
+      "title": "Development mode",
       "redirects": [
-        "/using-the-cubejs-cli"
+        "/cloud/workspace/development-api"
       ]
     }
   },
@@ -201,20 +114,37 @@
       ]
     }
   },
-  "../docs/content/SQL-API/Joins.mdx": {
+  "../docs/content/Workspace/Access Control.mdx": {
     "origin": {
-      "title": "Joins",
-      "category": "SQL API",
-      "permalink": "/backend/sql/reference/joins",
-      "menuOrder": 3
+      "title": "Access control",
+      "permalink": "/cloud/access-control/",
+      "category": "Workspace",
+      "menuOrder": 5
     },
     "done": false,
     "target": {
-      "path": "/sql-api/",
-      "fileName": "joins",
-      "title": "Joins",
+      "path": "/workspace/",
+      "fileName": "access-control",
+      "title": "Access control",
       "redirects": [
-        "/backend/sql/reference/joins"
+        "/cloud/access-control/"
+      ]
+    }
+  },
+  "../docs/content/Workspace/CLI.mdx": {
+    "origin": {
+      "title": "CLI",
+      "permalink": "/using-the-cubejs-cli",
+      "category": "Workspace",
+      "menuOrder": 51
+    },
+    "done": false,
+    "target": {
+      "path": "/workspace/",
+      "fileName": "cli",
+      "title": "CLI",
+      "redirects": [
+        "/using-the-cubejs-cli"
       ]
     }
   },
@@ -235,55 +165,20 @@
       ]
     }
   },
-  "../docs/content/REST-API/REST-API.mdx": {
+  "../docs/content/SQL-API/Joins.mdx": {
     "origin": {
-      "title": "REST API",
-      "menuTitle": "Overview",
-      "permalink": "/http-api/rest",
-      "category": "REST API",
-      "menuOrder": 1
-    },
-    "done": false,
-    "target": {
-      "path": "/rest-api/",
-      "fileName": "rest-api",
-      "title": "REST API",
-      "redirects": [
-        "/http-api/rest"
-      ]
-    }
-  },
-  "../docs/content/REST-API/Query-Format.mdx": {
-    "origin": {
-      "title": "Query Format",
-      "permalink": "/query-format",
-      "category": "REST API",
-      "menuOrder": 2
-    },
-    "done": false,
-    "target": {
-      "path": "/rest-api/",
-      "fileName": "query-format",
-      "title": "Query Format",
-      "redirects": [
-        "/query-format"
-      ]
-    }
-  },
-  "../docs/content/GraphQL-API/GraphQL-API.mdx": {
-    "origin": {
-      "title": "GraphQL API",
-      "permalink": "/http-api/graphql",
-      "category": "GraphQL API",
+      "title": "Joins",
+      "category": "SQL API",
+      "permalink": "/backend/sql/reference/joins",
       "menuOrder": 3
     },
     "done": false,
     "target": {
-      "path": "/graphql-api/",
-      "fileName": "graphql-api",
-      "title": "GraphQL API",
+      "path": "/sql-api/",
+      "fileName": "joins",
+      "title": "Joins",
       "redirects": [
-        "/http-api/graphql"
+        "/backend/sql/reference/joins"
       ]
     }
   },
@@ -304,22 +199,39 @@
       ]
     }
   },
-  "../docs/content/Getting-Started/Overview.mdx": {
+  "../docs/content/SQL-API/Overview.mdx": {
     "origin": {
-      "title": "Getting started with Cube",
+      "title": "SQL API",
       "menuTitle": "Overview",
-      "permalink": "/getting-started",
-      "category": "Getting Started",
-      "menuOrder": 1,
-      "isDisableFeedbackBlock": false
+      "category": "SQL API",
+      "permalink": "/backend/sql",
+      "menuOrder": 1
     },
     "done": false,
     "target": {
-      "path": "/getting-started/",
-      "fileName": "getting-started-with-cube",
-      "title": "Getting started with Cube",
+      "path": "/sql-api/",
+      "fileName": "sql-api",
+      "title": "SQL API",
       "redirects": [
-        "/getting-started"
+        "/backend/sql"
+      ]
+    }
+  },
+  "../docs/content/Schema/Getting-Started.mdx": {
+    "origin": {
+      "title": "Getting started with data modeling",
+      "menuTitle": "Getting started",
+      "permalink": "/schema/getting-started",
+      "category": "Data Modeling",
+      "menuOrder": 1
+    },
+    "done": false,
+    "target": {
+      "path": "/data-modeling/",
+      "fileName": "getting-started-with-data-modeling",
+      "title": "Getting started with data modeling",
+      "redirects": [
+        "/schema/getting-started"
       ]
     }
   },
@@ -344,6 +256,58 @@
       ]
     }
   },
+  "../docs/content/REST-API/REST-API.mdx": {
+    "origin": {
+      "title": "REST API",
+      "menuTitle": "Overview",
+      "permalink": "/http-api/rest",
+      "category": "REST API",
+      "menuOrder": 1
+    },
+    "done": false,
+    "target": {
+      "path": "/rest-api/",
+      "fileName": "rest-api",
+      "title": "REST API",
+      "redirects": [
+        "/http-api/rest"
+      ]
+    }
+  },
+  "../docs/content/Frontend-Integrations/Real-Time-Data-Fetch.mdx": {
+    "origin": {
+      "title": "Real-time data fetch",
+      "permalink": "/real-time-data-fetch",
+      "category": "Frontend Integrations",
+      "menuOrder": 3
+    },
+    "done": false,
+    "target": {
+      "path": "/frontend-integrations/",
+      "fileName": "real-time-data-fetch",
+      "title": "Real-time data fetch",
+      "redirects": [
+        "/real-time-data-fetch"
+      ]
+    }
+  },
+  "../docs/content/REST-API/Query-Format.mdx": {
+    "origin": {
+      "title": "Query Format",
+      "permalink": "/query-format",
+      "category": "REST API",
+      "menuOrder": 2
+    },
+    "done": false,
+    "target": {
+      "path": "/rest-api/",
+      "fileName": "query-format",
+      "title": "Query Format",
+      "redirects": [
+        "/query-format"
+      ]
+    }
+  },
   "../docs/content/Frontend-Integrations/Introduction.mdx": {
     "origin": {
       "title": "Introduction to Frontend Integrations",
@@ -362,20 +326,75 @@
       ]
     }
   },
-  "../docs/content/Frontend-Integrations/Real-Time-Data-Fetch.mdx": {
+  "../docs/content/Getting-Started/Overview.mdx": {
     "origin": {
-      "title": "Real-time data fetch",
-      "permalink": "/real-time-data-fetch",
-      "category": "Frontend Integrations",
-      "menuOrder": 3
+      "title": "Getting started with Cube",
+      "menuTitle": "Overview",
+      "permalink": "/getting-started",
+      "category": "Getting Started",
+      "menuOrder": 1,
+      "isDisableFeedbackBlock": false
+    },
+    "done": false,
+    "target": {
+      "path": "/getting-started/",
+      "fileName": "getting-started-with-cube",
+      "title": "Getting started with Cube",
+      "redirects": [
+        "/getting-started"
+      ]
+    }
+  },
+  "../docs/content/Workspace/SQL-Runner.mdx": {
+    "origin": {
+      "title": "SQL Runner",
+      "permalink": "/cloud/sql-runner",
+      "category": "Workspace",
+      "menuOrder": 6
+    },
+    "done": false,
+    "target": {
+      "path": "/workspace/",
+      "fileName": "sql-runner",
+      "title": "SQL Runner",
+      "redirects": [
+        "/cloud/sql-runner"
+      ]
+    }
+  },
+  "../docs/content/Frontend-Integrations/Introduction-react.mdx": {
+    "origin": {
+      "title": "Introduction for React Developers",
+      "menuTitle": "Introduction",
+      "frameworkOfChoice": "react",
+      "permalink": "/frontend-introduction/react",
+      "category": "Frontend Integrations"
     },
     "done": false,
     "target": {
       "path": "/frontend-integrations/",
-      "fileName": "real-time-data-fetch",
-      "title": "Real-time data fetch",
+      "fileName": "introduction-for-react-developers",
+      "title": "Introduction for React Developers",
       "redirects": [
-        "/real-time-data-fetch"
+        "/frontend-introduction/react"
+      ]
+    }
+  },
+  "../docs/content/Frontend-Integrations/Introduction-angular.mdx": {
+    "origin": {
+      "title": "Introduction for Angular Developers",
+      "menuTitle": "Introduction",
+      "frameworkOfChoice": "angular",
+      "permalink": "/frontend-introduction/angular",
+      "category": "Frontend Integrations"
+    },
+    "done": false,
+    "target": {
+      "path": "/frontend-integrations/",
+      "fileName": "introduction-for-angular-developers",
+      "title": "Introduction for Angular Developers",
+      "redirects": [
+        "/frontend-introduction/angular"
       ]
     }
   },
@@ -409,24 +428,6 @@
       "fileName": "troubleshooting",
       "title": "Troubleshooting",
       "redirects": []
-    }
-  },
-  "../docs/content/Frontend-Integrations/Introduction-angular.mdx": {
-    "origin": {
-      "title": "Introduction for Angular Developers",
-      "menuTitle": "Introduction",
-      "frameworkOfChoice": "angular",
-      "permalink": "/frontend-introduction/angular",
-      "category": "Frontend Integrations"
-    },
-    "done": false,
-    "target": {
-      "path": "/frontend-integrations/",
-      "fileName": "introduction-for-angular-developers",
-      "title": "Introduction for Angular Developers",
-      "redirects": [
-        "/frontend-introduction/angular"
-      ]
     }
   },
   "../docs/content/FAQs/Tips-and-Tricks.mdx": {
@@ -518,39 +519,6 @@
       ]
     }
   },
-  "../docs/content/Frontend-Integrations/Introduction-react.mdx": {
-    "origin": {
-      "title": "Introduction for React Developers",
-      "menuTitle": "Introduction",
-      "frameworkOfChoice": "react",
-      "permalink": "/frontend-introduction/react",
-      "category": "Frontend Integrations"
-    },
-    "done": false,
-    "target": {
-      "path": "/frontend-integrations/",
-      "fileName": "introduction-for-react-developers",
-      "title": "Introduction for React Developers",
-      "redirects": [
-        "/frontend-introduction/react"
-      ]
-    }
-  },
-  "../docs/content/Deployment/Production-Checklist.mdx": {
-    "origin": {
-      "title": "Production checklist",
-      "permalink": "/deployment/production-checklist",
-      "category": "Deployment",
-      "menuOrder": 2
-    },
-    "done": false,
-    "target": {
-      "path": "/deployment/",
-      "fileName": "production-checklist",
-      "title": "Production checklist",
-      "redirects": []
-    }
-  },
   "../docs/content/Configuration/Overview.mdx": {
     "origin": {
       "title": "Configuration Overview",
@@ -566,6 +534,23 @@
       "title": "Configuration Overview",
       "redirects": [
         "/configuration/overview"
+      ]
+    }
+  },
+  "../docs/content/GraphQL-API/GraphQL-API.mdx": {
+    "origin": {
+      "title": "GraphQL API",
+      "permalink": "/http-api/graphql",
+      "category": "GraphQL API",
+      "menuOrder": 3
+    },
+    "done": false,
+    "target": {
+      "path": "/graphql-api/",
+      "fileName": "graphql-api",
+      "title": "GraphQL API",
+      "redirects": [
+        "/http-api/graphql"
       ]
     }
   },
@@ -587,23 +572,6 @@
       "redirects": [
         "/config/databases",
         "/connecting-to-the-database"
-      ]
-    }
-  },
-  "../docs/content/Configuration/Connecting-to-Downstream-Tools.mdx": {
-    "origin": {
-      "title": "Connecting to visualization tools",
-      "permalink": "/config/downstream",
-      "category": "Configuration",
-      "menuOrder": 3
-    },
-    "done": false,
-    "target": {
-      "path": "/configuration/",
-      "fileName": "connecting-to-visualization-tools",
-      "title": "Connecting to visualization tools",
-      "redirects": [
-        "/config/downstream"
       ]
     }
   },
@@ -640,6 +608,38 @@
       ]
     }
   },
+  "../docs/content/Deployment/Production-Checklist.mdx": {
+    "origin": {
+      "title": "Production checklist",
+      "permalink": "/deployment/production-checklist",
+      "category": "Deployment",
+      "menuOrder": 2
+    },
+    "done": false,
+    "target": {
+      "path": "/deployment/",
+      "fileName": "production-checklist",
+      "title": "Production checklist",
+      "redirects": []
+    }
+  },
+  "../docs/content/Configuration/Connecting-to-Downstream-Tools.mdx": {
+    "origin": {
+      "title": "Connecting to visualization tools",
+      "permalink": "/config/downstream",
+      "category": "Configuration",
+      "menuOrder": 3
+    },
+    "done": false,
+    "target": {
+      "path": "/configuration/",
+      "fileName": "connecting-to-visualization-tools",
+      "title": "Connecting to visualization tools",
+      "redirects": [
+        "/config/downstream"
+      ]
+    }
+  },
   "../docs/content/Caching/Using-Pre-Aggregations.mdx": {
     "origin": {
       "title": "Using pre-aggregations",
@@ -669,6 +669,23 @@
       "title": "Getting started with pre-aggregations",
       "redirects": [
         "/caching/pre-aggregations/getting-started"
+      ]
+    }
+  },
+  "../docs/content/Caching/Lambda-Pre-Aggregations.mdx": {
+    "origin": {
+      "title": "Lambda pre-aggregations",
+      "permalink": "/caching/pre-aggregations/lambda-pre-aggregations",
+      "category": "Caching",
+      "menuOrder": 4
+    },
+    "done": false,
+    "target": {
+      "path": "/caching/",
+      "fileName": "lambda-pre-aggregations",
+      "title": "Lambda pre-aggregations",
+      "redirects": [
+        "/caching/pre-aggregations/lambda-pre-aggregations"
       ]
     }
   },
@@ -707,26 +724,45 @@
       ]
     }
   },
-  "../docs/content/Schema/Reference/types-and-formats.mdx": {
+  "../docs/content/Schema/Reference/view.mdx": {
     "origin": {
-      "title": "Types and Formats",
-      "permalink": "/schema/reference/types-and-formats",
+      "title": "Views",
+      "permalink": "/schema/reference/view",
+      "scope": "cubejs",
+      "category": "Data Modeling",
+      "menuOrder": 21,
+      "subCategory": "Reference"
+    },
+    "done": false,
+    "target": {
+      "path": "/data-modeling/reference",
+      "fileName": "views",
+      "title": "Views",
+      "redirects": [
+        "/schema/reference/view"
+      ]
+    }
+  },
+  "../docs/content/Schema/Reference/schema-execution-environment.mdx": {
+    "origin": {
+      "title": "Execution Environment",
+      "permalink": "/schema/reference/execution-environment",
       "scope": "cubejs",
       "category": "Data Modeling",
       "subCategory": "Reference",
-      "menuOrder": 27,
+      "menuOrder": 28,
       "redirect_from": [
-        "/types-and-formats"
+        "/schema-execution-environment"
       ]
     },
     "done": false,
     "target": {
       "path": "/data-modeling/reference",
-      "fileName": "types-and-formats",
-      "title": "Types and Formats",
+      "fileName": "execution-environment",
+      "title": "Execution Environment",
       "redirects": [
-        "/schema/reference/types-and-formats",
-        "/types-and-formats"
+        "/schema/reference/execution-environment",
+        "/schema-execution-environment"
       ]
     }
   },
@@ -754,26 +790,50 @@
       ]
     }
   },
-  "../docs/content/Schema/Reference/schema-execution-environment.mdx": {
+  "../docs/content/Schema/Reference/measures.mdx": {
     "origin": {
-      "title": "Execution Environment",
-      "permalink": "/schema/reference/execution-environment",
+      "title": "Measures",
+      "permalink": "/schema/reference/measures",
       "scope": "cubejs",
       "category": "Data Modeling",
       "subCategory": "Reference",
-      "menuOrder": 28,
+      "menuOrder": 22,
+      "proofread": "06/18/2019",
       "redirect_from": [
-        "/schema-execution-environment"
+        "/measures"
       ]
     },
     "done": false,
     "target": {
       "path": "/data-modeling/reference",
-      "fileName": "execution-environment",
-      "title": "Execution Environment",
+      "fileName": "measures",
+      "title": "Measures",
       "redirects": [
-        "/schema/reference/execution-environment",
-        "/schema-execution-environment"
+        "/schema/reference/measures",
+        "/measures"
+      ]
+    }
+  },
+  "../docs/content/Schema/Reference/types-and-formats.mdx": {
+    "origin": {
+      "title": "Types and Formats",
+      "permalink": "/schema/reference/types-and-formats",
+      "scope": "cubejs",
+      "category": "Data Modeling",
+      "subCategory": "Reference",
+      "menuOrder": 27,
+      "redirect_from": [
+        "/types-and-formats"
+      ]
+    },
+    "done": false,
+    "target": {
+      "path": "/data-modeling/reference",
+      "fileName": "types-and-formats",
+      "title": "Types and Formats",
+      "redirects": [
+        "/schema/reference/types-and-formats",
+        "/types-and-formats"
       ]
     }
   },
@@ -797,47 +857,6 @@
       "redirects": [
         "/schema/reference/pre-aggregations",
         "/pre-aggregations"
-      ]
-    }
-  },
-  "../docs/content/Caching/Lambda-Pre-Aggregations.mdx": {
-    "origin": {
-      "title": "Lambda pre-aggregations",
-      "permalink": "/caching/pre-aggregations/lambda-pre-aggregations",
-      "category": "Caching",
-      "menuOrder": 4
-    },
-    "done": false,
-    "target": {
-      "path": "/caching/",
-      "fileName": "lambda-pre-aggregations",
-      "title": "Lambda pre-aggregations",
-      "redirects": [
-        "/caching/pre-aggregations/lambda-pre-aggregations"
-      ]
-    }
-  },
-  "../docs/content/Schema/Reference/measures.mdx": {
-    "origin": {
-      "title": "Measures",
-      "permalink": "/schema/reference/measures",
-      "scope": "cubejs",
-      "category": "Data Modeling",
-      "subCategory": "Reference",
-      "menuOrder": 22,
-      "proofread": "06/18/2019",
-      "redirect_from": [
-        "/measures"
-      ]
-    },
-    "done": false,
-    "target": {
-      "path": "/data-modeling/reference",
-      "fileName": "measures",
-      "title": "Measures",
-      "redirects": [
-        "/schema/reference/measures",
-        "/measures"
       ]
     }
   },
@@ -889,6 +908,48 @@
       ]
     }
   },
+  "../docs/content/Schema/Reference/cube.mdx": {
+    "origin": {
+      "title": "Cubes",
+      "permalink": "/schema/reference/cube",
+      "scope": "cubejs",
+      "category": "Data Modeling",
+      "menuOrder": 20,
+      "subCategory": "Reference",
+      "proofread": "06/18/2019",
+      "redirect_from": [
+        "/cube"
+      ]
+    },
+    "done": false,
+    "target": {
+      "path": "/data-modeling/reference",
+      "fileName": "cubes",
+      "title": "Cubes",
+      "redirects": [
+        "/schema/reference/cube",
+        "/cube"
+      ]
+    }
+  },
+  "../docs/content/Reference/SQL-API/SQL-Commands.mdx": {
+    "origin": {
+      "title": "SQL commands",
+      "category": "Reference",
+      "subCategory": "SQL API",
+      "permalink": "/backend/sql/reference/commands",
+      "menuOrder": 3
+    },
+    "done": false,
+    "target": {
+      "path": "/reference/sql-api",
+      "fileName": "sql-commands",
+      "title": "SQL commands",
+      "redirects": [
+        "/backend/sql/reference/commands"
+      ]
+    }
+  },
   "../docs/content/Schema/Fundamentals/Working-with-Joins.mdx": {
     "origin": {
       "title": "Working with joins",
@@ -913,22 +974,45 @@
       ]
     }
   },
-  "../docs/content/Schema/Fundamentals/Concepts.mdx": {
+  "../docs/content/Schema/Fundamentals/Syntax.mdx": {
     "origin": {
-      "title": "Data modeling concepts",
-      "menuTitle": "Concepts",
-      "permalink": "/schema/fundamentals/concepts",
+      "title": "Syntax",
+      "permalink": "/data-modeling/syntax",
       "category": "Data Modeling",
       "subCategory": "Fundamentals",
-      "menuOrder": 10
+      "menuOrder": 12,
+      "redirect_from": [
+        "/schema/fundamentals/working-with-yaml",
+        "/schema/getting-started/yaml"
+      ]
     },
     "done": false,
     "target": {
       "path": "/data-modeling/fundamentals",
-      "fileName": "data-modeling-concepts",
-      "title": "Data modeling concepts",
+      "fileName": "syntax",
+      "title": "Syntax",
       "redirects": [
-        "/schema/fundamentals/concepts"
+        "/data-modeling/syntax",
+        "/schema/fundamentals/working-with-yaml",
+        "/schema/getting-started/yaml"
+      ]
+    }
+  },
+  "../docs/content/Reference/SQL-API/SQL-Functions-and-Operators.mdx": {
+    "origin": {
+      "title": "SQL functions and operators",
+      "category": "Reference",
+      "subCategory": "SQL API",
+      "permalink": "/backend/sql/reference/functions-operators",
+      "menuOrder": 4
+    },
+    "done": false,
+    "target": {
+      "path": "/reference/sql-api",
+      "fileName": "sql-functions-and-operators",
+      "title": "SQL functions and operators",
+      "redirects": [
+        "/backend/sql/reference/functions-operators"
       ]
     }
   },
@@ -958,27 +1042,193 @@
       ]
     }
   },
-  "../docs/content/Schema/Fundamentals/Syntax.mdx": {
+  "../docs/content/Reference/REST-API/REST-API.mdx": {
     "origin": {
-      "title": "Syntax",
-      "permalink": "/data-modeling/syntax",
+      "title": "REST API",
+      "permalink": "/rest-api",
+      "category": "Reference",
+      "subCategory": "REST API",
+      "menuOrder": 2
+    },
+    "done": false,
+    "target": {
+      "path": "/reference/rest-api",
+      "fileName": "rest-api",
+      "title": "REST API",
+      "redirects": [
+        "/rest-api"
+      ]
+    }
+  },
+  "../docs/content/Reference/GraphQL-API/GraphQL-API.mdx": {
+    "origin": {
+      "title": "GraphQL API",
+      "permalink": "/backend/graphql",
+      "category": "Reference",
+      "subCategory": "GraphQL API",
+      "menuOrder": 3
+    },
+    "done": false,
+    "target": {
+      "path": "/reference/graphql-api",
+      "fileName": "graphql-api",
+      "title": "GraphQL API",
+      "redirects": [
+        "/backend/graphql"
+      ]
+    }
+  },
+  "../docs/content/Schema/Fundamentals/Concepts.mdx": {
+    "origin": {
+      "title": "Data modeling concepts",
+      "menuTitle": "Concepts",
+      "permalink": "/schema/fundamentals/concepts",
       "category": "Data Modeling",
       "subCategory": "Fundamentals",
-      "menuOrder": 12,
-      "redirect_from": [
-        "/schema/fundamentals/working-with-yaml",
-        "/schema/getting-started/yaml"
-      ]
+      "menuOrder": 10
     },
     "done": false,
     "target": {
       "path": "/data-modeling/fundamentals",
-      "fileName": "syntax",
-      "title": "Syntax",
+      "fileName": "data-modeling-concepts",
+      "title": "Data modeling concepts",
       "redirects": [
-        "/data-modeling/syntax",
-        "/schema/fundamentals/working-with-yaml",
-        "/schema/getting-started/yaml"
+        "/schema/fundamentals/concepts"
+      ]
+    }
+  },
+  "../docs/content/Reference/CLI/CLI-Reference.mdx": {
+    "origin": {
+      "title": "Command reference",
+      "permalink": "/reference",
+      "category": "Reference",
+      "subCategory": "CLI",
+      "menuOrder": 6
+    },
+    "done": false,
+    "target": {
+      "path": "/reference/cli",
+      "fileName": "command-reference",
+      "title": "Command reference",
+      "redirects": [
+        "/reference"
+      ]
+    }
+  },
+  "../docs/content/Getting-Started/Migrate-from-Core/Import-GitLab-repository-via-SSH.mdx": {
+    "origin": {
+      "title": "Import a GitLab repository to Cube Cloud",
+      "permalink": "/cloud/getting-started/ssh/gitlab"
+    },
+    "done": false,
+    "target": {
+      "path": "/TODO/",
+      "fileName": "import-a-gitlab-repository-to-cube-cloud",
+      "title": "Import a GitLab repository to Cube Cloud",
+      "redirects": [
+        "/cloud/getting-started/ssh/gitlab"
+      ]
+    }
+  },
+  "../docs/content/Getting-Started/Migrate-from-Core/Upload-with-CLI.mdx": {
+    "origin": {
+      "title": "Import a local project to Cube Cloud with CLI",
+      "permalink": "/cloud/getting-started/cli"
+    },
+    "done": false,
+    "target": {
+      "path": "/TODO/",
+      "fileName": "import-a-local-project-to-cube-cloud-with-cli",
+      "title": "Import a local project to Cube Cloud with CLI",
+      "redirects": [
+        "/cloud/getting-started/cli"
+      ]
+    }
+  },
+  "../docs/content/Reference/Configuration/Config.mdx": {
+    "origin": {
+      "title": "Configuration options",
+      "permalink": "/config",
+      "category": "Reference",
+      "subCategory": "Configuration",
+      "menuOrder": 1
+    },
+    "done": false,
+    "target": {
+      "path": "/reference/configuration",
+      "fileName": "configuration-options",
+      "title": "Configuration options",
+      "redirects": [
+        "/config"
+      ]
+    }
+  },
+  "../docs/content/Reference/Configuration/Environment-Variables-Reference.mdx": {
+    "origin": {
+      "title": "Environment variables",
+      "permalink": "/reference/environment-variables",
+      "category": "Reference",
+      "subCategory": "Configuration",
+      "menuOrder": 2
+    },
+    "done": false,
+    "target": {
+      "path": "/reference/configuration",
+      "fileName": "environment-variables",
+      "title": "Environment variables",
+      "redirects": [
+        "/reference/environment-variables"
+      ]
+    }
+  },
+  "../docs/content/Reference/Frontend/@cubejs-client-ngx.mdx": {
+    "origin": {
+      "title": "@cubejs-client/ngx",
+      "permalink": "/@cubejs-client-ngx",
+      "category": "Reference",
+      "subCategory": "Frontend",
+      "menuOrder": 5
+    },
+    "done": false,
+    "target": {
+      "path": "/reference/frontend",
+      "fileName": "cubejs-client-ngx",
+      "title": "@cubejs-client/ngx",
+      "redirects": [
+        "/@cubejs-client-ngx"
+      ]
+    }
+  },
+  "../docs/content/Getting-Started/Migrate-from-Core/Import-GitHub-repository.mdx": {
+    "origin": {
+      "title": "Import a GitHub repository to Cube Cloud",
+      "permalink": "/cloud/getting-started/github"
+    },
+    "done": false,
+    "target": {
+      "path": "/TODO/",
+      "fileName": "import-a-github-repository-to-cube-cloud",
+      "title": "Import a GitHub repository to Cube Cloud",
+      "redirects": [
+        "/cloud/getting-started/github"
+      ]
+    }
+  },
+  "../docs/content/Reference/Frontend/@cubejs-client-vue.mdx": {
+    "origin": {
+      "title": "@cubejs-client/vue",
+      "permalink": "/@cubejs-client-vue",
+      "category": "Reference",
+      "subCategory": "Frontend",
+      "menuOrder": 6
+    },
+    "done": false,
+    "target": {
+      "path": "/reference/frontend",
+      "fileName": "cubejs-client-vue",
+      "title": "@cubejs-client/vue",
+      "redirects": [
+        "/@cubejs-client-vue"
       ]
     }
   },
@@ -997,6 +1247,21 @@
       "title": "Using dbt",
       "redirects": [
         "/schema/advanced/using-dbt"
+      ]
+    }
+  },
+  "../docs/content/Getting-Started/Migrate-from-Core/Import-Bitbucket-repository-via-SSH.mdx": {
+    "origin": {
+      "title": "Import a Bitbucket repository to Cube Cloud",
+      "permalink": "/cloud/getting-started/ssh/bitbucket"
+    },
+    "done": false,
+    "target": {
+      "path": "/TODO/",
+      "fileName": "import-a-bitbucket-repository-to-cube-cloud",
+      "title": "Import a Bitbucket repository to Cube Cloud",
+      "redirects": [
+        "/cloud/getting-started/ssh/bitbucket"
       ]
     }
   },
@@ -1022,75 +1287,18 @@
       ]
     }
   },
-  "../docs/content/Schema/Reference/cube.mdx": {
+  "../docs/content/Getting-Started/Migrate-from-Core/Import-Git-repository-via-SSH.mdx": {
     "origin": {
-      "title": "Cubes",
-      "permalink": "/schema/reference/cube",
-      "scope": "cubejs",
-      "category": "Data Modeling",
-      "menuOrder": 20,
-      "subCategory": "Reference",
-      "proofread": "06/18/2019",
-      "redirect_from": [
-        "/cube"
-      ]
+      "title": "Import a Git repository to Cube Cloud",
+      "permalink": "/cloud/getting-started/ssh/git"
     },
     "done": false,
     "target": {
-      "path": "/data-modeling/reference",
-      "fileName": "cubes",
-      "title": "Cubes",
+      "path": "/TODO/",
+      "fileName": "import-a-git-repository-to-cube-cloud",
+      "title": "Import a Git repository to Cube Cloud",
       "redirects": [
-        "/schema/reference/cube",
-        "/cube"
-      ]
-    }
-  },
-  "../docs/content/Schema/Advanced/Data-Blending.mdx": {
-    "origin": {
-      "title": "Data blending",
-      "permalink": "/schema/advanced/data-blending",
-      "category": "Data Modeling",
-      "subCategory": "Advanced",
-      "menuOrder": 32,
-      "redirect_from": [
-        "/data-blending",
-        "/recipes/data-blending"
-      ]
-    },
-    "done": false,
-    "target": {
-      "path": "/data-modeling/advanced",
-      "fileName": "data-blending",
-      "title": "Data blending",
-      "redirects": [
-        "/schema/advanced/data-blending",
-        "/data-blending",
-        "/recipes/data-blending"
-      ]
-    }
-  },
-  "../docs/content/Schema/Advanced/Code-Reusability-Extending-Cubes.mdx": {
-    "origin": {
-      "title": "Extending cubes",
-      "permalink": "/schema/advanced/extending-cubes",
-      "category": "Data Modeling",
-      "subCategory": "Advanced",
-      "menuOrder": 31,
-      "redirect_from": [
-        "/extending-cubes",
-        "/recipes/extending-cubes"
-      ]
-    },
-    "done": false,
-    "target": {
-      "path": "/data-modeling/advanced",
-      "fileName": "extending-cubes",
-      "title": "Extending cubes",
-      "redirects": [
-        "/schema/advanced/extending-cubes",
-        "/extending-cubes",
-        "/recipes/extending-cubes"
+        "/cloud/getting-started/ssh/git"
       ]
     }
   },
@@ -1142,241 +1350,27 @@
       ]
     }
   },
-  "../docs/content/Reference/SQL-API/SQL-Commands.mdx": {
+  "../docs/content/Schema/Advanced/Code-Reusability-Extending-Cubes.mdx": {
     "origin": {
-      "title": "SQL commands",
-      "category": "Reference",
-      "subCategory": "SQL API",
-      "permalink": "/backend/sql/reference/commands",
-      "menuOrder": 3
-    },
-    "done": false,
-    "target": {
-      "path": "/reference/sql-api",
-      "fileName": "sql-commands",
-      "title": "SQL commands",
-      "redirects": [
-        "/backend/sql/reference/commands"
-      ]
-    }
-  },
-  "../docs/content/Schema/Reference/view.mdx": {
-    "origin": {
-      "title": "Views",
-      "permalink": "/schema/reference/view",
-      "scope": "cubejs",
+      "title": "Extending cubes",
+      "permalink": "/schema/advanced/extending-cubes",
       "category": "Data Modeling",
-      "menuOrder": 21,
-      "subCategory": "Reference"
-    },
-    "done": false,
-    "target": {
-      "path": "/data-modeling/reference",
-      "fileName": "views",
-      "title": "Views",
-      "redirects": [
-        "/schema/reference/view"
+      "subCategory": "Advanced",
+      "menuOrder": 31,
+      "redirect_from": [
+        "/extending-cubes",
+        "/recipes/extending-cubes"
       ]
-    }
-  },
-  "../docs/content/Reference/GraphQL-API/GraphQL-API.mdx": {
-    "origin": {
-      "title": "GraphQL API",
-      "permalink": "/backend/graphql",
-      "category": "Reference",
-      "subCategory": "GraphQL API",
-      "menuOrder": 3
     },
     "done": false,
     "target": {
-      "path": "/reference/graphql-api",
-      "fileName": "graphql-api",
-      "title": "GraphQL API",
+      "path": "/data-modeling/advanced",
+      "fileName": "extending-cubes",
+      "title": "Extending cubes",
       "redirects": [
-        "/backend/graphql"
-      ]
-    }
-  },
-  "../docs/content/Reference/Frontend/@cubejs-client-vue.mdx": {
-    "origin": {
-      "title": "@cubejs-client/vue",
-      "permalink": "/@cubejs-client-vue",
-      "category": "Reference",
-      "subCategory": "Frontend",
-      "menuOrder": 6
-    },
-    "done": false,
-    "target": {
-      "path": "/reference/frontend",
-      "fileName": "cubejs-client-vue",
-      "title": "@cubejs-client/vue",
-      "redirects": [
-        "/@cubejs-client-vue"
-      ]
-    }
-  },
-  "../docs/content/Reference/Frontend/@cubejs-client-ngx.mdx": {
-    "origin": {
-      "title": "@cubejs-client/ngx",
-      "permalink": "/@cubejs-client-ngx",
-      "category": "Reference",
-      "subCategory": "Frontend",
-      "menuOrder": 5
-    },
-    "done": false,
-    "target": {
-      "path": "/reference/frontend",
-      "fileName": "cubejs-client-ngx",
-      "title": "@cubejs-client/ngx",
-      "redirects": [
-        "/@cubejs-client-ngx"
-      ]
-    }
-  },
-  "../docs/content/Reference/Configuration/Environment-Variables-Reference.mdx": {
-    "origin": {
-      "title": "Environment variables",
-      "permalink": "/reference/environment-variables",
-      "category": "Reference",
-      "subCategory": "Configuration",
-      "menuOrder": 2
-    },
-    "done": false,
-    "target": {
-      "path": "/reference/configuration",
-      "fileName": "environment-variables",
-      "title": "Environment variables",
-      "redirects": [
-        "/reference/environment-variables"
-      ]
-    }
-  },
-  "../docs/content/Reference/Configuration/Config.mdx": {
-    "origin": {
-      "title": "Configuration options",
-      "permalink": "/config",
-      "category": "Reference",
-      "subCategory": "Configuration",
-      "menuOrder": 1
-    },
-    "done": false,
-    "target": {
-      "path": "/reference/configuration",
-      "fileName": "configuration-options",
-      "title": "Configuration options",
-      "redirects": [
-        "/config"
-      ]
-    }
-  },
-  "../docs/content/Reference/CLI/CLI-Reference.mdx": {
-    "origin": {
-      "title": "Command reference",
-      "permalink": "/reference",
-      "category": "Reference",
-      "subCategory": "CLI",
-      "menuOrder": 6
-    },
-    "done": false,
-    "target": {
-      "path": "/reference/cli",
-      "fileName": "command-reference",
-      "title": "Command reference",
-      "redirects": [
-        "/reference"
-      ]
-    }
-  },
-  "../docs/content/Getting-Started/Migrate-from-Core/Upload-with-CLI.mdx": {
-    "origin": {
-      "title": "Import a local project to Cube Cloud with CLI",
-      "permalink": "/cloud/getting-started/cli"
-    },
-    "done": false,
-    "target": {
-      "path": "/TODO/",
-      "fileName": "import-a-local-project-to-cube-cloud-with-cli",
-      "title": "Import a local project to Cube Cloud with CLI",
-      "redirects": [
-        "/cloud/getting-started/cli"
-      ]
-    }
-  },
-  "../docs/content/Getting-Started/Migrate-from-Core/Import-GitLab-repository-via-SSH.mdx": {
-    "origin": {
-      "title": "Import a GitLab repository to Cube Cloud",
-      "permalink": "/cloud/getting-started/ssh/gitlab"
-    },
-    "done": false,
-    "target": {
-      "path": "/TODO/",
-      "fileName": "import-a-gitlab-repository-to-cube-cloud",
-      "title": "Import a GitLab repository to Cube Cloud",
-      "redirects": [
-        "/cloud/getting-started/ssh/gitlab"
-      ]
-    }
-  },
-  "../docs/content/Getting-Started/Migrate-from-Core/Import-GitHub-repository.mdx": {
-    "origin": {
-      "title": "Import a GitHub repository to Cube Cloud",
-      "permalink": "/cloud/getting-started/github"
-    },
-    "done": false,
-    "target": {
-      "path": "/TODO/",
-      "fileName": "import-a-github-repository-to-cube-cloud",
-      "title": "Import a GitHub repository to Cube Cloud",
-      "redirects": [
-        "/cloud/getting-started/github"
-      ]
-    }
-  },
-  "../docs/content/Getting-Started/Migrate-from-Core/Import-Git-repository-via-SSH.mdx": {
-    "origin": {
-      "title": "Import a Git repository to Cube Cloud",
-      "permalink": "/cloud/getting-started/ssh/git"
-    },
-    "done": false,
-    "target": {
-      "path": "/TODO/",
-      "fileName": "import-a-git-repository-to-cube-cloud",
-      "title": "Import a Git repository to Cube Cloud",
-      "redirects": [
-        "/cloud/getting-started/ssh/git"
-      ]
-    }
-  },
-  "../docs/content/Getting-Started/Core/05-Learn-more.mdx": {
-    "origin": {
-      "title": "Learn more",
-      "permalink": "/getting-started/core/learn-more",
-      "category": "Getting Started",
-      "subCategory": "Cube Core",
-      "menuOrder": 6
-    },
-    "done": false,
-    "target": {
-      "path": "/getting-started/cube-core",
-      "fileName": "learn-more",
-      "title": "Learn more",
-      "redirects": [
-        "/getting-started/core/learn-more"
-      ]
-    }
-  },
-  "../docs/content/Getting-Started/Migrate-from-Core/Import-Bitbucket-repository-via-SSH.mdx": {
-    "origin": {
-      "title": "Import a Bitbucket repository to Cube Cloud",
-      "permalink": "/cloud/getting-started/ssh/bitbucket"
-    },
-    "done": false,
-    "target": {
-      "path": "/TODO/",
-      "fileName": "import-a-bitbucket-repository-to-cube-cloud",
-      "title": "Import a Bitbucket repository to Cube Cloud",
-      "redirects": [
-        "/cloud/getting-started/ssh/bitbucket"
+        "/schema/advanced/extending-cubes",
+        "/extending-cubes",
+        "/recipes/extending-cubes"
       ]
     }
   },
@@ -1395,6 +1389,30 @@
       "title": "Add a pre-aggregation",
       "redirects": [
         "/getting-started/core/add-a-pre-aggregation"
+      ]
+    }
+  },
+  "../docs/content/Schema/Advanced/Data-Blending.mdx": {
+    "origin": {
+      "title": "Data blending",
+      "permalink": "/schema/advanced/data-blending",
+      "category": "Data Modeling",
+      "subCategory": "Advanced",
+      "menuOrder": 32,
+      "redirect_from": [
+        "/data-blending",
+        "/recipes/data-blending"
+      ]
+    },
+    "done": false,
+    "target": {
+      "path": "/data-modeling/advanced",
+      "fileName": "data-blending",
+      "title": "Data blending",
+      "redirects": [
+        "/schema/advanced/data-blending",
+        "/data-blending",
+        "/recipes/data-blending"
       ]
     }
   },
@@ -1434,6 +1452,60 @@
       ]
     }
   },
+  "../docs/content/Getting-Started/Core/05-Learn-more.mdx": {
+    "origin": {
+      "title": "Learn more",
+      "permalink": "/getting-started/core/learn-more",
+      "category": "Getting Started",
+      "subCategory": "Cube Core",
+      "menuOrder": 6
+    },
+    "done": false,
+    "target": {
+      "path": "/getting-started/cube-core",
+      "fileName": "learn-more",
+      "title": "Learn more",
+      "redirects": [
+        "/getting-started/core/learn-more"
+      ]
+    }
+  },
+  "../docs/content/Getting-Started/Cloud/06-Learn-more.mdx": {
+    "origin": {
+      "title": "Learn more",
+      "permalink": "/getting-started/cloud/learn-more",
+      "category": "Getting Started",
+      "subCategory": "Cube Cloud",
+      "menuOrder": 7
+    },
+    "done": false,
+    "target": {
+      "path": "/getting-started/cube-cloud",
+      "fileName": "learn-more",
+      "title": "Learn more",
+      "redirects": [
+        "/getting-started/cloud/learn-more"
+      ]
+    }
+  },
+  "../docs/content/Getting-Started/Cloud/04-Query-data.mdx": {
+    "origin": {
+      "title": "Query data",
+      "permalink": "/getting-started/cloud/query-data",
+      "category": "Getting Started",
+      "subCategory": "Cube Cloud",
+      "menuOrder": 5
+    },
+    "done": false,
+    "target": {
+      "path": "/getting-started/cube-cloud",
+      "fileName": "query-data",
+      "title": "Query data",
+      "redirects": [
+        "/getting-started/cloud/query-data"
+      ]
+    }
+  },
   "../docs/content/Getting-Started/Core/01-Overview.mdx": {
     "origin": {
       "title": "Getting started with Cube Core",
@@ -1458,21 +1530,21 @@
       ]
     }
   },
-  "../docs/content/Getting-Started/Cloud/06-Learn-more.mdx": {
+  "../docs/content/Getting-Started/Cloud/03-Generate-models.mdx": {
     "origin": {
-      "title": "Learn more",
-      "permalink": "/getting-started/cloud/learn-more",
+      "title": "Generate data models",
+      "permalink": "/getting-started/cloud/generate-models",
       "category": "Getting Started",
       "subCategory": "Cube Cloud",
-      "menuOrder": 7
+      "menuOrder": 4
     },
     "done": false,
     "target": {
       "path": "/getting-started/cube-cloud",
-      "fileName": "learn-more",
-      "title": "Learn more",
+      "fileName": "generate-data-models",
+      "title": "Generate data models",
       "redirects": [
-        "/getting-started/cloud/learn-more"
+        "/getting-started/cloud/generate-models"
       ]
     }
   },
@@ -1494,57 +1566,21 @@
       ]
     }
   },
-  "../docs/content/Reference/SQL-API/SQL-Functions-and-Operators.mdx": {
+  "../docs/content/Deployment/Cloud/Pricing.mdx": {
     "origin": {
-      "title": "SQL functions and operators",
-      "category": "Reference",
-      "subCategory": "SQL API",
-      "permalink": "/backend/sql/reference/functions-operators",
-      "menuOrder": 4
-    },
-    "done": false,
-    "target": {
-      "path": "/reference/sql-api",
-      "fileName": "sql-functions-and-operators",
-      "title": "SQL functions and operators",
-      "redirects": [
-        "/backend/sql/reference/functions-operators"
-      ]
-    }
-  },
-  "../docs/content/Getting-Started/Cloud/04-Query-data.mdx": {
-    "origin": {
-      "title": "Query data",
-      "permalink": "/getting-started/cloud/query-data",
-      "category": "Getting Started",
+      "title": "Pricing",
+      "permalink": "/cloud/pricing",
+      "category": "Deployment",
       "subCategory": "Cube Cloud",
-      "menuOrder": 5
+      "menuOrder": 6
     },
     "done": false,
     "target": {
-      "path": "/getting-started/cube-cloud",
-      "fileName": "query-data",
-      "title": "Query data",
+      "path": "/deployment/cube-cloud",
+      "fileName": "pricing",
+      "title": "Pricing",
       "redirects": [
-        "/getting-started/cloud/query-data"
-      ]
-    }
-  },
-  "../docs/content/Getting-Started/Cloud/03-Generate-models.mdx": {
-    "origin": {
-      "title": "Generate data models",
-      "permalink": "/getting-started/cloud/generate-models",
-      "category": "Getting Started",
-      "subCategory": "Cube Cloud",
-      "menuOrder": 4
-    },
-    "done": false,
-    "target": {
-      "path": "/getting-started/cube-cloud",
-      "fileName": "generate-data-models",
-      "title": "Generate data models",
-      "redirects": [
-        "/getting-started/cloud/generate-models"
+        "/cloud/pricing"
       ]
     }
   },
@@ -1566,6 +1602,24 @@
       ]
     }
   },
+  "../docs/content/Deployment/Cloud/Custom-Domains.mdx": {
+    "origin": {
+      "title": "Custom domains",
+      "permalink": "/cloud/configuration/custom-domains",
+      "category": "Deployment",
+      "subCategory": "Cube Cloud",
+      "menuOrder": 4
+    },
+    "done": false,
+    "target": {
+      "path": "/deployment/cube-cloud",
+      "fileName": "custom-domains",
+      "title": "Custom domains",
+      "redirects": [
+        "/cloud/configuration/custom-domains"
+      ]
+    }
+  },
   "../docs/content/Getting-Started/Cloud/01-Overview.mdx": {
     "origin": {
       "title": "Getting started with Cube Cloud",
@@ -1584,57 +1638,20 @@
       ]
     }
   },
-  "../docs/content/Deployment/Core/Overview.mdx": {
+  "../docs/content/Configuration/VPC/Connecting-with-a-VPC.mdx": {
     "origin": {
-      "title": "Overview",
-      "permalink": "/deployment/platforms/docker",
-      "category": "Deployment",
-      "subCategory": "Cube Core",
-      "menuOrder": 11
+      "title": "Connecting with a VPC",
+      "permalink": "/cloud/configuration/connecting-with-a-vpc",
+      "category": "Configuration",
+      "menuOrder": 4
     },
     "done": false,
     "target": {
-      "path": "/deployment/cube-core",
-      "fileName": "overview",
-      "title": "Overview",
+      "path": "/configuration/",
+      "fileName": "connecting-with-a-vpc",
+      "title": "Connecting with a VPC",
       "redirects": [
-        "/deployment/platforms/docker"
-      ]
-    }
-  },
-  "../docs/content/Deployment/Cloud/Pricing.mdx": {
-    "origin": {
-      "title": "Pricing",
-      "permalink": "/cloud/pricing",
-      "category": "Deployment",
-      "subCategory": "Cube Cloud",
-      "menuOrder": 6
-    },
-    "done": false,
-    "target": {
-      "path": "/deployment/cube-cloud",
-      "fileName": "pricing",
-      "title": "Pricing",
-      "redirects": [
-        "/cloud/pricing"
-      ]
-    }
-  },
-  "../docs/content/Deployment/Cloud/Overview.mdx": {
-    "origin": {
-      "title": "Overview",
-      "permalink": "/deployment/platforms/cube-cloud",
-      "category": "Deployment",
-      "subCategory": "Cube Cloud",
-      "menuOrder": 2
-    },
-    "done": false,
-    "target": {
-      "path": "/deployment/cube-cloud",
-      "fileName": "overview",
-      "title": "Overview",
-      "redirects": [
-        "/deployment/platforms/cube-cloud"
+        "/cloud/configuration/connecting-with-a-vpc"
       ]
     }
   },
@@ -1656,38 +1673,21 @@
       ]
     }
   },
-  "../docs/content/Configuration/VPC/Connecting-with-a-VPC.mdx": {
+  "../docs/content/Deployment/Cloud/Auto-Suspension.mdx": {
     "origin": {
-      "title": "Connecting with a VPC",
-      "permalink": "/cloud/configuration/connecting-with-a-vpc",
-      "category": "Configuration",
-      "menuOrder": 4
-    },
-    "done": false,
-    "target": {
-      "path": "/configuration/",
-      "fileName": "connecting-with-a-vpc",
-      "title": "Connecting with a VPC",
-      "redirects": [
-        "/cloud/configuration/connecting-with-a-vpc"
-      ]
-    }
-  },
-  "../docs/content/Deployment/Cloud/Custom-Domains.mdx": {
-    "origin": {
-      "title": "Custom domains",
-      "permalink": "/cloud/configuration/custom-domains",
+      "title": "Auto-suspension",
+      "permalink": "/deployment/cloud/auto-suspension",
       "category": "Deployment",
       "subCategory": "Cube Cloud",
-      "menuOrder": 4
+      "menuOrder": 3
     },
     "done": false,
     "target": {
       "path": "/deployment/cube-cloud",
-      "fileName": "custom-domains",
-      "title": "Custom domains",
+      "fileName": "auto-suspension",
+      "title": "Auto-suspension",
       "redirects": [
-        "/cloud/configuration/custom-domains"
+        "/deployment/cloud/auto-suspension"
       ]
     }
   },
@@ -1706,18 +1706,21 @@
       ]
     }
   },
-  "../docs/content/Configuration/VPC/Connecting-with-a-VPC-Azure.mdx": {
+  "../docs/content/Deployment/Cloud/Overview.mdx": {
     "origin": {
-      "title": "Connecting with a VPC on Azure",
-      "permalink": "/cloud/configuration/connecting-with-a-vpc/azure"
+      "title": "Overview",
+      "permalink": "/deployment/platforms/cube-cloud",
+      "category": "Deployment",
+      "subCategory": "Cube Cloud",
+      "menuOrder": 2
     },
     "done": false,
     "target": {
-      "path": "/TODO/",
-      "fileName": "connecting-with-a-vpc-on-azure",
-      "title": "Connecting with a VPC on Azure",
+      "path": "/deployment/cube-cloud",
+      "fileName": "overview",
+      "title": "Overview",
       "redirects": [
-        "/cloud/configuration/connecting-with-a-vpc/azure"
+        "/deployment/platforms/cube-cloud"
       ]
     }
   },
@@ -1739,6 +1742,57 @@
       ]
     }
   },
+  "../docs/content/Deployment/Core/Overview.mdx": {
+    "origin": {
+      "title": "Overview",
+      "permalink": "/deployment/platforms/docker",
+      "category": "Deployment",
+      "subCategory": "Cube Core",
+      "menuOrder": 11
+    },
+    "done": false,
+    "target": {
+      "path": "/deployment/cube-core",
+      "fileName": "overview",
+      "title": "Overview",
+      "redirects": [
+        "/deployment/platforms/docker"
+      ]
+    }
+  },
+  "../docs/content/Configuration/Advanced/Multitenancy.mdx": {
+    "origin": {
+      "title": "Multitenancy",
+      "permalink": "/config/multitenancy",
+      "category": "Configuration",
+      "subCategory": "Advanced",
+      "menuOrder": 3
+    },
+    "done": false,
+    "target": {
+      "path": "/configuration/advanced",
+      "fileName": "multitenancy",
+      "title": "Multitenancy",
+      "redirects": [
+        "/config/multitenancy"
+      ]
+    }
+  },
+  "../docs/content/Configuration/VPC/Connecting-with-a-VPC-Azure.mdx": {
+    "origin": {
+      "title": "Connecting with a VPC on Azure",
+      "permalink": "/cloud/configuration/connecting-with-a-vpc/azure"
+    },
+    "done": false,
+    "target": {
+      "path": "/TODO/",
+      "fileName": "connecting-with-a-vpc-on-azure",
+      "title": "Connecting with a VPC on Azure",
+      "redirects": [
+        "/cloud/configuration/connecting-with-a-vpc/azure"
+      ]
+    }
+  },
   "../docs/content/Configuration/VPC/Connecting-with-a-VPC-AWS.mdx": {
     "origin": {
       "title": "Connecting with a VPC on AWS",
@@ -1754,25 +1808,6 @@
       ]
     }
   },
-  "../docs/content/Configuration/Downstream/Superset.mdx": {
-    "origin": {
-      "title": "Connecting to Superset/Preset",
-      "permalink": "/config/downstream/superset",
-      "redirect_from": [
-        "/recipes/using-apache-superset-with-cube-sql"
-      ]
-    },
-    "done": false,
-    "target": {
-      "path": "/TODO/",
-      "fileName": "connecting-to-superset-preset",
-      "title": "Connecting to Superset/Preset",
-      "redirects": [
-        "/config/downstream/superset",
-        "/recipes/using-apache-superset-with-cube-sql"
-      ]
-    }
-  },
   "../docs/content/Configuration/Downstream/Tableau.mdx": {
     "origin": {
       "title": "Connecting from Tableau",
@@ -1785,6 +1820,24 @@
       "title": "Connecting from Tableau",
       "redirects": [
         "/config/downstream/tableau"
+      ]
+    }
+  },
+  "../docs/content/Configuration/Advanced/Multiple-Data-Sources.mdx": {
+    "origin": {
+      "title": "Multiple data sources",
+      "permalink": "/config/multiple-data-sources",
+      "category": "Configuration",
+      "subCategory": "Advanced",
+      "menuOrder": 2
+    },
+    "done": false,
+    "target": {
+      "path": "/configuration/advanced",
+      "fileName": "multiple-data-sources",
+      "title": "Multiple data sources",
+      "redirects": [
+        "/config/multiple-data-sources"
       ]
     }
   },
@@ -1818,21 +1871,6 @@
       ]
     }
   },
-  "../docs/content/Configuration/Downstream/Retool.mdx": {
-    "origin": {
-      "title": "Connecting to Retool",
-      "permalink": "/config/downstream/retool"
-    },
-    "done": false,
-    "target": {
-      "path": "/TODO/",
-      "fileName": "connecting-to-retool",
-      "title": "Connecting to Retool",
-      "redirects": [
-        "/config/downstream/retool"
-      ]
-    }
-  },
   "../docs/content/Configuration/Downstream/PowerBI.mdx": {
     "origin": {
       "title": "Connecting from Power BI",
@@ -1845,6 +1883,21 @@
       "title": "Connecting from Power BI",
       "redirects": [
         "/config/downstream/powerbi"
+      ]
+    }
+  },
+  "../docs/content/Configuration/Downstream/Retool.mdx": {
+    "origin": {
+      "title": "Connecting to Retool",
+      "permalink": "/config/downstream/retool"
+    },
+    "done": false,
+    "target": {
+      "path": "/TODO/",
+      "fileName": "connecting-to-retool",
+      "title": "Connecting to Retool",
+      "redirects": [
+        "/config/downstream/retool"
       ]
     }
   },
@@ -1893,18 +1946,18 @@
       ]
     }
   },
-  "../docs/content/Configuration/Downstream/Hex.mdx": {
+  "../docs/content/Configuration/Downstream/Deepnote.mdx": {
     "origin": {
-      "title": "Connecting to Hex",
-      "permalink": "/config/downstream/hex"
+      "title": "Connecting to Deepnote",
+      "permalink": "/config/downstream/deepnote"
     },
     "done": false,
     "target": {
       "path": "/TODO/",
-      "fileName": "connecting-to-hex",
-      "title": "Connecting to Hex",
+      "fileName": "connecting-to-deepnote",
+      "title": "Connecting to Deepnote",
       "redirects": [
-        "/config/downstream/hex"
+        "/config/downstream/deepnote"
       ]
     }
   },
@@ -1923,18 +1976,18 @@
       ]
     }
   },
-  "../docs/content/Configuration/Downstream/Deepnote.mdx": {
+  "../docs/content/Configuration/Downstream/Hex.mdx": {
     "origin": {
-      "title": "Connecting to Deepnote",
-      "permalink": "/config/downstream/deepnote"
+      "title": "Connecting to Hex",
+      "permalink": "/config/downstream/hex"
     },
     "done": false,
     "target": {
       "path": "/TODO/",
-      "fileName": "connecting-to-deepnote",
-      "title": "Connecting to Deepnote",
+      "fileName": "connecting-to-hex",
+      "title": "Connecting to Hex",
       "redirects": [
-        "/config/downstream/deepnote"
+        "/config/downstream/hex"
       ]
     }
   },
@@ -1953,87 +2006,22 @@
       ]
     }
   },
-  "../docs/content/Configuration/Downstream/Bubble.mdx": {
+  "../docs/content/Configuration/Downstream/Superset.mdx": {
     "origin": {
-      "title": "Connecting to Bubble",
-      "permalink": "/config/downstream/bubble"
+      "title": "Connecting to Superset/Preset",
+      "permalink": "/config/downstream/superset",
+      "redirect_from": [
+        "/recipes/using-apache-superset-with-cube-sql"
+      ]
     },
     "done": false,
     "target": {
       "path": "/TODO/",
-      "fileName": "connecting-to-bubble",
-      "title": "Connecting to Bubble",
+      "fileName": "connecting-to-superset-preset",
+      "title": "Connecting to Superset/Preset",
       "redirects": [
-        "/config/downstream/bubble"
-      ]
-    }
-  },
-  "../docs/content/Reference/REST-API/REST-API.mdx": {
-    "origin": {
-      "title": "REST API",
-      "permalink": "/rest-api",
-      "category": "Reference",
-      "subCategory": "REST API",
-      "menuOrder": 2
-    },
-    "done": false,
-    "target": {
-      "path": "/reference/rest-api",
-      "fileName": "rest-api",
-      "title": "REST API",
-      "redirects": [
-        "/rest-api"
-      ]
-    }
-  },
-  "../docs/content/Deployment/Cloud/Auto-Suspension.mdx": {
-    "origin": {
-      "title": "Auto-suspension",
-      "permalink": "/deployment/cloud/auto-suspension",
-      "category": "Deployment",
-      "subCategory": "Cube Cloud",
-      "menuOrder": 3
-    },
-    "done": false,
-    "target": {
-      "path": "/deployment/cube-cloud",
-      "fileName": "auto-suspension",
-      "title": "Auto-suspension",
-      "redirects": [
-        "/deployment/cloud/auto-suspension"
-      ]
-    }
-  },
-  "../docs/content/Configuration/Advanced/Multitenancy.mdx": {
-    "origin": {
-      "title": "Multitenancy",
-      "permalink": "/config/multitenancy",
-      "category": "Configuration",
-      "subCategory": "Advanced",
-      "menuOrder": 3
-    },
-    "done": false,
-    "target": {
-      "path": "/configuration/advanced",
-      "fileName": "multitenancy",
-      "title": "Multitenancy",
-      "redirects": [
-        "/config/multitenancy"
-      ]
-    }
-  },
-  "../docs/content/Configuration/Databases/Trino.mdx": {
-    "origin": {
-      "title": "Trino",
-      "permalink": "/config/databases/trino"
-    },
-    "done": false,
-    "target": {
-      "path": "/TODO/",
-      "fileName": "trino",
-      "title": "Trino",
-      "redirects": [
-        "/config/databases/trino"
+        "/config/downstream/superset",
+        "/recipes/using-apache-superset-with-cube-sql"
       ]
     }
   },
@@ -2052,6 +2040,36 @@
       ]
     }
   },
+  "../docs/content/Configuration/Databases/Trino.mdx": {
+    "origin": {
+      "title": "Trino",
+      "permalink": "/config/databases/trino"
+    },
+    "done": false,
+    "target": {
+      "path": "/TODO/",
+      "fileName": "trino",
+      "title": "Trino",
+      "redirects": [
+        "/config/databases/trino"
+      ]
+    }
+  },
+  "../docs/content/Configuration/Downstream/Bubble.mdx": {
+    "origin": {
+      "title": "Connecting to Bubble",
+      "permalink": "/config/downstream/bubble"
+    },
+    "done": false,
+    "target": {
+      "path": "/TODO/",
+      "fileName": "connecting-to-bubble",
+      "title": "Connecting to Bubble",
+      "redirects": [
+        "/config/downstream/bubble"
+      ]
+    }
+  },
   "../docs/content/Configuration/Downstream/Appsmith.mdx": {
     "origin": {
       "title": "Connecting to Appsmith",
@@ -2067,21 +2085,6 @@
       ]
     }
   },
-  "../docs/content/Configuration/Databases/Snowflake.mdx": {
-    "origin": {
-      "title": "Snowflake",
-      "permalink": "/config/databases/snowflake"
-    },
-    "done": false,
-    "target": {
-      "path": "/TODO/",
-      "fileName": "snowflake",
-      "title": "Snowflake",
-      "redirects": [
-        "/config/databases/snowflake"
-      ]
-    }
-  },
   "../docs/content/Configuration/Databases/SQLite.mdx": {
     "origin": {
       "title": "SQLite",
@@ -2094,40 +2097,6 @@
       "title": "SQLite",
       "redirects": [
         "/config/databases/sqlite"
-      ]
-    }
-  },
-  "../docs/content/Configuration/Databases/QuestDB.mdx": {
-    "origin": {
-      "title": "QuestDB",
-      "permalink": "/config/databases/questdb"
-    },
-    "done": false,
-    "target": {
-      "path": "/TODO/",
-      "fileName": "questdb",
-      "title": "QuestDB",
-      "redirects": [
-        "/config/databases/questdb"
-      ]
-    }
-  },
-  "../docs/content/Configuration/Databases/Presto.mdx": {
-    "origin": {
-      "title": "Presto",
-      "permalink": "/config/databases/presto",
-      "redirect_from": [
-        "/config/databases/prestodb"
-      ]
-    },
-    "done": false,
-    "target": {
-      "path": "/TODO/",
-      "fileName": "presto",
-      "title": "Presto",
-      "redirects": [
-        "/config/databases/presto",
-        "/config/databases/prestodb"
       ]
     }
   },
@@ -2158,6 +2127,21 @@
       "title": "Oracle",
       "redirects": [
         "/config/databases/oracle"
+      ]
+    }
+  },
+  "../docs/content/Configuration/Databases/Snowflake.mdx": {
+    "origin": {
+      "title": "Snowflake",
+      "permalink": "/config/databases/snowflake"
+    },
+    "done": false,
+    "target": {
+      "path": "/TODO/",
+      "fileName": "snowflake",
+      "title": "Snowflake",
+      "redirects": [
+        "/config/databases/snowflake"
       ]
     }
   },
@@ -2221,18 +2205,18 @@
       ]
     }
   },
-  "../docs/content/Configuration/Databases/Hive.mdx": {
+  "../docs/content/Configuration/Databases/QuestDB.mdx": {
     "origin": {
-      "title": "Hive/SparkSQL",
-      "permalink": "/config/databases/hive-sparksql"
+      "title": "QuestDB",
+      "permalink": "/config/databases/questdb"
     },
     "done": false,
     "target": {
       "path": "/TODO/",
-      "fileName": "hive-sparksql",
-      "title": "Hive/SparkSQL",
+      "fileName": "questdb",
+      "title": "QuestDB",
       "redirects": [
-        "/config/databases/hive-sparksql"
+        "/config/databases/questdb"
       ]
     }
   },
@@ -2251,33 +2235,18 @@
       ]
     }
   },
-  "../docs/content/Configuration/Databases/Firebolt.mdx": {
+  "../docs/content/Configuration/Databases/Hive.mdx": {
     "origin": {
-      "title": "Firebolt",
-      "permalink": "/config/databases/firebolt"
+      "title": "Hive/SparkSQL",
+      "permalink": "/config/databases/hive-sparksql"
     },
     "done": false,
     "target": {
       "path": "/TODO/",
-      "fileName": "firebolt",
-      "title": "Firebolt",
+      "fileName": "hive-sparksql",
+      "title": "Hive/SparkSQL",
       "redirects": [
-        "/config/databases/firebolt"
-      ]
-    }
-  },
-  "../docs/content/Configuration/Databases/Elasticsearch.mdx": {
-    "origin": {
-      "title": "Elasticsearch",
-      "permalink": "/config/databases/elasticsearch"
-    },
-    "done": false,
-    "target": {
-      "path": "/TODO/",
-      "fileName": "elasticsearch",
-      "title": "Elasticsearch",
-      "redirects": [
-        "/config/databases/elasticsearch"
+        "/config/databases/hive-sparksql"
       ]
     }
   },
@@ -2296,24 +2265,6 @@
       ]
     }
   },
-  "../docs/content/Configuration/Advanced/Multiple-Data-Sources.mdx": {
-    "origin": {
-      "title": "Multiple data sources",
-      "permalink": "/config/multiple-data-sources",
-      "category": "Configuration",
-      "subCategory": "Advanced",
-      "menuOrder": 2
-    },
-    "done": false,
-    "target": {
-      "path": "/configuration/advanced",
-      "fileName": "multiple-data-sources",
-      "title": "Multiple data sources",
-      "redirects": [
-        "/config/multiple-data-sources"
-      ]
-    }
-  },
   "../docs/content/Configuration/Databases/Databricks-JDBC.mdx": {
     "origin": {
       "title": "Databricks JDBC",
@@ -2329,18 +2280,37 @@
       ]
     }
   },
-  "../docs/content/Configuration/Databases/ClickHouse.mdx": {
+  "../docs/content/Configuration/Databases/Presto.mdx": {
     "origin": {
-      "title": "ClickHouse",
-      "permalink": "/config/databases/clickhouse"
+      "title": "Presto",
+      "permalink": "/config/databases/presto",
+      "redirect_from": [
+        "/config/databases/prestodb"
+      ]
     },
     "done": false,
     "target": {
       "path": "/TODO/",
-      "fileName": "clickhouse",
-      "title": "ClickHouse",
+      "fileName": "presto",
+      "title": "Presto",
       "redirects": [
-        "/config/databases/clickhouse"
+        "/config/databases/presto",
+        "/config/databases/prestodb"
+      ]
+    }
+  },
+  "../docs/content/Configuration/Databases/Firebolt.mdx": {
+    "origin": {
+      "title": "Firebolt",
+      "permalink": "/config/databases/firebolt"
+    },
+    "done": false,
+    "target": {
+      "path": "/TODO/",
+      "fileName": "firebolt",
+      "title": "Firebolt",
+      "redirects": [
+        "/config/databases/firebolt"
       ]
     }
   },
@@ -2359,6 +2329,87 @@
       ]
     }
   },
+  "../docs/content/Configuration/Databases/Elasticsearch.mdx": {
+    "origin": {
+      "title": "Elasticsearch",
+      "permalink": "/config/databases/elasticsearch"
+    },
+    "done": false,
+    "target": {
+      "path": "/TODO/",
+      "fileName": "elasticsearch",
+      "title": "Elasticsearch",
+      "redirects": [
+        "/config/databases/elasticsearch"
+      ]
+    }
+  },
+  "../docs/content/Examples-Tutorials-Recipes/Recipes/Data-sources/using-ssl-connections-to-data-source.mdx": {
+    "origin": {
+      "title": "Using SSL Connections to a Data Source",
+      "permalink": "/recipes/enable-ssl-connections-to-database",
+      "category": "Examples & Tutorials",
+      "subCategory": "Data sources",
+      "menuOrder": 3
+    },
+    "done": false,
+    "target": {
+      "path": "/examples-and-tutorials/data-sources",
+      "fileName": "using-ssl-connections-to-a-data-source",
+      "title": "Using SSL Connections to a Data Source",
+      "redirects": [
+        "/recipes/enable-ssl-connections-to-database"
+      ]
+    }
+  },
+  "../docs/content/Configuration/Databases/ClickHouse.mdx": {
+    "origin": {
+      "title": "ClickHouse",
+      "permalink": "/config/databases/clickhouse"
+    },
+    "done": false,
+    "target": {
+      "path": "/TODO/",
+      "fileName": "clickhouse",
+      "title": "ClickHouse",
+      "redirects": [
+        "/config/databases/clickhouse"
+      ]
+    }
+  },
+  "../docs/content/Configuration/Databases/AWS-Athena.mdx": {
+    "origin": {
+      "title": "AWS Athena",
+      "permalink": "/config/databases/aws-athena"
+    },
+    "done": false,
+    "target": {
+      "path": "/TODO/",
+      "fileName": "aws-athena",
+      "title": "AWS Athena",
+      "redirects": [
+        "/config/databases/aws-athena"
+      ]
+    }
+  },
+  "../docs/content/Examples-Tutorials-Recipes/Recipes/Data-sources/multiple-sources-same-schema.mdx": {
+    "origin": {
+      "title": "Using Multiple Data Sources",
+      "permalink": "/recipes/multiple-sources-same-schema",
+      "category": "Examples & Tutorials",
+      "subCategory": "Data sources",
+      "menuOrder": 3
+    },
+    "done": false,
+    "target": {
+      "path": "/examples-and-tutorials/data-sources",
+      "fileName": "using-multiple-data-sources",
+      "title": "Using Multiple Data Sources",
+      "redirects": [
+        "/recipes/multiple-sources-same-schema"
+      ]
+    }
+  },
   "../docs/content/Examples-Tutorials-Recipes/Recipes/Upgrading-Cube/Migrating-from-Express-to-Docker.mdx": {
     "origin": {
       "title": "Migrating from Express to Docker",
@@ -2374,60 +2425,6 @@
       "title": "Migrating from Express to Docker",
       "redirects": [
         "/recipes/migrating-from-express-to-docker"
-      ]
-    }
-  },
-  "../docs/content/Examples-Tutorials-Recipes/Recipes/Query-acceleration/using-originalsql-and-rollups-effectively.mdx": {
-    "origin": {
-      "title": "Using originalSql and rollup Pre-aggregations Effectively",
-      "permalink": "/recipes/using-originalsql-and-rollups-effectively",
-      "category": "Examples & Tutorials",
-      "subCategory": "Query acceleration",
-      "menuOrder": 6
-    },
-    "done": false,
-    "target": {
-      "path": "/examples-and-tutorials/query-acceleration",
-      "fileName": "using-originalsql-and-rollup-pre-aggregations-effectively",
-      "title": "Using originalSql and rollup Pre-aggregations Effectively",
-      "redirects": [
-        "/recipes/using-originalsql-and-rollups-effectively"
-      ]
-    }
-  },
-  "../docs/content/Examples-Tutorials-Recipes/Recipes/Query-acceleration/joining-multiple-data-sources.mdx": {
-    "origin": {
-      "title": "Joining Data from Multiple Data Sources",
-      "permalink": "/recipes/joining-multiple-data-sources",
-      "category": "Examples & Tutorials",
-      "subCategory": "Query acceleration",
-      "menuOrder": 6
-    },
-    "done": false,
-    "target": {
-      "path": "/examples-and-tutorials/query-acceleration",
-      "fileName": "joining-data-from-multiple-data-sources",
-      "title": "Joining Data from Multiple Data Sources",
-      "redirects": [
-        "/recipes/joining-multiple-data-sources"
-      ]
-    }
-  },
-  "../docs/content/Examples-Tutorials-Recipes/Recipes/Query-acceleration/non-additivity.mdx": {
-    "origin": {
-      "title": "Accelerating Non-Additive Measures",
-      "permalink": "/recipes/non-additivity",
-      "category": "Examples & Tutorials",
-      "subCategory": "Query acceleration",
-      "menuOrder": 6
-    },
-    "done": false,
-    "target": {
-      "path": "/examples-and-tutorials/query-acceleration",
-      "fileName": "accelerating-non-additive-measures",
-      "title": "Accelerating Non-Additive Measures",
-      "redirects": [
-        "/recipes/non-additivity"
       ]
     }
   },
@@ -2468,21 +2465,57 @@
       ]
     }
   },
-  "../docs/content/Examples-Tutorials-Recipes/Recipes/Queries/pagination.mdx": {
+  "../docs/content/Examples-Tutorials-Recipes/Recipes/Query-acceleration/using-originalsql-and-rollups-effectively.mdx": {
     "origin": {
-      "title": "Implementing Pagination",
-      "permalink": "/recipes/pagination",
+      "title": "Using originalSql and rollup Pre-aggregations Effectively",
+      "permalink": "/recipes/using-originalsql-and-rollups-effectively",
       "category": "Examples & Tutorials",
-      "subCategory": "Queries",
-      "menuOrder": 5
+      "subCategory": "Query acceleration",
+      "menuOrder": 6
     },
     "done": false,
     "target": {
-      "path": "/examples-and-tutorials/queries",
-      "fileName": "implementing-pagination",
-      "title": "Implementing Pagination",
+      "path": "/examples-and-tutorials/query-acceleration",
+      "fileName": "using-originalsql-and-rollup-pre-aggregations-effectively",
+      "title": "Using originalSql and rollup Pre-aggregations Effectively",
       "redirects": [
-        "/recipes/pagination"
+        "/recipes/using-originalsql-and-rollups-effectively"
+      ]
+    }
+  },
+  "../docs/content/Examples-Tutorials-Recipes/Recipes/Query-acceleration/non-additivity.mdx": {
+    "origin": {
+      "title": "Accelerating Non-Additive Measures",
+      "permalink": "/recipes/non-additivity",
+      "category": "Examples & Tutorials",
+      "subCategory": "Query acceleration",
+      "menuOrder": 6
+    },
+    "done": false,
+    "target": {
+      "path": "/examples-and-tutorials/query-acceleration",
+      "fileName": "accelerating-non-additive-measures",
+      "title": "Accelerating Non-Additive Measures",
+      "redirects": [
+        "/recipes/non-additivity"
+      ]
+    }
+  },
+  "../docs/content/Examples-Tutorials-Recipes/Recipes/Query-acceleration/joining-multiple-data-sources.mdx": {
+    "origin": {
+      "title": "Joining Data from Multiple Data Sources",
+      "permalink": "/recipes/joining-multiple-data-sources",
+      "category": "Examples & Tutorials",
+      "subCategory": "Query acceleration",
+      "menuOrder": 6
+    },
+    "done": false,
+    "target": {
+      "path": "/examples-and-tutorials/query-acceleration",
+      "fileName": "joining-data-from-multiple-data-sources",
+      "title": "Joining Data from Multiple Data Sources",
+      "redirects": [
+        "/recipes/joining-multiple-data-sources"
       ]
     }
   },
@@ -2504,6 +2537,24 @@
       ]
     }
   },
+  "../docs/content/Examples-Tutorials-Recipes/Recipes/Data-modeling/percentiles.mdx": {
+    "origin": {
+      "title": "Calculating Average and Percentiles",
+      "permalink": "/recipes/percentiles",
+      "category": "Examples & Tutorials",
+      "subCategory": "Data modeling",
+      "menuOrder": 4
+    },
+    "done": false,
+    "target": {
+      "path": "/examples-and-tutorials/data-modeling",
+      "fileName": "calculating-average-and-percentiles",
+      "title": "Calculating Average and Percentiles",
+      "redirects": [
+        "/recipes/percentiles"
+      ]
+    }
+  },
   "../docs/content/Examples-Tutorials-Recipes/Recipes/Queries/enforcing-mandatory-filters.mdx": {
     "origin": {
       "title": "Enforcing Mandatory Filters",
@@ -2519,60 +2570,6 @@
       "title": "Enforcing Mandatory Filters",
       "redirects": [
         "/recipes/enforcing-mandatory-filters"
-      ]
-    }
-  },
-  "../docs/content/Examples-Tutorials-Recipes/Recipes/Data-sources/using-ssl-connections-to-data-source.mdx": {
-    "origin": {
-      "title": "Using SSL Connections to a Data Source",
-      "permalink": "/recipes/enable-ssl-connections-to-database",
-      "category": "Examples & Tutorials",
-      "subCategory": "Data sources",
-      "menuOrder": 3
-    },
-    "done": false,
-    "target": {
-      "path": "/examples-and-tutorials/data-sources",
-      "fileName": "using-ssl-connections-to-a-data-source",
-      "title": "Using SSL Connections to a Data Source",
-      "redirects": [
-        "/recipes/enable-ssl-connections-to-database"
-      ]
-    }
-  },
-  "../docs/content/Examples-Tutorials-Recipes/Recipes/Data-sources/multiple-sources-same-schema.mdx": {
-    "origin": {
-      "title": "Using Multiple Data Sources",
-      "permalink": "/recipes/multiple-sources-same-schema",
-      "category": "Examples & Tutorials",
-      "subCategory": "Data sources",
-      "menuOrder": 3
-    },
-    "done": false,
-    "target": {
-      "path": "/examples-and-tutorials/data-sources",
-      "fileName": "using-multiple-data-sources",
-      "title": "Using Multiple Data Sources",
-      "redirects": [
-        "/recipes/multiple-sources-same-schema"
-      ]
-    }
-  },
-  "../docs/content/Examples-Tutorials-Recipes/Recipes/Data-modeling/using-dynamic-measures.mdx": {
-    "origin": {
-      "title": "Using Dynamic Measures",
-      "permalink": "/recipes/referencing-dynamic-measures",
-      "category": "Examples & Tutorials",
-      "subCategory": "Data modeling",
-      "menuOrder": 4
-    },
-    "done": false,
-    "target": {
-      "path": "/examples-and-tutorials/data-modeling",
-      "fileName": "using-dynamic-measures",
-      "title": "Using Dynamic Measures",
-      "redirects": [
-        "/recipes/referencing-dynamic-measures"
       ]
     }
   },
@@ -2594,10 +2591,28 @@
       ]
     }
   },
-  "../docs/content/Examples-Tutorials-Recipes/Recipes/Data-modeling/percentiles.mdx": {
+  "../docs/content/Examples-Tutorials-Recipes/Recipes/Queries/pagination.mdx": {
     "origin": {
-      "title": "Calculating Average and Percentiles",
-      "permalink": "/recipes/percentiles",
+      "title": "Implementing Pagination",
+      "permalink": "/recipes/pagination",
+      "category": "Examples & Tutorials",
+      "subCategory": "Queries",
+      "menuOrder": 5
+    },
+    "done": false,
+    "target": {
+      "path": "/examples-and-tutorials/queries",
+      "fileName": "implementing-pagination",
+      "title": "Implementing Pagination",
+      "redirects": [
+        "/recipes/pagination"
+      ]
+    }
+  },
+  "../docs/content/Examples-Tutorials-Recipes/Recipes/Data-modeling/using-dynamic-measures.mdx": {
+    "origin": {
+      "title": "Using Dynamic Measures",
+      "permalink": "/recipes/referencing-dynamic-measures",
       "category": "Examples & Tutorials",
       "subCategory": "Data modeling",
       "menuOrder": 4
@@ -2605,17 +2620,17 @@
     "done": false,
     "target": {
       "path": "/examples-and-tutorials/data-modeling",
-      "fileName": "calculating-average-and-percentiles",
-      "title": "Calculating Average and Percentiles",
+      "fileName": "using-dynamic-measures",
+      "title": "Using Dynamic Measures",
       "redirects": [
-        "/recipes/percentiles"
+        "/recipes/referencing-dynamic-measures"
       ]
     }
   },
-  "../docs/content/Examples-Tutorials-Recipes/Recipes/Data-modeling/passing-dynamic-parameters-in-a-query.mdx": {
+  "../docs/content/Examples-Tutorials-Recipes/Recipes/Data-modeling/entity-attribute-value.mdx": {
     "origin": {
-      "title": "Passing Dynamic Parameters in a Query",
-      "permalink": "/recipes/passing-dynamic-parameters-in-a-query",
+      "title": "Implementing Entity-Attribute-Value Model (EAV)",
+      "permalink": "/recipes/entity-attribute-value",
       "category": "Examples & Tutorials",
       "subCategory": "Data modeling",
       "menuOrder": 4
@@ -2623,25 +2638,10 @@
     "done": false,
     "target": {
       "path": "/examples-and-tutorials/data-modeling",
-      "fileName": "passing-dynamic-parameters-in-a-query",
-      "title": "Passing Dynamic Parameters in a Query",
+      "fileName": "implementing-entity-attribute-value-model-(eav)",
+      "title": "Implementing Entity-Attribute-Value Model (EAV)",
       "redirects": [
-        "/recipes/passing-dynamic-parameters-in-a-query"
-      ]
-    }
-  },
-  "../docs/content/Configuration/Databases/AWS-Athena.mdx": {
-    "origin": {
-      "title": "AWS Athena",
-      "permalink": "/config/databases/aws-athena"
-    },
-    "done": false,
-    "target": {
-      "path": "/TODO/",
-      "fileName": "aws-athena",
-      "title": "AWS Athena",
-      "redirects": [
-        "/config/databases/aws-athena"
+        "/recipes/entity-attribute-value"
       ]
     }
   },
@@ -2689,50 +2689,6 @@
       ]
     }
   },
-  "../docs/content/Examples-Tutorials-Recipes/Recipes/Auth/Auth0-Guide.mdx": {
-    "origin": {
-      "title": "Authenticate requests to Cube with Auth0",
-      "permalink": "/recipes/authn-with-auth0",
-      "category": "Examples & Tutorials",
-      "subCategory": "Authentication & Authorization",
-      "menuOrder": 12,
-      "redirect_from": [
-        "/security/jwt/auth0"
-      ]
-    },
-    "done": false,
-    "target": {
-      "path": "/examples-and-tutorials/authentication-&-authorization",
-      "fileName": "authenticate-requests-to-cube-with-auth0",
-      "title": "Authenticate requests to Cube with Auth0",
-      "redirects": [
-        "/recipes/authn-with-auth0",
-        "/security/jwt/auth0"
-      ]
-    }
-  },
-  "../docs/content/Examples-Tutorials-Recipes/Recipes/Auth/AWS-Cognito.mdx": {
-    "origin": {
-      "title": "Authenticate requests to Cube with AWS Cognito",
-      "permalink": "/recipes/authn-with-aws-cognito",
-      "category": "Examples & Tutorials",
-      "subCategory": "Authentication & Authorization",
-      "menuOrder": 12,
-      "redirect_from": [
-        "/security/jwt/aws-cognito"
-      ]
-    },
-    "done": false,
-    "target": {
-      "path": "/examples-and-tutorials/authentication-&-authorization",
-      "fileName": "authenticate-requests-to-cube-with-aws-cognito",
-      "title": "Authenticate requests to Cube with AWS Cognito",
-      "redirects": [
-        "/recipes/authn-with-aws-cognito",
-        "/security/jwt/aws-cognito"
-      ]
-    }
-  },
   "../docs/content/Examples-Tutorials-Recipes/Recipes/Analytics/funnels.mdx": {
     "origin": {
       "title": "Implementing Funnel Analysis",
@@ -2752,6 +2708,24 @@
       "redirects": [
         "/recipes/funnels",
         "/funnels"
+      ]
+    }
+  },
+  "../docs/content/Examples-Tutorials-Recipes/Recipes/Data-modeling/passing-dynamic-parameters-in-a-query.mdx": {
+    "origin": {
+      "title": "Passing Dynamic Parameters in a Query",
+      "permalink": "/recipes/passing-dynamic-parameters-in-a-query",
+      "category": "Examples & Tutorials",
+      "subCategory": "Data modeling",
+      "menuOrder": 4
+    },
+    "done": false,
+    "target": {
+      "path": "/examples-and-tutorials/data-modeling",
+      "fileName": "passing-dynamic-parameters-in-a-query",
+      "title": "Passing Dynamic Parameters in a Query",
+      "redirects": [
+        "/recipes/passing-dynamic-parameters-in-a-query"
       ]
     }
   },
@@ -2777,25 +2751,25 @@
       ]
     }
   },
-  "../docs/content/Examples-Tutorials-Recipes/Recipes/Analytics/cohort-retention.mdx": {
+  "../docs/content/Examples-Tutorials-Recipes/Recipes/Auth/Auth0-Guide.mdx": {
     "origin": {
-      "title": "Implementing Retention Analysis & Cohorts",
-      "permalink": "/recipes/cohort-retention",
+      "title": "Authenticate requests to Cube with Auth0",
+      "permalink": "/recipes/authn-with-auth0",
       "category": "Examples & Tutorials",
-      "subCategory": "Analytics",
-      "menuOrder": 3,
+      "subCategory": "Authentication & Authorization",
+      "menuOrder": 12,
       "redirect_from": [
-        "/cohort-retention"
+        "/security/jwt/auth0"
       ]
     },
     "done": false,
     "target": {
-      "path": "/examples-and-tutorials/analytics",
-      "fileName": "implementing-retention-analysis-&-cohorts",
-      "title": "Implementing Retention Analysis & Cohorts",
+      "path": "/examples-and-tutorials/authentication-&-authorization",
+      "fileName": "authenticate-requests-to-cube-with-auth0",
+      "title": "Authenticate requests to Cube with Auth0",
       "redirects": [
-        "/recipes/cohort-retention",
-        "/cohort-retention"
+        "/recipes/authn-with-auth0",
+        "/security/jwt/auth0"
       ]
     }
   },
@@ -2821,6 +2795,28 @@
       ]
     }
   },
+  "../docs/content/Examples-Tutorials-Recipes/Recipes/Auth/AWS-Cognito.mdx": {
+    "origin": {
+      "title": "Authenticate requests to Cube with AWS Cognito",
+      "permalink": "/recipes/authn-with-aws-cognito",
+      "category": "Examples & Tutorials",
+      "subCategory": "Authentication & Authorization",
+      "menuOrder": 12,
+      "redirect_from": [
+        "/security/jwt/aws-cognito"
+      ]
+    },
+    "done": false,
+    "target": {
+      "path": "/examples-and-tutorials/authentication-&-authorization",
+      "fileName": "authenticate-requests-to-cube-with-aws-cognito",
+      "title": "Authenticate requests to Cube with AWS Cognito",
+      "redirects": [
+        "/recipes/authn-with-aws-cognito",
+        "/security/jwt/aws-cognito"
+      ]
+    }
+  },
   "../docs/content/Examples-Tutorials-Recipes/Recipes/Access-control/using-different-schemas-for-tenants.mdx": {
     "origin": {
       "title": "Using Different Data Models for Tenants",
@@ -2839,21 +2835,43 @@
       ]
     }
   },
-  "../docs/content/Examples-Tutorials-Recipes/Recipes/Data-modeling/entity-attribute-value.mdx": {
+  "../docs/content/Examples-Tutorials-Recipes/Recipes/Access-control/column-based-access.mdx": {
     "origin": {
-      "title": "Implementing Entity-Attribute-Value Model (EAV)",
-      "permalink": "/recipes/entity-attribute-value",
+      "title": "Enforcing Column-Based Access",
+      "permalink": "/recipes/column-based-access",
       "category": "Examples & Tutorials",
-      "subCategory": "Data modeling",
-      "menuOrder": 4
+      "subCategory": "Access control",
+      "menuOrder": 2
     },
     "done": false,
     "target": {
-      "path": "/examples-and-tutorials/data-modeling",
-      "fileName": "implementing-entity-attribute-value-model-(eav)",
-      "title": "Implementing Entity-Attribute-Value Model (EAV)",
+      "path": "/examples-and-tutorials/access-control",
+      "fileName": "enforcing-column-based-access",
+      "title": "Enforcing Column-Based Access",
       "redirects": [
-        "/recipes/entity-attribute-value"
+        "/recipes/column-based-access"
+      ]
+    }
+  },
+  "../docs/content/Examples-Tutorials-Recipes/Recipes/Analytics/cohort-retention.mdx": {
+    "origin": {
+      "title": "Implementing Retention Analysis & Cohorts",
+      "permalink": "/recipes/cohort-retention",
+      "category": "Examples & Tutorials",
+      "subCategory": "Analytics",
+      "menuOrder": 3,
+      "redirect_from": [
+        "/cohort-retention"
+      ]
+    },
+    "done": false,
+    "target": {
+      "path": "/examples-and-tutorials/analytics",
+      "fileName": "implementing-retention-analysis-&-cohorts",
+      "title": "Implementing Retention Analysis & Cohorts",
+      "redirects": [
+        "/recipes/cohort-retention",
+        "/cohort-retention"
       ]
     }
   },
@@ -2890,24 +2908,6 @@
       "title": "Controlling access to cubes and views",
       "redirects": [
         "/recipes/controlling-access-to-cubes-and-views"
-      ]
-    }
-  },
-  "../docs/content/Examples-Tutorials-Recipes/Recipes/Access-control/column-based-access.mdx": {
-    "origin": {
-      "title": "Enforcing Column-Based Access",
-      "permalink": "/recipes/column-based-access",
-      "category": "Examples & Tutorials",
-      "subCategory": "Access control",
-      "menuOrder": 2
-    },
-    "done": false,
-    "target": {
-      "path": "/examples-and-tutorials/access-control",
-      "fileName": "enforcing-column-based-access",
-      "title": "Enforcing Column-Based Access",
-      "redirects": [
-        "/recipes/column-based-access"
       ]
     }
   }
