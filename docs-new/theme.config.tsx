@@ -33,7 +33,11 @@ const config: DocsThemeConfig = {
   footer: {
     component: <Footer />,
   },
-  darkMode: false
+  darkMode: false,
+  nextThemes: {
+    defaultTheme: 'light',
+    forcedTheme: 'light'
+  }
 };
 
 export default config;
