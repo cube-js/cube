@@ -14,6 +14,7 @@ import { InlineButton } from "@/components/mdx/InlineButton/InlineButton";
 import { LoomVideo } from "@/components/mdx/LoomVideo/LoomVideo";
 import { ParameterTable } from "@/components/mdx/ReferenceDocs/ParameterTable";
 import { Snippet, SnippetGroup } from "@/components/mdx/Snippets/SnippetGroup";
+import { Screenshot } from '@/components/mdx/Screenshot';
 
 export const components = {
   DangerBox,
@@ -34,4 +35,5 @@ export const components = {
   // h4: MyH4,
   CodeTabs,
   Btn: InlineButton,
+  Screenshot
 };

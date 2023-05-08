@@ -31,7 +31,7 @@ const config: DocsThemeConfig = {
     component: <SearchTrigger>Search</SearchTrigger>,
   },
   footer: {
-    component: Footer,
+    component: <Footer />,
   },
 };
 
