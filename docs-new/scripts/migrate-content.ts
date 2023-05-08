@@ -7,6 +7,7 @@ import {
   lstat,
   readdir,
   rmdir,
+  rename,
 } from "fs/promises";
 import glob from "glob";
 import frontmatter from "front-matter";
