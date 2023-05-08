@@ -1,4 +1,5 @@
 import React from 'react';
+import { Callout } from "nextra-theme-docs";
 
 export enum AlertBoxTypes {
   DANGER = 'danger',
@@ -7,10 +8,25 @@ export enum AlertBoxTypes {
   WARNING = 'warning',
 }
 
+declare const TypeToEmoji: {
+  default: string;
+  error: string;
+  info: JSX.Element;
+  warning: string;
+};
+type CalloutType = keyof typeof TypeToEmoji;
+
 export type AlertBoxProps = {
   children: string;
   heading?: string;
   type: AlertBoxTypes;
+}
+
+const typeMapping: Record<AlertBoxTypes, CalloutType> = {
+  'danger': 'error',
+  info: 'info',
+  warning: 'warning',
+  success: 'default',
 }
 
 export const AlertBox = ({ children, heading, type }: AlertBoxProps) => {
@@ -19,12 +35,12 @@ export const AlertBox = ({ children, heading, type }: AlertBoxProps) => {
     : null;
 
   return (
-    <div className={`custom-block ${type || AlertBoxTypes.INFO}`}>
+    <Callout type={typeMapping[type]}>
       {header}
       <div className="custom-block-body">
         {children}
       </div>
-    </div>
+    </Callout>
   )
 }
 

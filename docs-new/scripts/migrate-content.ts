@@ -273,7 +273,7 @@ async function cleanup() {
     contents
       .filter(
         (p) =>
-          !["pages/_app.tsx", "pages/_meta.js", "pages/index.mdx"].includes(p)
+          !["pages/_app.tsx", "pages/_meta.js", "pages/index.mdx", "pages/docs.mdx"].includes(p)
       )
       .map((p) => deleteFileOrFolder(path.resolve(p)))
   );

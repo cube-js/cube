@@ -5,10 +5,11 @@
   border-radius: 4px;
   filter: drop-shadow(2px 2px 2px grey);
   margin-bottom: 24px;
+  overflow: hidden;
+}
 
-  > img {
-    margin: 0 !important;
-  }
+.screenshot > img {
+  margin: 0 !important;
 }
 
 .highlight {

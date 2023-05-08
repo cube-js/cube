@@ -7,6 +7,9 @@ module.exports = {
       toc: false,
     },
   },
+
+  docs1: 'Docs (Preview)',
+
   introduction: "Introduction",
   "getting-started": "Getting Started",
   configuration: "Configuration",

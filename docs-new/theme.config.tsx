@@ -33,6 +33,7 @@ const config: DocsThemeConfig = {
   footer: {
     component: <Footer />,
   },
+  darkMode: false
 };
 
 export default config;
