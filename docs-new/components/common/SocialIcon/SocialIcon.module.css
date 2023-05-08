@@ -1,0 +1,16 @@
+.SocialIcon {
+  --hover_transtion: 300ms;
+  display: block;
+}
+
+.SocialIcon:hover {
+  cursor: pointer;
+}
+
+.SocialIcon path {
+  transition: fill var(--hover_transtion);
+}
+
+.SocialIcon:not(:hover) path {
+  fill: var(--dark_03_a50);
+}
