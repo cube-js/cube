@@ -359,6 +359,10 @@ async function main() {
         recursive: true,
       });
 
+      if (true) {
+        await rename(filePath, `${TARGET}${target.path}/${target.fileName}.mdx`);
+      }
+
       await writeFile(
         path.resolve(`${TARGET}${target.path}/${target.fileName}.mdx`),
         `# ${target.title}
