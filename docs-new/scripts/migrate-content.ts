@@ -359,15 +359,18 @@ async function main() {
         recursive: true,
       });
 
-      if (true) {
-        await rename(filePath, `${TARGET}${target.path}/${target.fileName}.mdx`);
+      const targetFilePath = `${TARGET}${target.path}/${target.fileName}.mdx`;
+
+      if (false) {
+        await rename(filePath, targetFilePath);
       }
 
       await writeFile(
-        path.resolve(`${TARGET}${target.path}/${target.fileName}.mdx`),
+        path.resolve(targetFilePath),
         `# ${target.title}
 ${data.body
   .replaceAll(/<--\{"id"\s*:\s*"[^"]*"\}-->/g, "")
+  .replaceAll(/<\!--(.+)-->/g, "")
   .replaceAll(/!\[image\|\d+x\d+\]\([^)]+\)/g, "")
   .replaceAll(`style="text-align: center"`, `style={{ textAlign: "center" }}`)
   .replaceAll("<pre><code>", '<pre><code>{"')
