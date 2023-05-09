@@ -44,7 +44,7 @@ const StyledCard: any = styled(Card)`
   .ant-card-head {
     position: sticky;
     top: 0;
-    z-index: 100;
+    z-index: 1;
     background: white;
   }
 
