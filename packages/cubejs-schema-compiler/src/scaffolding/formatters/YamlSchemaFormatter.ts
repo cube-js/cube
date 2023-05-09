@@ -110,6 +110,6 @@ export class YamlSchemaFormatter extends BaseSchemaFormatter {
       return value;
     }
 
-    return value.match(/[{}]/) ? `"${value.replace(/"/g, '\\"')}"` : value;
+    return value.match(/[{}"]/) ? `"${value.replace(/"/g, '\\"')}"` : value;
   }
 }
