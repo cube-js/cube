@@ -299,12 +299,12 @@ cubes:
     const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
 cubes:
   - name: orders
-    sql: "SELECT 1 as id, 1 as customer_id, '2022-01-01' as \\"timestamp\\" WHERE {FILTER_PARAMS.orders.time.filter(\\"timestamp\\")}"
+    sql: "SELECT 1 as id, 1 as customer_id, TO_TIMESTAMP('2022-01-01', 'YYYY-MM-DD') as timestamp WHERE {FILTER_PARAMS.orders.time.filter(\\"timestamp\\")}"
     
     joins:
       - name: customers
-        sql: "{orders}.customer_id = {customers}.id"
-        relationship: belongs_to
+        sql: "{CUBE}.customer_id = {customers}.id"
+        relationship: many_to_one
     
     measures:
       - name: count
@@ -312,7 +312,7 @@ cubes:
 
     dimensions:
       - name: id
-        sql: id
+        sql: "{CUBE}.id"
         type: string
         primary_key: true
         
@@ -327,6 +327,33 @@ cubes:
         time_dimension: orders.time
         granularity: day
 
+  - name: line_items
+    sql: "SELECT 1 as id, 1 as order_id, 100 as price"
+
+    joins:
+      - name: orders
+        sql: "{CUBE.order_id} = {orders.id}"
+        relationship: many_to_one
+
+    dimensions:
+      - name: id
+        sql: "{CUBE}.id"
+        type: string
+        primary_key: true
+
+      - name: order_id
+        sql: "{CUBE}.order_id"
+        type: number
+
+      - name: price
+        sql: "{CUBE}.price"
+        type: number
+
+    measures:
+      - name: count
+        type: count
+  
+  
   - name: customers
     sql: "SELECT 1 as id, 'Foo' as name"
     
@@ -345,29 +372,32 @@ cubes:
         type: string
         
 views:
-  - name: orders_view
+  - name: line_items_view
 
     cubes:
-      - join_path: orders
-        prefix: true
-        includes:
-          - count
-          - name: time
-            alias: date
+      - join_path: line_items
+        includes: "*"
 
-      - join_path: orders.customers
+      - join_path: line_items.orders
+        prefix: true
+        includes: "*"
+        excludes: 
+          - count
+      
+      - join_path: line_items.orders.customers
         alias: aliased_customers
         prefix: true
-        includes:
-          - name
+        includes: 
+          - name: name
+            alias: full_name
     `);
     await compiler.compile();
 
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
-      measures: ['orders_view.orders_count'],
-      dimensions: ['orders_view.aliased_customers_name'],
+      measures: ['line_items_view.count'],
+      dimensions: ['line_items_view.aliased_customers_full_name'],
       timeDimensions: [{
-        dimension: 'orders_view.orders_date',
+        dimension: 'line_items_view.orders_time',
         granularity: 'day',
         dateRange: ['2022-01-01', '2022-01-03']
       }],
@@ -379,9 +409,9 @@ views:
 
     expect(res).toEqual(
       [{
-        orders_view__orders_count: '1',
-        orders_view__aliased_customers_name: 'Foo',
-        orders_view__orders_date_day: '2022-01-01T00:00:00.000Z',
+        line_items_view__aliased_customers_full_name: 'Foo',
+        line_items_view__count: '1',
+        line_items_view__orders_time_day: '2022-01-01T00:00:00.000Z',
       }]
     );
   });
