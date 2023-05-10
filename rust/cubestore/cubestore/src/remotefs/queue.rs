@@ -191,8 +191,6 @@ impl QueueRemoteFs {
         Ok(())
     }
 
-    const CLEANUP_INTERVAL: Duration = Duration::from_secs(3 * 600);
-    const CLEANUP_FILE_SIZE_THRESHOLD: u64 = 1024 * 1024 * 1024;
     /// Periodically cleans up the local directory from the files removed on the remote side.
     /// This function currently removes only direct sibling files and does not touch subdirectories.
     /// So e.g. we remove the `.parquet` files, but not directories like `metastore` or heartbeat.
@@ -202,10 +200,12 @@ impl QueueRemoteFs {
     async fn cleanup_loop(&self) -> () {
         let local_dir = self.local_path().await;
         let mut stopped_rx = self.stopped_rx.clone();
+        let cleanup_interval = Duration::from_secs(self.config.local_files_cleanup_interval_secs());
+        let cleanup_files_size_threshold = self.config.local_files_cleanup_size_threshold();
         loop {
             // Do the cleanup every now and then.
             tokio::select! {
-                () = tokio::time::sleep(Self::CLEANUP_INTERVAL) => {},
+                () = tokio::time::sleep(cleanup_interval) => {},
                 res = stopped_rx.changed() => {
                     if res.is_err() || *stopped_rx.borrow() {
                         return;
@@ -265,7 +265,7 @@ impl QueueRemoteFs {
                 Ok(f) => f,
             };
 
-            if local_files_size < Self::CLEANUP_FILE_SIZE_THRESHOLD {
+            if local_files_size < cleanup_files_size_threshold {
                 continue;
             }
 
