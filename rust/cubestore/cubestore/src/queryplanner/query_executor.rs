@@ -15,10 +15,10 @@ use crate::table::parquet::CubestoreParquetMetadataCache;
 use crate::table::{Row, TableValue, TimestampValue};
 use crate::{app_metrics, CubeError};
 use arrow::array::{
-    make_array, Array, ArrayRef, BinaryArray, BooleanArray, Float64Array, Int64Array,
-    Int64Decimal0Array, Int64Decimal10Array, Int64Decimal1Array, Int64Decimal2Array,
+    make_array, Array, ArrayRef, BinaryArray, BooleanArray, Float64Array, Int16Array, Int32Array,
+    Int64Array, Int64Decimal0Array, Int64Decimal10Array, Int64Decimal1Array, Int64Decimal2Array,
     Int64Decimal3Array, Int64Decimal4Array, Int64Decimal5Array, MutableArrayData, StringArray,
-    TimestampMicrosecondArray, TimestampNanosecondArray, UInt64Array,
+    TimestampMicrosecondArray, TimestampNanosecondArray, UInt16Array, UInt32Array, UInt64Array,
 };
 use arrow::datatypes::{DataType, Schema, SchemaRef, TimeUnit};
 use arrow::ipc::reader::StreamReader;
@@ -1393,7 +1393,11 @@ pub fn batch_to_dataframe(batches: &Vec<RecordBatch>) -> Result<DataFrame, CubeE
             let array = batch.column(column_index);
             let num_rows = batch.num_rows();
             match array.data_type() {
+                DataType::UInt16 => convert_array!(array, num_rows, rows, UInt16Array, Int, i64),
+                DataType::UInt32 => convert_array!(array, num_rows, rows, UInt32Array, Int, i64),
                 DataType::UInt64 => convert_array!(array, num_rows, rows, UInt64Array, Int, i64),
+                DataType::Int16 => convert_array!(array, num_rows, rows, Int16Array, Int, i64),
+                DataType::Int32 => convert_array!(array, num_rows, rows, Int32Array, Int, i64),
                 DataType::Int64 => convert_array!(array, num_rows, rows, Int64Array, Int, i64),
                 DataType::Float64 => {
                     let a = array.as_any().downcast_ref::<Float64Array>().unwrap();
@@ -1643,4 +1647,41 @@ fn slice_copy(a: &dyn Array, start: usize, len: usize) -> ArrayRef {
     let mut a = MutableArrayData::new(vec![a.data()], false, len);
     a.extend(0, start, start + len);
     make_array(a.freeze())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use arrow::datatypes::Field;
+
+    #[test]
+    fn test_batch_to_dataframe() -> Result<(), CubeError> {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("uint32", DataType::UInt32, true),
+            Field::new("int32", DataType::Int32, true),
+            Field::new("str32", DataType::Utf8, true),
+        ]));
+        let result = batch_to_dataframe(&vec![RecordBatch::try_new(
+            schema,
+            vec![
+                Arc::new(UInt32Array::from_iter(vec![Some(1), None])) as ArrayRef,
+                Arc::new(Int32Array::from_iter(vec![Some(1), None])) as ArrayRef,
+                Arc::new(StringArray::from_iter(vec![Some("test".to_string()), None])) as ArrayRef,
+            ],
+        )?])?;
+
+        assert_eq!(
+            result.get_rows(),
+            &vec![
+                Row::new(vec![
+                    TableValue::Int(1),
+                    TableValue::Int(1),
+                    TableValue::String("test".to_string())
+                ]),
+                Row::new(vec![TableValue::Null, TableValue::Null, TableValue::Null,])
+            ]
+        );
+
+        Ok(())
+    }
 }
