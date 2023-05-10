@@ -273,7 +273,12 @@ async function cleanup() {
     contents
       .filter(
         (p) =>
-          !["pages/_app.tsx", "pages/_meta.js", "pages/index.mdx", "pages/docs.mdx"].includes(p)
+          ![
+            "pages/_app.tsx",
+            "pages/_meta.js",
+            "pages/index.mdx",
+            "pages/docs.mdx",
+          ].includes(p)
       )
       .map((p) => deleteFileOrFolder(path.resolve(p)))
   );
@@ -282,7 +287,7 @@ async function cleanup() {
 async function main() {
   await cleanup();
 
-  const mdxFiles = await glob("../docs/content/**/*.mdx");
+  const mdxFiles = await glob("../content/**/*.mdx");
 
   // prepare structure overrides
   await Promise.all(
