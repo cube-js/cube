@@ -24,7 +24,6 @@ import ChartContainer from '../../../ChartContainer';
 import { SectionHeader, SectionRow } from '../../../components';
 import ChartRenderer from '../../../components/ChartRenderer/ChartRenderer';
 import Settings from '../../../components/Settings/Settings';
-import DashboardSource from '../../../DashboardSource';
 import { playgroundAction } from '../../../events';
 import {
   useDeepEffect,
