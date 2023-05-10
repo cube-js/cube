@@ -97,7 +97,8 @@ export class YamlCompiler {
           }
         }
       }
-    } else if (propertyPath[propertyPath.length - 1] === 'extends') {
+    } 
+    if (propertyPath[propertyPath.length - 1] === 'extends') {
       const ast = this.parsePythonAndTranspileToJs(obj, errorsReport);
       return this.astIntoArrowFunction(ast, obj, cubeName, name => this.cubeDictionary.resolveCube(name));
     } else if (typeof obj === 'string') {

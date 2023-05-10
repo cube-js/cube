@@ -39,7 +39,6 @@ type QueryBuilderContainerProps = Pick<
   | 'defaultQuery'
   | 'initialVizState'
   | 'schemaVersion'
-  | 'dashboardSource'
   | 'extra'
   | 'onVizStateChanged'
   | 'onSchemaChange'
@@ -78,7 +77,6 @@ export function QueryBuilderContainer(props: QueryBuilderContainerProps) {
             <QueryTabsRenderer
               apiUrl={apiUrl!}
               token={currentToken!}
-              dashboardSource={props.dashboardSource}
               securityContextToken={securityContextToken}
               extra={props.extra}
               schemaVersion={props.schemaVersion}
@@ -102,7 +100,6 @@ type QueryTabsRendererProps = {
 } & Pick<
   PlaygroundQueryBuilderProps,
   | 'schemaVersion'
-  | 'dashboardSource'
   | 'onVizStateChanged'
   | 'onSchemaChange'
   | 'extra'
@@ -113,7 +110,6 @@ function QueryTabsRenderer({
   apiUrl,
   token,
   securityContextToken,
-  dashboardSource,
   onSecurityContextModalOpen,
   ...props
 }: QueryTabsRendererProps) {
@@ -165,7 +161,6 @@ function QueryTabsRenderer({
             query,
             chartType,
           }}
-          dashboardSource={dashboardSource}
           schemaVersion={props.schemaVersion}
           extra={props.extra}
           onSchemaChange={props.onSchemaChange}

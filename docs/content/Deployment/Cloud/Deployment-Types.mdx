@@ -116,6 +116,15 @@ pre-aggregation performance. A **minimum of 2** Cube Store Workers is required
 for pre-aggregations; this can be adjusted. For a rough estimate, it will take
 approximately 2 Cube Store Workers per 4 gigs of pre-aggregated data per day.
 
+<InfoBox>
+
+Idle workers will automatically hibernate after 10 minutes of inactivity, and
+will not consume CCUs until they are resumed. Workers are resumed automatically
+when Cube receives a query that should be accelerated by a pre-aggregation, or
+when a scheduled refresh is triggered.
+
+</InfoBox>
+
 To change the number of Cube Store Workers in a deployment, go to the
 deployment’s <Btn>Settings</Btn> screen, and open the <Btn>Configuration</Btn>
 tab. From this screen, you can set the number of Cube Store Workers from the
@@ -139,9 +148,9 @@ that 1 Cube API Instance is needed for every 5-10 requests-per-second served.
 Cube API Instances can also auto-scale as needed.
 
 To change how many Cube API instances are available in the Production Cluster,
-go to the deployment’s <Btn>Settings</Btn> screen, and open the
-<Btn>Configuration</Btn> tab. From this screen, you can set the minimum and
-maximum number of Cube API instances for a deployment:
+go to the deployment’s <Btn>Settings</Btn> screen, and open
+the&nbsp;<Btn>Configuration</Btn> tab. From this screen, you can set the minimum
+and maximum number of Cube API instances for a deployment:
 
 <Screenshot
   alt="Cube Cloud Deployment Settings page showing auto-scaling configuration options"
