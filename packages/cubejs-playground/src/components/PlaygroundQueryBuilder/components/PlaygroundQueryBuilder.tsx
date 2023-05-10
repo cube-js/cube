@@ -24,7 +24,6 @@ import ChartContainer from '../../../ChartContainer';
 import { SectionHeader, SectionRow } from '../../../components';
 import ChartRenderer from '../../../components/ChartRenderer/ChartRenderer';
 import Settings from '../../../components/Settings/Settings';
-import DashboardSource from '../../../DashboardSource';
 import { playgroundAction } from '../../../events';
 import {
   useDeepEffect,
@@ -172,7 +171,6 @@ export type PlaygroundQueryBuilderProps = {
   cubejsToken: string;
   queryId: string;
   defaultQuery?: Query;
-  dashboardSource?: DashboardSource;
   schemaVersion?: number;
   initialVizState?: VizState;
   extra?: React.FC<any>;
@@ -194,7 +192,6 @@ export function PlaygroundQueryBuilder({
   cubejsToken,
   defaultQuery,
   queryId,
-  dashboardSource,
   schemaVersion = 0,
   initialVizState,
   extra: Extra,
@@ -550,7 +547,6 @@ export function PlaygroundQueryBuilder({
                     pivotConfig={pivotConfig}
                     framework={framework}
                     chartingLibrary={chartingLibrary}
-                    dashboardSource={dashboardSource}
                     setFramework={(currentFramework) => {
                       if (currentFramework !== framework) {
                         setQueryLoading(queryId, false);

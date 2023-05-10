@@ -25,14 +25,6 @@ context('Playground: Explore Page', () => {
   //   });
   // });
 
-  describe('Overview', () => {
-    it('has the Add To Dashboard button', () => {
-      cy.setQuery(ordersCountQuery);
-      cy.runQuery();
-      cy.getByTestId('add-to-dashboard-btn').should('exist');
-    })
-  });
-
   describe('Tabs', () => {
     it('opens the code tab', () => {
       cy.setQuery(ordersCountQuery);
