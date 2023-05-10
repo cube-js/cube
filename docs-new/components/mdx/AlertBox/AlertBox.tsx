@@ -1,5 +1,7 @@
 import React from 'react';
-import { Callout } from "nextra-theme-docs";
+import classes from './AlertBox.module.css';
+import classnames from 'classnames/bind';
+const cn = classnames.bind(classes);
 
 export enum AlertBoxTypes {
   DANGER = 'danger',
@@ -31,16 +33,16 @@ const typeMapping: Record<AlertBoxTypes, CalloutType> = {
 
 export const AlertBox = ({ children, heading, type }: AlertBoxProps) => {
   const header = heading
-    ? <div className="custom-block-heading">{heading}</div>
+    ? <div className={classes.AlertBox__header}>{heading}</div>
     : null;
 
   return (
-    <Callout type={typeMapping[type]}>
+    <div className={cn('AlertBox__Wrapper', `AlertBox__Wrapper--${typeMapping[type]}`)}>
       {header}
-      <div className="custom-block-body">
+      <div className={classes.AlertBox__content}>
         {children}
       </div>
-    </Callout>
+    </div>
   )
 }
 
