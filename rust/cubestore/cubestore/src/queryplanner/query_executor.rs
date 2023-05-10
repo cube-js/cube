@@ -1648,3 +1648,40 @@ fn slice_copy(a: &dyn Array, start: usize, len: usize) -> ArrayRef {
     a.extend(0, start, start + len);
     make_array(a.freeze())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use arrow::datatypes::Field;
+
+    #[test]
+    fn test_batch_to_dataframe() -> Result<(), CubeError> {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("uint32", DataType::UInt32, true),
+            Field::new("int32", DataType::Int32, true),
+            Field::new("str32", DataType::Utf8, true),
+        ]));
+        let result = batch_to_dataframe(&vec![RecordBatch::try_new(
+            schema,
+            vec![
+                Arc::new(UInt32Array::from_iter(vec![Some(1), None])) as ArrayRef,
+                Arc::new(Int32Array::from_iter(vec![Some(1), None])) as ArrayRef,
+                Arc::new(StringArray::from_iter(vec![Some("test".to_string()), None])) as ArrayRef,
+            ],
+        )?])?;
+
+        assert_eq!(
+            result.get_rows(),
+            &vec![
+                Row::new(vec![
+                    TableValue::Int(1),
+                    TableValue::Int(1),
+                    TableValue::String("test".to_string())
+                ]),
+                Row::new(vec![TableValue::Null, TableValue::Null, TableValue::Null,])
+            ]
+        );
+
+        Ok(())
+    }
+}
