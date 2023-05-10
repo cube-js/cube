@@ -191,7 +191,8 @@ impl QueueRemoteFs {
         Ok(())
     }
 
-    const CLEANUP_INTERVAL: Duration = Duration::from_secs(600);
+    const CLEANUP_INTERVAL: Duration = Duration::from_secs(3 * 600);
+    const CLEANUP_FILE_SIZE_THRESHOLD: u64 = 1024 * 1024 * 1024;
     /// Periodically cleans up the local directory from the files removed on the remote side.
     /// This function currently removes only direct sibling files and does not touch subdirectories.
     /// So e.g. we remove the `.parquet` files, but not directories like `metastore` or heartbeat.
@@ -216,9 +217,10 @@ impl QueueRemoteFs {
             // We rely on RemoteFs implementations to upload the file to the server before they make
             // it available on the local filesystem.
             let local_dir_copy = local_dir.clone();
-            let res_local_files =
-                cube_ext::spawn_blocking(move || -> Result<HashSet<String>, std::io::Error> {
+            let res_local_files = cube_ext::spawn_blocking(
+                move || -> Result<(HashSet<String>, u64), std::io::Error> {
                     let mut local_files = HashSet::new();
+                    let mut local_files_size = 0;
                     for res_entry in Path::new(&local_dir_copy).read_dir()? {
                         let entry = match res_entry {
                             Err(_) => continue, // ignore errors, might come from concurrent fs ops.
@@ -233,6 +235,12 @@ impl QueueRemoteFs {
                             continue;
                         }
 
+                        local_files_size = if let Ok(metadata) = entry.metadata() {
+                            metadata.len()
+                        } else {
+                            0
+                        };
+
                         let file_name = match entry.file_name().into_string() {
                             Err(_) => {
                                 log::error!("could not convert file name {:?}", entry.file_name());
@@ -243,18 +251,23 @@ impl QueueRemoteFs {
 
                         local_files.insert(file_name);
                     }
-                    Ok(local_files)
-                })
-                .await
-                .unwrap();
+                    Ok((local_files, local_files_size))
+                },
+            )
+            .await
+            .unwrap();
 
-            let mut local_files = match res_local_files {
+            let (mut local_files, local_files_size) = match res_local_files {
                 Err(e) => {
                     log::error!("error while trying to list local files: {}", e);
                     continue;
                 }
                 Ok(f) => f,
             };
+
+            if local_files_size < Self::CLEANUP_FILE_SIZE_THRESHOLD {
+                continue;
+            }
 
             let res_remote_files = self.list("").await;
             let remote_files = match res_remote_files {
