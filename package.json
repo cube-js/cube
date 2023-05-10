@@ -1,6 +1,6 @@
 {
-  "name": "codefreshio/cubejs",
-  "version": "0.1.0",
+  "name": "cf-cubejs",
+  "version": "0.1.1",
   "description": "",
   "private": true,
   "workspaces": {
