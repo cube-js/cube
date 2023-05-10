@@ -2,7 +2,6 @@
   "name": "cubejs",
   "version": "0.1.0",
   "description": "",
-  "private": true,
   "workspaces": {
     "packages": [
       "rust/*",
