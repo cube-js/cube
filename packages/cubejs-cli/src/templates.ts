@@ -242,6 +242,38 @@ const ordersJs = `cube(\`orders\`, {
 });
 `;
 
+const exampleViewJs = `// In Cube, views are used to expose slices of your data graph and act as data marts.
+// You can control which measures and dimensions are exposed to BIs or data apps,
+// as well as the direction of joins between the exposed cubes.
+// You can learn more about views in documentation here - https://cube.dev/docs/schema/reference/view
+
+// The following example shows a view defined on top of orders and customers cubes.
+// Both orders and customers cubes are exposed using the "includes" parameter to
+// control which measures and dimensions are exposed.
+// Prefixes can also be applied when exposing measures or dimensions.
+// In this case, the customers' city dimension is prefixed with the cube name,
+// resulting in "customers_city" when querying the view.
+
+// view(\`example_view\`, {
+//   cubes: [
+//     {
+//       join_path: orders,
+//       includes: [
+//         'status',
+//         'created_date',
+//       ],
+//     },
+//     {
+//       join_path: orders.customers,
+//       prefix: true,
+//       includes: [
+//         'city',
+//       ],
+//     },
+//   ]
+// });
+`;
+
 const ordersYml = `cubes:
   - name: orders
     sql: >
@@ -271,6 +303,36 @@ const ordersYml = `cubes:
       - name: status
         sql: status
         type: string
+`;
+
+const exampleViewYml = `# In Cube, views are used to expose slices of your data graph and act as data marts.
+# You can control which measures and dimensions are exposed to BIs or data apps,
+# as well as the direction of joins between the exposed cubes.
+# You can learn more about views in documentation here - https://cube.dev/docs/schema/reference/view
+
+# The following example shows a view defined on top of orders and customers cubes.
+# Both orders and customers cubes are exposed using the "includes" parameter to
+# control which measures and dimensions are exposed.
+# Prefixes can also be applied when exposing measures or dimensions.
+# In this case, the customers' city dimension is prefixed with the cube name,
+# resulting in "customers_city" when querying the view.
+
+# views:
+#   - name: example_view
+#
+#     cubes:
+#       - join_path: orders
+#         includes:
+#           - status
+#           - created_date
+#
+#           - total_amount
+#           - count
+#
+#       - join_path: orders.customers
+#         prefix: true
+#         includes:
+#           - city
 `;
 
 const cubeJs = `// Cube configuration options: https://cube.dev/docs/config
@@ -307,7 +369,8 @@ const templates: Record<string, Template> = {
       'docker-compose.yml': dockerCompose,
       '.env': dotEnv,
       '.gitignore': () => gitIgnore,
-      'model/cubes/orders.js': () => ordersJs
+      'model/cubes/orders.js': () => ordersJs,
+      'model/views/example_view.js': () => exampleViewJs,
     }
   },
   docker: {
@@ -319,7 +382,8 @@ const templates: Record<string, Template> = {
       'docker-compose.yml': dockerCompose,
       '.env': dotEnv,
       '.gitignore': () => gitIgnore,
-      'model/cubes/orders.yml': () => ordersYml
+      'model/cubes/orders.yml': () => ordersYml,
+      'model/views/example_view.yml': () => exampleViewYml,
     }
   },
   express: {
