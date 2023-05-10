@@ -1,5 +1,6 @@
 import Redis, { Redis as redis, RedisOptions } from 'ioredis';
 import { getEnv } from '@cubejs-backend/shared';
+import fs from 'fs';
 import AsyncRedisClient from './AsyncRedisClient';
 import { parseRedisUrl } from './utils';
 
@@ -65,7 +66,16 @@ export async function createIORedisClient(url: string, opts: RedisOptions): Prom
   }
 
   if (getEnv('redisTls')) {
-    options.tls = {};
+    if (getEnv('redisCaPath') && getEnv('redisCertPath') && getEnv('redisKeyPath')) {
+      options.tls = {
+        ca: fs.readFileSync(getEnv('redisCaPath')),
+        cert: fs.readFileSync(getEnv('redisCertPath')),
+        key: fs.readFileSync(getEnv('redisKeyPath')),
+        rejectUnauthorized: getEnv('rejectUnauthorized')
+      };
+    } else {
+      options.tls = {};
+    }
   }
 
   const password = getEnv('redisPassword');
