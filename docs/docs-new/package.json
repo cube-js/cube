@@ -1,6 +1,6 @@
 {
-  "name": "@cubejs-docs/site-new",
-  "version": "1.0.0",
+  "name": "@cubejs-docs/site",
+  "version": "2.0.0",
   "keywords": [],
   "license": "MIT",
   "private": true,
