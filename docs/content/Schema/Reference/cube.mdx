@@ -194,38 +194,6 @@ LEFT JOIN contacts "contacts"
   ON "users".contact_id = "contacts".id
 ```
 
-## Abstract cubes
-
-<WarningBox>
-
-This feature is only available for Cube models authored in JavaScript.
-
-</WarningBox>
-
-Abstract cubes can be defined by simply omitting the first parameter to the
-`cube()` function. Cubes defined in this way can still be extended, but will be
-"hidden" from the [Developer Playground][ref-dev-playground] and calls to the
-[`/meta` API endpoint][ref-restapi-meta].
-
-```javascript
-const users = cube({
-  sql_table: `users`,
-
-  dimensions: {
-    // Primary key
-
-    name: {
-      sql: `${CUBE}.name`,
-      type: `string`,
-    },
-  },
-});
-
-cube(`contacts`, {
-  extends: users,
-});
-```
-
 ## Parameters
 
 ### <--{"id" : "Parameters"}--> name
@@ -735,6 +703,19 @@ It has the following structure:
 FILTER_PARAMS.<CUBE_NAME>.<FILTER_NAME>.filter(expression)
 ```
 
+<WarningBox>
+
+Heavy usage of FILTER_PARAMS is considered a bad practice. It usually leads to hard to maintain data model.
+
+Good rule of thumb is to use FILTER_PARAMS only for predict pushdown performance optimizations.
+
+If you find yourself relying a lot on FILTER_PARAMS, it might mean you'll need to 
+
+1. Rethink your data modeling and potentially move some transformations upstream 
+2. Reconsider choice of underlying database
+
+</WarningBox>
+
 The `filter()` function accepts the expression, which could be either `String`
 or `Function`. See the examples below.
 
@@ -837,17 +818,16 @@ cube(`events`, {
 
 ### <--{"id" : "Context Variables"}--> Security Context
 
+<WarningBox>
+
+`SECURITY_CONTEXT` is deprecated and may be removed in the upcoming versions. 
+Use [`queryRewrite`][ref-config-queryrewrite] instead.
+
+</WarningBox>
+
 `SECURITY_CONTEXT` is a user security object that is passed by the Cube Client.
 Please read the [Security Context page][ref-sec-ctx] for more information on how
 to set `SECURITY_CONTEXT`.
-
-<InfoBox>
-
-As a general rule, we **strongly** recommend using
-[`queryRewrite`][ref-config-queryrewrite] instead of `SECURITY_CONTEXT` wherever
-possible.
-
-</InfoBox>
 
 Security context is suitable for the row level security implementation. For
 example, if you have an `orders` table that contains an `email` field you can
@@ -926,16 +906,15 @@ cubes:
 
 </CodeTabs>
 
-### <--{"id" : "Context Variables"}--> Unsafe Value
+
+You can access values of context variables directly in JavaScript in order to
+use it during your SQL generation. For example:
 
 <WarningBox>
 
 Use of this feature entails SQL injection security risk. Use it with caution.
 
 </WarningBox>
-
-You can access values of context variables directly in javascript in order to
-use it during your SQL generation. For example:
 
 ```javascript
 cube(`orders`, {
