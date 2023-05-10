@@ -707,7 +707,7 @@ FILTER_PARAMS.<CUBE_NAME>.<FILTER_NAME>.filter(expression)
 
 Heavy usage of FILTER_PARAMS is considered a bad practice. It usually leads to hard to maintain data model.
 
-Good rule of thumb is to use FILTER_PARAMS only for predict pushdown performance optimizations.
+Good rule of thumb is to use FILTER_PARAMS only for predicate pushdown performance optimizations.
 
 If you find yourself relying a lot on FILTER_PARAMS, it might mean you'll need to 
 
