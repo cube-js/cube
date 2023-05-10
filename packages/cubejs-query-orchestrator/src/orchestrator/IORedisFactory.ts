@@ -66,6 +66,7 @@ export async function createIORedisClient(url: string, opts: RedisOptions): Prom
   }
 
   if (getEnv('redisTls')) {
+    // codefresh code added for supporting mtls
     if (getEnv('redisCaPath') && getEnv('redisCertPath') && getEnv('redisKeyPath')) {
       options.tls = {
         ca: fs.readFileSync(getEnv('redisCaPath')),
