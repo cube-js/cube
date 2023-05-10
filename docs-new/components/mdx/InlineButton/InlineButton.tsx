@@ -1,12 +1,12 @@
 import React from "react";
-import styles from "./styles.module.css";
+import classes from "./InlineButton.module.css";
 
 export type InlineButtonProps = {
   children: string;
 };
 
 export const InlineButton = ({ children }: InlineButtonProps) => {
-  return <span className={styles.button}>{children}</span>;
+  return <span className={classes.Button}>{children}</span>;
 };
 
 export default InlineButton;

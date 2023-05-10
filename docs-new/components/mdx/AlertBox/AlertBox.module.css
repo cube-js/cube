@@ -1,7 +1,6 @@
 .AlertBox__header {
     font-weight: 700;
-    font-size: 16px;
-    line-height: 28px;
+    font: var(--h5_font);
 }
 
 .AlertBox__content {
