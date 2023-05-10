@@ -83,6 +83,85 @@ cubes:
 
 </CodeTabs>
 
+## Views
+
+Views sit on top of the data graph of cubes and create a facade of your whole
+data model with which data consumers can interact. They are useful for defining
+metrics, managing governance and data access, and controlling ambiguous join
+paths.
+
+Views **can not** have their own members. Instead, use the `cubes` or `includes` parameters
+to include measures and dimensions from other cubes into the view. In the
+example below, we create a new view `active_users` which is made up of properties
+from the `users` cube:
+
+<CodeTabs>
+
+```javascript
+view(`orders`, {
+  cubes: [
+    {
+      join_path: base_orders,
+      includes: [
+        `status`,
+        `created_date`,
+        `total_amount`,
+        `total_amount_shipped`,
+        `count`,
+        `average_order_value`
+      ]
+    },
+    {
+      join_path: base_orders.line_items.products,
+      includes: [
+        {
+          name: `name`,
+          alias: `product`
+        }
+      ]
+    },
+    {
+      join_path: base_orders.users,
+      prefix: true,
+      includes: `*`,
+      excludes: [
+        `company`
+      ]
+
+    }
+  ]
+});
+```
+
+```yaml
+views:
+  - name: orders
+
+    cubes:
+      - join_path: base_orders
+        includes:
+          - status
+          - created_date
+          - total_amount
+          - total_amount_shipped
+          - count
+          - average_order_value
+      
+      - join_path: base_orders.line_items.products
+        includes: 
+          - name: name
+            alias: product
+
+      - join_path: base_orders.users
+        prefix: true
+        includes: *
+        excludes:
+          - company
+
+```
+
+</CodeTabs>
+
 ## Dimensions
 
 Dimensions represent the properties of a **single** data point in the cube.
@@ -180,8 +259,6 @@ cubes:
 
 Dimensions can be of different types, and you can find them all
 [here][ref-schema-dimension-types].
-
-### <--{"id" : "Dimensions"}--> Time Dimensions
 
 Time-based properties should be represented as dimensions with type `time`. Time
 dimensions allow grouping the result set by a unit of time (e.g. hours, days,
