@@ -33,23 +33,26 @@ features:
   migrate to alternatives. In such cases, a warning may be printed, and users
   should not rely on this feature.
 
-| Status     | Feature                                                                                                            | Deprecated | Remove    |
-| ---------- | ------------------------------------------------------------------------------------------------------------------ | ---------- | --------- |
-| Removed    | [Node.js 8](#nodejs-8)                                                                                             | v0.22.4    | v0.26.0   |
-| Deprecated | [`hearBeatInterval`](#hearbeatinterval)                                                                            | v0.23.8    | June 2021 |
-| Removed    | [`CUBEJS_ENABLE_TLS`](#cubejs_enable_tls)                                                                          | v0.23.11   | v0.26.0   |
-| Deprecated | [Embedding Cube.js within Express](#embedding-cubejs-within-express)                                               | v0.24.0    | June 2021 |
-| Deprecated | [Absolute import for `@cubejs-backend/query-orchestrator`](#absolute-import-for-@cubejs-backendquery-orchestrator) | v0.24.2    | v0.28.0   |
-| Removed    | [`contextToDataSourceId`](#contexttodatasourceid)                                                                  | v0.25.0    | v0.25.0   |
-| Deprecated | [Absolute import for `@cubejs-backend/server-core`](#absolute-import-for-@cubejs-backendserver-core)               | v0.25.4    | v0.30.0   |
-| Deprecated | [Absolute import for `@cubejs-backend/schema-compiler`](#absolute-import-for-@cubejs-backendschema-compiler)       | v0.25.21   | v0.32.0   |
-| Deprecated | [`checkAuthMiddleware`](#checkauthmiddleware)                                                                      | v0.26.0    |           |
-| Removed    | [Node.js 10](#nodejs-10)                                                                                           | v0.26.0    | v0.29.0   |
-| Removed    | [Node.js 15](#nodejs-15)                                                                                           | v0.26.0    | v0.29.0   |
-| Deprecated | [`USER_CONTEXT`](#user_context)                                                                                    | v0.26.0    |           |
-| Deprecated | [`authInfo`](#authinfo)                                                                                            | v0.26.0    |           |
-| Deprecated | [Prefix Redis environment variables with `CUBEJS_`](#prefix-redis-environment-variables-with-cubejs_)              | v0.27.0    |           |
-| Deprecated | [Node.js 12](#nodejs-12)                                                                                           | v0.29.0    |           |
+| Status     | Feature                                                                                                                           | Deprecated | Remove    |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------- | ---------- | --------- |
+| Removed    | [Node.js 8](#nodejs-8)                                                                                                            | v0.22.4    | v0.26.0   |
+| Deprecated | [`hearBeatInterval`](#hearbeatinterval)                                                                                           | v0.23.8    | June 2021 |
+| Removed    | [`CUBEJS_ENABLE_TLS`](#cubejs_enable_tls)                                                                                         | v0.23.11   | v0.26.0   |
+| Deprecated | [Embedding Cube.js within Express](#embedding-cubejs-within-express)                                                              | v0.24.0    | June 2021 |
+| Deprecated | [Absolute import for `@cubejs-backend/query-orchestrator`](#absolute-import-for-@cubejs-backendquery-orchestrator)                | v0.24.2    | v0.28.0   |
+| Removed    | [`contextToDataSourceId`](#contexttodatasourceid)                                                                                 | v0.25.0    | v0.25.0   |
+| Deprecated | [Absolute import for `@cubejs-backend/server-core`](#absolute-import-for-@cubejs-backendserver-core)                              | v0.25.4    | v0.30.0   |
+| Deprecated | [Absolute import for `@cubejs-backend/schema-compiler`](#absolute-import-for-@cubejs-backendschema-compiler)                      | v0.25.21   | v0.32.0   |
+| Deprecated | [`checkAuthMiddleware`](#checkauthmiddleware)                                                                                     | v0.26.0    |           |
+| Removed    | [Node.js 10](#nodejs-10)                                                                                                          | v0.26.0    | v0.29.0   |
+| Removed    | [Node.js 15](#nodejs-15)                                                                                                          | v0.26.0    | v0.29.0   |
+| Deprecated | [`USER_CONTEXT`](#user_context)                                                                                                   | v0.26.0    |           |
+| Deprecated | [`authInfo`](#authinfo)                                                                                                           | v0.26.0    |           |
+| Deprecated | [Prefix Redis environment variables with `CUBEJS_`](#prefix-redis-environment-variables-with-cubejs_)                             | v0.27.0    |           |
+| Deprecated | [Node.js 12](#nodejs-12)                                                                                                          | v0.29.0    |           |
+| Deprecated | [`CUBEJS_EXTERNAL_DEFAULT` and `CUBEJS_SCHEDULED_REFRESH_DEFAULT`](#cubejs_external_default-and-cubejs_scheduled_refresh_default) | v0.30.0    |           |
+| Deprecated | [Using external databases for pre-aggregations](#using-external-databases-for-pre-aggregations)                                   | v0.30.0    |           |
+| Deprecated | [`dbType`](#dbtype)                                                                                                               | v0.30.30   |           |
 
 ### Node.js 8
 
@@ -65,7 +68,8 @@ means no more updates. Please upgrade to Node.js 10 or higher.
 This option for [`@cubejs-client/ws-transport`][link-hearbeatinterval] has been
 replaced by `heartBeatInterval`.
 
-[link-hearbeatinterval]: https://cube.dev/docs/@cubejs-client-ws-transport#web-socket-transport-hear-beat-interval
+[link-hearbeatinterval]:
+  https://cube.dev/docs/@cubejs-client-ws-transport#web-socket-transport-hear-beat-interval
 
 ### `CUBEJS_ENABLE_TLS`
 
@@ -75,7 +79,8 @@ We no longer recommend setting TLS options via Cube.js. Developers should set up
 TLS on a load balancer or reverse proxy instead. [Read more
 here][link-enable-https].
 
-[link-enable-https]: https://cube.dev/docs/deployment/production-checklist#enable-https
+[link-enable-https]:
+  https://cube.dev/docs/deployment/production-checklist#enable-https
 
 ### Embedding Cube.js within Express
 
@@ -90,7 +95,8 @@ file][link-migration] and deploy Cube.js as a microservice (or multiple
 microservices, if necessary).
 
 [link-cube-docker]: https://cube.dev/blog/cubejs-loves-docker
-[link-migration]: https://cube.dev/docs/configuration/overview#migrating-from-express-to-docker
+[link-migration]:
+  https://cube.dev/docs/configuration/overview#migrating-from-express-to-docker
 
 ### Absolute import for `@cubejs-backend/query-orchestrator`
 
@@ -122,7 +128,8 @@ instance. Now orchestrator instances can be shared by Cube.js instances and
 across different tenants, if need be. Single-tenant setups should consider
 removing the `contextToDataSourceId` property completely.
 
-[link-contexttoorchestratorid]: https://cube.dev/docs/config#options-reference-context-to-orchestrator-id
+[link-contexttoorchestratorid]:
+  https://cube.dev/docs/config#options-reference-context-to-orchestrator-id
 
 ### Absolute import for `@cubejs-backend/server-core`
 
@@ -205,7 +212,9 @@ You should use:
 
 ```js
 cube(`visitors`, {
-  sql: `select * from visitors WHERE ${SECURITY_CONTEXT.source.filter('source')}`,
+  sql: `select * from visitors WHERE ${SECURITY_CONTEXT.source.filter(
+    'source'
+  )}`,
 });
 ```
 
@@ -223,9 +232,7 @@ Old shape of `authInfo`:
 ```json
 {
   "sub": "1234567890",
-  "u": {
-    "user_id": 131
-  }
+  "u": { "user_id": 131 }
 }
 ```
 
@@ -244,28 +251,14 @@ Deprecated:
 
 ```js
 const server = new CubejsServer({
-  checkAuth: async (req, auth) => {
-    // Notice how we're using the `u` property in `jwt.verify()` and assigning the result to `req.authInfo`
-    req.authInfo = jwt.verify({ u: auth }, pem);
-  },
-  contextToAppId: ({ authInfo }) => `APP_${authInfo.userId}`,
-  preAggregationsSchema: ({ authInfo }) => `pre_aggregations_${authInfo.userId}`,
-});
+ checkAuth: async (req, auth) => { // Notice how we're using the `u` property in `jwt.verify()` and assigning the result to `req.authInfo` req.authInfo = jwt.verify({ u: auth }, pem); }, contextToAppId: ({ authInfo }) => `APP_${authInfo.userId}`, preAggregationsSchema: ({ authInfo }) => `pre_aggregations_${authInfo.userId}`,});
 ```
 
 You should use:
 
 ```js
 const server = new CubejsServer({
-  checkAuth: async (req, auth) => {
-    // We're now using directly assigning the result of `jet.verify()` to the `securityContext` property
-    req.securityContext = jwt.verify(auth, pem);
-  },
-  // And here we're now using the `securityContext` parameter
-  contextToAppId: ({ securityContext }) => `APP_${securityContext.userId}`,
-  // And the same here
-  preAggregationsSchema: ({ securityContext }) => `pre_aggregations_${securityContext.userId}`,
-});
+ checkAuth: async (req, auth) => { // We're now using directly assigning the result of `jet.verify()` to the `securityContext` property req.securityContext = jwt.verify(auth, pem); }, // And here we're now using the `securityContext` parameter contextToAppId: ({ securityContext }) => `APP_${securityContext.userId}`, // And the same here preAggregationsSchema: ({ securityContext }) => `pre_aggregations_${securityContext.userId}`,});
 ```
 
 ### Prefix Redis environment variables with `CUBEJS_`
@@ -295,14 +288,49 @@ CUBEJS_REDIS_TLS=true
 
 **Removed in Release: v0.29.0**
 
-Node.js 15 reached [End of Life on June 1, 2021][link-nodejs-eol]. This
-means no more updates. Please upgrade to Node.js 14 or higher.
+Node.js 15 reached [End of Life on June 1, 2021][link-nodejs-eol]. This means no
+more updates. Please upgrade to Node.js 14 or higher.
 
 ### Node.js 12
 
 **Deprecated in Release: v0.29.0**
 
-Node.js 12 reached [End of Life on May 19, 2021][link-nodejs-eol]. This
-means no more updates. Please upgrade to Node.js 14 or higher.
+Node.js 12 reached [End of Life on May 19, 2021][link-nodejs-eol]. This means no
+more updates. Please upgrade to Node.js 14 or higher.
 
 [link-nodejs-eol]: https://github.com/nodejs/Release#end-of-life-releases
+
+### Using non-Cube Store databases as external database
+
+**Deprecated in Release: v0.29.0**
+
+Cube no longer supports using databases such as MySQL and Postgres as external
+databases. [Please switch to using Cube Store][link-running-in-prod] as it is a
+more robust and reliable solution.
+
+[link-running-in-prod]: https://cube.dev/docs/caching/running-in-production
+
+### `CUBEJS_EXTERNAL_DEFAULT` and `CUBEJS_SCHEDULED_REFRESH_DEFAULT`
+
+**Deprecated in Release: v0.30.0**
+
+The `CUBEJS_EXTERNAL_DEFAULT` and `CUBEJS_SCHEDULED_REFRESH_DEFAULT` environment
+variables are now marked as deprecated; they were introduced to smooth the
+migration to Cube Store and are no longer necessary.
+
+### Using external databases for pre-aggregations
+
+**Deprecated in Release: v0.30.0**
+
+Using external databases for pre-aggregations is now deprecated, and we strongly
+recommend [using Cube Store as a solution][ref-caching-in-prod].
+
+[ref-caching-in-prod]: https://cube.dev/docs/caching/running-in-production
+
+### dbType
+
+**Deprecated in Release: v0.30.30**
+
+Using `dbType` is now deprecated, and we recommend using
+[`driverFactory`][self-driver-factory] to return a `DriverConfig` object
+instead.

@@ -1,0 +1,11 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"select TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE\n                from INFORMATION_SCHEMA.tables\n                where TABLE_SCHEMA not in ('information_schema', 'pg_catalog')\n                order by TABLE_SCHEMA, TABLE_NAME\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++--------------+---------------------------+------------+
+| table_schema | table_name                | table_type |
++--------------+---------------------------+------------+
+| public       | KibanaSampleDataEcommerce | BASE TABLE |
+| public       | Logs                      | BASE TABLE |
+| public       | NumberCube                | BASE TABLE |
++--------------+---------------------------+------------+

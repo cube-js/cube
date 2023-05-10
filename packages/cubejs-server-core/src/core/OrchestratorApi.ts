@@ -4,13 +4,14 @@ import {
   QueryOrchestrator,
   ContinueWaitError,
   DriverFactoryByDataSource,
+  DriverType,
   QueryOrchestratorOptions,
 } from '@cubejs-backend/query-orchestrator';
 
-import { DbTypeFn, ExternalDbTypeFn, RequestContext } from './types';
+import { DbTypeAsyncFn, ExternalDbTypeFn, RequestContext } from './types';
 
 export interface OrchestratorApiOptions extends QueryOrchestratorOptions {
-  contextToDbType: DbTypeFn;
+  contextToDbType: DbTypeAsyncFn;
   contextToExternalDbType: ExternalDbTypeFn;
   redisPrefix?: string;
 }
@@ -35,6 +36,20 @@ export class OrchestratorApi {
       logger,
       options
     );
+  }
+
+  /**
+   * Returns QueryOrchestrator instance.
+   */
+  public getQueryOrchestrator(): QueryOrchestrator {
+    return this.orchestrator;
+  }
+
+  /**
+   * Force reconcile queue logic to be executed.
+   */
+  public async forceReconcile(datasource = 'default') {
+    await this.orchestrator.forceReconcile(datasource);
   }
 
   public async executeQuery(query) {
@@ -63,12 +78,13 @@ export class OrchestratorApi {
         requestId: query.requestId
       });
 
-      const extractDbType = (response) => (
-        this.options.contextToDbType({
+      const extractDbType = async (response) => {
+        const dbType = await this.options.contextToDbType({
           ...query.context,
           dataSource: response.dataSource,
-        })
-      );
+        });
+        return dbType;
+      };
 
       const extractExternalDbType = (response) => (
         this.options.contextToExternalDbType({
@@ -78,14 +94,17 @@ export class OrchestratorApi {
       );
 
       if (Array.isArray(data)) {
-        return data.map((item) => ({
-          ...item,
-          dbType: extractDbType(item),
-          extDbType: extractExternalDbType(item)
-        }));
+        const res = await Promise.all(
+          data.map(async (item) => ({
+            ...item,
+            dbType: await extractDbType(item),
+            extDbType: extractExternalDbType(item),
+          }))
+        );
+        return res;
       }
 
-      data.dbType = extractDbType(data);
+      data.dbType = await extractDbType(data);
       data.extDbType = extractExternalDbType(data);
 
       return data;
@@ -98,12 +117,20 @@ export class OrchestratorApi {
           requestId: query.requestId
         });
 
-        const fromCache = await this.orchestrator.resultFromCacheIfExists(query);
-        if (!query.renewQuery && fromCache && !query.scheduledRefresh) {
+        const fromCache = await this
+          .orchestrator
+          .resultFromCacheIfExists(query);
+        if (
+          !query.renewQuery &&
+          fromCache &&
+          !query.scheduledRefresh
+        ) {
           this.logger('Slow Query Warning', {
             query: queryForLog,
             requestId: query.requestId,
-            warning: 'Query is too slow to be renewed during the user request and was served from the cache. Please consider using low latency pre-aggregations.'
+            warning: 'Query is too slow to be renewed during the ' +
+              'user request and was served from the cache. Please ' +
+              'consider using low latency pre-aggregations.'
           });
 
           return {
@@ -114,14 +141,16 @@ export class OrchestratorApi {
 
         throw {
           error: 'Continue wait',
-          stage: !query.scheduledRefresh ? await this.orchestrator.queryStage(query) : null
+          stage: !query.scheduledRefresh
+            ? await this.orchestrator.queryStage(query)
+            : null
         };
       }
 
       this.logger('Error querying db', {
         query: queryForLog,
         params: query.values,
-        error: (err.stack || err),
+        error: ((err as Error).stack || err),
         requestId: query.requestId
       });
 
@@ -129,21 +158,46 @@ export class OrchestratorApi {
     }
   }
 
-  public async testConnection() {
-    return Promise.all([
-      ...Object.keys(this.seenDataSources).map(ds => this.testDriverConnection(this.driverFactory, ds)),
-      this.testDriverConnection(this.options.externalDriverFactory)
-    ]);
-  }
-
   public async testOrchestratorConnections() {
     return this.orchestrator.testConnections();
   }
 
-  public async testDriverConnection(driverFn?: DriverFactoryByDataSource, dataSource: string = 'default') {
+  /**
+   * Tests worker's connections to the Cubstore and, if not in the rollup only
+   * mode, to the datasources.
+   */
+  public async testConnection() {
+    if (this.options.rollupOnlyMode) {
+      return Promise.all([
+        this.testDriverConnection(this.options.externalDriverFactory, DriverType.External),
+      ]);
+    } else {
+      return Promise.all([
+        ...Object.keys(this.seenDataSources).map(
+          ds => this.testDriverConnection(this.driverFactory, DriverType.Internal, ds),
+        ),
+        this.testDriverConnection(this.options.externalDriverFactory, DriverType.External),
+      ]);
+    }
+  }
+
+  /**
+   * Tests connection to the data source specified by the driver factory
+   * function and data source name.
+   */
+  public async testDriverConnection(
+    driverFn?: DriverFactoryByDataSource,
+    driverType?: DriverType,
+    dataSource: string = 'default',
+  ) {
     if (driverFn) {
-      const driver = await driverFn(dataSource);
-      await driver.testConnection();
+      try {
+        const driver = await driverFn(dataSource);
+        await driver.testConnection();
+      } catch (e: any) {
+        e.driverType = driverType;
+        throw e;
+      }
     }
   }
 

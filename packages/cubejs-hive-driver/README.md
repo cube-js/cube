@@ -9,7 +9,11 @@
 
 Pure Javascript Thrift HiveServer 2 driver.
 
-[Learn more](https://github.com/cube-js/cube.js#getting-started)
+## Support
+
+This package is **community supported** and should be used at your own risk. 
+
+While the Cube Dev team is happy to review and accept future community contributions, we don't have active plans for further development. This includes bug fixes unless they affect different parts of Cube.js. **We're looking for maintainers for this package.** If you'd like to become a maintainer, please contact us in Cube.js Slack. 
 
 ## Contributing Missing Hive Protocol
 
@@ -26,6 +30,6 @@ Pure Javascript Thrift HiveServer 2 driver.
 2. Run `docker run -v "$PWD:/data" thrift thrift -o /data --gen js:node /data/TCLIService.thrift`
 3. Copy generated files to the idl directory of this repository.
 
-### License
+## License
 
 Cube.js Hive Database Driver is [Apache 2.0 licensed](./LICENSE).

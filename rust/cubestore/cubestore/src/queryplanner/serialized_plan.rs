@@ -1,7 +1,8 @@
 use crate::metastore::table::{Table, TablePath};
 use crate::metastore::{Chunk, IdRow, Index, Partition};
-use crate::queryplanner::planning::{ClusterSendNode, PlanningMeta};
-use crate::queryplanner::query_executor::CubeTable;
+use crate::queryplanner::panic::PanicWorkerNode;
+use crate::queryplanner::planning::{ClusterSendNode, PlanningMeta, Snapshots};
+use crate::queryplanner::query_executor::{CubeTable, InlineTableId, InlineTableProvider};
 use crate::queryplanner::topk::{ClusterAggregateTopK, SortColumn};
 use crate::queryplanner::udfs::aggregate_udf_by_kind;
 use crate::queryplanner::udfs::{
@@ -21,6 +22,7 @@ use datafusion::logical_plan::{
     Column, DFSchemaRef, Expr, JoinConstraint, JoinType, LogicalPlan, Operator, Partitioning,
     PlanVisitor,
 };
+use datafusion::physical_plan::parquet::ParquetMetadataCache;
 use datafusion::physical_plan::{aggregates, functions};
 use datafusion::scalar::ScalarValue;
 use serde_derive::{Deserialize, Serialize};
@@ -71,6 +73,7 @@ pub struct SerializedPlan {
     logical_plan: Arc<SerializedLogicalPlan>,
     schema_snapshot: Arc<SchemaSnapshot>,
     partition_ids_to_execute: Vec<(u64, RowFilter)>,
+    inline_table_ids_to_execute: Vec<InlineTableId>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -122,6 +125,11 @@ impl PartitionSnapshot {
     pub fn chunks(&self) -> &Vec<IdRow<Chunk>> {
         &self.chunks
     }
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct InlineSnapshot {
+    pub id: u64,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -190,7 +198,7 @@ pub enum SerializedLogicalPlan {
     },
     ClusterSend {
         input: Arc<SerializedLogicalPlan>,
-        snapshots: Vec<Vec<IndexSnapshot>>,
+        snapshots: Vec<Snapshots>,
     },
     ClusterAggregateTopK {
         limit: usize,
@@ -198,8 +206,9 @@ pub enum SerializedLogicalPlan {
         group_expr: Vec<SerializedExpr>,
         aggregate_expr: Vec<SerializedExpr>,
         sort_columns: Vec<SortColumn>,
+        having_expr: Option<SerializedExpr>,
         schema: DFSchemaRef,
-        snapshots: Vec<Vec<IndexSnapshot>>,
+        snapshots: Vec<Snapshots>,
     },
     CrossJoin {
         left: Arc<SerializedLogicalPlan>,
@@ -229,6 +238,7 @@ pub enum SerializedLogicalPlan {
         group_by_dimension: Option<SerializedExpr>,
         aggs: Vec<SerializedExpr>,
     },
+    Panic {},
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -240,7 +250,9 @@ pub enum SerializePartitioning {
 pub struct WorkerContext {
     remote_to_local_names: HashMap<String, String>,
     worker_partition_ids: Vec<(u64, RowFilter)>,
+    inline_table_ids_to_execute: Vec<InlineTableId>,
     chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
+    parquet_metadata_cache: Arc<dyn ParquetMetadataCache>,
 }
 
 impl SerializedLogicalPlan {
@@ -307,7 +319,11 @@ impl SerializedLogicalPlan {
                         worker_context.remote_to_local_names.clone(),
                         worker_context.worker_partition_ids.clone(),
                         worker_context.chunk_id_to_record_batches.clone(),
+                        worker_context.parquet_metadata_cache.clone(),
                     )),
+                    SerializedTableSource::InlineTable(v) => Arc::new(
+                        v.to_worker_table(worker_context.inline_table_ids_to_execute.clone()),
+                    ),
                 },
                 projection: projection.clone(),
                 projected_schema: projected_schema.clone(),
@@ -378,6 +394,7 @@ impl SerializedLogicalPlan {
                 group_expr,
                 aggregate_expr,
                 sort_columns,
+                having_expr,
                 schema,
                 snapshots,
             } => ClusterAggregateTopK {
@@ -386,6 +403,7 @@ impl SerializedLogicalPlan {
                 group_expr: group_expr.iter().map(|e| e.expr()).collect(),
                 aggregate_expr: aggregate_expr.iter().map(|e| e.expr()).collect(),
                 order_by: sort_columns.clone(),
+                having_expr: having_expr.as_ref().map(|e| e.expr()),
                 schema: schema.clone(),
                 snapshots: snapshots.clone(),
             }
@@ -449,7 +467,366 @@ impl SerializedLogicalPlan {
                     aggs: exprs(&aggs),
                 }),
             },
+            SerializedLogicalPlan::Panic {} => LogicalPlan::Extension {
+                node: Arc::new(PanicWorkerNode {}),
+            },
         })
+    }
+    fn is_empty_relation(&self) -> Option<DFSchemaRef> {
+        match self {
+            SerializedLogicalPlan::EmptyRelation {
+                produce_one_row,
+                schema,
+            } => {
+                if !produce_one_row {
+                    Some(schema.clone())
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    }
+
+    fn remove_unused_tables(
+        &self,
+        partition_ids_to_execute: &Vec<(u64, RowFilter)>,
+        inline_tables_to_execute: &Vec<InlineTableId>,
+    ) -> SerializedLogicalPlan {
+        debug_assert!(partition_ids_to_execute
+            .iter()
+            .is_sorted_by_key(|(id, _)| id));
+        match self {
+            SerializedLogicalPlan::Projection {
+                expr,
+                input,
+                schema,
+            } => {
+                let input =
+                    input.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
+                if input.is_empty_relation().is_some() {
+                    SerializedLogicalPlan::EmptyRelation {
+                        produce_one_row: false,
+                        schema: schema.clone(),
+                    }
+                } else {
+                    SerializedLogicalPlan::Projection {
+                        expr: expr.clone(),
+                        input: Arc::new(input),
+                        schema: schema.clone(),
+                    }
+                }
+            }
+            SerializedLogicalPlan::Filter { predicate, input } => {
+                let input =
+                    input.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
+
+                if let Some(schema) = input.is_empty_relation() {
+                    SerializedLogicalPlan::EmptyRelation {
+                        produce_one_row: false,
+                        schema: schema.clone(),
+                    }
+                } else {
+                    SerializedLogicalPlan::Filter {
+                        predicate: predicate.clone(),
+                        input: Arc::new(input),
+                    }
+                }
+            }
+            SerializedLogicalPlan::Aggregate {
+                input,
+                group_expr,
+                aggr_expr,
+                schema,
+            } => {
+                let input =
+                    input.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
+                SerializedLogicalPlan::Aggregate {
+                    input: Arc::new(input),
+                    group_expr: group_expr.clone(),
+                    aggr_expr: aggr_expr.clone(),
+                    schema: schema.clone(),
+                }
+            }
+            SerializedLogicalPlan::Sort { expr, input } => {
+                let input =
+                    input.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
+
+                if let Some(schema) = input.is_empty_relation() {
+                    SerializedLogicalPlan::EmptyRelation {
+                        produce_one_row: false,
+                        schema: schema.clone(),
+                    }
+                } else {
+                    SerializedLogicalPlan::Sort {
+                        expr: expr.clone(),
+                        input: Arc::new(input),
+                    }
+                }
+            }
+            SerializedLogicalPlan::Union {
+                inputs,
+                schema,
+                alias,
+            } => {
+                let inputs = inputs
+                    .iter()
+                    .filter_map(|i| {
+                        let i = i.remove_unused_tables(
+                            partition_ids_to_execute,
+                            inline_tables_to_execute,
+                        );
+                        if i.is_empty_relation().is_some() {
+                            None
+                        } else {
+                            Some(Arc::new(i))
+                        }
+                    })
+                    .collect::<Vec<_>>();
+
+                SerializedLogicalPlan::Union {
+                    inputs,
+                    schema: schema.clone(),
+                    alias: alias.clone(),
+                }
+            }
+            SerializedLogicalPlan::TableScan {
+                table_name,
+                source,
+                projection,
+                projected_schema,
+                filters,
+                alias,
+                limit,
+            } => {
+                let is_empty = match source {
+                    SerializedTableSource::CubeTable(table) => {
+                        !table.has_partitions(partition_ids_to_execute)
+                    }
+                    SerializedTableSource::InlineTable(table) => {
+                        !table.has_inline_table_id(inline_tables_to_execute)
+                    }
+                };
+                if is_empty {
+                    SerializedLogicalPlan::EmptyRelation {
+                        produce_one_row: false,
+                        schema: projected_schema.clone(),
+                    }
+                } else {
+                    SerializedLogicalPlan::TableScan {
+                        table_name: table_name.clone(),
+                        source: source.clone(),
+                        projection: projection.clone(),
+                        projected_schema: projected_schema.clone(),
+                        filters: filters.clone(),
+                        alias: alias.clone(),
+                        limit: limit.clone(),
+                    }
+                }
+            }
+            SerializedLogicalPlan::EmptyRelation {
+                produce_one_row,
+                schema,
+            } => SerializedLogicalPlan::EmptyRelation {
+                produce_one_row: *produce_one_row,
+                schema: schema.clone(),
+            },
+            SerializedLogicalPlan::Limit { n, input } => {
+                let input =
+                    input.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
+
+                if let Some(schema) = input.is_empty_relation() {
+                    SerializedLogicalPlan::EmptyRelation {
+                        produce_one_row: false,
+                        schema: schema.clone(),
+                    }
+                } else {
+                    SerializedLogicalPlan::Limit {
+                        n: *n,
+                        input: Arc::new(input),
+                    }
+                }
+            }
+            SerializedLogicalPlan::Skip { n, input } => {
+                let input =
+                    input.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
+
+                if let Some(schema) = input.is_empty_relation() {
+                    SerializedLogicalPlan::EmptyRelation {
+                        produce_one_row: false,
+                        schema: schema.clone(),
+                    }
+                } else {
+                    SerializedLogicalPlan::Skip {
+                        n: *n,
+                        input: Arc::new(input),
+                    }
+                }
+            }
+            SerializedLogicalPlan::Join {
+                left,
+                right,
+                on,
+                join_type,
+                join_constraint,
+                schema,
+            } => {
+                let left =
+                    left.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
+                let right =
+                    right.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
+
+                SerializedLogicalPlan::Join {
+                    left: Arc::new(left),
+                    right: Arc::new(right),
+                    on: on.clone(),
+                    join_type: join_type.clone(),
+                    join_constraint: *join_constraint,
+                    schema: schema.clone(),
+                }
+            }
+            SerializedLogicalPlan::Repartition {
+                input,
+                partitioning_scheme,
+            } => {
+                let input =
+                    input.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
+
+                if let Some(schema) = input.is_empty_relation() {
+                    SerializedLogicalPlan::EmptyRelation {
+                        produce_one_row: false,
+                        schema: schema.clone(),
+                    }
+                } else {
+                    SerializedLogicalPlan::Repartition {
+                        input: Arc::new(input),
+                        partitioning_scheme: partitioning_scheme.clone(),
+                    }
+                }
+            }
+            SerializedLogicalPlan::Alias {
+                input,
+                alias,
+                schema,
+            } => {
+                let input =
+                    input.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
+
+                if input.is_empty_relation().is_some() {
+                    SerializedLogicalPlan::EmptyRelation {
+                        produce_one_row: false,
+                        schema: schema.clone(),
+                    }
+                } else {
+                    SerializedLogicalPlan::Alias {
+                        input: Arc::new(input),
+                        alias: alias.clone(),
+                        schema: schema.clone(),
+                    }
+                }
+            }
+            SerializedLogicalPlan::ClusterSend { input, snapshots } => {
+                let input =
+                    input.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
+                SerializedLogicalPlan::ClusterSend {
+                    input: Arc::new(input),
+                    snapshots: snapshots.clone(),
+                }
+            }
+            SerializedLogicalPlan::ClusterAggregateTopK {
+                limit,
+                input,
+                group_expr,
+                aggregate_expr,
+                sort_columns,
+                having_expr,
+                schema,
+                snapshots,
+            } => {
+                let input =
+                    input.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
+                SerializedLogicalPlan::ClusterAggregateTopK {
+                    limit: *limit,
+                    input: Arc::new(input),
+                    group_expr: group_expr.clone(),
+                    aggregate_expr: aggregate_expr.clone(),
+                    sort_columns: sort_columns.clone(),
+                    having_expr: having_expr.clone(),
+                    schema: schema.clone(),
+                    snapshots: snapshots.clone(),
+                }
+            }
+            SerializedLogicalPlan::CrossJoin {
+                left,
+                right,
+                on,
+                join_schema,
+            } => {
+                let left =
+                    left.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
+                let right =
+                    right.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
+
+                SerializedLogicalPlan::CrossJoin {
+                    left: Arc::new(left),
+                    right: Arc::new(right),
+                    on: on.clone(),
+                    join_schema: join_schema.clone(),
+                }
+            }
+            SerializedLogicalPlan::CrossJoinAgg {
+                left,
+                right,
+                on,
+                join_schema,
+                group_expr,
+                agg_expr,
+                schema,
+            } => {
+                let left =
+                    left.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
+                let right =
+                    right.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
+
+                SerializedLogicalPlan::CrossJoinAgg {
+                    left: Arc::new(left),
+                    right: Arc::new(right),
+                    on: on.clone(),
+                    join_schema: join_schema.clone(),
+                    group_expr: group_expr.clone(),
+                    agg_expr: agg_expr.clone(),
+                    schema: schema.clone(),
+                }
+            }
+            SerializedLogicalPlan::RollingWindowAgg {
+                schema,
+                input,
+                dimension,
+                partition_by,
+                from,
+                to,
+                every,
+                rolling_aggs,
+                group_by_dimension,
+                aggs,
+            } => {
+                let input =
+                    input.remove_unused_tables(partition_ids_to_execute, inline_tables_to_execute);
+                SerializedLogicalPlan::RollingWindowAgg {
+                    schema: schema.clone(),
+                    input: Arc::new(input),
+                    dimension: dimension.clone(),
+                    partition_by: partition_by.clone(),
+                    from: from.clone(),
+                    to: to.clone(),
+                    every: every.clone(),
+                    rolling_aggs: rolling_aggs.clone(),
+                    group_by_dimension: group_by_dimension.clone(),
+                    aggs: aggs.clone(),
+                }
+            }
+            SerializedLogicalPlan::Panic {} => SerializedLogicalPlan::Panic {},
+        }
     }
 }
 
@@ -637,6 +1014,7 @@ impl SerializedExpr {
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum SerializedTableSource {
     CubeTable(CubeTable),
+    InlineTable(InlineTableProvider),
 }
 
 impl SerializedPlan {
@@ -649,17 +1027,23 @@ impl SerializedPlan {
             logical_plan: Arc::new(serialized_logical_plan),
             schema_snapshot: Arc::new(SchemaSnapshot { index_snapshots }),
             partition_ids_to_execute: Vec::new(),
+            inline_table_ids_to_execute: Vec::new(),
         })
     }
 
     pub fn with_partition_id_to_execute(
         &self,
         partition_ids_to_execute: Vec<(u64, RowFilter)>,
+        inline_table_ids_to_execute: Vec<InlineTableId>,
     ) -> Self {
         Self {
-            logical_plan: self.logical_plan.clone(),
+            logical_plan: Arc::new(
+                self.logical_plan
+                    .remove_unused_tables(&partition_ids_to_execute, &inline_table_ids_to_execute),
+            ),
             schema_snapshot: self.schema_snapshot.clone(),
             partition_ids_to_execute,
+            inline_table_ids_to_execute,
         }
     }
 
@@ -667,11 +1051,14 @@ impl SerializedPlan {
         &self,
         remote_to_local_names: HashMap<String, String>,
         chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
+        parquet_metadata_cache: Arc<dyn ParquetMetadataCache>,
     ) -> Result<LogicalPlan, CubeError> {
         self.logical_plan.logical_plan(&WorkerContext {
             remote_to_local_names,
             worker_partition_ids: self.partition_ids_to_execute.clone(),
+            inline_table_ids_to_execute: self.inline_table_ids_to_execute.clone(),
             chunk_id_to_record_batches,
+            parquet_metadata_cache,
         })
     }
 
@@ -683,7 +1070,7 @@ impl SerializedPlan {
         &self.schema_snapshot.index_snapshots
     }
 
-    pub fn files_to_download(&self) -> Vec<String> {
+    pub fn files_to_download(&self) -> Vec<(IdRow<Partition>, String, Option<u64>)> {
         self.list_files_to_download(|id| {
             self.partition_ids_to_execute
                 .binary_search_by_key(&id, |(id, _)| *id)
@@ -692,11 +1079,18 @@ impl SerializedPlan {
     }
 
     /// Note: avoid during normal execution, workers must filter the partitions they execute.
-    pub fn all_required_files(&self) -> Vec<String> {
+    pub fn all_required_files(&self) -> Vec<(IdRow<Partition>, String, Option<u64>)> {
         self.list_files_to_download(|_| true)
     }
 
-    fn list_files_to_download(&self, include_partition: impl Fn(u64) -> bool) -> Vec<String> {
+    fn list_files_to_download(
+        &self,
+        include_partition: impl Fn(u64) -> bool,
+    ) -> Vec<(
+        IdRow<Partition>,
+        /* file_name */ String,
+        /* size */ Option<u64>,
+    )> {
         let indexes = self.index_snapshots();
 
         let mut files = Vec::new();
@@ -711,12 +1105,20 @@ impl SerializedPlan {
                     .get_row()
                     .get_full_name(partition.partition.get_id())
                 {
-                    files.push(file);
+                    files.push((
+                        partition.partition.clone(),
+                        file,
+                        partition.partition.get_row().file_size(),
+                    ));
                 }
 
                 for chunk in partition.chunks() {
                     if !chunk.get_row().in_memory() {
-                        files.push(chunk.get_row().get_full_name(chunk.get_id()))
+                        files.push((
+                            partition.partition.clone(),
+                            chunk.get_row().get_full_name(chunk.get_id()),
+                            chunk.get_row().file_size(),
+                        ))
                     }
                 }
             }
@@ -804,6 +1206,10 @@ impl SerializedPlan {
                 table_name: table_name.clone(),
                 source: if let Some(cube_table) = source.as_any().downcast_ref::<CubeTable>() {
                     SerializedTableSource::CubeTable(cube_table.clone())
+                } else if let Some(inline_table) =
+                    source.as_any().downcast_ref::<InlineTableProvider>()
+                {
+                    SerializedTableSource::InlineTable(inline_table.clone())
                 } else {
                     panic!("Unexpected table source");
                 },
@@ -875,6 +1281,7 @@ impl SerializedPlan {
                             .map(|e| Self::serialized_expr(e))
                             .collect(),
                         sort_columns: topk.order_by.clone(),
+                        having_expr: topk.having_expr.as_ref().map(|e| Self::serialized_expr(&e)),
                         schema: topk.schema.clone(),
                         snapshots: topk.snapshots.clone(),
                     }
@@ -917,6 +1324,8 @@ impl SerializedPlan {
                             .map(|d| Self::serialized_expr(d)),
                         aggs: Self::serialized_exprs(&r.aggs),
                     }
+                } else if let Some(_) = node.as_any().downcast_ref::<PanicWorkerNode>() {
+                    SerializedLogicalPlan::Panic {}
                 } else {
                     panic!("unknown extension");
                 }

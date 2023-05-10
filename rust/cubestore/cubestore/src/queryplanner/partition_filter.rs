@@ -1,4 +1,5 @@
 use crate::table::{cmp_same_types, TableValue};
+use crate::util::decimal::Decimal;
 use arrow::datatypes::{DataType, Schema};
 use datafusion::logical_plan::{Column, Expr, Operator};
 use datafusion::scalar::ScalarValue;
@@ -377,6 +378,7 @@ impl Builder<'_> {
         }
         match t {
             t if Self::is_signed_int(t) => Self::extract_signed_int(v),
+            DataType::Int64Decimal(scale) => Self::extract_decimal(v, *scale),
             DataType::Boolean => Self::extract_bool(v),
             DataType::Utf8 => Self::extract_string(v),
             _ => None,
@@ -416,6 +418,47 @@ impl Builder<'_> {
             _ => return None, // TODO: casts.
         };
         Some(TableValue::String(s.unwrap()))
+    }
+
+    fn extract_decimal(v: &ScalarValue, scale: usize) -> Option<TableValue> {
+        let decimal_value = match v {
+            ScalarValue::Int64Decimal(v, input_scale) => {
+                Builder::int_to_decimal_value(v.unwrap(), scale as i64 - (*input_scale as i64))
+            }
+            ScalarValue::Int16(v) => Builder::int_to_decimal_value(v.unwrap() as i64, scale as i64),
+            ScalarValue::Int32(v) => Builder::int_to_decimal_value(v.unwrap() as i64, scale as i64),
+            ScalarValue::Int64(v) => Builder::int_to_decimal_value(v.unwrap() as i64, scale as i64),
+            ScalarValue::Float64(v) => {
+                Builder::int_to_decimal_value(v.unwrap() as i64, scale as i64)
+            }
+            ScalarValue::Float32(v) => {
+                Builder::int_to_decimal_value(v.unwrap() as i64, scale as i64)
+            }
+            ScalarValue::Utf8(s) | ScalarValue::LargeUtf8(s) => {
+                match s.as_ref().unwrap().parse::<i64>() {
+                    Ok(v) => Builder::int_to_decimal_value(v, scale as i64),
+                    Err(_) => {
+                        log::error!("could not convert string to int: {}", s.as_ref().unwrap());
+                        return None;
+                    }
+                }
+            }
+            _ => return None, // TODO: casts.
+        };
+        Some(decimal_value)
+    }
+
+    fn int_to_decimal_value(mut value: i64, diff_scale: i64) -> TableValue {
+        if diff_scale > 0 {
+            for _ in 0..diff_scale {
+                value *= 10;
+            }
+        } else if diff_scale < 0 {
+            for _ in 0..-diff_scale {
+                value /= 10;
+            }
+        }
+        TableValue::Decimal(Decimal::new(value))
     }
 
     fn extract_signed_int(v: &ScalarValue) -> Option<TableValue> {

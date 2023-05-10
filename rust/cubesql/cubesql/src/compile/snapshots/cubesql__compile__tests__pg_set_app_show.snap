@@ -1,0 +1,10 @@
+---
+source: cubesql/src/compile/mod.rs
+assertion_line: 7024
+expression: "execute_queries_with_flags(vec![\"set application_name = 'testing app'\".to_string(),\n                    \"show application_name\".to_string()],\n                DatabaseProtocol::PostgreSQL).await?.0"
+---
++-------------+
+| setting     |
++-------------+
+| testing app |
++-------------+

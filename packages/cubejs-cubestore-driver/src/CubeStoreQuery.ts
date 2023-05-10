@@ -1,5 +1,5 @@
 import moment from 'moment-timezone';
-import { BaseFilter, BaseQuery, UserError, BaseMeasure } from '@cubejs-backend/schema-compiler';
+import { BaseFilter, BaseQuery, BaseMeasure } from '@cubejs-backend/schema-compiler';
 
 const GRANULARITY_TO_INTERVAL: Record<string, string> = {
   day: 'day',
@@ -13,8 +13,10 @@ const GRANULARITY_TO_INTERVAL: Record<string, string> = {
 };
 
 class CubeStoreFilter extends BaseFilter {
-  public likeIgnoreCase(column, not, param) {
-    return `${column}${not ? ' NOT' : ''} ILIKE CONCAT('%', ${this.allocateParam(param)}, '%')`;
+  public likeIgnoreCase(column, not, param, type: string) {
+    const p = (!type || type === 'contains' || type === 'ends') ? '%' : '';
+    const s = (!type || type === 'contains' || type === 'starts') ? '%' : '';
+    return `${column}${not ? ' NOT' : ''} ILIKE CONCAT('${p}', ${this.allocateParam(param)}, '${s}')`;
   }
 }
 
@@ -96,6 +98,10 @@ export class CubeStoreQuery extends BaseQuery {
     return `cardinality(${sql})`;
   }
 
+  public castToString(sql) {
+    return `CAST(${sql} as VARCHAR)`;
+  }
+
   public countDistinctApprox(sql) {
     // TODO: We should throw an error, but this gets called even when only `hllMerge` result is used.
     return `approx_distinct_is_unsupported_in_cubestore(${sql}))`;
@@ -110,7 +116,7 @@ export class CubeStoreQuery extends BaseQuery {
     if (!cumulativeMeasures.length) {
       return super.regularAndTimeSeriesRollupQuery(regularMeasures, multipliedMeasures, cumulativeMeasures, preAggregationForQuery);
     }
-    const cumulativeMeasuresWithoutMultiplied = cumulativeMeasures.map(([multiplied, measure]) => measure);
+    const cumulativeMeasuresWithoutMultiplied = cumulativeMeasures.map(([_, measure]) => measure);
     const allMeasures = regularMeasures.concat(multipliedMeasures).concat(
       cumulativeMeasuresWithoutMultiplied
     );

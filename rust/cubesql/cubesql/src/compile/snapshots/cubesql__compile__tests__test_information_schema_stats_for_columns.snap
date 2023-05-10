@@ -1,0 +1,8 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"\n            SELECT\n                A.TABLE_SCHEMA TABLE_CAT, NULL TABLE_SCHEM, A.TABLE_NAME, A.COLUMN_NAME, B.SEQ_IN_INDEX KEY_SEQ, B.INDEX_NAME PK_NAME\n            FROM INFORMATION_SCHEMA.COLUMNS A, INFORMATION_SCHEMA.STATISTICS B\n            WHERE A.COLUMN_KEY in ('PRI','pri') AND B.INDEX_NAME='PRIMARY'  AND (ISNULL(database()) OR (A.TABLE_SCHEMA = database())) AND (ISNULL(database()) OR (B.TABLE_SCHEMA = database())) AND A.TABLE_NAME = 'OutlierFingerprints'  AND B.TABLE_NAME = 'OutlierFingerprints'  AND A.TABLE_SCHEMA = B.TABLE_SCHEMA AND A.TABLE_NAME = B.TABLE_NAME AND A.COLUMN_NAME = B.COLUMN_NAME\n            ORDER BY A.COLUMN_NAME\".to_string(),\n            DatabaseProtocol::MySQL).await?"
+---
++-----------+-------------+------------+-------------+---------+---------+
+| TABLE_CAT | TABLE_SCHEM | TABLE_NAME | COLUMN_NAME | KEY_SEQ | PK_NAME |
++-----------+-------------+------------+-------------+---------+---------+
++-----------+-------------+------------+-------------+---------+---------+

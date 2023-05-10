@@ -1,0 +1,12 @@
+---
+source: cubesql/e2e/tests/postgres.rs
+expression: self.print_query_result(res).await
+---
++---+------+
+| q | s    |
++---+------+
+| 1 | 2473 |
+| 2 | 2525 |
+| 3 | 2609 |
+| 4 | 2393 |
++---+------+

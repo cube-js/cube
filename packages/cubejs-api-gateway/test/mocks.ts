@@ -94,6 +94,43 @@ export const compilerApi = jest.fn().mockImplementation(() => ({
     ];
   },
 
+  async metaConfigExtended() {
+    const metaConfig = [
+      {
+        config: {
+          name: 'Foo',
+          measures: [
+            {
+              name: 'Foo.bar',
+              sql: 'bar',
+            },
+          ],
+          dimensions: [
+            {
+              name: 'Foo.id',
+            },
+            {
+              name: 'Foo.time',
+            },
+          ],
+        },
+      },
+    ];
+
+    const cubeDefinitions = {
+      Foo: {
+        sql: () => 'SELECT * FROM Foo',
+        measures: {},
+        dimension: {},
+      }
+    };
+
+    return {
+      metaConfig,
+      cubeDefinitions,
+    };
+  },
+
   async preAggregations() {
     return preAggregationsResultFactory();
   }

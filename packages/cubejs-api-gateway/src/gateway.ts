@@ -1,11 +1,14 @@
 /* eslint-disable no-restricted-syntax */
 import jwt, { Algorithm as JWTAlgorithm } from 'jsonwebtoken';
 import R from 'ramda';
-import moment from 'moment';
 import bodyParser from 'body-parser';
 import { graphqlHTTP } from 'express-graphql';
-import { getEnv, getRealType } from '@cubejs-backend/shared';
-
+import structuredClone from '@ungap/structured-clone';
+import {
+  getEnv,
+  getRealType,
+  QueryAlias,
+} from '@cubejs-backend/shared';
 import type {
   Application as ExpressApplication,
   ErrorRequestHandler,
@@ -13,7 +16,39 @@ import type {
   RequestHandler,
   Response,
 } from 'express';
-
+import {
+  QueryType
+} from './types/strings';
+import {
+  QueryType as QueryTypeEnum, ResultType
+} from './types/enums';
+import {
+  RequestContext,
+  ExtendedRequestContext,
+  Request,
+  QueryRewriteFn,
+  SecurityContextExtractorFn,
+  ExtendContextFn,
+  ResponseResultFn,
+  QueryRequest,
+} from './types/request';
+import {
+  CheckAuthInternalOptions,
+  JWTOptions,
+  CheckAuthFn,
+} from './types/auth';
+import {
+  Query,
+  NormalizedQuery,
+} from './types/query';
+import {
+  UserBackgroundContext,
+  ApiGatewayOptions,
+} from './types/gateway';
+import {
+  CheckAuthMiddlewareFn,
+  RequestLoggerMiddlewareFn,
+} from './interfaces';
 import { getRequestIdFromRequest, requestParser } from './requestParser';
 import { UserError } from './UserError';
 import { CubejsHandlerError } from './CubejsHandlerError';
@@ -26,191 +61,27 @@ import {
   normalizeQueryCancelPreAggregations,
   normalizeQueryPreAggregationPreview,
   normalizeQueryPreAggregations,
-  QUERY_TYPE, validatePostRewrite,
+  validatePostRewrite,
 } from './query';
-import {
-  CheckAuthFn,
-  CheckAuthMiddlewareFn,
-  ExtendContextFn,
-  ExtendedRequestContext,
-  JWTOptions,
-  QueryRewriteFn,
-  Request,
-  RequestContext,
-  RequestLoggerMiddlewareFn,
-  SecurityContextExtractorFn,
-} from './interfaces';
 import { cachedHandler } from './cached-handler';
 import { createJWKsFetcher } from './jwk';
 import { SQLServer } from './sql-server';
-
 import { makeSchema } from './graphql';
+import { ConfigItem, prepareAnnotation } from './helpers/prepareAnnotation';
+import transformData from './helpers/transformData';
+import {
+  transformCube,
+  transformMeasure,
+  transformDimension,
+  transformSegment,
+  transformJoins,
+  transformPreAggregations,
+} from './helpers/transformMetaExtended';
 
-type ResponseResultFn = (message: Record<string, any> | Record<string, any>[], extra?: { status: number }) => void;
-
-type MetaConfig = {
-  config: {
-    name: string,
-    title: string
-  }
-};
-
-type CheckAuthInternalOptions = {
-  isPlaygroundCheckAuth: boolean;
-};
-
-const toConfigMap = (metaConfig: MetaConfig[]) => R.fromPairs(
-  R.map((c) => [c.config.name, c.config], metaConfig)
-);
-
-const prepareAnnotation = (metaConfig: MetaConfig[], query: any) => {
-  const configMap = toConfigMap(metaConfig);
-
-  const annotation = (memberType) => (member) => {
-    const [cubeName, fieldName] = member.split('.');
-    const memberWithoutGranularity = [cubeName, fieldName].join('.');
-    const config = configMap[cubeName][memberType].find(m => m.name === memberWithoutGranularity);
-
-    if (!config) {
-      return undefined;
-    }
-
-    return [member, {
-      title: config.title,
-      shortTitle: config.shortTitle,
-      description: config.description,
-      type: config.type,
-      format: config.format,
-      meta: config.meta,
-      ...(memberType === 'measures' ? {
-        drillMembers: config.drillMembers,
-        drillMembersGrouped: config.drillMembersGrouped
-      } : {})
-    }];
-  };
-
-  const dimensions = (query.dimensions || []);
-  return {
-    measures: R.fromPairs((query.measures || []).map(annotation('measures')).filter(a => !!a)),
-    dimensions: R.fromPairs(dimensions.map(annotation('dimensions')).filter(a => !!a)),
-    segments: R.fromPairs((query.segments || []).map(annotation('segments')).filter(a => !!a)),
-    timeDimensions: R.fromPairs(
-      R.unnest(
-        (query.timeDimensions || [])
-          .filter(td => !!td.granularity)
-          .map(
-            td => [annotation('dimensions')(`${td.dimension}.${td.granularity}`)].concat(
-              // TODO: deprecated: backward compatibility for referencing time dimensions without granularity
-              dimensions.indexOf(td.dimension) === -1 ? [annotation('dimensions')(td.dimension)] : []
-            ).filter(a => !!a)
-          )
-      )
-    ),
-  };
-};
-
-const transformValue = (value, type) => {
-  if (value && (type === 'time' || value instanceof Date)) { // TODO support for max time
-    return (value instanceof Date ? moment(value) : moment.utc(value)).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
-  }
-  return value && value.value ? value.value : value; // TODO move to sql adapter
-};
-
-const transformData = (aliasToMemberNameMap, annotation, data, query, queryType) => (data.map(r => {
-  const row = R.pipe(
-    // @ts-ignore
-    R.toPairs,
-    R.map(p => {
-      const memberName = aliasToMemberNameMap[p[0]];
-      const annotationForMember = annotation[memberName];
-
-      if (!annotationForMember) {
-        throw new UserError(`You requested hidden member: '${p[0]}'. Please make it visible using \`shown: true\`. Please note primaryKey fields are \`shown: false\` by default: https://cube.dev/docs/schema/reference/joins#setting-a-primary-key.`);
-      }
-
-      const transformResult = [
-        memberName,
-        transformValue(p[1], annotationForMember.type)
-      ];
-
-      const path = memberName.split('.');
-
-      // TODO: deprecated: backward compatibility for referencing time dimensions without granularity
-      const memberNameWithoutGranularity = [path[0], path[1]].join('.');
-      if (path.length === 3 && (query.dimensions || []).indexOf(memberNameWithoutGranularity) === -1) {
-        return [
-          transformResult,
-          [
-            memberNameWithoutGranularity,
-            transformResult[1]
-          ]
-        ];
-      }
-
-      return [transformResult];
-    }),
-    // @ts-ignore
-    R.unnest,
-    R.fromPairs
-  // @ts-ignore
-  )(r);
-
-  // @ts-ignore
-  const [{ dimension, granularity, dateRange } = {}] = query.timeDimensions;
-
-  if (queryType === QUERY_TYPE.COMPARE_DATE_RANGE_QUERY) {
-    return {
-      ...row,
-      compareDateRange: dateRange.join(' - ')
-    };
-  } else if (queryType === QUERY_TYPE.BLENDING_QUERY) {
-    return {
-      ...row,
-      [['time', granularity].join('.')]: row[[dimension, granularity].join('.')]
-    };
-  }
-
-  return row;
-}));
-
-export type UserBackgroundContext = {
-  // @deprecated Renamed to securityContext, please use securityContext.
-  authInfo?: any;
-  securityContext: any;
-};
-
-type BaseRequest = {
- context: RequestContext;
- res: ResponseResultFn
-};
-
-type QueryRequest = BaseRequest & {
-  query: Record<string, any> | Record<string, any>[];
-  queryType?: 'multi';
-  apiType?: 'sql' | 'graphql' | 'rest' | 'ws';
-};
-
-export interface ApiGatewayOptions {
-  standalone: boolean;
-  dataSourceStorage: any;
-  refreshScheduler: any;
-  scheduledRefreshContexts?: () => Promise<UserBackgroundContext[]>;
-  scheduledRefreshTimeZones?: String[];
-  basePath: string;
-  extendContext?: ExtendContextFn;
-  checkAuth?: CheckAuthFn;
-  // @deprecated Please use checkAuth
-  checkAuthMiddleware?: CheckAuthMiddlewareFn;
-  jwt?: JWTOptions;
-  requestLoggerMiddleware?: RequestLoggerMiddlewareFn;
-  queryRewrite?: QueryRewriteFn;
-  subscriptionStore?: any;
-  enforceSecurityChecks?: boolean;
-  playgroundAuthSecret?: string;
-  serverCoreVersion?: string;
-}
-
-export class ApiGateway {
+/**
+ * API gateway server class.
+ */
+class ApiGateway {
   protected readonly refreshScheduler: any;
 
   protected readonly scheduledRefreshContexts: ApiGatewayOptions['scheduledRefreshContexts'];
@@ -278,6 +149,7 @@ export class ApiGateway {
     const userMiddlewares: RequestHandler[] = [
       this.checkAuthMiddleware,
       this.requestContextMiddleware,
+      this.logNetworkUsage,
       this.requestLoggerMiddleware
     ];
 
@@ -305,14 +177,12 @@ export class ApiGateway {
       })(req, res);
     });
 
-    app.use(this.logNetworkUsage);
-
     app.get(`${this.basePath}/v1/load`, userMiddlewares, (async (req, res) => {
       await this.load({
         query: req.query.query,
         context: req.context,
         res: this.resToResultFn(res),
-        queryType: req.query.queryType
+        queryType: req.query.queryType,
       });
     }));
 
@@ -343,11 +213,26 @@ export class ApiGateway {
       });
     }));
 
-    app.get(`${this.basePath}/v1/meta`, userMiddlewares, (async (req, res) => {
-      await this.meta({
+    app.post(`${this.basePath}/v1/sql`, userMiddlewares, (async (req, res) => {
+      await this.sql({
+        query: req.body.query,
         context: req.context,
         res: this.resToResultFn(res)
       });
+    }));
+
+    app.get(`${this.basePath}/v1/meta`, userMiddlewares, (async (req, res) => {
+      if (req.query.hasOwnProperty('extended')) {
+        await this.metaExtended({
+          context: req.context,
+          res: this.resToResultFn(res),
+        });
+      } else {
+        await this.meta({
+          context: req.context,
+          res: this.resToResultFn(res),
+        });
+      }
     }));
 
     app.get(`${this.basePath}/v1/run-scheduled-refresh`, userMiddlewares, (async (req, res) => {
@@ -509,6 +394,46 @@ export class ApiGateway {
           ...cube,
           measures: cube.measures.filter(visibilityFilter),
           dimensions: cube.dimensions.filter(visibilityFilter),
+        }));
+      res({ cubes });
+    } catch (e) {
+      this.handleError({
+        e,
+        context,
+        res,
+        requestStarted,
+      });
+    }
+  }
+
+  public async metaExtended({ context, res }: { context: RequestContext, res: ResponseResultFn }) {
+    const requestStarted = new Date();
+
+    function visibilityFilter(item) {
+      return getEnv('devMode') || context.signedWithPlaygroundAuthSecret || item.isVisible;
+    }
+
+    try {
+      const metaConfigExtended = await this.getCompilerApi(context).metaConfigExtended({
+        requestId: context.requestId,
+      });
+      const { metaConfig, cubeDefinitions } = metaConfigExtended;
+
+      const cubes = metaConfig
+        .map((meta) => meta.config)
+        .map((cube) => ({
+          ...transformCube(cube, cubeDefinitions),
+          measures: cube.measures?.filter(visibilityFilter).map((measure) => ({
+            ...transformMeasure(measure, cubeDefinitions),
+          })),
+          dimensions: cube.dimensions?.filter(visibilityFilter).map((dimension) => ({
+            ...transformDimension(dimension, cubeDefinitions),
+          })),
+          segments: cube.segments?.map((segment) => ({
+            ...transformSegment(segment, cubeDefinitions),
+          })),
+          joins: transformJoins(cubeDefinitions[cube.name]?.joins),
+          preAggregations: transformPreAggregations(cubeDefinitions[cube.name]?.preAggregations),
         }));
       res({ cubes });
     } catch (e) {
@@ -683,29 +608,43 @@ export class ApiGateway {
     }
   }
 
-  protected async getNormalizedQueries(query, context: RequestContext): Promise<any> {
+  /**
+   * Convert incoming query parameter (JSON fetched from the HTTP) to
+   * an array of query type and array of normalized queries.
+   */
+  protected async getNormalizedQueries(
+    query: Record<string, any> | Record<string, any>[],
+    context: RequestContext,
+  ): Promise<[QueryType, NormalizedQuery[]]> {
     query = this.parseQueryParam(query);
-    let queryType = QUERY_TYPE.REGULAR_QUERY;
+    let queryType: QueryType = QueryTypeEnum.REGULAR_QUERY;
 
     if (!Array.isArray(query)) {
       query = this.compareDateRangeTransformer(query);
       if (Array.isArray(query)) {
-        queryType = QUERY_TYPE.COMPARE_DATE_RANGE_QUERY;
+        queryType = QueryTypeEnum.COMPARE_DATE_RANGE_QUERY;
       }
     } else {
-      queryType = QUERY_TYPE.BLENDING_QUERY;
+      queryType = QueryTypeEnum.BLENDING_QUERY;
     }
 
     const queries = Array.isArray(query) ? query : [query];
-    const normalizedQueries = await Promise.all(
-      queries.map(async (currentQuery) => validatePostRewrite(await this.queryRewrite(normalizeQuery(currentQuery), context)))
+    const normalizedQueries: NormalizedQuery[] = await Promise.all(
+      queries.map(
+        async (currentQuery) => validatePostRewrite(
+          await this.queryRewrite(
+            normalizeQuery(currentQuery),
+            context
+          )
+        )
+      )
     );
 
     if (normalizedQueries.find((currentQuery) => !currentQuery)) {
       throw new Error('queryTransformer returned null query. Please check your queryTransformer implementation');
     }
 
-    if (queryType === QUERY_TYPE.BLENDING_QUERY) {
+    if (queryType === QueryTypeEnum.BLENDING_QUERY) {
       const queryGranularity = getQueryGranularity(normalizedQueries);
 
       if (queryGranularity.length > 1) {
@@ -738,7 +677,7 @@ export class ApiGateway {
         order: R.fromPairs(sqlQuery.order.map(({ id: key, desc }) => [key, desc ? 'desc' : 'asc']))
       });
 
-      res(queryType === QUERY_TYPE.REGULAR_QUERY ?
+      res(queryType === QueryTypeEnum.REGULAR_QUERY ?
         { sql: toQuery(sqlQueries[0]) } :
         sqlQueries.map((sqlQuery) => ({ sql: toQuery(sqlQuery) })));
     } catch (e) {
@@ -836,90 +775,220 @@ export class ApiGateway {
     }
   }
 
-  public async load({ query, context, res, apiType = 'rest', ...props }: QueryRequest) {
+  /**
+   * Returns an array of sqlQuery objects for specified normalized
+   * queries.
+   * @internal
+   */
+  private async getSqlQueriesInternal(
+    context: RequestContext,
+    normalizedQueries: (NormalizedQuery)[],
+  ): Promise<Array<any>> {
+    const sqlQueries = await Promise.all(
+      normalizedQueries.map(
+        async (normalizedQuery, index) => {
+          const loadRequestSQLStarted = new Date();
+          const sqlQuery = await this.getCompilerApi(context)
+            .getSql(
+              this.coerceForSqlQuery(normalizedQuery, context)
+            );
+
+          this.log({
+            type: 'Load Request SQL',
+            duration: this.duration(loadRequestSQLStarted),
+            query: normalizedQueries[index],
+            sqlQuery
+          }, context);
+
+          return sqlQuery;
+        }
+      )
+    );
+    return sqlQueries;
+  }
+
+  /**
+   * Execute query and return adapter's result.
+   * @internal
+   */
+  private async getSqlResponseInternal(
+    context: RequestContext,
+    normalizedQuery: NormalizedQuery,
+    sqlQuery: any,
+  ) {
+    const queries = [{
+      ...sqlQuery,
+      query: sqlQuery.sql[0],
+      values: sqlQuery.sql[1],
+      continueWait: true,
+      renewQuery: normalizedQuery.renewQuery,
+      requestId: context.requestId,
+      context
+    }];
+    if (normalizedQuery.total) {
+      const normalizedTotal = structuredClone(normalizedQuery);
+      normalizedTotal.totalQuery = true;
+      normalizedTotal.limit = null;
+      normalizedTotal.rowLimit = null;
+      normalizedTotal.offset = null;
+      const [totalQuery] = await this.getSqlQueriesInternal(
+        context,
+        [normalizedTotal],
+      );
+      queries.push({
+        ...totalQuery,
+        query: totalQuery.sql[0],
+        values: totalQuery.sql[1],
+        continueWait: true,
+        renewQuery: normalizedTotal.renewQuery,
+        requestId: context.requestId,
+        context
+      });
+    }
+    const [response, total] = await Promise.all(
+      queries.map(async (query) => {
+        const res = await this
+          .getAdapterApi(context)
+          .executeQuery(query);
+        return res;
+      })
+    );
+    response.total = normalizedQuery.total
+      ? Number(total.data[0][QueryAlias.TOTAL_COUNT])
+      : undefined;
+    return response;
+  }
+
+  /**
+   * Convert adapter's result and other request paramters to a final
+   * result object.
+   * @internal
+   */
+  private getResultInternal(
+    context: RequestContext,
+    queryType: QueryType,
+    normalizedQuery: NormalizedQuery,
+    sqlQuery: any,
+    annotation: {
+      measures: {
+        [index: string]: unknown;
+      };
+      dimensions: {
+        [index: string]: unknown;
+      };
+      segments: {
+        [index: string]: unknown;
+      };
+      timeDimensions: {
+        [index: string]: unknown;
+      };
+    },
+    response: any,
+    responseType?: ResultType,
+  ) {
+    return {
+      query: normalizedQuery,
+      data: transformData(
+        sqlQuery.aliasNameToMember,
+        {
+          ...annotation.measures,
+          ...annotation.dimensions,
+          ...annotation.timeDimensions
+        } as { [member: string]: ConfigItem },
+        response.data,
+        normalizedQuery,
+        queryType,
+        responseType,
+      ),
+      lastRefreshTime: response.lastRefreshTime?.toISOString(),
+      ...(
+        getEnv('devMode') ||
+          context.signedWithPlaygroundAuthSecret
+          ? {
+            refreshKeyValues: response.refreshKeyValues,
+            usedPreAggregations: response.usedPreAggregations,
+            transformedQuery: sqlQuery.canUseTransformedQuery,
+            requestId: context.requestId,
+          }
+          : null
+      ),
+      annotation,
+      dataSource: response.dataSource,
+      dbType: response.dbType,
+      extDbType: response.extDbType,
+      external: response.external,
+      slowQuery: Boolean(response.slowQuery),
+      total: normalizedQuery.total ? response.total : null,
+    };
+  }
+
+  /**
+   * Data queries APIs (`/load`, `/subscribe`) entry point. Used by
+   * `CubejsApi#load` and `CubejsApi#subscribe` methods to fetch the
+   * data.
+   */
+  public async load(request: QueryRequest) {
+    let query: Query | Query[] | undefined;
+    const {
+      context,
+      res,
+      apiType = 'rest',
+      ...props
+    } = request;
     const requestStarted = new Date();
 
     try {
-      query = this.parseQueryParam(query);
+      query = this.parseQueryParam(request.query);
+      let resType: ResultType = ResultType.DEFAULT;
+
+      if (!Array.isArray(query) && query.responseFormat) {
+        resType = query.responseFormat;
+      }
+
       this.log({
         type: 'Load Request',
         query
       }, context);
 
-      const [queryType, normalizedQueries] = await this.getNormalizedQueries(query, context);
+      const [queryType, normalizedQueries] =
+        await this.getNormalizedQueries(query, context);
 
-      const [metaConfigResult, ...sqlQueries] = await Promise.all(
-        [
-          this.getCompilerApi(context).metaConfig({ requestId: context.requestId })
-        ].concat(normalizedQueries.map(
-          async (normalizedQuery, index) => {
-            const loadRequestSQLStarted = new Date();
-            const sqlQuery = await this.getCompilerApi(context).getSql(
-              this.coerceForSqlQuery(normalizedQuery, context)
-            );
+      const metaConfigResult = await this
+        .getCompilerApi(context).metaConfig({
+          requestId: context.requestId
+        });
 
-            this.log({
-              type: 'Load Request SQL',
-              duration: this.duration(loadRequestSQLStarted),
-              query: normalizedQueries[index],
-              sqlQuery
-            }, context);
-
-            return sqlQuery;
-          }
-        ))
-      );
+      const sqlQueries = await this
+        .getSqlQueriesInternal(context, normalizedQueries);
 
       let slowQuery = false;
-      const results = await Promise.all<any[]>(normalizedQueries.map(async (normalizedQuery, index) => {
-        const sqlQuery = sqlQueries[index];
-        const annotation = prepareAnnotation(metaConfigResult, normalizedQuery);
-        const aliasToMemberNameMap = sqlQuery.aliasNameToMember;
 
-        const toExecute = {
-          ...sqlQuery,
-          query: sqlQuery.sql[0],
-          values: sqlQuery.sql[1],
-          continueWait: true,
-          renewQuery: normalizedQuery.renewQuery,
-          requestId: context.requestId,
-          context
-        };
+      const results = await Promise.all(
+        normalizedQueries.map(async (normalizedQuery, index) => {
+          slowQuery = slowQuery ||
+            Boolean(sqlQueries[index].slowQuery);
 
-        const response = await this.getAdapterApi(context).executeQuery(toExecute);
+          const annotation = prepareAnnotation(
+            metaConfigResult, normalizedQuery
+          );
 
-        const flattenAnnotation = {
-          ...annotation.measures,
-          ...annotation.dimensions,
-          ...annotation.timeDimensions
-        };
-
-        slowQuery = slowQuery || Boolean(response.slowQuery);
-
-        return {
-          query: normalizedQuery,
-          data: transformData(
-            aliasToMemberNameMap,
-            flattenAnnotation,
-            response.data,
+          const response = await this.getSqlResponseInternal(
+            context,
             normalizedQuery,
-            queryType
-          ),
-          lastRefreshTime: response.lastRefreshTime?.toISOString(),
-          ...(getEnv('devMode') || context.signedWithPlaygroundAuthSecret ? {
-            refreshKeyValues: response.refreshKeyValues,
-            usedPreAggregations: response.usedPreAggregations,
-            transformedQuery: sqlQuery.canUseTransformedQuery,
-            requestId: context.requestId,
-          } : null),
-          annotation,
-          dataSource: response.dataSource,
-          dbType: response.dbType,
-          extDbType: response.extDbType,
-          external: response.external,
-          slowQuery: Boolean(response.slowQuery)
-        };
-      }));
+            sqlQueries[index],
+          );
+
+          return this.getResultInternal(
+            context,
+            queryType,
+            normalizedQuery,
+            sqlQueries[index],
+            annotation,
+            response,
+            resType,
+          );
+        })
+      );
 
       this.log(
         {
@@ -927,16 +996,32 @@ export class ApiGateway {
           query,
           duration: this.duration(requestStarted),
           apiType,
-          isPlayground: Boolean(context.signedWithPlaygroundAuthSecret),
-          queriesWithPreAggregations: results.filter((r: any) => Object.keys(r.usedPreAggregations || {}).length)
-            .length,
-          queriesWithData: results.filter((r: any) => r.data?.length).length,
+          isPlayground: Boolean(
+            context.signedWithPlaygroundAuthSecret
+          ),
+          queries: results.length,
+          queriesWithPreAggregations:
+            results.filter(
+              (r: any) => Object.keys(
+                r.usedPreAggregations || {}
+              ).length
+            ).length,
+          queriesWithData:
+            results.filter((r: any) => r.data?.length).length,
+          dbType: results.map(r => r.dbType),
         },
-        context
+        context,
       );
 
-      if (queryType !== QUERY_TYPE.REGULAR_QUERY && props.queryType == null) {
-        throw new UserError(`'${queryType}' query type is not supported by the client. Please update the client.`);
+      if (
+        queryType !== QueryTypeEnum.REGULAR_QUERY &&
+        props.queryType == null
+      ) {
+        throw new UserError(
+          `'${queryType
+          }' query type is not supported by the client.` +
+          'Please update the client.'
+        );
       }
 
       if (props.queryType === 'multi') {
@@ -1021,14 +1106,14 @@ export class ApiGateway {
     return (message, { status }: { status?: number } = {}) => (status ? res.status(status).json(message) : res.json(message));
   }
 
-  protected parseQueryParam(query) {
+  protected parseQueryParam(query): Query | Query[] {
     if (!query || query === 'undefined') {
       throw new UserError('query param is required');
     }
     if (typeof query === 'string') {
       query = JSON.parse(query);
     }
-    return query;
+    return query as Query | Query[];
   }
 
   protected getCompilerApi(context) {
@@ -1056,7 +1141,7 @@ export class ApiGateway {
       authInfo: securityContext,
       signedWithPlaygroundAuthSecret: Boolean(req.signedWithPlaygroundAuthSecret),
       requestId,
-      ...extensions
+      ...extensions,
     };
   }
 
@@ -1074,6 +1159,10 @@ export class ApiGateway {
   public handleError({
     e, context, query, res, requestStarted
   }: any) {
+    const { requestId } = context ?? {};
+    
+    const plainError = e.plainMessages;
+    
     if (e instanceof CubejsHandlerError) {
       this.log({
         type: e.type,
@@ -1081,7 +1170,7 @@ export class ApiGateway {
         error: e.message,
         duration: this.duration(requestStarted)
       }, context);
-      res({ error: e.message }, { status: e.status });
+      res({ error: e.message, stack: e.stack, requestId, plainError }, { status: e.status });
     } else if (e.error === 'Continue wait') {
       this.log({
         type: 'Continue wait',
@@ -1095,7 +1184,7 @@ export class ApiGateway {
         type: 'Orchestrator error',
         query,
         error: e.error,
-        duration: this.duration(requestStarted)
+        duration: this.duration(requestStarted),
       }, context);
       res(e, { status: 400 });
     } else if (e.type === 'UserError') {
@@ -1108,7 +1197,10 @@ export class ApiGateway {
       res(
         {
           type: e.type,
-          error: e.message
+          error: e.message,
+          plainError,
+          stack: e.stack,
+          requestId
         },
         { status: 400 }
       );
@@ -1119,7 +1211,7 @@ export class ApiGateway {
         error: e.stack || e.toString(),
         duration: this.duration(requestStarted)
       }, context);
-      res({ error: e.toString() }, { status: 500 });
+      res({ error: e.toString(), stack: e.stack, requestId, plainError, }, { status: 500 });
     }
   }
 
@@ -1272,9 +1364,9 @@ export class ApiGateway {
             throw new CubejsHandlerError(403, 'Forbidden', 'Invalid token');
           } else {
             this.log({
-              type: e.message,
+              type: (e as Error).message,
               token: auth,
-              error: e.stack || e.toString()
+              error: (e as Error).stack || (e as Error).toString()
             }, <any>req);
           }
         }
@@ -1339,16 +1431,20 @@ export class ApiGateway {
       if (next) {
         next();
       }
-    } catch (e) {
+    } catch (e: unknown) {
       if (e instanceof CubejsHandlerError) {
         res.status(e.status).json({ error: e.message });
-      } else {
+      } else if (e instanceof Error) {
         this.log({
           type: 'Auth Error',
           token,
           error: e.stack || e.toString()
         }, <any>req);
-        res.status(500).json({ error: e.toString() });
+
+        res.status(500).json({
+          error: e.toString(),
+          stack: e.stack
+        });
       }
     }
   }
@@ -1383,12 +1479,14 @@ export class ApiGateway {
       type: 'Incoming network usage',
       service: 'api-http',
       bytes: Buffer.byteLength(req.url + req.rawHeaders.join('\n')) + (Number(req.get('content-length')) || 0),
+      path: req.path,
     }, req.context);
     res.on('finish', () => {
       this.log({
         type: 'Outgoing network usage',
         service: 'api-http',
         bytes: Number(res.get('content-length')) || 0,
+        path: req.path,
       }, req.context);
     });
     if (next) {
@@ -1439,7 +1537,10 @@ export class ApiGateway {
       ...restParams,
       ...(!context ? undefined : {
         securityContext: context.securityContext,
-        requestId: context.requestId
+        requestId: context.requestId,
+        ...(!context.appName ? undefined : { appName: context.appName }),
+        ...(!context.protocol ? undefined : { protocol: context.protocol }),
+        ...(!context.apiType ? undefined : { apiType: context.apiType }),
       })
     });
   }
@@ -1462,6 +1563,14 @@ export class ApiGateway {
     };
   };
 
+  private logProbeError(e: any, type: string): void {
+    this.log({
+      type,
+      driverType: e.driverType,
+      error: (e as Error).stack || (e as Error).toString(),
+    });
+  }
+
   protected readiness: RequestHandler = async (req, res) => {
     let health: 'HEALTH' | 'DOWN' = 'HEALTH';
 
@@ -1472,23 +1581,9 @@ export class ApiGateway {
         // todo: test other data sources
         orchestratorApi.addDataSeenSource('default');
         await orchestratorApi.testConnection();
-      } catch (e) {
-        this.log({
-          type: 'Internal Server Error on readiness probe',
-          error: e.stack || e.toString(),
-        });
-
-        return this.healthResponse(res, 'DOWN');
-      }
-
-      try {
         await orchestratorApi.testOrchestratorConnections();
-      } catch (e) {
-        this.log({
-          type: 'Internal Server Error on readiness probe',
-          error: e.stack || e.toString(),
-        });
-
+      } catch (e: any) {
+        this.logProbeError(e, 'Internal Server Error on readiness probe');
         health = 'DOWN';
       }
     }
@@ -1501,24 +1596,10 @@ export class ApiGateway {
 
     try {
       await this.dataSourceStorage.testConnections();
-    } catch (e) {
-      this.log({
-        type: 'Internal Server Error on liveness probe',
-        error: e.stack || e.toString(),
-      });
-
-      return this.healthResponse(res, 'DOWN');
-    }
-
-    try {
       // @todo Optimize this moment?
       await this.dataSourceStorage.testOrchestratorConnections();
-    } catch (e) {
-      this.log({
-        type: 'Internal Server Error on liveness probe',
-        error: e.stack || e.toString(),
-      });
-
+    } catch (e: any) {
+      this.logProbeError(e, 'Internal Server Error on liveness probe');
       health = 'DOWN';
     }
 
@@ -1531,3 +1612,8 @@ export class ApiGateway {
     }
   }
 }
+export {
+  UserBackgroundContext,
+  ApiGatewayOptions,
+  ApiGateway,
+};

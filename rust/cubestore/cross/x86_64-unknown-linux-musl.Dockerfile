@@ -4,11 +4,11 @@ FROM rustembedded/cross:x86_64-unknown-linux-musl
 
 RUN apt-get update \
     && apt-get -y upgrade \
-    && apt-get install -y software-properties-common pkg-config wget musl-tools libc6-dev apt-transport-https ca-certificates \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y software-properties-common pkg-config wget musl-tools libc6-dev apt-transport-https ca-certificates \
     && wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - \
-    && add-apt-repository "deb https://apt.llvm.org/focal/ llvm-toolchain-focal-9 main"  \
+    && add-apt-repository "deb https://apt.llvm.org/focal/ llvm-toolchain-focal-12 main"  \
     && apt-get update \
-    && apt-get install -y llvm-9 clang-9 libclang-9-dev clang-9 make \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y llvm-12 clang-12 libclang-12-dev clang-12 make \
     && rm -rf /var/lib/apt/lists/*;
 
 RUN ln -s /usr/include/x86_64-linux-gnu/asm /usr/include/x86_64-linux-musl/asm && \
@@ -19,7 +19,7 @@ RUN ln -s /usr/include/x86_64-linux-gnu/asm /usr/include/x86_64-linux-musl/asm &
 RUN mkdir /musl
 
 # https://www.openssl.org/source/old/1.1.1/
-ARG OPENSSL_VERSION=1.1.1h
+ARG OPENSSL_VERSION=1.1.1l
 
 RUN wget https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz -O - | tar -xz &&\
     cd openssl-${OPENSSL_VERSION} && \

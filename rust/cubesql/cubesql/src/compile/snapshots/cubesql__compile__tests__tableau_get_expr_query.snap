@@ -1,0 +1,8 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"SELECT c.oid, a.attnum, a.attname, c.relname, n.nspname, a.attnotnull OR ( t.typtype = 'd' AND t.typnotnull ), a.attidentity != '' OR pg_catalog.Pg_get_expr(d.adbin, d.adrelid) LIKE '%nextval(%'\n                FROM   pg_catalog.pg_class c\n                JOIN pg_catalog.pg_namespace n\n                    ON ( c.relnamespace = n.oid )\n                JOIN pg_catalog.pg_attribute a\n                    ON ( c.oid = a.attrelid )\n                JOIN pg_catalog.pg_type t\n                    ON ( a.atttypid = t.oid )\n                LEFT JOIN pg_catalog.pg_attrdef d\n                    ON ( d.adrelid = a.attrelid AND d.adnum = a.attnum )\n                JOIN (SELECT 2615 AS oid, 2 AS attnum UNION ALL SELECT 1259, 2 UNION ALL SELECT 2609, 4) vals\n                ON ( c.oid = vals.oid AND a.attnum = vals.attnum );\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++-----+--------+---------+---------+---------+--------------------------------------------------------+-------------------------------------------------------------------------------------+
+| oid | attnum | attname | relname | nspname | a.attnotnull OR t.typtype = Utf8("d") AND t.typnotnull | a.attidentity != Utf8("") OR pg_get_expr(d.adbin,d.adrelid) LIKE Utf8("%nextval(%") |
++-----+--------+---------+---------+---------+--------------------------------------------------------+-------------------------------------------------------------------------------------+
++-----+--------+---------+---------+---------+--------------------------------------------------------+-------------------------------------------------------------------------------------+

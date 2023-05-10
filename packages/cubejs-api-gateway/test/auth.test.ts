@@ -1,4 +1,6 @@
+// eslint-disable-next-line import/no-extraneous-dependencies
 import express, { Application as ExpressApplication, RequestHandler } from 'express';
+// eslint-disable-next-line import/no-extraneous-dependencies
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
 import { pausePromise } from '@cubejs-backend/shared';

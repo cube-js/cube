@@ -4,6 +4,7 @@ import {
   PivotConfig,
   PreAggregationType,
   Query,
+  validateQuery,
   TransformedQuery,
 } from '@cubejs-client/core';
 import {
@@ -15,7 +16,8 @@ import { Col, Row, Space } from 'antd';
 import React, { RefObject, useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
 
-import { Card, FatalError } from '../../../atoms';
+import { Card } from '../../../atoms';
+import { FatalError } from '../../../components/Error/FatalError';
 import ChartContainer from '../../../ChartContainer';
 import { SectionHeader, SectionRow } from '../../../components';
 import ChartRenderer from '../../../components/ChartRenderer/ChartRenderer';
@@ -149,7 +151,7 @@ function QueryChangeEmitter({
   onChange,
 }: QueryChangeEmitterProps) {
   useDeepEffect(() => {
-    if (!areQueriesEqual(query1, query2)) {
+    if (!areQueriesEqual(validateQuery(query1), validateQuery(query2))) {
       onChange();
     }
   }, [query1, query2]);
@@ -200,7 +202,7 @@ export function PlaygroundQueryBuilder({
   const isMounted = useIsMounted();
 
   const isGraphQLSupported = useServerCoreVersionGte('0.29.0');
-  
+
   const { isChartRendererReady, queryStatus, queryError, queryRequestId } =
     useChartRendererState(queryId);
   const {
@@ -209,7 +211,7 @@ export function PlaygroundQueryBuilder({
     setChartRendererReady,
     setQueryError,
   } = useChartRendererStateMethods();
-
+  
   const { refreshToken } = useSecurityContext();
 
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -286,6 +288,8 @@ export function PlaygroundQueryBuilder({
         query,
         error,
         metaError,
+        richMetaError,
+        metaErrorStack,
         meta,
         isQueryPresent,
         chartType,
@@ -311,7 +315,7 @@ export function PlaygroundQueryBuilder({
         availableFilterMembers,
       }) => {
         let parsedDateRange;
-
+        
         if (dryRunResponse) {
           const { timeDimensions = [] } = dryRunResponse.pivotQuery || {};
           parsedDateRange = timeDimensions[0]?.dateRange;
@@ -451,8 +455,9 @@ export function PlaygroundQueryBuilder({
                   <Space style={{ marginLeft: 'auto' }}>
                     {Extra ? (
                       <Extra
-                        queryRequestId={queryRequestId}
-                        queryStatus={queryStatus as QueryStatus}
+                        queryRequestId={queryRequestId || queryError?.response?.requestId}
+                        queryStatus={queryStatus}
+                        error={queryError}
                       />
                     ) : null}
                     {queryStatus ? (
@@ -475,9 +480,9 @@ export function PlaygroundQueryBuilder({
               style={{ margin: 0 }}
             >
               <Col span={24}>
-                {!isQueryPresent && metaError ? (
+                {!isQueryPresent && richMetaError ? (
                   <Card>
-                    <FatalError error={metaError} />
+                    <FatalError error={richMetaError} stack={metaErrorStack} />
                   </Card>
                 ) : null}
 
@@ -523,16 +528,16 @@ export function PlaygroundQueryBuilder({
                     chartLibraries={frameworkChartLibraries}
                     isFetchingMeta={isFetchingMeta}
                     render={({ framework }) => {
-                      if (metaError) {
-                        return <FatalError error={metaError} />;
+                      if (richMetaError) {
+                        return <FatalError error={richMetaError} stack={metaErrorStack} />;
                       }
 
                       return (
                         <ChartRenderer
                           queryId={queryId}
                           areQueriesEqual={areQueriesEqual(
-                            query,
-                            queryRef.current
+                            validateQuery(query),
+                            validateQuery(queryRef.current)
                           )}
                           isFetchingMeta={isFetchingMeta}
                           queryError={queryError}
@@ -551,7 +556,7 @@ export function PlaygroundQueryBuilder({
                               await refreshToken();
 
                               handleRunButtonClick({
-                                query,
+                                query: validateQuery(query),
                                 pivotConfig,
                                 chartType: chartType || 'line',
                               });

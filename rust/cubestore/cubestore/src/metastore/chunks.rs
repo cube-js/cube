@@ -1,7 +1,7 @@
 use super::{BaseRocksSecondaryIndex, Chunk, IndexId, RocksSecondaryIndex, RocksTable, TableId};
-use crate::base_rocks_secondary_index;
 use crate::metastore::{IdRow, MetaStoreEvent};
 use crate::rocks_table_impl;
+use crate::{base_rocks_secondary_index, CubeError};
 use byteorder::{BigEndian, WriteBytesExt};
 use chrono::{DateTime, Utc};
 use rand::distributions::Alphanumeric;
@@ -20,11 +20,14 @@ impl Chunk {
             last_used: None,
             in_memory,
             created_at: Some(Utc::now()),
+            oldest_insert_at: Some(Utc::now()),
+            deactivated_at: None,
             suffix: Some(
                 String::from_utf8(thread_rng().sample_iter(&Alphanumeric).take(8).collect())
                     .unwrap()
                     .to_lowercase(),
             ),
+            file_size: None,
         }
     }
 
@@ -53,9 +56,31 @@ impl Chunk {
         to_update
     }
 
+    pub fn set_oldest_insert_at(&self, oldest_insert_at: Option<DateTime<Utc>>) -> Chunk {
+        let mut to_update = self.clone();
+        to_update.oldest_insert_at = oldest_insert_at;
+        to_update
+    }
+
+    pub fn file_size(&self) -> Option<u64> {
+        self.file_size
+    }
+
+    pub fn set_file_size(&self, file_size: u64) -> Result<Self, CubeError> {
+        let mut c = self.clone();
+        if file_size == 0 {
+            return Err(CubeError::internal(format!(
+                "Received zero file size for chunk"
+            )));
+        }
+        c.file_size = Some(file_size);
+        Ok(c)
+    }
+
     pub fn deactivate(&self) -> Chunk {
         let mut to_update = self.clone();
         to_update.active = false;
+        to_update.deactivated_at = Some(Utc::now());
         to_update
     }
 
@@ -73,6 +98,14 @@ impl Chunk {
 
     pub fn created_at(&self) -> &Option<DateTime<Utc>> {
         &self.created_at
+    }
+
+    pub fn oldest_insert_at(&self) -> &Option<DateTime<Utc>> {
+        &self.oldest_insert_at
+    }
+
+    pub fn deactivated_at(&self) -> &Option<DateTime<Utc>> {
+        &self.deactivated_at
     }
 
     pub fn suffix(&self) -> &Option<String> {

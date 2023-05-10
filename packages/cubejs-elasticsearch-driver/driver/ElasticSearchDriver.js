@@ -1,9 +1,16 @@
 const { Client } = require('@elastic/elasticsearch');
 const SqlString = require('sqlstring');
-const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
+const { BaseDriver } = require('@cubejs-backend/base-driver');
 
 class ElasticSearchDriver extends BaseDriver {
-  constructor(config) {
+  /**
+   * Returns default concurrency value.
+   */
+  static getDefaultConcurrency() {
+    return 2;
+  }
+
+  constructor(config = {}) {
     super();
 
     const auth = {

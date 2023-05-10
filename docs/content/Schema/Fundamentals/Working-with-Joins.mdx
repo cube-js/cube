@@ -244,7 +244,7 @@ cube(`PostTopics`, {
 });
 ```
 
-### Many-to-many joins without an associative table
+### <--{"id" : "Many-to-many joins"}--> Many-to-many joins without an associative table
 
 Sometimes there is no associative table in the database, when in reality, there
 is a many-to-many relationship. In this case, the solution is to extract some
@@ -517,7 +517,7 @@ cube('Customers', {
 });
 ```
 
-### Transitive join pitfalls
+### <--{"id" : "Directions of joins"}--> Transitive join pitfalls
 
 Let's consider an example where we have a many-to-many relationship between
 `Users` and `Organizations` through an `OrganizationUsers` cube:

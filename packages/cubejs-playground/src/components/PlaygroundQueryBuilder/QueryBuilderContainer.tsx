@@ -2,18 +2,15 @@ import { LockOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import { CubeProvider } from '@cubejs-client/react';
 import { Card, Space } from 'antd';
 import { useLayoutEffect } from 'react';
-import { useHistory } from 'react-router';
+import { useHistory } from 'react-router-dom';
 import styled from 'styled-components';
 
 import { Button, CubeLoader } from '../../atoms';
-import { useCubejsApi, useSecurityContext } from '../../hooks';
-// import { LightningIcon } from '../../shared/icons/LightningIcon';
+import { useCloud } from '../../cloud';
+import { useAppContext, useCubejsApi, useSecurityContext } from '../../hooks';
+import { useRollupDesignerContext, RollupDesignerContext } from '../../rollup-designer';
 import { ChartRendererStateProvider } from '../QueryTabs/ChartRendererStateProvider';
 import { QueryTabs, QueryTabsProps } from '../QueryTabs/QueryTabs';
-import {
-  RollupDesignerContext,
-  useRollupDesignerContext,
-} from '../RollupDesigner';
 import {
   PlaygroundQueryBuilder,
   PlaygroundQueryBuilderProps,
@@ -30,29 +27,25 @@ const StyledCard = styled(Card)`
   }
 `;
 
-type QueryBuilderContainerProps = {
-  apiUrl: string | null;
-  token: string | null;
-} & Pick<
+type QueryBuilderContainerProps = Pick<
   PlaygroundQueryBuilderProps,
   | 'defaultQuery'
   | 'initialVizState'
   | 'schemaVersion'
   | 'dashboardSource'
+  | 'extra'
   | 'onVizStateChanged'
   | 'onSchemaChange'
-  | 'extra'
 > &
   Pick<QueryTabsProps, 'onTabChange'>;
 
-export function QueryBuilderContainer({
-  apiUrl,
-  token,
-  ...props
-}: QueryBuilderContainerProps) {
-  const { token: securityContextToken, setIsModalOpen } = useSecurityContext();
-
-  const currentToken = securityContextToken || token;
+export function QueryBuilderContainer(props: QueryBuilderContainerProps) {
+  const { apiUrl } = useAppContext();
+  const {
+    currentToken,
+    token: securityContextToken,
+    setIsModalOpen,
+  } = useSecurityContext();
 
   useLayoutEffect(() => {
     if (apiUrl && currentToken) {
@@ -82,6 +75,7 @@ export function QueryBuilderContainer({
               securityContextToken={securityContextToken}
               onTabChange={props.onTabChange}
               extra={props.extra}
+              onVizStateChanged={props.onVizStateChanged}
               onSecurityContextModalOpen={() => setIsModalOpen(true)}
             />
           </StyledCard>
@@ -117,6 +111,7 @@ function QueryTabsRenderer({
 }: QueryTabsRendererProps) {
   const { location } = useHistory();
   const { setQuery, toggleModal } = useRollupDesignerContext();
+  const { isAddRollupButtonVisible } = useCloud();
 
   const params = new URLSearchParams(location.search);
   const query = JSON.parse(params.get('query') || 'null');
@@ -136,14 +131,16 @@ function QueryTabsRenderer({
             {securityContextToken ? 'Edit' : 'Add'} Security Context
           </Button>
 
-          <Button
-            data-testid="rd-btn"
-            icon={<ThunderboltOutlined />}
-            size="small"
-            onClick={() => toggleModal()}
-          >
-            Add Rollup to Schema
-          </Button>
+          {isAddRollupButtonVisible == null || isAddRollupButtonVisible ? (
+            <Button
+              data-testid="rd-btn"
+              icon={<ThunderboltOutlined />}
+              size="small"
+              onClick={() => toggleModal()}
+            >
+              Add Rollup to Schema
+            </Button>
+          ) : null}
         </Space>
       }
       onTabChange={(tab) => {

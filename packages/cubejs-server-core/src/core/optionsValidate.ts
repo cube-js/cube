@@ -126,6 +126,7 @@ const schemaOptions = Joi.object().keys({
       preAggregationsOptions: {
         queueOptions: schemaQueueOptions,
         externalRefresh: Joi.boolean(),
+        maxPartitions: Joi.number(),
       },
       rollupOnlyMode: Joi.boolean()
     })
@@ -137,11 +138,15 @@ const schemaOptions = Joi.object().keys({
   livePreview: Joi.boolean(),
   // SQL API
   sqlPort: Joi.number(),
+  pgSqlPort: Joi.number(),
+  sqlSuperUser: Joi.string(),
   checkSqlAuth: Joi.func(),
+  canSwitchSqlUser: Joi.func(),
   sqlUser: Joi.string(),
   sqlPassword: Joi.string(),
   // Additional system flags
   serverless: Joi.boolean(),
+  allowNodeRequire: Joi.boolean(),
 });
 
 export default (options: any) => {

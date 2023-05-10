@@ -21,7 +21,16 @@ spec:
       labels:
         app.kubernetes.io/component: master
         {{- include "cubejs.selectorLabels" . | nindent 8 }}
+      {{- if .Values.commonAnnotations }}
+      annotations:
+      {{- toYaml .Values.commonAnnotations | nindent 8 }}
+      {{- end }}
     spec:
+      serviceAccountName: {{ template "cubejs.master.serviceAccountName" . }}
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: cube
           {{- if .Values.image.tag }}
@@ -29,10 +38,16 @@ spec:
           {{- else }}
           image: "{{ .Values.image.repository }}:v{{ .Chart.AppVersion }}"
           {{- end }}
+          imagePullPolicy: {{ .Values.image.pullPolicy | quote }}
           ports:
             - name: http
               containerPort: {{ .Values.config.apiPort }}
               protocol: TCP
+            {{- if .Values.config.sqlPort }}
+            - name: sql
+              containerPort: {{ .Values.config.sqlPort }}
+              protocol: TCP
+            {{- end }}
           env:
             {{- include "cubejs.common-env" . | nindent 12 }}
           {{- if .Values.master.livenessProbe.enabled }}
@@ -74,6 +89,14 @@ spec:
       {{- if .Values.master.affinity }}
       affinity:
         {{- toYaml .Values.master.affinity | nindent 8 }}
+      {{- end }}
+      {{- if .Values.master.tolerations }}
+      tolerations:
+        {{- toYaml .Values.master.tolerations | nindent 8 }}
+      {{- end }}
+      {{- if .Values.master.nodeSelector }}
+      nodeSelector:
+        {{- toYaml .Values.master.nodeSelector | nindent 8 }}
       {{- end }}
       {{- if .Values.master.spreadConstraints }}
       topologySpreadConstraints:

@@ -1,14 +1,16 @@
 import crypto from 'crypto';
+import csvWriter from 'csv-write-stream';
 import LRUCache from 'lru-cache';
-import { MaybeCancelablePromise } from '@cubejs-backend/shared';
+import { pipeline } from 'stream';
+import { MaybeCancelablePromise, streamToArray } from '@cubejs-backend/shared';
 
+import { BaseDriver, InlineTables } from '@cubejs-backend/base-driver';
 import { QueryQueue } from './QueryQueue';
 import { ContinueWaitError } from './ContinueWaitError';
 import { RedisCacheDriver } from './RedisCacheDriver';
 import { LocalCacheDriver } from './LocalCacheDriver';
 import { CacheDriverInterface } from './cache-driver.interface';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
-import { BaseDriver } from '../driver';
 import { PreAggregationDescription } from './PreAggregations';
 
 type QueryOptions = {
@@ -53,7 +55,13 @@ export class QueryCache {
       externalQueueOptions?: any;
       externalDriverFactory?: DriverFactory;
       backgroundRenew?: Boolean;
-      queueOptions?: object | ((dataSource: String) => object);
+      queueOptions?: (dataSource: string) => Promise<{
+        concurrency: number;
+        continueWaitTimeout?: number;
+        executionTimeout?: number;
+        orphanedTimeout?: number;
+        heartBeatInterval?: number;
+      }>;
       redisPool?: any;
       continueWaitTimeout?: number;
       cacheAndQueueDriver?: 'redis' | 'memory';
@@ -69,13 +77,29 @@ export class QueryCache {
     });
   }
 
+  /**
+   * Force reconcile queue logic to be executed.
+   */
+  public async forceReconcile(datasource = 'default') {
+    if (!this.externalQueue) {
+      // We don't need to reconcile external queue, because Cube Store
+      // uses its internal queue which managed separately.
+      return;
+    }
+    const queue = await this.getQueue(datasource);
+    if (queue) {
+      await queue.reconcileQueue();
+    }
+  }
+
   public async cachedQueryResult(queryBody, preAggregationsTablesToTempTables) {
     const replacePreAggregationTableNames = (queryAndParams: QueryWithParams) => QueryCache
       .replacePreAggregationTableNames(
         queryAndParams, preAggregationsTablesToTempTables
       );
-
     const query = replacePreAggregationTableNames(queryBody.query);
+    const inlineTables = preAggregationsTablesToTempTables.flatMap(([_, preAggregation]) => (preAggregation.lambdaTable ? [preAggregation.lambdaTable] : []));
+
     let queuePriority = 10;
     if (Number.isInteger(queryBody.queuePriority)) {
       // eslint-disable-next-line prefer-destructuring
@@ -96,8 +120,9 @@ export class QueryCache {
           cacheKey: [query, values],
           external: queryBody.external,
           requestId: queryBody.requestId,
-          dataSource: queryBody.dataSource
-        })
+          dataSource: queryBody.dataSource,
+          inlineTables,
+        }),
       };
     }
 
@@ -140,7 +165,7 @@ export class QueryCache {
         forceNoCache,
         external: queryBody.external,
         requestId: queryBody.requestId,
-        dataSource: queryBody.dataSource
+        dataSource: queryBody.dataSource,
       }
     );
 
@@ -169,7 +194,15 @@ export class QueryCache {
   }
 
   public static queryCacheKey(queryBody) {
-    return [queryBody.query, queryBody.values, (queryBody.preAggregations || []).map(p => p.loadSql)];
+    const key = [
+      queryBody.query,
+      queryBody.values,
+      (queryBody.preAggregations || []).map(p => p.loadSql)
+    ];
+    if (queryBody.invalidate) {
+      key.push(queryBody.invalidate);
+    }
+    return key;
   }
 
   protected static replaceAll(replaceThis, withThis, inThis) {
@@ -189,25 +222,29 @@ export class QueryCache {
     return Array.isArray(queryAndParams) ? [replacedKeqQuery, params, queryOptions] : replacedKeqQuery;
   }
 
-  public queryWithRetryAndRelease(query, values, {
-    priority, cacheKey, external, requestId, dataSource
+  public async queryWithRetryAndRelease(query, values, {
+    priority, cacheKey, external, requestId, dataSource, inlineTables, useCsvQuery,
   }: {
     priority?: number,
     cacheKey: object,
     external: boolean
     requestId?: string,
-    dataSource: string
+    dataSource: string,
+    inlineTables?: InlineTables,
+    useCsvQuery?: boolean,
   }) {
-    const queue = external ? this.getExternalQueue() : this.getQueue(dataSource);
+    const queue = external
+      ? this.getExternalQueue()
+      : await this.getQueue(dataSource);
     return queue.executeInQueue('query', cacheKey, {
-      queryKey: cacheKey, query, values, requestId
+      queryKey: cacheKey, query, values, requestId, inlineTables, useCsvQuery
     }, priority, {
       stageQueryKey: cacheKey,
-      requestId
+      requestId,
     });
   }
 
-  public getQueue(dataSource: string = 'default') {
+  public async getQueue(dataSource: string = 'default') {
     if (!this.queue[dataSource]) {
       this.queue[dataSource] = QueryCache.createQueue(
         `SQL_QUERY_${this.redisPrefix}_${dataSource}`,
@@ -216,21 +253,47 @@ export class QueryCache {
           this.logger('Executing SQL', {
             ...q
           });
-          return client.query(q.query, q.values, q);
-        }, {
+          if (q.useCsvQuery) {
+            return this.csvQuery(client, q);
+          } else {
+            return client.query(q.query, q.values, q);
+          }
+        },
+        {
           logger: this.logger,
           cacheAndQueueDriver: this.options.cacheAndQueueDriver,
           redisPool: this.options.redisPool,
           // Centralized continueWaitTimeout that can be overridden in queueOptions
           continueWaitTimeout: this.options.continueWaitTimeout,
-          ...(typeof this.options.queueOptions === 'function' ?
-            this.options.queueOptions(dataSource) :
-            this.options.queueOptions
-          )
+          ...(await this.options.queueOptions(dataSource)),
         }
       );
     }
     return this.queue[dataSource];
+  }
+
+  private async csvQuery(client, q) {
+    const tableData = await client.downloadQueryResults(q.query, q.values, q);
+    const headers = tableData.types.map(c => c.name);
+    const writer = csvWriter({
+      headers,
+      sendHeaders: false,
+    });
+    tableData.rows.forEach(
+      row => writer.write(row)
+    );
+    writer.end();
+    const lines = await streamToArray(writer);
+    if (tableData.release) {
+      await tableData.release();
+    }
+    const rowCount = lines.length;
+    const csvRows = lines.join('');
+    return {
+      types: tableData.types,
+      csvRows,
+      rowCount,
+    };
   }
 
   public getExternalQueue() {
@@ -300,11 +363,18 @@ export class QueryCache {
     return queue;
   }
 
+  /**
+   * Returns registered queries queues hash table.
+   */
+  public getQueues(): {[dataSource: string]: QueryQueue} {
+    return this.queue;
+  }
+
   public startRenewCycle(query, values, cacheKeyQueries, expireSecs, cacheKey, renewalThreshold, options: {
     requestId?: string,
     skipRefreshKeyWaitForRenew?: boolean,
     external?: boolean,
-    dataSource: string
+    dataSource: string,
   }) {
     this.renewQuery(
       query, values, cacheKeyQueries, expireSecs, cacheKey, renewalThreshold, options
@@ -321,7 +391,8 @@ export class QueryCache {
     requestId?: string,
     skipRefreshKeyWaitForRenew?: boolean,
     external?: boolean,
-    dataSource: string
+    dataSource: string,
+    useCsvQuery?: boolean,
   }) {
     options = options || { dataSource: 'default' };
     return Promise.all(
@@ -348,7 +419,8 @@ export class QueryCache {
               waitForRenew: true,
               external: options.external,
               requestId: options.requestId,
-              dataSource: options.dataSource
+              dataSource: options.dataSource,
+              useCsvQuery: options.useCsvQuery,
             }
           ),
           refreshKeyValues: cacheKeyQueryResults,
@@ -379,7 +451,7 @@ export class QueryCache {
       dataSource: string
     }
   ) {
-    return cacheKeyQueries.map((q, i) => {
+    return cacheKeyQueries.map((q) => {
       const [query, values, queryOptions]: QueryTuple = Array.isArray(q) ? q : [q, [], {}];
 
       return this.cacheQueryResult(
@@ -416,6 +488,7 @@ export class QueryCache {
     waitForRenew?: boolean,
     forceNoCache?: boolean,
     useInMemory?: boolean,
+    useCsvQuery?: boolean,
   }) {
     options = options || { dataSource: 'default' };
     const { renewalThreshold } = options;
@@ -427,7 +500,8 @@ export class QueryCache {
         cacheKey,
         external: options.external,
         requestId: options.requestId,
-        dataSource: options.dataSource
+        dataSource: options.dataSource,
+        useCsvQuery: options.useCsvQuery,
       }).then(res => {
         const result = {
           time: (new Date()).getTime(),

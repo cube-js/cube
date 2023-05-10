@@ -19,7 +19,7 @@ export function convertTimeStrToMs(
 
   if (input.length > 1) {
     // eslint-disable-next-line default-case
-    switch (input.substr(-1).toLowerCase()) {
+    switch (input.slice(-1).toLowerCase()) {
       case 'h':
         return parseInt(input.slice(0, -1), 10) * 60 * 60;
       case 'm':
@@ -115,10 +115,12 @@ const variables: Record<string, (...args: any) => any> = {
     // It's true by default for development
     return process.env.NODE_ENV !== 'production';
   },
+  preAggregationsBuilder: () => get('CUBEJS_PRE_AGGREGATIONS_BUILDER').asBool(),
   gracefulShutdown: () => get('CUBEJS_GRACEFUL_SHUTDOWN')
     .asIntPositive(),
   dockerImageVersion: () => get('CUBEJS_DOCKER_IMAGE_VERSION')
     .asString(),
+  concurrency: () => get('CUBEJS_CONCURRENCY').asInt(),
   // It's only excepted for CI, nothing else.
   internalExceptions: () => get('INTERNAL_EXCEPTIONS_YOU_WILL_BE_FIRED')
     .default('false')
@@ -141,6 +143,9 @@ const variables: Record<string, (...args: any) => any> = {
     const value = process.env.CUBEJS_DB_POLL_MAX_INTERVAL || '5s';
     return convertTimeStrToMs(value, 'CUBEJS_DB_POLL_MAX_INTERVAL');
   },
+  maxPartitionsPerCube: () => get('CUBEJS_MAX_PARTITIONS_PER_CUBE')
+    .default('10000')
+    .asInt(),
   // Common db options
   dbName: ({ required }: { required?: boolean }) => get('CUBEJS_DB_NAME')
     .required(required)
@@ -149,6 +154,8 @@ const variables: Record<string, (...args: any) => any> = {
   dbExportBucketType: ({ supported }: { supported: ('s3' | 'gcp' | 'azure')[] }) => get('CUBEJS_DB_EXPORT_BUCKET_TYPE')
     .asEnum(supported),
   dbExportBucket: () => get('CUBEJS_DB_EXPORT_BUCKET')
+    .asString(),
+  dbExportBucketMountDir: () => get('CUBEJS_DB_EXPORT_BUCKET_MOUNT_DIR')
     .asString(),
   // Export bucket options for AWS S3
   dbExportBucketAwsKey: () => get('CUBEJS_DB_EXPORT_BUCKET_AWS_KEY')
@@ -170,6 +177,12 @@ const variables: Record<string, (...args: any) => any> = {
 
     return undefined;
   },
+  // Export bucket options for Azure
+  dbExportBucketAzureKey:
+    () => get('CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY').asString(),
+  // Redshift Driver
+  dbExportBucketRedshiftArn: () => get('CUBEJS_DB_EXPORT_BUCKET_REDSHIFT_ARN')
+    .asString(),
   // BigQuery Driver
   bigQueryLocation: () => get('CUBEJS_DB_BQ_LOCATION')
     .asString(),
@@ -186,8 +199,10 @@ const variables: Record<string, (...args: any) => any> = {
   databrickUrl: () => get('CUBEJS_DB_DATABRICKS_URL')
     .required()
     .asString(),
-  databrickAcceptPolicy: () => get('CUBEJS_DB_DATABRICKS_ACCEPT_POLICY')
+  databrickToken: () => get('CUBEJS_DB_DATABRICKS_TOKEN')
     .asString(),
+  databrickAcceptPolicy: () => get('CUBEJS_DB_DATABRICKS_ACCEPT_POLICY')
+    .asBoolStrict(),
   // Redis
   redisPoolMin: () => get('CUBEJS_REDIS_POOL_MIN')
     .default('2')
@@ -196,6 +211,9 @@ const variables: Record<string, (...args: any) => any> = {
     .default('1000')
     .asInt(),
   redisUseIORedis: () => get('CUBEJS_REDIS_USE_IOREDIS')
+    .default('false')
+    .asBoolStrict(),
+  allowUngroupedWithoutPrimaryKey: () => get('CUBEJS_ALLOW_UNGROUPED_WITHOUT_PRIMARY_KEY')
     .default('false')
     .asBoolStrict(),
   redisPassword: () => {
@@ -295,6 +313,9 @@ const variables: Record<string, (...args: any) => any> = {
   agentFlushInterval: () => get('CUBEJS_AGENT_FLUSH_INTERVAL')
     .default(1000)
     .asInt(),
+  agentMaxSockets: () => get('CUBEJS_AGENT_MAX_SOCKETS')
+    .default(100)
+    .asInt(),
   instanceId: () => get('CUBEJS_INSTANCE_ID')
     .asString(),
   telemetry: () => get('CUBEJS_TELEMETRY')
@@ -303,6 +324,14 @@ const variables: Record<string, (...args: any) => any> = {
   // SQL Interface
   sqlPort: () => {
     const port = asFalseOrPort(process.env.CUBEJS_SQL_PORT || 'false', 'CUBEJS_SQL_PORT');
+    if (port) {
+      return port;
+    }
+
+    return undefined;
+  },
+  pgSqlPort: () => {
+    const port = asFalseOrPort(process.env.CUBEJS_PG_SQL_PORT || 'false', 'CUBEJS_PG_SQL_PORT');
     if (port) {
       return port;
     }
@@ -322,6 +351,7 @@ const variables: Record<string, (...args: any) => any> = {
   },
   sqlUser: () => get('CUBEJS_SQL_USER').asString(),
   sqlPassword: () => get('CUBEJS_SQL_PASSWORD').asString(),
+  sqlSuperUser: () => get('CUBEJS_SQL_SUPER_USER').asString(),
   // Experiments & Preview flags
   livePreview: () => get('CUBEJS_LIVE_PREVIEW')
     .default('true')
@@ -330,17 +360,20 @@ const variables: Record<string, (...args: any) => any> = {
     .default('false')
     .asBoolStrict(),
   externalDefault: () => get('CUBEJS_EXTERNAL_DEFAULT')
-    .default('false')
+    .default('true')
     .asBoolStrict(),
-  scheduledRefreshDefault: () => get('CUBEJS_SCHEDULED_REFRESH_DEFAULT')
-    .default('false')
-    .asBoolStrict(),
+  scheduledRefreshDefault: () => get(
+    'CUBEJS_SCHEDULED_REFRESH_DEFAULT'
+  ).default('true').asBoolStrict(),
   previewFeatures: () => get('CUBEJS_PREVIEW_FEATURES')
     .default('false')
     .asBoolStrict(),
   batchingRowSplitCount: () => get('CUBEJS_BATCHING_ROW_SPLIT_COUNT')
     .default(256 * 1024)
     .asInt(),
+  maxSourceRowLimit: () => get('CUBEJS_MAX_SOURCE_ROW_LIMIT')
+    .default(200000)
+    .asInt()
 };
 
 type Vars = typeof variables;

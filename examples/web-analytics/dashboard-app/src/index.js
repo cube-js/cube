@@ -16,6 +16,15 @@ import CustomReportPage from "./pages/CustomReportPage";
 import CustomReportsOverviewPage from "./pages/CustomReportsOverviewPage";
 import CustomReportsBuilderPage from "./pages/CustomReportsBuilderPage";
 
+import createExampleWrapper from "@cube-dev/example-wrapper";
+
+const exampleDescription = {
+  title: "Web Analytics app",
+  text: `The example application uses Cube.js as the analytics backend, Snowplow for data collection, and Athena as the main data warehouse.<br>The frontend is built with React, Material UI, and Recharts.`,
+};
+
+createExampleWrapper(exampleDescription);
+
 ReactDOM.render(
   <Router>
     <App>

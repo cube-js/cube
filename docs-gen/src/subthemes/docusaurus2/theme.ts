@@ -64,7 +64,7 @@ export default class Docusaurus2Theme extends MarkdownTheme {
     this.getNavigation(renderer.project).children.forEach(rootNavigation => {
       rootNavigation.children.map(item => {
         url = item.url.replace('.md', '');
-        navKey = url.substr(0, url.indexOf('/'));
+        navKey = url.substring(0, url.indexOf('/'));
         if (navKey !== undefined && navKey.length) {
           navKey = navKey[0].toUpperCase() + navKey.slice(1);
         }

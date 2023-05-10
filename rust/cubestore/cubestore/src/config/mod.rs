@@ -11,6 +11,7 @@ use crate::config::processing_loop::ProcessingLoop;
 use crate::http::HttpServer;
 use crate::import::limits::ConcurrencyLimits;
 use crate::import::{ImportService, ImportServiceImpl};
+use crate::metastore::metastore_fs::{MetaStoreFs, RocksMetaStoreFs};
 use crate::metastore::{MetaStore, MetaStoreRpcClient, RocksMetaStore};
 use crate::mysql::{MySqlServer, SqlAuthDefaultImpl, SqlAuthService};
 use crate::queryplanner::query_executor::{QueryExecutor, QueryExecutorImpl};
@@ -25,11 +26,13 @@ use crate::sql::{SqlService, SqlServiceImpl};
 use crate::store::compaction::{CompactionService, CompactionServiceImpl};
 use crate::store::{ChunkDataStore, ChunkStore, WALDataStore, WALStore};
 use crate::streaming::{StreamingService, StreamingServiceImpl};
+use crate::table::parquet::{CubestoreParquetMetadataCache, CubestoreParquetMetadataCacheImpl};
 use crate::telemetry::{
     start_agent_event_loop, start_track_event_loop, stop_agent_event_loop, stop_track_event_loop,
 };
 use crate::CubeError;
 use datafusion::cube_ext;
+use datafusion::physical_plan::parquet::{LruParquetMetadataCache, NoopParquetMetadataCache};
 use futures::future::join_all;
 use log::Level;
 use log::{debug, error};
@@ -39,6 +42,7 @@ use simple_logger::SimpleLogger;
 use std::fmt::Display;
 use std::future::Future;
 use std::path::PathBuf;
+use std::pin::Pin;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::{env, fs};
@@ -54,7 +58,6 @@ pub struct CubeServices {
     pub rocks_meta_store: Option<Arc<RocksMetaStore>>,
     pub meta_store: Arc<dyn MetaStore>,
     pub cluster: Arc<ClusterImpl>,
-    pub remote_fs: Arc<QueueRemoteFs>,
 }
 
 #[derive(Clone)]
@@ -91,7 +94,7 @@ impl CubeServices {
         futures.push(cube_ext::spawn(async move {
             cluster.wait_processing_loops().await
         }));
-        let remote_fs = self.remote_fs.clone();
+        let remote_fs = self.injector.get_service_typed::<QueueRemoteFs>().await;
         futures.push(cube_ext::spawn(async move {
             QueueRemoteFs::wait_processing_loops(remote_fs.clone()).await
         }));
@@ -153,7 +156,8 @@ impl CubeServices {
         #[cfg(not(target_os = "windows"))]
         self.cluster.stop_processing_loops().await?;
 
-        self.remote_fs.stop_processing_loops()?;
+        let remote_fs = self.injector.get_service_typed::<QueueRemoteFs>().await;
+        remote_fs.stop_processing_loops()?;
         if let Some(rocks_meta) = &self.rocks_meta_store {
             rocks_meta.stop_processing_loops().await;
         }
@@ -286,6 +290,20 @@ pub trait ConfigObj: DIService {
 
     fn compaction_chunks_count_threshold(&self) -> u64;
 
+    fn compaction_chunks_max_lifetime_threshold(&self) -> u64;
+
+    fn compaction_in_memory_chunks_max_lifetime_threshold(&self) -> u64;
+
+    fn compaction_in_memory_chunks_size_limit(&self) -> u64;
+
+    fn compaction_in_memory_chunks_total_size_limit(&self) -> u64;
+
+    fn compaction_in_memory_chunks_count_threshold(&self) -> usize;
+
+    fn compaction_in_memory_chunks_ratio_threshold(&self) -> u64;
+
+    fn compaction_in_memory_chunks_ratio_check_threshold(&self) -> u64;
+
     fn wal_split_threshold(&self) -> u64;
 
     fn select_worker_pool_size(&self) -> usize;
@@ -302,7 +320,15 @@ pub trait ConfigObj: DIService {
 
     fn not_used_timeout(&self) -> u64;
 
+    fn in_memory_not_used_timeout(&self) -> u64;
+
     fn import_job_timeout(&self) -> u64;
+
+    fn meta_store_snapshot_interval(&self) -> u64;
+
+    fn meta_store_log_upload_interval(&self) -> u64;
+
+    fn gc_loop_interval(&self) -> u64;
 
     fn stale_stream_timeout(&self) -> u64;
 
@@ -335,6 +361,12 @@ pub trait ConfigObj: DIService {
     fn malloc_trim_every_secs(&self) -> u64;
 
     fn max_cached_queries(&self) -> usize;
+
+    fn metadata_cache_max_capacity_bytes(&self) -> u64;
+
+    fn metadata_cache_time_to_idle_secs(&self) -> u64;
+
+    fn dump_dir(&self) -> &Option<PathBuf>;
 }
 
 #[derive(Debug, Clone)]
@@ -343,8 +375,16 @@ pub struct ConfigObjImpl {
     pub max_partition_split_threshold: u64,
     pub compaction_chunks_total_size_threshold: u64,
     pub compaction_chunks_count_threshold: u64,
+    pub compaction_chunks_max_lifetime_threshold: u64,
+    pub compaction_in_memory_chunks_max_lifetime_threshold: u64,
+    pub compaction_in_memory_chunks_size_limit: u64,
+    pub compaction_in_memory_chunks_total_size_limit: u64,
+    pub compaction_in_memory_chunks_count_threshold: usize,
+    pub compaction_in_memory_chunks_ratio_threshold: u64,
+    pub compaction_in_memory_chunks_ratio_check_threshold: u64,
     pub wal_split_threshold: u64,
     pub data_dir: PathBuf,
+    pub dump_dir: Option<PathBuf>,
     pub store_provider: FileStoreProvider,
     pub select_worker_pool_size: usize,
     pub job_runners_count: usize,
@@ -354,7 +394,11 @@ pub struct ConfigObjImpl {
     pub query_timeout: u64,
     /// Must be set to 2*query_timeout in prod, only for overrides in tests.
     pub not_used_timeout: u64,
+    pub in_memory_not_used_timeout: u64,
     pub import_job_timeout: u64,
+    pub meta_store_log_upload_interval: u64,
+    pub meta_store_snapshot_interval: u64,
+    pub gc_loop_interval: u64,
     pub stale_stream_timeout: u64,
     pub select_workers: Vec<String>,
     pub worker_bind_address: Option<String>,
@@ -370,6 +414,8 @@ pub struct ConfigObjImpl {
     pub enable_startup_warmup: bool,
     pub malloc_trim_every_secs: u64,
     pub max_cached_queries: usize,
+    pub metadata_cache_max_capacity_bytes: u64,
+    pub metadata_cache_time_to_idle_secs: u64,
 }
 
 crate::di_service!(ConfigObjImpl, [ConfigObj]);
@@ -390,6 +436,34 @@ impl ConfigObj for ConfigObjImpl {
 
     fn compaction_chunks_count_threshold(&self) -> u64 {
         self.compaction_chunks_count_threshold
+    }
+
+    fn compaction_in_memory_chunks_size_limit(&self) -> u64 {
+        self.compaction_in_memory_chunks_size_limit
+    }
+
+    fn compaction_chunks_max_lifetime_threshold(&self) -> u64 {
+        self.compaction_chunks_max_lifetime_threshold
+    }
+
+    fn compaction_in_memory_chunks_max_lifetime_threshold(&self) -> u64 {
+        self.compaction_in_memory_chunks_max_lifetime_threshold
+    }
+
+    fn compaction_in_memory_chunks_total_size_limit(&self) -> u64 {
+        self.compaction_in_memory_chunks_total_size_limit
+    }
+
+    fn compaction_in_memory_chunks_count_threshold(&self) -> usize {
+        self.compaction_in_memory_chunks_count_threshold
+    }
+
+    fn compaction_in_memory_chunks_ratio_threshold(&self) -> u64 {
+        self.compaction_in_memory_chunks_ratio_threshold
+    }
+
+    fn compaction_in_memory_chunks_ratio_check_threshold(&self) -> u64 {
+        self.compaction_in_memory_chunks_ratio_check_threshold
     }
 
     fn wal_split_threshold(&self) -> u64 {
@@ -424,8 +498,24 @@ impl ConfigObj for ConfigObjImpl {
         self.not_used_timeout
     }
 
+    fn in_memory_not_used_timeout(&self) -> u64 {
+        self.in_memory_not_used_timeout
+    }
+
     fn import_job_timeout(&self) -> u64 {
         self.import_job_timeout
+    }
+
+    fn meta_store_snapshot_interval(&self) -> u64 {
+        self.meta_store_snapshot_interval
+    }
+
+    fn meta_store_log_upload_interval(&self) -> u64 {
+        self.meta_store_log_upload_interval
+    }
+
+    fn gc_loop_interval(&self) -> u64 {
+        self.gc_loop_interval
     }
 
     fn stale_stream_timeout(&self) -> u64 {
@@ -489,11 +579,16 @@ impl ConfigObj for ConfigObjImpl {
     fn max_cached_queries(&self) -> usize {
         self.max_cached_queries
     }
-}
+    fn metadata_cache_max_capacity_bytes(&self) -> u64 {
+        self.metadata_cache_max_capacity_bytes
+    }
+    fn metadata_cache_time_to_idle_secs(&self) -> u64 {
+        self.metadata_cache_time_to_idle_secs
+    }
 
-lazy_static! {
-    pub static ref WORKER_SERVICES: std::sync::RwLock<Option<WorkerServices>> =
-        std::sync::RwLock::new(None);
+    fn dump_dir(&self) -> &Option<PathBuf> {
+        &self.dump_dir
+    }
 }
 
 lazy_static! {
@@ -512,7 +607,7 @@ fn env_bool(name: &str, default: bool) -> bool {
         .unwrap_or(default)
 }
 
-fn env_parse<T>(name: &str, default: T) -> T
+pub fn env_parse<T>(name: &str, default: T) -> T
 where
     T: FromStr,
     T::Err: Display,
@@ -544,6 +639,9 @@ impl Config {
                     .ok()
                     .map(|v| PathBuf::from(v))
                     .unwrap_or(env::current_dir().unwrap().join(".cubestore").join("data")),
+                dump_dir: env::var("CUBESTORE_DUMP_DIR")
+                    .ok()
+                    .map(|v| PathBuf::from(v)),
                 partition_split_threshold: env_parse(
                     "CUBESTORE_PARTITION_SPLIT_THRESHOLD",
                     1048576 * 2,
@@ -556,6 +654,34 @@ impl Config {
                 compaction_chunks_total_size_threshold: env_parse(
                     "CUBESTORE_CHUNKS_TOTAL_SIZE_THRESHOLD",
                     1048576 * 2,
+                ),
+                compaction_chunks_max_lifetime_threshold: env_parse(
+                    "CUBESTORE_CHUNKS_MAX_LIFETIME_THRESHOLD",
+                    600,
+                ),
+                compaction_in_memory_chunks_max_lifetime_threshold: env_parse(
+                    "CUBESTORE_IN_MEMORY_CHUNKS_MAX_LIFETIME_THRESHOLD",
+                    60,
+                ),
+                compaction_in_memory_chunks_size_limit: env_parse(
+                    "CUBESTORE_IN_MEMORY_CHUNKS_SIZE_LIMIT",
+                    262_144 / 4,
+                ),
+                compaction_in_memory_chunks_total_size_limit: env_parse(
+                    "CUBESTORE_IN_MEMORY_CHUNKS_TOTAL_SIZE_LIMIT",
+                    262_144,
+                ),
+                compaction_in_memory_chunks_count_threshold: env_parse(
+                    "CUBESTORE_IN_MEMORY_CHUNKS_COUNT_THRESHOLD",
+                    10,
+                ),
+                compaction_in_memory_chunks_ratio_threshold: env_parse(
+                    "CUBESTORE_IN_MEMORY_CHUNKS_RATIO_THRESHOLD",
+                    3,
+                ),
+                compaction_in_memory_chunks_ratio_check_threshold: env_parse(
+                    "CUBESTORE_IN_MEMORY_CHUNKS_RATIO_CHECK_THRESHOLD",
+                    1000,
                 ),
                 store_provider: {
                     if let Ok(bucket_name) = env::var("CUBESTORE_S3_BUCKET") {
@@ -598,7 +724,11 @@ impl Config {
                 )),
                 query_timeout,
                 not_used_timeout: 2 * query_timeout,
+                in_memory_not_used_timeout: 30,
                 import_job_timeout: env_parse("CUBESTORE_IMPORT_JOB_TIMEOUT", 600),
+                meta_store_log_upload_interval: 30,
+                meta_store_snapshot_interval: 300,
+                gc_loop_interval: 60,
                 stale_stream_timeout: 60,
                 select_workers: env::var("CUBESTORE_WORKERS")
                     .ok()
@@ -625,6 +755,14 @@ impl Config {
                 enable_startup_warmup: env_bool("CUBESTORE_STARTUP_WARMUP", true),
                 malloc_trim_every_secs: env_parse("CUBESTORE_MALLOC_TRIM_EVERY_SECS", 30),
                 max_cached_queries: env_parse("CUBESTORE_MAX_CACHED_QUERIES", 10_000),
+                metadata_cache_max_capacity_bytes: env_parse(
+                    "CUBESTORE_METADATA_CACHE_MAX_CAPACITY_BYTES",
+                    0,
+                ),
+                metadata_cache_time_to_idle_secs: env_parse(
+                    "CUBESTORE_METADATA_CACHE_TIME_TO_IDLE_SECS",
+                    0,
+                ),
             }),
         }
     }
@@ -637,10 +775,18 @@ impl Config {
                 data_dir: env::current_dir()
                     .unwrap()
                     .join(format!("{}-local-store", name)),
+                dump_dir: None,
                 partition_split_threshold: 20,
                 max_partition_split_threshold: 20,
                 compaction_chunks_count_threshold: 1,
                 compaction_chunks_total_size_threshold: 10,
+                compaction_chunks_max_lifetime_threshold: 600,
+                compaction_in_memory_chunks_max_lifetime_threshold: 60,
+                compaction_in_memory_chunks_size_limit: 262_144 / 4,
+                compaction_in_memory_chunks_total_size_limit: 262_144,
+                compaction_in_memory_chunks_count_threshold: 10,
+                compaction_in_memory_chunks_ratio_threshold: 3,
+                compaction_in_memory_chunks_ratio_check_threshold: 1000,
                 store_provider: FileStoreProvider::Filesystem {
                     remote_dir: Some(
                         env::current_dir()
@@ -655,6 +801,7 @@ impl Config {
                 http_bind_address: None,
                 query_timeout,
                 not_used_timeout: 2 * query_timeout,
+                in_memory_not_used_timeout: 30,
                 import_job_timeout: 600,
                 stale_stream_timeout: 60,
                 select_workers: Vec::new(),
@@ -672,6 +819,11 @@ impl Config {
                 enable_startup_warmup: true,
                 malloc_trim_every_secs: 0,
                 max_cached_queries: 10_000,
+                metadata_cache_max_capacity_bytes: 0,
+                metadata_cache_time_to_idle_secs: 1_000,
+                meta_store_log_upload_interval: 30,
+                meta_store_snapshot_interval: 300,
+                gc_loop_interval: 60,
             }),
         }
     }
@@ -691,22 +843,60 @@ impl Config {
     where
         T: Future<Output = ()> + Send,
     {
-        self.start_test_with_options(true, test_fn).await
+        self.start_test_with_options::<_, T, _, _>(
+            true,
+            Option::<
+                Box<
+                    dyn FnOnce(Arc<Injector>) -> Pin<Box<dyn Future<Output = ()> + Send>>
+                        + Send
+                        + Sync,
+                >,
+            >::None,
+            test_fn,
+        )
+        .await
     }
 
     pub async fn start_test_worker<T>(&self, test_fn: impl FnOnce(CubeServices) -> T)
     where
         T: Future<Output = ()> + Send,
     {
-        self.start_test_with_options(false, test_fn).await
+        self.start_test_with_options::<_, T, _, _>(
+            false,
+            Option::<
+                Box<
+                    dyn FnOnce(Arc<Injector>) -> Pin<Box<dyn Future<Output = ()> + Send>>
+                        + Send
+                        + Sync,
+                >,
+            >::None,
+            test_fn,
+        )
+        .await
     }
 
-    pub async fn start_test_with_options<T>(
+    pub async fn start_with_injector_override<T1, T2>(
+        &self,
+        configure_injector: impl FnOnce(Arc<Injector>) -> T1,
+        test_fn: impl FnOnce(CubeServices) -> T2,
+    ) where
+        T1: Future<Output = ()> + Send,
+        T2: Future<Output = ()> + Send,
+    {
+        self.start_test_with_options(true, Some(configure_injector), test_fn)
+            .await
+    }
+
+    pub async fn start_test_with_options<T1, T2, I, F>(
         &self,
         clean_remote: bool,
-        test_fn: impl FnOnce(CubeServices) -> T,
+        configure_injector: Option<I>,
+        test_fn: F,
     ) where
-        T: Future<Output = ()> + Send,
+        T1: Future<Output = ()> + Send,
+        T2: Future<Output = ()> + Send,
+        I: FnOnce(Arc<Injector>) -> T1,
+        F: FnOnce(CubeServices) -> T2,
     {
         if !*TEST_LOGGING_INITIALIZED.read().await {
             let mut initialized = TEST_LOGGING_INITIALIZED.write().await;
@@ -731,7 +921,11 @@ impl Config {
             }
         }
         {
-            let services = self.configure().await;
+            self.configure_injector().await;
+            if let Some(configure_injector) = configure_injector {
+                configure_injector(self.injector.clone()).await;
+            }
+            let services = self.cube_services().await;
             services.start_processing_loops().await.unwrap();
 
             // Should be long enough even for CI.
@@ -892,18 +1086,28 @@ impl Config {
                 })
                 .await;
         } else {
+            self.injector
+                .register_typed_with_default::<dyn MetaStoreFs, RocksMetaStoreFs, _, _>(
+                    async move |i| {
+                        // TODO metastore works with non queue remote fs as it requires loops to be started prior to load_from_remote call
+                        let original_remote_fs = i.get_service("original_remote_fs").await;
+                        RocksMetaStoreFs::new(original_remote_fs)
+                    },
+                )
+                .await;
             let path = self.meta_store_path().to_str().unwrap().to_string();
             self.injector
                 .register_typed_with_default::<dyn MetaStore, RocksMetaStore, _, _>(
                     async move |i| {
-                        let meta_store = RocksMetaStore::load_from_remote(
-                            &path,
-                            // TODO metastore works with non queue remote fs as it requires loops to be started prior to load_from_remote call
-                            i.get_service("original_remote_fs").await,
-                            i.get_service_typed::<dyn ConfigObj>().await,
-                        )
-                        .await
-                        .unwrap();
+                        let config = i.get_service_typed::<dyn ConfigObj>().await;
+                        let metastore_fs = i.get_service_typed::<dyn MetaStoreFs>().await;
+                        let meta_store = if let Some(dump_dir) = config.clone().dump_dir() {
+                            RocksMetaStore::load_from_dump(&path, dump_dir, metastore_fs, config)
+                                .await
+                                .unwrap()
+                        } else {
+                            metastore_fs.load_from_remote(&path, config).await.unwrap()
+                        };
                         meta_store.add_listener(event_sender).await;
                         meta_store
                     },
@@ -933,6 +1137,21 @@ impl Config {
                     i.get_service_typed::<dyn ConfigObj>()
                         .await
                         .wal_split_threshold() as usize,
+                )
+            })
+            .await;
+
+        self.injector
+            .register_typed::<dyn CubestoreParquetMetadataCache, _, _, _>(async move |i| {
+                let c = i.get_service_typed::<dyn ConfigObj>().await;
+                CubestoreParquetMetadataCacheImpl::new(
+                    match c.metadata_cache_max_capacity_bytes() {
+                        0 => NoopParquetMetadataCache::new(),
+                        max_cached_metadata => LruParquetMetadataCache::new(
+                            max_cached_metadata,
+                            Duration::from_secs(c.metadata_cache_time_to_idle_secs()),
+                        ),
+                    },
                 )
             })
             .await;
@@ -988,8 +1207,8 @@ impl Config {
             .await;
 
         self.injector
-            .register_typed::<dyn QueryExecutor, _, _, _>(async move |_| {
-                Arc::new(QueryExecutorImpl)
+            .register_typed_with_default::<dyn QueryExecutor, _, _, _>(async move |i| {
+                QueryExecutorImpl::new(i.get_service_typed().await)
             })
             .await;
 
@@ -1099,24 +1318,18 @@ impl Config {
             },
             meta_store: self.injector.get_service_typed().await,
             cluster: self.injector.get_service_typed().await,
-            remote_fs: self.injector.get_service_typed().await,
+        }
+    }
+
+    pub async fn worker_services(&self) -> WorkerServices {
+        WorkerServices {
+            query_executor: self.injector.get_service_typed().await,
         }
     }
 
     pub async fn configure(&self) -> CubeServices {
         self.configure_injector().await;
         self.cube_services().await
-    }
-
-    pub fn configure_worker_services() {
-        let mut services = WORKER_SERVICES.write().unwrap();
-        *services = Some(WorkerServices {
-            query_executor: Arc::new(QueryExecutorImpl),
-        })
-    }
-
-    pub fn current_worker_services() -> WorkerServices {
-        WORKER_SERVICES.read().unwrap().as_ref().unwrap().clone()
     }
 }
 

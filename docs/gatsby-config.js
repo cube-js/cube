@@ -6,7 +6,7 @@ const PACKAGE_VERSION = require('../lerna.json').version;
 
 const config = {
   siteMetadata: {
-    title: 'Cube.js Docs',
+    title: 'Cube Docs',
     siteUrl: `https://cube.dev`,
   },
   pathPrefix: process.env.PATH_PREFIX,
@@ -32,9 +32,10 @@ const config = {
       },
     },
     {
-      resolve: `gatsby-plugin-google-analytics`,
+      resolve: `gatsby-plugin-google-tagmanager`,
       options: {
-        trackingId: 'UA-70480064-3',
+        id: 'GTM-52W7VM2',
+        routeChangeEventName: 'pageview'
       },
     },
     {
@@ -85,12 +86,6 @@ const config = {
       },
     },
     {
-      resolve: 'gatsby-redirect-from',
-      options: {
-        query: 'allMdx',
-      },
-    },
-    {
       resolve: 'gatsby-plugin-react-svg',
       options: {
         rule: {
@@ -98,7 +93,7 @@ const config = {
         },
       },
     },
-    'gatsby-plugin-meta-redirect',
+    'gatsby-plugin-netlify'
     // 'gatsby-plugin-percy',
   ],
 };

@@ -5,7 +5,6 @@ import { CubeProvider } from '@cubejs-client/react';
 import theme from './theme';
 import 'typeface-roboto';
 import { Main } from './layouts';
-import palette from './theme/palette';
 
 const cubejsApi = cubejs(process.env.REACT_APP_CUBEJS_TOKEN, {
   apiUrl: process.env.REACT_APP_API_URL
@@ -13,9 +12,7 @@ const cubejsApi = cubejs(process.env.REACT_APP_CUBEJS_TOKEN, {
 
 const useStyles = makeStyles((theme) => ({
   root: {
-    flexGrow: 1,
-    margin: '-8px',
-    backgroundColor: palette.primary.light,
+    padding: 32
   },
 }));
 

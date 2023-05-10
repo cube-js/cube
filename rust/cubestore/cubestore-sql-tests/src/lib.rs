@@ -1,10 +1,11 @@
 #![feature(async_closure)]
 #![feature(test)]
 
-pub use crate::tests::TestFn;
+pub use crate::benches::cubestore_benches;
+pub use crate::tests::{to_rows, TestFn};
 extern crate test;
 use async_trait::async_trait;
-use cubestore::sql::{QueryPlans, SqlService};
+use cubestore::sql::{QueryPlans, SqlQueryContext, SqlService};
 use cubestore::store::DataFrame;
 use cubestore::CubeError;
 use std::env;
@@ -14,6 +15,8 @@ use test::TestFn::DynTestFn;
 use test::{ShouldPanic, TestDesc, TestDescAndFn, TestName, TestType};
 use tests::sql_tests;
 
+mod benches;
+mod files;
 #[cfg(not(target_os = "windows"))]
 pub mod multiproc;
 #[allow(unused_parens, non_snake_case)]
@@ -23,6 +26,11 @@ mod tests;
 #[async_trait]
 pub trait SqlClient: Send + Sync {
     async fn exec_query(&self, query: &str) -> Result<Arc<DataFrame>, CubeError>;
+    async fn exec_query_with_context(
+        &self,
+        context: SqlQueryContext,
+        query: &str,
+    ) -> Result<Arc<DataFrame>, CubeError>;
     async fn plan_query(&self, query: &str) -> Result<QueryPlans, CubeError>;
 }
 
@@ -40,7 +48,7 @@ pub fn run_sql_tests(
                     name: TestName::DynTestName(format!("cubesql::{}::{}", prefix, name)),
                     ignore: false,
                     should_panic: ShouldPanic::No,
-                    allow_fail: false,
+                    ignore_message: None,
                     compile_fail: false,
                     no_run: false,
                     test_type: TestType::IntegrationTest,
@@ -61,6 +69,14 @@ pub fn run_sql_tests(
 impl SqlClient for Arc<dyn SqlService> {
     async fn exec_query(&self, query: &str) -> Result<Arc<DataFrame>, CubeError> {
         self.as_ref().exec_query(query).await
+    }
+
+    async fn exec_query_with_context(
+        &self,
+        context: SqlQueryContext,
+        query: &str,
+    ) -> Result<Arc<DataFrame>, CubeError> {
+        self.as_ref().exec_query_with_context(context, query).await
     }
 
     async fn plan_query(&self, query: &str) -> Result<QueryPlans, CubeError> {

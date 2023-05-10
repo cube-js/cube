@@ -4,12 +4,16 @@ use neon::prelude::*;
 use async_trait::async_trait;
 use cubeclient::models::{V1Error, V1LoadRequestQuery, V1LoadResponse, V1MetaResponse};
 use cubesql::{
-    compile::TenantContext, di_service, mysql::AuthContext, schema::SchemaService, CubeError,
+    di_service,
+    sql::AuthContextRef,
+    transport::{LoadRequestMeta, MetaContext, TransportService},
+    CubeError,
 };
 use serde_derive::Serialize;
 use std::sync::Arc;
 use uuid::Uuid;
 
+use crate::auth::NativeAuthContext;
 use crate::{auth::TransportRequest, channel::call_js_with_channel_as_callback};
 
 #[derive(Debug)]
@@ -30,29 +34,44 @@ impl NodeBridgeTransport {
 }
 
 #[derive(Debug, Serialize)]
+struct SessionContext {
+    user: Option<String>,
+    superuser: bool,
+}
+
+#[derive(Debug, Serialize)]
 struct LoadRequest {
     request: TransportRequest,
-    user: Option<String>,
     query: V1LoadRequestQuery,
+    session: SessionContext,
 }
 
 #[derive(Debug, Serialize)]
 struct MetaRequest {
     request: TransportRequest,
-    user: Option<String>,
+    session: SessionContext,
 }
 
 #[async_trait]
-impl SchemaService for NodeBridgeTransport {
-    async fn get_ctx_for_tenant(&self, ctx: &AuthContext) -> Result<TenantContext, CubeError> {
+impl TransportService for NodeBridgeTransport {
+    async fn meta(&self, ctx: AuthContextRef) -> Result<Arc<MetaContext>, CubeError> {
         trace!("[transport] Meta ->");
+
+        let native_auth = ctx
+            .as_any()
+            .downcast_ref::<NativeAuthContext>()
+            .expect("Unable to cast AuthContext to NativeAuthContext");
 
         let request_id = Uuid::new_v4().to_string();
         let extra = serde_json::to_string(&MetaRequest {
             request: TransportRequest {
                 id: format!("{}-span-1", request_id),
+                meta: None,
             },
-            user: Some(ctx.access_token.clone()),
+            session: SessionContext {
+                user: native_auth.user.clone(),
+                superuser: native_auth.superuser,
+            },
         })?;
         let response = call_js_with_channel_as_callback::<V1MetaResponse>(
             self.channel.clone(),
@@ -62,17 +81,23 @@ impl SchemaService for NodeBridgeTransport {
         .await?;
         trace!("[transport] Meta <- {:?}", response);
 
-        Ok(TenantContext {
-            cubes: response.cubes.unwrap_or_default(),
-        })
+        Ok(Arc::new(MetaContext::new(
+            response.cubes.unwrap_or_default(),
+        )))
     }
 
-    async fn request(
+    async fn load(
         &self,
         query: V1LoadRequestQuery,
-        ctx: &AuthContext,
+        ctx: AuthContextRef,
+        meta: LoadRequestMeta,
     ) -> Result<V1LoadResponse, CubeError> {
         trace!("[transport] Request ->");
+
+        let native_auth = ctx
+            .as_any()
+            .downcast_ref::<NativeAuthContext>()
+            .expect("Unable to cast AuthContext to NativeAuthContext");
 
         let request_id = Uuid::new_v4().to_string();
         let mut span_counter: u32 = 1;
@@ -81,9 +106,13 @@ impl SchemaService for NodeBridgeTransport {
             let extra = serde_json::to_string(&LoadRequest {
                 request: TransportRequest {
                     id: format!("{}-span-{}", request_id, span_counter),
+                    meta: Some(meta.clone()),
                 },
-                user: Some(ctx.access_token.clone()),
                 query: query.clone(),
+                session: SessionContext {
+                    user: native_auth.user.clone(),
+                    superuser: native_auth.superuser,
+                },
             })?;
 
             let response: serde_json::Value = call_js_with_channel_as_callback(
@@ -126,4 +155,4 @@ impl SchemaService for NodeBridgeTransport {
     }
 }
 
-di_service!(NodeBridgeTransport, [SchemaService]);
+di_service!(NodeBridgeTransport, [TransportService]);

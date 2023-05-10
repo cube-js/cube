@@ -1,4 +1,3 @@
-{{- if .Values.service.enabled }}
 apiVersion: v1
 kind: Service
 metadata:
@@ -9,40 +8,20 @@ metadata:
     {{- if .Values.commonLabels }}
     {{- toYaml .Values.commonLabels | nindent 4 }}
     {{- end }}
-  {{- if or .Values.commonAnnotations .Values.service.annotations }}
+  {{- if .Values.commonAnnotations }}
   annotations:
-   {{- if .Values.commonAnnotations }}
     {{- toYaml .Values.commonAnnotations | nindent 4 }}
-    {{- end }}
-    {{- if .Values.service.annotations }}
-    {{- toYaml .Values.service.annotations | nindent 4 }}
-    {{- end }}
   {{- end }}
 spec:
-  type: {{ .Values.service.type }}
-  {{ if eq .Values.service.type "LoadBalancer" }}
-  externalTrafficPolicy: {{ .Values.service.externalTrafficPolicy }}
-  {{- end }}
-  {{- if and (eq .Values.service.type "LoadBalancer") .Values.service.loadBalancerIP }}
-  loadBalancerIP: {{ .Values.service.loadBalancerIP }}
-  {{- end }}
-  {{- if and (eq .Values.service.type "LoadBalancer") .Values.service.loadBalancerSourceRanges }}
-  loadBalancerSourceRanges:
-    {{- toYaml .Values.service.loadBalancerSourceRanges | nindent 4 }}
-  {{- end }}
-  {{- if and (eq .Values.service.type "ClusterIP") .Values.service.clusterIP }}
-  clusterIP: {{ .Values.service.clusterIP }}
-  {{- end }}
   ports:
     - name: http
-      port: {{ .Values.service.port }}
+      port: {{ .Values.config.apiPort }}
       targetPort: http
-      {{- if and (or (eq .Values.service.type "NodePort") (eq .Values.service.type "LoadBalancer")) .Values.service.nodePort }}
-      nodePort: {{ .Values.service.nodePort }}
-      {{- else if eq .Values.service.type "ClusterIP" }}
-      nodePort: null
-      {{- end }}
+    {{- if .Values.config.sqlPort }}
+    - name: sql
+      port: {{ .Values.config.sqlPort }}
+      targetPort: sql
+    {{- end}}
   selector:
     app.kubernetes.io/component: master
     {{- include "cubejs.selectorLabels" . | nindent 4 }}
-{{- end }}

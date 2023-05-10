@@ -1,5 +1,6 @@
 ---
-title: Developer Playground
+title: Developer Playground in Cube Cloud
+menuTitle: Developer Playground
 permalink: /cloud/dev-tools/dev-playground
 category: Developer Tools
 menuOrder: 2
@@ -25,4 +26,4 @@ API will restart and its status will be visible in the Playground:
   />
 </div>
 
-[ref-devtools-ide]: /cloud/cube-ide
+[ref-devtools-ide]: /cloud/dev-tools/cube-ide

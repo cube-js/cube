@@ -1,6 +1,5 @@
-import { BaseDriver } from '@cubejs-backend/query-orchestrator';
+import { BaseDriver, TableQueryResult } from '@cubejs-backend/base-driver';
 import { getEnv } from '@cubejs-backend/shared';
-
 import { DruidClient, DruidClientBaseConfiguration } from './DruidClient';
 import { DruidQuery } from './DruidQuery';
 
@@ -15,6 +14,13 @@ export class DruidDriver extends BaseDriver {
 
   public static dialectClass() {
     return DruidQuery;
+  }
+
+  /**
+   * Returns default concurrency value.
+   */
+  public static getDefaultConcurrency(): number {
+    return 2;
   }
 
   public constructor(config?: DruidDriverConfiguration) {
@@ -52,7 +58,7 @@ export class DruidDriver extends BaseDriver {
     //
   }
 
-  public async query(query: string, values: unknown[] = []): Promise<Array<unknown>> {
+  public async query<R = unknown>(query: string, values: unknown[] = []): Promise<Array<R>> {
     return this.client.query(query, this.normalizeQueryValues(values));
   }
 
@@ -73,7 +79,7 @@ export class DruidDriver extends BaseDriver {
   }
 
   public async getTablesQuery(schemaName: string) {
-    return this.query('SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = ?', [
+    return this.query<TableQueryResult>('SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = ?', [
       schemaName
     ]);
   }

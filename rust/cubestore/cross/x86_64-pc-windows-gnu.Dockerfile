@@ -2,11 +2,12 @@ FROM ubuntu:20.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get update && \
-    apt-get install --assume-yes -y curl pkg-config wget llvm libclang-dev gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 binutils-mingw-w64-x86-64 binutils make git automake autoconf ca-certificates gcc g++ mingw-w64-x86-64-dev
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install --assume-yes -y curl pkg-config wget llvm libclang-dev gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 binutils-mingw-w64-x86-64 binutils make git automake autoconf ca-certificates gcc g++ mingw-w64-x86-64-dev \
+    && rm -rf /var/lib/apt/lists/*;
 
 # https://www.openssl.org/source/old/1.1.1/
-ARG OPENSSL_VERSION=1.1.1h
+ARG OPENSSL_VERSION=1.1.1l
 
 RUN wget https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz -O - | tar -xz
 WORKDIR /openssl-${OPENSSL_VERSION}

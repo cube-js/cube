@@ -6,8 +6,9 @@ import * as moment from 'moment';
 import {
   BaseDriver,
   DownloadQueryResultsOptions, DownloadTableMemoryData, DriverInterface,
-  GenericDataBaseType, IndexesSQL, TableStructure, StreamOptions, StreamTableDataWithTypes, QueryOptions,
-} from '@cubejs-backend/query-orchestrator';
+  GenericDataBaseType, IndexesSQL, TableStructure, StreamOptions,
+  StreamTableDataWithTypes, QueryOptions, DownloadQueryResultsResult,
+} from '@cubejs-backend/base-driver';
 import { QueryStream } from './QueryStream';
 
 const GenericTypeToPostgres: Record<GenericDataBaseType, string> = {
@@ -44,7 +45,7 @@ const timestampDataTypes = [
 const timestampTypeParser = (val: string) => moment.utc(val).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
 const hllTypeParser = (val: string) => Buffer.from(
   // Postgres uses prefix as \x for encoding
-  val.substr(2),
+  val.slice(2),
   'hex'
 ).toString('base64');
 
@@ -52,10 +53,19 @@ export type PostgresDriverConfiguration = Partial<PoolConfig> & {
   storeTimezone?: string,
   executionTimeout?: number,
   readOnly?: boolean,
+} & {
+  maxPoolSize?: number
 };
 
 export class PostgresDriver<Config extends PostgresDriverConfiguration = PostgresDriverConfiguration>
   extends BaseDriver implements DriverInterface {
+  /**
+   * Returns default concurrency value.
+   */
+  public static getDefaultConcurrency(): number {
+    return 2;
+  }
+
   protected readonly pool: Pool;
 
   protected readonly config: Partial<Config>;
@@ -66,7 +76,9 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     super();
 
     this.pool = new Pool({
-      max: process.env.CUBEJS_DB_MAX_POOL && parseInt(process.env.CUBEJS_DB_MAX_POOL, 10) || 8,
+      max:
+        process.env.CUBEJS_DB_MAX_POOL && parseInt(process.env.CUBEJS_DB_MAX_POOL, 10) ||
+        config.maxPoolSize || 8,
       idleTimeoutMillis: 30000,
       host: process.env.CUBEJS_DB_HOST,
       database: process.env.CUBEJS_DB_NAME,
@@ -135,8 +147,8 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     try {
       await this.pool.query('SELECT $1::int AS number', ['1']);
     } catch (e) {
-      if (e.toString().indexOf('no pg_hba.conf entry for host') !== -1) {
-        throw new Error(`Please use CUBEJS_DB_SSL=true to connect: ${e.toString()}`);
+      if ((e as Error).toString().indexOf('no pg_hba.conf entry for host') !== -1) {
+        throw new Error(`Please use CUBEJS_DB_SSL=true to connect: ${(e as Error).toString()}`);
       }
 
       throw e;
@@ -145,8 +157,21 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
 
   protected async loadUserDefinedTypes(conn: PoolClient): Promise<void> {
     if (!this.userDefinedTypes) {
+      // Postgres enum types defined as typcategory = 'E' these can be assumed
+      // to be of type varchar for the drivers purposes.
+      // TODO: if full implmentation the constraints can be looked up via pg_enum
+      // https://www.postgresql.org/docs/9.1/catalog-pg-enum.html
       const customTypes = await conn.query(
-        'SELECT oid, typname FROM pg_type WHERE typcategory = \'U\'',
+        `SELECT
+            oid,
+            CASE
+                WHEN typcategory = 'E' THEN 'varchar'
+                ELSE typname
+            END
+        FROM
+            pg_type
+        WHERE
+            typcategory in ('U', 'E')`,
         []
       );
 
@@ -237,12 +262,13 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   public async query<R = unknown>(query: string, values: unknown[], options?: QueryOptions): Promise<R[]> {
     const result = await this.queryResponse(query, values);
     return result.rows;
   }
 
-  public async downloadQueryResults(query: string, values: unknown[], options: DownloadQueryResultsOptions) {
+  public async downloadQueryResults(query: string, values: unknown[], options: DownloadQueryResultsOptions): Promise<DownloadQueryResultsResult> {
     if (options.streamImport) {
       return this.stream(query, values, options);
     }

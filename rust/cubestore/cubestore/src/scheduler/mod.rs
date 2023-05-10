@@ -1,9 +1,11 @@
 use crate::cluster::{pick_worker_by_ids, Cluster};
 use crate::config::ConfigObj;
-use crate::metastore::job::{Job, JobType};
+use crate::metastore::job::{Job, JobStatus, JobType};
 use crate::metastore::partition::partition_file_name;
 use crate::metastore::table::Table;
-use crate::metastore::{IdRow, MetaStore, MetaStoreEvent, Partition, RowKey, TableId};
+use crate::metastore::{
+    deactivate_table_on_corrupt_data, IdRow, MetaStore, MetaStoreEvent, Partition, RowKey, TableId,
+};
 use crate::remotefs::RemoteFs;
 use crate::store::{ChunkStore, WALStore};
 use crate::util::time_span::warn_long_fut;
@@ -45,7 +47,12 @@ impl SchedulerImpl {
         config: Arc<dyn ConfigObj>,
     ) -> SchedulerImpl {
         let cancel_token = CancellationToken::new();
-        let gc_loop = DataGCLoop::new(meta_store.clone(), remote_fs.clone(), cancel_token.clone());
+        let gc_loop = DataGCLoop::new(
+            meta_store.clone(),
+            remote_fs.clone(),
+            config.clone(),
+            cancel_token.clone(),
+        );
         SchedulerImpl {
             meta_store,
             cluster,
@@ -287,7 +294,12 @@ impl SchedulerImpl {
         let all_inactive_chunks = self.meta_store.all_inactive_chunks().await?;
 
         for chunk in all_inactive_chunks.iter() {
-            let deadline = Instant::now() + Duration::from_secs(self.config.not_used_timeout());
+            let seconds = if chunk.get_row().in_memory() {
+                self.config.in_memory_not_used_timeout()
+            } else {
+                self.config.not_used_timeout()
+            };
+            let deadline = Instant::now() + Duration::from_secs(seconds);
             self.gc_loop
                 .send(GCTimedTask {
                     deadline,
@@ -393,13 +405,22 @@ impl SchedulerImpl {
                     .await?;
                 if chunk.get_row().active() {
                     if partition.get_row().is_active() {
+                        if chunk.get_row().in_memory() {
+                            self.schedule_compaction_in_memory_chunks_if_needed(&partition)
+                                .await
+                                .unwrap();
+                        }
                         self.schedule_compaction_if_needed(&partition).await?;
                     } else {
                         self.schedule_repartition(&partition).await?;
                     }
                 } else {
-                    let deadline =
-                        Instant::now() + Duration::from_secs(self.config.not_used_timeout());
+                    let seconds = if chunk.get_row().in_memory() {
+                        self.config.in_memory_not_used_timeout()
+                    } else {
+                        self.config.not_used_timeout()
+                    };
+                    let deadline = Instant::now() + Duration::from_secs(seconds);
                     self.gc_loop
                         .send(GCTimedTask {
                             deadline,
@@ -433,19 +454,30 @@ impl SchedulerImpl {
                     .free_memory_chunk(&node_name, chunk.get_id())
                     .await?;
             } else if chunk.get_row().uploaded() {
-                self.remote_fs
-                    .delete_file(
-                        ChunkStore::chunk_remote_path(chunk.get_id(), chunk.get_row().suffix())
-                            .as_str(),
-                    )
-                    .await?
+                let file_name =
+                    ChunkStore::chunk_remote_path(chunk.get_id(), chunk.get_row().suffix());
+                let deadline = Instant::now()
+                    + Duration::from_secs(self.config.meta_store_snapshot_interval() * 2);
+                self.gc_loop
+                    .send(GCTimedTask {
+                        deadline,
+                        task: GCTask::RemoveRemoteFile(file_name),
+                    })
+                    .await?;
             }
         }
         if let MetaStoreEvent::DeletePartition(partition) = &event {
             // remove file only if partition is active otherwise it should be removed when it's deactivated
             if partition.get_row().is_active() {
                 if let Some(file_name) = partition.get_row().get_full_name(partition.get_id()) {
-                    self.remote_fs.delete_file(file_name.as_str()).await?;
+                    let deadline = Instant::now()
+                        + Duration::from_secs(self.config.meta_store_snapshot_interval() * 2);
+                    self.gc_loop
+                        .send(GCTimedTask {
+                            deadline,
+                            task: GCTask::RemoveRemoteFile(file_name),
+                        })
+                        .await?;
                 }
             }
         }
@@ -467,11 +499,30 @@ impl SchedulerImpl {
                 }
             }
         }
+        if let MetaStoreEvent::UpdateJob(_, new_job) = &event {
+            match new_job.get_row().job_type() {
+                JobType::TableImportCSV(location) if Table::is_stream_location(location) => {
+                    match new_job.get_row().status() {
+                        JobStatus::Error(e) if e.contains("Stale stream timeout") => {
+                            log::info!("Removing stale stream job: {:?}", new_job);
+                            self.meta_store.delete_job(new_job.get_id()).await?;
+                            self.reconcile_table_imports().await?;
+                        }
+                        _ => {}
+                    }
+                }
+                _ => {}
+            }
+        }
         if let MetaStoreEvent::DeleteJob(job) = event {
             match job.get_row().job_type() {
-                JobType::Repartition => match job.get_row().row_reference() {
-                    RowKey::Table(TableId::Partitions, p) => {
-                        let p = self.meta_store.get_partition(*p).await?;
+                JobType::RepartitionChunk => match job.get_row().row_reference() {
+                    RowKey::Table(TableId::Chunks, c) => {
+                        let c = self.meta_store.get_chunk(*c).await?;
+                        let p = self
+                            .meta_store
+                            .get_partition(c.get_row().get_partition_id())
+                            .await?;
                         self.schedule_repartition_if_needed(&p).await?
                     }
                     _ => panic!(
@@ -529,28 +580,51 @@ impl SchedulerImpl {
             .filter(|c| !c.get_row().in_memory())
             .collect::<Vec<_>>();
 
-        let in_memory_chunks = all_chunks
-            .iter()
-            .filter(|c| c.get_row().in_memory())
-            .collect::<Vec<_>>();
-        let min_in_memory_created_at = in_memory_chunks
+        let min_created_at = chunks
             .iter()
             .filter_map(|c| c.get_row().created_at().clone())
             .min();
-        let max_created_at = chunks
-            .iter()
-            .filter_map(|c| c.get_row().created_at().clone())
-            .max();
         let check_row_counts = partition.get_row().multi_partition_id().is_none();
         if check_row_counts && chunk_sizes > self.config.compaction_chunks_total_size_threshold()
-            || chunks.len()
-            > self.config.compaction_chunks_count_threshold() as usize
-            // TODO config
-            || in_memory_chunks.len() > 100
-            || min_in_memory_created_at.map(|min| Utc::now().signed_duration_since(min).num_seconds() > 60).unwrap_or(false)
-            || max_created_at.map(|min| Utc::now().signed_duration_since(min).num_seconds() > 600).unwrap_or(false)
+            || chunks.len() > self.config.compaction_chunks_count_threshold() as usize
+            // Force compaction if other chunks were created far ago
+            || min_created_at.map(|min| Utc::now().signed_duration_since(min).num_seconds() > self.config.compaction_chunks_max_lifetime_threshold() as i64).unwrap_or(false)
         {
             self.schedule_partition_to_compact(partition).await?;
+        }
+        Ok(())
+    }
+
+    async fn schedule_compaction_in_memory_chunks_if_needed(
+        &self,
+        partition: &IdRow<Partition>,
+    ) -> Result<(), CubeError> {
+        let compaction_in_memory_chunks_count_threshold =
+            self.config.compaction_in_memory_chunks_count_threshold();
+
+        let partition_id = partition.get_id();
+
+        let chunks = self
+            .meta_store
+            .get_chunks_by_partition(partition_id, false)
+            .await?
+            .into_iter()
+            .filter(|c| c.get_row().in_memory() && c.get_row().active())
+            .collect::<Vec<_>>();
+
+        if chunks.len() > compaction_in_memory_chunks_count_threshold {
+            let node = self.cluster.node_name_by_partition(partition);
+            let job = self
+                .meta_store
+                .add_job(Job::new(
+                    RowKey::Table(TableId::Partitions, partition_id),
+                    JobType::InMemoryChunksCompaction,
+                    node.to_string(),
+                ))
+                .await?;
+            if job.is_some() {
+                self.cluster.notify_job_runner(node).await?;
+            }
         }
         Ok(())
     }
@@ -687,7 +761,14 @@ impl SchedulerImpl {
         path: String,
     ) -> Result<(), CubeError> {
         let node_name = self.cluster.node_name_by_partition(p);
-        self.cluster.warmup_download(&node_name, path).await
+        let result = self
+            .cluster
+            .warmup_download(&node_name, path, p.get_row().file_size())
+            .await;
+
+        deactivate_table_on_corrupt_data(self.meta_store.clone(), &result, p).await;
+
+        result
     }
 }
 
@@ -724,6 +805,7 @@ enum GCTask {
 struct DataGCLoop {
     metastore: Arc<dyn MetaStore>,
     remote_fs: Arc<dyn RemoteFs>,
+    config: Arc<dyn ConfigObj>,
     stop: CancellationToken,
     task_notify: Notify,
     pending: RwLock<(BinaryHeap<GCTimedTask>, HashSet<GCTask>)>,
@@ -733,11 +815,13 @@ impl DataGCLoop {
     fn new(
         metastore: Arc<dyn MetaStore>,
         remote_fs: Arc<dyn RemoteFs>,
+        config: Arc<dyn ConfigObj>,
         stop: CancellationToken,
     ) -> Arc<Self> {
         Arc::new(DataGCLoop {
             metastore,
             remote_fs,
+            config,
             stop,
             task_notify: Notify::new(),
             pending: RwLock::new((BinaryHeap::new(), HashSet::new())),
@@ -749,7 +833,14 @@ impl DataGCLoop {
             let mut pending_lock = self.pending.write().await;
             // Double-checked locking
             if pending_lock.1.get(&task.task).is_none() {
-                log::trace!("Posting GCTask: {:?}", task);
+                log::trace!(
+                    "Posting GCTask {}: {:?}",
+                    task.deadline
+                        .checked_duration_since(Instant::now())
+                        .map(|d| format!("in {:?}", d))
+                        .unwrap_or("now".to_string()),
+                    task
+                );
                 pending_lock.1.insert(task.task.clone());
                 pending_lock.0.push(task);
                 self.task_notify.notify_waiters();
@@ -765,7 +856,7 @@ impl DataGCLoop {
                 _ = self.stop.cancelled() => {
                     return;
                 }
-                _ = Delay::new(Duration::from_secs(60)) => {}
+                _ = Delay::new(Duration::from_secs(self.config.gc_loop_interval())) => {}
                 _ = self.task_notify.notified() => {}
             };
 

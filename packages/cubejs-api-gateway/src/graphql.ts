@@ -29,7 +29,7 @@ import {
   DateTimeResolver,
 } from 'graphql-scalars';
 
-import { QUERY_TYPE } from './query';
+import { QueryType, MemberType } from './types/enums';
 
 const DateTimeScalar = asNexusMethod(DateTimeResolver, 'date');
 
@@ -235,7 +235,7 @@ function getMemberType(metaConfig: any, cubeName: string, memberName: string) {
   const cubeConfig = metaConfig.find(cube => cube.config.name === cubeName);
   if (!cubeConfig) return undefined;
 
-  return ['measure', 'dimension'].find((memberType) => (cubeConfig.config[`${memberType}s`]
+  return [MemberType.MEASURES, MemberType.DIMENSIONS].find((memberType) => (cubeConfig.config[memberType]
     .findIndex(entry => entry.name === `${cubeName}.${memberName}`) !== -1
   ));
 }
@@ -354,7 +354,7 @@ export function makeSchema(metaConfig: any) {
         definition(t) {
           cube.config.measures.forEach(measure => {
             if (measure.isVisible) {
-              t.nonNull.field(safeName(measure.name), {
+              t.field(safeName(measure.name), {
                 type: mapType(measure.type),
                 description: measure.description
               });
@@ -362,7 +362,7 @@ export function makeSchema(metaConfig: any) {
           });
           cube.config.dimensions.forEach(dimension => {
             if (dimension.isVisible) {
-              t.nonNull.field(safeName(dimension.name), {
+              t.field(safeName(dimension.name), {
                 type: mapType(dimension.type),
                 description: dimension.description
               });
@@ -530,9 +530,9 @@ export function makeSchema(metaConfig: any) {
               const memberType = getMemberType(metaConfig, cubeName, memberName);
               const key = `${cubeName}.${memberName}`;
 
-              if (memberType === 'measure') {
+              if (memberType === MemberType.MEASURES) {
                 measures.push(key);
-              } else if (memberType === 'dimension') {
+              } else if (memberType === MemberType.DIMENSIONS) {
                 const granularityNodes = getFieldNodeChildren(memberNode, infos);
                 if (granularityNodes.length > 0) {
                   granularityNodes.forEach(granularityNode => {
@@ -573,7 +573,7 @@ export function makeSchema(metaConfig: any) {
             try {
               await apiGateway.load({
                 query,
-                queryType: QUERY_TYPE.REGULAR_QUERY,
+                queryType: QueryType.REGULAR_QUERY,
                 context: req.context,
                 res: (message) => {
                   if (message.error) {

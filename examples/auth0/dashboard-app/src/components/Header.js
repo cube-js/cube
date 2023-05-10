@@ -1,8 +1,7 @@
 import React from "react";
 import { withRouter } from "react-router";
-import MenuIcon from "@material-ui/icons/Menu";
 import { useAuth0 } from "@auth0/auth0-react";
-import { Button, IconButton, Typography, Toolbar, AppBar } from '@material-ui/core';
+import { Button, Typography, Toolbar, AppBar } from '@material-ui/core';
 import { makeStyles } from '@material-ui/core/styles';
 
 const useStyles = makeStyles((theme) => ({
@@ -21,13 +20,10 @@ const Header = ({ location }) => {
   return (
     <AppBar position="static">
       <Toolbar variant="dense">
-        <IconButton className={classes.menuButton} edge="start" color="inherit" aria-label="menu">
-          <MenuIcon />
-        </IconButton>
         <Typography className={classes.title} variant="h6" color="inherit">
           My Dashboard
         </Typography>
-        <Button onClick={() => logout({ returnTo: location.origin })}>
+        <Button onClick={() => logout({ returnTo: location.origin })} color="inherit">
           Log Out
         </Button>
       </Toolbar>

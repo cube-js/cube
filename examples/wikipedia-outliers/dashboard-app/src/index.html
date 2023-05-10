@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <title></title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="index.js"></script>
+
+    <script type="module">
+      import createExampleWrapper from "cube-example-wrapper";
+
+      createExampleWrapper({
+        title: "Wikipedia Outliers with Firebolt and Cube",
+        text: `
+          <p>This demo shows most popular pages by analyzing terabytes of Wikipedia logs.</p>
+          <p>Explore the <a href="https://github.com/cube-js/cube.js/tree/master/examples/wikipedia-outliers">source code</a> and check the <a href="#">tutorial</a>.</p>
+        `,
+      });
+    </script>
+  </body>
+</html>

@@ -20,7 +20,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        rust: [nightly-2021-07-04]
+        rust: [nightly-2022-06-22]
     env:
       RUST: ${{ matrix.rust }}
     steps:
@@ -146,14 +146,15 @@ jobs:
             cross: true
             # Unable to recognise the format of the input file `rust/cubestore/target/aarch64-unknown-linux-gnu/release/cubestored'
             strip: false
-            compress: true
+            # UPX is broken, issue https://github.com/cube-js/cube.js/issues/4474
+            compress: false
       fail-fast: false
     steps:
       - uses: actions/checkout@v2
       - name: Setup Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2021-07-04
+          toolchain: nightly-2022-06-22
           target: ${{ matrix.target }}
           override: true
           components: rustfmt

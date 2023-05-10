@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg width="56" height="56" viewBox="0 6 32.751 24.563" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <clipPath id="clip0_332_69507">
+      <rect width="218" height="24.5634" transform="translate(0 6)"/>
+    </clipPath>
+  </defs>
+  <path d="M 24.563 14.188 L 24.563 6 L 16.376 6 L 16.376 14.188 L 0 14.188 L 0 22.376 L 8.188 22.376 L 8.188 30.563 L 16.376 30.563 L 16.376 22.376 L 32.751 22.376 L 32.751 14.188 L 24.563 14.188 Z" fill="#009DC7" clip-path="url(#clip0_332_69507)"/>
+</svg>

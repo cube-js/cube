@@ -13,8 +13,10 @@ const GRANULARITY_TO_INTERVAL: Record<string, (date: string) => string> = {
 };
 
 class DruidFilter extends BaseFilter {
-  public likeIgnoreCase(column, not, param) {
-    return `${column}${not ? ' NOT' : ''} LIKE CONCAT('%', ${this.allocateParam(param)}, '%')`;
+  public likeIgnoreCase(column, not, param, type: string) {
+    const p = (!type || type === 'contains' || type === 'ends') ? '%' : '';
+    const s = (!type || type === 'contains' || type === 'starts') ? '%' : '';
+    return `${column}${not ? ' NOT' : ''} LIKE CONCAT('${p}', ${this.allocateParam(param)}, '${s}')`;
   }
 }
 

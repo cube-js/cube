@@ -6,8 +6,6 @@ use tokio::runtime::Builder;
 
 #[cfg(not(target_os = "windows"))]
 fn main() {
-    // Prepare workers.
-    Config::configure_worker_services();
     respawn::init(); // TODO: logs on workers.
 
     run_sql_tests("multi_process", vec![], |test_name, test_fn| {

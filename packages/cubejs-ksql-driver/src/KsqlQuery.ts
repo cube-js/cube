@@ -17,8 +17,10 @@ class KsqlFilter extends BaseFilter {
     super(query, filter);
   }
 
-  public likeIgnoreCase(column: string, not: boolean, param: any) {
-    return `${column}${not ? ' NOT' : ''} ILIKE CONCAT('%', ${this.allocateParam(param)}, '%')`;
+  public likeIgnoreCase(column: string, not: boolean, param: any, type: string) {
+    const p = (!type || type === 'contains' || type === 'ends') ? '%' : '';
+    const s = (!type || type === 'contains' || type === 'starts') ? '%' : '';
+    return `${column}${not ? ' NOT' : ''} ILIKE CONCAT('${p}', ${this.allocateParam(param)}, '${s}')`;
   }
 }
 
@@ -77,5 +79,15 @@ export class KsqlQuery extends BaseQuery {
   public preAggregationInvalidateKeyQueries(cube: string, preAggregation: any) {
     // always empty as streaming tables are constantly refreshed by Cube Store
     return [];
+  }
+
+  public preAggregationReadOnly(cube: string, preAggregation: any) {
+    const [sql] = this.preAggregationSql(cube, preAggregation);
+    return preAggregation.type === 'originalSql' && Boolean(KsqlQuery.extractTableFromSimpleSelectAsteriskQuery(sql));
+  }
+
+  public static extractTableFromSimpleSelectAsteriskQuery(sql: string) {
+    const match = sql.match(/^SELECT \* FROM ([\S]+)$/);
+    return match && match[1];
   }
 }

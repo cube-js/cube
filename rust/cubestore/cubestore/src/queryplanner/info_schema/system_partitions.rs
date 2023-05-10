@@ -147,6 +147,17 @@ impl InfoSchemaTableDef for SystemPartitionsTableDef {
                     ))
                 }),
             ),
+            (
+                Field::new("file_size", DataType::UInt64, true),
+                Box::new(|partitions| {
+                    Arc::new(UInt64Array::from(
+                        partitions
+                            .iter()
+                            .map(|row| row.get_row().file_size())
+                            .collect::<Vec<_>>(),
+                    ))
+                }),
+            ),
         ]
     }
 }

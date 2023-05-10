@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"show \\\"max_allowed_packet\\\";\".to_string(),\n              DatabaseProtocol::PostgreSQL).await?"
+---
++----------+
+| setting  |
++----------+
+| 67108864 |
++----------+

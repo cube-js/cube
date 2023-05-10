@@ -1,4 +1,4 @@
-const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
+const { BaseDriver } = require('@cubejs-backend/base-driver');
 const oracledb = require('oracledb');
 const { reduce } = require('ramda');
 
@@ -34,7 +34,14 @@ const reduceCb = (result, i) => {
 };
 
 class OracleDriver extends BaseDriver {
-  constructor(config) {
+  /**
+   * Returns default concurrency value.
+   */
+  static getDefaultConcurrency() {
+    return 2;
+  }
+
+  constructor(config = {}) {
     super();
     this.db = oracledb;
     this.db.outFormat = this.db.OBJECT;
@@ -49,7 +56,7 @@ class OracleDriver extends BaseDriver {
       host: process.env.CUBEJS_DB_HOST,
       port: process.env.CUBEJS_DB_PORT || 1521,
       poolMin: 0,
-      poolMax: 50,
+      poolMax: config.maxPoolSize || 50,
     };
 
     if (!this.config.connectionString) {

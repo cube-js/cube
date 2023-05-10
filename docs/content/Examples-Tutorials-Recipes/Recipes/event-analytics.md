@@ -288,7 +288,7 @@ averageDurationMinutes: {
 
 ## Mapping Sessions to Users
 
-Right now all our sessions are anonymous, so the final step in our modelling
+Right now all our sessions are anonymous, so the final step in our modeling
 would be to map sessions to users in case, they have signed up and have been
 assigned a `user_id`. Segment keeps track of such assignments in a table called
 identifies. Every time you identify a user with segment it will connect the

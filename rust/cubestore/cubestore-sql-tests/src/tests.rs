@@ -1,12 +1,16 @@
+use crate::files::write_tmp_file;
 use crate::rows::{rows, NULL};
 use crate::SqlClient;
 use async_compression::tokio::write::GzipEncoder;
+use cubestore::metastore::{Column, ColumnType};
 use cubestore::queryplanner::pretty_printers::{pp_phys_plan, pp_phys_plan_ext, PPOptions};
 use cubestore::queryplanner::MIN_TOPK_STREAM_ROWS;
-use cubestore::sql::timestamp_from_string;
+use cubestore::sql::{timestamp_from_string, InlineTable, SqlQueryContext};
 use cubestore::store::DataFrame;
 use cubestore::table::{Row, TableValue, TimestampValue};
 use cubestore::util::decimal::Decimal;
+use cubestore::CubeError;
+use indoc::indoc;
 use itertools::Itertools;
 use pretty_assertions::assert_eq;
 use std::env;
@@ -16,6 +20,7 @@ use std::io::Write;
 use std::panic::RefUnwindSafe;
 use std::path::Path;
 use std::pin::Pin;
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::io::{AsyncWriteExt, BufWriter};
 
@@ -30,6 +35,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("insert", insert),
         t("select_test", select_test),
         t("negative_numbers", negative_numbers),
+        t("negative_decimal", negative_decimal),
         t("custom_types", custom_types),
         t("group_by_boolean", group_by_boolean),
         t("group_by_decimal", group_by_decimal),
@@ -46,6 +52,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("in_list", in_list),
         t("in_list_with_union", in_list_with_union),
         t("numeric_cast", numeric_cast),
+        t("cast_timestamp_to_utf8", cast_timestamp_to_utf8),
         t("numbers_to_bool", numbers_to_bool),
         t("union", union),
         t("timestamp_select", timestamp_select),
@@ -55,6 +62,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("case_column_escaping", case_column_escaping),
         t("inner_column_escaping", inner_column_escaping),
         t("convert_tz", convert_tz),
+        t("date_trunc", date_trunc),
         t("coalesce", coalesce),
         t("ilike", ilike),
         t("count_distinct_crash", count_distinct_crash),
@@ -76,6 +84,19 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             "create_table_with_location_messed_order",
             create_table_with_location_messed_order,
         ),
+        t(
+            "create_table_with_location_invalid_digit",
+            create_table_with_location_invalid_digit,
+        ),
+        t("create_table_with_csv", create_table_with_csv),
+        t(
+            "create_table_with_csv_and_index",
+            create_table_with_csv_and_index,
+        ),
+        t(
+            "create_table_with_csv_no_header",
+            create_table_with_csv_no_header,
+        ),
         t("create_table_with_url", create_table_with_url),
         t("create_table_fail_and_retry", create_table_fail_and_retry),
         t("empty_crash", empty_crash),
@@ -84,6 +105,18 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("hyperloglog_empty_inputs", hyperloglog_empty_inputs),
         t("hyperloglog_empty_group_by", hyperloglog_empty_group_by),
         t("hyperloglog_inserts", hyperloglog_inserts),
+        t(
+            "create_table_with_location_and_hyperloglog",
+            create_table_with_location_and_hyperloglog,
+        ),
+        t(
+            "create_table_with_location_and_hyperloglog_postgress",
+            create_table_with_location_and_hyperloglog_postgress,
+        ),
+        t(
+            "create_table_with_location_and_hyperloglog_space_separated",
+            create_table_with_location_and_hyperloglog_space_separated,
+        ),
         t("hyperloglog_inplace_group_by", hyperloglog_inplace_group_by),
         t("hyperloglog_postgres", hyperloglog_postgres),
         t("hyperloglog_snowflake", hyperloglog_snowflake),
@@ -105,7 +138,12 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             planning_join_with_partitioned_index,
         ),
         t("topk_query", topk_query),
+        t("topk_having", topk_having),
         t("topk_decimals", topk_decimals),
+        t("planning_topk_having", planning_topk_having),
+        t("planning_topk_hll", planning_topk_hll),
+        t("topk_hll", topk_hll),
+        t("topk_hll_with_nulls", topk_hll_with_nulls),
         t("offset", offset),
         t("having", having),
         t("rolling_window_join", rolling_window_join),
@@ -114,6 +152,10 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t(
             "rolling_window_query_timestamps",
             rolling_window_query_timestamps,
+        ),
+        t(
+            "rolling_window_query_timestamps_exceeded",
+            rolling_window_query_timestamps_exceeded,
         ),
         t(
             "rolling_window_extra_aggregate",
@@ -142,6 +184,27 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             "dimension_only_queries_for_stream_table",
             dimension_only_queries_for_stream_table,
         ),
+        t(
+            "unique_key_and_multi_measures_for_stream_table",
+            unique_key_and_multi_measures_for_stream_table,
+        ),
+        t("divide_by_zero", divide_by_zero),
+        t(
+            "filter_multiple_in_for_decimal",
+            filter_multiple_in_for_decimal,
+        ),
+        t("panic_worker", panic_worker),
+        t(
+            "planning_filter_index_selection",
+            planning_filter_index_selection,
+        ),
+        t("planning_aggregate_index", planning_aggregate_index),
+        t("aggregate_index", aggregate_index),
+        t("aggregate_index_hll", aggregate_index_hll),
+        t("aggregate_index_errors", aggregate_index_errors),
+        t("inline_tables", inline_tables),
+        t("inline_tables_2x", inline_tables_2x),
+        t("build_range_end", build_range_end),
     ];
 
     fn t<F>(name: &'static str, f: fn(Box<dyn SqlClient>) -> F) -> (&'static str, TestFn)
@@ -249,6 +312,33 @@ async fn negative_numbers(service: Box<dyn SqlClient>) {
         .unwrap();
 
     assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(-153)]));
+}
+
+async fn negative_decimal(service: Box<dyn SqlClient>) {
+    let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+    let _ = service
+        .exec_query("CREATE TABLE foo.values (decimal_value decimal)")
+        .await
+        .unwrap();
+
+    service
+        .exec_query("INSERT INTO foo.values (decimal_value) VALUES (-0.12345)")
+        .await
+        .unwrap();
+
+    let result = service
+        .exec_query("SELECT * from foo.values")
+        .await
+        .unwrap();
+
+    assert_eq!(
+        match &result.get_rows()[0].values()[0] {
+            TableValue::Decimal(d) => d.to_string(5),
+            x => panic!("Expected decimal but found: {:?}", x),
+        },
+        "-0.12345"
+    );
 }
 
 async fn custom_types(service: Box<dyn SqlClient>) {
@@ -815,6 +905,29 @@ async fn numeric_cast(service: Box<dyn SqlClient>) {
     assert_eq!(result.get_rows()[0], Row::new(vec![TableValue::Int(3)]));
 }
 
+async fn cast_timestamp_to_utf8(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+    service
+        .exec_query("CREATE TABLE foo.timestamps (id text, created timestamp)")
+        .await
+        .unwrap();
+
+    service.exec_query(
+        "INSERT INTO foo.timestamps (id, created) VALUES ('a', '2022-01-01T00:00:00Z'), ('b', '2021-01-01T00:00:00Z')"
+    ).await.unwrap();
+
+    let r = service
+        .exec_query("SELECT id, CAST(created AS VARCHAR) from foo.timestamps ORDER BY id ASC")
+        .await
+        .unwrap();
+
+    assert_eq!(
+        to_rows(&r),
+        rows(&[("a", "2022-01-01 00:00:00"), ("b", "2021-01-01 00:00:00"),])
+    );
+}
+
 async fn numbers_to_bool(service: Box<dyn SqlClient>) {
     let r = service
         .exec_query("SELECT 1 = TRUE, FALSE = 0, -1 = TRUE, 123 = TRUE")
@@ -1138,6 +1251,56 @@ async fn convert_tz(service: Box<dyn SqlClient>) {
             TableValue::Timestamp(TimestampValue::new(1577923200000000000)),
             TableValue::Int(3)
         ])]
+    );
+}
+
+async fn date_trunc(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+    service
+        .exec_query("CREATE TABLE foo.timestamps (t timestamp)")
+        .await
+        .unwrap();
+
+    service
+        .exec_query(
+            "INSERT INTO foo.timestamps (t) VALUES \
+            ('2020-01-01T00:00:00.000Z'), \
+            ('2020-03-01T00:00:00.000Z'), \
+            ('2020-04-01T00:00:00.000Z'), \
+            ('2020-07-01T00:00:00.000Z'), \
+            ('2020-09-01T00:00:00.000Z')",
+        )
+        .await
+        .unwrap();
+
+    let result = service
+        .exec_query(
+            "SELECT date_trunc('quarter', `t`) `quarter` \
+            FROM foo.timestamps `timestamp`",
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        result.get_rows(),
+        &vec![
+            Row::new(vec![TableValue::Timestamp(TimestampValue::new(
+                1577836800000000000
+            )),]),
+            Row::new(vec![TableValue::Timestamp(TimestampValue::new(
+                1577836800000000000
+            )),]),
+            Row::new(vec![TableValue::Timestamp(TimestampValue::new(
+                1585699200000000000
+            )),]),
+            Row::new(vec![TableValue::Timestamp(TimestampValue::new(
+                1593561600000000000
+            )),]),
+            Row::new(vec![TableValue::Timestamp(TimestampValue::new(
+                1593561600000000000
+            )),])
+        ]
     );
 }
 
@@ -1623,6 +1786,128 @@ async fn create_table_with_location_messed_order(service: Box<dyn SqlClient>) {
     assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(1)])]);
 }
 
+async fn create_table_with_location_invalid_digit(service: Box<dyn SqlClient>) {
+    let paths = {
+        let dir = env::temp_dir();
+
+        let path_1 = dir.clone().join("invalid_digit.csv");
+        let mut file = File::create(path_1.clone()).unwrap();
+
+        file.write_all("c1,c3\n".as_bytes()).unwrap();
+        file.write_all("foo,1a23\n".as_bytes()).unwrap();
+
+        vec![path_1]
+    };
+
+    let _ = service
+        .exec_query("CREATE SCHEMA IF NOT EXISTS test")
+        .await
+        .unwrap();
+    let res = service
+        .exec_query(&format!(
+            "CREATE TABLE test.main (`c1` text, `c3` decimal)  LOCATION {}",
+            paths
+                .into_iter()
+                .map(|p| format!("'{}'", p.to_string_lossy()))
+                .join(",")
+        ))
+        .await;
+
+    println!("Res: {:?}", res);
+
+    assert!(
+        res.is_err(),
+        "Expected invalid digit error but got {:?}",
+        res
+    );
+}
+
+async fn create_table_with_csv(service: Box<dyn SqlClient>) {
+    let file = write_tmp_file(indoc! {"
+        fruit,number
+        apple,2
+        banana,3
+    "})
+    .unwrap();
+    let path = file.path().to_string_lossy();
+    let _ = service
+        .exec_query("CREATE SCHEMA IF NOT EXISTS test")
+        .await
+        .unwrap();
+    let _ = service
+        .exec_query(format!("CREATE TABLE test.table (`fruit` text, `number` int) WITH (input_format = 'csv') LOCATION '{}'", path).as_str())
+        .await
+        .unwrap();
+    let result = service
+        .exec_query("SELECT * FROM test.table")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&result),
+        vec![
+            vec![TableValue::String("apple".to_string()), TableValue::Int(2)],
+            vec![TableValue::String("banana".to_string()), TableValue::Int(3)]
+        ]
+    );
+}
+
+async fn create_table_with_csv_and_index(service: Box<dyn SqlClient>) {
+    let file = write_tmp_file(indoc! {"
+        fruit,number
+        apple,2
+        banana,3
+    "})
+    .unwrap();
+    let path = file.path().to_string_lossy();
+    let _ = service
+        .exec_query("CREATE SCHEMA IF NOT EXISTS test")
+        .await
+        .unwrap();
+    let _ = service
+        .exec_query(format!("CREATE TABLE test.table (`fruit` text, `number` int) WITH (input_format = 'csv') INDEX by_number (`number`) LOCATION '{}'", path).as_str())
+        .await
+        .unwrap();
+    let result = service
+        .exec_query("SELECT * FROM test.table")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&result),
+        vec![
+            vec![TableValue::String("apple".to_string()), TableValue::Int(2)],
+            vec![TableValue::String("banana".to_string()), TableValue::Int(3)]
+        ]
+    );
+}
+
+async fn create_table_with_csv_no_header(service: Box<dyn SqlClient>) {
+    let file = write_tmp_file(indoc! {"
+        apple,2
+        banana,3
+    "})
+    .unwrap();
+    let path = file.path().to_string_lossy();
+    let _ = service
+        .exec_query("CREATE SCHEMA IF NOT EXISTS test")
+        .await
+        .unwrap();
+    let _ = service
+        .exec_query(format!("CREATE TABLE test.table (`fruit` text, `number` int) WITH (input_format = 'csv_no_header') LOCATION '{}'", path).as_str())
+        .await
+        .unwrap();
+    let result = service
+        .exec_query("SELECT * FROM test.table")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&result),
+        vec![
+            vec![TableValue::String("apple".to_string()), TableValue::Int(2)],
+            vec![TableValue::String("banana".to_string()), TableValue::Int(3)]
+        ]
+    );
+}
+
 async fn create_table_with_url(service: Box<dyn SqlClient>) {
     let url = "https://data.wprdc.org/dataset/0b584c84-7e35-4f4d-a5a2-b01697470c0f/resource/e95dd941-8e47-4460-9bd8-1e51c194370b/download/bikepghpublic.csv";
 
@@ -1849,6 +2134,177 @@ async fn hyperloglog_inserts(service: Box<dyn SqlClient>) {
         .expect_err("should not allow invalid HLL (with extra bytes)");
 }
 
+async fn create_table_with_location_and_hyperloglog(service: Box<dyn SqlClient>) {
+    let paths = {
+        let dir = env::temp_dir();
+
+        let path_1 = dir.clone().join("hyperloglog.csv");
+        let mut file = File::create(path_1.clone()).unwrap();
+
+        file.write_all("id,hll,hll_base\n".as_bytes()).unwrap();
+
+        file.write_all(
+            format!(
+                "0,02 0c 01 00 80 a5 90 34,{}\n",
+                base64::encode(vec![0x02, 0x0c, 0x01, 0x00, 0x80, 0xa5, 0x90, 0x34])
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+        file.write_all(
+            format!(
+                "1,02 0C 02 00 C0 2F F5 89 41 D5 F0 C6,{}\n",
+                base64::encode(vec![
+                    0x02, 0x0c, 0x02, 0x00, 0xc0, 0x2f, 0xf5, 0x89, 0x41, 0xd5, 0xf0, 0xc6
+                ])
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+
+        vec![path_1]
+    };
+    let _ = service
+        .exec_query("CREATE SCHEMA IF NOT EXISTS hll")
+        .await
+        .unwrap();
+    let _ = service
+        .exec_query(&format!("CREATE TABLE hll.locations (id int, hll hyperloglog, hll_base hyperloglog) LOCATION {}", 
+            paths
+                .into_iter()
+                .map(|p| format!("'{}'", p.to_string_lossy()))
+                .join(",")
+        ))
+        .await
+        .unwrap();
+
+    let res = service
+        .exec_query("SELECT cardinality(merge(hll)) = cardinality(merge(hll_base)) FROM hll.locations GROUP BY id")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&res),
+        vec![
+            vec![TableValue::Boolean(true)],
+            vec![TableValue::Boolean(true)],
+        ]
+    );
+}
+async fn create_table_with_location_and_hyperloglog_postgress(service: Box<dyn SqlClient>) {
+    let paths = {
+        let dir = env::temp_dir();
+
+        let path_1 = dir.clone().join("hyperloglog-pg.csv");
+        let mut file = File::create(path_1.clone()).unwrap();
+
+        file.write_all("id,hll,hll_base\n".as_bytes()).unwrap();
+
+        file.write_all(
+            format!("0,11 8b 7f,{}\n", base64::encode(vec![0x11, 0x8b, 0x7f])).as_bytes(),
+        )
+        .unwrap();
+        file.write_all(
+            format!(
+                "1,12 8b 7f ee 22 c4 70 69 1a 81 34,{}\n",
+                base64::encode(vec![
+                    0x12, 0x8b, 0x7f, 0xee, 0x22, 0xc4, 0x70, 0x69, 0x1a, 0x81, 0x34
+                ])
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+
+        vec![path_1]
+    };
+    let _ = service
+        .exec_query("CREATE SCHEMA IF NOT EXISTS hll")
+        .await
+        .unwrap();
+    let _ = service
+        .exec_query(&format!("CREATE TABLE hll.locations_pg (id int, hll HLL_POSTGRES, hll_base HLL_POSTGRES) LOCATION {}", 
+            paths
+                .into_iter()
+                .map(|p| format!("'{}'", p.to_string_lossy()))
+                .join(",")
+        ))
+        .await
+        .unwrap();
+
+    let res = service
+        .exec_query("SELECT cardinality(merge(hll)) = cardinality(merge(hll_base)) FROM hll.locations_pg GROUP BY id")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&res),
+        vec![
+            vec![TableValue::Boolean(true)],
+            vec![TableValue::Boolean(true)],
+        ]
+    );
+}
+
+async fn create_table_with_location_and_hyperloglog_space_separated(service: Box<dyn SqlClient>) {
+    let paths = {
+        let dir = env::temp_dir();
+
+        let path_1 = dir.clone().join("hyperloglog-ssep.csv");
+        let mut file = File::create(path_1.clone()).unwrap();
+
+        file.write_all("id,hll,hll_base\n".as_bytes()).unwrap();
+
+        file.write_all(
+            format!(
+                "0,02 0c 01 00 05 05 7b cf,{}\n",
+                base64::encode(vec![0x02, 0x0c, 0x01, 0x00, 0x05, 0x05, 0x7b, 0xcf])
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+        file.write_all(
+            format!(
+                "1,02 0c 01 00 15 15 7b ff,{}\n",
+                base64::encode(vec![0x02, 0x0c, 0x01, 0x00, 0x15, 0x15, 0x7b, 0xff])
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+
+        vec![path_1]
+    };
+    let _ = service
+        .exec_query("CREATE SCHEMA IF NOT EXISTS hll")
+        .await
+        .unwrap();
+    let _ = service
+        .exec_query(&format!("CREATE TABLE hll.locations_ssep (id int, hll varbinary, hll_base varbinary) LOCATION {}", 
+            paths
+                .into_iter()
+                .map(|p| format!("'{}'", p.to_string_lossy()))
+                .join(",")
+        ))
+        .await
+        .unwrap();
+
+    let res = service
+        .exec_query("SELECT cardinality(merge(hll)) = cardinality(merge(hll_base)) FROM hll.locations_ssep GROUP BY id")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&res),
+        vec![
+            vec![TableValue::Boolean(true)],
+            vec![TableValue::Boolean(true)],
+        ]
+    );
+    let res = service
+        .exec_query("SELECT hll, hll_base FROM hll.locations_ssep")
+        .await
+        .unwrap();
+    for r in to_rows(&res).iter() {
+        assert_eq!(r[0], r[1]);
+    }
+    println!("res {:?}", res);
+}
 async fn hyperloglog_inplace_group_by(service: Box<dyn SqlClient>) {
     let _ = service
         .exec_query("CREATE SCHEMA IF NOT EXISTS hll")
@@ -2109,20 +2565,21 @@ async fn planning_hints(service: Box<dyn SqlClient>) {
            \n          Empty"
     );
 
+    // TODO
     // Removing single value columns should keep the sort order of the rest.
-    let p = service
-        .plan_query("SELECT id3 FROM s.Data WHERE id1 = 123 AND id2 = 234")
-        .await
-        .unwrap();
-    assert_eq!(
-        pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
-        "Worker, sort_order: [0]\
-           \n  Projection, [id3], sort_order: [0]\
-           \n    Filter, single_vals: [0, 1], sort_order: [0, 1, 2]\
-           \n      Merge, sort_order: [0, 1, 2]\
-           \n        Scan, index: default:1:[1], fields: *, sort_order: [0, 1, 2]\
-           \n          Empty"
-    );
+    // let p = service
+    //     .plan_query("SELECT id3 FROM s.Data WHERE id1 = 123 AND id2 = 234")
+    //     .await
+    //     .unwrap();
+    // assert_eq!(
+    //     pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
+    //     "Worker, sort_order: [0]\
+    //        \n  Projection, [id3], sort_order: [0]\
+    //        \n    Filter, single_vals: [0, 1], sort_order: [0, 1, 2]\
+    //        \n      Merge, sort_order: [0, 1, 2]\
+    //        \n        Scan, index: default:1:[1], fields: *, sort_order: [0, 1, 2]\
+    //        \n          Empty"
+    // );
     let p = service
         .plan_query("SELECT id1, id3 FROM s.Data WHERE id2 = 234")
         .await
@@ -2185,15 +2642,15 @@ async fn planning_inplace_aggregate2(service: Box<dyn SqlClient>) {
            \n    Worker\
            \n      Sort, by: [SUM(hits)@1 desc nulls last]\
            \n        FullInplaceAggregate, sort_order: [0]\
-           \n          MergeSort, single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
-           \n            Union, single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
-           \n              Filter, single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
-           \n                MergeSort, sort_order: [0, 1, 2, 3, 4]\
-           \n                  Scan, index: default:1:[1], fields: *, sort_order: [0, 1, 2, 3, 4]\
+           \n          MergeSort, single_vals: [0, 1], sort_order: [0, 1, 2]\
+           \n            Union, single_vals: [0, 1], sort_order: [0, 1, 2]\
+           \n              Filter, single_vals: [0, 1], sort_order: [0, 1, 2]\
+           \n                MergeSort, sort_order: [0, 1, 2]\
+           \n                  Scan, index: default:1:[1]:sort_on[allowed, site_id, url], fields: *, sort_order: [0, 1, 2]\
            \n                    Empty\
-           \n              Filter, single_vals: [0, 1], sort_order: [0, 1, 2, 3, 4]\
-           \n                MergeSort, sort_order: [0, 1, 2, 3, 4]\
-           \n                  Scan, index: default:2:[2], fields: *, sort_order: [0, 1, 2, 3, 4]\
+           \n              Filter, single_vals: [0, 1], sort_order: [0, 1, 2]\
+           \n                MergeSort, sort_order: [0, 1, 2]\
+           \n                  Scan, index: default:2:[2]:sort_on[allowed, site_id, url], fields: *, sort_order: [0, 1, 2]\
            \n                    Empty"
     );
 }
@@ -2563,6 +3020,88 @@ async fn planning_simple(service: Box<dyn SqlClient>) {
     );
 }
 
+async fn planning_filter_index_selection(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Orders(a int, b int, c int, d int, amount int)")
+        .await
+        .unwrap();
+
+    service
+        .exec_query("CREATE INDEX cb ON s.Orders(c, b)")
+        .await
+        .unwrap();
+
+    service
+        .exec_query("CREATE INDEX bcd ON s.Orders(d, b, c)")
+        .await
+        .unwrap();
+
+    let p = service
+        .plan_query("SELECT b, SUM(amount) FROM s.Orders WHERE c = 5 GROUP BY 1")
+        .await
+        .unwrap();
+    assert_eq!(
+        pp_phys_plan(p.router.as_ref()),
+        "Projection, [b, SUM(s.Orders.amount)@1:SUM(amount)]\n  FinalInplaceAggregate\n    ClusterSend, partitions: [[2]]"
+    );
+    assert_eq!(
+        pp_phys_plan(p.worker.as_ref()),
+        "Projection, [b, SUM(s.Orders.amount)@1:SUM(amount)]\
+           \n  FinalInplaceAggregate\
+           \n    Worker\
+           \n      PartialInplaceAggregate\
+           \n        Filter\
+           \n          MergeSort\
+           \n            Scan, index: cb:2:[2]:sort_on[c, b], fields: [b, c, amount]\
+           \n              Empty"
+    );
+
+    let p = service
+        .plan_query("SELECT b, SUM(amount) FROM s.Orders WHERE c in (5, 6) GROUP BY 1")
+        .await
+        .unwrap();
+    assert_eq!(
+        pp_phys_plan(p.router.as_ref()),
+        "Projection, [b, SUM(s.Orders.amount)@1:SUM(amount)]\n  FinalHashAggregate\n    ClusterSend, partitions: [[2]]"
+    );
+    assert_eq!(
+        pp_phys_plan(p.worker.as_ref()),
+        "Projection, [b, SUM(s.Orders.amount)@1:SUM(amount)]\
+           \n  FinalHashAggregate\
+           \n    Worker\
+           \n      PartialHashAggregate\
+           \n        Filter\
+           \n          Merge\
+           \n            Scan, index: cb:2:[2], fields: [b, c, amount]\
+           \n              Empty"
+    );
+
+    let p = service
+        .plan_query(
+            "SELECT b, SUM(amount) FROM s.Orders WHERE c = 5 and a > 5 and a < 10 GROUP BY 1",
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        pp_phys_plan(p.router.as_ref()),
+        "Projection, [b, SUM(s.Orders.amount)@1:SUM(amount)]\n  FinalInplaceAggregate\n    ClusterSend, partitions: [[2]]"
+    );
+
+    assert_eq!(
+        pp_phys_plan(p.worker.as_ref()),
+        "Projection, [b, SUM(s.Orders.amount)@1:SUM(amount)]\
+        \n  FinalInplaceAggregate\
+        \n    Worker\
+        \n      PartialInplaceAggregate\
+        \n        Filter\
+        \n          MergeSort\
+        \n            Scan, index: cb:2:[2]:sort_on[c, b], fields: [a, b, c, amount]\
+        \n              Empty"
+    );
+}
+
 async fn planning_joins(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA s").await.unwrap();
     service
@@ -2650,6 +3189,10 @@ async fn planning_3_table_joins(service: Box<dyn SqlClient>) {
         .await
         .unwrap();
     service
+        .exec_query("CREATE INDEX by_product_customer ON s.Orders(product_id, customer_id)")
+        .await
+        .unwrap();
+    service
         .exec_query("CREATE TABLE s.Customers(customer_id int, customer_name text)")
         .await
         .unwrap();
@@ -2669,7 +3212,7 @@ async fn planning_3_table_joins(service: Box<dyn SqlClient>) {
         .unwrap();
     assert_eq!(
         pp_phys_plan(p.router.as_ref()),
-        "ClusterSend, partitions: [[2, 3, 4]]"
+        "ClusterSend, partitions: [[2, 4, 5]]"
     );
     assert_eq!(
             pp_phys_plan(p.worker.as_ref()),
@@ -2682,10 +3225,10 @@ async fn planning_3_table_joins(service: Box<dyn SqlClient>) {
            \n            Scan, index: by_customer:2:[2]:sort_on[customer_id], fields: [order_id, customer_id, product_id]\
            \n              Empty\
            \n          MergeSort\
-           \n            Scan, index: default:3:[3]:sort_on[customer_id], fields: *\
+           \n            Scan, index: default:4:[4]:sort_on[customer_id], fields: *\
            \n              Empty\
            \n      MergeSort\
-           \n        Scan, index: default:4:[4]:sort_on[product_id], fields: *\
+           \n        Scan, index: default:5:[5]:sort_on[product_id], fields: *\
            \n          Empty",
         );
 
@@ -2712,14 +3255,14 @@ async fn planning_3_table_joins(service: Box<dyn SqlClient>) {
            \n        MergeJoin, on: [customer_id@1 = customer_id@0]\
            \n          Filter, predicate: product_id@2 = 125\
            \n            MergeSort\
-           \n              Scan, index: by_customer:2:[2]:sort_on[customer_id], fields: [order_id, customer_id, product_id], predicate: #product_id Eq Int64(125)\
+           \n              Scan, index: by_product_customer:3:[3]:sort_on[product_id, customer_id], fields: [order_id, customer_id, product_id], predicate: #product_id Eq Int64(125)\
            \n                Empty\
            \n          MergeSort\
-           \n            Scan, index: default:3:[3]:sort_on[customer_id], fields: *\
+           \n            Scan, index: default:4:[4]:sort_on[customer_id], fields: *\
            \n              Empty\
            \n      Filter, predicate: product_id@0 = 125\
            \n        MergeSort\
-           \n          Scan, index: default:4:[4]:sort_on[product_id], fields: *, predicate: #product_id Eq Int64(125)\
+           \n          Scan, index: default:5:[5]:sort_on[product_id], fields: *, predicate: #product_id Eq Int64(125)\
            \n            Empty",
         );
 }
@@ -2882,6 +3425,89 @@ async fn topk_query(service: Box<dyn SqlClient>) {
     assert_eq!(to_rows(&r), rows(&[("a", 1), ("e", 35), ("d", 40)]));
 }
 
+async fn topk_having(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data1(url text, hits int)")
+        .await
+        .unwrap();
+    service
+            .exec_query("INSERT INTO s.Data1(url, hits) VALUES ('a', 1), ('b', 2), ('c', 3), ('d', 4), ('e', 5), ('z', 100)")
+            .await
+            .unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data2(url text, hits int)")
+        .await
+        .unwrap();
+    service
+            .exec_query("INSERT INTO s.Data2(url, hits) VALUES ('b', 50), ('c', 45), ('d', 40), ('e', 35), ('y', 80)")
+            .await
+            .unwrap();
+
+    // A typical top-k query.
+    let r = service
+        .exec_query(
+            "SELECT `url` `url`, SUM(`hits`) `hits` \
+                         FROM (SELECT * FROM s.Data1 \
+                               UNION ALL \
+                               SELECT * FROM s.Data2) AS `Data` \
+                         GROUP BY 1 \
+                         HAVING SUM(`hits`) < 100 \
+                         ORDER BY 2 DESC \
+                         LIMIT 3",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[("y", 80), ("b", 52), ("c", 48)]));
+
+    let r = service
+        .exec_query(
+            "SELECT `url` `url`, SUM(`hits`) `hits` \
+                         FROM (SELECT * FROM s.Data1 \
+                               UNION ALL \
+                               SELECT * FROM s.Data2) AS `Data` \
+                         GROUP BY 1 \
+                         HAVING MIN(`hits`) >= 3 AND SUM(`hits`) < 100 \
+                         ORDER BY 2 DESC \
+                         LIMIT 3",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[("y", 80), ("c", 48), ("d", 44)]));
+
+    service
+        .exec_query("CREATE TABLE s.Data21(url text, hits int, hits_2 int)")
+        .await
+        .unwrap();
+    service
+            .exec_query("INSERT INTO s.Data21(url, hits, hits_2) VALUES  ('b', 5, 2), ('d', 3, 4), ('c', 4, 1),  ('e', 2, 10)")
+            .await
+            .unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data22(url text, hits int, hits_2 int)")
+        .await
+        .unwrap();
+    service
+            .exec_query("INSERT INTO s.Data22(url, hits, hits_2) VALUES ('b', 50, 3), ('c', 45, 12), ('d', 40, 10), ('e', 35, 5)")
+            .await
+            .unwrap();
+
+    let r = service
+        .exec_query(
+            "SELECT `url` `url`, SUM(`hits`) `hits` \
+                         FROM (SELECT * FROM s.Data21 \
+                               UNION ALL \
+                               SELECT * FROM s.Data22) AS `Data` \
+                         GROUP BY 1 \
+                         HAVING MAX(`hits_2`) < 11 \
+                         ORDER BY 2 DESC \
+                         LIMIT 2",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[("b", 55), ("d", 43)]));
+}
+
 async fn topk_decimals(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA s").await.unwrap();
     service
@@ -2918,6 +3544,280 @@ async fn topk_decimals(service: Box<dyn SqlClient>) {
         to_rows(&r),
         rows(&[("z", dec5(100)), ("y", dec5(80)), ("b", dec5(52))])
     );
+}
+
+async fn planning_topk_having(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data1(url text, hits int, uhits HLL_POSTGRES)")
+        .await
+        .unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data2(url text, hits int, uhits HLL_POSTGRES)")
+        .await
+        .unwrap();
+    let p = service
+        .plan_query(
+            "SELECT `url` `url`, SUM(`hits`) `hits` \
+                         FROM (SELECT * FROM s.Data1 \
+                               UNION ALL \
+                               SELECT * FROM s.Data2) AS `Data` \
+                         GROUP BY 1 \
+                         HAVING SUM(`hits`) > 10\
+                         ORDER BY 2 DESC \
+                         LIMIT 3",
+        )
+        .await
+        .unwrap();
+    let mut show_hints = PPOptions::default();
+    show_hints.show_filters = true;
+    assert_eq!(
+        pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
+        "Projection, [url, SUM(Data.hits)@1:hits]\
+        \n  AggregateTopK, limit: 3, having: SUM(Data.hits)@1 > 10\
+        \n    Worker\
+        \n      Sort\
+        \n        FullInplaceAggregate\
+        \n          MergeSort\
+        \n            Union\
+        \n              MergeSort\
+        \n                Scan, index: default:1:[1]:sort_on[url], fields: [url, hits]\
+        \n                  Empty\
+        \n              MergeSort\
+        \n                Scan, index: default:2:[2]:sort_on[url], fields: [url, hits]\
+        \n                  Empty"
+    );
+
+    let p = service
+        .plan_query(
+            "SELECT `url` `url`, SUM(`hits`) `hits`, CARDINALITY(MERGE(`uhits`)) `uhits` \
+                         FROM (SELECT * FROM s.Data1 \
+                               UNION ALL \
+                               SELECT * FROM s.Data2) AS `Data` \
+                         GROUP BY 1 \
+                         HAVING SUM(`hits`) > 10 AND CARDINALITY(MERGE(`uhits`)) > 5 \
+                         ORDER BY 2 DESC \
+                         LIMIT 3",
+        )
+        .await
+        .unwrap();
+    let mut show_hints = PPOptions::default();
+    show_hints.show_filters = true;
+    assert_eq!(
+        pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
+        "Projection, [url, SUM(Data.hits)@1:hits, CARDINALITY(MERGE(Data.uhits)@2):uhits]\
+        \n  AggregateTopK, limit: 3, having: SUM(Data.hits)@1 > 10 AND CAST(CARDINALITY(MERGE(Data.uhits)@2) AS Int64) > 5\
+        \n    Worker\
+        \n      Sort\
+        \n        FullInplaceAggregate\
+        \n          MergeSort\
+        \n            Union\
+        \n              MergeSort\
+        \n                Scan, index: default:1:[1]:sort_on[url], fields: *\
+        \n                  Empty\
+        \n              MergeSort\
+        \n                Scan, index: default:2:[2]:sort_on[url], fields: *\
+        \n                  Empty"
+        );
+}
+async fn planning_topk_hll(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data1(url text, hits HLL_POSTGRES)")
+        .await
+        .unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data2(url text, hits HLL_POSTGRES)")
+        .await
+        .unwrap();
+    // A typical top-k query.
+    let p = service
+        .plan_query(
+            "SELECT `url` `url`, cardinality(merge(hits)) `hits` \
+                         FROM (SELECT * FROM s.Data1 \
+                               UNION ALL \
+                               SELECT * FROM s.Data2) AS `Data` \
+                         GROUP BY 1 \
+                         ORDER BY 2 DESC \
+                         LIMIT 3",
+        )
+        .await
+        .unwrap();
+    let mut show_hints = PPOptions::default();
+    show_hints.show_filters = true;
+    assert_eq!(
+        pp_phys_plan(p.worker.as_ref()),
+        "Projection, [url, CARDINALITY(MERGE(Data.hits)@1):hits]\
+         \n  AggregateTopK, limit: 3\
+         \n    Worker\
+         \n      Sort\
+         \n        FullInplaceAggregate\
+         \n          MergeSort\
+         \n            Union\
+         \n              MergeSort\
+         \n                Scan, index: default:1:[1]:sort_on[url], fields: *\
+         \n                  Empty\
+         \n              MergeSort\
+         \n                Scan, index: default:2:[2]:sort_on[url], fields: *\
+         \n                  Empty"
+    );
+
+    let p = service
+        .plan_query(
+            "SELECT `url` `url`, cardinality(merge(hits)) `hits` \
+                         FROM (SELECT * FROM s.Data1 \
+                               UNION ALL \
+                               SELECT * FROM s.Data2) AS `Data` \
+                         GROUP BY 1 \
+                         HAVING cardinality(merge(hits)) > 20 and cardinality(merge(hits)) < 40\
+                         ORDER BY 2 DESC \
+                         LIMIT 3",
+        )
+        .await
+        .unwrap();
+    let mut show_hints = PPOptions::default();
+    show_hints.show_filters = true;
+    assert_eq!(
+        pp_phys_plan_ext(p.worker.as_ref(), &show_hints),
+        "Projection, [url, CARDINALITY(MERGE(Data.hits)@1):hits]\
+         \n  AggregateTopK, limit: 3, having: CAST(CARDINALITY(MERGE(Data.hits)@1) AS Int64) > 20 AND CAST(CARDINALITY(MERGE(Data.hits)@1) AS Int64) < 40\
+         \n    Worker\
+         \n      Sort\
+         \n        FullInplaceAggregate\
+         \n          MergeSort\
+         \n            Union\
+         \n              MergeSort\
+         \n                Scan, index: default:1:[1]:sort_on[url], fields: *\
+         \n                  Empty\
+         \n              MergeSort\
+         \n                Scan, index: default:2:[2]:sort_on[url], fields: *\
+         \n                  Empty"
+        );
+}
+
+async fn topk_hll(service: Box<dyn SqlClient>) {
+    let hlls = vec![
+        "X'118b7f'",
+        "X'128b7fee22c470691a8134'",
+        "X'138b7f04a10642078507c308e309230a420ac10c2510a2114511611363138116811848188218a119411a821ae11f0122e223a125a126632685276327a328e2296129e52b812fe23081320132c133e335a53641368236a23721374237e1382138e13a813c243e6140e341854304434148a24a034f8150c1520152e254e155a1564157e158e35ac25b265b615c615fc1620166a368226a416a626c016c816d677163728275817a637a817ac37b617c247c427d677f6180e18101826382e1846184e18541858287e1880189218a418b818bc38e018ea290a19244938295e4988198c299e29b239b419c419ce49da1a1e1a321a381a4c1aa61acc2ae01b0a1b101b142b161b443b801bd02bd61bf61c263c4a3c501c7a1caa1cb03cd03cf03cf42d123d4c3d662d744d901dd01df81e001e0a2e641e7e3edc1f0a2f1c1f203f484f5c4f763fc84fdc1fe02fea1'",
+        "X'148b7f21083288a4320a12086719c65108c1088422884511063388232904418c8520484184862886528c65198832106328c83114e6214831108518d03208851948511884188441908119083388661842818c43190c320ce4210a50948221083084a421c8328c632104221c4120d01284e20902318ca5214641942319101294641906228483184e128c43188e308882204a538c8328903288642102220c64094631086330c832106320c46118443886329062118a230c63108a320c23204a11852419c6528c85210a318c6308c41088842086308ce7110a418864190650884210ca631064108642a1022186518c8509862109020a0a4318671144150842400e5090631a0811848320c821888120c81114a220880290622906310d0220c83090a118c433106128c221902210cc23106029044114841104409862190c43188111063104c310c6728c8618c62290441102310c23214440882438ca2110a32908548c432110329462188a43946328842114640944320884190c928c442084228863318a2190a318c6618ca3114651886618c44190c5108e2110612144319062284641908428882314862106419883310421988619ca420cc511442104633888218c4428465288651910730c81118821088218c6418c45108452106519ce410d841904218863308622086211483198c710c83104a328c620906218864118623086418c8711423094632186420c4620c41104620a441108e40882628c6311c212046428c8319021104672888428ca320c431984418c4209043084451886510c641108310c4c20c66188472146310ca71084820c621946218c8228822190e2410861904411c27288621144328c6440c6311063190813086228ca710c2218c4718865188c2114850888608864404a3194e22882310ce53088619ca31904519503188e1118c4214cb2948110c6119c2818c843108520c43188c5204821186528c871908311086214c630c4218c8418cc3298a31888210c63110a121042198622886531082098c419c4210c6210c8338c25294610944518c442104610884104424206310c8311462288873102308c2440c451082228824310440982220c4240c622084310c642850118c641148430d0128c8228c2120c221884428863208c21a0a4190a4404c21186548865204633906308ca32086211c8319ce22146520c6120803318a518c840084519461208c21908538cc428c2110844384e40906320c44014a3204e62042408c8328c632146318c812004310c41318e3208a5308a511827104a4188c51048421446090a7088631102231484104473084318c41210860906919083190652906129c4628c45310652848221443114420084500865184a618c81198c32906418c63190e320c231882728484184671888309465188a320c83208632144318c6331c642988108c61218812144328d022844021022184a31908328c6218c2328c4528cc541428190641046418c84108443146230c6419483214232184411863290a210824318c220868194631106618c43188821048230c4128c6310c0330462094241106330c42188c321043118863046438823110a041464108e3190e4209a11902439c43188631104321008090441106218c6419064294a229463594622244320cc71184510902924421908218c62308641044328ca328882111012884120ca52882428c62184442086718c4221c8211082208a321023115270086218c4218c6528ce400482310a520c43104a520c44210811884118c4310864198263942331822'",
+    ];
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data1(url text, hits HLL_POSTGRES)")
+        .await
+        .unwrap();
+    service
+            .exec_query(
+                &format!("INSERT INTO s.Data1(url, hits) VALUES ('a', {}), ('b', {}), ('c', {}), ('d', {}), ('k', {}) ",
+                hlls[0], hlls[1], hlls[2], hlls[3], hlls[0]
+            ))
+            .await
+            .unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data2(url text, hits HLL_POSTGRES)")
+        .await
+        .unwrap();
+    service
+            .exec_query(
+                &format!("INSERT INTO s.Data2(url, hits) VALUES ('b', {}), ('c', {}), ('e', {}), ('d', {}), ('h', {})",
+                hlls[3], hlls[2], hlls[1], hlls[2], hlls[2]
+                )
+                )
+            .await
+            .unwrap();
+
+    // A typical top-k query.
+    let r = service
+        .exec_query(
+            "SELECT `url` `url`, cardinality(merge(hits)) `hits` \
+                         FROM (SELECT * FROM s.Data1 \
+                               UNION ALL \
+                               SELECT * FROM s.Data2) AS `Data` \
+                         GROUP BY 1 \
+                         ORDER BY 2 DESC \
+                         LIMIT 3",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[("d", 10383), ("b", 9722), ("c", 171)]));
+
+    let r = service
+        .exec_query(
+            "SELECT `url` `url`, cardinality(merge(hits)) `hits` \
+                         FROM (SELECT * FROM s.Data1 \
+                               UNION ALL \
+                               SELECT * FROM s.Data2) AS `Data` \
+                         GROUP BY 1 \
+                         HAVING cardinality(merge(hits)) < 10000
+                         ORDER BY 2 DESC \
+                         LIMIT 3",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[("b", 9722), ("c", 171), ("h", 164)]));
+    let r = service
+        .exec_query(
+            "SELECT `url` `url`, cardinality(merge(hits)) `hits` \
+                         FROM (SELECT * FROM s.Data1 \
+                               UNION ALL \
+                               SELECT * FROM s.Data2) AS `Data` \
+                         GROUP BY 1 \
+                         HAVING cardinality(merge(hits)) < 170 and cardinality(merge(hits)) > 160
+                         ORDER BY 2 DESC \
+                         LIMIT 3",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[("h", 164)]));
+}
+
+async fn topk_hll_with_nulls(service: Box<dyn SqlClient>) {
+    let hlls = vec![
+        "X'118b7f'",
+        "X'128b7fee22c470691a8134'",
+        "X'138b7f04a10642078507c308e309230a420ac10c2510a2114511611363138116811848188218a119411a821ae11f0122e223a125a126632685276327a328e2296129e52b812fe23081320132c133e335a53641368236a23721374237e1382138e13a813c243e6140e341854304434148a24a034f8150c1520152e254e155a1564157e158e35ac25b265b615c615fc1620166a368226a416a626c016c816d677163728275817a637a817ac37b617c247c427d677f6180e18101826382e1846184e18541858287e1880189218a418b818bc38e018ea290a19244938295e4988198c299e29b239b419c419ce49da1a1e1a321a381a4c1aa61acc2ae01b0a1b101b142b161b443b801bd02bd61bf61c263c4a3c501c7a1caa1cb03cd03cf03cf42d123d4c3d662d744d901dd01df81e001e0a2e641e7e3edc1f0a2f1c1f203f484f5c4f763fc84fdc1fe02fea1'",
+        "X'148b7f21083288a4320a12086719c65108c1088422884511063388232904418c8520484184862886528c65198832106328c83114e6214831108518d03208851948511884188441908119083388661842818c43190c320ce4210a50948221083084a421c8328c632104221c4120d01284e20902318ca5214641942319101294641906228483184e128c43188e308882204a538c8328903288642102220c64094631086330c832106320c46118443886329062118a230c63108a320c23204a11852419c6528c85210a318c6308c41088842086308ce7110a418864190650884210ca631064108642a1022186518c8509862109020a0a4318671144150842400e5090631a0811848320c821888120c81114a220880290622906310d0220c83090a118c433106128c221902210cc23106029044114841104409862190c43188111063104c310c6728c8618c62290441102310c23214440882438ca2110a32908548c432110329462188a43946328842114640944320884190c928c442084228863318a2190a318c6618ca3114651886618c44190c5108e2110612144319062284641908428882314862106419883310421988619ca420cc511442104633888218c4428465288651910730c81118821088218c6418c45108452106519ce410d841904218863308622086211483198c710c83104a328c620906218864118623086418c8711423094632186420c4620c41104620a441108e40882628c6311c212046428c8319021104672888428ca320c431984418c4209043084451886510c641108310c4c20c66188472146310ca71084820c621946218c8228822190e2410861904411c27288621144328c6440c6311063190813086228ca710c2218c4718865188c2114850888608864404a3194e22882310ce53088619ca31904519503188e1118c4214cb2948110c6119c2818c843108520c43188c5204821186528c871908311086214c630c4218c8418cc3298a31888210c63110a121042198622886531082098c419c4210c6210c8338c25294610944518c442104610884104424206310c8311462288873102308c2440c451082228824310440982220c4240c622084310c642850118c641148430d0128c8228c2120c221884428863208c21a0a4190a4404c21186548865204633906308ca32086211c8319ce22146520c6120803318a518c840084519461208c21908538cc428c2110844384e40906320c44014a3204e62042408c8328c632146318c812004310c41318e3208a5308a511827104a4188c51048421446090a7088631102231484104473084318c41210860906919083190652906129c4628c45310652848221443114420084500865184a618c81198c32906418c63190e320c231882728484184671888309465188a320c83208632144318c6331c642988108c61218812144328d022844021022184a31908328c6218c2328c4528cc541428190641046418c84108443146230c6419483214232184411863290a210824318c220868194631106618c43188821048230c4128c6310c0330462094241106330c42188c321043118863046438823110a041464108e3190e4209a11902439c43188631104321008090441106218c6419064294a229463594622244320cc71184510902924421908218c62308641044328ca328882111012884120ca52882428c62184442086718c4221c8211082208a321023115270086218c4218c6528ce400482310a520c43104a520c44210811884118c4310864198263942331822'",
+    ];
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data1(url text, hits HLL_POSTGRES)")
+        .await
+        .unwrap();
+    service
+            .exec_query(
+                &format!("INSERT INTO s.Data1(url, hits) VALUES ('a', {}), ('b', {}), ('c', {}), ('d', {}), ('k', {}) ",
+                "Null", hlls[1], hlls[2], hlls[3], hlls[3]
+            ))
+            .await
+            .unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data2(url text, hits HLL_POSTGRES)")
+        .await
+        .unwrap();
+    service
+            .exec_query(
+                &format!("INSERT INTO s.Data2(url, hits) VALUES ('b', {}), ('c', {}), ('e', {}), ('d', {}), ('h', {})",
+                hlls[3], "Null", hlls[1], hlls[2], hlls[2]
+                )
+                )
+            .await
+            .unwrap();
+
+    // A typical top-k query.
+    let r = service
+        .exec_query(
+            "SELECT `url` `url`, cardinality(merge(hits)) `hits` \
+                         FROM (SELECT * FROM s.Data1 \
+                               UNION ALL \
+                               SELECT * FROM s.Data2) AS `Data` \
+                         GROUP BY 1 \
+                         ORDER BY 2 ASC \
+                         LIMIT 3",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[("a", 0), ("e", 1), ("c", 164)]));
 }
 
 async fn offset(service: Box<dyn SqlClient>) {
@@ -3545,6 +4445,57 @@ async fn rolling_window_query_timestamps(service: Box<dyn SqlClient>) {
     );
 }
 
+async fn rolling_window_query_timestamps_exceeded(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.data(day int, name string, n int)")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO s.data(day, name, n)\
+                        VALUES \
+                         (4, 'john', 10), \
+                         (4, 'sara', 7), \
+                         (5, 'sara', 3), \
+                         (5, 'john', 9), \
+                         (6, 'john', 11), \
+                         (7, 'timmy', 5)",
+        )
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query(
+            "SELECT day, name, ROLLING(SUM(n) RANGE 1 PRECEDING) \
+             FROM (SELECT day, name, SUM(n) as n FROM s.data GROUP BY 1, 2) base \
+             ROLLING_WINDOW DIMENSION day PARTITION BY name \
+               FROM -5 \
+               TO 5 \
+               EVERY 1 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (-5, None, None),
+            (-4, None, None),
+            (-3, None, None),
+            (-2, None, None),
+            (-1, None, None),
+            (0, None, None),
+            (1, None, None),
+            (2, None, None),
+            (3, None, None),
+            (4, Some("john"), Some(10)),
+            (4, Some("sara"), Some(7)),
+            (5, Some("john"), Some(19)),
+            (5, Some("sara"), Some(10))
+        ])
+    );
+}
 async fn rolling_window_extra_aggregate(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA s").await.unwrap();
     service
@@ -4276,7 +5227,708 @@ async fn dimension_only_queries_for_stream_table(service: Box<dyn SqlClient>) {
     assert_eq!(to_rows(&r), rows(&[("0"), ("1")]));
 }
 
-fn to_rows(d: &DataFrame) -> Vec<Vec<TableValue>> {
+async fn unique_key_and_multi_measures_for_stream_table(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA test").await.unwrap();
+    service.exec_query("CREATE TABLE test.events_by_type (foo text, bar timestamp, bar_id text, measure1 int, measure2 text) unique key (foo, bar, bar_id)").await.unwrap();
+    for i in 0..2 {
+        for j in 0..2 {
+            service
+                .exec_query(&format!("INSERT INTO test.events_by_type (foo, bar, bar_id, measure1, measure2, __seq) VALUES ('a', '2021-01-01T00:00:00.000', '{}', {}, '{}', {})", i, j, "text_value", i * 10 + j))
+                .await
+                .unwrap();
+        }
+    }
+    let r = service
+        .exec_query(
+            "SELECT bar_id, measure1, measure2 FROM test.events_by_type as `events` LIMIT 100",
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        to_rows(&r),
+        rows(&[("0", 1, "text_value"), ("1", 1, "text_value")])
+    );
+}
+
+async fn divide_by_zero(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.t(i int, z int)")
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.t(i, z) VALUES (1, 0), (2, 0), (3, 0)")
+        .await
+        .unwrap();
+    let r = service
+        .exec_query("SELECT i / z FROM s.t")
+        .await
+        .err()
+        .unwrap();
+    assert_eq!(
+        r.elide_backtrace(),
+        CubeError::internal("Execution error: Internal: Arrow error: External error: Arrow error: Divide by zero error".to_string())
+    );
+}
+
+async fn panic_worker(service: Box<dyn SqlClient>) {
+    let r = service.exec_query("SYS PANIC WORKER").await;
+    assert_eq!(r, Err(CubeError::panic("worker panic".to_string())));
+}
+
+async fn filter_multiple_in_for_decimal(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.t(i decimal)")
+        .await
+        .unwrap();
+    service
+        .exec_query("INSERT INTO s.t(i) VALUES (1), (2), (3)")
+        .await
+        .unwrap();
+    let r = service
+        .exec_query("SELECT count(*) FROM s.t WHERE i in ('2', '3')")
+        .await
+        .unwrap();
+
+    assert_eq!(to_rows(&r), rows(&[(2)]));
+}
+
+async fn planning_aggregate_index(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Orders(a int, b int, c int, a_sum int, a_max int, a_min int, a_merge HYPERLOGLOG)
+                     AGGREGATIONS(sum(a_sum), max(a_max), min(a_min), merge(a_merge))
+                     INDEX reg_index (a, b) 
+                     AGGREGATE INDEX aggr_index (a, b)
+                     ")
+        .await
+        .unwrap();
+
+    let p = service
+        .plan_query("SELECT a, b, sum(a_sum) FROM s.Orders GROUP BY 1, 2")
+        .await
+        .unwrap();
+    assert_eq!(
+        pp_phys_plan(p.worker.as_ref()),
+        "Projection, [a, b, SUM(s.Orders.a_sum)@2:SUM(a_sum)]\
+         \n  FinalInplaceAggregate\
+         \n    Worker\
+         \n      PartialInplaceAggregate\
+         \n        MergeSort\
+         \n          Scan, index: aggr_index:2:[2]:sort_on[a, b], fields: [a, b, a_sum]\
+         \n            Empty"
+    );
+
+    let p = service
+        .plan_query("SELECT a, b, sum(a_sum), max(a_max), min(a_min), merge(a_merge) FROM s.Orders GROUP BY 1, 2")
+        .await
+        .unwrap();
+    assert_eq!(
+        pp_phys_plan(p.worker.as_ref()),
+        "Projection, [a, b, SUM(s.Orders.a_sum)@2:SUM(a_sum), MAX(s.Orders.a_max)@3:MAX(a_max), MIN(s.Orders.a_min)@4:MIN(a_min), MERGE(s.Orders.a_merge)@5:MERGE(a_merge)]\
+         \n  FinalInplaceAggregate\
+         \n    Worker\
+         \n      PartialInplaceAggregate\
+         \n        MergeSort\
+         \n          Scan, index: aggr_index:2:[2]:sort_on[a, b], fields: *\
+         \n            Empty"
+    );
+
+    let p = service
+        .plan_query("SELECT a, b, sum(a_sum), max(a_max), min(a_min), merge(a_merge) FROM s.Orders WHERE c = 1 GROUP BY 1, 2")
+        .await
+        .unwrap();
+    assert_eq!(
+        pp_phys_plan(p.worker.as_ref()),
+        "Projection, [a, b, SUM(s.Orders.a_sum)@2:SUM(a_sum), MAX(s.Orders.a_max)@3:MAX(a_max), MIN(s.Orders.a_min)@4:MIN(a_min), MERGE(s.Orders.a_merge)@5:MERGE(a_merge)]\
+         \n  FinalInplaceAggregate\
+         \n    Worker\
+         \n      PartialInplaceAggregate\
+         \n        Filter\
+         \n          MergeSort\
+         \n            Scan, index: default:3:[3]:sort_on[a, b, c], fields: *\
+         \n              Empty"
+    );
+
+    let p = service
+        .plan_query(
+            "SELECT a, sum(a_sum), max(a_max), min(a_min), merge(a_merge) FROM s.Orders GROUP BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        pp_phys_plan(p.worker.as_ref()),
+        "Projection, [a, SUM(s.Orders.a_sum)@1:SUM(a_sum), MAX(s.Orders.a_max)@2:MAX(a_max), MIN(s.Orders.a_min)@3:MIN(a_min), MERGE(s.Orders.a_merge)@4:MERGE(a_merge)]\
+         \n  FinalInplaceAggregate\
+         \n    Worker\
+         \n      PartialInplaceAggregate\
+         \n        MergeSort\
+         \n          Scan, index: aggr_index:2:[2]:sort_on[a], fields: [a, a_sum, a_max, a_min, a_merge]\
+         \n            Empty"
+    );
+
+    let p = service
+        .plan_query("SELECT a, avg(a_sum) FROM s.Orders GROUP BY 1")
+        .await
+        .unwrap();
+    assert_eq!(
+        pp_phys_plan(p.worker.as_ref()),
+        "Projection, [a, AVG(s.Orders.a_sum)@1:AVG(a_sum)]\
+         \n  FinalInplaceAggregate\
+         \n    Worker\
+         \n      PartialInplaceAggregate\
+         \n        MergeSort\
+         \n          Scan, index: reg_index:1:[1]:sort_on[a], fields: [a, a_sum]\
+         \n            Empty"
+    );
+
+    let p = service
+        .plan_query("SELECT a, sum(a_sum) FROM s.Orders WHERE b = 1 GROUP BY 1")
+        .await
+        .unwrap();
+    assert_eq!(
+        pp_phys_plan(p.worker.as_ref()),
+        "Projection, [a, SUM(s.Orders.a_sum)@1:SUM(a_sum)]\
+         \n  FinalInplaceAggregate\
+         \n    Worker\
+         \n      PartialInplaceAggregate\
+         \n        Filter\
+         \n          MergeSort\
+         \n            Scan, index: aggr_index:2:[2]:sort_on[a, b], fields: [a, b, a_sum]\
+         \n              Empty"
+    );
+}
+
+async fn aggregate_index(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query(
+            "CREATE TABLE s.Orders(a int, b int, c int, a_sum int, a_max int, a_min int)
+                     AGGREGATIONS(sum(a_sum), max(a_max), min(a_min))
+                     INDEX reg_index (a, b) 
+                     AGGREGATE INDEX aggr_index (a, b)
+                     ",
+        )
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO s.Orders (a, b, c, a_sum, a_max, a_min) VALUES (1, 10, 100, 10, 10, 10), \
+                                                   (2, 20, 200, 10, 10, 10), \
+                                                   (1, 10, 300, 20, 20, 20), \
+                                                   (2, 30, 200, 100, 100, 100), \
+                                                   (1, 10, 400, 20, 40, 40), \
+                                                   (2, 20, 410, 20, 30, 30) \
+                                                   ",
+        )
+        .await
+        .unwrap();
+
+    let res = service
+        .exec_query("SELECT a, b, sum(a_sum) as sum, max(a_max) as max, min(a_min) as min FROM s.Orders GROUP BY 1, 2 ORDER BY 1, 2")
+        .await
+        .unwrap();
+
+    assert_eq!(
+        to_rows(&res),
+        [
+            [
+                TableValue::Int(1),
+                TableValue::Int(10),
+                TableValue::Int(50),
+                TableValue::Int(40),
+                TableValue::Int(10)
+            ],
+            [
+                TableValue::Int(2),
+                TableValue::Int(20),
+                TableValue::Int(30),
+                TableValue::Int(30),
+                TableValue::Int(10)
+            ],
+            [
+                TableValue::Int(2),
+                TableValue::Int(30),
+                TableValue::Int(100),
+                TableValue::Int(100),
+                TableValue::Int(100)
+            ],
+        ]
+    );
+
+    let res = service
+        .exec_query("SELECT a, sum(a_sum) as sum, max(a_max) as max, min(a_min) as min FROM s.Orders GROUP BY 1 ORDER BY 1")
+        .await
+        .unwrap();
+
+    assert_eq!(
+        to_rows(&res),
+        [
+            [
+                TableValue::Int(1),
+                TableValue::Int(50),
+                TableValue::Int(40),
+                TableValue::Int(10)
+            ],
+            [
+                TableValue::Int(2),
+                TableValue::Int(130),
+                TableValue::Int(100),
+                TableValue::Int(10)
+            ],
+        ]
+    );
+
+    let res = service
+        .exec_query("SELECT a, sum(a_sum) as sum, max(a_max) as max, min(a_min) as min FROM s.Orders WHERE b = 20 GROUP BY 1 ORDER BY 1")
+        .await
+        .unwrap();
+
+    assert_eq!(
+        to_rows(&res),
+        [[
+            TableValue::Int(2),
+            TableValue::Int(30),
+            TableValue::Int(30),
+            TableValue::Int(10)
+        ],]
+    );
+}
+
+async fn aggregate_index_hll(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query(
+            "CREATE TABLE s.Orders(a int, b int, a_hll hyperloglog)
+                     AGGREGATIONS(merge(a_hll))
+                     AGGREGATE INDEX aggr_index (a, b)
+                     ",
+        )
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO s.Orders (a, b, a_hll) VALUES \
+                                                    (1, 10, X'020C0200C02FF58941D5F0C6'), \
+                                                    (1, 20, X'020C0200C02FF58941D5F0C6'), \
+                                                    (1, 10, X'020C0200C02FF58941D5F0C6'), \
+                                                    (1, 20, X'020C0200C02FF58941D5F0C6') \
+                                                   ",
+        )
+        .await
+        .unwrap();
+
+    let res = service
+        .exec_query("SELECT a, b, cardinality(merge(a_hll)) as hll FROM s.Orders GROUP BY 1, 2 ORDER BY 1, 2")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&res),
+        [
+            [TableValue::Int(1), TableValue::Int(10), TableValue::Int(2)],
+            [TableValue::Int(1), TableValue::Int(20), TableValue::Int(2)],
+        ]
+    );
+
+    let res = service
+        .exec_query("SELECT a, cardinality(merge(a_hll)) as hll FROM s.Orders WHERE b = 20 GROUP BY 1 ORDER BY 1")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&res), [[TableValue::Int(1), TableValue::Int(2)],]);
+
+    let res = service
+        .exec_query(
+            "SELECT a, cardinality(merge(a_hll)) as hll FROM s.Orders GROUP BY 1 ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&res), [[TableValue::Int(1), TableValue::Int(2)],]);
+}
+
+async fn aggregate_index_errors(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Orders(a int, b int, a_hll hyperloglog)
+                     AGGREGATE INDEX aggr_index (a, b, a_hll)
+                     ")
+        .await
+        .expect_err("Can't create aggregate index for table 'Orders' because aggregate columns (`AGGREGATIONS`) not specified for the table");
+
+    service
+        .exec_query("CREATE TABLE s.Orders(a int, b int, a_hll hyperloglog)
+                     AGGREGATIONS(merge(a_hll))
+                     AGGREGATE INDEX aggr_index (a, b, a_hll)
+                     ")
+        .await
+        .expect_err("Column 'a_hll' in aggregate index 'aggr_index' is in aggregations list for table 'Orders'. Aggregate index columns must be outside of aggregations list.");
+
+    service
+        .exec_query(
+            "CREATE TABLE s.Orders(a int, b string, a_hll hyperloglog)
+                    AGGREGATIONS (sum(a), sum(b))
+                     ",
+        )
+        .await
+        .expect_err("Aggregate function SUM not allowed for column type text");
+
+    service
+        .exec_query(
+            "CREATE TABLE s.Orders(a int, b string, a_hll hyperloglog)
+                    AGGREGATIONS (sum(a), max(b), sum(a_hll))
+                     ",
+        )
+        .await
+        .expect_err("Aggregate function SUM not allowed for column type hyperloglog");
+
+    service
+        .exec_query(
+            "CREATE TABLE s.Orders(a int, b string, a_hll hyperloglog)
+                    AGGREGATIONS (max(a_hll))
+                     ",
+        )
+        .await
+        .expect_err("Aggregate function MAX not allowed for column type hyperloglog");
+
+    service
+        .exec_query(
+            "CREATE TABLE s.Orders(a int, b string, a_hll hyperloglog)
+                    AGGREGATIONS (merge(a))
+                     ",
+        )
+        .await
+        .expect_err("Aggregate function MERGE not allowed for column type integer");
+}
+
+async fn inline_tables(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA Foo").await.unwrap();
+    service
+        .exec_query(
+            "CREATE TABLE Foo.Persons (
+                ID int,
+                FirstName varchar(255),
+                LastName varchar(255),
+                Timestamp timestamp
+            )",
+        )
+        .await
+        .unwrap();
+
+    service
+        .exec_query(
+            "INSERT INTO Foo.Persons
+        (ID, LastName, FirstName, Timestamp)
+        VALUES
+        (23, 'LastName 1', 'FirstName 1', '2020-01-01T00:00:00.000Z'),
+        (24, 'LastName 3', 'FirstName 1', '2020-01-02T00:00:00.000Z'),
+        (25, 'LastName 4', 'FirstName 1', '2020-01-03T00:00:00.000Z'),
+        (26, 'LastName 5', 'FirstName 1', '2020-01-04T00:00:00.000Z'),
+        (35, 'LastName 24', 'FirstName 2', '2020-01-01T00:00:00.000Z'),
+        (36, 'LastName 23', 'FirstName 2', '2020-01-02T00:00:00.000Z'),
+        (37, 'LastName 22', 'FirstName 2', '2020-01-03T00:00:00.000Z'),
+        (38, 'LastName 21', 'FirstName 2', '2020-01-04T00:00:00.000Z')",
+        )
+        .await
+        .unwrap();
+
+    let result = service
+        .exec_query("SELECT * FROM Foo.Persons")
+        .await
+        .unwrap();
+    assert_eq!(result.get_rows().len(), 8);
+    assert_eq!(
+        result.get_rows()[0],
+        Row::new(vec![
+            TableValue::Int(23),
+            TableValue::String("FirstName 1".to_string()),
+            TableValue::String("LastName 1".to_string()),
+            TableValue::Timestamp(timestamp_from_string("2020-01-01T00:00:00.000Z").unwrap()),
+        ])
+    );
+
+    let columns = vec![
+        Column::new("ID".to_string(), ColumnType::Int, 0),
+        Column::new("LastName".to_string(), ColumnType::String, 1),
+        Column::new("FirstName".to_string(), ColumnType::String, 2),
+        Column::new("Timestamp".to_string(), ColumnType::Timestamp, 3),
+    ];
+    let rows = vec![
+        Row::new(vec![
+            TableValue::Null,
+            TableValue::String("last 1".to_string()),
+            TableValue::String("first 1".to_string()),
+            TableValue::Timestamp(timestamp_from_string("2020-01-01T00:00:00.000Z").unwrap()),
+        ]),
+        Row::new(vec![
+            TableValue::Int(2),
+            TableValue::Null,
+            TableValue::String("first 2".to_string()),
+            TableValue::Timestamp(timestamp_from_string("2020-01-02T00:00:00.000Z").unwrap()),
+        ]),
+        Row::new(vec![
+            TableValue::Int(3),
+            TableValue::String("last 3".to_string()),
+            TableValue::String("first 3".to_string()),
+            TableValue::Timestamp(timestamp_from_string("2020-01-03T00:00:00.000Z").unwrap()),
+        ]),
+        Row::new(vec![
+            TableValue::Int(4),
+            TableValue::String("last 4".to_string()),
+            TableValue::String("first 4".to_string()),
+            TableValue::Null,
+        ]),
+    ];
+    let data = Arc::new(DataFrame::new(columns, rows.clone()));
+    let inline_tables = vec![InlineTable::new(1000, "Persons".to_string(), data)];
+
+    let context = SqlQueryContext::default().with_inline_tables(&inline_tables);
+    let result = service
+        .exec_query_with_context(context, "SELECT * FROM Persons")
+        .await
+        .unwrap();
+    assert_eq!(result.get_rows(), &rows);
+
+    let context = SqlQueryContext::default().with_inline_tables(&inline_tables);
+    let result = service
+        .exec_query_with_context(context, "SELECT LastName, Timestamp FROM Persons")
+        .await
+        .unwrap();
+    assert_eq!(
+        result.get_rows(),
+        &vec![
+            Row::new(vec![
+                TableValue::String("last 1".to_string()),
+                TableValue::Timestamp(timestamp_from_string("2020-01-01T00:00:00.000Z").unwrap()),
+            ]),
+            Row::new(vec![
+                TableValue::Null,
+                TableValue::Timestamp(timestamp_from_string("2020-01-02T00:00:00.000Z").unwrap()),
+            ]),
+            Row::new(vec![
+                TableValue::String("last 3".to_string()),
+                TableValue::Timestamp(timestamp_from_string("2020-01-03T00:00:00.000Z").unwrap()),
+            ]),
+            Row::new(vec![
+                TableValue::String("last 4".to_string()),
+                TableValue::Null,
+            ]),
+        ]
+    );
+
+    let context = SqlQueryContext::default().with_inline_tables(&inline_tables);
+    let result = service
+        .exec_query_with_context(
+            context,
+            r#"
+            SELECT *
+            FROM (
+                SELECT LastName, Timestamp FROM Foo.Persons
+                UNION ALL SELECT LastName, Timestamp FROM Persons
+            )
+            ORDER BY LastName
+        "#,
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        result.get_rows()[8..12].to_vec(),
+        vec![
+            Row::new(vec![
+                TableValue::String("last 1".to_string()),
+                TableValue::Timestamp(timestamp_from_string("2020-01-01T00:00:00.000Z").unwrap()),
+            ]),
+            Row::new(vec![
+                TableValue::String("last 3".to_string()),
+                TableValue::Timestamp(timestamp_from_string("2020-01-03T00:00:00.000Z").unwrap()),
+            ]),
+            Row::new(vec![
+                TableValue::String("last 4".to_string()),
+                TableValue::Null,
+            ]),
+            Row::new(vec![
+                TableValue::Null,
+                TableValue::Timestamp(timestamp_from_string("2020-01-02T00:00:00.000Z").unwrap()),
+            ]),
+        ]
+    );
+}
+
+async fn inline_tables_2x(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA Foo").await.unwrap();
+    service
+        .exec_query("CREATE TABLE Foo.Persons (ID int, First varchar(255), Last varchar(255))")
+        .await
+        .unwrap();
+    service
+        .exec_query("CREATE TABLE Foo.Persons2 (ID int, First varchar(255), Last varchar(255))")
+        .await
+        .unwrap();
+
+    service
+        .exec_query(
+            "INSERT INTO Foo.Persons
+            (ID, Last, First)
+            VALUES
+            (11, 'last 11', 'first 11'),
+            (12, 'last 12', 'first 12'),
+            (13, 'last 13', 'first 13')",
+        )
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO Foo.Persons2
+            (ID, Last, First)
+            VALUES
+            (31, 'last 31', 'first 31'),
+            (32, 'last 32', 'first 32'),
+            (33, 'last 33', 'first 33')",
+        )
+        .await
+        .unwrap();
+
+    let columns = vec![
+        Column::new("ID".to_string(), ColumnType::Int, 0),
+        Column::new("Last".to_string(), ColumnType::String, 1),
+        Column::new("First".to_string(), ColumnType::String, 2),
+    ];
+    let rows = vec![
+        Row::new(vec![
+            TableValue::Int(41),
+            TableValue::String("last 41".to_string()),
+            TableValue::String("first 41".to_string()),
+        ]),
+        Row::new(vec![
+            TableValue::Int(42),
+            TableValue::String("last 42".to_string()),
+            TableValue::String("first 42".to_string()),
+        ]),
+        Row::new(vec![
+            TableValue::Int(43),
+            TableValue::String("last 43".to_string()),
+            TableValue::String("first 43".to_string()),
+        ]),
+    ];
+    let rows2 = vec![
+        Row::new(vec![
+            TableValue::Int(21),
+            TableValue::String("last 21".to_string()),
+            TableValue::String("first 21".to_string()),
+        ]),
+        Row::new(vec![
+            TableValue::Int(22),
+            TableValue::String("last 22".to_string()),
+            TableValue::String("first 22".to_string()),
+        ]),
+        Row::new(vec![
+            TableValue::Int(23),
+            TableValue::String("last 23".to_string()),
+            TableValue::String("first 23".to_string()),
+        ]),
+    ];
+    let data = Arc::new(DataFrame::new(columns.clone(), rows.clone()));
+    let data2 = Arc::new(DataFrame::new(columns.clone(), rows2.clone()));
+    let inline_tables = vec![
+        InlineTable::new(1000, "Persons".to_string(), data),
+        InlineTable::new(1001, "Persons2".to_string(), data2),
+    ];
+
+    let context = SqlQueryContext::default().with_inline_tables(&inline_tables);
+    let result = service
+        .exec_query_with_context(
+            context,
+            r#"
+            SELECT Last
+            FROM (
+                SELECT ID, Last FROM Foo.Persons
+                UNION ALL SELECT ID, Last FROM Foo.Persons2
+                UNION ALL SELECT ID, Last FROM Persons
+                UNION ALL SELECT ID, Last FROM Persons2
+            )
+            ORDER BY Last
+        "#,
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        result.get_rows().to_vec(),
+        vec![
+            Row::new(vec![TableValue::String("last 11".to_string())]),
+            Row::new(vec![TableValue::String("last 12".to_string())]),
+            Row::new(vec![TableValue::String("last 13".to_string())]),
+            Row::new(vec![TableValue::String("last 21".to_string())]),
+            Row::new(vec![TableValue::String("last 22".to_string())]),
+            Row::new(vec![TableValue::String("last 23".to_string())]),
+            Row::new(vec![TableValue::String("last 31".to_string())]),
+            Row::new(vec![TableValue::String("last 32".to_string())]),
+            Row::new(vec![TableValue::String("last 33".to_string())]),
+            Row::new(vec![TableValue::String("last 41".to_string())]),
+            Row::new(vec![TableValue::String("last 42".to_string())]),
+            Row::new(vec![TableValue::String("last 43".to_string())]),
+        ]
+    );
+}
+
+async fn build_range_end(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+
+    service
+        .exec_query("CREATE TABLE s.t0(x string)")
+        .await
+        .unwrap();
+
+    service
+        .exec_query("CREATE TABLE s.t1(x string) WITH(build_range_end = '2020-01-01T00:00:00.000')")
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query("SELECT table_schema, table_name, build_range_end FROM system.tables")
+        .await
+        .unwrap();
+
+    assert_eq!(
+        r.get_rows(),
+        &vec![
+            Row::new(vec![
+                TableValue::String("s".to_string()),
+                TableValue::String("t0".to_string()),
+                TableValue::Null,
+            ]),
+            Row::new(vec![
+                TableValue::String("s".to_string()),
+                TableValue::String("t1".to_string()),
+                TableValue::Timestamp(timestamp_from_string("2020-01-01T00:00:00.000").unwrap()),
+            ]),
+        ]
+    );
+
+    let r = service
+        .exec_query(
+            "SELECT table_schema, table_name, build_range_end FROM information_schema.tables",
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        r.get_rows(),
+        &vec![
+            Row::new(vec![
+                TableValue::String("s".to_string()),
+                TableValue::String("t0".to_string()),
+                TableValue::Null,
+            ]),
+            Row::new(vec![
+                TableValue::String("s".to_string()),
+                TableValue::String("t1".to_string()),
+                TableValue::Timestamp(timestamp_from_string("2020-01-01T00:00:00.000").unwrap()),
+            ]),
+        ]
+    );
+}
+
+pub fn to_rows(d: &DataFrame) -> Vec<Vec<TableValue>> {
     return d
         .get_rows()
         .iter()

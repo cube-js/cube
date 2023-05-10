@@ -20,13 +20,16 @@ export class CubeEvaluator extends CubeSymbols {
 
     this.evaluatedCubes = R.fromPairs(validCubes.map(v => [v.name, v]));
     this.byFileName = R.groupBy(v => v.fileName, validCubes);
-    this.primaryKeys = R.fromPairs(validCubes.map((v) => {
-      const primaryKeyNameToSymbol = R.compose(R.find(d => d[1].primaryKey), R.toPairs)(v.dimensions || {});
-      return [
-        v.name,
-        primaryKeyNameToSymbol && primaryKeyNameToSymbol[0]
-      ];
-    }));
+    this.primaryKeys = R.fromPairs(
+      validCubes.map((v) => {
+        const primaryKeyNamesToSymbols = R.compose(
+          R.map((d) => d[0]),
+          R.filter((d) => d[1].primaryKey),
+          R.toPairs
+        )(v.dimensions || {});
+        return [v.name, primaryKeyNamesToSymbols];
+      })
+    );
   }
 
   /**
@@ -116,8 +119,15 @@ export class CubeEvaluator extends CubeSymbols {
         const preAggregations = this.preAggregationsForCube(cube);
         return Object.keys(preAggregations)
           .filter(
-            preAggregationName => (!scheduled || preAggregations[preAggregationName].scheduledRefresh) &&
-              (!preAggregationIds || preAggregationIds.includes(idFactory({ cube, preAggregationName })))
+            preAggregationName => (
+              !scheduled ||
+              preAggregations[preAggregationName].scheduledRefresh
+            ) && (
+              !preAggregationIds ||
+              preAggregationIds.includes(idFactory({
+                cube, preAggregationName
+              }))
+            )
           )
           .map(preAggregationName => {
             const { indexes, refreshKey } = preAggregations[preAggregationName];
@@ -134,7 +144,8 @@ export class CubeEvaluator extends CubeSymbols {
                     cube,
                     indexes[indexName].columns,
                     { originalSorting: true }
-                  )
+                  ),
+                  type: indexes[indexName].type
                 };
                 return obj;
               }, {})
@@ -267,6 +278,7 @@ export class CubeEvaluator extends CubeSymbols {
       granularity: aggregation.granularity
     }] : [];
     return {
+      allowNonStrictDateRangeMatch: aggregation.allowNonStrictDateRangeMatch,
       dimensions:
         (aggregation.dimensionReferences && this.evaluateReferences(cube, aggregation.dimensionReferences) || [])
           .concat(

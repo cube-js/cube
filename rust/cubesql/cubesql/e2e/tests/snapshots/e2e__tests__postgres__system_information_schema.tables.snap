@@ -1,0 +1,17 @@
+---
+source: cubesql/e2e/tests/postgres.rs
+assertion_line: 285
+expression: "self.print_query_result(res, true, false).await"
+---
+table_catalog type: 25 (text)
+table_schema type: 25 (text)
+table_name type: 25 (text)
+table_type type: 25 (text)
+self_referencing_column_name type: 25 (text)
+reference_generation type: 25 (text)
+user_defined_type_catalog type: 25 (text)
+user_defined_type_schema type: 25 (text)
+user_defined_type_name type: 25 (text)
+is_insertable_into type: 25 (text)
+is_typed type: 25 (text)
+commit_action type: 25 (text)

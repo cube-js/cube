@@ -51,18 +51,36 @@ impl ImportFormat {
         location: String,
         columns: Vec<Column>,
     ) -> Result<Pin<Box<dyn Stream<Item = Result<Option<Row>, CubeError>> + Send>>, CubeError> {
-        match self {
-            ImportFormat::CSV => {
-                let lines_stream: Pin<Box<dyn Stream<Item = Result<String, CubeError>> + Send>> =
-                    if location.contains(".gz") {
-                        let reader = BufReader::new(GzipDecoder::new(BufReader::new(file)));
-                        Box::pin(CsvLineStream::new(reader))
-                    } else {
-                        let reader = BufReader::new(file);
-                        Box::pin(CsvLineStream::new(reader))
-                    };
+        let reader: Pin<Box<dyn AsyncBufRead + Send>> = if location.contains(".gz") {
+            Box::pin(BufReader::new(GzipDecoder::new(BufReader::new(file))))
+        } else {
+            Box::pin(BufReader::new(file))
+        };
+        self.row_stream_from_reader(reader, columns)
+    }
 
-                let mut header_mapping = None;
+    pub fn row_stream_from_reader<'a>(
+        &self,
+        reader: Pin<Box<dyn AsyncBufRead + Send + 'a>>,
+        columns: Vec<Column>,
+    ) -> Result<Pin<Box<dyn Stream<Item = Result<Option<Row>, CubeError>> + Send + 'a>>, CubeError>
+    {
+        match self {
+            ImportFormat::CSV | ImportFormat::CSVNoHeader => {
+                let lines_stream: Pin<Box<dyn Stream<Item = Result<String, CubeError>> + Send>> =
+                    Box::pin(CsvLineStream::new(reader));
+
+                let mut header_mapping = match self {
+                    ImportFormat::CSV => None,
+                    ImportFormat::CSVNoHeader => Some(
+                        columns
+                            .iter()
+                            .enumerate()
+                            .map(|(i, c)| (i, c.clone()))
+                            .collect(),
+                    ),
+                };
+
                 let rows = lines_stream.map(move |line| -> Result<Option<Row>, CubeError> {
                     let str = line?;
 
@@ -101,42 +119,25 @@ impl ImportFormat {
                         if value == "" || value == "\\N" {
                             row[*insert_pos] = TableValue::Null;
                         } else {
-                            row[*insert_pos] = match column.get_column_type() {
-                                ColumnType::String => TableValue::String(value_buf.take_string()),
-                                ColumnType::Int => value
-                                    .parse()
-                                    .map(|v| TableValue::Int(v))
-                                    .unwrap_or(TableValue::Null),
-                                t @ ColumnType::Decimal { .. } => TableValue::Decimal(
-                                    parse_decimal(value, u8::try_from(t.target_scale()).unwrap())?,
-                                ),
-                                ColumnType::Bytes => TableValue::Bytes(base64::decode(value)?),
-                                ColumnType::HyperLogLog(HllFlavour::Snowflake) => {
-                                    let hll = HllSketch::read_snowflake(value)?;
-                                    TableValue::Bytes(hll.write())
-                                }
-                                ColumnType::HyperLogLog(HllFlavour::Postgres) => {
-                                    let data = base64::decode(value)?;
-                                    let hll = HllSketch::read_hll_storage_spec(&data)?;
-                                    TableValue::Bytes(hll.write())
-                                }
-                                ColumnType::HyperLogLog(
-                                    f @ (HllFlavour::Airlift | HllFlavour::ZetaSketch),
-                                ) => {
-                                    let data = base64::decode(value)?;
-                                    is_valid_plain_binary_hll(&data, *f)?;
-                                    TableValue::Bytes(data)
-                                }
-                                ColumnType::Timestamp => {
-                                    TableValue::Timestamp(timestamp_from_string(value)?)
-                                }
-                                ColumnType::Float => {
-                                    TableValue::Float(OrdF64(value.parse::<f64>()?))
-                                }
-                                ColumnType::Boolean => {
-                                    TableValue::Boolean(value.to_lowercase() == "true")
-                                }
-                            };
+                            let mut value_buf_opt = Some(value_buf);
+                            row[*insert_pos] =
+                                ImportFormat::parse_column_value(column, &mut value_buf_opt)
+                                    .map_err(|e| {
+                                        if let Some(value_buf) = value_buf_opt {
+                                            CubeError::user(format!(
+                                                "Can't parse '{}' column value for '{}' column: {}",
+                                                value_buf.as_ref(),
+                                                column.get_name(),
+                                                e
+                                            ))
+                                        } else {
+                                            CubeError::user(format!(
+                                                "Can't parse column value for '{}' column: {}",
+                                                column.get_name(),
+                                                e
+                                            ))
+                                        }
+                                    })?;
                         }
 
                         parser.advance()?;
@@ -146,6 +147,46 @@ impl ImportFormat {
                 Ok(rows.boxed())
             }
         }
+    }
+
+    fn parse_column_value(
+        column: &Column,
+        value_buf: &mut Option<MaybeOwnedStr>,
+    ) -> Result<TableValue, CubeError> {
+        let value = value_buf.as_ref().unwrap().as_ref();
+        ImportFormat::parse_column_value_str(column, value)
+    }
+
+    pub fn parse_column_value_str(column: &Column, value: &str) -> Result<TableValue, CubeError> {
+        Ok(match column.get_column_type() {
+            ColumnType::String => TableValue::String(value.to_string()),
+            ColumnType::Int => value
+                .parse()
+                .map(|v| TableValue::Int(v))
+                .unwrap_or(TableValue::Null),
+            t @ ColumnType::Decimal { .. } => TableValue::Decimal(parse_decimal(
+                value,
+                u8::try_from(t.target_scale()).unwrap(),
+            )?),
+            ColumnType::Bytes => TableValue::Bytes(parse_binary_data(value)?),
+            ColumnType::HyperLogLog(HllFlavour::Snowflake) => {
+                let hll = HllSketch::read_snowflake(value)?;
+                TableValue::Bytes(hll.write())
+            }
+            ColumnType::HyperLogLog(HllFlavour::Postgres) => {
+                let data = parse_binary_data(value)?;
+                let hll = HllSketch::read_hll_storage_spec(&data)?;
+                TableValue::Bytes(hll.write())
+            }
+            ColumnType::HyperLogLog(f @ (HllFlavour::Airlift | HllFlavour::ZetaSketch)) => {
+                let data = parse_binary_data(value)?;
+                is_valid_plain_binary_hll(&data, *f)?;
+                TableValue::Bytes(data)
+            }
+            ColumnType::Timestamp => TableValue::Timestamp(timestamp_from_string(value)?),
+            ColumnType::Float => TableValue::Float(OrdF64(value.parse::<f64>()?)),
+            ColumnType::Boolean => TableValue::Boolean(value.to_lowercase() == "true"),
+        })
     }
 }
 
@@ -167,6 +208,49 @@ pub(crate) fn parse_decimal(value: &str, scale: u8) -> Result<Decimal, CubeError
         }
     };
     Ok(Decimal::new(raw_value))
+}
+
+fn decode_byte(s: &str) -> Option<u8> {
+    let v = s.as_bytes();
+    if v.len() != 2 {
+        return None;
+    }
+    let decode_char = |c| match c {
+        b'a'..=b'f' => Some(10 + c - b'a'),
+        b'A'..=b'F' => Some(10 + c - b'A'),
+        b'0'..=b'9' => Some(c - b'0'),
+        _ => None,
+    };
+    let v0 = decode_char(v[0])?;
+    let v1 = decode_char(v[1])?;
+    return Some(v0 * 16 + v1);
+}
+
+pub(crate) fn parse_space_separated_binstring<'a>(
+    buffer: &'a mut Vec<u8>,
+    s: &'a str,
+) -> Result<&'a [u8], CubeError> {
+    *buffer = s
+        .split(' ')
+        .filter(|b| !b.is_empty())
+        .map(|s| {
+            decode_byte(s).ok_or_else(|| {
+                CubeError::user(format!("cannot convert value to binary string: {}", s))
+            })
+        })
+        .try_collect()?;
+    Ok(buffer.as_slice())
+}
+
+fn parse_binary_data(value: &str) -> Result<Vec<u8>, CubeError> {
+    let mut data = Vec::new();
+
+    if value.contains(' ') {
+        parse_space_separated_binstring(&mut data, value)?;
+    } else {
+        base64::decode_config_buf(value, base64::STANDARD, &mut data)?;
+    };
+    Ok(data)
 }
 
 struct CsvLineParser<'a> {
@@ -381,7 +465,14 @@ impl ImportServiceImpl {
         if location.starts_with("http") {
             let (file, path) = tempfile::Builder::new()
                 .prefix(&table_id.to_string())
-                .tempfile_in(temp_dir)?
+                .tempfile_in(temp_dir)
+                .map_err(|e| {
+                    CubeError::internal(format!(
+                        "Open tempfile in {}: {}",
+                        temp_dir.to_str().unwrap_or("<invalid>"),
+                        e
+                    ))
+                })?
                 .into_parts();
             let mut file = File::from_std(file);
             let mut stream = reqwest::get(location).await?.bytes_stream();
@@ -407,14 +498,22 @@ impl ImportServiceImpl {
                 .await?;
             Ok((temp_file, None))
         } else {
-            Ok((File::open(location.clone()).await?, None))
+            Ok((
+                File::open(location.clone()).await.map_err(|e| {
+                    CubeError::internal(format!("Open location {}: {}", location, e))
+                })?,
+                None,
+            ))
         }
     }
 
     async fn download_temp_file(&self, location: &str) -> Result<File, CubeError> {
         let to_download = ImportServiceImpl::temp_uploads_path(location);
-        let local_file = self.remote_fs.download_file(&to_download).await?;
-        Ok(File::open(local_file).await?)
+        // TODO check file size
+        let local_file = self.remote_fs.download_file(&to_download, None).await?;
+        Ok(File::open(local_file.clone())
+            .await
+            .map_err(|e| CubeError::internal(format!("Open temp_file {}: {}", local_file, e)))?)
     }
 
     fn temp_uploads_path(location: &str) -> String {
@@ -438,7 +537,15 @@ impl ImportServiceImpl {
         location: &str,
     ) -> Result<(), CubeError> {
         let temp_dir = self.config_obj.data_dir().join("tmp");
-        tokio::fs::create_dir_all(temp_dir.clone()).await?;
+        tokio::fs::create_dir_all(temp_dir.clone())
+            .await
+            .map_err(|e| {
+                CubeError::internal(format!(
+                    "Create temp_dir {}: {}",
+                    temp_dir.to_str().unwrap_or("<invalid>"),
+                    e
+                ))
+            })?;
 
         let (file, tmp_path) = self
             .resolve_location(location.clone(), table.get_id(), &temp_dir)
@@ -580,6 +687,8 @@ impl ImportService for ImportServiceImpl {
         } else if location.starts_with("temp://") {
             // TODO do the actual estimation
             Ok(ImportServiceImpl::estimate_rows(location, None))
+        } else if location.starts_with("stream://") {
+            Ok(ImportServiceImpl::estimate_rows(location, None))
         } else {
             Ok(ImportServiceImpl::estimate_rows(
                 location,
@@ -632,10 +741,13 @@ impl Ingestion {
 
             // More data frame processing can proceed now as we dropped `active_data_frame`.
             // Time to wait to chunks to upload and activate them.
-            let new_chunk_ids: Result<Vec<u64>, CubeError> = join_all(new_chunks)
+            let new_chunk_ids: Result<Vec<(u64, Option<u64>)>, CubeError> = join_all(new_chunks)
                 .await
                 .into_iter()
-                .map(|c| Ok(c??.get_id()))
+                .map(|c| {
+                    let (c, file_size) = c??;
+                    Ok((c.get_id(), file_size))
+                })
                 .collect();
             meta_store.activate_chunks(table_id, new_chunk_ids?).await
         }));
@@ -649,5 +761,74 @@ impl Ingestion {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    extern crate test;
+
+    use crate::import::parse_decimal;
+    use crate::metastore::{Column, ColumnType, ImportFormat};
+    use crate::table::{Row, TableValue};
+    use indoc::indoc;
+    use tokio::io::BufReader;
+    use tokio_stream::StreamExt;
+
+    #[test]
+    fn parse_decimal_test() {
+        assert_eq!(
+            parse_decimal("-0.12345", 5).unwrap().to_string(5),
+            "-0.12345",
+        );
+        assert_eq!(
+            parse_decimal("-0.002694881400", 5).unwrap().to_string(5),
+            "-0.00269",
+        );
+        assert_eq!(parse_decimal("-0.01", 5).unwrap().to_string(5), "-0.01",);
+        assert_eq!(parse_decimal("200", 5).unwrap().to_string(5), "200",);
+        assert_eq!(parse_decimal("200.35", 5).unwrap().to_string(5), "200.35",);
+        assert_eq!(parse_decimal("-200.4", 5).unwrap().to_string(5), "-200.4",);
+        assert_eq!(
+            parse_decimal("-200.040000", 5).unwrap().to_string(5),
+            "-200.04",
+        );
+    }
+
+    #[tokio::test]
+    async fn read_nulls() {
+        let data = indoc! {"
+            one,1
+            ,
+            three,3
+        "};
+        let csv_reader = Box::pin(BufReader::new(data.as_bytes()));
+        let columns = vec![
+            Column::new("A".to_string(), ColumnType::String, 0),
+            Column::new("B".to_string(), ColumnType::Int, 1),
+        ];
+        let mut row_stream = ImportFormat::CSVNoHeader
+            .row_stream_from_reader(csv_reader, columns)
+            .unwrap();
+        let mut rows = vec![];
+        while let Some(row) = row_stream.next().await {
+            if let Some(row) = row.unwrap() {
+                rows.push(row)
+            }
+        }
+        assert_eq!(
+            rows,
+            vec![
+                Row::new(vec![
+                    TableValue::String("one".to_string()),
+                    TableValue::Int(1)
+                ]),
+                Row::new(vec![TableValue::Null, TableValue::Null]),
+                Row::new(vec![
+                    TableValue::String("three".to_string()),
+                    TableValue::Int(3)
+                ]),
+            ]
+        );
     }
 }

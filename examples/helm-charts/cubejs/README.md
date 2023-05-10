@@ -165,36 +165,42 @@ cubestore:
 
 ### Image parameters
 
-| Name               | Description                                          | Value          |
-| ------------------ | ---------------------------------------------------- | -------------- |
-| `image.repository` | Cubestore image repository                           | `cubejs/cube`  |
-| `image.tag`        | Cubestore image tag (immutable tags are recommended) | `0.28.26`      |
-| `image.pullPolicy` | Cubestore image pull policy                          | `IfNotPresent` |
+| Name                | Description                                                                             | Value          |
+| ------------------- | --------------------------------------------------------------------------------------- | -------------- |
+| `image.repository`  | Cubestore image repository                                                              | `cubejs/cube`  |
+| `image.tag`         | Cubestore image tag (immutable tags are recommended)                                    | `0.28.26`      |
+| `image.pullPolicy`  | Cubestore image pull policy                                                             | `IfNotPresent` |
+| `image.pullSecrets` | If defined, uses a Secret to pull an image from a private Docker registry or repository | `[]`           |
 
 ### Config parameters
 
-| Name                               | Description                                                                                                                     | Value   |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| `config.apiPort`                   | The port for a Cube.js deployment to listen to API connections on                                                               | `4000`  |
-| `config.sqlPort`                   | The port for a Cube.js deployment to listen to SQL connections on                                                               |         |
-| `config.devMode`                   | If true, enables development mode                                                                                               | `false` |
-| `config.debug`                     | If true, enables debug logging                                                                                                  | `false` |
-| `config.logLevel`                  | The logging level for Cube.js                                                                                                   | `warn`  |
-| `config.externalDefault`           | If true, uses Cube Store or an external database for storing Pre-aggregations                                                   | `true`  |
-| `config.telemetry`                 | If true, then send telemetry to CubeJS                                                                                          | `false` |
-| `config.apiSecret`                 | The secret key used to sign and verify JWTs. Generated on project scaffold                                                      |         |
-| `config.apiSecretFromSecret.name`  | The secret key used to sign and verify JWTs. Generated on project scaffold (using secret)                                       |         |
-| `config.apiSecretFromSecret.key`   | The secret key used to sign and verify JWTs. Generated on project scaffold (using secret)                                       |         |
-| `config.schemaPath`                | The path where Cube.js loads schemas from. Defaults to schema                                                                   |         |
-| `config.app`                       | An application ID used to uniquely identify the Cube.js deployment. Can be different for multitenant setups. Defaults to cubejs |         |
-| `config.rollupOnly`                | If true, this instance of Cube.js will only query rollup pre-aggregations. Defaults to false                                    |         |
-| `config.scheduledRefreshTimezones` | A comma-separated list of timezones to schedule refreshes for                                                                   |         |
-| `config.webSockets`                | If true, then use WebSocket for data fetching. Defaults to true                                                                 |         |
-| `config.preAggregationsSchema`     | The schema name to use for storing pre-aggregations true                                                                        |         |
-| `config.cacheAndQueueDriver`       | The cache and queue driver to use for the Cube.js deployment. Defaults to redis                                                 |         |
-| `config.topicName`                 | The name of the Amazon SNS or Google Cloud Pub/Sub topicredis                                                                   |         |
-| `config.volumes`                   | The config volumes. Will be used to both master and workers                                                                     | `[]`    |
-| `config.volumeMounts`              | The config volumeMounts. Will be used to both master and workers                                                                | `[]`    |
+| Name                                | Description                                                                                                                     | Value   |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| `config.apiPort`                    | The port for a Cube.js deployment to listen to API connections on                                                               | `4000`  |
+| `config.sqlPort`                    | The port for a Cube.js deployment to listen to SQL connections on                                                               |         |
+| `config.pgSqlPort`                  | The port for a Cube.js deployment to listen to Postgres SQL connections on                                                      |         |
+| `config.sqlUser`                    | The username to access the SQL api                                                                                              |         |
+| `config.sqlPassword`                | The password to access the SQL api                                                                                              |         |
+| `config.sqlPasswordFromSecret.name` | The password to access the SQL api (using secret)                                                                               |         |
+| `config.sqlPasswordFromSecret.key`  | The password to access the SQL api (using secret)                                                                               |         |
+| `config.devMode`                    | If true, enables development mode                                                                                               | `false` |
+| `config.debug`                      | If true, enables debug logging                                                                                                  | `false` |
+| `config.logLevel`                   | The logging level for Cube.js                                                                                                   | `warn`  |
+| `config.externalDefault`            | If true, uses Cube Store or an external database for storing Pre-aggregations                                                   | `true`  |
+| `config.telemetry`                  | If true, then send telemetry to CubeJS                                                                                          | `false` |
+| `config.apiSecret`                  | The secret key used to sign and verify JWTs. Generated on project scaffold                                                      |         |
+| `config.apiSecretFromSecret.name`   | The secret key used to sign and verify JWTs. Generated on project scaffold (using secret)                                       |         |
+| `config.apiSecretFromSecret.key`    | The secret key used to sign and verify JWTs. Generated on project scaffold (using secret)                                       |         |
+| `config.schemaPath`                 | The path where Cube.js loads schemas from. Defaults to schema                                                                   |         |
+| `config.app`                        | An application ID used to uniquely identify the Cube.js deployment. Can be different for multitenant setups. Defaults to cubejs |         |
+| `config.rollupOnly`                 | If true, this instance of Cube.js will only query rollup pre-aggregations. Defaults to false                                    |         |
+| `config.scheduledRefreshTimezones`  | A comma-separated list of timezones to schedule refreshes for                                                                   |         |
+| `config.webSockets`                 | If true, then use WebSocket for data fetching. Defaults to true                                                                 |         |
+| `config.preAggregationsSchema`      | The schema name to use for storing pre-aggregations true                                                                        |         |
+| `config.cacheAndQueueDriver`        | The cache and queue driver to use for the Cube.js deployment. Defaults to redis                                                 |         |
+| `config.topicName`                  | The name of the Amazon SNS or Google Cloud Pub/Sub topicredis                                                                   |         |
+| `config.volumes`                    | The config volumes. Will be used to both master and workers                                                                     | `[]`    |
+| `config.volumeMounts`               | The config volumeMounts. Will be used to both master and workers                                                                | `[]`    |
 
 ### Redis parameters
 
@@ -253,7 +259,7 @@ cubestore:
 | `database.aws.keyFromSecret.name`              | The AWS Access Key ID to use for database connections (using secret)             |         |
 | `database.aws.keyFromSecret.key`               | The AWS Access Key ID to use for database connections (using secret)             |         |
 | `database.aws.region`                          | The AWS region of the Cube.js deployment                                         |         |
-| `database.aws.outputLocation`                  | The S3 path to store query results made by the Cube.js deployment                |         |
+| `database.aws.s3OutputLocation`                | The S3 path to store query results made by the Cube.js deployment                |         |
 | `database.aws.secret`                          | The AWS Secret Access Key to use for database connections                        |         |
 | `database.aws.secretFromSecret.name`           | The AWS Secret Access Key to use for database connections (using secret)         |         |
 | `database.aws.secretFromSecret.key`            | The AWS Secret Access Key to use for database connections (using secret)         |         |
@@ -311,62 +317,56 @@ cubestore:
 
 ### Master parameters
 
-| Name                                        | Description                                          | Value  |
-| ------------------------------------------- | ---------------------------------------------------- | ------ |
-| `master.affinity`                           | Affinity for pod assignment                          | `{}`   |
-| `master.spreadConstraints`                  | Topology spread constraint for pod assignment        | `[]`   |
-| `master.resources`                          | Define resources requests and limits for single Pods | `{}`   |
-| `master.livenessProbe.enabled`              | Enable livenessProbe                                 | `true` |
-| `master.livenessProbe.initialDelaySeconds`  | Initial delay seconds for livenessProbe              | `10`   |
-| `master.livenessProbe.periodSeconds`        | Period seconds for livenessProbe                     | `30`   |
-| `master.livenessProbe.timeoutSeconds`       | Timeout seconds for livenessProbe                    | `3`    |
-| `master.livenessProbe.successThreshold`     | Failure threshold for livenessProbe                  | `1`    |
-| `master.livenessProbe.failureThreshold`     | Success threshold for livenessProbe                  | `3`    |
-| `master.readinessProbe.enabled`             | Enable readinessProbe                                | `true` |
-| `master.readinessProbe.initialDelaySeconds` | Initial delay seconds for readinessProbe             | `10`   |
-| `master.readinessProbe.periodSeconds`       | Period seconds for readinessProbe                    | `30`   |
-| `master.readinessProbe.timeoutSeconds`      | Timeout seconds for readinessProbe                   | `3`    |
-| `master.readinessProbe.successThreshold`    | Failure threshold for readinessProbe                 | `1`    |
-| `master.readinessProbe.failureThreshold`    | Success threshold for readinessProbe                 | `3`    |
-| `master.customLivenessProbe`                | Custom livenessProbe that overrides the default one  | `{}`   |
-| `master.customReadinessProbe`               | Custom readinessProbe that overrides the default one | `{}`   |
+| Name                                                 | Description                                                                                                         | Value   |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------- |
+| `master.serviceAccount.create`                       | Specifies whether a ServiceAccount should be created                                                                | `false` |
+| `master.serviceAccount.name`                         | Name of the service account to use. If not set and create is true, a name is generated using the fullname template. | `""`    |
+| `master.serviceAccount.automountServiceAccountToken` | Automount service account token for the server service account                                                      | `true`  |
+| `master.serviceAccount.annotations`                  | Annotations for service account. Evaluated as a template. Only used if create is true.                              | `{}`    |
+| `master.affinity`                                    | Affinity for pod assignment                                                                                         | `{}`    |
+| `master.spreadConstraints`                           | Topology spread constraint for pod assignment                                                                       | `[]`    |
+| `master.resources`                                   | Define resources requests and limits for single Pods                                                                | `{}`    |
+| `master.livenessProbe.enabled`                       | Enable livenessProbe                                                                                                | `true`  |
+| `master.livenessProbe.initialDelaySeconds`           | Initial delay seconds for livenessProbe                                                                             | `10`    |
+| `master.livenessProbe.periodSeconds`                 | Period seconds for livenessProbe                                                                                    | `30`    |
+| `master.livenessProbe.timeoutSeconds`                | Timeout seconds for livenessProbe                                                                                   | `3`     |
+| `master.livenessProbe.successThreshold`              | Failure threshold for livenessProbe                                                                                 | `1`     |
+| `master.livenessProbe.failureThreshold`              | Success threshold for livenessProbe                                                                                 | `3`     |
+| `master.readinessProbe.enabled`                      | Enable readinessProbe                                                                                               | `true`  |
+| `master.readinessProbe.initialDelaySeconds`          | Initial delay seconds for readinessProbe                                                                            | `10`    |
+| `master.readinessProbe.periodSeconds`                | Period seconds for readinessProbe                                                                                   | `30`    |
+| `master.readinessProbe.timeoutSeconds`               | Timeout seconds for readinessProbe                                                                                  | `3`     |
+| `master.readinessProbe.successThreshold`             | Failure threshold for readinessProbe                                                                                | `1`     |
+| `master.readinessProbe.failureThreshold`             | Success threshold for readinessProbe                                                                                | `3`     |
+| `master.customLivenessProbe`                         | Custom livenessProbe that overrides the default one                                                                 | `{}`    |
+| `master.customReadinessProbe`                        | Custom readinessProbe that overrides the default one                                                                | `{}`    |
 
 ### Workers parameters
 
-| Name                                         | Description                                          | Value  |
-| -------------------------------------------- | ---------------------------------------------------- | ------ |
-| `workers.workersCount`                       | Number of workers to deploy                          | `1`    |
-| `workers.affinity`                           | Affinity for pod assignment                          | `{}`   |
-| `workers.spreadConstraints`                  | Topology spread constraint for pod assignment        | `[]`   |
-| `workers.resources`                          | Define resources requests and limits for single Pods | `{}`   |
-| `workers.livenessProbe.enabled`              | Enable livenessProbe                                 | `true` |
-| `workers.livenessProbe.initialDelaySeconds`  | Initial delay seconds for livenessProbe              | `10`   |
-| `workers.livenessProbe.periodSeconds`        | Period seconds for livenessProbe                     | `30`   |
-| `workers.livenessProbe.timeoutSeconds`       | Timeout seconds for livenessProbe                    | `3`    |
-| `workers.livenessProbe.successThreshold`     | Failure threshold for livenessProbe                  | `1`    |
-| `workers.livenessProbe.failureThreshold`     | Success threshold for livenessProbe                  | `3`    |
-| `workers.readinessProbe.enabled`             | Enable readinessProbe                                | `true` |
-| `workers.readinessProbe.initialDelaySeconds` | Initial delay seconds for readinessProbe             | `10`   |
-| `workers.readinessProbe.periodSeconds`       | Period seconds for readinessProbe                    | `30`   |
-| `workers.readinessProbe.timeoutSeconds`      | Timeout seconds for readinessProbe                   | `3`    |
-| `workers.readinessProbe.successThreshold`    | Failure threshold for readinessProbe                 | `1`    |
-| `workers.readinessProbe.failureThreshold`    | Success threshold for readinessProbe                 | `3`    |
-| `workers.customLivenessProbe`                | Custom livenessProbe that overrides the default one  | `{}`   |
-| `workers.customReadinessProbe`               | Custom readinessProbe that overrides the default one | `{}`   |
-
-## Service parameters
-
-| Name                               | Description                                      | Value       |
-| ---------------------------------- | ------------------------------------------------ | ----------- |
-| `service.enabled`                  | Set to true to enable service generation         | `true`      |
-| `service.type`                     | Master service type                              | `ClusterIP` |
-| `service.port`                     | Master service port                              | `80`        |
-| `service.nodePort`                 | Node port for master                             | `""`        |
-| `service.externalTrafficPolicy`    | Master service external traffic policy           | `Cluster`   |
-| `service.clusterIP`                | Master service Cluster IP                        | `""`        |
-| `service.loadBalancerIP`           | Master service Load Balancer IP                  | `""`        |
-| `service.loadBalancerSourceRanges` | Master service Load Balancer sources             | `[]`        |
-| `service.annotations`              | Additional custom annotations for master service | `{}`        |
+| Name                                                  | Description                                                                                                         | Value   |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------- |
+| `workers.serviceAccount.create`                       | Specifies whether a ServiceAccount should be created                                                                | `false` |
+| `workers.serviceAccount.name`                         | Name of the service account to use. If not set and create is true, a name is generated using the fullname template. | `""`    |
+| `workers.serviceAccount.automountServiceAccountToken` | Automount service account token for the server service account                                                      | `true`  |
+| `workers.serviceAccount.annotations`                  | Annotations for service account. Evaluated as a template. Only used if create is true.                              | `{}`    |
+| `workers.workersCount`                                | Number of workers to deploy                                                                                         | `1`     |
+| `workers.affinity`                                    | Affinity for pod assignment                                                                                         | `{}`    |
+| `workers.spreadConstraints`                           | Topology spread constraint for pod assignment                                                                       | `[]`    |
+| `workers.resources`                                   | Define resources requests and limits for single Pods                                                                | `{}`    |
+| `workers.livenessProbe.enabled`                       | Enable livenessProbe                                                                                                | `true`  |
+| `workers.livenessProbe.initialDelaySeconds`           | Initial delay seconds for livenessProbe                                                                             | `10`    |
+| `workers.livenessProbe.periodSeconds`                 | Period seconds for livenessProbe                                                                                    | `30`    |
+| `workers.livenessProbe.timeoutSeconds`                | Timeout seconds for livenessProbe                                                                                   | `3`     |
+| `workers.livenessProbe.successThreshold`              | Failure threshold for livenessProbe                                                                                 | `1`     |
+| `workers.livenessProbe.failureThreshold`              | Success threshold for livenessProbe                                                                                 | `3`     |
+| `workers.readinessProbe.enabled`                      | Enable readinessProbe                                                                                               | `true`  |
+| `workers.readinessProbe.initialDelaySeconds`          | Initial delay seconds for readinessProbe                                                                            | `10`    |
+| `workers.readinessProbe.periodSeconds`                | Period seconds for readinessProbe                                                                                   | `30`    |
+| `workers.readinessProbe.timeoutSeconds`               | Timeout seconds for readinessProbe                                                                                  | `3`     |
+| `workers.readinessProbe.successThreshold`             | Failure threshold for readinessProbe                                                                                | `1`     |
+| `workers.readinessProbe.failureThreshold`             | Success threshold for readinessProbe                                                                                | `3`     |
+| `workers.customLivenessProbe`                         | Custom livenessProbe that overrides the default one                                                                 | `{}`    |
+| `workers.customReadinessProbe`                        | Custom readinessProbe that overrides the default one                                                                | `{}`    |
 
 ## Ingress parameters
 

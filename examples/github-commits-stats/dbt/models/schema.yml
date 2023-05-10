@@ -1,0 +1,30 @@
+version: 2
+
+metrics:
+  - name: commits_count
+    label: Commits Count
+    model: ref('commits')
+    description: "A count metric for commits"
+
+    type: count
+
+    timestamp: timestamp
+    time_grains: [day, week, month, year]
+
+    dimensions:
+      - author_domain
+      - author_name
+
+  - name: users_count
+    label: Users Count
+    model: ref('commits')
+    description: "A count metric for users"
+
+    type: count_distinct
+    sql: author_id
+
+    timestamp: timestamp
+    time_grains: [day, week, month, year]
+
+    dimensions:
+      - author_domain

@@ -12,7 +12,7 @@ impl AsRef<str> for MaybeOwnedStr<'_> {
     }
 }
 
-impl MaybeOwnedStr<'a> {
+impl MaybeOwnedStr<'_> {
     pub fn take_string(self) -> String {
         match self {
             MaybeOwnedStr::Owned(s) => s,

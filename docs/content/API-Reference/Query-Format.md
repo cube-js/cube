@@ -20,7 +20,7 @@ Supported granularities: `second`, `minute`, `hour`, `day`, `week`, `month`,
 `quarter` and `year`.
 
 The Cube.js client also accepts an array of queries. By default it will be
-treated as a [Data Blending](/recipes/data-blending) query.
+treated as a Data Blending query type.
 
 ## Query Properties
 
@@ -206,6 +206,36 @@ The opposite operator of `contains`. It supports multiple values.
 }
 ```
 
+### <--{"id" : "Filters Operators"}--> startsWith
+
+The `startsWith` filter acts as a case insensitive `LIKE` operator with a wildcard at the beginning. In
+the majority of SQL backends, it uses the `ILIKE` operator with `%` at the start of each value. It supports multiple values.
+
+- Dimension types: `string`.
+
+```js
+{
+  member: "Posts.title",
+  operator: "startsWith",
+  values: ["ruby"]
+}
+```
+
+### <--{"id" : "Filters Operators"}--> endsWith
+
+The `endsWith` filter acts as a case insensitive `LIKE` operator with a wildcard at the end. In
+the majority of SQL backends, it uses the `ILIKE` operator with `%` at the end of each value. It supports multiple values.
+
+- Dimension types: `string`.
+
+```js
+{
+  member: "Posts.title",
+  operator: "endsWith",
+  values: ["ruby"]
+}
+```
+
 ### <--{"id" : "Filters Operators"}--> gt
 
 The `gt` operator means **greater than** and is used with measures or dimensions
@@ -302,6 +332,16 @@ An opposite to the `set` operator. It checks whether the value of the member
 
 ### <--{"id" : "Filters Operators"}--> inDateRange
 
+<WarningBox>
+
+From a pre-aggregation standpoint, `inDateRange` filter is applied as a generic filter.
+All pre-aggregation granularity matching rules aren't applied in this case.
+It feels like pre-aggregation isn't matched. 
+However, pre-aggregation is just missing the filtered time dimension in [dimensions][ref-schema-ref-preaggs-dimensions] list.
+If you want date range filter to match [timeDimension][ref-schema-ref-preaggs-time-dimension] please use [timeDimensions](#time-dimensions-format) `dateRange` instead.
+
+</WarningBox>
+
 The operator `inDateRange` is used to filter a time dimension into a specific
 date range. The values must be an array of dates with the following format
 'YYYY-MM-DD'. If only one date specified the filter would be set exactly to this
@@ -322,6 +362,15 @@ There is a convient way to use date filters with grouping -
 
 ### <--{"id" : "Filters Operators"}--> notInDateRange
 
+<WarningBox>
+
+From a pre-aggregation standpoint, `notInDateRange` filter is applied as a generic filter.
+All pre-aggregation granularity matching rules aren't applied in this case.
+It feels like pre-aggregation isn't matched. 
+However, pre-aggregation is just missing the filtered time dimension in [dimensions][ref-schema-ref-preaggs-dimensions] list.
+
+</WarningBox>
+
 An opposite operator to `inDateRange`, use it when you want to exclude specific
 dates. The values format is the same as for `inDateRange`.
 
@@ -337,6 +386,15 @@ dates. The values format is the same as for `inDateRange`.
 
 ### <--{"id" : "Filters Operators"}--> beforeDate
 
+<WarningBox>
+
+From a pre-aggregation standpoint, `beforeDate` filter is applied as a generic filter.
+All pre-aggregation granularity matching rules aren't applied in this case.
+It feels like pre-aggregation isn't matched. 
+However, pre-aggregation is just missing the filtered time dimension in [dimensions][ref-schema-ref-preaggs-dimensions] list.
+
+</WarningBox>
+
 Use it when you want to retreive all results before some specific date. The
 values should be an array of one element in `YYYY-MM-DD` format.
 
@@ -351,6 +409,15 @@ values should be an array of one element in `YYYY-MM-DD` format.
 ```
 
 ### <--{"id" : "Filters Operators"}--> afterDate
+
+<WarningBox>
+
+From a pre-aggregation standpoint, `afterDate` filter is applied as a generic filter.
+All pre-aggregation granularity matching rules aren't applied in this case.
+It feels like pre-aggregation isn't matched. 
+However, pre-aggregation is just missing the filtered time dimension in [dimensions][ref-schema-ref-preaggs-dimensions] list.
+
+</WarningBox>
 
 The same as `beforeDate`, but is used to get all results after a specific date.
 
@@ -487,3 +554,7 @@ date. If you need the current date also you can use `from N days ago to now` or
   /schema/reference/pre-aggregations#parameters-refresh-key
 [ref-schema-ref-preaggs-refreshkey-every]:
   /schema/reference/pre-aggregations#parameters-refresh-key-every
+[ref-schema-ref-preaggs-dimensions]: 
+  /schema/reference/pre-aggregations#parameters-dimensions
+[ref-schema-ref-preaggs-time-dimension]:
+  /schema/reference/pre-aggregations#parameters-time-dimension

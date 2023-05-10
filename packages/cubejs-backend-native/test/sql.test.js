@@ -1,19 +1,56 @@
 const mysql = require('mysql2/promise');
-const util = require('util');
 
 const native = require('../dist/js/index');
 const meta_fixture = require('./meta');
 
-native.setLogLevel('trace');
+let logger = jest.fn(({ event }) => {
+  if (!event.error.includes('load - strange response, success which contains error')) {
+      expect(event.apiType).toEqual('sql');
+      expect(event.protocol).toEqual('mysql');
+  }
+  console.log(event);
+});
 
-describe('SQLInteface', () => {
+expect.extend({
+  toBeTypeOrNull(received, classTypeOrNull) {
+    try {
+      expect(received).toEqual(expect.any(classTypeOrNull));
+      return {
+        message: () => `Ok`,
+        pass: true
+      };
+    } catch (error) {
+      return received === null
+        ? {
+          message: () => `Ok`,
+          pass: true
+        }
+        : {
+          message: () => `expected ${received} to be ${classTypeOrNull} type or null`,
+          pass: false
+        };
+    }
+  }
+});
+
+native.setupLogger(
+  logger,
+  'trace',
+);
+
+describe('SQLInterface', () => {
   jest.setTimeout(10 * 1000);
 
   it('SHOW FULL TABLES FROM `db`', async () => {
-    const load = jest.fn(async ({ request, user }) => {
+    const load = jest.fn(async ({ request, session }) => {
       console.log('[js] load',  {
         request,
-        user
+        session
+      });
+
+      expect(session).toEqual({
+        user: expect.toBeTypeOrNull(String),
+        superuser: expect.any(Boolean),
       });
 
       // It's just an emulation that ApiGateway returns error
@@ -22,10 +59,15 @@ describe('SQLInteface', () => {
       };
     });
 
-    const meta = jest.fn(async ({ request, user }) => {
+    const meta = jest.fn(async ({ request, session }) => {
       console.log('[js] meta',  {
         request,
-        user,
+        session,
+      });
+
+      expect(session).toEqual({
+        user: expect.toBeTypeOrNull(String),
+        superuser: expect.any(Boolean),
       });
 
       return meta_fixture;
@@ -39,7 +81,15 @@ describe('SQLInteface', () => {
 
       if (user === 'allowed_user') {
         return {
-          password: 'password_for_allowed_user'
+          password: 'password_for_allowed_user',
+          superuser: false,
+        }
+      }
+
+      if (user === 'admin') {
+        return {
+          password: 'password_for_admin',
+          superuser: true,
         }
       }
 
@@ -74,7 +124,8 @@ describe('SQLInteface', () => {
         expect(checkAuth.mock.calls.length).toEqual(1);
         expect(checkAuth.mock.calls[0][0]).toEqual({
           request: {
-            id: expect.any(String)
+            id: expect.any(String),
+            meta: null,
           },
           user: user || null,
         });
@@ -108,7 +159,7 @@ describe('SQLInteface', () => {
       {
         const [result] = await connection.query('SHOW FULL TABLES FROM `db`');
         console.log(result);
-  
+
         expect(result).toEqual([
           {
             Tables_in_db: 'KibanaSampleDataEcommerce',
@@ -118,13 +169,14 @@ describe('SQLInteface', () => {
             Tables_in_db: 'Logs',
             Table_type: 'BASE TABLE',
           },
-        ]);  
+        ]);
       }
 
       expect(checkAuth.mock.calls.length).toEqual(1);
       expect(checkAuth.mock.calls[0][0]).toEqual({
         request: {
-          id: expect.any(String)
+          id: expect.any(String),
+          meta: null,
         },
         user: 'allowed_user',
       });
@@ -132,9 +184,13 @@ describe('SQLInteface', () => {
       expect(meta.mock.calls.length).toEqual(1);
       expect(meta.mock.calls[0][0]).toEqual({
         request: {
-          id: expect.any(String)
+          id: expect.any(String),
+          meta: null,
         },
-        user: 'allowed_user',
+        session: {
+          user: 'allowed_user',
+          superuser: false,
+        }
       });
 
       {
@@ -143,10 +199,15 @@ describe('SQLInteface', () => {
 
           throw new Error('Error was not passed from transport to the client');
         } catch (e) {
-          expect(e.sqlState).toEqual('HY000'); 
-          expect(e.sqlMessage).toEqual('This error should be passed back to MySQL client'); 
+          expect(e.sqlState).toEqual('HY000');
+          expect(e.sqlMessage).toContain('This error should be passed back to MySQL client');
         }
       }
+
+      // Increment it in case you throw Error
+      setTimeout(_ => {
+        expect(logger.mock.calls.length).toEqual(1);
+      },2000);
 
       connection.destroy();
     } finally {

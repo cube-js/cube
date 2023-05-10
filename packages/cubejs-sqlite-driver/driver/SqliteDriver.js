@@ -1,8 +1,15 @@
 const sqlite3 = require('sqlite3');
-const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
+const { BaseDriver } = require('@cubejs-backend/base-driver');
 
 class SqliteDriver extends BaseDriver {
-  constructor(config) {
+  /**
+   * Returns default concurrency value.
+   */
+  static getDefaultConcurrency() {
+    return 2;
+  }
+
+  constructor(config = {}) {
     super();
     this.config = {
       database: process.env.CUBEJS_DB_NAME,

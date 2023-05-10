@@ -1,9 +1,10 @@
 ---
-title: Serverless Framework on AWS
+title: Deploy to Serverless Framework on AWS
+menuTitle: Serverless Framework on AWS
 permalink: /deployment/platforms/serverless/aws
 category: Deployment
 subCategory: Platforms
-menuOrder: 3
+menuOrder: 4
 ---
 
 This guide walks you through deploying Cube.js with the [Serverless
@@ -11,10 +12,13 @@ Framework][link-sls] on [AWS][link-aws].
 
 <WarningBox>
 
-This is an example of a production-ready deployment, but real-world deployments
-require extra configuration to enable scheduled refreshes. Cube Store **cannot**
-be deployed using Serverless platforms. For a "serverless" experience, we highly
-recommend using [Cube Cloud][link-cube-cloud]
+<b>WARNING!</b>
+
+We do not recommend deploying Cube with AWS Lambda, AWS Fargate and
+Google Cloud Functions. This guide will be removed soon. Additionally, please
+note that Cube Store [will replace Redis for in-memory caching and queue management in
+late 2022](https://cube.dev/blog/replacing-redis-with-cube-store) and will be a
+required component to run clustered Cube deployments.
 
 </WarningBox>
 

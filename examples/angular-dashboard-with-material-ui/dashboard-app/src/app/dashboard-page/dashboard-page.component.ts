@@ -28,7 +28,6 @@ export class DashboardPageComponent implements OnInit {
   }
   doughnutCols = 2;
   constructor(private meta: Meta, private title: Title, private breakpointObserver: BreakpointObserver) {
-    this.title.setTitle('Angular Dashboard with Material');
     this.meta.addTag({ name: 'description', content: 'How to build Angular Material Dashboard with Cube.js' });
     this.meta.addTag({ name: 'keywords', content: 'Angular, Cube.js, Dashboard, Material UI' });
 

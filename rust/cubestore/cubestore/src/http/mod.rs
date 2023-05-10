@@ -9,14 +9,16 @@ use crate::codegen::http_message_generated::{
     HttpMessageArgs, HttpQuery, HttpQueryArgs, HttpResultSet, HttpResultSetArgs, HttpRow,
     HttpRowArgs,
 };
+use crate::metastore::{Column, ColumnType, ImportFormat};
 use crate::mysql::SqlAuthService;
-use crate::sql::{SqlQueryContext, SqlService};
+use crate::sql::{InlineTable, InlineTables, SqlQueryContext, SqlService};
 use crate::store::DataFrame;
 use crate::table::TableValue;
 use crate::util::WorkerLoop;
 use crate::CubeError;
 use async_std::fs::File;
 use datafusion::cube_ext;
+use flatbuffers::{FlatBufferBuilder, ForwardsUOffset, Vector, WIPOffset};
 use futures::{AsyncWriteExt, SinkExt, Stream, StreamExt};
 use hex::ToHex;
 use http_auth_basic::Credentials;
@@ -28,6 +30,7 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::net::SocketAddr;
 use tempfile::NamedTempFile;
+use tokio::io::BufReader;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 use warp::filters::ws::{Message, Ws};
@@ -93,6 +96,7 @@ impl HttpServer {
                     match res {
                         Ok(user) => Ok(SqlQueryContext {
                             user,
+                            inline_tables: InlineTables::new(),
                             trace_obj: None,
                         }),
                         Err(_) => Err(warp::reject::custom(CubeRejection::NotAuthorized)),
@@ -129,7 +133,7 @@ impl HttpServer {
                                     }
                                     Ok(msg) => {
                                         if msg.is_binary() {
-                                            match HttpMessage::read(msg.into_bytes()) {
+                                            match HttpMessage::read(msg.into_bytes()).await {
                                                 Err(e) => error!("Websocket message read error: {:?}", e),
                                                 Ok(msg) => {
                                                     trace!("Received web socket message");
@@ -303,9 +307,18 @@ impl HttpServer {
         command: HttpCommand,
     ) -> Result<HttpCommand, CubeError> {
         match command {
-            HttpCommand::Query { query, trace_obj } => Ok(HttpCommand::ResultSet {
+            HttpCommand::Query {
+                query,
+                inline_tables,
+                trace_obj,
+            } => Ok(HttpCommand::ResultSet {
                 data_frame: sql_service
-                    .exec_query_with_context(sql_query_context.with_trace_obj(trace_obj), &query)
+                    .exec_query_with_context(
+                        sql_query_context
+                            .with_trace_obj(trace_obj)
+                            .with_inline_tables(&inline_tables),
+                        &query,
+                    )
                     .await?,
             }),
             x => Err(CubeError::user(format!("Unexpected command: {:?}", x))),
@@ -342,16 +355,17 @@ impl HttpServer {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct HttpMessage {
     message_id: u32,
     command: HttpCommand,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum HttpCommand {
     Query {
         query: String,
+        inline_tables: InlineTables,
         trace_obj: Option<String>,
     },
     ResultSet {
@@ -379,14 +393,22 @@ impl HttpMessage {
                 }
             },
             command: match &self.command {
-                HttpCommand::Query { query, trace_obj } => {
+                HttpCommand::Query {
+                    query,
+                    inline_tables,
+                    trace_obj,
+                } => {
                     let query_offset = builder.create_string(&query);
                     let trace_obj_offset = trace_obj.as_ref().map(|o| builder.create_string(o));
+                    if !inline_tables.is_empty() {
+                        panic!("Not implemented")
+                    }
                     Some(
                         HttpQuery::create(
                             &mut builder,
                             &HttpQueryArgs {
                                 query: Some(query_offset),
+                                inline_tables: None,
                                 trace_obj: trace_obj_offset,
                             },
                         )
@@ -406,97 +428,16 @@ impl HttpMessage {
                     )
                 }
                 HttpCommand::ResultSet { data_frame } => {
-                    let columns = data_frame
-                        .get_columns()
-                        .iter()
-                        .map(|c| c.get_name().as_str())
-                        .collect::<Vec<_>>();
-                    let columns_vec = builder.create_vector_of_strings(columns.as_slice());
-
-                    let mut row_offsets = Vec::with_capacity(data_frame.get_rows().len());
-                    for row in data_frame.get_rows().iter() {
-                        let mut value_offsets = Vec::with_capacity(row.values().len());
-                        for (i, value) in row.values().iter().enumerate() {
-                            let value = match value {
-                                TableValue::Null => HttpColumnValue::create(
-                                    &mut builder,
-                                    &HttpColumnValueArgs { string_value: None },
-                                ),
-                                TableValue::String(v) => {
-                                    let string_value = Some(builder.create_string(v));
-                                    HttpColumnValue::create(
-                                        &mut builder,
-                                        &HttpColumnValueArgs { string_value },
-                                    )
-                                }
-                                TableValue::Int(v) => {
-                                    let string_value = Some(builder.create_string(&v.to_string()));
-                                    HttpColumnValue::create(
-                                        &mut builder,
-                                        &HttpColumnValueArgs { string_value },
-                                    )
-                                }
-                                TableValue::Decimal(v) => {
-                                    let scale = u8::try_from(
-                                        data_frame.get_columns()[i]
-                                            .get_column_type()
-                                            .target_scale(),
-                                    )
-                                    .unwrap();
-                                    let string_value =
-                                        Some(builder.create_string(&v.to_string(scale)));
-                                    HttpColumnValue::create(
-                                        &mut builder,
-                                        &HttpColumnValueArgs { string_value },
-                                    )
-                                }
-                                TableValue::Float(v) => {
-                                    let string_value = Some(builder.create_string(&v.to_string()));
-                                    HttpColumnValue::create(
-                                        &mut builder,
-                                        &HttpColumnValueArgs { string_value },
-                                    )
-                                }
-                                TableValue::Bytes(v) => {
-                                    let string_value = Some(builder.create_string(&format!(
-                                        "0x{}",
-                                        v.encode_hex_upper::<String>()
-                                    )));
-                                    HttpColumnValue::create(
-                                        &mut builder,
-                                        &HttpColumnValueArgs { string_value },
-                                    )
-                                }
-                                TableValue::Timestamp(v) => {
-                                    let string_value = Some(builder.create_string(&v.to_string()));
-                                    HttpColumnValue::create(
-                                        &mut builder,
-                                        &HttpColumnValueArgs { string_value },
-                                    )
-                                }
-                                TableValue::Boolean(v) => {
-                                    let string_value = Some(builder.create_string(&v.to_string()));
-                                    HttpColumnValue::create(
-                                        &mut builder,
-                                        &HttpColumnValueArgs { string_value },
-                                    )
-                                }
-                            };
-                            value_offsets.push(value);
-                        }
-                        let values = Some(builder.create_vector(value_offsets.as_slice()));
-                        let row = HttpRow::create(&mut builder, &HttpRowArgs { values });
-                        row_offsets.push(row);
-                    }
-
-                    let rows = Some(builder.create_vector(row_offsets.as_slice()));
+                    let columns_vec =
+                        HttpMessage::build_columns(&mut builder, data_frame.get_columns());
+                    let rows = HttpMessage::build_rows(&mut builder, data_frame.clone());
 
                     Some(
                         HttpResultSet::create(
                             &mut builder,
                             &HttpResultSetArgs {
                                 columns: Some(columns_vec),
-                                rows,
+                                rows: Some(rows),
                             },
                         )
                         .as_union_value(),
@@ -510,15 +451,126 @@ impl HttpMessage {
         builder.finished_data().to_vec() // TODO copy
     }
 
-    pub fn read(buffer: Vec<u8>) -> Result<Self, CubeError> {
+    fn build_columns<'a: 'ma, 'ma>(
+        builder: &'ma mut FlatBufferBuilder<'a>,
+        columns: &Vec<Column>,
+    ) -> WIPOffset<Vector<'a, ForwardsUOffset<&'a str>>> {
+        let columns = columns
+            .iter()
+            .map(|c| c.get_name().as_str())
+            .collect::<Vec<_>>();
+        let columns_vec = builder.create_vector_of_strings(columns.as_slice());
+        columns_vec
+    }
+
+    fn build_rows<'a: 'ma, 'ma>(
+        builder: &'ma mut FlatBufferBuilder<'a>,
+        data_frame: Arc<DataFrame>,
+    ) -> WIPOffset<Vector<'a, ForwardsUOffset<HttpRow<'a>>>> {
+        let columns = data_frame.get_columns();
+        let rows = data_frame.get_rows();
+        let mut row_offsets = Vec::with_capacity(rows.len());
+        for row in rows.iter() {
+            let mut value_offsets = Vec::with_capacity(row.values().len());
+            for (i, value) in row.values().iter().enumerate() {
+                let value = match value {
+                    TableValue::Null => HttpColumnValue::create(
+                        builder,
+                        &HttpColumnValueArgs { string_value: None },
+                    ),
+                    TableValue::String(v) => {
+                        let string_value = Some(builder.create_string(v));
+                        HttpColumnValue::create(builder, &HttpColumnValueArgs { string_value })
+                    }
+                    TableValue::Int(v) => {
+                        let string_value = Some(builder.create_string(&v.to_string()));
+                        HttpColumnValue::create(builder, &HttpColumnValueArgs { string_value })
+                    }
+                    TableValue::Decimal(v) => {
+                        let scale =
+                            u8::try_from(columns[i].get_column_type().target_scale()).unwrap();
+                        let string_value = Some(builder.create_string(&v.to_string(scale)));
+                        HttpColumnValue::create(builder, &HttpColumnValueArgs { string_value })
+                    }
+                    TableValue::Float(v) => {
+                        let string_value = Some(builder.create_string(&v.to_string()));
+                        HttpColumnValue::create(builder, &HttpColumnValueArgs { string_value })
+                    }
+                    TableValue::Bytes(v) => {
+                        let string_value = Some(
+                            builder.create_string(&format!("0x{}", v.encode_hex_upper::<String>())),
+                        );
+                        HttpColumnValue::create(builder, &HttpColumnValueArgs { string_value })
+                    }
+                    TableValue::Timestamp(v) => {
+                        let string_value = Some(builder.create_string(&v.to_string()));
+                        HttpColumnValue::create(builder, &HttpColumnValueArgs { string_value })
+                    }
+                    TableValue::Boolean(v) => {
+                        let string_value = Some(builder.create_string(&v.to_string()));
+                        HttpColumnValue::create(builder, &HttpColumnValueArgs { string_value })
+                    }
+                };
+                value_offsets.push(value);
+            }
+            let values = Some(builder.create_vector(value_offsets.as_slice()));
+            let row = HttpRow::create(builder, &HttpRowArgs { values });
+            row_offsets.push(row);
+        }
+
+        let rows = builder.create_vector(row_offsets.as_slice());
+        rows
+    }
+
+    pub async fn read(buffer: Vec<u8>) -> Result<Self, CubeError> {
         let http_message = get_root_as_http_message(buffer.as_slice());
         Ok(HttpMessage {
             message_id: http_message.message_id(),
             command: match http_message.command_type() {
                 crate::codegen::http_message_generated::HttpCommand::HttpQuery => {
                     let query = http_message.command_as_http_query().unwrap();
+                    let mut inline_tables = Vec::new();
+                    if let Some(query_inline_tables) = query.inline_tables() {
+                        for inline_table in query_inline_tables.iter() {
+                            let name = inline_table.name().unwrap().to_string();
+                            let types = inline_table
+                                .types()
+                                .unwrap()
+                                .iter()
+                                .map(|column_type| ColumnType::from_string(column_type))
+                                .collect::<Result<Vec<_>, CubeError>>()?;
+                            let columns = inline_table
+                                .columns()
+                                .unwrap()
+                                .iter()
+                                .enumerate()
+                                .map(|(i, name)| Column::new(name.to_string(), types[i].clone(), i))
+                                .collect::<Vec<_>>();
+                            let rows = if inline_table.csv_rows().is_some() {
+                                let csv_rows = inline_table.csv_rows().unwrap().to_owned();
+                                let csv_reader = Box::pin(BufReader::new(csv_rows.as_bytes()));
+                                let mut rows_stream = ImportFormat::CSVNoHeader
+                                    .row_stream_from_reader(csv_reader, columns.clone())?;
+                                let mut rows = vec![];
+                                while let Some(row) = rows_stream.next().await {
+                                    if let Some(row) = row? {
+                                        rows.push(row)
+                                    }
+                                }
+                                rows
+                            } else {
+                                vec![]
+                            };
+                            inline_tables.push(InlineTable::new(
+                                inline_tables.len() as u64 + 1,
+                                name,
+                                Arc::new(DataFrame::new(columns, rows)),
+                            ));
+                        }
+                    };
                     HttpCommand::Query {
                         query: query.query().unwrap().to_string(),
+                        inline_tables,
                         trace_obj: query.trace_obj().map(|q| q.to_string()),
                     }
                 }
@@ -530,5 +582,136 @@ impl HttpMessage {
                 }
             },
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::codegen::http_message_generated::{
+        HttpMessageArgs, HttpQuery, HttpQueryArgs, HttpTable, HttpTableArgs,
+    };
+    use crate::http::{HttpCommand, HttpMessage};
+    use crate::metastore::{Column, ColumnType};
+    use crate::sql::{timestamp_from_string, InlineTable};
+    use crate::store::DataFrame;
+    use crate::table::{Row, TableValue};
+    use flatbuffers::{FlatBufferBuilder, ForwardsUOffset, Vector, WIPOffset};
+    use indoc::indoc;
+    use std::sync::Arc;
+
+    fn build_types<'a: 'ma, 'ma>(
+        builder: &'ma mut FlatBufferBuilder<'a>,
+        columns: &Vec<Column>,
+    ) -> WIPOffset<Vector<'a, ForwardsUOffset<&'a str>>> {
+        let types = columns
+            .iter()
+            .map(|c| c.get_column_type().to_string())
+            .collect::<Vec<_>>();
+        let str_types = types.iter().map(|t| t.as_str()).collect::<Vec<_>>();
+        let types_vec = builder.create_vector_of_strings(str_types.as_slice());
+        types_vec
+    }
+
+    #[tokio::test]
+    async fn query_test() {
+        let message = HttpMessage {
+            message_id: 1234,
+            command: HttpCommand::Query {
+                query: "test query".to_string(),
+                inline_tables: vec![],
+                trace_obj: Some("test trace".to_string()),
+            },
+        };
+        let bytes = message.bytes();
+        let output_message = HttpMessage::read(bytes).await.unwrap();
+        assert_eq!(message, output_message);
+    }
+
+    #[tokio::test]
+    async fn inline_tables_query_test() {
+        let columns = vec![
+            Column::new("A".to_string(), ColumnType::Int, 0),
+            Column::new("B".to_string(), ColumnType::String, 1),
+            Column::new("C".to_string(), ColumnType::Timestamp, 2),
+        ];
+        let rows = vec![
+            Row::new(vec![
+                TableValue::Int(1),
+                TableValue::String("one".to_string()),
+                TableValue::Timestamp(timestamp_from_string("2020-01-01T00:00:00.000Z").unwrap()),
+            ]),
+            Row::new(vec![
+                TableValue::Null,
+                TableValue::String("two".to_string()),
+                TableValue::Timestamp(timestamp_from_string("2020-01-02T00:00:00.000Z").unwrap()),
+            ]),
+            Row::new(vec![
+                TableValue::Int(3),
+                TableValue::Null,
+                TableValue::Timestamp(timestamp_from_string("2020-01-03T00:00:00.000Z").unwrap()),
+            ]),
+            Row::new(vec![
+                TableValue::Int(4),
+                TableValue::String("four".to_string()),
+                TableValue::Null,
+            ]),
+        ];
+        let csv_rows = indoc! {"
+            1,one,2020-01-01T00:00:00.000Z
+            ,two,2020-01-02T00:00:00.000Z
+            3,,2020-01-03T00:00:00.000Z
+            4,four,
+        "};
+        let mut builder = flatbuffers::FlatBufferBuilder::new_with_capacity(1024);
+        let query_offset = builder.create_string("query");
+        let mut inline_tables_offsets = Vec::with_capacity(1);
+        let name_offset = builder.create_string("table");
+        let columns_vec = HttpMessage::build_columns(&mut builder, &columns);
+        let types_vec = build_types(&mut builder, &columns);
+        let csv_rows_value = builder.create_string(csv_rows);
+        let inline_table_offset = HttpTable::create(
+            &mut builder,
+            &HttpTableArgs {
+                name: Some(name_offset),
+                columns: Some(columns_vec),
+                types: Some(types_vec),
+                csv_rows: Some(csv_rows_value),
+            },
+        );
+        inline_tables_offsets.push(inline_table_offset);
+        let inline_tables_offset = builder.create_vector(inline_tables_offsets.as_slice());
+        let query_value = HttpQuery::create(
+            &mut builder,
+            &HttpQueryArgs {
+                query: Some(query_offset),
+                inline_tables: Some(inline_tables_offset),
+                trace_obj: None,
+            },
+        );
+        let args = HttpMessageArgs {
+            message_id: 1234,
+            command_type: crate::codegen::http_message_generated::HttpCommand::HttpQuery,
+            command: Some(query_value.as_union_value()),
+        };
+        let message =
+            crate::codegen::http_message_generated::HttpMessage::create(&mut builder, &args);
+        builder.finish(message, None);
+        let bytes = builder.finished_data().to_vec();
+        let message = HttpMessage::read(bytes).await.unwrap();
+        assert_eq!(
+            message,
+            HttpMessage {
+                message_id: 1234,
+                command: HttpCommand::Query {
+                    query: "query".to_string(),
+                    inline_tables: vec![InlineTable::new(
+                        1,
+                        "table".to_string(),
+                        Arc::new(DataFrame::new(columns, rows.clone()))
+                    )],
+                    trace_obj: None
+                }
+            }
+        );
     }
 }

@@ -16,8 +16,8 @@ import crypto from 'crypto';
 
 import type { BaseDriver } from '@cubejs-backend/query-orchestrator';
 
-import { CubejsServerCore, ServerCoreInitializedOptions } from './server';
-import { ExternalDbTypeFn } from './types';
+import { CubejsServerCore } from './server';
+import { ExternalDbTypeFn, ServerCoreInitializedOptions } from './types';
 import DriverDependencies from './DriverDependencies';
 
 const repo = {
@@ -77,9 +77,9 @@ export class DevServer {
       try {
         await handler(req, res, next);
       } catch (e) {
-        console.error((e.stack || e).toString());
-        this.cubejsServer.event('Dev Server Error', { error: (e.stack || e).toString() });
-        res.status(500).json({ error: (e.stack || e).toString() });
+        console.error(((e as Error).stack || e).toString());
+        this.cubejsServer.event('Dev Server Error', { error: ((e as Error).stack || e).toString() });
+        res.status(500).json({ error: ((e as Error).stack || e).toString() });
       }
     };
 
@@ -297,7 +297,7 @@ export class DevServer {
             { cwd: path.resolve('.') }
           );
         } catch (error) {
-          driverError = error;
+          driverError = error as Error;
         } finally {
           driverPromise = null;
         }
@@ -464,7 +464,6 @@ export class DevServer {
         variables.CUBEJS_API_SECRET = options.apiSecret;
       }
 
-      // CUBEJS_EXTERNAL_DEFAULT will be default in next major version, let's test it with docker too
       variables.CUBEJS_EXTERNAL_DEFAULT = 'true';
       variables.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'true';
       variables.CUBEJS_DEV_MODE = 'true';
@@ -477,6 +476,19 @@ export class DevServer {
       }
 
       fs.writeFileSync(path.join(process.cwd(), '.env'), variables.join('\n'));
+
+      if (!fs.existsSync(path.join(process.cwd(), 'package.json'))) {
+        fs.writeFileSync(
+          path.join(process.cwd(), 'package.json'),
+          JSON.stringify({
+            name: 'cube-docker',
+            version: '0.0.1',
+            private: true,
+            createdAt: new Date().toJSON(),
+            dependencies: {}
+          }, null, 2)
+        );
+      }
 
       dotenv.config({ override: true });
 
@@ -508,7 +520,7 @@ export class DevServer {
       try {
         await schemaConverter.generate();
       } catch (error) {
-        res.status(400).json({ error: error.message || error });
+        res.status(400).json({ error: (error as Error).message || error });
       }
 
       schemaConverter.getSourceFiles().forEach(({ cubeName: currentCubeName, fileName, source }) => {
@@ -526,6 +538,6 @@ export class DevServer {
       .update(apiSecret)
       .digest('hex')
       .replace(/[^\d]/g, '')
-      .substr(0, 10);
+      .slice(0, 10);
   }
 }

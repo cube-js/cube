@@ -19,9 +19,11 @@ use tokio::sync::{oneshot, watch, Notify, RwLock};
 use tracing::{instrument, Instrument};
 use tracing_futures::WithSubscriber;
 
+use crate::config::{Config, WorkerServices};
 use crate::util::respawn::respawn;
 use crate::CubeError;
 use datafusion::cube_ext;
+use datafusion::cube_ext::catch_unwind::async_try_with_catch_unwind;
 
 pub struct WorkerPool<
     T: Debug + Serialize + DeserializeOwned + Sync + Send + 'static,
@@ -50,7 +52,7 @@ pub trait MessageProcessor<
     R: Serialize + DeserializeOwned + Sync + Send + 'static,
 >
 {
-    async fn process(args: T) -> Result<R, CubeError>;
+    async fn process(services: &WorkerServices, args: T) -> Result<R, CubeError>;
 }
 
 impl<
@@ -271,13 +273,28 @@ where
     P: MessageProcessor<T, R>,
 {
     let (rx, tx) = (a.args, a.results);
-    let runtime = Builder::new_multi_thread().enable_all().build().unwrap();
+    let mut tokio_builder = Builder::new_multi_thread();
+    tokio_builder.enable_all();
+    tokio_builder.thread_name("cubestore-worker");
+    if let Ok(var) = std::env::var("CUBESTORE_EVENT_LOOP_WORKER_THREADS") {
+        tokio_builder.worker_threads(var.parse().unwrap());
+    }
+    let runtime = tokio_builder.build().unwrap();
     runtime.block_on(async move {
+        let config = Config::default();
+        config.configure_injector().await;
+        let services = config.worker_services().await;
+
         loop {
             let res = rx.recv();
             match res {
                 Ok(args) => {
-                    let send_res = tx.send(P::process(args).await);
+                    let result =
+                        match async_try_with_catch_unwind(P::process(&services, args)).await {
+                            Ok(result) => result,
+                            Err(panic) => Err(CubeError::from(panic)),
+                        };
+                    let send_res = tx.send(result);
                     if let Err(e) = send_res {
                         error!("Worker message send error: {:?}", e);
                         return 0;
@@ -305,6 +322,7 @@ mod tests {
     use tokio::runtime::Builder;
 
     use crate::cluster::worker_pool::{worker_main, MessageProcessor, WorkerPool};
+    use crate::config::WorkerServices;
     use crate::queryplanner::serialized_plan::SerializedLogicalPlan;
     use crate::util::respawn;
     use crate::CubeError;
@@ -319,6 +337,7 @@ mod tests {
     #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
     pub enum Message {
         Delay(u64),
+        Panic,
     }
 
     #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
@@ -330,11 +349,14 @@ mod tests {
 
     #[async_trait]
     impl MessageProcessor<Message, Response> for Processor {
-        async fn process(args: Message) -> Result<Response, CubeError> {
+        async fn process(_services: &WorkerServices, args: Message) -> Result<Response, CubeError> {
             match args {
                 Message::Delay(x) => {
                     Delay::new(Duration::from_millis(x)).await;
                     Ok(Response::Foo(x))
+                }
+                Message::Panic => {
+                    panic!("oops")
                 }
             }
         }
@@ -405,6 +427,25 @@ mod tests {
                     assert_eq!(f.await.unwrap(), Response::Foo(i * 300));
                 }
             }
+            pool.stop_workers().await.unwrap();
+        });
+    }
+
+    #[test]
+    fn test_panic() {
+        let runtime = Builder::new_current_thread().enable_all().build().unwrap();
+
+        runtime.block_on(async move {
+            let pool = Arc::new(WorkerPool::<Message, Response, Processor>::new(
+                4,
+                Duration::from_millis(2000),
+            ));
+            let pool_to_move = pool.clone();
+            cube_ext::spawn(async move { pool_to_move.wait_processing_loops().await });
+            assert_eq!(
+                pool.process(Message::Panic).await,
+                Err(CubeError::panic("oops".to_string()))
+            );
             pool.stop_workers().await.unwrap();
         });
     }

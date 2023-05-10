@@ -28,6 +28,11 @@ image:
   ##
   pullPolicy: IfNotPresent
 
+  ## Specify a imagePullSecrets
+  ## ref: https://kubernetes.io/docs/concepts/containers/images/#specifying-imagepullsecrets-on-a-pod
+  ##
+  pullSecrets: []
+
 config:
   ## The port for a Cube.js deployment to listen to API connections on
   ##
@@ -36,6 +41,17 @@ config:
   ## The port for a Cube.js deployment to listen to SQL connections on
   ##
   sqlPort:
+
+  ## The username to access the SQL api
+  ##
+  sqlUser:
+
+  ## The password to access the SQL api
+  ##
+  sqlPassword:
+  # apiPasswordFromSecret:
+  #   name:
+  #   key:
 
   ## If true, enables development mode.
   ##
@@ -287,7 +303,7 @@ database:
 
     ## The S3 path to store query results made by the Cube.js deployment
     ##
-    outputLocation:
+    s3outputLocation:
 
     ## The AWS Secret Access Key to use for database connections
     ##
@@ -438,6 +454,14 @@ cubestore:
   port:
 
 master:
+  ## Service account for cubejs master to use
+  ##
+  serviceAccount:
+    create: false
+    name: ""
+    automountServiceAccountToken: true
+    annotations: {}
+
   ## Affinity for pod assignment
   ## ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
   ##
@@ -483,7 +507,23 @@ master:
   ##
   customReadinessProbe: {}
 
+  ## Tolerations for pod assignment
+  ##
+  tolerations: {}
+
+  ## Node selector for pod assignment
+  ##
+  nodeSelector: {}
+
 workers:
+  ## Service account for cubejs master to use
+  ##
+  serviceAccount:
+    create: false
+    name: ""
+    automountServiceAccountToken: true
+    annotations: {}
+
   workersCount: 1
 
   ## Affinity for pod assignment
@@ -531,50 +571,14 @@ workers:
   ##
   customReadinessProbe: {}
 
-service:
-  ## Set to true to enable service generation
-  ##
-  enabled: true
 
-  ## Master service type
+  ## Tolerations for pod assignment
   ##
-  type: ClusterIP
+  tolerations: {}
 
-  ## Master service port
+  ## Node selector for pod assignment
   ##
-  port: 4000
-
-  ## Node port for master
-  ## ref: https://kubernetes.io/docs/concepts/services-networking/service/#type-nodeport
-  ## NOTE: choose port between <30000-32767>
-  ##
-  nodePort:
-
-  ## Master service external traffic policy
-  ## ref: https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/#preserving-the-client-source-ip
-  ##
-  externalTrafficPolicy: Cluster
-
-  ## Master service Cluster IP
-  ##
-  clusterIP:
-
-  ## Master service Load Balancer IP
-  ## ref: https://kubernetes.io/docs/concepts/services-networking/service/#internal-load-balancer
-  ##
-  loadBalancerIP:
-
-  ## Master service Load Balancer sources
-  ## https://kubernetes.io/docs/tasks/access-application-cluster/configure-cloud-provider-firewall/#restrict-access-for-loadbalancer-service
-  ## e.g.
-  ## loadBalancerSourceRanges:
-  ##   - 10.10.10.0/24
-  ##
-  loadBalancerSourceRanges: []
-
-  ## Additional custom annotations for master service
-  ##
-  annotations: {}
+  nodeSelector: {}
 
 ## Configure the ingress resource that allows you to access the
 ## Cubejs installation. Set up the URL

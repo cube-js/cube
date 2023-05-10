@@ -157,10 +157,10 @@ const renderChart = Component => ({ resultSet, error }) =>
   (resultSet && <Component resultSet={resultSet} />) ||
   (error && error.toString()) || <Spin />;
 
-const ChartRenderer = ({ vizState, cubejsApi }) => {
+const ChartRenderer = ({ vizState }) => {
   const { query, chartType } = vizState;
   const component = TypeToMemoChartComponent[chartType];
-  const renderProps = useCubeQuery(query, { subscribe: true, cubejsApi });
+  const renderProps = useCubeQuery(query, { subscribe: true });
   return component && renderChart(component)(renderProps);
 };
 

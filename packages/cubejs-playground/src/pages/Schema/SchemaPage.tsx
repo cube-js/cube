@@ -1,6 +1,6 @@
 import { Component } from 'react';
 import { Layout, Button, Modal, Empty, Typography } from 'antd';
-import { RouterProps } from 'react-router';
+import { RouterProps } from 'react-router-dom';
 
 import PrismCode from '../../PrismCode';
 import { playgroundAction } from '../../events';
@@ -257,7 +257,7 @@ export default class SchemaPage extends Component<SchemaPageProps, any> {
                       href="https://cube.dev/docs/schema/getting-started"
                       target="_blank"
                     >
-                      Learn more about working with Cube.js data schema in the
+                      Learn more about working with Cube data schema in the
                       docs
                     </Typography.Link>
                   </span>
@@ -283,7 +283,7 @@ export default class SchemaPage extends Component<SchemaPageProps, any> {
           ) : (
             <Empty
               style={{ marginTop: 50 }}
-              description="Select tables to generate Cube.js schema"
+              description="Select tables to generate Cube schema"
             />
           )}
 

@@ -4,7 +4,7 @@ import color from '@oclif/color';
 const currentNodeVersion = process.versions.node;
 const semver = currentNodeVersion.split('.');
 const major = parseInt(<string> semver[0], 10);
-const minor = parseInt(<string> semver[1], 10);
+const _minor = parseInt(<string> semver[1], 10);
 
 if (major < 12 || major === 15) {
   console.error(
@@ -17,7 +17,7 @@ if (major < 12 || major === 15) {
   process.exit(1);
 }
 
-if (major === 10) {
+if (major === 12) {
   process.emitWarning(
     color.red(
       `You are running Node.js ${currentNodeVersion}.\n` +

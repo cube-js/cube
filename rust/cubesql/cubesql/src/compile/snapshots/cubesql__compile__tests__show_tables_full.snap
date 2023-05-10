@@ -1,0 +1,11 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"show full tables;\".to_string(), DatabaseProtocol::MySQL).await?"
+---
++---------------------------+------------+
+| Tables_in_db              | Table_type |
++---------------------------+------------+
+| KibanaSampleDataEcommerce | BASE TABLE |
+| Logs                      | BASE TABLE |
+| NumberCube                | BASE TABLE |
++---------------------------+------------+

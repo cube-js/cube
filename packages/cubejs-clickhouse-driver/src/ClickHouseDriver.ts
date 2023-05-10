@@ -6,7 +6,7 @@ import {
   DriverInterface,
   StreamOptions,
   StreamTableDataWithTypes,
-} from '@cubejs-backend/query-orchestrator';
+} from '@cubejs-backend/base-driver';
 import { getEnv } from '@cubejs-backend/shared';
 import genericPool, { Pool } from 'generic-pool';
 import { v4 as uuidv4 } from 'uuid';
@@ -45,9 +45,17 @@ interface ClickHouseDriverOptions {
   database?: string,
   readOnly?: boolean,
   queryOptions?: object,
+  maxPoolSize?: number,
 }
 
 export class ClickHouseDriver extends BaseDriver implements DriverInterface {
+  /**
+   * Returns default concurrency value.
+   */
+  public static getDefaultConcurrency(): number {
+    return 5;
+  }
+
   protected readonly pool: Pool<any>;
 
   protected readonly readOnlyMode: boolean;
@@ -87,7 +95,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       destroy: () => Promise.resolve()
     }, {
       min: 0,
-      max: 8,
+      max: this.config.maxPoolSize || 8,
       evictionRunIntervalMillis: 10000,
       softIdleTimeoutMillis: 30000,
       idleTimeoutMillis: 30000,

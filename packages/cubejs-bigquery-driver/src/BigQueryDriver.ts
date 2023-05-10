@@ -5,9 +5,8 @@ import { Bucket, Storage } from '@google-cloud/storage';
 import {
   BaseDriver, DownloadTableCSVData,
   DriverInterface, QueryOptions, StreamTableData,
-} from '@cubejs-backend/query-orchestrator';
+} from '@cubejs-backend/base-driver';
 import { getEnv, pausePromise, Required } from '@cubejs-backend/shared';
-import { Table } from '@google-cloud/bigquery/build/src/table';
 import { Query } from '@google-cloud/bigquery/build/src/bigquery';
 import { HydrationStream } from './HydrationStream';
 
@@ -19,11 +18,19 @@ interface BigQueryDriverOptions extends BigQueryOptions {
   location?: string,
   pollTimeout?: number,
   pollMaxInterval?: number,
+  maxPoolSize?: number,
 }
 
 type BigQueryDriverOptionsInitialized = Required<BigQueryDriverOptions, 'pollTimeout' | 'pollMaxInterval'>;
 
 export class BigQueryDriver extends BaseDriver implements DriverInterface {
+  /**
+   * Returns default concurrency value.
+   */
+  public static getDefaultConcurrency(): number {
+    return 10;
+  }
+
   protected readonly options: BigQueryDriverOptionsInitialized;
 
   protected readonly bigquery: BigQuery;
@@ -258,6 +265,8 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
         Math.min(this.options.pollMaxInterval, 200 * i),
       );
     }
+
+    await job.cancel();
 
     throw new Error(
       `BigQuery job timeout reached ${this.options.pollTimeout}ms`,

@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"SELECT array_lower(ARRAY['a', 'b']) v1\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++----+
+| v1 |
++----+
+| 1  |
++----+

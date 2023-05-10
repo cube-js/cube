@@ -8,7 +8,8 @@ import { fetchPoll, fetchWithTimeout } from '../../utils';
 import ConnectionTest from './components/ConnectionTest';
 import { DatabaseCard, SelectedDatabaseCard } from './components/DatabaseCard';
 import DatabaseForm from './components/DatabaseForm';
-import { Button, FatalError } from '../../atoms';
+import { Button } from '../../atoms';
+import { FatalError } from '../../components/Error/FatalError';
 import { LocalhostTipBox } from './components/LocalhostTipBox';
 import { event, playgroundAction } from '../../events';
 
@@ -244,7 +245,7 @@ export function ConnectionWizardPage({ history }) {
               ) : (
                 <Typography.Paragraph>
                   Enter database credentials to connect to your database. <br />
-                  Cube.js will store your credentials into the <code>
+                  Cube will store your credentials into the <code>
                     .env
                   </code>{' '}
                   file for future use.
@@ -256,7 +257,7 @@ export function ConnectionWizardPage({ history }) {
                 message={
                   <>
                     For advanced configuration, use the <b>cube.js</b> or{' '}
-                    <b>.env</b> configuration files in your cube.js project.
+                    <b>.env</b> configuration files in your Cube project.
                     Note these files are on the mount volume if you are running
                     Docker.
                     <br />
@@ -335,7 +336,7 @@ export function ConnectionWizardPage({ history }) {
                 </Space>
               </Col>
 
-              {['MySQL', 'PostgreSQL', 'Druid', 'ClickHouse'].includes(
+              {['MySQL', 'PostgreSQL', 'Druid', 'ClickHouse', 'Crate'].includes(
                 db?.title || ''
               ) && playgroundContext?.isDocker ? (
                 <Col span={12}>

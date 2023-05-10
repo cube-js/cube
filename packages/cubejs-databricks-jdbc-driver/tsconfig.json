@@ -7,6 +7,6 @@
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": ".",
-    "baseUrl": ".",
+    "baseUrl": "."
   }
 }

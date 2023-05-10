@@ -10,6 +10,11 @@ on:
     workflows: [ "Release" ]
     types:
       - completed
+  push:
+    paths:
+      - '.github/workflows/birdbox.yml'
+    branches:
+      - 'master'
 
 jobs:
   cli:
@@ -26,7 +31,7 @@ jobs:
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2021-07-04
+          toolchain: nightly-2022-06-22
           override: true
           components: rustfmt
       - name: Install Node.js ${{ matrix.node-version }}
@@ -48,7 +53,15 @@ jobs:
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
       - name: Yarn install
-        run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
+        uses: nick-invision/retry@v2
+        env:
+          CUBESTORE_SKIP_POST_INSTALL: true
+        with:
+          max_attempts: 3
+          retry_on: error
+          retry_wait_seconds: 15
+          timeout_minutes: 20
+          command: yarn install --frozen-lockfile
       - name: Build client
         run: yarn build
       - name: Lerna tsc
@@ -86,7 +99,7 @@ jobs:
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2021-07-04
+          toolchain: nightly-2022-06-22
           override: true
           components: rustfmt
       - name: Install Node.js 14.x
@@ -108,7 +121,15 @@ jobs:
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
       - name: Yarn install
-        run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
+        uses: nick-invision/retry@v2
+        env:
+          CUBESTORE_SKIP_POST_INSTALL: true
+        with:
+          max_attempts: 3
+          retry_on: error
+          retry_wait_seconds: 15
+          timeout_minutes: 20
+          command: yarn install --frozen-lockfile
       - name: Build client
         run: yarn build
       - name: Lerna tsc
@@ -147,7 +168,7 @@ jobs:
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2021-07-04
+          toolchain: nightly-2022-06-22
           override: true
           components: rustfmt
       - name: Install Node.js 14.x
@@ -169,7 +190,15 @@ jobs:
       - name: Set Yarn version
         run: yarn policies set-version v1.22.5
       - name: Yarn install
-        run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
+        uses: nick-invision/retry@v2
+        env:
+          CUBESTORE_SKIP_POST_INSTALL: true
+        with:
+          max_attempts: 3
+          retry_on: error
+          retry_wait_seconds: 15
+          timeout_minutes: 20
+          command: yarn install --frozen-lockfile
       - name: Lerna tsc
         run: yarn tsc
       - name: Birdbox

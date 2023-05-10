@@ -1,6 +1,6 @@
 import fetch from 'node-fetch';
 
-const DATASET_VERSION = 'v0.0.2';
+const DATASET_VERSION = 'v0.0.4';
 
 export type DataSetSchema = {
   name: string,

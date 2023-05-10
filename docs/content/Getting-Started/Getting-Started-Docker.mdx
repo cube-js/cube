@@ -28,7 +28,7 @@ Using Windows? Remember to use [PowerShell][link-powershell] or
 In a new folder for your project, run the following command:
 
 ```bash
-docker run -p 4000:4000 \
+docker run -p 4000:4000 -p 3000:3000 \
   -v ${PWD}:/cube/conf \
   -e CUBEJS_DEV_MODE=true \
   cubejs/cube
@@ -78,10 +78,10 @@ you can execute queries on the Build tab.
 ## Next Steps
 
 Generating Data Schema files in the Developer Playground is a good first step to
-start modelling your data. You can [learn more about Cube.js Data
-Schema][ref-cubejs-schema] for complex data modelling techniques.
+start modeling your data. You can [learn more about Cube.js Data
+Schema][ref-cubejs-schema] for complex data modeling techniques.
 
-Learn how to [query Cube.js with REST API][ref-rest-api] or [use our Javascript
+Learn how to query Cube.js with [REST API][ref-rest-api], [SQL API][ref-sql-api] or [use our Javascript
 client library and integrations with frontend
 frameworks][ref-frontend-introduction].
 
@@ -95,3 +95,4 @@ frameworks][ref-frontend-introduction].
 [ref-env-vars]: /reference/environment-variables
 [ref-frontend-introduction]: /frontend-introduction
 [ref-rest-api]: /rest-api
+[ref-sql-api]: /backend/sql

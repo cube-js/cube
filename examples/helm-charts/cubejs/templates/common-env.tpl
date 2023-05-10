@@ -9,6 +9,20 @@
 - name: CUBEJS_SQL_PORT
   value: {{ .Values.config.sqlPort | quote }}
 {{- end }}
+{{- if .Values.config.sqlUser }}
+- name: CUBEJS_SQL_USER
+  value: {{ .Values.config.sqlUser | quote }}
+{{- end }}
+{{- if .Values.config.sqlPassword }}
+- name: CUBEJS_SQL_PASSWORD
+  value: {{ .Values.config.sqlPassword | quote }}
+{{- else if .Values.config.sqlPasswordFromSecret }}
+- name: CUBEJS_SQL_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.config.sqlPasswordFromSecret.name | required "config.sqlPasswordFromSecret.name is required" }}
+      key: {{ .Values.config.sqlPasswordFromSecret.key | required "config.sqlPasswordFromSecret.key is required" }}
+{{- end }}
 {{- if .Values.config.devMode }}
 - name: CUBEJS_DEV_MODE
   value: {{ .Values.config.devMode | quote }}
@@ -232,9 +246,9 @@ CUBEJS_REDIS_PASSWORD.
 - name: CUBEJS_AWS_REGION
   value: {{ .Values.database.aws.region | quote }}
 {{- end }}
-{{- if .Values.database.aws.outputLocation }}
-- name: CUBEJS_AWS_OUTPUT_LOCATION
-  value: {{ .Values.database.aws.outputLocation | quote }}
+{{- if .Values.database.aws.s3OutputLocation }}
+- name: CUBEJS_AWS_S3_OUTPUT_LOCATION
+  value: {{ .Values.database.aws.s3OutputLocation | quote }}
 {{- end }}
 {{- if .Values.database.aws.secret }}
 - name: CUBEJS_AWS_SECRET
@@ -320,7 +334,7 @@ CUBEJS_REDIS_PASSWORD.
 {{- end }}
 {{- if .Values.database.snowFlake.role }}
 - name: CUBEJS_DB_SNOWFLAKE_ROLE
-  value: {{ .Values.database.snowFlake.urolerl | quote }}
+  value: {{ .Values.database.snowFlake.role | quote }}
 {{- end }}
 {{- if .Values.database.snowFlake.warehouse }}
 - name: CUBEJS_DB_SNOWFLAKE_WAREHOUSE
@@ -349,33 +363,33 @@ CUBEJS_REDIS_PASSWORD.
 {{- if .Values.database.ssl.enabled }}
 - name: CUBEJS_DB_SSL
   value: "true"
-{{- if .Value.database.ssl.rejectUnAuthorized }}
+{{- if .Values.database.ssl.rejectUnAuthorized }}
 - name: CUBEJS_DB_SSL_REJECT_UNAUTHORIZED
-  value: {{ .Value.database.ssl.rejectUnAuthorized | quote }}
+  value: {{ .Values.database.ssl.rejectUnAuthorized | quote }}
 {{- end }}
-{{- if .Value.database.ssl.ca }}
+{{- if .Values.database.ssl.ca }}
 - name: CUBEJS_DB_SSL_CA
-  value: {{ .Value.database.ssl.ca | quote }}
+  value: {{ .Values.database.ssl.ca | quote }}
 {{- end }}
-{{- if .Value.database.ssl.cert }}
+{{- if .Values.database.ssl.cert }}
 - name: CUBEJS_DB_SSL_CERT
-  value: {{ .Value.database.ssl.cert | quote }}
+  value: {{ .Values.database.ssl.cert | quote }}
 {{- end }}
-{{- if .Value.database.ssl.key }}
+{{- if .Values.database.ssl.key }}
 - name: CUBEJS_DB_SSL_KEY
-  value: {{ .Value.database.ssl.key | quote }}
+  value: {{ .Values.database.ssl.key | quote }}
 {{- end }}
-{{- if .Value.database.ssl.ciphers }}
+{{- if .Values.database.ssl.ciphers }}
 - name: CUBEJS_DB_SSL_CIPHERS
-  value: {{ .Value.database.ssl.ciphers | quote }}
+  value: {{ .Values.database.ssl.ciphers | quote }}
 {{- end }}
-{{- if .Value.database.ssl.serverName }}
+{{- if .Values.database.ssl.serverName }}
 - name: CUBEJS_DB_SSL_SERVERNAME
-  value: {{ .Value.database.ssl.serverName | quote }}
+  value: {{ .Values.database.ssl.serverName | quote }}
 {{- end }}
-{{- if .Value.database.ssl.passPhrase }}
+{{- if .Values.database.ssl.passPhrase }}
 - name: CUBEJS_DB_SSL_PASSPHRASE
-  value: {{ .Value.database.ssl.passPhrase | quote }}
+  value: {{ .Values.database.ssl.passPhrase | quote }}
 {{- end }}
 {{- end }}
 {{- /*

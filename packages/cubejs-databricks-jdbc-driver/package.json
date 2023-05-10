@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/databricks-jdbc-driver",
   "description": "Cube.js Databricks database driver",
   "author": "Cube Dev, Inc.",
-  "version": "0.29.17",
+  "version": "0.30.75",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -28,21 +28,27 @@
     "bin"
   ],
   "dependencies": {
-    "@cubejs-backend/jdbc-driver": "^0.29.15",
-    "@cubejs-backend/query-orchestrator": "^0.29.15",
-    "@cubejs-backend/schema-compiler": "^0.29.17",
-    "@cubejs-backend/shared": "^0.29.15",
+    "@aws-sdk/client-s3": "^3.49.0",
+    "@aws-sdk/s3-request-presigner": "^3.49.0",
+    "@azure/storage-blob": "^12.9.0",
+    "@cubejs-backend/base-driver": "^0.30.73",
+    "@cubejs-backend/jdbc-driver": "^0.30.73",
+    "@cubejs-backend/schema-compiler": "^0.30.75",
+    "@cubejs-backend/shared": "^0.30.69",
     "inquirer": "^8.0.0",
+    "node-fetch": "^2.6.1",
     "ramda": "^0.27.1",
-    "source-map-support": "^0.5.19"
+    "source-map-support": "^0.5.19",
+    "uuid": "^8.3.2"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "^0.29.0",
+    "@cubejs-backend/linter": "^0.30.0",
     "@types/generic-pool": "^3.1.9",
     "@types/inquirer": "^7.3.1",
     "@types/jest": "^26.0.20",
-    "@types/node": "^10.17.55",
+    "@types/node": "^12",
     "@types/ramda": "^0.27.34",
+    "@types/uuid": "^8.3.4",
     "jest": "^26.6.3",
     "typescript": "~4.1.5"
   },

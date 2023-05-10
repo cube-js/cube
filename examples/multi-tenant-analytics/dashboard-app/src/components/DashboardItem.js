@@ -1,6 +1,6 @@
 import React from 'react';
 import { Card, Menu, Button, Dropdown, Modal } from 'antd';
-import { useMutation } from '@apollo/react-hooks';
+import { useMutation } from '@apollo/client';
 import { Link } from 'react-router-dom';
 import { Icon } from '@ant-design/compatible';
 import { GET_DASHBOARD_ITEMS } from '../graphql/queries';

@@ -88,6 +88,32 @@ cube(`Events`, {
 });
 ```
 
+## Import from parent directories
+
+You may need to import from parent directories as Cube flattens nested directories.
+The example below shows a correct way to import a helper function, which is located in a parent directory.
+
+```shell
+.
+├── README.md
+├── cube.js
+├── package.json
+└── schema
+    ├── utils.js
+    └── Sales
+        └── Orders.js
+```
+
+```javascript
+// in schema/Sales/Orders.js
+import { capitalize } from './utils';
+```
+
+```javascript
+// in schema/utils.js
+export const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+```
+
 [mdn-js-es6-export]:
   https://developer.mozilla.org/en-US/docs/web/javascript/reference/statements/export
 [mdn-js-es6-import]:

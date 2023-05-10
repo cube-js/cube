@@ -2,13 +2,19 @@ import R from 'ramda';
 import { getEnv } from '@cubejs-backend/shared';
 
 import { QueryCache } from './QueryCache';
-import { PreAggregations, PreAggregationDescription } from './PreAggregations';
+import { PreAggregations, PreAggregationDescription, getLastUpdatedAtTimestamp } from './PreAggregations';
 import { RedisPool, RedisPoolOptions } from './RedisPool';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { RedisQueueEventsBus } from './RedisQueueEventsBus';
 import { LocalQueueEventsBus } from './LocalQueueEventsBus';
 
 export type CacheAndQueryDriverType = 'redis' | 'memory';
+
+export enum DriverType {
+  External = 'external',
+  Internal = 'internal',
+  Cache = 'cache',
+}
 
 export interface QueryOrchestratorOptions {
   externalDriverFactory?: DriverFactory;
@@ -71,14 +77,20 @@ export class QueryOrchestrator {
       }
     );
     this.preAggregations = new PreAggregations(
-      this.redisPrefix, this.driverFactory, this.logger, this.queryCache, {
+      this.redisPrefix,
+      this.driverFactory,
+      this.logger,
+      this.queryCache,
+      {
         externalDriverFactory,
         cacheAndQueueDriver,
         redisPool,
         continueWaitTimeout,
         skipExternalCacheAndQueue,
         ...options.preAggregationsOptions,
-        getQueueEventsBus: getEnv('preAggregationsQueueEventsBus') && this.getQueueEventsBus.bind(this)
+        getQueueEventsBus:
+          getEnv('preAggregationsQueueEventsBus') &&
+          this.getQueueEventsBus.bind(this)
       }
     );
   }
@@ -93,6 +105,27 @@ export class QueryOrchestrator {
     return this.queueEventsBus;
   }
 
+  /**
+   * Returns QueryCache instance.
+   */
+  public getQueryCache(): QueryCache {
+    return this.queryCache;
+  }
+
+  /**
+   * Returns PreAggregations instance.
+   */
+  public getPreAggregations(): PreAggregations {
+    return this.preAggregations;
+  }
+
+  /**
+   * Force reconcile queue logic to be executed.
+   */
+  public async forceReconcile(datasource = 'default') {
+    await this.queryCache.forceReconcile(datasource);
+  }
+
   public async fetchQuery(queryBody: any): Promise<any> {
     const { preAggregationsTablesToTempTables, values } = await this.preAggregations.loadAllPreAggregationsIfNeeded(queryBody);
 
@@ -103,14 +136,24 @@ export class QueryOrchestrator {
       };
     }
 
-    const usedPreAggregations = R.fromPairs(preAggregationsTablesToTempTables);
+    const usedPreAggregations = R.pipe(
+      R.fromPairs,
+      R.map((pa: any) => ({
+        targetTableName: pa.targetTableName,
+        refreshKeyValues: pa.refreshKeyValues,
+        lastUpdatedAt: pa.lastUpdatedAt,
+      })),
+    )(preAggregationsTablesToTempTables);
     if (this.rollupOnlyMode && Object.keys(usedPreAggregations).length === 0) {
       throw new Error('No pre-aggregation table has been built for this query yet. Please check your refresh worker configuration if it persists.');
     }
 
+    let lastRefreshTimestamp = getLastUpdatedAtTimestamp(preAggregationsTablesToTempTables.map(pa => new Date(pa[1].lastUpdatedAt)));
+
     if (!queryBody.query) {
       return {
-        usedPreAggregations
+        usedPreAggregations,
+        lastRefreshTime: lastRefreshTimestamp && new Date(lastRefreshTimestamp),
       };
     }
 
@@ -119,11 +162,14 @@ export class QueryOrchestrator {
       preAggregationsTablesToTempTables
     );
 
+    lastRefreshTimestamp = getLastUpdatedAtTimestamp([lastRefreshTimestamp, result.lastRefreshTime?.getTime()]);
+
     return {
       ...result,
       dataSource: queryBody.dataSource,
       external: queryBody.external,
-      usedPreAggregations
+      usedPreAggregations,
+      lastRefreshTime: lastRefreshTimestamp && new Date(lastRefreshTimestamp),
     };
   }
 
@@ -136,7 +182,7 @@ export class QueryOrchestrator {
 
     const preAggregationsQueryStageState = async (dataSource) => {
       if (!preAggregationsQueryStageStateByDataSource[dataSource]) {
-        const queue = this.preAggregations.getQueue(dataSource);
+        const queue = await this.preAggregations.getQueue(dataSource);
         preAggregationsQueryStageStateByDataSource[dataSource] = queue.fetchQueryStageState();
       }
       return preAggregationsQueryStageStateByDataSource[dataSource];
@@ -145,17 +191,24 @@ export class QueryOrchestrator {
     const pendingPreAggregationIndex =
       (await Promise.all(
         (queryBody.preAggregations || [])
-          .map(async p => this.preAggregations.getQueue(p.dataSource).getQueryStage(
-            PreAggregations.preAggregationQueryCacheKey(p), 10, await preAggregationsQueryStageState(p.dataSource)
-          ))
+          .map(async p => {
+            const queue = await this.preAggregations.getQueue(p.dataSource);
+            return queue.getQueryStage(
+              PreAggregations.preAggregationQueryCacheKey(p),
+              10,
+              await preAggregationsQueryStageState(p.dataSource),
+            );
+          })
       )).findIndex(p => !!p);
 
     if (pendingPreAggregationIndex === -1) {
-      return this.queryCache.getQueue(queryBody.dataSource).getQueryStage(QueryCache.queryCacheKey(queryBody));
+      const qcQueue = await this.queryCache.getQueue(queryBody.dataSource);
+      return qcQueue.getQueryStage(QueryCache.queryCacheKey(queryBody));
     }
 
     const preAggregation = queryBody.preAggregations[pendingPreAggregationIndex];
-    const preAggregationStage = await this.preAggregations.getQueue(preAggregation.dataSource).getQueryStage(
+    const paQueue = await this.preAggregations.getQueue(preAggregation.dataSource);
+    const preAggregationStage = await paQueue.getQueryStage(
       PreAggregations.preAggregationQueryCacheKey(preAggregation),
       undefined,
       await preAggregationsQueryStageState(preAggregation.dataSource)
@@ -176,9 +229,14 @@ export class QueryOrchestrator {
     return this.queryCache.resultFromCacheIfExists(queryBody);
   }
 
-  public async testConnections() {
+  public async testConnections(): Promise<void> {
     // @todo Possible, We will allow to use different drivers for cache and queue, dont forget to add both
-    return this.queryCache.testConnection();
+    try {
+      await this.queryCache.testConnection();
+    } catch (e: any) {
+      e.driverType = DriverType.Cache;
+      throw e;
+    }
   }
 
   public async cleanup() {
