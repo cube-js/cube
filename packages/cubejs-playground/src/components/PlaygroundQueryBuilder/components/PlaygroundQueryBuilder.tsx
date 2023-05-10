@@ -172,7 +172,6 @@ export type PlaygroundQueryBuilderProps = {
   cubejsToken: string;
   queryId: string;
   defaultQuery?: Query;
-  dashboardSource?: DashboardSource;
   schemaVersion?: number;
   initialVizState?: VizState;
   extra?: React.FC<any>;
@@ -194,7 +193,6 @@ export function PlaygroundQueryBuilder({
   cubejsToken,
   defaultQuery,
   queryId,
-  dashboardSource,
   schemaVersion = 0,
   initialVizState,
   extra: Extra,
@@ -550,7 +548,6 @@ export function PlaygroundQueryBuilder({
                     pivotConfig={pivotConfig}
                     framework={framework}
                     chartingLibrary={chartingLibrary}
-                    dashboardSource={dashboardSource}
                     setFramework={(currentFramework) => {
                       if (currentFramework !== framework) {
                         setQueryLoading(queryId, false);
