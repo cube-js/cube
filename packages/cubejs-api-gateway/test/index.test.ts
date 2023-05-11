@@ -259,7 +259,7 @@ describe('API Gateway', () => {
               timezone: 'UTC',
               order: [],
               filters: [],
-              limit: 10000,
+              rowLimit: 10000,
               dimensions: [],
               timeDimensions: [],
               queryType: 'regularQuery'
@@ -271,7 +271,7 @@ describe('API Gateway', () => {
             timezone: 'UTC',
             order: [],
             filters: [],
-            limit: 10000,
+            rowLimit: 10000,
             dimensions: [],
             timeDimensions: [],
             queryType: 'regularQuery'
