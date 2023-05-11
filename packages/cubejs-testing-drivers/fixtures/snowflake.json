@@ -35,8 +35,37 @@
   },
   "preAggregations": {
     "Products": [],
-    "Customers": [],
-    "ECommerce": []
+    "Customers": [
+      {
+        "name": "RA",
+        "measures": ["CUBE.count", "CUBE.runningTotal"]
+      }
+    ],
+    "ECommerce": [
+      {
+        "name": "SA",
+        "dimensions": ["CUBE.productName"],
+        "measures": [
+          "CUBE.totalQuantity",
+          "CUBE.avgDiscount",
+          "CUBE.totalSales",
+          "CUBE.totalProfit"
+        ]
+      },
+      {
+        "name": "TA",
+        "time_dimension": "CUBE.orderDate",
+        "granularity": "month",
+        "partition_granularity": "month",
+        "dimensions": ["CUBE.productName"],
+        "measures": [
+          "CUBE.totalQuantity",
+          "CUBE.avgDiscount",
+          "CUBE.totalSales",
+          "CUBE.totalProfit"
+        ]
+      }
+    ]
   },
   "skip": [
     "---------------------------------------",
@@ -52,13 +81,6 @@
     "for the ECommerce.SimpleAnalysisInternal",
     "for the ECommerce.TimeAnalysisInternal",
     "for the ECommerce.TimeAnalysisExternal",
-
-    "---------------------------------------",
-    "Full tests                             ",
-    "---------------------------------------",
-    "must built pre-aggregations",
-    "querying Customers: dimentions + order + total + offset",
-    "querying ECommerce: dimentions + order + total + offset",
 
     "---------------------------------------",
     "SKIPED FOR ALL                         ",
