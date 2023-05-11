@@ -8575,6 +8575,33 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_df_compare_int_with_null() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "df_compare_int_with_null",
+            execute_query(
+                "SELECT
+                    typname AS name,
+                    oid,
+                    typarray AS array_oid,
+                    CAST(CAST(oid AS regtype) AS TEXT) AS regtype,
+                    typdelim AS delimiter
+                FROM
+                    pg_type AS t
+                WHERE
+                    t.oid = to_regtype('nonexistent')
+                ORDER BY
+                    t.oid
+                ;"
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn pgcli_queries() -> Result<(), CubeError> {
         init_logger();
 
