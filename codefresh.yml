@@ -2,8 +2,8 @@ version: "1.0"
 # Stages can help you organize your steps in stages
 stages:
   - "clone"
-  - "install-dependencies"
-  - "npm-publish"
+  - "prepare"
+  - "publish"
 
 steps:
   clone:
@@ -21,7 +21,16 @@ steps:
     commands:
       - ls
       - yarn install --frozen-lockfile
-    stage: "install-dependencies"
+    stage: "prepare"
+
+  build:
+    title: 'Installing testing dependencies'
+    working_directory: ${{main_clone}}
+    image: node:12.22.9
+    commands:
+      - ls
+      - yarn install --frozen-lockfile
+    stage: "prepare"
 
   deploy_bigquery_driver_to_npm:
     title: 'Deploy bigquery-driver'
@@ -29,7 +38,7 @@ steps:
     arguments:
       NPM_TOKEN: '${{NPM_TOKEN}}'
       DIR: 'cube.js/packages/cubejs-bigquery-driver'
-    stage: "npm-publish"
+    stage: "publish"
 
   deploy_postgres_driver_to_npm:
     title: 'Deploy postgres-driver'
@@ -37,7 +46,7 @@ steps:
     arguments:
       NPM_TOKEN: '${{NPM_TOKEN}}'
       DIR: 'cube.js/packages/cubejs-postgres-driver'
-    stage: "npm-publish"
+    stage: "publish"
 
   deploy_server_core_to_npm:
     title: 'Deploy server-core'
@@ -45,5 +54,5 @@ steps:
     arguments:
       NPM_TOKEN: '${{NPM_TOKEN}}'
       DIR: 'cube.js/packages/cubejs-server-core'
-    stage: "npm-publish"
+    stage: "publish"
 
