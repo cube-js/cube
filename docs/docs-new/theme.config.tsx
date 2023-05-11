@@ -4,13 +4,13 @@ import { CubeLogo } from "@/components/common/CubeLogo";
 import { Footer } from "@/components/common/Footer";
 import { SearchTrigger } from "@cube-dev/marketing-ui";
 
-const repo = "https://github.com/cubedevinc/cube-docs-new";
-const branch = "main";
-const path = "";
+const repo = "https://github.com/cube-js/cube";
+const branch = "master";
+const path = "/docs/docs-new/";
 
 const config: DocsThemeConfig = {
   logo: CubeLogo,
-  docsRepositoryBase: `${repo}/blob/${branch}/${path}`,
+  docsRepositoryBase: `${repo}/blob/${branch}${path}`,
   project: {
     link: repo,
   },
@@ -35,9 +35,9 @@ const config: DocsThemeConfig = {
   },
   darkMode: false,
   nextThemes: {
-    defaultTheme: 'light',
-    forcedTheme: 'light'
-  }
+    defaultTheme: "light",
+    forcedTheme: "light",
+  },
 };
 
 export default config;

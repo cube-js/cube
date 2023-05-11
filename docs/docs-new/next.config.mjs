@@ -7,6 +7,7 @@ import linkEnvironmentVariables from "./plugins/link-environment-variables.mjs";
  * @type {import('next').NextConfig}
  */
 const config = {
+  basePath: process.env.BASE_PATH || "",
   async redirects() {
     return [
       // {
