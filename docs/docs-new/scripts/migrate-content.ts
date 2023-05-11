@@ -816,8 +816,6 @@ const files: Record<string, Override> = {
   // "FAQs/Troubleshooting.mdx": {},
   // "FAQs/Tips-and-Tricks.mdx": {},
   // "FAQs/General.mdx": {},
-  // "Examples-Tutorials-Recipes/Recipes.mdx": {},
-  // "Examples-Tutorials-Recipes/Examples.mdx": {},
 
   // "Caching/Using-Pre-Aggregations.mdx": {},
   // "Caching/Running-in-Production.mdx": {},
@@ -826,15 +824,7 @@ const files: Record<string, Override> = {
   // "Caching/Getting-Started-Pre-Aggregations.mdx": {},
   // "Auth/Security-Context.mdx": {},
   // "Auth/Overview.mdx": {},
-  // "Reference/REST-API/REST-API.mdx": {},
-  // "Reference/GraphQL-API/GraphQL-API.mdx": {},
-  // "Reference/Configuration/Environment-Variables-Reference.mdx": {},
-  // "Reference/Configuration/Config.mdx": {},
-  // "Reference/CLI/CLI-Reference.mdx": {},
-  // "Reference/SQL-API/SQL-Functions-and-Operators.mdx": {},
-  // "Reference/SQL-API/SQL-Commands.mdx": {},
-  // "Reference/Frontend/@cubejs-client-vue.mdx": {},
-  // "Reference/Frontend/@cubejs-client-ngx.mdx": {},
+
   // "Deployment/Core/Overview.mdx": {},
   // "Deployment/Cloud/Pricing.mdx": {},
   // "Deployment/Cloud/Overview.mdx": {},
@@ -845,8 +835,41 @@ const files: Record<string, Override> = {
   // "Deployment/Production-Checklist.mdx": {},
   // "Deployment/Overview.mdx": {},
 
-  // "Examples-Tutorials-Recipes/Recipes/Upgrading-Cube/Migrating-from-Express-to-Docker.mdx":
-  //   {},
+  "Reference/Configuration/Config.mdx": {
+    ready: true,
+    path: "reference/configuration/config",
+    title: "Configuration options",
+  },
+  "Reference/Configuration/Environment-Variables-Reference.mdx": {
+    ready: true,
+    path: "reference/configuration/environment-variables",
+    title: "Environment-variables",
+  },
+  "Reference/Frontend/@cubejs-client-vue.mdx": {
+    ready: true,
+    path: "reference/frontend/cubejs-client-vue",
+    title: "@cubejs-client/vue",
+  },
+  // "Reference/Frontend/@cubejs-client-ngx.mdx": {},
+
+  // "Reference/REST-API/REST-API.mdx": {},
+  // "Reference/GraphQL-API/GraphQL-API.mdx": {},
+  // "Reference/CLI/CLI-Reference.mdx": {},
+  // "Reference/SQL-API/SQL-Functions-and-Operators.mdx": {},
+  // "Reference/SQL-API/SQL-Commands.mdx": {},
+
+  // "Examples-Tutorials-Recipes/Examples.mdx": {},
+  "Examples-Tutorials-Recipes/Recipes.mdx": {
+    ready: true,
+    path: "guides/recipes",
+    title: "Recipes",
+  },
+  "Examples-Tutorials-Recipes/Recipes/Upgrading-Cube/Migrating-from-Express-to-Docker.mdx":
+    {
+      ready: true,
+      path: "guides/recipes/migrating-from-express-to-docker",
+      title: "Migrating from Express to Docker",
+    },
   // "Examples-Tutorials-Recipes/Recipes/Query-acceleration/using-originalsql-and-rollups-effectively.mdx":
   //   {},
   // "Examples-Tutorials-Recipes/Recipes/Query-acceleration/non-additivity.mdx":
