@@ -1,3 +1,25 @@
+## Codefresh release life cycle
+
+### Instructions
+1. make sure to manually bump the version in package.json of all the packages that we are using otherwise it will fail to publish it during cd pipeline 
+
+### CI
+CI part will take place from github actions. and not from codefresh pipeline once a PR has been created
+
+### CD
+CD part will take place from codefresh pipeline and will only publish specific packages that were defined in the codefresh.yml
+
+### how to add another new package in case we need
+1. make change in the package.json of the specific required new package and rename the original name. take a look on how we did it for cubejs-bigquery-driver
+2. add another step in the codefresh.yml so that the new package will be pushed to our npm
+
+### What packages are we publishing atm
+1. [server-core](https://github.com/codefresh-io/cube.js/blob/master/packages/cubejs-server-core/package.json), [@codefresh-io/cubejs-backend-server-core](https://www.npmjs.com/package/@codefresh-io/cubejs-backend-server-core)
+2. [cbuejs-bigquery-driver](https://github.com/codefresh-io/cube.js/tree/master/packages/cubejs-bigquery-driver), [@codefresh-io/cubejs-backend-bigquery-driver](https://www.npmjs.com/package/@codefresh-io/cubejs-backend-bigquery-driver)
+3. [cubejs-postgres-driver](https://github.com/codefresh-io/cube.js/tree/master/packages/cubejs-postgres-driver), [@codefresh-io/cubejs-backend-postgres-driver
+   ](https://www.npmjs.com/package/@codefresh-io/cubejs-backend-postgres-driver)
+
+
 <p align="center">
   <a href="https://cube.dev?ref=github-readme"><img src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/cube-logo.png" alt="Cube — Headless Business Intelligence" width="300px"></a>
 </p>
