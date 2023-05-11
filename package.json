@@ -12,6 +12,7 @@
       "**/vue/*"
     ]
   },
+  "private": true,
   "scripts": {
     "build": "rollup -c",
     "watch": "rollup -c -w",

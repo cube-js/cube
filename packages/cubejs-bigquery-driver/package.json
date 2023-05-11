@@ -1,8 +1,8 @@
 {
-  "name": "@cubejs-backend/bigquery-driver",
+  "name": "@codefresh-io/cubejs-backend-bigquery-driver",
   "description": "Cube.js BigQuery database driver",
   "author": "Cube Dev, Inc.",
-  "version": "0.30.75",
+  "version": "0.30.78",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
