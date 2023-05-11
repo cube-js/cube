@@ -17,7 +17,7 @@ steps:
     stage: "clone"
 
   install_dependencies:
-    title: 'Installing testing dependencies'
+    title: 'Installing dependencies'
     working_directory: ${{clone}}
     image: node:12.22.9
     commands:
@@ -26,7 +26,7 @@ steps:
     stage: "prepare"
 
   build:
-    title: 'Installing testing dependencies'
+    title: 'Building'
     working_directory: ${{clone}}
     image: node:12.22.9
     commands:
