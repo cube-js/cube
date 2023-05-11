@@ -5,9 +5,7 @@ use crate::cachestore::queue_item::{
     QueueItem, QueueItemIndexKey, QueueItemRocksIndex, QueueItemRocksTable, QueueItemStatus,
     QueueResultAckEvent, QueueResultAckEventResult, QueueRetrieveResponse,
 };
-use crate::cachestore::queue_result::{
-    QueueResultIndexKey, QueueResultRocksIndex, QueueResultRocksTable,
-};
+use crate::cachestore::queue_result::QueueResultRocksTable;
 use crate::cachestore::{compaction, QueueResult};
 use crate::config::injection::DIService;
 use crate::config::{Config, ConfigObj};
@@ -268,14 +266,7 @@ impl RocksCacheStore {
         self.store
             .write_operation(move |db_ref, batch_pipe| {
                 let result_schema = QueueResultRocksTable::new(db_ref.clone());
-                let queue_result = match key {
-                    QueueKey::ByPath(path) => {
-                        let index_key = QueueResultIndexKey::ByPath(path);
-                        result_schema
-                            .get_single_opt_row_by_index(&index_key, &QueueResultRocksIndex::ByPath)
-                    }
-                    QueueKey::ById(id) => result_schema.get_row(id),
-                }?;
+                let queue_result = result_schema.get_row_by_key(key.clone())?;
 
                 if let Some(queue_result) = queue_result {
                     result_schema.try_delete(queue_result.get_id(), batch_pipe)?;
