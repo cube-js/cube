@@ -1,3 +1,5 @@
+# this only takes care of CD pipeline
+# CI pipeline is taken care from github actions atm
 version: "1.0"
 # Stages can help you organize your steps in stages
 stages:
