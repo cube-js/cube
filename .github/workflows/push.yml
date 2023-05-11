@@ -1,23 +1,6 @@
 name: Build
 
 on:
-  push:
-    paths:
-      - '.github/workflows/push.yml'
-      - '.github/workflows/master.yml'
-      - 'packages/**'
-      - 'rust/cubestore/js-wrapper/**'
-      - 'rust/cubestore/tsconfig.json'
-      - 'rust/cubestore/package.json'
-      - 'rust/cubesql/**'
-      - '.eslintrc.js'
-      - '.prettierrc'
-      - 'package.json'
-      - 'lerna.json'
-      - 'rollup.config.js'
-      - 'yarn.lock'
-    branches:
-      - 'master'
   pull_request:
     paths:
       - '.github/workflows/push.yml'
