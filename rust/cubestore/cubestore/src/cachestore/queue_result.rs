@@ -1,5 +1,7 @@
+use crate::cachestore::QueueKey;
 use crate::metastore::{
-    BaseRocksTable, IndexId, RocksEntity, RocksSecondaryIndex, RocksTable, TableId, TableInfo,
+    BaseRocksTable, IdRow, IndexId, RocksEntity, RocksSecondaryIndex, RocksTable, TableId,
+    TableInfo,
 };
 use crate::{base_rocks_secondary_index, rocks_table_new, CubeError};
 use chrono::serde::ts_seconds;
@@ -50,6 +52,16 @@ pub struct QueueResultRocksTable<'a> {
 impl<'a> QueueResultRocksTable<'a> {
     pub fn new(db: crate::metastore::DbTableRef<'a>) -> Self {
         Self { db }
+    }
+
+    pub fn get_row_by_key(&self, key: QueueKey) -> Result<Option<IdRow<QueueResult>>, CubeError> {
+        match key {
+            QueueKey::ByPath(path) => {
+                let index_key = QueueResultIndexKey::ByPath(path);
+                self.get_single_opt_row_by_index(&index_key, &QueueResultRocksIndex::ByPath)
+            }
+            QueueKey::ById(id) => self.get_row(id),
+        }
     }
 }
 
