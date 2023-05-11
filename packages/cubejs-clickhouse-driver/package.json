@@ -1,5 +1,5 @@
 {
-  "name": "@cubejs-backend/clickhouse-driver",
+  "name": "@codefresh-io/cubejs-backend-clickhouse-driver",
   "description": "Cube.js ClickHouse database driver",
   "author": "Cube Dev, Inc.",
   "version": "0.30.73",

@@ -1,5 +1,5 @@
 {
-  "name": "@cubejs-backend/questdb-driver",
+  "name": "@codefresh.io/cubejs-backend-questdb-driver",
   "description": "Cube.js QuestDB database driver",
   "author": "Cube Dev, Inc.",
   "version": "0.30.75",

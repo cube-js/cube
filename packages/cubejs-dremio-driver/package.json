@@ -1,5 +1,5 @@
 {
-  "name": "@cubejs-backend/dremio-driver",
+  "name": "@codefresh.io/cubejs-backend-dremio-driver",
   "description": "Cube.js Dremio driver",
   "author": "Cube Dev, Inc.",
   "version": "0.30.75",

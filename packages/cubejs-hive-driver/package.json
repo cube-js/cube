@@ -1,5 +1,5 @@
 {
-  "name": "@cubejs-backend/hive-driver",
+  "name": "@codefresh.io/cubejs-backend-hive-driver",
   "description": "Cube.js Hive database driver",
   "author": "Cube Dev, Inc.",
   "version": "0.30.73",

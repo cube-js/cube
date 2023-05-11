@@ -1,5 +1,5 @@
 {
-  "name": "@cubejs-backend/dbt-schema-extension",
+  "name": "@codefresh.io/cubejs-backend-dbt-schema-extension",
   "description": "Cube.js dbt Schema Extension",
   "author": "Cube Dev, Inc.",
   "version": "0.30.75",

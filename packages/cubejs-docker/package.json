@@ -1,5 +1,5 @@
 {
-  "name": "@cubejs-backend/docker",
+  "name": "@codefresh.io/cubejs-backend-docker",
   "version": "0.30.75",
   "description": "Cube.js In Docker (virtual package)",
   "author": "Cube Dev, Inc.",

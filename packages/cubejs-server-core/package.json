@@ -1,5 +1,5 @@
 {
-  "name": "@cubejs-backend/server-core",
+  "name": "@codefresh-io/cubejs-backend-server-core",
   "description": "Cube.js base component to wire all backend components together",
   "author": "Cube Dev, Inc.",
   "version": "0.30.75",

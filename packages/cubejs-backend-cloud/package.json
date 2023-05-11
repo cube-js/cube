@@ -1,5 +1,5 @@
 {
-  "name": "@cubejs-backend/cloud",
+  "name": "@codefresh-io/cubejs-backend-cloud",
   "version": "0.30.69",
   "description": "Cube Cloud package",
   "main": "dist/src/index.js",

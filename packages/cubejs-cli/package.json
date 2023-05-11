@@ -1,5 +1,5 @@
 {
-  "name": "cubejs-cli",
+  "name": "@codefresh-io/cubejs-cli",
   "description": "Cube.js Command Line Interface",
   "author": "Cube Dev, Inc.",
   "version": "0.30.75",

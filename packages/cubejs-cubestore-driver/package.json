@@ -1,5 +1,5 @@
 {
-  "name": "@cubejs-backend/cubestore-driver",
+  "name": "@codefresh.io/cubejs-backend-cubestore-driver",
   "description": "Cube Store driver",
   "author": "Cube Dev, Inc.",
   "version": "0.30.75",

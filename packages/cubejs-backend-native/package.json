@@ -1,5 +1,5 @@
 {
-  "name": "@cubejs-backend/native",
+  "name": "@codefresh-io/cubejs-backend-native",
   "version": "0.30.75",
   "author": "Cube Dev, Inc.",
   "description": "Native module for Cube.js (binding to Rust codebase)",

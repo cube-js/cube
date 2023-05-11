@@ -1,5 +1,5 @@
 {
-  "name": "@cubejs-backend/redshift-driver",
+  "name": "@codefresh.io/cubejs-backend-redshift-driver",
   "description": "Cube.js Redshift database driver",
   "author": "Cube Dev, Inc.",
   "version": "0.30.75",

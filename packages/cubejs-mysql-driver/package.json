@@ -1,5 +1,5 @@
 {
-  "name": "@cubejs-backend/mysql-driver",
+  "name": "@codefresh.io/cubejs-backend-mysql-driver",
   "description": "Cube.js Mysql database driver",
   "author": "Cube Dev, Inc.",
   "version": "0.30.75",

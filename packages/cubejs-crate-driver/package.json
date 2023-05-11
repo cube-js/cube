@@ -1,5 +1,5 @@
 {
-  "name": "@cubejs-backend/crate-driver",
+  "name": "@codefresh.io/cubejs-backend-crate-driver",
   "description": "Cube.js Crate database driver",
   "author": "Cube Dev, Inc.",
   "version": "0.30.75",

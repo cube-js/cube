@@ -1,5 +1,5 @@
 {
-  "name": "@cubejs-backend/elasticsearch-driver",
+  "name": "@codefresh.io/cubejs-backend-elasticsearch-driver",
   "description": "Cube.js elasticsearch database driver",
   "author": "Cube Dev, Inc.",
   "version": "0.30.73",

@@ -1,5 +1,5 @@
 {
-  "name": "@cubejs-backend/api-gateway",
+  "name": "@codefresh-io/cubejs-backend-api-gateway",
   "description": "Cube.js API Gateway",
   "author": "Cube Dev, Inc.",
   "version": "0.30.75",

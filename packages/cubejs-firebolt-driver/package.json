@@ -1,5 +1,5 @@
 {
-  "name": "@cubejs-backend/firebolt-driver",
+  "name": "@codefresh.io/cubejs-backend-firebolt-driver",
   "description": "Cube.js Firebolt database driver",
   "author": "Cube Dev, Inc.",
   "version": "0.30.75",

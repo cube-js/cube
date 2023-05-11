@@ -1,5 +1,5 @@
 {
-  "name": "@cubejs-backend/prestodb-driver",
+  "name": "@codefresh.io/cubejs-backend-prestodb-driver",
   "description": "Cube.js Presto database driver",
   "author": "Cube Dev, Inc.",
   "version": "0.30.73",

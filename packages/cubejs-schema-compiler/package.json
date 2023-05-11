@@ -1,5 +1,5 @@
 {
-  "name": "@cubejs-backend/schema-compiler",
+  "name": "@codefresh.io/cubejs-backend-schema-compiler",
   "description": "Cube.js schema compiler",
   "author": "Cube Dev, Inc.",
   "version": "0.30.75",

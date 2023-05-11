@@ -1,5 +1,5 @@
 {
-  "name": "@cubejs-backend/materialize-driver",
+  "name": "@codefresh.io/cubejs-backend-materialize-driver",
   "description": "Cube.js Materialize database driver",
   "author": "Cube Dev, Inc.",
   "version": "0.30.75",

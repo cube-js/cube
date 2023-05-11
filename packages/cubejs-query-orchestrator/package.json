@@ -1,5 +1,5 @@
 {
-  "name": "@cubejs-backend/query-orchestrator",
+  "name": "@codefresh.io/cubejs-backend-query-orchestrator",
   "description": "Cube.js Query Orchestrator and Cache",
   "author": "Cube Dev, Inc.",
   "version": "0.30.75",

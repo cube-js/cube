@@ -1,5 +1,5 @@
 {
-  "name": "@cubejs-backend/templates",
+  "name": "@codefresh.io/cubejs-backend-templates",
   "version": "0.30.69",
   "description": "Cube.js Templates helpers",
   "author": "Cube Dev, Inc.",

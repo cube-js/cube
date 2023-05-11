@@ -1,5 +1,5 @@
 {
-  "name": "@cubejs-backend/snowflake-driver",
+  "name": "@codefresh.io/cubejs-backend-snowflake-driver",
   "description": "Cube.js Snowflake database driver",
   "author": "Cube Dev, Inc.",
   "version": "0.30.73",

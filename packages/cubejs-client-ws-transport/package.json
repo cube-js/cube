@@ -1,5 +1,5 @@
 {
-  "name": "@cubejs-client/ws-transport",
+  "name": "@codefresh-io/cubejs-client-ws-transport",
   "version": "0.30.74",
   "engines": {},
   "repository": {

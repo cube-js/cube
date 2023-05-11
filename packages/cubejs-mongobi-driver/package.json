@@ -1,5 +1,5 @@
 {
-  "name": "@cubejs-backend/mongobi-driver",
+  "name": "@codefresh.io/cubejs-backend-mongobi-driver",
   "description": "Cube.js MongoBI driver",
   "author": "krunalsabnis@gmail.com",
   "version": "0.30.73",
