@@ -1,6 +1,6 @@
 {
-  "name": "cubejs",
-  "version": "0.1.2",
+  "name": "cf-cubejs",
+  "version": "0.1.1",
   "description": "",
   "workspaces": {
     "packages": [
@@ -40,7 +40,6 @@
     "src",
     "dist"
   ],
-  "private": true,
   "devDependencies": {
     "@babel/core": "^7.13.8",
     "@babel/plugin-transform-runtime": "^7.13.9",

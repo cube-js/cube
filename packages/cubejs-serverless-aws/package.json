@@ -1,5 +1,5 @@
 {
-  "name": "@codefresh.io/cubejs-backend-serverless-aws",
+  "name": "@cubejs-backend/serverless-aws",
   "description": "Cube.js Serverless AWS support",
   "author": "Cube Dev, Inc.",
   "version": "0.30.75",

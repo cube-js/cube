@@ -1,5 +1,5 @@
 {
-  "name": "@codefresh.io/cubejs-backend-linter",
+  "name": "@cubejs-backend/linter",
   "description": "Cube.js ESLint (virtual package) for linting code",
   "author": "Cube Dev, Inc.",
   "version": "0.30.0",
