@@ -18,7 +18,7 @@ steps:
 
   install_dependencies:
     title: 'Installing testing dependencies'
-    working_directory: ${{main_clone}}
+    working_directory: ${{clone}}
     image: node:12.22.9
     commands:
       - ls
@@ -27,7 +27,7 @@ steps:
 
   build:
     title: 'Installing testing dependencies'
-    working_directory: ${{main_clone}}
+    working_directory: ${{clone}}
     image: node:12.22.9
     commands:
       - ls
@@ -36,25 +36,28 @@ steps:
 
   deploy_bigquery_driver_to_npm:
     title: 'Deploy bigquery-driver'
+    working_directory: ${{clone}}
     type: npm-publish
     arguments:
       NPM_TOKEN: '${{NPM_TOKEN}}'
-      DIR: 'cube.js/packages/cubejs-bigquery-driver'
+      DIR: 'packages/cubejs-bigquery-driver'
     stage: "publish"
 
   deploy_postgres_driver_to_npm:
     title: 'Deploy postgres-driver'
+    working_directory: ${{clone}}
     type: npm-publish
     arguments:
       NPM_TOKEN: '${{NPM_TOKEN}}'
-      DIR: 'cube.js/packages/cubejs-postgres-driver'
+      DIR: 'packages/cubejs-postgres-driver'
     stage: "publish"
 
   deploy_server_core_to_npm:
     title: 'Deploy server-core'
+    working_directory: ${{clone}}
     type: npm-publish
     arguments:
       NPM_TOKEN: '${{NPM_TOKEN}}'
-      DIR: 'cube.js/packages/cubejs-server-core'
+      DIR: 'packages/cubejs-server-core'
     stage: "publish"
 
