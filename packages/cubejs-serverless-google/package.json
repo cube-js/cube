@@ -1,5 +1,5 @@
 {
-  "name": "@codefresh.io/cubejs-backend-serverless-google",
+  "name": "@cubejs-backend/serverless-google",
   "description": "Cube.js Serverless Google support",
   "author": "Cube Dev, Inc.",
   "version": "0.30.75",

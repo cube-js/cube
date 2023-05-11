@@ -1,5 +1,5 @@
 {
-  "name": "@codefresh.io/cubejs-backend-testing",
+  "name": "@cubejs-backend/testing",
   "version": "0.30.75",
   "description": "Cube.js e2e tests",
   "author": "Cube Dev, Inc.",
