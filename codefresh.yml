@@ -10,16 +10,16 @@ steps:
     title: "Cloning repository"
     type: "git-clone"
     repo: "codefresh-io/cube.js"
-    # CF_BRANCH value is auto set when pipeline is triggered
-    # Learn more at codefresh.io/docs/docs/codefresh-yaml/variables/
     revision: "${{CF_BRANCH}}"
     git: "cf_github"
     stage: "clone"
 
   install_dependencies:
     title: 'Installing testing dependencies'
+    working_directory: ${{main_clone}}
     image: node:12.22.9
     commands:
+      - ls
       - yarn install --frozen-lockfile
     stage: "install-dependencies"
 
@@ -29,5 +29,21 @@ steps:
     arguments:
       NPM_TOKEN: '${{NPM_TOKEN}}'
       DIR: 'cube.js/packages/cubejs-bigquery-driver'
+    stage: "npm-publish"
+
+  deploy_postgres_driver_to_npm:
+    title: 'Deploy postgres-driver'
+    type: npm-publish
+    arguments:
+      NPM_TOKEN: '${{NPM_TOKEN}}'
+      DIR: 'cube.js/packages/cubejs-postgres-driver'
+    stage: "npm-publish"
+
+  deploy_server_core_to_npm:
+    title: 'Deploy server-core'
+    type: npm-publish
+    arguments:
+      NPM_TOKEN: '${{NPM_TOKEN}}'
+      DIR: 'cube.js/packages/cubejs-server-core'
     stage: "npm-publish"
 
