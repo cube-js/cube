@@ -294,6 +294,8 @@ interface Override {
   ready: boolean;
   path: string;
   title: string;
+
+  meta?: Record<string, string>;
 }
 
 const files: Record<string, Override> = {
@@ -301,22 +303,40 @@ const files: Record<string, Override> = {
     ready: true,
     path: "product/introduction",
     title: "Introduction",
+    meta: {
+      introduction: "Introduction",
+      "getting-started": "Getting Started",
+      configuration: "Configuration",
+      "data-modeling": "Data Modeling",
+    },
   },
 
   // Getting Started
 
   "Getting-Started/Overview.mdx": {
     ready: true,
-    path: "product/getting-started",
+    path: "product/getting-started/overview",
     title: "Getting started with Cube",
+    meta: {
+      overview: "Overview",
+      core: "Cube Core",
+      cloud: "Cube Cloud",
+    },
   },
 
   // Core
 
   "Getting-Started/Core/01-Overview.mdx": {
     ready: true,
-    path: "product/getting-started/core",
+    path: "product/getting-started/core/overview",
     title: "Getting started with Cube Core",
+    meta: {
+      overview: "Overview",
+      "create-a-project": "Create a project",
+      "query-data": "Query data",
+      "add-a-pre-aggregation": "Add a pre-aggregation",
+      "learn-more": "Learn more",
+    },
   },
   "Getting-Started/Core/02-Create-a-project.mdx": {
     ready: true,
@@ -343,8 +363,16 @@ const files: Record<string, Override> = {
 
   "Getting-Started/Cloud/01-Overview.mdx": {
     ready: true,
-    path: "product/getting-started/cloud",
+    path: "product/getting-started/cloud/overview",
     title: "Getting started with Cube Cloud",
+    meta: {
+      overview: "Overview",
+      "create-a-deployment": "Create a deployment",
+      "generate-models": "Generate models",
+      "query-data": "Query data",
+      "add-a-pre-aggregation": "Add a pre-aggregation",
+      "learn-more": "Learn more",
+    },
   },
   "Getting-Started/Cloud/02-Create-a-deployment.mdx": {
     ready: true,
@@ -384,7 +412,15 @@ const files: Record<string, Override> = {
     ready: true,
     path: "product/configuration/overview",
     title: "Overview",
+    meta: {
+      overview: "Overview",
+      "data-sources": "Connecting to data sources",
+      "visualization-tools": "Connecting to visualization tools",
+      vpc: "Connecting with a VPC",
+      advanced: "Advanced",
+    },
   },
+
   "Configuration/Advanced/Multitenancy.mdx": {
     ready: true,
     path: "product/configuration/advanced/multitenancy",
@@ -616,8 +652,14 @@ const files: Record<string, Override> = {
 
   "Schema/Getting-Started.mdx": {
     ready: true,
-    path: "product/data-modeling",
+    path: "product/data-modeling/overview",
     title: "Getting started with data modeling",
+    meta: {
+      overview: "Overview",
+      fundamentals: "Fundamentals",
+      reference: "Reference",
+      advanced: "Advanced",
+    },
   },
 
   // data modeling / fundamentals
@@ -649,6 +691,16 @@ const files: Record<string, Override> = {
     ready: true,
     path: "product/data-modeling/reference/cube",
     title: "Cubes",
+    meta: {
+      cube: "Cubes",
+      view: "Views",
+      measures: "Measures",
+      dimensions: "Dimensions",
+      joins: "Joins",
+      segments: "Segments",
+      "pre-aggregations": "Pre-aggregations",
+      "types-and-formats": "Types and Formats",
+    },
   },
   "Schema/Reference/view.mdx": {
     ready: true,
@@ -688,13 +740,50 @@ const files: Record<string, Override> = {
 
   // data modeling / advanced
 
-  // "Schema/Advanced/schema-execution-environment.mdx": {},
-  // "Schema/Advanced/Code-Reusability-Export-and-Import.mdx": {},
-  // "Schema/Advanced/Code-Reusability-Extending-Cubes.mdx": {},
-  // "Schema/Advanced/Data-Blending.mdx": {},
-  // "Schema/Advanced/Dynamic-Schema-Creation.mdx": {},
-  // "Schema/Advanced/Polymorphic-Cubes.mdx": {},
-  // "Schema/Advanced/Using-dbt.mdx": {},
+  "Schema/Advanced/schema-execution-environment.mdx": {
+    ready: true,
+    path: "product/data-modeling/advanced/schema-execution-environment",
+    title: "Execution Environment (JS models)",
+    meta: {
+      "schema-execution-environment": "Execution Environment (JS models)",
+      "code-reusability-export-and-import": "Export and import",
+      "code-reusability-extending-cubes": "Extending cubes",
+      "data-blending": "Data blending",
+      "dynamic-schema-creation": "Dynamic data models",
+      "polymorphic-cubes": "Polymorphic cubes",
+      "using-dbt": "Using dbt",
+    },
+  },
+  "Schema/Advanced/Code-Reusability-Export-and-Import.mdx": {
+    ready: true,
+    path: "product/data-modeling/advanced/code-reusability-export-and-import",
+    title: "Export and import",
+  },
+  "Schema/Advanced/Code-Reusability-Extending-Cubes.mdx": {
+    ready: true,
+    path: "product/data-modeling/advanced/code-reusability-extending-cubes",
+    title: "Extending cubes",
+  },
+  "Schema/Advanced/Data-Blending.mdx": {
+    ready: true,
+    path: "product/data-modeling/advanced/data-blending",
+    title: "Data blending",
+  },
+  "Schema/Advanced/Dynamic-Schema-Creation.mdx": {
+    ready: true,
+    path: "product/data-modeling/advanced/dynamic-schema-creation",
+    title: "Dynamic data models",
+  },
+  "Schema/Advanced/Polymorphic-Cubes.mdx": {
+    ready: true,
+    path: "product/data-modeling/advanced/polymorphic-cubes",
+    title: "Polymorphic cubes",
+  },
+  "Schema/Advanced/Using-dbt.mdx": {
+    ready: true,
+    path: "product/data-modeling/advanced/using-dbt",
+    title: "Using dbt",
+  },
 
   // "Workspace/SQL-Runner.mdx": {},
   // "Workspace/Preferences.mdx": {},
@@ -814,7 +903,6 @@ async function main() {
     mdxFiles.map(async (filePath) => {
       const override = files[filePath.slice(11)];
 
-      console.log(override);
       if (override && override.ready && override.path) {
         const file = await readFile(filePath, "utf8");
         const data = frontmatter<DocAttributes>(file);
@@ -829,10 +917,20 @@ async function main() {
         const folderPath = dirname(targetFilePath);
         const folderExists = await stat(folderPath).catch(() => false);
 
-        if (!folderExists)
+        console.log(targetFilePath, folderPath);
+
+        if (!folderExists) {
           await mkdir(folderPath, {
             recursive: true,
           });
+        }
+
+        if (override.meta) {
+          await writeFile(
+            path.resolve(folderPath, "_meta.js"),
+            `module.exports = ${JSON.stringify(override.meta, null, 2)}`
+          );
+        }
 
         await writeFile(
           path.resolve(targetFilePath),
