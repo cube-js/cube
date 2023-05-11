@@ -1,5 +1,8 @@
 ## Codefresh release life cycle
 
+### Instructions
+1. make sure to manually bump the version in package.json of all the packages that we are using otherwise it will fail to publish it during cd pipeline 
+
 ### CI
 CI part will take place from github actions. and not from codefresh pipeline once a PR has been created
 
