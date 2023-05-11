@@ -7,9 +7,6 @@ module.exports = {
       toc: false,
     },
   },
-
-  docs1: 'Docs (Preview)',
-
   introduction: "Introduction",
   "getting-started": "Getting Started",
   configuration: "Configuration",
@@ -23,8 +20,13 @@ module.exports = {
   workspace: "Workspace",
   deployment: "Deployment",
   monitoring: "Monitoring",
-  "examples-and-tutorials": "Examples & Tutorials",
-  faqs: "FAQs",
-  releases: "Release Notes",
-  reference: "Reference",
+
+  reference: {
+    type: "page",
+    title: "Reference",
+  },
+  guides: {
+    type: "page",
+    title: "Guides",
+  },
 };

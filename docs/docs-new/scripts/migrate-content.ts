@@ -28,10 +28,11 @@ const Categories: Record<string, string> = {
   Workspace: "/workspace/",
   Deployment: "/deployment/",
   Monitoring: "/monitoring/",
-  "Examples & Tutorials": "/examples-and-tutorials/",
-  FAQs: "/faqs/",
-  "Release Notes": "/releases/",
+  // "Examples & Tutorials": "/examples-and-tutorials/",
+  // FAQs: "/faqs/",
+  // "Release Notes": "/releases/",
   Reference: "/reference/",
+  Guides: "/guides/",
 };
 
 type Node = {
@@ -185,16 +186,20 @@ const Structure: Nodes = {
     title: "Monitoring",
     children: {},
   },
-  "examples-and-tutorials": {
-    title: "Examples & Tutorials",
-    children: {},
-  },
-  faqs: {
-    title: "FAQs",
-    children: {},
-  },
+  // "examples-and-tutorials": {
+  //   title: "Examples & Tutorials",
+  //   children: {},
+  // },
+  // faqs: {
+  //   title: "FAQs",
+  //   children: {},
+  // },
   reference: {
     title: "Reference",
+    children: {},
+  },
+  guides: {
+    title: "Guides",
     children: {},
   },
 };
