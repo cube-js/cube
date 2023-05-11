@@ -7,7 +7,6 @@ stages:
   - "prepare"
   - "publish"
 
-
 steps:
   clone:
     title: "Cloning repository"
@@ -41,7 +40,7 @@ steps:
     type: npm-publish
     arguments:
       NPM_TOKEN: '${{NPM_TOKEN}}'
-      DIR: 'packages/cubejs-bigquery-driver'
+      DIR: 'cube.js/packages/cubejs-bigquery-driver'
     stage: "publish"
 
   deploy_postgres_driver_to_npm:
@@ -50,7 +49,7 @@ steps:
     type: npm-publish
     arguments:
       NPM_TOKEN: '${{NPM_TOKEN}}'
-      DIR: 'packages/cubejs-postgres-driver'
+      DIR: 'cube.js/packages/cubejs-postgres-driver'
     stage: "publish"
 
   deploy_server_core_to_npm:
@@ -59,6 +58,6 @@ steps:
     type: npm-publish
     arguments:
       NPM_TOKEN: '${{NPM_TOKEN}}'
-      DIR: 'packages/cubejs-server-core'
+      DIR: 'cube.js/packages/cubejs-server-core'
     stage: "publish"
 
