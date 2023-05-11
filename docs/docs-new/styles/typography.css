@@ -1,0 +1,70 @@
+:root {
+  /* --font: CeraPro, CeraPro-Regular, -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
+    "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif; */
+
+  --h1big_font-size: 48px;
+  --h1big_line-height: 56px;
+  --h1big_font: 700 var(--h1big_font-size) / var(--h1big_line-height) var(--font);
+
+  --h1_font-size: 42px;
+  --h1_line-height: 54px;
+  --h1_font: bold var(--h1_font-size) / var(--h1_line-height) var(--font);
+
+  --h2_font-size: 32px;
+  --h2_line-height: 44px;
+  --h2_font: bold var(--h2_font-size) / var(--h2_line-height) var(--font);
+
+  --h3_font-size: 26px;
+  --h3_line-height: 36px;
+  --h3_font: bold var(--h3_font-size) / var(--h3_line-height) var(--font);
+
+  --h4_font-size: 20px;
+  --h4_line-height: 32px;
+  --h4_font: bold var(--h4_font-size) / var(--h4_line-height) var(--font);
+
+  --h4m_font: 500 var(--h4_font-size) / var(--h4_line-height) var(--font);
+
+  --h5_font-size: 16px;
+  --h5_line-height: 26px;
+  --h5_font: bold var(--h5_font-size) / var(--h5_line-height) var(--font);
+
+  --h5m_font: 500 var(--h5_font-size) / var(--h5_line-height) var(--font);
+
+  --h6_font-size: 14px;
+  --h6_line-height: 22px;
+  --h6_font: bold var(--h6_font-size) / var(--h6_line-height) var(--font);
+
+  --p1_font-size: 20px;
+  --p1_line-height: 32px;
+  --p1_font: var(--p1_font-size) / var(--p1_line-height) var(--font);
+
+  --p2_font-size: 16px;
+  --p2_line-height: 26px;
+  --p2_font: var(--p2_font-size) / var(--p2_line-height) var(--font);
+
+  --p3_font-size: 14px;
+  --p3_line-height: 20px;
+  --p3_font: var(--p3_font-size) / var(--p3_line-height) var(--font);
+}
+
+@media (max-width: 979px) {
+  :root {
+    --h1big_font-size: 42px;
+    --h1big_line-height: 54px;
+
+    --h1_font-size: 32px;
+    --h1_line-height: 44px;
+
+    --h2_font-size: 26px;
+    --h2_line-height: 36px;
+
+    --h3_font-size: 20px;
+    --h3_line-height: 32px;
+
+    --h4_font-size: var(--h5_font-size);
+    --h4_line-height: var(--h5_line-height);
+
+    --p1_font-size: var(--p2_font-size);
+    --p1_line-height: var(--p2_line-height);
+  }
+}

@@ -969,12 +969,7 @@ impl CacheStore for RocksCacheStore {
     }
 
     async fn healthcheck(&self) -> Result<(), CubeError> {
-        self.store
-            .read_operation(move |_| {
-                // read_operation will call getSnapshot, which is enough to test that RocksDB works
-                Ok(())
-            })
-            .await?;
+        self.store.healthcheck().await?;
 
         Ok(())
     }

@@ -1,0 +1,46 @@
+:root {
+  --dark: hsl(240, 32%, 10%);
+  --dark_a70: rgba(15, 15, 35, 0.7);
+  --dark_01: var(--dark);
+  --dark_02: hsla(240, 14%, 23%);
+  --dark_03: hsl(240, 8%, 45%);
+  --dark_03_a50: hsl(240, 32%, 10%, 0.5);
+  --dark_02_a75: hsla(240, 32%, 10%, 0.75);
+  --dark_04: hsl(240, 9%, 69%);
+  --dark_04_a30: hsl(240, 32%, 10%, 0.3);
+  --dark_05_a12: hsl(240, 32%, 10%, 0.12);
+  --dark_05: hsla(240, 16%, 91%, 1);
+  --dark_06: hsl(240, 40%, 10%);
+
+  --dark_bg: hsl(240, 12%, 97%, 1);
+  --dark_bg_a04: hsla(240, 32%, 10%, 0.04);
+  --dark_bg_a08: hsla(240, 32%, 10%, 0.08);
+
+  --white: hsla(240, 0%, 100%, 1);
+  --white_a01: hsla(240, 0%, 100%, 0.1);
+  --white_a08: hsla(0, 0%, 100%, 0.08);
+  --white_a12: hsla(240, 0%, 100%, 0.12);
+  --white_a15: hsla(240, 0%, 100%, 0.15);
+
+  --gray_01: hsl(228, 6%, 31%, 1);
+  --gray_02: hsl(225, 4%, 39%, 1);
+
+  --purple: hsl(251, 94%, 66%, 1);
+  --purple_03: hsla(241, 94%, 84%, 1);
+  --purple_03_a60: hsl(241, 94%, 66%, 0.6);
+  --purple_04_a30: hsl(241, 94%, 66%, 0.3);
+  --purple_bg_02: hsl(240, 50%, 98%);
+  --purple_bg_a08: hsla(244, 94%, 66%, 0.08);
+  --purple_bright: hsl(251, 61%, 52%, 1);
+  --purple_a12: hsla(251, 94%, 66%, 0.12);
+
+  --pink: hsl(342, 69%, 53%, 1);
+  --pink_03_a60: hsl(342, 69%, 53%, 0.6);
+  --pink_04_a30: hsl(342, 69%, 53%, 0.3);
+  --pink_bg_a10: hsl(342, 69%, 53%, 0.1);
+  --pink_bright: hsl(342, 62%, 48%, 1);
+  --pink_bright_02: var(--pink_bright);
+
+  --cherry: var(--pink);
+  --cherry_dark: var(--pink_bright);
+}

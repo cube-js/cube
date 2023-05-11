@@ -1,0 +1,129 @@
+# MDX Components
+
+## Code block
+
+#### Default
+
+```javascript
+cube(`monthly_retention`, {
+  // ...
+
+  dimensions: {
+    months_since_signup: {
+      sql: `DATEDIFF('month', ${CUBE}.signup_month, ${CUBE}.activity_month)`,
+      type: `number`,
+    },
+
+    signup_date: {
+      sql: `(signup_month AT TIME ZONE 'America/Los_Angeles')`,
+      type: `time`,
+    },
+  },
+});
+```
+
+#### With tabs
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: monthly_retention
+    # ...
+    dimensions:
+      - name: months_since_signup
+        sql: "DATEDIFF('month', signup_month, activity_month)"
+        type: number
+
+      - name: signup_date
+        sql: "(signup_month AT TIME ZONE 'America/Los_Angeles')"
+        type: time
+```
+
+```javascript
+cube(`monthly_retention`, {
+  // ...
+
+  dimensions: {
+    months_since_signup: {
+      sql: `DATEDIFF('month', ${CUBE}.signup_month, ${CUBE}.activity_month)`,
+      type: `number`,
+    },
+
+    signup_date: {
+      sql: `(signup_month AT TIME ZONE 'America/Los_Angeles')`,
+      type: `time`,
+    },
+  },
+});
+```
+
+</CodeTabs>
+
+## Alert Box
+
+<DangerBox heading="DangerBox">
+  DangerBox
+</DangerBox>
+
+<InfoBox heading="InfoBox">
+  InfoBox
+</InfoBox>
+
+<SuccessBox heading="SuccessBox">
+  SuccessBox
+</SuccessBox>
+
+<WarningBox heading="WarningBox">
+  WarningBox
+</WarningBox>
+
+## Button
+
+You can implement the element directly by using inline <Btn>Button</Btn> component.
+
+## Inline code
+
+SQL query `SELECT * FROM users`.
+
+## Selected text
+
+## Table
+
+| Name  | Age |
+| ----- | --- |
+| Alice | 20  |
+| Bob   | 21  |
+
+## Video
+
+#### Loom
+
+<LoomVideo url="https://www.loom.com/embed/8898c6394cac46568c2be6ae526b1fd5" />
+
+#### Youtube
+
+<YouTubeVideo url="https://www.youtube.com/embed/FotEaaf20gY" />
+
+## Image
+
+<Screenshot
+  alt="Cube Cloud Environment Variables Screen"
+  src="https://ucarecdn.com/b47693b9-f770-4e01-a0d1-60e3fcf19e23/"
+/>
+
+## Card links
+
+- TODO
+
+## Cube Cloud Promo block
+
+- TODO
+
+## Event promo block
+
+- TODO
+
+## Case Study promo block
+
+- TODO

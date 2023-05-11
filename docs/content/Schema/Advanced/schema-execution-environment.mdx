@@ -1,0 +1,196 @@
+---
+title: Execution Environment (JS models)
+permalink: /schema/reference/execution-environment
+scope: cubejs
+category: Data Modeling
+subCategory: Advanced
+menuOrder: 28
+redirect_from:
+  - /schema-execution-environment
+---
+
+Cube Data Model Compiler uses [Node.js VM][nodejs-vm] to execute data model
+compiler code. It gives required flexibility allowing transpiling data model
+files before they get executed, storing data models in external databases and
+executing untrusted code in a safe manner. Cube data model JavaScript is
+standard JavaScript supported by Node.js starting in version 8 with the
+following exceptions.
+
+## Require
+
+Being executed in VM, data model JavaScript code doesn't have access to [Node.js
+require][nodejs-require] directly. Instead `require()` is implemented by Data
+Model Compiler to provide access to other data model files and to regular
+Node.js modules. Besides that, the data model `require()` can resolve Cube
+packages such as `Funnels` unlike standard Node.js `require()`.
+
+## Node.js globals (process.env, console.log and others)
+
+Data model JavaScript code doesn't have access to any standard Node.js globals
+like `process` or `console`. In order to access `process.env`, utility functions
+can be added outside the `model/` directory:
+
+**tablePrefix.js:**
+
+```javascript
+exports.tableSchema = () => process.env.TABLE_SCHEMA;
+```
+
+**model/cubes/Users.js**:
+
+```javascript
+import { tableSchema } from "../tablePrefix";
+
+cube(`users`, {
+  sql_table: `${tableSchema()}.users`,
+
+  // ...
+});
+```
+
+## console.log
+
+Data models cannot access `console.log` due to a separate [VM
+instance][nodejs-vm] that runs it. Suppose you find yourself writing complex
+logic for SQL generation that depends on a lot of external input. In that case,
+you probably want to introduce a helper service outside of `schema` directory
+that you can debug as usual Node.js code.
+
+## Cube globals (cube and others)
+
+Cube defines `cube()`, `context()` and `asyncModule()` global variable functions
+in order to provide API for data model configuration which aren't normally
+accessible outside of a Cube data model.
+
+## Import / Export
+
+Data model JavaScript files are transpiled to convert ES6 `import` and `export`
+expressions to corresponding Node.js calls. In fact `import` is routed to
+[Require][self-require] method.
+
+`export` can be used to define named exports as well as default ones:
+
+**constants.js:**
+
+```javascript
+export const TEST_USER_IDS = [1, 2, 3, 4, 5];
+```
+
+**usersSql.js:**
+
+```javascript
+export default (usersTable) => `select * from ${usersTable}`;
+```
+
+Later, you can `import` into the cube, wherever needed:
+
+**Users.js**:
+
+```javascript
+// in users.js
+import { TEST_USER_IDS } from "./constants";
+import usersSql from "./usersSql";
+
+cube(`users`, {
+  sql: usersSql(`users`),
+  measures: {
+    /* ... */
+  },
+
+  dimensions: {
+    /* ... */
+  },
+
+  segments: {
+    excludeTestUsers: {
+      sql: `${CUBE}.id NOT IN (${TEST_USER_IDS.join(", ")})`,
+    },
+  },
+});
+```
+
+## asyncModule
+
+Data models can be externally stored and retrieved through an asynchronous
+operation using the `asyncModule()`. For more information, consult the [Dynamic
+Schema Creation][ref-dynamic-schemas] page.
+
+## Context symbols transpile
+
+Cube uses a custom transpiler to optimize boilerplate code around referencing
+cubes and cube members. There are reserved property names inside `cube`
+definition that undergo reference resolve transpiling process:
+
+- `sql`
+- `measures`
+- `dimensions`
+- `segments`
+- `time_dimension`
+- `drill_members`
+- `context_members`
+
+Each of these properties inside `cube` and `context` definitions are transpiled
+to functions with resolved arguments. For example:
+
+```javascript
+cube(`users`, {
+  // ...
+
+  measures: {
+    count: {
+      type: `count`,
+    },
+
+    ratio: {
+      sql: `SUM(${CUBE}.amount) / ${count}`,
+      type: `number`,
+    },
+  },
+});
+```
+
+is transpiled to:
+
+```javascript
+cube(`users`, {
+  // ...
+
+  measures: {
+    count: {
+      type: `count`,
+    },
+
+    ratio: {
+      sql: (CUBE, count) => `SUM(${CUBE}.amount) / ${count}`,
+      type: `number`,
+    },
+  },
+});
+```
+
+So for example if you want to pass the definition of `ratio` outside of the
+cube, you would define it as:
+
+```javascript
+const measureRatioDefinition = {
+  sql: (CUBE, count) => `sum(${CUBE}.amount) / ${count}`,
+  type: `number`,
+};
+
+cube(`users`, {
+  // ...
+
+  measures: {
+    count: {
+      type: `count`,
+    },
+
+    ratio: measureRatioDefinition,
+  },
+});
+```
+
+[nodejs-vm]: https://nodejs.org/api/vm.html
+[nodejs-require]: https://nodejs.org/api/modules.html#modules_require_id
+[ref-dynamic-schemas]: /schema/advanced/dynamic-schema-creation
+[self-require]: #require

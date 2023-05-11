@@ -124,8 +124,11 @@ class HttpTransport implements AgentTransport {
     const result = await fetch(this.endpointUrl, {
       agent: this.agent,
       method: 'post',
-      body: JSON.stringify(data),
-      headers: { 'Content-Type': 'application/json' },
+      body: await deflate(JSON.stringify(data)),
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Encoding': 'deflate'
+      },
     });
     return result.status === 200;
   }

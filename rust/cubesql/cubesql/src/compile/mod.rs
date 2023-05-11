@@ -64,8 +64,8 @@ use self::{
             create_position_udf, create_quarter_udf, create_quote_ident_udf,
             create_regexp_substr_udf, create_second_udf, create_session_user_udf, create_sha1_udf,
             create_str_to_date_udf, create_time_format_udf, create_timediff_udf,
-            create_to_char_udf, create_to_date_udf, create_ucase_udf, create_unnest_udtf,
-            create_user_udf, create_version_udf, create_year_udf,
+            create_to_char_udf, create_to_date_udf, create_to_regtype_udf, create_ucase_udf,
+            create_unnest_udtf, create_user_udf, create_version_udf, create_year_udf,
         },
     },
     parser::parse_sql_to_statement,
@@ -1183,6 +1183,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_array_to_string_udf());
         ctx.register_udf(create_charindex_udf());
         ctx.register_udf(create_mod_udf());
+        ctx.register_udf(create_to_regtype_udf());
 
         // udaf
         ctx.register_udaf(create_measure_udaf());
@@ -7884,6 +7885,26 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_pg_to_regtype_pid() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pg_to_regtype",
+            execute_query(
+                "select
+                    to_regtype('bool') b,
+                    to_regtype('name') n,
+                    to_regtype('_int4') ai,
+                    to_regtype('unknown') u
+                ;"
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_date_part_quarter() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "date_part_quarter",
@@ -8518,6 +8539,33 @@ ORDER BY \"COUNT(count)\" DESC"
             ORDER BY
                 a.attnum"#
                     .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_sqlalchemy_regtype() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "sqlalchemy_regtype",
+            execute_query(
+                "SELECT
+                    typname AS name,
+                    oid,
+                    typarray AS array_oid,
+                    CAST(CAST(oid AS regtype) AS TEXT) AS regtype,
+                    typdelim AS delimiter
+                FROM
+                    pg_type AS t
+                WHERE
+                    t.oid = to_regtype('boolean')
+                ORDER BY
+                    t.oid
+                ;"
+                .to_string(),
                 DatabaseProtocol::PostgreSQL
             )
             .await?

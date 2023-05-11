@@ -1,0 +1,14 @@
+.Button {
+  font-weight: 400;
+  font-size: var(--h5_font-size);
+  line-height: var(--h6_line-height);
+
+  display: inline-block;
+  padding: 0 6px;
+  background: white;
+
+  border-radius: 4px;
+  margin-right: 4px;
+  border: 1px solid var(--dark_05);
+  box-shadow: 2px 2px 0 var(--dark_05);
+}
