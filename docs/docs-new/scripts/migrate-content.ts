@@ -291,9 +291,9 @@ async function cleanup() {
 }
 
 interface Override {
-  ready?: boolean;
-  path?: string;
-  title?: string;
+  ready: boolean;
+  path: string;
+  title: string;
 }
 
 const files: Record<string, Override> = {
@@ -302,6 +302,82 @@ const files: Record<string, Override> = {
     path: "product/introduction",
     title: "Introduction",
   },
+
+  // Getting Started
+
+  "Getting-Started/Overview.mdx": {
+    ready: true,
+    path: "product/getting-started",
+    title: "Getting started with Cube",
+  },
+
+  // Core
+
+  "Getting-Started/Core/01-Overview.mdx": {
+    ready: true,
+    path: "product/getting-started/core",
+    title: "Getting started with Cube Core",
+  },
+  "Getting-Started/Core/02-Create-a-project.mdx": {
+    ready: true,
+    path: "product/getting-started/core/create-a-project",
+    title: "Create a project",
+  },
+  "Getting-Started/Core/03-Query-data.mdx": {
+    ready: true,
+    path: "product/getting-started/core/query-data",
+    title: "Query data",
+  },
+  "Getting-Started/Core/04-Add-a-pre-aggregation.mdx": {
+    ready: true,
+    path: "product/getting-started/core/add-a-pre-aggregation",
+    title: "Add a pre-aggregation",
+  },
+  "Getting-Started/Core/05-Learn-more.mdx": {
+    ready: true,
+    path: "product/getting-started/core/learn-more",
+    title: "Learn more",
+  },
+
+  // Cloud
+
+  "Getting-Started/Cloud/01-Overview.mdx": {
+    ready: true,
+    path: "product/getting-started/cloud",
+    title: "Getting started with Cube Cloud",
+  },
+  "Getting-Started/Cloud/02-Create-a-deployment.mdx": {
+    ready: true,
+    path: "product/getting-started/cloud/create-a-deployment",
+    title: "Create a deployment",
+  },
+  "Getting-Started/Cloud/03-Generate-models.mdx": {
+    ready: true,
+    path: "product/getting-started/cloud/generate-models",
+    title: "Generate models",
+  },
+  "Getting-Started/Cloud/04-Query-data.mdx": {
+    ready: true,
+    path: "product/getting-started/cloud/query-data",
+    title: "Query data",
+  },
+  "Getting-Started/Cloud/05-Add-a-pre-aggregation.mdx": {
+    ready: true,
+    path: "product/getting-started/cloud/add-a-pre-aggregation",
+    title: "Add a pre-aggregation",
+  },
+  "Getting-Started/Cloud/06-Learn-more.mdx": {
+    ready: true,
+    path: "product/getting-started/cloud/learn-more",
+    title: "Learn more",
+  },
+
+  // "Getting-Started/Migrate-from-Core/Upload-with-CLI.mdx": {},
+  // "Getting-Started/Migrate-from-Core/Import-GitLab-repository-via-SSH.mdx": {},
+  // "Getting-Started/Migrate-from-Core/Import-GitHub-repository.mdx": {},
+  // "Getting-Started/Migrate-from-Core/Import-Git-repository-via-SSH.mdx": {},
+  // "Getting-Started/Migrate-from-Core/Import-Bitbucket-repository-via-SSH.mdx":
+  //   {},
 
   // configuration
   "Configuration/Overview.mdx": {
@@ -536,151 +612,197 @@ const files: Record<string, Override> = {
     title: "AWS-Athena",
   },
 
-  //
+  // Data modeling
 
-  "Workspace/SQL-Runner.mdx": {},
-  "Workspace/Preferences.mdx": {},
-  "Workspace/Inspecting-Queries.mdx": {},
-  "Workspace/Inspecting-Pre-aggregations.mdx": {},
-  "Workspace/Development-API.mdx": {},
-  "Workspace/Developer-Playground.mdx": {},
-  "Workspace/Cube-IDE.mdx": {},
-  "Workspace/CLI.mdx": {},
-  "Workspace/Access Control.mdx": {},
-  "Style-Guide/Overview.mdx": {},
-  "Schema/Getting-Started.mdx": {},
-  "SQL-API/Template.mdx": {},
-  "SQL-API/Overview.mdx": {},
-  "SQL-API/Joins.mdx": {},
-  "SQL-API/Authentication-and-Authorization.mdx": {},
-  "REST-API/REST-API.mdx": {},
-  "REST-API/Query-Format.mdx": {},
-  "Monitoring/Log-Export.mdx": {},
-  "Monitoring/Alerts.mdx": {},
-  "GraphQL-API/GraphQL-API.mdx": {},
-  "Getting-Started/Overview.mdx": {},
-  "Frontend-Integrations/Real-Time-Data-Fetch.mdx": {},
-  "Frontend-Integrations/Introduction.mdx": {},
-  "Frontend-Integrations/Introduction-vue.mdx": {},
-  "Frontend-Integrations/Introduction-react.mdx": {},
-  "Frontend-Integrations/Introduction-angular.mdx": {},
-  "FAQs/Troubleshooting.mdx": {},
-  "FAQs/Tips-and-Tricks.mdx": {},
-  "FAQs/General.mdx": {},
-  "Examples-Tutorials-Recipes/Recipes.mdx": {},
-  "Examples-Tutorials-Recipes/Examples.mdx": {},
-  "Deployment/Production-Checklist.mdx": {},
-  "Deployment/Overview.mdx": {},
-  "Caching/Using-Pre-Aggregations.mdx": {},
-  "Caching/Running-in-Production.mdx": {},
-  "Caching/Overview.mdx": {},
-  "Caching/Lambda-Pre-Aggregations.mdx": {},
-  "Caching/Getting-Started-Pre-Aggregations.mdx": {},
-  "Auth/Security-Context.mdx": {},
-  "Auth/Overview.mdx": {},
-  "Workspace/Single-Sign-On/SAML.mdx": {},
-  "Workspace/Single-Sign-On/Overview.mdx": {},
-  "Workspace/Single-Sign-On/Okta.mdx": {},
-  "Schema/Reference/view.mdx": {},
-  "Schema/Reference/types-and-formats.mdx": {},
-  "Schema/Reference/segments.mdx": {},
-  "Schema/Reference/pre-aggregations.mdx": {},
-  "Schema/Reference/measures.mdx": {},
-  "Schema/Reference/joins.mdx": {},
-  "Schema/Reference/dimensions.mdx": {},
-  "Schema/Reference/cube.mdx": {},
-  "Reference/REST-API/REST-API.mdx": {},
-  "Schema/Fundamentals/Working-with-Joins.mdx": {},
-  "Schema/Fundamentals/Syntax.mdx": {},
-  "Schema/Fundamentals/Concepts.mdx": {},
-  "Schema/Fundamentals/Additional-Concepts.mdx": {},
-  "Schema/Advanced/schema-execution-environment.mdx": {},
-  "Schema/Advanced/Using-dbt.mdx": {},
-  "Schema/Advanced/Polymorphic-Cubes.mdx": {},
-  "Schema/Advanced/Dynamic-Schema-Creation.mdx": {},
-  "Schema/Advanced/Data-Blending.mdx": {},
-  "Schema/Advanced/Code-Reusability-Extending-Cubes.mdx": {},
-  "Schema/Advanced/Code-Reusability-Export-and-Import.mdx": {},
-  "Reference/GraphQL-API/GraphQL-API.mdx": {},
-  "Reference/Configuration/Environment-Variables-Reference.mdx": {},
-  "Reference/Configuration/Config.mdx": {},
-  "Getting-Started/Migrate-from-Core/Upload-with-CLI.mdx": {},
-  "Getting-Started/Migrate-from-Core/Import-GitLab-repository-via-SSH.mdx": {},
-  "Getting-Started/Migrate-from-Core/Import-GitHub-repository.mdx": {},
-  "Getting-Started/Migrate-from-Core/Import-Git-repository-via-SSH.mdx": {},
-  "Getting-Started/Migrate-from-Core/Import-Bitbucket-repository-via-SSH.mdx":
-    {},
-  "Reference/CLI/CLI-Reference.mdx": {},
-  "Getting-Started/Core/05-Learn-more.mdx": {},
-  "Getting-Started/Core/04-Add-a-pre-aggregation.mdx": {},
-  "Getting-Started/Core/03-Query-data.mdx": {},
-  "Getting-Started/Core/02-Create-a-project.mdx": {},
-  "Getting-Started/Core/01-Overview.mdx": {},
-  "Getting-Started/Cloud/06-Learn-more.mdx": {},
-  "Getting-Started/Cloud/05-Add-a-pre-aggregation.mdx": {},
-  "Getting-Started/Cloud/04-Query-data.mdx": {},
-  "Getting-Started/Cloud/03-Generate-models.mdx": {},
-  "Getting-Started/Cloud/02-Create-a-deployment.mdx": {},
-  "Getting-Started/Cloud/01-Overview.mdx": {},
-  "Deployment/Core/Overview.mdx": {},
-  "Deployment/Cloud/Pricing.mdx": {},
-  "Deployment/Cloud/Overview.mdx": {},
-  "Deployment/Cloud/Deployment-Types.mdx": {},
-  "Deployment/Cloud/Custom-Domains.mdx": {},
-  "Deployment/Cloud/Continuous-Deployment.mdx": {},
-  "Deployment/Cloud/Auto-Suspension.mdx": {},
+  "Schema/Getting-Started.mdx": {
+    ready: true,
+    path: "product/data-modeling",
+    title: "Getting started with data modeling",
+  },
 
-  "Examples-Tutorials-Recipes/Recipes/Upgrading-Cube/Migrating-from-Express-to-Docker.mdx":
-    {},
-  "Examples-Tutorials-Recipes/Recipes/Query-acceleration/using-originalsql-and-rollups-effectively.mdx":
-    {},
-  "Examples-Tutorials-Recipes/Recipes/Query-acceleration/non-additivity.mdx":
-    {},
-  "Examples-Tutorials-Recipes/Recipes/Query-acceleration/joining-multiple-data-sources.mdx":
-    {},
-  "Examples-Tutorials-Recipes/Recipes/Query-acceleration/incrementally-building-pre-aggregations-for-a-date-range.mdx":
-    {},
-  "Examples-Tutorials-Recipes/Recipes/Query-acceleration/Refreshing-select-partitions.mdx":
-    {},
+  // data modeling / fundamentals
 
-  "Examples-Tutorials-Recipes/Recipes/Queries/pagination.mdx": {},
-  "Examples-Tutorials-Recipes/Recipes/Queries/getting-unique-values-for-a-field.mdx":
-    {},
-  "Examples-Tutorials-Recipes/Recipes/Queries/enforcing-mandatory-filters.mdx":
-    {},
-  "Examples-Tutorials-Recipes/Recipes/Data-modeling/using-dynamic-measures.mdx":
-    {},
-  "Examples-Tutorials-Recipes/Recipes/Data-modeling/snapshots.mdx": {},
-  "Examples-Tutorials-Recipes/Recipes/Data-modeling/percentiles.mdx": {},
-  "Examples-Tutorials-Recipes/Recipes/Data-modeling/passing-dynamic-parameters-in-a-query.mdx":
-    {},
-  "Examples-Tutorials-Recipes/Recipes/Data-modeling/entity-attribute-value.mdx":
-    {},
-  "Examples-Tutorials-Recipes/Recipes/Data-modeling/dynamic-union-tables.mdx":
-    {},
-  "Examples-Tutorials-Recipes/Recipes/Code-reusability/schema-generation.mdx":
-    {},
-  "Examples-Tutorials-Recipes/Recipes/Data-sources/using-ssl-connections-to-data-source.mdx":
-    {},
-  "Examples-Tutorials-Recipes/Recipes/Data-sources/multiple-sources-same-schema.mdx":
-    {},
-  "Examples-Tutorials-Recipes/Recipes/Auth/Auth0-Guide.mdx": {},
-  "Examples-Tutorials-Recipes/Recipes/Auth/AWS-Cognito.mdx": {},
-  "Examples-Tutorials-Recipes/Recipes/Access-control/using-different-schemas-for-tenants.mdx":
-    {},
-  "Examples-Tutorials-Recipes/Recipes/Access-control/role-based-access.mdx": {},
-  "Examples-Tutorials-Recipes/Recipes/Access-control/controlling-access-to-cubes-and-views.mdx":
-    {},
-  "Examples-Tutorials-Recipes/Recipes/Access-control/column-based-access.mdx":
-    {},
-  "Examples-Tutorials-Recipes/Recipes/Analytics/funnels.mdx": {},
-  "Examples-Tutorials-Recipes/Recipes/Analytics/event-analytics.mdx": {},
-  "Examples-Tutorials-Recipes/Recipes/Analytics/cohort-retention.mdx": {},
-  "Examples-Tutorials-Recipes/Recipes/Analytics/active-users.mdx": {},
-  "Reference/SQL-API/SQL-Functions-and-Operators.mdx": {},
-  "Reference/SQL-API/SQL-Commands.mdx": {},
-  "Reference/Frontend/@cubejs-client-vue.mdx": {},
-  "Reference/Frontend/@cubejs-client-ngx.mdx": {},
+  "Schema/Fundamentals/Concepts.mdx": {
+    ready: true,
+    path: "product/data-modeling/fundamentals/concepts",
+    title: "Concepts",
+  },
+  "Schema/Fundamentals/Syntax.mdx": {
+    ready: true,
+    path: "product/data-modeling/fundamentals/syntax",
+    title: "Syntax",
+  },
+  "Schema/Fundamentals/Working-with-Joins.mdx": {
+    ready: true,
+    path: "product/data-modeling/fundamentals/working-with-joins",
+    title: "Working-with-Joins",
+  },
+  "Schema/Fundamentals/Additional-Concepts.mdx": {
+    ready: true,
+    path: "product/data-modeling/fundamentals/additional-concepts",
+    title: "Additional-Concepts",
+  },
+
+  // data modeling / reference
+
+  "Schema/Reference/cube.mdx": {
+    ready: true,
+    path: "product/data-modeling/reference/cube",
+    title: "Cubes",
+  },
+  "Schema/Reference/view.mdx": {
+    ready: true,
+    path: "product/data-modeling/reference/view",
+    title: "Views",
+  },
+  "Schema/Reference/measures.mdx": {
+    ready: true,
+    path: "product/data-modeling/reference/measures",
+    title: "Measures",
+  },
+  "Schema/Reference/dimensions.mdx": {
+    ready: true,
+    path: "product/data-modeling/reference/dimensions",
+    title: "Dimensions",
+  },
+  "Schema/Reference/joins.mdx": {
+    ready: true,
+    path: "product/data-modeling/reference/joins",
+    title: "Joins",
+  },
+  "Schema/Reference/segments.mdx": {
+    ready: true,
+    path: "product/data-modeling/reference/segments",
+    title: "Segments",
+  },
+  "Schema/Reference/pre-aggregations.mdx": {
+    ready: true,
+    path: "product/data-modeling/reference/pre-aggregations",
+    title: "Pre-aggregations",
+  },
+  "Schema/Reference/types-and-formats.mdx": {
+    ready: true,
+    path: "product/data-modeling/reference/types-and-formats",
+    title: "Types and Formats",
+  },
+
+  // data modeling / advanced
+
+  // "Schema/Advanced/schema-execution-environment.mdx": {},
+  // "Schema/Advanced/Code-Reusability-Export-and-Import.mdx": {},
+  // "Schema/Advanced/Code-Reusability-Extending-Cubes.mdx": {},
+  // "Schema/Advanced/Data-Blending.mdx": {},
+  // "Schema/Advanced/Dynamic-Schema-Creation.mdx": {},
+  // "Schema/Advanced/Polymorphic-Cubes.mdx": {},
+  // "Schema/Advanced/Using-dbt.mdx": {},
+
+  // "Workspace/SQL-Runner.mdx": {},
+  // "Workspace/Preferences.mdx": {},
+  // "Workspace/Inspecting-Queries.mdx": {},
+  // "Workspace/Inspecting-Pre-aggregations.mdx": {},
+  // "Workspace/Development-API.mdx": {},
+  // "Workspace/Developer-Playground.mdx": {},
+  // "Workspace/Cube-IDE.mdx": {},
+  // "Workspace/CLI.mdx": {},
+  // "Workspace/Access Control.mdx": {},
+  // "Workspace/Single-Sign-On/SAML.mdx": {},
+  // "Workspace/Single-Sign-On/Overview.mdx": {},
+  // "Workspace/Single-Sign-On/Okta.mdx": {},
+
+  // "Style-Guide/Overview.mdx": {},
+  // "SQL-API/Template.mdx": {},
+  // "SQL-API/Overview.mdx": {},
+  // "SQL-API/Joins.mdx": {},
+  // "SQL-API/Authentication-and-Authorization.mdx": {},
+  // "REST-API/REST-API.mdx": {},
+  // "REST-API/Query-Format.mdx": {},
+  // "Monitoring/Log-Export.mdx": {},
+  // "Monitoring/Alerts.mdx": {},
+  // "GraphQL-API/GraphQL-API.mdx": {},
+  // "Frontend-Integrations/Real-Time-Data-Fetch.mdx": {},
+  // "Frontend-Integrations/Introduction.mdx": {},
+  // "Frontend-Integrations/Introduction-vue.mdx": {},
+  // "Frontend-Integrations/Introduction-react.mdx": {},
+  // "Frontend-Integrations/Introduction-angular.mdx": {},
+  // "FAQs/Troubleshooting.mdx": {},
+  // "FAQs/Tips-and-Tricks.mdx": {},
+  // "FAQs/General.mdx": {},
+  // "Examples-Tutorials-Recipes/Recipes.mdx": {},
+  // "Examples-Tutorials-Recipes/Examples.mdx": {},
+
+  // "Caching/Using-Pre-Aggregations.mdx": {},
+  // "Caching/Running-in-Production.mdx": {},
+  // "Caching/Overview.mdx": {},
+  // "Caching/Lambda-Pre-Aggregations.mdx": {},
+  // "Caching/Getting-Started-Pre-Aggregations.mdx": {},
+  // "Auth/Security-Context.mdx": {},
+  // "Auth/Overview.mdx": {},
+  // "Reference/REST-API/REST-API.mdx": {},
+  // "Reference/GraphQL-API/GraphQL-API.mdx": {},
+  // "Reference/Configuration/Environment-Variables-Reference.mdx": {},
+  // "Reference/Configuration/Config.mdx": {},
+  // "Reference/CLI/CLI-Reference.mdx": {},
+  // "Reference/SQL-API/SQL-Functions-and-Operators.mdx": {},
+  // "Reference/SQL-API/SQL-Commands.mdx": {},
+  // "Reference/Frontend/@cubejs-client-vue.mdx": {},
+  // "Reference/Frontend/@cubejs-client-ngx.mdx": {},
+  // "Deployment/Core/Overview.mdx": {},
+  // "Deployment/Cloud/Pricing.mdx": {},
+  // "Deployment/Cloud/Overview.mdx": {},
+  // "Deployment/Cloud/Deployment-Types.mdx": {},
+  // "Deployment/Cloud/Custom-Domains.mdx": {},
+  // "Deployment/Cloud/Continuous-Deployment.mdx": {},
+  // "Deployment/Cloud/Auto-Suspension.mdx": {},
+  // "Deployment/Production-Checklist.mdx": {},
+  // "Deployment/Overview.mdx": {},
+
+  // "Examples-Tutorials-Recipes/Recipes/Upgrading-Cube/Migrating-from-Express-to-Docker.mdx":
+  //   {},
+  // "Examples-Tutorials-Recipes/Recipes/Query-acceleration/using-originalsql-and-rollups-effectively.mdx":
+  //   {},
+  // "Examples-Tutorials-Recipes/Recipes/Query-acceleration/non-additivity.mdx":
+  //   {},
+  // "Examples-Tutorials-Recipes/Recipes/Query-acceleration/joining-multiple-data-sources.mdx":
+  //   {},
+  // "Examples-Tutorials-Recipes/Recipes/Query-acceleration/incrementally-building-pre-aggregations-for-a-date-range.mdx":
+  //   {},
+  // "Examples-Tutorials-Recipes/Recipes/Query-acceleration/Refreshing-select-partitions.mdx":
+  //   {},
+
+  // "Examples-Tutorials-Recipes/Recipes/Queries/pagination.mdx": {},
+  // "Examples-Tutorials-Recipes/Recipes/Queries/getting-unique-values-for-a-field.mdx":
+  //   {},
+  // "Examples-Tutorials-Recipes/Recipes/Queries/enforcing-mandatory-filters.mdx":
+  //   {},
+  // "Examples-Tutorials-Recipes/Recipes/Data-modeling/using-dynamic-measures.mdx":
+  //   {},
+  // "Examples-Tutorials-Recipes/Recipes/Data-modeling/snapshots.mdx": {},
+  // "Examples-Tutorials-Recipes/Recipes/Data-modeling/percentiles.mdx": {},
+  // "Examples-Tutorials-Recipes/Recipes/Data-modeling/passing-dynamic-parameters-in-a-query.mdx":
+  //   {},
+  // "Examples-Tutorials-Recipes/Recipes/Data-modeling/entity-attribute-value.mdx":
+  //   {},
+  // "Examples-Tutorials-Recipes/Recipes/Data-modeling/dynamic-union-tables.mdx":
+  //   {},
+  // "Examples-Tutorials-Recipes/Recipes/Code-reusability/schema-generation.mdx":
+  //   {},
+  // "Examples-Tutorials-Recipes/Recipes/Data-sources/using-ssl-connections-to-data-source.mdx":
+  //   {},
+  // "Examples-Tutorials-Recipes/Recipes/Data-sources/multiple-sources-same-schema.mdx":
+  //   {},
+  // "Examples-Tutorials-Recipes/Recipes/Auth/Auth0-Guide.mdx": {},
+  // "Examples-Tutorials-Recipes/Recipes/Auth/AWS-Cognito.mdx": {},
+  // "Examples-Tutorials-Recipes/Recipes/Access-control/using-different-schemas-for-tenants.mdx":
+  //   {},
+  // "Examples-Tutorials-Recipes/Recipes/Access-control/role-based-access.mdx": {},
+  // "Examples-Tutorials-Recipes/Recipes/Access-control/controlling-access-to-cubes-and-views.mdx":
+  //   {},
+  // "Examples-Tutorials-Recipes/Recipes/Access-control/column-based-access.mdx":
+  //   {},
+  // "Examples-Tutorials-Recipes/Recipes/Analytics/funnels.mdx": {},
+  // "Examples-Tutorials-Recipes/Recipes/Analytics/event-analytics.mdx": {},
+  // "Examples-Tutorials-Recipes/Recipes/Analytics/cohort-retention.mdx": {},
+  // "Examples-Tutorials-Recipes/Recipes/Analytics/active-users.mdx": {},
 };
 
 async function main() {

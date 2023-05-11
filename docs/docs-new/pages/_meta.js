@@ -13,14 +13,14 @@
 // monitoring: "Monitoring",
 
 module.exports = {
-  index: {
-    title: "Home",
-    theme: {
-      layout: "raw",
-      sidebar: false,
-      toc: false,
-    },
-  },
+  // index: {
+  //   title: "Home",
+  //   theme: {
+  //     layout: "raw",
+  //     sidebar: false,
+  //     toc: false,
+  //   },
+  // },
 
   product: {
     type: "page",
