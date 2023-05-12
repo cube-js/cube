@@ -47,6 +47,8 @@ const Structure: Nodes = {
   introduction: {
     title: "Introduction",
   },
+
+  // пуеепшт ыефкеув
   "getting-started": {
     title: "Getting Started",
     children: {
@@ -940,8 +942,6 @@ async function main() {
         const folderPath = dirname(targetFilePath);
         const folderExists = await stat(folderPath).catch(() => false);
 
-        console.log(targetFilePath, folderPath);
-
         if (!folderExists) {
           await mkdir(folderPath, {
             recursive: true,
@@ -955,28 +955,36 @@ async function main() {
           );
         }
 
-        await writeFile(
-          path.resolve(targetFilePath),
-          `# ${override.title}
-  ${data.body
-    .replaceAll(/<--\{"id"\s*:\s*"[^"]*"\}-->/g, "")
-    .replaceAll(/<\!--(.+)-->/g, "")
-    .replaceAll(/!\[image\|\d+x\d+\]\([^)]+\)/g, "")
-    .replaceAll(`style="text-align: center"`, `style={{ textAlign: "center" }}`)
-    .replaceAll("<pre><code>", '<pre><code>{"')
-    .replaceAll("</code></pre>", '"}</code></pre>')
-    .replaceAll(`style="border: none"`, `style={{ border: "none" }}`)
-    .replaceAll(
-      `style="width:100%; height:500px; border:0; border-radius: 4px; overflow:hidden;"`,
-      `style={{
-                  width: "100%",
-                  height:500,
-                  border:0,
-                  borderRadius: 4,
-                  overflow:"hidden"
-                }}`
-    )}`
-        );
+        const redirects = data.attributes.redirect_from
+          ? [...data.attributes.redirect_from, permalink]
+          : [permalink];
+
+        const content = `---
+redirect_from:
+${redirects.map((r) => `  - ${r}`).join("\n")}
+---
+
+# ${override.title}
+${data.body
+  .replaceAll(/<--\{"id"\s*:\s*"[^"]*"\}-->/g, "")
+  .replaceAll(/<\!--(.+)-->/g, "")
+  .replaceAll(/!\[image\|\d+x\d+\]\([^)]+\)/g, "")
+  .replaceAll(`style="text-align: center"`, `style={{ textAlign: "center" }}`)
+  .replaceAll("<pre><code>", '<pre><code>{"')
+  .replaceAll("</code></pre>", '"}</code></pre>')
+  .replaceAll(`style="border: none"`, `style={{ border: "none" }}`)
+  .replaceAll(
+    `style="width:100%; height:500px; border:0; border-radius: 4px; overflow:hidden;"`,
+    `style={{
+      width: "100%",
+      height:500,
+      border:0,
+      borderRadius: 4,
+      overflow:"hidden"
+    }}`
+  )}`;
+
+        await writeFile(path.resolve(targetFilePath), content);
       }
     })
   );
