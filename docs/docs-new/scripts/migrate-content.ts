@@ -665,6 +665,43 @@ const overrides: Record<string, Override> = {
   },
   // "SQL-API/Template.mdx": {},
 
+  // frontend
+
+  "Frontend-Integrations/Introduction.mdx": {
+    ready: true,
+    path: "product/frontend-integrations/introduction",
+    title: "Introduction",
+    meta: {
+      introduction: "Introduction",
+      "real-time-data-fetch": "Real-Time data fetch",
+    },
+  },
+  "Frontend-Integrations/Introduction-vue.mdx": {
+    ready: true,
+    path: "product/frontend-integrations/introduction/vue",
+    title: "Vue",
+    meta: {
+      react: "React",
+      vue: "Vue",
+      angular: "Angular",
+    },
+  },
+  "Frontend-Integrations/Introduction-react.mdx": {
+    ready: true,
+    path: "product/frontend-integrations/introduction/react",
+    title: "React",
+  },
+  "Frontend-Integrations/Introduction-angular.mdx": {
+    ready: true,
+    path: "product/frontend-integrations/introduction/angular",
+    title: "Angular",
+  },
+  "Frontend-Integrations/Real-Time-Data-Fetch.mdx": {
+    ready: true,
+    path: "product/frontend-integrations/real-time-data-fetch",
+    title: "Real-Time data fetch",
+  },
+
   // "Workspace/SQL-Runner.mdx": {},
   // "Workspace/Preferences.mdx": {},
   // "Workspace/Inspecting-Queries.mdx": {},
@@ -682,11 +719,7 @@ const overrides: Record<string, Override> = {
 
   // "Monitoring/Log-Export.mdx": {},
   // "Monitoring/Alerts.mdx": {},
-  // "Frontend-Integrations/Real-Time-Data-Fetch.mdx": {},
-  // "Frontend-Integrations/Introduction.mdx": {},
-  // "Frontend-Integrations/Introduction-vue.mdx": {},
-  // "Frontend-Integrations/Introduction-react.mdx": {},
-  // "Frontend-Integrations/Introduction-angular.mdx": {},
+
   // "FAQs/Troubleshooting.mdx": {},
   // "FAQs/Tips-and-Tricks.mdx": {},
   // "FAQs/General.mdx": {},
