@@ -1,0 +1,111 @@
+---
+redirect_from:
+  - /getting-started/cloud/create-a-deployment
+---
+
+# Create a deployment
+In this step, we will create a new deployment in Cube Cloud. A deployment
+represents a data model, configuration, and managed infrastructure. We will use
+it to connect a data source and generate data models.
+
+## Create an account
+
+To continue with this guide, you'll need to have a Cube Cloud account. If you
+don't have one yet, [click here to sign up][cube-cloud-signup] for free.
+
+## Create a deployment
+
+First, [sign in to your Cube Cloud account][cube-cloud-signin]. Then,
+click&nbsp;<Btn>Create Deployment</Btn>:
+
+<Screenshot
+  alt="Cube Cloud Landing Screen with no configured deployments"
+  src="https://ucarecdn.com/f3ec1ae0-1d5d-4b5b-9859-9fc145b38e43/"
+/>
+
+Give the deployment a name, select the cloud provider and region of your choice,
+and click <Btn>Next</Btn>:
+
+<Screenshot
+  alt="Cube Cloud Create Deployment Screen"
+  src="https://ucarecdn.com/2338323e-0db8-4224-8e7a-3b4daf9c60ec/"
+/>
+
+<SuccessBox>
+
+Microsoft Azure is available in Cube Cloud on
+[Premium](https://cube.dev/pricing) tier. [Contact us](https://cube.dev/contact)
+for details.
+
+</SuccessBox>
+
+## Set up a Cube project
+
+Next, click <Btn>Create</Btn> to create a new project from scratch:
+
+<Screenshot
+  alt="Cube Cloud Upload Project Screen"
+  src="https://ucarecdn.com/46b72b61-b650-4271-808d-55203f1c8d8b/"
+/>
+
+## Connect a data source
+
+The last step in creating a deployment is to connect your data source to Cube
+Cloud. First, select the data source from the grid:
+
+<Screenshot
+  alt="Cube Cloud Setup Database Screen"
+  src="https://ucarecdn.com/1d656ba9-dd83-4ff4-a59e-8b5f97a9ddcc/"
+/>
+
+<InfoBox>
+
+Want to use a sample database instead? Select <Btn>PostgreSQL</Btn> and use the
+credentials below:
+
+<br />
+
+| Field    | Value              |
+| -------- | ------------------ |
+| Host     | `demo-db.cube.dev` |
+| Port     | `5432`             |
+| Database | `ecom`             |
+| Username | `cube`             |
+| Password | `12345`            |
+
+</InfoBox>
+
+After selecting the data source, enter valid credentials for it and
+click&nbsp;<Btn>Apply</Btn>. Check the [Connecting to Databases][ref-conf-db]
+page for more details on specific data sources.
+
+<Screenshot
+  alt="Cube Cloud Setup Database Screen"
+  src="https://ucarecdn.com/1ccdb149-bcf3-4426-9103-986f092939b7/"
+/>
+
+If you run into issues here, make sure to allow inbound connections from Cube
+Cloud IP addresses to your database. This means you need to enable these IPs in
+your firewall. Using the screenshot in the example above, if you are using AWS,
+this would mean adding new [rules][aws-docs-sec-group-rule] to your database's
+[security group][aws-docs-sec-group]:
+
+| Source          | Protocol | Port range |
+| --------------- | -------- | ---------- |
+| `3.65.255.79`   | `TCP`    | `5432`     |
+| `3.69.4.168`    | `TCP`    | `5432`     |
+| `3.64.153.169`  | `TCP`    | `5432`     |
+| `18.185.128.84` | `TCP`    | `5432`     |
+
+Now that the deployment is configured, we can move on to [generating data
+models][ref-getting-started-cloud-generate-models].
+
+[aws-docs-sec-group]:
+  https://docs.aws.amazon.com/vpc/latest/userguide/security-groups.html
+[aws-docs-sec-group-rule]:
+  https://docs.aws.amazon.com/vpc/latest/userguide/security-group-rules.html
+[cube-cloud-signin]: https://cubecloud.dev/auth
+[cube-cloud-signup]: https://cubecloud.dev/auth/signup
+[ref-conf-db]: /config/databases
+[ref-getting-started-cloud-generate-models]:
+  /getting-started/cloud/generate-models

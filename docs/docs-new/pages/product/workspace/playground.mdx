@@ -1,0 +1,118 @@
+---
+redirect_from:
+  - /cloud/dev-tools/dev-playground
+  - /dev-tools/dev-playground
+---
+
+# Playground
+Playground is a web-based tool which allows executing queries and previewing
+their results.
+
+<SuccessBox>
+
+Playground is available in Cube Cloud on [all tiers](https://cube.dev/pricing).
+
+</SuccessBox>
+
+Cube Core and Cube Cloud both provide the Playground experience; however, a few
+additional features are available in Cube Cloud.
+
+<Screenshot
+  alt="Playground Query and Results Example"
+  src="https://ucarecdn.com/06bece10-f322-4b4a-9250-234d1bae98db/"
+/>
+
+## Running Playground
+
+### Cube Core
+
+Playground is available at [http://localhost:4000](http://localhost:4000) when
+Cube is run in [development mode][ref-dev-mode], i.e., when `CUBEJS_DEV_MODE` is
+set to `true`.
+
+<WarningBox>
+
+Since Playground exposes all data models and allows running all possible
+queries, it should not be used in production. You can use the
+[JavaScript SDKs](/frontend-introduction) to build your own query builder and
+use it to query your Cube API in a secure way.
+
+</WarningBox>
+
+### Cube Cloud
+
+Playground is available out of the box to authenticated [Cube Cloud][cube-cloud]
+users.
+
+When editing the data model through the [Cube IDE][ref-devtools-ide], Playground
+will switch to the Development API and its status will be visible in the
+Playground:
+
+<Screenshot
+  alt="Playground during API restart"
+  src="https://ucarecdn.com/06bece10-f322-4b4a-9250-234d1bae98db/"
+/>
+
+## Query tabs
+
+You can use query tabs to keep results of previous queries while still being
+able to make new queries. The query tabs can be found at the top of the
+Developer Playground:
+
+<Screenshot
+  alt="Cube Developer Playground Tabs"
+  src="https://ucarecdn.com/06bece10-f322-4b4a-9250-234d1bae98db/"
+/>
+
+## Editing the Security Context
+
+The security context used for queries can be modified by clicking&nbsp;<Btn>Add
+Security Context</Btn>:
+
+<Screenshot src="https://ucarecdn.com/06bece10-f322-4b4a-9250-234d1bae98db/" />
+
+You can paste in an existing JWT if desired; or create a brand-new one by
+providing a JSON object that represents the decoded JWT.
+
+## Using the Rollup Designer
+
+The Rollup Designer provides an easy way to create and edit
+[pre-aggregations][ref-caching-preaggs-gs] from within the Playground. For
+example, when you execute a query that has no matching pre-aggregations, the
+Playground also displays some information above the results:
+
+<Screenshot
+  highlight="inset(58% 16% 37% 49% round 10px)"
+  src="https://ucarecdn.com/4698a6c7-b77e-41ec-8866-3611d6a6e073/"
+/>
+
+Clicking <Btn>Query was not accelerated with pre-aggregation</Btn> will open the
+Rollup Designer with a suggested pre-aggregation that will accelerate the query:
+
+<Screenshot src="https://ucarecdn.com/d860dd55-4f94-46a1-ba64-53452ec267ba/" />
+
+If desired, you can also modify settings such as the [refresh
+key][ref-preaggs-ref-refreshkey], the [partition
+granularity][ref-preaggs-ref-partitiongranularity], and
+[indexes][ref-preaggs-ref-indexes] to further optimize the pre-aggregation by
+clicking the&nbsp;&ZeroWidthSpace;<Btn>Settings</Btn> tab:
+
+<Screenshot src="https://ucarecdn.com/27afed37-10ae-4948-bf3f-4261f6e0663c/" />
+
+Click <Btn>Add to the Data Schema</Btn> to add the pre-aggregation to the data
+model. You can then run the query again to see the results:
+
+<Screenshot
+  highlight="inset(52% 15% 42% 52% round 10px)"
+  src="https://ucarecdn.com/e75a39a7-db3f-479f-a606-4680d04dd5d0/"
+/>
+
+[cube-cloud]: https://cube.dev/cloud
+[ref-dev-mode]: /configuration/overview
+[ref-devtools-ide]: /cloud/dev-tools/cube-ide
+[ref-caching-preaggs-gs]: /caching/pre-aggregations/getting-started
+[ref-preaggs-ref-refreshkey]:
+  /schema/reference/pre-aggregations#parameters-refresh-key
+[ref-preaggs-ref-partitiongranularity]:
+  /schema/reference/pre-aggregations#parameters-partition-granularity
+[ref-preaggs-ref-indexes]: /schema/reference/pre-aggregations#parameters-indexes

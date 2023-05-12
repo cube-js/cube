@@ -1,0 +1,293 @@
+---
+redirect_from:
+  - /schema/dynamic-schema-creation
+  - /schema/advanced/dynamic-schema-creation
+---
+
+# Dynamic data models
+<InfoBox>
+
+This functionality only works with data models written in JavaScript, not YAML.
+
+<br />
+
+We're planning to add support for authoring models in Python to allow dynamic
+generation of models the very same way you can generate them in JavaScript
+today. If you’re interested in this feature, we'd love to hear your thoughts,
+please post an issue on GitHub.
+
+</InfoBox>
+
+Cube allows data models to be created on-the-fly using a special
+[`asyncModule()`][ref-async-module] function only available in the [schema
+execution environment][ref-schema-env]. `asyncModule()` allows registering an
+async function to be executed at the end of the data model compile phase so
+additional definitions can be added. This is often useful in situations where
+schema properties can be dynamically updated through an API, for example.
+
+<WarningBox>
+
+Each `asyncModule` call will be invoked only once per data model compilation.
+
+</WarningBox>
+
+[ref-schema-env]: /schema/reference/execution-environment
+[ref-async-module]: /schema/reference/execution-environment#asyncmodule
+
+When creating data models via `asyncModule()`, it is important to be aware of
+the following differences compared to statically defined ones with `cube()`:
+
+- The `sql` and `drill_members` properties for both dimensions and measures must
+  be of type `() => string` and `() => string[]` accordingly
+
+Cube supports importing JavaScript logic from other files in a data model, so it
+is useful to declare utility functions for handling the above differences in a
+separate file:
+
+[ref-import-export]: /recipes/export-import
+
+```javascript
+// model/utils.js
+export const convertStringPropToFunction = (propNames, dimensionDefinition) => {
+  let newResult = { ...dimensionDefinition };
+  propNames.forEach((propName) => {
+    const propValue = newResult[propName];
+
+    if (!propValue) {
+      return;
+    }
+
+    newResult[propName] = () => propValue;
+  });
+  return newResult;
+};
+
+export const transformDimensions = (dimensions) => {
+  return Object.keys(dimensions).reduce((result, dimensionName) => {
+    const dimensionDefinition = dimensions[dimensionName];
+    return {
+      ...result,
+      [dimensionName]: convertStringPropToFunction(
+        ['sql'],
+        dimensionDefinition
+      ),
+    };
+  }, {});
+};
+
+export const transformMeasures = (measures) => {
+  return Object.keys(measures).reduce((result, dimensionName) => {
+    const dimensionDefinition = measures[dimensionName];
+    return {
+      ...result,
+      [dimensionName]: convertStringPropToFunction(
+        ['sql', 'drill_members'],
+        dimensionDefinition
+      ),
+    };
+  }, {});
+};
+```
+
+## Generation
+
+In the following example, we retrieve a JSON object representing all our cubes
+using `fetch()`, transform some of the properties to be functions that return a
+string, and then finally use the [`cube()` global function][ref-globals] to
+generate data models from that data:
+
+[ref-globals]:
+  /schema/reference/execution-environment#cube-js-globals-cube-and-others
+
+```javascript
+// model/cubes/DynamicSchema.js
+const fetch = require('node-fetch');
+import {
+  convertStringPropToFunction,
+  transformDimensions,
+  transformMeasures,
+} from './utils';
+
+asyncModule(async () => {
+  const dynamicCubes = await (
+    await fetch('http://your-api-endpoint/dynamicCubes')
+  ).json();
+
+  console.log(dynamicCubes);
+  // [
+  //   {
+  //      name: 'dynamic_cube_model',
+  //      sql_table: 'my_table',
+  //
+  //      measures: {
+  //        price: {
+  //          sql: `price`,
+  //          type: `number`,
+  //        }
+  //      },
+  //
+  //      dimensions: {
+  //        color: {
+  //          sql: `color`,
+  //          type: `string`,
+  //        },
+  //      },
+  //   },
+  // ]
+
+  dynamicCubes.forEach((dynamicCube) => {
+    const dimensions = transformDimensions(dynamicCube.dimensions);
+    const measures = transformMeasures(dynamicCube.measures);
+
+    cube(dynamicCube.name, {
+      sql: dynamicCube.sql,
+      dimensions,
+      measures,
+      pre_aggregations: {
+        main: {
+          // ...
+        },
+      },
+    });
+  });
+});
+```
+
+## Usage with schemaVersion
+
+It is also useful to be able to recompile the data model when there are changes
+in the underlying input data. For this purpose, the [`schemaVersion`
+][link-config-schema-version] value in the `cube.js` configuration options can
+be specified as an asynchronous function:
+
+```javascript
+// cube.js
+module.exports = {
+  schemaVersion: async ({ securityContext }) => {
+    const schemaVersions = await (
+      await fetch('http://your-api-endpoint/schemaVersion')
+    ).json();
+
+    return schemaVersions[securityContext.tenantId];
+  },
+};
+```
+
+[link-config-schema-version]: /config#schema-version
+
+## Usage with COMPILE_CONTEXT
+
+The `COMPILE_CONTEXT` global object can also be used in conjunction with async
+schema creation to allow for multi-tenant deployments of Cube.
+
+In an example scenario where all tenants share the same cube, but see different
+dimensions and measures, you could do the following:
+
+```javascript
+// model/cubes/DynamicSchema.js
+const fetch = require('node-fetch');
+import {
+  convertStringPropToFunction,
+  transformDimensions,
+  transformMeasures,
+} from './utils';
+
+asyncModule(async () => {
+  const {
+    securityContext: { tenantId },
+  } = COMPILE_CONTEXT;
+
+  const dynamicCubes = await (
+    await fetch(`http://your-api-endpoint/dynamicCubes`)
+  ).json();
+
+  const allowedDimensions = await (
+    await fetch(`http://your-api-endpoint/dynamicDimensions/${tenantId}`)
+  ).json();
+
+  const allowedMeasures = await (
+    await fetch(`http://your-api-endpoint/dynamicMeasures/${tenantId}`)
+  ).json();
+
+  dynamicCubes.forEach((dynamicCube) => {
+    const dimensions = transformDimensions(allowedDimensions);
+    const measures = transformMeasures(allowedMeasures);
+
+    cube(dynamicCube.name, {
+      sql: dynamicCube.sql,
+      title: `${dynamicCube.title}-${tenantId}`,
+      dimensions,
+      measures,
+      pre_aggregations: {
+        main: {
+          // ...
+        },
+      },
+    });
+  });
+});
+```
+
+## Usage with data_source
+
+When using multiple databases, you'll need to ensure you set the
+[`data_source`][ref-schema-datasource] property for any asynchronously-created
+schemas, as well as ensuring the corresponding database drivers are set up with
+[`driverFactory()`][ref-config-driverfactory] in your [`cube.js` configuration
+file][ref-config].
+
+[ref-schema-datasource]: /schema/reference/cube#data-source
+[ref-config-driverfactory]: /config#driver-factory
+[ref-config]: /config
+
+For an example scenario where data models may use either MySQL or Postgres
+databases, you could do the following:
+
+```javascript
+// model/cubes/DynamicSchema.js
+const fetch = require('node-fetch');
+import {
+  convertStringPropToFunction,
+  transformDimensions,
+  transformMeasures,
+} from './utils';
+
+asyncModule(async () => {
+  const dynamicCubes = await (
+    await fetch('http://your-api-endpoint/dynamicCubes')
+  ).json();
+
+  dynamicCubes.forEach((dynamicCube) => {
+    const dimensions = transformDimensions(dynamicCube.dimensions);
+    const measures = transformMeasures(dynamicCube.measures);
+
+    cube(dynamicCube.name, {
+      data_source: dynamicCube.data_source,
+      sql: dynamicCube.sql,
+      dimensions,
+      measures,
+      pre_aggregations: {
+        main: {
+          // ...
+        },
+      },
+    });
+  });
+});
+```
+
+```javascript
+// cube.js
+const MySQLDriver = require('@cubejs-backend/mysql-driver');
+const PostgresDriver = require('@cubejs-backend/postgres-driver');
+
+module.exports = {
+  driverFactory: ({ dataSource }) => {
+    if (dataSource === 'mysql') {
+      return new MySQLDriver({ database: dataSource });
+    }
+
+    return new PostgresDriver({ database: dataSource });
+  },
+};
+```

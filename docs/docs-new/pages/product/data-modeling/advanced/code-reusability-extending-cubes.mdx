@@ -1,0 +1,214 @@
+---
+redirect_from:
+  - /extending-cubes
+  - /recipes/extending-cubes
+  - /schema/advanced/extending-cubes
+---
+
+# Extending cubes
+Cube supports the [`extends` feature][ref-schema-ref-cube-extends], which allows
+you to reuse all declared members of a cube. This is a foundation for building
+reusable data models.
+
+[Cubes][ref-schema-concepts-cubes] are represented as [JavaScript
+objects][mdn-js-objects] with such properties as measures, dimensions, and
+segments. Extending in Cube works similarly to JavaScript’s prototype
+inheritance. Measures, dimensions, and segments are merged as separate objects.
+So if the base cube defines measure `a` and the extending cube defines measure
+`b`, the resulting cube will have both measures `a` and `b`.
+
+The usual pattern is to **extract common measures, dimensions, and joins into
+the base cube** and then **extend from the base cube**. This helps to prevent
+code duplication and makes code easier to maintain and refactor.
+
+In the example below, the `base_events` cube defines the common events measures,
+dimensions, and a join to the `users` cube:
+
+<InfoBox>
+
+It’s important to use the `CUBE` reference when referencing properties on the
+cube. Not specifying the cube name or using `${base_events}` does not work when
+the cube is extended.
+
+</InfoBox>
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: base_events
+    sql_table: events
+
+    joins:
+      - name: users
+        relationship: many_to_one
+        sql: "{CUBE}.user_id = {users.id}"
+
+    measures:
+      - name: count
+        type: count
+
+    dimensions:
+      - name: timestamp
+        sql: time
+        type: time
+```
+
+```javascript
+cube(`base_events`, {
+  sql_table: `events`,
+
+  joins: {
+    users: {
+      relationship: `many_to_one`,
+      sql: `${CUBE}.user_id = ${users.id}`,
+    },
+  },
+
+  measures: {
+    count: {
+      type: `count`,
+    },
+  },
+
+  dimensions: {
+    timestamp: {
+      sql: `time`,
+      type: `time`,
+    },
+  },
+});
+```
+
+</CodeTabs>
+
+The `product_purchases` and `page_views` cubes are extended from `base_events` and
+define only the specific dimensions: `product_name` for product purchases and
+`page_path` for page views.
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: product_purchases
+    sql_table: product_purchases
+    extends: base_events
+
+    dimensions:
+      - name: product_name
+        sql: product_name
+        type: string
+
+  - name: page_views
+    sql_table: page_views
+    extends: base_events
+
+    dimensions:
+      - name: page_path
+        sql: page_path
+        type: string
+```
+
+```javascript
+cube(`product_purchases`, {
+  sql_table: `product_purchases`,
+  extends: base_events,
+
+  dimensions: {
+    product_name: {
+      sql: `product_name`,
+      type: `string`,
+    },
+  },
+});
+
+cube(`page_views`, {
+  sql_table: `page_views`,
+  extends: base_events,
+
+  dimensions: {
+    page_path: {
+      sql: `page_path`,
+      type: `string`,
+    },
+  },
+});
+```
+
+</CodeTabs>
+
+## Usage with FILTER_PARAMS
+
+If the base cube is using [`FILTER_PARAMS`][ref-schema-ref-cube-filter-params]
+in any `sql` property, then extending cubes can do one of two things:
+
+- Override the `sql` property in each target cube.
+
+  <CodeTabs>
+
+  ```yaml
+  cubes:
+    - name: product_purchases
+      sql: >
+        SELECT *
+        FROM events
+        WHERE {FILTER_PARAMS.product_purchases.timestamp.filter('time')}
+
+      # ...
+  ```
+
+  ```javascript
+  cube(`product_purchases`, {
+    sql: `
+      SELECT *
+      FROM events
+      WHERE ${FILTER_PARAMS.product_purchases.timestamp.filter('time')}
+    `,
+
+    // ...
+  });
+  ```
+
+  </CodeTabs>
+
+- Put all filters inside the base cube and reference all specific cubes filters
+  using `AND`. The unused filters will be rendered to `1 = 1` in the SQL query.
+  
+  <CodeTabs>
+
+  ```yaml
+  cubes:
+    - name: base_events
+      sql: >
+        SELECT *
+        FROM events
+        WHERE
+          {FILTER_PARAMS.base_events.timestamp.filter('time')} AND
+          {FILTER_PARAMS.product_purchases.timestamp.filter('time')} AND
+          {FILTER_PARAMS.page_views.timestamp.filter('time')}
+
+      # ...
+  ```
+
+  ```javascript
+  cube(`base_events`, {
+    sql: `
+      SELECT *
+      FROM events
+      WHERE
+        {$FILTER_PARAMS.base_events.timestamp.filter('time')} AND
+        {$FILTER_PARAMS.product_purchases.timestamp.filter('time')} AND
+        {$FILTER_PARAMS.page_views.timestamp.filter('time')}
+    `,
+
+    // ...
+  });
+  ```
+
+  </CodeTabs>
+
+[mdn-js-objects]:
+  https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object
+[ref-schema-concepts-cubes]: /schema/fundamentals/concepts#cubes
+[ref-schema-ref-cube-extends]: /schema/reference/cube#extends
+[ref-schema-ref-cube-filter-params]: /schema/reference/cube#filter-params

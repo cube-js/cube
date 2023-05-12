@@ -1,0 +1,180 @@
+---
+redirect_from:
+  - /cloud/inspecting-queries
+---
+
+# Query inspection
+The Queries page in Cube Cloud is a one-stop shop for all performance and
+diagnostic information about queries issued for a deployment. It is kept
+up-to-date in real time and provides a quick way to check whether queries are
+being accelerated with [pre-aggregations][ref-caching-gs-preaggs], how long they
+took to execute, and if they failed.
+
+<Screenshot src="https://ucarecdn.com/44bb6d8d-5943-4978-8b15-73e1e43fd988/" />
+
+## Setting the time range
+
+By default, Cube Cloud shows you a live feed of queries made to the API and
+connected [data sources][ref-conf-db]. You can see query history for the last 72
+hours by using the date picker in the top right corner of the page and selecting
+a time period:
+
+<Screenshot
+  highlight="inset(15% 1% 60% 21% round 10px)"
+  src="https://ucarecdn.com/691e7cfa-e7fd-4df1-8cfa-f8f0d74634f6/"
+/>
+
+To go back to live mode, click <Btn>▶</Btn>:
+
+<Screenshot
+  highlight="inset(15% 6% 79% 88% round 10px)"
+  src="https://ucarecdn.com/691e7cfa-e7fd-4df1-8cfa-f8f0d74634f6/"
+/>
+
+## Exploring queries
+
+You can switch between [queries made to the API](#api-queries) and
+[queries made to connected data sources](#database-queries) by switching between
+the <Btn>API</Btn> and <Btn>Database</Btn> tabs.
+
+<Screenshot
+  highlight="inset(22% 64% 70% 20% round 10px)"
+  src="https://ucarecdn.com/44bb6d8d-5943-4978-8b15-73e1e43fd988/"
+/>
+
+###  All Queries and Top Queries
+
+Clicking <Btn>All Queries</Btn> will show all queries in order of recency,
+while&nbsp;<Btn>Top Queries</Btn> will show the most-frequently executed
+queries:
+
+<Screenshot
+  highlight="inset(30% 50% 64% 20% round 10px)"
+  src="https://ucarecdn.com/44bb6d8d-5943-4978-8b15-73e1e43fd988/"
+/>
+
+###  Filtering
+
+You can also use filters to find problematic queries; you can filter by query
+duration, cache status, whether the query was accelerated, and by failing
+queries:
+
+<Screenshot
+  highlight="inset(36% 8% 58% 20% round 10px)"
+  src="https://ucarecdn.com/44bb6d8d-5943-4978-8b15-73e1e43fd988/"
+/>
+
+## Inspecting API Queries
+
+To see an expanded view of a query, click on <Btn>❯</Btn> next to any query:
+
+<Screenshot
+  highlight="inset(-1% 87% -1% 9% round 10px)"
+  src="https://ucarecdn.com/7ec40dc3-813d-4e3e-881b-dc01a6fdfb50/"
+/>
+
+This will show us how long the query took, whether the query was accelerated,
+and even view the raw query by clicking <Btn>❮/❯</Btn>:
+
+<Screenshot
+  highlight="inset(1% 2% 93% 68% round 10px)"
+  src="https://ucarecdn.com/e3c00115-49f9-48a6-8f2b-949c53523c9f/"
+/>
+
+To drill down on a specific query, click it to see more information.
+
+###  Query
+
+The <Btn>Query</Btn> tab shows the raw JSON query sent to the Cube Cloud
+deployment.
+
+<Screenshot src="https://ucarecdn.com/3c0490be-757d-46cd-ba2d-d7c93a7acf4e/" />
+
+###  Errors
+
+If the query failed, the <Btn>Errors</Btn> tab will show you the error message
+and stacktrace:
+
+<Screenshot src="https://ucarecdn.com/858633a0-4ee3-4dec-adb6-1d91ca30919f/" />
+
+###  SQL
+
+The <Btn>SQL</Btn> tab shows the generated SQL query sent by Cube to either your
+data source **or** Cube Store if the query was accelerated with a
+pre-aggregation:
+
+<Screenshot src="https://ucarecdn.com/537f7269-654d-479c-a0cc-abc2941f9b5a/" />
+
+###  Pre-Aggregations
+
+The <Btn>Pre-Aggregations</Btn> tab shows the
+[pre-aggregation][ref-caching-gs-preaggs] used to accelerate this query, if one
+was used:
+
+<Screenshot src="https://ucarecdn.com/e0a8d722-d43a-4d6f-8d3c-dbdd3173638e/" />
+
+If no pre-aggregations were used for this query, you should see the following
+screen:
+
+<Screenshot src="https://ucarecdn.com/b5cadb89-fbda-404a-806c-da99dc046845/" />
+
+Clicking <Btn>Accelerate</Btn> takes you to the Rollup Designer, where you can
+add a pre-aggregation to accelerate similar queries in the future.
+
+###  Queue Graph
+
+The <Btn>Queue Graph</Btn> tab details any activity in the query queue while
+processing the query. This may include other queries that were being processed
+or were waiting in the queue by Cube Cloud at the same time as this query:
+
+<Screenshot src="https://ucarecdn.com/dbac27fa-5722-415f-9374-11682b4159d7/" />
+
+A large number of queries in the queue may indicate that your deployment is
+under-provisioned, and you may want to consider scaling up your deployment.
+
+###  Flame Graph
+
+The <Btn>Flame Graph</Btn> tab shows a [flame graph][datadog-kb-flamegraph] of a
+query's execution time across resources in the Cube Cloud deployment. This is
+extremely useful for diagnosing where time is being spent in a query, and can
+help identify bottlenecks in your Cube deployment or data source.
+
+<Screenshot src="https://ucarecdn.com/56188be4-0614-48e1-97c8-6d8d89639849/" />
+
+## Inspecting Database Queries
+
+###  Query
+
+For Database requests, the <Btn>Query</Btn> tab shows the SQL query compiled by
+Cube that is executed on the data source:
+
+<Screenshot src="https://ucarecdn.com/5a5779f6-b484-49bc-9269-6e145b89f5eb/" />
+
+This can be useful for debugging queries that are failing or taking a long time,
+as you can copy the query and run it directly against your data source.
+
+###  Errors
+
+If the query failed, the <Btn>Errors</Btn> tab will show you the error message
+and stacktrace:
+
+<Screenshot src="https://ucarecdn.com/efd45e3a-8b44-4ee9-9f9e-284f0fd8eb96/" />
+
+Errors here generally indicate a problem with querying the data source. The
+generated SQL query can be copied from the
+<Btn>[Query](#inspecting-database-queries-query)</Btn> tab and run directly
+against your data source to debug the issue.
+
+###  Events
+
+The <Btn>Events</Btn> tab shows all data source-related events that occurred
+while the query is in the query execution queue:
+
+<Screenshot src="https://ucarecdn.com/24eb11a1-4312-4d06-ac1b-6a0575c7dbe6/" />
+
+[datadog-kb-flamegraph]:
+  https://www.datadoghq.com/knowledge-center/distributed-tracing/flame-graph/
+[ref-caching-gs-preaggs]: /caching/pre-aggregations/getting-started
+[ref-conf-db]: /config/databases
+[ref-deployment-api-instance]: /deployment/overview#api-instances
+[ref-deployment-refresh-worker]: /deployment/overview#refresh-worker

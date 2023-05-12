@@ -1,0 +1,612 @@
+---
+redirect_from:
+  - /query-format
+---
+
+# Query format
+Cube Queries are plain JavaScript objects, describing an analytics query. The
+basic elements of a query (query members) are `measures`, `dimensions`, and
+`segments`.
+
+The query member format name is `CUBE_NAME.MEMBER_NAME`, for example the
+dimension `email` in the Cube `Users` would have the name `Users.email`.
+
+In the case of dimension of type `time` granularity could be optionally added to
+the name, in the following format `CUBE_NAME.TIME_DIMENSION_NAME.GRANULARITY`,
+ex: `stories.time.month`.
+
+Supported granularities: `second`, `minute`, `hour`, `day`, `week`, `month`,
+`quarter` and `year`.
+
+The Cube client also accepts an array of queries. By default, it will be treated
+as a Data Blending query type.
+
+## Query Properties
+
+A Query has the following properties:
+
+- `measures`: An array of measures.
+- `dimensions`: An array of dimensions.
+- `filters`: An array of objects, describing filters. Learn about
+  [filters format](#filters-format).
+- `timeDimensions`: A convenient way to specify a time dimension with a filter.
+  It is an array of objects in [timeDimension format.](#time-dimensions-format)
+- `segments`: An array of segments. A segment is a named filter, created in the
+  data model.
+- `limit`: A row limit for your query. The default value is `10000`. The maximum
+  allowed limit is `50000`. If you'd like to request more rows than the maximum
+  allowed limit, consider using [pagination][ref-recipe-pagination].
+- `offset`: The number of initial rows to be skipped for your query. The default
+  value is `0`.
+- `order`: An object, where the keys are measures or dimensions to order by and
+  their corresponding values are either `asc` or `desc`. The order of the fields
+  to order on is based on the order of the keys in the object.
+- `timezone`: All time based calculations performed within Cube are
+  timezone-aware. This property is applied to all time dimensions during
+  aggregation and filtering. It isn't applied to the time dimension referenced
+  in a `dimensions` query property unless granularity or date filter is
+  specified. Using this property you can set your desired timezone in
+  [TZ Database Name](https://en.wikipedia.org/wiki/Tz_database) format, e.g.:
+  `America/Los_Angeles`. The default value is `UTC`.
+- `renewQuery`: If `renewQuery` is set to `true`, Cube will renew all
+  [`refreshKey`][ref-schema-ref-preaggs-refreshkey] for queries and query
+  results in the foreground. However, if the
+  [`refreshKey`][ref-schema-ref-preaggs-refreshkey] (or
+  [`refreshKey.every`][ref-schema-ref-preaggs-refreshkey-every]) doesn't
+  indicate that there's a need for an update this setting has no effect. The
+  default value is `false`.
+  > **NOTE**: Cube provides only eventual consistency guarantee. Using a small
+  > [`refreshKey.every`][ref-schema-ref-preaggs-refreshkey-every] value together
+  > with `renewQuery` to achieve immediate consistency can lead to endless
+  > refresh loops and overall system instability.
+- `ungrouped`: If `ungrouped` is set to `true` no `GROUP BY` statement will be
+  added to the query. Instead, the raw results after filtering and joining will
+  be returned without grouping. By default `ungrouped` queries require a primary
+  key as a dimension of every cube involved in the query for security purposes.
+  In case of `ungrouped` query measures will be rendered as underlying `sql` of
+  measures without aggregation and time dimensions will be truncated as usual
+  however not grouped by.
+
+```json
+{
+  "measures": ["stories.count"],
+  "dimensions": ["stories.category"],
+  "filters": [
+    {
+      "member": "stories.isDraft",
+      "operator": "equals",
+      "values": ["No"]
+    }
+  ],
+  "timeDimensions": [
+    {
+      "dimension": "stories.time",
+      "dateRange": ["2015-01-01", "2015-12-31"],
+      "granularity": "month"
+    }
+  ],
+  "limit": 100,
+  "offset": 50,
+  "order": {
+    "stories.time": "asc",
+    "stories.count": "desc"
+  },
+  "timezone": "America/Los_Angeles"
+}
+```
+
+###  Default order
+
+If the `order` property is not specified in the query, Cube sorts results by
+default using the following rules:
+
+- The first time dimension with granularity, ascending. If no time dimension
+  with granularity exists...
+- The first measure, descending. If no measure exists...
+- The first dimension, ascending.
+
+###  Alternative order format
+
+Also you can control the ordering of the `order` specification, Cube support
+alternative order format - array of tuples:
+
+```json
+{
+  "order": [
+      ["stories.time", "asc"],
+      ["stories.count", "asc"]
+    ]
+  }
+}
+```
+
+## Filters Format
+
+A filter is a Javascript object with the following properties:
+
+- `member`: Dimension or measure to be used in the filter, for example:
+  `stories.isDraft`. See below on difference between filtering dimensions vs
+  filtering measures.
+- `operator`: An operator to be used in the filter. Only some operators are
+  available for measures. For dimensions the available operators depend on the
+  type of the dimension. Please see the reference below for the full list of
+  available operators.
+- `values`: An array of values for the filter. Values must be of type String. If
+  you need to pass a date, pass it as a string in `YYYY-MM-DD` format.
+
+###  Filtering Dimensions vs Filtering Measures
+
+Filters are applied differently to dimensions and measures.
+
+When you filter on a dimension, you are restricting the raw data before any
+calculations are made. When you filter on a measure, you are restricting the
+results after the measure has been calculated.
+
+## Filters Operators
+
+Only some operators are available for measures. For dimensions, the available
+operators depend on the
+[type of the dimension](/schema/reference/types-and-formats#types).
+
+###  equals
+
+Use it when you need an exact match. It supports multiple values.
+
+- Applied to measures.
+- Dimension types: `string`, `number`, `time`.
+
+```json
+{
+  "member": "users.country",
+  "operator": "equals",
+  "values": ["US", "Germany", "Israel"]
+}
+```
+
+###  notEquals
+
+The opposite operator of `equals`. It supports multiple values.
+
+- Applied to measures.
+- Dimension types: `string`, `number`, `time`.
+
+```json
+{
+  "member": "users.country",
+  "operator": "notEquals",
+  "values": ["France"]
+}
+```
+
+###  contains
+
+The `contains` filter acts as a wildcard case-insensitive `LIKE` operator. In
+the majority of SQL backends it uses `ILIKE` operator with values being
+surrounded by `%`. It supports multiple values.
+
+- Dimension types: `string`.
+
+```json
+{
+  "member": "posts.title",
+  "operator": "contains",
+  "values": ["serverless", "aws"]
+}
+```
+
+###  notContains
+
+The opposite operator of `contains`. It supports multiple values.
+
+- Dimension types: `string`.
+
+```json
+{
+  "member": "posts.title",
+  "operator": "notContains",
+  "values": ["ruby"]
+}
+```
+
+This operator adds `IS NULL` check to include `NULL` values unless you add
+`null` to `values`. For example:
+
+```json
+{
+  "member": "posts.title",
+  "operator": "notContains",
+  "values": ["ruby", null]
+}
+```
+
+###  startsWith
+
+The `startsWith` filter acts as a case-insensitive `LIKE` operator with a
+wildcard at the beginning. In the majority of SQL backends, it uses the `ILIKE`
+operator with `%` at the start of each value. It supports multiple values.
+
+- Dimension types: `string`.
+
+```json
+{
+  "member": "posts.title",
+  "operator": "startsWith",
+  "values": ["ruby"]
+}
+```
+
+###  endsWith
+
+The `endsWith` filter acts as a case-insensitive `LIKE` operator with a wildcard
+at the end. In the majority of SQL backends, it uses the `ILIKE` operator with
+`%` at the end of each value. It supports multiple values.
+
+- Dimension types: `string`.
+
+```json
+{
+  "member": "posts.title",
+  "operator": "endsWith",
+  "values": ["ruby"]
+}
+```
+
+###  gt
+
+The `gt` operator means **greater than** and is used with measures or dimensions
+of type `number`.
+
+- Applied to measures.
+- Dimension types: `number`.
+
+```json
+{
+  "member": "posts.upvotes_count",
+  "operator": "gt",
+  "values": ["100"]
+}
+```
+
+###  gte
+
+The `gte` operator means **greater than or equal to** and is used with measures
+or dimensions of type `number`.
+
+- Applied to measures.
+- Dimension types: `number`.
+
+```json
+{
+  "member": "posts.upvotes_count",
+  "operator": "gte",
+  "values": ["100"]
+}
+```
+
+###  lt
+
+The `lt` operator means **less than** and is used with measures or dimensions of
+type `number`.
+
+- Applied to measures.
+- Dimension types: `number`.
+
+```json
+{
+  "member": "posts.upvotes_count",
+  "operator": "lt",
+  "values": ["10"]
+}
+```
+
+###  lte
+
+The `lte` operator means **less than or equal to** and is used with measures or
+dimensions of type `number`.
+
+- Applied to measures.
+- Dimension types: `number`.
+
+```json
+{
+  "member": "posts.upvotes_count",
+  "operator": "lte",
+  "values": ["10"]
+}
+```
+
+###  set
+
+Operator `set` checks whether the value of the member **is not** `NULL`. You
+don't need to pass `values` for this operator.
+
+- Applied to measures.
+- Dimension types: `number`, `string`, `time`.
+
+```json
+{
+  "member": "posts.author_name",
+  "operator": "set"
+}
+```
+
+###  notSet
+
+An opposite to the `set` operator. It checks whether the value of the member
+**is** `NULL`. You don't need to pass `values` for this operator.
+
+- Applied to measures.
+- Dimension types: `number`, `string`, `time`.
+
+```json
+{
+  "member": "posts.author_name",
+  "operator": "notSet"
+}
+```
+
+###  inDateRange
+
+<WarningBox>
+
+From a pre-aggregation standpoint, `inDateRange` filter is applied as a generic
+filter. All pre-aggregation granularity matching rules aren't applied in this
+case. It feels like pre-aggregation isn't matched. However, pre-aggregation is
+just missing the filtered time dimension in
+[dimensions][ref-schema-ref-preaggs-dimensions] list. If you want date range
+filter to match [timeDimension][ref-schema-ref-preaggs-time-dimension] please
+use [timeDimensions](#time-dimensions-format) `dateRange` instead.
+
+</WarningBox>
+
+The operator `inDateRange` is used to filter a time dimension into a specific
+date range. The values must be an array of dates with the following format
+'YYYY-MM-DD'. If only one date specified the filter would be set exactly to this
+date.
+
+There is a convenient way to use date filters with grouping -
+[learn more about the `timeDimensions` property here](#time-dimensions-format)
+
+- Dimension types: `time`.
+
+```json
+{
+  "member": "posts.time",
+  "operator": "inDateRange",
+  "values": ["2015-01-01", "2015-12-31"]
+}
+```
+
+###  notInDateRange
+
+<WarningBox>
+
+From a pre-aggregation standpoint, `notInDateRange` filter is applied as a
+generic filter. All pre-aggregation granularity matching rules aren't applied in
+this case. It feels like pre-aggregation isn't matched. However, pre-aggregation
+is just missing the filtered time dimension in
+[dimensions][ref-schema-ref-preaggs-dimensions] list.
+
+</WarningBox>
+
+An opposite operator to `inDateRange`, use it when you want to exclude specific
+dates. The values format is the same as for `inDateRange`.
+
+- Dimension types: `time`.
+
+```json
+{
+  "member": "posts.time",
+  "operator": "notInDateRange",
+  "values": ["2015-01-01", "2015-12-31"]
+}
+```
+
+###  beforeDate
+
+<WarningBox>
+
+From a pre-aggregation standpoint, `beforeDate` filter is applied as a generic
+filter. All pre-aggregation granularity matching rules aren't applied in this
+case. It feels like pre-aggregation isn't matched. However, pre-aggregation is
+just missing the filtered time dimension in
+[dimensions][ref-schema-ref-preaggs-dimensions] list.
+
+</WarningBox>
+
+Use it when you want to retrieve all results before some specific date. The
+values should be an array of one element in `YYYY-MM-DD` format.
+
+- Dimension types: `time`.
+
+```json
+{
+  "member": "posts.time",
+  "operator": "beforeDate",
+  "values": ["2015-01-01"]
+}
+```
+
+###  afterDate
+
+<WarningBox>
+
+From a pre-aggregation standpoint, `afterDate` filter is applied as a generic
+filter. All pre-aggregation granularity matching rules aren't applied in this
+case. It feels like pre-aggregation isn't matched. However, pre-aggregation is
+just missing the filtered time dimension in
+[dimensions][ref-schema-ref-preaggs-dimensions] list.
+
+</WarningBox>
+
+The same as `beforeDate`, but is used to get all results after a specific date.
+
+- Dimension types: `time`.
+
+```json
+{
+  "member": "posts.time",
+  "operator": "afterDate",
+  "values": ["2015-01-01"]
+}
+```
+
+###  measureFilter
+
+The `measureFilter` operator is used to apply an existing measure's filters to
+the current query.
+
+This usually happens when you call
+[`ResultSet.drilldown()`][ref-client-core-resultset-drilldown], which will
+return a query for the drill members. If the original query has a filter on a
+measure, that filter will be added as otherwise the drilldown query will lose
+that context.
+
+- Applied to measures.
+
+```json
+{
+  "member": "Orders.count",
+  "operator": "measureFilter"
+}
+```
+
+## Boolean logical operators
+
+Filters can contain `or` and `and` logical operators. Logical operators have
+only one of the following properties:
+
+- `or` An array with one or more filters or other logical operators
+- `and` An array with one or more filters or other logical operators
+
+```json
+{
+  "or": [
+    {
+      "member": "visitors.source",
+      "operator": "equals",
+      "values": ["some"]
+    },
+    {
+      "and": [
+        {
+          "member": "visitors.source",
+          "operator": "equals",
+          "values": ["other"]
+        },
+        {
+          "member": "visitor_checkins.cards_count",
+          "operator": "equals",
+          "values": ["0"]
+        }
+      ]
+    }
+  ]
+}
+```
+
+> **Note:** You can not put dimensions and measures filters in the same logical
+> operator.
+
+## Time Dimensions Format
+
+Since grouping and filtering by a time dimension is quite a common case, Cube
+provides a convenient shortcut to pass a dimension and a filter as a
+`timeDimension` property.
+
+- `dimension`: Time dimension name.
+- `dateRange`: An array of dates with the following format `YYYY-MM-DD` or in
+  `YYYY-MM-DDTHH:mm:ss.SSS` format. Values should always be local and in query
+  `timezone`. Dates in `YYYY-MM-DD` format are also accepted. Such dates are
+  padded to the start and end of the day if used in start and end of date range
+  interval accordingly. Please note that for timestamp comparison, `>=` and `<=`
+  operators are used. It requires, for example, that the end date range date
+  `2020-01-01` is padded to `2020-01-01T23:59:59.999`. If only one date is
+  specified it's equivalent to passing two of the same dates as a date range.
+  You can also pass a string with a [relative date
+  range][ref-relative-date-range], for example, `last quarter`.
+- `compareDateRange`: An array of date ranges to compare a measure change over
+  previous period
+- `granularity`: A granularity for a time dimension. It supports the following
+  values `second`, `minute`, `hour`, `day`, `week`, `month`, `quarter`, `year`.
+  If you pass `null` to the granularity, Cube will only perform filtering by a
+  specified time dimension, without grouping.
+
+```json
+{
+  "measures": ["stories.count"],
+  "timeDimensions": [
+    {
+      "dimension": "stories.time",
+      "dateRange": ["2015-01-01", "2015-12-31"],
+      "granularity": "month"
+    }
+  ]
+}
+```
+
+You can use compare date range queries when you want to see, for example, how a
+metric performed over a period in the past and how it performs now. You can pass
+two or more date ranges where each of them is in the same format as a
+`dateRange`
+
+```javascript
+// ...
+const resultSet = await cubejsApi.load({
+  measures: ["stories.count"],
+  timeDimensions: [
+    {
+      dimension: "stories.time",
+      compareDateRange: ["this week", ["2020-05-21", "2020-05-28"]],
+      granularity: "month",
+    },
+  ],
+});
+```
+
+###  Relative date range
+
+You can also use a string with a relative date range in the `dateRange`
+property, for example:
+
+```json
+{
+  "measures": ["stories.count"],
+  "timeDimensions": [
+    {
+      "dimension": "stories.time",
+      "dateRange": "last week",
+      "granularity": "day"
+    }
+  ]
+}
+```
+
+Some of supported formats:
+
+- `today`, `yesterday`, or `tomorrow`
+- `last year`, `last quarter`, or `last 360 days`
+- `next month` or `last 6 months` (current date not included)
+- `from 7 days ago to now` or `from now to 2 weeks from now` (current date
+  included)
+
+<InfoBox>
+
+Cube uses the [Chrono][chrono-website] library to parse relative dates. Please
+refer to its documentation for more examples.
+
+</InfoBox>
+
+[ref-recipe-pagination]: /recipes/pagination
+[ref-client-core-resultset-drilldown]:
+  /@cubejs-client-core#result-set-drill-down
+[ref-schema-ref-preaggs-refreshkey]:
+  /schema/reference/pre-aggregations#parameters-refresh-key
+[ref-schema-ref-preaggs-refreshkey-every]:
+  /schema/reference/pre-aggregations#parameters-refresh-key-every
+[ref-schema-ref-preaggs-dimensions]:
+  /schema/reference/pre-aggregations#parameters-dimensions
+[ref-schema-ref-preaggs-time-dimension]:
+  /schema/reference/pre-aggregations#parameters-time-dimension
+[ref-relative-date-range]: #relative-date-range
+[chrono-website]: https://github.com/wanasit/chrono
