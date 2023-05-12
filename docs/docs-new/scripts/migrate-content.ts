@@ -702,18 +702,84 @@ const overrides: Record<string, Override> = {
     title: "Real-Time data fetch",
   },
 
-  // "Workspace/SQL-Runner.mdx": {},
-  // "Workspace/Preferences.mdx": {},
-  // "Workspace/Inspecting-Queries.mdx": {},
-  // "Workspace/Inspecting-Pre-aggregations.mdx": {},
-  // "Workspace/Development-API.mdx": {},
-  // "Workspace/Developer-Playground.mdx": {},
-  // "Workspace/Cube-IDE.mdx": {},
-  // "Workspace/CLI.mdx": {},
-  // "Workspace/Access Control.mdx": {},
-  // "Workspace/Single-Sign-On/SAML.mdx": {},
-  // "Workspace/Single-Sign-On/Overview.mdx": {},
-  // "Workspace/Single-Sign-On/Okta.mdx": {},
+  // workspace
+
+  "Workspace/Developer-Playground.mdx": {
+    ready: true,
+    path: "product/workspace/playground",
+    title: "Playground",
+    meta: {
+      playground: "Playground",
+      sso: "Single Sign-On",
+      "dev-mode": "Development mode",
+      "cube-ide": "Cube IDE",
+      "query-inspection": "Query inspection",
+      "pre-aggregation-inspection": "Pre-aggregation inspection",
+      "access-control": "Access control",
+      "sql-runner": "SQL Runner",
+      preferences: "Preferences",
+      cli: "CLI",
+    },
+  },
+  "Workspace/Single-Sign-On/Overview.mdx": {
+    ready: true,
+    path: "product/workspace/sso",
+    title: "Single Sign-On",
+  },
+  "Workspace/Single-Sign-On/SAML.mdx": {
+    ready: true,
+    path: "product/workspace/sso/saml",
+    title: "SAML",
+    meta: {
+      saml: "SAML",
+      okta: "Okta",
+    },
+  },
+  "Workspace/Single-Sign-On/Okta.mdx": {
+    ready: true,
+    path: "product/workspace/sso/okta",
+    title: "Okta",
+  },
+  "Workspace/Development-API.mdx": {
+    ready: true,
+    path: "product/workspace/dev-mode",
+    title: "Development mode",
+  },
+  "Workspace/Cube-IDE.mdx": {
+    ready: true,
+    path: "product/workspace/cube-ide",
+    title: "Cube IDE",
+  },
+  "Workspace/Inspecting-Queries.mdx": {
+    ready: true,
+    path: "product/workspace/query-inspection",
+    title: "Query inspection",
+  },
+  "Workspace/Inspecting-Pre-aggregations.mdx": {
+    ready: true,
+    path: "product/workspace/pre-aggregation-inspection",
+    title: "Pre-aggregation inspection",
+  },
+  "Workspace/Access Control.mdx": {
+    ready: true,
+    path: "product/workspace/access-control",
+    title: "Access control",
+  },
+  "Workspace/SQL-Runner.mdx": {
+    ready: true,
+    path: "product/workspace/sql-runner",
+    title: "SQL Runner",
+  },
+  "Workspace/Preferences.mdx": {
+    ready: true,
+    path: "product/workspace/preferences",
+    title: "Preferences",
+  },
+  "Workspace/CLI.mdx": {
+    ready: true,
+    path: "product/workspace/cli",
+    title: "CLI",
+  },
 
   // "Style-Guide/Overview.mdx": {},
 
