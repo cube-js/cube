@@ -860,11 +860,6 @@ const overrides: Record<string, Override> = {
     title: "Log Export",
   },
 
-  // "Style-Guide/Overview.mdx": {},
-  // "FAQs/Troubleshooting.mdx": {},
-  // "FAQs/Tips-and-Tricks.mdx": {},
-  // "FAQs/General.mdx": {},
-
   // reference
 
   "Reference/Configuration/Config.mdx": {
@@ -931,63 +926,190 @@ const overrides: Record<string, Override> = {
     title: "CLI Command reference",
   },
 
-  // "Examples-Tutorials-Recipes/Examples.mdx": {},
+  "Examples-Tutorials-Recipes/Examples.mdx": {
+    ready: true,
+    path: "guides/examples",
+    title: "Examples",
+  },
   "Examples-Tutorials-Recipes/Recipes.mdx": {
     ready: true,
-    path: "guides/recipes",
+    path: "guides/recipes/overview",
     title: "Recipes",
+    meta: {
+      "access-control": "Access control",
+      analytics: "Analytics",
+      auth: "Auth",
+      "code-reusability": "Code reusability",
+      "data-modeling": "Data modeling",
+      "data-sources": "Data sources",
+      queries: "Queries",
+      "query-acceleration": "Query acceleration",
+      "upgrading-cube": "Upgrading Cube",
+    },
   },
   "Examples-Tutorials-Recipes/Recipes/Upgrading-Cube/Migrating-from-Express-to-Docker.mdx":
     {
       ready: true,
-      path: "guides/recipes/migrating-from-express-to-docker",
+      path: "guides/recipes/upgrading-cube/migrating-from-express-to-docker",
       title: "Migrating from Express to Docker",
     },
-  // "Examples-Tutorials-Recipes/Recipes/Query-acceleration/using-originalsql-and-rollups-effectively.mdx":
-  //   {},
-  // "Examples-Tutorials-Recipes/Recipes/Query-acceleration/non-additivity.mdx":
-  //   {},
-  // "Examples-Tutorials-Recipes/Recipes/Query-acceleration/joining-multiple-data-sources.mdx":
-  //   {},
-  // "Examples-Tutorials-Recipes/Recipes/Query-acceleration/incrementally-building-pre-aggregations-for-a-date-range.mdx":
-  //   {},
-  // "Examples-Tutorials-Recipes/Recipes/Query-acceleration/Refreshing-select-partitions.mdx":
-  //   {},
 
-  // "Examples-Tutorials-Recipes/Recipes/Queries/pagination.mdx": {},
-  // "Examples-Tutorials-Recipes/Recipes/Queries/getting-unique-values-for-a-field.mdx":
-  //   {},
-  // "Examples-Tutorials-Recipes/Recipes/Queries/enforcing-mandatory-filters.mdx":
-  //   {},
-  // "Examples-Tutorials-Recipes/Recipes/Data-modeling/using-dynamic-measures.mdx":
-  //   {},
-  // "Examples-Tutorials-Recipes/Recipes/Data-modeling/snapshots.mdx": {},
-  // "Examples-Tutorials-Recipes/Recipes/Data-modeling/percentiles.mdx": {},
-  // "Examples-Tutorials-Recipes/Recipes/Data-modeling/passing-dynamic-parameters-in-a-query.mdx":
-  //   {},
-  // "Examples-Tutorials-Recipes/Recipes/Data-modeling/entity-attribute-value.mdx":
-  //   {},
-  // "Examples-Tutorials-Recipes/Recipes/Data-modeling/dynamic-union-tables.mdx":
-  //   {},
-  // "Examples-Tutorials-Recipes/Recipes/Code-reusability/schema-generation.mdx":
-  //   {},
-  // "Examples-Tutorials-Recipes/Recipes/Data-sources/using-ssl-connections-to-data-source.mdx":
-  //   {},
-  // "Examples-Tutorials-Recipes/Recipes/Data-sources/multiple-sources-same-schema.mdx":
-  //   {},
-  // "Examples-Tutorials-Recipes/Recipes/Auth/Auth0-Guide.mdx": {},
-  // "Examples-Tutorials-Recipes/Recipes/Auth/AWS-Cognito.mdx": {},
-  // "Examples-Tutorials-Recipes/Recipes/Access-control/using-different-schemas-for-tenants.mdx":
-  //   {},
-  // "Examples-Tutorials-Recipes/Recipes/Access-control/role-based-access.mdx": {},
-  // "Examples-Tutorials-Recipes/Recipes/Access-control/controlling-access-to-cubes-and-views.mdx":
-  //   {},
-  // "Examples-Tutorials-Recipes/Recipes/Access-control/column-based-access.mdx":
-  //   {},
-  // "Examples-Tutorials-Recipes/Recipes/Analytics/funnels.mdx": {},
-  // "Examples-Tutorials-Recipes/Recipes/Analytics/event-analytics.mdx": {},
-  // "Examples-Tutorials-Recipes/Recipes/Analytics/cohort-retention.mdx": {},
-  // "Examples-Tutorials-Recipes/Recipes/Analytics/active-users.mdx": {},
+  "Examples-Tutorials-Recipes/Recipes/Query-acceleration/using-originalsql-and-rollups-effectively.mdx":
+    {
+      ready: true,
+      path: "guides/recipes/query-acceleration/using-originalsql-and-rollups-effectively",
+      title: "using-originalsql-and-rollups-effectively",
+    },
+  "Examples-Tutorials-Recipes/Recipes/Query-acceleration/non-additivity.mdx": {
+    ready: true,
+    path: "guides/recipes/query-acceleration/non-additivity",
+    title: "non-additivity",
+  },
+  "Examples-Tutorials-Recipes/Recipes/Query-acceleration/joining-multiple-data-sources.mdx":
+    {
+      ready: true,
+      path: "guides/recipes/query-acceleration/joining-multiple-data-sources",
+      title: "joining-multiple-data-sources",
+    },
+  "Examples-Tutorials-Recipes/Recipes/Query-acceleration/incrementally-building-pre-aggregations-for-a-date-range.mdx":
+    {
+      ready: true,
+      path: "guides/recipes/query-acceleration/incrementally-building-pre-aggregations-for-a-date-range",
+      title:
+        "/Query-acceleration/incrementally-building-pre-aggregations-for-a-date-range",
+    },
+  "Examples-Tutorials-Recipes/Recipes/Query-acceleration/Refreshing-select-partitions.mdx":
+    {
+      ready: true,
+      path: "guides/recipes/query-acceleration/refreshing-select-partitions",
+      title: "Refreshing-select-partitions",
+    },
+  "Examples-Tutorials-Recipes/Recipes/Queries/pagination.mdx": {
+    ready: true,
+    path: "guides/recipes/queries/pagination",
+    title: "/Queries/pagination",
+  },
+  "Examples-Tutorials-Recipes/Recipes/Queries/getting-unique-values-for-a-field.mdx":
+    {
+      ready: true,
+      path: "guides/recipes/queries/getting-unique-values-for-a-field",
+      title: "/Queries/getting-unique-values-for-a-field",
+    },
+  "Examples-Tutorials-Recipes/Recipes/Queries/enforcing-mandatory-filters.mdx":
+    {
+      ready: true,
+      path: "guides/recipes/queries/enforcing-mandatory-filters",
+      title: "/Queries/enforcing-mandatory-filters",
+    },
+  "Examples-Tutorials-Recipes/Recipes/Data-modeling/using-dynamic-measures.mdx":
+    {
+      ready: true,
+      path: "guides/recipes/data-modeling/using-dynamic-measures",
+      title: "/Data-modeling/using-dynamic-measures",
+    },
+  "Examples-Tutorials-Recipes/Recipes/Data-modeling/snapshots.mdx": {
+    ready: true,
+    path: "guides/recipes/data-modeling/snapshots",
+    title: "/Data-modeling/snapshots",
+  },
+  "Examples-Tutorials-Recipes/Recipes/Data-modeling/percentiles.mdx": {
+    ready: true,
+    path: "guides/recipes/data-modeling/percentiles",
+    title: "/Data-modeling/percentiles",
+  },
+  "Examples-Tutorials-Recipes/Recipes/Data-modeling/passing-dynamic-parameters-in-a-query.mdx":
+    {
+      ready: true,
+      path: "guides/recipes/data-modeling/passing-dynamic-parameters-in-a-query",
+      title: "/Data-modeling/passing-dynamic-parameters-in-a-query",
+    },
+  "Examples-Tutorials-Recipes/Recipes/Data-modeling/entity-attribute-value.mdx":
+    {
+      ready: true,
+      path: "guides/recipes/data-modeling/entity-attribute-value",
+      title: "/Data-modeling/entity-attribute-value",
+    },
+  "Examples-Tutorials-Recipes/Recipes/Data-modeling/dynamic-union-tables.mdx": {
+    ready: true,
+    path: "guides/recipes/data-modeling/dynamic-union-tables",
+    title: "/Data-modeling/dynamic-union-tables",
+  },
+  "Examples-Tutorials-Recipes/Recipes/Code-reusability/schema-generation.mdx": {
+    ready: true,
+    path: "guides/recipes/code-reusability/schema-generation",
+    title: "/Code-reusability/schema-generation",
+  },
+  "Examples-Tutorials-Recipes/Recipes/Data-sources/using-ssl-connections-to-data-source.mdx":
+    {
+      ready: true,
+      path: "guides/recipes/data-sources/using-ssl-connections-to-data-source",
+      title: "/Data-sources/using-ssl-connections-to-data-source",
+    },
+  "Examples-Tutorials-Recipes/Recipes/Data-sources/multiple-sources-same-schema.mdx":
+    {
+      ready: true,
+      path: "guides/recipes/data-sources/multiple-sources-same-schema",
+      title: "/Data-sources/multiple-sources-same-schema",
+    },
+  "Examples-Tutorials-Recipes/Recipes/Auth/Auth0-Guide.mdx": {
+    ready: true,
+    path: "guides/recipes/auth/auth0-guide",
+    title: "/Auth/Auth0-Guide",
+  },
+  "Examples-Tutorials-Recipes/Recipes/Auth/AWS-Cognito.mdx": {
+    ready: true,
+    path: "guides/recipes/auth/aws-cognito",
+    title: "/Auth/AWS-Cognito",
+  },
+  "Examples-Tutorials-Recipes/Recipes/Access-control/using-different-schemas-for-tenants.mdx":
+    {
+      ready: true,
+      path: "guides/recipes/access-control/using-different-schemas-for-tenants",
+      title: "/Access-control/using-different-schemas-for-tenants",
+    },
+  "Examples-Tutorials-Recipes/Recipes/Access-control/role-based-access.mdx": {
+    ready: true,
+    path: "guides/recipes/access-control/role-based-access",
+    title: "/Access-control/role-based-access",
+  },
+  "Examples-Tutorials-Recipes/Recipes/Access-control/controlling-access-to-cubes-and-views.mdx":
+    {
+      ready: true,
+      path: "guides/recipes/access-control/controlling-access-to-cubes-and-views",
+      title: "/Access-control/controlling-access-to-cubes-and-views",
+    },
+  "Examples-Tutorials-Recipes/Recipes/Access-control/column-based-access.mdx": {
+    ready: true,
+    path: "guides/recipes/access-control/column-based-access",
+    title: "/Access-control/column-based-access",
+  },
+  "Examples-Tutorials-Recipes/Recipes/Analytics/funnels.mdx": {
+    ready: true,
+    path: "guides/recipes/analytics/funnels",
+    title: "/Analytics/funnels",
+  },
+  "Examples-Tutorials-Recipes/Recipes/Analytics/event-analytics.mdx": {
+    ready: true,
+    path: "guides/recipes/analytics/event-analytics",
+    title: "/Analytics/event-analytics",
+  },
+  "Examples-Tutorials-Recipes/Recipes/Analytics/cohort-retention.mdx": {
+    ready: true,
+    path: "guides/recipes/analytics/cohort-retention",
+    title: "/Analytics/cohort-retention",
+  },
+  "Examples-Tutorials-Recipes/Recipes/Analytics/active-users.mdx": {
+    ready: true,
+    path: "guides/recipes/analytics/active-users",
+    title: "/Analytics/active-users",
+  },
+
+  // TODO:
+
+  // "Style-Guide/Overview.mdx": {},
+  // "FAQs/Troubleshooting.mdx": {},
+  // "FAQs/Tips-and-Tricks.mdx": {},
+  // "FAQs/General.mdx": {},
 };
 
 async function main() {
