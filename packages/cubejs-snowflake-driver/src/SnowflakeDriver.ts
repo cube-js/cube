@@ -430,7 +430,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     if (!options.query) {
       throw new Error('Unload query is missed.');
     } else {
-      const types = await this.queryColumnTypes(options.query.sql);
+      const types = await this.queryColumnTypes(options.query.sql, options.query.params);
       const connection = await this.getConnection();
       const { bucketType, bucketName } =
         <SnowflakeDriverExportBucket> this.config.exportBucket;
@@ -441,7 +441,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       const result = await this.execute<UnloadResponse[]>(
         connection,
         unloadSql,
-        [],
+        options.query.params,
         false,
       );
       if (!result) {
@@ -454,11 +454,11 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   /**
    * Returns an array of queried fields meta info.
    */
-  public async queryColumnTypes(sql: string): Promise<TableStructure> {
+  public async queryColumnTypes(sql: string, params?: unknown[]): Promise<TableStructure> {
     const connection = await this.getConnection();
     return new Promise((resolve, reject) => connection.execute({
       sqlText: `${sql} LIMIT 0`,
-      binds: [],
+      binds: <string[] | undefined>params,
       fetchAsString: ['Number'],
       complete: (err, stmt) => {
         if (err) {
