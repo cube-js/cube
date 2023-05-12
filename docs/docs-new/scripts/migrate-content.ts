@@ -781,6 +781,68 @@ const overrides: Record<string, Override> = {
     title: "CLI",
   },
 
+  // Deployment
+
+  "Deployment/Overview.mdx": {
+    ready: true,
+    path: "product/deployment/overview",
+    title: "Overview",
+    meta: {
+      overview: "Overview",
+      "production-checklist": "Production checklist",
+      cloud: "Cube Cloud",
+      core: "Cube Core",
+    },
+  },
+  "Deployment/Production-Checklist.mdx": {
+    ready: true,
+    path: "product/deployment/production-checklist",
+    title: "Production checklist",
+  },
+  "Deployment/Cloud/Overview.mdx": {
+    ready: true,
+    path: "product/deployment/cloud/overview",
+    title: "Overview",
+    meta: {
+      overview: "Overview",
+      "auto-suspension": "Auto-suspension",
+      "continuous-deployment": "Continuous deployment",
+      "custom-domains": "Custom domains",
+      "deployment-types": "Deployment types",
+      pricing: "Pricing",
+    },
+  },
+  "Deployment/Cloud/Auto-Suspension.mdx": {
+    ready: true,
+    path: "product/deployment/cloud/auto-suspension",
+    title: "Auto-suspension",
+  },
+  "Deployment/Cloud/Continuous-Deployment.mdx": {
+    ready: true,
+    path: "product/deployment/cloud/continuous-deployment",
+    title: "Continuous deployment",
+  },
+  "Deployment/Cloud/Custom-Domains.mdx": {
+    ready: true,
+    path: "product/deployment/cloud/custom-domains",
+    title: "Custom domains",
+  },
+  "Deployment/Cloud/Deployment-Types.mdx": {
+    ready: true,
+    path: "product/deployment/cloud/deployment-types",
+    title: "Deployment types",
+  },
+  "Deployment/Cloud/Pricing.mdx": {
+    ready: true,
+    path: "product/deployment/cloud/pricing",
+    title: "Pricing",
+  },
+  "Deployment/Core/Overview.mdx": {
+    ready: true,
+    path: "product/deployment/core",
+    title: "Cube Core",
+  },
+
   // "Style-Guide/Overview.mdx": {},
 
   // "Monitoring/Log-Export.mdx": {},
@@ -789,16 +851,6 @@ const overrides: Record<string, Override> = {
   // "FAQs/Troubleshooting.mdx": {},
   // "FAQs/Tips-and-Tricks.mdx": {},
   // "FAQs/General.mdx": {},
-
-  // "Deployment/Core/Overview.mdx": {},
-  // "Deployment/Cloud/Pricing.mdx": {},
-  // "Deployment/Cloud/Overview.mdx": {},
-  // "Deployment/Cloud/Deployment-Types.mdx": {},
-  // "Deployment/Cloud/Custom-Domains.mdx": {},
-  // "Deployment/Cloud/Continuous-Deployment.mdx": {},
-  // "Deployment/Cloud/Auto-Suspension.mdx": {},
-  // "Deployment/Production-Checklist.mdx": {},
-  // "Deployment/Overview.mdx": {},
 
   "Reference/Configuration/Config.mdx": {
     ready: true,
