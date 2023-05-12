@@ -9,7 +9,7 @@ mod scheduler;
 
 pub use cache_item::CacheItem;
 pub use cache_rocksstore::{
-    CacheStore, CacheStoreRpcClient, ClusterCacheStoreClient, QueueAddResponse,
+    CacheStore, CacheStoreRpcClient, ClusterCacheStoreClient, QueueAddResponse, QueueKey,
     QueueResultResponse, RocksCacheStore,
 };
 pub use lazy::LazyRocksCacheStore;

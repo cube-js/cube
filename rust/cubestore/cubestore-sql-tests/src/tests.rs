@@ -234,6 +234,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("cache_set_nx", cache_set_nx),
         t("cache_prefix_keys", cache_prefix_keys),
         t("queue_full_workflow_v1", queue_full_workflow_v1),
+        t("queue_full_workflow_v2", queue_full_workflow_v2),
         t("queue_retrieve_extended", queue_retrieve_extended),
         t("queue_ack_then_result", queue_ack_then_result),
         t("queue_orphaned_timeout", queue_orphaned_timeout),
@@ -8324,6 +8325,269 @@ async fn queue_full_workflow_v1(service: Box<dyn SqlClient>) {
             .exec_query(r#"QUEUE CANCEL "STANDALONE#queue:2""#)
             .await
             .unwrap();
+        assert_eq!(
+            cancel_response.get_rows(),
+            &vec![Row::new(vec![
+                TableValue::String("payload2".to_string()),
+                TableValue::Null
+            ]),]
+        );
+
+        // assertion that job was removed
+        let get_response = service
+            .exec_query(r#"QUEUE GET "STANDALONE#queue:2""#)
+            .await
+            .unwrap();
+        assert_eq!(get_response.get_rows().len(), 0);
+    }
+}
+
+async fn queue_full_workflow_v2(service: Box<dyn SqlClient>) {
+    let add_response = service
+        .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:1" "payload1";"#)
+        .await
+        .unwrap();
+    assert_queue_add_columns(&add_response);
+    assert_eq!(
+        add_response.get_rows(),
+        &vec![Row::new(vec![
+            TableValue::String("1".to_string()),
+            TableValue::Boolean(true),
+            TableValue::Int(1)
+        ])]
+    );
+
+    let add_response = service
+        .exec_query(r#"QUEUE ADD PRIORITY 10 "STANDALONE#queue:2" "payload2";"#)
+        .await
+        .unwrap();
+    assert_queue_add_columns(&add_response);
+    assert_eq!(
+        add_response.get_rows(),
+        &vec![Row::new(vec![
+            TableValue::String("2".to_string()),
+            TableValue::Boolean(true),
+            TableValue::Int(2)
+        ])]
+    );
+
+    let add_response = service
+        .exec_query(r#"QUEUE ADD PRIORITY 100 "STANDALONE#queue:3" "payload3";"#)
+        .await
+        .unwrap();
+    assert_queue_add_columns(&add_response);
+    assert_eq!(
+        add_response.get_rows(),
+        &vec![Row::new(vec![
+            TableValue::String("3".to_string()),
+            TableValue::Boolean(true),
+            TableValue::Int(3)
+        ])]
+    );
+
+    let add_response = service
+        .exec_query(r#"QUEUE ADD PRIORITY 50 "STANDALONE#queue:4" "payload4";"#)
+        .await
+        .unwrap();
+    assert_queue_add_columns(&add_response);
+    assert_eq!(
+        add_response.get_rows(),
+        &vec![Row::new(vec![
+            TableValue::String("4".to_string()),
+            TableValue::Boolean(true),
+            TableValue::Int(4)
+        ])]
+    );
+
+    let add_response = service
+        .exec_query(r#"QUEUE ADD PRIORITY -1 "STANDALONE#queue:5" "payload5";"#)
+        .await
+        .unwrap();
+    assert_queue_add_columns(&add_response);
+    assert_eq!(
+        add_response.get_rows(),
+        &vec![Row::new(vec![
+            TableValue::String("5".to_string()),
+            TableValue::Boolean(true),
+            TableValue::Int(5)
+        ])]
+    );
+
+    // deduplication check
+    {
+        let add_response = service
+            .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:1" "payload1";"#)
+            .await
+            .unwrap();
+        assert_queue_add_columns(&add_response);
+        assert_eq!(
+            add_response.get_rows(),
+            &vec![Row::new(vec![
+                TableValue::String("1".to_string()),
+                TableValue::Boolean(false),
+                TableValue::Int(5)
+            ])]
+        );
+    }
+
+    {
+        let pending_response = service
+            .exec_query(r#"QUEUE PENDING "STANDALONE#queue""#)
+            .await
+            .unwrap();
+        assert_eq!(
+            pending_response.get_columns(),
+            &vec![
+                Column::new("id".to_string(), ColumnType::String, 0),
+                Column::new("status".to_string(), ColumnType::String, 1),
+                Column::new("extra".to_string(), ColumnType::String, 2),
+            ]
+        );
+        assert_eq!(
+            pending_response.get_rows(),
+            &vec![
+                Row::new(vec![
+                    TableValue::String("3".to_string()),
+                    TableValue::String("pending".to_string()),
+                    TableValue::Null
+                ]),
+                Row::new(vec![
+                    TableValue::String("4".to_string()),
+                    TableValue::String("pending".to_string()),
+                    TableValue::Null
+                ]),
+                Row::new(vec![
+                    TableValue::String("2".to_string()),
+                    TableValue::String("pending".to_string()),
+                    TableValue::Null
+                ]),
+                Row::new(vec![
+                    TableValue::String("1".to_string()),
+                    TableValue::String("pending".to_string()),
+                    TableValue::Null
+                ]),
+                Row::new(vec![
+                    TableValue::String("5".to_string()),
+                    TableValue::String("pending".to_string()),
+                    TableValue::Null
+                ]),
+            ]
+        );
+    }
+
+    {
+        let active_response = service
+            .exec_query(r#"QUEUE ACTIVE "STANDALONE#queue""#)
+            .await
+            .unwrap();
+        assert_eq!(active_response.get_rows().len(), 0);
+    }
+
+    {
+        let retrieve_response = service
+            .exec_query(r#"QUEUE RETRIEVE CONCURRENCY 1 "STANDALONE#queue:3""#)
+            .await
+            .unwrap();
+        assert_queue_retrieve_columns(&retrieve_response);
+        assert_eq!(
+            retrieve_response.get_rows(),
+            &vec![Row::new(vec![
+                TableValue::String("payload3".to_string()),
+                TableValue::Null,
+                TableValue::Int(4),
+                TableValue::String("3".to_string()),
+                TableValue::String("3".to_string()),
+            ]),]
+        );
+    }
+
+    {
+        // concurrency limit
+        let retrieve_response = service
+            .exec_query(r#"QUEUE RETRIEVE CONCURRENCY 1 "STANDALONE#queue:4""#)
+            .await
+            .unwrap();
+        assert_queue_retrieve_columns(&retrieve_response);
+        assert_eq!(retrieve_response.get_rows().len(), 0);
+    }
+
+    {
+        let active_response = service
+            .exec_query(r#"QUEUE ACTIVE "STANDALONE#queue""#)
+            .await
+            .unwrap();
+        assert_eq!(
+            active_response.get_rows(),
+            &vec![Row::new(vec![
+                TableValue::String("3".to_string()),
+                TableValue::String("active".to_string()),
+                TableValue::Null
+            ]),]
+        );
+    }
+
+    let service = Arc::new(service);
+
+    {
+        let service_to_move = service.clone();
+        let blocking = async move {
+            service_to_move
+                .exec_query(r#"QUEUE RESULT_BLOCKING 5000 3"#)
+                .await
+                .unwrap()
+        };
+
+        let service_to_move = service.clone();
+        let ack = async move {
+            tokio::time::sleep(Duration::from_millis(1000)).await;
+
+            let ack_result = service_to_move
+                .exec_query(r#"QUEUE ACK 3 "result:3""#)
+                .await
+                .unwrap();
+            assert_eq!(
+                ack_result.get_rows(),
+                &vec![Row::new(vec![TableValue::Boolean(true)])]
+            )
+        };
+
+        let (blocking_res, _ack_res) = join!(blocking, ack);
+        assert_eq!(
+            blocking_res.get_rows(),
+            &vec![Row::new(vec![
+                TableValue::String("result:3".to_string()),
+                TableValue::String("success".to_string())
+            ]),]
+        );
+    }
+
+    // previous job was finished
+    {
+        let active_response = service
+            .exec_query(r#"QUEUE ACTIVE "STANDALONE#queue""#)
+            .await
+            .unwrap();
+        assert_eq!(active_response.get_rows().len(), 0);
+    }
+
+    // get
+    {
+        let get_response = service
+            .exec_query(r#"QUEUE GET "STANDALONE#queue:2""#)
+            .await
+            .unwrap();
+        assert_eq!(
+            get_response.get_rows(),
+            &vec![Row::new(vec![
+                TableValue::String("payload2".to_string()),
+                TableValue::Null
+            ]),]
+        );
+    }
+
+    // cancel job
+    {
+        let cancel_response = service.exec_query(r#"QUEUE CANCEL 2"#).await.unwrap();
         assert_eq!(
             cancel_response.get_rows(),
             &vec![Row::new(vec![

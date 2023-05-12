@@ -381,6 +381,7 @@ impl<T: Clone> IdRow<T> {
     pub fn new(id: u64, row: T) -> IdRow<T> {
         IdRow { id, row }
     }
+
     pub fn get_id(&self) -> u64 {
         self.id
     }

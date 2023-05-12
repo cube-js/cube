@@ -1,5 +1,6 @@
 use crate::cachestore::{
-    CacheItem, CacheStore, QueueItem, QueueItemStatus, QueueResultResponse, QueueRetrieveResponse,
+    CacheItem, CacheStore, QueueItem, QueueItemStatus, QueueKey, QueueResultResponse,
+    QueueRetrieveResponse,
 };
 use crate::metastore::job::{Job, JobStatus, JobType};
 use crate::metastore::multi_index::{MultiIndex, MultiPartition};
@@ -782,18 +783,11 @@ impl CacheStore for CacheStoreMock {
         panic!("CacheStore mock!")
     }
 
-    async fn queue_cancel_by_path(
-        &self,
-        _path: String,
-    ) -> Result<Option<IdRow<QueueItem>>, CubeError> {
+    async fn queue_cancel(&self, _key: QueueKey) -> Result<Option<IdRow<QueueItem>>, CubeError> {
         panic!("CacheStore mock!")
     }
 
-    async fn queue_heartbeat_by_id(&self, _id: u64) -> Result<(), CubeError> {
-        panic!("CacheStore mock!")
-    }
-
-    async fn queue_heartbeat_by_path(&self, _path: String) -> Result<(), CubeError> {
+    async fn queue_heartbeat(&self, _key: QueueKey) -> Result<(), CubeError> {
         panic!("CacheStore mock!")
     }
 
@@ -805,11 +799,7 @@ impl CacheStore for CacheStoreMock {
         panic!("CacheStore mock!")
     }
 
-    async fn queue_ack_by_path(
-        &self,
-        _path: String,
-        _result: Option<String>,
-    ) -> Result<bool, CubeError> {
+    async fn queue_ack(&self, _key: QueueKey, _result: Option<String>) -> Result<bool, CubeError> {
         panic!("CacheStore mock!")
     }
 
@@ -820,23 +810,15 @@ impl CacheStore for CacheStoreMock {
         panic!("CacheStore mock!")
     }
 
-    async fn queue_result_blocking_by_path(
+    async fn queue_result_blocking(
         &self,
-        _path: String,
+        _key: QueueKey,
         _timeout: u64,
     ) -> Result<Option<QueueResultResponse>, CubeError> {
         panic!("CacheStore mock!")
     }
 
-    async fn queue_merge_extra_by_id(&self, _id: u64, _payload: String) -> Result<(), CubeError> {
-        panic!("CacheStore mock!")
-    }
-
-    async fn queue_merge_extra_by_path(
-        &self,
-        _key: String,
-        _payload: String,
-    ) -> Result<(), CubeError> {
+    async fn queue_merge_extra(&self, _key: QueueKey, _payload: String) -> Result<(), CubeError> {
         panic!("CacheStore mock!")
     }
 
