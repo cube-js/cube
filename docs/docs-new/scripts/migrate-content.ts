@@ -599,6 +599,23 @@ const overrides: Record<string, Override> = {
     title: "Running in production",
   },
 
+  // auth
+
+  "Auth/Overview.mdx": {
+    ready: true,
+    path: "product/auth/overview",
+    title: "Overview",
+    meta: {
+      overview: "Overview",
+      context: "Security context",
+    },
+  },
+  "Auth/Security-Context.mdx": {
+    ready: true,
+    path: "product/auth/context",
+    title: "Security context",
+  },
+
   // "Workspace/SQL-Runner.mdx": {},
   // "Workspace/Preferences.mdx": {},
   // "Workspace/Inspecting-Queries.mdx": {},
@@ -630,9 +647,6 @@ const overrides: Record<string, Override> = {
   // "FAQs/Troubleshooting.mdx": {},
   // "FAQs/Tips-and-Tricks.mdx": {},
   // "FAQs/General.mdx": {},
-
-  // "Auth/Security-Context.mdx": {},
-  // "Auth/Overview.mdx": {},
 
   // "Deployment/Core/Overview.mdx": {},
   // "Deployment/Cloud/Pricing.mdx": {},
