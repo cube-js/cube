@@ -961,6 +961,7 @@ export class PreAggregations {
   refreshRangeQuery() {
     return this.query.newSubQuery({
       rowLimit: null,
+      offset: null,
       preAggregationQuery: true,
     });
   }
@@ -970,6 +971,7 @@ export class PreAggregations {
       cube,
       {
         rowLimit: null,
+        offset: null,
         timeDimensions: aggregation.partitionTimeDimensions,
         preAggregationQuery: true,
       }
@@ -983,6 +985,7 @@ export class PreAggregations {
       cube,
       {
         rowLimit: null,
+        offset: null,
         measures: references.measures,
         dimensions: references.dimensions,
         timeDimensions: this.mergePartitionTimeDimensions(references, aggregation.partitionTimeDimensions),
@@ -999,6 +1002,7 @@ export class PreAggregations {
       cube,
       {
         rowLimit: null,
+        offset: null,
         measures: aggregation.measures,
         dimensions: aggregation.dimensions,
         timeDimensions:
