@@ -77,11 +77,11 @@ const overrides: Record<string, Override> = {
       configuration: "Configuration",
       "data-modeling": "Data Modeling",
       caching: "Caching",
-
       auth: "Authentication & Authorization",
       "api-rest": "REST API",
       "api-graphql": "GraphQL API",
       "api-sql": "SQL API",
+
       "frontend-integrations": "Frontend Integrations",
       workspace: "Workspace",
       deployment: "Deployment",
@@ -616,6 +616,55 @@ const overrides: Record<string, Override> = {
     title: "Security context",
   },
 
+  // rest api
+
+  "REST-API/REST-API.mdx": {
+    ready: true,
+    path: "product/api-rest/overview",
+    title: "Overview",
+    meta: {
+      overview: "Overview",
+      "query-format": "Query format",
+    },
+  },
+  "REST-API/Query-Format.mdx": {
+    ready: true,
+    path: "product/api-rest/query-format",
+    title: "Query format",
+  },
+
+  // graphql api
+
+  "GraphQL-API/GraphQL-API.mdx": {
+    ready: true,
+    path: "product/api-graphql",
+    title: "GraphQL API",
+  },
+
+  // sql api
+
+  "SQL-API/Overview.mdx": {
+    ready: true,
+    path: "product/api-sql/overview",
+    title: "Overview",
+    meta: {
+      overview: "Overview",
+      security: "Authentication and Authorization",
+      joins: "Joins",
+    },
+  },
+  "SQL-API/Authentication-and-Authorization.mdx": {
+    ready: true,
+    path: "product/api-sql/security",
+    title: "Authentication and Authorization",
+  },
+  "SQL-API/Joins.mdx": {
+    ready: true,
+    path: "product/api-sql/joins",
+    title: "Joins",
+  },
+  // "SQL-API/Template.mdx": {},
+
   // "Workspace/SQL-Runner.mdx": {},
   // "Workspace/Preferences.mdx": {},
   // "Workspace/Inspecting-Queries.mdx": {},
@@ -630,15 +679,9 @@ const overrides: Record<string, Override> = {
   // "Workspace/Single-Sign-On/Okta.mdx": {},
 
   // "Style-Guide/Overview.mdx": {},
-  // "SQL-API/Template.mdx": {},
-  // "SQL-API/Overview.mdx": {},
-  // "SQL-API/Joins.mdx": {},
-  // "SQL-API/Authentication-and-Authorization.mdx": {},
-  // "REST-API/REST-API.mdx": {},
-  // "REST-API/Query-Format.mdx": {},
+
   // "Monitoring/Log-Export.mdx": {},
   // "Monitoring/Alerts.mdx": {},
-  // "GraphQL-API/GraphQL-API.mdx": {},
   // "Frontend-Integrations/Real-Time-Data-Fetch.mdx": {},
   // "Frontend-Integrations/Introduction.mdx": {},
   // "Frontend-Integrations/Introduction-vue.mdx": {},

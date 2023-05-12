@@ -1,0 +1,65 @@
+---
+redirect_from:
+  - /backend/sql/security
+---
+
+# Authentication and Authorization
+Cube can be configured with dynamic username & password verification system by
+setting a [`checkSqlAuth()`][ref-config-check-sql-auth] function in the
+`cube.js` configuration file. This function should verify username and return
+object with password and security context.
+
+If password returned from this function matches provided in connection string
+user will be authenticated with provided security context.
+
+```javascript
+module.exports = {
+  checkSqlAuth: async (req, username) => {
+    if (username === "fooUser") {
+      return {
+        password: "mypassword",
+        securityContext: {},
+      };
+    }
+
+    throw new Error("Incorrect user name or password");
+  },
+};
+```
+
+As Cube expects passwords to be provided by `checkSqlAuth` implementation best
+practice is to use a generated password here instead of an actual user password.
+Generated passwords can be implemented as an HMAC of the user name or requested
+from some service that provides the mapping of the user name to passwords for
+additional security.
+
+## Security Context (Row-Level Security)
+
+Cube's SQL API can also use the Security Context for [Dynamic data model
+creation][ref-dynamic-schemas] or [`queryRewrite`][ref-config-queryrewrite]
+property in your [`cube.js` configuration file][ref-config-js].
+
+By default, the SQL API uses the current user's Security Context, but this
+behaviour can be modified so that certain users are allowed to switch. To do
+this, we must first define which user is allowed to change Security Context:
+
+First, you need to define what user is allowed to change security context:
+
+```dotenv
+CUBEJS_SQL_SUPER_USER=admin
+```
+
+If it's not enough for your case, you define your logic for check with
+`canSwitchSqlUser` property in your [`cube.js` configuration
+file][ref-config-js].
+
+You can change security context for specific query via virtual filter on:
+
+```sql
+SELECT * FROM orders WHERE __user = 'anotheruser';
+```
+
+[ref-config-check-sql-auth]: /config#check-sql-auth
+[ref-config-queryrewrite]: /config#query-rewrite
+[ref-dynamic-schemas]: /schema/dynamic-schema-creation
+[ref-config-js]: /config
