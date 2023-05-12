@@ -76,6 +76,16 @@ const overrides: Record<string, Override> = {
       "getting-started": "Getting Started",
       configuration: "Configuration",
       "data-modeling": "Data Modeling",
+      caching: "Caching",
+
+      auth: "Authentication & Authorization",
+      "api-rest": "REST API",
+      "api-graphql": "GraphQL API",
+      "api-sql": "SQL API",
+      "frontend-integrations": "Frontend Integrations",
+      workspace: "Workspace",
+      deployment: "Deployment",
+      monitoring: "Monitoring",
     },
   },
 
@@ -553,6 +563,42 @@ const overrides: Record<string, Override> = {
     title: "Using dbt",
   },
 
+  // Caching
+
+  "Caching/Overview.mdx": {
+    ready: true,
+    path: "product/caching/overview",
+    title: "Overview",
+    meta: {
+      overview: "Overview",
+      "getting-started-pre-aggregations":
+        "Getting started with pre-aggregations",
+      "using-pre-aggregations": "Using pre-aggregations",
+      "lambda-pre-aggregations": "Lambda pre-aggregations",
+      "running-in-production": "Running in production",
+    },
+  },
+  "Caching/Getting-Started-Pre-Aggregations.mdx": {
+    ready: true,
+    path: "product/caching/getting-started-pre-aggregations",
+    title: "Getting started with pre-aggregations",
+  },
+  "Caching/Using-Pre-Aggregations.mdx": {
+    ready: true,
+    path: "product/caching/using-pre-aggregations",
+    title: "Using pre-aggregations",
+  },
+  "Caching/Lambda-Pre-Aggregations.mdx": {
+    ready: true,
+    path: "product/caching/lambda-pre-aggregations",
+    title: "Lambda pre-aggregations",
+  },
+  "Caching/Running-in-Production.mdx": {
+    ready: true,
+    path: "product/caching/running-in-production",
+    title: "Running in production",
+  },
+
   // "Workspace/SQL-Runner.mdx": {},
   // "Workspace/Preferences.mdx": {},
   // "Workspace/Inspecting-Queries.mdx": {},
@@ -585,11 +631,6 @@ const overrides: Record<string, Override> = {
   // "FAQs/Tips-and-Tricks.mdx": {},
   // "FAQs/General.mdx": {},
 
-  // "Caching/Using-Pre-Aggregations.mdx": {},
-  // "Caching/Running-in-Production.mdx": {},
-  // "Caching/Overview.mdx": {},
-  // "Caching/Lambda-Pre-Aggregations.mdx": {},
-  // "Caching/Getting-Started-Pre-Aggregations.mdx": {},
   // "Auth/Security-Context.mdx": {},
   // "Auth/Overview.mdx": {},
 
