@@ -843,19 +843,38 @@ const overrides: Record<string, Override> = {
     title: "Cube Core",
   },
 
+  // Monitoring
+
+  "Monitoring/Alerts.mdx": {
+    ready: true,
+    path: "product/monitoring/alerts",
+    title: "Alerts",
+    meta: {
+      alerts: "Alerts",
+      "log-export": "Log Export",
+    },
+  },
+  "Monitoring/Log-Export.mdx": {
+    ready: true,
+    path: "product/monitoring/log-export",
+    title: "Log Export",
+  },
+
   // "Style-Guide/Overview.mdx": {},
-
-  // "Monitoring/Log-Export.mdx": {},
-  // "Monitoring/Alerts.mdx": {},
-
   // "FAQs/Troubleshooting.mdx": {},
   // "FAQs/Tips-and-Tricks.mdx": {},
   // "FAQs/General.mdx": {},
+
+  // reference
 
   "Reference/Configuration/Config.mdx": {
     ready: true,
     path: "reference/configuration/config",
     title: "Configuration options",
+    meta: {
+      config: "Configuration options",
+      "environment-variables": "Environment variables",
+    },
   },
   "Reference/Configuration/Environment-Variables-Reference.mdx": {
     ready: true,
@@ -867,13 +886,50 @@ const overrides: Record<string, Override> = {
     path: "reference/frontend/cubejs-client-vue",
     title: "@cubejs-client/vue",
   },
-  // "Reference/Frontend/@cubejs-client-ngx.mdx": {},
+  "Reference/Frontend/@cubejs-client-ngx.mdx": {
+    ready: true,
+    path: "reference/frontend/cubejs-client-ngx",
+    title: "@cubejs-client/ngx",
+  },
 
-  // "Reference/REST-API/REST-API.mdx": {},
-  // "Reference/GraphQL-API/GraphQL-API.mdx": {},
-  // "Reference/CLI/CLI-Reference.mdx": {},
-  // "Reference/SQL-API/SQL-Functions-and-Operators.mdx": {},
-  // "Reference/SQL-API/SQL-Commands.mdx": {},
+  "Reference/REST-API/REST-API.mdx": {
+    ready: true,
+    path: "reference/rest-api",
+    title: "REST API",
+
+    meta: {
+      configuration: "Configuration",
+      frontend: "Frontend",
+      "rest-api": "REST API",
+      "graphql-api": "GraphQL API",
+      "sql-api": "SQL API",
+      cli: "CLI",
+    },
+  },
+  "Reference/GraphQL-API/GraphQL-API.mdx": {
+    ready: true,
+    path: "reference/graphql-api",
+    title: "GraphQL API",
+  },
+  "Reference/SQL-API/SQL-Commands.mdx": {
+    ready: true,
+    path: "reference/sql-api/sql-commands",
+    title: "SQL commands",
+    meta: {
+      "sql-commands": "SQL commands",
+      "sql-functions-and-operators": "SQL functions and operators",
+    },
+  },
+  "Reference/SQL-API/SQL-Functions-and-Operators.mdx": {
+    ready: true,
+    path: "reference/sql-api/sql-functions-and-operators",
+    title: "SQL functions and operators",
+  },
+  "Reference/CLI/CLI-Reference.mdx": {
+    ready: true,
+    path: "reference/cli",
+    title: "CLI Command reference",
+  },
 
   // "Examples-Tutorials-Recipes/Examples.mdx": {},
   "Examples-Tutorials-Recipes/Recipes.mdx": {
