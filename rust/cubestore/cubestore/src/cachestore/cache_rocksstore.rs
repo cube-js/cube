@@ -889,7 +889,7 @@ impl CacheStore for RocksCacheStore {
 
     async fn compaction(&self) -> Result<(), CubeError> {
         self.store
-            .write_operation(move |db_ref, _batch_pipe| {
+            .read_operation_out_of_queue(move |db_ref| {
                 let start: Option<&[u8]> = None;
                 let end: Option<&[u8]> = None;
 
