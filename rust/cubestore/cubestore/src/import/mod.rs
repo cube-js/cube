@@ -67,25 +67,40 @@ impl ImportFormat {
     ) -> Result<Pin<Box<dyn Stream<Item = Result<Option<Row>, CubeError>> + Send + 'a>>, CubeError>
     {
         match self {
-            ImportFormat::CSV | ImportFormat::CSVNoHeader => {
+            ImportFormat::CSV | ImportFormat::CSVNoHeader | ImportFormat::CSVOptions { .. } => {
                 let lines_stream: Pin<Box<dyn Stream<Item = Result<String, CubeError>> + Send>> =
                     Box::pin(CsvLineStream::new(reader));
 
                 let mut header_mapping = match self {
-                    ImportFormat::CSV => None,
-                    ImportFormat::CSVNoHeader => Some(
+                    ImportFormat::CSVNoHeader
+                    | ImportFormat::CSVOptions {
+                        has_header: false, ..
+                    } => Some(
                         columns
                             .iter()
                             .enumerate()
                             .map(|(i, c)| (i, c.clone()))
                             .collect(),
                     ),
+                    _ => None,
                 };
+
+                let delimiter = match self {
+                    ImportFormat::CSV | ImportFormat::CSVNoHeader => ',',
+                    ImportFormat::CSVOptions { delimiter, .. } => delimiter.unwrap_or(','),
+                };
+
+                if delimiter as u16 > 255 {
+                    return Err(CubeError::user(format!(
+                        "Non ASCII delimiters are unsupported: '{}'",
+                        delimiter
+                    )));
+                }
 
                 let rows = lines_stream.map(move |line| -> Result<Option<Row>, CubeError> {
                     let str = line?;
 
-                    let mut parser = CsvLineParser::new(str.as_str());
+                    let mut parser = CsvLineParser::new(delimiter as u8, str.as_str());
 
                     if header_mapping.is_none() {
                         let mut mapping = Vec::new();
@@ -257,13 +272,15 @@ fn parse_binary_data(value: &str) -> Result<Vec<u8>, CubeError> {
 }
 
 struct CsvLineParser<'a> {
+    delimiter: u8,
     line: &'a str,
     remaining: &'a str,
 }
 
 impl<'a> CsvLineParser<'a> {
-    fn new(line: &'a str) -> Self {
+    fn new(delimiter: u8, line: &'a str) -> Self {
         Self {
+            delimiter,
             line,
             remaining: line,
         }
@@ -308,7 +325,7 @@ impl<'a> CsvLineParser<'a> {
                     .remaining
                     .as_bytes()
                     .iter()
-                    .position(|c| *c == b',')
+                    .position(|c| *c == self.delimiter)
                     .unwrap_or(self.remaining.len());
                 let res = &self.remaining[0..next_comma];
                 self.remaining = self.remaining[next_comma..].as_ref();
@@ -318,8 +335,10 @@ impl<'a> CsvLineParser<'a> {
     }
 
     fn advance(&mut self) -> Result<(), CubeError> {
-        if let Some(b',') = self.remaining.as_bytes().iter().nth(0) {
-            self.remaining = self.remaining[1..].as_ref()
+        if let Some(c) = self.remaining.as_bytes().iter().nth(0) {
+            if *c == self.delimiter {
+                self.remaining = self.remaining[1..].as_ref()
+            }
         }
         Ok(())
     }
