@@ -2579,6 +2579,15 @@ Array [
 ]
 `;
 
+exports[`Queries with the @cubejs-backend/snowflake-driver querying Customers: dimentions + order + total + offset 1`] = `
+Array [
+  Object {
+    "Customers.customerId": "BS-11380",
+    "Customers.customerName": "Customer 9",
+  },
+]
+`;
+
 exports[`Queries with the @cubejs-backend/snowflake-driver querying Customers: dimentions + order 1`] = `
 Array [
   Object {
@@ -4152,6 +4161,26 @@ Array [
     "ECommerce.rowId": "2661",
     "ECommerce.sales": "1979.890",
     "ECommerce.subCategory": "Phones",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/snowflake-driver querying ECommerce: dimentions + order + total + offset 1`] = `
+Array [
+  Object {
+    "ECommerce.category": "Office Supplies",
+    "ECommerce.city": "Bowling",
+    "ECommerce.customerId": "BS-11380",
+    "ECommerce.customerName": "Customer 9",
+    "ECommerce.discount": "0.2",
+    "ECommerce.orderDate": "2020-11-16T00:00:00.000",
+    "ECommerce.orderId": "CA-2017-160633",
+    "ECommerce.productName": "Panasonic KP-380BK Classic Electric Pencil Sharpener",
+    "ECommerce.profit": "5.3970",
+    "ECommerce.quantity": "3",
+    "ECommerce.rowId": "9619",
+    "ECommerce.sales": "86.352",
+    "ECommerce.subCategory": "Art",
   },
 ]
 `;

@@ -278,6 +278,9 @@ impl RemoteFs for GCSRemoteFs {
         if result.len() % 1_000 > 0 {
             pages_count += 1;
         }
+        if pages_count > 100 {
+            log::warn!("S3 list returned more than 100 pages: {}", pages_count);
+        }
         app_metrics::REMOTE_FS_OPERATION_CORE.add_with_tags(
             pages_count as i64,
             Some(&vec![

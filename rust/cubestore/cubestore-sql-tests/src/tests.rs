@@ -103,6 +103,10 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             "create_table_with_csv_no_header",
             create_table_with_csv_no_header,
         ),
+        t(
+            "create_table_with_csv_no_header_and_delimiter",
+            create_table_with_csv_no_header_and_delimiter,
+        ),
         t("create_table_with_url", create_table_with_url),
         t("create_table_fail_and_retry", create_table_fail_and_retry),
         t("empty_crash", empty_crash),
@@ -2140,6 +2144,34 @@ async fn create_table_with_csv_no_header(service: Box<dyn SqlClient>) {
         .unwrap();
     let _ = service
         .exec_query(format!("CREATE TABLE test.table (`fruit` text, `number` int) WITH (input_format = 'csv_no_header') LOCATION '{}'", path).as_str())
+        .await
+        .unwrap();
+    let result = service
+        .exec_query("SELECT * FROM test.table")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&result),
+        vec![
+            vec![TableValue::String("apple".to_string()), TableValue::Int(2)],
+            vec![TableValue::String("banana".to_string()), TableValue::Int(3)]
+        ]
+    );
+}
+
+async fn create_table_with_csv_no_header_and_delimiter(service: Box<dyn SqlClient>) {
+    let file = write_tmp_file(indoc! {"
+        apple\u{0001}2
+        banana\u{0001}3
+    "})
+    .unwrap();
+    let path = file.path().to_string_lossy();
+    let _ = service
+        .exec_query("CREATE SCHEMA IF NOT EXISTS test")
+        .await
+        .unwrap();
+    let _ = service
+        .exec_query(format!("CREATE TABLE test.table (`fruit` text, `number` int) WITH (input_format = 'csv_no_header', delimiter = '^A') LOCATION '{}'", path).as_str())
         .await
         .unwrap();
     let result = service

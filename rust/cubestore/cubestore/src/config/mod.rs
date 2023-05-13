@@ -458,6 +458,10 @@ pub trait ConfigObj: DIService {
 
     fn transport_max_message_size(&self) -> usize;
     fn transport_max_frame_size(&self) -> usize;
+
+    fn local_files_cleanup_interval_secs(&self) -> u64;
+
+    fn local_files_cleanup_size_threshold(&self) -> u64;
 }
 
 #[derive(Debug, Clone)]
@@ -526,6 +530,8 @@ pub struct ConfigObjImpl {
     pub disk_space_cache_duration_secs: u64,
     pub transport_max_message_size: usize,
     pub transport_max_frame_size: usize,
+    pub local_files_cleanup_interval_secs: u64,
+    pub local_files_cleanup_size_threshold: u64,
 }
 
 crate::di_service!(ConfigObjImpl, [ConfigObj]);
@@ -771,6 +777,14 @@ impl ConfigObj for ConfigObjImpl {
 
     fn transport_max_frame_size(&self) -> usize {
         self.transport_max_frame_size
+    }
+
+    fn local_files_cleanup_interval_secs(&self) -> u64 {
+        self.local_files_cleanup_interval_secs
+    }
+
+    fn local_files_cleanup_size_threshold(&self) -> u64 {
+        self.local_files_cleanup_size_threshold
     }
 }
 
@@ -1075,6 +1089,16 @@ impl Config {
                     Some(256 << 20),
                     Some(4 << 20),
                 ),
+                local_files_cleanup_interval_secs: env_parse(
+                    "CUBESTORE_LOCAL_FILES_CLEANUP_INTERVAL_SECS",
+                    3 * 600,
+                ),
+                local_files_cleanup_size_threshold: env_parse_size(
+                    "CUBESTORE_LOCAL_FILES_CLEANUP_SIZE_THRESHOLD",
+                    1024 * 1024 * 1024,
+                    None,
+                    None,
+                ) as u64,
             }),
         }
     }
@@ -1155,6 +1179,8 @@ impl Config {
                 disk_space_cache_duration_secs: 0,
                 transport_max_message_size: 64 << 20,
                 transport_max_frame_size: 16 << 20,
+                local_files_cleanup_interval_secs: 600,
+                local_files_cleanup_size_threshold: 0,
             }),
         }
     }

@@ -1,0 +1,91 @@
+---
+redirect_from:
+  - /deployment/cloud/auto-suspension
+---
+
+# Auto-suspension
+<SuccessBox>
+
+Auto-suspension is available in Cube Cloud on
+[Starter and above tiers](https://cube.dev/pricing).
+
+</SuccessBox>
+
+Cube Cloud can automatically suspend deployments when not in use to prevent
+[resource consumption][ref-deployment-pricing] when infrastructure is not being
+actively used, which helps manage spend and preventing unnecessary quota use.
+
+This is useful for deployments that are not used 24/7, such as staging
+deployments. Auto-suspension will hibernate the deployment when **no** API requests
+are received after a period of time, and automatically resume the deployment
+when API requests start coming in again:
+
+<div style={{ textAlign: "center" }}>
+  <img
+    alt="Cube Cloud auto-suspend flowchart"
+    src="https://ucarecdn.com/e9a22d59-e0af-40c5-b590-02f2566663d1/"
+    style={{ border: "none" }}
+    width="100%"
+  />
+</div>
+
+[Development Instances][ref-deployment-dev-instance] are auto-suspended
+automatically when not in use for 10 minutes, whereas [Production
+Clusters][ref-deployment-prod-cluster] and [Production
+Multi-Clusters][ref-deployment-prod-multi-cluster] can auto-suspend after no API
+requests were received within a configurable time period.
+
+## Configuration
+
+To configure auto-suspension settings, navigate to the <Btn>Settings</Btn> screen
+in your deployment and click the <Btn>Configuration</Btn> tab, then ensure&nbsp;
+&ZeroWidthSpace;<Btn>Enable Auto-suspend</Btn> is turned on:
+
+<Screenshot
+  highlight="inset(40% 43% 50% 8% round 10px)"
+  src="https://ucarecdn.com/5747b03a-d414-455e-a5bf-dbebc64d8ddf/"
+/>
+
+To configure how long Cube Cloud should wait before suspending the deployment,
+adjust <Btn>Auto-suspend threshold (minutes)</Btn> to the desired value and
+click <Btn>Apply</Btn>:
+
+<Screenshot
+  highlight="inset(50% 43% 23% 8% round 10px)"
+  src="https://ucarecdn.com/4aaa1b98-2af8-4ff9-84f6-e7b9c44c317a/"
+/>
+
+The Cube API instances will temporarily become unavailable while they are
+configured; this usually takes less than a minute.
+
+## Resuming a suspended deployment
+
+To resume a suspended deployment, send a query to Cube via either the API or
+the&nbsp;<Btn>Playground</Btn> screen in Cube Cloud.
+
+<InfoBox>
+
+Opening the deployment in Cube Cloud will also resume the deployment, this is
+because Cube Cloud sends API requests to fetch the deployment details. API
+requests sent to [Development Mode][ref-workspace-dev-api] will also resume the
+deployment.
+
+</InfoBox>
+
+Deployments typically resume in under 30 seconds, but can take significantly
+longer in certain situations depending on two major factors:
+
+- **Data model:** How many cubes and views are defined.
+- **Query complexity:** How complicated the queries being sent to the API are
+
+Complex data models take more time to compile, and complex queries can cause
+response times to be significantly longer than usual.
+
+[ref-deployment-dev-instance]:
+  /cloud/configuration/deployment-types#development-instance
+[ref-deployment-prod-cluster]:
+  /cloud/configuration/deployment-types#production-cluster
+[ref-deployment-prod-multi-cluster]:
+  /cloud/configuration/deployment-types#production-multi-cluster
+[ref-deployment-pricing]: /cloud/pricing
+[ref-workspace-dev-api]: /cloud/workspace/development-api

@@ -779,7 +779,7 @@ impl CacheStore for RocksCacheStore {
                     queue_schema.delete(item_row.get_id(), batch_pipe)?;
 
                     if let Some(result) = result {
-                        let queue_result = QueueResult::new(path.clone(), result.clone());
+                        let queue_result = QueueResult::new(path.clone(), result);
                         let result_schema = QueueResultRocksTable::new(db_ref.clone());
                         // QueueResult is a result of QueueItem, it's why we can use row_id of QueueItem
                         let result_row = result_schema.insert_with_pk(
@@ -793,7 +793,7 @@ impl CacheStore for RocksCacheStore {
                             path,
                             result: QueueResultAckEventResult::WithResult {
                                 row_id: result_row.get_id(),
-                                result,
+                                result: result_row.into_row().value,
                             },
                         }));
                     } else {
@@ -889,7 +889,7 @@ impl CacheStore for RocksCacheStore {
 
     async fn compaction(&self) -> Result<(), CubeError> {
         self.store
-            .write_operation(move |db_ref, _batch_pipe| {
+            .read_operation_out_of_queue(move |db_ref| {
                 let start: Option<&[u8]> = None;
                 let end: Option<&[u8]> = None;
 

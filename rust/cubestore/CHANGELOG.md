@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.6](https://github.com/cube-js/cube.js/compare/v0.33.5...v0.33.6) (2023-05-13)
+
+
+### Bug Fixes
+
+* **cubestore:** Optimize unique constraint check on insert ([c227ae9](https://github.com/cube-js/cube.js/commit/c227ae9f72cfd66fd47e60fc567c2fde88ebc932))
+* **cubestore:** Schedule compaction without blocking rw loop ([f9bbbac](https://github.com/cube-js/cube.js/commit/f9bbbac278898d02d50e6ff5911658d5e8caf7e3))
+
+
+### Features
+
+* **cubestore:** Queue - support cancel, ack, result_blocking by processingId ([#6551](https://github.com/cube-js/cube.js/issues/6551)) ([2e82839](https://github.com/cube-js/cube.js/commit/2e82839586f18d8b9ba385ab6f8e5641113ccf0c))
+* **cubestore:** Support custom CSV delimiters ([#6597](https://github.com/cube-js/cube.js/issues/6597)) ([f8c2c88](https://github.com/cube-js/cube.js/commit/f8c2c888150e9436c90de9ecd45f540bb0314855))
+
+
+
+
+
 ## [0.33.5](https://github.com/cube-js/cube.js/compare/v0.33.4...v0.33.5) (2023-05-11)
 
 

@@ -1,0 +1,181 @@
+---
+redirect_from:
+  - /backend/sql/reference/joins
+---
+
+# Joins
+The SQL API supports joins through `__cubeJoinField` virtual column, which is
+available in every cube table. Join can also be done through `CROSS JOIN`. Usage
+of `__cubeJoinField` in a join instructs Cube to perform join as it's defined in
+a data model. Cube generates the correct joining conditions for the underlying
+data source.
+
+For example, the following query joins the `orders` and `products` tables under
+the hood with `orders.product_id = products.id`, exactly the same way as the
+REST API query does:
+
+```sql
+cube=> SELECT p.name, SUM(o.count) FROM orders o LEFT JOIN products p ON o.__cubeJoinField = p.__cubeJoinField GROUP BY 1 LIMIT 5;
+           name           | SUM(o.count)
+--------------------------+--------------
+ Tasty Plastic Mouse      |          121
+ Intelligent Cotton Ball  |          119
+ Ergonomic Steel Tuna     |          116
+ Intelligent Rubber Pants |          116
+ Generic Wooden Gloves    |          116
+(5 rows)
+```
+
+Or through `CROSS JOIN`:
+
+```sql
+cube=> SELECT p.name, sum(o.count) FROM orders o CROSS JOIN products p GROUP BY 1 LIMIT 5;
+           name           | SUM(o.count)
+--------------------------+--------------
+ Tasty Plastic Mouse      |          121
+ Intelligent Cotton Ball  |          119
+ Ergonomic Steel Tuna     |          116
+ Intelligent Rubber Pants |          116
+ Generic Wooden Gloves    |          116
+(5 rows)
+```
+
+In the resulting query plan, you won't see any joins as you can't see those for
+REST API queries either:
+
+```sql
+cube=> EXPLAIN SELECT p.name, sum(o.count) FROM orders o LEFT JOIN products p ON o.__cubeJoinField = p.__cubeJoinField GROUP BY 1 LIMIT 5;
+   plan_type   |         plan
+---------------+-----------------------
+ logical_plan  | CubeScan: request={  +
+               |   "measures": [      +
+               |     "orders.count"   +
+               |   ],                 +
+               |   "dimensions": [    +
+               |     "products.name"  +
+               |   ],                 +
+               |   "segments": [],    +
+               |   "limit": 5         +
+               | }
+ physical_plan | CubeScanExecutionPlan+
+               |
+(2 rows)
+```
+
+This feature allows you to join cubes even joined transitively only.
+
+In most of the BI tools you'd use `__cubeJoinField` to define joins between cube
+tables. In tools that allow defining custom SQL datasets, you can use joined
+tables as a dataset SQL. For example:
+
+```sql
+SELECT o.count as count, p.name as product_name, p.description as product_description
+FROM orders o
+CROSS JOIN products p;
+```
+
+Please note we use aliasing to avoid name clashing between cube members in a
+resulting data set. In this case, wrapped SQL will be properly processed by
+Cube, pushing down all operations to Cube query:
+
+```sql
+cube=> SELECT product_name, SUM(count) FROM (
+  SELECT o.count as count, p.name as product_name, p.description as product_description
+  FROM orders o CROSS
+  JOIN products p
+) joined
+GROUP BY 1
+ORDER BY 2 DESC
+LIMIT 5;
+       product_name       | SUM(joined.count)
+--------------------------+-------------------
+ Tasty Plastic Mouse      |               121
+ Intelligent Cotton Ball  |               119
+ Ergonomic Steel Tuna     |               116
+ Intelligent Rubber Pants |               116
+ Generic Wooden Gloves    |               116
+(5 rows)
+```
+
+We can see this by introspecting the `EXPLAIN` plan for this query:
+
+```sql
+cube=> EXPLAIN SELECT product_name, SUM(count) FROM (
+  SELECT o.count as count, p.name as product_name, p.description as product_description
+  FROM orders o
+  CROSS JOIN products p
+) joined
+GROUP BY 1
+ORDER BY 2 DESC
+LIMIT 5;
+   plan_type   |         plan
+---------------+-----------------------
+ logical_plan  | CubeScan: request={  +
+               |   "measures": [      +
+               |     "orders.count"   +
+               |   ],                 +
+               |   "dimensions": [    +
+               |     "products.name"  +
+               |   ],                 +
+               |   "segments": [],    +
+               |   "order": [         +
+               |     [                +
+               |       "orders.count",+
+               |       "desc"         +
+               |     ]                +
+               |   ],                 +
+               |   "limit": 5         +
+               | }
+ physical_plan | CubeScanExecutionPlan+
+               |
+(2 rows)
+```
+
+Please note even if `product_description` is in the inner selection, it isn't
+evaluated in the final query as it isn't used in any way.
+
+## Proxy Dimensions and Views
+
+As an alternative to achieve joins, it is also possible to define proxy
+dimension or measure inside a cube or a view. This is the preferred way of
+joining as it provides you control over the joining path for complex use cases.
+
+<CodeTabs>
+
+```yaml
+views:
+  - name: orders_users
+    includes:
+      - orders
+      # This is a proxy dimension
+      - orders.users.city
+```
+
+```javascript
+view(`orders_users`, {
+  includes: [
+    orders,
+    // This is a proxy dimension
+    orders.users.city,
+  ],
+});
+```
+
+</CodeTabs>
+
+Now, it is possible to get orders count by users city with the following query.
+
+```sql
+cube=> SELECT count, city FROM orders_users;
+ count |   user_city
+-------+---------------
+  1416 | Los Angeles
+  1412 | Seattle
+  1365 | Mountain View
+  1263 | New York
+  1220 | Austin
+  1164 | Chicago
+  1101 | San Francisco
+  1059 | Palo Alto
+(8 rows)
+```

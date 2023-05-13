@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.6](https://github.com/cube-js/cube.js/compare/v0.33.5...v0.33.6) (2023-05-13)
+
+
+### Bug Fixes
+
+* **cubesql:** Improve NULL comparison with int/bool ([de1be39](https://github.com/cube-js/cube.js/commit/de1be39d07ceec5d87d6c7aef8adb65fbe246ee3))
+
+
+
+
+
 ## [0.33.5](https://github.com/cube-js/cube.js/compare/v0.33.4...v0.33.5) (2023-05-11)
 
 **Note:** Version bump only for package @cubejs-backend/cubesql

@@ -552,6 +552,12 @@ impl fmt::Display for Column {
 pub enum ImportFormat {
     CSV,
     CSVNoHeader,
+    CSVOptions {
+        delimiter: Option<char>,
+        escape: Option<char>,
+        quote: Option<char>,
+        has_header: bool,
+    },
 }
 
 data_frame_from! {

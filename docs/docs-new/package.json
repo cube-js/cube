@@ -32,6 +32,7 @@
     "front-matter": "^4.0.2",
     "glob": "^9.3.4",
     "postcss": "^8.4.21",
+    "remark-frontmatter": "^4.0.1",
     "sass": "^1.62.1",
     "tailwindcss": "^3.3.1",
     "ts-node": "^10.9.1",

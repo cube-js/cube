@@ -1,0 +1,169 @@
+---
+redirect_from:
+  - /cloud/configuration/deployment-types
+---
+
+# Deployment types
+## Development Instance
+
+<SuccessBox>
+
+Development instance is available in Cube Cloud for free, no credit card
+required. Your free trial is limited to 2 development instances and only 1,000
+queries per day. Upgrade to [any tier](https://cube.dev/pricing) to unlock all
+features.
+
+</SuccessBox>
+
+<div style={{ textAlign: "center" }}>
+  <img
+    alt="High-level architecture diagram of a Cube Cloud Development Instance"
+    src="https://ucarecdn.com/adaa000a-c562-4eb4-9687-6f57f0f4c22b/"
+    style={{ border: "none" }}
+    width="100%"
+  />
+</div>
+
+Development Instances are designed for development use-cases only. This makes it
+easy to get started with Cube Cloud quickly, and also allows you to build and
+query pre-aggregations on-demand.
+
+Development Instances do not provide high-availability nor do they guarantee
+fast response times. Development Instances also hibernate after 60 minutes of
+inactivity, which can cause the first request after hibernation to take
+additional time to process. They also have a 10,000 queries per day limit, and
+are limited to a maximum of 2 Cube Store Workers. We **strongly** advise not
+using a development instance in a production environment, it is for testing and
+learning about Cube only and will not deliver a production-level experience for
+your users.
+
+You can try a Cube Cloud development instance by
+[signing up for Cube Cloud](https://cubecloud.dev/auth/signup) to try it free
+(no credit card required).
+
+## Production Cluster
+
+<SuccessBox>
+
+Production cluster is available in Cube Cloud on
+[all tiers](https://cube.dev/pricing).
+
+</SuccessBox>
+
+<div style={{ textAlign: "center" }}>
+  <img
+    alt="High-level architecture diagram of a Cube Cloud Production Cluster"
+    src="https://ucarecdn.com/fcb57d7a-09ee-4854-9282-db443a5ee61d/"
+    style={{ border: "none" }}
+    width="100%"
+  />
+</div>
+
+Production Clusters are designed to support high-availability production
+workloads. It consists of several key components, including starting with 2 Cube
+API instances, 1 Cube Refresh Worker and 2 Cube Store Routers - all of which run
+on dedicated infrastructure. The cluster can automatically scale to meet the
+needs of your workload by adding more components as necessary; check the
+[Limits section](#limits) below.
+
+## Production multi-cluster
+
+You can deploy a production multi-cluster in Cube Cloud, which allows for larger
+amounts of data as well as load balancing for multi-tenant deployments with over
+1,000 tenants.
+
+<SuccessBox>
+
+Production multi-cluster is available in Cube Cloud on
+[Enterprise Premier](https://cube.dev/pricing) tier.
+[Contact us](https://cube.dev/contact) for details.
+
+</SuccessBox>
+
+<div style={{ textAlign: "center" }}>
+  <img
+    alt="High-level architecture diagram of a Cube Cloud Production Multi-Cluster"
+    src="https://ucarecdn.com/0ab1eb5c-7aba-4e9c-8951-1998d4b714f0/"
+    style={{ border: "none" }}
+    width="100%"
+  />
+</div>
+
+Cube Cloud routes traffic between clusters based on
+[`contextToAppId()`][ref-conf-ref-ctx-to-app-id].
+
+Each cluster is billed separately, and all clusters can use auto-scaling to
+match demand.
+
+## Limits
+
+Cube Cloud also allows adding additional infrastructure to your deployment to
+increase scalability and performance beyond what is available with each
+Production Deployment.
+
+###  Cube Store Worker
+
+|                           | Free Tier | Starter | Premium | Enterprise |        Enterprise Premier        |
+| ------------------------- | :-------: | :-----: | :-----: | :--------: | :------------------------------: |
+| Maximum number of workers |     2     |   16    |   16    |     16     | [Talk to Sales][cube-contact-us] |
+
+Cube Store Workers are used to build and persist pre-aggregations. Each Worker
+has a **maximum of 150GB** of storage; additional Cube Store workers can be
+added to your deployment to both increase storage space and improve
+pre-aggregation performance. A **minimum of 2** Cube Store Workers is required
+for pre-aggregations; this can be adjusted. For a rough estimate, it will take
+approximately 2 Cube Store Workers per 4 gigs of pre-aggregated data per day.
+
+<InfoBox>
+
+Idle workers will automatically hibernate after 10 minutes of inactivity, and
+will not consume CCUs until they are resumed. Workers are resumed automatically
+when Cube receives a query that should be accelerated by a pre-aggregation, or
+when a scheduled refresh is triggered.
+
+</InfoBox>
+
+To change the number of Cube Store Workers in a deployment, go to the
+deployment’s <Btn>Settings</Btn> screen, and open the <Btn>Configuration</Btn>
+tab. From this screen, you can set the number of Cube Store Workers from the
+dropdown:
+
+<Screenshot
+  alt="Cube Cloud Deployment Settings page showing auto-scaling configuration options"
+  src="https://ucarecdn.com/3b39c56f-d553-4612-b4f0-07084cc4b742/"
+/>
+
+###  Cube API Instance
+
+|                 | Free Tier | Starter |  Premium  | Enterprise | Enterprise Premier |
+| --------------- | :-------: | :-----: | :-------: | :--------: | :----------------: |
+| Queries per day |   1,000   | 50,000  | Unlimited | Unlimited  |     Unlimited      |
+
+With a Production Deployment, 2 Cube API Instances are included. That said, it
+is very common to use more, and additional Cube API instances can be added to
+your deployment to increase the throughput of your queries. A rough estimate is
+that 1 Cube API Instance is needed for every 5-10 requests-per-second served.
+Cube API Instances can also auto-scale as needed.
+
+To change how many Cube API instances are available in the Production Cluster,
+go to the deployment’s <Btn>Settings</Btn> screen, and open
+the&nbsp;<Btn>Configuration</Btn> tab. From this screen, you can set the minimum
+and maximum number of Cube API instances for a deployment:
+
+<Screenshot
+  alt="Cube Cloud Deployment Settings page showing auto-scaling configuration options"
+  src="https://ucarecdn.com/3b39c56f-d553-4612-b4f0-07084cc4b742/"
+/>
+
+## Switching between deployment types
+
+To switch a deployment's type, go to the deployment's <Btn>Settings</Btn> screen
+and select from the available options:
+
+<Screenshot
+  alt="Cube Cloud Deployment Settings page showing Development Instance, Production Cluster, and Production Multi-Cluster options"
+  src="https://ucarecdn.com/fbde6a1e-734a-4091-8edd-922dc1ee7e1c/"
+/>
+
+[cube-contact-us]: https://cube.dev/contact
+[ref-conf-ref-ctx-to-app-id]: /config#options-reference-context-to-app-id

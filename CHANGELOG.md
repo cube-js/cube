@@ -3,6 +3,27 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.6](https://github.com/cube-js/cube/compare/v0.33.5...v0.33.6) (2023-05-13)
+
+
+### Bug Fixes
+
+* **cubesql:** Improve NULL comparison with int/bool ([de1be39](https://github.com/cube-js/cube/commit/de1be39d07ceec5d87d6c7aef8adb65fbe246ee3))
+* **cubestore:** Optimize unique constraint check on insert ([c227ae9](https://github.com/cube-js/cube/commit/c227ae9f72cfd66fd47e60fc567c2fde88ebc932))
+* **cubestore:** Schedule compaction without blocking rw loop ([f9bbbac](https://github.com/cube-js/cube/commit/f9bbbac278898d02d50e6ff5911658d5e8caf7e3))
+* LIMIT is not enforced ([#6586](https://github.com/cube-js/cube/issues/6586)) ([8ca5234](https://github.com/cube-js/cube/commit/8ca52342944b9767f2c34591a9241bf31cf78c71))
+* **snowflake-driver:** Bind variable ? not set for partitioned pre-aggregations ([#6594](https://github.com/cube-js/cube/issues/6594)) ([0819075](https://github.com/cube-js/cube/commit/081907568d97fa79f56edf1898b2845affb925cf))
+
+
+### Features
+
+* **cubestore:** Queue - support cancel, ack, result_blocking by processingId ([#6551](https://github.com/cube-js/cube/issues/6551)) ([2e82839](https://github.com/cube-js/cube/commit/2e82839586f18d8b9ba385ab6f8e5641113ccf0c))
+* **cubestore:** Support custom CSV delimiters ([#6597](https://github.com/cube-js/cube/issues/6597)) ([f8c2c88](https://github.com/cube-js/cube/commit/f8c2c888150e9436c90de9ecd45f540bb0314855))
+
+
+
+
+
 ## [0.33.5](https://github.com/cube-js/cube/compare/v0.33.4...v0.33.5) (2023-05-11)
 
 

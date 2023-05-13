@@ -969,7 +969,7 @@ impl SqlService for SqlServiceImpl {
                 }
                 let schema_name = &nv[0].value;
                 let table_name = &nv[1].value;
-                let import_format = with_options
+                let mut import_format = with_options
                     .iter()
                     .find(|&opt| opt.name.value == "input_format")
                     .map_or(Result::Ok(ImportFormat::CSV), |option| {
@@ -990,6 +990,49 @@ impl SqlService for SqlServiceImpl {
                             ))),
                         }
                     })?;
+
+                let delimiter = with_options
+                    .iter()
+                    .find(|&opt| opt.name.value == "delimiter")
+                    .map_or(Ok(None), |option| match &option.value {
+                        Value::SingleQuotedString(delimiter) => match delimiter.as_str() {
+                            "tab" => Ok(Some('\t')),
+                            "^A" => Ok(Some('\u{0001}')),
+                            s if s.len() != 1 => {
+                                Err(CubeError::user(format!("Bad delimiter {}", option.value)))
+                            }
+                            s => Ok(Some(s.chars().next().unwrap())),
+                        },
+                        _ => Err(CubeError::user(format!("Bad delimiter {}", option.value))),
+                    })?;
+
+                if let Some(delimiter) = delimiter {
+                    import_format = match import_format {
+                        ImportFormat::CSV => ImportFormat::CSVOptions {
+                            delimiter: Some(delimiter),
+                            has_header: true,
+                            escape: None,
+                            quote: None,
+                        },
+                        ImportFormat::CSVNoHeader => ImportFormat::CSVOptions {
+                            delimiter: Some(delimiter),
+                            has_header: false,
+                            escape: None,
+                            quote: None,
+                        },
+                        ImportFormat::CSVOptions {
+                            has_header,
+                            escape,
+                            quote,
+                            ..
+                        } => ImportFormat::CSVOptions {
+                            delimiter: Some(delimiter),
+                            has_header,
+                            escape,
+                            quote,
+                        },
+                    }
+                }
                 let build_range_end = with_options
                     .iter()
                     .find(|&opt| opt.name.value == "build_range_end")

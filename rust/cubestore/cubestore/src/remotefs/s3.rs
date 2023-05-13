@@ -282,6 +282,9 @@ impl RemoteFs for S3RemoteFs {
             pages_count as i64,
             Some(&vec!["operation:list".to_string(), "driver:s3".to_string()]),
         );
+        if pages_count > 100 {
+            log::warn!("S3 list returned more than 100 pages: {}", pages_count);
+        }
         let leading_slash = Regex::new(format!("^{}", self.s3_path("")).as_str()).unwrap();
         let result = list
             .iter()

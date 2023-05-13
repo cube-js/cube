@@ -1,0 +1,543 @@
+---
+redirect_from:
+  - /schema/fundamentals/concepts
+---
+
+# Concepts
+Cube borrows a lot of terminology from data science and [OLAP
+theory][wiki-olap], and this document is intended for both newcomers and regular
+users to refresh their understanding.
+
+We'll use a sample e-commerce database with two tables, `orders` and
+`line_items` to illustrate the concepts throughout this page:
+
+**`orders`**
+
+| **id** | **status** | **completed_at**           | **created_at**             |
+| ------ | ---------- | -------------------------- | -------------------------- |
+| 1      | completed  | 2019-01-05 00:00:00.000000 | 2019-01-02 00:00:00.000000 |
+| 2      | shipped    | 2019-01-17 00:00:00.000000 | 2019-01-02 00:00:00.000000 |
+| 3      | completed  | 2019-01-27 00:00:00.000000 | 2019-01-02 00:00:00.000000 |
+| 4      | shipped    | 2019-01-09 00:00:00.000000 | 2019-01-02 00:00:00.000000 |
+| 5      | processing | 2019-01-29 00:00:00.000000 | 2019-01-02 00:00:00.000000 |
+
+**`line_items`**
+
+| **id** | **product_id** | **order_id** | **quantity** | **price** | **created_at**             |
+| ------ | -------------- | ------------ | ------------ | --------- | -------------------------- |
+| 1      | 31             | 1            | 1            | 275       | 2019-01-31 00:00:00.000000 |
+| 2      | 49             | 2            | 6            | 248       | 2021-01-20 00:00:00.000000 |
+| 3      | 89             | 3            | 6            | 197       | 2021-11-25 00:00:00.000000 |
+| 4      | 71             | 4            | 8            | 223       | 2019-12-23 00:00:00.000000 |
+| 5      | 64             | 5            | 5            | 75        | 2019-04-20 00:00:00.000000 |
+
+## Cubes
+
+A cube represents a dataset in Cube, and is conceptually similar to a [view in
+SQL][wiki-view-sql]. Cubes are typically declared in separate files with one
+cube per file. Within each cube are definitions of [dimensions][self-dimensions]
+and [measures][self-measures]. Typically, a cube points to a single table in
+your database using the [`sql_table` property][ref-schema-ref-sql-table]:
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  sql_table: `orders`
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    sql_table: orders
+```
+
+</CodeTabs>
+
+You can also use the [`sql` property][ref-schema-ref-sql] to accommodate more complex SQL queries:
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  sql: `
+    SELECT *
+    FROM orders, line_items
+    WHERE orders.id = line_items.order_id
+  `
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    sql: >
+      SELECT *
+      FROM orders, line_items
+      WHERE orders.id = line_items.order_id
+```
+
+</CodeTabs>
+
+## Views
+
+Views sit on top of the data graph of cubes and create a facade of your whole
+data model with which data consumers can interact. They are useful for defining
+metrics, managing governance and data access, and controlling ambiguous join
+paths.
+
+Views **can not** have their own members. Instead, use the `cubes` or `includes` parameters
+to include measures and dimensions from other cubes into the view. In the
+example below, we create a new view `active_users` which is made up of properties
+from the `users` cube:
+
+<CodeTabs>
+
+```javascript
+view(`orders`, {
+  cubes: [
+    {
+      join_path: base_orders,
+      includes: [
+        `status`,
+        `created_date`,
+        `total_amount`,
+        `total_amount_shipped`,
+        `count`,
+        `average_order_value`
+      ]
+    },
+    {
+      join_path: base_orders.line_items.products,
+      includes: [
+        {
+          name: `name`,
+          alias: `product`
+        }
+      ]
+    },
+    {
+      join_path: base_orders.users,
+      prefix: true,
+      includes: `*`,
+      excludes: [
+        `company`
+      ]
+
+    }
+  ]
+});
+```
+
+```yaml
+views:
+  - name: orders
+
+    cubes:
+      - join_path: base_orders
+        includes:
+          - status
+          - created_date
+          - total_amount
+          - total_amount_shipped
+          - count
+          - average_order_value
+      
+      - join_path: base_orders.line_items.products
+        includes: 
+          - name: name
+            alias: product
+
+      - join_path: base_orders.users
+        prefix: true
+        includes: *
+        excludes:
+          - company
+
+```
+
+</CodeTabs>
+
+## Dimensions
+
+Dimensions represent the properties of a **single** data point in the cube.
+[The `orders` table](#top) contains only dimensions, so representing them in the
+`orders` cube is straightforward:
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  dimensions: {
+    id: {
+      sql: `id`,
+      type: `number`,
+      // Here we explicitly let Cube know this field is the primary key
+      // This is required for de-duplicating results when using joins
+      primary_key: true,
+    },
+
+    status: {
+      sql: `status`,
+      type: `string`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        # Here we explicitly let Cube know this field is the primary key
+        # This is required for de-duplicating results when using joins
+        primary_key: true
+
+      - name: status
+        sql: status
+        type: string
+```
+
+</CodeTabs>
+
+[The `line_items` table](#top) also has a couple of dimensions which can be
+represented as follows:
+
+<CodeTabs>
+
+```javascript
+cube(`line_items`, {
+  // ...
+
+  dimensions: {
+    id: {
+      sql: `id`,
+      type: `number`,
+      // Again, we explicitly let Cube know this field is the primary key
+      // This is required for de-duplicating results when using joins
+      primary_key: true,
+    },
+
+    order_id: {
+      sql: `order_id`,
+      type: `number`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: line_items
+    # ...
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        # Again, we explicitly let Cube know this field is the primary key
+        # This is required for de-duplicating results when using joins
+        primary_key: true
+
+      - name: order_id
+        sql: order_id
+        type: number
+```
+
+</CodeTabs>
+
+Dimensions can be of different types, and you can find them all
+[here][ref-schema-dimension-types].
+
+Time-based properties should be represented as dimensions with type `time`. Time
+dimensions allow grouping the result set by a unit of time (e.g. hours, days,
+weeks). In analytics, this is also known as "granularity".
+
+We can add the necessary time dimensions to both data models as follows:
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  dimensions: {
+    created_at: {
+      sql: `created_at`,
+      type: `time`,
+    },
+
+    completed_at: {
+      sql: `completed_at`,
+      type: `time`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    dimensions:
+      - name: created_at
+        sql: created_at
+        type: time
+
+      - name: completed_at
+        sql: completed_at
+        type: time
+```
+
+</CodeTabs>
+
+<CodeTabs>
+
+```javascript
+cube(`line_items`, {
+  // ...
+
+  dimensions: {
+    created_at: {
+      sql: `created_at`,
+      type: `time`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: line_items
+    # ...
+
+    dimensions:
+      - name: created_at
+        sql: created_at
+        type: time
+```
+
+</CodeTabs>
+
+Time dimensions are essential to enabling performance boosts such as
+[partitioned pre-aggregations][ref-caching-use-preaggs-partition-time] and
+[incremental refreshes][ref-tutorial-incremental-preagg].
+
+## Measures
+
+Measures represent the properties of a **set of data points** in the cube. To
+add a measure called `count` to our `orders` cube, for example, we can do the
+following:
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  measures: {
+    count: {
+      type: `count`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: count
+        type: count
+```
+
+</CodeTabs>
+
+In our `LineItems` cube, we can also create a measure to sum up the total value
+of line items sold:
+
+<CodeTabs>
+
+```javascript
+cube(`line_items`, {
+  // ...
+
+  measures: {
+    total: {
+      sql: `price`,
+      type: `sum`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: line_items
+    # ...
+
+    measures:
+      - name: total
+        sql: price
+        type: sum
+```
+
+</CodeTabs>
+
+Measures can be of different types, and you can find them all
+[here][ref-schema-measure-types].
+
+## Joins
+
+Joins define the relationships between cubes, which then allows accessing and
+comparing properties from two or more cubes at the same time. In Cube, all joins
+are `LEFT JOIN`s.
+
+<InfoBox>
+
+An `INNER JOIN` can be replicated with Cube; when making a Cube query, add a
+filter for `IS NOT NULL` on the required column.
+
+</InfoBox>
+
+In the following example, we are left-joining the `line_items` cube onto our
+`orders` cube:
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  joins: {
+    line_items: {
+      relationship: `many_to_one`,
+      // Here we use the `CUBE` global to refer to the current cube,
+      // so the following is equivalent to `orders.id = line_items.order_id`
+      sql: `${CUBE}.id = ${line_items.order_id}`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    joins:
+      - name: line_items
+        # Here we use the `CUBE` global to refer to the current cube,
+        # so the following is equivalent to `orders.id = line_items.order_id`
+        sql: "{CUBE}.id = {line_items.order_id}"
+        relationship: many_to_one
+```
+
+</CodeTabs>
+
+There are the three [types of join relationships][ref-schema-ref-joins-types]:
+`one_to_one`, `one_to_many`, and `many_to_one`.
+
+## Segments
+
+Segments are filters that are predefined in the data model instead of [a Cube
+query][ref-backend-query-filters]. They allow simplifying Cube queries and make
+it easy to re-use common filters across a variety of queries.
+
+To add a segment which limits results to completed orders, we can do the
+following:
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  segments: {
+    only_completed: {
+      sql: `${CUBE}.status = 'completed'`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    segments:
+      - name: only_completed
+        sql: "{CUBE}.status = 'completed'"
+```
+
+</CodeTabs>
+
+## Pre-aggregations
+
+Pre-aggregations are a powerful way of caching frequently-used, expensive
+queries and keeping the cache up-to-date on a periodic basis. Within a data
+schema, they are defined under the `pre_aggregations` property:
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  pre_aggregations: {
+    main: {
+      measures: [CUBE.count],
+      dimensions: [CUBE.status],
+      timeDimension: CUBE.created_at,
+      granularity: `day`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    pre_aggregations:
+      - name: main
+        measures:
+          - count
+        dimensions:
+          - status
+        time_dimension: created_at
+        granularity: day
+```
+
+</CodeTabs>
+
+A more thorough introduction can be found in [Getting Started with
+Pre-Aggregations][ref-caching-preaggs-intro].
+
+[ref-backend-query-filters]: /query-format#filters-format
+[ref-caching-preaggs-intro]: /caching/pre-aggregations/getting-started
+[ref-caching-use-preaggs-partition-time]:
+  /caching/using-pre-aggregations#time-partitioning
+[ref-schema-dimension-types]: /schema/reference/types-and-formats#types
+[ref-schema-measure-types]: /schema/reference/types-and-formats#measures-types
+[ref-schema-ref-joins-types]: /schema/reference/joins#relationship
+[ref-schema-ref-sql]: /schema/reference/cube#sql
+[ref-schema-ref-sql-table]: /schema/reference/cube#sql-table
+[ref-tutorial-incremental-preagg]: /incremental-pre-aggregations
+[self-dimensions]: #dimensions
+[self-measures]: #measures
+[wiki-olap]: https://en.wikipedia.org/wiki/Online_analytical_processing
+[wiki-view-sql]: https://en.wikipedia.org/wiki/View_(SQL)

@@ -1146,13 +1146,13 @@ class ApiGateway {
 
     if (!persistent) {
       if (
-        typeof query.limit === 'number' &&
-        query.limit > getEnv('dbQueryLimit')
+        typeof query.rowLimit === 'number' &&
+        query.rowLimit > getEnv('dbQueryLimit')
       ) {
         throw new Error('The query limit has been exceeded.');
       }
-      query.limit = typeof query.limit === 'number'
-        ? query.limit
+      query.rowLimit = typeof query.rowLimit === 'number'
+        ? query.rowLimit
         : def;
     }
   }

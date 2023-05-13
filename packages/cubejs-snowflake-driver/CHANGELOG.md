@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.6](https://github.com/cube-js/cube/compare/v0.33.5...v0.33.6) (2023-05-13)
+
+
+### Bug Fixes
+
+* **snowflake-driver:** Bind variable ? not set for partitioned pre-aggregations ([#6594](https://github.com/cube-js/cube/issues/6594)) ([0819075](https://github.com/cube-js/cube/commit/081907568d97fa79f56edf1898b2845affb925cf))
+
+
+
+
+
 ## [0.33.3](https://github.com/cube-js/cube/compare/v0.33.2...v0.33.3) (2023-05-05)
 
 

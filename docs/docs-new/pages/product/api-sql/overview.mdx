@@ -1,0 +1,513 @@
+---
+redirect_from:
+  - /backend/sql
+---
+
+# Overview
+<WarningBox heading={`Migration to Postgres protocol`}>
+
+This is documentation of Cube’s SQL API for the Postgres protocol. The MySQL
+protocol used in the first versions of the Cube SQL API is no longer being
+developed and will be phased out soon. Please consider migrating to the Postgres
+protocol.
+
+</WarningBox>
+
+The Cube SQL API allows querying Cube via Postgres-compatible SQL. It enables
+the use of BI applications, Python notebooks, reverse ETL tools, and other
+downstream tools on top of Cube.
+
+###  Supported Tools
+
+Cube SQL API has been tested with
+
+- psql CLI
+- Apache Superset
+- Tableau Cloud
+- Tableau Desktop with JDBC driver
+- Power BI
+- Metabase
+- Google Data Studio
+- Excel through Devart plugin
+- Deepnote
+- Hex
+- Observable
+- Streamlit
+- Jupyter notebook
+- Hightouch
+
+Please see [this GitHub issue](https://github.com/cube-js/cube/issues/3906) for
+the tools roadmap and to suggest and vote for tools of your interest.
+
+## Querying Fundamentals
+
+Under the hood, SQL API uses
+[Apache Datafusion](https://arrow.apache.org/datafusion/) as its SQL execution
+engine. It's responsible for query planning and execution. As the conversion
+process from SQL to Cube Query can be ambiguous, an additional step of query
+rewriting is done before the query is executed. During this step, the query plan
+is rewritten such that the maximum number of Cube Queries can be detected within
+the given query plan. Overall, rewriting is a seamless process. There are some
+practical considerations that you should keep in mind while querying, though.
+
+In the SQL API, each cube is represented as a table. Measures, dimensions, and
+segments in this table are columns. We call these tables **cube tables**.
+
+Consider the `orders` cube in your data model, the following query is performing
+a `SELECT` from the `orders` **cube**.
+
+```sql
+SELECt
+  city,
+  SUM(amount)
+FROM orders
+WHERE status = 'shipped'
+GROUP BY 1
+```
+
+The SQL API transforms `SELECT` query fragments from **cube tables** into
+[Cube's internal query format](/query-format). This process is called **Cube
+query rewrite**.
+
+The SQL query above would be rewritten into the following Cube query:
+
+```json
+{
+  "measures": ["Orders.amount"],
+  "dimensions": ["Orders.city"],
+  "filters": [
+    {
+      "member": "Orders.status",
+      "operator": "equals",
+      "values": ["shipped"]
+    }
+  ]
+}
+```
+
+Because of this transformation, not all functions and expressions are supported
+in query fragments performing `SELECT` from cube tables. Please refer to the
+reference to see whether a specific expression or function is supported. For
+example, the following query won't work because the SQL API can't push down the
+`case` expression to Cube for processing. It is not possible to translate `case`
+expression in measure.
+
+```sql
+-- This query won't work because of the Cube query rewrite
+SELECT
+  city,
+  CASE
+    WHEN status = 'shipped' THEN 'done'
+    ELSE 'in-progress'
+  END real_status,
+  SUM(number)
+FROM orders
+  CROSS JOIN Users
+GROUP BY 1;
+```
+
+You can leverage nested queries in cases like this. You can wrap your `SELECT`
+statement from a cube table into another `SELECT` statement to perform
+calculations with expressions like `CASE`. This outer select is **not** part of
+the SQL query that being rewritten and thus allows you to use more SQL
+functions, operators and expressions. You can rewrite the above query as
+follows, making sure to wrap the original `SELECT` statement:
+
+```sql
+--- You can also use CTEs to achieve the same result
+SELECT
+  city,
+  CASE
+    WHEN status = 'shipped' THEN 'done'
+    ELSE 'in-progress'
+  END real_status,
+  SUM(amount) AS total
+FROM (
+  SELECT
+    Users.city AS city,
+    SUM(number) AS amount,
+    orders.status
+  FROM orders
+    CROSS JOIN Users
+  GROUP BY 1, 3
+) AS inner
+GROUP BY 1, 2
+ORDER BY 1;
+```
+
+The above query works because the `CASE` expression is supported in `SELECT`
+queries **not** querying cube tables.
+
+When querying cube tables, it is important to understand fundamentals of Cube
+query rewrite as well as the **pushdown** process. **Pushdown** is a process of
+pushing the processing of a particular part of the query down to the inner
+`SELECT` from the cube table. The following sections provide an overview of Cube
+query rewrite and pushdown. Please refer to the reference to see whether
+specific functions, operators or expressions are supported in Cube query
+rewrite.
+
+###  Aggregated vs Non-aggregated queries
+
+There are two types of queries supported against **cube tables**: aggregated and
+non-aggregated. Aggregated are those with `GROUP BY` statement, and
+non-aggregated are those without. Cube queries issued to your database will
+always be aggregated, and it doesn't matter if you provide `GROUP BY` in a query
+or not.
+
+Whenever you use a non-aggregated query you need to provide only column names in
+SQL:
+
+```sql
+SELECT status, count FROM orders
+```
+
+The same aggregated query should always aggregate measure columns using a
+corresponding aggregating function or special `MEASURE()` function:
+
+<WarningBox>
+
+In cases where measure columns are not aggregated
+`Projection references non-aggregate values` error will be thrown. It means
+there are columns that are neither in `GROUP BY` or aggregated. This is a
+standard SQL `GROUP BY` operation consistency check enforced by SQL API as well.
+
+</WarningBox>
+
+```sql
+SELECT status, SUM(count) FROM orders GROUP BY 1
+SELECT status, MEASURE(count) FROM orders GROUP BY 1
+```
+
+###  Filtering
+
+Cube supports most simple equality operators like `=`, `<>`, `<`, `<=`, `>`,
+`>=` as well as `IN` and `LIKE` operators. Cube tries to push down all filters
+into Cube query. In some cases, SQL filters aren't available in Cube and can be
+done in a post-processing phase. Time dimension filters will be converted to
+time dimension date ranges whenever it's possible.
+
+###  Ordering
+
+Cube tries to push down all `ORDER BY` statements into Cube Query.
+
+If it can't be done ordering part would be done in a post-processing phase. In
+case there are more than 50,000 rows in the result set, incorrect results can be
+received in this case. Please use `EXPLAIN` in order to check if it's the case.
+
+Consider the following query.
+
+```sql
+SELECT
+  status,
+  SUM(total_value) + 2 as transformed_amount
+FROM (
+  SELECT * FROM orders
+) orders
+GROUP BY status
+ORDER BY status DESC
+LIMIT 100
+```
+
+Because of the expression `SUM(total_value) + 2` in the projection of outer
+query, Cube can't push down `ORDER`.
+
+You can run `EXPLAIN` against the above query to look at the plan. As you can
+see below, the sorting operation is done after Cube query and projection.
+
+```bash
++ GlobalLimitExec: skip=None, fetch=100
++- SortExec: [transformed_amount@1 DESC]
++-- ProjectionExec: expr=[status@0 as status, SUM(orders.total_value)@1 + CAST(2 AS Float64) as transformed_amount]
++--- CubeScanExecutionPlan
+```
+
+Because of the default limit in Cube queries (50,000 rows), there is a
+possibility of a wrong result if there are more than 50,000 rows. Given that
+queries to Cube are usually aggregated, it is rare that they may return more
+than 50,000 rows, but keep that limitation in mind when designing your queries.
+
+###  Limit
+
+Limit push down is supported by Cube however, a limit over 50,000 can't be
+overridden. In future versions, paging and streaming would be used to avoid this
+limitation.
+
+## Enabling SQL API in Cube Cloud
+
+To enable the SQL API in Cube Cloud, click&nbsp;<Btn>Deploy SQL API</Btn> from
+the&nbsp;<Btn>Overview</Btn> page, then click <Btn>How to connect your BI
+tool</Btn>. You should then see the following screen:
+
+![SQL API details modal|690x428](https://ucarecdn.com/67508334-1641-43ec-9d50-a8f64629992b/)
+
+## Examples
+
+Consider the following data model:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    sql_table: orders
+
+    measures:
+      - name: count
+        type: count
+
+    dimensions:
+      - name: status
+        type: string
+        sql: status
+
+      - name: created_at
+        type: time
+        sql: created_at
+```
+
+```javascript
+cube(`orders`, {
+  sql_table: `orders`,
+
+  measures: {
+    count: {
+      type: `count`,
+    },
+  },
+
+  dimensions: {
+    status: {
+      sql: `status`,
+      type: `string`,
+    },
+
+    created_at: {
+      sql: `created_at`,
+      type: `time`,
+    },
+  },
+});
+```
+
+</CodeTabs>
+
+It would be represented as table in SQL API with `count`, `status`, `created`
+columns.
+
+To get the count of orders grouped by status we can run the following query.
+
+```sql
+cube=> SELECT count, status FROM orders;
+ count |   status
+-------+------------
+ 15513 | completed
+ 14652 | processing
+ 13829 | shipped
+(3 rows)
+```
+
+Cube will automatically apply the `GROUP BY` clause in case it is missing in the
+query. We can also provide the `GROUP BY` statement to control how results are
+grouped. In the following example, we group orders by created month and also by
+status within every month.
+
+```sql
+cube=> SELECT MEASURE(count), status, DATE_TRUNC('month', created_at) date FROM orders GROUP BY date, status ORDER BY date asc;
+ measure(orders.count) |   status   |            date
+-----------------------+------------+----------------------------
+                    31 | shipped    | 2016-01-01 00:00:00.000000
+                    28 | completed  | 2016-01-01 00:00:00.000000
+                    28 | processing | 2016-01-01 00:00:00.000000
+                    28 | shipped    | 2016-02-01 00:00:00.000000
+                    18 | processing | 2016-02-01 00:00:00.000000
+                    28 | completed  | 2016-02-01 00:00:00.000000
+                    54 | processing | 2016-03-01 00:00:00.000000
+                    57 | completed  | 2016-03-01 00:00:00.000000
+                    56 | shipped    | 2016-03-01 00:00:00.000000
+                    54 | shipped    | 2016-04-01 00:00:00.000000
+                    60 | completed  | 2016-04-01 00:00:00.000000
+                    43 | processing | 2016-04-01 00:00:00.000000
+                    55 | shipped    | 2016-05-01 00:00:00.000000
+```
+
+###  Querying Dimensions
+
+Querying dimensions is straightforward, simply add any required fields to the
+`SELECT` clause.
+
+```sql
+cube=> SELECT status FROM orders;
+   status
+------------
+ completed
+ processing
+ shipped
+(3 rows)
+```
+
+###  Querying Measures
+
+Measures can similarly be queried through Cube SQL.
+
+Because measures are already aggregated in Cube there is no need to apply
+aggregate functions to them in SQL API if you don't have a `GROUP BY` statement
+in query.
+
+```sql
+cube=> SELECT count FROM orders;
+ count
+-------
+ 43994
+(1 row)
+```
+
+Some BI systems or SQL constraints may require you to apply aggregate functions.
+To support this, Cube allows aggregate functions on measures as long as they
+match the type of the measure.
+
+`count` measure in our example is of type `count`, It means we can apply
+`COUNT()` aggregate function to it. The below query is similar to the above one.
+
+```sql
+cube=> SELECT COUNT(count) FROM orders;
+ COUNT(orders.count)
+---------------------
+               43994
+(1 row)
+```
+
+There's also universal aggregate function `MEASURE()` that matches any measure
+type.
+
+```sql
+cube=> SELECT MEASURE(count) FROM orders;
+ measure(orders.count)
+-----------------------
+                 43994
+(1 row)
+```
+
+Let's look at more measures types:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: count
+        type: count
+
+      - name: distinct_count
+        type: count_distinct
+        sql: id
+
+      - name: approx_distinct_count
+        type: count_distinct_approx
+        sql: id
+
+      - name: min_value
+        type: min
+        sql: min_value
+
+      - name: max_value
+        type: max
+        sql: max_value
+```
+
+```javascript
+cube(`orders`, {
+  // ...,
+
+  measures: {
+    count: {
+      type: `count`,
+    },
+    distinct_count: {
+      sql: `id`,
+      type: `count_distinct`,
+    },
+    approx_distinct_count: {
+      sql: `id`,
+      type: `count_distinct_approx`,
+    },
+    min_value: {
+      sql: `min_value`,
+      type: `min`,
+    },
+    max_value: {
+      sql: `max_value`,
+      type: `max`,
+    },
+  },
+});
+```
+
+</CodeTabs>
+
+As we can see, we have a mix of measure types in the above data model. To query
+them, we could use the following SQL statements:
+
+```sql
+--- Both the following statements are equivalent
+SELECT count FROM orders
+SELECT COUNT(*) FROM orders
+
+--- Count distinct, and count distinct approx
+--- Both the following statements are equivalent
+SELECT distinct_count FROM orders
+SELECT COUNT(DISTINCT distinct_count) FROM orders
+
+--- Both the following statements are equivalent
+SELECT approx_distinct_count FROM orders
+SELECT COUNT(DISTINCT approx_distinct_count) FROM orders
+
+--- Both the following statements are equivalent
+SELECT min_value FROM orders
+SELECT MIN(min_value) FROM orders
+
+--- Both the following statements are equivalent
+SELECT max_value FROM orders
+SELECT MAX(max_value) FROM orders
+```
+
+###  Querying Segments
+
+Any segments defined in a data model can also be used in Cube SQL queries.
+Looking at the data model below, we have one segment `is_completed`:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+    segments:
+      - name: is_completed
+        sql: status = 'completed'
+```
+
+```javascript
+cube("orders", {
+  // ...,
+
+  segments: {
+    is_completed: {
+      sql: `${CUBE}.status = 'completed'`,
+    },
+  },
+});
+```
+
+</CodeTabs>
+
+Segments must be used as `boolean` types in Cube SQL queries:
+
+```sql
+WHERE is_completed = true
+```
+
+[ref-config-js]: /config
+[ref-dynamic-schemas]: /schema/dynamic-schema-creation

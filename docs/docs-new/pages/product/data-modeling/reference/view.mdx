@@ -1,0 +1,339 @@
+---
+redirect_from:
+  - /schema/reference/view
+---
+
+# Views
+Views sit on top of the data graph of cubes and create a facade of your whole
+data model with which data consumers can interact. They are useful for defining
+metrics, managing governance and data access, and controlling ambiguous join
+paths.
+
+<div style={{ textAlign: "center" }}>
+  <img
+    alt="Architecture diagram of queries being sent to cubes and views"
+    src="https://ucarecdn.com/bfc3e04a-b690-40bc-a6f8-14a9175fb4fd/"
+    style={{ border: "none" }}
+    width="100%"
+  />
+</div>
+
+Views **can not** have their own members. Instead, use the `cubes` or `includes` parameters
+to include measures and dimensions from other cubes into the view. In the
+example below, we create a new view `active_users` which is made up of properties
+from the `users` cube:
+
+<CodeTabs>
+
+```javascript
+view(`orders`, {
+  cubes: [
+    {
+      join_path: base_orders,
+      includes: [
+        `status`,
+        `created_date`,
+        `total_amount`,
+        `total_amount_shipped`,
+        `count`,
+        `average_order_value`
+      ]
+    },
+    {
+      join_path: base_orders.line_items.products,
+      includes: [
+        {
+          name: `name`,
+          alias: `product`
+        }
+      ]
+    },
+    {
+      join_path: base_orders.users,
+      prefix: true,
+      includes: `*`,
+      excludes: [
+        `company`
+      ]
+
+    }
+  ]
+});
+```
+
+```yaml
+views:
+  - name: orders
+
+    cubes:
+      - join_path: base_orders
+        includes:
+          - status
+          - created_date
+          - total_amount
+          - total_amount_shipped
+          - count
+          - average_order_value
+      
+      - join_path: base_orders.line_items.products
+        includes: 
+          - name: name
+            alias: product
+
+      - join_path: base_orders.users
+        prefix: true
+        includes: *
+        excludes:
+          - company
+
+```
+
+</CodeTabs>
+
+
+Views can be queried the same way as cubes; the example below show how to query
+the above view with SQL API:
+
+```sql
+SELECT 
+  users_city,
+  MEASURE(total_amount)
+FROM orders
+GROUP BY 1
+```
+
+Views also do not define any pre-aggregations, instead they re-use
+pre-aggregations defined by the underlying cubes.
+
+## Parameters
+
+###  name
+
+The `name` parameter serves as the identifier of a view. It must be unique among
+_all cubes and views_ within a deployment and follow the [naming
+conventions][ref-naming].
+
+<CodeTabs>
+
+```javascript
+view(`active_users`, {});
+```
+
+```yaml
+views:
+  - name: active_users
+```
+
+</CodeTabs>
+
+###  description
+
+A description of the view allows your team to better understand what its purpose
+is. It is a very simple and yet useful tool that gives a hint to everyone and
+ensures that data is interpreted correctly by users.
+
+<CodeTabs>
+
+```javascript
+view(`active_users`, {
+  description: `14 days rolling count of active users`,
+});
+```
+
+```yaml
+views:
+  - name: active_users
+    description: 14 days rolling count of active users
+```
+
+</CodeTabs>
+
+###  cubes
+
+Use `cubes` parameter in view to include exposed cubes in bulk.
+You can build your view by combining multiple joined cubes together and specifying the path by which they should be joined for that particular view. 
+
+<CodeTabs>
+
+```javascript
+view(`orders`, {
+  cubes: [
+    {
+      join_path: base_orders,
+      includes: [
+        `status`,
+        `created_date`,
+        `total_amount`,
+        `total_amount_shipped`,
+        `count`,
+        `average_order_value`
+      ]
+    },
+    {
+      join_path: base_orders.line_items.products,
+      includes: [
+        {
+          name: `name`,
+          alias: `product`
+        }
+      ]
+    },
+    {
+      join_path: base_orders.users,
+      prefix: true
+      includes: `*`,
+      excludes: [
+        `company`
+      ]
+    }
+  ]
+});
+```
+
+```yaml
+views:
+  - name: orders
+
+    cubes:
+      - join_path: base_orders
+        includes:
+          - status
+          - created_date
+          - total_amount
+          - total_amount_shipped
+          - count
+          - average_order_value
+      
+      - join_path: base_orders.line_items.products
+        includes: 
+          - name: name
+            alias: product
+
+      - join_path: base_orders.users
+        prefix: true
+        includes: *
+        excludes:
+          - company
+
+```
+</CodeTabs>
+
+When listing cubes to expose, you need to provide a `join_path` parameter. It uses dot notation to describe the join path: `cube_1.cube_2.cube_3`.
+For the root cube of the view, just put the cube name as in the example above for `base_orders`.
+
+The other required parameter inside the `cubes` block is `includes`. You can simply list measures, dimensions, or segments you'd like to include.
+In case you need to rename some of them, you can provide `name` and `alias` parameters.
+Alternatively, you can use the `excludes` parameter in conjunction with the includes all definition `includes: *`.
+
+Optionally, if you'd like to prefix exposed measures, dimensions, or segments with the cube name, you can use the `prefix: true` parameter.
+It will prefix them with the cube name, e.g. `users_city`. You can use the `alias` parameter to rename the cube for the prefixing purpose.
+
+
+###  includes
+
+The `includes` property is used to bulk add measures or dimensions to a view.
+
+<CodeTabs>
+
+```javascript
+view(`active_users`, {
+  description: `14 days rolling count of active users`,
+
+  includes: [
+    // Measures
+    users.rolling_count,
+
+    // Dimensions
+    users.city,
+    users.created_at,
+  ],
+});
+```
+
+```yaml
+views:
+  - name: active_users
+
+    includes:
+      # Measures
+      - users.rolling_count
+
+      # Dimensions
+      - users.city
+      - users.created_at
+```
+
+</CodeTabs>
+
+###  public
+
+<InfoBox>
+
+Prior to v0.33, this property was called `shown`.
+
+</InfoBox>
+
+The `public` property is used to manage the visibility of a view. Valid values
+for `public` are `true` and `false`. When set to `false`, this view **cannot**
+be queried through the API. Defaults to `true`.
+
+<CodeTabs>
+
+```yaml
+views:
+  - name: orders
+    public: false
+```
+
+```javascript
+view(`orders`, {
+  public: false
+});
+```
+
+</CodeTabs>
+
+
+You can also use `COMPILE_CONTEXT` for dynamic visibility if necessary, check out our [Controlling access to cubes and views
+](https://cube.dev/docs/recipes/controlling-access-to-cubes-and-views) recipe.
+
+
+<CodeTabs>
+
+```javascript
+view(`arr`, {
+  description: `Annual Recurring Revenue`,
+  public: COMPILE_CONTEXT.security_context.is_finance,
+
+  includes: [
+    revenue.arr,
+    revenue.date,
+    customers.plan
+  ],
+});
+```
+
+```yaml
+views:
+  - name: arr
+    description: Annual Recurring Revenue
+    public: COMPILE_CONTEXT.security_context.is_finance
+
+    includes:
+      # Measures
+      - revenue.arr
+      # Dimensions
+      - revenue.date
+      - customers.plan
+```
+
+</CodeTabs>
+
+To learn more about using `public` to control visibility based on security
+context, read the [Controlling access to cubes and views
+recipe][ref-recipe-control-access-cubes-views].
+
+[ref-recipe-control-access-cubes-views]:
+  /recipes/controlling-access-to-cubes-and-views
+[ref-schema-joins-direction]: /schema/fundamentals/joins#directions-of-joins
+[ref-naming]: /data-modeling/syntax#naming

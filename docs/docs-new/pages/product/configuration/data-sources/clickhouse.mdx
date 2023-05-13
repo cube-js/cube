@@ -1,0 +1,98 @@
+---
+redirect_from:
+  - /config/databases/clickhouse
+---
+
+# ClickHouse
+## Prerequisites
+
+- The hostname for the [ClickHouse][clickhouse] database server
+- The [username/password][clickhouse-docs-users] for the
+  [ClickHouse][clickhouse] database server
+
+## Setup
+
+###  Manual
+
+Add the following to a `.env` file in your Cube project:
+
+```dotenv
+CUBEJS_DB_TYPE=clickhouse
+CUBEJS_DB_HOST=my.clickhouse.host
+CUBEJS_DB_NAME=my_clickhouse_database
+CUBEJS_DB_USER=clickhouse_user
+CUBEJS_DB_PASS=**********
+```
+
+## Environment Variables
+
+| Environment Variable            | Description                                                                         | Possible Values           | Required | [Supports multiple data sources?][ref-config-multiple-ds-decorating-env] |
+| ------------------------------- | ----------------------------------------------------------------------------------- | ------------------------- | :------: | :----------------------------------------------------------------------: |
+| `CUBEJS_DB_HOST`                | The host URL for a database                                                         | A valid database host URL |    ✅    |                                    ✅                                    |
+| `CUBEJS_DB_PORT`                | The port for the database connection                                                | A valid port number       |    ❌    |                                    ✅                                    |
+| `CUBEJS_DB_NAME`                | The name of the database to connect to                                              | A valid database name     |    ✅    |                                    ✅                                    |
+| `CUBEJS_DB_USER`                | The username used to connect to the database                                        | A valid database username |    ✅    |                                    ✅                                    |
+| `CUBEJS_DB_PASS`                | The password used to connect to the database                                        | A valid database password |    ✅    |                                    ✅                                    |
+| `CUBEJS_DB_CLICKHOUSE_READONLY` | Whether the ClickHouse user has read-only access or not                             | `true`, `false`           |    ❌    |                                    ✅                                    |
+| `CUBEJS_CONCURRENCY`            | The number of concurrent connections each queue has to the database. Default is `5` | A valid number            |    ❌    |                                    ❌                                    |
+| `CUBEJS_DB_MAX_POOL`            | The maximum number of concurrent database connections to pool. Default is `20`      | A valid number            |    ❌    |                                    ✅                                    |
+
+## Pre-Aggregation Feature Support
+
+### count_distinct_approx
+
+Measures of type
+[`count_distinct_approx`][ref-schema-ref-types-formats-countdistinctapprox] can
+not be used in pre-aggregations when using ClickHouse as a source database.
+
+## Pre-Aggregation Build Strategies
+
+<InfoBox>
+
+To learn more about pre-aggregation build strategies, [head
+here][ref-caching-using-preaggs-build-strats].
+
+</InfoBox>
+
+| Feature       | Works with read-only mode? | Is default? |
+| ------------- | :------------------------: | :---------: |
+| Batching      |             ✅             |     ✅      |
+| Export Bucket |             -              |      -      |
+
+By default, ClickHouse uses [batching][self-preaggs-batching] to build
+pre-aggregations.
+
+### Batching
+
+No extra configuration is required to configure batching for ClickHouse.
+
+### Export Bucket
+
+ClickHouse does not support export buckets.
+
+## SSL
+
+To enable SSL-encrypted connections between Cube and ClickHouse, set the
+`CUBEJS_DB_SSL` environment variable to `true`. For more information on how to
+configure custom certificates, please check out [Enable SSL Connections to the
+Database][ref-recipe-enable-ssl].
+
+## Additional Configuration
+
+You can connect to a ClickHouse database when your user's permissions are
+[restricted][clickhouse-readonly] to read-only, by setting
+`CUBEJS_DB_CLICKHOUSE_READONLY` to `true`.
+
+[clickhouse]: https://clickhouse.tech/
+[clickhouse-docs-users]:
+  https://clickhouse.tech/docs/en/operations/settings/settings-users/
+[clickhouse-readonly]:
+  https://clickhouse.tech/docs/en/operations/settings/permissions-for-queries/#settings_readonly
+[ref-caching-using-preaggs-build-strats]:
+  /caching/using-pre-aggregations#pre-aggregation-build-strategies
+[ref-config-multiple-ds-decorating-env]:
+  /config/multiple-data-sources#configuring-data-sources-with-environment-variables-decorated-environment-variables
+[ref-recipe-enable-ssl]: /recipes/enable-ssl-connections-to-database
+[ref-schema-ref-types-formats-countdistinctapprox]:
+  /schema/reference/types-and-formats#count-distinct-approx
+[self-preaggs-batching]: #batching
