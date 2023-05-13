@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.6](https://github.com/cube-js/cube/compare/v0.33.5...v0.33.6) (2023-05-13)
+
+
+### Features
+
+* **cubestore:** Queue - support cancel, ack, result_blocking by processingId ([#6551](https://github.com/cube-js/cube/issues/6551)) ([2e82839](https://github.com/cube-js/cube/commit/2e82839586f18d8b9ba385ab6f8e5641113ccf0c))
+
+
+
+
+
 ## [0.33.5](https://github.com/cube-js/cube/compare/v0.33.4...v0.33.5) (2023-05-11)
 
 **Note:** Version bump only for package @cubejs-backend/query-orchestrator

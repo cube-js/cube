@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.6](https://github.com/cube-js/cube.js/compare/v0.33.5...v0.33.6) (2023-05-13)
+
+
+### Bug Fixes
+
+* LIMIT is not enforced ([#6586](https://github.com/cube-js/cube.js/issues/6586)) ([8ca5234](https://github.com/cube-js/cube.js/commit/8ca52342944b9767f2c34591a9241bf31cf78c71))
+* **snowflake-driver:** Bind variable ? not set for partitioned pre-aggregations ([#6594](https://github.com/cube-js/cube.js/issues/6594)) ([0819075](https://github.com/cube-js/cube.js/commit/081907568d97fa79f56edf1898b2845affb925cf))
+
+
+
+
+
 ## [0.33.5](https://github.com/cube-js/cube.js/compare/v0.33.4...v0.33.5) (2023-05-11)
 
 **Note:** Version bump only for package @cubejs-backend/testing-drivers
