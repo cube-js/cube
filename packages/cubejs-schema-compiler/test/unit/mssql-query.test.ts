@@ -122,7 +122,7 @@ describe('MssqlQuery', () => {
       expect(finalGroupBy).toEqual("GROUP BY \"visitors.createdAt_series\".\"date_from\"");
     }));
 
-    it('should group by both time and regular dimensions on rolling windows',
+  it('should group by both time and regular dimensions on rolling windows',
     () => compiler.compile().then(() => {
       const query = new MssqlQuery(
         { joinGraph, cubeEvaluator, compiler },
