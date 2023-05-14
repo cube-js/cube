@@ -29,10 +29,10 @@ describe('MssqlQuery', () => {
           sql: 'created_at'
         },
 
-        role: {
+        source: {
           type: 'string',
-          sql: 'role'
-        }
+          sql: 'source'
+        },
       }
     })
 
@@ -128,7 +128,7 @@ describe('MssqlQuery', () => {
         { joinGraph, cubeEvaluator, compiler },
         {
           measures: ['visitors.count', 'visitors.unboundedCount'],
-          dimensions: ['visitors.role'],
+          dimensions: ['visitors.source'],
           timeDimensions: [
             {
               dimension: 'visitors.createdAt',
@@ -152,7 +152,7 @@ describe('MssqlQuery', () => {
       const queryCloseIdx = queryString.indexOf(')', lastGroupByIdx + 1);
       const finalGroupBy = queryString.substring(lastGroupByIdx, queryCloseIdx);
 
-      expect(finalGroupBy).toEqual("GROUP BY \"visitors.createdAt_series\".\"date_from\", \"visitors__role\"");
+      expect(finalGroupBy).toEqual("GROUP BY \"visitors.createdAt_series\".\"date_from\", \"visitors__source\"");
     }));
 
   it('should not include order by clauses in subqueries',
