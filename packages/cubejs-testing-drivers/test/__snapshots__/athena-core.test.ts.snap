@@ -7,6 +7,7 @@ Array [
     "queryColumnTypes",
   ],
   Array [
+    "createSchemaIfNotExists",
     "uploadTableWithIndexes",
   ],
 ]
