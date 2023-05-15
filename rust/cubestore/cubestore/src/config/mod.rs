@@ -1064,14 +1064,16 @@ impl Config {
                 cachestore_rocks_store_config: RocksStoreConfig::cachestore_default(),
                 cachestore_gc_loop_interval: env_parse_duration(
                     "CUBESTORE_CACHESTORE_GC_LOOP",
-                    30,
-                    None,
+                    15,
+                    // 1 minute
+                    Some(60 * 1),
                     Some(1),
                 ),
                 cachestore_queue_results_expire: env_parse_duration(
                     "CUBESTORE_QUEUE_RESULTS_EXPIRE",
-                    90,
-                    None,
+                    60,
+                    // 5 minutes = TTL of QueueResult
+                    Some(60 * 5),
                     Some(1),
                 ),
                 upload_concurrency: env_parse("CUBESTORE_MAX_ACTIVE_UPLOADS", 4),

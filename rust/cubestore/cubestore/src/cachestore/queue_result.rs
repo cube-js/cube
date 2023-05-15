@@ -30,7 +30,7 @@ impl QueueResult {
             path,
             value,
             deleted: false,
-            expire: Utc::now() + Duration::minutes(10),
+            expire: Utc::now() + Duration::minutes(5),
         }
     }
 
