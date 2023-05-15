@@ -47,6 +47,28 @@ describe('SQL Generation', () => {
     });
   });
 
+  describe('Common - JS - limit', () => {
+    const compilers = /** @type Compilers */ prepareCompiler(
+      createCubeSchema({
+        name: 'cards',
+        sqlTable: 'card_tbl'
+      })
+    );
+
+    it('Query with limit', async () => {
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: [
+          'cards.count'
+        ],
+        limit: 5
+      });
+      const queryAndParams = query.buildSqlAndParams();
+      expect(queryAndParams[0]).toContain('LIMIT 5');
+    });
+  });
+
   describe('Common - JS', () => {
     const compilers = /** @type Compilers */ prepareCompiler(
       createCubeSchema({
