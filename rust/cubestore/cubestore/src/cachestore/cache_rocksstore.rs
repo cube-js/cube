@@ -262,8 +262,8 @@ impl RocksCacheStore {
     async fn queue_result_delete_by_id(&self, id: u64) -> Result<(), CubeError> {
         self.store
             .write_operation(move |db_ref, batch_pipe| {
-                let queue_schema = QueueResultRocksTable::new(db_ref.clone());
-                queue_schema.try_delete(id, batch_pipe)?;
+                let result_schema = QueueResultRocksTable::new(db_ref.clone());
+                result_schema.try_delete(id, batch_pipe)?;
 
                 Ok(())
             })
@@ -271,7 +271,21 @@ impl RocksCacheStore {
     }
 
     /// This method should be called when we are sure that we return data to the consumer
-    fn queue_result_ready_to_delete(
+    async fn queue_result_ready_to_delete(&self, id: u64) -> Result<(), CubeError> {
+        self.store
+            .write_operation(move |db_ref, batch_pipe| {
+                let result_schema = QueueResultRocksTable::new(db_ref.clone());
+                if let Some(row) = result_schema.get_row(id)? {
+                    Self::queue_result_ready_to_delete_impl(&result_schema, batch_pipe, row)?;
+                }
+
+                Ok(())
+            })
+            .await
+    }
+
+    /// This method should be called when we are sure that we return data to the consumer
+    fn queue_result_ready_to_delete_impl(
         result_schema: &QueueResultRocksTable,
         batch_pipe: &mut BatchPipe,
         queue_result: IdRow<QueueResult>,
@@ -304,7 +318,7 @@ impl RocksCacheStore {
                         if queue_result.get_row().is_deleted() {
                             Ok(None)
                         } else {
-                            Self::queue_result_ready_to_delete(
+                            Self::queue_result_ready_to_delete_impl(
                                 &result_schema,
                                 batch_pipe,
                                 queue_result,
@@ -920,9 +934,12 @@ impl CacheStore for RocksCacheStore {
                         Ok(Some(QueueResultResponse::Success { value: None }))
                     }
                     QueueResultAckEventResult::WithResult { result } => {
-                        // Queue v1 behaviour
                         if query_key_is_path {
+                            // Queue v1 behaviour
                             self.queue_result_delete_by_id(ack_event.id).await?;
+                        } else {
+                            // Queue v2 behaviour
+                            self.queue_result_ready_to_delete(ack_event.id).await?;
                         }
 
                         Ok(Some(QueueResultResponse::Success {

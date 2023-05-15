@@ -241,7 +241,8 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("queue_full_workflow_v2", queue_full_workflow_v2),
         t("queue_latest_result_v1", queue_latest_result_v1),
         t("queue_retrieve_extended", queue_retrieve_extended),
-        t("queue_ack_then_result", queue_ack_then_result),
+        t("queue_ack_then_result_v1", queue_ack_then_result_v1),
+        t("queue_ack_then_result_v2", queue_ack_then_result_v2),
         t("queue_orphaned_timeout", queue_orphaned_timeout),
         t("queue_heartbeat_by_id", queue_heartbeat_by_id),
         t("queue_heartbeat_by_path", queue_heartbeat_by_path),
@@ -5522,7 +5523,7 @@ async fn ksql_simple(service: Box<dyn SqlClient>) {
                 .await
                 .unwrap();
             if res.len() == 0 {
-                futures_timer::Delay::new(Duration::from_millis(100)).await;
+                tokio::time::sleep(Duration::from_millis(100)).await;
                 continue;
             }
             if res.len() == 1 {
@@ -8725,6 +8726,16 @@ fn assert_queue_retrieve_columns(response: &Arc<DataFrame>) {
     );
 }
 
+fn assert_queue_result_blocking_columns(response: &Arc<DataFrame>) {
+    assert_eq!(
+        response.get_columns(),
+        &vec![
+            Column::new("payload".to_string(), ColumnType::String, 0),
+            Column::new("type".to_string(), ColumnType::String, 1),
+        ]
+    );
+}
+
 async fn queue_retrieve_extended(service: Box<dyn SqlClient>) {
     service
         .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:1" "payload1";"#)
@@ -8797,7 +8808,7 @@ async fn queue_retrieve_extended(service: Box<dyn SqlClient>) {
     }
 }
 
-async fn queue_ack_then_result(service: Box<dyn SqlClient>) {
+async fn queue_ack_then_result_v1(service: Box<dyn SqlClient>) {
     service
         .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:5555" "payload1";"#)
         .await
@@ -8863,6 +8874,84 @@ async fn queue_ack_then_result(service: Box<dyn SqlClient>) {
         .unwrap();
 
     assert_eq!(result.get_rows().len(), 0);
+}
+
+async fn queue_ack_then_result_v2(service: Box<dyn SqlClient>) {
+    let add_response = service
+        .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:5555" "payload1";"#)
+        .await
+        .unwrap();
+    assert_queue_add_columns(&add_response);
+
+    let ack_result = service
+        .exec_query(r#"QUEUE ACK 1 "result:5555""#)
+        .await
+        .unwrap();
+    assert_eq!(
+        ack_result.get_rows(),
+        &vec![Row::new(vec![TableValue::Boolean(true)])]
+    );
+
+    // double ack for result, should be restricted
+    {
+        let ack_result = service
+            .exec_query(r#"QUEUE ACK 1 "result:5555""#)
+            .await
+            .unwrap();
+        assert_eq!(
+            ack_result.get_rows(),
+            &vec![Row::new(vec![TableValue::Boolean(false)])]
+        );
+    }
+
+    // ack on unknown queue item
+    {
+        let ack_result = service
+            .exec_query(r#"QUEUE ACK 10 "result:5555""#)
+            .await
+            .unwrap();
+        assert_eq!(
+            ack_result.get_rows(),
+            &vec![Row::new(vec![TableValue::Boolean(false)])]
+        );
+    }
+
+    let result = service
+        .exec_query(r#"QUEUE RESULT "STANDALONE#queue:5555""#)
+        .await
+        .unwrap();
+
+    assert_eq!(
+        result.get_columns(),
+        &vec![
+            Column::new("payload".to_string(), ColumnType::String, 0),
+            Column::new("type".to_string(), ColumnType::String, 1),
+        ]
+    );
+    assert_eq!(
+        result.get_rows(),
+        &vec![Row::new(vec![
+            TableValue::String("result:5555".to_string()),
+            TableValue::String("success".to_string())
+        ]),]
+    );
+
+    // second call should not return anything, because first call should mark result as ready to delete
+    let result = service
+        .exec_query(r#"QUEUE RESULT "STANDALONE#queue:5555""#)
+        .await
+        .unwrap();
+    assert_eq!(result.get_rows().len(), 0);
+
+    tokio::time::sleep(Duration::new(1, 0)).await;
+
+    // should return, because we use id
+    let result = service
+        .exec_query(r#"QUEUE RESULT_BLOCKING 1000 1"#)
+        .await
+        .unwrap();
+    assert_queue_result_blocking_columns(&result);
+    assert_eq!(result.get_rows().len(), 1);
 }
 
 async fn queue_orphaned_timeout(service: Box<dyn SqlClient>) {
