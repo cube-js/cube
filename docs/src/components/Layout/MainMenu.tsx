@@ -33,7 +33,7 @@ const menuOrder = [
   'Monitoring',
   'Examples & Tutorials',
   'FAQs',
-  'Style Guide',
+  'Guides',
   'Reference'
 ];
 
