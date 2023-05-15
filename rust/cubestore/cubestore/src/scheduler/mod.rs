@@ -8,29 +8,27 @@ use crate::metastore::replay_handle::{
     union_seq_pointer_by_location, SeqPointerForLocation,
 };
 use crate::metastore::table::Table;
-use crate::metastore::Chunk;
 use crate::metastore::{
-    deactivate_table_due_to_corrupt_data, deactivate_table_on_corrupt_data, IdRow, MetaStore,
-    MetaStoreEvent, Partition, RowKey, TableId,
+    deactivate_table_due_to_corrupt_data, deactivate_table_on_corrupt_data, Chunk, IdRow,
+    MetaStore, MetaStoreEvent, Partition, RowKey, TableId,
 };
 use crate::remotefs::RemoteFs;
+use crate::shared::deadline_queue::DeadlineQueue;
 use crate::store::{ChunkStore, WALStore};
 use crate::util::time_span::warn_long_fut;
 use crate::util::WorkerLoop;
 use crate::CubeError;
 use chrono::Utc;
 use datafusion::cube_ext;
-use flatbuffers::bitflags::_core::cmp::Ordering;
-use flatbuffers::bitflags::_core::time::Duration;
 use futures::future::join_all;
 use futures_timer::Delay;
 use itertools::Itertools;
 use log::error;
-use std::collections::{BinaryHeap, HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 use tokio::sync::broadcast::Receiver;
-use tokio::sync::{broadcast, Mutex, Notify, RwLock};
+use tokio::sync::{broadcast, Mutex};
 use tokio::task::JoinHandle;
 use tokio::time::Instant;
 use tokio_util::sync::CancellationToken;
@@ -41,7 +39,7 @@ pub struct SchedulerImpl {
     remote_fs: Arc<dyn RemoteFs>,
     event_receiver: Mutex<Receiver<MetaStoreEvent>>,
     cancel_token: CancellationToken,
-    gc_loop: Arc<DataGCLoop>,
+    gc_queue: DeadlineQueue<GCTask>,
     config: Arc<dyn ConfigObj>,
     reconcile_loop: WorkerLoop,
     chunk_processing_loop: WorkerLoop,
@@ -59,20 +57,16 @@ impl SchedulerImpl {
         config: Arc<dyn ConfigObj>,
     ) -> Self {
         let cancel_token = CancellationToken::new();
-        let gc_loop = DataGCLoop::new(
-            meta_store.clone(),
-            remote_fs.clone(),
-            config.clone(),
-            cancel_token.clone(),
-        );
+        let gc_queue = DeadlineQueue::new(config.gc_loop_interval(), cancel_token.clone());
+
         Self {
             meta_store,
             cluster,
             remote_fs,
             event_receiver: Mutex::new(event_receiver),
             cancel_token,
-            gc_loop,
             config,
+            gc_queue,
             reconcile_loop: WorkerLoop::new("Reconcile"),
             chunk_events_queue: Mutex::new(Vec::with_capacity(1000)),
             chunk_processing_loop: WorkerLoop::new("ChunkProcessing"),
@@ -80,14 +74,20 @@ impl SchedulerImpl {
     }
 
     pub fn spawn_processing_loops(self: Arc<Self>) -> Vec<JoinHandle<Result<(), CubeError>>> {
+        let scheduler1 = self.clone();
         let scheduler2 = self.clone();
         let scheduler3 = self.clone();
         let scheduler4 = self.clone();
 
         vec![
             cube_ext::spawn(async move {
-                let gc_loop = self.gc_loop.clone();
-                gc_loop.run().await;
+                scheduler1
+                    .gc_queue
+                    .run(scheduler1.clone(), async move |s, tasks| {
+                        s.process_gc_tasks(tasks).await
+                    })
+                    .await;
+
                 Ok(())
             }),
             cube_ext::spawn(async move {
@@ -117,6 +117,90 @@ impl SchedulerImpl {
                 Ok(())
             }),
         ]
+    }
+
+    pub async fn process_gc_tasks(self: Arc<Self>, task: GCTask) -> Result<(), CubeError> {
+        log::trace!("Executing GC task: {:?}", task);
+
+        match task {
+            GCTask::RemoveRemoteFile(remote_path) => {
+                log::trace!("Removing deactivated data file: {}", remote_path);
+                if let Err(e) = self.remote_fs.delete_file(&remote_path).await {
+                    log::error!(
+                        "Could not remove deactivated data file({}): {}",
+                        remote_path,
+                        e
+                    );
+                }
+            }
+            GCTask::DeleteChunks(chunk_ids) => {
+                match self.meta_store.get_chunks_out_of_queue(chunk_ids).await {
+                    Ok(chunks) => {
+                        let ids = chunks
+                            .into_iter()
+                            .filter_map(|c| {
+                                if c.get_row().active() {
+                                    None
+                                } else {
+                                    Some(c.get_id())
+                                }
+                            })
+                            .collect::<Vec<_>>();
+
+                        if let Err(e) = self.meta_store.delete_chunks_without_checks(ids).await {
+                            log::error!(
+                                "Could not delete chunks. Get error {} when deleting chunks",
+                                e
+                            );
+                        }
+                    }
+                    Err(e) => {
+                        log::error!(
+                                    "Could not delete chunks. Get error {} when trying get chunks for deletion",
+                                    e
+                                );
+                    }
+                }
+            }
+            GCTask::DeleteMiddleManPartition(partition_id) => {
+                if let Ok(true) = self
+                    .meta_store
+                    .can_delete_middle_man_partition(partition_id)
+                    .await
+                {
+                    log::trace!("Removing middle man partition {}", partition_id);
+                    if let Err(e) = self
+                        .meta_store
+                        .delete_middle_man_partition(partition_id)
+                        .await
+                    {
+                        log::error!(
+                            "Could not remove middle man partition ({}): {}",
+                            partition_id,
+                            e
+                        );
+                    }
+                } else {
+                    log::trace!("Skipping removing of middle man partition {}", partition_id);
+                }
+            }
+            GCTask::DeletePartition(partition_id) => {
+                if let Ok(true) = self.meta_store.can_delete_partition(partition_id).await {
+                    log::trace!("Removing orphaned partition {}", partition_id);
+                    if let Err(e) = self.meta_store.delete_partition(partition_id).await {
+                        log::error!(
+                            "Could not remove orphaned partition ({}): {}",
+                            partition_id,
+                            e
+                        );
+                    }
+                } else {
+                    log::trace!("Skipping removing orphaned partition {}", partition_id);
+                }
+            }
+        };
+
+        Ok(())
     }
 
     async fn run_meta_event_processor(self: Arc<Self>) {
@@ -292,11 +376,8 @@ impl SchedulerImpl {
 
         for partition in all_inactive_partitions.iter() {
             let deadline = Instant::now() + Duration::from_secs(self.config.import_job_timeout());
-            self.gc_loop
-                .send(GCTimedTask {
-                    deadline,
-                    task: GCTask::DeletePartition(partition.get_id()),
-                })
+            self.gc_queue
+                .send(GCTask::DeletePartition(partition.get_id()), deadline)
                 .await?;
         }
         Ok(())
@@ -307,11 +388,11 @@ impl SchedulerImpl {
 
         for partition in all_inactive_partitions.iter() {
             let deadline = Instant::now() + Duration::from_secs(self.config.import_job_timeout());
-            self.gc_loop
-                .send(GCTimedTask {
+            self.gc_queue
+                .send(
+                    GCTask::DeleteMiddleManPartition(partition.get_id()),
                     deadline,
-                    task: GCTask::DeleteMiddleManPartition(partition.get_id()),
-                })
+                )
                 .await?;
         }
         Ok(())
@@ -463,11 +544,11 @@ impl SchedulerImpl {
 
         let deadline = Instant::now() + Duration::from_secs(self.config.import_job_timeout());
         for part in ids.as_slice().chunks(10000) {
-            self.gc_loop
-                .send(GCTimedTask {
+            self.gc_queue
+                .send(
+                    GCTask::DeleteChunks(part.iter().cloned().collect_vec()),
                     deadline,
-                    task: GCTask::DeleteChunks(part.iter().cloned().collect_vec()),
-                })
+                )
                 .await?;
         }
         Ok(())
@@ -489,11 +570,11 @@ impl SchedulerImpl {
                 .map(|c| c.get_id().clone())
                 .collect::<Vec<_>>();
             for part in ids.as_slice().chunks(10000) {
-                self.gc_loop
-                    .send(GCTimedTask {
+                self.gc_queue
+                    .send(
+                        GCTask::DeleteChunks(part.iter().cloned().collect_vec()),
                         deadline,
-                        task: GCTask::DeleteChunks(part.iter().cloned().collect_vec()),
-                    })
+                    )
                     .await?;
             }
         }
@@ -506,11 +587,11 @@ impl SchedulerImpl {
                 .map(|c| c.get_id())
                 .collect::<Vec<_>>();
             for part in ids.as_slice().chunks(10000) {
-                self.gc_loop
-                    .send(GCTimedTask {
+                self.gc_queue
+                    .send(
+                        GCTask::DeleteChunks(part.iter().cloned().collect_vec()),
                         deadline,
-                        task: GCTask::DeleteChunks(part.iter().cloned().collect_vec()),
-                    })
+                    )
                     .await?;
             }
         }
@@ -650,11 +731,8 @@ impl SchedulerImpl {
                     ChunkStore::chunk_remote_path(chunk.get_id(), chunk.get_row().suffix());
                 let deadline = Instant::now()
                     + Duration::from_secs(self.config.meta_store_snapshot_interval() * 2);
-                self.gc_loop
-                    .send(GCTimedTask {
-                        deadline,
-                        task: GCTask::RemoveRemoteFile(file_name),
-                    })
+                self.gc_queue
+                    .send(GCTask::RemoveRemoteFile(file_name), deadline)
                     .await?;
             }
         }
@@ -664,11 +742,8 @@ impl SchedulerImpl {
                 if let Some(file_name) = partition.get_row().get_full_name(partition.get_id()) {
                     let deadline = Instant::now()
                         + Duration::from_secs(self.config.meta_store_snapshot_interval() * 2);
-                    self.gc_loop
-                        .send(GCTimedTask {
-                            deadline,
-                            task: GCTask::RemoveRemoteFile(file_name),
-                        })
+                    self.gc_queue
+                        .send(GCTask::RemoveRemoteFile(file_name), deadline)
                         .await?;
                 }
             }
@@ -682,11 +757,8 @@ impl SchedulerImpl {
                         partition_file_name(partition.get_id(), partition.get_row().suffix());
                     let deadline =
                         Instant::now() + Duration::from_secs(self.config.not_used_timeout());
-                    self.gc_loop
-                        .send(GCTimedTask {
-                            deadline,
-                            task: GCTask::RemoveRemoteFile(file_name),
-                        })
+                    self.gc_queue
+                        .send(GCTask::RemoveRemoteFile(file_name), deadline)
                         .await?;
                 }
             }
@@ -875,31 +947,31 @@ impl SchedulerImpl {
         if !in_memory_inactive.is_empty() {
             let seconds = self.config.in_memory_not_used_timeout();
             let deadline = Instant::now() + Duration::from_secs(seconds);
-            self.gc_loop
-                .send(GCTimedTask {
-                    deadline,
-                    task: GCTask::DeleteChunks(
+            self.gc_queue
+                .send(
+                    GCTask::DeleteChunks(
                         in_memory_inactive
                             .into_iter()
                             .map(|c| c.get_id())
                             .collect::<Vec<_>>(),
                     ),
-                })
+                    deadline,
+                )
                 .await?;
         }
         if !persistent_inactive.is_empty() {
             let seconds = self.config.not_used_timeout();
             let deadline = Instant::now() + Duration::from_secs(seconds);
-            self.gc_loop
-                .send(GCTimedTask {
-                    deadline,
-                    task: GCTask::DeleteChunks(
+            self.gc_queue
+                .send(
+                    GCTask::DeleteChunks(
                         persistent_inactive
                             .into_iter()
                             .map(|c| c.get_id())
                             .collect::<Vec<_>>(),
                     ),
-                })
+                    deadline,
+                )
                 .await?;
         }
         Ok(())
@@ -1135,207 +1207,12 @@ impl SchedulerImpl {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
-struct GCTimedTask {
-    pub deadline: Instant,
-    pub task: GCTask,
-}
-
-impl PartialOrd for GCTimedTask {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        // Reverse order to have min heap
-        other.deadline.partial_cmp(&self.deadline)
-    }
-}
-
-impl Ord for GCTimedTask {
-    fn cmp(&self, other: &Self) -> Ordering {
-        // Reverse order to have min heap
-        other.deadline.cmp(&self.deadline)
-    }
-}
-
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
-enum GCTask {
+pub enum GCTask {
     RemoveRemoteFile(/*remote_path*/ String),
     DeleteChunks(/*chunk_ids*/ Vec<u64>),
     DeleteMiddleManPartition(/*partition_id*/ u64),
     DeletePartition(/*partition_id*/ u64),
-}
-
-/// Cleans up deactivated partitions and chunks on remote fs.
-/// Ensures enough time has passed that queries over those files finish.
-struct DataGCLoop {
-    metastore: Arc<dyn MetaStore>,
-    remote_fs: Arc<dyn RemoteFs>,
-    config: Arc<dyn ConfigObj>,
-    stop: CancellationToken,
-    task_notify: Notify,
-    pending: RwLock<(BinaryHeap<GCTimedTask>, HashSet<GCTask>)>,
-}
-
-impl DataGCLoop {
-    fn new(
-        metastore: Arc<dyn MetaStore>,
-        remote_fs: Arc<dyn RemoteFs>,
-        config: Arc<dyn ConfigObj>,
-        stop: CancellationToken,
-    ) -> Arc<Self> {
-        Arc::new(DataGCLoop {
-            metastore,
-            remote_fs,
-            config,
-            stop,
-            task_notify: Notify::new(),
-            pending: RwLock::new((BinaryHeap::new(), HashSet::new())),
-        })
-    }
-
-    async fn send(&self, task: GCTimedTask) -> Result<(), CubeError> {
-        if self.pending.read().await.1.get(&task.task).is_none() {
-            let mut pending_lock = self.pending.write().await;
-            // Double-checked locking
-            if pending_lock.1.get(&task.task).is_none() {
-                log::trace!(
-                    "Posting GCTask {}: {:?}",
-                    task.deadline
-                        .checked_duration_since(Instant::now())
-                        .map(|d| format!("in {:?}", d))
-                        .unwrap_or("now".to_string()),
-                    task
-                );
-                pending_lock.1.insert(task.task.clone());
-                pending_lock.0.push(task);
-                self.task_notify.notify_waiters();
-            }
-        }
-
-        Ok(())
-    }
-
-    async fn run(&self) {
-        loop {
-            tokio::select! {
-                _ = self.stop.cancelled() => {
-                    return;
-                }
-                _ = Delay::new(Duration::from_secs(self.config.gc_loop_interval())) => {}
-                _ = self.task_notify.notified() => {}
-            };
-
-            while self
-                .pending
-                .read()
-                .await
-                .0
-                .peek()
-                .map(|current| current.deadline <= Instant::now())
-                .unwrap_or(false)
-            {
-                let task = {
-                    let mut pending_lock = self.pending.write().await;
-                    // Double-checked locking
-                    if pending_lock
-                        .0
-                        .peek()
-                        .map(|current| current.deadline <= Instant::now())
-                        .unwrap_or(false)
-                    {
-                        let task = pending_lock.0.pop().unwrap();
-                        pending_lock.1.remove(&task.task);
-                        task.task
-                    } else {
-                        continue;
-                    }
-                };
-
-                log::trace!("Executing GCTask: {:?}", task);
-
-                match task {
-                    GCTask::RemoveRemoteFile(remote_path) => {
-                        log::trace!("Removing deactivated data file: {}", remote_path);
-                        if let Err(e) = self.remote_fs.delete_file(&remote_path).await {
-                            log::error!(
-                                "Could not remove deactivated data file({}): {}",
-                                remote_path,
-                                e
-                            );
-                        }
-                    }
-                    GCTask::DeleteChunks(chunk_ids) => {
-                        match self.metastore.get_chunks_out_of_queue(chunk_ids).await {
-                            Ok(chunks) => {
-                                let ids = chunks
-                                    .into_iter()
-                                    .filter_map(|c| {
-                                        if c.get_row().active() {
-                                            None
-                                        } else {
-                                            Some(c.get_id())
-                                        }
-                                    })
-                                    .collect::<Vec<_>>();
-
-                                if let Err(e) =
-                                    self.metastore.delete_chunks_without_checks(ids).await
-                                {
-                                    log::error!(
-                                        "Could not delete chunks. Get error {} when deleting chunks",
-                                        e
-                                    );
-                                }
-                            }
-                            Err(e) => {
-                                log::error!(
-                                    "Could not delete chunks. Get error {} when trying get chunks for deletion",
-                                    e
-                                );
-                            }
-                        }
-                    }
-                    GCTask::DeleteMiddleManPartition(partition_id) => {
-                        if let Ok(true) = self
-                            .metastore
-                            .can_delete_middle_man_partition(partition_id)
-                            .await
-                        {
-                            log::trace!("Removing middle man partition {}", partition_id);
-                            if let Err(e) = self
-                                .metastore
-                                .delete_middle_man_partition(partition_id)
-                                .await
-                            {
-                                log::error!(
-                                    "Could not remove middle man partition ({}): {}",
-                                    partition_id,
-                                    e
-                                );
-                            }
-                        } else {
-                            log::trace!(
-                                "Skipping removing of middle man partition {}",
-                                partition_id
-                            );
-                        }
-                    }
-                    GCTask::DeletePartition(partition_id) => {
-                        if let Ok(true) = self.metastore.can_delete_partition(partition_id).await {
-                            log::trace!("Removing orphaned partition {}", partition_id);
-                            if let Err(e) = self.metastore.delete_partition(partition_id).await {
-                                log::error!(
-                                    "Could not remove orphaned partition ({}): {}",
-                                    partition_id,
-                                    e
-                                );
-                            }
-                        } else {
-                            log::trace!("Skipping removing orphaned partition {}", partition_id);
-                        }
-                    }
-                }
-            }
-        }
-    }
 }
 
 #[cfg(test)]

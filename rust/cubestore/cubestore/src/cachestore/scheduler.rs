@@ -1,7 +1,7 @@
 use crate::cachestore::CacheStore;
 use crate::config::ConfigObj;
 use crate::metastore::MetaStoreEvent;
-use crate::shared::deadline_queue::{DeadlineQueue, TimedTask};
+use crate::shared::deadline_queue::DeadlineQueue;
 use crate::CubeError;
 use datafusion::cube_ext;
 use log::error;
@@ -14,14 +14,14 @@ use tokio::time::Instant;
 use tokio_util::sync::CancellationToken;
 
 #[derive(Debug, Eq, Hash, PartialEq, Clone)]
-pub enum GcTask {
+pub enum GCTask {
     DeleteQueue(u64),
 }
 
 pub struct CacheStoreSchedulerImpl {
     event_receiver: Mutex<Receiver<MetaStoreEvent>>,
     cancel_token: CancellationToken,
-    gc_queue: DeadlineQueue<GcTask>,
+    gc_queue: DeadlineQueue<GCTask>,
     cache_store: Arc<dyn CacheStore>,
     cachestore_queue_results_expire: Duration,
 }
@@ -57,7 +57,7 @@ impl CacheStoreSchedulerImpl {
             cube_ext::spawn(async move {
                 scheduler1
                     .gc_queue
-                    .run(scheduler1.clone(), async move |s, tasks| {
+                    .run_batching(scheduler1.clone(), async move |s, tasks| {
                         s.process_gc_tasks(tasks).await
                     })
                     .await;
@@ -70,11 +70,13 @@ impl CacheStoreSchedulerImpl {
         ]
     }
 
-    pub async fn process_gc_tasks(self: Arc<Self>, tasks: Vec<GcTask>) -> Result<(), CubeError> {
+    pub async fn process_gc_tasks(self: Arc<Self>, tasks: Vec<GCTask>) -> Result<(), CubeError> {
+        log::trace!("Executing GC tasks: {:?}", tasks);
+
         let queue_results_to_remove = tasks
             .into_iter()
             .map(|i| match i {
-                GcTask::DeleteQueue(id) => id,
+                GCTask::DeleteQueue(id) => id,
             })
             .collect();
 
@@ -114,10 +116,10 @@ impl CacheStoreSchedulerImpl {
                 MetaStoreEvent::AckQueueItem(event) => {
                     if let Err(e) = self
                         .gc_queue
-                        .send(TimedTask {
-                            deadline: Instant::now() + self.cachestore_queue_results_expire,
-                            task: GcTask::DeleteQueue(event.id),
-                        })
+                        .send(
+                            GCTask::DeleteQueue(event.id),
+                            Instant::now() + self.cachestore_queue_results_expire,
+                        )
                         .await
                     {
                         println!("error while scheduling delete, error: {}", e);

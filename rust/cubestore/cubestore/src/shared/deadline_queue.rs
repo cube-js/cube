@@ -51,21 +51,21 @@ impl<T: Debug + PartialEq + Eq + Hash + Clone> DeadlineQueue<T> {
         }
     }
 
-    pub async fn send(&self, task: TimedTask<T>) -> Result<(), CubeError> {
-        if self.pending.read().await.1.get(&task.task).is_none() {
+    pub async fn send(&self, task: T, deadline: Instant) -> Result<(), CubeError> {
+        if self.pending.read().await.1.get(&task).is_none() {
             let mut pending_lock = self.pending.write().await;
             // Double-checked locking
-            if pending_lock.1.get(&task.task).is_none() {
+            if pending_lock.1.get(&task).is_none() {
                 log::trace!(
                     "Posting GCTask {}: {:?}",
-                    task.deadline
+                    deadline
                         .checked_duration_since(Instant::now())
                         .map(|d| format!("in {:?}", d))
                         .unwrap_or("now".to_string()),
                     task
                 );
-                pending_lock.1.insert(task.task.clone());
-                pending_lock.0.push(task);
+                pending_lock.1.insert(task.clone());
+                pending_lock.0.push(TimedTask { task, deadline });
                 self.task_notify.notify_waiters();
             }
         }
@@ -74,6 +74,56 @@ impl<T: Debug + PartialEq + Eq + Hash + Clone> DeadlineQueue<T> {
     }
 
     pub async fn run<S, F>(
+        &self,
+        service: Arc<S>,
+        loop_fn: impl Fn(Arc<S>, T) -> F + Send + Sync + 'static,
+    ) where
+        S: Send + Sync + 'static,
+        F: Future<Output = Result<(), CubeError>> + Send + 'static,
+    {
+        loop {
+            tokio::select! {
+                _ = self.stop.cancelled() => {
+                    return;
+                }
+                _ = Delay::new(Duration::from_secs(self.gc_loop_interval)) => {}
+                _ = self.task_notify.notified() => {}
+            };
+
+            while self
+                .pending
+                .read()
+                .await
+                .0
+                .peek()
+                .map(|current| current.deadline <= Instant::now())
+                .unwrap_or(false)
+            {
+                let task = {
+                    let mut pending_lock = self.pending.write().await;
+                    // Double-checked locking
+                    if pending_lock
+                        .0
+                        .peek()
+                        .map(|current| current.deadline <= Instant::now())
+                        .unwrap_or(false)
+                    {
+                        let task = pending_lock.0.pop().unwrap();
+                        pending_lock.1.remove(&task.task);
+                        task.task
+                    } else {
+                        continue;
+                    }
+                };
+
+                if let Err(e) = loop_fn(service.clone(), task).await {
+                    error!("Error while processing deadline queue: {}", e);
+                };
+            }
+        }
+    }
+
+    pub async fn run_batching<S, F>(
         &self,
         service: Arc<S>,
         loop_fn: impl Fn(Arc<S>, Vec<T>) -> F + Send + Sync + 'static,
@@ -118,7 +168,6 @@ impl<T: Debug + PartialEq + Eq + Hash + Clone> DeadlineQueue<T> {
                     }
                 };
 
-                log::trace!("Executing GCTask: {:?}", task);
                 pending_tasks.push(task);
             }
 
