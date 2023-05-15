@@ -1,7 +1,7 @@
 use crate::cachestore::cache_rocksstore::QueueAddResponse;
 use crate::cachestore::queue_item::QueueRetrieveResponse;
 use crate::cachestore::{
-    CacheItem, CacheStore, QueueItem, QueueItemStatus, QueueKey, QueueResultResponse,
+    CacheItem, CacheStore, QueueItem, QueueItemStatus, QueueKey, QueueResult, QueueResultResponse,
     RocksCacheStore,
 };
 use crate::config::ConfigObj;
@@ -204,6 +204,14 @@ impl CacheStore for LazyRocksCacheStore {
 
     async fn queue_all(&self) -> Result<Vec<IdRow<QueueItem>>, CubeError> {
         self.init().await?.queue_all().await
+    }
+
+    async fn queue_results_all(&self) -> Result<Vec<IdRow<QueueResult>>, CubeError> {
+        self.init().await?.queue_results_all().await
+    }
+
+    async fn queue_results_multi_delete(&self, ids: Vec<u64>) -> Result<(), CubeError> {
+        self.init().await?.queue_results_multi_delete(ids).await
     }
 
     async fn queue_add(&self, item: QueueItem) -> Result<QueueAddResponse, CubeError> {

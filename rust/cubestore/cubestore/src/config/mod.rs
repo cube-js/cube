@@ -403,6 +403,10 @@ pub trait ConfigObj: DIService {
 
     fn cachestore_rocksdb_config(&self) -> &RocksStoreConfig;
 
+    fn cachestore_gc_loop_interval(&self) -> u64;
+
+    fn cachestore_queue_results_expire(&self) -> u64;
+
     fn download_concurrency(&self) -> u64;
 
     fn upload_concurrency(&self) -> u64;
@@ -503,6 +507,8 @@ pub struct ConfigObjImpl {
     pub metastore_remote_address: Option<String>,
     pub metastore_rocks_store_config: RocksStoreConfig,
     pub cachestore_rocks_store_config: RocksStoreConfig,
+    pub cachestore_gc_loop_interval: u64,
+    pub cachestore_queue_results_expire: u64,
     pub upload_concurrency: u64,
     pub download_concurrency: u64,
     pub connection_timeout: u64,
@@ -670,6 +676,14 @@ impl ConfigObj for ConfigObjImpl {
         &self.cachestore_rocks_store_config
     }
 
+    fn cachestore_gc_loop_interval(&self) -> u64 {
+        self.cachestore_gc_loop_interval
+    }
+
+    fn cachestore_queue_results_expire(&self) -> u64 {
+        self.cachestore_queue_results_expire
+    }
+
     fn download_concurrency(&self) -> u64 {
         self.download_concurrency
     }
@@ -824,6 +838,49 @@ where
     T::Err: Display,
 {
     env_optparse(name).unwrap_or(default)
+}
+
+pub fn env_parse_duration<T>(name: &str, default: T, max: Option<T>, min: Option<T>) -> T
+where
+    T: FromStr + PartialOrd + Display,
+    T::Err: Display,
+{
+    let v = match env::var(name).ok() {
+        None => {
+            return default;
+        }
+        Some(v) => v,
+    };
+
+    let n = match v.parse::<T>() {
+        Ok(n) => n,
+        Err(e) => panic!(
+            "could not parse environment variable '{}' with '{}' value: {}",
+            name, v, e
+        ),
+    };
+
+    if let Some(max) = max {
+        if n > max {
+            panic!(
+                "wrong configuration for environment variable '{}' with '{}' value: greater then max size {}",
+                name, v,
+                max
+            )
+        }
+    };
+
+    if let Some(min) = min {
+        if n < min {
+            panic!(
+                "wrong configuration for environment variable '{}' with '{}' value: lower then min size {}",
+                name, v,
+                min
+            )
+        }
+    };
+
+    n
 }
 
 pub fn env_parse_size(name: &str, default: usize, max: Option<usize>, min: Option<usize>) -> usize {
@@ -1005,6 +1062,20 @@ impl Config {
                 metastore_remote_address: env::var("CUBESTORE_META_ADDR").ok(),
                 metastore_rocks_store_config: RocksStoreConfig::metastore_default(),
                 cachestore_rocks_store_config: RocksStoreConfig::cachestore_default(),
+                cachestore_gc_loop_interval: env_parse_duration(
+                    "CUBESTORE_CACHESTORE_GC_LOOP",
+                    15,
+                    // 1 minute
+                    Some(60 * 1),
+                    Some(1),
+                ),
+                cachestore_queue_results_expire: env_parse_duration(
+                    "CUBESTORE_QUEUE_RESULTS_EXPIRE",
+                    60,
+                    // 5 minutes = TTL of QueueResult
+                    Some(60 * 5),
+                    Some(1),
+                ),
                 upload_concurrency: env_parse("CUBESTORE_MAX_ACTIVE_UPLOADS", 4),
                 download_concurrency: env_parse("CUBESTORE_MAX_ACTIVE_DOWNLOADS", 8),
                 max_ingestion_data_frames: env_parse("CUBESTORE_MAX_DATA_FRAMES", 4),
@@ -1148,6 +1219,8 @@ impl Config {
                 metastore_remote_address: None,
                 metastore_rocks_store_config: RocksStoreConfig::metastore_default(),
                 cachestore_rocks_store_config: RocksStoreConfig::cachestore_default(),
+                cachestore_gc_loop_interval: 30,
+                cachestore_queue_results_expire: 90,
                 upload_concurrency: 4,
                 download_concurrency: 8,
                 max_ingestion_data_frames: 4,
@@ -1449,9 +1522,11 @@ impl Config {
         }
 
         self.injector
-            .register_typed::<CacheStoreSchedulerImpl, _, _, _>(async move |_i| {
+            .register_typed::<CacheStoreSchedulerImpl, _, _, _>(async move |i| {
                 Arc::new(CacheStoreSchedulerImpl::new(
                     cachestore_event_sender_to_move.subscribe(),
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
                 ))
             })
             .await;

@@ -50,6 +50,7 @@ pub mod mysql;
 pub mod queryplanner;
 pub mod remotefs;
 pub mod scheduler;
+pub mod shared;
 pub mod sql;
 pub mod store;
 pub mod streaming;
