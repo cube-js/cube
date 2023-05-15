@@ -290,6 +290,12 @@ impl RocksCacheStore {
         batch_pipe: &mut BatchPipe,
         queue_result: IdRow<QueueResult>,
     ) -> Result<Option<QueueResultResponse>, CubeError> {
+        if queue_result.get_row().is_deleted() {
+            return Ok(Some(QueueResultResponse::Success {
+                value: Some(queue_result.into_row().value),
+            }));
+        }
+
         let row_id = queue_result.get_id();
         let row = queue_result.into_row();
         let mut new_row = row.clone();
