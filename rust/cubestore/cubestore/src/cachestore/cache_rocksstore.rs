@@ -13,7 +13,7 @@ use std::collections::HashMap;
 use std::env;
 
 use crate::metastore::{
-    BaseRocksStoreFs, DbTableRef, IdRow, MetaStoreEvent, MetaStoreFs, RocksStore,
+    BaseRocksStoreFs, BatchPipe, DbTableRef, IdRow, MetaStoreEvent, MetaStoreFs, RocksStore,
     RocksStoreDetails, RocksTable,
 };
 use crate::remotefs::LocalDirRemoteFs;
@@ -259,6 +259,36 @@ impl RocksCacheStore {
 }
 
 impl RocksCacheStore {
+    async fn queue_result_delete_by_id(&self, id: u64) -> Result<(), CubeError> {
+        self.store
+            .write_operation(move |db_ref, batch_pipe| {
+                let queue_schema = QueueResultRocksTable::new(db_ref.clone());
+                queue_schema.try_delete(id, batch_pipe)?;
+
+                Ok(())
+            })
+            .await
+    }
+
+    /// This method should be called when we are sure that we return data to the consumer
+    fn queue_result_ready_to_delete(
+        result_schema: &QueueResultRocksTable,
+        batch_pipe: &mut BatchPipe,
+        queue_result: IdRow<QueueResult>,
+    ) -> Result<Option<QueueResultResponse>, CubeError> {
+        let row_id = queue_result.get_id();
+        let row = queue_result.into_row();
+        let mut new_row = row.clone();
+        new_row.deleted = true;
+
+        // TODO: Partial update? Index?
+        let queue_result = result_schema.update(row_id, new_row, &row, batch_pipe)?;
+
+        Ok(Some(QueueResultResponse::Success {
+            value: Some(queue_result.into_row().value),
+        }))
+    }
+
     async fn lookup_queue_result_by_key(
         &self,
         key: QueueKey,
@@ -266,45 +296,25 @@ impl RocksCacheStore {
         self.store
             .write_operation(move |db_ref, batch_pipe| {
                 let result_schema = QueueResultRocksTable::new(db_ref.clone());
+                let query_key_is_path = key.is_path();
                 let queue_result = result_schema.get_row_by_key(key.clone())?;
 
                 if let Some(queue_result) = queue_result {
-                    if queue_result.get_row().is_deleted() {
-                        Ok(None)
+                    if query_key_is_path {
+                        if queue_result.get_row().is_deleted() {
+                            Ok(None)
+                        } else {
+                            Self::queue_result_ready_to_delete(
+                                &result_schema,
+                                batch_pipe,
+                                queue_result,
+                            )
+                        }
                     } else {
-                        let row_id = queue_result.get_id();
-                        let row = queue_result.into_row();
-                        let mut new_row = row.clone();
-                        new_row.deleted = true;
-
-                        // TODO: Partial update? Index?
-                        let queue_result =
-                            result_schema.update(row_id, new_row, &row, batch_pipe)?;
-
                         Ok(Some(QueueResultResponse::Success {
                             value: Some(queue_result.into_row().value),
                         }))
                     }
-                } else {
-                    Ok(None)
-                }
-            })
-            .await
-    }
-
-    async fn lookup_queue_result_blocking_by_key(
-        &self,
-        key: QueueKey,
-    ) -> Result<Option<QueueResultResponse>, CubeError> {
-        self.store
-            .read_operation(move |db_ref| {
-                let result_schema = QueueResultRocksTable::new(db_ref.clone());
-                let queue_result = result_schema.get_row_by_key(key.clone())?;
-
-                if let Some(queue_result) = queue_result {
-                    Ok(Some(QueueResultResponse::Success {
-                        value: Some(queue_result.row.value),
-                    }))
                 } else {
                     Ok(None)
                 }
@@ -361,6 +371,15 @@ impl RocksCacheStore {
 pub enum QueueKey {
     ById(u64),
     ByPath(String),
+}
+
+impl QueueKey {
+    pub(crate) fn is_path(&self) -> bool {
+        match self {
+            QueueKey::ByPath(_) => true,
+            QueueKey::ById(_) => false,
+        }
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
@@ -883,13 +902,12 @@ impl CacheStore for RocksCacheStore {
         // it will fix position (subscribe) of broadcast channel
         let listener = self.get_listener().await;
 
-        let store_in_result = self
-            .lookup_queue_result_blocking_by_key(key.clone())
-            .await?;
+        let store_in_result = self.lookup_queue_result_by_key(key.clone()).await?;
         if store_in_result.is_some() {
             return Ok(store_in_result);
         }
 
+        let query_key_is_path = key.is_path();
         let fut = tokio::time::timeout(
             Duration::from_millis(timeout),
             listener.wait_for_queue_ack_by_key(key),
@@ -902,6 +920,11 @@ impl CacheStore for RocksCacheStore {
                         Ok(Some(QueueResultResponse::Success { value: None }))
                     }
                     QueueResultAckEventResult::WithResult { result } => {
+                        // Queue v1 behaviour
+                        if query_key_is_path {
+                            self.queue_result_delete_by_id(ack_event.id).await?;
+                        }
+
                         Ok(Some(QueueResultResponse::Success {
                             value: Some(result),
                         }))
