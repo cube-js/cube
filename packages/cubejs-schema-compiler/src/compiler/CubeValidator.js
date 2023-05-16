@@ -656,7 +656,7 @@ export class CubeValidator {
         `${cube.isView ? 'View' : 'Cube'} "${cube.name}" has a name clash with ` +
         `${otherCube.isView ? 'view' : 'cube'} "${otherCube.name}".\n` +
         `Cube and view names should be distinct when compared case-insensitively.\n` +
-        `Please see the documenation: https://cube.dev/docs/data-modeling/syntax#naming.\n` +
+        `Please see the documentation: https://cube.dev/docs/data-modeling/syntax#naming.\n` +
         (isCubeAndView ? `Please also see the style guide: https://cube.dev/docs/style-guide#cubes` : '')
       );
 
