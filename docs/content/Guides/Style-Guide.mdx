@@ -270,17 +270,6 @@ cubes:
 cube(`users`, {
   sql_table: `public.users`,
 
-  measures: {
-    count: {
-      type: `count`
-    },
-
-    total_orders_amount: {
-      sql: `${lifetime_value}`,
-      type: `sum`
-    }
-  },
-
   dimensions: {
     id: {
       sql: `id`,
@@ -297,6 +286,19 @@ cube(`users`, {
       sql: `${line_items.total_amount}`,
       type: `number`,
       sub_query: true
+    }
+  },
+
+  measures: {
+    count: {
+      type: `count`
+    },
+
+    total_orders_amount: {
+      sql: `${lifetime_value}`,
+      type: `sum`
+    }
+  }
 })
 ```
 
