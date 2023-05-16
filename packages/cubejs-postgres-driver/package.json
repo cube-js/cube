@@ -1,8 +1,8 @@
 {
-  "name": "@codefresh-io/cubejs-backend-postgres-driver-yosi",
+  "name": "@codefresh-io/cubejs-backend-postgres-driver-yosi1",
   "description": "Cube.js Postgres database driver",
   "author": "Cube Dev, Inc.",
-  "version": "0.30.80",
+  "version": "0.30.81",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.js.git",
