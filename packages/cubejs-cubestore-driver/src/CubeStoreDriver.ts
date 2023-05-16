@@ -76,7 +76,8 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
 
   public async query<R = any>(query: string, values: any[], options?: QueryOptions): Promise<R[]> {
     const { inlineTables, ...queryTracingObj } = options ?? {};
-    return this.connection.query(formatSql(query, values || []), inlineTables ?? [], { ...queryTracingObj, instance: getEnv('instanceId') });
+    const sql = formatSql(query, values || []);
+    return this.connection.query(sql, inlineTables ?? [], { ...queryTracingObj, instance: getEnv('instanceId') });
   }
 
   public async release() {

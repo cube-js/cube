@@ -168,95 +168,6 @@ export class QueryQueue {
   }
 
   /**
-   * Depends on the `queryHandler` value either runs `executeQueryInQueue`
-   * or `executeStreamInQueue` method.
-   *
-   * @param {string} queryHandler For the regular query is eq to 'query'.
-   * @param {*} queryKey
-   * @param {*} query
-   * @param {number=} priority
-   * @param {*=} options
-   * @returns {*}
-   *
-   * @throw {ContinueWaitError}
-   */
-  async executeInQueue(
-    queryHandler,
-    queryKey,
-    query,
-    priority,
-    options,
-  ) {
-    return this.executeQueryInQueue(
-      queryHandler,
-      queryKey,
-      query,
-      priority,
-      options,
-    );
-  }
-
-  /**
-   * Push persistent query to the queue and call `QueryQueue.reconcileQueue()` method.
-   *
-   * @param {string} queryHandler
-   * @param {*} queryKey
-   * @param {*} query
-   * @param {number=} priority
-   * @param {*=} options
-   * @returns {Promise<void>}
-   */
-  async executeStreamInQueue(
-    queryHandler,
-    queryKey,
-    query,
-    priority,
-    options,
-  ) {
-    options = options || {};
-    const queueConnection = await this.queueDriver.createConnection();
-    try {
-      priority = priority || 0;
-      if (!(priority >= -10000 && priority <= 10000)) {
-        throw new Error(
-          'Priority should be between -10000 and 10000'
-        );
-      }
-      const time = new Date().getTime();
-      const keyScore = time + (10000 - priority) * 1E14;
-
-      options.orphanedTimeout = query.orphanedTimeout;
-      const orphanedTimeout = 'orphanedTimeout' in query
-        ? query.orphanedTimeout
-        : this.orphanedTimeout;
-      const orphanedTime = time + (orphanedTimeout * 1000);
-
-      const [added, _b, _c, queueSize, addedToQueueTime] = await queueConnection.addToQueue(
-        keyScore, queryKey, orphanedTime, queryHandler, query, priority, options
-      );
-      if (added > 0) {
-        this.logger('Added to queue (persistent)', {
-          priority,
-          queueSize,
-          queryKey,
-          queuePrefix: this.redisQueuePrefix,
-          requestId: options.requestId,
-          metadata: query.metadata,
-          preAggregationId: query.preAggregation?.preAggregationId,
-          newVersionEntry: query.newVersionEntry,
-          forceBuild: query.forceBuild,
-          preAggregation: query.preAggregation,
-          addedToQueueTime,
-          persistent: queryKey.persistent,
-        });
-      }
-      this.reconcileQueue();
-    } finally {
-      this.queueDriver.release(queueConnection);
-    }
-  }
-
-  /**
    * Push query to the queue and call `QueryQueue.reconcileQueue()` method if
    * `options.skipQueue` is set to `false`, execute query skipping queue
    * otherwise.
@@ -270,7 +181,7 @@ export class QueryQueue {
    *
    * @throw {ContinueWaitError}
    */
-  async executeQueryInQueue(
+  async executeInQueue(
     queryHandler,
     queryKey,
     query,
@@ -334,7 +245,7 @@ export class QueryQueue {
       const orphanedTimeout = 'orphanedTimeout' in query ? query.orphanedTimeout : this.orphanedTimeout;
       const orphanedTime = time + (orphanedTimeout * 1000);
 
-      const [added, _b, _c, queueSize, addedToQueueTime] = await queueConnection.addToQueue(
+      const [added, queueId, queueSize, addedToQueueTime] = await queueConnection.addToQueue(
         keyScore, queryKey, orphanedTime, queryHandler, query, priority, options
       );
 
@@ -400,7 +311,7 @@ export class QueryQueue {
       } else {
         // Result here won't be fetched for a jobed build query (initialized by
         // the /cubejs-system/v1/pre-aggregations/jobs endpoint).
-        result = !query.isJob && await queueConnection.getResultBlocking(queryKey);
+        result = !query.isJob && await queueConnection.getResultBlocking(queryKeyHash, queueId);
       }
 
       // We don't want to throw the ContinueWaitError for a jobed build query.
@@ -763,8 +674,8 @@ export class QueryQueue {
   }
 
   /**
-   * Processing query specified by the `queryKey`. This method incapsulate most
-   * of the logic related with the queues updates, heartbeating, etc.
+   * Processing query specified by the `queryKey`. This method encapsulate most
+   * of the logic related with the queues updates, heartbeat, etc.
    *
    * @param {QueryKeyHash} queryKeyHashed
    * @return {Promise<{ result: undefined | Object, error: string | undefined }>}
@@ -773,17 +684,18 @@ export class QueryQueue {
     const queueConnection = await this.queueDriver.createConnection();
 
     let insertedCount;
-    let _removedCount;
+    let queueId;
     let activeKeys;
     let queueSize;
     let query;
     let processingLockAcquired;
+
     try {
       const processingId = await queueConnection.getNextProcessingId();
       const retrieveResult = await queueConnection.retrieveForProcessing(queryKeyHashed, processingId);
 
       if (retrieveResult) {
-        [insertedCount /** todo(ovr): Remove */, _removedCount/** todo(ovr): Remove */, activeKeys, queueSize, query, processingLockAcquired] = retrieveResult;
+        [insertedCount, queueId, activeKeys, queueSize, query, processingLockAcquired] = retrieveResult;
       }
 
       const activated = activeKeys && activeKeys.indexOf(queryKeyHashed) !== -1;
@@ -808,7 +720,7 @@ export class QueryQueue {
           preAggregation: query.query?.preAggregation,
           addedToQueueTime: query.addedToQueueTime,
         });
-        await queueConnection.optimisticQueryUpdate(queryKeyHashed, { startQueryTime }, processingId);
+        await queueConnection.optimisticQueryUpdate(queryKeyHashed, { startQueryTime }, processingId, queueId);
 
         const heartBeatTimer = setInterval(
           () => queueConnection.updateHeartBeat(queryKeyHashed),
@@ -840,7 +752,7 @@ export class QueryQueue {
                     query.query,
                     async (cancelHandler) => {
                       try {
-                        return queueConnection.optimisticQueryUpdate(queryKeyHashed, { cancelHandler }, processingId);
+                        return queueConnection.optimisticQueryUpdate(queryKeyHashed, { cancelHandler }, processingId, queueId);
                       } catch (e) {
                         this.logger('Error while query update', {
                           queryKey: query.queryKey,
@@ -916,7 +828,7 @@ export class QueryQueue {
 
         clearInterval(heartBeatTimer);
 
-        if (!(await queueConnection.setResultAndRemoveQuery(queryKeyHashed, executionResult, processingId))) {
+        if (!(await queueConnection.setResultAndRemoveQuery(queryKeyHashed, executionResult, processingId, queueId))) {
           this.logger('Orphaned execution result', {
             processingId,
             warn: 'Result for query was not set due to processing lock wasn\'t acquired',
@@ -937,7 +849,7 @@ export class QueryQueue {
         // if (query?.queryHandler === 'stream') {
         //   const [active] = await queueConnection.getQueryStageState(true);
         //   if (active && active.length > 0) {
-        //     await Promise.race(active.map(keyHash => queueConnection.getResultBlockingByHash(keyHash)));
+        //     await Promise.race(active.map(keyHash => queueConnection.getResultBlocking(keyHash)));
         //     await this.reconcileQueue();
         //   }
         // }
