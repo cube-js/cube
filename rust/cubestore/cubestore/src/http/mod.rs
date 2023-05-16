@@ -146,6 +146,10 @@ impl HttpServer {
                                 if let Err(e) = send_res {
                                     error!("Websocket message send error: {:?}", e)
                                 }
+                                if res.should_close_connection() {
+                                   log::warn!("Websocket connection closed");
+                                   break;
+                                }
                             }
                             Some(msg) = web_socket.next() => {
                                 match msg {
@@ -284,12 +288,21 @@ impl HttpServer {
                                 "Error processing HTTP command: {}\n",
                                 e.display_with_backtrace()
                             );
+                                let command = if e.is_wrong_connection() {
+                                    HttpCommand::CloseConnection {
+                                        error: e.to_string(),
+                                    }
+
+                                } else {
+                                    HttpCommand::Error {
+                                        error: e.to_string(),
+                                    }
+                                };
+
                                 HttpMessage {
                                     message_id,
                                     connection_id,
-                                    command: HttpCommand::Error {
-                                        error: e.to_string(),
-                                    },
+                                    command,
                                 }
                             }
                         });
@@ -576,6 +589,9 @@ pub enum HttpCommand {
     ResultSet {
         data_frame: Arc<DataFrame>,
     },
+    CloseConnection {
+        error: String,
+    },
     Error {
         error: String,
     },
@@ -589,7 +605,9 @@ impl HttpMessage {
             command_type: match self.command {
                 HttpCommand::Query { .. } => crate::codegen::HttpCommand::HttpQuery,
                 HttpCommand::ResultSet { .. } => crate::codegen::HttpCommand::HttpResultSet,
-                HttpCommand::Error { .. } => crate::codegen::HttpCommand::HttpError,
+                HttpCommand::CloseConnection { .. } | HttpCommand::Error { .. } => {
+                    crate::codegen::HttpCommand::HttpError
+                }
             },
             command: match &self.command {
                 HttpCommand::Query {
@@ -614,7 +632,7 @@ impl HttpMessage {
                         .as_union_value(),
                     )
                 }
-                HttpCommand::Error { error } => {
+                HttpCommand::Error { error } | HttpCommand::CloseConnection { error } => {
                     let error_offset = builder.create_string(&error);
                     Some(
                         HttpError::create(
@@ -651,6 +669,10 @@ impl HttpMessage {
         let message = crate::codegen::HttpMessage::create(&mut builder, &args);
         builder.finish(message, None);
         builder.finished_data().to_vec() // TODO copy
+    }
+
+    pub fn should_close_connection(&self) -> bool {
+        matches!(self.command, HttpCommand::CloseConnection { .. })
     }
 
     fn build_columns<'a: 'ma, 'ma>(
