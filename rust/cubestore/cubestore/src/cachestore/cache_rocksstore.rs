@@ -463,7 +463,7 @@ pub trait CacheStore: DIService + Send + Sync {
         priority_sort: bool,
     ) -> Result<Vec<IdRow<QueueItem>>, CubeError>;
     // API with Path
-    async fn queue_get_by_path(&self, key: String) -> Result<Option<IdRow<QueueItem>>, CubeError>;
+    async fn queue_get(&self, key: QueueKey) -> Result<Option<IdRow<QueueItem>>, CubeError>;
     async fn queue_cancel(&self, key: QueueKey) -> Result<Option<IdRow<QueueItem>>, CubeError>;
     async fn queue_heartbeat(&self, key: QueueKey) -> Result<(), CubeError>;
     async fn queue_retrieve_by_path(
@@ -749,12 +749,11 @@ impl CacheStore for RocksCacheStore {
             .await
     }
 
-    async fn queue_get_by_path(&self, path: String) -> Result<Option<IdRow<QueueItem>>, CubeError> {
+    async fn queue_get(&self, key: QueueKey) -> Result<Option<IdRow<QueueItem>>, CubeError> {
         self.store
             .read_operation(move |db_ref| {
                 let queue_schema = QueueItemRocksTable::new(db_ref.clone());
-                let index_key = QueueItemIndexKey::ByPath(path);
-                queue_schema.get_single_opt_row_by_index(&index_key, &QueueItemRocksIndex::ByPath)
+                queue_schema.get_row_by_key(key)
             })
             .await
     }
@@ -1079,11 +1078,8 @@ impl CacheStore for ClusterCacheStoreClient {
         panic!("CacheStore cannot be used on the worker node! queue_list was used.")
     }
 
-    async fn queue_get_by_path(
-        &self,
-        _path: String,
-    ) -> Result<Option<IdRow<QueueItem>>, CubeError> {
-        panic!("CacheStore cannot be used on the worker node! queue_get_by_path was used.")
+    async fn queue_get(&self, _key: QueueKey) -> Result<Option<IdRow<QueueItem>>, CubeError> {
+        panic!("CacheStore cannot be used on the worker node! queue_get was used.")
     }
 
     async fn queue_cancel(&self, _key: QueueKey) -> Result<Option<IdRow<QueueItem>>, CubeError> {

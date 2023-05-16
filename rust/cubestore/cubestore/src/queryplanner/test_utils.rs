@@ -784,10 +784,7 @@ impl CacheStore for CacheStoreMock {
         panic!("CacheStore mock!")
     }
 
-    async fn queue_get_by_path(
-        &self,
-        _path: String,
-    ) -> Result<Option<IdRow<QueueItem>>, CubeError> {
+    async fn queue_get(&self, _key: QueueKey) -> Result<Option<IdRow<QueueItem>>, CubeError> {
         panic!("CacheStore mock!")
     }
 

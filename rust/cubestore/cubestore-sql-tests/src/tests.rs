@@ -8669,10 +8669,7 @@ async fn queue_full_workflow_v2(service: Box<dyn SqlClient>) {
 
     // get
     {
-        let get_response = service
-            .exec_query(r#"QUEUE GET "STANDALONE#queue:2""#)
-            .await
-            .unwrap();
+        let get_response = service.exec_query(r#"QUEUE GET 2"#).await.unwrap();
         assert_eq!(
             get_response.get_rows(),
             &vec![Row::new(vec![
@@ -8694,10 +8691,7 @@ async fn queue_full_workflow_v2(service: Box<dyn SqlClient>) {
         );
 
         // assertion that job was removed
-        let get_response = service
-            .exec_query(r#"QUEUE GET "STANDALONE#queue:2""#)
-            .await
-            .unwrap();
+        let get_response = service.exec_query(r#"QUEUE GET 2"#).await.unwrap();
         assert_eq!(get_response.get_rows().len(), 0);
     }
 }
@@ -9141,10 +9135,7 @@ async fn queue_merge_extra_by_id(service: Box<dyn SqlClient>) {
 
     // extra must be empty after creation
     {
-        let res = service
-            .exec_query(r#"QUEUE GET "STANDALONE#queue:1";"#)
-            .await
-            .unwrap();
+        let res = service.exec_query(r#"QUEUE GET 1;"#).await.unwrap();
         assert_eq!(
             res.get_columns(),
             &vec![
@@ -9168,10 +9159,7 @@ async fn queue_merge_extra_by_id(service: Box<dyn SqlClient>) {
 
     // extra should contains first field
     {
-        let res = service
-            .exec_query(r#"QUEUE GET "STANDALONE#queue:1";"#)
-            .await
-            .unwrap();
+        let res = service.exec_query(r#"QUEUE GET 1;"#).await.unwrap();
         assert_eq!(
             res.get_columns(),
             &vec![
