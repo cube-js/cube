@@ -1,3 +1,5 @@
+import { multiline } from './utils';
+
 const Joi = require('joi');
 const cronParser = require('cron-parser');
 
@@ -633,8 +635,7 @@ export class CubeValidator {
 
     if (result.error != null) {
       errorReporter.error(formatErrorMessage(result.error), result.error);
-    }
-    else if (this.validateName(cube, errorReporter)) {
+    } else if (this.validateName(cube, errorReporter)) {
       this.validCubes[cube.name] = true;
     }
 
@@ -642,23 +643,20 @@ export class CubeValidator {
   }
 
   validateName(cube, errorReporter) {
-    const otherCube = this.cubeSymbols.cubeList.find(otherCube =>
-      otherCube.name !== cube.name &&
-      otherCube.name.toLowerCase() === cube.name.toLowerCase()
-    );
+    const otherCube = this.cubeSymbols.cubeList
+      .find(other => other.name !== cube.name && other.name.toLowerCase() === cube.name.toLowerCase());
 
     if (otherCube !== undefined) {
       const isCubeAndView =
         !cube.isView && otherCube.isView ||
         cube.isView && !otherCube.isView;
 
-      errorReporter.error(
-        `${cube.isView ? 'View' : 'Cube'} "${cube.name}" has a name clash with ` +
-        `${otherCube.isView ? 'view' : 'cube'} "${otherCube.name}".\n` +
-        `Cube and view names should be distinct when compared case-insensitively.\n` +
-        `Please see the documentation: https://cube.dev/docs/data-modeling/syntax#naming.\n` +
-        (isCubeAndView ? `Please also see the style guide: https://cube.dev/docs/style-guide#cubes` : '')
-      );
+      errorReporter.error(multiline`
+        ${cube.isView ? 'View' : 'Cube'} "${cube.name}" has a name clash with ${otherCube.isView ? 'view' : 'cube'} "${otherCube.name}".
+        Cube and view names should be distinct when compared case-insensitively.
+        Please see the documentation: https://cube.dev/docs/data-modeling/syntax#naming.
+        ${isCubeAndView ? 'Please also see the style guide: https://cube.dev/docs/style-guide#cubes' : ''}
+      `);
 
       return false;
     }
