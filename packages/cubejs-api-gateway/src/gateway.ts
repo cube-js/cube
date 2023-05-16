@@ -1105,18 +1105,16 @@ class ApiGateway {
       query
     }, context);
 
-    let duration = 0;
+    const startTime = new Date().getTime();
 
     let normalizedQueries: NormalizedQuery[] = await Promise.all(
       queries.map(
         async (currentQuery) => {
           const normalizedQuery = normalizeQuery(currentQuery, persistent);
-          const startTime = new Date().getTime();
           const rewrite = await this.queryRewrite(
             normalizedQuery,
             context,
           );
-          duration += new Date().getTime() - startTime;
           return normalizeQuery(
             rewrite,
             persistent,
@@ -1128,7 +1126,7 @@ class ApiGateway {
     this.log({
       type: 'Query Rewrite completed',
       normalizedQueries,
-      duration,
+      duration: new Date().getTime() - startTime,
       query
     }, context);
 
