@@ -260,6 +260,7 @@ describe('API Gateway', () => {
               order: [],
               filters: [],
               rowLimit: 10000,
+              limit: 10000,
               dimensions: [],
               timeDimensions: [],
               queryType: 'regularQuery'
@@ -272,6 +273,113 @@ describe('API Gateway', () => {
             order: [],
             filters: [],
             rowLimit: 10000,
+            limit: 10000,
+            dimensions: [],
+            timeDimensions: [],
+            queryType: 'regularQuery'
+          },
+          transformedQueries: [null]
+        });
+      }
+    );
+  });
+
+  test('normalize queryRewrite limit', async () => {
+    const { app } = createApiGateway(
+      new AdapterApiMock(),
+      new DataSourceStorageMock(),
+      {
+        checkAuth: (req: Request, authorization) => {
+          if (authorization) {
+            jwt.verify(authorization, API_SECRET);
+            req.authInfo = authorization;
+          }
+        },
+        queryRewrite: async (query, context) => {
+          query.limit = 2;
+          return query;
+        }
+      }
+    );
+
+    const query = {
+      measures: ['Foo.bar']
+    };
+
+    return requestBothGetAndPost(
+      app,
+      { url: '/cubejs-api/v1/dry-run', query: { query: JSON.stringify(query) }, body: { query } },
+      (res) => {
+        expect(res.body).toStrictEqual({
+          queryType: 'regularQuery',
+          normalizedQueries: [
+            {
+              measures: ['Foo.bar'],
+              timezone: 'UTC',
+              order: [],
+              filters: [],
+              rowLimit: 2,
+              limit: 2,
+              dimensions: [],
+              timeDimensions: [],
+              queryType: 'regularQuery'
+            }
+          ],
+          queryOrder: [{ id: 'desc' }],
+          pivotQuery: {
+            measures: ['Foo.bar'],
+            timezone: 'UTC',
+            order: [],
+            filters: [],
+            rowLimit: 2,
+            limit: 2,
+            dimensions: [],
+            timeDimensions: [],
+            queryType: 'regularQuery'
+          },
+          transformedQueries: [null]
+        });
+      }
+    );
+  });
+
+  test('normalize order', async () => {
+    const { app } = createApiGateway();
+
+    const query = {
+      measures: ['Foo.bar'],
+      order: {
+        'Foo.bar': 'desc'
+      }
+    };
+
+    return requestBothGetAndPost(
+      app,
+      { url: '/cubejs-api/v1/dry-run', query: { query: JSON.stringify(query) }, body: { query } },
+      (res) => {
+        expect(res.body).toStrictEqual({
+          queryType: 'regularQuery',
+          normalizedQueries: [
+            {
+              measures: ['Foo.bar'],
+              order: [{ id: 'Foo.bar', desc: true }],
+              timezone: 'UTC',
+              filters: [],
+              rowLimit: 10000,
+              limit: 10000,
+              dimensions: [],
+              timeDimensions: [],
+              queryType: 'regularQuery'
+            }
+          ],
+          queryOrder: [{ id: 'desc' }],
+          pivotQuery: {
+            measures: ['Foo.bar'],
+            order: [{ id: 'Foo.bar', desc: true }],
+            timezone: 'UTC',
+            filters: [],
+            rowLimit: 10000,
+            limit: 10000,
             dimensions: [],
             timeDimensions: [],
             queryType: 'regularQuery'

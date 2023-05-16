@@ -71,8 +71,7 @@ import {
   normalizeQuery,
   normalizeQueryCancelPreAggregations,
   normalizeQueryPreAggregationPreview,
-  normalizeQueryPreAggregations,
-  validatePostRewrite,
+  normalizeQueryPreAggregations, remapToQueryAdapterFormat,
 } from './query';
 import { cachedHandler } from './cached-handler';
 import { createJWKsFetcher } from './jwk';
@@ -1101,20 +1100,39 @@ class ApiGateway {
 
     const queries = Array.isArray(query) ? query : [query];
 
-    const normalizedQueries: NormalizedQuery[] = await Promise.all(
+    this.log({
+      type: 'Query Rewrite',
+      query
+    }, context);
+
+    let duration = 0;
+
+    let normalizedQueries: NormalizedQuery[] = await Promise.all(
       queries.map(
-        async (currentQuery) => validatePostRewrite(
-          await this.queryRewrite(
-            normalizeQuery(currentQuery),
-            context
-          )
-        )
+        async (currentQuery) => {
+          const normalizedQuery = normalizeQuery(currentQuery, persistent);
+          const startTime = new Date().getTime();
+          const rewrite = await this.queryRewrite(
+            normalizedQuery,
+            context,
+          );
+          duration += new Date().getTime() - startTime;
+          return normalizeQuery(
+            rewrite,
+            persistent,
+          );
+        }
       )
     );
 
-    normalizedQueries.forEach((q) => {
-      this.processQueryLimit(q, persistent);
-    });
+    this.log({
+      type: 'Query Rewrite completed',
+      normalizedQueries,
+      duration,
+      query
+    }, context);
+
+    normalizedQueries = normalizedQueries.map(q => remapToQueryAdapterFormat(q));
 
     if (normalizedQueries.find((currentQuery) => !currentQuery)) {
       throw new Error('queryTransformer returned null query. Please check your queryTransformer implementation');
@@ -1132,29 +1150,6 @@ class ApiGateway {
     }
 
     return [queryType, normalizedQueries];
-  }
-
-  /**
-   * Asserts query limit, sets the default value if neccessary.
-   *
-   * @throw {Error}
-   */
-  public processQueryLimit(query: NormalizedQuery, persistent = false): void {
-    const def = getEnv('dbQueryDefaultLimit') <= getEnv('dbQueryLimit')
-      ? getEnv('dbQueryDefaultLimit')
-      : getEnv('dbQueryLimit');
-
-    if (!persistent) {
-      if (
-        typeof query.rowLimit === 'number' &&
-        query.rowLimit > getEnv('dbQueryLimit')
-      ) {
-        throw new Error('The query limit has been exceeded.');
-      }
-      query.rowLimit = typeof query.rowLimit === 'number'
-        ? query.rowLimit
-        : def;
-    }
   }
 
   public async sql({ query, context, res }: QueryRequest) {
