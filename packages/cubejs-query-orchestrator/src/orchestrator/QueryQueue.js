@@ -234,7 +234,7 @@ export class QueryQueue {
       const queryKeyHash = this.redisHash(queryKey);
 
       if (query.forceBuild) {
-        const jobExists = await queueConnection.getQueryDef(queryKeyHash);
+        const jobExists = await queueConnection.getQueryDef(queryKeyHash, null);
         if (jobExists) return null;
       }
 
@@ -268,7 +268,7 @@ export class QueryQueue {
 
       await this.reconcileQueue();
 
-      const queryDef = await queueConnection.getQueryDef(queryKeyHash);
+      const queryDef = await queueConnection.getQueryDef(queryKeyHash, queueId);
       const [active, toProcess] = await queueConnection.getQueryStageState(true);
 
       if (queryDef) {
@@ -700,7 +700,7 @@ export class QueryQueue {
 
       const activated = activeKeys && activeKeys.indexOf(queryKeyHashed) !== -1;
       if (!query) {
-        query = await queueConnection.getQueryDef(queryKeyHashed);
+        query = await queueConnection.getQueryDef(queryKeyHashed, null);
       }
 
       if (query && insertedCount && activated && processingLockAcquired) {

@@ -74,7 +74,7 @@ export interface QueueDriverConnectionInterface {
   // Return query keys which was sorted by priority and time
   getToProcessQueries(): Promise<string[]>;
   getActiveQueries(): Promise<string[]>;
-  getQueryDef(queryKey: QueryKeyHash): Promise<QueryDef | null>;
+  getQueryDef(hash: QueryKeyHash, queueId: QueueId | null): Promise<QueryDef | null>;
   // Queries which was added to queue, but was not processed and not needed
   getOrphanedQueries(): Promise<string[]>;
   // Queries which was not completed with old heartbeat
