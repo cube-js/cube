@@ -89,7 +89,7 @@ export interface QueueDriverConnectionInterface {
   optimisticQueryUpdate(hash: QueryKeyHash, toUpdate: unknown, processingId: ProcessingId, queueId: QueueId | null): Promise<boolean>;
   cancelQuery(queryKey: QueryKey): Promise<QueryDef | null>;
   getQueryAndRemove(hash: QueryKeyHash): Promise<[QueryDef]>;
-  setResultAndRemoveQuery(key: QueueId | QueryKeyHash, executionResult: any, processingId: ProcessingId, queueId: QueueId | null): Promise<unknown>;
+  setResultAndRemoveQuery(hash: QueryKeyHash, executionResult: any, processingId: ProcessingId, queueId: QueueId | null): Promise<unknown>;
   release(): void;
   //
   getQueriesToCancel(): Promise<string[]>
