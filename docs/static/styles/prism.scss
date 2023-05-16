@@ -108,6 +108,8 @@ pre[class*="language-"] {
   color: $purple-02;
 }
 
+.token.parameter,
+.token.interpolation,
 .token.operator,
 .token.entity,
 .token.url,

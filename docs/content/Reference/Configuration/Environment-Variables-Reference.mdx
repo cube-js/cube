@@ -6,6 +6,13 @@ subCategory: Configuration
 menuOrder: 2
 ---
 
+Cube can be configured using environment variables. When running Cube locally,
+these can be set in a `.env` file in the root of the project. [In Cube
+Cloud][ref-conf-ov-cloud], these can be set in the
+deployment's&nbsp;<Btn>Settings</Btn> screen.
+
+This page lists all environment variables that can be used to configure Cube.
+
 <InfoBox>
 
 To see a complete list of environment variables for a specific data source,
@@ -80,15 +87,6 @@ The name of the AWS Athena catalog to use for queries.
 | ------------------------------------------------- | ---------------------- | --------------------- |
 | [A valid Athena Catalog name][aws-athena-catalog] | N/A                    | N/A                   |
 
-## `CUBEJS_DB_SCHEMA`
-
-The name of the schema to use as `information_schema` filter. Reduces count of
-tables loaded during data model generation.
-
-| Possible Values     | Default in Development | Default in Production |
-| ------------------- | ---------------------- | --------------------- |
-| A valid schema name | N/A                    | N/A                   |
-
 ## `CUBEJS_CACHE_AND_QUEUE_DRIVER`
 
 The cache and queue driver to use for the Cube deployment.
@@ -131,13 +129,17 @@ environment variables.
 | --------------------------------- | ---------------------- | --------------------- |
 | A comma-separated list of strings | N/A                    | N/A                   |
 
+<InfoBox heading="Example: Specifying two data sources">
+
 ```dotenv
 CUBEJS_DATASOURCES=default,datasource1
 ```
 
+</InfoBox>
+
 ## `CUBEJS_DB_BQ_CREDENTIALS`
 
-A Base64 encoded JSON key file for connecting to Google BigQuery.
+A Base64-encoded JSON key file for connecting to Google BigQuery.
 
 | Possible Values                                                  | Default in Development | Default in Production |
 | ---------------------------------------------------------------- | ---------------------- | --------------------- |
@@ -262,12 +264,21 @@ with a data source][ref-config-multiple-ds-decorating-env].
 | ---------------------------------------------- | ---------------------- | --------------------- |
 | A valid bucket in the configured cloud storage | N/A                    | N/A                   |
 
+<InfoBox heading="Example: Specifying an export bucket">
+
 ```dotenv
 CUBEJS_DB_EXPORT_BUCKET=exports-20210505
+```
 
-# Decorated with a data source named `datasource1`
+</InfoBox>
+
+<InfoBox heading="Example: Specifying an export bucket for a specific data source">
+
+```dotenv
 CUBEJS_DS_DATASOURCE1_DB_EXPORT_BUCKET=exports-20210505
 ```
+
+</InfoBox>
 
 ## `CUBEJS_DB_EXPORT_BUCKET_TYPE`
 
@@ -284,12 +295,21 @@ with a data source][ref-config-multiple-ds-decorating-env].
 | --------------- | ---------------------- | --------------------- |
 | `gcp`, `s3`     | N/A                    | N/A                   |
 
+<InfoBox heading="Example: Specifying an export bucket type">
+
 ```dotenv
 CUBEJS_DB_EXPORT_BUCKET_TYPE=gcp
+```
 
-# Decorated with a data source named `datasource1`
+</InfoBox>
+
+<InfoBox heading='Example: Specifying an export bucket type for a specific data source'>
+
+```dotenv
 CUBEJS_DS_DATASOURCE1_DB_EXPORT_BUCKET_TYPE=gcp
 ```
+
+</InfoBox>
 
 ## `CUBEJS_DB_EXPORT_BUCKET_AWS_KEY`
 
@@ -446,6 +466,15 @@ The timeout value for any queries made to the database by Cube.
 | Possible Values                          | Default in Development | Default in Production |
 | ---------------------------------------- | ---------------------- | --------------------- |
 | A number in seconds or a duration string | `10m`                  | `10m`                 |
+
+## `CUBEJS_DB_SCHEMA`
+
+The name of the schema to use as `information_schema` filter. Reduces count of
+tables loaded during data model generation.
+
+| Possible Values     | Default in Development | Default in Production |
+| ------------------- | ---------------------- | --------------------- |
+| A valid schema name | N/A                    | N/A                   |
 
 ## `CUBEJS_DB_SNOWFLAKE_ACCOUNT`
 
@@ -840,13 +869,21 @@ for][ref-config-sched-refresh-timer]. Used in conjunction with
 | --------------------------------------------------------- | ---------------------- | --------------------- |
 | [A valid timezone from the tz database][wiki-tz-database] | N/A                    | N/A                   |
 
+<InfoBox heading="Example: Specifying multiple timezones for scheduled refresh">
+
+```dotenv
+CUBEJS_SCHEDULED_REFRESH_TIMEZONES=America/Los_Angeles,UTC
+```
+
+</InfoBox>
+
 ## `CUBEJS_SCHEMA_PATH`
 
 The path where Cube loads data models from.
 
 | Possible Values                          | Default in Development | Default in Production |
 | ---------------------------------------- | ---------------------- | --------------------- |
-| A valid path containing Cube data models | `schema`               | `schema`              |
+| A valid path containing Cube data models | `model`                | `model`               |
 
 ## `CUBEJS_SQL_PASSWORD`
 
@@ -888,30 +925,36 @@ If `true`, then send telemetry to Cube.
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | `true`                 | `true`                |
 
+<InfoBox heading="Example: Disabling Cube telemetry">
+
+```dotenv
+CUBEJS_TELEMETRY=false
+```
+
+</InfoBox>
+
 ## `CUBESTORE_METRICS_FORMAT`
 
 Define which metrics collector format.
 
-| Possible Values | Default in Development | Default in Production |
-| --------------- | ---------------------- | --------------------- |
-| `statsd`, `dogstatsd` | `statsd`                 | `statsd`                |
-
+| Possible Values       | Default in Development | Default in Production |
+| --------------------- | ---------------------- | --------------------- |
+| `statsd`, `dogstatsd` | `statsd`               | `statsd`              |
 
 ## `CUBESTORE_METRICS_ADDRESS`
 
 Required IP address to send metrics.
 
-| Possible Values | Default in Development | Default in Production |
-| --------------- | ---------------------- | --------------------- |
-| A valid IP address | `127.0.0.1`                 | `127.0.0.1`                |
-
+| Possible Values    | Default in Development | Default in Production |
+| ------------------ | ---------------------- | --------------------- |
+| A valid IP address | `127.0.0.1`            | `127.0.0.1`           |
 
 ## `CUBESTORE_METRICS_PORT`
 
 Required port to send where collector server accept UDP connections.
 
-| Possible Values | Default in Development | Default in Production |
-| --------------- | ---------------------- | --------------------- |
+| Possible Values     | Default in Development | Default in Production |
+| ------------------- | ---------------------- | --------------------- |
 | A valid port number | `8125`                 | `8125`                |
 
 ## `CUBEJS_TOUCH_PRE_AGG_TIMEOUT`
@@ -1108,9 +1151,13 @@ The minIO server endpoint. Required when using minIO.
 | ---------------------- | ---------------------- | --------------------- |
 | A valid minIO endpoint | N/A                    | N/A                   |
 
+<InfoBox heading="Example: Configuring the minIO server endpoint">
+
 ```dotenv
 CUBESTORE_MINIO_SERVER_ENDPOINT=http://localhost:9000
 ```
+
+</InfoBox>
 
 ## `CUBESTORE_NO_UPLOAD`
 
@@ -1214,9 +1261,13 @@ A comma-separated list of address/port pairs for Cube Store workers.
 | -------------------------------------------- | ---------------------- | --------------------- |
 | A comma-separated list of address/port pairs | N/A                    | N/A                   |
 
+<InfoBox heading="Example: Specifying multiple Cube Store worker address/port pairs">
+
 ```dotenv
 CUBESTORE_WORKERS=worker-1:3123,localhost:3124,123.124.125.128:3123
 ```
+
+</InfoBox>
 
 ## `DEBUG_LOG`
 
@@ -1272,6 +1323,7 @@ The port for a Cube deployment to listen to API connections on.
 [ref-config-db]: /config/databases
 [ref-config-multiple-ds-decorating-env]:
   /config/multiple-data-sources#configuring-data-sources-with-environment-variables-decorated-environment-variables
+[ref-conf-ov-cloud]: /configuration/overview#cube-cloud
 [ref-config-preagg-schema-name]: /config#pre-aggregations-schema
 [ref-config-sched-refresh-timer]: /config#scheduled-refresh-timer
 [snowflake-docs-account-id]:
