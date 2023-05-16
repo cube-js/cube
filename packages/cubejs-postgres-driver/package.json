@@ -1,5 +1,5 @@
 {
-  "name": "@codefresh-io/cubejs-backend-postgres-driver-yosi1",
+  "name": "@codefresh-io/cubejs-backend-postgres-driver",
   "description": "Cube.js Postgres database driver",
   "author": "Cube Dev, Inc.",
   "version": "0.30.81",
