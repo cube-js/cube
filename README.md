@@ -19,6 +19,12 @@ CD part will take place from codefresh pipeline and will only publish specific p
 3. [cubejs-postgres-driver](https://github.com/codefresh-io/cube.js/tree/master/packages/cubejs-postgres-driver), [@codefresh-io/cubejs-backend-postgres-driver
    ](https://www.npmjs.com/package/@codefresh-io/cubejs-backend-postgres-driver)
 
+### How to use packages 
+1. We need to keep real names of packages when using the published packages, so since we are publishing with different name, other places in cube js code aren't aware of this name and this causing issues on runtime.
+2. a workaround for that will be to add the dependency in the service which consume it(For example platform-analytics) - with this syntax:
+`"@cubejs-backend/bigquery-driver": "npm:@codefresh-io/cubejs-backend-bigquery-driver@0.30.81"
+`3. this will resolve in platform analytics from our fork but will resolve it correctly in cube-js code.
+see examples in platform-analytics package.json file
 
 <p align="center">
   <a href="https://cube.dev?ref=github-readme"><img src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/cube-logo.png" alt="Cube — Headless Business Intelligence" width="300px"></a>
