@@ -516,4 +516,112 @@ describe('Cube Validation', () => {
 
     expect(validationResult.error).toBeFalsy();
   });
+
+  it('case-insensitive name clash - two cubes', async () => {
+    const cubeA = {
+      name: 'orders', // lowercase
+      sqlTable: () => 'public.orders',
+      fileName: 'fileName'
+    };
+
+    const cubeB = {
+      name: 'Orders', // uppercase
+      sqlTable: () => 'public.orders',
+      fileName: 'fileName'
+    };
+
+    const cubeSymbols = new CubeSymbols();
+    cubeSymbols.compile([
+      cubeA,
+      cubeB
+    ], {
+      inContext: () => false,
+      error: (message, _e) => {
+        console.log(message);
+      }
+    });
+
+    const cubeValidator = new CubeValidator(cubeSymbols);
+    const validationResult = cubeValidator.validate(cubeSymbols.getCubeDefinition('orders'), {
+      inContext: () => false,
+      error: (message, _e) => {
+        console.log(message);
+        expect(message).toContain('case-insensitive');
+      }
+    });
+
+    expect(validationResult.error).toBeFalsy();
+  });
+
+  it('case-insensitive name clash - two views', async () => {
+    const cubeA = {
+      name: 'orders', // lowercase
+      isView: true,
+      fileName: 'fileName'
+    };
+
+    const cubeB = {
+      name: 'Orders', // uppercase
+      isView: true,
+      fileName: 'fileName'
+    };
+
+    const cubeSymbols = new CubeSymbols();
+    cubeSymbols.compile([
+      cubeA,
+      cubeB
+    ], {
+      inContext: () => false,
+      error: (message, _e) => {
+        console.log(message);
+      }
+    });
+
+    const cubeValidator = new CubeValidator(cubeSymbols);
+    const validationResult = cubeValidator.validate(cubeSymbols.getCubeDefinition('orders'), {
+      inContext: () => false,
+      error: (message, _e) => {
+        console.log(message);
+        expect(message).toContain('case-insensitive');
+      }
+    });
+
+    expect(validationResult.error).toBeFalsy();
+  });
+
+  it('case-insensitive name clash - cube and view', async () => {
+    const cubeA = {
+      name: 'orders', // lowercase
+      sqlTable: () => 'public.orders',
+      fileName: 'fileName'
+    };
+
+    const cubeB = {
+      name: 'Orders', // uppercase
+      isView: true,
+      fileName: 'fileName'
+    };
+
+    const cubeSymbols = new CubeSymbols();
+    cubeSymbols.compile([
+      cubeA,
+      cubeB
+    ], {
+      inContext: () => false,
+      error: (message, _e) => {
+        console.log(message);
+      }
+    });
+
+    const cubeValidator = new CubeValidator(cubeSymbols);
+    const validationResult = cubeValidator.validate(cubeSymbols.getCubeDefinition('orders'), {
+      inContext: () => false,
+      error: (message, _e) => {
+        console.log(message);
+        expect(message).toContain('case-insensitive');
+      }
+    });
+
+    expect(validationResult.error).toBeFalsy();
+  });
 });

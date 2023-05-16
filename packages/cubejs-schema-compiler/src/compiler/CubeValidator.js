@@ -633,11 +633,37 @@ export class CubeValidator {
 
     if (result.error != null) {
       errorReporter.error(formatErrorMessage(result.error), result.error);
-    } else {
+    }
+    else if (this.validateName(cube, errorReporter)) {
       this.validCubes[cube.name] = true;
     }
 
     return result;
+  }
+
+  validateName(cube, errorReporter) {
+    const otherCube = this.cubeSymbols.cubeList.find(otherCube =>
+      otherCube.name !== cube.name &&
+      otherCube.name.toLowerCase() === cube.name.toLowerCase()
+    );
+
+    if (otherCube !== undefined) {
+      const isCubeAndView =
+        !cube.isView && otherCube.isView ||
+        cube.isView && !otherCube.isView;
+
+      errorReporter.error(
+        `${cube.isView ? 'View' : 'Cube'} "${cube.name}" has a name clash with ` +
+        `${otherCube.isView ? 'view' : 'cube'} "${otherCube.name}".\n` +
+        `Cube and view names should be distinct when compared case-insensitively.\n` +
+        `Please see the documenation: https://cube.dev/docs/data-modeling/syntax#naming.\n` +
+        (isCubeAndView ? `Please also see the style guide: https://cube.dev/docs/style-guide#cubes` : '')
+      );
+
+      return false;
+    }
+
+    return true;
   }
 
   isCubeValid(cube) {
