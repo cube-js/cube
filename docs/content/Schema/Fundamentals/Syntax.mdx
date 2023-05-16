@@ -83,8 +83,15 @@ It is also recommended that names use [snake case][wiki-snake-case] and follow
 the [style guide][ref-style-guide].
 
 Cube and view names should be distinct when compared case-insensitively.
-For example, you can't have a cube named `Orders` and a view named `orders`
+For example, you can't have a cube named `orders` and a view named `Orders`
 within the same data model.
+
+<WarningBox>
+
+Before v0.34, it was allowed to have cubes and views with distinct names when
+compared case-sensitively, e.g., `orders` and `Orders`.
+
+</WarningBox>
 
 Good examples of names:
 
