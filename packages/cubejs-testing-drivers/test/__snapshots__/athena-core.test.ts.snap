@@ -3,8 +3,8 @@
 exports[`Sequence with the @cubejs-backend/athena-driver for the Customers.RollingExternal 1`] = `
 Array [
   Array [
-    "downloadQueryResults",
-    "stream",
+    "unload",
+    "queryColumnTypes",
   ],
   Array [
     "createSchemaIfNotExists",
@@ -25,8 +25,8 @@ Array [
 exports[`Sequence with the @cubejs-backend/athena-driver for the ECommerce.SimpleAnalysisExternal 1`] = `
 Array [
   Array [
-    "downloadQueryResults",
-    "stream",
+    "unload",
+    "queryColumnTypes",
   ],
   Array [
     "uploadTableWithIndexes",

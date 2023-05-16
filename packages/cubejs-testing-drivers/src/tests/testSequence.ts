@@ -35,7 +35,7 @@ export function testSequence(type: string): void {
       env = await runEnvironment(type, 'core');
       process.env.CUBEJS_REFRESH_WORKER = 'true';
       process.env.CUBEJS_CUBESTORE_HOST = '127.0.0.1';
-      process.env.CUBEJS_CUBESTORE_PORT = `${env.store.port}`;
+      process.env.CUBEJS_CUBESTORE_PORT = process.env.CUBEJS_CUBESTORE_PORT ? process.env.CUBEJS_CUBESTORE_PORT : `${env.store.port}`;
       process.env.CUBEJS_CUBESTORE_USER = 'root';
       process.env.CUBEJS_CUBESTORE_PASS = 'root';
       process.env.CUBEJS_CACHE_AND_QUEUE_DRIVER = 'memory'; // memory, cubestore

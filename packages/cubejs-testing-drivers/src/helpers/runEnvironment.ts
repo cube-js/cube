@@ -140,7 +140,7 @@ export async function runEnvironment(type: string, suf?: string): Promise<Enviro
   if (cliEnv) {
     cliEnv.withEnvironment({
       CUBEJS_CUBESTORE_HOST: '127.0.0.1',
-      CUBEJS_CUBESTORE_PORT: `${store.port}`,
+      CUBEJS_CUBESTORE_PORT: process.env.CUBEJS_CUBESTORE_PORT ? process.env.CUBEJS_CUBESTORE_PORT : `${store.port}`,
     });
     await cliEnv.up();
   }
