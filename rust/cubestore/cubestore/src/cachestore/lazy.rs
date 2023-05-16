@@ -246,8 +246,8 @@ impl CacheStore for LazyRocksCacheStore {
             .await
     }
 
-    async fn queue_get_by_path(&self, path: String) -> Result<Option<IdRow<QueueItem>>, CubeError> {
-        self.init().await?.queue_get_by_path(path).await
+    async fn queue_get(&self, key: QueueKey) -> Result<Option<IdRow<QueueItem>>, CubeError> {
+        self.init().await?.queue_get(key).await
     }
 
     async fn queue_cancel(&self, key: QueueKey) -> Result<Option<IdRow<QueueItem>>, CubeError> {
