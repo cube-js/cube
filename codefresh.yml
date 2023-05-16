@@ -31,7 +31,7 @@ steps:
     image: node:12.22.9
     commands:
       - ls
-      - yarn build
+      - yarn tsc
     stage: "prepare"
 
   deploy_bigquery_driver_to_npm:
