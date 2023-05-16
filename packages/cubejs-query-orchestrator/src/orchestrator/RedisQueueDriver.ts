@@ -11,7 +11,9 @@ import {
   QueryKey,
   AddToQueueQuery,
   AddToQueueOptions,
-  AddToQueueResponse, ProcessingId, RetrieveForProcessingResponse,
+  AddToQueueResponse,
+  ProcessingId,
+  RetrieveForProcessingResponse,
 } from '@cubejs-backend/base-driver';
 
 import { BaseQueueDriver } from './BaseQueueDriver';
