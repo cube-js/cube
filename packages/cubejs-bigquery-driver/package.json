@@ -1,5 +1,5 @@
 {
-  "name": "@codefresh-io/cubejs-backend-bigquery-driver",
+  "name": "@codefresh-io/cubejs-backend-bigquery-driver-yosi",
   "description": "Cube.js BigQuery database driver",
   "author": "Cube Dev, Inc.",
   "version": "0.30.80",
