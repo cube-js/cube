@@ -39,8 +39,7 @@ steps:
     working_directory: ${{clone}}
     image: node:12.22.9
     commands:
-      - latest_commit=$(git log -n 1 --skip=1 origin/"${{CF_BRANCH}}" --pretty=format:"%H")
-      - cf_export changed_files=$(git diff "${{CF_BRANCH}}"..$latest_commit --name-only)
+      - cf_export changed_files=$(git diff "${{CF_BRANCH}}"^ "${{CF_BRANCH}}" --name-only)
     stage: "prepare"
 
   deploy_bigquery_driver_to_npm:
