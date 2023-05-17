@@ -3667,6 +3667,23 @@
     pg "^8.6.0"
     pg-query-stream "^4.1.0"
 
+"@cubejs-backend/query-orchestrator@^0.30.75":
+  version "0.30.75"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/query-orchestrator/-/query-orchestrator-0.30.75.tgz#4558ee344223ad5a269aeee693d3fc7b0b14060f"
+  integrity sha512-pzzswakbphMhl4OPZX3YOv2hYSYxsbFDqRuX7ek9WN/fZDXzYk+eMAnkUHepeiZzsrq6NM+0u8ShxoCzzq4diA==
+  dependencies:
+    "@cubejs-backend/base-driver" "^0.30.73"
+    "@cubejs-backend/shared" "^0.30.69"
+    csv-write-stream "^2.0.0"
+    es5-ext "0.10.53"
+    generic-pool "^3.7.1"
+    ioredis "^4.27.8"
+    lru-cache "^6.0.0"
+    moment-range "^4.0.2"
+    moment-timezone "^0.5.33"
+    ramda "^0.27.0"
+    redis "^3.0.2"
+
 "@cubejs-backend/server-core@^0.30.75":
   version "0.30.75"
   resolved "https://registry.yarnpkg.com/@cubejs-backend/server-core/-/server-core-0.30.75.tgz#8dfe6d306adfc8281742b445fd935a84427cbbd6"
@@ -3696,6 +3713,25 @@
     sqlstring "^2.3.1"
     uuid "^8.3.2"
     ws "^7.5.3"
+
+"@cubejs-backend/shared@^0.30.69":
+  version "0.30.69"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/shared/-/shared-0.30.69.tgz#b049fed6d71474d16256a2db53c426bd3093106a"
+  integrity sha512-eVyMmBqI4iLBSwUBfzHWsYgoU4uNfywDZ9fElg/u0RghjQTC2tGXItAgn3Wpdq8ZtHOXdrX8qYSaKu8bq5ipgA==
+  dependencies:
+    "@oclif/color" "^0.1.2"
+    bytes "^3.1.0"
+    cli-progress "^3.9.0"
+    cross-spawn "^7.0.3"
+    decompress "^4.2.1"
+    env-var "^6.3.0"
+    fs-extra "^9.1.0"
+    http-proxy-agent "^4.0.1"
+    moment-range "^4.0.1"
+    moment-timezone "^0.5.33"
+    node-fetch "^2.6.1"
+    shelljs "^0.8.5"
+    throttle-debounce "^3.0.1"
 
 "@cubejs-infra/node-pre-gyp-github@^1.0.3":
   version "1.0.3"
