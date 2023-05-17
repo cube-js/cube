@@ -286,7 +286,7 @@ const variables: Record<string, (...args: any) => any> = {
     .asString(),
   redisKeyPath: () => get('REDIS_CLIENT_KEY_PATH')
     .asString(),
-  rejectUnauthorized: () => get('REDIS_REJECT_UNAUTHORIZED')
+  redisRejectUnauthorized: () => get('REDIS_REJECT_UNAUTHORIZED')
     .asBool(),
   //
   dbSsl: () => get('CUBEJS_DB_SSL')

@@ -72,7 +72,7 @@ export async function createIORedisClient(url: string, opts: RedisOptions): Prom
         ca: fs.readFileSync(getEnv('redisCaPath')),
         cert: fs.readFileSync(getEnv('redisCertPath')),
         key: fs.readFileSync(getEnv('redisKeyPath')),
-        rejectUnauthorized: getEnv('rejectUnauthorized')
+        rejectUnauthorized: getEnv('redisRejectUnauthorized')
       };
     } else {
       options.tls = {};
