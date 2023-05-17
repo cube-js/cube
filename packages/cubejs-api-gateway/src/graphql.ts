@@ -257,10 +257,11 @@ function getMemberType(metaConfig: any, cubeName: string, memberName: string) {
 
 function whereArgToQueryFilters(
   whereArg: Record<string, any>,
-  prefix?: string
+  prefix?: string,
+  metaConfig: any[] = []
 ) {
   const queryFilters: any[] = [];
-
+  
   Object.keys(whereArg).forEach((key) => {
     if (['OR', 'AND'].includes(key)) {
       queryFilters.push({
@@ -281,6 +282,8 @@ function whereArgToQueryFilters(
       //   age: { equals: 28 } # <-- will require AND
       // }
       if (Object.keys(whereArg[key]).length > 1) {
+        const cubeExists = metaConfig.find((cube) => cube.config.name === key);
+        
         queryFilters.push(
           ...whereArgToQueryFilters(
             {
@@ -289,7 +292,7 @@ function whereArgToQueryFilters(
                 []
               ),
             },
-            capitalize(key)
+            cubeExists ? key : capitalize(key)
           )
         );
       } else {
@@ -312,10 +315,12 @@ function whereArgToQueryFilters(
     } else {
       Object.entries<any>(whereArg[key]).forEach(([member, filters]) => {
         Object.entries(filters).forEach(([operator, value]) => {
+          const cubeExists = metaConfig.find((cube) => cube.config.name === key);
+          
           queryFilters.push({
             member: prefix
               ? `${prefix}.${key}`
-              : `${capitalize(key)}.${member}`,
+              : `${cubeExists ? key : capitalize(key)}.${member}`,
             operator: mapWhereOperator(operator, value),
             ...(mapWhereValue(operator, value) && {
               values: mapWhereValue(operator, value),
@@ -359,7 +364,11 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
   ];
 
   function hasMembers(cube: any) {
-    return cube.config.measures.length || cube.config.dimensions.length;
+    if (cube.public === false) {
+      return false;
+    }
+    
+    return ([...cube.config.measures, ...cube.config.dimensions].filter((member) => member.isVisible)).length > 0;
   }
 
   metaConfig.forEach(cube => {
@@ -504,7 +513,8 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
           const order: [string, 'asc' | 'desc'][] = [];
 
           if (where) {
-            filters = whereArgToQueryFilters(where);
+            console.log('>>>', 'FIRST!', where);
+            filters = whereArgToQueryFilters(where, undefined, metaConfig);
           }
 
           if (orderBy) {
@@ -517,7 +527,9 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
 
           getFieldNodeChildren(infos.fieldNodes[0], infos).forEach(cubeNode => {
             const cubeExists = metaConfig.find((cube) => cube.config.name === cubeNode.name.value);
+            
             const cubeName = cubeExists ? (cubeNode.name.value) : capitalize(cubeNode.name.value);
+            // console.log('>>>', { cubeExists, v: cubeNode.name.value, cubeName });
             const orderByArg = getArgumentValue(cubeNode, 'orderBy', infos.variableValues);
             // todo: throw if both RootOrderByInput and [Cube]OrderByInput provided
             if (orderByArg) {
