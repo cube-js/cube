@@ -34,6 +34,15 @@ steps:
       - yarn tsc
     stage: "prepare"
 
+  changed_files:
+    title: 'Export changed files env for publish condition'
+    working_directory: ${{clone}}
+    image: node:12.22.9
+    commands:
+      - latest_commit=$(git log -n 1 --skip=1 origin/main --pretty=format:"%H")
+      - cf_export changed_files=$(git diff main..$latest_commit --name-only)
+    stage: "prepare"
+
   deploy_bigquery_driver_to_npm:
     title: 'Deploy bigquery-driver'
     working_directory: ${{clone}}
@@ -42,6 +51,10 @@ steps:
       NPM_TOKEN: '${{NPM_TOKEN}}'
       DIR: 'cube.js/packages/cubejs-bigquery-driver'
     stage: "publish"
+    when:
+      condition:
+        all:
+          executeForChangedFiles: 'includes("${{changed_files}}", "cubejs-bigquery-driver") == true'
 
   deploy_postgres_driver_to_npm:
     title: 'Deploy postgres-driver'
@@ -51,6 +64,10 @@ steps:
       NPM_TOKEN: '${{NPM_TOKEN}}'
       DIR: 'cube.js/packages/cubejs-postgres-driver'
     stage: "publish"
+    when:
+      condition:
+        all:
+          executeForChangedFiles: 'includes("${{changed_files}}", "cubejs-postgres-driver") == true'
 
   deploy_server_core_to_npm:
     title: 'Deploy server-core'
@@ -60,4 +77,34 @@ steps:
       NPM_TOKEN: '${{NPM_TOKEN}}'
       DIR: 'cube.js/packages/cubejs-server-core'
     stage: "publish"
+    when:
+      condition:
+        all:
+          executeForChangedFiles: 'includes("${{changed_files}}", "cubejs-server-core") == true'
+
+  deploy_backend_shared_to_npm:
+    title: 'Deploy backend-shared'
+    working_directory: ${{clone}}
+    type: npm-publish
+    arguments:
+      NPM_TOKEN: '${{NPM_TOKEN}}'
+      DIR: 'cube.js/packages/cubejs-backend-shared'
+    stage: "publish"
+    when:
+      condition:
+        all:
+          executeForChangedFiles: 'includes("${{changed_files}}", "cubejs-backend-shared") == true'
+
+  deploy_query_orchestrator_to_npm:
+    title: 'Deploy query-orchestrator'
+    working_directory: ${{clone}}
+    type: npm-publish
+    arguments:
+      NPM_TOKEN: '${{NPM_TOKEN}}'
+      DIR: 'cube.js/packages/cubejs-query-orchestrator'
+    stage: "publish"
+    when:
+      condition:
+        all:
+          executeForChangedFiles: 'includes("${{changed_files}}", "cubejs-query-orchestrator") == true'
 
