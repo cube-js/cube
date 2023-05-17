@@ -513,7 +513,6 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
           const order: [string, 'asc' | 'desc'][] = [];
 
           if (where) {
-            console.log('>>>', 'FIRST!', where);
             filters = whereArgToQueryFilters(where, undefined, metaConfig);
           }
 
@@ -529,7 +528,6 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
             const cubeExists = metaConfig.find((cube) => cube.config.name === cubeNode.name.value);
             
             const cubeName = cubeExists ? (cubeNode.name.value) : capitalize(cubeNode.name.value);
-            // console.log('>>>', { cubeExists, v: cubeNode.name.value, cubeName });
             const orderByArg = getArgumentValue(cubeNode, 'orderBy', infos.variableValues);
             // todo: throw if both RootOrderByInput and [Cube]OrderByInput provided
             if (orderByArg) {
