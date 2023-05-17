@@ -37,8 +37,8 @@ const DateTimeScalar = asNexusMethod(DateTimeResolver, 'date');
 const FloatFilter = inputObjectType({
   name: 'FloatFilter',
   definition(t) {
-    t.list.float('equals');
-    t.list.float('notEquals');
+    t.float('equals');
+    t.float('notEquals');
     t.list.float('in');
     t.list.float('notIn');
     t.boolean('set');
@@ -52,8 +52,8 @@ const FloatFilter = inputObjectType({
 const StringFilter = inputObjectType({
   name: 'StringFilter',
   definition(t) {
-    t.list.string('equals');
-    t.list.string('notEquals');
+    t.string('equals');
+    t.string('notEquals');
     t.list.string('in');
     t.list.string('notIn');
     t.list.string('contains');
