@@ -1003,14 +1003,20 @@ mod tests {
         async fn exec_query_with_context(
             &self,
             _context: SqlQueryContext,
-            _query: &str,
+            query: &str,
         ) -> Result<Arc<DataFrame>, CubeError> {
             tokio::time::sleep(Duration::from_secs(2)).await;
             let counter = self.message_counter.fetch_add(1, Ordering::Relaxed);
-            Ok(Arc::new(DataFrame::new(
-                vec![Column::new("foo".to_string(), ColumnType::String, 0)],
-                vec![Row::new(vec![TableValue::String(format!("{}", counter))])],
-            )))
+            if query == "close_connection" {
+                Err(CubeError::wrong_connection("wrong connection".to_string()))
+            } else if query == "error" {
+                Err(CubeError::internal("error".to_string()))
+            } else {
+                Ok(Arc::new(DataFrame::new(
+                    vec![Column::new("foo".to_string(), ColumnType::String, 0)],
+                    vec![Row::new(vec![TableValue::String(format!("{}", counter))])],
+                )))
+            }
         }
 
         async fn plan_query(&self, _query: &str) -> Result<QueryPlans, CubeError> {
@@ -1068,19 +1074,25 @@ mod tests {
 
         tokio::time::sleep(Duration::from_secs(1)).await;
 
-        async fn connect_and_send(
-            message_id: u32,
-            connection_id: Option<String>,
-        ) -> WebSocketStream<MaybeTlsStream<TcpStream>> {
-            let (mut socket, _) = connect_async(Url::parse("ws://127.0.0.1:53031/ws").unwrap())
+        async fn connect() -> WebSocketStream<MaybeTlsStream<TcpStream>> {
+            let (socket, _) = connect_async(Url::parse("ws://127.0.0.1:53031/ws").unwrap())
                 .await
                 .unwrap();
+            socket
+        }
+
+        async fn send_query(
+            socket: &mut WebSocketStream<MaybeTlsStream<TcpStream>>,
+            message_id: u32,
+            connection_id: Option<String>,
+            query: &str,
+        ) {
             socket
                 .send(Message::binary(
                     HttpMessage {
                         message_id,
                         command: HttpCommand::Query {
-                            query: "foo".to_string(),
+                            query: query.to_string(),
                             inline_tables: vec![],
                             trace_obj: None,
                         },
@@ -1090,7 +1102,23 @@ mod tests {
                 ))
                 .await
                 .unwrap();
+        }
+
+        async fn connect_and_send_query(
+            message_id: u32,
+            connection_id: Option<String>,
+            query: &str,
+        ) -> WebSocketStream<MaybeTlsStream<TcpStream>> {
+            let mut socket = connect().await;
+            send_query(&mut socket, message_id, connection_id, query).await;
             socket
+        }
+
+        async fn connect_and_send(
+            message_id: u32,
+            connection_id: Option<String>,
+        ) -> WebSocketStream<MaybeTlsStream<TcpStream>> {
+            connect_and_send_query(message_id, connection_id, "foo").await
         }
 
         async fn assert_message(
@@ -1171,6 +1199,25 @@ mod tests {
                 socket.close(None).await.unwrap();
             },
         );
+
+        tokio::time::sleep(Duration::from_millis(2500)).await;
+        let mut socket = connect_and_send(3, Some("foo".to_string())).await;
+        assert_message(&mut socket, "6").await;
+
+        let mut socket2 = connect_and_send(3, Some("foo2".to_string())).await;
+        assert_message(&mut socket2, "7").await;
+
+        send_query(&mut socket, 3, Some("foo".to_string()), "close_connection").await;
+        socket.next().await.unwrap().unwrap();
+
+        send_query(&mut socket2, 3, Some("foo".to_string()), "error").await;
+        socket2.next().await.unwrap().unwrap();
+
+        send_query(&mut socket, 3, Some("foo".to_string()), "foo").await;
+        assert!(socket.next().await.unwrap().is_err());
+
+        let mut socket2 = connect_and_send(3, Some("foo2".to_string())).await;
+        assert_message(&mut socket2, "10").await;
 
         http_server.stop_processing().await;
     }
