@@ -148,7 +148,9 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
 
   public async testConnection() {
     await this.bigquery.query({
-      query: 'SELECT ? AS number', params: ['1']
+      query: 'SELECT ? AS number',
+      params: ['1'],
+      jobTimeoutMs: this.testConnectionTimeout(),
     });
   }
 
