@@ -65,8 +65,8 @@ cube_project
   - `refresh_key`
   - `pre_aggregations`
   - `joins`
-  - `measures`
   - `dimensions`
+  - `measures`
 
 ### Dimensions & measures
 
@@ -102,14 +102,6 @@ cubes:
         sql: "{CUBE}.order_id = {orders.id}"
         relationship: many_to_one
 
-    measures:
-      - name: count
-        type: count
-
-      - name: total_amount
-        sql: price
-        type: sum
-
     dimensions:
       - name: id
         sql: id
@@ -119,6 +111,14 @@ cubes:
       - name: created_date
         sql: created_at
         type: time
+
+    measures:
+      - name: count
+        type: count
+
+      - name: total_amount
+        sql: price
+        type: sum
 ```
 
 ## Views
@@ -195,10 +195,6 @@ cubes:
       FROM public.users
       WHERE state = 'CA'
 
-    measures:
-      - name: count
-        type: count
-
     dimensions:
       - name: id
         sql: id
@@ -212,6 +208,10 @@ cubes:
       - name: last_name
         sql: last_name
         type: string
+
+    measures:
+      - name: count
+        type: count
 
 ```
 
@@ -231,14 +231,6 @@ cubes:
   - name: users
     sql_table: public.users
 
-    measures:
-      - name: count
-        type: count
-
-      - name: total_orders_amount
-        sql: "{lifetime_value}"
-        type: sum
-
     dimensions:
       - name: id
         sql: id
@@ -253,6 +245,14 @@ cubes:
         sql: "{line_items.total_amount}"
         type: number
         sub_query: true
+
+    measures:
+      - name: count
+        type: count
+
+      - name: total_orders_amount
+        sql: "{lifetime_value}"
+        type: sum
 ```
 
 ## JavaScript style guide
