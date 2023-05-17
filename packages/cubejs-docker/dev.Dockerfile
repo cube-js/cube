@@ -1,4 +1,4 @@
-FROM node:14.21.1-buster-slim AS base
+FROM node:16.20.0-bullseye-slim AS base
 
 ARG IMAGE_VERSION=dev
 
@@ -9,8 +9,7 @@ ENV CI=0
 RUN DEBIAN_FRONTEND=noninteractive \
     && apt-get update \
     && apt-get install -y --no-install-recommends rxvt-unicode libssl1.1 curl \
-       cmake python2 python3 gcc g++ make cmake openjdk-11-jdk-headless \
-    && npm config set python /usr/bin/python2.7 \
+       cmake python3 gcc g++ make cmake openjdk-11-jdk-headless \
     && rm -rf /var/lib/apt/lists/*
 
 ENV RUSTUP_HOME=/usr/local/rustup
@@ -86,7 +85,9 @@ COPY packages/cubejs-client-ngx/package.json packages/cubejs-client-ngx/package.
 COPY packages/cubejs-client-ws-transport/package.json packages/cubejs-client-ws-transport/package.json
 COPY packages/cubejs-playground/package.json packages/cubejs-playground/package.json
 
-RUN yarn policies set-version v1.22.5
+RUN yarn policies set-version v1.22.19
+# Yarn v1 uses aggressive timeouts with summing time spending on fs, https://github.com/yarnpkg/yarn/issues/4890
+RUN yarn config set network-timeout 120000 -g
 
 # There is a problem with release process.
 # We are doing version bump without updating lock files for the docker package.

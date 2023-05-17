@@ -18,7 +18,8 @@ import type {
   Response,
 } from 'express';
 import {
-  QueryType
+  QueryType,
+  ApiScopes,
 } from './types/strings';
 import {
   QueryType as QueryTypeEnum, ResultType
@@ -43,6 +44,7 @@ import {
   CheckAuthInternalOptions,
   JWTOptions,
   CheckAuthFn,
+  ContextToApiScopesFn,
 } from './types/auth';
 import {
   Query,
@@ -69,8 +71,7 @@ import {
   normalizeQuery,
   normalizeQueryCancelPreAggregations,
   normalizeQueryPreAggregationPreview,
-  normalizeQueryPreAggregations,
-  validatePostRewrite,
+  normalizeQueryPreAggregations, remapToQueryAdapterFormat,
 } from './query';
 import { cachedHandler } from './cached-handler';
 import { createJWKsFetcher } from './jwk';
@@ -78,7 +79,6 @@ import { SQLServer } from './sql-server';
 import { makeSchema } from './graphql';
 import { ConfigItem, prepareAnnotation } from './helpers/prepareAnnotation';
 import transformData from './helpers/transformData';
-import { shouldAddLimit } from './helpers/shouldAddLimit';
 import {
   transformCube,
   transformMeasure,
@@ -116,6 +116,11 @@ class ApiGateway {
 
   public readonly checkAuthSystemFn: CheckAuthFn;
 
+  protected readonly contextToApiScopesFn: ContextToApiScopesFn;
+
+  protected readonly contextToApiScopesDefFn: ContextToApiScopesFn =
+    async () => ['liveliness', 'graphql', 'meta', 'data'];
+
   protected readonly checkAuthMiddleware: CheckAuthMiddlewareFn;
 
   protected readonly requestLoggerMiddleware: RequestLoggerMiddlewareFn;
@@ -129,6 +134,8 @@ class ApiGateway {
   protected readonly releaseListeners: (() => any)[] = [];
 
   protected readonly playgroundAuthSecret?: string;
+
+  protected readonly event: (name: string, props?: object) => void;
 
   public constructor(
     protected readonly apiSecret: string,
@@ -152,6 +159,7 @@ class ApiGateway {
 
     this.checkAuthFn = this.createCheckAuthFn(options);
     this.checkAuthSystemFn = this.createCheckAuthSystemFn();
+    this.contextToApiScopesFn = this.createContextToApiScopesFn(options);
     this.checkAuthMiddleware = options.checkAuthMiddleware
       ? this.wrapCheckAuthMiddleware(options.checkAuthMiddleware)
       : this.checkAuth;
@@ -159,6 +167,8 @@ class ApiGateway {
     this.requestLoggerMiddleware = options.requestLoggerMiddleware || this.requestLogger;
     this.contextRejectionMiddleware = options.contextRejectionMiddleware || (async (req, res, next) => next());
     this.wsContextAcceptor = options.wsContextAcceptor || (() => ({ accepted: true }));
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
+    this.event = options.event || function () {};
   }
 
   public initApp(app: ExpressApplication) {
@@ -170,30 +180,67 @@ class ApiGateway {
       this.requestLoggerMiddleware
     ];
 
+    /** **************************************************************
+     * Liveliness scope                                              *
+     *************************************************************** */
+
     // @todo Should we pass requestLoggerMiddleware?
+    // @todo Should we add scope assert here?
+
     const guestMiddlewares = [];
 
-    app.use(`${this.basePath}/graphql`, userMiddlewares, async (req, res) => {
-      const compilerApi = this.getCompilerApi(req.context);
-      let schema = compilerApi.getGraphQLSchema();
-      if (!schema) {
-        let metaConfig = await compilerApi.metaConfig({
-          requestId: req.context.requestId,
-        });
-        metaConfig = this.filterVisibleItemsInMeta(req.context, metaConfig);
-        schema = makeSchema(metaConfig);
-        compilerApi.setGraphQLSchema(schema);
-      }
+    app.get('/readyz', guestMiddlewares, cachedHandler(this.readiness));
+    app.get('/livez', guestMiddlewares, cachedHandler(this.liveness));
 
-      return graphqlHTTP({
-        schema,
-        context: {
-          req,
-          apiGateway: this
+    /** **************************************************************
+     * Graphql scope                                                 *
+     *************************************************************** */
+
+    app.use(
+      `${this.basePath}/graphql`,
+      [
+        ...userMiddlewares,
+        async (req, res, next) => {
+          try {
+            await this.assertApiScope(
+              'graphql',
+              req?.context?.securityContext
+            );
+            if (next) next();
+          } catch (e: unknown) {
+            if (e instanceof CubejsHandlerError) {
+              res.status(e.status).json({ error: e.message });
+            }
+          }
         },
-        graphiql: getEnv('nodeEnv') !== 'production' ? { headerEditorEnabled: true } : false,
-      })(req, res);
-    });
+      ],
+      async (req, res) => {
+        const compilerApi = this.getCompilerApi(req.context);
+        let schema = compilerApi.getGraphQLSchema();
+        if (!schema) {
+          let metaConfig = await compilerApi.metaConfig({
+            requestId: req.context.requestId,
+          });
+          metaConfig = this.filterVisibleItemsInMeta(req.context, metaConfig);
+          schema = makeSchema(metaConfig);
+          compilerApi.setGraphQLSchema(schema);
+        }
+        return graphqlHTTP({
+          schema,
+          context: {
+            req,
+            apiGateway: this
+          },
+          graphiql: getEnv('nodeEnv') !== 'production'
+            ? { headerEditorEnabled: true }
+            : false,
+        })(req, res);
+      }
+    );
+
+    /** **************************************************************
+     * Data scope                                                    *
+     *************************************************************** */
 
     app.get(`${this.basePath}/v1/load`, userMiddlewares, (async (req, res) => {
       await this.load({
@@ -231,31 +278,9 @@ class ApiGateway {
       });
     }));
 
-    app.post(`${this.basePath}/v1/sql`, userMiddlewares, (async (req, res) => {
+    app.post(`${this.basePath}/v1/sql`, jsonParser, userMiddlewares, (async (req, res) => {
       await this.sql({
         query: req.body.query,
-        context: req.context,
-        res: this.resToResultFn(res)
-      });
-    }));
-
-    app.get(`${this.basePath}/v1/meta`, userMiddlewares, (async (req, res) => {
-      if (req.query.hasOwnProperty('extended')) {
-        await this.metaExtended({
-          context: req.context,
-          res: this.resToResultFn(res),
-        });
-      } else {
-        await this.meta({
-          context: req.context,
-          res: this.resToResultFn(res),
-        });
-      }
-    }));
-
-    app.get(`${this.basePath}/v1/run-scheduled-refresh`, userMiddlewares, (async (req, res) => {
-      await this.runScheduledRefresh({
-        queryingOptions: req.query.queryingOptions,
         context: req.context,
         res: this.resToResultFn(res)
       });
@@ -276,6 +301,81 @@ class ApiGateway {
         res: this.resToResultFn(res)
       });
     }));
+
+    app.get(
+      `${this.basePath}/v1/meta`,
+      userMiddlewares,
+      async (req, res) => {
+        if (req.query.hasOwnProperty('extended')) {
+          await this.metaExtended({
+            context: req.context,
+            res: this.resToResultFn(res),
+          });
+        } else {
+          await this.meta({
+            context: req.context,
+            res: this.resToResultFn(res),
+          });
+        }
+      }
+    );
+
+    app.post(
+      `${this.basePath}/v1/pre-aggregations/can-use`,
+      [
+        ...userMiddlewares,
+        async (req, res, next) => {
+          try {
+            await this.assertApiScope(
+              'meta',
+              req?.context?.securityContext
+            );
+            if (next) next();
+          } catch (e: unknown) {
+            if (e instanceof CubejsHandlerError) {
+              res.status(e.status).json({ error: e.message });
+            }
+          }
+        },
+      ],
+      (req: Request, res: Response) => {
+        const { transformedQuery, references } = req.body;
+        const canUsePreAggregationForTransformedQuery =
+          this
+            .compilerApi(req.context)
+            .canUsePreAggregationForTransformedQuery(
+              transformedQuery,
+              references,
+            );
+        res.json({ canUsePreAggregationForTransformedQuery });
+      }
+    );
+
+    /** **************************************************************
+     * Jobs scope                                                    *
+     *************************************************************** */
+
+    app.get(
+      `${this.basePath}/v1/run-scheduled-refresh`,
+      userMiddlewares,
+      async (req, res) => {
+        await this.runScheduledRefresh({
+          queryingOptions: req.query.queryingOptions,
+          context: req.context,
+          res: this.resToResultFn(res)
+        });
+      }
+    );
+
+    app.post(
+      `${this.basePath}/v1/pre-aggregations/jobs`,
+      userMiddlewares,
+      this.preAggregationsJobs.bind(this),
+    );
+
+    /** **************************************************************
+     * Private API (no scopes)                                       *
+     *************************************************************** */
 
     if (this.playgroundAuthSecret) {
       const systemMiddlewares: RequestHandler[] = [
@@ -348,60 +448,7 @@ class ApiGateway {
           res: this.resToResultFn(res)
         });
       }));
-
-      app.post(
-        '/cubejs-system/v1/pre-aggregations/jobs',
-        systemMiddlewares,
-        this.preAggregationsJobs.bind(this),
-      );
-
-      const sqlRunnerMiddlewares = [...systemMiddlewares, this.checkSqlRunnerScope];
-
-      app.post(
-        '/cubejs-system/v1/sql-runner',
-        jsonParser,
-        sqlRunnerMiddlewares,
-        async (req: Request, res: Response) => {
-          await this.sqlRunner({
-            query: req.body.query,
-            context: req.context!,
-            res: this.resToResultFn(res),
-          });
-        }
-      );
-      
-      app.get(
-        '/cubejs-system/v1/data-sources',
-        jsonParser,
-        sqlRunnerMiddlewares,
-        async (req: Request, res: Response) => {
-          await this.dataSources({
-            context: req.context,
-            res: this.resToResultFn(res),
-          });
-        }
-      );
-      
-      app.post('/cubejs-system/v1/db-schema', jsonParser, systemMiddlewares, (async (req: Request, res: Response) => {
-        await this.dbSchema({
-          query: req.body.query,
-          context: req.context,
-          res: this.resToResultFn(res),
-        });
-      }));
     }
-
-    app.get('/readyz', guestMiddlewares, cachedHandler(this.readiness));
-    app.get('/livez', guestMiddlewares, cachedHandler(this.liveness));
-
-    app.post(`${this.basePath}/v1/pre-aggregations/can-use`, userMiddlewares, (req: Request, res: Response) => {
-      const { transformedQuery, references } = req.body;
-
-      const canUsePreAggregationForTransformedQuery = this.compilerApi(req.context)
-        .canUsePreAggregationForTransformedQuery(transformedQuery, references);
-
-      res.json({ canUsePreAggregationForTransformedQuery });
-    });
 
     app.use(this.handleErrorMiddleware);
   }
@@ -425,6 +472,7 @@ class ApiGateway {
   }) {
     const requestStarted = new Date();
     try {
+      await this.assertApiScope('jobs', context.securityContext);
       const refreshScheduler = this.refreshScheduler();
       res(await refreshScheduler.runScheduledRefresh(context, {
         ...this.parseQueryParam(queryingOptions || {}),
@@ -437,15 +485,15 @@ class ApiGateway {
     }
   }
 
-  private filterVisibleItemsInMeta(_context: RequestContext, metaConfig: any) {
+  private filterVisibleItemsInMeta(context: RequestContext, metaConfig: any) {
     function visibilityFilter(item) {
-      // Hidden items shouldn't be accessible through API everywhere for consistency.
-      return item.isVisible;
+      return getEnv('devMode') || context.signedWithPlaygroundAuthSecret || item.isVisible;
     }
 
     return metaConfig
       .map((cube) => ({
         config: {
+          public: cube.isVisible,
           ...cube.config,
           measures: cube.config.measures?.filter(visibilityFilter),
           dimensions: cube.config.dimensions?.filter(visibilityFilter),
@@ -458,6 +506,7 @@ class ApiGateway {
     const requestStarted = new Date();
 
     try {
+      await this.assertApiScope('meta', context.securityContext);
       const metaConfig = await this.getCompilerApi(context).metaConfig({
         requestId: context.requestId,
       });
@@ -476,13 +525,8 @@ class ApiGateway {
   public async metaExtended({ context, res }: { context: RequestContext, res: ResponseResultFn }) {
     const requestStarted = new Date();
 
-    // TODO: test and remove this function.
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    function visibilityFilter(item) {
-      return getEnv('devMode') || context.signedWithPlaygroundAuthSecret || item.isVisible;
-    }
-
     try {
+      await this.assertApiScope('meta', context.securityContext);
       const metaConfigExtended = await this.getCompilerApi(context).metaConfigExtended({
         requestId: context.requestId,
       });
@@ -690,8 +734,9 @@ class ApiGateway {
     const started = new Date();
     const context = <RequestContext>req.context;
     const query = <PreAggsJobsRequest>req.body;
+    let result;
     try {
-      let result;
+      await this.assertApiScope('jobs', req?.context?.securityContext);
       switch (query.action) {
         case 'post':
           if (
@@ -748,6 +793,9 @@ class ApiGateway {
         default:
           throw new Error(`The '${query.action}' action type doesn't supported.`);
       }
+      this.event(`pre_aggregations_jobs_${query.action}`, {
+        source: req.header('source') || 'unknown',
+      });
       response(result, { status: 200 });
     } catch (e) {
       this.handleError({ e, context, query, res: response, started });
@@ -1028,171 +1076,6 @@ class ApiGateway {
       });
     }
   }
-  
-  protected async dataSources({ context, res }: { context?: RequestContext, res: ResponseResultFn }) {
-    const requestStarted = new Date();
-
-    try {
-      const orchestratorApi = await this.getAdapterApi(context);
-      const { dataSources } = await this.getCompilerApi(context).dataSources(orchestratorApi);
-
-      res({ dataSources });
-    } catch (e) {
-      this.handleError({
-        e,
-        context,
-        res,
-        requestStarted,
-      });
-    }
-  }
-
-  protected async sqlRunner({ query, context, res }: QueryRequest) {
-    const requestStarted = new Date();
-    try {
-      if (!query) {
-        throw new UserError('A user\'s query must contain a body');
-      }
-
-      if (!Array.isArray(query) && !query.query) {
-        throw new UserError(
-          'A user\'s query must contain at least one query param.'
-        );
-      }
-      
-      query = {
-        ...query,
-        requestId: context.requestId,
-      };
-
-      const orchestratorApi = this.getAdapterApi(context);
-
-      if (shouldAddLimit(query.query)) {
-        if (
-          !query.limit ||
-          !Number.isInteger(query.limit) ||
-          query.limit < 0
-        ) {
-          throw new UserError(
-            'A user\'s query must contain limit query param and it must be positive number'
-          );
-        }
-
-        if (query.limit > getEnv('dbQueryDefaultLimit')) {
-          throw new UserError('The query limit has been exceeded');
-        }
-  
-        if (
-          query.resultFilter?.objectTypes &&
-          !Array.isArray(query.resultFilter.objectTypes)
-        ) {
-          throw new UserError(
-            'A query.resultFilter.objectTypes must be an array of strings'
-          );
-        }
-        
-        query.query = query.query.trim();
-        if (query.query.charAt(query.query.length - 1) === ';') {
-          query.query = query.query.slice(0, -1);
-        }
-
-        const driver = await orchestratorApi
-          .driverFactory(query.dataSource || 'default');
-
-        driver.wrapQueryWithLimit(query);
-      }
-      
-      this.log(
-        {
-          type: 'Load SQL Runner Request',
-          query,
-        },
-        context
-      );
-
-      const result = await orchestratorApi.executeQuery(query);
-
-      if (result.data.length) {
-        const objectLimit = Number(query.resultFilter?.objectLimit) || 100;
-        const stringLimit = Number(query.resultFilter?.stringLimit) || 100;
-        const objectTypes = query.resultFilter?.objectTypes || [];
-        const limit = Number(query.resultFilter?.limit) || 20;
-        const offset = Number(query.resultFilter?.offset) || 0;
-        result.total = result.data.length;
-        result.offset = offset;
-        result.data = result.data.slice(offset, offset + limit);
-        result.data = result.data.map((row) => {
-          Object.keys(row).forEach((key) => {
-            if (
-              typeof row[key] === 'object' && row[key] !== null && row[key].type &&
-              (objectTypes.length === 0 || !objectTypes.includes(row[key].type))
-            ) {
-              row[key] = row[key].type;
-            } else if (typeof row[key] === 'object' && row[key] !== null) {
-              row[key] = JSON.stringify(row[key].data || row[key]).slice(0, objectLimit);
-            } else if (typeof row[key] === 'string') {
-              row[key] = row[key].slice(0, stringLimit);
-            }
-          });
-
-          return row;
-        });
-      }
-
-      this.log(
-        {
-          type: 'Load SQL Runner Request Success',
-          query,
-          duration: this.duration(requestStarted),
-          dbType: result.dbType,
-        },
-        context
-      );
-
-      res(result);
-    } catch (e) {
-      this.handleError({
-        e, context, query, res, requestStarted
-      });
-    }
-  }
-
-  protected async dbSchema({ query, context, res }: {
-    query: {
-      dataSource: string;
-    };
-    context?: RequestContext;
-    res: ResponseResultFn;
-  }) {
-    const requestStarted = new Date();
-    try {
-      if (!query) {
-        throw new UserError(
-          'A user\'s query must contain a body'
-        );
-      }
-
-      if (!query.dataSource) {
-        throw new UserError(
-          'A user\'s query must contain dataSource.'
-        );
-      }
-
-      const orchestratorApi = await this.getAdapterApi(context);
-   
-      const schema = await orchestratorApi
-        .getQueryOrchestrator()
-        .fetchSchema(query.dataSource);
-
-      res({ data: schema });
-    } catch (e) {
-      this.handleError({ e,
-        context,
-        res,
-        requestStarted,
-      });
-    }
-  }
 
   /**
    * Convert incoming query parameter (JSON fetched from the HTTP) to
@@ -1217,20 +1100,37 @@ class ApiGateway {
 
     const queries = Array.isArray(query) ? query : [query];
 
-    const normalizedQueries: NormalizedQuery[] = await Promise.all(
+    this.log({
+      type: 'Query Rewrite',
+      query
+    }, context);
+
+    const startTime = new Date().getTime();
+
+    let normalizedQueries: NormalizedQuery[] = await Promise.all(
       queries.map(
-        async (currentQuery) => validatePostRewrite(
-          await this.queryRewrite(
-            normalizeQuery(currentQuery),
-            context
-          )
-        )
+        async (currentQuery) => {
+          const normalizedQuery = normalizeQuery(currentQuery, persistent);
+          const rewrite = await this.queryRewrite(
+            normalizedQuery,
+            context,
+          );
+          return normalizeQuery(
+            rewrite,
+            persistent,
+          );
+        }
       )
     );
 
-    normalizedQueries.forEach((q) => {
-      this.processQueryLimit(q, persistent);
-    });
+    this.log({
+      type: 'Query Rewrite completed',
+      normalizedQueries,
+      duration: new Date().getTime() - startTime,
+      query
+    }, context);
+
+    normalizedQueries = normalizedQueries.map(q => remapToQueryAdapterFormat(q));
 
     if (normalizedQueries.find((currentQuery) => !currentQuery)) {
       throw new Error('queryTransformer returned null query. Please check your queryTransformer implementation');
@@ -1250,33 +1150,12 @@ class ApiGateway {
     return [queryType, normalizedQueries];
   }
 
-  /**
-   * Asserts query limit, sets the default value if neccessary.
-   *
-   * @throw {Error}
-   */
-  public processQueryLimit(query: NormalizedQuery, persistent = false): void {
-    const def = getEnv('dbQueryDefaultLimit') <= getEnv('dbQueryLimit')
-      ? getEnv('dbQueryDefaultLimit')
-      : getEnv('dbQueryLimit');
-
-    if (!persistent) {
-      if (
-        typeof query.limit === 'number' &&
-        query.limit > getEnv('dbQueryLimit')
-      ) {
-        throw new Error('The query limit has been exceeded.');
-      }
-      query.limit = typeof query.limit === 'number'
-        ? query.limit
-        : def;
-    }
-  }
-
   public async sql({ query, context, res }: QueryRequest) {
     const requestStarted = new Date();
 
     try {
+      await this.assertApiScope('data', context.securityContext);
+
       query = this.parseQueryParam(query);
       const [queryType, normalizedQueries] = await this.getNormalizedQueries(query, context);
 
@@ -1363,6 +1242,8 @@ class ApiGateway {
     const requestStarted = new Date();
 
     try {
+      await this.assertApiScope('data', context.securityContext);
+
       const [queryType, normalizedQueries] = await this.getNormalizedQueries(query, context);
 
       const sqlQueries = await Promise.all<any>(
@@ -1550,7 +1431,7 @@ class ApiGateway {
   }> {
     const requestStarted = new Date();
     try {
-      this.log({ type: 'Streaming Query', query }, context);
+      this.log({ type: 'Load Request', query, streaming: true }, context);
       const [, normalizedQueries] = await this.getNormalizedQueries(query, context, true);
       const sqlQuery = (await this.getSqlQueriesInternal(context, normalizedQueries))[0];
       const q = {
@@ -1571,13 +1452,17 @@ class ApiGateway {
         stream: await this.getAdapterApi(context).streamQuery(q),
       };
       return _stream;
-    } catch (e) {
-      this.log({
-        type: 'Streaming Error',
+    } catch (err: any) {
+      const e = err.message === 'Continue wait' ? { error: 'Continue wait' } : err;
+      this.handleError({
+        e,
+        context,
         query,
-        error: (<Error>e).message,
-        duration: this.duration(requestStarted),
-      }, context);
+        res: (errorObj) => {
+          throw errorObj;
+        },
+        requestStarted
+      });
       return null;
     }
   }
@@ -1598,6 +1483,8 @@ class ApiGateway {
     const requestStarted = new Date();
 
     try {
+      await this.assertApiScope('data', context.securityContext);
+
       query = this.parseQueryParam(request.query);
       let resType: ResultType = ResultType.DEFAULT;
 
@@ -2022,14 +1909,13 @@ class ApiGateway {
           req.securityContext = await checkAuthFn(auth, secret);
           req.signedWithPlaygroundAuthSecret = Boolean(internalOptions?.isPlaygroundCheckAuth);
         } catch (e) {
+          this.log({
+            type: (e as Error).message,
+            token: auth,
+            error: (e as Error).stack || (e as Error).toString()
+          }, <any>req);
           if (this.enforceSecurityChecks) {
             throw new CubejsHandlerError(403, 'Forbidden', 'Invalid token');
-          } else {
-            this.log({
-              type: (e as Error).message,
-              token: auth,
-              error: (e as Error).stack || (e as Error).toString()
-            }, <any>req);
           }
         }
       } else if (this.enforceSecurityChecks) {
@@ -2070,6 +1956,60 @@ class ApiGateway {
     return async (ctx, authorization) => {
       await systemCheckAuthFn(ctx, authorization);
     };
+  }
+
+  protected createContextToApiScopesFn(
+    options: ApiGatewayOptions,
+  ): ContextToApiScopesFn {
+    return options.contextToApiScopes
+      ? async (securityContext?: any, defaultApiScopes?: ApiScopes[]) => {
+        const scopes = options.contextToApiScopes &&
+            await options.contextToApiScopes(
+              securityContext,
+              defaultApiScopes,
+            );
+        if (!scopes || !Array.isArray(scopes)) {
+          throw new Error(
+            'A user-defined contextToApiScopes function returns an inconsistent type.'
+          );
+        } else {
+          scopes.forEach((p) => {
+            if (['liveliness', 'graphql', 'meta', 'data', 'jobs'].indexOf(p) === -1) {
+              throw new Error(
+                `A user-defined contextToApiScopes function returns a wrong scope: ${p}`
+              );
+            }
+          });
+        }
+        return scopes;
+      }
+      : async () => {
+        const defaultApiScope = getEnv('defaultApiScope');
+        if (defaultApiScope) {
+          return defaultApiScope;
+        } else {
+          return this.contextToApiScopesDefFn();
+        }
+      };
+  }
+
+  protected async assertApiScope(
+    scope: ApiScopes,
+    securityContext?: any,
+  ): Promise<void> {
+    const scopes =
+      await this.contextToApiScopesFn(
+        securityContext || {},
+        getEnv('defaultApiScope') || await this.contextToApiScopesDefFn(),
+      );
+    const permited = scopes.indexOf(scope) >= 0;
+    if (!permited) {
+      throw new CubejsHandlerError(
+        403,
+        'Forbidden',
+        `Api scope is missed: ${scope}`
+      );
+    }
   }
 
   protected extractAuthorizationHeaderWithSchema(req: Request) {
@@ -2119,28 +2059,18 @@ class ApiGateway {
     await this.checkAuthWrapper(this.checkAuthSystemFn, req, res, next);
   };
   
-  protected checkSqlRunnerScope: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
-    await this.checkAuthWrapper(
-      async () => {
-        if (
-          !getEnv('devMode') &&
-          (!req.context?.securityContext?.scope ||
-          !Array.isArray(req.context?.securityContext?.scope) ||
-          !req.context?.securityContext?.scope.includes('sql-runner'))
-        ) {
-          throw new CubejsHandlerError(403, 'Forbidden', 'Sql-runner scope is missing.');
-        }
-      },
-      req,
-      res,
-      next
-    );
-  };
-
   protected requestContextMiddleware: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
-    req.context = await this.contextByReq(req, req.securityContext, getRequestIdFromRequest(req));
-    if (next) {
-      next();
+    try {
+      req.context = await this.contextByReq(req, req.securityContext, getRequestIdFromRequest(req));
+      if (next) {
+        next();
+      }
+    } catch (e) {
+      if (next) {
+        next(e);
+      } else {
+        throw e;
+      }
     }
   };
 

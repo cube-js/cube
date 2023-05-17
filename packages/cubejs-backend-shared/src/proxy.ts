@@ -16,7 +16,7 @@ function getCommandOutput(command: string) {
 
 export async function getProxySettings() {
   const [proxy] = (
-    await Promise.all([getCommandOutput('npm config get https-proxy'), getCommandOutput('npm config get proxy')])
+    await Promise.all([getCommandOutput('npm config -g get https-proxy'), getCommandOutput('npm config -g get proxy')])
   )
     .map((s) => s.trim())
     .filter((s) => !['null', 'undefined', ''].includes(s));

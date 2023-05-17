@@ -71,7 +71,7 @@ const generateQueryTypes = async (apiUrl, { token }) => {
       url: `${apiUrl}/meta`,
       json: true,
     });
-  } catch (e) {
+  } catch (e: any) {
     await displayError(e.error.error);
   }
 

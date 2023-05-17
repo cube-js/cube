@@ -1,0 +1,162 @@
+---
+redirect_from:
+  - /config/databases/aws-redshift
+---
+
+# AWS-Redshift
+## Prerequisites
+
+<InfoBox>
+
+If the cluster is configured within a [VPC][aws-vpc], then Cube **must** have a
+network route to the cluster.
+
+</InfoBox>
+
+- The [hostname][aws-redshift-docs-connection-string] for the [AWS
+  Redshift][aws-redshift] cluster
+- The [username/password][aws-redshift-docs-users] for the [AWS
+  Redshift][aws-redshift] cluster
+- The name of the database to use within the [AWS Redshift][aws-redshift]
+  cluster
+
+## Setup
+
+###  Manual
+
+Add the following to a `.env` file in your Cube project:
+
+```dotenv
+CUBEJS_DB_TYPE=redshift
+CUBEJS_DB_HOST=my-redshift-cluster.cfbs3dkw1io8.eu-west-1.redshift.amazonaws.com
+CUBEJS_DB_NAME=my_redshift_database
+CUBEJS_DB_USER=redshift_user
+CUBEJS_DB_PASS=**********
+```
+
+###  Cube Cloud
+
+<InfoBox heading="Allowing connections from Cube Cloud IP">
+
+In some cases you'll need to allow connections from your Cube Cloud deployment IP
+address to your database. You can copy the IP address from either the Database
+Setup step in deployment creation, or from <Btn>Settings →
+Configuration</Btn> in your deployment.
+
+</InfoBox>
+
+The following fields are required when creating an AWS Redshift connection:
+
+<Screenshot
+  alt="Cube Cloud AWS Redshift Configuration Screen"
+  src="https://ucarecdn.com/4ccd3485-36fe-4740-9a11-0e8fb23fe8c3/"
+/>
+
+Cube Cloud also supports connecting to data sources within private VPCs. If you already have VPCs enabled in
+your account, check out the [VPC documentation][ref-cloud-conf-vpc] to learn how
+to get started.
+
+<SuccessBox>
+
+VPC connectivity is available in Cube Cloud on [Premium](https://cube.dev/pricing) tier. [Contact us][cube-contact] for details.
+
+</SuccessBox>
+
+[cube-pricing]: https://cube.dev/pricing/
+[cube-contact]: https://cube.dev/contact/
+[ref-cloud-conf-vpc]: /cloud/configuration/connecting-with-a-vpc
+
+## Environment Variables
+
+| Environment Variable                   | Description                                                                         | Possible Values           | Required | [Supports multiple data sources?][ref-config-multiple-ds-decorating-env] |
+| -------------------------------------- | ----------------------------------------------------------------------------------- | ------------------------- | :------: | :----------------------------------------------------------------------: |
+| `CUBEJS_DB_HOST`                       | The host URL for a database                                                         | A valid database host URL |    ✅    |                                    ✅                                    |
+| `CUBEJS_DB_PORT`                       | The port for the database connection                                                | A valid port number       |    ❌    |                                    ✅                                    |
+| `CUBEJS_DB_NAME`                       | The name of the database to connect to                                              | A valid database name     |    ✅    |                                    ✅                                    |
+| `CUBEJS_DB_USER`                       | The username used to connect to the database                                        | A valid database username |    ✅    |                                    ✅                                    |
+| `CUBEJS_DB_PASS`                       | The password used to connect to the database                                        | A valid database password |    ✅    |                                    ✅                                    |
+| `CUBEJS_DB_SSL`                        | If `true`, enables SSL encryption for database connections from Cube                | `true`, `false`           |    ❌    |                                    ✅                                    |
+| `CUBEJS_CONCURRENCY`                   | The number of concurrent connections each queue has to the database. Default is `4` | A valid number            |    ❌    |                                    ❌                                    |
+| `CUBEJS_DB_MAX_POOL`                   | The maximum number of concurrent database connections to pool. Default is `16`      | A valid number            |    ❌    |                                    ✅                                    |
+| `CUBEJS_DB_EXPORT_BUCKET_REDSHIFT_ARN` |                                                                                     |                           |    ❌    |                                    ✅                                    |
+
+## Pre-Aggregation Feature Support
+
+### count_distinct_approx
+
+Measures of type
+[`count_distinct_approx`][ref-schema-ref-types-formats-countdistinctapprox] can
+not be used in pre-aggregations when using AWS Redshift as a source database.
+
+## Pre-Aggregation Build Strategies
+
+<InfoBox>
+
+To learn more about pre-aggregation build strategies, [head
+here][ref-caching-using-preaggs-build-strats].
+
+</InfoBox>
+
+| Feature       | Works with read-only mode? | Is default? |
+| ------------- | :------------------------: | :---------: |
+| Batching      |             ❌             |     ✅      |
+| Export Bucket |             ❌             |     ❌      |
+
+By default, AWS Redshift uses [batching][self-preaggs-batching] to build
+pre-aggregations.
+
+### Batching
+
+No extra configuration is required to configure batching for AWS Redshift.
+
+### Export bucket
+
+<WarningBox>
+
+AWS Redshift **only** supports using AWS S3 for export buckets.
+
+</WarningBox>
+
+#### AWS S3
+
+For [improved pre-aggregation performance with large
+datasets][ref-caching-large-preaggs], enable export bucket functionality by
+configuring Cube with the following environment variables:
+
+<InfoBox>
+
+Ensure the AWS credentials are correctly configured in IAM to allow reads and
+writes to the export bucket in S3.
+
+</InfoBox>
+
+```dotenv
+CUBEJS_DB_EXPORT_BUCKET_TYPE=s3
+CUBEJS_DB_EXPORT_BUCKET=my.bucket.on.s3
+CUBEJS_DB_EXPORT_BUCKET_AWS_KEY=<AWS_KEY>
+CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET=<AWS_SECRET>
+CUBEJS_DB_EXPORT_BUCKET_AWS_REGION=<AWS_REGION>
+```
+
+## SSL
+
+To enable SSL-encrypted connections between Cube and AWS Redshift, set the
+`CUBEJS_DB_SSL` environment variable to `true`. For more information on how to
+configure custom certificates, please check out [Enable SSL Connections to the
+Database][ref-recipe-enable-ssl].
+
+[aws-redshift-docs-connection-string]:
+  https://docs.aws.amazon.com/redshift/latest/mgmt/configuring-connections.html#connecting-drivers
+[aws-redshift-docs-users]:
+  https://docs.aws.amazon.com/redshift/latest/dg/r_Users.html
+[aws-redshift]: https://aws.amazon.com/redshift/
+[aws-vpc]: https://aws.amazon.com/vpc/
+[ref-caching-large-preaggs]: /caching/using-pre-aggregations#export-bucket
+[ref-caching-using-preaggs-build-strats]:
+  /caching/using-pre-aggregations#pre-aggregation-build-strategies
+[ref-config-multiple-ds-decorating-env]:
+  /config/multiple-data-sources#configuring-data-sources-with-environment-variables-decorated-environment-variables
+[ref-recipe-enable-ssl]: /recipes/enable-ssl-connections-to-database
+[ref-schema-ref-types-formats-countdistinctapprox]:
+  /schema/reference/types-and-formats#count-distinct-approx
+[self-preaggs-batching]: #batching

@@ -25,13 +25,45 @@ network route to the cluster.
 
 Add the following to a `.env` file in your Cube project:
 
-```bash
+```dotenv
 CUBEJS_DB_TYPE=redshift
 CUBEJS_DB_HOST=my-redshift-cluster.cfbs3dkw1io8.eu-west-1.redshift.amazonaws.com
 CUBEJS_DB_NAME=my_redshift_database
 CUBEJS_DB_USER=redshift_user
 CUBEJS_DB_PASS=**********
 ```
+
+### <--{"id" : "Setup"}--> Cube Cloud
+
+<InfoBox heading="Allowing connections from Cube Cloud IP">
+
+In some cases you'll need to allow connections from your Cube Cloud deployment IP
+address to your database. You can copy the IP address from either the Database
+Setup step in deployment creation, or from <Btn>Settings →
+Configuration</Btn> in your deployment.
+
+</InfoBox>
+
+The following fields are required when creating an AWS Redshift connection:
+
+<Screenshot
+  alt="Cube Cloud AWS Redshift Configuration Screen"
+  src="https://ucarecdn.com/4ccd3485-36fe-4740-9a11-0e8fb23fe8c3/"
+/>
+
+Cube Cloud also supports connecting to data sources within private VPCs. If you already have VPCs enabled in
+your account, check out the [VPC documentation][ref-cloud-conf-vpc] to learn how
+to get started.
+
+<SuccessBox>
+
+VPC connectivity is available in Cube Cloud on [Premium](https://cube.dev/pricing) tier. [Contact us][cube-contact] for details.
+
+</SuccessBox>
+
+[cube-pricing]: https://cube.dev/pricing/
+[cube-contact]: https://cube.dev/contact/
+[ref-cloud-conf-vpc]: /cloud/configuration/connecting-with-a-vpc
 
 ## Environment Variables
 
@@ -49,10 +81,10 @@ CUBEJS_DB_PASS=**********
 
 ## Pre-Aggregation Feature Support
 
-### countDistinctApprox
+### count_distinct_approx
 
 Measures of type
-[`countDistinctApprox`][ref-schema-ref-types-formats-countdistinctapprox] can
+[`count_distinct_approx`][ref-schema-ref-types-formats-countdistinctapprox] can
 not be used in pre-aggregations when using AWS Redshift as a source database.
 
 ## Pre-Aggregation Build Strategies
@@ -97,7 +129,7 @@ writes to the export bucket in S3.
 
 </InfoBox>
 
-```bash
+```dotenv
 CUBEJS_DB_EXPORT_BUCKET_TYPE=s3
 CUBEJS_DB_EXPORT_BUCKET=my.bucket.on.s3
 CUBEJS_DB_EXPORT_BUCKET_AWS_KEY=<AWS_KEY>

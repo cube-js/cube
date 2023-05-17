@@ -74,7 +74,7 @@ export function parseNpmLock(): ProjectLock | null {
         return null;
       },
     };
-  } catch (e) {
+  } catch (e: any) {
     internalExceptions(e);
 
     return null;

@@ -87,5 +87,14 @@ pub fn defaults() -> DatabaseVariables {
         ),
     );
 
+    variables.insert(
+        "max_identifier_length".to_string(),
+        DatabaseVariable::system(
+            "max_identifier_length".to_string(),
+            ScalarValue::UInt32(Some(63)),
+            None,
+        ),
+    );
+
     variables
 }

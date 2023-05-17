@@ -1,0 +1,101 @@
+{
+  "cube": {
+    "environment": {
+      "CUBEJS_DEV_MODE": "true",
+      "CUBEJS_API_SECRET": "mysupersecret",
+      "CUBEJS_CACHE_AND_QUEUE_DRIVER": "cubestore",
+      "CUBEJS_CUBESTORE_HOST": "store",
+      "CUBEJS_DB_TYPE": "bigquery",
+      "CUBEJS_DB_NAME": "test",
+      "CUBEJS_PRE_AGGREGATIONS_SCHEMA": "dev_pre_aggregations",
+      "CUBEJS_DB_BQ_PROJECT_ID": "cube-open-source",
+      "CUBEJS_DB_BQ_CREDENTIALS": "${DRIVERS_TESTS_CUBEJS_DB_BQ_CREDENTIALS}",
+
+      "CUBEJS_DB_EXPORT_BUCKET": "cube-open-source-export-bucket",
+      "CUBEJS_DB_EXPORT_BUCKET_TYPE": "gcp"
+    },
+    "ports" : ["4000"]
+  },
+  "cast": {
+    "SELECT_PREFIX": "",
+    "SELECT_SUFFIX": "",
+    "DATE_PREFIX": "PARSE_DATE('%Y-%m-%d', ",
+    "DATE_SUFFIX": ")",
+    "CREATE_TBL_PREFIX": "CREATE TABLE ",
+    "CREATE_TBL_SUFFIX": " AS ",
+    "CREATE_SUB_PREFIX": "(",
+    "CREATE_SUB_SUFFIX": ");"
+  },
+  "tables": {
+    "products": "test.products",
+    "customers": "test.customers",
+    "ecommerce": "test.ecommerce"
+  },
+  "preAggregations": {
+    "Products": [],
+    "Customers": [
+      {
+        "name": "RA",
+        "measures": ["CUBE.count", "CUBE.runningTotal"]
+      }
+    ],
+    "ECommerce": [
+      {
+        "name": "SA",
+        "dimensions": ["CUBE.productName"],
+        "measures": [
+          "CUBE.totalQuantity",
+          "CUBE.avgDiscount",
+          "CUBE.totalSales",
+          "CUBE.totalProfit"
+        ]
+      },
+      {
+        "name": "TA",
+        "time_dimension": "CUBE.orderDate",
+        "granularity": "month",
+        "partition_granularity": "month",
+        "dimensions": ["CUBE.productName"],
+        "measures": [
+          "CUBE.totalQuantity",
+          "CUBE.avgDiscount",
+          "CUBE.totalSales",
+          "CUBE.totalProfit"
+        ]
+      }
+    ]
+  },
+  "skip": [
+    "---------------------------------------",
+    "Driver tests                           ",
+    "---------------------------------------",
+    "must download query from the data source via memory",
+    "must download query from the data source via stream",
+
+    "---------------------------------------",
+    "Core tests                             ",
+    "---------------------------------------",
+    "for the Customers.RollingExternal",
+    "for the Customers.RollingInternal",
+    "for the ECommerce.SimpleAnalysisExternal",
+    "for the ECommerce.SimpleAnalysisInternal",
+    "for the ECommerce.TimeAnalysisExternal",
+    "for the ECommerce.TimeAnalysisInternal",
+
+    "---------------------------------------",
+    "Full tests                             ",
+    "---------------------------------------",
+    "must built pre-aggregations",
+    "querying Customers: dimentions + order + total + offset",
+    "querying ECommerce: dimentions + order + total + offset",
+
+    "---------------------------------------",
+    "SKIPED FOR ALL                         ",
+    "---------------------------------------",
+    "querying Products: dimensions -- doesn't work wo ordering",
+    "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- rounding in athena",
+    "querying ECommerce: total sales, total profit by month + order (date) + total -- doesn't work with the BigQuery",
+    "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- noisy test",
+    "querying ECommerce: partitioned pre-agg"
+  ]
+}

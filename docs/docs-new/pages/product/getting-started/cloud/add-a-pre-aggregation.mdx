@@ -1,0 +1,43 @@
+---
+redirect_from:
+  - /getting-started/cloud/add-a-pre-aggregation
+---
+
+# Add a pre-aggregation
+In this step, we'll add a pre-aggregation to optimize the performance of a
+specific query. Pre-aggregations are a caching technique that massively reduces
+query time from seconds to milliseconds. They are extremely useful for speeding
+up queries that are run frequently.
+
+From the <Btn>Developer Playground</Btn> page, execute a query:
+
+<Screenshot
+  alt="Cube Cloud Deployment Developer Playground Screen showing query results"
+  src="https://ucarecdn.com/d2210bb7-a35e-4da7-ba29-447da24cc06d/"
+/>
+
+Just above the results, click on <Btn>Query was not accelerated with
+pre-aggregation</Btn> to bring up the Rollup Designer:
+
+<Screenshot
+  alt="Cube Cloud Deployment Developer Playground Screen showing Rollup Designer"
+  src="https://ucarecdn.com/76c685b5-f778-486c-bf3f-e06996e29a50/"
+/>
+
+The Rollup Designer will automatically suggest a pre-aggregation for the query;
+click <Btn>Add to the Data Model</Btn> and then retry the query in the
+Playground. This time, the query should be accelerated with a pre-aggregation.
+
+It takes a bit of time to build a pre-aggregation, so the first run might not
+necessarily fast. Click <Btn>Rerun query</Btn> a few times until you see a
+subsecond query time.
+
+<Screenshot
+  alt="Cube Cloud Deployment Developer Playground Screen querying a pre-aggregation"
+  src="https://ucarecdn.com/c0ded0ca-d2a7-45cc-b14a-9899ed3d9a5a/"
+/>
+
+And with that, we conclude our Getting Started with Cube Cloud guide. If you'd
+like to learn more about Cube Cloud, [check out this page][next].
+
+[next]: /getting-started/cloud/learn-more

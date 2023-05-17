@@ -46,6 +46,9 @@ cube(`ECommerce`, {
   measures: {
     count: {
       type: `count`,
+      meta: {
+        foo: `bar`
+      }
     },
     totalQuantity: {
       sql: 'quantity',
@@ -113,4 +116,12 @@ cube(`ECommerce`, {
       type: 'number',
     },
   },
+});
+
+view(`ECommerceView`, {
+  cubes: [{
+    joinPath: ECommerce,
+    includes: `*`,
+    excludes: [`orderDate`]
+  }]
 });

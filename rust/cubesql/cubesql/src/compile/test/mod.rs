@@ -5,13 +5,15 @@ use cubeclient::models::{
     V1CubeMeta, V1CubeMetaDimension, V1CubeMetaJoin, V1CubeMetaMeasure, V1CubeMetaSegment,
     V1LoadRequestQuery, V1LoadResponse,
 };
+use datafusion::arrow::datatypes::SchemaRef;
 
 use crate::{
+    compile::engine::df::scan::MemberField,
     sql::{
         session::DatabaseProtocol, AuthContextRef, AuthenticateResponse, HttpAuthContext,
         ServerManager, Session, SessionManager, SqlAuthService,
     },
-    transport::{CubeReadStream, LoadRequestMeta, TransportService},
+    transport::{CubeStreamReceiver, LoadRequestMeta, TransportService},
     CubeError,
 };
 
@@ -189,7 +191,7 @@ pub async fn get_test_session(protocol: DatabaseProtocol) -> Arc<Session> {
     };
     let session_manager = Arc::new(SessionManager::new(server.clone()));
     let session = session_manager
-        .create_session(protocol, "127.0.0.1".to_string())
+        .create_session(protocol, "127.0.0.1".to_string(), 1234)
         .await;
 
     // Populate like shims
@@ -250,12 +252,14 @@ pub fn get_test_transport() -> Arc<dyn TransportService> {
             panic!("It's a fake transport");
         }
 
-        fn load_stream(
+        async fn load_stream(
             &self,
             _query: V1LoadRequestQuery,
             _ctx: AuthContextRef,
             _meta_fields: LoadRequestMeta,
-        ) -> Result<Arc<dyn CubeReadStream>, CubeError> {
+            _schema: SchemaRef,
+            _member_fields: Vec<MemberField>,
+        ) -> Result<CubeStreamReceiver, CubeError> {
             panic!("It's a fake transport");
         }
     }

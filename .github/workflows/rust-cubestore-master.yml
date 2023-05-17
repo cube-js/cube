@@ -207,11 +207,15 @@ jobs:
             cross: true
             # Unable to recognise the format of the input file `rust/cubestore/target/aarch64-unknown-linux-gnu/release/cubestored'
             strip: false
-            # UPX is broken, issue https://github.com/cube-js/cube.js/issues/4474
+            # UPX is broken, issue https://github.com/cube-js/cube/issues/4474
             compress: false
       fail-fast: false
     steps:
       - uses: actions/checkout@v3
+      - name: Disable rustup update (issue workaround for Windows)
+        run: rustup set auto-self-update disable
+        if: contains(runner.os, 'windows')
+        shell: bash
       - name: Setup Rust toolchain
         uses: actions-rs/toolchain@v1
         with:

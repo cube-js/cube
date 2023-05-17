@@ -1,21 +1,27 @@
 # CAUTION: This workflow exposes secrets. It is only supposed to be run on "merge into master" condition.
 name: 'Cloud Tests'
 on:
+  # push doesn't work for PRs, it's safe to use it
+  # only maintainers/core contributors are allowed to push directly to the main repository
   push:
     paths:
-      - '.github/actions/integration/**'
+      - '.github/actions/integration/athena.sh'
+      - '.github/actions/integration/bigquery.sh'
+      - '.github/actions/integration/snowflake.sh'
       - '.github/workflows/cloud.yml'
-      - 'packages/**'
-      - '.eslintrc.js'
-      - '.prettierrc'
+      - 'packages/cubejs-testing/**'
+      - 'packages/cubejs-testing-shared/**'
+      - 'packages/cubejs-backend-shared/**'
+      - 'packages/cubejs-base-driver/**'
+      - 'packages/cubejs-query-orchestrator/**'
+      - 'packages/cubejs-schema-compiler/**'
+      # drivers
+      - 'packages/cubejs-athena-driver/**'
+      - 'packages/cubejs-bigquery-driver/**'
+      - 'packages/cubejs-snowflake-driver/**'
       - 'lerna.json'
       - 'package.json'
-      - 'rollup.config.js'
       - 'yarn.lock'
-      - 'docs-gen/**'
-      - 'docs/**'
-    branches:
-      - master
 
 jobs:
   integration-cloud:
@@ -24,13 +30,17 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [ 14.x ]
-        db: [ 'athena', 'bigquery' ]
+        node-version: [ 16.x ]
+        db: [ 'athena', 'bigquery', 'snowflake' ]
       fail-fast: false
 
     steps:
       - name: Checkout
         uses: actions/checkout@v3
+      - name: Disable rustup update (issue workaround for Windows)
+        run: rustup set auto-self-update disable
+        if: contains(runner.os, 'windows')
+        shell: bash
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
@@ -56,9 +66,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.5
+        run: yarn policies set-version v1.22.19
       - name: Yarn install
         run: CUBESTORE_SKIP_POST_INSTALL=true yarn install --frozen-lockfile
+      - name: Build client
+        run: yarn build
       - name: Lerna tsc
         run: yarn tsc
       - name: Run Integration tests for ${{ matrix.db }} matrix
@@ -67,4 +79,6 @@ jobs:
           CUBEJS_DB_BQ_CREDENTIALS: ${{ secrets.CUBEJS_DB_BQ_CREDENTIALS }}
           CUBEJS_AWS_KEY: ${{ secrets.CUBEJS_AWS_KEY }}
           CUBEJS_AWS_SECRET: ${{ secrets.CUBEJS_AWS_SECRET }}
+          CUBEJS_DB_USER: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_USER }}
+          CUBEJS_DB_PASS: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_PASS }}
         run: ./.github/actions/integration/${{ matrix.db }}.sh

@@ -1,0 +1,71 @@
+---
+title: Connecting from Thoughtspot
+permalink: /config/downstream/thoughtspot
+---
+
+You can connect to Cube from [Thoughtspot][thoughtspot] using the [Cube SQL
+API][ref-sql-api].
+
+## Enable Cube SQL API
+
+<InfoBox>
+
+Don't have a Cube project yet? [Learn how to get started
+here][ref-getting-started].
+
+</InfoBox>
+
+### <--{"id" : "Enable Cube SQL API"}--> Cube Cloud
+
+Click **How to connect your BI tool** link on the Overview page, navigate to the
+SQL API tab and enable it. Once enabled, you should see the screen like the one
+below with your connection credentials:
+
+<Screenshot src="https://ucarecdn.com/fc74ee91-b8a9-4c46-81ed-cb3daeef6b83/" />
+
+### <--{"id" : "Enable Cube SQL API"}--> Self-hosted Cube
+
+You need to set the following environment variables to enable the Cube SQL API.
+These credentials will be required to connect to Cube from Tableau later.
+
+```dotenv
+CUBEJS_PG_SQL_PORT=5432
+CUBEJS_SQL_USER=myusername
+CUBEJS_SQL_PASSWORD=mypassword
+```
+
+## Connecting from Thoughtspot
+
+Thoughtspot connects to Cube as a Redshift database.
+
+In Thoughtspot, go to the Setup tab, then click **Connect now** to add a new
+data source:
+
+<Screenshot src="https://ucarecdn.com/85bd8325-efd9-4cae-a463-e9b025a667cc/" />
+
+Enter a name for the data source, choose **Amazon Redshift** as the data
+warehouse and click **Continue** in the header:
+
+<Screenshot src="https://ucarecdn.com/36aad090-b8c8-4e2b-8684-dc83ce2578c3/" />
+
+Enter credentials from the previous step and click **Continue**:
+
+<Screenshot src="https://ucarecdn.com/bddba9ac-1e24-4651-9086-75f1d0c3c811/" />
+
+Select columns from the desired cubes and click **Create Connection** on the
+next screen:
+
+<Screenshot src="https://ucarecdn.com/95692c63-e620-42a5-9355-b4df27d6b3c4/" />
+
+## Querying data
+
+Your cubes will be exposed as tables, where both your measures and dimensions
+are columns.
+
+[ref-getting-started]: /getting-started/cloud/overview
+[ref-sql-api]: /backend/sql
+[ref-connecting-from-tableau]:
+  https://cubedev-blog-images.s3.us-east-2.amazonaws.com/dc025b24-674f-4f32-ac44-421d546ee676.GIF
+[ref-querying-from-tableau]:
+  https://cubedev-blog-images.s3.us-east-2.amazonaws.com/ea73a998-e2ce-4814-863e-425b4d35860c.gif
+[thoughtspot]: https://www.thoughtspot.com/

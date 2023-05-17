@@ -5,6 +5,13 @@
  * Cube.js auth related data types definition.
  */
 
+import { ApiScopes } from './strings';
+
+/**
+ * ApiScopes tuple.
+ */
+type ApiScopesTuple = ApiScopes[];
+
 /**
  * Internal auth logic options object data type.
  */
@@ -70,6 +77,13 @@ type CanSwitchSQLUserFn =
     Promise<boolean> |
     boolean;
 
+/**
+ * Returns scopes tuple from a security context.
+ */
+type ContextToApiScopesFn =
+  (securityContext?: any, scopes?: ApiScopesTuple) =>
+    Promise<ApiScopesTuple>;
+
 export {
   CheckAuthInternalOptions,
   JWTOptions,
@@ -77,4 +91,6 @@ export {
   CheckSQLAuthSuccessResponse,
   CheckSQLAuthFn,
   CanSwitchSQLUserFn,
+  ApiScopesTuple,
+  ContextToApiScopesFn,
 };

@@ -10,17 +10,20 @@ import {
   AddToQueueOptions,
   AddToQueueResponse,
   QueryKey,
-  QueryKeyHash
+  QueryKeyHash,
+  ProcessingId,
+  QueueId,
 } from '@cubejs-backend/base-driver';
 import { getProcessUid } from '@cubejs-backend/shared';
 
 import { CubeStoreDriver } from './CubeStoreDriver';
 
-function hashQueryKey(queryKey: QueryKey): QueryKeyHash {
+function hashQueryKey(queryKey: QueryKey, processUid?: string): QueryKeyHash {
+  processUid = processUid || getProcessUid();
   const hash = crypto.createHash('md5').update(JSON.stringify(queryKey)).digest('hex');
 
   if (typeof queryKey === 'object' && queryKey.persistent) {
-    return `${hash}@${getProcessUid()}` as any;
+    return `${hash}@${processUid}` as any;
   }
 
   return hash as any;
@@ -33,7 +36,7 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
   ) { }
 
   public redisHash(queryKey: QueryKey): QueryKeyHash {
-    return hashQueryKey(queryKey);
+    return hashQueryKey(queryKey, this.options.processUid);
   }
 
   protected prefixKey(queryKey: QueryKey): string {
@@ -43,7 +46,7 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
   public async addToQueue(
     keyScore: number,
     queryKey: QueryKey,
-    orphanedTime: any,
+    orphanedTime: number,
     queryHandler: string,
     query: AddToQueueQuery,
     priority: number,
@@ -74,8 +77,7 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
     if (rows && rows.length) {
       return [
         rows[0].added === 'true' ? 1 : 0,
-        null,
-        null,
+        rows[0].id ? parseInt(rows[0].id, 10) : null,
         parseInt(rows[0].pending, 10),
         data.addedToQueueTime
       ];
@@ -216,7 +218,7 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
     return rows.map((row) => row.id);
   }
 
-  protected decodeQueryDefFromRow(row: { payload: string, extra?: string }, method: string): QueryDef {
+  protected decodeQueryDefFromRow(row: { payload: string, extra?: string | null }, method: string): QueryDef {
     if (!row.payload) {
       throw new Error(`Field payload is empty, incorrect response for ${method} method`);
     }
@@ -230,9 +232,9 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
     return payload;
   }
 
-  public async getQueryDef(queryKey: QueryKeyHash): Promise<QueryDef | null> {
+  public async getQueryDef(hash: QueryKeyHash, queueId: QueueId | null): Promise<QueryDef | null> {
     const rows = await this.driver.query('QUEUE GET ?', [
-      this.prefixKey(queryKey)
+      queueId || this.prefixKey(hash),
     ]);
     if (rows && rows.length) {
       return this.decodeQueryDefFromRow(rows[0], 'getQueryDef');
@@ -241,9 +243,10 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
     return null;
   }
 
-  public async optimisticQueryUpdate(queryKey: any, toUpdate: any, _processingId: any): Promise<boolean> {
+  public async optimisticQueryUpdate(hash: QueryKeyHash, toUpdate: unknown, _processingId: ProcessingId, queueId: QueueId): Promise<boolean> {
     await this.driver.query('QUEUE MERGE_EXTRA ? ?', [
-      this.prefixKey(queryKey),
+      // queryKeyHash as compatibility fallback
+      queueId || this.prefixKey(hash),
       JSON.stringify(toUpdate)
     ]);
 
@@ -254,30 +257,41 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
     // nothing to release
   }
 
-  public async retrieveForProcessing(queryKeyHashed: QueryKeyHash, _processingId: string): Promise<RetrieveForProcessingResponse> {
-    const rows = await this.driver.query('QUEUE RETRIEVE CONCURRENCY ? ?', [
+  public async retrieveForProcessing(hash: QueryKeyHash, _processingId: string): Promise<RetrieveForProcessingResponse> {
+    const rows = await this.driver.query<{ id: string /* cube store convert int64 to string */, active: string | null, pending: string, payload: string, extra: string | null }>('QUEUE RETRIEVE EXTENDED CONCURRENCY ? ?', [
       this.options.concurrency,
-      this.prefixKey(queryKeyHashed),
+      this.prefixKey(hash),
     ]);
     if (rows && rows.length) {
-      const addedCount = 1;
-      const active = [queryKeyHashed];
-      const toProcess = 0;
-      const lockAcquired = true;
-      const def = this.decodeQueryDefFromRow(rows[0], 'retrieveForProcessing');
+      const active = rows[0].active ? (rows[0].active).split(',') as unknown as QueryKeyHash[] : [];
+      const pending = parseInt(rows[0].pending, 10);
 
-      return [
-        addedCount, null, active, toProcess, def, lockAcquired
-      ];
+      if (rows[0].payload) {
+        const def = this.decodeQueryDefFromRow(rows[0], 'retrieveForProcessing');
+
+        return [
+          1,
+          rows[0].id ? parseInt(rows[0].id, 10) : null,
+          active,
+          pending,
+          def,
+          true
+        ];
+      } else {
+        return [
+          0, null, active, pending, null, false
+        ];
+      }
     }
 
     return null;
   }
 
-  public async getResultBlocking(queryKey: string): Promise<QueryDef | null> {
+  public async getResultBlocking(hash: QueryKeyHash, queueId: QueueId): Promise<QueryDef | null> {
     const rows = await this.driver.query('QUEUE RESULT_BLOCKING ? ?', [
       this.options.continueWaitTimeout * 1000,
-      this.prefixKey(this.redisHash(queryKey)),
+      // queryKeyHash as compatibility fallback
+      queueId || this.prefixKey(hash),
     ]);
     if (rows && rows.length) {
       return this.decodeQueryDefFromRow(rows[0], 'getResultBlocking');
@@ -286,12 +300,17 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
     return null;
   }
 
-  public async setResultAndRemoveQuery(hash: QueryKeyHash, executionResult: any, _processingId: any): Promise<boolean> {
-    await this.driver.query('QUEUE ACK ? ? ', [
-      this.prefixKey(hash),
+  public async setResultAndRemoveQuery(hash: QueryKeyHash, executionResult: unknown, _processingId: ProcessingId, queueId: QueueId): Promise<boolean> {
+    const rows = await this.driver.query('QUEUE ACK ? ? ', [
+      // queryKeyHash as compatibility fallback
+      queueId || this.prefixKey(hash),
       executionResult ? JSON.stringify(executionResult) : executionResult
     ]);
+    if (rows && rows.length === 1) {
+      return rows[0].success === 'true';
+    }
 
+    // Backward compatibility for old Cube Store
     return true;
   }
 

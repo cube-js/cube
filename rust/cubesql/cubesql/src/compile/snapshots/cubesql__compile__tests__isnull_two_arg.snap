@@ -1,0 +1,11 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(r#\"\n                SELECT id, result\n                FROM (\n                    SELECT 1 id, isnull('left', 'right') result\n                    UNION ALL\n                    SELECT 2 id, isnull(NULL, 'right') result\n                    UNION ALL\n                    SELECT 3 id, isnull(NULL, NULL) result\n                ) t\n                ORDER BY id\n                ;\"#.to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++----+--------+
+| id | result |
++----+--------+
+| 1  | left   |
+| 2  | right  |
+| 3  | NULL   |
++----+--------+

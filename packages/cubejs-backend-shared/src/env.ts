@@ -155,6 +155,9 @@ const variables: Record<string, (...args: any) => any> = {
   rollupOnlyMode: () => get('CUBEJS_ROLLUP_ONLY')
     .default('false')
     .asBoolStrict(),
+  schemaPath: () => get('CUBEJS_SCHEMA_PATH')
+    .default('schema')
+    .asString(),
   refreshWorkerMode: () => {
     const refreshWorkerMode = get('CUBEJS_REFRESH_WORKER').asBool();
     if (refreshWorkerMode !== undefined) {
@@ -393,7 +396,7 @@ const variables: Record<string, (...args: any) => any> = {
   }) => (
     process.env[keyByDataSource('CUBEJS_DB_PASS', dataSource)]
   ),
-  
+
   /**
    * Database name.
    */
@@ -416,7 +419,7 @@ const variables: Record<string, (...args: any) => any> = {
     }
     return val;
   },
-  
+
   /**
    * Database name.
    * @deprecated
@@ -447,7 +450,7 @@ const variables: Record<string, (...args: any) => any> = {
     }
     return val;
   },
-  
+
   /**
    * Database name.
    * @deprecated
@@ -582,7 +585,7 @@ const variables: Record<string, (...args: any) => any> = {
    * Expire time for touch records
    */
   dropPreAggregationsWithoutTouch: (): boolean => get('CUBEJS_DROP_PRE_AGG_WITHOUT_TOUCH')
-    .default('false')
+    .default('true')
     .asBoolStrict(),
 
   /** ****************************************************************
@@ -625,7 +628,7 @@ const variables: Record<string, (...args: any) => any> = {
   }) => (
     process.env[keyByDataSource('CUBEJS_DB_EXPORT_BUCKET_CSV_ESCAPE_SYMBOL', dataSource)]
   ),
-  
+
   /**
    * Export bucket storage type.
    */
@@ -1352,6 +1355,20 @@ const variables: Record<string, (...args: any) => any> = {
     ];
   },
 
+  /** ****************************************************************
+   * duckdb                                                         *
+   ***************************************************************** */
+
+  duckdbHttpFs: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_DUCKDB_HTTP_FS', dataSource)
+    ]
+  ),
+
   /**
    * Presto catalog.
    */
@@ -1394,6 +1411,9 @@ const variables: Record<string, (...args: any) => any> = {
   redisUseIORedis: () => get('CUBEJS_REDIS_USE_IOREDIS')
     .default('false')
     .asBoolStrict(),
+  redisAcquireTimeout: () => get('CUBEJS_REDIS_ACQUIRE_TIMEOUT')
+    .default('5000')
+    .asInt(),
   allowUngroupedWithoutPrimaryKey: () => get('CUBEJS_ALLOW_UNGROUPED_WITHOUT_PRIMARY_KEY')
     .default('false')
     .asBoolStrict(),
@@ -1464,6 +1484,8 @@ const variables: Record<string, (...args: any) => any> = {
     .asString(),
   cacheAndQueueDriver: () => get('CUBEJS_CACHE_AND_QUEUE_DRIVER')
     .asString(),
+  defaultApiScope: () => get('CUBEJS_DEFAULT_API_SCOPES')
+    .asArray(','),
   jwkUrl: () => get('CUBEJS_JWK_URL')
     .asString(),
   jwtKey: () => get('CUBEJS_JWT_KEY')
@@ -1506,9 +1528,21 @@ const variables: Record<string, (...args: any) => any> = {
     return undefined;
   },
   pgSqlPort: () => {
+    if (process.env.CUBEJS_PG_SQL_PORT === 'false') {
+      return undefined;
+    }
+    
     const port = asFalseOrPort(process.env.CUBEJS_PG_SQL_PORT || 'false', 'CUBEJS_PG_SQL_PORT');
     if (port) {
       return port;
+    }
+
+    const isDevMode = get('CUBEJS_DEV_MODE')
+      .default('false')
+      .asBoolStrict();
+
+    if (isDevMode) {
+      return 15432;
     }
 
     return undefined;

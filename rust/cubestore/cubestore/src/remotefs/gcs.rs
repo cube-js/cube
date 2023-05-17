@@ -1,3 +1,4 @@
+use crate::app_metrics;
 use crate::di_service;
 use crate::remotefs::{LocalDirRemoteFs, RemoteFile, RemoteFs};
 use crate::util::lock::acquire_lock;
@@ -123,6 +124,13 @@ impl RemoteFs for GCSRemoteFs {
         temp_upload_path: &str,
         remote_path: &str,
     ) -> Result<u64, CubeError> {
+        app_metrics::REMOTE_FS_OPERATION_CORE.add_with_tags(
+            1,
+            Some(&vec![
+                "operation:upload_file".to_string(),
+                "driver:gcs".to_string(),
+            ]),
+        );
         let time = SystemTime::now();
         debug!("Uploading {}", remote_path);
         let file = File::open(temp_upload_path).await?;
@@ -168,6 +176,13 @@ impl RemoteFs for GCSRemoteFs {
 
         fs::create_dir_all(&downloads_dirs).await?;
         if !local_file.exists() {
+            app_metrics::REMOTE_FS_OPERATION_CORE.add_with_tags(
+                1,
+                Some(&vec![
+                    "operation:download_file".to_string(),
+                    "driver:gcs".to_string(),
+                ]),
+            );
             let time = SystemTime::now();
             debug!("Downloading {}", remote_path);
             let (temp_file, temp_path) =
@@ -206,6 +221,13 @@ impl RemoteFs for GCSRemoteFs {
     }
 
     async fn delete_file(&self, remote_path: &str) -> Result<(), CubeError> {
+        app_metrics::REMOTE_FS_OPERATION_CORE.add_with_tags(
+            1,
+            Some(&vec![
+                "operation:delete_file".to_string(),
+                "driver:gcs".to_string(),
+            ]),
+        );
         let time = SystemTime::now();
         debug!("Deleting {}", remote_path);
         Object::delete(self.bucket.as_str(), self.gcs_path(remote_path).as_str()).await?;
@@ -252,6 +274,20 @@ impl RemoteFs for GCSRemoteFs {
             .flatten()
             .flatten()
             .collect::<Vec<_>>();
+        let mut pages_count = result.len() / 1_000;
+        if result.len() % 1_000 > 0 {
+            pages_count += 1;
+        }
+        if pages_count > 100 {
+            log::warn!("S3 list returned more than 100 pages: {}", pages_count);
+        }
+        app_metrics::REMOTE_FS_OPERATION_CORE.add_with_tags(
+            pages_count as i64,
+            Some(&vec![
+                "operation:list".to_string(),
+                "driver:gcs".to_string(),
+            ]),
+        );
         Ok(result)
     }
 

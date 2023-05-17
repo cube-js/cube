@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 
 use arrow::array::*;
 use arrow::compute::kernels::cast_utils::string_to_timestamp_nanos;
@@ -19,7 +19,7 @@ use datafusion::sql::parser::Statement as DFStatement;
 use futures::future::join_all;
 use hex::FromHex;
 use itertools::Itertools;
-use log::{debug, trace};
+use log::trace;
 use rand::distributions::Uniform;
 use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
@@ -35,7 +35,7 @@ use tracing_futures::WithSubscriber;
 use cubehll::HllSketch;
 use parser::Statement as CubeStoreStatement;
 
-use crate::cachestore::{CacheItem, CacheStore, QueueItem};
+use crate::cachestore::CacheStore;
 use crate::cluster::{Cluster, JobEvent, JobResultListener};
 use crate::config::injection::DIService;
 use crate::config::ConfigObj;
@@ -57,8 +57,7 @@ use crate::queryplanner::{PlanningMeta, QueryPlan, QueryPlanner};
 use crate::remotefs::RemoteFs;
 use crate::sql::cache::SqlResultCache;
 use crate::sql::parser::{
-    CacheCommand, CubeStoreParser, MetastoreCommand, PartitionedIndexRef, QueueCommand,
-    RocksStoreName, SystemCommand,
+    CubeStoreParser, DropCommand, MetaStoreCommand, PartitionedIndexRef, SystemCommand,
 };
 use crate::store::ChunkDataStore;
 use crate::table::{data, Row, TableValue, TimestampValue};
@@ -74,10 +73,14 @@ use crate::{
 use data::create_array_builder;
 use datafusion::cube_ext::catch_unwind::async_try_with_catch_unwind;
 use datafusion::physical_plan::parquet::NoopParquetMetadataCache;
+use deepsize::DeepSizeOf;
 use std::mem::take;
 
 pub mod cache;
+pub mod cachestore;
 pub mod parser;
+
+use crate::sql::cachestore::CacheStoreSqlService;
 use mockall::automock;
 
 #[automock]
@@ -116,7 +119,7 @@ pub struct QueryPlans {
     pub worker: Arc<dyn ExecutionPlan>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Hash, Eq, PartialEq, Debug)]
+#[derive(Serialize, Deserialize, Clone, Hash, Eq, PartialEq, Debug, DeepSizeOf)]
 pub struct InlineTable {
     pub id: u64,
     pub name: String,
@@ -159,7 +162,7 @@ impl SqlQueryContext {
 
 pub struct SqlServiceImpl {
     db: Arc<dyn MetaStore>,
-    cachestore: Arc<dyn CacheStore>,
+    cachestore: CacheStoreSqlService,
     chunk_store: Arc<dyn ChunkDataStore>,
     remote_fs: Arc<dyn RemoteFs>,
     limits: Arc<ConcurrencyLimits>,
@@ -171,7 +174,7 @@ pub struct SqlServiceImpl {
     rows_per_chunk: usize,
     query_timeout: Duration,
     create_table_timeout: Duration,
-    cache: SqlResultCache,
+    cache: Arc<SqlResultCache>,
 }
 
 crate::di_service!(SqlServiceImpl, [SqlService]);
@@ -192,11 +195,11 @@ impl SqlServiceImpl {
         rows_per_chunk: usize,
         query_timeout: Duration,
         create_table_timeout: Duration,
-        max_cached_queries: usize,
+        cache: Arc<SqlResultCache>,
     ) -> Arc<SqlServiceImpl> {
         Arc::new(SqlServiceImpl {
+            cachestore: CacheStoreSqlService::new(cachestore, query_planner.clone()),
             db,
-            cachestore,
             chunk_store,
             limits,
             query_planner,
@@ -208,7 +211,7 @@ impl SqlServiceImpl {
             query_timeout,
             create_table_timeout,
             remote_fs,
-            cache: SqlResultCache::new(max_cached_queries),
+            cache,
         })
     }
 
@@ -231,6 +234,7 @@ impl SqlServiceImpl {
         build_range_end: Option<DateTime<Utc>>,
         seal_at: Option<DateTime<Utc>>,
         select_statement: Option<String>,
+        source_table: Option<String>,
         stream_offset: Option<String>,
         indexes: Vec<Statement>,
         unique_key: Option<Vec<Ident>>,
@@ -344,6 +348,7 @@ impl SqlServiceImpl {
                     build_range_end,
                     seal_at,
                     select_statement,
+                    None,
                     stream_offset,
                     unique_key.map(|keys| keys.iter().map(|c| c.value.to_string()).collect()),
                     aggregates.map(|keys| {
@@ -351,6 +356,7 @@ impl SqlServiceImpl {
                             .map(|c| (c.0.value.to_string(), c.1.value.to_string()))
                             .collect()
                     }),
+                    None,
                     None,
                 )
                 .await;
@@ -390,6 +396,28 @@ impl SqlServiceImpl {
             None
         };
 
+        let has_streaming_locations = locations.as_ref().map_or(false, |locations| {
+            locations.iter().any(|l| Table::is_stream_location(l))
+        });
+
+        let trace_obj_to_save = if has_streaming_locations {
+            trace_obj.clone()
+        } else {
+            None
+        };
+
+        let source_columns = if let Some(source_table) = source_table {
+            let mut parser = CubeStoreParser::new(&source_table)?;
+            let cols = parser
+                .parse_streaming_source_table()
+                .map_err(|e| CubeError::user(format!("Unexpected source_table param: {}", e)))?;
+            let res = convert_columns_type(&cols)
+                .map_err(|e| CubeError::user(format!("Unexpected source_table param: {}", e)))?;
+            Some(res)
+        } else {
+            None
+        };
+
         let table = self
             .db
             .create_table(
@@ -403,6 +431,7 @@ impl SqlServiceImpl {
                 build_range_end,
                 seal_at,
                 select_statement,
+                source_columns,
                 stream_offset,
                 unique_key.map(|keys| keys.iter().map(|c| c.value.to_string()).collect()),
                 aggregates.map(|keys| {
@@ -411,6 +440,7 @@ impl SqlServiceImpl {
                         .collect()
                 }),
                 partition_split_threshold,
+                trace_obj_to_save,
             )
             .await?;
 
@@ -611,7 +641,7 @@ impl SqlServiceImpl {
                 tokio::fs::create_dir(&data_dir).await?;
                 log::debug!("Dumping data files to {:?}", data_dir);
                 // TODO: download in parallel.
-                for (_, f, size) in p.all_required_files() {
+                for (_, f, size, _) in p.all_required_files() {
                     let f = self.remote_fs.download_file(&f, size).await?;
                     let name = Path::new(&f).file_name().ok_or_else(|| {
                         CubeError::internal(format!("Could not get filename of '{}'", f))
@@ -836,20 +866,6 @@ impl SqlService for SqlServiceImpl {
                 }
             }
             CubeStoreStatement::System(command) => match command {
-                SystemCommand::Compaction { store } => {
-                    match store {
-                        None => {
-                            self.db.compaction().await?;
-                            self.cachestore.compaction().await?;
-                        }
-                        Some(store_name) => match store_name {
-                            RocksStoreName::Meta => self.db.compaction().await?,
-                            RocksStoreName::Cache => self.cachestore.compaction().await?,
-                        },
-                    }
-
-                    Ok(Arc::new(DataFrame::new(vec![], vec![])))
-                }
                 SystemCommand::KillAllJobs => {
                     self.db.delete_all_jobs().await?;
                     Ok(Arc::new(DataFrame::new(vec![], vec![])))
@@ -886,12 +902,37 @@ impl SqlService for SqlServiceImpl {
                     }
                     panic!("worker did not panic")
                 }
-                SystemCommand::Metastore(command) => match command {
-                    MetastoreCommand::SetCurrent { id } => {
-                        self.db.set_current_snapshot(id).await?;
+                SystemCommand::Drop(command) => match command {
+                    DropCommand::DropQueryCache => {
+                        self.cache.clear().await;
+
+                        Ok(Arc::new(DataFrame::new(vec![], vec![])))
+                    }
+                    DropCommand::DropAllCache => {
+                        self.cache.clear().await;
+
                         Ok(Arc::new(DataFrame::new(vec![], vec![])))
                     }
                 },
+                SystemCommand::MetaStore(command) => match command {
+                    MetaStoreCommand::SetCurrent { id } => {
+                        self.db.set_current_snapshot(id).await?;
+                        Ok(Arc::new(DataFrame::new(vec![], vec![])))
+                    }
+                    MetaStoreCommand::Compaction => {
+                        self.db.compaction().await?;
+                        Ok(Arc::new(DataFrame::new(vec![], vec![])))
+                    }
+                    MetaStoreCommand::Healthcheck => {
+                        self.db.healthcheck().await?;
+                        Ok(Arc::new(DataFrame::new(vec![], vec![])))
+                    }
+                },
+                SystemCommand::CacheStore(command) => {
+                    self.cachestore
+                        .exec_system_command_with_context(context, command)
+                        .await
+                }
             },
             CubeStoreStatement::Statement(Statement::SetVariable { .. }) => {
                 Ok(Arc::new(DataFrame::new(vec![], vec![])))
@@ -928,7 +969,7 @@ impl SqlService for SqlServiceImpl {
                 }
                 let schema_name = &nv[0].value;
                 let table_name = &nv[1].value;
-                let import_format = with_options
+                let mut import_format = with_options
                     .iter()
                     .find(|&opt| opt.name.value == "input_format")
                     .map_or(Result::Ok(ImportFormat::CSV), |option| {
@@ -949,6 +990,49 @@ impl SqlService for SqlServiceImpl {
                             ))),
                         }
                     })?;
+
+                let delimiter = with_options
+                    .iter()
+                    .find(|&opt| opt.name.value == "delimiter")
+                    .map_or(Ok(None), |option| match &option.value {
+                        Value::SingleQuotedString(delimiter) => match delimiter.as_str() {
+                            "tab" => Ok(Some('\t')),
+                            "^A" => Ok(Some('\u{0001}')),
+                            s if s.len() != 1 => {
+                                Err(CubeError::user(format!("Bad delimiter {}", option.value)))
+                            }
+                            s => Ok(Some(s.chars().next().unwrap())),
+                        },
+                        _ => Err(CubeError::user(format!("Bad delimiter {}", option.value))),
+                    })?;
+
+                if let Some(delimiter) = delimiter {
+                    import_format = match import_format {
+                        ImportFormat::CSV => ImportFormat::CSVOptions {
+                            delimiter: Some(delimiter),
+                            has_header: true,
+                            escape: None,
+                            quote: None,
+                        },
+                        ImportFormat::CSVNoHeader => ImportFormat::CSVOptions {
+                            delimiter: Some(delimiter),
+                            has_header: false,
+                            escape: None,
+                            quote: None,
+                        },
+                        ImportFormat::CSVOptions {
+                            has_header,
+                            escape,
+                            quote,
+                            ..
+                        } => ImportFormat::CSVOptions {
+                            delimiter: Some(delimiter),
+                            has_header,
+                            escape,
+                            quote,
+                        },
+                    }
+                }
                 let build_range_end = with_options
                     .iter()
                     .find(|&opt| opt.name.value == "build_range_end")
@@ -987,6 +1071,18 @@ impl SqlService for SqlServiceImpl {
                             option.value
                         ))),
                     })?;
+                let source_table = with_options
+                    .iter()
+                    .find(|&opt| opt.name.value == "source_table")
+                    .map_or(Result::Ok(None), |option| match &option.value {
+                        Value::SingleQuotedString(source_table) => {
+                            Result::Ok(Some(source_table.clone()))
+                        }
+                        _ => Result::Err(CubeError::user(format!(
+                            "Bad source_table {}",
+                            option.value
+                        ))),
+                    })?;
                 let stream_offset = with_options
                     .iter()
                     .find(|&opt| opt.name.value == "stream_offset")
@@ -1011,6 +1107,7 @@ impl SqlService for SqlServiceImpl {
                         build_range_end,
                         seal_at,
                         select_statement,
+                        source_table,
                         stream_offset,
                         indexes,
                         unique_key,
@@ -1177,230 +1274,14 @@ impl SqlService for SqlServiceImpl {
                 Ok(Arc::new(DataFrame::new(vec![], vec![])))
             }
             CubeStoreStatement::Queue(command) => {
-                app_metrics::QUEUE_QUERIES.increment();
-                let execution_time = SystemTime::now();
-
-                let (result, track_time) = match command {
-                    QueueCommand::Add {
-                        key,
-                        priority,
-                        orphaned,
-                        value,
-                    } => {
-                        let response = self
-                            .cachestore
-                            .queue_add(QueueItem::new(
-                                key.value,
-                                value,
-                                QueueItem::status_default(),
-                                priority,
-                                orphaned,
-                            ))
-                            .await?;
-
-                        (
-                            Arc::new(DataFrame::new(
-                                vec![
-                                    Column::new("added".to_string(), ColumnType::Boolean, 0),
-                                    Column::new("pending".to_string(), ColumnType::Int, 1),
-                                ],
-                                vec![Row::new(vec![
-                                    TableValue::Boolean(response.added),
-                                    TableValue::Int(response.pending as i64),
-                                ])],
-                            )),
-                            true,
-                        )
-                    }
-                    QueueCommand::Truncate {} => {
-                        self.cachestore.queue_truncate().await?;
-
-                        (Arc::new(DataFrame::new(vec![], vec![])), false)
-                    }
-                    QueueCommand::Cancel { key } => {
-                        let columns = vec![
-                            Column::new("payload".to_string(), ColumnType::String, 0),
-                            Column::new("extra".to_string(), ColumnType::String, 1),
-                        ];
-
-                        let result = self.cachestore.queue_cancel(key.value).await?;
-                        let rows = if let Some(result) = result {
-                            vec![result.into_row().into_queue_cancel_row()]
-                        } else {
-                            vec![]
-                        };
-
-                        (Arc::new(DataFrame::new(columns, rows)), true)
-                    }
-                    QueueCommand::Heartbeat { key } => {
-                        self.cachestore.queue_heartbeat(key.value).await?;
-
-                        (Arc::new(DataFrame::new(vec![], vec![])), true)
-                    }
-                    QueueCommand::MergeExtra { key, payload } => {
-                        self.cachestore
-                            .queue_merge_extra(key.value, payload)
-                            .await?;
-
-                        (Arc::new(DataFrame::new(vec![], vec![])), true)
-                    }
-                    QueueCommand::Ack { key, result } => {
-                        self.cachestore.queue_ack(key.value, result).await?;
-
-                        (Arc::new(DataFrame::new(vec![], vec![])), true)
-                    }
-                    QueueCommand::Get { key } => {
-                        let result = self.cachestore.queue_get(key.value).await?;
-                        let rows = if let Some(result) = result {
-                            vec![result.into_row().into_queue_get_row()]
-                        } else {
-                            vec![]
-                        };
-
-                        (
-                            Arc::new(DataFrame::new(
-                                vec![
-                                    Column::new("payload".to_string(), ColumnType::String, 0),
-                                    Column::new("extra".to_string(), ColumnType::String, 1),
-                                ],
-                                rows,
-                            )),
-                            true,
-                        )
-                    }
-                    QueueCommand::ToCancel {
-                        prefix,
-                        heartbeat_timeout,
-                        orphaned_timeout,
-                    } => {
-                        let rows = self
-                            .cachestore
-                            .queue_to_cancel(prefix.value, orphaned_timeout, heartbeat_timeout)
-                            .await?;
-
-                        let columns = vec![Column::new("id".to_string(), ColumnType::String, 0)];
-
-                        (
-                            Arc::new(DataFrame::new(
-                                columns,
-                                rows.into_iter()
-                                    .map(|item| {
-                                        Row::new(vec![TableValue::String(
-                                            item.get_row().get_key().clone(),
-                                        )])
-                                    })
-                                    .collect(),
-                            )),
-                            true,
-                        )
-                    }
-                    QueueCommand::List {
-                        prefix,
-                        with_payload,
-                        status_filter,
-                        sort_by_priority,
-                    } => {
-                        let rows = self
-                            .cachestore
-                            .queue_list(prefix.value, status_filter, sort_by_priority)
-                            .await?;
-
-                        let mut columns = vec![
-                            Column::new("id".to_string(), ColumnType::String, 0),
-                            Column::new("status".to_string(), ColumnType::String, 1),
-                            Column::new("extra".to_string(), ColumnType::String, 2),
-                        ];
-
-                        if with_payload {
-                            columns.push(Column::new("payload".to_string(), ColumnType::String, 3));
-                        }
-
-                        (
-                            Arc::new(DataFrame::new(
-                                columns,
-                                rows.into_iter()
-                                    .map(|item| item.into_row().into_queue_list_row(with_payload))
-                                    .collect(),
-                            )),
-                            true,
-                        )
-                    }
-                    QueueCommand::Retrieve { key, concurrency } => {
-                        let result = self
-                            .cachestore
-                            .queue_retrieve(key.value, concurrency)
-                            .await?;
-
-                        let rows = if let Some(result) = result {
-                            vec![result.into_row().into_queue_retrieve_row()]
-                        } else {
-                            vec![]
-                        };
-
-                        (
-                            Arc::new(DataFrame::new(
-                                vec![
-                                    Column::new("payload".to_string(), ColumnType::String, 0),
-                                    Column::new("extra".to_string(), ColumnType::String, 1),
-                                ],
-                                rows,
-                            )),
-                            true,
-                        )
-                    }
-                    QueueCommand::Result { key } => {
-                        let ack_result = self.cachestore.queue_result(key.value).await?;
-                        let rows = if let Some(ack_result) = ack_result {
-                            vec![ack_result.into_queue_result_row()]
-                        } else {
-                            vec![]
-                        };
-
-                        (
-                            Arc::new(DataFrame::new(
-                                vec![
-                                    Column::new("payload".to_string(), ColumnType::String, 0),
-                                    Column::new("type".to_string(), ColumnType::String, 1),
-                                ],
-                                rows,
-                            )),
-                            true,
-                        )
-                    }
-                    QueueCommand::ResultBlocking { timeout, key } => {
-                        let ack_result = self
-                            .cachestore
-                            .queue_result_blocking(key.value, timeout)
-                            .await?;
-
-                        let rows = if let Some(ack_result) = ack_result {
-                            vec![ack_result.into_queue_result_row()]
-                        } else {
-                            vec![]
-                        };
-
-                        (
-                            Arc::new(DataFrame::new(
-                                vec![
-                                    Column::new("payload".to_string(), ColumnType::String, 0),
-                                    Column::new("type".to_string(), ColumnType::String, 1),
-                                ],
-                                rows,
-                            )),
-                            false,
-                        )
-                    }
-                };
-
-                let execution_time = execution_time.elapsed()?;
-
-                if track_time {
-                    app_metrics::QUEUE_QUERY_TIME_MS.report(execution_time.as_millis() as i64);
-                }
-
-                debug!("Queue command processing time: {:?}", execution_time,);
-
-                Ok(result)
+                self.cachestore
+                    .exec_queue_command_with_context(context, command)
+                    .await
+            }
+            CubeStoreStatement::Cache(command) => {
+                self.cachestore
+                    .exec_cache_command_with_context(context, command)
+                    .await
             }
             CubeStoreStatement::Statement(Statement::Query(q)) => {
                 let logical_plan = self
@@ -1466,98 +1347,6 @@ impl SqlService for SqlServiceImpl {
 
             CubeStoreStatement::Dump(q) => self.dump_select_inputs(query, q).await,
 
-            CubeStoreStatement::Cache(command) => {
-                app_metrics::CACHE_QUERIES.increment();
-                let execution_time = SystemTime::now();
-
-                let (result, track_time) = match command {
-                    CacheCommand::Set {
-                        key,
-                        value,
-                        ttl,
-                        nx,
-                    } => {
-                        let key = key.value;
-
-                        let success = self
-                            .cachestore
-                            .cache_set(CacheItem::new(key, ttl, value), nx)
-                            .await?;
-
-                        (
-                            Arc::new(DataFrame::new(
-                                vec![Column::new("success".to_string(), ColumnType::Boolean, 0)],
-                                vec![Row::new(vec![TableValue::Boolean(success)])],
-                            )),
-                            true,
-                        )
-                    }
-                    CacheCommand::Get { key } => {
-                        let result = self.cachestore.cache_get(key.value).await?;
-                        let value = if let Some(result) = result {
-                            TableValue::String(result.into_row().value)
-                        } else {
-                            TableValue::Null
-                        };
-
-                        (
-                            Arc::new(DataFrame::new(
-                                vec![Column::new("value".to_string(), ColumnType::String, 0)],
-                                vec![Row::new(vec![value])],
-                            )),
-                            true,
-                        )
-                    }
-                    CacheCommand::Keys { prefix } => {
-                        let rows = self.cachestore.cache_keys(prefix.value).await?;
-                        (
-                            Arc::new(DataFrame::new(
-                                vec![Column::new("key".to_string(), ColumnType::String, 0)],
-                                rows.iter()
-                                    .map(|i| {
-                                        Row::new(vec![TableValue::String(i.get_row().get_path())])
-                                    })
-                                    .collect(),
-                            )),
-                            true,
-                        )
-                    }
-                    CacheCommand::Remove { key } => {
-                        self.cachestore.cache_delete(key.value).await?;
-
-                        (Arc::new(DataFrame::new(vec![], vec![])), true)
-                    }
-                    CacheCommand::Truncate {} => {
-                        self.cachestore.cache_truncate().await?;
-
-                        (Arc::new(DataFrame::new(vec![], vec![])), false)
-                    }
-                    CacheCommand::Incr { path } => {
-                        let row = self.cachestore.cache_incr(path.value).await?;
-
-                        (
-                            Arc::new(DataFrame::new(
-                                vec![Column::new("value".to_string(), ColumnType::String, 0)],
-                                vec![Row::new(vec![TableValue::String(
-                                    row.get_row().get_value().clone(),
-                                )])],
-                            )),
-                            true,
-                        )
-                    }
-                };
-
-                let execution_time = execution_time.elapsed()?;
-
-                if track_time {
-                    app_metrics::CACHE_QUERY_TIME_MS.report(execution_time.as_millis() as i64);
-                }
-
-                debug!("Cache command processing time: {:?}", execution_time,);
-
-                Ok(result)
-            }
-
             _ => Err(CubeError::user(format!("Unsupported SQL: '{}'", query))),
         }
     }
@@ -1602,7 +1391,7 @@ impl SqlService for SqlServiceImpl {
                             context.inline_tables.into_iter().map(|i| i.id).collect(),
                         );
                         let mut mocked_names = HashMap::new();
-                        for (_, f, _) in worker_plan.files_to_download() {
+                        for (_, f, _, _) in worker_plan.files_to_download() {
                             let name = self.remote_fs.local_file(&f).await?;
                             mocked_names.insert(f, name);
                         }
@@ -1706,7 +1495,7 @@ fn convert_columns_type(columns: &Vec<ColumnDef>) -> Result<Vec<Column>, CubeErr
                 DataType::Custom(custom) => {
                     let custom_type_name = custom.to_string().to_lowercase();
                     match custom_type_name.as_str() {
-                        "mediumint" => ColumnType::Int,
+                        "tinyint" | "mediumint" => ColumnType::Int,
                         "bytes" => ColumnType::Bytes,
                         "varbinary" => ColumnType::Bytes,
                         "hyperloglog" => ColumnType::HyperLogLog(HllFlavour::Airlift),
@@ -2108,6 +1897,7 @@ mod tests {
     use crate::remotefs::queue::QueueRemoteFs;
     use crate::scheduler::SchedulerImpl;
     use crate::table::data::{cmp_min_rows, cmp_row_key_heap};
+    use crate::table::TableValue;
     use regex::Regex;
 
     #[tokio::test]
@@ -2129,13 +1919,13 @@ mod tests {
             );
             let meta_store = RocksMetaStore::new(
                 &Path::new(path).join("metastore"),
-                BaseRocksStoreFs::new(remote_fs.clone(), "metastore", config.config_obj()),
+                BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
                 config.config_obj(),
             )
             .unwrap();
             let cache_store = RocksCacheStore::new(
                 &Path::new(path).join("cachestore"),
-                BaseRocksStoreFs::new(remote_fs.clone(), "cachestore", config.config_obj()),
+                BaseRocksStoreFs::new_for_cachestore(remote_fs.clone(), config.config_obj()),
                 config.config_obj(),
             )
             .unwrap();
@@ -2163,7 +1953,10 @@ mod tests {
                 rows_per_chunk,
                 query_timeout,
                 query_timeout,
-                10_000, // max_cached_queries
+                Arc::new(SqlResultCache::new(
+                    config.config_obj().query_cache_max_capacity_bytes(),
+                    config.config_obj().query_cache_time_to_idle_secs(),
+                )),
             );
             let i = service.exec_query("CREATE SCHEMA foo").await.unwrap();
             assert_eq!(
@@ -2201,13 +1994,13 @@ mod tests {
             );
             let meta_store = RocksMetaStore::new(
                 &Path::new(path).join("metastore"),
-                BaseRocksStoreFs::new(remote_fs.clone(), "metastore", config.config_obj()),
+                BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
                 config.config_obj(),
             )
             .unwrap();
             let cache_store = RocksCacheStore::new(
                 &Path::new(path).join("cachestore"),
-                BaseRocksStoreFs::new(remote_fs.clone(), "cachestore", config.config_obj()),
+                BaseRocksStoreFs::new_for_cachestore(remote_fs.clone(), config.config_obj()),
                 config.config_obj(),
             )
             .unwrap();
@@ -2235,7 +2028,10 @@ mod tests {
                 rows_per_chunk,
                 query_timeout,
                 query_timeout,
-                10_000, // max_cached_queries
+                Arc::new(SqlResultCache::new(
+                    config.config_obj().query_cache_max_capacity_bytes(),
+                    config.config_obj().query_cache_time_to_idle_secs(),
+                )),
             );
             let i = service.exec_query("CREATE SCHEMA Foo").await.unwrap();
             assert_eq!(
@@ -2266,6 +2062,7 @@ mod tests {
                 TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
                 TableValue::String("false".to_string()),
+                TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
@@ -2302,13 +2099,13 @@ mod tests {
             );
             let meta_store = RocksMetaStore::new(
                 &Path::new(path).join("metastore"),
-                BaseRocksStoreFs::new(remote_fs.clone(), "metastore", config.config_obj()),
+                BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
                 config.config_obj(),
             )
             .unwrap();
             let cache_store = RocksCacheStore::new(
                 &Path::new(path).join("cachestore"),
-                BaseRocksStoreFs::new(remote_fs.clone(), "cachestore", config.config_obj()),
+                BaseRocksStoreFs::new_for_cachestore(remote_fs.clone(), config.config_obj()),
                 config.config_obj(),
             )
             .unwrap();
@@ -2336,7 +2133,10 @@ mod tests {
                 rows_per_chunk,
                 query_timeout,
                 query_timeout,
-                10_000, // max_cached_queries
+                Arc::new(SqlResultCache::new(
+                    config.config_obj().query_cache_max_capacity_bytes(),
+                    config.config_obj().query_cache_time_to_idle_secs(),
+                )),
             );
             let i = service.exec_query("CREATE SCHEMA Foo").await.unwrap();
             assert_eq!(
@@ -2368,6 +2168,7 @@ mod tests {
                 TableValue::String("2022-10-05 01:00:00 UTC".to_string()),
                 TableValue::String("false".to_string()),
                 TableValue::String("SELECT * FROM test WHERE created_at > '2022-05-01 00:00:00'".to_string()),
+                TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
                 TableValue::String("".to_string()),
@@ -2593,8 +2394,8 @@ mod tests {
                                         union all \
                                         select * from foo.b \
                                         ) \
-                             union all 
-                             select * from 
+                             union all
+                             select * from
                                 ( \
                                         select * from foo.a1 \
                                         union all \
@@ -2631,8 +2432,8 @@ mod tests {
                          select * from ( \
                                         select * from foo.a\
                                         ) \
-                             union all 
-                             select * from 
+                             union all
+                             select * from
                                 ( \
                                         select * from foo.a1 \
                                         union all \
@@ -2667,8 +2468,8 @@ mod tests {
                          select * from ( \
                                         select * from foo.a where 1 = 0\
                                         ) \
-                             union all 
-                             select * from 
+                             union all
+                             select * from
                                 ( \
                                         select * from foo.a1 \
                                         union all \
@@ -3315,7 +3116,7 @@ mod tests {
                         .unwrap();
                 }
 
-                Delay::new(Duration::from_millis(500)).await;
+                Delay::new(Duration::from_millis(1500)).await;
 
                 let active_partitions = services
                     .meta_store
@@ -3791,18 +3592,29 @@ mod tests {
             let p_3 = partitions.iter().find(|r| r.get_id() == 4).unwrap();
             let p_4 = partitions.iter().find(|r| r.get_id() == 5).unwrap();
             let new_partitions = vec![p_1, p_2, p_3, p_4];
-            println!("{:?}", new_partitions);
             let mut intervals_set = new_partitions.into_iter()
-                .map(|p| (p.get_row().get_min_val().clone(), p.get_row().get_max_val().clone()))
+                .map(|p| (p.get_row().get_min_val().clone(), p.get_row().get_max_val().clone(), p.get_row().get_min().clone(), p.get_row().get_max().clone()))
                 .collect::<Vec<_>>();
-            intervals_set.sort_by(|(min_a, _), (min_b, _)| cmp_min_rows(1, min_a.as_ref(), min_b.as_ref()));
+            intervals_set.sort_by(|(min_a, _, _, _), (min_b, _, _, _)| cmp_min_rows(1, min_a.as_ref(), min_b.as_ref()));
             let mut expected = vec![
-                (None, Some(Row::new(vec![TableValue::Int(2)]))),
-                (Some(Row::new(vec![TableValue::Int(2)])), Some(Row::new(vec![TableValue::Int(10)]))),
-                (Some(Row::new(vec![TableValue::Int(10)])), Some(Row::new(vec![TableValue::Int(27)]))),
-                (Some(Row::new(vec![TableValue::Int(27)])), None),
+                (
+                    None, Some(Row::new(vec![TableValue::Int(2)])),
+                    Some(Row::new(vec![TableValue::Null])), Some(Row::new(vec![TableValue::Int(1)]))
+                    ),
+                (
+                    Some(Row::new(vec![TableValue::Int(2)])), Some(Row::new(vec![TableValue::Int(10)])),
+                    Some(Row::new(vec![TableValue::Int(2)])), Some(Row::new(vec![TableValue::Int(5)]))
+                ),
+                (
+                    Some(Row::new(vec![TableValue::Int(10)])), Some(Row::new(vec![TableValue::Int(27)])),
+                    Some(Row::new(vec![TableValue::Int(10)])), Some(Row::new(vec![TableValue::Int(25)]))
+                ),
+                (
+                    Some(Row::new(vec![TableValue::Int(27)])), None,
+                    Some(Row::new(vec![TableValue::Int(27)])), Some(Row::new(vec![TableValue::Int(29)])),
+                ),
             ].into_iter().collect::<Vec<_>>();
-            expected.sort_by(|(min_a, _), (min_b, _)| cmp_min_rows(1, min_a.as_ref(), min_b.as_ref()));
+            expected.sort_by(|(min_a, _, _, _), (min_b, _, _, _)| cmp_min_rows(1, min_a.as_ref(), min_b.as_ref()));
             assert_eq!(intervals_set, expected);
 
             let result = service.exec_query("SELECT count(*) from foo.table").await.unwrap();
@@ -4125,8 +3937,94 @@ mod tests {
                 .exec_query("CREATE TABLE test.events_by_type_fail_2 (`EVENT` text, `KSQL_COL_0` int) WITH (select_statement = 'SELECT * FROM (SELECT * FROM EVENTS_BY_TYPE WHERE time >= \\'2022-01-01\\' AND time < \\'2022-02-01\\')') unique key (`EVENT`) location 'stream://ksql/EVENTS_BY_TYPE'")
                 .await
                 .expect_err("Validation should fail");
-        })
-            .await;
+        }).await;
+    }
+
+    #[tokio::test]
+    async fn create_stream_table_with_projection() {
+        Config::test("create_stream_table_with_projection").update_config(|mut c| {
+            c.partition_split_threshold = 2;
+            c
+        }).start_test(async move |services| {
+            let service = services.sql_service;
+            let metastore = services.meta_store;
+
+            let _ = service.exec_query("CREATE SCHEMA test").await.unwrap();
+
+            service
+                .exec_query("CREATE SOURCE OR UPDATE kafka AS 'kafka' VALUES (user = 'foo', password = 'bar', host = 'localhost:9092')")
+                .await
+                .unwrap();
+
+            let _ = service
+                .exec_query("CREATE TABLE test.events_1 (a int, b int) WITH (\
+                select_statement = 'SELECT a as a, b + c as b FROM EVENTS_BY_TYPE WHERE c > 10',\
+                source_table = 'CREATE TABLE events1 (a int, b int, c int)'
+                            ) unique key (`a`) location 'stream://kafka/EVENTS_BY_TYPE/0'")
+                .await
+                .unwrap();
+            let table = metastore.get_table("test".to_string(), "events_1".to_string()).await.unwrap();
+            assert_eq!(
+                table.get_row().source_columns(),
+                &Some(vec![
+                     Column::new("a".to_string(), ColumnType::Int, 0),
+                     Column::new("b".to_string(), ColumnType::Int, 1),
+                     Column::new("c".to_string(), ColumnType::Int, 2),
+                ])
+            );
+            let _ = service
+                .exec_query("CREATE TABLE test.events_1 (a int, b int) WITH (\
+                select_statement = 'SELECT a as a, b + c  as b FROM EVENTS_BY_TYPE WHERE c > 10',\
+                source_table = 'TABLE events1 (a int, b int, c int)'
+                            ) unique key (`a`) location 'stream://kafka/EVENTS_BY_TYPE/0'")
+                    .await
+                    .expect_err("Validation should fail");
+
+            let _ = service
+                .exec_query("CREATE TABLE test.events_1 (a int, b int) WITH (\
+                select_statement = 'SELECT a as a, b + c as b FROM EVENTS_BY_TYPE WHERE c > 10',\
+                source_table = 'CREATE TABLE events1 (a int, b int, c int'
+                            ) unique key (`a`) location 'stream://kafka/EVENTS_BY_TYPE/0'")
+                    .await
+                    .expect_err("Validation should fail");
+
+
+        }).await;
+    }
+
+    #[tokio::test]
+    async fn trace_obj_for_streaming_table() {
+        Config::test("trace_obj_for_streaming_table").start_test(async move |services| {
+            let service = services.sql_service;
+            let meta_store = services.meta_store;
+
+            let _ = service.exec_query("CREATE SCHEMA test").await.unwrap();
+
+            service
+                .exec_query("CREATE SOURCE OR UPDATE ksql AS 'ksql' VALUES (user = 'foo', password = 'bar', url = 'http://foo.com')").await.unwrap();
+            let context = SqlQueryContext::default().with_trace_obj(Some("{\"test\":\"context\"}".to_string()));
+
+            let _ = service
+                .exec_query_with_context(context, "CREATE TABLE test.table_1 (`EVENT` text, `KSQL_COL_0` int) unique key (`EVENT`) location 'stream://ksql/EVENTS_BY_TYPE'")
+                .await
+                .unwrap();
+
+            let table = meta_store.get_table("test".to_string(), "table_1".to_string()).await.unwrap();
+            let trace_obj = meta_store.get_trace_obj_by_table_id(table.get_id()).await.unwrap();
+            assert!(trace_obj.is_some());
+            assert_eq!(trace_obj.unwrap(), "{\"test\":\"context\"}".to_string());
+
+            let _ = service
+                .exec_query("CREATE TABLE test.table_2 (`EVENT` text, `KSQL_COL_0` int) unique key (`EVENT`)")
+                .await
+                .unwrap();
+
+            let table = meta_store.get_table("test".to_string(), "table_2".to_string()).await.unwrap();
+            let trace_obj = meta_store.get_trace_obj_by_table_id(table.get_id()).await.unwrap();
+            println!("tobj {:?}", trace_obj);
+            assert!(trace_obj.is_none());
+
+        }).await;
     }
 }
 

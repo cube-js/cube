@@ -167,11 +167,10 @@ pub fn parse_sql_to_statements(
     );
     let query = query.replace("AND TABLE_TYPE IN ( 'TABLE', 'VIEW', 'EXTERNAL TABLE')", "");
     let query = query.replace(
-        // REGEXP_REPLACE
         // Subquery must have alias
         // Incorrect alias for subquery
         "FROM (select lbv_cols.schemaname, lbv_cols.tablename, lbv_cols.columnname,REGEXP_REPLACE(REGEXP_REPLACE(lbv_cols.columntype,'\\\\(.*\\\\)'),'^_.+','ARRAY') as columntype_rep,columntype, lbv_cols.columnnum from pg_get_late_binding_view_cols() lbv_cols( schemaname name, tablename name, columnname name, columntype text, columnnum int)) lbv_columns   WHERE",
-        "FROM (select schemaname, tablename, columnname,columntype as columntype_rep,columntype, columnnum from get_late_binding_view_cols_unpacked) as lbv_columns   WHERE",
+        "FROM (select schemaname, tablename, columnname,REGEXP_REPLACE(REGEXP_REPLACE(columntype,'\\\\(.*\\\\)'),'^_.+','ARRAY') as columntype_rep,columntype, columnnum from get_late_binding_view_cols_unpacked) as lbv_columns   WHERE",
     );
     let query = query.replace(
         // Subquery must have alias
@@ -242,6 +241,45 @@ pub fn parse_sql_to_statements(
     let query = query.replace(
         "AND c.relname IN (SELECT table_name\nFROM information_schema.tables\nWHERE (table_type = 'BASE TABLE' OR table_type = 'VIEW')\n  AND table_schema NOT IN ('pg_catalog', 'information_schema')\n  AND has_schema_privilege(table_schema, 'USAGE'::text)\n)\n",
         "",
+    );
+
+    // Microstrategy
+    // TODO: Support Subquery Node
+    let query = query.replace("= (SELECT current_schema())", "= current_schema()");
+
+    // Grafana
+    // TODO: Support InSubquery Node
+    let query = query.replace(
+        "WHERE quote_ident(table_schema) NOT IN ('information_schema', 'pg_catalog', '_timescaledb_cache', '_timescaledb_catalog', '_timescaledb_internal', '_timescaledb_config', 'timescaledb_information', 'timescaledb_experimental') AND table_type = 'BASE TABLE' AND quote_ident(table_schema) IN (SELECT CASE WHEN TRIM(s[i]) = '\"$user\"' THEN user ELSE TRIM(s[i]) END FROM generate_series(array_lower(string_to_array(current_setting('search_path'), ','), 1), array_upper(string_to_array(current_setting('search_path'), ','), 1)) AS i, string_to_array(current_setting('search_path'), ',') AS s)",
+        "WHERE quote_ident(table_schema) IN (current_user, current_schema()) AND table_type = 'BASE TABLE'"
+    );
+    let query = query.replace(
+        "where quote_ident(table_schema) not in ('information_schema',\
+\n                             'pg_catalog',\
+\n                             '_timescaledb_cache',\
+\n                             '_timescaledb_catalog',\
+\n                             '_timescaledb_internal',\
+\n                             '_timescaledb_config',\
+\n                             'timescaledb_information',\
+\n                             'timescaledb_experimental')\
+\n      and \
+\n          quote_ident(table_schema) IN (\
+\n          SELECT\
+\n            CASE WHEN trim(s[i]) = '\"$user\"' THEN user ELSE trim(s[i]) END\
+\n          FROM\
+\n            generate_series(\
+\n              array_lower(string_to_array(current_setting('search_path'),','),1),\
+\n              array_upper(string_to_array(current_setting('search_path'),','),1)\
+\n            ) as i,\
+\n            string_to_array(current_setting('search_path'),',') s\
+\n          )",
+        "WHERE quote_ident(table_schema) IN (current_user, current_schema())",
+    );
+
+    // psqlODBC
+    let query = query.replace(
+        "select NULL, NULL, NULL",
+        "select NULL, NULL AS NULL2, NULL AS NULL3",
     );
 
     if let Some(qtrace) = qtrace {

@@ -28,7 +28,7 @@ export class PackageFetcher {
     try {
       // Folder node_modules does not exist by default inside docker in /cube/conf without sharing volume for it
       fs.mkdirpSync(this.tmpFolderPath);
-    } catch (err) {
+    } catch (err: any) {
       if (err.code === 'EEXIST') {
         this.cleanup();
         fs.mkdirSync(this.tmpFolderPath);

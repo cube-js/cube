@@ -1,8 +1,9 @@
 import csvWriter from 'csv-write-stream';
 import LRUCache from 'lru-cache';
+import { pipeline } from 'stream';
 import { MaybeCancelablePromise, streamToArray } from '@cubejs-backend/shared';
 import { CubeStoreCacheDriver, CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
-import { BaseDriver, InlineTables, CacheDriverInterface } from '@cubejs-backend/base-driver';
+import { BaseDriver, InlineTables, CacheDriverInterface, TableStructure } from '@cubejs-backend/base-driver';
 
 import { QueryQueue } from './QueryQueue';
 import { ContinueWaitError } from './ContinueWaitError';
@@ -47,7 +48,6 @@ export type QueryBody = {
   continueWait?: boolean;
   renewQuery?: boolean;
   requestId?: string;
-  context?: any;
   external?: boolean;
   isJob?: boolean;
   forceNoCache?: boolean;
@@ -183,21 +183,6 @@ export class QueryCache {
   }
 
   /**
-   * Force reconcile queue logic to be executed.
-   */
-  public async forceReconcile(datasource = 'default') {
-    if (!this.externalQueue) {
-      // We don't need to reconcile external queue, because Cube Store
-      // uses its internal queue which managed separately.
-      return;
-    }
-    const queue = await this.getQueue(datasource);
-    if (queue) {
-      await queue.reconcileQueue();
-    }
-  }
-
-  /**
    * Generates from the `queryBody` the final `sql` query and push it to
    * the queue. Returns promise which will be resolved by the different
    * objects, depend from the original `queryBody` object. For the
@@ -262,6 +247,7 @@ export class QueryCache {
           persistent: queryBody.persistent,
           dataSource: queryBody.dataSource,
           useCsvQuery: queryBody.useCsvQuery,
+          lambdaTypes: queryBody.lambdaTypes,
           aliasNameToMember: queryBody.aliasNameToMember,
         });
       } else {
@@ -442,6 +428,7 @@ export class QueryCache {
       requestId,
       inlineTables,
       useCsvQuery,
+      lambdaTypes,
       persistent,
       aliasNameToMember,
     }: {
@@ -452,6 +439,7 @@ export class QueryCache {
       requestId?: string,
       inlineTables?: InlineTables,
       useCsvQuery?: boolean,
+      lambdaTypes?: TableStructure,
       persistent?: boolean,
       aliasNameToMember?: { [alias: string]: string },
     }
@@ -467,6 +455,7 @@ export class QueryCache {
       requestId,
       inlineTables,
       useCsvQuery,
+      lambdaTypes,
     };
 
     const opt = {
@@ -477,62 +466,79 @@ export class QueryCache {
     if (!persistent) {
       return queue.executeInQueue('query', cacheKey, _query, priority, opt);
     } else {
-      const stream = queue.setQueryStream(cacheKey, aliasNameToMember);
-      // we don't want to handle error here as we want it to bubble up
-      // to the api gateway
-      queue.executeInQueue('stream', cacheKey, _query, priority, opt);
-      return stream;
+      return queue.executeInQueue('stream', cacheKey, {
+        ..._query,
+        aliasNameToMember,
+      }, priority, opt);
     }
   }
 
   public async getQueue(dataSource = 'default') {
     if (!this.queue[dataSource]) {
-      this.queue[dataSource] = QueryCache.createQueue(
-        `SQL_QUERY_${this.redisPrefix}_${dataSource}`,
-        () => this.driverFactory(dataSource),
-        (client, req) => {
-          this.logger('Executing SQL', { ...req });
-          if (req.useCsvQuery) {
-            return this.csvQuery(client, req);
-          } else if (req.tablesSchema) {
-            return client.tablesSchema();
-          } else {
-            return client.query(req.query, req.values, req);
+      const queueOptions = await this.options.queueOptions(dataSource);
+      if (!this.queue[dataSource]) {
+        this.queue[dataSource] = QueryCache.createQueue(
+          `SQL_QUERY_${this.redisPrefix}_${dataSource}`,
+          () => this.driverFactory(dataSource),
+          (client, req) => {
+            this.logger('Executing SQL', { ...req });
+            if (req.useCsvQuery) {
+              return this.csvQuery(client, req);
+            } else {
+              return client.query(req.query, req.values, req);
+            }
+          },
+          {
+            logger: this.logger,
+            cacheAndQueueDriver: this.options.cacheAndQueueDriver,
+            redisPool: this.options.redisPool,
+            cubeStoreDriverFactory: this.options.cubeStoreDriverFactory,
+            // Centralized continueWaitTimeout that can be overridden in queueOptions
+            continueWaitTimeout: this.options.continueWaitTimeout,
+            ...queueOptions,
           }
-        },
-        {
-          logger: this.logger,
-          cacheAndQueueDriver: this.options.cacheAndQueueDriver,
-          redisPool: this.options.redisPool,
-          cubeStoreDriverFactory: this.options.cubeStoreDriverFactory,
-          // Centralized continueWaitTimeout that can be overridden in queueOptions
-          continueWaitTimeout: this.options.continueWaitTimeout,
-          ...(await this.options.queueOptions(dataSource)),
-        }
-      );
+        );
+      }
     }
     return this.queue[dataSource];
   }
 
-  private async csvQuery(client, q) {
-    const tableData = await client.downloadQueryResults(q.query, q.values, q);
-    const headers = tableData.types.map(c => c.name);
+  protected async csvQuery(client, q) {
+    const headers = q.lambdaTypes.map(c => c.name);
     const writer = csvWriter({
       headers,
       sendHeaders: false,
     });
-    tableData.rows.forEach(
-      row => writer.write(row)
-    );
-    writer.end();
-    const lines = await streamToArray(writer);
-    if (tableData.release) {
-      await tableData.release();
+    let tableData;
+    try {
+      if (client.stream) {
+        tableData = await client.stream(q.query, q.values, q);
+        const errors = [];
+        await pipeline(tableData.rowStream, writer, (err) => {
+          if (err) {
+            errors.push(err);
+          }
+        });
+        if (errors.length > 0) {
+          throw new Error(`Lambda query errors ${errors.join(', ')}`);
+        }
+      } else {
+        tableData = await client.downloadQueryResults(q.query, q.values, q);
+        tableData.rows.forEach(
+          row => writer.write(row)
+        );
+        writer.end();
+      }
+    } finally {
+      if (tableData?.release) {
+        await tableData.release();
+      }
     }
+    const lines = await streamToArray(writer);
     const rowCount = lines.length;
     const csvRows = lines.join('');
     return {
-      types: tableData.types,
+      types: q.lambdaTypes,
       csvRows,
       rowCount,
     };
@@ -590,47 +596,54 @@ export class QueryCache {
           return result;
         },
         stream: async (req, target) => {
-          let logged = false;
           queue.logger('Streaming SQL', { ...req });
-          const client = await clientFactory();
-          try {
-            const source = await client.streamQuery(req.query, req.values);
+          await (new Promise((resolve, reject) => {
+            let logged = false;
+            Promise
+              .all([clientFactory()])
+              // TODO use stream method instead
+              .then(([client]) => client.streamQuery(req.query, req.values))
+              .then((source) => {
+                const cleanup = (error) => {
+                  if (error && !source.destroyed) {
+                    source.destroy(error);
+                  }
+                  if (error && !target.destroyed) {
+                    target.destroy(error);
+                  }
+                  if (!logged && source.destroyed && target.destroyed) {
+                    logged = true;
+                    if (error) {
+                      queue.logger('Streaming done with error', {
+                        query: req.query,
+                        query_values: req.values,
+                        error,
+                      });
+                      reject(error);
+                    } else {
+                      queue.logger('Streaming successfully completed', {
+                        requestId: req.requestId,
+                      });
+                      resolve(req.requestId);
+                    }
+                  }
+                };
 
-            const cleanup = (error) => {
-              if (!source.destroyed) {
-                source.destroy(error);
-              }
-              if (!target.destroyed) {
-                target.destroy(error);
-              }
-              if (!logged && source.destroyed && target.destroyed) {
-                logged = true;
-                if (error) {
-                  queue.logger('Streaming done with error', {
-                    query: req.query,
-                    query_values: req.values,
-                    error,
-                  });
-                } else {
-                  queue.logger('Streaming successfully completed', {
-                    requestId: req.requestId,
-                  });
-                }
-              }
-            };
-  
-            source.once('end', cleanup);
-            source.once('error', cleanup);
-            source.once('close', cleanup);
-  
-            target.once('end', cleanup);
-            target.once('error', cleanup);
-            target.once('close', cleanup);
-  
-            source.pipe(target);
-          } catch (e) {
-            target.emit('error', e);
-          }
+                source.once('end', () => cleanup(undefined));
+                source.once('error', cleanup);
+                source.once('close', () => cleanup(undefined));
+      
+                target.once('end', () => cleanup(undefined));
+                target.once('error', cleanup);
+                target.once('close', () => cleanup(undefined));
+      
+                source.pipe(target);
+              })
+              .catch((reason) => {
+                target.emit('error', reason);
+                resolve(reason);
+              });
+          }));
         },
       },
       cancelHandlers: {
@@ -639,7 +652,14 @@ export class QueryCache {
             await queue.handles[req.cancelHandler].cancel();
             delete queue.handles[req.cancelHandler];
           }
-        }
+        },
+        stream: async (req) => {
+          req.queryKey.persistent = true;
+          const queryKeyHash = queue.redisHash(req.queryKey);
+          if (queue.streams.has(queryKeyHash)) {
+            queue.streams.get(queryKeyHash).destroy();
+          }
+        },
       },
       logger: (msg, params) => options.logger(msg, params),
       ...options
@@ -701,6 +721,7 @@ export class QueryCache {
       external?: boolean,
       dataSource: string,
       useCsvQuery?: boolean,
+      lambdaTypes?: TableStructure,
       persistent?: boolean,
     }
   ) {
@@ -734,6 +755,7 @@ export class QueryCache {
               requestId: options.requestId,
               dataSource: options.dataSource,
               useCsvQuery: options.useCsvQuery,
+              lambdaTypes: options.lambdaTypes,
               persistent: options.persistent,
             }
           ),
@@ -808,6 +830,7 @@ export class QueryCache {
       forceNoCache?: boolean,
       useInMemory?: boolean,
       useCsvQuery?: boolean,
+      lambdaTypes?: TableStructure,
       persistent?: boolean,
     }
   ) {
@@ -824,6 +847,7 @@ export class QueryCache {
         persistent: options.persistent,
         dataSource: options.dataSource,
         useCsvQuery: options.useCsvQuery,
+        lambdaTypes: options.lambdaTypes,
       }).then(res => {
         const result = {
           time: (new Date()).getTime(),
@@ -879,7 +903,7 @@ export class QueryCache {
             // Most likely it'll cause race condition of refreshing data with different refreshKey values.
             renewedAgo + inMemoryCacheDisablePeriod > renewalThreshold * 1000 ||
             inMemoryValue.renewalKey !== renewalKey
-          )
+          ) || renewedAgo > expiration * 1000 || renewedAgo > inMemoryCacheDisablePeriod
         ) {
           this.memoryCache.del(redisKey);
         } else {
@@ -971,10 +995,5 @@ export class QueryCache {
 
   public async testConnection() {
     return this.cacheDriver.testConnection();
-  }
-  
-  public async fetchSchema(dataSource: string) {
-    const queue = await this.getQueue(dataSource);
-    return queue.executeQueryInQueue('query', [`Fetch schema for ${dataSource}`, []], { tablesSchema: true });
   }
 }

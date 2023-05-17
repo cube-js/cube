@@ -16,7 +16,7 @@ permalink: /config/databases/snowflake
 
 Add the following to a `.env` file in your Cube project:
 
-```bash
+```dotenv
 CUBEJS_DB_TYPE=snowflake
 CUBEJS_DB_SNOWFLAKE_ACCOUNT=XXXXXXXXX.us-east-1
 CUBEJS_DB_SNOWFLAKE_WAREHOUSE=MY_SNOWFLAKE_WAREHOUSE
@@ -24,6 +24,38 @@ CUBEJS_DB_NAME=my_snowflake_database
 CUBEJS_DB_USER=snowflake_user
 CUBEJS_DB_PASS=**********
 ```
+
+### <--{"id" : "Setup"}--> Cube Cloud
+
+<InfoBox heading="Allowing connections from Cube Cloud IP">
+
+In some cases you'll need to allow connections from your Cube Cloud deployment IP
+address to your database. You can copy the IP address from either the Database
+Setup step in deployment creation, or from <Btn>Settings →
+Configuration</Btn> in your deployment.
+
+</InfoBox>
+
+The following fields are required when creating a Snowflake connection:
+
+<Screenshot
+  alt="Cube Cloud Snowflake Configuration Screen"
+  src="https://ucarecdn.com/304d6222-3b82-4edc-b35d-63f70375642c/"
+/>
+
+Cube Cloud also supports connecting to data sources within private VPCs. If you already have VPCs enabled in
+your account, check out the [VPC documentation][ref-cloud-conf-vpc] to learn how
+to get started.
+
+<SuccessBox>
+
+VPC connectivity is available in Cube Cloud on [Premium](https://cube.dev/pricing) tier. [Contact us][cube-contact] for details.
+
+</SuccessBox>
+
+[cube-pricing]: https://cube.dev/pricing/
+[cube-contact]: https://cube.dev/contact/
+[ref-cloud-conf-vpc]: /cloud/configuration/connecting-with-a-vpc
 
 ## Environment Variables
 
@@ -45,10 +77,10 @@ CUBEJS_DB_PASS=**********
 
 ## Pre-Aggregation Feature Support
 
-### countDistinctApprox
+### count_distinct_approx
 
 Measures of type
-[`countDistinctApprox`][ref-schema-ref-types-formats-countdistinctapprox] can be
+[`count_distinct_approx`][ref-schema-ref-types-formats-countdistinctapprox] can be
 used in pre-aggregations when using Snowflake as a source database. To learn
 more about Snowflake's support for approximate aggregate functions, [click
 here][snowflake-docs-approx-agg-fns].
@@ -88,7 +120,7 @@ writes to the export bucket in S3.
 
 </InfoBox>
 
-```bash
+```dotenv
 CUBEJS_DB_EXPORT_BUCKET_TYPE=s3
 CUBEJS_DB_EXPORT_BUCKET=my.bucket.on.s3
 CUBEJS_DB_EXPORT_BUCKET_AWS_KEY=<AWS_KEY>
@@ -111,7 +143,7 @@ Snowflake][snowflake-docs-gcs-integration]. Take note of the integration name
 
 Once the Snowflake integration is set up, configure Cube using the following:
 
-```bash
+```dotenv
 CUBEJS_DB_EXPORT_BUCKET=snowflake-export-bucket
 CUBEJS_DB_EXPORT_BUCKET_TYPE=gcp
 CUBEJS_DB_EXPORT_GCS_CREDENTIALS=<BASE64_ENCODED_SERVICE_CREDENTIALS_JSON>

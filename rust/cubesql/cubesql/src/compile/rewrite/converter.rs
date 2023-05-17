@@ -6,19 +6,19 @@ use crate::{
         },
         rewrite::{
             analysis::LogicalPlanAnalysis, rewriter::Rewriter, AggregateFunctionExprDistinct,
-            AggregateFunctionExprFun, AggregateUDFExprFun, AliasExprAlias, AnyExprOp,
-            BetweenExprNegated, BinaryExprOp, CastExprDataType, ChangeUserMemberValue,
+            AggregateFunctionExprFun, AggregateSplit, AggregateUDFExprFun, AliasExprAlias,
+            AnyExprOp, BetweenExprNegated, BinaryExprOp, CastExprDataType, ChangeUserMemberValue,
             ColumnExprColumn, CubeScanLimit, CubeScanOffset, DimensionName,
             EmptyRelationProduceOneRow, FilterMemberMember, FilterMemberOp, FilterMemberValues,
             FilterOpOp, InListExprNegated, JoinJoinConstraint, JoinJoinType, JoinLeftOn,
             JoinRightOn, LikeExprEscapeChar, LikeExprLikeType, LikeExprNegated, LikeType,
             LimitFetch, LimitSkip, LiteralExprValue, LiteralMemberRelation, LiteralMemberValue,
             LogicalPlanLanguage, MeasureName, MemberErrorError, OrderAsc, OrderMember,
-            OuterColumnExprColumn, OuterColumnExprDataType, ProjectionAlias, ScalarFunctionExprFun,
-            ScalarUDFExprFun, ScalarVariableExprDataType, ScalarVariableExprVariable,
-            SegmentMemberMember, SortExprAsc, SortExprNullsFirst, TableScanFetch,
-            TableScanProjection, TableScanSourceTableName, TableScanTableName, TableUDFExprFun,
-            TimeDimensionDateRange, TimeDimensionGranularity, TimeDimensionName,
+            OuterColumnExprColumn, OuterColumnExprDataType, ProjectionAlias, ProjectionSplit,
+            ScalarFunctionExprFun, ScalarUDFExprFun, ScalarVariableExprDataType,
+            ScalarVariableExprVariable, SegmentMemberMember, SortExprAsc, SortExprNullsFirst,
+            TableScanFetch, TableScanProjection, TableScanSourceTableName, TableScanTableName,
+            TableUDFExprFun, TimeDimensionDateRange, TimeDimensionGranularity, TimeDimensionName,
             TryCastExprDataType, UnionAlias, WindowFunctionExprFun, WindowFunctionExprWindowFrame,
         },
     },
@@ -356,8 +356,9 @@ impl LogicalPlanToLanguageConverter {
                 let expr = add_expr_list_node!(self, node.expr, ProjectionExpr);
                 let input = self.add_logical_plan(node.input.as_ref())?;
                 let alias = add_data_node!(self, node.alias, ProjectionAlias);
+                let split = add_data_node!(self, false, ProjectionSplit);
                 self.graph
-                    .add(LogicalPlanLanguage::Projection([expr, input, alias]))
+                    .add(LogicalPlanLanguage::Projection([expr, input, alias, split]))
             }
             LogicalPlan::Filter(node) => {
                 let predicate = self.add_expr(&node.predicate)?;
@@ -375,8 +376,9 @@ impl LogicalPlanToLanguageConverter {
                 let input = self.add_logical_plan(node.input.as_ref())?;
                 let group_expr = add_expr_list_node!(self, node.group_expr, AggregateGroupExpr);
                 let aggr_expr = add_expr_list_node!(self, node.aggr_expr, AggregateAggrExpr);
+                let split = add_data_node!(self, false, AggregateSplit);
                 self.graph.add(LogicalPlanLanguage::Aggregate([
-                    input, group_expr, aggr_expr,
+                    input, group_expr, aggr_expr, split,
                 ]))
             }
             LogicalPlan::Sort(node) => {
@@ -1310,6 +1312,12 @@ impl LanguageToLogicalPlanConverter {
                                     let error =
                                         match_data_node!(node_by_id, params[0], MemberErrorError);
                                     return Err(CubeError::user(error.to_string()));
+                                }
+                                LogicalPlanLanguage::AllMembers(_) => {
+                                    return Err(CubeError::internal(
+                                        "Can't detect Cube query and it may be not supported yet"
+                                            .to_string(),
+                                    ));
                                 }
                                 x => panic!("Expected dimension but found {:?}", x),
                             }

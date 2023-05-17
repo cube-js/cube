@@ -19,15 +19,13 @@ import {
   SASProtocol,
   generateBlobSASQueryParameters,
 } from '@azure/storage-blob';
-import { DriverCapabilities, UnloadOptions, } from '@cubejs-backend/base-driver';
+import { DriverCapabilities, QueryOptions, UnloadOptions } from '@cubejs-backend/base-driver';
 import {
   JDBCDriver,
   JDBCDriverConfiguration,
 } from '@cubejs-backend/jdbc-driver';
 import { DatabricksQuery } from './DatabricksQuery';
 import { downloadJDBCDriver } from './installer';
-
-const { version } = require('../../package.json');
 
 export type DatabricksDriverConfiguration = JDBCDriverConfiguration &
   {
@@ -175,6 +173,12 @@ export class DatabricksDriver extends JDBCDriver {
        * Max pool size value for the [cube]<-->[db] pool.
        */
       maxPoolSize?: number,
+
+      /**
+       * Time to wait for a response from a connection after validation
+       * request before determining it as not valid. Default - 10000 ms.
+       */
+      testConnectionTimeout?: number,
     } = {},
   ) {
     const dataSource =
@@ -204,7 +208,7 @@ export class DatabricksDriver extends JDBCDriver {
           conf?.token ||
           getEnv('databrickToken', { dataSource }) ||
           '',
-        UserAgentEntry: `CubeDev+Cube/${version} (Databricks)`,
+        UserAgentEntry: `CubeDev_Cube`,
       },
       catalog:
         conf?.catalog ||
@@ -337,7 +341,7 @@ export class DatabricksDriver extends JDBCDriver {
   /**
    * @override
    */
-  public dropTable(tableName: string, options?: unknown): Promise<unknown> {
+  public dropTable(tableName: string, options?: QueryOptions): Promise<unknown> {
     const tableFullName = `${
       this.config?.catalog ? `${this.config.catalog}.` : ''
     }${tableName}`;
@@ -380,7 +384,7 @@ export class DatabricksDriver extends JDBCDriver {
    * Execute create schema query.
    */
   public async createSchemaIfNotExists(schemaName: string) {
-    return this.query(
+    await this.query(
       `CREATE SCHEMA IF NOT EXISTS ${
         this.getSchemaFullName(schemaName)
       }`,
@@ -557,16 +561,15 @@ export class DatabricksDriver extends JDBCDriver {
   }
 
   /**
-   * Determines whether export bucket feature is configured or no.
-   * @returns {boolean}
+   * Determines whether export bucket feature is configured or not.
    */
   public async isUnloadSupported() {
     return this.config.exportBucket !== undefined;
   }
 
   /**
-   * Returns an object with the links to unloaded to the export bucket
-   * data to the Cubestore.
+   * Returns to the Cubestore an object with links to unloaded to an
+   * export bucket data.
    */
   public async unload(tableName: string, options: UnloadOptions) {
     if (!['azure', 's3'].includes(this.config.bucketType as string)) {
@@ -574,20 +577,20 @@ export class DatabricksDriver extends JDBCDriver {
         this.config.bucketType
       }`);
     }
-
     const tableFullName = `${
-      this.config.catalog ? `${this.config.catalog}.` : ''
+      this.config.catalog
+        ? `${this.config.catalog}.`
+        : ''
     }${tableName}`;
-
-    const types = options.query ?
-      await this.unloadWithSql(tableFullName, options.query.sql, options.query.params) :
-      await this.unloadWithTable(tableFullName);
-
+    const types = options.query
+      ? await this.unloadWithSql(
+        tableFullName,
+        options.query.sql,
+        options.query.params,
+      )
+      : await this.unloadWithTable(tableFullName);
     const pathname = `${this.config.exportBucket}/${tableFullName}.csv`;
-    const csvFile = await this.getCsvFiles(
-      pathname,
-    );
-
+    const csvFile = await this.getCsvFiles(pathname);
     return {
       exportBucketCsvEscapeSymbol: this.config.exportBucketCsvEscapeSymbol,
       csvFile,
@@ -597,7 +600,7 @@ export class DatabricksDriver extends JDBCDriver {
   }
 
   /**
-   * Unload data from the SQL query to the export bucket.
+   * Unload data from a SQL query to an export bucket.
    */
   private async unloadWithSql(tableFullName: string, sql: string, params: unknown[]) {
     const types = await this.queryColumnTypes(sql, params);
@@ -608,7 +611,7 @@ export class DatabricksDriver extends JDBCDriver {
   }
 
   /**
-   * Unload data from the temp table to the export bucket.
+   * Unload data from a temp table to an export bucket.
    */
   private async unloadWithTable(tableFullName: string) {
     const types = await this.tableColumnTypes(tableFullName);
@@ -620,7 +623,7 @@ export class DatabricksDriver extends JDBCDriver {
   }
 
   /**
-   * Returns an array of signed URLs of the unloaded csv files.
+   * Returns an array of signed URLs of unloaded csv files.
    */
   private async getCsvFiles(
     pathname: string,
@@ -750,15 +753,19 @@ export class DatabricksDriver extends JDBCDriver {
    * `fs.s3a.secret.key <aws-secret-key>`
    */
   private async createExternalTableFromSql(tableFullName: string, sql: string, params: unknown[]) {
-    await this.query(
-      `
-      CREATE TABLE ${tableFullName}_csv_export
-      USING CSV LOCATION '${this.config.exportBucketMountDir || this.config.exportBucket}/${tableFullName}.csv'
-      OPTIONS (escape = '"')
-      AS (${sql})
-      `,
-      params,
-    );
+    try {
+      await this.query(
+        `
+        CREATE TABLE ${tableFullName}
+        USING CSV LOCATION '${this.config.exportBucketMountDir || this.config.exportBucket}/${tableFullName}.csv'
+        OPTIONS (escape = '"')
+        AS (${sql});
+        `,
+        params,
+      );
+    } finally {
+      await this.query(`DROP TABLE IF EXISTS ${tableFullName};`, []);
+    }
   }
 
   /**
@@ -779,14 +786,18 @@ export class DatabricksDriver extends JDBCDriver {
    * `fs.s3a.secret.key <aws-secret-key>`
    */
   private async createExternalTableFromTable(tableFullName: string, columns: string) {
-    await this.query(
-      `
-      CREATE TABLE ${tableFullName}_csv_export
-      USING CSV LOCATION '${this.config.exportBucketMountDir || this.config.exportBucket}/${tableFullName}.csv'
-      OPTIONS (escape = '"')
-      AS SELECT ${columns} FROM ${tableFullName}
-      `,
-      [],
-    );
+    try {
+      await this.query(
+        `
+        CREATE TABLE _${tableFullName}
+        USING CSV LOCATION '${this.config.exportBucketMountDir || this.config.exportBucket}/${tableFullName}.csv'
+        OPTIONS (escape = '"')
+        AS SELECT ${columns} FROM ${tableFullName}
+        `,
+        [],
+      );
+    } finally {
+      await this.query(`DROP TABLE IF EXISTS _${tableFullName};`, []);
+    }
   }
 }

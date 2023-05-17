@@ -3,7 +3,7 @@ import crypto from 'crypto';
 
 import { Optional } from './type-helpers';
 
-type CancelablePromiseCancel = (waitExecution?: boolean) => Promise<any>;
+export type CancelablePromiseCancel = (waitExecution?: boolean) => Promise<any>;
 
 export interface CancelablePromise<T> extends Promise<T> {
   cancel: CancelablePromiseCancel;
@@ -362,7 +362,7 @@ export const asyncMemoizeBackground = <Ret, Arguments>(
 
       bucket.item = item;
       bucket.lifetime = Date.now() + options.extractCacheLifetime(item);
-    } catch (e) {
+    } catch (e: any) {
       options.onBackgroundException(e);
     }
   };

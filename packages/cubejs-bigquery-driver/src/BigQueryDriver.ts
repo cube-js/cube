@@ -20,7 +20,7 @@ import {
 } from '@google-cloud/bigquery';
 import { Bucket, Storage } from '@google-cloud/storage';
 import {
-  BaseDriver, DownloadTableCSVData,
+  BaseDriver, DownloadQueryResultsOptions, DownloadQueryResultsResult, DownloadTableCSVData,
   DriverInterface, QueryOptions, StreamTableData,
 } from '@cubejs-backend/base-driver';
 import { Query } from '@google-cloud/bigquery/build/src/bigquery';
@@ -77,9 +77,17 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
        * Max pool size value for the [cube]<-->[db] pool.
        */
       maxPoolSize?: number,
+
+      /**
+       * Time to wait for a response from a connection after validation
+       * request before determining it as not valid. Default - 10000 ms.
+       */
+      testConnectionTimeout?: number,
     } = {}
   ) {
-    super();
+    super({
+      testConnectionTimeout: config.testConnectionTimeout,
+    });
 
     const dataSource =
       config.dataSource ||
@@ -140,7 +148,9 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
 
   public async testConnection() {
     await this.bigquery.query({
-      query: 'SELECT ? AS number', params: ['1']
+      query: 'SELECT ? AS number',
+      params: ['1'],
+      jobTimeoutMs: this.testConnectionTimeout(),
     });
   }
 
@@ -223,8 +233,8 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     return bigQueryTable.schema.fields.map((c: any) => ({ name: c.name, type: this.toGenericType(c.type) }));
   }
 
-  public async createSchemaIfNotExists(schemaName: string) {
-    return this.bigquery.dataset(schemaName).get({ autoCreate: true });
+  public async createSchemaIfNotExists(schemaName: string): Promise<void> {
+    await this.bigquery.dataset(schemaName).get({ autoCreate: true });
   }
 
   public async isUnloadSupported() {

@@ -1,0 +1,153 @@
+{
+  "cubes": [
+    {
+      "name": "Products",
+      "dimensions": [
+        {
+          "name": "category",
+          "type": "string",
+          "sql": "category"
+        },
+        {
+          "name": "subCategory",
+          "type": "string",
+          "sql": "sub_category"
+        },
+        {
+          "name": "productName",
+          "type": "string",
+          "sql": "product_name"
+        }
+      ]
+    },
+    {
+      "name": "Customers",
+      "dimensions": [
+        {
+          "primary_key": true,
+          "shown": true,
+          "name": "customerId",
+          "type": "string",
+          "sql": "customer_id"
+        },
+        {
+          "name": "customerName",
+          "type": "string",
+          "sql": "customer_name"
+        }
+      ],
+      "measures": [
+        {
+          "name": "count",
+          "type": "count",
+          "sql": "customer_id"
+        },
+        {
+          "name": "runningTotal",
+          "type": "count",
+          "rolling_window": {
+            "trailing": "unbounded"
+          }
+        }
+      ]
+    },
+    {
+      "name": "ECommerce",
+      "extends": "Products",
+      "joins": [
+        {
+          "name": "Customers",
+          "relationship": "belongs_to",
+          "sql": "{CUBE}.customer_id = {Customers}.customer_id"
+        }
+      ],
+      "dimensions": [
+        {
+          "name": "rowId",
+          "sql": "row_id",
+          "type": "number",
+          "primary_key": true,
+          "shown": true
+        },
+        {
+          "name": "orderId",
+          "sql": "order_id",
+          "type": "string"
+        },
+        {
+          "name": "orderDate",
+          "sql": "order_date",
+          "type": "time"
+        },
+        {
+          "name": "customerId",
+          "sql": "customer_id",
+          "type": "string"
+        },
+        {
+          "name": "customerName",
+          "sql": "{Customers.customerName}",
+          "type":"string"
+        },
+        {
+          "name": "city",
+          "sql": "city",
+          "type": "string"
+        },
+        {
+          "name": "sales",
+          "sql": "sales",
+          "type":"number"
+        },
+        {
+          "name": "quantity",
+          "sql": "quantity",
+          "type": "number"
+        },
+        {
+          "name": "discount",
+          "sql": "discount",
+          "type": "number"
+        },
+        {
+          "name": "profit",
+          "sql": "profit",
+          "type": "number"
+        }
+      ],
+      "measures": [
+        {
+          "name": "count",
+          "type": "count",
+          "sql": "customer_id"
+        },
+        {
+          "name": "totalQuantity",
+          "sql": "quantity",
+          "type": "sum"
+        },
+        {
+          "name": "avgDiscount",
+          "sql": "discount",
+          "type": "avg"
+        },
+        {
+          "name": "totalSales",
+          "sql": "sales",
+          "type": "sum"
+        },
+        {
+          "name": "totalProfit",
+          "sql": "profit",
+          "type": "sum"
+        },
+        {
+          "name": "hiddenSum",
+          "sql": "profit",
+          "type": "sum",
+          "shown": false
+        }
+      ]
+    }
+  ]
+}

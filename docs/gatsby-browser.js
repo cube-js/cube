@@ -1,5 +1,7 @@
 import { page } from 'cubedev-tracking';
 
+import 'prismjs/plugins/command-line/prism-command-line.css'
+
 export const onRouteUpdate = ({ location, prevLocation }, pluginOptions = {}) => {
   //if (process.env.NODE_ENV !== `production` || typeof snowplow !== `function`) {
   //  return null

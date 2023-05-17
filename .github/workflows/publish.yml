@@ -20,10 +20,10 @@ jobs:
           toolchain: nightly-2022-03-08
           override: true
           components: rustfmt
-      - name: Install Node.js 14.x
+      - name: Install Node.js 16.x
         uses: actions/setup-node@v3
         with:
-          node-version: 14.x
+          node-version: 16.x
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "::set-output name=dir::$(yarn cache dir)"
@@ -35,11 +35,11 @@ jobs:
             node_modules
             rust/cubestore/node_modules
             packages/*/node_modules
-          key: ${{ runner.os }}-workspace-main-14.x-${{ hashFiles('**/yarn.lock') }}
+          key: ${{ runner.os }}-workspace-main-16.x-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-workspace-main-14.x-
+            ${{ runner.os }}-workspace-main-16.x-
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.5
+        run: yarn policies set-version v1.22.19
       - name: Copy yarn.lock file
         run: cp yarn.lock packages/cubejs-docker
       - name: Yarn install
@@ -76,7 +76,7 @@ jobs:
     name: Build native Linux ${{ matrix.node-version }} ${{ matrix.target }}
     strategy:
       matrix:
-        node-version: [14]
+        node-version: [16]
         target: ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"]
         include:
           - target: aarch64-unknown-linux-gnu
@@ -119,7 +119,7 @@ jobs:
       - name: Install Yarn
         run: npm install -g yarn
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.5
+        run: yarn policies set-version v1.22.19
       - name: Copy yarn.lock file
         run: cp yarn.lock packages/cubejs-docker
       - name: Yarn install
@@ -149,19 +149,23 @@ jobs:
 
   native:
     runs-on: ${{ matrix.os-version }}
-    timeout-minutes: 60
+    timeout-minutes: 90
     env:
       NODE_PRE_GYP_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     name: Build ${{ matrix.os-version }} ${{ matrix.node-version }}
     strategy:
       matrix:
-        node-version: [14.x]
+        node-version: [16.x]
         os-version: [windows-2019, macos-11]
       fail-fast: false
 
     steps:
       - name: Checkout
         uses: actions/checkout@v3
+      - name: Disable rustup update (issue workaround for Windows)
+        run: rustup set auto-self-update disable
+        if: contains(runner.os, 'windows')
+        shell: bash
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
@@ -200,7 +204,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.5
+        run: yarn policies set-version v1.22.19
       - name: Copy yarn.lock file
         run: cp yarn.lock packages/cubejs-docker
       - name: Yarn install
@@ -234,10 +238,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-20.04
+          - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
             platforms: linux/amd64,linux/arm64
-    timeout-minutes: 30
+    timeout-minutes: 90
     steps:
       - name: Check out the repo
         uses: actions/checkout@v3
@@ -279,7 +283,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
         with:
-          version: v0.9.1
+          version: v0.10.3
       - name: Copy yarn.lock file
         run: cp yarn.lock packages/cubejs-docker
       - name: Push to Docker Hub
@@ -299,6 +303,10 @@ jobs:
             org.opencontainers.image.created=${{ steps.prep.outputs.created }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.licenses=${{ fromJson(steps.repo.outputs.result).license.spdx_id }}
+          # Workaround for yarn v1, it uses aggressive timeouts with summing time spending on fs, https://github.com/yarnpkg/yarn/issues/4890
+          config-inline: |
+            [worker.oci]
+              max-parallelism = 1
           build-args: |
             IMAGE_VERSION=${{ steps.prep.outputs.version }}
 
@@ -601,11 +609,15 @@ jobs:
             cross: true
             # Unable to recognise the format of the input file `rust/cubestore/target/aarch64-unknown-linux-gnu/release/cubestored'
             strip: false
-            # UPX is broken, issue https://github.com/cube-js/cube.js/issues/4474
+            # UPX is broken, issue https://github.com/cube-js/cube/issues/4474
             compress: false
       fail-fast: false
     steps:
       - uses: actions/checkout@v3
+      - name: Disable rustup update (issue workaround for Windows)
+        run: rustup set auto-self-update disable
+        if: contains(runner.os, 'windows')
+        shell: bash
       - name: Setup Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
@@ -638,6 +650,10 @@ jobs:
           OPENSSL_LIB_DIR: 'C:/vcpkg/packages/openssl_x64-windows/lib'
           OPENSSL_INCLUDE_DIR: 'C:/vcpkg/packages/openssl_x64-windows/include'
           LIBCLANG_PATH: 'C:\Program Files\LLVM\bin'
+      # Hotfix before https://github.com/actions/runner-images/pull/7125 will be released/rolled on the productions servers
+      - name: Hotfix for macOS (pkg-config)
+        if: contains(runner.os, 'macos')
+        run: brew install pkg-config
       - name: Build with Cross
         if: ${{ matrix.cross }}
         run: |

@@ -27,6 +27,7 @@ use log::SetLoggerError;
 use parquet::errors::ParquetError;
 use serde_derive::{Deserialize, Serialize};
 use sqlparser::parser::ParserError;
+use std::any::Any;
 use std::backtrace::Backtrace;
 use std::fmt;
 use std::fmt::Display;
@@ -49,6 +50,7 @@ pub mod mysql;
 pub mod queryplanner;
 pub mod remotefs;
 pub mod scheduler;
+pub mod shared;
 pub mod sql;
 pub mod store;
 pub mod streaming;
@@ -155,6 +157,16 @@ impl CubeError {
             cause: CubeErrorCauseType::Internal,
         }
     }
+
+    pub fn from_panic_payload(payload: Box<dyn Any + Send>) -> Self {
+        if let Some(reason) = payload.downcast_ref::<&str>() {
+            CubeError::panic(format!("Reason: {}", reason))
+        } else if let Some(reason) = payload.downcast_ref::<String>() {
+            CubeError::panic(format!("Reason: {}", reason))
+        } else {
+            CubeError::panic("Without reason".to_string())
+        }
+    }
 }
 
 impl fmt::Display for CubeError {
@@ -175,6 +187,12 @@ impl From<flexbuffers::DeserializationError> for CubeError {
 impl From<rocksdb::Error> for CubeError {
     fn from(v: rocksdb::Error) -> Self {
         CubeError::from_error(v.into_string())
+    }
+}
+
+impl From<flatbuffers::InvalidFlatbuffer> for CubeError {
+    fn from(v: flatbuffers::InvalidFlatbuffer) -> Self {
+        CubeError::from_debug_error(v)
     }
 }
 

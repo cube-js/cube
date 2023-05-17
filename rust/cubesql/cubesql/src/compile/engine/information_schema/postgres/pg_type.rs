@@ -190,6 +190,7 @@ impl PgCatalogTypeProvider {
             builder.add_type(&PgType {
                 oid: table.record_oid,
                 typname: table.name.as_str(),
+                regtype: table.name.as_str(),
                 typnamespace: 2200,
                 typowner: 10,
                 typlen: -1,
@@ -215,6 +216,7 @@ impl PgCatalogTypeProvider {
             builder.add_type(&PgType {
                 oid: table.array_handler_oid,
                 typname: format!("_{}", table.name).as_str(),
+                regtype: format!("{}[]", table.name).as_str(),
                 typnamespace: 2200,
                 typowner: 10,
                 typlen: -1,

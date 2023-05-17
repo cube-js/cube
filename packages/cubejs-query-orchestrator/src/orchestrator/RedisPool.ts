@@ -41,7 +41,7 @@ export class RedisPool {
     const opts: PoolOptions = {
       min,
       max,
-      acquireTimeoutMillis: 5000,
+      acquireTimeoutMillis: getEnv('redisAcquireTimeout') || 5000,
       evictionRunIntervalMillis: 5000,
       // idleTimeoutSeconds and softIdleTimeoutSeconds should be deprecated in favour of options.poolOptions.idleTimeoutMillis
       idleTimeoutMillis: options.idleTimeoutSeconds ? options.idleTimeoutSeconds * 1000 : 5000,
@@ -81,7 +81,9 @@ export class RedisPool {
 
   public release(client: AsyncRedisClient) {
     if (this.pool) {
-      this.pool.release(client);
+      this.pool.release(client).catch(() => {
+        // nothing to do
+      });
     } else if (client) {
       client.quit();
     }

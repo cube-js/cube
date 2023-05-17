@@ -29,7 +29,7 @@ here][cube-blog-mongodb].
 
 Add the following to a `.env` file in your Cube project:
 
-```bash
+```dotenv
 CUBEJS_DB_TYPE=mongobi
 # The MongoBI connector host. If using on local machine, it should be either `localhost` or `127.0.0.1`:
 CUBEJS_DB_HOST=my.mongobi.host
@@ -63,10 +63,10 @@ file][mongobi-with-remote-db].
 
 ## Pre-Aggregation Feature Support
 
-### countDistinctApprox
+### count_distinct_approx
 
 Measures of type
-[`countDistinctApprox`][ref-schema-ref-types-formats-countdistinctapprox] can
+[`count_distinct_approx`][ref-schema-ref-types-formats-countdistinctapprox] can
 not be used in pre-aggregations when using MongoDB as a source database.
 
 ## Pre-Aggregation Build Strategies

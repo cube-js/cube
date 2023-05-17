@@ -26,7 +26,7 @@ describe('Transpilers', () => {
       await compiler.compile();
 
       throw new Error('Compile should thrown an error');
-    } catch (e) {
+    } catch (e: any) {
       expect(e.message).toMatch(/Duplicate property parsing test1 in main.js/);
     }
   });
@@ -55,5 +55,18 @@ describe('Transpilers', () => {
     await compiler.compile();
 
     expect(warnings[0]).toMatch(/Warning: USER_CONTEXT was deprecated in favor of SECURITY_CONTEXT. in main.js/);
+  });
+
+  it('CubePropContextTranspiler', async () => {
+    const { compiler } = prepareCompiler(`
+        let { securityContext } = COMPILE_CONTEXT;
+
+        cube(\`Test\`, {
+          sql_table: 'public.user_\${securityContext.tenantId}',
+          dimensions: {}
+        })
+    `);
+
+    await compiler.compile();
   });
 });

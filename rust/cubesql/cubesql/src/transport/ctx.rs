@@ -1,7 +1,7 @@
 use datafusion::{arrow::datatypes::DataType, logical_plan::Column};
 use std::ops::RangeFrom;
 
-use cubeclient::models::{V1CubeMeta, V1CubeMetaMeasure};
+use cubeclient::models::{V1CubeMeta, V1CubeMetaDimension, V1CubeMetaMeasure};
 
 use crate::sql::ColumnType;
 
@@ -126,6 +126,15 @@ impl MetaContext {
         let cube_and_member_name = name.split(".").collect::<Vec<_>>();
         if let Some(cube) = self.find_cube_with_name(cube_and_member_name[0]) {
             cube.lookup_measure(cube_and_member_name[1]).cloned()
+        } else {
+            None
+        }
+    }
+
+    pub fn find_dimension_with_name(&self, name: String) -> Option<V1CubeMetaDimension> {
+        let cube_and_member_name = name.split(".").collect::<Vec<_>>();
+        if let Some(cube) = self.find_cube_with_name(cube_and_member_name[0]) {
+            cube.lookup_dimension(cube_and_member_name[1]).cloned()
         } else {
             None
         }

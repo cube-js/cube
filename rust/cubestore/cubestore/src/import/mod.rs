@@ -41,6 +41,7 @@ use crate::util::decimal::Decimal;
 use crate::util::maybe_owned::MaybeOwnedStr;
 use crate::CubeError;
 use datafusion::cube_ext::ordfloat::OrdF64;
+use tokio::time::{sleep, Duration};
 
 pub mod limits;
 
@@ -66,25 +67,40 @@ impl ImportFormat {
     ) -> Result<Pin<Box<dyn Stream<Item = Result<Option<Row>, CubeError>> + Send + 'a>>, CubeError>
     {
         match self {
-            ImportFormat::CSV | ImportFormat::CSVNoHeader => {
+            ImportFormat::CSV | ImportFormat::CSVNoHeader | ImportFormat::CSVOptions { .. } => {
                 let lines_stream: Pin<Box<dyn Stream<Item = Result<String, CubeError>> + Send>> =
                     Box::pin(CsvLineStream::new(reader));
 
                 let mut header_mapping = match self {
-                    ImportFormat::CSV => None,
-                    ImportFormat::CSVNoHeader => Some(
+                    ImportFormat::CSVNoHeader
+                    | ImportFormat::CSVOptions {
+                        has_header: false, ..
+                    } => Some(
                         columns
                             .iter()
                             .enumerate()
                             .map(|(i, c)| (i, c.clone()))
                             .collect(),
                     ),
+                    _ => None,
                 };
+
+                let delimiter = match self {
+                    ImportFormat::CSV | ImportFormat::CSVNoHeader => ',',
+                    ImportFormat::CSVOptions { delimiter, .. } => delimiter.unwrap_or(','),
+                };
+
+                if delimiter as u16 > 255 {
+                    return Err(CubeError::user(format!(
+                        "Non ASCII delimiters are unsupported: '{}'",
+                        delimiter
+                    )));
+                }
 
                 let rows = lines_stream.map(move |line| -> Result<Option<Row>, CubeError> {
                     let str = line?;
 
-                    let mut parser = CsvLineParser::new(str.as_str());
+                    let mut parser = CsvLineParser::new(delimiter as u8, str.as_str());
 
                     if header_mapping.is_none() {
                         let mut mapping = Vec::new();
@@ -185,7 +201,9 @@ impl ImportFormat {
             }
             ColumnType::Timestamp => TableValue::Timestamp(timestamp_from_string(value)?),
             ColumnType::Float => TableValue::Float(OrdF64(value.parse::<f64>()?)),
-            ColumnType::Boolean => TableValue::Boolean(value.to_lowercase() == "true"),
+            ColumnType::Boolean => {
+                TableValue::Boolean(value.to_lowercase() == "true" || value.to_lowercase() == "t")
+            }
         })
     }
 }
@@ -254,13 +272,15 @@ fn parse_binary_data(value: &str) -> Result<Vec<u8>, CubeError> {
 }
 
 struct CsvLineParser<'a> {
+    delimiter: u8,
     line: &'a str,
     remaining: &'a str,
 }
 
 impl<'a> CsvLineParser<'a> {
-    fn new(line: &'a str) -> Self {
+    fn new(delimiter: u8, line: &'a str) -> Self {
         Self {
+            delimiter,
             line,
             remaining: line,
         }
@@ -305,7 +325,7 @@ impl<'a> CsvLineParser<'a> {
                     .remaining
                     .as_bytes()
                     .iter()
-                    .position(|c| *c == b',')
+                    .position(|c| *c == self.delimiter)
                     .unwrap_or(self.remaining.len());
                 let res = &self.remaining[0..next_comma];
                 self.remaining = self.remaining[next_comma..].as_ref();
@@ -315,8 +335,10 @@ impl<'a> CsvLineParser<'a> {
     }
 
     fn advance(&mut self) -> Result<(), CubeError> {
-        if let Some(b',') = self.remaining.as_bytes().iter().nth(0) {
-            self.remaining = self.remaining[1..].as_ref()
+        if let Some(c) = self.remaining.as_bytes().iter().nth(0) {
+            if *c == self.delimiter {
+                self.remaining = self.remaining[1..].as_ref()
+            }
         }
         Ok(())
     }
@@ -465,31 +487,13 @@ impl ImportServiceImpl {
         temp_dir: &Path,
     ) -> Result<(File, Option<TempPath>), CubeError> {
         if location.starts_with("http") {
-            let (file, path) = tempfile::Builder::new()
-                .prefix(&table_id.to_string())
-                .tempfile_in(temp_dir)
-                .map_err(|e| {
-                    CubeError::internal(format!(
-                        "Open tempfile in {}: {}",
-                        temp_dir.to_str().unwrap_or("<invalid>"),
-                        e
-                    ))
-                })?
-                .into_parts();
-            let mut file = File::from_std(file);
-            let mut stream = reqwest::get(location).await?.bytes_stream();
-            let mut size = 0;
-            while let Some(bytes) = stream.next().await {
-                let bytes = bytes?;
-                let slice = bytes.as_ref();
-                size += slice.len();
-                file.write_all(slice).await?;
-            }
+            let (file, size, path) = self
+                .download_http_location(location, table_id, temp_dir)
+                .await?;
             log::info!("Import downloaded {} ({} bytes)", location, size);
             self.meta_store
                 .update_location_download_size(table_id, location.to_string(), size as u64)
                 .await?;
-            file.seek(SeekFrom::Start(0)).await?;
             Ok((file, Some(path)))
         } else if location.starts_with("temp://") {
             let temp_file = self.download_temp_file(location).await?;
@@ -507,6 +511,74 @@ impl ImportServiceImpl {
                 None,
             ))
         }
+    }
+
+    async fn download_http_location(
+        &self,
+        location: &str,
+        table_id: u64,
+        temp_dir: &Path,
+    ) -> Result<(File, usize, TempPath), CubeError> {
+        let max_retries: i32 = 10;
+        let mut retry_attempts = max_retries;
+        let mut retries_sleep = Duration::from_millis(100);
+        let sleep_multiplier = 2;
+        loop {
+            retry_attempts -= 1;
+            let result = self
+                .try_download_http_location(location, table_id, temp_dir)
+                .await;
+
+            if retry_attempts <= 0 {
+                return result;
+            }
+            match result {
+                Ok(size) => {
+                    return Ok(size);
+                }
+                Err(err) => {
+                    log::error!(
+                        "Import {} download error: {}. Retrying {}/{}...",
+                        location,
+                        err,
+                        retry_attempts,
+                        max_retries
+                    );
+                    sleep(retries_sleep).await;
+                    retries_sleep *= sleep_multiplier;
+                }
+            }
+        }
+    }
+
+    async fn try_download_http_location(
+        &self,
+        location: &str,
+        table_id: u64,
+        temp_dir: &Path,
+    ) -> Result<(File, usize, TempPath), CubeError> {
+        let (file, path) = tempfile::Builder::new()
+            .prefix(&table_id.to_string())
+            .tempfile_in(temp_dir)
+            .map_err(|e| {
+                CubeError::internal(format!(
+                    "Open tempfile in {}: {}",
+                    temp_dir.to_str().unwrap_or("<invalid>"),
+                    e
+                ))
+            })?
+            .into_parts();
+        let mut file = File::from_std(file);
+        let mut stream = reqwest::get(location).await?.bytes_stream();
+        let mut size = 0;
+        while let Some(bytes) = stream.next().await {
+            let bytes = bytes?;
+            let slice = bytes.as_ref();
+            size += slice.len();
+            file.write_all(slice).await?;
+        }
+        file.seek(SeekFrom::Start(0)).await?;
+        Ok((file, size, path))
     }
 
     async fn download_temp_file(&self, location: &str) -> Result<File, CubeError> {
@@ -845,6 +917,56 @@ mod tests {
                 Row::new(vec![
                     TableValue::String("three".to_string()),
                     TableValue::Int(3)
+                ]),
+            ]
+        );
+    }
+    #[tokio::test]
+    async fn parse_bools() {
+        let data = "ff,gg,f,t,t\
+                    \nf1f1,g1g1,false,false,t\
+                    \nf2f2,g2g2,F,true,T\n";
+
+        let csv_reader = Box::pin(BufReader::new(data.as_bytes()));
+        let columns = vec![
+            Column::new("A".to_string(), ColumnType::String, 0),
+            Column::new("B".to_string(), ColumnType::String, 1),
+            Column::new("C".to_string(), ColumnType::Boolean, 2),
+            Column::new("D".to_string(), ColumnType::Boolean, 3),
+            Column::new("E".to_string(), ColumnType::Boolean, 4),
+        ];
+        let mut row_stream = ImportFormat::CSVNoHeader
+            .row_stream_from_reader(csv_reader, columns)
+            .unwrap();
+        let mut rows = vec![];
+        while let Some(row) = row_stream.next().await {
+            if let Some(row) = row.unwrap() {
+                rows.push(row)
+            }
+        }
+        assert_eq!(
+            rows,
+            vec![
+                Row::new(vec![
+                    TableValue::String("ff".to_string()),
+                    TableValue::String("gg".to_string()),
+                    TableValue::Boolean(false),
+                    TableValue::Boolean(true),
+                    TableValue::Boolean(true),
+                ]),
+                Row::new(vec![
+                    TableValue::String("f1f1".to_string()),
+                    TableValue::String("g1g1".to_string()),
+                    TableValue::Boolean(false),
+                    TableValue::Boolean(false),
+                    TableValue::Boolean(true),
+                ]),
+                Row::new(vec![
+                    TableValue::String("f2f2".to_string()),
+                    TableValue::String("g2g2".to_string()),
+                    TableValue::Boolean(false),
+                    TableValue::Boolean(true),
+                    TableValue::Boolean(true),
                 ]),
             ]
         );

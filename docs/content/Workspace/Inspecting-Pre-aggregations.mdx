@@ -1,0 +1,129 @@
+---
+title: Pre-aggregation inspection
+permalink: /cloud/inspecting-pre-aggregations
+category: Workspace
+menuOrder: 7
+---
+
+The Pre-Aggregations page in Cube Cloud allows you to inspect all
+[pre-aggregations][ref-caching-gs-preaggs] in your deployment at a glance. You
+can see which pre-aggregations are accelerating queries, if they are [being
+refreshed][ref-caching-using-preaggs-refresh], along with the last 24 hours of
+build history.
+
+<SuccessBox>
+
+Pre-Aggregations are available in Cube Cloud on
+[all tiers](https://cube.dev/pricing).
+
+</SuccessBox>
+
+<Screenshot src="https://ucarecdn.com/eb10de99-4ff6-4a9f-abd5-736971497583/" />
+
+## Exploring pre-aggregations
+
+You can switch between [pre-aggregations](#pre-aggregations) and
+[build history](#build-history) by switching between the&nbsp;
+&ZeroWidthSpace;<Btn>Pre-Aggregations</Btn> and <Btn>Build History</Btn> tabs.
+
+## Pre-aggregations
+
+The <Btn>Pre-Aggregations</Btn> tab shows a list of all configured
+[pre-aggregations][ref-caching-gs-preaggs] for the deployment, and is useful for
+quickly checking details such as when the last build occurred, how long the
+build took to complete, the total size of the pre-aggregated data, and how many
+partitions the data is split across. To see more information about a specific
+pre-aggregation, click on it.
+
+### <--{"id" : "Pre-aggregations"}--> Partitions
+
+The <Btn>Partitions</Btn> tab shows all partitions (as specified by
+[`partitionGranularity`][ref-model-ref-preaggs-partition-granularity]) of the
+pre-aggregation. In the example below, the pre-aggregation has a single
+partition:
+
+<Screenshot src="https://ucarecdn.com/d65d5910-3561-4101-9317-2c9f8366694e/" />
+
+Pre-aggregations with multiple partitions show a list of all partitions, which
+is helpful for checking pre-aggregation partition build times and sizes:
+
+<Screenshot src="https://ucarecdn.com/84c2989b-cbd1-469c-aca6-127fc97f074b/" />
+
+Ideally partitions should be of a similar size and build time. If a partition is
+taking significantly longer to build than others, it may be worth investigating
+why.
+
+If the pre-aggregation requires rebuilding (usually due to the underlying data
+changing in a significant way), clicking <Btn>Build All</Btn> rebuilds **all**
+partitions of the pre-aggregation:
+
+<Screenshot
+  highlight="inset(41% 1% 54% 91% round 10px)"
+  src="https://ucarecdn.com/d65d5910-3561-4101-9317-2c9f8366694e/"
+/>
+
+You can also choose to rebuild **specific** partitions by selecting them and
+then clicking the <Btn>Build Selected</Btn> button:
+
+<Screenshot
+  highlight="inset(52% 88% 0% 7% round 10px)"
+  src="https://ucarecdn.com/99c72537-51d4-44ce-8df1-ea1a9cc3feaf/"
+/>
+
+### <--{"id" : "Pre-aggregations"}--> Definition
+
+The <Btn>Definition</Btn> tab shows how the [pre-aggregation is defined in the
+data model][ref-model-ref-preaggs] without having to switch to the <Btn>Data
+Model</Btn> page:
+
+<Screenshot src="https://ucarecdn.com/4e8f203a-bd6b-4316-86ff-b742ccbc78a4/" />
+
+### <--{"id" : "Pre-aggregations"}--> Preview
+
+To see a sample of the data contained in the pre-aggregation, click the&nbsp;
+&ZeroWidthSpace;<Btn>Preview</Btn> tab:
+
+<Screenshot src="https://ucarecdn.com/7f5059bb-3bc9-492e-9c69-3b614f3feca5/" />
+
+This can be used to verify that the data within the pre-aggregation is being
+built correctly.
+
+### <--{"id" : "Pre-aggregations"}--> Used By
+
+The <Btn>Used By</Btn> tab shows recent queries that used this pre-aggregation
+for acceleration:
+
+<Screenshot src="https://ucarecdn.com/1dcef348-af33-434a-9ef7-7a4c5f30c26c/" />
+
+This is especially useful for checking that the pre-aggregation is being used as
+expected by queries sent to the deployment.
+
+### <--{"id" : "Pre-aggregations"}--> Indexes
+
+[Indexes][ref-model-ref-preaggs-index] significantly improve the performance of
+configured pre-aggregations. The <Btn>Indexes</Btn> tab displays any configured
+indexes for this pre-aggregation:
+
+<Screenshot src="https://ucarecdn.com/f7e306e2-4245-46b4-8785-3e7fc1be518e/" />
+
+## Build History
+
+The <Btn>Build History</Btn> tab shows the last 24 hours of build history for
+all pre-aggregations in the deployment. From here, you can see if a
+pre-aggregation build succeeded (or failed), how the build was triggered, when
+the build started, and how long it took to complete.
+
+<Screenshot src="https://ucarecdn.com/9a9f88fb-9977-4aed-a0a8-52494d1d8e6b/" />
+
+To see more information about a specific build, click on it:
+
+<Screenshot src="https://ucarecdn.com/2f2d4366-35a6-42be-aac6-f554d824f8d3/" />
+
+[ref-caching-gs-preaggs]: /caching/pre-aggregations/getting-started
+[ref-caching-using-preaggs-refresh]:
+  /caching/using-pre-aggregations#refresh-strategy
+[ref-model-ref-preaggs]: /schema/reference/pre-aggregations
+[ref-model-ref-preaggs-index]:
+  /schema/reference/pre-aggregations#parameters-indexes
+[ref-model-ref-preaggs-partition-granularity]:
+  /schema/reference/pre-aggregations#parameters-partition-granularity

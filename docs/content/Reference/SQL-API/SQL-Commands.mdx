@@ -1,0 +1,157 @@
+---
+title: SQL commands
+category: Reference
+subCategory: SQL API
+permalink: /backend/sql/reference/commands
+menuOrder: 3
+---
+
+<InfoBox>
+
+This page describes the difference in behaviour of SQL commands when using them
+within a Cube Query Rewrite. Outside a Cube Query Rewrite, the behaviour is the
+same as described in the [PostgreSQL documentation][pg-docs].
+
+</InfoBox>
+
+## SELECT
+
+### Synopsis
+
+```sql
+SELECT select_expr [, ...]
+  FROM from_item
+    CROSS JOIN join_item
+    ON join_criteria]*
+  [ WHERE where_condition ]
+  [ GROUP BY grouping_expression ]
+  [ HAVING having_expression ]
+  [ LIMIT number ] [ OFFSET number ];
+```
+
+### Description
+
+`SELECT` retrieves rows from a cube.
+
+The `FROM` clause specifies one or more source **cube tables** for the `SELECT`.
+Qualification conditions can be added (via `WHERE`) to restrict the returned
+rows to a small subset of the original dataset.
+
+### Example
+
+```sql
+SELECT COUNT(*), orders.status, users.city
+FROM orders
+  CROSS JOIN users
+WHERE city IN ('San Francisco', 'Los Angeles')
+GROUP BY orders.status, users.city
+HAVING status = 'shipped'
+LIMIT 1 OFFSET 1;
+```
+
+## EXPLAIN
+
+### Synopsis
+
+```sql
+EXPLAIN [ ANALYZE ] statement
+```
+
+### Description
+
+The `EXPLAIN` command displays the query execution plan that the Cube planner
+will generate for the supplied `statement`.
+
+The `ANALYZE` will execute `statement` and display actual runtime statistics,
+including the total elapsed time expended within each plan node and the total
+number of rows it actually returned.
+
+### Example
+
+```sql
+EXPLAIN WITH cte AS (
+  SELECT o.count as count, p.name as product_name, p.description as product_description
+  FROM orders o
+    CROSS JOIN products p
+)
+SELECT COUNT(*) FROM cte;
+   plan_type   |                                plan
+---------------+---------------------------------------------------------------------
+ logical_plan  | Projection: #COUNT(UInt8(1))                                       +
+               |   Aggregate: groupBy=[[]], aggr=[[COUNT(UInt8(1))]]                +
+               |     CubeScan: request={                                            +
+               |   "measures": [                                                    +
+               |     "orders.count"                                                 +
+               |   ],                                                               +
+               |   "dimensions": [                                                  +
+               |     "products.name",                                               +
+               |     "products.description"                                         +
+               |   ],                                                               +
+               |   "segments": []                                                   +
+               | }
+ physical_plan | ProjectionExec: expr=[COUNT(UInt8(1))@0 as COUNT(UInt8(1))]        +
+               |   HashAggregateExec: mode=Final, gby=[], aggr=[COUNT(UInt8(1))]    +
+               |     HashAggregateExec: mode=Partial, gby=[], aggr=[COUNT(UInt8(1))]+
+               |       CubeScanExecutionPlan                                        +
+               |
+(2 rows)
+```
+
+with `ANALYZE`:
+
+```sql
+EXPLAIN ANALYZE WITH cte AS (
+  SELECT o.count as count, p.name as product_name, p.description as product_description
+  FROM orders o
+    CROSS JOIN products p
+)
+SELECT COUNT(*) FROM cte;
+     plan_type     |                                                                                plan
+-------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Plan with Metrics | ProjectionExec: expr=[COUNT(UInt8(1))@0 as COUNT(UInt8(1))], metrics=[output_rows=1, elapsed_compute=541ns, spill_count=0, spilled_bytes=0, mem_used=0]           +
+                   |   HashAggregateExec: mode=Final, gby=[], aggr=[COUNT(UInt8(1))], metrics=[output_rows=1, elapsed_compute=6.583µs, spill_count=0, spilled_bytes=0, mem_used=0]     +
+                   |     HashAggregateExec: mode=Partial, gby=[], aggr=[COUNT(UInt8(1))], metrics=[output_rows=1, elapsed_compute=13.958µs, spill_count=0, spilled_bytes=0, mem_used=0]+
+                   |       CubeScanExecutionPlan, metrics=[]                                                                                                                           +
+                   |
+(1 row)
+```
+
+## SHOW
+
+### Synopsis
+
+```sql
+SHOW name
+SHOW ALL
+```
+
+### Description
+
+Returns the value of a runtime parameter using `name`, or all runtime parameters
+if `ALL` is specified.
+
+### Example
+
+```sql
+SHOW timezone;
+ setting
+---------
+ GMT
+(1 row)
+
+SHOW ALL;
+            name             |    setting     | description
+-----------------------------+----------------+-------------
+ max_index_keys              | 32             |
+ max_allowed_packet          | 67108864       |
+ timezone                    | GMT            |
+ client_min_messages         | NOTICE         |
+ standard_conforming_strings | on             |
+ extra_float_digits          | 1              |
+ transaction_isolation       | read committed |
+ application_name            | NULL           |
+ lc_collate                  | en_US.utf8     |
+(9 rows)
+```
+
+[pg-docs]: https://www.postgresql.org/docs/current/

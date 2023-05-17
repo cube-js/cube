@@ -1,0 +1,168 @@
+---
+title: Pricing
+permalink: /cloud/pricing
+category: Deployment
+subCategory: Cube Cloud
+menuOrder: 6
+---
+
+Cube Cloud pricing is based on consumption of compute power which we measure
+using Cube Compute Units. The units are priced based on which subscription plan
+you have chosen. Each plan has different features and functionality that you
+should review as you think about what is right for your business.
+
+<InfoBox heading="What's a Cube Compute Unit?">
+
+A **Cube Compute Unit** is a way to measure compute power used to run Cube Cloud
+infrastructure. The price of a compute unit is determined by the Cube Cloud plan
+you're subscribed to.
+
+</InfoBox>
+
+| Node Type                 | Compute Unit per hour |
+| ------------------------- | :-------------------: |
+| Cube Production Cluster   |          `4`          |
+| Cube Development Instance |          `1`          |
+| Cube Store Worker         |          `1`          |
+| Cube API Instance         |          `1`          |
+
+Cube Cloud has four subscription plans that you can review
+[here](https://cube.dev/pricing). The subscription plan you choose will
+determine the price per Cube Compute Unit (CCU). Each subscription plan
+determines the features, scalability, availability, as well as the speed and
+scope of support you may receive for your deployment.
+
+## Starter
+
+The Starter plan starts at a minimum of $99/month and targets low-scale
+production that is not business-critical.
+
+It offers a [Production Cluster][ref-cloud-deployment-prod-cluster], the ability
+to use third-party packages from the npm registry, AWS and GCP support in select
+regions, pre-aggregations of upto 150GB in size, [alerts][ref-cloud-alerts],
+auto-suspend controls and a 50,000 queries per day limit.
+
+### Support
+
+The Starter plan includes support via the community Slack channel and in-product
+chat support with three questions per week.
+
+| Priority | Response Time    |
+| -------- | ---------------- |
+| P0       | 8 business hours |
+| P1       | 8 business hours |
+| P2       | 8 business hours |
+| P3       | 2 business days  |
+
+## Premium
+
+The Premium plan starts at a minimum of $12,000/year, and is designed for basic
+small-scale production deployments.
+
+It offers everything in the [Starter plan](#starter) as well as Okta support for
+single sign-on, AWS and GCP support in all regions, and unlimited queries.
+
+### Support
+
+The Premium plan includes support via the community Slack channel and unlimited
+in-product chat support on weekdays. Cube Cloud provides a 99.95% uptime SLA for
+this plan.
+
+| Priority | Response Time    |
+| -------- | ---------------- |
+| P0       | 60 minutes       |
+| P1       | 4 hours          |
+| P2       | 8 business hours |
+| P3       | 2 business days  |
+
+## Enterprise
+
+The Enterprise plan starts at a minimum of $18,000/year, and is suitable for
+high-scale or mission-critical production deployments with more significant
+security and compliance needs.
+
+It offers everything in the [Premium plan](#premium) as well as SAML/LDAP
+support for single sign-on, Azure support for all regions, [VPC
+peering][ref-cloud-vpc-peering], [logs/metrics export][ref-cloud-log-export],
+and [role-based access control][ref-cloud-acl].
+
+### Support
+
+The Enterprise plan offers improved support response times as compared to the
+[Premium plan](#premium-support) with the addition of a dedicated CSM. Cube
+Cloud provides a 99.99% uptime SLA for this plan.
+
+| Priority | Response Time    |
+| -------- | ---------------- |
+| P0       | 30 minutes       |
+| P1       | 2 hours          |
+| P2       | 8 business hours |
+| P3       | 2 business days  |
+
+## Enterprise Premier
+
+The Enterprise Premium plan caters to high-scale, high-availability
+mission-critical production deployments with security and compliance needs.
+
+It offers everything in the [Enterprise plan](#enterprise) as well as enabling
+the use of [Production Multi-Clusters][ref-cloud-deployment-prod-multicluster],
+unlimited pre-aggregation sizes, support for kSQL/Elasticsearch and [custom
+domains][ref-cloud-custom-domains].
+
+### Support
+
+The Enterprise Premier plan includes the same
+[support plan as the Enterprise plan](#enterprise-support). Cube Cloud provides
+a 99.995% uptime SLA for this plan.
+
+| Priority | Response Time    |
+| -------- | ---------------- |
+| P0       | 30 minutes       |
+| P1       | 2 hours          |
+| P2       | 8 business hours |
+| P3       | 2 business days  |
+
+## Support Priority Definitions
+
+We prioritize support requests based on their severity, as follows:
+
+- **P0**: The platform is severely impacted or completely shut down. We will
+  assign specialists to work continuously to fix the issue, provide ongoing
+  updates, and start working on a temporary workaround or fix.
+
+- **P1**: The platform is functioning with limited capabilities or facing
+  critical issues preventing a production deployment. We will assign specialists
+  to fix the issue, provide ongoing updates, and start working on a temporary
+  workaround or fix.
+
+- **P2**: There are issues with workaround solutions or non-critical functions.
+  We will use resources during local business hours until the issue is resolved
+  or a workaround is in place.
+
+- **P3**: There is a need for clarification in the documentation, or a
+  suggestion for product enhancement. We will triage the request, provide
+  clarification when possible, and may include a resolution in a future update.
+
+## Payment Terms
+
+Future purchases and upgrades are subject to the pricing that is in effect at
+the time of the order. Payments are non-refundable. If your usage of resources
+exceeds the balance of CCUs in your account, services may degrade or be
+suspended until new CCUs are purchased. You may upgrade your CCUs to a
+higher-level subscription plan at any time by paying the difference in per-Cube
+Compute Unit pricing, or by asking to convert the price paid for the remaining
+CCUs into CCUs for the higher subscription plan at the CCU pricing for that plan
+(resulting in a lower number of available CCUs but upgraded to the higher
+subscription plan). Future purchases and upgrades are subject to the pricing
+that is in effect at the time of the order. No credit is allowed for downgrading
+CCUs to a lower subscription plan level.
+
+[ref-cloud-deployment-prod-cluster]:
+  /cloud/configuration/deployment-types#production-cluster
+[ref-cloud-alerts]: /cloud/workspace/alerts
+[ref-cloud-log-export]: /cloud/workspace/logs
+[ref-cloud-acl]: /cloud/access-control/
+[ref-cloud-deployment-prod-multicluster]:
+  /cloud/configuration/deployment-types#production-multi-cluster
+[ref-cloud-custom-domains]: /cloud/configuration/custom-domains
+[ref-cloud-vpc-peering]: /cloud/configuration/connecting-with-a-vpc

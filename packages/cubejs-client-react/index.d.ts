@@ -1,8 +1,8 @@
 /**
  * @title @cubejs-client/react
  * @permalink /@cubejs-client-react
- * @menuCategory Frontend Integrations
- * @subcategory Reference
+ * @menuCategory Reference
+ * @subcategory Frontend
  * @menuOrder 3
  * @description `@cubejs-client/react` provides React Components for easy Cube.js integration in a React app.
  */
@@ -330,6 +330,8 @@ declare module '@cubejs-client/react' {
 
   // todo: CubeMember
   export type AvailableCube<T = any> = {
+    type: 'cube' | 'view';
+    public: boolean;
     cubeName: string;
     cubeTitle: string;
     members: T[];

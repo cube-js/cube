@@ -4,4 +4,7 @@ module.exports = {
       externalRefresh: false,
     },
   },
+  contextToApiScopes: async () => new Promise((resolve) => {
+    resolve(['liveliness', 'graphql', 'meta', 'data', 'jobs']);
+  }),
 };

@@ -1,3 +1,4 @@
+use crate::app_metrics;
 use crate::di_service;
 use crate::remotefs::{LocalDirRemoteFs, RemoteFile, RemoteFs};
 use crate::util::lock::acquire_lock;
@@ -138,6 +139,14 @@ impl RemoteFs for S3RemoteFs {
         remote_path: &str,
     ) -> Result<u64, CubeError> {
         {
+            app_metrics::REMOTE_FS_OPERATION_CORE.add_with_tags(
+                1,
+                Some(&vec![
+                    "operation:upload_file".to_string(),
+                    "driver:s3".to_string(),
+                ]),
+            );
+
             let time = SystemTime::now();
             debug!("Uploading {}", remote_path);
             let path = self.s3_path(remote_path);
@@ -188,6 +197,13 @@ impl RemoteFs for S3RemoteFs {
 
         fs::create_dir_all(&downloads_dir).await?;
         if !local_file.exists() {
+            app_metrics::REMOTE_FS_OPERATION_CORE.add_with_tags(
+                1,
+                Some(&vec![
+                    "operation:download_file".to_string(),
+                    "driver:s3".to_string(),
+                ]),
+            );
             let time = SystemTime::now();
             debug!("Downloading {}", remote_path);
             let path = self.s3_path(remote_path);
@@ -216,6 +232,13 @@ impl RemoteFs for S3RemoteFs {
     }
 
     async fn delete_file(&self, remote_path: &str) -> Result<(), CubeError> {
+        app_metrics::REMOTE_FS_OPERATION_CORE.add_with_tags(
+            1,
+            Some(&vec![
+                "operation:delete_file".to_string(),
+                "driver:s3".to_string(),
+            ]),
+        );
         let time = SystemTime::now();
         debug!("Deleting {}", remote_path);
         let path = self.s3_path(remote_path);
@@ -254,6 +277,14 @@ impl RemoteFs for S3RemoteFs {
         let path = self.s3_path(remote_prefix);
         let bucket = self.bucket.read().unwrap().clone();
         let list = cube_ext::spawn_blocking(move || bucket.list_blocking(path, None)).await??;
+        let pages_count = list.len();
+        app_metrics::REMOTE_FS_OPERATION_CORE.add_with_tags(
+            pages_count as i64,
+            Some(&vec!["operation:list".to_string(), "driver:s3".to_string()]),
+        );
+        if pages_count > 100 {
+            log::warn!("S3 list returned more than 100 pages: {}", pages_count);
+        }
         let leading_slash = Regex::new(format!("^{}", self.s3_path("")).as_str()).unwrap();
         let result = list
             .iter()

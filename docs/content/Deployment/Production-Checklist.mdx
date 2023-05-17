@@ -1,5 +1,5 @@
 ---
-title: Production Checklist
+title: Production checklist
 permalink: /deployment/production-checklist
 category: Deployment
 menuOrder: 2
@@ -30,7 +30,7 @@ Development mode is disabled by default.
 
 </InfoBox>
 
-```bash
+```dotenv
 # Set this to false or leave unset to disable development mode
 CUBEJS_DEV_MODE=false
 ```
@@ -42,15 +42,24 @@ background, we recommend running a separate Cube Refresh Worker instance. This
 allows your Cube API Instance to continue to serve requests with high
 availability.
 
-```bash
+```dotenv
 # Set to true so a Cube instance acts as a refresh worker
 CUBEJS_REFRESH_WORKER=true
 ```
 
 ## Set up Cube Store
 
-Cube Store is the purpose-built pre-aggregations storage for Cube. Follow the
-[instructions here][ref-caching-cubestore] to set it up.
+<WarningBox>
+
+While Cube can operate with in-memory cache and queue storage, there're multiple
+parts of Cube which require Cube Store in production mode. Replicating Cube
+instances without Cube Store can lead to source database degraded performance,
+various race conditions and cached data inconsistencies.
+
+</WarningBox>
+
+Cube Store manages in-memory cache, queue and pre-aggregations for Cube. Follow
+the [instructions here][ref-caching-cubestore] to set it up.
 
 Depending on your database, Cube may need to "stage" pre-aggregations inside
 your database first before ingesting them into Cube Store. In this case, Cube
@@ -69,78 +78,6 @@ configured database][ref-config-connect-db] to set it up.
 
 </InfoBox>
 
-## Set up Redis
-
-<WarningBox>
-
-Cube Store [will replace Redis][replace-redis] for in-memory cache and queue
-management in late 2022.
-
-</WarningBox>
-
-Cube requires [Redis](https://redis.io/), an in-memory data structure store, to
-run in production.
-
-It uses Redis for query caching and queue. Set the
-[`CUBEJS_REDIS_URL`][ref-conf-ref-env-redis-url] environment variable to allow
-Cube to connect to Redis. If your Redis instance also has a password, please set
-it via the [`CUBEJS_REDIS_PASSWORD`][ref-conf-ref-env-redis-pass] environment
-variable. Set the [`CUBEJS_REDIS_TLS`][ref-conf-ref-env-redis-tls] environment
-variable to `true` if you want to enable SSL-secured connections. Ensure your
-Redis cluster allows at least 15 concurrent connections.
-
-### <--{"id" : "Set up Redis"}--> Redis Sentinel
-
-Redis provides functionality for high availability through [Redis
-Sentinel][link-redis-sentinel].
-
-For Redis Sentinel support, the npm package [`ioredis`][gh-ioredis] needs to be
-used instead of[`redis`][gh-node-redis]. This is done by setting the
-[`CUBEJS_REDIS_USE_IOREDIS`][ref-conf-ref-env-redis-ioredis] environment
-variable to `true`. Then set [`CUBEJS_REDIS_URL`][ref-conf-ref-env-redis-url] to
-the `redis+sentinel://localhost:26379,otherhost:26479/mymaster/5` to allow Cube
-to connect to the Redis Sentinel.
-
-<WarningBox>
-
-Cube server instances used by same tenant environments should have same Redis
-instances. Otherwise they will have different query queues which can lead to
-incorrect pre-aggregation states and intermittent data access errors.
-
-</WarningBox>
-
-### <--{"id" : "Set up Redis"}--> Redis Pool
-
-If [`CUBEJS_REDIS_URL`][ref-conf-ref-env-redis-url] is provided, Cube will
-create a Redis connection pool with a minimum of `2` and maximum of `1000`
-concurrent connections, by default. The
-[`CUBEJS_REDIS_POOL_MIN`][ref-conf-ref-env-redis-poolmin] and
-[`CUBEJS_REDIS_POOL_MAX`][ref-conf-ref-env-redis-poolmax] environment variables
-can be used to tweak pool size limits. To disable connection pooling, and
-instead create connections on-demand, you can set
-[`CUBEJS_REDIS_POOL_MAX`][`cubejs_redis_pool_max`] to `0`.
-
-If your maximum concurrent connections limit is too low, you may see
-`TimeoutError: ResourceRequest timed out` errors. As a rule of a thumb, you need
-to have `Queue Size * Number of tenants` concurrent connections to ensure the
-best performance possible. If you use clustered deployments, please make sure
-you have enough connections for all Cube server instances. A lower number of
-connections still can work, however Redis becomes a performance bottleneck in
-this case.
-
-### <--{"id" : "Set up Redis"}--> Running without Redis
-
-If you want to run Cube in production without Redis, you can use
-[`CUBEJS_CACHE_AND_QUEUE_DRIVER`][ref-conf-ref-env-cachequeue-driver]
-environment variable to `memory`.
-
-<WarningBox>
-
-Serverless and clustered deployments can't be run without Redis as it is used to
-manage the query queue.
-
-</WarningBox>
-
 ## Secure the deployment
 
 If you're using JWTs, you can configure Cube to correctly decode them and inject
@@ -158,10 +95,50 @@ monitoring service of choice to use the [`/readyz`][ref-api-readyz] and
 [`/livez`][ref-api-livez] API endpoints so you can check on the Cube
 deployment's health and be alerted to any issues.
 
+## Appropriate cluster sizing
+
+There's no one-size-fits-all when it comes to sizing a Cube cluster and its
+resources. Resources required by Cube significantly depend on the amount of
+traffic Cube needs to serve and the amount of data it needs to process. The
+following sizing estimates are based on default settings and are very generic,
+which may not fit your Cube use case, so you should always tweak resources based
+on consumption patterns you see.
+
+### <--{"id" : "Appropriate cluster sizing"}--> Memory and CPU
+
+Each Cube cluster should contain at least 2 Cube API instances. Every Cube API
+instance should have at least 3GB of RAM and 2 CPU cores allocated for it.
+
+Refresh workers tend to be much more CPU and memory intensive, so at least 6GB
+of RAM is recommended. Please note that to take advantage of all available RAM,
+the Node.js heap size should be adjusted accordingly by using the
+[`--max-old-space-size` option][node-heap-size]:
+
+```sh
+NODE_OPTIONS="--max-old-space-size=6144"
+```
+
+[node-heap-size]:
+  https://nodejs.org/api/cli.html#--max-old-space-sizesize-in-megabytes
+
+The Cube Store router node should have at least 6GB of RAM and 4 CPU cores
+allocated for it. Every Cube Store worker node should have at least 8GB of RAM
+and 4 CPU cores allocated for it. The Cube Store cluster should have at least
+two worker nodes.
+
+### <--{"id" : "Appropriate cluster sizing"}--> RPS and data volume
+
+Depending on data model size, every Core Cube API instance can serve 1 to 10
+requests per second. Every Core Cube Store router node can serve 50-100 queries
+per second. As a rule of thumb, you should provision 1 Cube Store worker node
+per one Cube Store partition or 1M of rows scanned in a query. For example if
+your queries scan 16M of rows per query, you should have at least 16 Cube Store
+worker nodes provisioned. `EXPLAIN ANALYZE` can be used to see partitions
+involved in a Cube Store query. Cube Cloud ballpark performance numbers can
+differ as it has different Cube runtime.
+
 [blog-migrate-to-cube-cloud]:
   https://cube.dev/blog/migrating-from-self-hosted-to-cube-cloud/
-[gh-ioredis]: https://github.com/luin/ioredis
-[gh-node-redis]: https://github.com/NodeRedis/node-redis
 [link-caddy]: https://caddyserver.com/
 [link-cube-cloud]: https://cubecloud.dev
 [link-cubejs-dev-vs-prod]: /configuration/overview#development-mode
@@ -170,23 +147,12 @@ deployment's health and be alerted to any issues.
 [link-kong]: https://konghq.com/kong/
 [link-nginx]: https://www.nginx.com/
 [link-nginx-docs]: https://nginx.org/en/docs/http/configuring_https_servers.html
-[link-redis-sentinel]: https://redis.io/topics/sentinel
 [ref-config-connect-db]: /connecting-to-the-database
 [ref-caching-cubestore]: /caching/running-in-production
 [ref-conf-ref-env-cachequeue-driver]:
   /reference/environment-variables#cubejs-cache-and-queue-driver
 [ref-conf-ref-env-preaggs-schema]:
   /reference/environment-variables#cubejs-pre-aggregations-schema
-[ref-conf-ref-env-redis-ioredis]:
-  /reference/environment-variables#cubejs-redis-use-ioredis
-[ref-conf-ref-env-redis-pass]:
-  /reference/environment-variables#cubejs-redis-password
-[ref-conf-ref-env-redis-poolmax]:
-  /reference/environment-variables#cubejs-redis-pool-max
-[ref-conf-ref-env-redis-poolmin]:
-  /reference/environment-variables#cubejs-redis-pool-min
-[ref-conf-ref-env-redis-tls]: /reference/environment-variables#cubejs-redis-tls
-[ref-conf-ref-env-redis-url]: /reference/environment-variables#cubejs-redis-url
 [ref-env-vars]: /reference/environment-variables
 [ref-schema-ref-preaggs]: /schema/reference/pre-aggregations
 [ref-api-scheduled-refresh]: /rest-api#v-1-run-scheduled-refresh
@@ -194,4 +160,3 @@ deployment's health and be alerted to any issues.
 [ref-config-jwt]: /config#jwt
 [ref-api-readyz]: /rest-api#readyz
 [ref-api-livez]: /rest-api#livez
-[replace-redis]: https://cube.dev/blog/replacing-redis-with-cube-store

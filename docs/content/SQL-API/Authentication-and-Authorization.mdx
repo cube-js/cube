@@ -2,7 +2,7 @@
 title: Authentication and Authorization
 category: SQL API
 permalink: /backend/sql/security
-menuOrder: 3
+menuOrder: 2
 ---
 
 Cube can be configured with dynamic username & password verification system by
@@ -16,22 +16,28 @@ user will be authenticated with provided security context.
 ```javascript
 module.exports = {
   checkSqlAuth: async (req, username) => {
-    if (username === 'fooUser') {
+    if (username === "fooUser") {
       return {
-        password: 'mypassword',
+        password: "mypassword",
         securityContext: {},
       };
     }
 
-    throw new Error('Incorrect user name or password');
+    throw new Error("Incorrect user name or password");
   },
 };
 ```
 
+As Cube expects passwords to be provided by `checkSqlAuth` implementation best
+practice is to use a generated password here instead of an actual user password.
+Generated passwords can be implemented as an HMAC of the user name or requested
+from some service that provides the mapping of the user name to passwords for
+additional security.
+
 ## Security Context (Row-Level Security)
 
-Cube's SQL API can also use the Security Context for [Dynamic Schema
-Creation][ref-dynamic-schemas] or [`queryRewrite`][ref-config-queryrewrite]
+Cube's SQL API can also use the Security Context for [Dynamic data model
+creation][ref-dynamic-schemas] or [`queryRewrite`][ref-config-queryrewrite]
 property in your [`cube.js` configuration file][ref-config-js].
 
 By default, the SQL API uses the current user's Security Context, but this
@@ -40,7 +46,7 @@ this, we must first define which user is allowed to change Security Context:
 
 First, you need to define what user is allowed to change security context:
 
-```
+```dotenv
 CUBEJS_SQL_SUPER_USER=admin
 ```
 
@@ -51,7 +57,7 @@ file][ref-config-js].
 You can change security context for specific query via virtual filter on:
 
 ```sql
-SELECT * FROM Orders WHERE __user = 'anotheruser';
+SELECT * FROM orders WHERE __user = 'anotheruser';
 ```
 
 [ref-config-check-sql-auth]: /config#check-sql-auth

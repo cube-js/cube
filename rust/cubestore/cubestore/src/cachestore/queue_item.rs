@@ -1,5 +1,6 @@
 use crate::metastore::{
-    BaseRocksTable, IndexId, RocksEntity, RocksSecondaryIndex, RocksTable, TableId, TableInfo,
+    BaseRocksTable, IdRow, IndexId, RocksEntity, RocksSecondaryIndex, RocksTable, TableId,
+    TableInfo,
 };
 use crate::table::{Row, TableValue};
 use crate::{base_rocks_secondary_index, rocks_table_new, CubeError};
@@ -8,6 +9,7 @@ use chrono::{DateTime, Duration, Utc};
 use rocksdb::WriteBatch;
 use std::cmp::Ordering;
 
+use crate::cachestore::QueueKey;
 use serde::{Deserialize, Deserializer, Serialize};
 
 fn merge(a: serde_json::Value, b: serde_json::Value) -> Option<serde_json::Value> {
@@ -33,11 +35,12 @@ fn merge(a: serde_json::Value, b: serde_json::Value) -> Option<serde_json::Value
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
 pub enum QueueResultAckEventResult {
     Empty,
-    WithResult { row_id: u64, result: String },
+    WithResult { result: String },
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
 pub struct QueueResultAckEvent {
+    pub id: u64,
     pub path: String,
     pub result: QueueResultAckEventResult,
 }
@@ -63,7 +66,7 @@ impl ToString for QueueItemStatus {
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
 pub struct QueueItem {
     prefix: Option<String>,
-    key: String,
+    pub(crate) key: String,
     // Immutable field
     value: String,
     extra: Option<String>,
@@ -102,6 +105,15 @@ impl PartialOrd for QueueItem {
 }
 
 impl QueueItem {
+    pub fn parse_path(path: String) -> (Option<String>, String) {
+        let parts: Vec<&str> = path.rsplitn(2, ":").collect();
+
+        match parts.len() {
+            2 => (Some(parts[1].to_string()), parts[0].to_string()),
+            _ => (None, path),
+        }
+    }
+
     pub fn new(
         path: String,
         value: String,
@@ -109,13 +121,7 @@ impl QueueItem {
         priority: i64,
         orphaned: Option<u32>,
     ) -> Self {
-        let parts: Vec<&str> = path.rsplitn(2, ":").collect();
-
-        let (prefix, key) = match parts.len() {
-            2 => (Some(parts[1].to_string()), parts[0].to_string()),
-            _ => (None, path),
-        };
-
+        let (prefix, key) = QueueItem::parse_path(path);
         let created = Utc::now();
 
         QueueItem {
@@ -262,6 +268,74 @@ impl QueueItem {
     }
 }
 
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
+pub enum QueueRetrieveResponse {
+    Success {
+        id: u64,
+        item: QueueItem,
+        pending: u64,
+        active: Vec<String>,
+    },
+    LockFailed {
+        pending: u64,
+        active: Vec<String>,
+    },
+    NotEnoughConcurrency {
+        pending: u64,
+        active: Vec<String>,
+    },
+    NotFound {
+        pending: u64,
+        active: Vec<String>,
+    },
+}
+
+impl QueueRetrieveResponse {
+    pub fn into_queue_retrieve_rows(self, extended: bool) -> Vec<Row> {
+        match self {
+            QueueRetrieveResponse::Success {
+                id,
+                item,
+                pending,
+                active,
+            } => vec![Row::new(vec![
+                TableValue::String(item.value),
+                if let Some(extra) = item.extra {
+                    TableValue::String(extra)
+                } else {
+                    TableValue::Null
+                },
+                TableValue::Int(pending as i64),
+                if active.len() > 0 {
+                    TableValue::String(active.join(","))
+                } else {
+                    TableValue::Null
+                },
+                TableValue::String(id.to_string()),
+            ])],
+            QueueRetrieveResponse::LockFailed { pending, active }
+            | QueueRetrieveResponse::NotEnoughConcurrency { pending, active }
+            | QueueRetrieveResponse::NotFound { pending, active } => {
+                if extended {
+                    vec![Row::new(vec![
+                        TableValue::Null,
+                        TableValue::Null,
+                        TableValue::Int(pending as i64),
+                        if active.len() > 0 {
+                            TableValue::String(active.join(","))
+                        } else {
+                            TableValue::Null
+                        },
+                        TableValue::Null,
+                    ])]
+                } else {
+                    vec![]
+                }
+            }
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum QueueItemRocksIndex {
     ByPath = 1,
@@ -277,9 +351,27 @@ impl<'a> QueueItemRocksTable<'a> {
     pub fn new(db: crate::metastore::DbTableRef<'a>) -> Self {
         Self { db }
     }
+
+    pub fn get_row_by_key(&self, key: QueueKey) -> Result<Option<IdRow<QueueItem>>, CubeError> {
+        match key {
+            QueueKey::ByPath(path) => {
+                let index_key = QueueItemIndexKey::ByPath(path.clone());
+                self.get_single_opt_row_by_index(&index_key, &QueueItemRocksIndex::ByPath)
+            }
+            QueueKey::ById(id) => self.get_row(id.clone()),
+        }
+    }
 }
 
 impl<'a> BaseRocksTable for QueueItemRocksTable<'a> {
+    fn enable_delete_event(&self) -> bool {
+        false
+    }
+
+    fn enable_update_event(&self) -> bool {
+        false
+    }
+
     fn migrate_table(
         &self,
         batch: &mut WriteBatch,

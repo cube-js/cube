@@ -35,6 +35,7 @@ use datafusion::{
 use itertools::izip;
 use pg_srv::{PgType, PgTypeId};
 use regex::Regex;
+use sha1_smol::Sha1;
 
 use crate::{
     compile::engine::df::{
@@ -379,22 +380,62 @@ pub fn create_ucase_udf() -> ScalarUDF {
 
 pub fn create_isnull_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
-        assert!(args.len() == 1);
+        let result = match args.len() {
+            1 => {
+                let len = args[0].len();
+                let mut builder = BooleanBuilder::new(len);
+                for i in 0..len {
+                    builder.append_value(args[0].is_null(i))?;
+                }
 
-        let len = args[0].len();
-        let mut builder = BooleanBuilder::new(len);
-        for i in 0..len {
-            builder.append_value(args[0].is_null(i))?;
-        }
+                Arc::new(builder.finish()) as ArrayRef
+            }
+            2 => {
+                if args[0].data_type() != &DataType::Utf8 || args[1].data_type() != &DataType::Utf8
+                {
+                    return Err(DataFusionError::Internal(format!(
+                        "isnull with 2 arguments supports only (Utf8, Utf8), actual: ({}, {})",
+                        args[0].data_type(),
+                        args[1].data_type(),
+                    )));
+                }
 
-        Ok(Arc::new(builder.finish()) as ArrayRef)
+                let exprs = downcast_string_arg!(&args[0], "expr", i32);
+                let replacements = downcast_string_arg!(&args[1], "replacement", i32);
+
+                let result = exprs
+                    .iter()
+                    .zip(replacements.iter())
+                    .map(|(expr, replacement)| if expr.is_some() { expr } else { replacement })
+                    .collect::<StringArray>();
+
+                Arc::new(result)
+            }
+            _ => {
+                return Err(DataFusionError::Internal(format!(
+                    "isnull accepts 1 or 2 arguments, actual: {}",
+                    args.len(),
+                )))
+            }
+        };
+        Ok(result)
     });
 
-    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Boolean)));
+    let return_type: ReturnTypeFunction = Arc::new(move |types| match types.len() {
+        1 => Ok(Arc::new(DataType::Boolean)),
+        2 => Ok(Arc::new(types[0].clone())),
+        _ => Err(DataFusionError::Internal(format!(
+            "isnull accepts 1 or 2 arguments, actual: {}",
+            types.len(),
+        ))),
+    });
 
     ScalarUDF::new(
         "isnull",
-        &Signature::any(1, Volatility::Immutable),
+        &Signature::one_of(
+            vec![TypeSignature::Any(1), TypeSignature::Any(2)],
+            Volatility::Immutable,
+        ),
         &return_type,
         &fun,
     )
@@ -1608,15 +1649,15 @@ pub fn create_format_type_udf() -> ScalarUDF {
                 (Some(oid), typemod) => Some(match PgTypeId::from_oid(oid) {
                     Some(type_id) => {
                         let typemod_str = || match type_id {
-                            PgTypeId::BPCHAR | PgTypeId::VARCHAR => match typemod {
+                            PgTypeId::BPCHAR
+                            | PgTypeId::VARCHAR
+                            | PgTypeId::ARRAYBPCHAR
+                            | PgTypeId::ARRAYVARCHAR => match typemod {
                                 Some(typemod) if typemod >= 5 => format!("({})", typemod - 4),
                                 _ => "".to_string(),
                             },
-                            PgTypeId::NUMERIC => match typemod {
+                            PgTypeId::NUMERIC | PgTypeId::ARRAYNUMERIC => match typemod {
                                 Some(typemod) if typemod >= 4 => format!("(0,{})", typemod - 4),
-                                Some(typemod) if typemod >= 0 => {
-                                    format!("(65535,{})", 65532 + typemod)
-                                }
                                 _ => "".to_string(),
                             },
                             _ => match typemod {
@@ -1637,20 +1678,30 @@ pub fn create_format_type_udf() -> ScalarUDF {
                             PgTypeId::OID => format!("oid{}", typemod_str()),
                             PgTypeId::TID => format!("tid{}", typemod_str()),
                             PgTypeId::PGCLASS => format!("pg_class{}", typemod_str()),
+                            PgTypeId::ARRAYPGCLASS => format!("pg_class{}[]", typemod_str()),
                             PgTypeId::FLOAT4 => "real".to_string(),
                             PgTypeId::FLOAT8 => "double precision".to_string(),
                             PgTypeId::MONEY => format!("money{}", typemod_str()),
+                            PgTypeId::ARRAYMONEY => format!("money{}[]", typemod_str()),
                             PgTypeId::INET => format!("inet{}", typemod_str()),
                             PgTypeId::ARRAYBOOL => "boolean[]".to_string(),
                             PgTypeId::ARRAYBYTEA => format!("bytea{}[]", typemod_str()),
+                            PgTypeId::ARRAYNAME => format!("name{}[]", typemod_str()),
                             PgTypeId::ARRAYINT2 => "smallint[]".to_string(),
                             PgTypeId::ARRAYINT4 => "integer[]".to_string(),
                             PgTypeId::ARRAYTEXT => format!("text{}[]", typemod_str()),
+                            PgTypeId::ARRAYTID => format!("tid{}[]", typemod_str()),
+                            PgTypeId::ARRAYBPCHAR => format!("character{}[]", typemod_str()),
+                            PgTypeId::ARRAYVARCHAR => {
+                                format!("character varying{}[]", typemod_str())
+                            }
                             PgTypeId::ARRAYINT8 => "bigint[]".to_string(),
                             PgTypeId::ARRAYFLOAT4 => "real[]".to_string(),
                             PgTypeId::ARRAYFLOAT8 => "double precision[]".to_string(),
+                            PgTypeId::ARRAYOID => format!("oid{}[]", typemod_str()),
                             PgTypeId::ACLITEM => format!("aclitem{}", typemod_str()),
                             PgTypeId::ARRAYACLITEM => format!("aclitem{}[]", typemod_str()),
+                            PgTypeId::ARRAYINET => format!("inet{}[]", typemod_str()),
                             PgTypeId::BPCHAR => match typemod {
                                 Some(typemod) if typemod < 0 => "bpchar".to_string(),
                                 _ => format!("character{}", typemod_str()),
@@ -1661,38 +1712,83 @@ pub fn create_format_type_udf() -> ScalarUDF {
                             PgTypeId::TIMESTAMP => {
                                 format!("timestamp{} without time zone", typemod_str())
                             }
+                            PgTypeId::ARRAYTIMESTAMP => {
+                                format!("timestamp{} without time zone[]", typemod_str())
+                            }
+                            PgTypeId::ARRAYDATE => format!("date{}[]", typemod_str()),
+                            PgTypeId::ARRAYTIME => {
+                                format!("time{} without time zone[]", typemod_str())
+                            }
                             PgTypeId::TIMESTAMPTZ => {
                                 format!("timestamp{} with time zone", typemod_str())
+                            }
+                            PgTypeId::ARRAYTIMESTAMPTZ => {
+                                format!("timestamp{} with time zone[]", typemod_str())
                             }
                             PgTypeId::INTERVAL => match typemod {
                                 Some(typemod) if typemod >= 0 => "-".to_string(),
                                 _ => "interval".to_string(),
                             },
+                            PgTypeId::ARRAYINTERVAL => match typemod {
+                                Some(typemod) if typemod >= 0 => "-".to_string(),
+                                _ => "interval[]".to_string(),
+                            },
+                            PgTypeId::ARRAYNUMERIC => format!("numeric{}[]", typemod_str()),
                             PgTypeId::TIMETZ => format!("time{} with time zone", typemod_str()),
+                            PgTypeId::ARRAYTIMETZ => {
+                                format!("time{} with time zone[]", typemod_str())
+                            }
                             PgTypeId::NUMERIC => format!("numeric{}", typemod_str()),
                             PgTypeId::RECORD => format!("record{}", typemod_str()),
                             PgTypeId::ANYARRAY => format!("anyarray{}", typemod_str()),
                             PgTypeId::ANYELEMENT => format!("anyelement{}", typemod_str()),
+                            PgTypeId::ARRAYRECORD => format!("record{}[]", typemod_str()),
                             PgTypeId::PGLSN => format!("pg_lsn{}", typemod_str()),
+                            PgTypeId::ARRAYPGLSN => format!("pg_lsn{}[]", typemod_str()),
                             PgTypeId::ANYENUM => format!("anyenum{}", typemod_str()),
                             PgTypeId::ANYRANGE => format!("anyrange{}", typemod_str()),
                             PgTypeId::INT4RANGE => format!("int4range{}", typemod_str()),
+                            PgTypeId::ARRAYINT4RANGE => format!("int4range{}[]", typemod_str()),
                             PgTypeId::NUMRANGE => format!("numrange{}", typemod_str()),
+                            PgTypeId::ARRAYNUMRANGE => format!("numrange{}[]", typemod_str()),
                             PgTypeId::TSRANGE => format!("tsrange{}", typemod_str()),
+                            PgTypeId::ARRAYTSRANGE => format!("tsrange{}[]", typemod_str()),
                             PgTypeId::TSTZRANGE => format!("tstzrange{}", typemod_str()),
+                            PgTypeId::ARRAYTSTZRANGE => format!("tstzrange{}[]", typemod_str()),
                             PgTypeId::DATERANGE => format!("daterange{}", typemod_str()),
+                            PgTypeId::ARRAYDATERANGE => format!("daterange{}[]", typemod_str()),
                             PgTypeId::INT8RANGE => format!("int8range{}", typemod_str()),
+                            PgTypeId::ARRAYINT8RANGE => format!("int8range{}[]", typemod_str()),
                             PgTypeId::INT4MULTIRANGE => format!("int4multirange{}", typemod_str()),
                             PgTypeId::NUMMULTIRANGE => format!("nummultirange{}", typemod_str()),
                             PgTypeId::TSMULTIRANGE => format!("tsmultirange{}", typemod_str()),
                             PgTypeId::DATEMULTIRANGE => format!("datemultirange{}", typemod_str()),
                             PgTypeId::INT8MULTIRANGE => format!("int8multirange{}", typemod_str()),
-                            PgTypeId::CHARACTERDATA => {
-                                format!("information_schema.character_data{}", typemod_str())
+                            PgTypeId::ARRAYINT4MULTIRANGE => {
+                                format!("int4multirange{}[]", typemod_str())
+                            }
+                            PgTypeId::ARRAYNUMMULTIRANGE => {
+                                format!("nummultirange{}[]", typemod_str())
+                            }
+                            PgTypeId::ARRAYTSMULTIRANGE => {
+                                format!("tsmultirange{}[]", typemod_str())
+                            }
+                            PgTypeId::ARRAYDATEMULTIRANGE => {
+                                format!("datemultirange{}[]", typemod_str())
+                            }
+                            PgTypeId::ARRAYINT8MULTIRANGE => {
+                                format!("int8multirange{}[]", typemod_str())
+                            }
+                            PgTypeId::ARRAYPGCONSTRAINT => {
+                                format!("pg_constraint{}[]", typemod_str())
                             }
                             PgTypeId::PGCONSTRAINT => format!("pg_constraint{}", typemod_str()),
-                            PgTypeId::PGNAMESPACE => {
-                                format!("pg_namespace{}", typemod_str())
+                            PgTypeId::ARRAYPGNAMESPACE => {
+                                format!("pg_namespace{}[]", typemod_str())
+                            }
+                            PgTypeId::PGNAMESPACE => format!("pg_namespace{}", typemod_str()),
+                            PgTypeId::CHARACTERDATA => {
+                                format!("information_schema.character_data{}", typemod_str())
                             }
                             PgTypeId::SQLIDENTIFIER => {
                                 format!("information_schema.sql_identifier{}", typemod_str())
@@ -2934,6 +3030,243 @@ pub fn create_date_to_timestamp_udf() -> ScalarUDF {
             ],
             Volatility::Immutable,
         ),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_sha1_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 1);
+
+        let strings = downcast_string_arg!(args[0], "str", i32);
+
+        let result = strings
+            .iter()
+            .map(|string| {
+                string.map(|string| {
+                    let mut hasher = Sha1::new();
+                    hasher.update(string.as_bytes());
+                    hasher.digest().to_string()
+                })
+            })
+            .collect::<StringArray>();
+
+        Ok(Arc::new(result))
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Utf8)));
+
+    ScalarUDF::new(
+        "sha1",
+        &Signature::exact(vec![DataType::Utf8], Volatility::Immutable),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_current_setting_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 1);
+
+        let setting_names = downcast_string_arg!(args[0], "str", i32);
+
+        let result = setting_names
+            .iter()
+            .map(|setting_name| {
+                if let Some(setting_name) = setting_name {
+                    Ok(Some(match setting_name.to_ascii_lowercase().as_str() {
+                        "max_index_keys" => "32".to_string(), // Taken from PostgreSQL
+                        "search_path" => "\"$user\", public".to_string(), // Taken from PostgreSQL
+                        "server_version_num" => "140002".to_string(), // Matches 14.2
+                        setting_name => Err(DataFusionError::Execution(format!(
+                            "unrecognized configuration parameter \"{}\"",
+                            setting_name
+                        )))?,
+                    }))
+                } else {
+                    Ok(None)
+                }
+            })
+            .collect::<Result<StringArray>>()?;
+
+        Ok(Arc::new(result))
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Utf8)));
+
+    ScalarUDF::new(
+        "current_setting",
+        &Signature::exact(vec![DataType::Utf8], Volatility::Stable),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_quote_ident_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 1);
+
+        let idents = downcast_string_arg!(args[0], "str", i32);
+
+        let re = Regex::new(r"^[a-z_][a-z0-9_]*$").unwrap();
+        let result = idents
+            .iter()
+            .map(|ident| {
+                ident.map(|ident| {
+                    if re.is_match(ident) {
+                        return ident.to_string();
+                    }
+                    format!("\"{}\"", ident.replace("\"", "\"\""))
+                })
+            })
+            .collect::<StringArray>();
+
+        Ok(Arc::new(result))
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Utf8)));
+
+    ScalarUDF::new(
+        "quote_ident",
+        &Signature::exact(vec![DataType::Utf8], Volatility::Immutable),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_pg_encoding_to_char_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        let encoding_ids = downcast_primitive_arg!(args[0], "encoding_id", Int32Type);
+
+        let result = encoding_ids
+            .iter()
+            .map(|oid| match oid {
+                Some(0) => Some("SQL_ASCII".to_string()),
+                Some(6) => Some("UTF8".to_string()),
+                Some(_) => Some("".to_string()),
+                _ => None,
+            })
+            .collect::<StringArray>();
+
+        Ok(Arc::new(result))
+    });
+
+    create_udf(
+        "pg_encoding_to_char",
+        vec![DataType::Int32],
+        Arc::new(DataType::Utf8),
+        Volatility::Immutable,
+        fun,
+    )
+}
+
+pub fn create_array_to_string_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 2);
+
+        let input_arr = downcast_list_arg!(args[0], "strs");
+        let join_strs = downcast_string_arg!(args[1], "join_str", i32);
+
+        let mut builder = StringBuilder::new(input_arr.len());
+
+        for i in 0..input_arr.len() {
+            if input_arr.is_null(i) || join_strs.is_null(i) {
+                builder.append_null()?;
+                continue;
+            }
+
+            let array = input_arr.value(i);
+            let join_str = join_strs.value(i);
+            let strings = downcast_string_arg!(array, "str", i32);
+            let joined_string =
+                itertools::Itertools::intersperse(strings.iter().filter_map(|s| s), join_str)
+                    .collect::<String>();
+            builder.append_value(joined_string)?;
+        }
+
+        Ok(Arc::new(builder.finish()) as ArrayRef)
+    });
+
+    create_udf(
+        "array_to_string",
+        vec![
+            DataType::List(Box::new(Field::new("item", DataType::Utf8, true))),
+            DataType::Utf8,
+        ],
+        Arc::new(DataType::Utf8),
+        Volatility::Immutable,
+        fun,
+    )
+}
+
+// https://docs.aws.amazon.com/redshift/latest/dg/r_CHARINDEX.html
+pub fn create_charindex_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 2);
+
+        return Err(DataFusionError::NotImplemented(format!(
+            "charindex is not implemented, it's stub"
+        )));
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int32)));
+
+    ScalarUDF::new(
+        "charindex",
+        &Signature::exact(vec![DataType::Utf8, DataType::Utf8], Volatility::Immutable),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_mod_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 2);
+
+        return Err(DataFusionError::NotImplemented(format!(
+            "mod is not implemented, it's stub"
+        )));
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int32)));
+
+    ScalarUDF::new(
+        "mod",
+        &Signature::any(2, Volatility::Immutable),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_to_regtype_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 1);
+
+        let regtype_arr = downcast_string_arg!(args[0], "regtype", i32);
+
+        let pg_types = PgType::get_all();
+
+        let result = regtype_arr
+            .iter()
+            .map(|regtype| match regtype {
+                Some(regtype) => pg_types
+                    .iter()
+                    .find(|typ| typ.typname == regtype || typ.regtype == regtype)
+                    .map(|typ| typ.oid as i32),
+                None => None,
+            })
+            .collect::<PrimitiveArray<Int32Type>>();
+
+        Ok(Arc::new(result) as ArrayRef)
+    });
+
+    // TODO: `to_regtype` should return regtype but we use `oid` since it's used for comparison with oids
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int32)));
+
+    ScalarUDF::new(
+        "to_regtype",
+        &Signature::exact(vec![DataType::Utf8], Volatility::Immutable),
         &return_type,
         &fun,
     )

@@ -1,8 +1,6 @@
 ---
 title: Trino
 permalink: /config/databases/trino
-redirect_from:
-  - /config/databases/trino
 ---
 
 ## Prerequisites
@@ -17,7 +15,7 @@ redirect_from:
 
 Add the following to a `.env` file in your Cube project:
 
-```bash
+```dotenv
 CUBEJS_DB_TYPE=trino
 CUBEJS_DB_HOST=my.trino.host
 CUBEJS_DB_USER=trino_user
@@ -42,10 +40,10 @@ CUBEJS_DB_SCHEMA=my_trino_schema
 
 ## Pre-Aggregation Feature Support
 
-### countDistinctApprox
+### count_distinct_approx
 
 Measures of type
-[`countDistinctApprox`][ref-schema-ref-types-formats-countdistinctapprox] can be
+[`count_distinct_approx`][ref-schema-ref-types-formats-countdistinctapprox] can be
 used in pre-aggregations when using Trino as a source database. To learn more
 about Trino support for approximate aggregate functions, [click
 here][trino-docs-approx-agg-fns].

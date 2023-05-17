@@ -12,7 +12,7 @@ import {
   StreamTableData,
   StreamingSourceTableData,
   QueryOptions,
-  ExternalDriverCompatibilities,
+  ExternalDriverCompatibilities, TableStructure, TableColumnQueryResult,
 } from '@cubejs-backend/base-driver';
 import { getEnv } from '@cubejs-backend/shared';
 import { format as formatSql, escape } from 'sqlstring';
@@ -24,7 +24,10 @@ import { WebSocketConnection } from './WebSocketConnection';
 const GenericTypeToCubeStore: Record<string, string> = {
   string: 'varchar(255)',
   text: 'varchar(255)',
-  uuid: 'varchar(64)'
+  uuid: 'varchar(64)',
+  // Cube Store uses an old version of sql parser which doesn't support timestamp with custom precision, but
+  // athena driver (I believe old version) allowed to use it
+  'timestamp(3)': 'timestamp',
 };
 
 type Column = {
@@ -42,6 +45,7 @@ type CreateTableOptions = {
   aggregations?: string
   selectStatement?: string
   sealAt?: string
+  delimiter?: string
 };
 
 export class CubeStoreDriver extends BaseDriver implements DriverInterface {
@@ -71,9 +75,10 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     await this.query('SELECT 1', []);
   }
 
-  public async query(query: string, values: any[], options?: QueryOptions) {
+  public async query<R = any>(query: string, values: any[], options?: QueryOptions): Promise<R[]> {
     const { inlineTables, ...queryTracingObj } = options ?? {};
-    return this.connection.query(formatSql(query, values || []), inlineTables ?? [], { ...queryTracingObj, instance: getEnv('instanceId') });
+    const sql = formatSql(query, values || []);
+    return this.connection.query(sql, inlineTables ?? [], { ...queryTracingObj, instance: getEnv('instanceId') });
   }
 
   public async release() {
@@ -81,7 +86,13 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
   }
 
   public informationSchemaQuery() {
-    return `${super.informationSchemaQuery()} AND columns.table_schema = '${this.config.database}'`;
+    return `
+      SELECT columns.column_name as ${this.quoteIdentifier('column_name')},
+             columns.table_name as ${this.quoteIdentifier('table_name')},
+             columns.table_schema as ${this.quoteIdentifier('table_schema')},
+             columns.data_type as ${this.quoteIdentifier('data_type')}
+      FROM information_schema.columns as columns
+      WHERE columns.table_schema NOT IN ('information_schema', 'system')`;
   }
 
   public createTableSqlWithOptions(tableName, columns, options: CreateTableOptions) {
@@ -91,6 +102,9 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
 
     if (options.inputFormat) {
       withEntries.push(`input_format = '${options.inputFormat}'`);
+    }
+    if (options.delimiter) {
+      withEntries.push(`delimiter = '${options.delimiter}'`);
     }
     if (options.buildRangeEnd) {
       withEntries.push(`build_range_end = '${options.buildRangeEnd}'`);
@@ -150,6 +164,22 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
       `SELECT table_name, build_range_end FROM information_schema.tables WHERE table_schema = ${this.param(0)} AND (${prefixWhere})`,
       [schemaName].concat(tablePrefixes)
     );
+  }
+
+  public async tableColumnTypes(table: string): Promise<TableStructure> {
+    const [schema, name] = table.split('.');
+
+    const columns = await this.query<TableColumnQueryResult>(
+      `SELECT column_name as ${this.quoteIdentifier('column_name')},
+             table_name as ${this.quoteIdentifier('table_name')},
+             table_schema as ${this.quoteIdentifier('table_schema')},
+             data_type as ${this.quoteIdentifier('data_type')}
+      FROM information_schema.columns
+      WHERE table_name = ${this.param(0)} AND table_schema = ${this.param(1)}`,
+      [name, schema]
+    );
+
+    return columns.map(c => ({ name: c.column_name, type: this.toGenericType(c.data_type) }));
   }
 
   public quoteIdentifier(identifier: string): string {
@@ -245,6 +275,9 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     };
     if (files.length > 0) {
       options.inputFormat = tableData.csvNoHeader ? 'csv_no_header' : 'csv';
+      if (tableData.csvDelimiter) {
+        options.delimiter = tableData.csvDelimiter;
+      }
       options.files = files;
     }
 

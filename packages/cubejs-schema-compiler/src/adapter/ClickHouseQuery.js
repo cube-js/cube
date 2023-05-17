@@ -174,7 +174,7 @@ export class ClickHouseQuery extends BaseQuery {
   }
 
   castToString(sql) {
-    return `CAST(${sql} as STRING)`;
+    return `CAST(${sql} as String)`;
   }
 
   seriesSql(timeDimension) {

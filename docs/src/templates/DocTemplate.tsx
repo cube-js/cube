@@ -11,6 +11,7 @@ import cx from 'classnames';
 import kebabCase from 'lodash/kebabCase';
 import get from 'lodash/get';
 import last from 'lodash/last';
+import dayjs from 'dayjs';
 import { renameCategory } from '../rename-category';
 
 import 'katex/dist/katex.min.css';
@@ -35,6 +36,7 @@ import {
   WarningBox,
 } from '../components/AlertBox/AlertBox';
 import { LoomVideo } from '../components/LoomVideo/LoomVideo';
+import { YouTubeVideo } from '../components/YouTubeVideo/YouTubeVideo';
 import { Grid } from '../components/Grid/Grid';
 import { GridItem } from '../components/Grid/GridItem';
 import ScrollSpyH2 from '../components/Headers/ScrollSpyH2';
@@ -44,6 +46,8 @@ import MyH3 from '../components/Headers/MyH3';
 import { ParameterTable } from '../components/ReferenceDocs/ParameterTable';
 import { Snippet, SnippetGroup } from '../components/Snippets/SnippetGroup';
 import { CodeTabs } from '../components/CodeTabs';
+import InlineButton from '../components/InlineButton/InlineButton';
+import { Screenshot } from '../components/Screenshot';
 
 const MyH4: React.FC<{ children: string }> = ({ children }) => {
   return (<h4 id={kebabCase(children)} name={kebabCase(children)}>{children}</h4>);
@@ -55,6 +59,7 @@ const components = {
   SuccessBox,
   WarningBox,
   LoomVideo,
+  YouTubeVideo,
   Grid,
   GridItem,
   GitHubCodeBlock,
@@ -67,6 +72,8 @@ const components = {
   h3: ScrollSpyH3,
   h4: MyH4,
   CodeTabs,
+  Btn: InlineButton,
+  Screenshot,
 };
 
 const MDX = (props) => (
@@ -319,7 +326,9 @@ class DocTemplate extends Component<Props, State> {
         </Helmet>
         <div className={styles.docContentWrapper}>
           <div className={cx(styles.docContent, 'docContent')}>
-            <h1 id={kebabCase(frontmatter.title)}>{frontmatter.title}</h1>
+            <div className={styles.titleWrapper}>
+              <h1 id={kebabCase(frontmatter.title)}>{frontmatter.title}</h1>
+            </div>
             <MDX {...this.props} />
             {!isDisableFeedbackBlock && (
               <FeedbackBlock page={frontmatter.permalink} />

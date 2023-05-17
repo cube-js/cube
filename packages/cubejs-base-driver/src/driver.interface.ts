@@ -62,6 +62,8 @@ export interface DownloadTableCSVData extends DownloadTableBase {
    */
   csvNoHeader?: boolean;
 
+  csvDelimiter?: string;
+
   /**
    * The CSV file escape symbol.
    */
@@ -106,12 +108,12 @@ export function isDownloadTableMemoryData(tableData: any): tableData is Download
 export type DownloadTableData = DownloadTableMemoryData | DownloadTableCSVData | StreamTableData | StreamingSourceTableData;
 
 export interface ExternalDriverCompatibilities {
-  csvImport?: true,
-  streamImport?: true,
+  csvImport?: boolean,
+  streamImport?: boolean,
 }
 
 export interface DriverCapabilities extends ExternalDriverCompatibilities {
-  unloadWithoutTempTable?: true,
+  unloadWithoutTempTable?: boolean,
   streamingSource?: boolean,
 }
 
@@ -165,7 +167,7 @@ export type DownloadQueryResultsResult = DownloadQueryResultsBase & (DownloadTab
 export type TableQueryResult = { table_name?: string, TABLE_NAME?: string };
 
 export interface DriverInterface {
-  createSchemaIfNotExists(schemaName: string): Promise<any>;
+  createSchemaIfNotExists(schemaName: string): Promise<void>;
   uploadTableWithIndexes(
     table: string, columns: TableStructure, tableData: DownloadTableData, indexesSql: IndexesSQL, uniqueKeyColumns: string[], queryTracingObj: any, externalOptions: ExternalCreateTableOptions
   ): Promise<void>;
@@ -183,12 +185,24 @@ export interface DriverInterface {
   downloadQueryResults: (query: string, values: unknown[], options: DownloadQueryResultsOptions) => Promise<DownloadQueryResultsResult>;
   // Download table
   downloadTable: (table: string, options: ExternalDriverCompatibilities & StreamingSourceOptions) => Promise<DownloadTableMemoryData | DownloadTableCSVData>;
-  // Some drivers can implement streaming from SQL
+  
+  /**
+   * Returns stream table object that includes query result stream and
+   * queried fields types.
+   */
   stream?: (table: string, values: unknown[], options: StreamOptions) => Promise<StreamTableData>;
-  // Some drivers can implement UNLOAD data to external storage
+  
+  /**
+   * Returns to the Cubestore an object with links to unloaded to an
+   * export bucket data.
+   */
   unload?: (table: string, options: UnloadOptions) => Promise<DownloadTableCSVData>;
-  // Some drivers can implement UNLOAD data to external storage
+  
+  /**
+   * Determines whether export bucket feature is configured or not.
+   */
   isUnloadSupported?: (options: UnloadOptions) => Promise<boolean>;
+  
   // Current timestamp, defaults to new Date().getTime()
   nowTimestamp(): number;
   // Shutdown the driver

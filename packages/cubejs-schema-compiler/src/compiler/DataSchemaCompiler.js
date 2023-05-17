@@ -181,6 +181,7 @@ export class DataSchemaCompiler {
     if (err) {
       errorsReport.error(err.toString());
     }
+
     try {
       vm.runInNewContext(file.content, {
         view: (name, cube) => (
@@ -234,11 +235,19 @@ export class DataSchemaCompiler {
             return exports[foundFile.fileName];
           }
         },
-        COMPILE_CONTEXT: this.standalone ? this.standaloneCompileContextProxy() : R.clone(this.compileContext || {}),
+        COMPILE_CONTEXT: this.standalone ? this.standaloneCompileContextProxy() : this.cloneCompileContextWithGetterAlias(this.compileContext || {}),
       }, { filename: file.fileName, timeout: 15000 });
     } catch (e) {
       errorsReport.error(e);
     }
+  }
+
+  // Alias "securityContext" with "security_context" (snake case version)
+  // to support snake case based data models
+  cloneCompileContextWithGetterAlias(compileContext) {
+    const clone = R.clone(compileContext || {});
+    clone.security_context = compileContext.securityContext;
+    return clone;
   }
 
   standaloneCompileContextProxy() {

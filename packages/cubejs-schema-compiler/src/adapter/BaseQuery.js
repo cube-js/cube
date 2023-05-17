@@ -338,9 +338,6 @@ class BaseQuery {
           throw new UserError(`Ungrouped query requires primary keys to be present in dimensions: ${missingPrimaryKeys.map(k => `'${k}'`).join(', ')}. Pass allowUngroupedWithoutPrimaryKey option to disable this check.`);
         }
       }
-      if (this.measures.length) {
-        throw new UserError('Measures aren\'t allowed in ungrouped query');
-      }
       if (this.measureFilters.length) {
         throw new UserError('Measure filters aren\'t allowed in ungrouped query');
       }
@@ -1421,11 +1418,18 @@ class BaseQuery {
       }
       return this.preAggregations.originalSqlPreAggregationTable(foundPreAggregation);
     }
-    const evaluatedSql = this.evaluateSql(cube, this.cubeEvaluator.cubeFromPath(cube).sql);
+
+    const fromPath = this.cubeEvaluator.cubeFromPath(cube);
+    if (fromPath.sqlTable) {
+      return this.evaluateSql(cube, fromPath.sqlTable);
+    }
+
+    const evaluatedSql = this.evaluateSql(cube, fromPath.sql);
     const selectAsterisk = evaluatedSql.match(/^\s*select\s+\*\s+from\s+([a-zA-Z0-9_\-`".*]+)\s*$/i);
     if (selectAsterisk) {
       return selectAsterisk[1];
     }
+
     return `(${evaluatedSql})`;
   }
 
@@ -1956,6 +1960,13 @@ class BaseQuery {
     ) {
       return evaluateSql === '*' ? '1' : evaluateSql;
     }
+    if (this.ungrouped) {
+      if (symbol.type === 'count' || symbol.type === 'countDistinct' || symbol.type === 'countDistinctApprox') {
+        return '1';
+      } else {
+        return evaluateSql;
+      }
+    }
     if ((this.safeEvaluateSymbolContext().ungroupedAliases || {})[measurePath]) {
       evaluateSql = (this.safeEvaluateSymbolContext().ungroupedAliases || {})[measurePath];
     }
@@ -2018,18 +2029,15 @@ class BaseQuery {
     return evaluateSql;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  hllInit(sql) {
+  hllInit(_sql) {
     throw new UserError('Distributed approximate distinct count is not supported by this DB');
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  hllMerge(sql) {
+  hllMerge(_sql) {
     throw new UserError('Distributed approximate distinct count is not supported by this DB');
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  hllCardinality(sql) {
+  hllCardinality(_sql) {
     throw new UserError('Distributed approximate distinct count is not supported by this DB');
   }
 
@@ -2365,6 +2373,10 @@ class BaseQuery {
   }
 
   preAggregationReadOnly(_cube, _preAggregation) {
+    return false;
+  }
+
+  preAggregationAllowUngroupingWithPrimaryKey(_cube, _preAggregation) {
     return false;
   }
 

@@ -3,10 +3,11 @@ use neon::prelude::*;
 
 use async_trait::async_trait;
 use cubeclient::models::{V1Error, V1LoadRequestQuery, V1LoadResponse, V1MetaResponse};
+use cubesql::compile::engine::df::scan::{MemberField, SchemaRef};
 use cubesql::{
     di_service,
     sql::AuthContextRef,
-    transport::{CubeReadStream, LoadRequestMeta, MetaContext, TransportService},
+    transport::{CubeStreamReceiver, LoadRequestMeta, MetaContext, TransportService},
     CubeError,
 };
 use serde_derive::Serialize;
@@ -89,7 +90,10 @@ impl TransportService for NodeBridgeTransport {
             Some(extra),
         )
         .await?;
+        #[cfg(debug_assertions)]
         trace!("[transport] Meta <- {:?}", response);
+        #[cfg(not(debug_assertions))]
+        trace!("[transport] Meta <- <hidden>");
 
         Ok(Arc::new(MetaContext::new(
             response.cubes.unwrap_or_default(),
@@ -131,7 +135,10 @@ impl TransportService for NodeBridgeTransport {
                 Some(extra),
             )
             .await?;
+            #[cfg(debug_assertions)]
             trace!("[transport] Request <- {:?}", response);
+            #[cfg(not(debug_assertions))]
+            trace!("[transport] Request <- <hidden>");
 
             let load_err = match serde_json::from_value::<V1LoadResponse>(response.clone()) {
                 Ok(r) => {
@@ -164,37 +171,54 @@ impl TransportService for NodeBridgeTransport {
         }
     }
 
-    fn load_stream(
+    async fn load_stream(
         &self,
         query: V1LoadRequestQuery,
         ctx: AuthContextRef,
         meta: LoadRequestMeta,
-    ) -> Result<Arc<dyn CubeReadStream>, CubeError> {
+        schema: SchemaRef,
+        member_fields: Vec<MemberField>,
+    ) -> Result<CubeStreamReceiver, CubeError> {
         trace!("[transport] Request ->");
 
-        let native_auth = ctx
-            .as_any()
-            .downcast_ref::<NativeAuthContext>()
-            .expect("Unable to cast AuthContext to NativeAuthContext");
-
         let request_id = Uuid::new_v4().to_string();
-        let extra = serde_json::to_string(&LoadRequest {
-            request: TransportRequest {
-                id: format!("{}-span-{}", request_id, 1),
-                meta: Some(meta),
-            },
-            query,
-            session: SessionContext {
-                user: native_auth.user.clone(),
-                superuser: native_auth.superuser,
-            },
-        })?;
+        let mut span_counter: u32 = 1;
+        loop {
+            let native_auth = ctx
+                .as_any()
+                .downcast_ref::<NativeAuthContext>()
+                .expect("Unable to cast AuthContext to NativeAuthContext");
 
-        call_js_with_stream_as_callback(
-            self.channel.clone(),
-            self.on_load_stream.clone(),
-            Some(extra),
-        )
+            let extra = serde_json::to_string(&LoadRequest {
+                request: TransportRequest {
+                    id: format!("{}-span-{}", request_id, span_counter),
+                    meta: Some(meta.clone()),
+                },
+                query: query.clone(),
+                session: SessionContext {
+                    user: native_auth.user.clone(),
+                    superuser: native_auth.superuser,
+                },
+            })?;
+
+            let res = call_js_with_stream_as_callback(
+                self.channel.clone(),
+                self.on_load_stream.clone(),
+                Some(extra),
+                schema.clone(),
+                member_fields.clone(),
+            )
+            .await;
+
+            if let Err(e) = &res {
+                if e.message.to_lowercase().contains("continue wait") {
+                    span_counter += 1;
+                    continue;
+                }
+            }
+
+            break res;
+        }
     }
 }
 
