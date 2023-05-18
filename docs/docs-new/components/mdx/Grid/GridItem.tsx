@@ -1,6 +1,8 @@
+import classnames from 'classnames/bind';
 import React from 'react';
+import styles from './GridItem.module.css';
 
-import { GridContext } from './Grid';
+const cn = classnames.bind(styles);
 
 export type GridItemProps = {
   imageUrl: string;
@@ -12,31 +14,15 @@ export const GridItem = ({
   imageUrl,
   title,
   url,
-}: GridItemProps) => {
-  return (
-    <GridContext.Consumer>
-      {(value) => {
-        const settings = JSON.parse(value);
-        const [ width, height ] = settings.imageSize;
-
-        return (
-          <div className="grid-item">
-            <a href={url}>
-              <div>
-                <div className="grid-item-image">
-                  <img
-                    src={imageUrl}
-                    alt={title}
-                    width={width}
-                    height={height}
-                  />
-                </div>
-                <div className="grid-item-title">{title}</div>
-              </div>
-            </a>
-          </div>
-        );
-      }}
-    </GridContext.Consumer>
-  );
-};
+}: GridItemProps) => (
+  <a className={cn('GridItem__Wrapper')} href={url}>
+    <div className={cn('GridItem')}>
+      <img
+        className={cn('GridItem__Image')}
+        src={imageUrl}
+        alt={title}
+      />
+      <span className={cn('GridItem__Title')}>{title}</span>
+    </div>
+  </a>
+);
