@@ -284,6 +284,51 @@ describe('API Gateway', () => {
     );
   });
 
+  test('normalize filter number values', async () => {
+    const { app } = createApiGateway();
+
+    const query = {
+      measures: ['Foo.bar'],
+      filters: [{
+        member: 'Foo.bar',
+        operator: 'gte',
+        values: [10.5]
+      }, {
+        member: 'Foo.bar',
+        operator: 'gte',
+        values: [0]
+      }]
+    };
+
+    return requestBothGetAndPost(
+      app,
+      { url: '/cubejs-api/v1/dry-run', query: { query: JSON.stringify(query) }, body: { query } },
+      (res) => {
+        expect(res.body.normalizedQueries).toStrictEqual([
+          {
+            measures: ['Foo.bar'],
+            timezone: 'UTC',
+            order: [],
+            filters: [{
+              member: 'Foo.bar',
+              operator: 'gte',
+              values: ['10.5']
+            }, {
+              member: 'Foo.bar',
+              operator: 'gte',
+              values: ['0']
+            }],
+            rowLimit: 10000,
+            limit: 10000,
+            dimensions: [],
+            timeDimensions: [],
+            queryType: 'regularQuery'
+          }
+        ]);
+      }
+    );
+  });
+
   test('normalize queryRewrite limit', async () => {
     const { app } = createApiGateway(
       new AdapterApiMock(),

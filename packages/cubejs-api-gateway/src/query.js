@@ -70,7 +70,7 @@ const oneFilter = Joi.object().keys({
   dimension: id,
   member: id,
   operator: Joi.valid(...operators).required(),
-  values: Joi.array().items(Joi.string().allow('', null), Joi.link('...'))
+  values: Joi.array().items(Joi.string().allow('', null), Joi.link('...'), Joi.number(), Joi.boolean())
 }).xor('dimension', 'member');
 
 const oneCondition = Joi.object().keys({
@@ -200,18 +200,19 @@ const normalizeQuery = (query, persistent) => {
     order: normalizeQueryOrder(query.order),
     filters: (query.filters || []).map(f => {
       const { dimension, member, ...filter } = f;
-      const normalizedFlter = {
+      const normalizedFilter = {
         ...filter,
-        member: member || dimension
+        member: member || dimension,
+        values: filter.values?.map(v => (v != null ? v.toString() : v))
       };
 
-      Object.defineProperty(normalizedFlter, 'dimension', {
+      Object.defineProperty(normalizedFilter, 'dimension', {
         get() {
           console.warn('Warning: Attribute `filter.dimension` is deprecated. Please use \'member\' instead of \'dimension\'.');
           return this.member;
         }
       });
-      return normalizedFlter;
+      return normalizedFilter;
     }),
     dimensions: (query.dimensions || []).filter(d => d.split('.').length !== 3),
     timeDimensions: (query.timeDimensions || []).map(td => {
