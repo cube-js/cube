@@ -3271,3 +3271,31 @@ pub fn create_to_regtype_udf() -> ScalarUDF {
         &fun,
     )
 }
+
+pub fn create_pg_get_indexdef_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 3);
+
+        let index_oids = downcast_primitive_arg!(args[0], "index_oid", UInt32Type);
+        let column_nos = downcast_primitive_arg!(args[1], "column_no", Int64Type);
+        let prettys = downcast_boolean_arr!(&args[2], "pretty");
+
+        let result = izip!(index_oids, column_nos, prettys)
+            .map(|_| None as Option<&str>)
+            .collect::<StringArray>();
+
+        Ok(Arc::new(result) as ArrayRef)
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Utf8)));
+
+    ScalarUDF::new(
+        "pg_get_indexdef",
+        &Signature::exact(
+            vec![DataType::UInt32, DataType::Int64, DataType::Boolean],
+            Volatility::Immutable,
+        ),
+        &return_type,
+        &fun,
+    )
+}

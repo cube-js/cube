@@ -7,7 +7,7 @@ use pg_srv::{
     BindValue, PgType,
 };
 use sqlparser::ast::{
-    self, Expr, Function, FunctionArg, FunctionArgExpr, Ident, ObjectName, Value,
+    self, ArrayAgg, Expr, Function, FunctionArg, FunctionArgExpr, Ident, ObjectName, Value,
 };
 use std::{collections::HashMap, error::Error};
 
@@ -212,6 +212,20 @@ trait Visitor<'ast, E: Error> {
             Expr::Position { expr, r#in } => {
                 self.visit_expr(expr)?;
                 self.visit_expr(r#in)?;
+            }
+            Expr::ArrayAgg(ArrayAgg {
+                expr,
+                order_by,
+                limit,
+                ..
+            }) => {
+                self.visit_expr(expr)?;
+                if let Some(order_by) = order_by {
+                    self.visit_expr(&mut order_by.expr)?;
+                }
+                if let Some(limit) = limit {
+                    self.visit_expr(limit)?;
+                }
             }
         };
 
