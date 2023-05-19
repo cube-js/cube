@@ -324,6 +324,29 @@ const overrides: Record<string, Override> = {
     ready: true,
     path: "product/configuration/data-sources/ksqldb",
     title: "ksqlDB",
+    meta: {
+      "aws-athena": "AWS Athena",
+      "aws-redshift": "AWS Redshift",
+      "clickhouse": "ClickHouse",
+      "databricks-jdbc": "Databricks (JDBC)",
+      "druid": "Druid",
+      "elasticsearch": "Elasticsearch",
+      "firebolt": "Firebolt",
+      "google-bigquery": "Google BigQuery",
+      "hive": "Hive",
+      "ksqldb": "ksqlDB",
+      "materialize": "Materialize",
+      "mongodb": "MongoDB",
+      "ms-sql": "MS-SQL",
+      "mysql": "MySQL",
+      "oracle": "Oracle",
+      "postgres": "Postgres",
+      "presto": "Presto",
+      "questdb": "QuestDB",
+      "snowflake": "Snowflake",
+      "sqlite": "SQLite",
+      "trino": "Trino",
+    },
   },
   "Configuration/Databases/Trino.mdx": {
     ready: true,
@@ -388,7 +411,7 @@ const overrides: Record<string, Override> = {
   "Configuration/Databases/Google-BigQuery.mdx": {
     ready: true,
     path: "product/configuration/data-sources/google-bigquery",
-    title: "Google-BigQuery",
+    title: "Google BigQuery",
   },
   "Configuration/Databases/Firebolt.mdx": {
     ready: true,
@@ -408,7 +431,7 @@ const overrides: Record<string, Override> = {
   "Configuration/Databases/Databricks-JDBC.mdx": {
     ready: true,
     path: "product/configuration/data-sources/databricks-jdbc",
-    title: "Databricks-JDBC",
+    title: "Databricks (JDBC)",
   },
   "Configuration/Databases/ClickHouse.mdx": {
     ready: true,
@@ -418,12 +441,12 @@ const overrides: Record<string, Override> = {
   "Configuration/Databases/AWS-Redshift.mdx": {
     ready: true,
     path: "product/configuration/data-sources/aws-redshift",
-    title: "AWS-Redshift",
+    title: "AWS Redshift",
   },
   "Configuration/Databases/AWS-Athena.mdx": {
     ready: true,
     path: "product/configuration/data-sources/aws-athena",
-    title: "AWS-Athena",
+    title: "AWS Athena",
   },
 
   // Data modeling
@@ -760,7 +783,7 @@ const overrides: Record<string, Override> = {
     path: "product/workspace/pre-aggregation-inspection",
     title: "Pre-aggregation inspection",
   },
-  "Workspace/Access Control.mdx": {
+  "Workspace/Access-Control.mdx": {
     ready: true,
     path: "product/workspace/access-control",
     title: "Access control",

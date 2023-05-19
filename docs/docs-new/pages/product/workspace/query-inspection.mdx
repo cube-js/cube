@@ -4,13 +4,20 @@ redirect_from:
 ---
 
 # Query inspection
-The Queries page in Cube Cloud is a one-stop shop for all performance and
-diagnostic information about queries issued for a deployment. It is kept
+The Query History screen in Cube Cloud is a one-stop shop for all performance
+and diagnostic information about queries issued for a deployment. It is kept
 up-to-date in real time and provides a quick way to check whether queries are
 being accelerated with [pre-aggregations][ref-caching-gs-preaggs], how long they
 took to execute, and if they failed.
 
-<Screenshot src="https://ucarecdn.com/44bb6d8d-5943-4978-8b15-73e1e43fd988/" />
+<SuccessBox>
+
+Query History is available in Cube Cloud on
+[all tiers](https://cube.dev/pricing).
+
+</SuccessBox>
+
+<Screenshot src="https://ucarecdn.com/951a2a64-bc9b-4277-b2fe-4cc88dbf4f49/" />
 
 ## Setting the time range
 
@@ -21,25 +28,25 @@ a time period:
 
 <Screenshot
   highlight="inset(15% 1% 60% 21% round 10px)"
-  src="https://ucarecdn.com/691e7cfa-e7fd-4df1-8cfa-f8f0d74634f6/"
+  src="https://ucarecdn.com/393dfa47-033d-421b-87ce-fcf5617ac1c8/"
 />
 
 To go back to live mode, click <Btn>▶</Btn>:
 
 <Screenshot
   highlight="inset(15% 6% 79% 88% round 10px)"
-  src="https://ucarecdn.com/691e7cfa-e7fd-4df1-8cfa-f8f0d74634f6/"
+  src="https://ucarecdn.com/393dfa47-033d-421b-87ce-fcf5617ac1c8/"
 />
 
 ## Exploring queries
 
-You can switch between [queries made to the API](#api-queries) and
-[queries made to connected data sources](#database-queries) by switching between
-the <Btn>API</Btn> and <Btn>Database</Btn> tabs.
+You can switch between [queries made to the API](#inspecting-api-queries) and
+[queries made to connected data sources](#inspecting-database-queries) by
+switching between the <Btn>API</Btn> and <Btn>Database</Btn> tabs.
 
 <Screenshot
-  highlight="inset(22% 64% 70% 20% round 10px)"
-  src="https://ucarecdn.com/44bb6d8d-5943-4978-8b15-73e1e43fd988/"
+  highlight="inset(22% 79% 70% 7% round 10px)"
+  src="https://ucarecdn.com/951a2a64-bc9b-4277-b2fe-4cc88dbf4f49/"
 />
 
 ###  All Queries and Top Queries
@@ -49,8 +56,8 @@ while&nbsp;<Btn>Top Queries</Btn> will show the most-frequently executed
 queries:
 
 <Screenshot
-  highlight="inset(30% 50% 64% 20% round 10px)"
-  src="https://ucarecdn.com/44bb6d8d-5943-4978-8b15-73e1e43fd988/"
+  highlight="inset(30% 65% 64% 7% round 10px)"
+  src="https://ucarecdn.com/951a2a64-bc9b-4277-b2fe-4cc88dbf4f49/"
 />
 
 ###  Filtering
@@ -60,8 +67,8 @@ duration, cache status, whether the query was accelerated, and by failing
 queries:
 
 <Screenshot
-  highlight="inset(36% 8% 58% 20% round 10px)"
-  src="https://ucarecdn.com/44bb6d8d-5943-4978-8b15-73e1e43fd988/"
+  highlight="inset(36% 22% 58% 7% round 10px)"
+  src="https://ucarecdn.com/951a2a64-bc9b-4277-b2fe-4cc88dbf4f49/"
 />
 
 ## Inspecting API Queries
@@ -104,6 +111,14 @@ data source **or** Cube Store if the query was accelerated with a
 pre-aggregation:
 
 <Screenshot src="https://ucarecdn.com/537f7269-654d-479c-a0cc-abc2941f9b5a/" />
+
+You can also run the SQL query directly against your data source using the [SQL
+Runner][ref-workspace-sqlrunner] by clicking <Btn>▶️</Btn>:
+
+<Screenshot
+  highlight="inset(51.5% 2.5% 44% 94% round 10px)"
+  src="https://ucarecdn.com/537f7269-654d-479c-a0cc-abc2941f9b5a/"
+/>
 
 ###  Pre-Aggregations
 
@@ -161,9 +176,9 @@ and stacktrace:
 <Screenshot src="https://ucarecdn.com/efd45e3a-8b44-4ee9-9f9e-284f0fd8eb96/" />
 
 Errors here generally indicate a problem with querying the data source. The
-generated SQL query can be copied from the
-<Btn>[Query](#inspecting-database-queries-query)</Btn> tab and run directly
-against your data source to debug the issue.
+generated SQL query can be copied from
+the&nbsp;<Btn>[Query](#inspecting-database-queries-query)</Btn> tab and run
+directly against your data source to debug the issue.
 
 ###  Events
 
@@ -178,3 +193,4 @@ while the query is in the query execution queue:
 [ref-conf-db]: /config/databases
 [ref-deployment-api-instance]: /deployment/overview#api-instances
 [ref-deployment-refresh-worker]: /deployment/overview#refresh-worker
+[ref-workspace-sqlrunner]: /cloud/sql-runner

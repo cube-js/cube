@@ -6,8 +6,8 @@ redirect_from:
 
 # Dimensions
 The `dimensions` property contains a set of dimensions. You can think about a
-dimension as an attribute related to a measure, e.g. the measure `user_count` can
-have dimensions like `country`, `age`, `occupation`, etc.
+dimension as an attribute related to a measure, e.g. the measure `user_count`
+can have dimensions like `country`, `age`, `occupation`, etc.
 
 Any dimension should have the following properties: `name`, `sql` and `type`.
 
@@ -180,6 +180,43 @@ cubes:
 
 </CodeTabs>
 
+###  format
+
+`format` is an optional parameter. It is used to format the output of dimensions
+in different ways, for example, a link for `external_url`. Please refer to the
+[Dimension Formats][ref-schema-ref-dims-formats] for the full list of supported
+formats.
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  measures: {
+    total: {
+      sql: `amount`,
+      type: `running_total`,
+      format: `currency`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: total
+        sql: amount
+        type: running_total
+        format: currency
+```
+
+</CodeTabs>
+
 ###  meta
 
 Custom metadata. Can be used to pass any information to the frontend.
@@ -343,9 +380,9 @@ cubes:
 ###  sql
 
 `sql` is a required parameter. It can take any valid SQL expression depending on
-the `type` of the dimension. Please refer to the [Dimension Types
-Guide][ref-schema-ref-types-formats-dimension-types] for detailed information on
-the corresponding `sql` parameter.
+the `type` of the dimension. Please refer to the [Dimension
+Types][ref-schema-ref-dims-types] to understand what the `sql` parameter should
+be for a given dimension type.
 
 <CodeTabs>
 
@@ -446,9 +483,44 @@ cubes:
 
 </CodeTabs>
 
+###  type
+
+`type` is a required parameter. There are various types that can be assigned to
+a dimension. Please refer to the [Dimension Types][ref-schema-ref-dims-types]
+for the full list of dimension types.
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  dimensions: {
+    rating: {
+      sql: `rating`,
+      type: `number`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    dimensions:
+      - name: rating
+        sql: rating
+        type: number
+```
+
+</CodeTabs>
+
 [ref-schema-ref-joins]: /schema/reference/joins
-[ref-schema-ref-types-formats-dimension-types]:
-  /schema/reference/types-and-formats#dimensions-types
 [ref-subquery]: /schema/fundamentals/additional-concepts#subquery
 [self-subquery]: #sub-query
 [ref-naming]: /data-modeling/syntax#naming
+[ref-schema-ref-dims-types]: /schema/reference/types-and-formats#dimension-types
+[ref-schema-ref-dims-formats]:
+  /schema/reference/types-and-formats#dimension-formats

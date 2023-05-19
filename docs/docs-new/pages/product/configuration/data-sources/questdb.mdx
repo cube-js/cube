@@ -4,6 +4,13 @@ redirect_from:
 ---
 
 # QuestDB
+<WarningBox>
+
+The driver for QuestDB is supported by its vendor. Please report any issues to
+their [Slack][questdb-slack].
+
+</WarningBox>
+
 ## Prerequisites
 
 - The hostname for the [QuestDB][questdb] database server
@@ -37,5 +44,6 @@ CUBEJS_DB_PASS=quest
 | `CUBEJS_DB_MAX_POOL` | The maximum number of concurrent database connections to pool. Default is `8`       | A valid number            |    ❌    |                                    ✅                                    |
 
 [questdb]: https://questdb.io/
+[questdb-slack]: https://slack.questdb.io/
 [ref-config-multiple-ds-decorating-env]:
   /config/multiple-data-sources#configuring-data-sources-with-environment-variables-decorated-environment-variables

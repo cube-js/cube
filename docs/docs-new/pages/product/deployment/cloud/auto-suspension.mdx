@@ -16,9 +16,9 @@ Cube Cloud can automatically suspend deployments when not in use to prevent
 actively used, which helps manage spend and preventing unnecessary quota use.
 
 This is useful for deployments that are not used 24/7, such as staging
-deployments. Auto-suspension will hibernate the deployment when **no** API requests
-are received after a period of time, and automatically resume the deployment
-when API requests start coming in again:
+deployments. Auto-suspension will hibernate the deployment when **no** API
+requests are received after a period of time, and automatically resume the
+deployment when API requests start coming in again:
 
 <div style={{ textAlign: "center" }}>
   <img
@@ -33,13 +33,15 @@ when API requests start coming in again:
 automatically when not in use for 10 minutes, whereas [Production
 Clusters][ref-deployment-prod-cluster] and [Production
 Multi-Clusters][ref-deployment-prod-multi-cluster] can auto-suspend after no API
-requests were received within a configurable time period.
+requests were received within a configurable time period. While suspended,
+[pre-aggregation][ref-caching-preaggs-gs] builds will also be paused to prevent
+unnecessary resource consumption.
 
 ## Configuration
 
-To configure auto-suspension settings, navigate to the <Btn>Settings</Btn> screen
-in your deployment and click the <Btn>Configuration</Btn> tab, then ensure&nbsp;
-&ZeroWidthSpace;<Btn>Enable Auto-suspend</Btn> is turned on:
+To configure auto-suspension settings, navigate to the <Btn>Settings</Btn>
+screen in your deployment and click the <Btn>Configuration</Btn> tab, then
+ensure <Btn>Enable Auto-suspend</Btn> is turned on:
 
 <Screenshot
   highlight="inset(40% 43% 50% 8% round 10px)"
@@ -60,17 +62,18 @@ configured; this usually takes less than a minute.
 
 ## Resuming a suspended deployment
 
-To resume a suspended deployment, send a query to Cube via either the API or
-the&nbsp;<Btn>Playground</Btn> screen in Cube Cloud.
+To resume a suspended deployment, send a query to Cube using the API or by
+navigating to the deployment in Cube Cloud.
 
-<InfoBox>
+<WarningBox>
 
-Opening the deployment in Cube Cloud will also resume the deployment, this is
-because Cube Cloud sends API requests to fetch the deployment details. API
-requests sent to [Development Mode][ref-workspace-dev-api] will also resume the
-deployment.
+Currently, Cube Cloud's auto-suspension feature cannot guarantee a 100% resume
+rate on the first query or a specific time frame for resume. While in most
+cases, deployment resumes within several seconds of the first query, there is
+still a possibility that it may take longer to resume your deployment. This can
+potentially lead to an error response code for the initial query.
 
-</InfoBox>
+</WarningBox>
 
 Deployments typically resume in under 30 seconds, but can take significantly
 longer in certain situations depending on two major factors:
@@ -81,6 +84,7 @@ longer in certain situations depending on two major factors:
 Complex data models take more time to compile, and complex queries can cause
 response times to be significantly longer than usual.
 
+[ref-caching-preaggs-gs]: /caching/pre-aggregations/getting-started
 [ref-deployment-dev-instance]:
   /cloud/configuration/deployment-types#development-instance
 [ref-deployment-prod-cluster]:
