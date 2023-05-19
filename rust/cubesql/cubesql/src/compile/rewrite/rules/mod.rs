@@ -8,6 +8,7 @@ pub mod members;
 pub mod order;
 pub mod split;
 pub mod utils;
+pub mod wrapper;
 
 pub fn replacer_push_down_node(
     name: &str,
@@ -37,6 +38,24 @@ pub fn replacer_push_down_node(
     } else {
         vec![push_down_rule]
     }
+}
+
+pub fn replacer_pull_up_node(
+    name: &str,
+    list_node: &str,
+    replacer_node: impl Fn(String) -> String,
+) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
+    let pull_up_rule = rewrite(
+        &format!("{}-pull-up", name),
+        format!(
+            "({} {} {})",
+            list_node,
+            replacer_node("?left".to_string()),
+            replacer_node("?right".to_string())
+        ),
+        replacer_node(format!("({} ?left ?right)", list_node)),
+    );
+    vec![pull_up_rule]
 }
 
 pub fn replacer_push_down_node_substitute_rules(

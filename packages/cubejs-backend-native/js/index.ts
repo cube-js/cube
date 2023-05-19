@@ -56,6 +56,7 @@ export type SQLInterfaceOptions = {
     load: (payload: LoadPayload) => unknown | Promise<unknown>,
     meta: (payload: MetaPayload) => unknown | Promise<unknown>,
     stream: (payload: LoadPayload) => unknown | Promise<unknown>,
+    sqlGenerators: (paramsJson: string) => unknown | Promise<unknown>,
 };
 
 function loadNative() {
@@ -107,6 +108,40 @@ function wrapNativeFunctionWithChannelCallback(
         if (process.env.CUBEJS_NATIVE_INTERNAL_DEBUG) {
           console.debug('[js] channel.reject exception', {
             e: rejectErr
+          });
+        }
+      }
+
+      // throw e;
+    }
+  };
+}
+
+function wrapRawNativeFunctionWithChannelCallback(
+  fn: (extra: any) => unknown | Promise<unknown>,
+) {
+  return async (extra: any, channel: any) => {
+    try {
+      const result = await fn(extra);
+
+      if (process.env.CUBEJS_NATIVE_INTERNAL_DEBUG) {
+        console.debug('[js] channel.resolve', {
+          result,
+        });
+      }
+      channel.resolve(result);
+    } catch (e: any) {
+      if (process.env.CUBEJS_NATIVE_INTERNAL_DEBUG) {
+        console.debug('[js] channel.reject', {
+          e,
+        });
+      }
+      try {
+        channel.reject(e.message || e.toString());
+      } catch (e) {
+        if (process.env.CUBEJS_NATIVE_INTERNAL_DEBUG) {
+          console.debug('[js] channel.reject exception', {
+            e,
           });
         }
       }
@@ -224,14 +259,19 @@ export const registerInterface = async (options: SQLInterfaceOptions): Promise<S
     throw new Error('options.stream must be a function');
   }
 
-  const native = loadNative();
-  return native.registerInterface({
-    ...options,
-    checkAuth: wrapNativeFunctionWithChannelCallback(options.checkAuth),
-    load: wrapNativeFunctionWithChannelCallback(options.load),
-    meta: wrapNativeFunctionWithChannelCallback(options.meta),
-    stream: wrapNativeFunctionWithStream(options.stream),
-  });
+  if (typeof options.sqlGenerators != 'function') {
+        throw new Error('options.sqlGenerators must be a function');
+    }
+
+    const native = loadNative();
+    return native.registerInterface({
+        ...options,
+        checkAuth: wrapNativeFunctionWithChannelCallback(options.checkAuth),
+        load: wrapNativeFunctionWithChannelCallback(options.load),
+        meta: wrapNativeFunctionWithChannelCallback(options.meta),
+        stream: wrapNativeFunctionWithStream(options.stream),
+        sqlGenerators: wrapRawNativeFunctionWithChannelCallback(options.sqlGenerators),
+    });
 };
 
 export const shutdownInterface = async (instance: SqlInterfaceInstance): Promise<void> => {

@@ -247,6 +247,11 @@ crate::plan_to_language! {
             aliases: Option<Vec<(String, String)>>,
             split: bool,
             can_pushdown_join: bool,
+            wrapped: bool,
+        },
+        CubeScanWrapper {
+            input: Arc<LogicalPlan>,
+            finalized: bool,
         },
         AllMembers {
             cube: String,
@@ -370,6 +375,14 @@ crate::plan_to_language! {
         },
         GroupAggregateSplitReplacer {
             members: Vec<LogicalPlan>,
+            alias_to_cube: Vec<(String, String)>,
+        },
+        WrapperPushdownReplacer {
+            member: Arc<LogicalPlan>,
+            alias_to_cube: Vec<(String, String)>,
+        },
+        WrapperPullupReplacer {
+            member: Arc<LogicalPlan>,
             alias_to_cube: Vec<(String, String)>,
         },
         // NOTE: converting this to a list might provide rewrite improvements
@@ -999,6 +1012,14 @@ fn case_expr_replacer(members: impl Display, alias_to_cube: impl Display) -> Str
     format!("(CaseExprReplacer {} {})", members, alias_to_cube)
 }
 
+fn wrapper_pushdown_replacer(members: impl Display, alias_to_cube: impl Display) -> String {
+    format!("(WrapperPushdownReplacer {} {})", members, alias_to_cube)
+}
+
+fn wrapper_pullup_replacer(members: impl Display, alias_to_cube: impl Display) -> String {
+    format!("(WrapperPullupReplacer {} {})", members, alias_to_cube)
+}
+
 fn event_notification(name: impl Display, members: impl Display, meta: impl Display) -> String {
     format!("(EventNotification {} {} {})", name, members, meta)
 }
@@ -1118,11 +1139,25 @@ fn cube_scan(
     aliases: impl Display,
     split: impl Display,
     can_pushdown_join: impl Display,
+    wrapped: impl Display,
 ) -> String {
     format!(
-        "(Extension (CubeScan {} {} {} {} {} {} {} {} {}))",
-        alias_to_cube, members, filters, orders, limit, offset, aliases, split, can_pushdown_join,
+        "(Extension (CubeScan {} {} {} {} {} {} {} {} {} {}))",
+        alias_to_cube,
+        members,
+        filters,
+        orders,
+        limit,
+        offset,
+        aliases,
+        split,
+        can_pushdown_join,
+        wrapped
     )
+}
+
+fn cube_scan_wrapper(input: impl Display, finalized: impl Display) -> String {
+    format!("(CubeScanWrapper {} {})", input, finalized)
 }
 
 pub fn original_expr_name(

@@ -45,6 +45,24 @@ export class SQLServer {
     const canSwitchSqlUser: CanSwitchSQLUserFn = options.canSwitchSqlUser
       || this.createDefaultCanSwitchSqlUserFn(options);
 
+    const contextByRequest = async (request, session) => {
+      let userForContext = session.user;
+
+      if (request.meta.changeUser && request.meta.changeUser !== session.user) {
+        const canSwitch = session.superuser || await canSwitchSqlUser(session.user, request.meta.changeUser);
+        if (canSwitch) {
+          userForContext = request.meta.changeUser;
+        } else {
+          throw new Error(
+            `You cannot change security context via __user from ${session.user} to ${request.meta.changeUser}, because it's not allowed.`
+          );
+        }
+      }
+      // @todo Store security context in native for session's user, but not for switching
+      const current = await checkSqlAuth(request, userForContext);
+      return this.contextByNativeReq(request, current.securityContext, request.id);
+    };
+
     this.sqlInterfaceInstance = await registerInterface({
       port: options.sqlPort,
       pgPort: options.pgSqlPort,
@@ -78,22 +96,7 @@ export class SQLServer {
         });
       },
       load: async ({ request, session, query }) => {
-        let userForContext = session.user;
-
-        if (request.meta.changeUser && request.meta.changeUser !== session.user) {
-          const canSwitch = session.superuser || await canSwitchSqlUser(session.user, request.meta.changeUser);
-          if (canSwitch) {
-            userForContext = request.meta.changeUser;
-          } else {
-            throw new Error(
-              `You cannot change security context via __user from ${session.user} to ${request.meta.changeUser}, because it's not allowed.`
-            );
-          }
-        }
-
-        // @todo Store security context in native for session's user, but not for switching
-        const current = await checkSqlAuth(request, userForContext);
-        const context = await this.contextByNativeReq(request, current.securityContext, request.id);
+        const context = await contextByRequest(request, session);
 
         // eslint-disable-next-line no-async-promise-executor
         return new Promise(async (resolve, reject) => {
@@ -113,27 +116,33 @@ export class SQLServer {
         });
       },
       stream: async ({ request, session, query }) => {
-        let userForContext = session.user;
-
-        if (request.meta.changeUser && request.meta.changeUser !== session.user) {
-          const canSwitch = session.superuser || await canSwitchSqlUser(session.user, request.meta.changeUser);
-          if (canSwitch) {
-            userForContext = request.meta.changeUser;
-          } else {
-            throw new Error(
-              `You cannot change security context via __user from ${session.user} to ${request.meta.changeUser}, because it's not allowed.`
-            );
-          }
-        }
-
-        // @todo Store security context in native for session's user, but not for switching
-        const current = await checkSqlAuth(request, userForContext);
-        const context = await this.contextByNativeReq(request, current.securityContext, request.id);
+        const context = await contextByRequest(request, session);
 
         // eslint-disable-next-line no-async-promise-executor
         return new Promise(async (resolve, reject) => {
           try {
             resolve(await this.apiGateway.stream(context, query));
+          } catch (e) {
+            reject(e);
+          }
+        });
+      },
+      sqlGenerators: async (paramsJson: string) => {
+        // TODO get rid of it
+        const { request, session } = JSON.parse(paramsJson);
+        // @todo Store security context in native
+        const { securityContext } = await checkSqlAuth(request, session.user);
+        const context = await this.apiGateway.contextByReq(<any> request, securityContext, request.id);
+
+        // eslint-disable-next-line no-async-promise-executor
+        return new Promise(async (resolve, reject) => {
+          try {
+            await this.apiGateway.sqlGenerators({
+              context,
+              res: (queries) => {
+                resolve(queries);
+              },
+            });
           } catch (e) {
             reject(e);
           }

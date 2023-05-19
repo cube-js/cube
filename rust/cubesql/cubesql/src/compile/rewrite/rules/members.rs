@@ -75,6 +75,7 @@ impl RewriteRules for MemberRules {
                     "?cube_scan_aliases",
                     "CubeScanSplit:false",
                     "CubeScanCanPushdownJoin:true",
+                    "CubeScanWrapped:false",
                 ),
                 self.transform_table_scan(
                     "?source_table_name",
@@ -345,6 +346,7 @@ impl RewriteRules for MemberRules {
                         "?aliases",
                         "?split",
                         "?can_pushdown_join",
+                        "CubeScanWrapped:false",
                     ),
                     "?group_expr",
                     "?aggr_expr",
@@ -371,6 +373,7 @@ impl RewriteRules for MemberRules {
                     "?aliases",
                     "?split",
                     "?new_pushdown_join",
+                    "CubeScanWrapped:false",
                 ),
                 self.push_down_aggregate_to_empty_scan(
                     "?alias_to_cube",
@@ -395,6 +398,7 @@ impl RewriteRules for MemberRules {
                         "?aliases",
                         "?split",
                         "?can_pushdown_join",
+                        "CubeScanWrapped:false",
                     ),
                     "?group_expr",
                     "?aggr_expr",
@@ -421,6 +425,7 @@ impl RewriteRules for MemberRules {
                     "?aliases",
                     "?split",
                     "?new_pushdown_join",
+                    "CubeScanWrapped:false",
                 ),
                 self.push_down_non_empty_aggregate(
                     "?alias_to_cube",
@@ -446,6 +451,7 @@ impl RewriteRules for MemberRules {
                         "?aliases",
                         "?split",
                         "?can_pushdown_join",
+                        "CubeScanWrapped:false",
                     ),
                     "?alias",
                     "?projection_split",
@@ -464,6 +470,7 @@ impl RewriteRules for MemberRules {
                     "?aliases_none",
                     "?split",
                     "?can_pushdown_join",
+                    "CubeScanWrapped:false",
                 ),
                 self.push_down_projection_to_empty_scan(
                     "?alias",
@@ -489,6 +496,7 @@ impl RewriteRules for MemberRules {
                         "?cube_aliases",
                         "?split",
                         "?can_pushdown_join",
+                        "CubeScanWrapped:false",
                     ),
                     "?alias",
                     "?projection_split",
@@ -507,6 +515,7 @@ impl RewriteRules for MemberRules {
                     "?aliases",
                     "?split",
                     "?can_pushdown_join",
+                    "CubeScanWrapped:false",
                 ),
                 self.push_down_projection(
                     "?expr",
@@ -532,6 +541,7 @@ impl RewriteRules for MemberRules {
                     "?aliases",
                     "?split",
                     "?can_pushdown_join",
+                    "CubeScanWrapped:false",
                 ),
                 cube_scan(
                     "?alias_to_cube",
@@ -543,6 +553,7 @@ impl RewriteRules for MemberRules {
                     "?new_aliases",
                     "?split",
                     "?can_pushdown_join",
+                    "CubeScanWrapped:false",
                 ),
                 self.cube_scan_resolve_aliases("?members", "?aliases", "?new_aliases"),
             ),
@@ -561,6 +572,7 @@ impl RewriteRules for MemberRules {
                         "?aliases",
                         "?split",
                         "?can_pushdown_join",
+                        "CubeScanWrapped:false",
                     ),
                 ),
                 cube_scan(
@@ -573,33 +585,9 @@ impl RewriteRules for MemberRules {
                     "?aliases",
                     "?split",
                     "?can_pushdown_join",
+                    "CubeScanWrapped:false",
                 ),
                 self.push_down_limit("?skip", "?fetch", "?new_skip", "?new_fetch"),
-            ),
-            // Empty tail merges
-            rewrite(
-                "merge-member-empty-tails",
-                cube_scan_members(
-                    cube_scan_members_empty_tail(),
-                    cube_scan_members_empty_tail(),
-                ),
-                cube_scan_members_empty_tail(),
-            ),
-            rewrite(
-                "merge-member-empty-tails-right",
-                cube_scan_members(
-                    cube_scan_members_empty_tail(),
-                    cube_scan_members("?left", "?right"),
-                ),
-                cube_scan_members("?left", "?right"),
-            ),
-            rewrite(
-                "merge-member-empty-tails-left",
-                cube_scan_members(
-                    cube_scan_members("?left", "?right"),
-                    cube_scan_members_empty_tail(),
-                ),
-                cube_scan_members("?left", "?right"),
             ),
             // Binary expression associative properties
             rewrite(
@@ -645,6 +633,7 @@ impl RewriteRules for MemberRules {
                         "?aliases",
                         "CubeScanSplit:false",
                         "CubeScanCanPushdownJoin:true",
+                        "CubeScanWrapped:false",
                     ),
                     cube_scan(
                         "?right_alias_to_cube",
@@ -656,6 +645,7 @@ impl RewriteRules for MemberRules {
                         "?aliases",
                         "CubeScanSplit:false",
                         "CubeScanCanPushdownJoin:true",
+                        "CubeScanWrapped:false",
                     ),
                 ),
                 cube_scan(
@@ -668,6 +658,7 @@ impl RewriteRules for MemberRules {
                     "?aliases",
                     "CubeScanSplit:false",
                     "CubeScanCanPushdownJoin:true",
+                    "CubeScanWrapped:false",
                 ),
                 self.push_down_cross_join_to_empty_scan(
                     "?left_alias_to_cube",
@@ -716,6 +707,7 @@ impl RewriteRules for MemberRules {
                         "?left_aliases",
                         "?left_split",
                         "?left_can_pushdown_join",
+                        "CubeScanWrapped:false",
                     ),
                     cube_scan(
                         "?right_alias_to_cube",
@@ -727,6 +719,7 @@ impl RewriteRules for MemberRules {
                         "?right_aliases",
                         "?right_split",
                         "?right_can_pushdown_join",
+                        "CubeScanWrapped:false",
                     ),
                     "?left_on",
                     "?right_on",
@@ -744,6 +737,7 @@ impl RewriteRules for MemberRules {
                         "?left_aliases",
                         "?left_split",
                         "?left_can_pushdown_join",
+                        "CubeScanWrapped:false",
                     ),
                     cube_scan(
                         "?right_alias_to_cube",
@@ -755,6 +749,7 @@ impl RewriteRules for MemberRules {
                         "?right_aliases",
                         "?right_split",
                         "?right_can_pushdown_join",
+                        "CubeScanWrapped:false",
                     ),
                 ),
                 self.join_to_cross_join("?left_on", "?right_on", "?left_aliases", "?right_aliases"),
@@ -3615,6 +3610,7 @@ impl MemberRules {
                     "?left_aliases",
                     "CubeScanSplit:false",
                     "CubeScanCanPushdownJoin:true",
+                    "CubeScanWrapped:false",
                 ),
                 cube_scan(
                     "?right_alias_to_cube",
@@ -3626,6 +3622,7 @@ impl MemberRules {
                     "?right_aliases",
                     "CubeScanSplit:false",
                     "CubeScanCanPushdownJoin:true",
+                    "CubeScanWrapped:false",
                 ),
             ),
             cube_scan(
@@ -3638,6 +3635,7 @@ impl MemberRules {
                 "?joined_aliases",
                 "CubeScanSplit:false",
                 "CubeScanCanPushdownJoin:true",
+                "CubeScanWrapped:false",
             ),
             self.push_down_cross_join_to_cube_scan(
                 "?left_alias_to_cube",

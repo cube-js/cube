@@ -2380,6 +2380,14 @@ class BaseQuery {
     return false;
   }
 
+  sqlTemplates() {
+    return {
+      functions: {
+        sum: 'SUM({{ argument }})',
+      }
+    };
+  }
+
   // eslint-disable-next-line consistent-return
   preAggregationQueryForSqlEvaluation(cube, preAggregation) {
     if (preAggregation.type === 'autoRollup') {

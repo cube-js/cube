@@ -1200,6 +1200,30 @@ class ApiGateway {
     }
   }
 
+  public async sqlGenerators({ context, res }: { context: RequestContext, res: ResponseResultFn }) {
+    const requestStarted = new Date();
+
+    try {
+      const compilerApi = this.getCompilerApi(context);
+      const query = {
+        requestId: context.requestId,
+      };
+      const cubeNameToDataSource = await compilerApi.cubeNameToDataSource(query);
+
+      let dataSources = Object.keys(cubeNameToDataSource).map(c => cubeNameToDataSource[c]);
+      dataSources = [...new Set(dataSources)];
+      const dataSourceToSqlGenerator = (await Promise.all(
+        dataSources.map(async dataSource => ({ [dataSource]: (await compilerApi.getSqlGenerator(query, dataSource)).sqlGenerator }))
+      )).reduce((a, b) => ({ ...a, ...b }), {});
+
+      res({ cubeNameToDataSource, dataSourceToSqlGenerator });
+    } catch (e) {
+      this.handleError({
+        e, context, res, requestStarted
+      });
+    }
+  }
+
   protected createSecurityContextExtractor(options?: JWTOptions): SecurityContextExtractorFn {
     if (options?.claimsNamespace) {
       return (ctx: Readonly<RequestContext>) => {

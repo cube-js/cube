@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
 use cubeclient::models::{
@@ -13,7 +13,9 @@ use crate::{
         session::DatabaseProtocol, AuthContextRef, AuthenticateResponse, HttpAuthContext,
         ServerManager, Session, SessionManager, SqlAuthService,
     },
-    transport::{CubeStreamReceiver, LoadRequestMeta, TransportService},
+    transport::{
+        CubeStreamReceiver, LoadRequestMeta, SqlGenerator, SqlTemplates, TransportService,
+    },
     CubeError,
 };
 
@@ -170,12 +172,64 @@ pub fn get_string_cube_meta() -> Vec<V1CubeMeta> {
     }]
 }
 
+#[derive(Debug)]
+pub struct SqlGeneratorMock {
+    pub sql_templates: Arc<SqlTemplates>,
+}
+
+#[async_trait]
+impl SqlGenerator for SqlGeneratorMock {
+    fn get_sql_templates(&self) -> Arc<SqlTemplates> {
+        self.sql_templates.clone()
+    }
+
+    async fn call_template(
+        &self,
+        name: String,
+        params: HashMap<String, String>,
+    ) -> Result<String, CubeError> {
+        todo!()
+    }
+}
+
 pub fn get_test_tenant_ctx() -> Arc<MetaContext> {
-    Arc::new(MetaContext::new(get_test_meta()))
+    let sql_generator: Arc<dyn SqlGenerator + Send + Sync> = Arc::new(SqlGeneratorMock {
+        sql_templates: Arc::new(SqlTemplates {
+            functions: vec![
+                ("SUM".to_string(), "SUM({{ column }})".to_string()),
+                ("MIN".to_string(), "MIN({{ column }})".to_string()),
+                ("MAX".to_string(), "MAX({{ column }})".to_string()),
+                ("COUNT".to_string(), "COUNT({{ column }})".to_string()),
+                (
+                    "COUNT_DISTINCT".to_string(),
+                    "COUNT(DISTINCT {{ column }})".to_string(),
+                ),
+            ]
+            .into_iter()
+            .collect(),
+        }),
+    });
+    Arc::new(MetaContext::new(
+        get_test_meta(),
+        vec![
+            (
+                "KibanaSampleDataEcommerce".to_string(),
+                "default".to_string(),
+            ),
+            ("Logs".to_string(), "default".to_string()),
+            ("NumberCube".to_string(), "default".to_string()),
+        ]
+        .into_iter()
+        .collect(),
+        vec![("default".to_string(), sql_generator)]
+            .into_iter()
+            .collect(),
+    ))
 }
 
 pub fn get_test_tenant_ctx_with_meta(meta: Vec<V1CubeMeta>) -> Arc<MetaContext> {
-    Arc::new(MetaContext::new(meta))
+    // TODO
+    Arc::new(MetaContext::new(meta, HashMap::new(), HashMap::new()))
 }
 
 pub async fn get_test_session(protocol: DatabaseProtocol) -> Arc<Session> {

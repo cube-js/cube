@@ -1,5 +1,6 @@
 use std::{
     any::Any,
+    collections::HashSet,
     fmt,
     sync::Arc,
     task::{Context, Poll},
@@ -118,6 +119,52 @@ impl UserDefinedLogicalNode for CubeScanNode {
             request: self.request.clone(),
             auth_context: self.auth_context.clone(),
             options: self.options.clone(),
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct CubeScanWrapperNode {
+    input: Arc<LogicalPlan>,
+}
+
+impl CubeScanWrapperNode {
+    pub fn new(input: Arc<LogicalPlan>) -> Self {
+        Self { input }
+    }
+}
+
+impl UserDefinedLogicalNode for CubeScanWrapperNode {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn inputs(&self) -> Vec<&LogicalPlan> {
+        vec![&self.input]
+    }
+
+    fn schema(&self) -> &DFSchemaRef {
+        self.input.schema()
+    }
+
+    fn expressions(&self) -> Vec<Expr> {
+        vec![]
+    }
+
+    fn fmt_for_explain(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "CubeScanWrapper")
+    }
+
+    fn from_template(
+        &self,
+        exprs: &[datafusion::logical_plan::Expr],
+        inputs: &[datafusion::logical_plan::LogicalPlan],
+    ) -> std::sync::Arc<dyn UserDefinedLogicalNode + Send + Sync> {
+        assert_eq!(inputs.len(), 1, "input size inconsistent");
+        assert_eq!(exprs.len(), 0, "expression size inconsistent");
+
+        Arc::new(CubeScanWrapperNode {
+            input: Arc::new(inputs[0].clone()),
         })
     }
 }

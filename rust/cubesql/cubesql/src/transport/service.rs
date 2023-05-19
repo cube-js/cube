@@ -6,7 +6,7 @@ use cubeclient::{
 
 use datafusion::arrow::{datatypes::SchemaRef, record_batch::RecordBatch};
 use serde_derive::*;
-use std::{fmt::Debug, sync::Arc, time::Duration};
+use std::{collections::HashMap, fmt::Debug, sync::Arc, time::Duration};
 use tokio::{
     sync::{mpsc::Receiver, RwLock as RwLockAsync},
     time::Instant,
@@ -73,6 +73,22 @@ pub trait TransportService: Send + Sync + Debug {
     ) -> Result<CubeStreamReceiver, CubeError>;
 }
 
+#[derive(Debug)]
+pub struct SqlTemplates {
+    pub functions: HashMap<String, String>,
+}
+
+#[async_trait]
+pub trait SqlGenerator: Send + Sync + Debug {
+    fn get_sql_templates(&self) -> Arc<SqlTemplates>;
+
+    async fn call_template(
+        &self,
+        name: String,
+        params: HashMap<String, String>,
+    ) -> Result<String, CubeError>;
+}
+
 pub type CubeStreamReceiver = Receiver<Option<Result<RecordBatch, CubeError>>>;
 
 #[derive(Debug)]
@@ -136,7 +152,12 @@ impl TransportService for HttpTransport {
             }
         };
 
-        let value = Arc::new(MetaContext::new(response.cubes.unwrap_or_else(Vec::new)));
+        // Not used -- doesn't make sense to implement
+        let value = Arc::new(MetaContext::new(
+            response.cubes.unwrap_or_else(Vec::new),
+            HashMap::new(),
+            HashMap::new(),
+        ));
 
         *store = Some(MetaCacheBucket {
             lifetime: Instant::now(),

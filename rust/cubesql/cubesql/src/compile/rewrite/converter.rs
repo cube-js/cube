@@ -1,7 +1,7 @@
 use crate::{
     compile::{
         engine::{
-            df::scan::{CubeScanNode, CubeScanOptions, MemberField},
+            df::scan::{CubeScanNode, CubeScanOptions, CubeScanWrapperNode, MemberField},
             provider::CubeContext,
         },
         rewrite::{
@@ -1600,6 +1600,12 @@ impl LanguageToLogicalPlanConverter {
                 };
 
                 LogicalPlan::Extension(Extension { node })
+            }
+            LogicalPlanLanguage::CubeScanWrapper(params) => {
+                let input = Arc::new(self.to_logical_plan(params[0])?);
+                LogicalPlan::Extension(Extension {
+                    node: Arc::new(CubeScanWrapperNode::new(input)),
+                })
             }
             LogicalPlanLanguage::Union(params) => {
                 let inputs = match_list_node_ids!(node_by_id, params[0], UnionInputs)
