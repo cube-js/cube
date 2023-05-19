@@ -11,6 +11,12 @@ import localFont from "next/font/local";
 import { Inter } from "next/font/google";
 import { SearchProvider } from "@cube-dev/marketing-ui";
 
+export const SourceCodePro = localFont({
+  src: "../fonts/SourceCodePro-Regular.woff2",
+  weight: "400",
+  style: "normal",
+});
+
 export const JetBrainsMono = localFont({
   src: "../fonts/JetBrainsMono-Regular.woff2",
   weight: "400",
@@ -65,6 +71,7 @@ export default function MyApp({ Component, pageProps }: AppProps) {
           --font: ${inter.style.fontFamily};
           --font-creapro: ${CeraPro.style.fontFamily};
           --font-mono: ${JetBrainsMono.style.fontFamily};
+          --font-code: ${SourceCodePro.style.fontFamily};
           --cube-font: ${CeraPro.style.fontFamily};
         }
 
@@ -84,7 +91,7 @@ export default function MyApp({ Component, pageProps }: AppProps) {
         kbd,
         samp,
         pre {
-          font-family: var(--font-mono);
+          font-family: var(--font-code);
         }
       `}</style>
       <Component {...pageProps} />
