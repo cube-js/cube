@@ -200,19 +200,11 @@ const normalizeQuery = (query, persistent) => {
     order: normalizeQueryOrder(query.order),
     filters: (query.filters || []).map(f => {
       const { dimension, member, ...filter } = f;
-      const normalizedFilter = {
+      return {
         ...filter,
         member: member || dimension,
         values: filter.values?.map(v => (v != null ? v.toString() : v))
       };
-
-      Object.defineProperty(normalizedFilter, 'dimension', {
-        get() {
-          console.warn('Warning: Attribute `filter.dimension` is deprecated. Please use \'member\' instead of \'dimension\'.');
-          return this.member;
-        }
-      });
-      return normalizedFilter;
     }),
     dimensions: (query.dimensions || []).filter(d => d.split('.').length !== 3),
     timeDimensions: (query.timeDimensions || []).map(td => {
