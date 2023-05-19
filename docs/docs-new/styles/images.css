@@ -1,0 +1,4 @@
+main > img,
+main > div > img {
+  margin: 1.5rem 0;
+}

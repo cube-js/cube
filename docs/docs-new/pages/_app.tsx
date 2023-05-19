@@ -4,6 +4,7 @@ import "@/styles/globals.css";
 import "@/styles/palette.css";
 import "@/styles/typography.css";
 import "@/styles/math.css";
+import "@/styles/images.css";
 import "katex/dist/katex.min.css";
 import "@cube-dev/marketing-ui/dist/index.css";
 
