@@ -908,6 +908,11 @@ const overrides: Record<string, Override> = {
     ready: true,
     path: "reference/frontend/cubejs-client-ngx",
     title: "@cubejs-client/ngx",
+
+    meta: {
+      'cubejs-client-ngx': "@cubejs-client-ngx",
+      'cubejs-client-vue': '@cubejs-client-vue',
+    },
   },
 
   "Reference/REST-API/REST-API.mdx": {
