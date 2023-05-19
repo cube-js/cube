@@ -277,8 +277,8 @@ impl SqlGenerator for NodeSqlGenerator {
 
     async fn call_template(
         &self,
-        name: String,
-        params: HashMap<String, String>,
+        _name: String,
+        _params: HashMap<String, String>,
     ) -> Result<String, CubeError> {
         todo!()
     }
