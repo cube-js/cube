@@ -56,8 +56,8 @@ use self::{
             create_minute_udf, create_mod_udf, create_pg_backend_pid_udf,
             create_pg_datetime_precision_udf, create_pg_encoding_to_char_udf,
             create_pg_expandarray_udtf, create_pg_get_constraintdef_udf, create_pg_get_expr_udf,
-            create_pg_get_serial_sequence_udf, create_pg_get_userbyid_udf,
-            create_pg_is_other_temp_schema, create_pg_my_temp_schema,
+            create_pg_get_indexdef_udf, create_pg_get_serial_sequence_udf,
+            create_pg_get_userbyid_udf, create_pg_is_other_temp_schema, create_pg_my_temp_schema,
             create_pg_numeric_precision_udf, create_pg_numeric_scale_udf,
             create_pg_table_is_visible_udf, create_pg_total_relation_size_udf,
             create_pg_truetypid_udf, create_pg_truetypmod_udf, create_pg_type_is_visible_udf,
@@ -1184,6 +1184,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_charindex_udf());
         ctx.register_udf(create_mod_udf());
         ctx.register_udf(create_to_regtype_udf());
+        ctx.register_udf(create_pg_get_indexdef_udf());
 
         // udaf
         ctx.register_udaf(create_measure_udaf());
@@ -18133,5 +18134,138 @@ ORDER BY \"COUNT(count)\" DESC"
                 filters: None,
             }
         )
+    }
+
+    #[tokio::test]
+    async fn test_langchain_pgcatalog_schema() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "langchain_pgcatalog_schema",
+            execute_query(
+                "
+                SELECT pg_catalog.pg_class.relname
+                FROM pg_catalog.pg_class
+                JOIN pg_catalog.pg_namespace ON pg_catalog.pg_namespace.oid = pg_catalog.pg_class.relnamespace
+                WHERE
+                    pg_catalog.pg_class.relkind = ANY (ARRAY['r', 'p'])
+                    AND pg_catalog.pg_class.relpersistence != 't'
+                    AND pg_catalog.pg_table_is_visible(pg_catalog.pg_class.oid)
+                    AND pg_catalog.pg_namespace.nspname != 'pg_catalog'
+                ;".to_string(),
+                DatabaseProtocol::PostgreSQL,
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_langchain_array_agg_order_by() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "langchain_array_agg_order_by",
+            execute_query(
+                "
+                SELECT
+                    pg_catalog.pg_type.typname AS name,
+                    pg_catalog.pg_type_is_visible(pg_catalog.pg_type.oid) AS visible,
+                    pg_catalog.pg_namespace.nspname AS schema, lbl_agg.labels AS labels 
+                FROM pg_catalog.pg_type
+                JOIN pg_catalog.pg_namespace ON pg_catalog.pg_namespace.oid = pg_catalog.pg_type.typnamespace
+                LEFT OUTER JOIN (
+                    SELECT
+                        pg_catalog.pg_enum.enumtypid AS enumtypid,
+                        array_agg(pg_catalog.pg_enum.enumlabel ORDER BY pg_catalog.pg_enum.enumsortorder) AS labels 
+                    FROM pg_catalog.pg_enum
+                    GROUP BY pg_catalog.pg_enum.enumtypid
+                ) AS lbl_agg ON pg_catalog.pg_type.oid = lbl_agg.enumtypid 
+                WHERE pg_catalog.pg_type.typtype = 'e'
+                ORDER BY
+                    pg_catalog.pg_namespace.nspname,
+                    pg_catalog.pg_type.typname
+                ;".to_string(),
+                DatabaseProtocol::PostgreSQL,
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_langchain_pg_get_indexdef_and_in_realiasing() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "langchain_pg_get_indexdef_and_in_realiasing",
+            execute_query(
+                "
+                SELECT
+                    pg_catalog.pg_index.indrelid,
+                    cls_idx.relname AS relname_index,
+                    pg_catalog.pg_index.indisunique,
+                    pg_catalog.pg_constraint.conrelid IS NOT NULL AS has_constraint,
+                    pg_catalog.pg_index.indoption,
+                    cls_idx.reloptions,
+                    pg_catalog.pg_am.amname,
+                    CASE
+                        WHEN (pg_catalog.pg_index.indpred IS NOT NULL)
+                            THEN pg_catalog.pg_get_expr(pg_catalog.pg_index.indpred, pg_catalog.pg_index.indrelid)
+                    END AS filter_definition,
+                    pg_catalog.pg_index.indnkeyatts,
+                    idx_cols.elements,
+                    idx_cols.elements_is_expr 
+                FROM pg_catalog.pg_index
+                JOIN pg_catalog.pg_class AS cls_idx ON pg_catalog.pg_index.indexrelid = cls_idx.oid
+                JOIN pg_catalog.pg_am ON cls_idx.relam = pg_catalog.pg_am.oid
+                LEFT OUTER JOIN (
+                    SELECT
+                        idx_attr.indexrelid AS indexrelid,
+                        min(idx_attr.indrelid) AS min_1,
+                        array_agg(idx_attr.element ORDER BY idx_attr.ord) AS elements,
+                        array_agg(idx_attr.is_expr ORDER BY idx_attr.ord) AS elements_is_expr 
+                    FROM (
+                        SELECT
+                            idx.indexrelid AS indexrelid,
+                            idx.indrelid AS indrelid,
+                            idx.ord AS ord,
+                            CASE
+                                WHEN (idx.attnum = 0)
+                                    THEN pg_catalog.pg_get_indexdef(idx.indexrelid, idx.ord + 1, true)
+                                ELSE CAST(pg_catalog.pg_attribute.attname AS TEXT)
+                            END AS element,
+                            idx.attnum = 0 AS is_expr 
+                        FROM (
+                            SELECT
+                                pg_catalog.pg_index.indexrelid AS indexrelid,
+                                pg_catalog.pg_index.indrelid AS indrelid,
+                                unnest(pg_catalog.pg_index.indkey) AS attnum,
+                                generate_subscripts(pg_catalog.pg_index.indkey, 1) AS ord 
+                            FROM pg_catalog.pg_index 
+                            WHERE
+                                NOT pg_catalog.pg_index.indisprimary
+                                AND pg_catalog.pg_index.indrelid IN (18000)
+                        ) AS idx
+                        LEFT OUTER JOIN pg_catalog.pg_attribute ON
+                            pg_catalog.pg_attribute.attnum = idx.attnum
+                            AND pg_catalog.pg_attribute.attrelid = idx.indrelid 
+                        WHERE idx.indrelid IN (18000)
+                    ) AS idx_attr
+                    GROUP BY idx_attr.indexrelid
+                ) AS idx_cols ON pg_catalog.pg_index.indexrelid = idx_cols.indexrelid
+                LEFT OUTER JOIN pg_catalog.pg_constraint ON
+                    pg_catalog.pg_index.indrelid = pg_catalog.pg_constraint.conrelid
+                    AND pg_catalog.pg_index.indexrelid = pg_catalog.pg_constraint.conindid
+                    AND pg_catalog.pg_constraint.contype = ANY (ARRAY['p', 'u', 'x']) 
+                WHERE
+                    pg_catalog.pg_index.indrelid IN (18000)
+                    AND NOT pg_catalog.pg_index.indisprimary
+                ORDER BY
+                    pg_catalog.pg_index.indrelid,
+                    cls_idx.relname
+                ;".to_string(),
+                DatabaseProtocol::PostgreSQL,
+            )
+            .await?
+        );
+
+        Ok(())
     }
 }
