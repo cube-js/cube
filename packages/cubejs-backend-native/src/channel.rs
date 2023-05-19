@@ -164,6 +164,7 @@ where
     rx.await?
 }
 
+#[allow(clippy::type_complexity)]
 pub async fn call_raw_js_with_channel_as_callback<T, R>(
     channel: Arc<Channel>,
     js_method: Arc<Root<JsFunction>>,

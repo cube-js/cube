@@ -43,10 +43,10 @@ impl CubePlanState {
             (CubePlanState::Wrapper, _) => CubePlanState::Wrapper,
             (_, CubePlanState::Wrapped) => CubePlanState::Wrapped,
             (CubePlanState::Wrapped, _) => CubePlanState::Wrapped,
-            (CubePlanState::Unwrapped(a), _) => CubePlanState::Unwrapped(*a),
             (CubePlanState::Unwrapped(a), CubePlanState::Unwrapped(b)) => {
                 CubePlanState::Unwrapped(a + b)
             }
+            (CubePlanState::Unwrapped(a), _) => CubePlanState::Unwrapped(*a),
         }
     }
 }

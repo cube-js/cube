@@ -1,6 +1,5 @@
 use std::{
     any::Any,
-    collections::HashSet,
     fmt,
     sync::Arc,
     task::{Context, Poll},

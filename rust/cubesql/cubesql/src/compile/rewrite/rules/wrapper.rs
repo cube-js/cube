@@ -2,8 +2,7 @@ use crate::{
     compile::{
         engine::provider::CubeContext,
         rewrite::{
-            agg_fun_expr, aggr_aggr_expr_empty_tail, aggr_group_expr, aggr_group_expr_empty_tail,
-            aggregate,
+            agg_fun_expr, aggregate,
             analysis::LogicalPlanAnalysis,
             column_expr, cube_scan, cube_scan_wrapper, literal_expr, rewrite,
             rewriter::RewriteRules,
