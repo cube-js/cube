@@ -1,19 +1,22 @@
 import React, { useState } from 'react';
 import { event } from 'cubedev-tracking';
-import styles from './styles.module.scss';
-import FeedbackForm from './FeedbackForm'
+import { ButtonGroup, DislikeButton, LikeButton } from '@/components/common/Button/Button';
+import FeedbackForm from '@/components/common/FeedbackBlock/FeedbackForm';
 
-const Button = (props) => <button {...props} />;
+import styles from './FeedbackBlock.module.css';
 
-const FeedbackBlock = (props: propsType) => {
-  const { page } = props;
+export interface FeedbackBlockProps {
+}
+
+export const FeedbackBlock = (props: FeedbackBlockProps) => {
+  const page = window.location.pathname;
   const [date, setDate] = useState('');
   const [feedback, setFeedbackState] = useState('');
   const [isShowThanks, setShowThanks] = useState(false);
 
   const setFeedback = (state: string, page: string) => {
     if (feedback) {
-      return
+      return;
     }
     const date = new Date().toISOString();
     setDate(date);
@@ -28,39 +31,39 @@ const FeedbackBlock = (props: propsType) => {
   };
   const clearFeedback = () => {
     setFeedbackState('');
-  }
+  };
 
   if (isShowThanks) {
     return (
-      <div className={styles.thanksBlock}>Thank you for the feedback!</div>
+      <div className={styles.ThanksBlock}>Thank you for the feedback!</div>
     );
   }
-  
+
   return (
-    <div className={styles.feedbackBlock}>
-      <div className={styles.feedbackBlock__wrap}>
-        <p className={styles.feedbackBlock__question}>
-          Did you find this page useful?
+    <div className={styles.FeedbackBlock}>
+      <div className={styles.FeedbackBlock__wrap}>
+        <p className={styles.FeedbackBlock__question}>
+          Was this page useful?
         </p>
-        <div className={styles.feedbackBlock__buttons}>
-          <Button
-            className={styles.feedbackBlock__like}
-            active={feedback === 'like' ? 'active' : null}
-            disabled={feedback === 'dislike' ? 'disabled' : null}
-            view="like"
+        <ButtonGroup>
+          <LikeButton
+            // className={styles.FeedbackBlock__like}
+            // active={feedback === 'like' ? 'active' : null}
+            // disabled={feedback === 'dislike' ? 'disabled' : null}
+            // view='like'
             onClick={() => setFeedback('like', page)}
           >
             Yes
-          </Button>
-          <Button
-            active={feedback === 'dislike' ? 'active' : null}
-            disabled={feedback === 'like' ? 'disabled' : null}
-            view="dislike"
+          </LikeButton>
+          <DislikeButton
+            // active={feedback === 'dislike' ? 'active' : null}
+            // disabled={feedback === 'like' ? 'disabled' : null}
+            // view='dislike'
             onClick={() => setFeedback('dislike', page)}
           >
             No
-          </Button>
-        </div>
+          </DislikeButton>
+        </ButtonGroup>
       </div>
       {feedback && date && (
         <FeedbackForm
@@ -72,9 +75,4 @@ const FeedbackBlock = (props: propsType) => {
     </div>
   );
 };
-
-interface propsType {
-  page: string;
-}
-
 export default FeedbackBlock;

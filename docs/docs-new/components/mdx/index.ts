@@ -1,3 +1,4 @@
+import * as Buttons from '@/components/common/Button/Button';
 import { CodeTabs } from "@/components/mdx/CodeTabs";
 import { CubeQueryResultSet } from "@/components/mdx/CubeQueryResultSet";
 import {
@@ -18,6 +19,7 @@ import { Screenshot } from '@/components/mdx/Screenshot';
 import { YouTubeVideo } from '@/components/mdx/YouTubeVideo/YouTubeVideo';
 
 export const components = {
+  ...Buttons,
   DangerBox,
   InfoBox,
   SuccessBox,

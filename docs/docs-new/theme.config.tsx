@@ -3,6 +3,7 @@ import { components } from "@/components/mdx";
 import { CubeLogo } from "@/components/common/CubeLogo";
 import { Footer } from "@/components/common/Footer";
 import { SearchTrigger } from "@cube-dev/marketing-ui";
+import { MainLayout } from '@/components/layouts/MainLayout';
 
 const repo = "https://github.com/cube-js/cube";
 const branch = "master";
@@ -24,12 +25,25 @@ const config: DocsThemeConfig = {
     dark: 342,
   },
   components,
+  main: MainLayout,
   sidebar: {
     defaultMenuCollapseLevel: 1,
+    //
+    // @TODO This is disabled for now because there's no way to modify the title
+    // for the breadcrumb, which results in breadcrumbs like "Foo > `@cubejs-client/core`",
+    // when instead we want the backticks to be processed as Markdown and transformed into
+    // a code block.
+    // titleComponent: ({ title }) => {
+    //   const normalizedTitle = title.startsWith('`') && title.endsWith('`')
+    //     ? title.replace(/`/g, '')
+    //     : title;
+    //   return (<>{normalizedTitle}</>);
+    // },
   },
   search: {
     component: <SearchTrigger>Search</SearchTrigger>,
   },
+  gitTimestamp: () => null,
   footer: {
     component: <Footer />,
   },
