@@ -4,7 +4,7 @@
   border: 1px solid grey;
   border-radius: 4px;
   filter: drop-shadow(2px 2px 2px grey);
-  margin-bottom: 24px;
+  margin: 1.5rem 0;
   overflow: hidden;
 }
 
