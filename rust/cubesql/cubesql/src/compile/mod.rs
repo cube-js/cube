@@ -9518,6 +9518,8 @@ ORDER BY \"COUNT(count)\" DESC"
 
     #[tokio::test]
     async fn test_metabase_table_exists() -> Result<(), CubeError> {
+        init_logger();
+
         insta::assert_snapshot!(
             "metabase_table_exists",
             execute_query(

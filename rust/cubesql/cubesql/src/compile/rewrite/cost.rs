@@ -43,9 +43,6 @@ impl CubePlanState {
             (CubePlanState::Wrapper, _) => CubePlanState::Wrapper,
             (_, CubePlanState::Wrapped) => CubePlanState::Wrapped,
             (CubePlanState::Wrapped, _) => CubePlanState::Wrapped,
-            (CubePlanState::Unwrapped(a), CubePlanState::Unwrapped(b)) => {
-                CubePlanState::Unwrapped(a + b)
-            }
             (CubePlanState::Unwrapped(a), _) => CubePlanState::Unwrapped(*a),
         }
     }
@@ -125,7 +122,7 @@ impl CubePlanCost {
                 CubePlanState::Wrapped => 0,
                 CubePlanState::Unwrapped(size) => *size,
                 CubePlanState::Wrapper => 0,
-            },
+            } + self.ast_size_outside_wrapper,
             wrapper_nodes: self.wrapper_nodes,
             cube_scan_nodes: self.cube_scan_nodes,
             ast_size: self.ast_size,
@@ -155,18 +152,17 @@ impl CostFunction<LogicalPlanLanguage> for BestCubePlan {
         };
 
         let ast_size_outside_wrapper = match enode {
-            LogicalPlanLanguage::Measure(_) => 0,
-            LogicalPlanLanguage::Dimension(_) => 0,
-            LogicalPlanLanguage::ChangeUser(_) => 0,
-            LogicalPlanLanguage::VirtualField(_) => 0,
-            LogicalPlanLanguage::LiteralMember(_) => 0,
-            LogicalPlanLanguage::TimeDimensionGranularity(TimeDimensionGranularity(Some(_))) => 0,
-            // MemberError must be present here as well in order to preserve error priority
-            LogicalPlanLanguage::MemberError(_) => 0,
-            LogicalPlanLanguage::Extension(_) => 0,
-            LogicalPlanLanguage::CubeScanWrapper(_) => 0,
-            LogicalPlanLanguage::CubeScanWrapped(CubeScanWrapped(true)) => 0,
-            _ => 1,
+            LogicalPlanLanguage::Aggregate(_) => 1,
+            LogicalPlanLanguage::Projection(_) => 1,
+            LogicalPlanLanguage::Limit(_) => 1,
+            LogicalPlanLanguage::Sort(_) => 1,
+            LogicalPlanLanguage::Filter(_) => 1,
+            LogicalPlanLanguage::Join(_) => 1,
+            LogicalPlanLanguage::CrossJoin(_) => 1,
+            LogicalPlanLanguage::Union(_) => 1,
+            LogicalPlanLanguage::Window(_) => 1,
+            LogicalPlanLanguage::Subquery(_) => 1,
+            _ => 0,
         };
 
         let wrapper_nodes = match enode {
@@ -202,6 +198,7 @@ impl CostFunction<LogicalPlanLanguage> for BestCubePlan {
         };
 
         let this_replacers = match enode {
+            LogicalPlanLanguage::OrderReplacer(_) => 1,
             LogicalPlanLanguage::MemberReplacer(_) => 1,
             LogicalPlanLanguage::FilterReplacer(_) => 1,
             LogicalPlanLanguage::TimeDimensionDateRangeReplacer(_) => 1,
