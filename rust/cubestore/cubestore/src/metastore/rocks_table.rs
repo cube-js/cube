@@ -391,7 +391,7 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
             if index.is_unique() {
                 let hash = index.key_hash(&row);
                 let index_val = index.index_key_by(&row);
-                let existing_keys = self.get_row_from_index(
+                let existing_keys = self.get_row_ids_from_index(
                     index.get_id(),
                     &index_val,
                     &hash.to_be_bytes().to_vec(),
@@ -632,7 +632,7 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
     {
         let hash = secondary_index.typed_key_hash(&row_key);
         let index_val = secondary_index.key_to_bytes(&row_key);
-        let existing_keys = self.get_row_from_index(
+        let existing_keys = self.get_row_ids_from_index(
             RocksSecondaryIndex::get_id(secondary_index),
             &index_val,
             &hash.to_be_bytes().to_vec(),
@@ -656,6 +656,47 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
 
         let rows_ids = self.get_row_ids_by_index(row_key, secondary_index)?;
         Ok(rows_ids.len() as u64)
+    }
+
+    fn get_row_by_index_opt<K: Debug>(
+        &self,
+        row_key: &K,
+        secondary_index: &impl RocksSecondaryIndex<Self::T, K>,
+        reverse: bool,
+    ) -> Result<Option<IdRow<Self::T>>, CubeError>
+    where
+        K: Hash,
+    {
+        let row_ids = self.get_row_ids_by_index(row_key, secondary_index)?;
+
+        if RocksSecondaryIndex::is_unique(secondary_index) && row_ids.len() > 1 {
+            return Err(CubeError::internal(format!(
+                "Unique index expected but found multiple values in {:?} table: {:?}",
+                self, row_ids
+            )));
+        }
+
+        let id = if let Some(id) = if reverse {
+            row_ids.last()
+        } else {
+            row_ids.first()
+        } {
+            id.clone()
+        } else {
+            return Ok(None);
+        };
+
+        if let Some(row) = self.get_row(id)? {
+            Ok(Some(row))
+        } else {
+            let index = self.get_index_by_id(BaseRocksSecondaryIndex::get_id(secondary_index));
+            self.rebuild_index(&index)?;
+
+            Err(CubeError::internal(format!(
+                "Row exists in secondary index however missing in {:?} table: {}. Repairing index.",
+                self, id
+            )))
+        }
     }
 
     fn get_rows_by_index<K: Debug>(
@@ -701,11 +742,11 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
     where
         K: Hash,
     {
-        let rows = self.get_rows_by_index(row_key, secondary_index)?;
-        Ok(rows.into_iter().nth(0).ok_or(CubeError::internal(format!(
+        let row = self.get_row_by_index_opt(row_key, secondary_index, false)?;
+        row.ok_or(CubeError::internal(format!(
             "One value expected in {:?} for {:?} but nothing found",
             self, row_key
-        )))?)
+        )))
     }
 
     fn get_single_opt_row_by_index<K: Debug>(
@@ -716,8 +757,18 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
     where
         K: Hash,
     {
-        let rows = self.get_rows_by_index(row_key, secondary_index)?;
-        Ok(rows.into_iter().nth(0))
+        self.get_row_by_index_opt(row_key, secondary_index, false)
+    }
+
+    fn get_single_opt_row_by_index_reverse<K: Debug>(
+        &self,
+        row_key: &K,
+        secondary_index: &impl RocksSecondaryIndex<Self::T, K>,
+    ) -> Result<Option<IdRow<Self::T>>, CubeError>
+    where
+        K: Hash,
+    {
+        self.get_row_by_index_opt(row_key, secondary_index, true)
     }
 
     fn update_with_fn(
@@ -943,7 +994,7 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
             .unwrap()
     }
 
-    fn get_row_from_index(
+    fn get_row_ids_from_index(
         &self,
         secondary_id: u32,
         secondary_key_val: &Vec<u8>,

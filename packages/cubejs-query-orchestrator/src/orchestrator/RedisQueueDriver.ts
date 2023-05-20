@@ -12,6 +12,8 @@ import {
   AddToQueueQuery,
   AddToQueueOptions,
   AddToQueueResponse,
+  ProcessingId,
+  RetrieveForProcessingResponse,
 } from '@cubejs-backend/base-driver';
 
 import { BaseQueueDriver } from './BaseQueueDriver';
@@ -53,11 +55,7 @@ export class RedisQueueDriverConnection implements QueueDriverConnectionInterfac
     return this.redisClient;
   }
 
-  public async getResultBlocking(queryKey) {
-    return this.getResultBlockingByHash(this.redisHash(queryKey));
-  }
-
-  public async getResultBlockingByHash(queryKeyHash) {
+  public async getResultBlocking(queryKeyHash) {
     // Double redisHash apply is being used here
     const resultListKey = this.resultListKey(queryKeyHash);
     if (!(await this.redisClient.hgetAsync([this.queriesDefKey(), queryKeyHash]))) {
@@ -132,7 +130,15 @@ export class RedisQueueDriverConnection implements QueueDriverConnectionInterfac
         })
       );
     }
-    return tx.execAsync().then(result => [...result, data.addedToQueueTime]);
+
+    const [added, _b, _c, queueSize] = await tx.execAsync();
+
+    return [
+      added,
+      null,
+      queueSize,
+      data.addedToQueueTime
+    ];
   }
 
   public getToProcessQueries() {
@@ -252,13 +258,12 @@ export class RedisQueueDriverConnection implements QueueDriverConnectionInterfac
     return id && id.toString();
   }
 
-  public async retrieveForProcessing(queryKey, processingId) {
+  public async retrieveForProcessing(queryKey: QueryKeyHash, processingId: ProcessingId): Promise<RetrieveForProcessingResponse> {
     try {
       const lockKey = this.queryProcessingLockKey(queryKey);
       await this.redisClient.watchAsync(lockKey);
 
       const currentProcessId = await this.redisClient.getAsync(lockKey);
-
       if (currentProcessId) {
         return null;
       }
@@ -273,6 +278,7 @@ export class RedisQueueDriverConnection implements QueueDriverConnectionInterfac
           .set(lockKey, processingId, 'NX')
           .zadd([this.heartBeatRedisKey(), 'NX', new Date().getTime(), this.redisHash(queryKey)])
           .execAsync();
+
       if (result) {
         result[4] = JSON.parse(result[4]);
 
@@ -288,7 +294,18 @@ export class RedisQueueDriverConnection implements QueueDriverConnectionInterfac
           );
         }
       }
-      return result;
+
+      const [insertedCount, _b, activeKeys, queueSize, query, processingLockAcquired] = result;
+
+      return [
+        insertedCount,
+        // this driver doesnt support queue id
+        null,
+        activeKeys,
+        queueSize,
+        query,
+        processingLockAcquired
+      ];
     } finally {
       await this.redisClient.unwatchAsync();
     }

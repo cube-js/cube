@@ -1282,5 +1282,26 @@ export function testQueries(type: string): void {
         expect(e.toString()).toMatch(/error/);
       });
     });
+
+    execute('querying ECommerce: partitioned pre-agg', async () => {
+      const response = await client.load({
+        dimensions: [
+          'ECommerce.productName'
+        ],
+        measures: [
+          'ECommerce.totalQuantity',
+        ],
+        timeDimensions: [{
+          dimension: 'ECommerce.orderDate',
+          granularity: 'month'
+        }],
+        order: {
+          'ECommerce.totalProfit': 'desc',
+          'ECommerce.productName': 'asc'
+        },
+        total: true
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
   });
 }

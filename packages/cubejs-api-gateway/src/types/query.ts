@@ -61,7 +61,7 @@ interface Query {
   offset?: number;
   total?: boolean;
   totalQuery?: boolean;
-  order?: QueryOrderType;
+  order?: any;
   timezone?: string;
   renewQuery?: boolean;
   ungrouped?: boolean;
@@ -81,6 +81,7 @@ interface NormalizedQueryFilter extends QueryFilter {
 interface NormalizedQuery extends Query {
   filters?: NormalizedQueryFilter[];
   rowLimit?: null | number;
+  order?: [{ id: string; desc: boolean }];
 }
 
 export {

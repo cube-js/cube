@@ -3,6 +3,65 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.10](https://github.com/cube-js/cube/compare/v0.33.9...v0.33.10) (2023-05-19)
+
+
+### Bug Fixes
+
+* remove noisy Warning: Attribute `filter.dimension` is deprecated. Please use 'member' instead of 'dimension' ([546227a](https://github.com/cube-js/cube/commit/546227a96c5c41078c82a75d7e4697dfd505e181))
+
+
+
+
+
+## [0.33.9](https://github.com/cube-js/cube/compare/v0.33.8...v0.33.9) (2023-05-18)
+
+
+### Bug Fixes
+
+* **databricks-jdbc-driver:** Error: [Databricks][JDBC](11220) Parameters cannot be used with normal Statement objects, use PreparedStatements instead. ([328bb79](https://github.com/cube-js/cube/commit/328bb79853833420a287fc9e31dda72a9886999d)), closes [#6627](https://github.com/cube-js/cube/issues/6627)
+* Invalid query format: \"filters[0]\" does not match any of the allowed types if queryRewrite is using non string values ([ac57b4c](https://github.com/cube-js/cube/commit/ac57b4c15cb39392faa75a01c042fdd5ecb19af9))
+
+
+
+
+
+## [0.33.8](https://github.com/cube-js/cube/compare/v0.33.7...v0.33.8) (2023-05-17)
+
+
+### Bug Fixes
+
+* **athena-driver:** Fix partitioned pre-aggregations and column values with `,` through export bucket ([#6596](https://github.com/cube-js/cube/issues/6596)) ([1214cab](https://github.com/cube-js/cube/commit/1214cabf69f9e6216c516d05acadfe7e6178cccf))
+* **graphql:** exclude empty cubes, revert equals/notEquals type ([#6619](https://github.com/cube-js/cube/issues/6619)) ([fab1b6a](https://github.com/cube-js/cube/commit/fab1b6abe198b1d83b4484bae66108782e62887c))
+
+
+### Features
+
+* **bigquery-driver:** Specify timeout for job on testConnection ([#6588](https://github.com/cube-js/cube/issues/6588)) ([d724f09](https://github.com/cube-js/cube/commit/d724f09113e4b4cb8c703fc02e9d9e13c3e05fb7))
+* **cubestore-driver:** Queue - protect possible race condition (query def) [#6616](https://github.com/cube-js/cube/issues/6616)) ([60294de](https://github.com/cube-js/cube/commit/60294defff88ee96d95d1d34b1fe17fccdb17b71))
+
+
+
+
+
+## [0.33.7](https://github.com/cube-js/cube/compare/v0.33.6...v0.33.7) (2023-05-16)
+
+
+### Bug Fixes
+
+* Limit override isn't respected in queryRewrite ([#6605](https://github.com/cube-js/cube/issues/6605)) ([172c39b](https://github.com/cube-js/cube/commit/172c39b6fb2609f003a364efb63d8091e39607a0))
+
+
+### Features
+
+* **cubestore-driver:** Queue - protect race conditions ([#6598](https://github.com/cube-js/cube/issues/6598)) ([d503598](https://github.com/cube-js/cube/commit/d50359845d388ccadc8d5a7233ed7317849558f4))
+* **cubestore:** Queue - allow to GET by processingId ([#6608](https://github.com/cube-js/cube/issues/6608)) ([f0c1156](https://github.com/cube-js/cube/commit/f0c11565426b5604bae665fc52d5b416f4f055d2))
+* **cubestore:** Queue - delete results via scheduler ([#6515](https://github.com/cube-js/cube/issues/6515)) ([8e1ab20](https://github.com/cube-js/cube/commit/8e1ab2044a92f9e71918085a31716a784cd5bb9f))
+
+
+
+
+
 ## [0.33.6](https://github.com/cube-js/cube/compare/v0.33.5...v0.33.6) (2023-05-13)
 
 

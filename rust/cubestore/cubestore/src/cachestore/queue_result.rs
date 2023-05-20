@@ -13,13 +13,14 @@ use serde::{Deserialize, Deserializer, Serialize};
 pub struct QueueResult {
     path: String,
     pub(crate) value: String,
+    pub(crate) deleted: bool,
     #[serde(with = "ts_seconds")]
     pub(crate) expire: DateTime<Utc>,
 }
 
 impl RocksEntity for QueueResult {
     fn version() -> u32 {
-        2
+        3
     }
 }
 
@@ -28,7 +29,8 @@ impl QueueResult {
         QueueResult {
             path,
             value,
-            expire: Utc::now() + Duration::minutes(10),
+            deleted: false,
+            expire: Utc::now() + Duration::minutes(5),
         }
     }
 
@@ -38,6 +40,14 @@ impl QueueResult {
 
     pub fn get_value(&self) -> &String {
         &self.value
+    }
+
+    pub fn get_expire(&self) -> &DateTime<Utc> {
+        &self.expire
+    }
+
+    pub fn is_deleted(&self) -> bool {
+        self.deleted
     }
 }
 
@@ -58,7 +68,7 @@ impl<'a> QueueResultRocksTable<'a> {
         match key {
             QueueKey::ByPath(path) => {
                 let index_key = QueueResultIndexKey::ByPath(path);
-                self.get_single_opt_row_by_index(&index_key, &QueueResultRocksIndex::ByPath)
+                self.get_single_opt_row_by_index_reverse(&index_key, &QueueResultRocksIndex::ByPath)
             }
             QueueKey::ById(id) => self.get_row(id),
         }
@@ -109,7 +119,7 @@ impl RocksSecondaryIndex<QueueResult, QueueResultIndexKey> for QueueResultRocksI
 
     fn is_unique(&self) -> bool {
         match self {
-            QueueResultRocksIndex::ByPath => true,
+            QueueResultRocksIndex::ByPath => false,
         }
     }
 

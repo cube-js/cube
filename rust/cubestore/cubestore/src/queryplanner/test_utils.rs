@@ -1,5 +1,5 @@
 use crate::cachestore::{
-    CacheItem, CacheStore, QueueItem, QueueItemStatus, QueueKey, QueueResultResponse,
+    CacheItem, CacheStore, QueueItem, QueueItemStatus, QueueKey, QueueResult, QueueResultResponse,
     QueueRetrieveResponse,
 };
 use crate::metastore::job::{Job, JobStatus, JobType};
@@ -747,6 +747,14 @@ impl CacheStore for CacheStoreMock {
         panic!("CacheStore mock!")
     }
 
+    async fn queue_results_all(&self) -> Result<Vec<IdRow<QueueResult>>, CubeError> {
+        panic!("CacheStore mock!")
+    }
+
+    async fn queue_results_multi_delete(&self, _ids: Vec<u64>) -> Result<(), CubeError> {
+        panic!("CacheStore mock!")
+    }
+
     async fn queue_add(
         &self,
         _item: QueueItem,
@@ -776,10 +784,7 @@ impl CacheStore for CacheStoreMock {
         panic!("CacheStore mock!")
     }
 
-    async fn queue_get_by_path(
-        &self,
-        _path: String,
-    ) -> Result<Option<IdRow<QueueItem>>, CubeError> {
+    async fn queue_get(&self, _key: QueueKey) -> Result<Option<IdRow<QueueItem>>, CubeError> {
         panic!("CacheStore mock!")
     }
 

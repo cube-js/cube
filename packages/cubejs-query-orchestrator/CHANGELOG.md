@@ -3,6 +3,40 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.9](https://github.com/cube-js/cube/compare/v0.33.8...v0.33.9) (2023-05-18)
+
+
+### Bug Fixes
+
+* **databricks-jdbc-driver:** Error: [Databricks][JDBC](11220) Parameters cannot be used with normal Statement objects, use PreparedStatements instead. ([328bb79](https://github.com/cube-js/cube/commit/328bb79853833420a287fc9e31dda72a9886999d)), closes [#6627](https://github.com/cube-js/cube/issues/6627)
+
+
+
+
+
+## [0.33.8](https://github.com/cube-js/cube/compare/v0.33.7...v0.33.8) (2023-05-17)
+
+
+### Features
+
+* **cubestore-driver:** Queue - protect possible race condition (query def) [#6616](https://github.com/cube-js/cube/issues/6616)) ([60294de](https://github.com/cube-js/cube/commit/60294defff88ee96d95d1d34b1fe17fccdb17b71))
+
+
+
+
+
+## [0.33.7](https://github.com/cube-js/cube/compare/v0.33.6...v0.33.7) (2023-05-16)
+
+
+### Features
+
+* **cubestore-driver:** Queue - protect race conditions ([#6598](https://github.com/cube-js/cube/issues/6598)) ([d503598](https://github.com/cube-js/cube/commit/d50359845d388ccadc8d5a7233ed7317849558f4))
+* **cubestore:** Queue - delete results via scheduler ([#6515](https://github.com/cube-js/cube/issues/6515)) ([8e1ab20](https://github.com/cube-js/cube/commit/8e1ab2044a92f9e71918085a31716a784cd5bb9f))
+
+
+
+
+
 ## [0.33.6](https://github.com/cube-js/cube/compare/v0.33.5...v0.33.6) (2023-05-13)
 
 

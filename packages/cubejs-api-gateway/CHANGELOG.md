@@ -3,6 +3,50 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.10](https://github.com/cube-js/cube/compare/v0.33.9...v0.33.10) (2023-05-19)
+
+
+### Bug Fixes
+
+* remove noisy Warning: Attribute `filter.dimension` is deprecated. Please use 'member' instead of 'dimension' ([546227a](https://github.com/cube-js/cube/commit/546227a96c5c41078c82a75d7e4697dfd505e181))
+
+
+
+
+
+## [0.33.9](https://github.com/cube-js/cube/compare/v0.33.8...v0.33.9) (2023-05-18)
+
+
+### Bug Fixes
+
+* Invalid query format: \"filters[0]\" does not match any of the allowed types if queryRewrite is using non string values ([ac57b4c](https://github.com/cube-js/cube/commit/ac57b4c15cb39392faa75a01c042fdd5ecb19af9))
+
+
+
+
+
+## [0.33.8](https://github.com/cube-js/cube/compare/v0.33.7...v0.33.8) (2023-05-17)
+
+
+### Bug Fixes
+
+* **graphql:** exclude empty cubes, revert equals/notEquals type ([#6619](https://github.com/cube-js/cube/issues/6619)) ([fab1b6a](https://github.com/cube-js/cube/commit/fab1b6abe198b1d83b4484bae66108782e62887c))
+
+
+
+
+
+## [0.33.7](https://github.com/cube-js/cube/compare/v0.33.6...v0.33.7) (2023-05-16)
+
+
+### Bug Fixes
+
+* Limit override isn't respected in queryRewrite ([#6605](https://github.com/cube-js/cube/issues/6605)) ([172c39b](https://github.com/cube-js/cube/commit/172c39b6fb2609f003a364efb63d8091e39607a0))
+
+
+
+
+
 ## [0.33.6](https://github.com/cube-js/cube/compare/v0.33.5...v0.33.6) (2023-05-13)
 
 

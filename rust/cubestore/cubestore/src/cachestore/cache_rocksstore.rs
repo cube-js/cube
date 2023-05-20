@@ -13,7 +13,7 @@ use std::collections::HashMap;
 use std::env;
 
 use crate::metastore::{
-    BaseRocksStoreFs, DbTableRef, IdRow, MetaStoreEvent, MetaStoreFs, RocksStore,
+    BaseRocksStoreFs, BatchPipe, DbTableRef, IdRow, MetaStoreEvent, MetaStoreFs, RocksStore,
     RocksStoreDetails, RocksTable,
 };
 use crate::remotefs::LocalDirRemoteFs;
@@ -259,6 +259,56 @@ impl RocksCacheStore {
 }
 
 impl RocksCacheStore {
+    async fn queue_result_delete_by_id(&self, id: u64) -> Result<(), CubeError> {
+        self.store
+            .write_operation(move |db_ref, batch_pipe| {
+                let result_schema = QueueResultRocksTable::new(db_ref.clone());
+                result_schema.try_delete(id, batch_pipe)?;
+
+                Ok(())
+            })
+            .await
+    }
+
+    /// This method should be called when we are sure that we return data to the consumer
+    async fn queue_result_ready_to_delete(&self, id: u64) -> Result<(), CubeError> {
+        self.store
+            .write_operation(move |db_ref, batch_pipe| {
+                let result_schema = QueueResultRocksTable::new(db_ref.clone());
+                if let Some(row) = result_schema.get_row(id)? {
+                    Self::queue_result_ready_to_delete_impl(&result_schema, batch_pipe, row)?;
+                }
+
+                Ok(())
+            })
+            .await
+    }
+
+    /// This method should be called when we are sure that we return data to the consumer
+    fn queue_result_ready_to_delete_impl(
+        result_schema: &QueueResultRocksTable,
+        batch_pipe: &mut BatchPipe,
+        queue_result: IdRow<QueueResult>,
+    ) -> Result<Option<QueueResultResponse>, CubeError> {
+        if queue_result.get_row().is_deleted() {
+            return Ok(Some(QueueResultResponse::Success {
+                value: Some(queue_result.into_row().value),
+            }));
+        }
+
+        let row_id = queue_result.get_id();
+        let row = queue_result.into_row();
+        let mut new_row = row.clone();
+        new_row.deleted = true;
+
+        // TODO: Partial update? Index?
+        let queue_result = result_schema.update(row_id, new_row, &row, batch_pipe)?;
+
+        Ok(Some(QueueResultResponse::Success {
+            value: Some(queue_result.into_row().value),
+        }))
+    }
+
     async fn lookup_queue_result_by_key(
         &self,
         key: QueueKey,
@@ -266,14 +316,25 @@ impl RocksCacheStore {
         self.store
             .write_operation(move |db_ref, batch_pipe| {
                 let result_schema = QueueResultRocksTable::new(db_ref.clone());
+                let query_key_is_path = key.is_path();
                 let queue_result = result_schema.get_row_by_key(key.clone())?;
 
                 if let Some(queue_result) = queue_result {
-                    result_schema.try_delete(queue_result.get_id(), batch_pipe)?;
-
-                    Ok(Some(QueueResultResponse::Success {
-                        value: Some(queue_result.row.value),
-                    }))
+                    if query_key_is_path {
+                        if queue_result.get_row().is_deleted() {
+                            Ok(None)
+                        } else {
+                            Self::queue_result_ready_to_delete_impl(
+                                &result_schema,
+                                batch_pipe,
+                                queue_result,
+                            )
+                        }
+                    } else {
+                        Ok(Some(QueueResultResponse::Success {
+                            value: Some(queue_result.into_row().value),
+                        }))
+                    }
                 } else {
                     Ok(None)
                 }
@@ -332,6 +393,15 @@ pub enum QueueKey {
     ByPath(String),
 }
 
+impl QueueKey {
+    pub(crate) fn is_path(&self) -> bool {
+        match self {
+            QueueKey::ByPath(_) => true,
+            QueueKey::ById(_) => false,
+        }
+    }
+}
+
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
 pub struct QueueAddResponse {
     pub id: u64,
@@ -376,6 +446,8 @@ pub trait CacheStore: DIService + Send + Sync {
 
     // queue
     async fn queue_all(&self) -> Result<Vec<IdRow<QueueItem>>, CubeError>;
+    async fn queue_results_all(&self) -> Result<Vec<IdRow<QueueResult>>, CubeError>;
+    async fn queue_results_multi_delete(&self, ids: Vec<u64>) -> Result<(), CubeError>;
     async fn queue_add(&self, item: QueueItem) -> Result<QueueAddResponse, CubeError>;
     async fn queue_truncate(&self) -> Result<(), CubeError>;
     async fn queue_to_cancel(
@@ -391,7 +463,7 @@ pub trait CacheStore: DIService + Send + Sync {
         priority_sort: bool,
     ) -> Result<Vec<IdRow<QueueItem>>, CubeError>;
     // API with Path
-    async fn queue_get_by_path(&self, key: String) -> Result<Option<IdRow<QueueItem>>, CubeError>;
+    async fn queue_get(&self, key: QueueKey) -> Result<Option<IdRow<QueueItem>>, CubeError>;
     async fn queue_cancel(&self, key: QueueKey) -> Result<Option<IdRow<QueueItem>>, CubeError>;
     async fn queue_heartbeat(&self, key: QueueKey) -> Result<(), CubeError>;
     async fn queue_retrieve_by_path(
@@ -549,6 +621,26 @@ impl CacheStore for RocksCacheStore {
             .await
     }
 
+    async fn queue_results_all(&self) -> Result<Vec<IdRow<QueueResult>>, CubeError> {
+        self.store
+            .read_operation(move |db_ref| Ok(QueueResultRocksTable::new(db_ref).all_rows()?))
+            .await
+    }
+
+    async fn queue_results_multi_delete(&self, ids: Vec<u64>) -> Result<(), CubeError> {
+        self.store
+            .write_operation(move |db_ref, batch_pipe| {
+                let queue_result_schema = QueueResultRocksTable::new(db_ref);
+
+                for id in ids {
+                    queue_result_schema.try_delete(id, batch_pipe)?;
+                }
+
+                Ok(())
+            })
+            .await
+    }
+
     async fn queue_add(&self, item: QueueItem) -> Result<QueueAddResponse, CubeError> {
         self.store
             .write_operation(move |db_ref, batch_pipe| {
@@ -657,12 +749,11 @@ impl CacheStore for RocksCacheStore {
             .await
     }
 
-    async fn queue_get_by_path(&self, path: String) -> Result<Option<IdRow<QueueItem>>, CubeError> {
+    async fn queue_get(&self, key: QueueKey) -> Result<Option<IdRow<QueueItem>>, CubeError> {
         self.store
             .read_operation(move |db_ref| {
                 let queue_schema = QueueItemRocksTable::new(db_ref.clone());
-                let index_key = QueueItemIndexKey::ByPath(path);
-                queue_schema.get_single_opt_row_by_index(&index_key, &QueueItemRocksIndex::ByPath)
+                queue_schema.get_row_by_key(key)
             })
             .await
     }
@@ -792,7 +883,6 @@ impl CacheStore for RocksCacheStore {
                             id: item_row.get_id(),
                             path,
                             result: QueueResultAckEventResult::WithResult {
-                                row_id: result_row.get_id(),
                                 result: result_row.into_row().value,
                             },
                         }));
@@ -836,6 +926,7 @@ impl CacheStore for RocksCacheStore {
             return Ok(store_in_result);
         }
 
+        let query_key_is_path = key.is_path();
         let fut = tokio::time::timeout(
             Duration::from_millis(timeout),
             listener.wait_for_queue_ack_by_key(key),
@@ -847,17 +938,18 @@ impl CacheStore for RocksCacheStore {
                     QueueResultAckEventResult::Empty => {
                         Ok(Some(QueueResultResponse::Success { value: None }))
                     }
-                    QueueResultAckEventResult::WithResult { row_id, result } => {
-                        self.store
-                            .write_operation(move |db_ref, batch_pipe| {
-                                let queue_schema = QueueResultRocksTable::new(db_ref.clone());
-                                queue_schema.try_delete(row_id, batch_pipe)?;
+                    QueueResultAckEventResult::WithResult { result } => {
+                        if query_key_is_path {
+                            // Queue v1 behaviour
+                            self.queue_result_delete_by_id(ack_event.id).await?;
+                        } else {
+                            // Queue v2 behaviour
+                            self.queue_result_ready_to_delete(ack_event.id).await?;
+                        }
 
-                                Ok(Some(QueueResultResponse::Success {
-                                    value: Some(result),
-                                }))
-                            })
-                            .await
+                        Ok(Some(QueueResultResponse::Success {
+                            value: Some(result),
+                        }))
                     }
                 },
                 Ok(None) => Ok(None),
@@ -952,6 +1044,14 @@ impl CacheStore for ClusterCacheStoreClient {
         panic!("CacheStore cannot be used on the worker node! queue_all was used.")
     }
 
+    async fn queue_results_all(&self) -> Result<Vec<IdRow<QueueResult>>, CubeError> {
+        panic!("CacheStore cannot be used on the worker node! queue_results_all was used.")
+    }
+
+    async fn queue_results_multi_delete(&self, _ids: Vec<u64>) -> Result<(), CubeError> {
+        panic!("CacheStore cannot be used on the worker node! queue_results_multi_delete was used.")
+    }
+
     async fn queue_add(&self, _item: QueueItem) -> Result<QueueAddResponse, CubeError> {
         panic!("CacheStore cannot be used on the worker node! queue_add was used.")
     }
@@ -978,11 +1078,8 @@ impl CacheStore for ClusterCacheStoreClient {
         panic!("CacheStore cannot be used on the worker node! queue_list was used.")
     }
 
-    async fn queue_get_by_path(
-        &self,
-        _path: String,
-    ) -> Result<Option<IdRow<QueueItem>>, CubeError> {
-        panic!("CacheStore cannot be used on the worker node! queue_get_by_path was used.")
+    async fn queue_get(&self, _key: QueueKey) -> Result<Option<IdRow<QueueItem>>, CubeError> {
+        panic!("CacheStore cannot be used on the worker node! queue_get was used.")
     }
 
     async fn queue_cancel(&self, _key: QueueKey) -> Result<Option<IdRow<QueueItem>>, CubeError> {

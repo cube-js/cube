@@ -132,10 +132,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       getEnv('dbSchema', { dataSource });
 
     this.config = {
-      readOnly: true,
-
       ...restConfig,
-
       credentials: accessKeyId && secretAccessKey
         ? { accessKeyId, secretAccessKey }
         : undefined,
@@ -170,6 +167,11 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     if (this.config.exportBucket) {
       this.config.exportBucket =
         AthenaDriver.normalizeS3Path(this.config.exportBucket);
+    }
+
+    if (typeof this.config.readOnly === 'undefined') {
+      // If Export bucket configuration is in place we want to always use it instead of batching
+      this.config.readOnly = !this.isUnloadSupported();
     }
 
     this.athena = new Athena(this.config);
@@ -356,7 +358,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       throw new Error('Export bucket is not configured.');
     }
     const types = options.query
-      ? await this.unloadWithSql(tableName, options.query.sql)
+      ? await this.unloadWithSql(tableName, options)
       : await this.unloadWithTable(tableName);
     const csvFile = await this.getCsvFiles(tableName);
     return {
@@ -364,6 +366,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       csvFile,
       types,
       csvNoHeader: true,
+      csvDelimiter: '^A',
     };
   }
 
@@ -372,18 +375,17 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
    */
   private async unloadWithSql(
     tableName: string,
-    sql: string,
+    unloadOptions: UnloadOptions,
   ): Promise<TableStructure> {
-    const columns = await this.queryColumnTypes(sql);
+    const columns = await this.queryColumnTypes(unloadOptions.query!.sql, unloadOptions.query!.params);
     const unloadSql = `
-      UNLOAD (${sql})
+      UNLOAD (${unloadOptions.query!.sql})
       TO '${this.config.exportBucket}/${tableName}'
       WITH (
         format = 'TEXTFILE',
-        field_delimiter = ',',
         compression='GZIP'
       )`;
-    const qid = await this.startQuery(unloadSql, []);
+    const qid = await this.startQuery(unloadSql, unloadOptions.query!.params);
     await this.waitForSuccess(qid);
     await this.athena.getQueryResults(qid);
     return columns;
@@ -400,7 +402,6 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       TO '${this.config.exportBucket}/${tableName}'
       WITH (
         format = 'TEXTFILE',
-        field_delimiter = ',',
         compression='GZIP'
       )`;
     const qid = await this.startQuery(unloadSql, []);
@@ -411,9 +412,9 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
   /**
    * Returns an array of queried fields meta info.
    */
-  public async queryColumnTypes(sql: string): Promise<TableStructure> {
+  public async queryColumnTypes(sql: string, params?: unknown[]): Promise<TableStructure> {
     const unloadSql = `${sql} LIMIT 0`;
-    const qid = await this.startQuery(unloadSql, []);
+    const qid = await this.startQuery(unloadSql, params || []);
     await this.waitForSuccess(qid);
     const results = await this.athena.getQueryResults(qid);
     const columns = this.mapTypes(

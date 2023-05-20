@@ -1286,7 +1286,7 @@ export class PreAggregationLoader {
     }
 
     if (!tableData.types && client.queryColumnTypes) {
-      tableData.types = await saveCancelFn(client.queryColumnTypes(sql));
+      tableData.types = await saveCancelFn(client.queryColumnTypes(sql, params));
     }
 
     return tableData;

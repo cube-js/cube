@@ -189,12 +189,22 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
       await delayFn(null, 200);
 
       await Promise.all([
-        queue.executeInQueue('delay', '32', { delay: 100, result: '3' }, -9).then(r => results.push(r)),
-        queue.executeInQueue('delay', '33', { delay: 100, result: '2' }, -8).then(r => results.push(r)),
-        queue.executeInQueue('delay', '34', { delay: 100, result: '1' }, -7).then(r => results.push(r))
+        queue.executeInQueue('delay', '32', { delay: 100, result: '3' }, -9).then(r => {
+          results.push(['32', r]);
+        }),
+        queue.executeInQueue('delay', '33', { delay: 100, result: '2' }, -8).then(r => {
+          results.push(['33', r]);
+        }),
+        queue.executeInQueue('delay', '34', { delay: 100, result: '1' }, -7).then(r => {
+          results.push(['34', r]);
+        })
       ]);
 
-      expect(results.map(r => parseInt(r[0], 10) - parseInt(results[0][0], 10))).toEqual([0, 1, 2]);
+      expect(results).toEqual([
+        ['34', '11'],
+        ['33', '22'],
+        ['32', '33'],
+      ]);
     });
 
     test('sequence', async () => {

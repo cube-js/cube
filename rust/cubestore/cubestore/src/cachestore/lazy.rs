@@ -1,7 +1,7 @@
 use crate::cachestore::cache_rocksstore::QueueAddResponse;
 use crate::cachestore::queue_item::QueueRetrieveResponse;
 use crate::cachestore::{
-    CacheItem, CacheStore, QueueItem, QueueItemStatus, QueueKey, QueueResultResponse,
+    CacheItem, CacheStore, QueueItem, QueueItemStatus, QueueKey, QueueResult, QueueResultResponse,
     RocksCacheStore,
 };
 use crate::config::ConfigObj;
@@ -206,6 +206,14 @@ impl CacheStore for LazyRocksCacheStore {
         self.init().await?.queue_all().await
     }
 
+    async fn queue_results_all(&self) -> Result<Vec<IdRow<QueueResult>>, CubeError> {
+        self.init().await?.queue_results_all().await
+    }
+
+    async fn queue_results_multi_delete(&self, ids: Vec<u64>) -> Result<(), CubeError> {
+        self.init().await?.queue_results_multi_delete(ids).await
+    }
+
     async fn queue_add(&self, item: QueueItem) -> Result<QueueAddResponse, CubeError> {
         self.init().await?.queue_add(item).await
     }
@@ -238,8 +246,8 @@ impl CacheStore for LazyRocksCacheStore {
             .await
     }
 
-    async fn queue_get_by_path(&self, path: String) -> Result<Option<IdRow<QueueItem>>, CubeError> {
-        self.init().await?.queue_get_by_path(path).await
+    async fn queue_get(&self, key: QueueKey) -> Result<Option<IdRow<QueueItem>>, CubeError> {
+        self.init().await?.queue_get(key).await
     }
 
     async fn queue_cancel(&self, key: QueueKey) -> Result<Option<IdRow<QueueItem>>, CubeError> {

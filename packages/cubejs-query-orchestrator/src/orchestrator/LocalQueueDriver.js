@@ -48,11 +48,7 @@ export class LocalQueueDriverConnection {
     return this.resultPromises[resultListKey];
   }
 
-  async getResultBlocking(queryKey) {
-    return this.getResultBlockingByHash(this.redisHash(queryKey));
-  }
-
-  async getResultBlockingByHash(queryKeyHash) {
+  async getResultBlocking(queryKeyHash) {
     // Double redisHash apply is being used here
     const resultListKey = this.resultListKey(queryKeyHash);
     if (!this.queryDef[queryKeyHash] && !this.resultPromises[resultListKey]) {
@@ -144,7 +140,13 @@ export class LocalQueueDriverConnection {
       });
     }
 
-    return [added, null, null, Object.keys(this.toProcess).length, queryQueueObj.addedToQueueTime]; // TODO nulls
+    return [
+      added,
+      // this driver doesnt support queue id
+      null,
+      Object.keys(this.toProcess).length,
+      queryQueueObj.addedToQueueTime
+    ];
   }
 
   getToProcessQueries() {
@@ -268,8 +270,14 @@ export class LocalQueueDriverConnection {
     }
 
     return [
-      added, null, this.queueArray(this.active), Object.keys(this.toProcess).length, this.queryDef[key], lockAcquired
-    ]; // TODO nulls
+      added,
+      // this driver doesnt support queue id
+      null,
+      this.queueArray(this.active),
+      Object.keys(this.toProcess).length,
+      this.queryDef[key],
+      lockAcquired
+    ];
   }
 
   freeProcessingLock(queryKey, processingId, activated) {

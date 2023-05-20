@@ -45,6 +45,7 @@ type CreateTableOptions = {
   aggregations?: string
   selectStatement?: string
   sealAt?: string
+  delimiter?: string
 };
 
 export class CubeStoreDriver extends BaseDriver implements DriverInterface {
@@ -76,7 +77,8 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
 
   public async query<R = any>(query: string, values: any[], options?: QueryOptions): Promise<R[]> {
     const { inlineTables, ...queryTracingObj } = options ?? {};
-    return this.connection.query(formatSql(query, values || []), inlineTables ?? [], { ...queryTracingObj, instance: getEnv('instanceId') });
+    const sql = formatSql(query, values || []);
+    return this.connection.query(sql, inlineTables ?? [], { ...queryTracingObj, instance: getEnv('instanceId') });
   }
 
   public async release() {
@@ -100,6 +102,9 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
 
     if (options.inputFormat) {
       withEntries.push(`input_format = '${options.inputFormat}'`);
+    }
+    if (options.delimiter) {
+      withEntries.push(`delimiter = '${options.delimiter}'`);
     }
     if (options.buildRangeEnd) {
       withEntries.push(`build_range_end = '${options.buildRangeEnd}'`);
@@ -270,6 +275,9 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     };
     if (files.length > 0) {
       options.inputFormat = tableData.csvNoHeader ? 'csv_no_header' : 'csv';
+      if (tableData.csvDelimiter) {
+        options.delimiter = tableData.csvDelimiter;
+      }
       options.files = files;
     }
 

@@ -100,7 +100,7 @@ pub enum QueueCommand {
         value: String,
     },
     Get {
-        key: Ident,
+        key: QueueKey,
     },
     ToCancel {
         prefix: Ident,
@@ -467,7 +467,7 @@ impl<'a> CubeStoreParser<'a> {
                 payload: self.parser.parse_literal_string()?,
             },
             "get" => QueueCommand::Get {
-                key: self.parser.parse_identifier()?,
+                key: self.parse_queue_key()?,
             },
             "stalled" => {
                 let heartbeat_timeout = Some(self.parse_integer("heartbeat timeout", false)?);

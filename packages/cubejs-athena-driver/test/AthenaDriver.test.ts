@@ -27,6 +27,7 @@ describe('AthenaDriver', () => {
         expectStringFields: true,
         csvNoHeader: true,
         wrapLoadQueryWithCtas: true,
+        delimiter: '\x01',
       }
     );
   });

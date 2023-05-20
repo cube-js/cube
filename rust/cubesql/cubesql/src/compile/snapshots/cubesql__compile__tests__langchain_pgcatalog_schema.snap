@@ -1,0 +1,11 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"\n                SELECT pg_catalog.pg_class.relname\n                FROM pg_catalog.pg_class\n                JOIN pg_catalog.pg_namespace ON pg_catalog.pg_namespace.oid = pg_catalog.pg_class.relnamespace\n                WHERE\n                    pg_catalog.pg_class.relkind = ANY (ARRAY['r', 'p'])\n                    AND pg_catalog.pg_class.relpersistence != 't'\n                    AND pg_catalog.pg_table_is_visible(pg_catalog.pg_class.oid)\n                    AND pg_catalog.pg_namespace.nspname != 'pg_catalog'\n                ;\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++---------------------------+
+| relname                   |
++---------------------------+
+| KibanaSampleDataEcommerce |
+| Logs                      |
+| NumberCube                |
++---------------------------+

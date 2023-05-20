@@ -13,6 +13,9 @@ export type Template = {
   devDependencies?: string[],
 };
 
+/**
+ * @deprecated
+ */
 const indexJs = `const CubejsServer = require('@cubejs-backend/server');
 
 const server = new CubejsServer();
@@ -25,6 +28,9 @@ server.listen().then(({ version, port }) => {
 });
 `;
 
+/**
+ * @deprecated
+ */
 const handlerJs = `module.exports = require('@cubejs-backend/serverless');
 `;
 
@@ -75,6 +81,9 @@ node_modules
 upstream
 `;
 
+/**
+ * @deprecated
+ */
 const serverlessYml = env => `service: ${env.projectName}
 
 provider:
@@ -141,6 +150,9 @@ plugins:
   - serverless-express
 `;
 
+/**
+ * @deprecated
+ */
 const serverlessGoogleYml = env => `service: ${env.projectName} # NOTE: Don't put the word "google" in here
 
 provider:
@@ -192,20 +204,20 @@ functions:
           resource: "projects/\${self:provider.project}/topics/\${self:service.name}-\${self:provider.stage}-process"
 `;
 
-const ordersJs = `cube(\`Orders\`, {
+const ordersJs = `cube(\`orders\`, {
   sql: \`
-  select 1 as id, 100 as amount, 'new' status
+  SELECT 1 AS id, 100 AS amount, 'new' status
   UNION ALL
-  select 2 as id, 200 as amount, 'new' status
+  SELECT 2 AS id, 200 AS amount, 'new' status
   UNION ALL
-  select 3 as id, 300 as amount, 'processed' status
+  SELECT 3 AS id, 300 AS amount, 'processed' status
   UNION ALL
-  select 4 as id, 500 as amount, 'processed' status
+  SELECT 4 AS id, 500 AS amount, 'processed' status
   UNION ALL
-  select 5 as id, 600 as amount, 'shipped' status
+  SELECT 5 AS id, 600 AS amount, 'shipped' status
   \`,
 
-  preAggregations: {
+  pre_aggregations: {
     // Pre-aggregation definitions go here
     // Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started
   },
@@ -215,7 +227,7 @@ const ordersJs = `cube(\`Orders\`, {
       type: \`count\`
     },
 
-    totalAmount: {
+    total_amount: {
       sql: \`amount\`,
       type: \`sum\`
     }
@@ -228,6 +240,37 @@ const ordersJs = `cube(\`Orders\`, {
     }
   }
 });
+`;
+
+const ordersYml = `cubes:
+  - name: orders
+    sql: >
+      SELECT 1 AS id, 100 AS amount, 'new' status
+      UNION ALL
+      SELECT 2 AS id, 200 AS amount, 'new' status
+      UNION ALL
+      SELECT 3 AS id, 300 AS amount, 'processed' status
+      UNION ALL
+      SELECT 4 AS id, 500 AS amount, 'processed' status
+      UNION ALL
+      SELECT 5 AS id, 600 AS amount, 'shipped' status
+
+    # Pre-aggregation definitions go here
+    # Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started
+    # pre_aggregations:
+
+    measures:
+      - name: count
+        type: count
+
+      - name: total_amount
+        sql: amount
+        type: sum
+
+    dimensions:
+      - name: status
+        sql: status
+        type: string
 `;
 
 const cubeJs = `// Cube configuration options: https://cube.dev/docs/config
@@ -255,6 +298,18 @@ services:
 `;
 
 const templates: Record<string, Template> = {
+  'docker-js': {
+    scripts: {
+      dev: 'cubejs-server',
+    },
+    files: {
+      'cube.js': () => cubeJs,
+      'docker-compose.yml': dockerCompose,
+      '.env': dotEnv,
+      '.gitignore': () => gitIgnore,
+      'model/cubes/orders.js': () => ordersJs
+    }
+  },
   docker: {
     scripts: {
       dev: 'cubejs-server',
@@ -264,7 +319,7 @@ const templates: Record<string, Template> = {
       'docker-compose.yml': dockerCompose,
       '.env': dotEnv,
       '.gitignore': () => gitIgnore,
-      'schema/Orders.js': () => ordersJs
+      'model/cubes/orders.yml': () => ordersYml
     }
   },
   express: {
@@ -275,7 +330,7 @@ const templates: Record<string, Template> = {
       'index.js': () => indexJs,
       '.env': dotEnv,
       '.gitignore': () => gitIgnore,
-      'schema/Orders.js': () => ordersJs
+      'model/cubes/orders.js': () => ordersJs
     }
   },
   serverless: {
@@ -287,7 +342,7 @@ const templates: Record<string, Template> = {
       'serverless.yml': serverlessYml,
       '.env': dotEnv,
       '.gitignore': () => gitIgnore,
-      'schema/Orders.js': () => ordersJs
+      'model/cubes/orders.js': () => ordersJs
     },
     dependencies: ['@cubejs-backend/serverless', '@cubejs-backend/serverless-aws']
   },
