@@ -8,7 +8,7 @@ import {
   FROM_PARTITION_RANGE,
   getEnv,
   inDbTimeZone,
-  MAX_SOURCE_ROW_LIMIT, reformatInIsoLocal,
+  MAX_SOURCE_ROW_LIMIT, MaybeCancelablePromise, reformatInIsoLocal,
   timeSeries,
   TO_PARTITION_RANGE,
   utcToLocalTimeZone,
@@ -1065,7 +1065,7 @@ export class PreAggregationLoader {
       const actualTables = await client.getTablesQuery(this.preAggregation.preAggregationsSchema);
       const mappedActualTables = actualTables.map(t => `${this.preAggregation.preAggregationsSchema}.${t.table_name || t.TABLE_NAME}`);
       if (mappedActualTables.includes(targetTableName)) {
-        await client.dropTable(targetTableName);
+        await this.withDropLock(false, () => client.dropTable(targetTableName));
       }
     }
 
@@ -1369,6 +1369,11 @@ export class PreAggregationLoader {
     });
   }
 
+  private async withDropLock<T>(external: boolean, lockFn: () => MaybeCancelablePromise<T>): Promise<boolean> {
+    const lockKey = this.dropLockKey(external);
+    return this.queryCache.withLock(lockKey, 60 * 5, lockFn);
+  }
+
   protected async dropOrphanedTables(
     client: DriverInterface,
     justCreatedTable: string,
@@ -1378,11 +1383,7 @@ export class PreAggregationLoader {
   ) {
     await this.preAggregations.addTableUsed(justCreatedTable);
 
-    const lockKey = external
-      ? 'drop-orphaned-tables-external'
-      : `drop-orphaned-tables:${this.preAggregation.dataSource}`;
-
-    return this.queryCache.withLock(lockKey, 60 * 5, async () => {
+    return this.withDropLock(external, async () => {
       this.logger('Dropping orphaned tables', queryOptions);
       const actualTables = await client.getTablesQuery(
         this.preAggregation.preAggregationsSchema,
@@ -1439,6 +1440,12 @@ export class PreAggregationLoader {
         tablesToDrop: JSON.stringify(toDrop),
       });
     });
+  }
+
+  private dropLockKey(external: boolean) {
+    return external
+      ? 'drop-orphaned-tables-external'
+      : `drop-orphaned-tables:${this.preAggregation.dataSource}`;
   }
 }
 
