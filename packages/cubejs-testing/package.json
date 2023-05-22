@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/testing",
-  "version": "0.33.11",
+  "version": "0.33.12",
   "description": "Cube.js e2e tests",
   "author": "Cube Dev, Inc.",
   "license": "Apache-2.0",
@@ -94,7 +94,7 @@
     "@cubejs-backend/schema-compiler": "^0.33.11",
     "@cubejs-backend/shared": "^0.33.11",
     "@cubejs-backend/testing-shared": "^0.33.11",
-    "@cubejs-client/ws-transport": "^0.33.0",
+    "@cubejs-client/ws-transport": "^0.33.12",
     "dedent": "^0.7.0",
     "fs-extra": "^8.1.0",
     "http-proxy": "^1.18.1",
@@ -106,7 +106,7 @@
   "devDependencies": {
     "@4tw/cypress-drag-drop": "^1.6.0",
     "@cubejs-backend/linter": "^0.33.0",
-    "@cubejs-client/core": "^0.33.0",
+    "@cubejs-client/core": "^0.33.12",
     "@jest/globals": "^26.6.2",
     "@types/dedent": "^0.7.0",
     "@types/http-proxy": "^1.17.5",
