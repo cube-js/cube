@@ -65,6 +65,15 @@ describe('SQLInterface', () => {
       return metaFixture;
     });
 
+    const sqlGenerators = jest.fn(async ({ request, session }) => {
+      console.log('[js] sqlGenerators',  {
+        request,
+        session,
+      });
+
+      return {};
+    });
+
     const checkAuth = jest.fn(async ({ request, user }) => {
       console.log('[js] checkAuth', {
         request,
@@ -95,6 +104,7 @@ describe('SQLInterface', () => {
       load,
       meta,
       stream,
+      sqlGenerators,
     });
     console.log(instance);
 
