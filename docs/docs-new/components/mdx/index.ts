@@ -17,9 +17,11 @@ import { ParameterTable } from "@/components/mdx/ReferenceDocs/ParameterTable";
 import { Snippet, SnippetGroup } from "@/components/mdx/Snippets/SnippetGroup";
 import { Screenshot } from '@/components/mdx/Screenshot';
 import { YouTubeVideo } from '@/components/mdx/YouTubeVideo/YouTubeVideo';
+import { CloudPromoBlock } from '@/components/mdx/CloudPromoBlock/CloudPromoBlock';
 
 export const components = {
   ...Buttons,
+  CloudPromoBlock,
   DangerBox,
   InfoBox,
   SuccessBox,
