@@ -18,10 +18,12 @@ import { Snippet, SnippetGroup } from "@/components/mdx/Snippets/SnippetGroup";
 import { Screenshot } from '@/components/mdx/Screenshot';
 import { YouTubeVideo } from '@/components/mdx/YouTubeVideo/YouTubeVideo';
 import { CloudPromoBlock } from '@/components/mdx/CloudPromoBlock/CloudPromoBlock';
+import { EventPromoBlock } from '@/components/mdx/EventPromoBlock/EventPromoBlock';
 
 export const components = {
   ...Buttons,
   CloudPromoBlock,
+  EventPromoBlock,
   DangerBox,
   InfoBox,
   SuccessBox,

@@ -1,0 +1,63 @@
+.EventPromoBlock__Wrapper {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  margin: 1.5rem 0;
+  background: var(--dark_bg);
+  border-radius: 0.5rem;
+  font-family: var(--font);
+}
+
+.EventPromoBlock__Image {
+  flex: 1;
+  padding: 0.25rem;
+}
+
+.EventPromoBlock__Image > img {
+  width: auto;
+  height: 6.75rem;
+}
+
+.EventPromoBlock__Details {
+  display: flex;
+  flex-direction: column;
+  flex: 3;
+  padding: 1rem;
+}
+
+.EventPromoBlock__Date {
+  display: flex;
+  gap: 0.5rem;
+  font-weight: 500;
+  font-size: 0.875rem;
+  line-height: 1.375rem;
+  color: var(--dark_03);
+}
+
+.EventPromoBlock__Date--Upcoming {
+  color: hsla(14, 86%, 52%, 1);
+}
+
+.EventPromoBlock__Date--Now {
+  color: hsla(353, 92%, 47%, 1);
+}
+
+.EventPromoBlock__Title {
+  font-weight: 600;
+  font-size: 1rem;
+  line-height: 1.75rem;
+  color: var(--dark_01);
+}
+
+.EventPromoBlock__CTA {
+  font-weight: 400;
+  font-size: 1rem;
+  line-height: 1.75rem;
+  color: var(--purple_bright);
+
+  > a {
+    border-bottom: 1px solid rgba(122, 119, 255, 0.3);
+    padding-bottom: 3px;
+    border-radius: 0;
+  }
+}
