@@ -69,6 +69,7 @@ jobs:
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
+        shell: bash
       - name: Restore yarn cache
         uses: actions/cache@v3
         with:
@@ -123,6 +124,7 @@ jobs:
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
+        shell: bash
       - name: Restore yarn cache
         uses: actions/cache@v3
         with:
@@ -169,6 +171,7 @@ jobs:
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
+        shell: bash
       - name: Restore yarn cache
         uses: actions/cache@v3
         with:
@@ -235,6 +238,7 @@ jobs:
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
+        shell: bash
       - name: Restore yarn cache
         uses: actions/cache@v3
         with:
@@ -312,6 +316,7 @@ jobs:
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
+        shell: bash
       - name: Restore yarn cache
         uses: actions/cache@v3
         with:
@@ -380,6 +385,7 @@ jobs:
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
+        shell: bash
       - name: Restore yarn cache
         uses: actions/cache@v3
         with:
@@ -432,6 +438,7 @@ jobs:
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
+        shell: bash
       - name: Restore yarn cache
         uses: actions/cache@v3
         with:
@@ -558,6 +565,7 @@ jobs:
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
+        shell: bash
       - name: Restore yarn cache
         uses: actions/cache@v3
         with:
