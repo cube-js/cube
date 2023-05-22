@@ -17,11 +17,13 @@ import { ParameterTable } from "@/components/mdx/ReferenceDocs/ParameterTable";
 import { Snippet, SnippetGroup } from "@/components/mdx/Snippets/SnippetGroup";
 import { Screenshot } from '@/components/mdx/Screenshot';
 import { YouTubeVideo } from '@/components/mdx/YouTubeVideo/YouTubeVideo';
+import { CaseStudyPromoBlock } from '@/components/mdx/CaseStudyPromoBlock/CaseStudyPromoBlock';
 import { CloudPromoBlock } from '@/components/mdx/CloudPromoBlock/CloudPromoBlock';
 import { EventPromoBlock } from '@/components/mdx/EventPromoBlock/EventPromoBlock';
 
 export const components = {
   ...Buttons,
+  CaseStudyPromoBlock,
   CloudPromoBlock,
   EventPromoBlock,
   DangerBox,
