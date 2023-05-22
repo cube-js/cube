@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.11](https://github.com/cube-js/cube/compare/v0.33.10...v0.33.11) (2023-05-22)
+
+
+### Features
+
+* **docker:** Install DuckDB as built-in driver ([b1e77bd](https://github.com/cube-js/cube/commit/b1e77bdee1d9b35a46c51387d8d16565d332754b))
+
+
+
+
+
 ## [0.33.10](https://github.com/cube-js/cube.js/compare/v0.33.9...v0.33.10) (2023-05-19)
 
 **Note:** Version bump only for package @cubejs-backend/docker
