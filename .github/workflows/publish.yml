@@ -99,6 +99,10 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: ${{ matrix.node-version }}
+      - name: Install Yarn
+        run: npm install -g yarn
+      - name: Set Yarn version
+        run: yarn policies set-version v1.22.19
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
@@ -110,10 +114,6 @@ jobs:
           key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-yarn-
-      - name: Install Yarn
-        run: npm install -g yarn
-      - name: Set Yarn version
-        run: yarn policies set-version v1.22.19
       - name: Copy yarn.lock file
         run: cp yarn.lock packages/cubejs-docker
       - name: Yarn install
