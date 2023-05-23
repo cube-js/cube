@@ -20,7 +20,7 @@ pub enum CubeConfigPyVariableValue {
 }
 
 pub struct CubeConfigPy {
-    dynamic_properties: Option<HashMap<String, CubeConfigPyVariableValue>>,
+    static_properties: Option<HashMap<String, CubeConfigPyVariableValue>>,
     query_rewrite: Option<Py<PyFunction>>,
     check_auth: Option<Py<PyFunction>>,
 }
@@ -30,7 +30,7 @@ type BoxedCubeConfigPy = JsBox<RefCell<CubeConfigPy>>;
 impl CubeConfigPy {
     pub fn new() -> Self {
         Self {
-            dynamic_properties: Some(HashMap::new()),
+            static_properties: Some(HashMap::new()),
             query_rewrite: None,
             check_auth: None,
         }
@@ -136,7 +136,7 @@ impl Finalize for CubeConfigPy {}
 
 fn config_py_query_rewrite(mut cx: FunctionContext) -> JsResult<JsPromise> {
     #[cfg(build = "debug")]
-    trace!("JsAsyncChannel.config_py_query_rewrite");
+    trace!("config_py_query_rewrite");
 
     let (deferred, promise) = cx.promise();
     let channel = cx.channel();
@@ -179,7 +179,7 @@ fn config_py_query_rewrite(mut cx: FunctionContext) -> JsResult<JsPromise> {
 
 fn config_py_check_auth(mut cx: FunctionContext) -> JsResult<JsPromise> {
     #[cfg(build = "debug")]
-    trace!("JsAsyncChannel.config_py_check_auth");
+    trace!("config_py_check_auth");
 
     let (deferred, promise) = cx.promise();
     let channel = cx.channel();
@@ -226,8 +226,8 @@ impl CubeConfigPy {
     pub fn to_object<'a, C: Context<'a>>(mut self, cx: &mut C) -> JsResult<'a, JsObject> {
         let obj = cx.empty_object();
 
-        let dynamic_properties = self.dynamic_properties.take().unwrap();
-        for (k, v) in dynamic_properties.into_iter() {
+        let static_properties = self.static_properties.take().unwrap();
+        for (k, v) in static_properties.into_iter() {
             match v {
                 CubeConfigPyVariableValue::String(v) => {
                     let js_val = JsString::new(cx, v);
@@ -247,7 +247,7 @@ impl CubeConfigPy {
         // before move
         let has_query_rewrite = self.query_rewrite.is_some();
         let has_check_auth = self.check_auth.is_some();
-        // Pass JsAsyncChannel as this, because JsFunction cannot use closure (fn with move)
+        // Pass CubeConfigPy as this, because JsFunction cannot use closure (fn with move)
         let obj_this = cx.boxed(RefCell::new(self)).upcast::<JsValue>();
 
         if has_query_rewrite {
