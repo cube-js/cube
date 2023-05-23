@@ -24,9 +24,6 @@ log = "=0.4.11"
 simple_logger = "1.7.0"
 uuid = { version = "0.8", features = ["v4"] }
 once_cell = "1.10"
-pyo3 = { version = "0.18.3", features = [] }
-pyo3-asyncio = { version = "0.18.0", features = ["tokio-runtime"] }
-convert_case = "0.4"
 
 [dependencies.neon]
 version = "=0.10.0"

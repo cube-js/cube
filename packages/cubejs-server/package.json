@@ -44,7 +44,6 @@
     "@cubejs-backend/dotenv": "^9.0.2",
     "@cubejs-backend/server-core": "^0.33.12",
     "@cubejs-backend/shared": "^0.33.11",
-    "@cubejs-backend/native": "0.33.11",
     "@oclif/color": "^1.0.0",
     "@oclif/command": "^1.8.13",
     "@oclif/config": "^1.18.2",
