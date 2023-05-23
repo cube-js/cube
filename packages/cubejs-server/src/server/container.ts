@@ -1,5 +1,6 @@
 import path from 'path';
 import fs from 'fs';
+import fsAsync from 'fs/promises';
 import vm from 'vm';
 import color from '@oclif/color';
 import dotenv from '@cubejs-backend/dotenv';
@@ -13,6 +14,7 @@ import {
   resolveBuiltInPackageVersion,
 } from '@cubejs-backend/shared';
 import { SystemOptions } from '@cubejs-backend/server-core';
+import { pythonLoadConfig } from '@cubejs-backend/native';
 
 import {
   getMajorityVersion,
@@ -265,6 +267,14 @@ export class ServerContainer {
       process.env.NODE_ENV = 'development';
     }
 
+    if (fs.existsSync(path.join(process.cwd(), 'cube.py'))) {
+      console.log(
+        `${color.yellow('warning')} You are using Python configuration 🐍, which is an experimental feature and may not support all features`
+      );
+
+      return this.loadConfigurationFromPythonFile();
+    }
+
     if (fs.existsSync(path.join(process.cwd(), 'cube.ts'))) {
       return this.loadConfigurationFromMemory(
         this.getTypeScriptCompiler().compileConfiguration()
@@ -313,13 +323,30 @@ export class ServerContainer {
     );
   }
 
+  protected async loadConfigurationFromPythonFile(): Promise<CreateOptions> {
+    const file = await fsAsync.readFile(
+      path.join(process.cwd(), 'cube.py'),
+      'utf-8'
+    );
+
+    if (this.configuration.debug) {
+      console.log('Loaded python configuration file', file);
+    }
+
+    const config = await pythonLoadConfig(file, {
+      file: 'cube.py',
+    });
+
+    return config as any;
+  }
+
   protected async loadConfigurationFromFile(): Promise<CreateOptions> {
     const file = await import(
       path.join(process.cwd(), 'cube.js')
     );
 
     if (this.configuration.debug) {
-      console.log('Loaded configuration file', file);
+      console.log('Loaded js configuration file', file);
     }
 
     if (file.default) {
