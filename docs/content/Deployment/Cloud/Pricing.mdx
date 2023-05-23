@@ -32,6 +32,18 @@ determine the price per Cube Compute Unit (CCU). Each subscription plan
 determines the features, scalability, availability, as well as the speed and
 scope of support you may receive for your deployment.
 
+## Free
+
+The Free plan is designed for development and testing purposes. It is not
+intended for production use.
+
+It offers up to two [Development Instances][ref-cloud-deployment-dev-instance].
+The Free plan also has limits which are described [here][ref-cloud-limits].
+
+### Support
+
+The Free plan offers support via the community Slack channel.
+
 ## Starter
 
 The Starter plan starts at a minimum of $99/month and targets low-scale
@@ -40,9 +52,9 @@ production that is not business-critical.
 It offers a [Production Cluster][ref-cloud-deployment-prod-cluster], the ability
 to use third-party packages from the npm registry, AWS and GCP support in select
 regions, pre-aggregations of upto 150GB in size, [alerts][ref-cloud-alerts],
-auto-suspend controls, [semantic layer sync][ref-workspace-semantic-layer] with
-a single BI tool (such as Preset or Metabase), and a 50,000 queries per day
-limit.
+auto-suspend controls, and [semantic layer sync][ref-workspace-semantic-layer]
+with a single BI tool (such as Preset or Metabase). The Starter plan also has
+limits which are described [here][ref-cloud-limits].
 
 ### Support
 
@@ -63,8 +75,8 @@ small-scale production deployments.
 
 It offers everything in the [Starter plan](#starter) as well as support for
 [custom domains][ref-cloud-custom-domains], AWS and GCP support in all regions,
-[semantic layer sync][ref-workspace-semantic-layer] with unlimited BI tools, and
-unlimited queries.
+and [semantic layer sync][ref-workspace-semantic-layer] with unlimited BI tools.
+The Premium plan also has limits which are described [here][ref-cloud-limits].
 
 ### Support
 
@@ -89,7 +101,8 @@ It offers everything in the [Premium plan](#premium) as well as SAML 2.0 support
 for single sign-on, Azure support for all regions, a dedicated VPC for your Cube
 Cloud infrastructure, [VPC peering][ref-cloud-vpc-peering], [monitoring
 integrations][ref-cloud-monitoring], and [role-based access
-control][ref-cloud-acl].
+control][ref-cloud-acl]. The Enterprise plan also has limits which are described
+[here][ref-cloud-limits].
 
 ### Support
 
@@ -111,7 +124,9 @@ mission-critical production deployments with security and compliance needs.
 
 It offers everything in the [Enterprise plan](#enterprise) as well as enabling
 the use of [Production Multi-Clusters][ref-cloud-deployment-prod-multicluster],
-unlimited pre-aggregation sizes, and support for kSQL/Elasticsearch.
+unlimited pre-aggregation sizes, and support for kSQL/Elasticsearch. The
+Enterprise Premier plan also has limits which are described
+[here][ref-cloud-limits].
 
 ### Support
 
@@ -164,6 +179,7 @@ CCUs to a lower subscription plan level.
 [ref-cloud-deployment-prod-cluster]:
   /cloud/configuration/deployment-types#production-cluster
 [ref-cloud-alerts]: /cloud/workspace/alerts
+[ref-cloud-limits]: /cloud/limits
 [ref-cloud-monitoring]: /monitoring/integrations
 [ref-cloud-acl]: /cloud/access-control/
 [ref-cloud-deployment-prod-multicluster]:
