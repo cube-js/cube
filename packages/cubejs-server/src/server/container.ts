@@ -272,7 +272,7 @@ export class ServerContainer {
         `${color.yellow('warning')} You are using Python configuration 🐍, which is an experimental feature and may not support all features`
       );
 
-      return this.loadPythonConfiguration();
+      return this.loadConfigurationFromPythonFile();
     }
 
     if (fs.existsSync(path.join(process.cwd(), 'cube.ts'))) {
@@ -323,11 +323,15 @@ export class ServerContainer {
     );
   }
 
-  protected async loadPythonConfiguration(): Promise<CreateOptions> {
+  protected async loadConfigurationFromPythonFile(): Promise<CreateOptions> {
     const file = await fsAsync.readFile(
       path.join(process.cwd(), 'cube.py'),
       'utf-8'
     );
+
+    if (this.configuration.debug) {
+      console.log('Loaded python configuration file', file);
+    }
 
     const config = await pythonLoadConfig(file, {
       file: 'cube.py',
@@ -342,7 +346,7 @@ export class ServerContainer {
     );
 
     if (this.configuration.debug) {
-      console.log('Loaded configuration file', file);
+      console.log('Loaded js configuration file', file);
     }
 
     if (file.default) {

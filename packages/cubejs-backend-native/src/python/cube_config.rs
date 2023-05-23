@@ -36,7 +36,7 @@ impl CubeConfigPy {
         }
     }
 
-    pub fn get_dynamic_attrs(&self) -> Vec<&'static str> {
+    pub fn get_static_attrs(&self) -> Vec<&'static str> {
         vec![
             "schema_path",
             "base_path",
@@ -101,7 +101,7 @@ impl CubeConfigPy {
         Ok(None)
     }
 
-    pub fn dynamic_from_attr(&mut self, config_module: &PyAny, key: &str) -> PyResult<()> {
+    pub fn static_from_attr(&mut self, config_module: &PyAny, key: &str) -> PyResult<()> {
         let v = config_module.getattr(&*key)?;
         if !v.is_none() {
             let value = if v.get_type().is_subclass_of::<PyString>()? {
@@ -122,10 +122,10 @@ impl CubeConfigPy {
                 )));
             };
 
-            let mut dynamic_properties = self.dynamic_properties.take().unwrap();
-            dynamic_properties.insert(key.to_case(Case::Camel), value);
+            let mut static_properties = self.static_properties.take().unwrap();
+            static_properties.insert(key.to_case(Case::Camel), value);
 
-            self.dynamic_properties = Some(dynamic_properties);
+            self.static_properties = Some(static_properties);
         };
 
         Ok(())
