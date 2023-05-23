@@ -127,52 +127,9 @@ export const CodeTabs: FC<CodeTabsProps> = ({ children }) => {
             );
           })}
       </div>
-      <Pre className="!rounded-t-none">
+      <Pre className="!rounded-t-none" hasCopyCode={true}>
         {children[selectedTab].props.children}
       </Pre>
-    </div>
-  );
-
-  return (
-    <div className={classes.CodeBlock}>
-      <div className={classes.CodeBlocks__tabs}>
-        {children
-          .filter((tab) => !!tab.props["data-language"])
-          .map((tab, i) => {
-            let lang = tab.props["data-language"];
-            if (lang === "js") {
-              lang = "javascript";
-            }
-            return (
-              <div
-                key={i}
-                className={cn("CodeBlocks__tab", {
-                  [classes.SelectedTab]: i === selectedTab,
-                })}
-                onClick={() => {
-                  if (
-                    i !== selectedTab &&
-                    (lang === "javascript" || lang === "yaml")
-                  ) {
-                    localStorage.setItem(STORAGE_KEY, lang);
-                    window.dispatchEvent(
-                      new CustomEvent("codetabs.changed", {
-                        detail: {
-                          lang,
-                        },
-                      })
-                    );
-                  }
-                  setSelectedTab(i);
-                }}
-              >
-                {langs[lang] || lang}
-              </div>
-            );
-          })}
-      </div>
-
-      {children && children[selectedTab].props.children}
     </div>
   );
 };
