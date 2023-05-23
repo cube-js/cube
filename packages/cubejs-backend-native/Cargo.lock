@@ -2392,7 +2392,19 @@ dependencies = [
  "once_cell",
  "pin-project-lite",
  "pyo3",
+ "pyo3-asyncio-macros",
  "tokio",
+]
+
+[[package]]
+name = "pyo3-asyncio-macros"
+version = "0.18.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "be72d4cd43a27530306bd0d20d3932182fbdd072c6b98d3638bc37efb9d559dd"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

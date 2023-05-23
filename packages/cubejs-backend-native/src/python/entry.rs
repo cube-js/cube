@@ -1,21 +1,7 @@
 use crate::python::cube_config::CubeConfigPy;
-use crate::runtime;
+use crate::python::runtime::py_runtime_init;
 use neon::prelude::*;
-use once_cell::sync::OnceCell;
 use pyo3::prelude::*;
-
-fn py_runtime<'a, C: Context<'a>>(cx: &mut C) -> NeonResult<&()> {
-    static PY_RUNTIME: OnceCell<()> = OnceCell::new();
-
-    let runtime = runtime(cx)?;
-
-    PY_RUNTIME.get_or_try_init(|| {
-        pyo3::prepare_freethreaded_python();
-        pyo3_asyncio::tokio::init_with_runtime(runtime).unwrap();
-
-        Ok(())
-    })
-}
 
 fn python_load_config(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let config_file_content = cx.argument::<JsString>(0)?.value(&mut cx);
@@ -23,7 +9,7 @@ fn python_load_config(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let (deferred, promise) = cx.promise();
     let channel = cx.channel();
 
-    py_runtime(&mut cx)?;
+    py_runtime_init(&mut cx, channel.clone())?;
 
     let conf_res = Python::with_gil(|py| -> PyResult<CubeConfigPy> {
         let cube_conf_code = include_str!(concat!(

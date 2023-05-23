@@ -11,7 +11,6 @@ mod transport;
 mod utils;
 
 use once_cell::sync::OnceCell;
-
 use std::sync::Arc;
 
 use auth::NodeBridgeAuthService;

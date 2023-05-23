@@ -127,7 +127,7 @@ jobs:
     strategy:
       matrix:
         node-version: [14, 16, 18]
-        python-version: ["3.9", "3.10", "3.11", "false"]
+        python-version: ["3.9", "3.10", "3.11", "fallback"]
         target: ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"]
       fail-fast: false
     container:
@@ -179,12 +179,12 @@ jobs:
       - name: Lerna tsc
         run: yarn tsc
       - name: Build native (fallback)
-        if: (matrix.python-version == 'false')
+        if: (matrix.python-version == 'fallback')
         env:
           CARGO_BUILD_TARGET: ${{ matrix.target }}
         run: cd packages/cubejs-backend-native && yarn run native:build-debug
       - name: Build native (with Python)
-        if: (matrix.python-version != 'false')
+        if: (matrix.python-version != 'fallback')
         env:
           PYO3_PYTHON: python${{ matrix.python-version }}
           CARGO_BUILD_TARGET: ${{ matrix.target }}
@@ -209,10 +209,18 @@ jobs:
 
     strategy:
       matrix:
-        # We dont need to test under all versions, we do it under linux
+        # We don't need to test under all versions, we do it under linux
         node-version: [16.x]
         os-version: [windows-2019, macos-11]
-        python-version: ["3.9", "3.10", "3.11", "false"]
+        python-version: ["3.9", "3.10", "3.11", "fallback"]
+        exclude:
+          # We dont plan to support windows for native-python
+          - os-version: windows-2019
+            python-version: "3.9"
+          - os-version: windows-2019
+            python-version: "3.10"
+          - os-version: windows-2019
+            python-version: "3.11"
       fail-fast: false
 
     steps:
@@ -230,7 +238,7 @@ jobs:
           components: rustfmt
       - name: Install Python
         uses: actions/setup-python@v4
-        if: (matrix.python-version != 'false')
+        if: (matrix.python-version != 'fallback')
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install Node.js ${{ matrix.node-version }}
@@ -263,16 +271,15 @@ jobs:
       - name: Lerna tsc
         run: yarn tsc
       - name: Build native (fallback)
-        if: (matrix.python-version == 'false')
+        if: (matrix.python-version == 'fallback')
         env:
           CUBESQL_STREAM_MODE: true
           CUBEJS_NATIVE_INTERNAL_DEBUG: true
         run: cd packages/cubejs-backend-native && yarn run native:build && yarn run test:unit
       - name: Build native (with Python)
-        if: (matrix.python-version != 'false')
-        # todo(ovr): not working on windows..
-        #env:
-        #  PYO3_PYTHON: python${{ matrix.python-version }}
+        if: (matrix.python-version != 'fallback')
+        env:
+          PYO3_PYTHON: python${{ matrix.python-version }}
         run: cd packages/cubejs-backend-native && yarn run native:build-debug-python
       - name: Tests
         env:

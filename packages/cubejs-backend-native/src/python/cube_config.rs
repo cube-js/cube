@@ -2,14 +2,13 @@ use crate::utils::bind_method;
 
 use convert_case::{Case, Casing};
 use cubesql::CubeError;
-use log::error;
 use neon::prelude::*;
-use pyo3::exceptions::{PyNotImplementedError, PyTypeError};
-
+use pyo3::exceptions::PyTypeError;
 use pyo3::types::{PyBool, PyFloat, PyFunction, PyInt, PyString};
-use pyo3::{AsPyPointer, Py, PyAny, PyErr, PyResult, Python};
+use pyo3::{Py, PyAny, PyErr, PyResult};
 
 use crate::python::cross::CLRepr;
+use crate::python::runtime::py_runtime;
 use std::cell::RefCell;
 use std::collections::HashMap;
 
@@ -139,7 +138,6 @@ fn config_py_query_rewrite(mut cx: FunctionContext) -> JsResult<JsPromise> {
     trace!("config_py_query_rewrite");
 
     let (deferred, promise) = cx.promise();
-    let channel = cx.channel();
 
     let this = cx
         .this()
@@ -151,28 +149,9 @@ fn config_py_query_rewrite(mut cx: FunctionContext) -> JsResult<JsPromise> {
         Ok(fun) => fun.clone(),
         Err(err) => return cx.throw_error(format!("{}", err)),
     };
-    std::thread::spawn(move || {
-        let res = Python::with_gil(|py| {
-            let res = py_method.call1(py, (query_arg.into_py(py)?, context_arg.into_py(py)?))?;
-            let is_coroutine = unsafe { pyo3::ffi::PyCoro_CheckExact(res.as_ptr()) == 1 };
-            if is_coroutine {
-                Err(PyErr::new::<PyNotImplementedError, _>(
-                    "Async functions are not supported, unimplemented",
-                ))
-            } else {
-                CLRepr::from_python_ref(res.as_ref(py))
-            }
-        });
 
-        deferred.settle_with(&channel, move |mut cx| match res {
-            Err(err) => {
-                error!("Python error: {:?}", err);
-
-                cx.throw_error(format!("Python error: {}", err))
-            }
-            Ok(r) => r.into_js(cx),
-        });
-    });
+    let py_runtime = py_runtime(&mut cx)?;
+    py_runtime.call_async_with_promise_callback(py_method, vec![query_arg, context_arg], deferred);
 
     Ok(promise)
 }
@@ -182,7 +161,6 @@ fn config_py_check_auth(mut cx: FunctionContext) -> JsResult<JsPromise> {
     trace!("config_py_check_auth");
 
     let (deferred, promise) = cx.promise();
-    let channel = cx.channel();
 
     let this = cx
         .this()
@@ -195,28 +173,13 @@ fn config_py_check_auth(mut cx: FunctionContext) -> JsResult<JsPromise> {
         Ok(fun) => fun.clone(),
         Err(err) => return cx.throw_error(format!("{}", err)),
     };
-    std::thread::spawn(move || {
-        let res = Python::with_gil(|py| {
-            let res =
-                py_method.call1(py, (req_arg.into_py(py)?, &authorization_arg.into_py(py)?))?;
-            let is_coroutine = unsafe { pyo3::ffi::PyCoro_CheckExact(res.as_ptr()) == 1 };
-            if is_coroutine {
-                Err(PyErr::new::<PyNotImplementedError, _>(
-                    "Async functions are not supported, unimplemented",
-                ))
-            } else {
-                CLRepr::from_python_ref(res.as_ref(py))
-            }
-        });
-        deferred.settle_with(&channel, move |mut cx| match res {
-            Err(err) => {
-                error!("Python error: {:?}", err);
 
-                cx.throw_error(format!("Python error: {}", err))
-            }
-            Ok(r) => r.into_js(cx),
-        });
-    });
+    let py_runtime = py_runtime(&mut cx)?;
+    py_runtime.call_async_with_promise_callback(
+        py_method,
+        vec![req_arg, authorization_arg],
+        deferred,
+    );
 
     Ok(promise)
 }

@@ -1,6 +1,3 @@
-# import aiohttp
-# import asyncio
-
 from cube.conf import settings
 
 settings.schema_path = "models"
@@ -13,8 +10,8 @@ def query_rewrite(query, ctx):
 
 settings.query_rewrite = query_rewrite
 
-def check_auth(req, authorization):
+async def check_auth(req, authorization):
     print('[python] check_auth req=', req, ' authorization=', authorization)
-    return req
+
 
 settings.check_auth = check_auth
