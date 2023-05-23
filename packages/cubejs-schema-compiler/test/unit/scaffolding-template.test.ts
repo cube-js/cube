@@ -592,7 +592,7 @@ describe('ScaffoldingTemplate', () => {
         format: SchemaFormat.Yaml,
         snakeCase: true
       });
-      
+
       expect(
         template.generateFilesByTableNames([
           'public.orders',

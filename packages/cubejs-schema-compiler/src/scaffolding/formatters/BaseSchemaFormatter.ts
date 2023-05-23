@@ -106,14 +106,14 @@ export abstract class BaseSchemaFormatter {
     const table = `${
       tableSchema.schema?.length ? `${this.escapeName(tableSchema.schema)}.` : ''
     }${this.escapeName(tableSchema.table)}`;
-    
+
     const { dataSource, ...contextProps } = schemaContext;
-      
+
     let dataSourceProp = {};
     if (dataSource) {
       dataSourceProp = this.options.snakeCase ? { data_source: dataSource } : { dataSource };
     }
-      
+
     const sqlOption = this.options.snakeCase
       ? {
         sql_table: table,
@@ -126,7 +126,7 @@ export abstract class BaseSchemaFormatter {
       cube: tableSchema.cube,
       ...sqlOption,
       ...dataSourceProp,
-      
+
       joins: tableSchema.joins
         .map((j) => ({
           [j.cubeToJoin]: {
@@ -164,7 +164,7 @@ export abstract class BaseSchemaFormatter {
             type: 'count',
           },
         }),
-        
+
       ...(this.options.snakeCase
         ? Object.fromEntries(
           Object.entries(contextProps).map(([key, value]) => [toSnakeCase(key), value])
