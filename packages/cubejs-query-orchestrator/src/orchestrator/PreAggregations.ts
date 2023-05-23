@@ -1062,11 +1062,15 @@ export class PreAggregationLoader {
     dropSourceTempTable: boolean,
   ) {
     if (withTempTable && dropSourceTempTable) {
-      const actualTables = await client.getTablesQuery(this.preAggregation.preAggregationsSchema);
-      const mappedActualTables = actualTables.map(t => `${this.preAggregation.preAggregationsSchema}.${t.table_name || t.TABLE_NAME}`);
-      if (mappedActualTables.includes(targetTableName)) {
-        await this.withDropLock(false, () => client.dropTable(targetTableName));
-      }
+      await this.withDropLock(false, async () => {
+        this.logger('Dropping source temp table', queryOptions);
+
+        const actualTables = await client.getTablesQuery(this.preAggregation.preAggregationsSchema);
+        const mappedActualTables = actualTables.map(t => `${this.preAggregation.preAggregationsSchema}.${t.table_name || t.TABLE_NAME}`);
+        if (mappedActualTables.includes(targetTableName)) {
+          await client.dropTable(targetTableName);
+        }
+      });
     }
 
     // We must clean orphaned in any cases: success or exception
@@ -1384,7 +1388,7 @@ export class PreAggregationLoader {
     await this.preAggregations.addTableUsed(justCreatedTable);
 
     return this.withDropLock(external, async () => {
-      this.logger('Dropping orphaned tables', queryOptions);
+      this.logger('Dropping orphaned tables', { ...queryOptions, external });
       const actualTables = await client.getTablesQuery(
         this.preAggregation.preAggregationsSchema,
       );
@@ -1437,6 +1441,7 @@ export class PreAggregationLoader {
       await Promise.all(toDrop.map(table => saveCancelFn(client.dropTable(table))));
       this.logger('Dropping orphaned tables completed', {
         ...queryOptions,
+        external,
         tablesToDrop: JSON.stringify(toDrop),
       });
     });
