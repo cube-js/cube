@@ -127,13 +127,6 @@ export abstract class BaseSchemaFormatter {
       ...sqlOption,
       ...dataSourceProp,
       
-      [this.options.snakeCase ? 'pre_aggregations' : 'preAggregations']: new ValueWithComments(
-        null,
-        [
-          'Pre-aggregation definitions go here',
-          'Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started',
-        ]
-      ),
       joins: tableSchema.joins
         .map((j) => ({
           [j.cubeToJoin]: {
@@ -143,6 +136,18 @@ export abstract class BaseSchemaFormatter {
             relationship: this.options.snakeCase
               ? JOIN_RELATIONSHIP_MAP[j.relationship]
               : j.relationship,
+          },
+        }))
+        .reduce((a, b) => ({ ...a, ...b }), {}),
+      dimensions: tableSchema.dimensions
+        .map((m) => ({
+          [this.memberName(m)]: {
+            sql: this.sqlForMember(m),
+            type: m.type ?? m.types[0],
+            title: this.memberTitle(m),
+            [this.options.snakeCase ? 'primary_key' : 'primaryKey']: m.isPrimaryKey
+              ? true
+              : undefined,
           },
         }))
         .reduce((a, b) => ({ ...a, ...b }), {}),
@@ -159,23 +164,20 @@ export abstract class BaseSchemaFormatter {
             type: 'count',
           },
         }),
-      dimensions: tableSchema.dimensions
-        .map((m) => ({
-          [this.memberName(m)]: {
-            sql: this.sqlForMember(m),
-            type: m.type ?? m.types[0],
-            title: this.memberTitle(m),
-            [this.options.snakeCase ? 'primary_key' : 'primaryKey']: m.isPrimaryKey
-              ? true
-              : undefined,
-          },
-        }))
-        .reduce((a, b) => ({ ...a, ...b }), {}),
+        
       ...(this.options.snakeCase
         ? Object.fromEntries(
           Object.entries(contextProps).map(([key, value]) => [toSnakeCase(key), value])
         )
         : contextProps),
+
+      [this.options.snakeCase ? 'pre_aggregations' : 'preAggregations']: new ValueWithComments(
+        null,
+        [
+          'Pre-aggregation definitions go here.',
+          'Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started',
+        ]
+      ),
     };
   }
 

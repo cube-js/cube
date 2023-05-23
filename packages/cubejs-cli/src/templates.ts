@@ -218,8 +218,8 @@ const ordersJs = `cube(\`orders\`, {
   \`,
 
   pre_aggregations: {
-    // Pre-aggregation definitions go here
-    // Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started
+    // Pre-aggregation definitions go here.
+    // Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started
   },
 
   measures: {
@@ -287,8 +287,8 @@ const ordersYml = `cubes:
       UNION ALL
       SELECT 5 AS id, 600 AS amount, 'shipped' status
 
-    # Pre-aggregation definitions go here
-    # Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started
+    # Pre-aggregation definitions go here.
+    # Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started
     # pre_aggregations:
 
     measures:
