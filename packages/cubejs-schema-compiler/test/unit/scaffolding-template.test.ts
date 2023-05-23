@@ -135,8 +135,8 @@ describe('ScaffoldingTemplate', () => {
   },
   
   preAggregations: {
-    // Pre-aggregation definitions go here
-    // Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started
+    // Pre-aggregation definitions go here.
+    // Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started
   }
 });
 `,
@@ -178,8 +178,8 @@ describe('ScaffoldingTemplate', () => {
   },
   
   preAggregations: {
-    // Pre-aggregation definitions go here
-    // Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started
+    // Pre-aggregation definitions go here.
+    // Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started
   }
 });
 `,
@@ -223,8 +223,8 @@ describe('ScaffoldingTemplate', () => {
   },
   
   preAggregations: {
-    // Pre-aggregation definitions go here
-    // Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started
+    // Pre-aggregation definitions go here.
+    // Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started
   }
 });
 `,
@@ -276,8 +276,8 @@ describe('ScaffoldingTemplate', () => {
   },
   
   pre_aggregations: {
-    // Pre-aggregation definitions go here
-    // Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started
+    // Pre-aggregation definitions go here.
+    // Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started
   }
 });
 `,
@@ -319,8 +319,8 @@ describe('ScaffoldingTemplate', () => {
   },
   
   pre_aggregations: {
-    // Pre-aggregation definitions go here
-    // Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started
+    // Pre-aggregation definitions go here.
+    // Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started
   }
 });
 `,
@@ -364,8 +364,8 @@ describe('ScaffoldingTemplate', () => {
   },
   
   pre_aggregations: {
-    // Pre-aggregation definitions go here
-    // Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started
+    // Pre-aggregation definitions go here.
+    // Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started
   }
 });
 `,
@@ -438,8 +438,8 @@ describe('ScaffoldingTemplate', () => {
   },
   
   pre_aggregations: {
-    // Pre-aggregation definitions go here
-    // Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started
+    // Pre-aggregation definitions go here.
+    // Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started
   }
 });
 `,
@@ -503,8 +503,8 @@ describe('ScaffoldingTemplate', () => {
   },
   
   pre_aggregations: {
-    // Pre-aggregation definitions go here
-    // Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started
+    // Pre-aggregation definitions go here.
+    // Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started
   }
 });
 `,
@@ -576,8 +576,8 @@ describe('ScaffoldingTemplate', () => {
   },
   
   pre_aggregations: {
-    // Pre-aggregation definitions go here
-    // Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started
+    // Pre-aggregation definitions go here.
+    // Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started
   }
 });
 `,
@@ -626,8 +626,8 @@ describe('ScaffoldingTemplate', () => {
         type: sum
 
     pre_aggregations:
-      # Pre-aggregation definitions go here
-      # Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started
+      # Pre-aggregation definitions go here.
+      # Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started
 
 `,
         },
@@ -661,8 +661,8 @@ describe('ScaffoldingTemplate', () => {
         type: sum
 
     pre_aggregations:
-      # Pre-aggregation definitions go here
-      # Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started
+      # Pre-aggregation definitions go here.
+      # Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started
 
 `,
         },
@@ -697,8 +697,8 @@ describe('ScaffoldingTemplate', () => {
         type: sum
 
     pre_aggregations:
-      # Pre-aggregation definitions go here
-      # Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started
+      # Pre-aggregation definitions go here.
+      # Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started
 
 `,
         },
@@ -751,8 +751,8 @@ describe('ScaffoldingTemplate', () => {
         type: sum
 
     pre_aggregations:
-      # Pre-aggregation definitions go here
-      # Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started
+      # Pre-aggregation definitions go here.
+      # Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started
 
 `,
         },

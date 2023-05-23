@@ -174,8 +174,8 @@ export abstract class BaseSchemaFormatter {
       [this.options.snakeCase ? 'pre_aggregations' : 'preAggregations']: new ValueWithComments(
         null,
         [
-          'Pre-aggregation definitions go here',
-          'Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started',
+          'Pre-aggregation definitions go here.',
+          'Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started',
         ]
       ),
     };
