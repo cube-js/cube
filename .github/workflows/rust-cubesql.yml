@@ -88,7 +88,7 @@ jobs:
           files: ./rust/cubesql/cobertura.xml
           verbose: true
           flags: cubesql
-          fail_ci_if_error: true
+          fail_ci_if_error: false
 
   unit_legacy:
     runs-on: ubuntu-20.04
@@ -130,7 +130,7 @@ jobs:
         target: ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"]
       fail-fast: false
     container:
-      image: cubejs/rust-cross:${{ matrix.target }}-03012023
+      image: cubejs/rust-cross:${{ matrix.target }}-23052023
 
     steps:
       - name: Checkout
@@ -219,6 +219,10 @@ jobs:
           toolchain: nightly-2022-03-08
           override: true
           components: rustfmt
+      - name: Install Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
       - name: Install Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v3
         with:
