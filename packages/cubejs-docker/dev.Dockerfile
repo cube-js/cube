@@ -168,7 +168,7 @@ FROM base AS final
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
-    && apt-get install -y ca-certificates \
+    && apt-get install -y ca-certificates python3 \
     && apt-get clean
 
 COPY --from=build /cubejs .
