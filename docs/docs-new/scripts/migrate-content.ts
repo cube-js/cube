@@ -99,6 +99,7 @@ const overrides: Record<string, Override> = {
       overview: "Overview",
       core: "Cube Core",
       cloud: "Cube Cloud",
+      'migrate-from-core': 'Migrate from Cube Core',
     },
   },
 
@@ -178,12 +179,38 @@ const overrides: Record<string, Override> = {
     title: "Learn more",
   },
 
-  // "Getting-Started/Migrate-from-Core/Upload-with-CLI.mdx": {},
-  // "Getting-Started/Migrate-from-Core/Import-GitLab-repository-via-SSH.mdx": {},
-  // "Getting-Started/Migrate-from-Core/Import-GitHub-repository.mdx": {},
-  // "Getting-Started/Migrate-from-Core/Import-Git-repository-via-SSH.mdx": {},
-  // "Getting-Started/Migrate-from-Core/Import-Bitbucket-repository-via-SSH.mdx":
-  //   {},
+  "Getting-Started/Migrate-from-Core/Upload-with-CLI.mdx": {
+    ready: true,
+    path: "product/getting-started/migrate-from-core/upload-with-cli",
+    title: "Import a local project to Cube Cloud with CLI",
+    meta: {
+      'upload-with-cli': "Upload with CLI",
+      'import-gitlab-repository-via-ssh': 'Import a GitLab repository',
+      'import-github-repository': 'Import a GitHub repository',
+      'import-git-repository-via-ssh': 'Import a Git repository',
+      'import-bitbucket-repository-via-ssh': 'Import a Bitbucket repository',
+    },
+  },
+  "Getting-Started/Migrate-from-Core/Import-GitLab-repository-via-SSH.mdx": {
+    ready: true,
+    path: "product/getting-started/migrate-from-core/import-gitlab-repository-via-ssh",
+    title: "Import a GitLab repository"
+  },
+  "Getting-Started/Migrate-from-Core/Import-GitHub-repository.mdx": {
+    ready: true,
+    path: "product/getting-started/migrate-from-core/import-github-repository",
+    title: "Import a GitHub repository"
+  },
+  "Getting-Started/Migrate-from-Core/Import-Git-repository-via-SSH.mdx": {
+    ready: true,
+    path: "product/getting-started/migrate-from-core/import-git-repository-via-ssh",
+    title: "Import a Git repository"
+  },
+  "Getting-Started/Migrate-from-Core/Import-Bitbucket-repository-via-SSH.mdx": {
+    ready: true,
+    path: "product/getting-started/migrate-from-core/import-bitbucket-repository-via-ssh",
+    title: "Import a Bitbucket repository"
+  },
 
   // configuration
   "Configuration/Overview.mdx": {
@@ -1147,6 +1174,7 @@ async function main() {
 
   await Promise.all(
     mdxFiles.map(async (filePath) => {
+      // Strip the `../content/` prefix to get the path relative to the old docs content root
       const override = overrides[filePath.slice(11)];
 
       if (override && override.ready && override.path) {

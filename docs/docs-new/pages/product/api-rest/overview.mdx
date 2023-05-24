@@ -27,8 +27,8 @@ security context, which can be used in the
 configuration file][ref-config-js].
 
 The API Token is passed via the Authorization Header. The token itself is a
-[JSON Web Token](https://jwt.io), the [Security section](security) describes how
-to generate it.
+[JSON Web Token](https://jwt.io), the [Security section][ref-security] describes
+how to generate it.
 
 In the development environment the token is not required for authorization, but
 you can still use it to pass a security context.
@@ -131,3 +131,4 @@ example, the following query will retrieve rows 101-200 from the `Orders` cube:
 [ref-api-ref-query-format]: /query-format#query-properties
 [ref-config-cors]: /config#http
 [ref-schema-ref-cube-refresh-key]: /schema/reference/cube#refresh-key
+[ref-security]: /security

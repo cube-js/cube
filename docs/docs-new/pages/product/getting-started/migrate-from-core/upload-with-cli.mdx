@@ -1,0 +1,100 @@
+---
+redirect_from:
+  - /cloud/getting-started/cli
+---
+
+# Import a local project to Cube Cloud with CLI
+This guide walks you through setting up Cube Cloud, importing an existing Cube
+project from a local machine via SSH, and connecting to your database.
+
+<LoomVideo url="https://www.loom.com/embed/8ad76276b9d74e8283b7c319a22e4411" />
+
+## Step 1: Create Deployment
+
+Click&nbsp;<Btn>Create Deployment</Btn>. Then give it a name and select the
+cloud provider and region of your choice.
+
+<div style={{ textAlign: "center" }}>
+  <img
+    alt="Cube Cloud Create Deployment Screen"
+    src="https://cube.dev/downloads/images/cube-cloud-quickstart-1.png"
+    style={{ border: "none" }}
+    width="100%"
+  />
+</div>
+
+<SuccessBox>
+
+Microsoft Azure is available in Cube Cloud on
+[Premium](https://cube.dev/pricing) tier. [Contact us](https://cube.dev/contact)
+for details.
+
+</SuccessBox>
+
+## Step 2: Upload your Cube project
+
+The next step is to upload your existing Cube project to the Cube Cloud.
+
+You can do it by running the following command from terminal in your Cube
+project directory.
+
+```bash{promptUser: user}
+npx cubejs-cli deploy --token <TOKEN>
+```
+
+<div style={{ textAlign: "center" }}>
+  <img
+    alt="Cube Cloud Upload Project Screen"
+    src="https://ucarecdn.com/8cbf3ce0-0db0-44b3-b624-b0a79d9cce24/"
+    style={{ border: "none" }}
+    width="100%"
+  />
+</div>
+
+## Step 3: Connect your Database
+
+Enter your credentials to connect to your database. Check the [connecting to
+databases][ref-cloud-connecting-to-databases] guide for more details.
+
+<InfoBox>
+
+Want to use a sample database instead? We also have a sample database where you
+can try out Cube Cloud:
+
+<br />
+
+| Field    | Value              |
+| -------- | ------------------ |
+| Host     | `demo-db.cube.dev` |
+| Port     | `5432`             |
+| Database | `ecom`             |
+| Username | `cube`             |
+| Password | `12345`            |
+
+</InfoBox>
+
+<div style={{ textAlign: "center" }}>
+  <img
+    alt="Cube Cloud Setup Database Screen"
+    src="https://cube.dev/downloads/images/cube-cloud-quickstart-3.png"
+    style={{ border: "none" }}
+    width="100%"
+  />
+</div>
+
+## Step 4: Try out Cube Cloud
+
+Now you can navigate to [the Playground][ref-cloud-playground] to try out your
+queries or connect your application to Cube Cloud API.
+
+<div style={{ textAlign: "center" }}>
+  <img
+    alt="Cube Cloud Playground"
+    src="https://ucarecdn.com/43bc545a-3c77-42e4-a9db-7c5188fe610e/"
+    style={{ border: "none" }}
+    width="100%"
+  />
+</div>
+
+[ref-cloud-connecting-to-databases]: /config/databases
+[ref-cloud-playground]: /cloud/dev-tools/dev-playground

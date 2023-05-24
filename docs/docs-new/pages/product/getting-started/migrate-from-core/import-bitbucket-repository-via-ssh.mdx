@@ -1,0 +1,211 @@
+---
+redirect_from:
+  - /cloud/getting-started/ssh/bitbucket
+---
+
+# Import a Bitbucket repository
+This guide walks you through setting up Cube Cloud, importing a
+[Bitbucket][bitbucket] repository with an existing Cube project via SSH, and
+connecting to your database.
+
+## Step 1: Create an account
+
+Navigate to [cubecloud.dev](https://cubecloud.dev/), and create a new Cube Cloud
+account.
+
+## Step 2: Create a new Deployment
+
+Click&nbsp;<Btn>Create Deployment</Btn>. This is the first step in the
+deployment creation. Give it a name and select the cloud provider and region of
+your choice.
+
+<div style={{ textAlign: "center" }}>
+  <img
+    alt="Cube Cloud Create Deployment Screen"
+    src="https://cubedev-blog-images.s3.us-east-2.amazonaws.com/f5b73cc7-ac72-49ff-a3cd-491c6ab89bbc.png"
+    style={{ border: "none" }}
+    width="100%"
+  />
+</div>
+
+<SuccessBox>
+
+Microsoft Azure is available in Cube Cloud on
+[Premium](https://cube.dev/pricing) tier. [Contact us](https://cube.dev/contact)
+for details.
+
+</SuccessBox>
+
+## Step 3: Import Git repository
+
+Next up, the second step in creating a Cube App from scratch in Cube Cloud is to
+click&nbsp;<Btn>Import Git repository via SSH</Btn>.
+
+<div style={{ textAlign: "center" }}>
+  <img
+    alt="Cube Cloud Upload Project Screen"
+    src="https://cubedev-blog-images.s3.us-east-2.amazonaws.com/4e212151-527b-4435-892c-257a11842e03.png"
+    style={{ border: "none" }}
+    width="100%"
+  />
+</div>
+
+Now go to your Bitbucket repository and on the&nbsp;<Btn>Clone</Btn> dialog,
+switch to&nbsp;<Btn>SSH</Btn> and copy the URL:
+
+<div style={{ textAlign: "center" }}>
+  <img
+    alt="Getting the repository's SSH URL from Bitbucket"
+    src="https://cubedev-blog-images.s3.us-east-2.amazonaws.com/55ac9d84-5412-4ff8-96eb-b6f04e1977e9.png"
+    style={{ border: "none" }}
+    width="100%"
+  />
+</div>
+
+Back in Cube Cloud, paste the URL and click <Btn>Generate SSH key</Btn>:
+
+<div style={{ textAlign: "center" }}>
+  <img
+    alt="Getting SSH key from Cube Cloud"
+    src="https://cubedev-blog-images.s3.us-east-2.amazonaws.com/ff06ef69-74bf-4259-ba4b-2499d3d5d265.png"
+    style={{ border: "none" }}
+    width="100%"
+  />
+</div>
+
+Now copy the SSH key and go back to Bitbucket and into the repository's
+settings. Click&nbsp;<Btn>Access keys</Btn> from the navigation, then click
+&nbsp;<Btn>Add key</Btn> button. Give the key a label (`Cube Cloud`, for
+example) and paste the SSH key in the relevant field:
+
+<div style={{ textAlign: "center" }}>
+  <img
+    alt="Add Cube Cloud deploy key to Bitbucket"
+    src="https://cubedev-blog-images.s3.us-east-2.amazonaws.com/6c9367c1-be9c-4707-9102-37d66c8942f0.png"
+    style={{ border: "none" }}
+    width="100%"
+  />
+</div>
+
+Click&nbsp;<Btn>Add SSH key</Btn> to save, then go back to Cube Cloud and
+click&nbsp;<Btn>Connect</Btn>. After a connection is successfully established,
+you should see the next screen:
+
+<div style={{ textAlign: "center" }}>
+  <img
+    alt="Getting webhook URL from Cube Cloud"
+    src="https://cubedev-blog-images.s3.us-east-2.amazonaws.com/eda31adf-fd36-4757-a2a2-d9b919b890d3.png"
+    style={{ border: "none" }}
+    width="100%"
+  />
+</div>
+
+Copy the&nbsp;<Btn>Cube Cloud Git Webhook URL</Btn>, go to your Bitbucket
+repository's settings, and click&nbsp;<Btn>Webhooks</Btn> from the navigation.
+Click&nbsp;<Btn>Add webhook</Btn>, then add a title (`Cube Cloud`, for example).
+Paste the URL into the correct field, ensure the&nbsp;<Btn>Repository >
+Push</Btn> trigger is checked and click&nbsp;<Btn>Save</Btn>.
+
+<div style={{ textAlign: "center" }}>
+  <img
+    alt="Add Cube Cloud webhook to Bitbucket"
+    src="https://cubedev-blog-images.s3.us-east-2.amazonaws.com/b59ddcf6-bc28-463b-8526-dee0934ffbfe.png"
+    style={{ border: "none" }}
+    width="100%"
+  />
+</div>
+
+Back in Cube Cloud, click <Btn>Connect</Btn> to test the webhook.
+
+## Step 4: Connect your Database
+
+Enter your credentials to connect to your database. Check the [connecting to
+databases][link-connecting-to-databases] guide for more details.
+
+<InfoBox>
+
+Want to use a sample database instead? We also have a sample database where you
+can try out Cube Cloud:
+
+<br />
+
+| Field    | Value              |
+| -------- | ------------------ |
+| Host     | `demo-db.cube.dev` |
+| Port     | `5432`             |
+| Database | `ecom`             |
+| Username | `cube`             |
+| Password | `12345`            |
+
+</InfoBox>
+
+<div style={{ textAlign: "center" }}>
+  <img
+    alt="Cube Cloud Setup Database Screen"
+    src="https://cubedev-blog-images.s3.us-east-2.amazonaws.com/1375f9f1-0860-412a-a436-e2e775ec10fa.png"
+    style={{ border: "none" }}
+    width="100%"
+  />
+</div>
+
+In the UI it'll look exactly like the image below.
+
+<div style={{ textAlign: "center" }}>
+  <img
+    alt="Cube Cloud Setup Database Screen"
+    src="https://cubedev-blog-images.s3.us-east-2.amazonaws.com/031bb948-d706-412c-b714-5bf28df01312.png"
+    style={{ border: "none" }}
+    width="100%"
+  />
+</div>
+
+If you run into issues here, make sure to allow the Cube Cloud IPs to access
+your database. This means you need to enable these IPs in your firewall. If you
+are using AWS, this would mean adding a security group with allowed IPs.
+
+## Step 5: Generate the Data Model
+
+Step five in this case consists of generating data models. Start by selecting
+the database tables to generate the data models from, then
+hit&nbsp;<Btn>Generate</Btn>.
+
+<div style={{ textAlign: "center" }}>
+  <img
+    alt="Cube Cloud Setup Database Screen"
+    src="https://cubedev-blog-images.s3.us-east-2.amazonaws.com/a906434b-c4da-414a-adb3-f010b1fa45d1.png"
+    style={{ border: "none" }}
+    width="100%"
+  />
+</div>
+
+Cube Cloud will generate the data models and spin up your Cube deployment. With
+this, you're done. You've created a Cube deployment, configured a database
+connection, and generated data models!
+
+<div style={{ textAlign: "center" }}>
+  <img
+    alt="Cube Cloud Setup Database Screen"
+    src="https://cubedev-blog-images.s3.us-east-2.amazonaws.com/b6addada-cc77-4940-aa0c-a0a9c3df6fd1.png"
+    style={{ border: "none" }}
+    width="100%"
+  />
+</div>
+
+You're ready for the last step, running queries in the Playground.
+
+## Step 6: Try out Cube Cloud
+
+Now you can navigate to Playground to try out your queries or connect your
+application to the Cube Cloud API.
+
+<div style={{ textAlign: "center" }}>
+  <img
+    alt="Cube Cloud Playground"
+    src="https://ucarecdn.com/43bc545a-3c77-42e4-a9db-7c5188fe610e/"
+    style={{ border: "none" }}
+    width="100%"
+  />
+</div>
+
+[bitbucket]: https://bitbucket.org/
+[link-connecting-to-databases]: /config/databases
