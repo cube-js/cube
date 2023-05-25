@@ -126,6 +126,8 @@ jobs:
           retry_wait_seconds: 15
           timeout_minutes: 20
           command: yarn install --frozen-lockfile
+      - name: Compile TypeScript
+        run: yarn tsc
       - name: Build native
         env:
           CARGO_BUILD_TARGET: ${{ matrix.target }}
@@ -199,6 +201,8 @@ jobs:
           retry_wait_seconds: 15
           timeout_minutes: 20
           command: yarn install --frozen-lockfile
+      - name: Compile TypeScript
+        run: yarn tsc
       - name: Build native
         run: cd packages/cubejs-backend-native && npm run native:build-release
       - name: Upload artifact
