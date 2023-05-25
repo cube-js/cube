@@ -173,5 +173,7 @@ jobs:
           cd ./packages/cubejs-testing-drivers
           export DEBUG=testcontainers
           yarn ${{ matrix.database }}-driver
+          sleep 10
           yarn ${{ matrix.database }}-core
+          sleep 10
           yarn ${{ matrix.database }}-full
