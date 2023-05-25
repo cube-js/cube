@@ -16,7 +16,6 @@ Array [
 exports[`Sequence with the @cubejs-backend/athena-driver for the Customers.RollingInternal 1`] = `
 Array [
   Array [
-    "createSchemaIfNotExists",
     "loadPreAggregationIntoTable",
   ],
   Array [],
