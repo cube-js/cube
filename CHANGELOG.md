@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.13](https://github.com/cube-js/cube/compare/v0.33.12...v0.33.13) (2023-05-25)
+
+
+### Features
+
+* **native:** Initial support for cube.py (Python configuration) ([#6465](https://github.com/cube-js/cube/issues/6465)) ([c41af63](https://github.com/cube-js/cube/commit/c41af63c9ba9778364ebb89ad7b087156b48cfec))
+
+
+
+
+
 ## [0.33.12](https://github.com/cube-js/cube/compare/v0.33.11...v0.33.12) (2023-05-22)
 
 
