@@ -4,7 +4,6 @@ mod auth;
 mod channel;
 mod config;
 mod logger;
-mod python;
 mod stream;
 mod transport;
 mod utils;
@@ -13,14 +12,12 @@ use once_cell::sync::OnceCell;
 
 use std::sync::Arc;
 
-use crate::python::CubeConfigPy;
 use auth::NodeBridgeAuthService;
 use config::NodeConfig;
 use cubesql::{config::CubeServices, telemetry::ReportingLogger};
 use log::Level;
 use logger::NodeBridgeLogger;
 use neon::prelude::*;
-use pyo3::prelude::*;
 use simple_logger::SimpleLogger;
 use tokio::runtime::{Builder, Runtime};
 use transport::NodeBridgeTransport;
@@ -45,19 +42,6 @@ fn runtime<'a, C: Context<'a>>(cx: &mut C) -> NeonResult<&'static Runtime> {
             .enable_all()
             .build()
             .or_else(|err| cx.throw_error(err.to_string()))
-    })
-}
-
-fn py_runtime<'a, C: Context<'a>>(cx: &mut C) -> NeonResult<&()> {
-    static PY_RUNTIME: OnceCell<()> = OnceCell::new();
-
-    let runtime = runtime(cx)?;
-
-    PY_RUNTIME.get_or_try_init(|| {
-        pyo3::prepare_freethreaded_python();
-        pyo3_asyncio::tokio::init_with_runtime(runtime).unwrap();
-
-        Ok(())
     })
 }
 
@@ -202,50 +186,11 @@ fn shutdown_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
     Ok(promise)
 }
 
-fn python_load_config(mut cx: FunctionContext) -> JsResult<JsPromise> {
-    let config_file_content = cx.argument::<JsString>(0)?.value(&mut cx);
-
-    let (deferred, promise) = cx.promise();
-    let channel = cx.channel();
-
-    py_runtime(&mut cx)?;
-
-    let conf_res = Python::with_gil(|py| -> PyResult<CubeConfigPy> {
-        let cube_conf_code = include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/python/cube/src/conf/__init__.py"
-        ));
-        PyModule::from_code(py, cube_conf_code, "__init__.py", "cube.conf")?;
-
-        let config_module = PyModule::from_code(py, &config_file_content, "config.py", "")?;
-        let settings_py = config_module.getattr("settings")?;
-
-        let mut cube_conf = CubeConfigPy::new();
-
-        for attr_name in cube_conf.get_static_attrs() {
-            cube_conf.static_from_attr(settings_py, attr_name)?;
-        }
-
-        cube_conf.apply_dynamic_functions(settings_py)?;
-
-        Ok(cube_conf)
-    });
-
-    deferred.settle_with(&channel, move |mut cx| match conf_res {
-        Ok(c) => c.to_object(&mut cx),
-        Err(err) => cx.throw_error(format!("Python error: {}", err)),
-    });
-
-    Ok(promise)
-}
-
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("setupLogger", setup_logger)?;
     cx.export_function("registerInterface", register_interface)?;
     cx.export_function("shutdownInterface", shutdown_interface)?;
-
-    cx.export_function("pythonLoadConfig", python_load_config)?;
 
     Ok(())
 }

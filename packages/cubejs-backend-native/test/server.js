@@ -1,4 +1,4 @@
-const native = require('../js/index');
+const native = require('../dist/js/index');
 const meta_fixture = require('./meta');
 const { FakeRowStream } = require('@cubejs-backend/testing-shared');
 

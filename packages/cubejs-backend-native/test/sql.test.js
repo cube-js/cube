@@ -1,8 +1,8 @@
-import { FakeRowStream } from '@cubejs-backend/testing-shared';
-import mysql from 'mysql2/promise';
+const mysql = require('mysql2/promise');
 
-import * as native from '../js';
-import meta_fixture from './meta';
+const native = require('../dist/js/index');
+const meta_fixture = require('./meta');
+const { FakeRowStream } = require('@cubejs-backend/testing-shared');
 
 let logger = jest.fn(({ event }) => {
   if (!event.error.includes('load - strange response, success which contains error')) {
@@ -10,6 +10,28 @@ let logger = jest.fn(({ event }) => {
       expect(event.protocol).toEqual('mysql');
   }
   console.log(event);
+});
+
+expect.extend({
+  toBeTypeOrNull(received, classTypeOrNull) {
+    try {
+      expect(received).toEqual(expect.any(classTypeOrNull));
+      return {
+        message: () => `Ok`,
+        pass: true
+      };
+    } catch (error) {
+      return received === null
+        ? {
+          message: () => `Ok`,
+          pass: true
+        }
+        : {
+          message: () => `expected ${received} to be ${classTypeOrNull} type or null`,
+          pass: false
+        };
+    }
+  }
 });
 
 native.setupLogger(
@@ -99,7 +121,7 @@ describe('SQLInterface', () => {
     console.log(instance);
 
     try {
-      const testConnectionFailed = async (/** input */ { user, password }: { user?: string, password?: string }) =>{
+      const testConnectionFailed = async (/** input */ { user, password }) =>{
         try {
           await mysql.createConnection({
             host: '127.0.0.1',
@@ -109,7 +131,7 @@ describe('SQLInterface', () => {
           });;
 
           throw new Error('must throw error');
-        } catch (e: any) {
+        } catch (e) {
           expect(e.message).toContain('Incorrect user name or password');
         }
 
@@ -192,17 +214,17 @@ describe('SQLInterface', () => {
           await connection.query('select * from KibanaSampleDataEcommerce LIMIT 1000');
 
           throw new Error('Error was not passed from transport to the client');
-        } catch (e: any) {
+        } catch (e) {
           expect(e.sqlState).toEqual('HY000');
           expect(e.sqlMessage).toContain('This error should be passed back to MySQL client');
         }
       }
 
       if (process.env.CUBESQL_STREAM_MODE === 'true') {
-        const [result, _columns] = (await connection.query({
+        const [result, _columns] = await connection.query({
           sql: 'select id, order_date from KibanaSampleDataEcommerce order by order_date desc limit 50001',
           rowsAsArray: false,
-        })) as any;
+        });
         expect(result.length).toEqual(50001);
         expect(result[0].id).toEqual(0);
         expect(result[50000].id).toEqual(50000);
