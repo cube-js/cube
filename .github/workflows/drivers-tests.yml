@@ -108,10 +108,6 @@ jobs:
           - mysql
           - postgres
           - snowflake
-        suite:
-#          - driver
-#          - core
-          - full
       fail-fast: false
 
     steps:
@@ -176,4 +172,6 @@ jobs:
         run: |
           cd ./packages/cubejs-testing-drivers
           export DEBUG=testcontainers
-          yarn ${{ matrix.database }}-${{ matrix.suite }}
+          yarn ${{ matrix.database }}-driver
+          yarn ${{ matrix.database }}-core
+          yarn ${{ matrix.database }}-full
