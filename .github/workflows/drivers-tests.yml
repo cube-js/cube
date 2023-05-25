@@ -109,8 +109,8 @@ jobs:
           - postgres
           - snowflake
         suite:
-          - driver
-          - core
+#          - driver
+#          - core
           - full
       fail-fast: false
 
