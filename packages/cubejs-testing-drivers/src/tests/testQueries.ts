@@ -30,8 +30,9 @@ export function testQueries(type: string): void {
     }
     const apiToken = sign({}, 'mysupersecret');
 
+    const suffix = `_${new Date().getTime().toString(32)}`;
     beforeAll(async () => {
-      env = await runEnvironment(type);
+      env = await runEnvironment(type, suffix);
       process.env.CUBEJS_REFRESH_WORKER = 'true';
       process.env.CUBEJS_CUBESTORE_HOST = '127.0.0.1';
       process.env.CUBEJS_CUBESTORE_PORT = `${env.store.port}`;
@@ -46,7 +47,7 @@ export function testQueries(type: string): void {
         apiUrl: `http://127.0.0.1:${env.cube.port}/cubejs-api/v1`,
       });
       driver = (await getDriver(type)).source;
-      query = getCreateQueries(type);
+      query = getCreateQueries(type, suffix);
       await Promise.all(query.map(async (q) => {
         await driver.query(q);
       }));
@@ -55,7 +56,7 @@ export function testQueries(type: string): void {
     afterAll(async () => {
       const tables = Object
         .keys(fixtures.tables)
-        .map((key: string) => fixtures.tables[<'products' | 'customers' | 'ecommerce'>key]);
+        .map((key: string) => `${fixtures.tables[<'products' | 'customers' | 'ecommerce'>key]}${suffix}`);
       await Promise.all(
         tables.map(async (t) => {
           await driver.dropTable(t);
