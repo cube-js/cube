@@ -30,7 +30,7 @@ export function testQueries(type: string): void {
     }
     const apiToken = sign({}, 'mysupersecret');
 
-    const suffix = `_${new Date().getTime().toString(32)}`;
+    const suffix = new Date().getTime().toString(32);
     beforeAll(async () => {
       env = await runEnvironment(type, suffix);
       process.env.CUBEJS_REFRESH_WORKER = 'true';
@@ -54,16 +54,19 @@ export function testQueries(type: string): void {
     });
   
     afterAll(async () => {
-      const tables = Object
-        .keys(fixtures.tables)
-        .map((key: string) => `${fixtures.tables[<'products' | 'customers' | 'ecommerce'>key]}${suffix}`);
-      await Promise.all(
-        tables.map(async (t) => {
-          await driver.dropTable(t);
-        })
-      );
-      await driver.release();
-      await env.stop();
+      try {
+        const tables = Object
+          .keys(fixtures.tables)
+          .map((key: string) => `${fixtures.tables[<'products' | 'customers' | 'ecommerce'>key]}${suffix}`);
+        await Promise.all(
+          tables.map(async (t) => {
+            await driver.dropTable(t);
+          })
+        );
+      } finally {
+        await driver.release();
+        await env.stop();
+      }
     });
 
     // MUST be the first test in the list!
@@ -1295,6 +1298,27 @@ export function testQueries(type: string): void {
         timeDimensions: [{
           dimension: 'ECommerce.orderDate',
           granularity: 'month'
+        }],
+        order: {
+          'ECommerce.totalProfit': 'desc',
+          'ECommerce.productName': 'asc'
+        },
+        total: true
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying ECommerce: partitioned pre-agg higher granularity', async () => {
+      const response = await client.load({
+        dimensions: [
+          'ECommerce.productName'
+        ],
+        measures: [
+          'ECommerce.totalQuantity',
+        ],
+        timeDimensions: [{
+          dimension: 'ECommerce.orderDate',
+          granularity: 'year'
         }],
         order: {
           'ECommerce.totalProfit': 'desc',
