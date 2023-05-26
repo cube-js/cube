@@ -198,6 +198,11 @@ export const setupLogger = (logger: (extra: any) => unknown, logLevel: LogLevel)
     native.setupLogger({logger: wrapNativeFunctionWithChannelCallback(logger), logLevel});
 }
 
+export const isFallbackBuild = (): boolean => {
+    const native = loadNative();
+    return native.isFallbackBuild();
+}
+
 export type SqlInterfaceInstance = { __typename: 'sqlinterfaceinstance' };
 
 export const registerInterface = async (options: SQLInterfaceOptions): Promise<SqlInterfaceInstance> => {
@@ -245,6 +250,10 @@ interface PyConfiguration {
 }
 
 export const pythonLoadConfig = async (context: string, options: { file: string }): Promise<PyConfiguration> => {
+    if (isFallbackBuild()) {
+        throw new Error('Python is not supported in fallback build');
+    }
+
     const native = loadNative();
     const config = await native.pythonLoadConfig(context, options);
 

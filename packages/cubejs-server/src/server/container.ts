@@ -8,13 +8,13 @@ import { parse as semverParse, SemVer, compare as semverCompare } from 'semver';
 import {
   displayCLIWarning,
   getEnv,
-  isDockerImage,
+  isDockerImage, isNativeSupported,
   packageExists,
   PackageManifest,
   resolveBuiltInPackageVersion,
 } from '@cubejs-backend/shared';
 import { SystemOptions } from '@cubejs-backend/server-core';
-import { pythonLoadConfig } from '@cubejs-backend/native';
+import { isFallbackBuild, pythonLoadConfig } from '@cubejs-backend/native';
 
 import {
   getMajorityVersion,
@@ -271,6 +271,15 @@ export class ServerContainer {
       console.log(
         `${color.yellow('warning')} You are using Python configuration 🐍, which is an experimental feature and may not support all features`
       );
+
+      const supported = isNativeSupported();
+      if (supported !== true) {
+        throw new Error(`Native extension is required to load python configs. ${supported.reason}`);
+      }
+
+      if (isFallbackBuild()) {
+        throw new Error('Unable to load python config, because you are using fallback build of native extension. Please read more on ');
+      }
 
       return this.loadConfigurationFromPythonFile();
     }

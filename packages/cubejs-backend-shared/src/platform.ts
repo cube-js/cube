@@ -1,6 +1,7 @@
 import { spawnSync } from 'child_process';
+import process from 'process';
 import { internalExceptions } from './errors';
-import { displayCLIWarning } from './cli';
+import { displayCLIWarning, displayCLIWarningOnce } from './cli';
 
 export function detectLibc() {
   if (process.platform !== 'linux') {
@@ -48,4 +49,25 @@ export function detectLibc() {
   displayCLIWarning('Unable to detect what host library is used as libc, continue with gnu');
 
   return 'gnu';
+}
+
+type IsNativeSupportedResult = true | {
+  reason: string
+};
+
+export function isNativeSupported(): IsNativeSupportedResult {
+  if (process.platform === 'linux') {
+    if (detectLibc() === 'musl') {
+      displayCLIWarningOnce(
+        'is-native-supported',
+        'Unable to load native on your system. You are using linux distro with Musl which is not supported.'
+      );
+
+      return {
+        reason: 'You are using linux distro with Musl which is not supported'
+      };
+    }
+  }
+
+  return true;
 }
