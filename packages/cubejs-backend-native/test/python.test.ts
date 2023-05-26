@@ -2,9 +2,10 @@ import fs from 'fs/promises';
 import path from 'path';
 
 import * as native from '../js';
-import * as assert from 'assert';
 
-describe('Python', () => {
+const suite = native.isFallbackBuild() ? xdescribe : describe;
+
+suite('Python', () => {
   async function loadConfigurationFile() {
       const content = await fs.readFile(path.join(process.cwd(), 'test', 'config.py'), 'utf8');
       console.log('content', {

@@ -120,13 +120,14 @@ jobs:
         run: cd rust/cubesql && cargo test
 
   native_linux:
-    needs: [lint,unit,unit_legacy]
+    needs: [lint]
     runs-on: ubuntu-20.04
     timeout-minutes: 60
-    name: Build Linux GNU ${{ matrix.node-version }}.x ${{ matrix.target }}
+    name: Build Linux GNU ${{ matrix.node-version }}.x ${{ matrix.target }} with Python ${{ matrix.python-version }}
     strategy:
       matrix:
         node-version: [14, 16, 18]
+        python-version: [3.11, "false"]
         target: ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"]
       fail-fast: false
     container:
@@ -177,10 +178,16 @@ jobs:
           command: yarn install --frozen-lockfile
       - name: Lerna tsc
         run: yarn tsc
-      - name: Build native
+      - name: Build native (fallback)
+        if: (matrix.python-version == 'false')
         env:
           CARGO_BUILD_TARGET: ${{ matrix.target }}
-        run: cd packages/cubejs-backend-native && yarn run native:build
+        run: cd packages/cubejs-backend-native && yarn run native:build-debug
+      - name: Build native (with Python)
+        if: (matrix.python-version != 'false')
+        env:
+          CARGO_BUILD_TARGET: ${{ matrix.target }}
+        run: cd packages/cubejs-backend-native && yarn run native:build-debug-python
       - name: Test native (GNU only)
         if: (matrix.target == 'x86_64-unknown-linux-gnu')
         env:
@@ -194,16 +201,17 @@ jobs:
         run: cd packages/cubejs-testing && yarn smoke:cubesql
 
   native:
-    needs: [lint,unit,unit_legacy]
+    needs: [lint]
     runs-on: ${{ matrix.os-version }}
     timeout-minutes: 60
-    name: Build ${{ matrix.os-version }} ${{ matrix.node-version }}
+    name: Build ${{ matrix.os-version }} ${{ matrix.node-version }} with Python ${{ matrix.python-version }}
 
     strategy:
       matrix:
         # We dont need to test under all versions, we do it under linux
         node-version: [16.x]
         os-version: [windows-2019, macos-11]
+        python-version: ["3.9", "3.10", "3.11", "false"]
       fail-fast: false
 
     steps:
@@ -221,8 +229,9 @@ jobs:
           components: rustfmt
       - name: Install Python
         uses: actions/setup-python@v4
+        if: (matrix.python-version != 'false')
         with:
-          python-version: '3.11'
+          python-version: ${{ matrix.python-version }}
       - name: Install Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v3
         with:
@@ -252,8 +261,15 @@ jobs:
           command: yarn install --frozen-lockfile
       - name: Lerna tsc
         run: yarn tsc
-      - name: Build native
+      - name: Build native (fallback)
+        if: (matrix.python-version == 'false')
         env:
           CUBESQL_STREAM_MODE: true
           CUBEJS_NATIVE_INTERNAL_DEBUG: true
         run: cd packages/cubejs-backend-native && yarn run native:build && yarn run test:unit
+      - name: Build native (with Python)
+        if: (matrix.python-version != 'false')
+        env:
+          CUBESQL_STREAM_MODE: true
+          CUBEJS_NATIVE_INTERNAL_DEBUG: true
+        run: cd packages/cubejs-backend-native && yarn run native:build-debug-python && yarn run test:unit

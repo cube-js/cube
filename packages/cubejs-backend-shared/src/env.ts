@@ -1,7 +1,7 @@
 /* eslint-disable no-restricted-syntax */
 import { get } from 'env-var';
 import { displayCLIWarning } from './cli';
-import { detectLibc } from './platform';
+import { isNativeSupported } from './platform';
 
 export class InvalidConfiguration extends Error {
   public constructor(key: string, value: any, description: string) {
@@ -1543,11 +1543,15 @@ const variables: Record<string, (...args: any) => any> = {
       .asBoolStrict();
 
     if (isDevMode) {
-      if (process.platform === 'linux' && detectLibc() === 'musl') {
-        return undefined;
-      }
+      if (isNativeSupported()) {
+        return 15432;
+      } else {
+        displayCLIWarning(
+          'Native module is not supported on your platform. Please use official docker image as a recommended way'
+        );
 
-      return 15432;
+        return false;
+      }
     }
 
     return undefined;
