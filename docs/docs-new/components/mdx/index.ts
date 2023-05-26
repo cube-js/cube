@@ -20,6 +20,7 @@ import { YouTubeVideo } from '@/components/mdx/YouTubeVideo/YouTubeVideo';
 import { CaseStudyPromoBlock } from '@/components/mdx/CaseStudyPromoBlock/CaseStudyPromoBlock';
 import { CloudPromoBlock } from '@/components/mdx/CloudPromoBlock/CloudPromoBlock';
 import { EventPromoBlock } from '@/components/mdx/EventPromoBlock/EventPromoBlock';
+import { H1 } from '@/components/overrides/Headings/H1';
 
 export const components = {
   ...Buttons,
@@ -45,5 +46,7 @@ export const components = {
   CodeTabs,
   Btn: InlineButton,
   Screenshot,
-  YouTubeVideo
+  YouTubeVideo,
+
+  h1: H1,
 };

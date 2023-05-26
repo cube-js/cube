@@ -70,29 +70,10 @@ export default function MyApp({ Component, pageProps }: AppProps) {
       <style jsx global>{`
         :root {
           --font: ${inter.style.fontFamily};
-          --font-creapro: ${CeraPro.style.fontFamily};
+          --font-title: ${CeraPro.style.fontFamily};
           --font-mono: ${JetBrainsMono.style.fontFamily};
           --font-code: ${SourceCodePro.style.fontFamily};
           --cube-font: ${CeraPro.style.fontFamily};
-        }
-
-        body {
-        }
-
-        h1,
-        h2,
-        h3,
-        h4,
-        h5,
-        h6 {
-          font-family: ${CeraPro.style.fontFamily};
-        }
-
-        code,
-        kbd,
-        samp,
-        pre {
-          font-family: var(--font-code);
         }
       `}</style>
       <Component {...pageProps} />
