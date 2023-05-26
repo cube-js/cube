@@ -18,7 +18,7 @@ export function testQueries(type: string): void {
     const fixtures = getFixtures(type);
     let client: CubejsApi;
     let driver: BaseDriver;
-    let query: string[];
+    let queries: string[];
     let env: Environment;
 
     function execute(name: string, test: () => Promise<void>) {
@@ -47,10 +47,12 @@ export function testQueries(type: string): void {
         apiUrl: `http://127.0.0.1:${env.cube.port}/cubejs-api/v1`,
       });
       driver = (await getDriver(type)).source;
-      query = getCreateQueries(type, suffix);
-      await Promise.all(query.map(async (q) => {
+      queries = getCreateQueries(type, suffix);
+      console.log(`Creating ${queries.length} fixture tables`);
+      for (const q of queries) {
         await driver.query(q);
-      }));
+      }
+      console.log(`Creating ${queries.length} fixture tables completed`);
     });
   
     afterAll(async () => {
@@ -58,11 +60,11 @@ export function testQueries(type: string): void {
         const tables = Object
           .keys(fixtures.tables)
           .map((key: string) => `${fixtures.tables[<'products' | 'customers' | 'ecommerce'>key]}${suffix}`);
-        await Promise.all(
-          tables.map(async (t) => {
-            await driver.dropTable(t);
-          })
-        );
+        console.log(`Dropping ${tables.length} fixture tables`);
+        for (const t of tables) {
+          await driver.dropTable(t);
+        }
+        console.log(`Dropping ${tables.length} fixture tables completed`);
       } finally {
         await driver.release();
         await env.stop();
