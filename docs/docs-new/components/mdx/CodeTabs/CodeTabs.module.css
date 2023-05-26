@@ -1,10 +1,6 @@
 .CodeBlock {
-  --code_bg: #43436B;
-  --gray_02: hsl(225, 4%, 39%, 1);
-  --white: #FFFFFF;
-
   position: relative;
-  background-color: var(--code_bg);
+  background-color: var(--dark_bg);
   border-radius: 4px;
   overflow: hidden;
   margin: 24px 0;
@@ -38,13 +34,13 @@
 }
 
 .CodeBlocks__tab {
-  padding: 0 16px;
-  height: 40px;
+  padding: 0 1rem;
+  /*height: 40px;*/
   display: flex;
   align-items: center;
   font-weight: 500;
-  font-size: 16px;
-  line-height: 24px;
+  font-size: 1rem;
+  line-height: 1.75rem;
   color: var(--white);
   transition: background-color 0.3s, color 0.3s, box-shadow 0.3s;
   cursor: pointer;
@@ -56,11 +52,12 @@
 
 
 .SelectedTab {
-  --pink: hsl(342, 100%, 70%, 1);
-  --pink_bg_a10: hsl(342, 95%, 70%, 0.1);
+  /*--pink: hsl(342, 100%, 70%, 1);*/
+  /*--pink_bg_a10: hsl(342, 95%, 70%, 0.1);*/
+  color: var(--purple_bright);
   cursor: default;
-  background-color: var(--pink_bg_a10);
-  box-shadow: inset 0px -2.6px 0px var(--pink);
+  background-color: var(--purple_bg_a08);
+  box-shadow: inset 0px -2.6px 0px var(--purple_bright);
 }
 
 

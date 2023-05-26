@@ -102,7 +102,7 @@ export const CodeTabs: FC<CodeTabsProps> = ({ children }) => {
             return (
               <div
                 key={i}
-                className={cn("py-2 px-4 text-sm cursor-pointer", {
+                className={cn("py-[0.625rem] px-4 cursor-pointer leading-7 font-medium", {
                   [classes.SelectedTab]: i === selectedTab,
                 })}
                 onClick={() => {
