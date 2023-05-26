@@ -88,13 +88,13 @@ export class JDBCDriver extends BaseDriver {
 
       /**
        * Time to wait for a response from a connection after validation
-       * request before determining it as not valid. Default - 30000 ms.
+       * request before determining it as not valid. Default - 60000 ms.
        */
       testConnectionTimeout?: number,
     } = {}
   ) {
     super({
-      testConnectionTimeout: config.testConnectionTimeout || 30000,
+      testConnectionTimeout: config.testConnectionTimeout || 60000,
     });
 
     const dataSource =

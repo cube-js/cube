@@ -18,7 +18,7 @@ export function testQueries(type: string): void {
     const fixtures = getFixtures(type);
     let client: CubejsApi;
     let driver: BaseDriver;
-    let query: string[];
+    let queries: string[];
     let env: Environment;
 
     function execute(name: string, test: () => Promise<void>) {
@@ -30,7 +30,7 @@ export function testQueries(type: string): void {
     }
     const apiToken = sign({}, 'mysupersecret');
 
-    const suffix = `_${new Date().getTime().toString(32)}`;
+    const suffix = new Date().getTime().toString(32);
     beforeAll(async () => {
       env = await runEnvironment(type, suffix);
       process.env.CUBEJS_REFRESH_WORKER = 'true';
@@ -47,23 +47,28 @@ export function testQueries(type: string): void {
         apiUrl: `http://127.0.0.1:${env.cube.port}/cubejs-api/v1`,
       });
       driver = (await getDriver(type)).source;
-      query = getCreateQueries(type, suffix);
-      await Promise.all(query.map(async (q) => {
+      queries = getCreateQueries(type, suffix);
+      console.log(`Creating ${queries.length} fixture tables`);
+      for (const q of queries) {
         await driver.query(q);
-      }));
+      }
+      console.log(`Creating ${queries.length} fixture tables completed`);
     });
   
     afterAll(async () => {
-      const tables = Object
-        .keys(fixtures.tables)
-        .map((key: string) => `${fixtures.tables[<'products' | 'customers' | 'ecommerce'>key]}${suffix}`);
-      await Promise.all(
-        tables.map(async (t) => {
+      try {
+        const tables = Object
+          .keys(fixtures.tables)
+          .map((key: string) => `${fixtures.tables[<'products' | 'customers' | 'ecommerce'>key]}${suffix}`);
+        console.log(`Dropping ${tables.length} fixture tables`);
+        for (const t of tables) {
           await driver.dropTable(t);
-        })
-      );
-      await driver.release();
-      await env.stop();
+        }
+        console.log(`Dropping ${tables.length} fixture tables completed`);
+      } finally {
+        await driver.release();
+        await env.stop();
+      }
     });
 
     // MUST be the first test in the list!
@@ -1295,6 +1300,27 @@ export function testQueries(type: string): void {
         timeDimensions: [{
           dimension: 'ECommerce.orderDate',
           granularity: 'month'
+        }],
+        order: {
+          'ECommerce.totalProfit': 'desc',
+          'ECommerce.productName': 'asc'
+        },
+        total: true
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying ECommerce: partitioned pre-agg higher granularity', async () => {
+      const response = await client.load({
+        dimensions: [
+          'ECommerce.productName'
+        ],
+        measures: [
+          'ECommerce.totalQuantity',
+        ],
+        timeDimensions: [{
+          dimension: 'ECommerce.orderDate',
+          granularity: 'year'
         }],
         order: {
           'ECommerce.totalProfit': 'desc',
