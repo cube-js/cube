@@ -124,6 +124,9 @@ class MSSqlDriver extends BaseDriver {
       request.on('error', (err) => {
         reject(err);
       });
+      stream.on('error', (err) => {
+        reject(err);
+      })
     });
     return {
       rowStream: stream,
