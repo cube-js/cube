@@ -103,7 +103,12 @@
           "CUBE.avgDiscount",
           "CUBE.totalSales",
           "CUBE.totalProfit"
-        ]
+        ],
+        "indexes": {
+          "category_index": {
+            "columns": ["CUBE.productName"]
+          }
+        }
       }
     ]
   },
