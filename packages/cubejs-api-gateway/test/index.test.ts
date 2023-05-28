@@ -297,6 +297,16 @@ describe('API Gateway', () => {
         member: 'Foo.bar',
         operator: 'gte',
         values: [0]
+      }, {
+        or: [{
+          member: 'Foo.bar',
+          operator: 'gte',
+          values: [10.5]
+        }, {
+          member: 'Foo.bar',
+          operator: 'gte',
+          values: [0]
+        }]
       }]
     };
 
@@ -317,6 +327,16 @@ describe('API Gateway', () => {
               member: 'Foo.bar',
               operator: 'gte',
               values: ['0']
+            }, {
+              or: [{
+                member: 'Foo.bar',
+                operator: 'gte',
+                values: ['10.5']
+              }, {
+                member: 'Foo.bar',
+                operator: 'gte',
+                values: ['0']
+              }]
             }],
             rowLimit: 10000,
             limit: 10000,
@@ -327,6 +347,19 @@ describe('API Gateway', () => {
         ]);
       }
     );
+  });
+
+  test('normalize empty filters', async () => {
+    const { app } = createApiGateway();
+
+    const res = await request(app)
+      .get(
+        '/cubejs-api/v1/load?query={"measures":["Foo.bar"],"filters":[{"member":"Foo.bar","operator":"equals","values":[]}]}'
+      )
+      .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+      .expect(400);
+    console.log(res.body);
+    expect(res.body.error).toMatch(/Values required for filter/);
   });
 
   test('normalize queryRewrite limit', async () => {

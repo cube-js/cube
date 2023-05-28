@@ -26,18 +26,15 @@ jobs:
           node-version: 16.x
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
-        run: echo "::set-output name=dir::$(yarn cache dir)"
-      - name: Restore lerna
+        run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
+        shell: bash
+      - name: Restore yarn cache
         uses: actions/cache@v3
         with:
-          path: |
-            ${{ steps.yarn-cache-dir-path.outputs.dir }}
-            node_modules
-            rust/cubestore/node_modules
-            packages/*/node_modules
-          key: ${{ runner.os }}-workspace-main-16.x-${{ hashFiles('**/yarn.lock') }}
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-workspace-main-16.x-
+            ${{ runner.os }}-yarn-
       - name: Set Yarn version
         run: yarn policies set-version v1.22.19
       - name: Copy yarn.lock file
@@ -86,7 +83,7 @@ jobs:
             package_target_libc: glibc
       fail-fast: false
     container:
-      image: cubejs/rust-cross:${{ matrix.target }}-03012023
+      image: cubejs/rust-cross:${{ matrix.target }}-23052023
 
     steps:
       - name: Checkout
@@ -102,24 +99,21 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: ${{ matrix.node-version }}
-      - name: Get yarn cache directory path
-        id: yarn-cache-dir-path
-        run: echo "::set-output name=dir::$(yarn cache dir)"
-      - name: Restore lerna
-        uses: actions/cache@v3
-        with:
-          path: |
-            ${{ steps.yarn-cache-dir-path.outputs.dir }}
-            node_modules
-            rust/cubesql/node_modules
-            packages/*/node_modules
-          key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
       - name: Install Yarn
         run: npm install -g yarn
       - name: Set Yarn version
         run: yarn policies set-version v1.22.19
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
+        shell: bash
+      - name: Restore yarn cache
+        uses: actions/cache@v3
+        with:
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
       - name: Copy yarn.lock file
         run: cp yarn.lock packages/cubejs-docker
       - name: Yarn install
@@ -132,6 +126,8 @@ jobs:
           retry_wait_seconds: 15
           timeout_minutes: 20
           command: yarn install --frozen-lockfile
+      - name: Compile TypeScript
+        run: yarn tsc
       - name: Build native
         env:
           CARGO_BUILD_TARGET: ${{ matrix.target }}
@@ -172,37 +168,25 @@ jobs:
           toolchain: nightly-2022-03-08
           override: true
           components: rustfmt
+      - name: Install Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
       - name: Install Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v3
         with:
           node-version: ${{ matrix.node-version }}
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
-        run: echo "::set-output name=dir::$(yarn cache dir)"
-      - name: Restore lerna (excluding windows)
+        run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
+        shell: bash
+      - name: Restore yarn cache
         uses: actions/cache@v3
-        if: ${{ !startsWith(matrix.os-version, 'windows') }}
         with:
-          path: |
-            ${{ steps.yarn-cache-dir-path.outputs.dir }}
-            node_modules
-            rust/cubesql/node_modules
-            packages/*/node_modules
-          key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
-      # Windows doesn't support links + cache action doesn't support exclude
-      # cache will include rust cache for native, which causes 3GB archive
-      # Right now, GH provides 10 gb for each repository with automatic retention.
-      - name: Restore lerna (Windows only)
-        uses: actions/cache@v3
-        if: ${{ startsWith(matrix.os-version, 'windows') }}
-        with:
-          path: |
-            ${{ steps.yarn-cache-dir-path.outputs.dir }}
-          key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
+            ${{ runner.os }}-yarn-
       - name: Set Yarn version
         run: yarn policies set-version v1.22.19
       - name: Copy yarn.lock file
@@ -217,6 +201,8 @@ jobs:
           retry_wait_seconds: 15
           timeout_minutes: 20
           command: yarn install --frozen-lockfile
+      - name: Compile TypeScript
+        run: yarn tsc
       - name: Build native
         run: cd packages/cubejs-backend-native && npm run native:build-release
       - name: Upload artifact

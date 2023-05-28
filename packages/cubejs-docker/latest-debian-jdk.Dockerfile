@@ -27,7 +27,7 @@ ENV CUBEJS_DOCKER_IMAGE_TAG=latest
 RUN groupadd cube && useradd -ms /bin/bash -g cube cube \
     && DEBIAN_FRONTEND=noninteractive \
     && apt-get update \
-    && apt-get install -y --no-install-recommends rxvt-unicode libssl1.1 openjdk-11-jdk-headless \
+    && apt-get install -y --no-install-recommends rxvt-unicode libssl1.1 openjdk-11-jdk-headless python3 \
     && rm -rf /var/lib/apt/lists/* \
     && mkdir cube \
     && chown -R cube:cube /tmp /cube /usr

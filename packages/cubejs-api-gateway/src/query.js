@@ -70,7 +70,7 @@ const oneFilter = Joi.object().keys({
   dimension: id,
   member: id,
   operator: Joi.valid(...operators).required(),
-  values: Joi.array().items(Joi.string().allow('', null), Joi.link('...'), Joi.number(), Joi.boolean())
+  values: Joi.array().items(Joi.string().allow('', null), Joi.number(), Joi.boolean(), Joi.link('...'))
 }).xor('dimension', 'member');
 
 const oneCondition = Joi.object().keys({
@@ -118,15 +118,16 @@ const normalizeQueryOrder = order => {
 
 const DateRegex = /^\d\d\d\d-\d\d-\d\d$/;
 
-const checkQueryFilters = (filter) => {
-  filter.find(f => {
+const normalizeQueryFilters = (filter) => (
+  filter.map(f => {
+    const res = { ...f };
     if (f.or) {
-      checkQueryFilters(f.or);
-      return false;
+      res.or = normalizeQueryFilters(f.or);
+      return res;
     }
     if (f.and) {
-      checkQueryFilters(f.and);
-      return false;
+      res.and = normalizeQueryFilters(f.and);
+      return res;
     }
 
     if (!f.operator) {
@@ -137,18 +138,27 @@ const checkQueryFilters = (filter) => {
       throw new UserError(`Operator ${f.operator} not supported for filter: ${JSON.stringify(f)}`);
     }
 
-    if (!f.values && ['set', 'notSet', 'measureFilter'].indexOf(f.operator) === -1) {
+    if ((!f.values || f.values.length === 0) && ['set', 'notSet', 'measureFilter'].indexOf(f.operator) === -1) {
       throw new UserError(`Values required for filter: ${JSON.stringify(f)}`);
     }
-    return false;
-  });
 
-  return true;
-};
+    if (f.values) {
+      res.values = f.values.map(v => (v != null ? v.toString() : v));
+    }
+
+    if (f.dimension) {
+      res.member = f.dimension;
+      delete res.dimension;
+    }
+
+    return res;
+  })
+);
 
 /**
  * Normalize incoming network query.
  * @param {Query} query
+ * @param {boolean} persistent
  * @throws {UserError}
  * @returns {NormalizedQuery}
  */
@@ -165,8 +175,6 @@ const normalizeQuery = (query, persistent) => {
       'Query should contain either measures, dimensions or timeDimensions with granularities in order to be valid'
     );
   }
-
-  checkQueryFilters(query.filters || []);
 
   const regularToTimeDimension = (query.dimensions || []).filter(d => d.split('.').length === 3).map(d => ({
     dimension: d.split('.').slice(0, 2).join('.'),
@@ -198,14 +206,7 @@ const normalizeQuery = (query, persistent) => {
     limit: newLimit,
     timezone,
     order: normalizeQueryOrder(query.order),
-    filters: (query.filters || []).map(f => {
-      const { dimension, member, ...filter } = f;
-      return {
-        ...filter,
-        member: member || dimension,
-        values: filter.values?.map(v => (v != null ? v.toString() : v))
-      };
-    }),
+    filters: normalizeQueryFilters(query.filters || []),
     dimensions: (query.dimensions || []).filter(d => d.split('.').length !== 3),
     timeDimensions: (query.timeDimensions || []).map(td => {
       let dateRange;

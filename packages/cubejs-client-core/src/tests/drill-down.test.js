@@ -57,7 +57,11 @@ const loadResponse = (query = {}) => ({
         dimensions: {},
         segments: {},
         timeDimensions: {
-          'Orders.ts.day': { title: 'Orders Ts', shortTitle: 'Ts', type: 'time' },
+          'Orders.ts.day': {
+            title: 'Orders Ts',
+            shortTitle: 'Ts',
+            type: 'time',
+          },
           'Orders.ts': { title: 'Orders Ts', shortTitle: 'Ts', type: 'time' },
         },
       },
@@ -80,6 +84,139 @@ const loadResponse = (query = {}) => ({
   },
 });
 
+const loadResponse2 = {
+  queryType: 'regularQuery',
+  results: [
+    {
+      query: {
+        measures: ['Orders.count'],
+        timeDimensions: [
+          {
+            dimension: 'Orders.createdAt',
+            granularity: 'week',
+            dateRange: ['2023-05-10T00:00:00.000', '2023-05-14T23:59:59.999'],
+          },
+        ],
+        limit: 10000,
+        timezone: 'UTC',
+        order: [],
+        filters: [],
+        dimensions: [],
+        rowLimit: 10000,
+        queryType: 'regularQuery',
+      },
+      data: [
+        {
+          'Orders.createdAt.week': '2023-05-08T00:00:00.000',
+          'Orders.createdAt': '2023-05-08T00:00:00.000',
+          'Orders.count': '21',
+        },
+      ],
+      lastRefreshTime: '2023-05-22T14:46:45.000Z',
+      usedPreAggregations: {
+        'prod_pre_aggregations.orders_main': {
+          targetTableName:
+            'prod_pre_aggregations.orders_main20230508_instgodu_ehgypjtt_1i6n02l',
+          refreshKeyValues: [[]],
+          lastUpdatedAt: 1684766805000,
+        },
+      },
+      transformedQuery: {
+        sortedDimensions: [],
+        sortedTimeDimensions: [['Orders.createdAt', 'day']],
+        timeDimensions: [['Orders.createdAt', 'week']],
+        measures: ['Orders.count'],
+        leafMeasureAdditive: true,
+        leafMeasures: ['Orders.count'],
+        measureToLeafMeasures: {
+          'Orders.count': [
+            { measure: 'Orders.count', additive: true, type: 'count' },
+          ],
+        },
+        hasNoTimeDimensionsWithoutGranularity: true,
+        allFiltersWithinSelectedDimensions: true,
+        isAdditive: true,
+        granularityHierarchies: {
+          year: [
+            'year',
+            'quarter',
+            'month',
+            'month',
+            'day',
+            'hour',
+            'minute',
+            'second',
+          ],
+          quarter: ['quarter', 'month', 'day', 'hour', 'minute', 'second'],
+          month: ['month', 'day', 'hour', 'minute', 'second'],
+          week: ['week', 'day', 'hour', 'minute', 'second'],
+          day: ['day', 'hour', 'minute', 'second'],
+          hour: ['hour', 'minute', 'second'],
+          minute: ['minute', 'second'],
+          second: ['second'],
+        },
+        hasMultipliedMeasures: false,
+        hasCumulativeMeasures: false,
+        windowGranularity: null,
+        filterDimensionsSingleValueEqual: {},
+        ownedDimensions: [],
+        ownedTimeDimensionsWithRollupGranularity: [['Orders.createdAt', 'day']],
+        ownedTimeDimensionsAsIs: [['Orders.createdAt', 'week']],
+      },
+      requestId: 'x',
+      annotation: {
+        measures: {
+          'Orders.count': {
+            title: 'Orders Count',
+            shortTitle: 'Count',
+            type: 'number',
+            drillMembers: ['Orders.id', 'Orders.createdAt'],
+            drillMembersGrouped: {
+              measures: [],
+              dimensions: ['Orders.id', 'Orders.createdAt'],
+            },
+          },
+        },
+        dimensions: {},
+        segments: {},
+        timeDimensions: {
+          'Orders.createdAt.week': {
+            title: 'Orders Created at',
+            shortTitle: 'Created at',
+            type: 'time',
+          },
+          'Orders.createdAt': {
+            title: 'Orders Created at',
+            shortTitle: 'Created at',
+            type: 'time',
+          },
+        },
+      },
+      dataSource: 'default',
+      dbType: 'postgres',
+      extDbType: 'cubestore',
+    },
+  ],
+  pivotQuery: {
+    measures: ['Orders.count'],
+    timeDimensions: [
+      {
+        dimension: 'Orders.createdAt',
+        granularity: 'week',
+        dateRange: ['2023-05-10T00:00:00.000', '2023-05-14T23:59:59.999'],
+      },
+    ],
+    limit: 10000,
+    timezone: 'UTC',
+    order: [],
+    filters: [],
+    dimensions: [],
+    rowLimit: 10000,
+    queryType: 'regularQuery',
+  },
+  slowQuery: false,
+};
+
 describe('drill down query', () => {
   const resultSet1 = new ResultSet(loadResponse());
   const resultSet2 = new ResultSet(
@@ -101,7 +238,7 @@ describe('drill down query', () => {
   const resultSet4 = new ResultSet(
     loadResponse({
       dimensions: ['Statuses.potential'],
-      timeDimensions: []
+      timeDimensions: [],
     })
   );
 
@@ -184,31 +321,49 @@ describe('drill down query', () => {
       timezone: 'UTC',
     });
   });
-  
+
   it('handles null values', () => {
+    expect(resultSet4.drillDown({ xvalues: [null] })).toEqual({
+      measures: [],
+      segments: [],
+      dimensions: ['Orders.id', 'Orders.title'],
+      filters: [
+        {
+          member: 'Orders.count',
+          operator: 'measureFilter',
+        },
+        {
+          member: 'Statuses.potential',
+          operator: 'notSet',
+        },
+      ],
+      timeDimensions: [],
+      timezone: 'UTC',
+    });
+  });
+
+  it('respects the parent time dimension date range', () => {
+    const resultSet = new ResultSet(loadResponse2);
+
     expect(
-      resultSet4.drillDown({ xvalues: [null] })
-    ).toEqual(
-      {
-        measures: [],
-        segments: [],
-        dimensions: [
-          'Orders.id',
-          'Orders.title',
-        ],
-        filters: [
-          {
-            member: 'Orders.count',
-            operator: 'measureFilter',
-          },
-          {
-            member: 'Statuses.potential',
-            operator: 'notSet',
-          },
-        ],
-        timeDimensions: [],
-        timezone: 'UTC',
-      }
-    );
+      resultSet.drillDown({ xValues: ['2023-05-08T00:00:00.000'] })
+    ).toEqual({
+      measures: [],
+      segments: [],
+      dimensions: ['Orders.id', 'Orders.createdAt'],
+      filters: [
+        {
+          operator: 'measureFilter',
+          member: 'Orders.count',
+        },
+      ],
+      timeDimensions: [
+        {
+          dimension: 'Orders.createdAt',
+          dateRange: ['2023-05-10T00:00:00.000', '2023-05-14T23:59:59.999'],
+        },
+      ],
+      timezone: 'UTC'
+    });
   });
 });

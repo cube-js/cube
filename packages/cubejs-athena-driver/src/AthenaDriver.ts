@@ -428,47 +428,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
    * fields meta info.
    */
   public mapTypes(fields: ColumnInfo[]): TableStructure {
-    return fields.map((field) => {
-      let type;
-      switch (field.Type) {
-        case 'boolean':
-          type = 'boolean';
-          break;
-        // integers
-        case 'tinyint':
-        case 'smallint':
-        case 'int':
-        case 'integer':
-        case 'bigint':
-          type = 'int';
-          break;
-        // float
-        case 'float':
-          type = 'float';
-          break;
-        // double
-        case 'double':
-          type = 'double';
-          break;
-        // strings
-        case 'char':
-        case 'varchar':
-        case 'string':
-        case 'binary':
-          type = 'text';
-          break;
-        // date and time
-        case 'date':
-        case 'timestamp':
-          type = 'date';
-          break;
-        // unknown
-        default:
-          type = 'text';
-          break;
-      }
-      return { name: <string>field.Name, type };
-    });
+    return fields.map((field) => ({ name: <string>field.Name, type: this.toGenericType(field.Type || 'text') }));
   }
 
   /**

@@ -1137,6 +1137,7 @@ mod tests {
             c.compaction_chunks_total_size_threshold = 100000;
             c.stale_stream_timeout = 1;
             c.wal_split_threshold = 1638;
+            c.compaction_in_memory_chunks_schedule_period_secs = 0;
             c
         }).start_with_injector_override(async move |injector| {
             injector.register_typed::<dyn KsqlClient, _, _, _>(async move |_| {
@@ -1294,6 +1295,7 @@ mod tests {
             c.compaction_chunks_total_size_threshold = 100000;
             c.stale_stream_timeout = 1;
             c.wal_split_threshold = 1638;
+            c.compaction_in_memory_chunks_schedule_period_secs = 0;
             c
         }).start_with_injector_override(async move |injector| {
             injector.register_typed::<dyn KafkaClientService, _, _, _>(async move |_| {

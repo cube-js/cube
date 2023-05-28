@@ -1,6 +1,7 @@
 /* eslint-disable no-restricted-syntax */
 import { get } from 'env-var';
 import { displayCLIWarning } from './cli';
+import { detectLibc } from './platform';
 
 export class InvalidConfiguration extends Error {
   public constructor(key: string, value: any, description: string) {
@@ -1542,6 +1543,10 @@ const variables: Record<string, (...args: any) => any> = {
       .asBoolStrict();
 
     if (isDevMode) {
+      if (process.platform === 'linux' && detectLibc() === 'musl') {
+        return undefined;
+      }
+
       return 15432;
     }
 

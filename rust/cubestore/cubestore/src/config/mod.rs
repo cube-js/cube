@@ -361,6 +361,8 @@ pub trait ConfigObj: DIService {
 
     fn compaction_in_memory_chunks_ratio_check_threshold(&self) -> u64;
 
+    fn compaction_in_memory_chunks_schedule_period_secs(&self) -> u64;
+
     fn wal_split_threshold(&self) -> u64;
 
     fn select_worker_pool_size(&self) -> usize;
@@ -482,6 +484,7 @@ pub struct ConfigObjImpl {
     pub compaction_in_memory_chunks_count_threshold: usize,
     pub compaction_in_memory_chunks_ratio_threshold: u64,
     pub compaction_in_memory_chunks_ratio_check_threshold: u64,
+    pub compaction_in_memory_chunks_schedule_period_secs: u64,
     pub wal_split_threshold: u64,
     pub data_dir: PathBuf,
     pub dump_dir: Option<PathBuf>,
@@ -590,6 +593,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn compaction_in_memory_chunks_ratio_check_threshold(&self) -> u64 {
         self.compaction_in_memory_chunks_ratio_check_threshold
+    }
+
+    fn compaction_in_memory_chunks_schedule_period_secs(&self) -> u64 {
+        self.compaction_in_memory_chunks_schedule_period_secs
     }
 
     fn wal_split_threshold(&self) -> u64 {
@@ -1002,6 +1009,10 @@ impl Config {
                     "CUBESTORE_IN_MEMORY_CHUNKS_RATIO_CHECK_THRESHOLD",
                     1000,
                 ),
+                compaction_in_memory_chunks_schedule_period_secs: env_parse(
+                    "CUBESTORE_IN_MEMORY_CHUNKS_SCHEDULE_PERIOD_SECS",
+                    5,
+                ),
                 store_provider: {
                     if let Ok(bucket_name) = env::var("CUBESTORE_S3_BUCKET") {
                         FileStoreProvider::S3 {
@@ -1195,6 +1206,7 @@ impl Config {
                 compaction_in_memory_chunks_count_threshold: 10,
                 compaction_in_memory_chunks_ratio_threshold: 3,
                 compaction_in_memory_chunks_ratio_check_threshold: 1000,
+                compaction_in_memory_chunks_schedule_period_secs: 5,
                 store_provider: FileStoreProvider::Filesystem {
                     remote_dir: Some(
                         env::current_dir()

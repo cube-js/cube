@@ -637,7 +637,7 @@ impl MetaStore for MetaStoreMock {
         &self,
         _old_ids: Vec<u64>,
         _new_seq_pointer: Option<Vec<Option<SeqPointer>>>,
-    ) -> Result<IdRow<ReplayHandle>, CubeError> {
+    ) -> Result<Option<IdRow<ReplayHandle>>, CubeError> {
         panic!("MetaStore mock!")
     }
 
@@ -701,6 +701,38 @@ impl MetaStore for MetaStoreMock {
         panic!("MetaStore mock!")
     }
     async fn get_trace_obj_by_table_id(&self, _table_id: u64) -> Result<Option<String>, CubeError> {
+        panic!("MetaStore mock!")
+    }
+    async fn get_partition_out_of_queue(
+        &self,
+        _partition_id: u64,
+    ) -> Result<IdRow<Partition>, CubeError> {
+        panic!("MetaStore mock!")
+    }
+    async fn get_partitions_for_in_memory_compaction(
+        &self,
+        _node: String,
+    ) -> Result<
+        Vec<(
+            IdRow<Partition>,
+            IdRow<Index>,
+            IdRow<Table>,
+            Vec<IdRow<Chunk>>,
+        )>,
+        CubeError,
+    > {
+        panic!("MetaStore mock!")
+    }
+    async fn get_all_node_in_memory_chunks(
+        &self,
+        _node: String,
+    ) -> Result<Vec<IdRow<Chunk>>, CubeError> {
+        panic!("MetaStore mock!")
+    }
+    async fn get_table_indexes_out_of_queue(
+        &self,
+        _table_id: u64,
+    ) -> Result<Vec<IdRow<Index>>, CubeError> {
         panic!("MetaStore mock!")
     }
 }
