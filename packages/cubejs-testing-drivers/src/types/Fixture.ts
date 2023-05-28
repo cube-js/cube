@@ -22,14 +22,10 @@ export type Fixture = {
   },
   cast: Cast,
   tables: {
-    products: string,
-    customers: string,
-    ecommerce: string,
+    [table: string]: string,
   },
   preAggregations?: {
-    Products: [{ name: string, [prop: string]: unknown }],
-    Customers: [{ name: string, [prop: string]: unknown }],
-    ECommerce: [{ name: string, [prop: string]: unknown }],
+    [cube: string]: [{ name: string, [prop: string]: unknown }],
   },
   skip?: string[],
 };

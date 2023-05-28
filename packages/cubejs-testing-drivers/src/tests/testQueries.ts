@@ -59,7 +59,7 @@ export function testQueries(type: string): void {
       try {
         const tables = Object
           .keys(fixtures.tables)
-          .map((key: string) => `${fixtures.tables[<'products' | 'customers' | 'ecommerce'>key]}${suffix}`);
+          .map((key: string) => `${fixtures.tables[key]}${suffix}`);
         console.log(`Dropping ${tables.length} fixture tables`);
         for (const t of tables) {
           await driver.dropTable(t);
@@ -88,6 +88,12 @@ export function testQueries(type: string): void {
       await buildPreaggs(env.cube.port, apiToken, {
         timezones: ['UTC'],
         preAggregations: ['ECommerce.TAExternal'],
+        contexts: [{ securityContext: { tenant: 't1' } }],
+      });
+
+      await buildPreaggs(env.cube.port, apiToken, {
+        timezones: ['UTC'],
+        preAggregations: ['BigECommerce.TAExternal'],
         contexts: [{ securityContext: { tenant: 't1' } }],
       });
     });
@@ -1302,6 +1308,7 @@ export function testQueries(type: string): void {
           granularity: 'month'
         }],
         order: {
+          'ECommerce.orderDate': 'asc',
           'ECommerce.totalProfit': 'desc',
           'ECommerce.productName': 'asc'
         },
@@ -1323,10 +1330,32 @@ export function testQueries(type: string): void {
           granularity: 'year'
         }],
         order: {
+          'ECommerce.orderDate': 'asc',
           'ECommerce.totalProfit': 'desc',
           'ECommerce.productName': 'asc'
         },
         total: true
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying BigECommerce: partitioned pre-agg', async () => {
+      const response = await client.load({
+        dimensions: [
+          'BigECommerce.productName'
+        ],
+        measures: [
+          'BigECommerce.totalQuantity',
+        ],
+        timeDimensions: [{
+          dimension: 'BigECommerce.orderDate',
+          granularity: 'month'
+        }],
+        order: {
+          'BigECommerce.orderDate': 'asc',
+          'BigECommerce.totalProfit': 'desc',
+          'BigECommerce.productName': 'asc'
+        }
       });
       expect(response.rawData()).toMatchSnapshot();
     });

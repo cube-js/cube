@@ -3,7 +3,7 @@ import * as path from 'path';
 import { ChildProcess, ChildProcessWithoutNullStreams, spawn } from 'child_process';
 import { config } from 'dotenv';
 import yargs from 'yargs/yargs';
-import { DockerComposeEnvironment } from 'testcontainers';
+import { DockerComposeEnvironment, Wait } from 'testcontainers';
 import { pausePromise } from '@cubejs-backend/shared';
 import { getFixtures } from './getFixtures';
 import { getTempPath } from './getTempPath';
@@ -129,6 +129,10 @@ export async function runEnvironment(type: string, suf?: string): Promise<Enviro
       process.env[key] = fixtures.cube.environment[key];
     }
   });
+  // TODO extract as a config
+  if (type === 'mssql') {
+    compose.withWaitStrategy('data', Wait.forLogMessage('Service Broker manager has started'));
+  }
   const environment = await compose.up();
 
   const store = {
@@ -137,11 +141,20 @@ export async function runEnvironment(type: string, suf?: string): Promise<Enviro
   };
 
   const cliEnv = isLocal ? new CubeCliEnvironment(composePath) : null;
+  const mappedDataPort = fixtures.data ? environment.getContainer('data').getMappedPort(
+    parseInt(fixtures.data.ports[0], 10),
+  ) : null;
   if (cliEnv) {
     cliEnv.withEnvironment({
       CUBEJS_CUBESTORE_HOST: '127.0.0.1',
       CUBEJS_CUBESTORE_PORT: process.env.CUBEJS_CUBESTORE_PORT ? process.env.CUBEJS_CUBESTORE_PORT : `${store.port}`,
     });
+    if (mappedDataPort) {
+      cliEnv.withEnvironment({
+        CUBEJS_DB_HOST: '127.0.0.1',
+        CUBEJS_DB_PORT: `${mappedDataPort}`,
+      });
+    }
     await cliEnv.up();
   }
   const cube = cliEnv ? {
@@ -156,9 +169,7 @@ export async function runEnvironment(type: string, suf?: string): Promise<Enviro
 
   if (fixtures.data) {
     const data = {
-      port: environment.getContainer('data').getMappedPort(
-        parseInt(fixtures.data.ports[0], 10),
-      ),
+      port: mappedDataPort!,
       logs: await environment.getContainer('data').logs(),
     };
     return {

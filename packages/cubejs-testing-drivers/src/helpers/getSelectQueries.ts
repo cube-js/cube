@@ -8,7 +8,7 @@ export function getSelectQueries(type: string, suf?: string): string[] {
   return Object
     .keys(tables)
     .map((key: string) => {
-      let name = tables[<'products' | 'customers' | 'ecommerce'>key];
+      let name = tables[key];
       name = suf ? `${name}_${suf}` : name;
       return `select * from ${name}`;
     });

@@ -6,8 +6,7 @@ const { getEnv } = require('@cubejs-backend/shared');
  */
 class QueryStream extends Readable {
   request = null;
-  recordset = [];
-  done = false;
+  toRead = 0;
 
   /**
    * @constructor
@@ -19,32 +18,34 @@ class QueryStream extends Readable {
         highWaterMark || getEnv('dbQueryStreamHighWaterMark'),
     });
     this.request = request;
-    this.request.on('row', (row) => {
-      this.recordset?.push(row);
-      if (this.recordset?.length === getEnv('dbQueryStreamHighWaterMark')) {
+    this.request.on('row', row => {
+      this.transformRow(row);
+      const canAdd = this.push(row);
+      if (this.toRead-- <= 0 || !canAdd) {
         this.request.pause();
       }
-    });
+    })
+    this.request.on('done', () => {
+      this.push(null);
+    })
     this.request.on('error', (err) => {
       this.destroy(err);
-    });
-    this.request.on('done', () => {
-      this.done = true;
     });
   }
 
   /**
    * @override
    */
-  _read(highWaterMark) {
-    const chunk = this.recordset?.splice(0, highWaterMark);
-    chunk?.forEach((row) => {
-      this.push(row);
-    });
-    if (this.recordset?.length === 0 && this.done) {
-      this.push(null);
-    } else {
-      this.request.resume();
+  _read(toRead) {
+    this.toRead += toRead;
+    this.request.resume();
+  }
+
+  transformRow(row) {
+    for (const key in row) {
+      if (row.hasOwnProperty(key) && row[key] && row[key] instanceof Date) {
+        row[key] = row[key].toJSON();
+      }
     }
   }
 
@@ -52,8 +53,8 @@ class QueryStream extends Readable {
    * @override
    */
   _destroy(error, callback) {
+    this.request.cancel();
     this.request = null;
-    this.recordset = null;
     callback(error);
   }
 }
