@@ -3,7 +3,7 @@ import * as path from 'path';
 import { ChildProcess, ChildProcessWithoutNullStreams, spawn } from 'child_process';
 import { config } from 'dotenv';
 import yargs from 'yargs/yargs';
-import { DockerComposeEnvironment } from 'testcontainers';
+import { DockerComposeEnvironment, Wait } from 'testcontainers';
 import { pausePromise } from '@cubejs-backend/shared';
 import { getFixtures } from './getFixtures';
 import { getTempPath } from './getTempPath';
@@ -129,6 +129,10 @@ export async function runEnvironment(type: string, suf?: string): Promise<Enviro
       process.env[key] = fixtures.cube.environment[key];
     }
   });
+  // TODO extract as a config
+  if (type === 'mssql') {
+    compose.withWaitStrategy('data', Wait.forLogMessage('Service Broker manager has started'));
+  }
   const environment = await compose.up();
 
   const store = {
