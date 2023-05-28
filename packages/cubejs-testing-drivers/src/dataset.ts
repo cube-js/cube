@@ -159,9 +159,9 @@ export const BigECommerce = {
     const { GENERATE_BIG_SERIES } = cast;
     const data = ECommerce.select(cast);
     if (!GENERATE_BIG_SERIES) {
-      return `SELECT row_id as id, * from (${data}) d`;
+      return `SELECT row_id as id, row_id, order_id, order_date, city, category, sub_category, product_name, sales, quantity, discount, profit from (${data}) d`;
     }
-    return `select value * 10000 + row_id as id, * from ${GENERATE_BIG_SERIES} CROSS JOIN (${data}) d`;
+    return `select value * 10000 + row_id as id, row_id, order_id, order_date, city, category, sub_category, product_name, sales, quantity, discount, profit from ${GENERATE_BIG_SERIES} CROSS JOIN (${data}) d`;
   },
   create: (cast: Cast, name: string, suf?: string) => create(name, BigECommerce.select(cast), cast, suf),
 };
