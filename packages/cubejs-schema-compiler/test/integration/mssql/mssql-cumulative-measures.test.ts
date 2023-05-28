@@ -1,8 +1,6 @@
-import R from 'ramda';
 import { MssqlQuery } from '../../../src/adapter/MssqlQuery';
 import { prepareCompiler } from '../../unit/PrepareCompiler';
 import { MSSqlDbRunner } from './MSSqlDbRunner';
-import { createJoinedCubesSchema } from '../../unit/utils';
 
 describe('MSSqlCumulativeMeasures', () => {
   jest.setTimeout(200000);
@@ -54,8 +52,6 @@ describe('MSSqlCumulativeMeasures', () => {
     })
     `);
 
-  const joinedSchemaCompilers = prepareCompiler(createJoinedCubesSchema());
-
   it('should group by the created_at field on the calculated granularity for unbounded trailing windows without dimension', () => compiler.compile().then(async () => {
     const query = new MssqlQuery(
       { joinGraph, cubeEvaluator, compiler },
@@ -82,24 +78,24 @@ describe('MSSqlCumulativeMeasures', () => {
 
     expect(await dbRunner.testQuery(query.buildSqlAndParams())).toEqual([
       {
-        "visitors__count": 1,
-        "visitors__created_at_day": new Date("2017-01-03T00:00:00.000Z"),
-        "visitors__unbounded_count": 2,
+        visitors__count: 1,
+        visitors__created_at_day: new Date('2017-01-03T00:00:00.000Z'),
+        visitors__unbounded_count: 2,
       },
       {
-        "visitors__count": 1,
-        "visitors__created_at_day": new Date("2017-01-05T00:00:00.000Z"),
-        "visitors__unbounded_count": 3,
+        visitors__count: 1,
+        visitors__created_at_day: new Date('2017-01-05T00:00:00.000Z'),
+        visitors__unbounded_count: 3,
       },
       {
-        "visitors__count": 1,
-        "visitors__created_at_day": new Date("2017-01-06T00:00:00.000Z"),
-        "visitors__unbounded_count": 4,
+        visitors__count: 1,
+        visitors__created_at_day: new Date('2017-01-06T00:00:00.000Z'),
+        visitors__unbounded_count: 4,
       },
       {
-        "visitors__count": 2,
-        "visitors__created_at_day": new Date("2017-01-07T00:00:00.000Z"),
-        "visitors__unbounded_count": 6,
+        visitors__count: 2,
+        visitors__created_at_day: new Date('2017-01-07T00:00:00.000Z'),
+        visitors__unbounded_count: 6,
       }
     ]);
   }));
@@ -131,28 +127,28 @@ describe('MSSqlCumulativeMeasures', () => {
 
     expect(await dbRunner.testQuery(query.buildSqlAndParams())).toEqual([
       {
-        "visitors__count": 1,
-        "visitors__created_at_day": new Date("2017-01-03T00:00:00.000Z"),
-        "visitors__source": "some",
-        "visitors__unbounded_count": 1
+        visitors__count: 1,
+        visitors__created_at_day: new Date('2017-01-03T00:00:00.000Z'),
+        visitors__source: 'some',
+        visitors__unbounded_count: 1
       },
       {
-        "visitors__count": 1,
-        "visitors__created_at_day": new Date("2017-01-05T00:00:00.000Z"),
-        "visitors__source": "some",
-        "visitors__unbounded_count": 2,
+        visitors__count: 1,
+        visitors__created_at_day: new Date('2017-01-05T00:00:00.000Z'),
+        visitors__source: 'some',
+        visitors__unbounded_count: 2,
       },
       {
-        "visitors__count": 1,
-        "visitors__created_at_day": new Date("2017-01-06T00:00:00.000Z"),
-        "visitors__source": "google",
-        "visitors__unbounded_count": 1,
+        visitors__count: 1,
+        visitors__created_at_day: new Date('2017-01-06T00:00:00.000Z'),
+        visitors__source: 'google',
+        visitors__unbounded_count: 1,
       },
       {
-        "visitors__count": 2,
-        "visitors__created_at_day": new Date("2017-01-07T00:00:00.000Z"),
-        "visitors__source": null,
-        "visitors__unbounded_count": 3,
+        visitors__count: 2,
+        visitors__created_at_day: new Date('2017-01-07T00:00:00.000Z'),
+        visitors__source: null,
+        visitors__unbounded_count: 3,
       }
     ]);
   }));
