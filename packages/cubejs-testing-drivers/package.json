@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/testing-drivers",
-  "version": "0.33.15",
+  "version": "0.33.16",
   "description": "Cube.js drivers test suite",
   "author": "Cube Dev, Inc.",
   "license": "MIT",

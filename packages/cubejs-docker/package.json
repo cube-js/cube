@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/docker",
-  "version": "0.33.15",
+  "version": "0.33.16",
   "description": "Cube.js In Docker (virtual package)",
   "author": "Cube Dev, Inc.",
   "license": "Apache-2.0",
@@ -24,7 +24,7 @@
     "@cubejs-backend/ksql-driver": "^0.33.15",
     "@cubejs-backend/materialize-driver": "^0.33.15",
     "@cubejs-backend/mongobi-driver": "^0.33.11",
-    "@cubejs-backend/mssql-driver": "^0.33.11",
+    "@cubejs-backend/mssql-driver": "^0.33.16",
     "@cubejs-backend/mysql-driver": "^0.33.15",
     "@cubejs-backend/oracle-driver": "^0.33.11",
     "@cubejs-backend/postgres-driver": "^0.33.15",

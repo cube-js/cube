@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.16](https://github.com/cube-js/cube/compare/v0.33.15...v0.33.16) (2023-05-28)
+
+
+### Bug Fixes
+
+* **mssql-driver:** Pre-aggregations builds hang up if over 10K of rows ([#6661](https://github.com/cube-js/cube/issues/6661)) ([9b20ff4](https://github.com/cube-js/cube/commit/9b20ff4ef78acbb65ebea80adceb227bf96b1727))
+
+
+
+
+
 ## [0.33.15](https://github.com/cube-js/cube/compare/v0.33.14...v0.33.15) (2023-05-26)
 
 
