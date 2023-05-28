@@ -31,7 +31,8 @@
   "tables": {
     "products": "products",
     "customers": "customers",
-    "ecommerce": "ecommerce"
+    "ecommerce": "ecommerce",
+    "bigecommerce": "bigecommerce"
   },
   "preAggregations": {
     "Products": [],

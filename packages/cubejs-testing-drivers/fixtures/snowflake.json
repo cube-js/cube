@@ -36,7 +36,8 @@
   "tables": {
     "products": "public.products",
     "customers": "public.customers",
-    "ecommerce": "public.ecommerce"
+    "ecommerce": "public.ecommerce",
+    "bigecommerce": "public.bigecommerce"
   },
   "preAggregations": {
     "Products": [],
