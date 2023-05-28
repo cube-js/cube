@@ -101,10 +101,10 @@ export const Products = {
   create: (cast: Cast, name: string, suf?: string) => create(name, Products.select(cast), cast, suf),
 };
 
-export const BigECommerce = {
+export const ECommerce = {
   select: (cast: Cast) => {
-    const { DATE_PREFIX, DATE_SUFFIX, GENERATE_BIG_SERIES } = cast;
-    const data = `
+    const { DATE_PREFIX, DATE_SUFFIX } = cast;
+    return `
       select 3060 as row_id, 'CA-2017-131492' as order_id, ${DATE_PREFIX}'2020-10-19'${DATE_SUFFIX} as order_date, 'HH-15010' as customer_id, 'San Francisco' as city, 'Furniture' as category, 'Tables' as sub_category, 'Anderson Hickey Conga Table Tops & Accessories' as product_name, 24.36800 as sales, 2 as quantity, 0.20000 as discount, -3.35060 as profit union all
       select 523 as row_id, 'CA-2017-145142' as order_id, ${DATE_PREFIX}'2020-01-23'${DATE_SUFFIX} as order_date, 'MC-17605' as customer_id, 'Detroit' as city, 'Furniture' as category, 'Tables' as sub_category, 'Balt Solid Wood Rectangular Table' as product_name, 210.98000 as sales, 2 as quantity, 0.00000 as discount, 21.09800 as profit union all
       select 9584 as row_id, 'CA-2017-116127' as order_id, ${DATE_PREFIX}'2020-06-25'${DATE_SUFFIX} as order_date, 'SB-20185' as customer_id, 'New York City' as city, 'Furniture' as category, 'Bookcases' as sub_category, 'DMI Eclipse Executive Suite Bookcases' as product_name, 400.78400 as sales, 1 as quantity, 0.20000 as discount, -5.00980 as profit union all
@@ -150,18 +150,18 @@ export const BigECommerce = {
       select 8878 as row_id, 'CA-2017-126928' as order_id, ${DATE_PREFIX}'2020-09-17'${DATE_SUFFIX} as order_date, 'GZ-14470' as customer_id, 'Morristown' as city, 'Technology' as category, 'Machines' as sub_category, 'Lexmark 20R1285 X6650 Wireless All-in-One Printer' as product_name, 480.00000 as sales, 4 as quantity, 0.00000 as discount, 225.60000 as profit union all
       select 7293 as row_id, 'CA-2017-109183' as order_id, ${DATE_PREFIX}'2020-12-04'${DATE_SUFFIX} as order_date, 'LR-16915' as customer_id, 'Columbus' as city, 'Technology' as category, 'Machines' as sub_category, 'Okidata C610n Printer' as product_name, 649.00000 as sales, 2 as quantity, 0.50000 as discount, -272.58000 as profit
     `;
+  },
+  create: (cast: Cast, name: string, suf?: string) => create(name, ECommerce.select(cast), cast, suf),
+};
+
+export const BigECommerce = {
+  select: (cast: Cast) => {
+    const { GENERATE_BIG_SERIES } = cast;
+    const data = ECommerce.select(cast);
     if (!GENERATE_BIG_SERIES) {
-      return data;
+      return `SELECT row_id as id, * from (${data}) d`;
     }
     return `select value * 10000 + row_id as id, * from ${GENERATE_BIG_SERIES} CROSS JOIN (${data}) d`;
   },
   create: (cast: Cast, name: string, suf?: string) => create(name, BigECommerce.select(cast), cast, suf),
-};
-
-export const ECommerce = {
-  select: (cast: Cast) => {
-    const { GENERATE_BIG_SERIES: _, ...withoutBigSeries } = cast;
-    return BigECommerce.select(withoutBigSeries);
-  },
-  create: (cast: Cast, name: string, suf?: string) => create(name, ECommerce.select(cast), cast, suf),
 };
