@@ -58,7 +58,7 @@ class MSSqlDriver extends BaseDriver {
       user: getEnv('dbUser', { dataSource }),
       password: getEnv('dbPass', { dataSource }),
       domain: getEnv('dbDomain', { dataSource }),
-      requestTimeout: 10 * 60 * 1000, // 10 minutes
+      requestTimeout: getEnv('dbQueryTimeout') * 1000,
       options: {
         encrypt: getEnv('dbSsl', { dataSource }),
         useUTC: false
@@ -168,7 +168,7 @@ class MSSqlDriver extends BaseDriver {
         case sql.Money:
         case sql.SmallMoney:
         case sql.Numeric:
-          type = 'float';
+          type = 'decimal';
           break;
         // double
         case sql.Float:
@@ -186,16 +186,16 @@ class MSSqlDriver extends BaseDriver {
           break;
         // date and time
         case sql.Time:
-          type = 'date';
+          type = 'time';
           break;
         case sql.Date:
-          type = 'date';
+          type = 'timestamp';
           break;
         case sql.DateTime:
         case sql.DateTime2:
         case sql.SmallDateTime:
         case sql.DateTimeOffset:
-          type = 'date';
+          type = 'timestamp';
           break;
         // others
         case sql.UniqueIdentifier:
@@ -213,7 +213,7 @@ class MSSqlDriver extends BaseDriver {
           type = 'string';
           break;
       }
-      return { name: fields[field].name, type };
+      return { name: fields[field].name, type: this.toGenericType(type) };
     });
   }
 

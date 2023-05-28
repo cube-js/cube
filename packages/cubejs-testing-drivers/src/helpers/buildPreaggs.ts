@@ -91,7 +91,7 @@ export async function buildPreaggs(
           setTimeout(() => {
             clearInterval(interval);
             reject('Cube pre-aggregations build failed: timeout.');
-          }, 60000);
+          }, 120000);
         }
       });
     });

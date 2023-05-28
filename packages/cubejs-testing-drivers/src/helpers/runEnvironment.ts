@@ -137,11 +137,20 @@ export async function runEnvironment(type: string, suf?: string): Promise<Enviro
   };
 
   const cliEnv = isLocal ? new CubeCliEnvironment(composePath) : null;
+  const mappedDataPort = fixtures.data ? environment.getContainer('data').getMappedPort(
+    parseInt(fixtures.data.ports[0], 10),
+  ) : null;
   if (cliEnv) {
     cliEnv.withEnvironment({
       CUBEJS_CUBESTORE_HOST: '127.0.0.1',
       CUBEJS_CUBESTORE_PORT: process.env.CUBEJS_CUBESTORE_PORT ? process.env.CUBEJS_CUBESTORE_PORT : `${store.port}`,
     });
+    if (mappedDataPort) {
+      cliEnv.withEnvironment({
+        CUBEJS_DB_HOST: '127.0.0.1',
+        CUBEJS_DB_PORT: `${mappedDataPort}`,
+      });
+    }
     await cliEnv.up();
   }
   const cube = cliEnv ? {
@@ -156,9 +165,7 @@ export async function runEnvironment(type: string, suf?: string): Promise<Enviro
 
   if (fixtures.data) {
     const data = {
-      port: environment.getContainer('data').getMappedPort(
-        parseInt(fixtures.data.ports[0], 10),
-      ),
+      port: mappedDataPort!,
       logs: await environment.getContainer('data').logs(),
     };
     return {

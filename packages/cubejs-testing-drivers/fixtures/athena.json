@@ -62,6 +62,21 @@
           "CUBE.totalProfit"
         ]
       }
+    ],
+    "BigECommerce": [
+      {
+        "name": "TA",
+        "time_dimension": "CUBE.orderDate",
+        "granularity": "month",
+        "partition_granularity": "year",
+        "dimensions": ["CUBE.productName", "CUBE.id"],
+        "measures": [
+          "CUBE.totalQuantity",
+          "CUBE.avgDiscount",
+          "CUBE.totalSales",
+          "CUBE.totalProfit"
+        ]
+      }
     ]
   },
   "skip": [
