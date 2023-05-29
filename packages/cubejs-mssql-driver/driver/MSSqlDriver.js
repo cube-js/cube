@@ -164,24 +164,26 @@ class MSSqlDriver extends BaseDriver {
         case sql.Int:
         case sql.SmallInt:
         case sql.TinyInt:
+        case sql.BigInt:
           type = 'int';
           break;
         // float
-        case sql.Real:
         case sql.Money:
         case sql.SmallMoney:
         case sql.Numeric:
+        case sql.Decimal:
           type = 'decimal';
           break;
         // double
+        case sql.Real:
         case sql.Float:
-        case sql.Decimal:
           type = 'double';
           break;
         // strings
         case sql.Char:
         case sql.NChar:
         case sql.Text:
+        case sql.NText:
         case sql.VarChar:
         case sql.NVarChar:
         case sql.Xml:
@@ -209,6 +211,7 @@ class MSSqlDriver extends BaseDriver {
         case sql.UDT:
         case sql.Geography:
         case sql.Geometry:
+        case sql.TVP:
           type = 'string';
           break;
         // unknown
