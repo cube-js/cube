@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/native",
-  "version": "0.33.15",
+  "version": "0.33.18",
   "author": "Cube Dev, Inc.",
   "description": "Native module for Cube.js (binding to Rust codebase)",
   "main": "dist/js/index.js",
@@ -33,7 +33,7 @@
     "dist/js"
   ],
   "devDependencies": {
-    "@cubejs-backend/testing-shared": "^0.33.15",
+    "@cubejs-backend/testing-shared": "^0.33.18",
     "@cubejs-infra/node-pre-gyp-github": "^1.0.3",
     "@types/jest": "^26",
     "@types/node": "^14",
@@ -44,7 +44,7 @@
   },
   "dependencies": {
     "@cubejs-backend/cubesql": "^0.33.11",
-    "@cubejs-backend/shared": "^0.33.11",
+    "@cubejs-backend/shared": "^0.33.18",
     "@mapbox/node-pre-gyp": "^1"
   },
   "binary": {
