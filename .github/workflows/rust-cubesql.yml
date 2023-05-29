@@ -270,8 +270,9 @@ jobs:
         run: cd packages/cubejs-backend-native && yarn run native:build && yarn run test:unit
       - name: Build native (with Python)
         if: (matrix.python-version != 'false')
-        env:
-          PYO3_PYTHON: python${{ matrix.python-version }}
+        # todo(ovr): not working on windows..
+        #env:
+        #  PYO3_PYTHON: python${{ matrix.python-version }}
         run: cd packages/cubejs-backend-native && yarn run native:build-debug-python
       - name: Tests
         env:
