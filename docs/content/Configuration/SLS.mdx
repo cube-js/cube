@@ -1,0 +1,127 @@
+---
+title: Semantic Layer Sync
+permalink: /semantic-layer-sync
+category: Configuration
+menuOrder: 5
+---
+
+Semantic Layer Sync synchronizes the [data model][ref-data-model]
+of a semantic layer with datasets in BI tools. It's the easiest way to
+connect a BI tool to the semantic layer.
+
+Semantic Layer Sync programmatically connects a BI tool to Cube via the
+[SQL API][ref-sql-api] and creates BI-specific entities that correspond to
+entities within the data model, e.g., cubes, views, measures, dimensions:
+
+| Cube                        | BI tool                   |
+| --------------------------- | ------------------------- |
+| Deployment                  | Database                  |
+| Cube, view                  | Dataset, table            |
+| Measure, dimension, segment | Column, dimension, metric |
+
+## Supported tools
+
+Semantic Layer Sync supports the following BI tools:
+
+* [Apache Superset][ref-superset]
+* [Metabase][ref-metabase]
+* [Preset][ref-preset]
+
+<InfoBox>
+
+We're working on bringing support for other BI tools. Please
+[reach out to us](https://forms.gle/eEit9Pa7ZXSoFxb86) if you're interested
+in using Semantic Layer Sync with other BI tools.
+
+</InfoBox>
+
+## Configuration
+
+Semantic Layer Sync is configured via the [semanticLayerSync][ref-config-sls]
+option in the `cube.js` configuration file.
+
+<SuccessBox>
+
+Cube Cloud [has a dedicated page][ref-workspace-sls] to manage Semantic Layer
+Sync: configure syncs, run them, and view synchronization history.
+
+</SuccessBox>
+
+### Prerequisites
+
+The following configuration is required for Semantic Layer Sync to work:
+
+* Semantic Layer Sync runs on a [refresh worker][ref-refresh-worker].
+You have to have a refresh worker as part of your Cube deployment.
+* Semantic Layer Sync uses the [SQL API][ref-sql-api] to connect BI tools
+to Cube. You have to [enable and configure][ref-sql-api-conf] the SQL API,
+including setting `CUBEJS_SQL_HOST` and `CUBEJS_SQL_DB_NAME` environment
+variables.
+
+### Syncs
+
+The [semanticLayerSync][ref-config-sls] function returns an array of
+configured syncs. This function can be asynchronous, allowing for dynamic
+definition of syncs, e.g., loading the configuration from a remote endpoint.
+
+Each sync is configured with a mandatory `name` and a `type` as well as the
+`config` object with BI-specific credentials, e.g., as a workspace URL and an
+API key.
+
+A sync can be disabled by setting `active` to `false`; such syncs will be
+ignored. If `active` is undefined, a sync is considered enabled.
+
+Example configuration with an active Preset sync and a disabled Metabase sync:
+
+```javascript
+module.exports = {
+  semanticLayerSync: () => {
+    return [
+      {
+        type: "preset,
+        name: "Preset Sync",
+        config: {
+          api_token: "07988f63-c200-499e-97c9-ba137d8918aa",
+          api_secret: "c19fbab4fd4945899795d32898f2e1165bef8e5ee653499e92f083b3d088aecb",
+          workspace_url: "12345678.us1a.app.preset.io"
+        }
+      }, {
+        type: "metabase",
+        name: "Metabase Sync",
+        active: false,
+        config: {
+          user: "mail@example.com",
+          password: "4dceae-606a03-93ae6dc7",
+          url: "example.metabaseapp.com"
+        }
+      }
+    ];
+  }
+};
+```
+
+Check [connection instructions][ref-downstream-tools] for specific BI tools
+to learn more about configuring them to work with Semantic Layer Sync.
+
+## Running syncs
+
+When a refresh worker starts, it will automatically run all configured syncs.
+To re-run all syncs, shut down and start a refresh worker again.
+
+Example log output:
+
+```
+2023-05-29T19:08:28.021: Semantic Layer Sync Started
+2023-05-29T19:08:33.008: Semantic Layer Sync Completed
+```
+
+[ref-data-model]: /schema/getting-started
+[ref-sql-api]: /backend/sql
+[ref-sql-api-conf]: /backend/sql#configuration
+[ref-config-sls]: /config#options-reference-semantic-layer-sync
+[ref-workspace-sls]: /workspace/bi-integrations
+[ref-refresh-worker]: /deployment/overview#refresh-worker
+[ref-preset]: /config/downstream/superset
+[ref-superset]: /config/downstream/superset
+[ref-metabase]: /config/downstream/metabase
+[ref-downstream-tools]: /config/downstream

@@ -6,22 +6,13 @@ permalink: /backend/sql
 menuOrder: 1
 ---
 
-<WarningBox heading={`Migration to Postgres protocol`}>
-
-This is documentation of Cube’s SQL API for the Postgres protocol. The MySQL
-protocol used in the first versions of the Cube SQL API is no longer being
-developed and will be phased out soon. Please consider migrating to the Postgres
-protocol.
-
-</WarningBox>
-
-The Cube SQL API allows querying Cube via Postgres-compatible SQL. It enables
-the use of BI applications, Python notebooks, reverse ETL tools, and other
-downstream tools on top of Cube.
+The SQL API allows querying Cube with Postgres-compatible SQL dialect.
+It enables the use of BI applications, Python notebooks, reverse ETL tools,
+and other downstream tools on top of Cube.
 
 ### <--{"id" : "SQL API"}--> Supported Tools
 
-Cube SQL API has been tested with
+Cube SQL API has been tested with the following tools:
 
 - psql CLI
 - Apache Superset
@@ -38,8 +29,38 @@ Cube SQL API has been tested with
 - Jupyter notebook
 - Hightouch
 
-Please see [this GitHub issue](https://github.com/cube-js/cube/issues/3906) for
-the tools roadmap and to suggest and vote for tools of your interest.
+<InfoBox>
+
+Please use [this GitHub issue](https://github.com/cube-js/cube/issues/3906)
+to suggest tools of your interest and vote for already proposed ones.
+
+</InfoBox>
+
+## Configuration
+
+### <--{"id" : "Configuration"}--> Cube Core
+
+SQL API is configured via [environment variables][ref-config-env].
+
+To enable the SQL API, set `CUBEJS_PG_SQL_PORT` to a port number you'd like
+to connect to with a Postgres-compatible tool.
+
+Use `CUBEJS_SQL_USER` and `CUBEJS_SQL_PASSWORD` to configure credentials
+required to connect to the SQL API. You can also use
+[`checkSqlAuth`][ref-config-checksqlauth], [`canSwitchSqlUser`][ref-config-canswitchsqluser],
+and `CUBEJS_SQL_SUPER_USER` to configure [custom authentication][ref-sql-api-auth].
+
+When using [Semantic Layer Sync][ref-sls], configure `CUBEJS_SQL_HOST` and
+`CUBEJS_SQL_DB_NAME` so Bi tools know which host and port should be used to
+connect to the SQL API.
+
+### <--{"id" : "Configuration"}--> Cube Cloud
+
+To enable the SQL API in Cube Cloud, click&nbsp;<Btn>Deploy SQL API</Btn> on
+the&nbsp;<Btn>Overview</Btn> page, then click&nbsp;<Btn>How to connect your BI
+tool</Btn>. You should then see the following screen:
+
+![SQL API details modal|690x428](https://ucarecdn.com/67508334-1641-43ec-9d50-a8f64629992b/)
 
 ## Querying Fundamentals
 
@@ -233,14 +254,6 @@ than 50,000 rows, but keep that limitation in mind when designing your queries.
 Limit push down is supported by Cube however, a limit over 50,000 can't be
 overridden. In future versions, paging and streaming would be used to avoid this
 limitation.
-
-## Enabling SQL API in Cube Cloud
-
-To enable the SQL API in Cube Cloud, click&nbsp;<Btn>Deploy SQL API</Btn> from
-the&nbsp;<Btn>Overview</Btn> page, then click <Btn>How to connect your BI
-tool</Btn>. You should then see the following screen:
-
-![SQL API details modal|690x428](https://ucarecdn.com/67508334-1641-43ec-9d50-a8f64629992b/)
 
 ## Examples
 
@@ -513,3 +526,8 @@ WHERE is_completed = true
 
 [ref-config-js]: /config
 [ref-dynamic-schemas]: /schema/dynamic-schema-creation
+[ref-config-env]: /reference/environment-variables
+[ref-sql-api-auth]: /backend/sql/security
+[ref-config-checksqlauth]: /config#options-reference-check-sql-auth
+[ref-config-canswitchsqluser]: /config#options-reference-can-switch-sql-user
+[ref-sls]: /semantic-layer-sync
