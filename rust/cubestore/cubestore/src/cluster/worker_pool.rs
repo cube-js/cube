@@ -8,6 +8,7 @@ use std::time::Duration;
 use async_trait::async_trait;
 use deadqueue::unlimited;
 use futures::future::join_all;
+use futures::future::BoxFuture;
 use ipc_channel::ipc;
 use ipc_channel::ipc::{IpcReceiver, IpcSender};
 use log::error;
@@ -334,9 +335,9 @@ where
     let runtime = tokio_builder.build().unwrap();
     worker_setup(&runtime);
     runtime.block_on(async move {
-        let config = Config::default();
-        config.configure_injector().await;
+        let config = get_worker_config().await;
         let services = config.worker_services().await;
+        startup_worker(&config).await;
 
         loop {
             let res = rx.recv();
@@ -350,11 +351,13 @@ where
                     let send_res = tx.send(result);
                     if let Err(e) = send_res {
                         error!("Worker message send error: {:?}", e);
+                        shutdown_worker(&config).await;
                         return 0;
                     }
                 }
                 Err(e) => {
                     error!("Worker message receive error: {:?}", e);
+                    shutdown_worker(&config).await;
                     return 0;
                 }
             }
@@ -369,15 +372,82 @@ fn worker_setup(runtime: &Runtime) {
     }
 }
 
+async fn get_worker_config() -> Config {
+    let custom_fn = SELECT_WORKER_CONFIGURE_FN.read().unwrap();
+    if let Some(func) = custom_fn.as_ref() {
+        func().await
+    } else {
+        let config = Config::default();
+        config.configure_injector().await;
+        config
+    }
+}
+
+async fn startup_worker(config: &Config) {
+    let custom_fn = SELECT_WORKER_STARTUP_FN.read().unwrap();
+    if let Some(func) = custom_fn.as_ref() {
+        func(config).await;
+    }
+}
+
+async fn shutdown_worker(config: &Config) {
+    let custom_fn = SELECT_WORKER_SHUTDOWN_FN.read().unwrap();
+    if let Some(func) = custom_fn.as_ref() {
+        func(config).await;
+    }
+}
+
 lazy_static! {
     static ref SELECT_WORKER_SETUP: std::sync::RwLock<Option<Box<dyn Fn(&Runtime) + Send + Sync>>> =
         std::sync::RwLock::new(None);
 }
 
+lazy_static! {
+    static ref SELECT_WORKER_CONFIGURE_FN: std::sync::RwLock<Option<Box<dyn Fn() -> BoxFuture<'static, Config> + Send + Sync>>> =
+        std::sync::RwLock::new(None);
+}
+
+lazy_static! {
+    static ref SELECT_WORKER_STARTUP_FN: std::sync::RwLock<Option<Box<dyn Fn(&Config) -> BoxFuture<'static, ()> + Send + Sync>>> =
+        std::sync::RwLock::new(None);
+}
+
+lazy_static! {
+    static ref SELECT_WORKER_SHUTDOWN_FN: std::sync::RwLock<Option<Box<dyn Fn(&Config) -> BoxFuture<'static, ()> + Send + Sync>>> =
+        std::sync::RwLock::new(None);
+}
+
 pub fn register_select_worker_setup(f: fn(&Runtime)) {
-    let mut startup = SELECT_WORKER_SETUP.write().unwrap();
-    assert!(startup.is_none(), "select worker setup already registered");
-    *startup = Some(Box::new(f));
+    let mut setup = SELECT_WORKER_SETUP.write().unwrap();
+    assert!(setup.is_none(), "select worker setup already registered");
+    *setup = Some(Box::new(f));
+}
+
+pub fn register_select_worker_configure_fn(f: fn() -> BoxFuture<'static, Config>) {
+    let mut func = SELECT_WORKER_CONFIGURE_FN.write().unwrap();
+    assert!(
+        func.is_none(),
+        "select worker configure function already registered"
+    );
+    *func = Some(Box::new(f));
+}
+
+pub fn register_select_worker_startup_fn(f: fn(&Config) -> BoxFuture<'static, ()>) {
+    let mut func = SELECT_WORKER_STARTUP_FN.write().unwrap();
+    assert!(
+        func.is_none(),
+        "select worker startup function already registered"
+    );
+    *func = Some(Box::new(f));
+}
+
+pub fn register_select_worker_shutdown_fn(f: fn(&Config) -> BoxFuture<'static, ()>) {
+    let mut func = SELECT_WORKER_SHUTDOWN_FN.write().unwrap();
+    assert!(
+        func.is_none(),
+        "select worker shutdown function already registered"
+    );
+    *func = Some(Box::new(f));
 }
 
 #[cfg(test)]
