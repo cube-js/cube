@@ -142,6 +142,7 @@ jobs:
         shell: bash
         run: |
           cd packages/cubejs-backend-native
+          rm -rf native
           mkdir native
           cp index.node native/index.node
           tar czvf native.tar.gz native
