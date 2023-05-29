@@ -8,6 +8,7 @@ export type Cast = {
   CREATE_SUB_PREFIX: string,
   CREATE_SUB_SUFFIX: string,
   USE_SCHEMA: string,
+  GENERATE_BIG_SERIES?: string,
 };
 
 function create(table: string, query: string, cast: Cast, suf?: string): string {
@@ -151,4 +152,16 @@ export const ECommerce = {
     `;
   },
   create: (cast: Cast, name: string, suf?: string) => create(name, ECommerce.select(cast), cast, suf),
+};
+
+export const BigECommerce = {
+  select: (cast: Cast) => {
+    const { GENERATE_BIG_SERIES } = cast;
+    const data = ECommerce.select(cast);
+    if (!GENERATE_BIG_SERIES) {
+      return `SELECT row_id as id, row_id, order_id, order_date, city, category, sub_category, product_name, sales, quantity, discount, profit from (${data}) d`;
+    }
+    return `select value * 10000 + row_id as id, row_id, order_id, order_date, city, category, sub_category, product_name, sales, quantity, discount, profit from ${GENERATE_BIG_SERIES} CROSS JOIN (${data}) d`;
+  },
+  create: (cast: Cast, name: string, suf?: string) => create(name, BigECommerce.select(cast), cast, suf),
 };

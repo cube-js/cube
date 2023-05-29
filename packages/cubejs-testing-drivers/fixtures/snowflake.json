@@ -36,7 +36,8 @@
   "tables": {
     "products": "public.products",
     "customers": "public.customers",
-    "ecommerce": "public.ecommerce"
+    "ecommerce": "public.ecommerce",
+    "bigecommerce": "public.bigecommerce"
   },
   "preAggregations": {
     "Products": [],
@@ -70,6 +71,21 @@
           "CUBE.totalProfit"
         ]
       }
+    ],
+    "BigECommerce": [
+      {
+        "name": "TA",
+        "time_dimension": "CUBE.orderDate",
+        "granularity": "month",
+        "partition_granularity": "year",
+        "dimensions": ["CUBE.productName", "CUBE.id"],
+        "measures": [
+          "CUBE.totalQuantity",
+          "CUBE.avgDiscount",
+          "CUBE.totalSales",
+          "CUBE.totalProfit"
+        ]
+      }
     ]
   },
   "skip": [
@@ -93,6 +109,7 @@
     "querying Products: dimensions -- doesn't work wo ordering",
     "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- rounding in athena",
     "querying ECommerce: total sales, total profit by month + order (date) + total -- doesn't work with the BigQuery",
-    "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- noisy test"
+    "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- noisy test",
+    "querying BigECommerce: partitioned pre-agg"
   ]
 }

@@ -179,9 +179,7 @@ export function testConnection(type: string): void {
     execute('must delete the data source', async () => {
       const tables = Object
         .keys(fixtures.tables)
-        .map((key: string) => `${fixtures.tables[
-            <'products' | 'customers' | 'ecommerce'>key
-        ]}_driver`);
+        .map((key: string) => `${fixtures.tables[key]}_driver`);
       await Promise.all(
         tables.map(async (t) => {
           await driver.dropTable(t);

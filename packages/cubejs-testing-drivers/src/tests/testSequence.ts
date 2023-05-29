@@ -58,9 +58,7 @@ export function testSequence(type: string): void {
     afterAll(async () => {
       const tables = Object
         .keys(fixtures.tables)
-        .map((key: string) => `${fixtures.tables[
-            <'products' | 'customers' | 'ecommerce'>key
-        ]}_core`);
+        .map((key: string) => `${fixtures.tables[key]}_core`);
       await Promise.all(
         tables.map(async (t) => {
           await source.dropTable(t);
