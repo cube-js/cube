@@ -65,7 +65,7 @@ jobs:
   native_linux:
     runs-on: ubuntu-20.04
     timeout-minutes: 60
-    name: Build native Linux ${{ matrix.node-version }} ${{ matrix.target }} ${{ matrix.python-version }}
+    name: Build native Linux ${{ matrix.node-version }} ${{ matrix.target }} Python ${{ matrix.python-version }}
     strategy:
       matrix:
         node-version: [16]
@@ -138,16 +138,6 @@ jobs:
           PYO3_PYTHON: python${{ matrix.python-version }}
           CARGO_BUILD_TARGET: ${{ matrix.target }}
         run: cd packages/cubejs-backend-native && npm run native:build-release-python
-      - name: Upload artifact
-        uses: nick-invision/retry@v2
-        with:
-          max_attempts: 10
-          retry_on: error
-          timeout_minutes: 5
-          retry_wait_seconds: 15
-          command: |
-            cd packages/cubejs-backend-native
-            npm run upload-binary-cross
       - name: Archive release asset
         shell: bash
         run: |
