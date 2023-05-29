@@ -186,6 +186,7 @@ jobs:
       - name: Build native (with Python)
         if: (matrix.python-version != 'false')
         env:
+          PYO3_PYTHON: python${{ matrix.python-version }}
           CARGO_BUILD_TARGET: ${{ matrix.target }}
         run: cd packages/cubejs-backend-native && yarn run native:build-debug-python
       - name: Test native (GNU only)
@@ -269,7 +270,12 @@ jobs:
         run: cd packages/cubejs-backend-native && yarn run native:build && yarn run test:unit
       - name: Build native (with Python)
         if: (matrix.python-version != 'false')
+        # todo(ovr): not working on windows..
+        #env:
+        #  PYO3_PYTHON: python${{ matrix.python-version }}
+        run: cd packages/cubejs-backend-native && yarn run native:build-debug-python
+      - name: Tests
         env:
           CUBESQL_STREAM_MODE: true
           CUBEJS_NATIVE_INTERNAL_DEBUG: true
-        run: cd packages/cubejs-backend-native && yarn run native:build-debug-python && yarn run test:unit
+        run: cd packages/cubejs-backend-native && yarn run test:unit

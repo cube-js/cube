@@ -64,20 +64,19 @@ jobs:
 
   native_linux:
     runs-on: ubuntu-20.04
-    env:
-      NODE_PRE_GYP_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      PACKAGE_TARGET_ARCH: ${{ matrix.package_target_arch }}
-      PACKAGE_TARGET_PLATFORM: ${{ matrix.package_target_platform }}
-      PACKAGE_TARGET_LIBC: ${{ matrix.package_target_libc }}
     timeout-minutes: 60
     name: Build native Linux ${{ matrix.node-version }} ${{ matrix.target }}
     strategy:
       matrix:
         node-version: [16]
+        python-version: ["3.11", "fallback"]
         target: ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"]
         include:
+          - target: x86_64-unknown-linux-gnu
+            package_target_arch: x64
+            package_target_platform: linux
+            package_target_libc: glibc
           - target: aarch64-unknown-linux-gnu
-            # We use cross for this type, it's why we need to override package
             package_target_arch: arm64
             package_target_platform: linux
             package_target_libc: glibc
@@ -128,10 +127,17 @@ jobs:
           command: yarn install --frozen-lockfile
       - name: Compile TypeScript
         run: yarn tsc
-      - name: Build native
+      - name: Build native (fallback)
+        if: (matrix.python-version == 'fallback')
         env:
           CARGO_BUILD_TARGET: ${{ matrix.target }}
         run: cd packages/cubejs-backend-native && npm run native:build-release
+      - name: Build native (with Python)
+        if: (matrix.python-version != 'fallback')
+        env:
+          PYO3_PYTHON: python${{ matrix.python-version }}
+          CARGO_BUILD_TARGET: ${{ matrix.target }}
+        run: cd packages/cubejs-backend-native && npm run native:build-release-python
       - name: Upload artifact
         uses: nick-invision/retry@v2
         with:
@@ -142,6 +148,22 @@ jobs:
           command: |
             cd packages/cubejs-backend-native
             npm run upload-binary-cross
+      - name: Archive release asset
+        shell: bash
+        run: |
+          cd packages/cubejs-backend-native
+          mkdir native
+          cp index.node native/index.node
+          tar czvf native.tar.gz native
+      - name: Upload to Release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: packages/cubejs-backend-native/native.tar.gz
+          # Example: native-linux-arm64-glibc.tar.gz
+          asset_name: native-${{ matrix.package_target_platform }}-${{ matrix.package_target_arch }}-${{ matrix.package_target_libc }}-${{ matrix.python-version }}.tar.gz
+          tag: ${{ github.ref }}
+          overwrite: true
 
   native:
     runs-on: ${{ matrix.os-version }}
