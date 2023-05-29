@@ -63,6 +63,7 @@ use crate::store::ChunkDataStore;
 use crate::table::{data, Row, TableValue, TimestampValue};
 use crate::telemetry::incoming_traffic_agent_event;
 use crate::util::decimal::Decimal;
+use crate::util::memory::MemoryHandler;
 use crate::util::strings::path_to_string;
 use crate::CubeError;
 use crate::{
@@ -171,6 +172,7 @@ pub struct SqlServiceImpl {
     cluster: Arc<dyn Cluster>,
     import_service: Arc<dyn ImportService>,
     config_obj: Arc<dyn ConfigObj>,
+    memory_handler: Arc<dyn MemoryHandler>,
     rows_per_chunk: usize,
     query_timeout: Duration,
     create_table_timeout: Duration,
@@ -192,6 +194,7 @@ impl SqlServiceImpl {
         import_service: Arc<dyn ImportService>,
         config_obj: Arc<dyn ConfigObj>,
         remote_fs: Arc<dyn RemoteFs>,
+        memory_handler: Arc<dyn MemoryHandler>,
         rows_per_chunk: usize,
         query_timeout: Duration,
         create_table_timeout: Duration,
@@ -211,6 +214,7 @@ impl SqlServiceImpl {
             query_timeout,
             create_table_timeout,
             remote_fs,
+            memory_handler,
             cache,
         })
     }
@@ -1301,6 +1305,7 @@ impl SqlService for SqlServiceImpl {
                         app_metrics::DATA_QUERIES.increment();
                         let cluster = self.cluster.clone();
                         let executor = self.query_executor.clone();
+                        let memory_handler = self.memory_handler.clone();
                         timeout(
                             self.query_timeout,
                             self.cache
@@ -1310,6 +1315,7 @@ impl SqlService for SqlServiceImpl {
                                         records =
                                             executor.execute_router_plan(plan, cluster).await?.1;
                                     } else {
+                                        memory_handler.check_memory()?;
                                         // Pick one of the workers to run as main for the request.
                                         let i = thread_rng().sample(Uniform::new(0, workers.len()));
                                         let rs = cluster.route_select(&workers[i], plan).await?.1;
@@ -1891,10 +1897,11 @@ mod tests {
     use crate::queryplanner::MockQueryPlanner;
     use crate::remotefs::{LocalDirRemoteFs, RemoteFile, RemoteFs};
     use crate::store::ChunkStore;
+    use crate::util::memory::MemoryHandlerImpl;
 
     use super::*;
     use crate::cachestore::RocksCacheStore;
-    use crate::queryplanner::pretty_printers::pp_phys_plan;
+    use crate::queryplanner::pretty_printers::{pp_phys_plan, pp_phys_plan_ext, PPOptions};
     use crate::remotefs::queue::QueueRemoteFs;
     use crate::scheduler::SchedulerImpl;
     use crate::table::data::{cmp_min_rows, cmp_row_key_heap};
@@ -1951,6 +1958,7 @@ mod tests {
                 Arc::new(MockImportService::new()),
                 config.config_obj(),
                 remote_fs.clone(),
+                Arc::new(MemoryHandlerImpl {}),
                 rows_per_chunk,
                 query_timeout,
                 query_timeout,
@@ -2026,6 +2034,7 @@ mod tests {
                 Arc::new(MockImportService::new()),
                 config.config_obj(),
                 remote_fs.clone(),
+                Arc::new(MemoryHandlerImpl {}),
                 rows_per_chunk,
                 query_timeout,
                 query_timeout,
@@ -2131,6 +2140,7 @@ mod tests {
                 Arc::new(MockImportService::new()),
                 config.config_obj(),
                 remote_fs.clone(),
+                Arc::new(MemoryHandlerImpl {}),
                 rows_per_chunk,
                 query_timeout,
                 query_timeout,
@@ -2742,6 +2752,62 @@ mod tests {
                     "{}\nshould have 2 and less partition scan nodes",
                     worker_plan
                 );
+            })
+            .await;
+    }
+
+    #[tokio::test]
+    async fn check_memory_test() {
+        Config::test("check_memory_test")
+            .update_config(|mut c| {
+                c.partition_split_threshold = 25;
+                c.compaction_chunks_count_threshold = 0;
+                c
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
+
+                service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+                service
+                    .exec_query("CREATE TABLE foo.numbers (num decimal)")
+                    .await
+                    .unwrap();
+
+                for _ in 0..2 {
+                    let t = (0..100).map(|i| format!("({i})")).join(", ");
+                    service
+                        .exec_query(&format!("INSERT INTO foo.numbers (num) VALUES {}", t))
+                        .await
+                        .unwrap();
+                }
+
+                let mut opts = PPOptions::default();
+                opts.show_check_memory_nodes = true;
+
+                let plans = service
+                    .plan_query("SELECT sum(num) from foo.numbers where num = 50")
+                    .await
+                    .unwrap();
+                let plan_regexp = Regex::new(r"ParquetScan.*\.parquet").unwrap();
+
+                let expected = "Projection, [SUM(foo.numbers.num)@0:SUM(num)]\
+                \n  FinalHashAggregate\
+                \n    Worker\
+                \n      PartialHashAggregate\
+                \n        Filter\
+                \n          MergeSort\
+                \n            Scan, index: default:1:[1]:sort_on[num], fields: *\
+                \n              FilterByKeyRange\
+                \n                CheckMemoryExec\
+                \n                  ParquetScan\
+                \n              FilterByKeyRange\
+                \n                CheckMemoryExec\
+                \n                  ParquetScan";
+                let plan = pp_phys_plan_ext(plans.worker.as_ref(), &opts);
+                let p = plan_regexp.replace_all(&plan, "ParquetScan");
+                println!("pp {}", p);
+                assert_eq!(p, expected);
             })
             .await;
     }

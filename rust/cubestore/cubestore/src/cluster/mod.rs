@@ -33,6 +33,7 @@ use crate::store::compaction::CompactionService;
 use crate::store::ChunkDataStore;
 use crate::telemetry::tracing::TracingHelper;
 use crate::util::aborting_join_handle::AbortingJoinHandle;
+use crate::util::memory::MemoryHandler;
 use crate::CubeError;
 use arrow::datatypes::SchemaRef;
 use arrow::error::ArrowError;
@@ -1318,6 +1319,12 @@ impl ClusterImpl {
         &self,
         plan_node: SerializedPlan,
     ) -> Result<(SchemaRef, Vec<SerializedRecordBatchStream>), CubeError> {
+        let memory_handler = self
+            .injector
+            .upgrade()
+            .unwrap()
+            .get_service_typed::<dyn MemoryHandler>()
+            .await;
         let start = SystemTime::now();
         debug!("Running select");
         let remote_to_local_names = self.warmup_select_worker_files(&plan_node).await?;
@@ -1393,6 +1400,7 @@ impl ClusterImpl {
                     )
                     .collect::<Result<HashMap<_, _>, _>>()
                 })?;
+                memory_handler.check_memory()?;
                 res = Some(
                     pool.process(WorkerMessage::Select(
                         plan_node.clone(),
