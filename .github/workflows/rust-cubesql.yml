@@ -272,6 +272,9 @@ jobs:
         if: (matrix.python-version != 'false')
         env:
           PYO3_PYTHON: python${{ matrix.python-version }}
+        run: cd packages/cubejs-backend-native && yarn run native:build-debug-python
+      - name: Tests
+        env:
           CUBESQL_STREAM_MODE: true
           CUBEJS_NATIVE_INTERNAL_DEBUG: true
-        run: cd packages/cubejs-backend-native && yarn run native:build-debug-python && yarn run test:unit
+        run: cd packages/cubejs-backend-native && yarn run test:unit
