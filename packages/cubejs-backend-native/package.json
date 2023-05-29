@@ -51,7 +51,7 @@
     "module_name": "index",
     "host": "https://github.com/cube-js/cube/releases/download/",
     "remote_path": "v{version}",
-    "package_name": "native-{platform}-{arch}-{libc}.tar.gz",
+    "package_name": "native-{platform}-{arch}-{libc}-fallback.tar.gz",
     "module_path": "native",
     "pkg_path": "."
   },
