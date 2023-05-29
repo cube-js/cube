@@ -65,7 +65,7 @@ jobs:
   native_linux:
     runs-on: ubuntu-20.04
     timeout-minutes: 60
-    name: Build native Linux ${{ matrix.node-version }} ${{ matrix.target }}
+    name: Build native Linux ${{ matrix.node-version }} ${{ matrix.target }} ${{ matrix.python-version }}
     strategy:
       matrix:
         node-version: [16]
