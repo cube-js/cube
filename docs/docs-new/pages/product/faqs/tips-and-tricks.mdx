@@ -1,0 +1,120 @@
+---
+redirect_from:
+  - /faqs/tips-and-tricks
+---
+
+# Tips and Tricks
+
+## How can I read from two different database schemas in my database when I'm only able to select one while connecting?
+
+Use your first schema when setting up your database connection in Cube Cloud.
+
+To use your second database schema, update the `CUBE_DB_NAME` environment
+variable in **Settings > Configuration**. Change `CUBE_DB_NAME` to the name of
+your second schema.
+
+This will trigger a new build. Once it's completed click on <Btn>Data
+Model</Btn> in the left hand side navigation, and then in the upper-right
+corner, click the three-dot menu and select <Btn>Generate Data Model</Btn>. You
+should be able to see the name of the second schema from your database and
+generate new models.
+
+## Can I track my customers' query usage?
+
+You can track query usage by user (or other dimension) by setting up [Log
+Export][ref-cloud-o11y-logs] and parsing the necessary information.
+
+## Can I bypass Row-Level Security when using the SQL API?
+
+There may be times when you want the permissions through Cube's REST API to be
+different from the permissions of the SQL API.
+
+For example, perhaps your customers use the REST API to access their own data.
+You might use row-level security to prevent them from seeing any data associated
+with other customers.
+
+For your internal analytics, you could provide access to your Data Analysts via
+the SQL API. Since this is for your internal use, you will need access to all
+the data rather than a single customer's. To give yourself higher permissions
+through the SQL API, you could create an exception for the usual Row-Level
+Security checks.
+
+In the following data models, we have created some example Row-Level Security
+rules and an exception for querying data via the SQL API.
+
+### Defining basic RLS
+
+First, in the `cube.js` configuration file, we'll define the
+[`queryRewrite()`][ref-conf-ref-queryrewrite] property to push a filter to each
+query depending on the `tenantId` within the [Security Context][ref-sec-ctx].
+
+```javascript
+module.exports = {
+  queryRewrite: (query, { securityContext }) => {
+    if (!securityContext.tenantId) {
+      throw new Error('No id found in Security Context!');
+    } else {
+      query.filters.push({
+        member: 'orders.tenant_id',
+        operator: 'equals',
+        values: [securityContext.tenantId],
+      });
+
+      return query;
+    }
+  },
+};
+```
+
+With this logic, each tenant can see their data and nothing else.
+
+### Bypassing RLS for queries created with the SQL API
+
+When we want to bypass the RLS we defined above, we need to create a sort of
+"superuser" only accessible when authenticating via the SQL API. We need to
+define two new things for this to work:
+
+1. Leverage the [`checkSqlAuth()`][ref-conf-ref-checksqlauth] configuration
+   option to inject a new property into the Security Context that defines a
+   superuser. In this case, we'll call it `isSuperUser`.
+
+2. Handle the new `isSuperUser` property in our previously defined
+   `queryRewrite` to bypass the filter push.
+
+```javascript
+module.exports = {
+  // Create a "superuser" security context for the SQL API
+  checkSqlAuth: async (req, username) => {
+    if (username === process.env.CUBEJS_SQL_USER) {
+      return {
+        password: process.env.CUBEJS_SQL_PASSWORD,
+        securityContext: { isSuperUser: true },
+      };
+    }
+  },
+  queryRewrite: (query, { securityContext }) => {
+    // Bypass row-level-security when connected from the SQL API
+    if (securityContext.isSuperUser) {
+      return query;
+    } else if (!securityContext.tenantId) {
+      throw new Error('No id found in Security Context!');
+    } else {
+      query.filters.push({
+        member: 'orders.tenant_id',
+        operator: 'equals',
+        values: [securityContext.tenantId],
+      });
+
+      return query;
+    }
+  },
+};
+```
+
+With this exception in place we should be able to query all the customers' data
+via the SQL API without being hindered by the row-level security checks.
+
+[ref-cloud-o11y-logs]: /cloud/workspace/logs
+[ref-conf-ref-checksqlauth]: /config#options-reference-check-sql-auth
+[ref-conf-ref-queryrewrite]: /config#options-reference-query-rewrite
+[ref-sec-ctx]: /security/context

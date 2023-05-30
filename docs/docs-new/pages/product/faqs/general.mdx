@@ -1,0 +1,37 @@
+---
+redirect_from:
+  - /faqs/general
+---
+
+# General
+
+## Is there a row limit on the results of a query?
+
+The row limit for all query results is set to 10,000 rows by default. You may
+specify a row limit up to 50,000 in query parameters for an individual query. If
+more rows are needed, we recommend using pagination in your application to
+request more rows.
+
+## Can I try Cube Cloud for free?
+
+Yes. Cube Cloud provides free [development instances](/cloud/configuration/deployment-types#development-instance) and a set of [paid tiers](https://cube.dev/pricing). Each tier comes with additional features, however, you're welcome to use development instances
+indefinitely if they satisfy your needs.
+
+## What is the difference between CUBEJS_CONCURRENCY and CUBEJS_DB_MAX_POOL?
+
+`CUBEJS_CONCURRENCY` specifies the maximum number of queries that can be
+executed concurrently on your source database. This variable should reflect the
+limitations of your database, and will help limit the number of queries that are
+sent from cube.
+
+`CUBEJS_DB_MAX_POOL` allows you to set a maximum number of connection pools to
+your database. This only applies to databases that use connection pooling
+(Postgresql, Redshift, Clickhouse) and is not applicable to databases without it
+(BigQuery, Snowflake). The concurrency limit specified in `CUBEJS_CONCURRENCY`
+will supersede the number of connections if it is lower.
+
+For example, if your database has a hard concurrency limit of 10 that cannot be
+changed, but you wish to raise the concurrency limit to 50 you would first set
+`CUBEJS_CONCURRENCY=50` and `CUBEJS_DB_MAX_POOL=5` or higher. Note that some
+data warehouses (BigQuery, Snowflake) do not use connection pooling so this
+parameter is not applicable.

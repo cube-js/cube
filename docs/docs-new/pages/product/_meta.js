@@ -11,5 +11,6 @@ module.exports = {
   "frontend-integrations": "Frontend Integrations",
   "workspace": "Workspace",
   "deployment": "Deployment",
-  "monitoring": "Monitoring"
+  "monitoring": "Monitoring",
+  "faq": "FAQs"
 }

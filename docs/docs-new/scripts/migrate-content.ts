@@ -86,6 +86,7 @@ const overrides: Record<string, Override> = {
       workspace: "Workspace",
       deployment: "Deployment",
       monitoring: "Monitoring",
+      faq: "FAQs",
     },
   },
 
@@ -99,7 +100,7 @@ const overrides: Record<string, Override> = {
       overview: "Overview",
       core: "Cube Core",
       cloud: "Cube Cloud",
-      'migrate-from-core': 'Migrate from Cube Core',
+      "migrate-from-core": "Migrate from Cube Core",
     },
   },
 
@@ -184,32 +185,32 @@ const overrides: Record<string, Override> = {
     path: "product/getting-started/migrate-from-core/upload-with-cli",
     title: "Import a local project to Cube Cloud with CLI",
     meta: {
-      'upload-with-cli': "Upload with CLI",
-      'import-gitlab-repository-via-ssh': 'Import a GitLab repository',
-      'import-github-repository': 'Import a GitHub repository',
-      'import-git-repository-via-ssh': 'Import a Git repository',
-      'import-bitbucket-repository-via-ssh': 'Import a Bitbucket repository',
+      "upload-with-cli": "Upload with CLI",
+      "import-gitlab-repository-via-ssh": "Import a GitLab repository",
+      "import-github-repository": "Import a GitHub repository",
+      "import-git-repository-via-ssh": "Import a Git repository",
+      "import-bitbucket-repository-via-ssh": "Import a Bitbucket repository",
     },
   },
   "Getting-Started/Migrate-from-Core/Import-GitLab-repository-via-SSH.mdx": {
     ready: true,
     path: "product/getting-started/migrate-from-core/import-gitlab-repository-via-ssh",
-    title: "Import a GitLab repository"
+    title: "Import a GitLab repository",
   },
   "Getting-Started/Migrate-from-Core/Import-GitHub-repository.mdx": {
     ready: true,
     path: "product/getting-started/migrate-from-core/import-github-repository",
-    title: "Import a GitHub repository"
+    title: "Import a GitHub repository",
   },
   "Getting-Started/Migrate-from-Core/Import-Git-repository-via-SSH.mdx": {
     ready: true,
     path: "product/getting-started/migrate-from-core/import-git-repository-via-ssh",
-    title: "Import a Git repository"
+    title: "Import a Git repository",
   },
   "Getting-Started/Migrate-from-Core/Import-Bitbucket-repository-via-SSH.mdx": {
     ready: true,
     path: "product/getting-started/migrate-from-core/import-bitbucket-repository-via-ssh",
-    title: "Import a Bitbucket repository"
+    title: "Import a Bitbucket repository",
   },
 
   // configuration
@@ -354,25 +355,25 @@ const overrides: Record<string, Override> = {
     meta: {
       "aws-athena": "AWS Athena",
       "aws-redshift": "AWS Redshift",
-      "clickhouse": "ClickHouse",
+      clickhouse: "ClickHouse",
       "databricks-jdbc": "Databricks (JDBC)",
-      "druid": "Druid",
-      "elasticsearch": "Elasticsearch",
-      "firebolt": "Firebolt",
+      druid: "Druid",
+      elasticsearch: "Elasticsearch",
+      firebolt: "Firebolt",
       "google-bigquery": "Google BigQuery",
-      "hive": "Hive",
-      "ksqldb": "ksqlDB",
-      "materialize": "Materialize",
-      "mongodb": "MongoDB",
+      hive: "Hive",
+      ksqldb: "ksqlDB",
+      materialize: "Materialize",
+      mongodb: "MongoDB",
       "ms-sql": "MS-SQL",
-      "mysql": "MySQL",
-      "oracle": "Oracle",
-      "postgres": "Postgres",
-      "presto": "Presto",
-      "questdb": "QuestDB",
-      "snowflake": "Snowflake",
-      "sqlite": "SQLite",
-      "trino": "Trino",
+      mysql: "MySQL",
+      oracle: "Oracle",
+      postgres: "Postgres",
+      presto: "Presto",
+      questdb: "QuestDB",
+      snowflake: "Snowflake",
+      sqlite: "SQLite",
+      trino: "Trino",
     },
   },
   "Configuration/Databases/Trino.mdx": {
@@ -937,8 +938,8 @@ const overrides: Record<string, Override> = {
     title: "@cubejs-client/ngx",
 
     meta: {
-      'cubejs-client-ngx': "@cubejs-client-ngx",
-      'cubejs-client-vue': '@cubejs-client-vue',
+      "cubejs-client-ngx": "@cubejs-client-ngx",
+      "cubejs-client-vue": "@cubejs-client-vue",
     },
   },
 
@@ -985,20 +986,25 @@ const overrides: Record<string, Override> = {
     ready: true,
     path: "guides/examples",
     title: "Examples",
+    meta: {
+      examples: "Examples",
+      recipes: "Recipes",
+    },
   },
   "Examples-Tutorials-Recipes/Recipes.mdx": {
     ready: true,
     path: "guides/recipes/overview",
     title: "Recipes",
     meta: {
-      "access-control": "Access control",
+      overview: "Overview",
       analytics: "Analytics",
-      auth: "Auth",
-      "code-reusability": "Code reusability",
+      "access-control": "Access control",
+      auth: "Authentication & Authorization",
       "data-modeling": "Data modeling",
       "data-sources": "Data sources",
       queries: "Queries",
       "query-acceleration": "Query acceleration",
+      "code-reusability": "Code reusability",
       "upgrading-cube": "Upgrading Cube",
     },
   },
@@ -1013,158 +1019,231 @@ const overrides: Record<string, Override> = {
     {
       ready: true,
       path: "guides/recipes/query-acceleration/using-originalsql-and-rollups-effectively",
-      title: "using-originalsql-and-rollups-effectively",
+      title: "Using originalSql and rollup pre-aggregations effectively",
+      meta: {
+        "incrementally-building-pre-aggregations-for-a-date-range":
+          "Incrementally building pre-aggregations for a date range",
+        "refreshing-select-partitions": "Refreshing select partitions",
+        "joining-multiple-data-sources":
+          "Joining data from multiple data sources",
+        "non-additivity": "Accelerating non-additive measures",
+        "using-originalsql-and-rollups-effectively":
+          "Using originalSql and rollup pre-aggregations effectively",
+      },
     },
   "Examples-Tutorials-Recipes/Recipes/Query-acceleration/non-additivity.mdx": {
     ready: true,
     path: "guides/recipes/query-acceleration/non-additivity",
-    title: "non-additivity",
+    title: "Accelerating non-additive measures",
   },
   "Examples-Tutorials-Recipes/Recipes/Query-acceleration/joining-multiple-data-sources.mdx":
     {
       ready: true,
       path: "guides/recipes/query-acceleration/joining-multiple-data-sources",
-      title: "joining-multiple-data-sources",
+      title: "Joining data from multiple data sources",
     },
   "Examples-Tutorials-Recipes/Recipes/Query-acceleration/incrementally-building-pre-aggregations-for-a-date-range.mdx":
     {
       ready: true,
       path: "guides/recipes/query-acceleration/incrementally-building-pre-aggregations-for-a-date-range",
-      title:
-        "/Query-acceleration/incrementally-building-pre-aggregations-for-a-date-range",
+      title: "Incrementally building pre-aggregations for a date range",
     },
   "Examples-Tutorials-Recipes/Recipes/Query-acceleration/Refreshing-select-partitions.mdx":
     {
       ready: true,
       path: "guides/recipes/query-acceleration/refreshing-select-partitions",
-      title: "Refreshing-select-partitions",
+      title: "Refreshing select partitions",
     },
+
   "Examples-Tutorials-Recipes/Recipes/Queries/pagination.mdx": {
     ready: true,
     path: "guides/recipes/queries/pagination",
-    title: "/Queries/pagination",
+    title: "Implementing pagination",
+    meta: {
+      pagination: "Implementing pagination",
+      "getting-unique-values-for-a-field": "Getting unique values for a field",
+    },
   },
   "Examples-Tutorials-Recipes/Recipes/Queries/getting-unique-values-for-a-field.mdx":
     {
       ready: true,
       path: "guides/recipes/queries/getting-unique-values-for-a-field",
-      title: "/Queries/getting-unique-values-for-a-field",
+      title: "Getting unique values for a field",
     },
-  "Examples-Tutorials-Recipes/Recipes/Queries/enforcing-mandatory-filters.mdx":
-    {
-      ready: true,
-      path: "guides/recipes/queries/enforcing-mandatory-filters",
-      title: "/Queries/enforcing-mandatory-filters",
-    },
+
   "Examples-Tutorials-Recipes/Recipes/Data-modeling/using-dynamic-measures.mdx":
     {
       ready: true,
       path: "guides/recipes/data-modeling/using-dynamic-measures",
-      title: "/Data-modeling/using-dynamic-measures",
+      title: "Using dynamic measures",
+      meta: {
+        "dynamic-union-tables": "Using dynamic union tables",
+        "entity-attribute-value":
+          "Implementing Entity-Attribute-Value Model (EAV)",
+        "passing-dynamic-parameters-in-a-query":
+          "Passing dynamic parameters in a query",
+        snapshots: "Implementing data snapshots",
+        "using-dynamic-measures": "Using dynamic measures",
+        percentiles: "Calculating averages and percentiles",
+      },
     },
   "Examples-Tutorials-Recipes/Recipes/Data-modeling/snapshots.mdx": {
     ready: true,
     path: "guides/recipes/data-modeling/snapshots",
-    title: "/Data-modeling/snapshots",
+    title: "Implementing data snapshots",
   },
   "Examples-Tutorials-Recipes/Recipes/Data-modeling/percentiles.mdx": {
     ready: true,
     path: "guides/recipes/data-modeling/percentiles",
-    title: "/Data-modeling/percentiles",
+    title: "Calculating averages and percentiles",
   },
   "Examples-Tutorials-Recipes/Recipes/Data-modeling/passing-dynamic-parameters-in-a-query.mdx":
     {
       ready: true,
       path: "guides/recipes/data-modeling/passing-dynamic-parameters-in-a-query",
-      title: "/Data-modeling/passing-dynamic-parameters-in-a-query",
+      title: "Passing dynamic parameters in a query",
     },
   "Examples-Tutorials-Recipes/Recipes/Data-modeling/entity-attribute-value.mdx":
     {
       ready: true,
       path: "guides/recipes/data-modeling/entity-attribute-value",
-      title: "/Data-modeling/entity-attribute-value",
+      title: "Implementing Entity-Attribute-Value Model (EAV)",
     },
   "Examples-Tutorials-Recipes/Recipes/Data-modeling/dynamic-union-tables.mdx": {
     ready: true,
     path: "guides/recipes/data-modeling/dynamic-union-tables",
-    title: "/Data-modeling/dynamic-union-tables",
+    title: "Using Dynamic Union Tables",
   },
+
   "Examples-Tutorials-Recipes/Recipes/Code-reusability/schema-generation.mdx": {
     ready: true,
     path: "guides/recipes/code-reusability/schema-generation",
-    title: "/Code-reusability/schema-generation",
+    title: "Implementing Schema Generation",
   },
-  "Examples-Tutorials-Recipes/Recipes/Data-sources/using-ssl-connections-to-data-source.mdx":
-    {
-      ready: true,
-      path: "guides/recipes/data-sources/using-ssl-connections-to-data-source",
-      title: "/Data-sources/using-ssl-connections-to-data-source",
-    },
+
   "Examples-Tutorials-Recipes/Recipes/Data-sources/multiple-sources-same-schema.mdx":
     {
       ready: true,
       path: "guides/recipes/data-sources/multiple-sources-same-schema",
-      title: "/Data-sources/multiple-sources-same-schema",
+      title: "Using multiple data sources",
+      meta: {
+        "multiple-sources-same-schema": "Using multiple data sources",
+        "using-ssl-connections-to-data-source":
+          "Using SSL Connections to a data source",
+      },
     },
+  "Examples-Tutorials-Recipes/Recipes/Data-sources/using-ssl-connections-to-data-source.mdx":
+    {
+      ready: true,
+      path: "guides/recipes/data-sources/using-ssl-connections-to-data-source",
+      title: "Using SSL Connections to a data source",
+    },
+
   "Examples-Tutorials-Recipes/Recipes/Auth/Auth0-Guide.mdx": {
     ready: true,
     path: "guides/recipes/auth/auth0-guide",
-    title: "/Auth/Auth0-Guide",
+    title: "Authenticate requests to Cube with Auth0",
+    meta: {
+      "auth0-guide": "Authenticate requests to Cube with Auth0",
+      "aws-cognito": "Authenticate requests to Cube with AWS Cognito",
+    },
   },
   "Examples-Tutorials-Recipes/Recipes/Auth/AWS-Cognito.mdx": {
     ready: true,
     path: "guides/recipes/auth/aws-cognito",
-    title: "/Auth/AWS-Cognito",
+    title: "Authenticate requests to Cube with AWS Cognito",
   },
+
+  "Examples-Tutorials-Recipes/Recipes/Queries/enforcing-mandatory-filters.mdx":
+    {
+      ready: true,
+      path: "guides/recipes/access-control/enforcing-mandatory-filters",
+      title: "Enforcing mandatory filters",
+      meta: {
+        "enforcing-mandatory-filters": "Enforcing mandatory filters",
+        "column-based-access": "Enforcing column-based access",
+        "role-based-access": "Enforcing role-based access",
+        "controlling-access-to-cubes-and-views":
+          "Controlling access to cubes and views",
+        "using-different-schemas-for-tenants":
+          "Using different data models for tenants",
+      },
+    },
   "Examples-Tutorials-Recipes/Recipes/Access-control/using-different-schemas-for-tenants.mdx":
     {
       ready: true,
       path: "guides/recipes/access-control/using-different-schemas-for-tenants",
-      title: "/Access-control/using-different-schemas-for-tenants",
+      title: "Using different data models for tenants",
     },
   "Examples-Tutorials-Recipes/Recipes/Access-control/role-based-access.mdx": {
     ready: true,
     path: "guides/recipes/access-control/role-based-access",
-    title: "/Access-control/role-based-access",
+    title: "Enforcing role-based access",
   },
   "Examples-Tutorials-Recipes/Recipes/Access-control/controlling-access-to-cubes-and-views.mdx":
     {
       ready: true,
       path: "guides/recipes/access-control/controlling-access-to-cubes-and-views",
-      title: "/Access-control/controlling-access-to-cubes-and-views",
+      title: "Controlling access to cubes and views",
     },
   "Examples-Tutorials-Recipes/Recipes/Access-control/column-based-access.mdx": {
     ready: true,
     path: "guides/recipes/access-control/column-based-access",
-    title: "/Access-control/column-based-access",
+    title: "Enforcing column-based access",
   },
+
   "Examples-Tutorials-Recipes/Recipes/Analytics/funnels.mdx": {
     ready: true,
     path: "guides/recipes/analytics/funnels",
-    title: "/Analytics/funnels",
+    title: "Implementing funnel analysis",
+    meta: {
+      "active-users": "Daily, Weekly, Monthly Active Users (DAU, WAU, MAU)",
+      "event-analytics": "Implementing event analytics",
+      "cohort-retention": "Implementing retention analysis & cohorts",
+      funnels: "Implementing Funnel Analysis",
+    },
   },
   "Examples-Tutorials-Recipes/Recipes/Analytics/event-analytics.mdx": {
     ready: true,
     path: "guides/recipes/analytics/event-analytics",
-    title: "/Analytics/event-analytics",
+    title: "Implementing event analytics",
   },
   "Examples-Tutorials-Recipes/Recipes/Analytics/cohort-retention.mdx": {
     ready: true,
     path: "guides/recipes/analytics/cohort-retention",
-    title: "/Analytics/cohort-retention",
+    title: "Implementing retention analysis & cohorts",
   },
   "Examples-Tutorials-Recipes/Recipes/Analytics/active-users.mdx": {
     ready: true,
     path: "guides/recipes/analytics/active-users",
-    title: "/Analytics/active-users",
+    title: "Daily, Weekly, Monthly Active Users (DAU, WAU, MAU)",
   },
 
-  // TODO:
-
-  // "Style-Guide/Overview.mdx": {},
-  // "FAQs/Troubleshooting.mdx": {},
-  // "FAQs/Tips-and-Tricks.mdx": {},
-  // "FAQs/General.mdx": {},
+  "Guides/Style-Guide.mdx": {
+    ready: true,
+    path: "guides/style-guide",
+    title: "Cube Style Guide",
+  },
+  "Guides/Data-Store-Cost-Saving-Guide.mdx": {
+    ready: true,
+    path: "guides/data-store-cost-saving-guide",
+    title: "Data Store Cost Saving Guide",
+  },
+  "FAQs/Troubleshooting.mdx": {
+    ready: true,
+    path: "product/faqs/troubleshooting",
+    title: "Troubleshooting",
+  },
+  "FAQs/Tips-and-Tricks.mdx": {
+    ready: true,
+    path: "product/faqs/tips-and-tricks",
+    title: "Tips and Tricks",
+  },
+  "FAQs/General.mdx": {
+    ready: true,
+    path: "product/faqs/general",
+    title: "General",
+  },
 };
 
 async function main() {
@@ -1214,6 +1293,7 @@ ${redirects.map((r) => `  - ${r}`).join("\n")}
 ---
 
 # ${override.title}
+
 ${data.body
   .replaceAll(/<--\{"id"\s*:\s*"[^"]*"\}-->/g, "")
   .replaceAll(/<\!--(.+)-->/g, "")
