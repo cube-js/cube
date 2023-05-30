@@ -25,7 +25,7 @@ ENV CUBEJS_DOCKER_IMAGE_TAG=latest
 
 RUN DEBIAN_FRONTEND=noninteractive \
     && apt-get update \
-    && apt-get install -y --no-install-recommends rxvt-unicode libssl1.1 python3 \
+    && apt-get install -y --no-install-recommends rxvt-unicode libssl1.1 python3 libpython3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 RUN yarn policies set-version v1.22.19
