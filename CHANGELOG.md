@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.19](https://github.com/cube-js/cube/compare/v0.33.18...v0.33.19) (2023-05-30)
+
+
+### Bug Fixes
+
+* **mssql-driver:** Handle BigInt and other mismatched types ([9cebfef](https://github.com/cube-js/cube/commit/9cebfefbe44d2606195f2f2add0579687c2f4461)), closes [#6658](https://github.com/cube-js/cube/issues/6658)
+
+
+### Features
+
+* **native:** Publish builds with Python 3.9, 3.10 for Linux ([#6666](https://github.com/cube-js/cube/issues/6666)) ([0b1c7b8](https://github.com/cube-js/cube/commit/0b1c7b8bd13947a7c43d4f91d425a9124a4dde77))
+
+
+
+
+
 ## [0.33.18](https://github.com/cube-js/cube/compare/v0.33.17...v0.33.18) (2023-05-29)
 
 
