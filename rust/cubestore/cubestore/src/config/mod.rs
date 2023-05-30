@@ -1783,9 +1783,7 @@ impl Config {
             .await;
 
         self.injector
-            .register_typed_with_default::<dyn MemoryHandler, _, _, _>(async move |_| {
-                MemoryHandlerImpl::new()
-            })
+            .register_typed::<dyn MemoryHandler, _, _, _>(async move |_| MemoryHandlerImpl::new())
             .await;
 
         let query_cache_to_move = query_cache.clone();

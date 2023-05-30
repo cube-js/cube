@@ -337,7 +337,8 @@ where
     runtime.block_on(async move {
         let config = get_worker_config().await;
         let services = config.worker_services().await;
-        startup_worker(&config).await;
+
+        spawn_background_processes(config.clone());
 
         loop {
             let res = rx.recv();
@@ -351,13 +352,11 @@ where
                     let send_res = tx.send(result);
                     if let Err(e) = send_res {
                         error!("Worker message send error: {:?}", e);
-                        shutdown_worker(&config).await;
                         return 0;
                     }
                 }
                 Err(e) => {
                     error!("Worker message receive error: {:?}", e);
-                    shutdown_worker(&config).await;
                     return 0;
                 }
             }
@@ -383,17 +382,10 @@ async fn get_worker_config() -> Config {
     }
 }
 
-async fn startup_worker(config: &Config) {
-    let custom_fn = SELECT_WORKER_STARTUP_FN.read().unwrap();
+fn spawn_background_processes(config: Config) {
+    let custom_fn = SELECT_WORKER_SPAWN_BACKGROUND_FN.read().unwrap();
     if let Some(func) = custom_fn.as_ref() {
-        func(config).await;
-    }
-}
-
-async fn shutdown_worker(config: &Config) {
-    let custom_fn = SELECT_WORKER_SHUTDOWN_FN.read().unwrap();
-    if let Some(func) = custom_fn.as_ref() {
-        func(config).await;
+        func(config);
     }
 }
 
@@ -408,12 +400,7 @@ lazy_static! {
 }
 
 lazy_static! {
-    static ref SELECT_WORKER_STARTUP_FN: std::sync::RwLock<Option<Box<dyn Fn(&Config) -> BoxFuture<'static, ()> + Send + Sync>>> =
-        std::sync::RwLock::new(None);
-}
-
-lazy_static! {
-    static ref SELECT_WORKER_SHUTDOWN_FN: std::sync::RwLock<Option<Box<dyn Fn(&Config) -> BoxFuture<'static, ()> + Send + Sync>>> =
+    static ref SELECT_WORKER_SPAWN_BACKGROUND_FN: std::sync::RwLock<Option<Box<dyn Fn(Config) + Send + Sync>>> =
         std::sync::RwLock::new(None);
 }
 
@@ -432,20 +419,11 @@ pub fn register_select_worker_configure_fn(f: fn() -> BoxFuture<'static, Config>
     *func = Some(Box::new(f));
 }
 
-pub fn register_select_worker_startup_fn(f: fn(&Config) -> BoxFuture<'static, ()>) {
-    let mut func = SELECT_WORKER_STARTUP_FN.write().unwrap();
+pub fn register_select_worker_spawn_background_fn(f: fn(Config)) {
+    let mut func = SELECT_WORKER_SPAWN_BACKGROUND_FN.write().unwrap();
     assert!(
         func.is_none(),
-        "select worker startup function already registered"
-    );
-    *func = Some(Box::new(f));
-}
-
-pub fn register_select_worker_shutdown_fn(f: fn(&Config) -> BoxFuture<'static, ()>) {
-    let mut func = SELECT_WORKER_SHUTDOWN_FN.write().unwrap();
-    assert!(
-        func.is_none(),
-        "select worker shutdown function already registered"
+        "select worker spawn background function already registered"
     );
     *func = Some(Box::new(f));
 }
