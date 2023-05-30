@@ -12,70 +12,8 @@ Superset.
 ## Semantic Layer Sync
 
 It is recommended to use [Semantic Layer Sync][ref-sls] to connect Cube to
-Superset or Preset. Semantic Layer Sync automatically synchronizes the
-[data model][ref-data-model] with datasets in Superset or Preset.
-
-<SuccessBox>
-
-Cube Cloud [has a dedicated page][ref-workspace-sls] to manage Semantic Layer
-Sync: configure syncs, run them, and view synchronization history.
-
-</SuccessBox>
-
-### Superset
-
-Data model is synchronized via [Superset API][superset-api] which uses a
-`user` name and a `password` for authentication. You can use your own user
-name and password or create a new service account. You can copy a `url` at
-any page of your Superset workspace.
-
-Example `cube.js` confguration file for Superset:
-
-```javascript
-module.exports = {
-  semanticLayerSync: () => {
-    return [
-      {
-        type: "superset",
-        name: "Superset Sync",
-        config: {
-          user: "mail@example.com",
-          password: "4dceae-606a03-93ae6dc7",
-          url: "superset.example.com"
-        }
-      }
-    ];
-  }
-};
-```
-
-### Preset
-
-Data model is synchronized via [Preset API][preset-api] which uses API keys
-for authentication. You can generate a new API key in your
-[user settings][preset-user-settings] in Preset to obtain an `api_token` and
-an `api_secret`. You can also copy a `workspace_url` at any page of your
-Preset workspace.
-
-Example `cube.js` confguration file for Preset:
-
-```javascript
-module.exports = {
-  semanticLayerSync: () => {
-    return [
-      {
-        type: "preset",
-        name: "Preset Sync",
-        config: {
-          api_token: "07988f63-c200-499e-97c9-ba137d8918aa",
-          api_secret: "c19fbab4fd4945899795d32898f2e1165bef8e5ee653499e92f083b3d088aecb",
-          workspace_url: "12345678.us1a.app.preset.io"
-        }
-      }
-    ];
-  }
-};
-```
+Superset or Preset. It automatically synchronizes the
+[data model][ref-data-model] between Cube and Superset or Preset.
 
 ## SQL API
 
@@ -214,13 +152,9 @@ Superset uses loose date ranges when generating SQL queries.
 [ref-schema-ref-preagg-allownonstrict]:
   /schema/reference/pre-aggregations#allow-non-strict-date-range-match
 [superset]: https://superset.apache.org/
-[superset-api]: https://superset.apache.org/docs/api/
 [superset-docs-installation-docker]:
   https://superset.apache.org/docs/installation/installing-superset-using-docker-compose
 [preset]: https://preset.io
-[preset-api]: https://api-docs.preset.io
-[preset-user-settings]: https://manage.app.preset.io/app/user
 [ref-sls]: /semantic-layer-sync
 [ref-sql-api]: /backend/sql
 [ref-data-model]: /schema/getting-started
-[ref-workspace-sls]: /workspace/bi-integrations

@@ -10,47 +10,8 @@ company to ask questions and learn from data. There's also a fully-managed
 ## Semantic Layer Sync
 
 It is recommended to use [Semantic Layer Sync][ref-sls] to connect Cube to
-Metabase. Semantic Layer Sync automatically synchronizes the
-[data model][ref-data-model] with datasets in Metabase.
-
-<SuccessBox>
-
-Cube Cloud [has a dedicated page][ref-workspace-sls] to menage Semantic Layer
-Sync: configure syncs, run them, and view synchronization history.
-
-</SuccessBox>
-
-Data model is synchronized via [Metabase API][metabase-api] which uses a
-`user` name and a `password` for authentication. You can use your own user
-name and password or create a new service account. You can copy a `url` at
-any page of your Metabase workspace. 
-
-Example `cube.js` confguration file for Metabase:
-
-```javascript
-module.exports = {
-  semanticLayerSync: () => {
-    return [
-      {
-        type: "metabase",
-        name: "Metabase Sync",
-        config: {
-          user: "mail@example.com",
-          password: "4dceae-606a03-93ae6dc7",
-          url: "example.metabaseapp.com"
-        }
-      }
-    ];
-  }
-};
-```
-
-When a sync is run, Metabase will send an email with a new login
-notification. You can ignore such emails,
-[configure Metabase][metabase-skip-emails] to skip sending them, or use a
-service account with a different email address:
-
-<Screenshot src="https://ucarecdn.com/2e7ac466-73a5-4dd6-9c85-ed98d9df8979/"/>
+Metabase. It automatically synchronizes the [data model][ref-data-model]
+between Cube and Metabase.
 
 ## SQL API
 
@@ -139,9 +100,6 @@ well.
 [ref-sql-api]: /backend/sql
 [metabase-oss]: https://github.com/metabase/metabase
 [metabase]: https://www.metabase.com
-[metabase-api]: https://www.metabase.com/learn/administration/metabase-api#authenticate-your-requests-with-a-session-token
-[metabase-skip-emails]: https://www.metabase.com/docs/latest/configuring-metabase/environment-variables#mb_send_email_on_first_login_from_new_device
 [ref-sls]: /semantic-layer-sync
 [ref-sql-api]: /backend/sql
 [ref-data-model]: /schema/getting-started
-[ref-workspace-sls]: /workspace/bi-integrations
