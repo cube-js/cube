@@ -55,6 +55,27 @@
     "module_path": "native",
     "pkg_path": "."
   },
+  "resources": {
+    "vars": {
+      "libpython_or_fallback": {
+        "default": "fallback",
+        "value": [
+          "libpython",
+          ["3.11", "3.10", "3.9"]
+        ],
+        "constraints": {
+          "platform": [
+            "linux"
+          ]
+        }
+      }
+    },
+    "files": [{
+      "host": "https://github.com/",
+      "path": "/cube-js/cube/releases/download/v${version}/native-${platform}-${arch}-${libc}-${libpython_or_fallback}.tar.gz",
+      "not_found": "Your system is not supported by @cubejs-backend/native, some feature will be unavailable."
+    }]
+  },
   "jest": {
     "testEnvironment": "node",
     "verbose": true,
