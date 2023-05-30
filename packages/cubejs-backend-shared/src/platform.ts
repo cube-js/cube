@@ -71,3 +71,36 @@ export function isNativeSupported(): IsNativeSupportedResult {
 
   return true;
 }
+
+export enum LibraryExistsResult {
+  // We are sure that required library doesnt exist on system
+  None,
+  // We are sure that required library exists
+  Exists,
+  UnableToCheck
+}
+
+export function libraryExists(libraryName: string): LibraryExistsResult {
+  if (process.platform === 'linux') {
+    try {
+      const { status, output } = spawnSync('ldconfig -v', [], {
+        encoding: 'utf8',
+        // Using pipe to protect unexpect STDERR output
+        stdio: 'pipe'
+      });
+      if (status === 0) {
+        if (output.join(' ').includes(libraryName)) {
+          return LibraryExistsResult.Exists;
+        }
+
+        return LibraryExistsResult.None;
+      } else {
+        return LibraryExistsResult.UnableToCheck;
+      }
+    } catch (e: any) {
+      internalExceptions(e);
+    }
+  }
+
+  return LibraryExistsResult.UnableToCheck;
+}
