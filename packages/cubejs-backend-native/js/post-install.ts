@@ -85,7 +85,7 @@ function resolveVars(variables: Record<string, any>): UrlVariable[] {
 function resolvePath(path: string, variables: UrlVariable[]): string {
   path = path.replace('${version}', pkg.version);
   path = path.replace('${platform}', process.platform);
-  path = path.replace('${arch}', 'x64');
+  path = path.replace('${arch}', process.arch);
 
   if (process.platform === 'linux') {
     path = path.replace('${libc}', detectLibc());
