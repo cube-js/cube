@@ -127,11 +127,11 @@ jobs:
     strategy:
       matrix:
         node-version: [14, 16, 18]
-        python-version: [3.11, "false"]
+        python-version: ["3.9", "3.10", "3.11", "false"]
         target: ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"]
       fail-fast: false
     container:
-      image: cubejs/rust-cross:${{ matrix.target }}-23052023
+      image: cubejs/rust-cross:${{ matrix.target }}-30052023
 
     steps:
       - name: Checkout
