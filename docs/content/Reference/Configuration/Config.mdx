@@ -760,89 +760,6 @@ module.exports = {
 This property controls how often Websocket client subscriptions are refreshed.
 Defaults to `5000`.
 
-### <--{"id" : "Options Reference"}--> semanticLayerSync
-
-This function provides the configuration for [Semantic Layer Sync][ref-sls].
-
-Called once when a refresh worker starts. Can be an `async` function.
-Returns an array with options for specific BI tools:
-
-```typescript
-semanticLayerSync: () =>
-  SemanticLayerSyncConfig[] |
-  Promise<SemanticLayerSyncConfig[]>;
-
-type SemanticLayerSyncConfig =
-  PresetSemanticLayerSyncConfig |
-  SupersetSemanticLayerSyncConfig |
-  MetabaseSemanticLayerSyncConfig;
-
-// Semantic Layer Sync with Preset
-interface PresetSemanticLayerSyncConfig {
-  name: string;
-  active?: boolean;
-  type: "preset";
-  config: {
-    api_token: string;
-    api_secret: string;
-    workspace_url: string;
-  }
-}
-
-// Semantic Layer Sync with Apache Superset
-interface SupersetSemanticLayerSyncConfig {
-  name: string;
-  active?: boolean;
-  type: "superset";
-  config: {
-    api_token: string;
-    api_secret: string;
-    url: string;
-  }
-}
-
-// Semantic Layer Sync with Metabase
-interface MetabaseSemanticLayerSyncConfig {
-  name: string;
-  active?: boolean;
-  type: "metabase";
-  config: {
-    user: string;
-    password: string;
-    url: string;
-  }
-}
-```
-
-Example configuration with an active Preset sync and a disabled Metabase sync:
-
-```javascript
-module.exports = {
-  semanticLayerSync: () => {
-    return [
-      {
-        type: "preset",
-        name: "Preset Sync",
-        config: {
-          api_token: "07988f63-c200-499e-97c9-ba137d8918aa",
-          api_secret: "c19fbab4fd4945899795d32898f2e1165bef8e5ee653499e92f083b3d088aecb",
-          workspace_url: "12345678.us1a.app.preset.io"
-        }
-      }, {
-        type: "metabase",
-        name: "Metabase Sync",
-        active: false,
-        config: {
-          user: "mail@example.com",
-          password: "4dceae-606a03-93ae6dc7",
-          url: "example.metabaseapp.com"
-        }
-      }
-    ];
-  }
-};
-```
-
 ## QueueOptions
 
 <WarningBox>
@@ -943,4 +860,3 @@ module.exports = {
 [ref-exec-environment-globals]:
   /schema/reference/execution-environment#node-js-globals-process-env-console-log-and-others
 [ref-environment-variables]: /reference/environment-variables
-[ref-sls]: /semantic-layer-sync
