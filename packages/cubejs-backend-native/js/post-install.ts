@@ -3,7 +3,8 @@ import 'source-map-support/register';
 import {
   detectLibc,
   displayCLIError,
-  displayCLIWarning, downloadAndExtractFile,
+  displayCLIWarning,
+  downloadAndExtractFile,
   libraryExists,
   LibraryExistsResult,
 } from '@cubejs-backend/shared';
@@ -18,6 +19,10 @@ interface UrlVariable {
 function resolveConstraint(name: string, constraintDetails: any): boolean {
   if (name === 'platform') {
     return constraintDetails.includes(process.platform);
+  }
+
+  if (name === 'arch') {
+    return constraintDetails.includes(process.arch);
   }
 
   displayCLIWarning(`Unknown constraint name: ${name}, pass: false`);
@@ -37,6 +42,10 @@ function resolveVariableValue(value: any): string | false {
 
       return false;
     }
+  }
+
+  if (value === 'libc') {
+    return resolveLibc();
   }
 
   displayCLIWarning(`Unable to resolve value, unknown value ${value}`);
@@ -82,16 +91,19 @@ function resolveVars(variables: Record<string, any>): UrlVariable[] {
   return res;
 }
 
+function resolveLibc(): string {
+  if (process.platform === 'linux') {
+    return detectLibc() === 'gnu' ? 'glibc' : 'musl';
+  }
+
+  return 'unknown';
+}
+
 function resolvePath(path: string, variables: UrlVariable[]): string {
   path = path.replace('${version}', pkg.version);
   path = path.replace('${platform}', process.platform);
   path = path.replace('${arch}', process.arch);
-
-  if (process.platform === 'linux') {
-    path = path.replace('${libc}', detectLibc());
-  } else {
-    path = path.replace('${libc}', 'unknown');
-  }
+  path = path.replace('${libc}', resolveLibc());
 
   for (const variable of variables) {
     path = variable.resolve(path);
