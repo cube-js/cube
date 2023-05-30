@@ -46,8 +46,9 @@ module.exports = {
 ```
 
 When a sync is run, Metabase will send an email with a new login
-notification. You can ignore such emails, create an email rule to delete them,
-or use a service account with a different email address:
+notification. You can ignore such emails,
+[configure Metabase][metabase-skip-emails] to skip sending them, or use a
+service account with a different email address:
 
 <Screenshot src="https://ucarecdn.com/2e7ac466-73a5-4dd6-9c85-ed98d9df8979/"/>
 
@@ -139,6 +140,7 @@ well.
 [metabase-oss]: https://github.com/metabase/metabase
 [metabase]: https://www.metabase.com
 [metabase-api]: https://www.metabase.com/learn/administration/metabase-api#authenticate-your-requests-with-a-session-token
+[metabase-skip-emails]: https://www.metabase.com/docs/latest/configuring-metabase/environment-variables#mb_send_email_on_first_login_from_new_device
 [ref-sls]: /semantic-layer-sync
 [ref-sql-api]: /backend/sql
 [ref-data-model]: /schema/getting-started
