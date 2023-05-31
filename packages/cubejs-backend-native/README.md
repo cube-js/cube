@@ -16,7 +16,7 @@ Native module for Cube.js (binding to Rust codebase).
 
 [Learn more](https://github.com/cube-js/cube.js#getting-started)
 
-There are two different types of builds: with python and fallback.
+There are two different types of builds: with Python, and a fallback.
 If Cube cannot detect a `libpython` library or your system is not supported, it will use a fallback build.
 
 ### With python
