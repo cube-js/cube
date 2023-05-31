@@ -16,6 +16,29 @@ Native module for Cube.js (binding to Rust codebase).
 
 [Learn more](https://github.com/cube-js/cube.js#getting-started)
 
+There are two different type of builds: with python and fallback.
+If installer script cannot detect `libpython` library or you system is not supported it will use fallback build.
+
+### With python
+
+Supported python versions: `3.11`, `3.10`, `3.9`. This builds requires `libpython` library.
+
+|          |   `linux-gnu`   |   `linux-musl`   |  `darwin`   |    `win32`    |
+| -------- |:---------------:|:----------------:|:-----------:|:-------------:|
+| `x86`    |       N/A       |       N/A        |     N/A     |      N/A      |
+| `x86_64` |        ✅        |       N/A        |     N/A     |      N/A      |
+| `arm64`  |       N/A       |       N/A        |     N/A     |      N/A      |
+
+### Fallback (without python)
+
+|          | `linux-gnu` | `linux-musl`  | `darwin` | `win32` |
+| -------- | :---------: |:-------------:| :------: | :-----: |
+| `x86`    |     N/A     |      N/A      |   N/A    |   N/A   |
+| `x86_64` |     ✅      |      N/A      |    ✅    |   ✅    |
+| `arm64`  |     ✅      |               |  ✅[1]   |         |
+
+[1] It can be launched using Rosetta 2 via the `x86_64-apple` binary.
+
 ### License
 
 Cube.js Native is [Apache 2.0 licensed](./LICENSE).
