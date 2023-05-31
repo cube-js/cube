@@ -60,7 +60,7 @@ export function isNativeSupported(): IsNativeSupportedResult {
     if (detectLibc() === 'musl') {
       displayCLIWarningOnce(
         'is-native-supported',
-        'Unable to load native. You are using linux distro with Musl which is not supported. Read more: ' +
+        'Unable to load native extension. You are using a Linux distro with Musl which is not supported. Read more: ' +
         'https://github.com/cube-js/cube/blob/master/packages/cubejs-backend-native/README.md#supported-architectures-and-platforms'
       );
 
