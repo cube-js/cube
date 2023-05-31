@@ -26,7 +26,7 @@ Supported python versions: `3.11`, `3.10`, `3.9`. This builds requires `libpytho
 |          |   `linux-gnu`   |   `linux-musl`   |  `darwin`   |    `win32`    |
 | -------- |:---------------:|:----------------:|:-----------:|:-------------:|
 | `x86`    |       N/A       |       N/A        |     N/A     |      N/A      |
-| `x86_64` |        ✅        |       N/A        |     N/A     |      N/A      |
+| `x86_64` |        ✅       |       N/A        |     N/A     |      N/A      |
 | `arm64`  |       N/A       |       N/A        |     N/A     |      N/A      |
 
 ### Fallback (without python)
@@ -35,7 +35,7 @@ Supported python versions: `3.11`, `3.10`, `3.9`. This builds requires `libpytho
 | -------- | :---------: |:-------------:| :------: | :-----: |
 | `x86`    |     N/A     |      N/A      |   N/A    |   N/A   |
 | `x86_64` |     ✅      |      N/A      |    ✅    |   ✅    |
-| `arm64`  |     ✅      |               |  ✅[1]   |         |
+| `arm64`  |     ✅      |      N/A      |  ✅[1]   |         |
 
 [1] It can be launched using Rosetta 2 via the `x86_64-apple` binary.
 
