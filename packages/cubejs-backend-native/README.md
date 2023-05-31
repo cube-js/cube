@@ -16,12 +16,12 @@ Native module for Cube.js (binding to Rust codebase).
 
 [Learn more](https://github.com/cube-js/cube.js#getting-started)
 
-There are two different type of builds: with python and fallback.
-If installer script cannot detect `libpython` library or you system is not supported it will use fallback build.
+There are two different types of builds: with python and fallback.
+If Cube cannot detect a `libpython` library or your system is not supported, it will use a fallback build.
 
 ### With python
 
-Supported python versions: `3.11`, `3.10`, `3.9`. This builds requires `libpython` library.
+Supported python versions: `3.11`, `3.10`, `3.9`.
 
 |          |   `linux-gnu`   |   `linux-musl`   |  `darwin`   |    `win32`    |
 | -------- |:---------------:|:----------------:|:-----------:|:-------------:|
