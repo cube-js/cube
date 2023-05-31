@@ -40,9 +40,6 @@ const config: DocsThemeConfig = {
     //   return (<>{normalizedTitle}</>);
     // },
   },
-  search: {
-    component: <SearchTrigger>Search</SearchTrigger>,
-  },
   gitTimestamp: () => null,
   footer: {
     component: <Footer />,
