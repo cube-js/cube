@@ -282,7 +282,7 @@ export class ServerContainer {
 
       if (isFallbackBuild()) {
         throw new Error(
-          'Unable to load python config, because you are using fallback build of native extension. Read more: ' +
+          'Unable to load Python configuration because you are using the fallback build of native extension. Read more: ' +
           'https://github.com/cube-js/cube/blob/master/packages/cubejs-backend-native/README.md#supported-architectures-and-platforms'
         );
       }
