@@ -275,7 +275,7 @@ export class ServerContainer {
       const supported = isNativeSupported();
       if (supported !== true) {
         throw new Error(
-          `Native extension is required to load python configs. ${supported.reason}. Read more: ` +
+          `Native extension is required to load Python configuration. ${supported.reason}. Read more: ` +
           'https://github.com/cube-js/cube/blob/master/packages/cubejs-backend-native/README.md#supported-architectures-and-platforms'
         );
       }
