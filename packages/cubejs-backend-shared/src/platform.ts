@@ -83,7 +83,7 @@ export enum LibraryExistsResult {
 export function libraryExists(libraryName: string): LibraryExistsResult {
   if (process.platform === 'linux') {
     try {
-      const { status, output } = spawnSync('ldconfig -v', [], {
+      const { status, output } = spawnSync('ldconfig', ['-v'], {
         encoding: 'utf8',
         // Using pipe to protect unexpect STDERR output
         stdio: 'pipe'
