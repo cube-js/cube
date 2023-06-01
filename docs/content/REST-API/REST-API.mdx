@@ -9,13 +9,21 @@ menuOrder: 1
 REST API enables Cube to deliver data over the HTTP protocol to certain kinds
 of data applications, including but not limited to the following ones:
 
-* front-end applications
-* some data notebooks, e.g., [Observable][ref-observable]
-* some AI-based applications, e.g., [Delphi][ref-delphi]
-* automated jobs
+* Most commonly, front-end applications
+* Some [data notebooks][ref-notebooks], e.g., [Observable][ref-observable]
+* Some AI-based applications, e.g., [Delphi][ref-delphi]
+* [Low-code tools][ref-low-code], e.g., [Retool][ref-retool]
+* Automated jobs
 
-Often, the REST API will be used to enable [embedded analytics][cube-ea] and
+Often, the REST API is used to enable [embedded analytics][cube-ea] and
 [real-time analytics][cube-rta] use cases.
+
+<InfoBox>
+
+If you've chosen [GraphQL][graphql] as a query language for your front-end
+application, consider using the [GraphQL API][ref-graphql-api] that Cube also provides.
+
+</InfoBox>
 
 ## Configuration
 
@@ -196,8 +204,11 @@ example, the following query will retrieve rows 101-200 from the `Orders` cube:
 [ref-config-cors]: /config#http
 [ref-schema-ref-cube-refresh-key]: /schema/reference/cube#refresh-key
 [ref-security]: /security
+[ref-notebooks]: /config/downstream#notebooks
 [ref-observable]: /config/downstream/observable
 [ref-delphi]: /config/downstream/delphi
+[ref-low-code]: /config/downstream#low-code-tools-internal-tool-builders
+[ref-retool]: /config/downstream/retool
 [ref-conf-basepath]: /config#options-reference-base-path
 [ref-conf-contexttoapiscopes]: /config#options-reference-context-to-api-scopes
 [ref-ref-load]: /rest-api#v-1-load
@@ -206,5 +217,7 @@ example, the following query will retrieve rows 101-200 from the `Orders` cube:
 [ref-ref-rsr]: /rest-api#v-1-run-scheduled-refresh
 [ref-ref-paj]: /rest-api#v-1-pre-aggregations-jobs
 [ref-security-context]: /security/context
+[ref-graphql-api]: /http-api/graphql
 [cube-ea]: https://cube.dev/use-cases/embedded-analytics
 [cube-rta]: https://cube.dev/use-cases/real-time-analytics
+[graphql]: https://graphql.org
