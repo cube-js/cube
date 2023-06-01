@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.23](https://github.com/cube-js/cube/compare/v0.33.22...v0.33.23) (2023-06-01)
+
+
+### Bug Fixes
+
+* **ci:** Publish - cubestore use gtar on windows ([9feaf49](https://github.com/cube-js/cube/commit/9feaf4944843dde200229dbe56ef3b5ba9069236))
+* **docker:** Install libpython3-dev on building step ([11245d2](https://github.com/cube-js/cube/commit/11245d201666c56b07c277b57f23ec99a812516a))
+
+
+
+
+
 ## [0.33.22](https://github.com/cube-js/cube/compare/v0.33.21...v0.33.22) (2023-05-31)
 
 
