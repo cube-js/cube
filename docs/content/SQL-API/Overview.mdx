@@ -18,12 +18,8 @@ of data applications, including but not limited to the following ones:
 * [Low-code tools][ref-low-code], e.g., [Retool][ref-retool]
 * Automated jobs
 
-Often, the REST API is used to enable [embedded analytics][cube-ea] and
-[real-time analytics][cube-rta] use cases.
-
-The Cube SQL API allows querying Cube via Postgres-compatible SQL. It enables
-the use of BI applications, Python notebooks, reverse ETL tools, and other
-downstream tools on top of Cube.
+Often, the SQL API is used to enable internal or self-serve
+[business intelligence][cube-issbi] use cases.
 
 ### <--{"id" : "SQL API"}--> Supported Tools
 
@@ -44,8 +40,12 @@ Cube SQL API has been tested with
 - Jupyter notebook
 - Hightouch
 
+<InfoBox>
+
 Please see [this GitHub issue](https://github.com/cube-js/cube/issues/3906) for
 the tools roadmap and to suggest and vote for tools of your interest.
+
+</InfoBox>
 
 ## Querying Fundamentals
 
@@ -528,3 +528,4 @@ WHERE is_completed = true
 [ref-low-code]: /config/downstream#low-code-tools-internal-tool-builders
 [ref-retool]: /config/downstream/retool
 [postgres-protocol]: https://www.postgresql.org/docs/current/protocol.html
+[cube-issbi]: https://cube.dev/use-cases/semantic-layer
