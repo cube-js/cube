@@ -193,7 +193,7 @@ class ApiGateway {
     app.get('/livez', guestMiddlewares, cachedHandler(this.liveness));
 
     /** **************************************************************
-     * Graphql scope                                                 *
+     * graphql scope                                                 *
      *************************************************************** */
 
     app.use(
@@ -239,7 +239,7 @@ class ApiGateway {
     );
 
     /** **************************************************************
-     * Data scope                                                    *
+     * data scope                                                    *
      *************************************************************** */
 
     app.get(`${this.basePath}/v1/load`, userMiddlewares, (async (req, res) => {
@@ -302,6 +302,10 @@ class ApiGateway {
       });
     }));
 
+    /** **************************************************************
+     * meta scope                                                    *
+     *************************************************************** */
+
     app.get(
       `${this.basePath}/v1/meta`,
       userMiddlewares,
@@ -320,6 +324,7 @@ class ApiGateway {
       }
     );
 
+    // Used by Rollup Designer
     app.post(
       `${this.basePath}/v1/pre-aggregations/can-use`,
       [
@@ -352,7 +357,7 @@ class ApiGateway {
     );
 
     /** **************************************************************
-     * Jobs scope                                                    *
+     * jobs scope                                                    *
      *************************************************************** */
 
     app.get(
@@ -2007,7 +2012,7 @@ class ApiGateway {
       throw new CubejsHandlerError(
         403,
         'Forbidden',
-        `Api scope is missed: ${scope}`
+        `API scope is missing: ${scope}`
       );
     }
   }
