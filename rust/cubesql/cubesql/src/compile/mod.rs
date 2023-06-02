@@ -11234,6 +11234,42 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_current_date() -> Result<(), CubeError> {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT CURRENT_DATE AS \"COL\"".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = &query_plan.print(true).unwrap();
+
+        let re = Regex::new(r#"Date32\("\d+"\)"#).unwrap();
+        let logical_plan = re
+            .replace_all(logical_plan, "Date32(\"0\")")
+            .as_ref()
+            .to_string();
+
+        assert_eq!(
+            logical_plan,
+            "Projection: Date32(\"0\") AS COL\
+            \n  EmptyRelation",
+        );
+
+        insta::assert_snapshot!(
+            "current_date",
+            execute_query(
+                "SELECT current_timestamp::date = current_date".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_union_ctes() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "union_ctes",
