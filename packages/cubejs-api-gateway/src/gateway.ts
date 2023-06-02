@@ -119,7 +119,7 @@ class ApiGateway {
   protected readonly contextToApiScopesFn: ContextToApiScopesFn;
 
   protected readonly contextToApiScopesDefFn: ContextToApiScopesFn =
-    async () => ['liveliness', 'graphql', 'meta', 'data'];
+    async () => ['graphql', 'meta', 'data'];
 
   protected readonly checkAuthMiddleware: CheckAuthMiddlewareFn;
 
@@ -181,11 +181,10 @@ class ApiGateway {
     ];
 
     /** **************************************************************
-     * Liveliness scope                                              *
+     * No scope                                              *
      *************************************************************** */
 
     // @todo Should we pass requestLoggerMiddleware?
-    // @todo Should we add scope assert here?
 
     const guestMiddlewares = [];
 
@@ -1979,7 +1978,7 @@ class ApiGateway {
           );
         } else {
           scopes.forEach((p) => {
-            if (['liveliness', 'graphql', 'meta', 'data', 'jobs'].indexOf(p) === -1) {
+            if (['graphql', 'meta', 'data', 'jobs'].indexOf(p) === -1) {
               throw new Error(
                 `A user-defined contextToApiScopes function returns a wrong scope: ${p}`
               );

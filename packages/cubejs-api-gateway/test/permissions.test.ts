@@ -73,7 +73,7 @@ describe('Gateway Api Scopes', () => {
     apiGateway.release();
   });
 
-  test('Liveliness declined', async () => {
+  test('/readyz and /livez accessible', async () => {
     const { app, apiGateway } = createApiGateway({
       contextToApiScopes: async () => new Promise((resolve) => {
         resolve(['graphql', 'meta', 'data', 'jobs']);
@@ -96,7 +96,7 @@ describe('Gateway Api Scopes', () => {
   test('GraphQL declined', async () => {
     const { app, apiGateway } = createApiGateway({
       contextToApiScopes: async () => new Promise((resolve) => {
-        resolve(['liveliness', 'meta', 'data', 'jobs']);
+        resolve(['meta', 'data', 'jobs']);
       }),
     });
 
@@ -114,7 +114,7 @@ describe('Gateway Api Scopes', () => {
   test('Meta declined', async () => {
     const { app, apiGateway } = createApiGateway({
       contextToApiScopes: async () => new Promise((resolve) => {
-        resolve(['liveliness', 'graphql', 'data', 'jobs']);
+        resolve(['graphql', 'data', 'jobs']);
       }),
     });
 
@@ -140,7 +140,7 @@ describe('Gateway Api Scopes', () => {
   test('Data declined', async () => {
     const { app, apiGateway } = createApiGateway({
       contextToApiScopes: async () => new Promise((resolve) => {
-        resolve(['liveliness', 'graphql', 'meta', 'jobs']);
+        resolve(['graphql', 'meta', 'jobs']);
       }),
     });
 
@@ -208,7 +208,7 @@ describe('Gateway Api Scopes', () => {
   test('Jobs declined', async () => {
     const { app, apiGateway } = createApiGateway({
       contextToApiScopes: async () => new Promise((resolve) => {
-        resolve(['liveliness', 'graphql', 'data', 'meta']);
+        resolve(['graphql', 'data', 'meta']);
       }),
     });
 

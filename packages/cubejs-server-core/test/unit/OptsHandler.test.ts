@@ -1057,7 +1057,7 @@ describe('OptsHandler class', () => {
     const permissions = await gateway.contextToApiScopesFn();
     expect(permissions).toBeDefined();
     expect(Array.isArray(permissions)).toBeTruthy();
-    expect(permissions).toEqual(['liveliness', 'graphql', 'meta', 'data']);
+    expect(permissions).toEqual(['graphql', 'meta', 'data']);
   });
 
   test('must set env api scopes if fn not specified', async () => {
@@ -1094,7 +1094,6 @@ describe('OptsHandler class', () => {
     process.env.CUBEJS_PRE_AGGREGATIONS_BUILDER = 'false';
 
     type ApiScopes =
-      'liveliness' |
       'graphql' |
       'meta' |
       'data' |
@@ -1128,7 +1127,6 @@ describe('OptsHandler class', () => {
     process.env.CUBEJS_PRE_AGGREGATIONS_BUILDER = 'false';
 
     type ApiScopes =
-      'liveliness' |
       'graphql' |
       'meta' |
       'data' |
@@ -1144,7 +1142,7 @@ describe('OptsHandler class', () => {
         database: 'database',
       }),
       contextToApiScopes: async () => new Promise((resolve) => {
-        resolve(['liveliness', 'graphql', 'meta', 'data', 'job'] as unknown as ApiScopes[]);
+        resolve(['graphql', 'meta', 'data', 'job'] as unknown as ApiScopes[]);
       }),
     });
 
@@ -1172,7 +1170,7 @@ describe('OptsHandler class', () => {
         database: 'database',
       }),
       contextToApiScopes: async () => new Promise((resolve) => {
-        resolve(['liveliness', 'graphql', 'meta', 'data', 'jobs']);
+        resolve(['graphql', 'meta', 'data', 'jobs']);
       }),
     });
 
@@ -1180,6 +1178,6 @@ describe('OptsHandler class', () => {
     const permissions = await gateway.contextToApiScopesFn();
     expect(permissions).toBeDefined();
     expect(Array.isArray(permissions)).toBeTruthy();
-    expect(permissions).toEqual(['liveliness', 'graphql', 'meta', 'data', 'jobs']);
+    expect(permissions).toEqual(['graphql', 'meta', 'data', 'jobs']);
   });
 });
