@@ -161,7 +161,7 @@ jobs:
     timeout-minutes: 90
     env:
       NODE_PRE_GYP_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    name: Build ${{ matrix.os-version }} ${{ matrix.node-version }}
+    name: Build ${{ matrix.os-version }} ${{ matrix.node-version }} Python ${{ matrix.python-version }}
     strategy:
       matrix:
         node-version: [16.x]
