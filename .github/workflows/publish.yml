@@ -172,10 +172,13 @@ jobs:
             package_target_arch: x64
             package_target_platform: win32
             package_target_libc: unknown
+            tar_executable: tar
           - os: macos-11
             package_target_arch: x64
             package_target_platform: darwin
             package_target_libc: unknown
+            # bsd tar has a different format with Sparse files which breaks download script
+            tar_executable: gtar
       fail-fast: false
 
     steps:
@@ -244,7 +247,7 @@ jobs:
           rm -rf native
           mkdir native
           cp index.node native/index.node
-          tar czvf native.tar.gz native
+          ${{ matrix.tar_executable }} -czvf native.tar.gz native
       - name: Upload to Release
         uses: svenstaro/upload-release-action@v2
         with:
