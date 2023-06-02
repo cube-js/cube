@@ -3567,7 +3567,6 @@ pub fn register_fun_stubs(mut ctx: SessionContext) -> SessionContext {
         rettyp = Utf8,
         vol = Stable
     );
-    register_fun_stub!(udf, "current_date", argc = 0, rettyp = Date32, vol = Stable);
     register_fun_stub!(udf, "current_query", argc = 0, rettyp = Utf8, vol = Stable);
     register_fun_stub!(udf, "current_role", argc = 0, rettyp = Utf8, vol = Stable);
     register_fun_stub!(
