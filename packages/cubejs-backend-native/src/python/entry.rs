@@ -41,6 +41,9 @@ fn python_load_config(mut cx: FunctionContext) -> JsResult<JsPromise> {
 }
 
 pub fn python_register_module(mut cx: ModuleContext) -> NeonResult<()> {
+    #[cfg(target_os = "linux")]
+    super::linux_dylib::load_python_symbols();
+
     cx.export_function("pythonLoadConfig", python_load_config)?;
 
     Ok(())
