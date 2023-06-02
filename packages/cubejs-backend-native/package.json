@@ -34,7 +34,6 @@
   ],
   "devDependencies": {
     "@cubejs-backend/testing-shared": "^0.33.21",
-    "@cubejs-infra/node-pre-gyp-github": "^1.0.3",
     "@types/jest": "^26",
     "@types/node": "^14",
     "cargo-cp-artifact": "^0.1",
@@ -45,16 +44,7 @@
   "dependencies": {
     "@cubejs-backend/cubesql": "^0.33.23",
     "@cubejs-backend/shared": "^0.33.21",
-    "@cubejs-infra/post-installer": "^0.0.7",
-    "@mapbox/node-pre-gyp": "^1"
-  },
-  "binary": {
-    "module_name": "index",
-    "host": "https://github.com/cube-js/cube/releases/download/",
-    "remote_path": "v{version}",
-    "package_name": "native-{platform}-{arch}-{libc}-fallback.tar.gz",
-    "module_path": "native",
-    "pkg_path": "."
+    "@cubejs-infra/post-installer": "^0.0.7"
   },
   "resources": {
     "vars": {
