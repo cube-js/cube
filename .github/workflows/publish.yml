@@ -161,11 +161,24 @@ jobs:
     timeout-minutes: 90
     env:
       NODE_PRE_GYP_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    name: Build ${{ matrix.os-version }} ${{ matrix.node-version }}
+    name: Build ${{ matrix.os-version }} ${{ matrix.node-version }} Python ${{ matrix.python-version }}
     strategy:
       matrix:
         node-version: [16.x]
+        python-version: ["fallback"]
         os-version: [windows-2019, macos-11]
+        include:
+          - os: windows-2019
+            package_target_arch: x64
+            package_target_platform: win32
+            package_target_libc: unknown
+            tar_executable: tar
+          - os: macos-11
+            package_target_arch: x64
+            package_target_platform: darwin
+            package_target_libc: unknown
+            # bsd tar has a different format with Sparse files which breaks download script
+            tar_executable: gtar
       fail-fast: false
 
     steps:
@@ -183,8 +196,9 @@ jobs:
           components: rustfmt
       - name: Install Python
         uses: actions/setup-python@v4
+        if: (matrix.python-version != 'fallback')
         with:
-          python-version: '3.11'
+          python-version: ${{ matrix.python-version }}
       - name: Install Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v3
         with:
@@ -218,16 +232,31 @@ jobs:
         run: yarn tsc
       - name: Build native
         run: cd packages/cubejs-backend-native && npm run native:build-release
-      - name: Upload artifact
-        uses: nick-invision/retry@v2
+      - name: Build native (fallback)
+        if: (matrix.python-version == 'fallback')
+        run: cd packages/cubejs-backend-native && npm run native:build-release
+      - name: Build native (with Python)
+        if: (matrix.python-version != 'fallback')
+        env:
+          PYO3_PYTHON: python${{ matrix.python-version }}
+        run: cd packages/cubejs-backend-native && npm run native:build-release-python
+      - name: Archive release asset
+        shell: bash
+        run: |
+          cd packages/cubejs-backend-native
+          rm -rf native
+          mkdir native
+          cp index.node native/index.node
+          ${{ matrix.tar_executable }} -czvf native.tar.gz native
+      - name: Upload to Release
+        uses: svenstaro/upload-release-action@v2
         with:
-          max_attempts: 10
-          retry_on: error
-          timeout_minutes: 5
-          retry_wait_seconds: 15
-          command: |
-            cd packages/cubejs-backend-native
-            npm run upload-binary
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: packages/cubejs-backend-native/native.tar.gz
+          # Example: native-linux-arm64-glibc.tar.gz
+          asset_name: native-${{ matrix.package_target_platform }}-${{ matrix.package_target_arch }}-${{ matrix.package_target_libc }}-${{ matrix.python-version }}.tar.gz
+          tag: ${{ github.ref }}
+          overwrite: true
 
   docker-default:
     needs: [npm, cubestore_linux, native_linux]

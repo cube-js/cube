@@ -18,8 +18,6 @@
     "native:build-debug-python": "npm run native:build -- --features python",
     "native:build-release-python": "npm run native:build -- --release --features python",
     "postinstall": "post-installer || echo 'Your system is not supported by @cubejs-backend/native, some feature will be unavailable.'",
-    "upload-binary-cross": "mkdir -p native && cp index.node native/index.node && node-pre-gyp package --target_arch=$PACKAGE_TARGET_ARCH --target_platform=$PACKAGE_TARGET_PLATFORM --target_libc=$PACKAGE_TARGET_LIBC && node-pre-gyp-github publish",
-    "upload-binary": "mkdir -p native && cp index.node native/index.node && node-pre-gyp package && node-pre-gyp-github publish",
     "test:server": "CUBEJS_NATIVE_INTERNAL_DEBUG=true CUBESQL_LOG_LEVEL=trace CUBESQL_PG_PORT=5555 node dist/test/server.js",
     "test:server:stream": "CUBESQL_STREAM_MODE=true CUBESQL_LOG_LEVEL=error CUBESQL_PG_PORT=5555 node dist/test/server.js",
     "test:python": "CUBEJS_NATIVE_INTERNAL_DEBUG=true CUBESQL_LOG_LEVEL=trace CUBESQL_PG_PORT=5555 node dist/test/python.js",
@@ -34,7 +32,6 @@
   ],
   "devDependencies": {
     "@cubejs-backend/testing-shared": "^0.33.21",
-    "@cubejs-infra/node-pre-gyp-github": "^1.0.3",
     "@types/jest": "^26",
     "@types/node": "^14",
     "cargo-cp-artifact": "^0.1",
@@ -45,16 +42,7 @@
   "dependencies": {
     "@cubejs-backend/cubesql": "^0.33.23",
     "@cubejs-backend/shared": "^0.33.21",
-    "@cubejs-infra/post-installer": "^0.0.7",
-    "@mapbox/node-pre-gyp": "^1"
-  },
-  "binary": {
-    "module_name": "index",
-    "host": "https://github.com/cube-js/cube/releases/download/",
-    "remote_path": "v{version}",
-    "package_name": "native-{platform}-{arch}-{libc}-fallback.tar.gz",
-    "module_path": "native",
-    "pkg_path": "."
+    "@cubejs-infra/post-installer": "^0.0.7"
   },
   "resources": {
     "vars": {
