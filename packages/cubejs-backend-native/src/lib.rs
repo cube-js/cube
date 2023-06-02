@@ -1,5 +1,7 @@
 #![feature(async_closure)]
 
+extern crate findshlibs;
+
 mod auth;
 mod channel;
 mod config;
