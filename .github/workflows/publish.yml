@@ -193,8 +193,9 @@ jobs:
           components: rustfmt
       - name: Install Python
         uses: actions/setup-python@v4
+        if: (matrix.python-version != 'fallback')
         with:
-          python-version: '3.11'
+          python-version: ${{ matrix.python-version }}
       - name: Install Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v3
         with:
