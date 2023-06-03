@@ -3,6 +3,7 @@ name: Build
 on:
   push:
     paths:
+      - '.github/actions/smoke.sh'
       - '.github/workflows/push.yml'
       - '.github/workflows/master.yml'
       - 'packages/**'
