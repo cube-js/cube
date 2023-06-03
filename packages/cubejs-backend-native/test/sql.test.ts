@@ -71,7 +71,10 @@ describe('SQLInterface', () => {
         session,
       });
 
-      return {};
+      return {
+        cubeNameToDataSource: {},
+        dataSourceToSqlGenerator: {},
+      };
     });
 
     const checkAuth = jest.fn(async ({ request, user }) => {
