@@ -50,6 +50,7 @@ fn get_job_type_priority(j: &JobType) -> u32 {
         JobType::FinishMultiSplit => 1000,
         JobType::RepartitionChunk => 1000,
         JobType::InMemoryChunksCompaction => 10000,
+        JobType::NodeInMemoryChunksCompaction(_) => 10000,
     }
 }
 
