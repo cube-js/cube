@@ -8,6 +8,7 @@ class MockDriver {
     this.tablesReady = [];
     this.executedQueries = [];
     this.cancelledQueries = [];
+    this.droppedTables = [];
     this.csvImport = csvImport;
     this.now = new Date().getTime();
     this.schemaData = schemaData;
@@ -95,8 +96,22 @@ class MockDriver {
   }
 
   async dropTable(tableName) {
+    if (this.droppedTables.indexOf(tableName) !== -1) {
+      throw new Error(`Can't drop table twice: ${tableName}`);
+    }
+    this.droppedTables.push(tableName);
+    console.log(`Driver drops ${tableName}`);
+    if (!this.tablesObj.find(t => (t.tableName || t) === tableName)) {
+      throw new Error(`Can't drop missing table: ${tableName}`);
+    }
+    await this.query(`DROP TABLE ${tableName}`);
+    if (this.tablesDropDelay) {
+      await this.delay(this.tablesDropDelay);
+    }
+    if (!this.tablesObj.find(t => (t.tableName || t) === tableName)) {
+      throw new Error(`Can't drop missing table: ${tableName}`);
+    }
     this.tablesObj = this.tablesObj.filter(t => (t.tableName || t) !== tableName);
-    return this.query(`DROP TABLE ${tableName}`);
   }
 
   async downloadTable(table, { csvImport } = {}) {
@@ -276,6 +291,7 @@ describe('QueryOrchestrator', () => {
         preAggregationsOptions: {
           ...options('p1').preAggregationsOptions,
           dropPreAggregationsWithoutTouch: true,
+          touchTablePersistTime: 1,
         },
       });
     mockDriver = mockDriverLocal;
@@ -1703,5 +1719,41 @@ describe('QueryOrchestrator', () => {
       });
       expect(data['Foo.query']).toMatch(/orders_d/);
     }));
+  });
+
+  test('drop lock', async () => {
+    mockDriver.tablesDropDelay = 300;
+    for (let i = 0; i < 10; i++) {
+      const promises = [];
+      for (let j = 0; j < 10; j++) {
+        // eslint-disable-next-line no-loop-func
+        promises.push((async () => {
+          await mockDriver.delay(100 * j);
+          await queryOrchestratorDropWithoutTouch.fetchQuery({
+            query: `SELECT * FROM stb_pre_aggregations.orders_d2018110${j}`,
+            values: [],
+            cacheKeyQueries: {
+              renewalThreshold: 21600,
+              queries: []
+            },
+            preAggregations: [{
+              preAggregationsSchema: 'stb_pre_aggregations',
+              tableName: `stb_pre_aggregations.orders_d2018110${j}`,
+              loadSql: [`CREATE TABLE stb_pre_aggregations.orders_d2018110${j} AS SELECT * FROM public.orders_d`, []],
+              invalidateKeyQueries: [['SELECT NOW()', [], {
+                renewalThreshold: 0.001
+              }]],
+              external: true,
+            }],
+            requestId: `drop lock ${i}-${j}`
+          });
+        })());
+      }
+
+      await Promise.all(promises);
+
+      await mockDriver.delay(200);
+    }
+    // expect(mockDriver.tables).toContainEqual(expect.stringMatching(/orders_delay/));
   });
 });

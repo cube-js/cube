@@ -1872,6 +1872,7 @@ mod tests {
     use std::time::Duration;
     use std::{env, fs};
 
+    use crate::store::compaction::CompactionService;
     use async_compression::tokio::write::GzipEncoder;
     use futures_timer::Delay;
     use itertools::Itertools;
@@ -3063,7 +3064,7 @@ mod tests {
                 let last_active_partition = active_partitions.iter().next().unwrap();
 
                 // Wait for GC tasks to drop files
-                Delay::new(Duration::from_millis(3000)).await;
+                Delay::new(Duration::from_millis(4000)).await;
 
                 let remote_fs = services.injector.get_service_typed::<dyn RemoteFs>().await;
                 let files = remote_fs
@@ -3090,7 +3091,7 @@ mod tests {
         Config::test("inmemory_compaction")
             .update_config(|mut c| {
                 c.partition_split_threshold = 1000000;
-                c.compaction_chunks_count_threshold = 6;
+                c.compaction_chunks_count_threshold = 2;
                 c.not_used_timeout = 0;
                 c.compaction_in_memory_chunks_count_threshold = 5;
                 c.compaction_in_memory_chunks_max_lifetime_threshold = 1;
@@ -3098,6 +3099,10 @@ mod tests {
             })
             .start_test(async move |services| {
                 let service = services.sql_service;
+                let compaction_service = services
+                    .injector
+                    .get_service_typed::<dyn CompactionService>()
+                    .await;
 
                 service.exec_query("CREATE SCHEMA foo").await.unwrap();
 
@@ -3116,7 +3121,10 @@ mod tests {
                         .unwrap();
                 }
 
-                Delay::new(Duration::from_millis(1500)).await;
+                compaction_service
+                    .compact_in_memory_chunks(1)
+                    .await
+                    .unwrap();
 
                 let active_partitions = services
                     .meta_store
@@ -3134,7 +3142,6 @@ mod tests {
                 assert_eq!(chunks.len(), 1);
                 assert_eq!(chunks.first().unwrap().get_row().get_row_count(), 6);
                 assert_eq!(chunks.first().unwrap().get_row().in_memory(), true);
-                //waiting for more then compaction_chunks_count_threshold
                 Delay::new(Duration::from_millis(2000)).await;
                 for i in 0..6 {
                     service
@@ -3147,6 +3154,10 @@ mod tests {
                         .await
                         .unwrap();
                 }
+                compaction_service
+                    .compact_in_memory_chunks(1)
+                    .await
+                    .unwrap();
                 Delay::new(Duration::from_millis(2000)).await;
                 let active_partitions = services
                     .meta_store

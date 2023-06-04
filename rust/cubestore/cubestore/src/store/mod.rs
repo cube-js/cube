@@ -48,7 +48,7 @@ use itertools::Itertools;
 use log::trace;
 use mockall::automock;
 use std::cmp::Ordering;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 
@@ -246,6 +246,7 @@ pub trait ChunkDataStore: DIService + Send + Sync {
     ) -> Result<(Vec<ArrayRef>, Vec<u64>), CubeError>;
     async fn add_memory_chunk(&self, chunk_id: u64, batch: RecordBatch) -> Result<(), CubeError>;
     async fn free_memory_chunk(&self, chunk_id: u64) -> Result<(), CubeError>;
+    async fn free_deleted_memory_chunks(&self) -> Result<(), CubeError>;
     async fn add_persistent_chunk(
         &self,
         index: IdRow<Index>,
@@ -365,7 +366,10 @@ impl ChunkDataStore for ChunkStore {
         columns: &[Column],
         in_memory: bool,
     ) -> Result<Vec<ChunkUploadJob>, CubeError> {
-        let indexes = self.meta_store.get_table_indexes(table_id).await?;
+        let indexes = self
+            .meta_store
+            .get_table_indexes_out_of_queue(table_id)
+            .await?;
         self.build_index_chunks(&indexes, rows.into(), columns, in_memory)
             .await
     }
@@ -687,6 +691,24 @@ impl ChunkDataStore for ChunkStore {
         self.report_in_memory_metrics().await?;
         let mut memory_chunks = self.memory_chunks.write().await;
         memory_chunks.remove(&chunk_id);
+        Ok(())
+    }
+    #[tracing::instrument(level = "trace", skip(self))]
+    async fn free_deleted_memory_chunks(&self) -> Result<(), CubeError> {
+        let existing_chunk_ids = self
+            .meta_store
+            .get_all_node_in_memory_chunks(self.cluster.server_name().to_string())
+            .await?
+            .into_iter()
+            .map(|c| c.get_id())
+            .collect::<HashSet<_>>();
+
+        {
+            let mut memory_chunks = self.memory_chunks.write().await;
+            memory_chunks.retain(|id, _| existing_chunk_ids.contains(id));
+        }
+
+        self.report_in_memory_metrics().await?;
         Ok(())
     }
 }
@@ -1084,14 +1106,24 @@ mod tests {
 pub type ChunkUploadJob = JoinHandle<Result<(IdRow<Chunk>, Option<u64>), CubeError>>;
 
 impl ChunkStore {
-    #[tracing::instrument(level = "trace", skip(self, columns))]
     async fn partition_rows(
         &self,
         index_id: u64,
-        mut columns: Vec<ArrayRef>,
+        columns: Vec<ArrayRef>,
         in_memory: bool,
     ) -> Result<Vec<JoinHandle<Result<(IdRow<Chunk>, Option<u64>), CubeError>>>, CubeError> {
         let index = self.meta_store.get_index(index_id).await?;
+        self.partition_rows_for_index(&index, columns, in_memory)
+            .await
+    }
+    #[tracing::instrument(level = "trace", skip(self, columns))]
+    async fn partition_rows_for_index(
+        &self,
+        index: &IdRow<Index>,
+        mut columns: Vec<ArrayRef>,
+        in_memory: bool,
+    ) -> Result<Vec<JoinHandle<Result<(IdRow<Chunk>, Option<u64>), CubeError>>>, CubeError> {
+        let index_id = index.get_id();
         let partitions = self
             .meta_store
             .get_active_partitions_by_index_id(index_id)
@@ -1334,7 +1366,7 @@ impl ChunkStore {
             .await?;
             let remapped = remapped?;
             rows = rows_again;
-            futures.push(self.partition_rows(index.get_id(), remapped, in_memory));
+            futures.push(self.partition_rows_for_index(&index, remapped, in_memory));
         }
 
         let new_chunks = join_all(futures)

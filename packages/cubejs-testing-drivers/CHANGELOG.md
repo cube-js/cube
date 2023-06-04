@@ -3,6 +3,125 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.23](https://github.com/cube-js/cube/compare/v0.33.22...v0.33.23) (2023-06-01)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+
+
+
+
+## [0.33.22](https://github.com/cube-js/cube/compare/v0.33.21...v0.33.22) (2023-05-31)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+
+
+
+
+## [0.33.21](https://github.com/cube-js/cube/compare/v0.33.20...v0.33.21) (2023-05-31)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+
+
+
+
+## [0.33.20](https://github.com/cube-js/cube/compare/v0.33.19...v0.33.20) (2023-05-31)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+
+
+
+
+## [0.33.19](https://github.com/cube-js/cube/compare/v0.33.18...v0.33.19) (2023-05-30)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+
+
+
+
+## [0.33.18](https://github.com/cube-js/cube/compare/v0.33.17...v0.33.18) (2023-05-29)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+
+
+
+
+## [0.33.16](https://github.com/cube-js/cube.js/compare/v0.33.15...v0.33.16) (2023-05-28)
+
+
+### Bug Fixes
+
+* **mssql-driver:** Pre-aggregations builds hang up if over 10K of rows ([#6661](https://github.com/cube-js/cube.js/issues/6661)) ([9b20ff4](https://github.com/cube-js/cube.js/commit/9b20ff4ef78acbb65ebea80adceb227bf96b1727))
+
+
+
+
+
+## [0.33.15](https://github.com/cube-js/cube.js/compare/v0.33.14...v0.33.15) (2023-05-26)
+
+
+### Bug Fixes
+
+* **athena-driver:** Internal: Error during planning: Coercion from [Utf8, Utf8] to the signature Exact([Utf8, Timestamp(Nanosecond, None)]) failed for athena pre-aggregations ([#6655](https://github.com/cube-js/cube.js/issues/6655)) ([46f7dbd](https://github.com/cube-js/cube.js/commit/46f7dbdeb0a9f55640d0f7afd7edb67ec101a43a))
+* Put temp table strategy drop under lock to avoid missing table r… ([#6642](https://github.com/cube-js/cube.js/issues/6642)) ([05fcdca](https://github.com/cube-js/cube.js/commit/05fcdca9795bb7f049d57eb3cdaa38d098554bb8))
+
+
+
+
+
+## [0.33.14](https://github.com/cube-js/cube/compare/v0.33.13...v0.33.14) (2023-05-25)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+
+
+
+
+## [0.33.13](https://github.com/cube-js/cube/compare/v0.33.12...v0.33.13) (2023-05-25)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+
+
+
+
+## [0.33.12](https://github.com/cube-js/cube.js/compare/v0.33.11...v0.33.12) (2023-05-22)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+
+
+
+
+## [0.33.11](https://github.com/cube-js/cube/compare/v0.33.10...v0.33.11) (2023-05-22)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+
+
+
+
+## [0.33.10](https://github.com/cube-js/cube.js/compare/v0.33.9...v0.33.10) (2023-05-19)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+
+
+
+
+## [0.33.9](https://github.com/cube-js/cube.js/compare/v0.33.8...v0.33.9) (2023-05-18)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+
+
+
+
 ## [0.33.8](https://github.com/cube-js/cube/compare/v0.33.7...v0.33.8) (2023-05-17)
 
 

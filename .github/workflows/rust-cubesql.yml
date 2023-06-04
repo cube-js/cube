@@ -88,7 +88,7 @@ jobs:
           files: ./rust/cubesql/cobertura.xml
           verbose: true
           flags: cubesql
-          fail_ci_if_error: true
+          fail_ci_if_error: false
 
   unit_legacy:
     runs-on: ubuntu-20.04
@@ -120,17 +120,18 @@ jobs:
         run: cd rust/cubesql && cargo test
 
   native_linux:
-    needs: [lint,unit,unit_legacy]
+    needs: [lint]
     runs-on: ubuntu-20.04
     timeout-minutes: 60
-    name: Build Linux GNU ${{ matrix.node-version }}.x ${{ matrix.target }}
+    name: Build Linux GNU ${{ matrix.node-version }}.x ${{ matrix.target }} with Python ${{ matrix.python-version }}
     strategy:
       matrix:
         node-version: [14, 16, 18]
+        python-version: ["3.9", "3.10", "3.11", "fallback"]
         target: ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"]
       fail-fast: false
     container:
-      image: cubejs/rust-cross:${{ matrix.target }}-03012023
+      image: cubejs/rust-cross:${{ matrix.target }}-30052023
 
     steps:
       - name: Checkout
@@ -157,18 +158,14 @@ jobs:
         run: yarn policies set-version v1.22.19
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
-        run: echo "::set-output name=dir::$(yarn cache dir)"
-      - name: Restore lerna
+        run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
+      - name: Restore yarn cache
         uses: actions/cache@v3
         with:
-          path: |
-            ${{ steps.yarn-cache-dir-path.outputs.dir }}
-            node_modules
-            rust/cubesql/node_modules
-            packages/*/node_modules
-          key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
+            ${{ runner.os }}-yarn-
       - name: Yarn install
         uses: nick-invision/retry@v2
         env:
@@ -181,10 +178,17 @@ jobs:
           command: yarn install --frozen-lockfile
       - name: Lerna tsc
         run: yarn tsc
-      - name: Build native
+      - name: Build native (fallback)
+        if: (matrix.python-version == 'fallback')
         env:
           CARGO_BUILD_TARGET: ${{ matrix.target }}
-        run: cd packages/cubejs-backend-native && yarn run native:build
+        run: cd packages/cubejs-backend-native && yarn run native:build-debug
+      - name: Build native (with Python)
+        if: (matrix.python-version != 'fallback')
+        env:
+          PYO3_PYTHON: python${{ matrix.python-version }}
+          CARGO_BUILD_TARGET: ${{ matrix.target }}
+        run: cd packages/cubejs-backend-native && yarn run native:build-debug-python
       - name: Test native (GNU only)
         if: (matrix.target == 'x86_64-unknown-linux-gnu')
         env:
@@ -198,16 +202,25 @@ jobs:
         run: cd packages/cubejs-testing && yarn smoke:cubesql
 
   native:
-    needs: [lint,unit,unit_legacy]
+    needs: [lint]
     runs-on: ${{ matrix.os-version }}
     timeout-minutes: 60
-    name: Build ${{ matrix.os-version }} ${{ matrix.node-version }}
+    name: Build ${{ matrix.os-version }} ${{ matrix.node-version }} with Python ${{ matrix.python-version }}
 
     strategy:
       matrix:
-        # We dont need to test under all versions, we do it under linux
+        # We don't need to test under all versions, we do it under linux
         node-version: [16.x]
         os-version: [windows-2019, macos-11]
+        python-version: ["3.9", "3.10", "3.11", "fallback"]
+        exclude:
+          # We dont plan to support windows for native-python
+          - os-version: windows-2019
+            python-version: "3.9"
+          - os-version: windows-2019
+            python-version: "3.10"
+          - os-version: windows-2019
+            python-version: "3.11"
       fail-fast: false
 
     steps:
@@ -223,41 +236,28 @@ jobs:
           toolchain: nightly-2022-03-08
           override: true
           components: rustfmt
+      - name: Install Python
+        uses: actions/setup-python@v4
+        if: (matrix.python-version != 'fallback')
+        with:
+          python-version: ${{ matrix.python-version }}
       - name: Install Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v3
         with:
           node-version: ${{ matrix.node-version }}
-      - name: Install Yarn
-        run: npm install -g yarn
       - name: Set Yarn version
         run: yarn policies set-version v1.22.19
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
-        run: echo "::set-output name=dir::$(yarn cache dir)"
-      - name: Restore lerna (excluding Windows)
+        run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
+        shell: bash
+      - name: Restore yarn cache
         uses: actions/cache@v3
-        if: ${{ !startsWith(matrix.os-version, 'windows') }}
         with:
-          path: |
-            ${{ steps.yarn-cache-dir-path.outputs.dir }}
-            node_modules
-            rust/cubesql/node_modules
-            packages/*/node_modules
-          key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
-      # Windows doesn't support links + cache action doesn't support exclude
-      # cache will include rust cache for native, which causes 3GB archive
-      # Right now, GH provides 10 gb for each repository with automatic retention.
-      - name: Restore lerna (Windows only)
-        uses: actions/cache@v3
-        if: ${{ startsWith(matrix.os-version, 'windows') }}
-        with:
-          path: |
-            ${{ steps.yarn-cache-dir-path.outputs.dir }}
-          key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
+            ${{ runner.os }}-yarn-
       - name: Yarn install
         uses: nick-invision/retry@v2
         env:
@@ -270,8 +270,19 @@ jobs:
           command: yarn install --frozen-lockfile
       - name: Lerna tsc
         run: yarn tsc
-      - name: Build native
+      - name: Build native (fallback)
+        if: (matrix.python-version == 'fallback')
         env:
           CUBESQL_STREAM_MODE: true
           CUBEJS_NATIVE_INTERNAL_DEBUG: true
         run: cd packages/cubejs-backend-native && yarn run native:build && yarn run test:unit
+      - name: Build native (with Python)
+        if: (matrix.python-version != 'fallback')
+        env:
+          PYO3_PYTHON: python${{ matrix.python-version }}
+        run: cd packages/cubejs-backend-native && yarn run native:build-debug-python
+      - name: Tests
+        env:
+          CUBESQL_STREAM_MODE: true
+          CUBEJS_NATIVE_INTERNAL_DEBUG: true
+        run: cd packages/cubejs-backend-native && yarn run test:unit

@@ -819,6 +819,10 @@ pub trait MetaStore: DIService + Send + Sync {
     fn partition_table(&self) -> PartitionMetaStoreTable;
     async fn create_partition(&self, partition: Partition) -> Result<IdRow<Partition>, CubeError>;
     async fn get_partition(&self, partition_id: u64) -> Result<IdRow<Partition>, CubeError>;
+    async fn get_partition_out_of_queue(
+        &self,
+        partition_id: u64,
+    ) -> Result<IdRow<Partition>, CubeError>;
     async fn get_partition_for_compaction(
         &self,
         partition_id: u64,
@@ -865,6 +869,22 @@ pub trait MetaStore: DIService + Send + Sync {
         &self,
         seconds_ago: i64,
     ) -> Result<Vec<IdRow<Partition>>, CubeError>;
+    async fn get_partitions_for_in_memory_compaction(
+        &self,
+        node: String,
+    ) -> Result<
+        Vec<(
+            IdRow<Partition>,
+            IdRow<Index>,
+            IdRow<Table>,
+            Vec<IdRow<Chunk>>,
+        )>,
+        CubeError,
+    >;
+    async fn get_all_node_in_memory_chunks(
+        &self,
+        node: String,
+    ) -> Result<Vec<IdRow<Chunk>>, CubeError>;
     async fn get_chunks_without_partition_created_seconds_ago(
         &self,
         seconds_ago: i64,
@@ -879,6 +899,10 @@ pub trait MetaStore: DIService + Send + Sync {
     ) -> Result<IdRow<Index>, CubeError>;
     async fn get_default_index(&self, table_id: u64) -> Result<IdRow<Index>, CubeError>;
     async fn get_table_indexes(&self, table_id: u64) -> Result<Vec<IdRow<Index>>, CubeError>;
+    async fn get_table_indexes_out_of_queue(
+        &self,
+        table_id: u64,
+    ) -> Result<Vec<IdRow<Index>>, CubeError>;
     async fn get_active_partitions_by_index_id(
         &self,
         index_id: u64,
@@ -1084,7 +1108,7 @@ pub trait MetaStore: DIService + Send + Sync {
         &self,
         old_ids: Vec<u64>,
         new_seq_pointer: Option<Vec<Option<SeqPointer>>>,
-    ) -> Result<IdRow<ReplayHandle>, CubeError>;
+    ) -> Result<Option<IdRow<ReplayHandle>>, CubeError>;
 
     async fn get_tables_with_indexes(
         &self,
@@ -2316,6 +2340,18 @@ impl MetaStore for RocksMetaStore {
         .await
     }
 
+    #[tracing::instrument(level = "trace", skip(self))]
+    async fn get_partition_out_of_queue(
+        &self,
+        partition_id: u64,
+    ) -> Result<IdRow<Partition>, CubeError> {
+        self.read_operation_out_of_queue(move |db_ref| {
+            PartitionRocksTable::new(db_ref).get_row_or_not_found(partition_id)
+        })
+        .await
+    }
+
+    #[tracing::instrument(level = "trace", skip(self))]
     async fn get_partition_for_compaction(
         &self,
         partition_id: u64,
@@ -2857,6 +2893,101 @@ impl MetaStore for RocksMetaStore {
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
+    async fn get_partitions_for_in_memory_compaction(
+        &self,
+        node: String,
+    ) -> Result<
+        Vec<(
+            IdRow<Partition>,
+            IdRow<Index>,
+            IdRow<Table>,
+            Vec<IdRow<Chunk>>,
+        )>,
+        CubeError,
+    > {
+        let config = self.store.config.clone();
+        self.read_operation_out_of_queue(move |db_ref| {
+            let chunks_table = ChunkRocksTable::new(db_ref.clone());
+
+            let mut partitions_map = HashMap::new();
+            for c in chunks_table.scan_all_rows()? {
+                let c = c?;
+                if c.get_row().active() && c.get_row().in_memory() {
+                    partitions_map
+                        .entry(c.get_row().get_partition_id())
+                        .or_insert(Vec::new())
+                        .push(c);
+                }
+            }
+
+            let partitions_table = PartitionRocksTable::new(db_ref.clone());
+
+            let mut result = Vec::with_capacity(partitions_map.len());
+            let index_table = IndexRocksTable::new(db_ref.clone());
+            let table_table = TableRocksTable::new(db_ref.clone());
+
+            for (id, chunks) in partitions_map.into_iter() {
+                if let Some(partition) = partitions_table.get_row(id)? {
+                    if partition.get_row().is_active()
+                        && partition.get_row().multi_partition_id.is_none()
+                        && node_name_by_partition(config.as_ref(), &partition) == node
+                    {
+                        let index = index_table
+                            .get_row(partition.get_row().get_index_id())?
+                            .ok_or(CubeError::internal(format!(
+                                "Index {} is not found for partition: {}",
+                                partition.get_row().get_index_id(),
+                                id
+                            )))?;
+                        let table = table_table.get_row_or_not_found(index.get_row().table_id())?;
+
+                        result.push((partition, index, table, chunks));
+                    }
+                }
+            }
+
+            Ok(result)
+        })
+        .await
+    }
+
+    #[tracing::instrument(level = "trace", skip(self))]
+    async fn get_all_node_in_memory_chunks(
+        &self,
+        node: String,
+    ) -> Result<Vec<IdRow<Chunk>>, CubeError> {
+        let config = self.store.config.clone();
+        self.read_operation_out_of_queue(move |db_ref| {
+            let chunks_table = ChunkRocksTable::new(db_ref.clone());
+            let partitions_table = PartitionRocksTable::new(db_ref.clone());
+
+            let mut partitions_map = HashMap::new();
+            for c in chunks_table.scan_all_rows()? {
+                let c = c?;
+                if c.get_row().in_memory() {
+                    partitions_map
+                        .entry(c.get_row().get_partition_id())
+                        .or_insert(Vec::new())
+                        .push(c);
+                }
+            }
+
+            let mut result = Vec::new();
+
+            for (id, mut chunks) in partitions_map.into_iter() {
+                if let Some(partition) = partitions_table.get_row(id)? {
+                    if node_name_by_partition(config.as_ref(), &partition) == node {
+                        result.append(&mut chunks);
+                    }
+                }
+            }
+
+            Ok(result)
+        })
+        .await
+    }
+
+    #[tracing::instrument(level = "trace", skip(self))]
     async fn get_chunks_without_partition_created_seconds_ago(
         &self,
         seconds_ago: i64,
@@ -2964,11 +3095,24 @@ impl MetaStore for RocksMetaStore {
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
+    async fn get_table_indexes_out_of_queue(
+        &self,
+        table_id: u64,
+    ) -> Result<Vec<IdRow<Index>>, CubeError> {
+        self.read_operation_out_of_queue(move |db_ref| {
+            let index_table = IndexRocksTable::new(db_ref);
+            Ok(index_table
+                .get_rows_by_index(&IndexIndexKey::TableId(table_id), &IndexRocksIndex::TableID)?)
+        })
+        .await
+    }
+
+    #[tracing::instrument(level = "trace", skip(self))]
     async fn get_active_partitions_by_index_id(
         &self,
         index_id: u64,
     ) -> Result<Vec<IdRow<Partition>>, CubeError> {
-        self.read_operation(move |db_ref| {
+        self.read_operation_out_of_queue(move |db_ref| {
             let rocks_partition = PartitionRocksTable::new(db_ref);
             // TODO iterate over range
             Ok(rocks_partition
@@ -3698,7 +3842,10 @@ impl MetaStore for RocksMetaStore {
                 )?
                 .into_iter()
                 .filter(|j| j.get_row().is_long_term() == long_term)
-                .nth(0);
+                //We use min_by instead of the max_by because of min_by returns the first element
+                //if priority is equal while max_by returns the last element
+                .min_by(|a, b| b.get_row().priority().cmp(&a.get_row().priority()));
+
             if let Some(job) = next_job {
                 if let JobStatus::ProcessingBy(node) = job.get_row().status() {
                     return Err(CubeError::internal(format!(
@@ -3841,7 +3988,7 @@ impl MetaStore for RocksMetaStore {
         &self,
         table_id: u64,
     ) -> Result<Vec<IdRow<ReplayHandle>>, CubeError> {
-        self.read_operation(move |db_ref| {
+        self.read_operation_out_of_queue(move |db_ref| {
             Ok(ReplayHandleRocksTable::new(db_ref).get_rows_by_index(
                 &ReplayHandleIndexKey::ByTableId(table_id),
                 &ReplayHandleRocksIndex::ByTableId,
@@ -3891,7 +4038,7 @@ impl MetaStore for RocksMetaStore {
         &self,
         old_ids: Vec<u64>,
         new_seq_pointer: Option<Vec<Option<SeqPointer>>>,
-    ) -> Result<IdRow<ReplayHandle>, CubeError> {
+    ) -> Result<Option<IdRow<ReplayHandle>>, CubeError> {
         self.write_operation(move |db_ref, batch_pipe| {
             if old_ids.is_empty() {
                 return Err(CubeError::internal("Can't merge empty replay handles list".to_string()));
@@ -3928,8 +4075,14 @@ impl MetaStore for RocksMetaStore {
                 }
                 replay_handles.push(replay_handle);
             }
-            let new_replay_handle = ReplayHandle::new_from_seq_pointers(replay_handles[0].get_row().table_id(), new_seq_pointer);
-            let new_handle = table.insert(new_replay_handle, batch_pipe)?;
+            let new_handle = if let Some(_) = new_seq_pointer {
+                let new_replay_handle = ReplayHandle::new_from_seq_pointers(replay_handles[0].get_row().table_id(), new_seq_pointer);
+                Some(table.insert(new_replay_handle, batch_pipe)?)
+
+            } else {
+                None
+            };
+
             for handle in replay_handles.iter() {
                 table.delete(handle.get_id(), batch_pipe)?;
             }
@@ -3949,7 +4102,7 @@ impl MetaStore for RocksMetaStore {
     async fn all_replay_handles_to_merge(
         &self,
     ) -> Result<Vec<(IdRow<ReplayHandle>, bool)>, CubeError> {
-        self.read_operation(move |db_ref| {
+        self.read_operation_out_of_queue(move |db_ref| {
             let all_replay_handles = ReplayHandleRocksTable::new(db_ref.clone()).all_rows()?;
             let chunks_table = ChunkRocksTable::new(db_ref);
             let mut result = Vec::new();
@@ -6323,6 +6476,179 @@ mod tests {
         }
 
         assert!(true);
+        let _ = fs::remove_dir_all(store_path.clone());
+        let _ = fs::remove_dir_all(remote_store_path.clone());
+    }
+
+    #[tokio::test]
+    async fn job_priority_test() {
+        let config = Config::test("job_priority_test");
+        let store_path = env::current_dir().unwrap().join("test-job-priority-local");
+        let remote_store_path = env::current_dir().unwrap().join("test-job-priority-remote");
+        let _ = fs::remove_dir_all(store_path.clone());
+        let _ = fs::remove_dir_all(remote_store_path.clone());
+        let remote_fs = LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
+        {
+            let meta_store = RocksMetaStore::new(
+                store_path.clone().join("metastore").as_path(),
+                BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
+                config.config_obj(),
+            )
+            .unwrap();
+            meta_store
+                .add_job(Job::new(
+                    RowKey::Table(TableId::Partitions, 1),
+                    JobType::InMemoryChunksCompaction,
+                    "node1".to_string(),
+                ))
+                .await
+                .unwrap();
+            meta_store
+                .add_job(Job::new(
+                    RowKey::Table(TableId::Partitions, 1),
+                    JobType::PartitionCompaction,
+                    "node1".to_string(),
+                ))
+                .await
+                .unwrap();
+            meta_store
+                .add_job(Job::new(
+                    RowKey::Table(TableId::Partitions, 2),
+                    JobType::PartitionCompaction,
+                    "node1".to_string(),
+                ))
+                .await
+                .unwrap();
+            meta_store
+                .add_job(Job::new(
+                    RowKey::Table(TableId::Partitions, 3),
+                    JobType::InMemoryChunksCompaction,
+                    "node1".to_string(),
+                ))
+                .await
+                .unwrap();
+
+            meta_store
+                .add_job(Job::new(
+                    RowKey::Table(TableId::Partitions, 11),
+                    JobType::PartitionCompaction,
+                    "node2".to_string(),
+                ))
+                .await
+                .unwrap();
+            meta_store
+                .add_job(Job::new(
+                    RowKey::Table(TableId::Partitions, 12),
+                    JobType::PartitionCompaction,
+                    "node2".to_string(),
+                ))
+                .await
+                .unwrap();
+            meta_store
+                .add_job(Job::new(
+                    RowKey::Table(TableId::Partitions, 13),
+                    JobType::InMemoryChunksCompaction,
+                    "node2".to_string(),
+                ))
+                .await
+                .unwrap();
+            meta_store
+                .add_job(Job::new(
+                    RowKey::Table(TableId::Partitions, 11),
+                    JobType::InMemoryChunksCompaction,
+                    "node2".to_string(),
+                ))
+                .await
+                .unwrap();
+
+            let job = meta_store
+                .start_processing_job("node1".to_string(), false)
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(job.get_row().job_type(), &JobType::InMemoryChunksCompaction);
+            assert_eq!(
+                job.get_row().row_reference(),
+                &RowKey::Table(TableId::Partitions, 1)
+            );
+
+            let job = meta_store
+                .start_processing_job("node1".to_string(), false)
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(job.get_row().job_type(), &JobType::InMemoryChunksCompaction);
+            assert_eq!(
+                job.get_row().row_reference(),
+                &RowKey::Table(TableId::Partitions, 3)
+            );
+
+            let job = meta_store
+                .start_processing_job("node1".to_string(), false)
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(job.get_row().job_type(), &JobType::PartitionCompaction);
+            assert_eq!(
+                job.get_row().row_reference(),
+                &RowKey::Table(TableId::Partitions, 1)
+            );
+
+            let job = meta_store
+                .start_processing_job("node1".to_string(), false)
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(job.get_row().job_type(), &JobType::PartitionCompaction);
+            assert_eq!(
+                job.get_row().row_reference(),
+                &RowKey::Table(TableId::Partitions, 2)
+            );
+
+            let job = meta_store
+                .start_processing_job("node2".to_string(), false)
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(job.get_row().job_type(), &JobType::InMemoryChunksCompaction);
+            assert_eq!(
+                job.get_row().row_reference(),
+                &RowKey::Table(TableId::Partitions, 13)
+            );
+
+            let job = meta_store
+                .start_processing_job("node2".to_string(), false)
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(job.get_row().job_type(), &JobType::InMemoryChunksCompaction);
+            assert_eq!(
+                job.get_row().row_reference(),
+                &RowKey::Table(TableId::Partitions, 11)
+            );
+
+            let job = meta_store
+                .start_processing_job("node2".to_string(), false)
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(job.get_row().job_type(), &JobType::PartitionCompaction);
+            assert_eq!(
+                job.get_row().row_reference(),
+                &RowKey::Table(TableId::Partitions, 11)
+            );
+
+            let job = meta_store
+                .start_processing_job("node2".to_string(), false)
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(job.get_row().job_type(), &JobType::PartitionCompaction);
+            assert_eq!(
+                job.get_row().row_reference(),
+                &RowKey::Table(TableId::Partitions, 12)
+            );
+        }
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
     }
