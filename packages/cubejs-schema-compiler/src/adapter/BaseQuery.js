@@ -1176,12 +1176,12 @@ class BaseQuery {
     const sql = subQuery.evaluateSymbolSqlWithContext(() => subQuery.buildParamAnnotatedSql(), {
       collectOriginalSqlPreAggregations
     });
-    const onCondition = primaryKeys.map((pk) => `${subQueryAlias}.${this.newDimension(this.primaryKeyName(cubeName, pk)).aliasName()} = ${this.primaryKeySql(pk, cubeName)}`;
+    const onCondition = primaryKeys.map((pk) => `${subQueryAlias}.${this.newDimension(this.primaryKeyName(cubeName, pk)).aliasName()} = ${this.primaryKeySql(pk, cubeName)}`);
 
     return {
       sql: `(${sql})`,
       alias: subQueryAlias,
-      on: onCondition.join(' AND '))
+      on: onCondition.join(' AND ')
     };
   }
 
