@@ -191,6 +191,115 @@ impl QueueRemoteFs {
         Ok(())
     }
 
+    async fn cleanup_local_files_loop(&self) {
+        let local_dir = self.local_path().await;
+        let mut stopped_rx = self.stopped_rx.clone();
+        let cleanup_interval = Duration::from_secs(self.config.local_files_cleanup_interval_secs());
+        let cleanup_local_files_delay = Duration::from_secs(self.config.local_files_cleanup_delay_secs());
+
+        loop {
+            // Do the cleanup every now and then.
+            tokio::select! {
+                () = tokio::time::sleep(cleanup_interval) => {},
+                res = stopped_rx.changed() => {
+                    if res.is_err() || *stopped_rx.borrow() {
+                        return;
+                    }
+                }
+            }
+
+            let local_dir_copy = local_dir.clone();
+            let res_local_files = cube_ext::spawn_blocking(
+                move || -> Result<(HashSet<String>, u64), std::io::Error> {
+                    let mut local_files = HashSet::new();
+                    let mut local_files_size = 0;
+                    for res_entry in Path::new(&local_dir_copy).read_dir()? {
+                        let entry = match res_entry {
+                            Err(_) => continue, // ignore errors, might come from concurrent fs ops.
+                            Ok(e) => e,
+                        };
+
+                        let ft = match entry.file_type() {
+                            Err(_) => continue,
+                            Ok(ft) => ft,
+                        };
+                        if !ft.is_file() {
+                            continue;
+                        }
+
+                        if let Ok(metadata) = entry.metadata() {
+                            if metadata.created().elapsed().map_or(true, |e| e < cleanup_local_files_delay) {
+                                continue;
+                            }
+                        } else {
+                            continue;
+                        };
+
+                        let file_name = match entry.file_name().into_string() {
+                            Err(_) => {
+                                log::error!("could not convert file name {:?}", entry.file_name());
+                                continue;
+                            }
+                            Ok(name) => name,
+                        };
+
+                        if file_name.ends_with("parquet") {
+                            local_files.insert(file_name);
+                        }
+
+                    }
+                    Ok(local_files)
+                },
+            )
+            .await
+            .unwrap();
+
+            let mut local_files = match res_local_files {
+                Err(e) => {
+                    log::error!("error while trying to list local files: {}", e);
+                    continue;
+                }
+                Ok(f) => f,
+            };
+
+            if local_files_size.is_empty() {
+                continue;
+            }
+
+            let res_remote_files = self.list("").await;
+            let remote_files = match res_remote_files {
+                Err(e) => {
+                    log::error!("could not get the list of remote files: {}", e);
+                    continue;
+                }
+                Ok(f) => f,
+            };
+
+            // Only keep the files we want to remove in `local_files`.
+            for f in remote_files {
+                local_files.remove(&f);
+            }
+
+            if !local_files.is_empty() {
+                log::debug!(
+                    "Cleaning up {} files that were removed remotely",
+                    local_files.len()
+                );
+                log::trace!("The files being removed are {:?}", local_files);
+            }
+
+            let local_dir_copy = local_dir.clone();
+            cube_ext::spawn_blocking(move || {
+                for f in local_files {
+                    let _ = std::fs::remove_file(Path::new(&local_dir_copy).join(f));
+                }
+            })
+            .await
+            .unwrap();
+        }
+
+    }
+
     /// Periodically cleans up the local directory from the files removed on the remote side.
     /// This function currently removes only direct sibling files and does not touch subdirectories.
     /// So e.g. we remove the `.parquet` files, but not directories like `metastore` or heartbeat.
@@ -202,6 +311,7 @@ impl QueueRemoteFs {
         let mut stopped_rx = self.stopped_rx.clone();
         let cleanup_interval = Duration::from_secs(self.config.local_files_cleanup_interval_secs());
         let cleanup_files_size_threshold = self.config.local_files_cleanup_size_threshold();
+        let cleanup_local_files_delay = self.config.local_files_cleanup_delay_secs();
         loop {
             // Do the cleanup every now and then.
             tokio::select! {
