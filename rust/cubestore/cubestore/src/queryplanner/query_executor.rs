@@ -124,7 +124,6 @@ impl QueryExecutor for QueryExecutorImpl {
 
         let execution_time = SystemTime::now();
 
-        self.memory_handler.check_memory()?;
         let results = collect(split_plan.clone()).instrument(collect_span).await;
         let execution_time = execution_time.elapsed()?;
         debug!("Query data processing time: {:?}", execution_time,);

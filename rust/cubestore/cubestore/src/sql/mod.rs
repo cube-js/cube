@@ -63,7 +63,6 @@ use crate::store::ChunkDataStore;
 use crate::table::{data, Row, TableValue, TimestampValue};
 use crate::telemetry::incoming_traffic_agent_event;
 use crate::util::decimal::Decimal;
-use crate::util::memory::MemoryHandler;
 use crate::util::strings::path_to_string;
 use crate::CubeError;
 use crate::{
@@ -172,7 +171,6 @@ pub struct SqlServiceImpl {
     cluster: Arc<dyn Cluster>,
     import_service: Arc<dyn ImportService>,
     config_obj: Arc<dyn ConfigObj>,
-    memory_handler: Arc<dyn MemoryHandler>,
     rows_per_chunk: usize,
     query_timeout: Duration,
     create_table_timeout: Duration,
@@ -194,7 +192,6 @@ impl SqlServiceImpl {
         import_service: Arc<dyn ImportService>,
         config_obj: Arc<dyn ConfigObj>,
         remote_fs: Arc<dyn RemoteFs>,
-        memory_handler: Arc<dyn MemoryHandler>,
         rows_per_chunk: usize,
         query_timeout: Duration,
         create_table_timeout: Duration,
@@ -214,7 +211,6 @@ impl SqlServiceImpl {
             query_timeout,
             create_table_timeout,
             remote_fs,
-            memory_handler,
             cache,
         })
     }
@@ -1305,7 +1301,6 @@ impl SqlService for SqlServiceImpl {
                         app_metrics::DATA_QUERIES.increment();
                         let cluster = self.cluster.clone();
                         let executor = self.query_executor.clone();
-                        let memory_handler = self.memory_handler.clone();
                         timeout(
                             self.query_timeout,
                             self.cache
@@ -1315,7 +1310,6 @@ impl SqlService for SqlServiceImpl {
                                         records =
                                             executor.execute_router_plan(plan, cluster).await?.1;
                                     } else {
-                                        memory_handler.check_memory()?;
                                         // Pick one of the workers to run as main for the request.
                                         let i = thread_rng().sample(Uniform::new(0, workers.len()));
                                         let rs = cluster.route_select(&workers[i], plan).await?.1;
@@ -1897,7 +1891,6 @@ mod tests {
     use crate::queryplanner::MockQueryPlanner;
     use crate::remotefs::{LocalDirRemoteFs, RemoteFile, RemoteFs};
     use crate::store::ChunkStore;
-    use crate::util::memory::MemoryHandlerImpl;
 
     use super::*;
     use crate::cachestore::RocksCacheStore;
@@ -1958,7 +1951,6 @@ mod tests {
                 Arc::new(MockImportService::new()),
                 config.config_obj(),
                 remote_fs.clone(),
-                Arc::new(MemoryHandlerImpl {}),
                 rows_per_chunk,
                 query_timeout,
                 query_timeout,
@@ -2034,7 +2026,6 @@ mod tests {
                 Arc::new(MockImportService::new()),
                 config.config_obj(),
                 remote_fs.clone(),
-                Arc::new(MemoryHandlerImpl {}),
                 rows_per_chunk,
                 query_timeout,
                 query_timeout,
@@ -2140,7 +2131,6 @@ mod tests {
                 Arc::new(MockImportService::new()),
                 config.config_obj(),
                 remote_fs.clone(),
-                Arc::new(MemoryHandlerImpl {}),
                 rows_per_chunk,
                 query_timeout,
                 query_timeout,
