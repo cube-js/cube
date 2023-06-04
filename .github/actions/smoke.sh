@@ -39,6 +39,8 @@ yarn lerna run --concurrency 1 --stream --no-prefix smoke:multidb
 echo "::endgroup::"
 
 echo "::group::Prestodb"
+docker rm -vf $(docker ps -aq)
+docker rmi -f $(docker images -aq)
 docker pull ahanaio/prestodb-sandbox:0.281
 yarn lerna run --concurrency 1 --stream --no-prefix smoke:prestodb
 echo "::endgroup::"
