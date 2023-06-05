@@ -2,7 +2,7 @@ declare namespace jest {
   interface Expect {
     toBeTypeOrNull: any
   }
-  interface Matchers<R, T = {}> {
+  interface Matchers<R, _T = {}> {
     toBeTypeOrNull(expected: any): R;
   }
 }

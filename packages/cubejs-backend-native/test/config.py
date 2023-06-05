@@ -15,3 +15,9 @@ async def check_auth(req, authorization):
 
 
 settings.check_auth = check_auth
+
+async def context_to_api_scopes():
+    print('[python] context_to_api_scopes')
+    return ['meta', 'data', 'jobs']
+
+settings.context_to_api_scopes = context_to_api_scopes

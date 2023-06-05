@@ -22,7 +22,9 @@
     "test:server:stream": "CUBESQL_STREAM_MODE=true CUBESQL_LOG_LEVEL=error CUBESQL_PG_PORT=5555 node dist/test/server.js",
     "test:python": "CUBEJS_NATIVE_INTERNAL_DEBUG=true CUBESQL_LOG_LEVEL=trace CUBESQL_PG_PORT=5555 node dist/test/python.js",
     "test:unit": "jest --forceExit",
-    "test:cargo": "cargo test"
+    "test:cargo": "cargo test",
+    "lint": "eslint test/ --ext .ts",
+    "lint:fix": "eslint --fix test/ --ext .ts"
   },
   "engines": {
     "node": "^14.0.0 || ^16.0.0 || >=17.0.0"
@@ -31,6 +33,7 @@
     "dist/js"
   ],
   "devDependencies": {
+    "@cubejs-backend/linter": "^0.33.0",
     "@cubejs-backend/testing-shared": "^0.33.21",
     "@types/jest": "^26",
     "@types/node": "^14",
@@ -83,6 +86,9 @@
     "setupFilesAfterEnv": [
       "<rootDir>/dist/test/setup/index.js"
     ]
+  },
+  "eslintConfig": {
+    "extends": "../cubejs-linter"
   },
   "license": "Apache-2.0",
   "publishConfig": {

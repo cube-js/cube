@@ -17,7 +17,7 @@ class Configuration:
     cache_and_queue_driver: str
     allow_js_duplicate_props_in_schema: bool
     process_subscriptions_interval: int
-    # Dynamic properties
+    # Functions
     logger: Callable
     context_to_app_id: Union[str, Callable[[RequestContext], str]]
     context_to_orchestrator_id: Union[str, Callable[[RequestContext], str]]
@@ -28,6 +28,7 @@ class Configuration:
     can_switch_sql_user: Callable
     extend_context: Callable
     scheduled_refresh_contexts: Callable
+    context_to_api_scopes: Callable
 
     def __init__(self):
         self.schema_path = None
@@ -39,7 +40,7 @@ class Configuration:
         self.cache_and_queue_driver = None
         self.allow_js_duplicate_props_in_schema = None
         self.process_subscriptions_interval = None
-        # Dynamic properties
+        # Functions
         self.logger = None
         self.context_to_app_id = None
         self.context_to_orchestrator_id = None
@@ -51,6 +52,7 @@ class Configuration:
         self.query_rewrite = None
         self.extend_context = None
         self.scheduled_refresh_contexts = None
+        self.context_to_api_scopes = None
 
     def set_schema_path(self, schema_path: str):
         self.schema_path = schema_path
