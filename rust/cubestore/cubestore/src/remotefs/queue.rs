@@ -3,8 +3,9 @@ use crate::di_service;
 use crate::metastore::MetaStore;
 use crate::remotefs::{RemoteFile, RemoteFs};
 use crate::util::lock::acquire_lock;
-use crate::CubeError;
+use crate::{app_metrics, CubeError};
 use async_trait::async_trait;
+use chrono::Utc;
 use core::fmt;
 use datafusion::cube_ext;
 use deadqueue::unlimited;
@@ -144,6 +145,19 @@ impl QueueRemoteFs {
             .await
             .into_iter()
             .collect::<Result<Vec<_>, _>>()?;
+        Ok(())
+    }
+
+    #[allow(dead_code)]
+    pub async fn wait_remote_fs_cleanup_loop(
+        queue_remote_fs: Arc<Self>,
+        stat_tags: Vec<String>,
+    ) -> Result<(), CubeError> {
+        let to_move = queue_remote_fs.clone();
+        tokio::task::spawn(async move {
+            to_move.cleanup_remotefs_loop(stat_tags).await;
+        })
+        .await?;
         Ok(())
     }
 
@@ -316,6 +330,66 @@ impl QueueRemoteFs {
             })
             .await
             .unwrap();
+        }
+    }
+
+    async fn cleanup_remotefs_loop(&self, stat_tags: Vec<String>) -> () {
+        let mut stopped_rx = self.stopped_rx.clone();
+        let cleanup_interval =
+            Duration::from_secs(self.config.remote_files_cleanup_interval_secs());
+        let cleanup_local_files_delay = self.config.remote_files_cleanup_delay_secs() as i64;
+        loop {
+            // Do the cleanup every now and then.
+            tokio::select! {
+                () = tokio::time::sleep(cleanup_interval) => {},
+                res = stopped_rx.changed() => {
+                    if res.is_err() || *stopped_rx.borrow() {
+                        return;
+                    }
+                }
+            }
+
+            let res_remote_files = self.list_with_metadata("").await;
+            let remote_files = match res_remote_files {
+                Err(e) => {
+                    log::error!("could not get the list of remote files: {}", e);
+                    continue;
+                }
+                Ok(f) => f,
+            };
+
+            let files_from_metastore = match self.metastore.get_all_filenames().await {
+                Err(e) => {
+                    log::error!("could not get the list of files from metastore: {}", e);
+                    continue;
+                }
+                Ok(f) => f.into_iter().collect::<HashSet<_>>(),
+            };
+
+            let mut files_to_remove = Vec::new();
+            let mut files_to_remove_size = 0;
+
+            for f in remote_files {
+                if files_from_metastore.get(f.remote_path()).is_some() {
+                    continue;
+                }
+                if Utc::now()
+                    .signed_duration_since(f.updated().clone())
+                    .num_seconds()
+                    < cleanup_local_files_delay
+                {
+                    continue;
+                }
+                files_to_remove.push(f.remote_path().to_string());
+                files_to_remove_size += f.file_size;
+            }
+            if !files_to_remove.is_empty() {
+                app_metrics::REMOTE_FS_FILES_TO_REMOVE
+                    .report_with_tags(files_to_remove.len() as i64, Some(&stat_tags));
+
+                app_metrics::REMOTE_FS_FILES_SIZE_TO_REMOVE
+                    .report_with_tags(files_to_remove_size as i64, Some(&stat_tags));
+            }
         }
     }
 }
