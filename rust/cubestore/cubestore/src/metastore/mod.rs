@@ -3317,7 +3317,6 @@ impl MetaStore for RocksMetaStore {
     }
     async fn get_all_filenames(&self) -> Result<Vec<String>, CubeError> {
         self.read_operation_out_of_queue(|db| {
-            // Do full scan, likely only a small number chunks and partitions are inactive.
             let mut filenames = Vec::new();
             for c in ChunkRocksTable::new(db.clone()).table_scan(db.snapshot)? {
                 let c = c?;
