@@ -1,16 +1,15 @@
-
 expect.extend({
   toBeTypeOrNull(received, classTypeOrNull) {
     try {
       expect(received).toEqual(expect.any(classTypeOrNull));
       return {
-        message: () => `Ok`,
+        message: () => 'Ok',
         pass: true
       };
     } catch (error) {
       return received === null
         ? {
-          message: () => `Ok`,
+          message: () => 'Ok',
           pass: true
         }
         : {

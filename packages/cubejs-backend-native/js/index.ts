@@ -244,9 +244,10 @@ export const shutdownInterface = async (instance: SqlInterfaceInstance): Promise
     await new Promise((resolve) => setTimeout(resolve, 2000));
 }
 
-interface PyConfiguration {
+export interface PyConfiguration {
     checkAuth?: (req: unknown, authorization: string) => Promise<void>
     queryRewrite?: (query: unknown, ctx: unknown) => Promise<unknown>
+    contextToApiScopes?: () => Promise<string[]>
 }
 
 export const pythonLoadConfig = async (context: string, options: { file: string }): Promise<PyConfiguration> => {

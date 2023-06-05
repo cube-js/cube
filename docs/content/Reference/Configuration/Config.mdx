@@ -20,6 +20,7 @@ interface CubejsConfiguration {
   driverFactory: (
     context: DriverContext
   ) => DriverConfig | BaseDriver | Promise<BaseDriver> | Promise<DriverConfig>;
+  contextToApiScopes: (context: RequestContext) => string[] | Promise<string[]>;
   contextToAppId: (context: RequestContext) => string;
   contextToOrchestratorId: (context: RequestContext) => string;
   repositoryFactory: (context: RequestContext) => SchemaFileRepository;
@@ -190,6 +191,26 @@ module.exports = {
   driverFactory: ({ dataSource }) =>
     new PostgresDriver({ database: dataSource }),
   dbType: ({ dataSource }) => "postgres",
+};
+```
+
+### <--{"id" : "Options Reference"}--> contextToApiScopes
+
+This function is used to select accessible [API scopes][ref-rest-scopes],
+used to allow or disallow access to REST API endpoints, based on the
+[security context][ref-sec-ctx].
+
+Can be an `async` function. Security context is provided as the first
+argument. An array of scopes that was set via `CUBEJS_DEFAULT_API_SCOPES` is
+provided as the second argument.
+
+Called on each request.
+
+```javascript
+module.exports = {
+  contextToApiScopes: (securityContext, defaultScopes) => {
+    return ['meta', 'data', 'graphql'];
+  }
 };
 ```
 
@@ -860,3 +881,4 @@ module.exports = {
 [ref-exec-environment-globals]:
   /schema/reference/execution-environment#node-js-globals-process-env-console-log-and-others
 [ref-environment-variables]: /reference/environment-variables
+[ref-rest-scopes]: /http-api/rest#configuration-api-scopes

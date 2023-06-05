@@ -5,6 +5,16 @@ category: GraphQL API
 menuOrder: 3
 ---
 
+GraphQL API enables Cube to deliver data over the HTTP protocol to
+[GraphQL][graphql]-enabled data applications, e.g., most commonly, front-end
+applications.
+
+Often, the GraphQL API is used to enable the [embedded analytics][cube-ea]
+use case.
+
+Under the hood, the GraphQL API is exposed via the `/graphql` endpoint of the
+[REST API][ref-rest-api].
+
 ## Getting started
 
 First, ensure you're running Cube v0.28.58 or later. Then start the project
@@ -196,3 +206,6 @@ to our query as follows:
 ```
 
 [ref-schema-ref-preagg-granularity]: /schema/reference/pre-aggregations#parameters-granularity
+[ref-rest-api]: /http-api/rest
+[graphql]: https://graphql.org
+[cube-ea]: https://cube.dev/use-cases/embedded-analytics
