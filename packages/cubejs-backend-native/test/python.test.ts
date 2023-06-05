@@ -36,6 +36,7 @@ suite('Python', () => {
       schemaPath: 'models',
       pgSqlPort: 5555,
       telemetry: false,
+      contextToApiScopes: expect.any(Function),
       checkAuth: expect.any(Function),
       queryRewrite: expect.any(Function),
     });
@@ -49,9 +50,9 @@ suite('Python', () => {
 
   test('context_to_api_scopes', async () => {
     if (config.contextToApiScopes) {
-      expect(config.contextToApiScopes()).toEqual(['meta', 'data', 'jobs']);
+      expect(await config.contextToApiScopes()).toEqual(['meta', 'data', 'jobs']);
     } else {
-      throw new Error('checkAuth was defined in config.py');
+      throw new Error('contextToApiScopes was defined in config.py');
     }
   });
 });

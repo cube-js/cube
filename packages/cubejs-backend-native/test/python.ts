@@ -54,5 +54,13 @@ import * as native from '../js';
     console.log(result, '<-');
   }
 
+  if (config.contextToApiScopes) {
+    console.log('->contextToApiScopes');
+
+    const result = await config.contextToApiScopes();
+
+    console.log(result, '<-');
+  }
+
   console.log('js finish');
 })();
