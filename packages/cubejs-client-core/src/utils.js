@@ -298,7 +298,7 @@ export function movePivotItem(
     destinationIndex > lastIndex &&
     nextPivotConfig[destinationAxis][lastIndex] === 'measures'
   ) {
-    destinationIndex -= 1;
+    destinationIndex = lastIndex;
   }
 
   nextPivotConfig[sourceAxis].splice(sourceIndex, 1);
