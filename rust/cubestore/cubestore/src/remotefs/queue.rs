@@ -1,5 +1,6 @@
 use crate::config::ConfigObj;
 use crate::di_service;
+use crate::metastore::MetaStore;
 use crate::remotefs::{RemoteFile, RemoteFs};
 use crate::util::lock::acquire_lock;
 use crate::CubeError;
@@ -21,6 +22,7 @@ use tokio::time::Duration;
 pub struct QueueRemoteFs {
     config: Arc<dyn ConfigObj>,
     remote_fs: Arc<dyn RemoteFs>,
+    metastore: Arc<dyn MetaStore>,
     upload_queue: unlimited::Queue<RemoteFsOp>,
     download_queue: unlimited::Queue<RemoteFsOp>,
     // TODO not used
@@ -60,12 +62,17 @@ pub enum RemoteFsOpResult {
 di_service!(QueueRemoteFs, [RemoteFs]);
 
 impl QueueRemoteFs {
-    pub fn new(config: Arc<dyn ConfigObj>, remote_fs: Arc<dyn RemoteFs>) -> Arc<Self> {
+    pub fn new(
+        config: Arc<dyn ConfigObj>,
+        remote_fs: Arc<dyn RemoteFs>,
+        metastore: Arc<dyn MetaStore>,
+    ) -> Arc<Self> {
         let (stopped_tx, stopped_rx) = watch::channel(false);
         let (tx, rx) = broadcast::channel(16384);
         Arc::new(Self {
             config,
             remote_fs,
+            metastore,
             upload_queue: unlimited::Queue::new(),
             download_queue: unlimited::Queue::new(),
             deleted: RwLock::new(HashSet::new()),
@@ -130,7 +137,7 @@ impl QueueRemoteFs {
         let to_move = queue_remote_fs.clone();
         if queue_remote_fs.config.upload_to_remote() {
             futures.push(tokio::task::spawn(async move {
-                to_move.cleanup_loop().await;
+                to_move.cleanup_local_files_loop().await;
             }));
         }
         join_all(futures)
@@ -195,7 +202,8 @@ impl QueueRemoteFs {
         let local_dir = self.local_path().await;
         let mut stopped_rx = self.stopped_rx.clone();
         let cleanup_interval = Duration::from_secs(self.config.local_files_cleanup_interval_secs());
-        let cleanup_local_files_delay = Duration::from_secs(self.config.local_files_cleanup_delay_secs());
+        let cleanup_local_files_delay =
+            Duration::from_secs(self.config.local_files_cleanup_delay_secs());
 
         loop {
             // Do the cleanup every now and then.
@@ -209,10 +217,9 @@ impl QueueRemoteFs {
             }
 
             let local_dir_copy = local_dir.clone();
-            let res_local_files = cube_ext::spawn_blocking(
-                move || -> Result<(HashSet<String>, u64), std::io::Error> {
+            let res_local_files =
+                cube_ext::spawn_blocking(move || -> Result<HashSet<String>, std::io::Error> {
                     let mut local_files = HashSet::new();
-                    let mut local_files_size = 0;
                     for res_entry in Path::new(&local_dir_copy).read_dir()? {
                         let entry = match res_entry {
                             Err(_) => continue, // ignore errors, might come from concurrent fs ops.
@@ -227,14 +234,6 @@ impl QueueRemoteFs {
                             continue;
                         }
 
-                        if let Ok(metadata) = entry.metadata() {
-                            if metadata.created().elapsed().map_or(true, |e| e < cleanup_local_files_delay) {
-                                continue;
-                            }
-                        } else {
-                            continue;
-                        };
-
                         let file_name = match entry.file_name().into_string() {
                             Err(_) => {
                                 log::error!("could not convert file name {:?}", entry.file_name());
@@ -243,16 +242,38 @@ impl QueueRemoteFs {
                             Ok(name) => name,
                         };
 
-                        if file_name.ends_with("parquet") {
-                            local_files.insert(file_name);
+                        if !file_name.ends_with(".parquet") {
+                            continue;
                         }
 
+                        if let Ok(metadata) = entry.metadata() {
+                            match metadata.created() {
+                                Ok(created) => {
+                                    if created
+                                        .elapsed()
+                                        .map_or(true, |e| e < cleanup_local_files_delay)
+                                    {
+                                        continue;
+                                    }
+                                }
+                                Err(e) => {
+                                    log::error!(
+                                        "error while getting created time for file {:?}:{}",
+                                        entry.file_name(),
+                                        e
+                                    );
+                                }
+                            }
+                        } else {
+                            continue;
+                        };
+
+                        local_files.insert(file_name);
                     }
                     Ok(local_files)
-                },
-            )
-            .await
-            .unwrap();
+                })
+                .await
+                .unwrap();
 
             let mut local_files = match res_local_files {
                 Err(e) => {
@@ -262,134 +283,20 @@ impl QueueRemoteFs {
                 Ok(f) => f,
             };
 
-            if local_files_size.is_empty() {
+            if local_files.is_empty() {
                 continue;
             }
 
-            let res_remote_files = self.list("").await;
-            let remote_files = match res_remote_files {
+            let files_from_metastore = match self.metastore.get_all_filenames().await {
                 Err(e) => {
-                    log::error!("could not get the list of remote files: {}", e);
+                    log::error!("could not get the list of files from metastore: {}", e);
                     continue;
                 }
                 Ok(f) => f,
             };
 
             // Only keep the files we want to remove in `local_files`.
-            for f in remote_files {
-                local_files.remove(&f);
-            }
-
-            if !local_files.is_empty() {
-                log::debug!(
-                    "Cleaning up {} files that were removed remotely",
-                    local_files.len()
-                );
-                log::trace!("The files being removed are {:?}", local_files);
-            }
-
-            let local_dir_copy = local_dir.clone();
-            cube_ext::spawn_blocking(move || {
-                for f in local_files {
-                    let _ = std::fs::remove_file(Path::new(&local_dir_copy).join(f));
-                }
-            })
-            .await
-            .unwrap();
-        }
-
-    }
-
-    /// Periodically cleans up the local directory from the files removed on the remote side.
-    /// This function currently removes only direct sibling files and does not touch subdirectories.
-    /// So e.g. we remove the `.parquet` files, but not directories like `metastore` or heartbeat.
-    ///
-    /// Uploads typically live in the `uploads` directory while being prepared and only get moved
-    /// to be direct siblings **after** appearing on the server.
-    async fn cleanup_loop(&self) -> () {
-        let local_dir = self.local_path().await;
-        let mut stopped_rx = self.stopped_rx.clone();
-        let cleanup_interval = Duration::from_secs(self.config.local_files_cleanup_interval_secs());
-        let cleanup_files_size_threshold = self.config.local_files_cleanup_size_threshold();
-        let cleanup_local_files_delay = self.config.local_files_cleanup_delay_secs();
-        loop {
-            // Do the cleanup every now and then.
-            tokio::select! {
-                () = tokio::time::sleep(cleanup_interval) => {},
-                res = stopped_rx.changed() => {
-                    if res.is_err() || *stopped_rx.borrow() {
-                        return;
-                    }
-                }
-            }
-
-            // Important to collect local files **before** remote to avoid invalid removals.
-            // We rely on RemoteFs implementations to upload the file to the server before they make
-            // it available on the local filesystem.
-            let local_dir_copy = local_dir.clone();
-            let res_local_files = cube_ext::spawn_blocking(
-                move || -> Result<(HashSet<String>, u64), std::io::Error> {
-                    let mut local_files = HashSet::new();
-                    let mut local_files_size = 0;
-                    for res_entry in Path::new(&local_dir_copy).read_dir()? {
-                        let entry = match res_entry {
-                            Err(_) => continue, // ignore errors, might come from concurrent fs ops.
-                            Ok(e) => e,
-                        };
-
-                        let ft = match entry.file_type() {
-                            Err(_) => continue,
-                            Ok(ft) => ft,
-                        };
-                        if !ft.is_file() {
-                            continue;
-                        }
-
-                        local_files_size = if let Ok(metadata) = entry.metadata() {
-                            metadata.len()
-                        } else {
-                            0
-                        };
-
-                        let file_name = match entry.file_name().into_string() {
-                            Err(_) => {
-                                log::error!("could not convert file name {:?}", entry.file_name());
-                                continue;
-                            }
-                            Ok(name) => name,
-                        };
-
-                        local_files.insert(file_name);
-                    }
-                    Ok((local_files, local_files_size))
-                },
-            )
-            .await
-            .unwrap();
-
-            let (mut local_files, local_files_size) = match res_local_files {
-                Err(e) => {
-                    log::error!("error while trying to list local files: {}", e);
-                    continue;
-                }
-                Ok(f) => f,
-            };
-
-            if local_files_size < cleanup_files_size_threshold {
-                continue;
-            }
-
-            let res_remote_files = self.list("").await;
-            let remote_files = match res_remote_files {
-                Err(e) => {
-                    log::error!("could not get the list of remote files: {}", e);
-                    continue;
-                }
-                Ok(f) => f,
-            };
-
-            // Only keep the files we want to remove in `local_files`.
-            for f in remote_files {
+            for f in files_from_metastore {
                 local_files.remove(&f);
             }
 
@@ -701,7 +608,11 @@ mod test {
             error: MockFSError::None,
             download_error: false,
         });
-        let queue_fs = QueueRemoteFs::new(config.config_obj(), failed_fs.clone());
+        let queue_fs = QueueRemoteFs::new(
+            config.config_obj(),
+            failed_fs.clone(),
+            config.injector().get_service_typed().await,
+        );
 
         let path = make_test_csv();
 
@@ -724,7 +635,11 @@ mod test {
             error: MockFSError::WrongSize,
             download_error: false,
         });
-        let queue_fs = QueueRemoteFs::new(config.config_obj(), failed_fs.clone());
+        let queue_fs = QueueRemoteFs::new(
+            config.config_obj(),
+            failed_fs.clone(),
+            config.injector().get_service_typed().await,
+        );
 
         let path = make_test_csv();
 
@@ -747,7 +662,11 @@ mod test {
             error: MockFSError::MissingFile,
             download_error: false,
         });
-        let queue_fs = QueueRemoteFs::new(config.config_obj(), failed_fs.clone());
+        let queue_fs = QueueRemoteFs::new(
+            config.config_obj(),
+            failed_fs.clone(),
+            config.injector().get_service_typed().await,
+        );
 
         let path = make_test_csv();
 
@@ -769,6 +688,7 @@ mod test {
         let queue_fs = QueueRemoteFs::new(
             config.config_obj(),
             config.injector().get_service("original_remote_fs").await,
+            config.injector().get_service_typed().await,
         );
         let r = tokio::spawn(QueueRemoteFs::wait_processing_loops(queue_fs.clone()));
         let res = queue_fs.download_file("temp-upload/foo.csv", None).await;
@@ -790,6 +710,7 @@ mod test {
         let queue_fs = QueueRemoteFs::new(
             config.config_obj(),
             config.injector().get_service("original_remote_fs").await,
+            config.injector().get_service_typed().await,
         );
         let r = tokio::spawn(QueueRemoteFs::wait_processing_loops(queue_fs.clone()));
         queue_fs
@@ -821,7 +742,11 @@ mod test {
             download_error: true,
         });
         let path = make_test_csv();
-        let queue_fs = QueueRemoteFs::new(config.config_obj(), failed_fs.clone());
+        let queue_fs = QueueRemoteFs::new(
+            config.config_obj(),
+            failed_fs.clone(),
+            config.injector().get_service_typed().await,
+        );
 
         let r = tokio::spawn(QueueRemoteFs::wait_processing_loops(queue_fs.clone()));
 

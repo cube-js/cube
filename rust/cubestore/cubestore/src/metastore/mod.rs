@@ -969,9 +969,7 @@ pub trait MetaStore: DIService + Send + Sync {
         &self,
     ) -> Result<Vec<(IdRow<Partition>, Vec<IdRow<Chunk>>)>, CubeError>;
 
-    async fn get_all_filenames(
-        &self,
-    ) -> Result<Vec<String>, CubeError>;
+    async fn get_all_filenames(&self) -> Result<Vec<String>, CubeError>;
 
     fn chunks_table(&self) -> ChunkMetaStoreTable;
     async fn create_chunk(
@@ -3317,9 +3315,7 @@ impl MetaStore for RocksMetaStore {
         })
         .await
     }
-    async fn get_all_filenames(
-        &self,
-    ) -> Result<Vec<String>, CubeError> {
+    async fn get_all_filenames(&self) -> Result<Vec<String>, CubeError> {
         self.read_operation_out_of_queue(|db| {
             // Do full scan, likely only a small number chunks and partitions are inactive.
             let mut filenames = Vec::new();
@@ -3339,7 +3335,6 @@ impl MetaStore for RocksMetaStore {
             Ok(filenames)
         })
         .await
-
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
