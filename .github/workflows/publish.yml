@@ -168,12 +168,12 @@ jobs:
         python-version: ["3.9", "3.10", "3.11", "fallback"]
         os-version: [windows-2019, macos-11]
         include:
-          - os: windows-2019
+          - os-version: windows-2019
             package_target_arch: x64
             package_target_platform: win32
             package_target_libc: unknown
             tar_executable: tar
-          - os: macos-11
+          - os-version: macos-11
             package_target_arch: x64
             package_target_platform: darwin
             package_target_libc: unknown
