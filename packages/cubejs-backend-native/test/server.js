@@ -1,98 +1,98 @@
+const { FakeRowStream } = require('@cubejs-backend/testing-shared');
 const native = require('../js/index');
 const meta_fixture = require('./meta');
-const { FakeRowStream } = require('@cubejs-backend/testing-shared');
 
 (async () => {
-    const load = async ({ request, session, query }) => {
-      console.log('[js] load',  {
-        request,
-        session,
-        query ,
-      });
+  const load = async ({ request, session, query }) => {
+    console.log('[js] load', {
+      request,
+      session,
+      query,
+    });
 
-      throw new Error('load is not implemented');
+    throw new Error('load is not implemented');
+  };
+
+  const meta = async ({ request, session }) => {
+    console.log('[js] meta', {
+      request,
+      session
+    });
+
+    return meta_fixture;
+  };
+
+  const stream = async ({ request, session, query }) => {
+    console.log('[js] stream', {
+      request,
+      session,
+      query,
+    });
+
+    return {
+      stream: new FakeRowStream(query),
     };
+  };
 
-    const meta = async ({ request, session }) => {
-        console.log('[js] meta',  {
-          request,
-          session
-        });
+  const checkAuth = async ({ request, user }) => {
+    console.log('[js] checkAuth', {
+      request,
+      user,
+    });
 
-        return meta_fixture;
-    };
+    if (user) {
+      // without password
+      if (user === 'wp') {
+        return {
+          password: null,
+          superuser: false,
+        };
+      }
 
-    const stream = async ({ request, session, query }) => {
-      console.log('[js] stream',  {
-        request,
-        session,
-        query ,
-      });
+      if (user === 'admin') {
+        return {
+          password: null,
+          superuser: true,
+        };
+      }
 
       return {
-        stream: new FakeRowStream(query),
+        password: 'test',
+        superuser: false,
       };
-    };
+    }
 
-    const checkAuth = async ({ request, user }) => {
-      console.log('[js] checkAuth',  {
-        request,
-        user,
-      });
+    throw new Error('Please specify password');
+  };
 
-      if (user) {
-        // without password
-        if (user === 'wp') {
-          return {
-            password: null,
-            superuser: false,
-          };
-        }
+  native.setupLogger(
+    ({ event }) => console.log(event),
+    'trace',
+  );
 
-        if (user === 'admin') {
-          return {
-            password: null,
-            superuser: true,
-          };
-        }
+  const server = await native.registerInterface({
+    // nonce: '12345678910111213141516'.substring(0, 20),
+    checkAuth,
+    load,
+    meta,
+    stream,
+  });
+  console.log({
+    server
+  });
 
-        return {
-          password: 'test',
-          superuser: false,
-        }
-      }
+  process.on('SIGINT', async () => {
+    console.log('SIGINT signal');
 
-      throw new Error('Please specify password');
-    };
+    try {
+      await native.shutdownInterface(server);
+    } catch (e) {
+      console.log(e);
+    } finally {
+      process.exit(1);
+    }
+  });
 
-    native.setupLogger(
-      ({ event }) => console.log(event),
-      'trace',
-    );
-
-    const server = await native.registerInterface({
-      // nonce: '12345678910111213141516'.substring(0, 20),
-      checkAuth,
-      load,
-      meta,
-      stream,
-    });
-    console.log({
-      server
-    });
-
-    process.on('SIGINT', async () => {
-      console.log('SIGINT signal');
-
-      try {
-        await native.shutdownInterface(server);
-      } catch (e) {
-        console.log(e);
-      } finally {
-        process.exit(1);
-      }
-    });
-
-    // block
-    await new Promise(() => {});
+  // block
+  await new Promise(() => {});
 })();

@@ -4,56 +4,63 @@ import path from 'path';
 import * as native from '../js';
 
 (async () => {
-    native.setupLogger(
-        ({ event }) => console.log(event),
-        'trace',
-    );
+  native.setupLogger(
+    ({ event }) => console.log(event),
+    'trace',
+  );
 
-    const content = await fs.readFile(path.join(process.cwd(), 'test', 'config.py'), 'utf8');
-    console.log('content', {
-        content
-    });
+  const content = await fs.readFile(path.join(process.cwd(), 'test', 'config.py'), 'utf8');
+  console.log('content', {
+    content
+  });
 
-    const config = await native.pythonLoadConfig(
-        content,
+  const config = await native.pythonLoadConfig(
+    content,
+    {
+      file: 'config.py'
+    }
+  );
+
+  console.log(config);
+
+  if (config.queryRewrite) {
+    console.log('->queryRewrite');
+
+    const result = await config.queryRewrite(
       {
-          file: 'config.py'
+        measures: ['Orders.count']
+      },
+      {
+        securityContext: {
+          tenantId: 1
+        }
       }
     );
 
-    console.log(config);
+    console.log(result, '<-');
+  }
 
-    if (config.queryRewrite) {
-        console.log('->queryRewrite');
+  if (config.checkAuth) {
+    console.log('->checkAuth');
 
-        const result = await config.queryRewrite(
-            {
-                measures: ['Orders.count']
-            },
-            {
-                securityContext: {
-                    tenantId: 1
-                }
-            }
-        );
+    const result = await config.checkAuth({
+      url: 'test',
+      method: 'GET',
+      headers: {
+        'X-MY-HEADER': 'LONG HEADER VALUE'
+      }
+    }, 'MY_LONG_TOKEN');
 
-        console.log(result, '<-');
-    }
+    console.log(result, '<-');
+  }
 
+  if (config.contextToApiScopes) {
+    console.log('->contextToApiScopes');
 
-    if (config.checkAuth) {
-        console.log('->checkAuth');
+    const result = await config.contextToApiScopes();
 
-        const result =  await config.checkAuth({
-            url: 'test',
-            method: 'GET',
-            headers: {
-                'X-MY-HEADER': 'LONG HEADER VALUE'
-            }
-        }, 'MY_LONG_TOKEN');
+    console.log(result, '<-');
+  }
 
-        console.log(result, '<-');
-    }
-
-    console.log('js finish');
+  console.log('js finish');
 })();

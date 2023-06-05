@@ -1,10 +1,15 @@
+use crate::python::runtime::py_runtime;
+use crate::utils::bind_method;
 use neon::prelude::*;
 use neon::result::Throw;
 use neon::types::JsDate;
-use pyo3::exceptions::PyTypeError;
-use pyo3::types::{PyBool, PyDict, PyFloat, PyInt, PyList, PyString};
-use pyo3::{PyAny, PyErr, PyObject, Python, ToPyObject};
+use pyo3::exceptions::{PyNotImplementedError, PyTypeError};
+use pyo3::types::{PyBool, PyDict, PyFloat, PyFunction, PyInt, PyList, PyString};
+use pyo3::{Py, PyAny, PyErr, PyObject, Python, ToPyObject};
+use std::cell::RefCell;
 use std::collections::HashMap;
+
+pub type CLReprObject = HashMap<String, CLRepr>;
 
 #[derive(Debug)]
 pub enum CLRepr {
@@ -13,8 +18,48 @@ pub enum CLRepr {
     Float(f64),
     Int(i64),
     Array(Vec<CLRepr>),
-    Object(HashMap<String, CLRepr>),
+    Object(CLReprObject),
+    PyFunction(Py<PyFunction>),
     Null,
+}
+
+pub struct JsPyFunctionWrapper {
+    fun: Py<PyFunction>,
+    _fun_name: Option<String>,
+}
+
+impl Finalize for JsPyFunctionWrapper {}
+
+type BoxedJsPyFunctionWrapper = JsBox<RefCell<JsPyFunctionWrapper>>;
+
+fn cl_repr_py_function_wrapper(mut cx: FunctionContext) -> JsResult<JsPromise> {
+    #[cfg(build = "debug")]
+    trace!("cl_repr_py_function_wrapper {}", _fun_name);
+
+    let (deferred, promise) = cx.promise();
+
+    let this = cx
+        .this()
+        .downcast_or_throw::<BoxedJsPyFunctionWrapper, _>(&mut cx)?;
+
+    let mut arguments = Vec::with_capacity(cx.len() as usize);
+
+    for arg_idx in 0..cx.len() {
+        arguments.push(CLRepr::from_js_ref(
+            cx.argument::<JsValue>(arg_idx)?,
+            &mut cx,
+        )?);
+    }
+
+    let py_method = this.borrow().fun.clone();
+    let py_runtime = py_runtime(&mut cx)?;
+    py_runtime.call_async_with_promise_callback(py_method, arguments, deferred);
+
+    Ok(promise)
+}
+
+struct IntoJsContext {
+    parent_key_name: Option<String>,
 }
 
 impl CLRepr {
@@ -113,7 +158,11 @@ impl CLRepr {
         Ok(Self::Null)
     }
 
-    fn into_js_impl<'a, C: Context<'a>>(from: CLRepr, cx: &mut C) -> JsResult<'a, JsValue> {
+    fn into_js_impl<'a, C: Context<'a>>(
+        from: CLRepr,
+        cx: &mut C,
+        tcx: IntoJsContext,
+    ) -> JsResult<'a, JsValue> {
         Ok(match from {
             CLRepr::String(v) => cx.string(v).upcast(),
             CLRepr::Bool(v) => cx.boolean(v).upcast(),
@@ -123,7 +172,13 @@ impl CLRepr {
                 let r = cx.empty_array();
 
                 for (k, v) in arr.into_iter().enumerate() {
-                    let vv = Self::into_js_impl(v, cx)?;
+                    let vv = Self::into_js_impl(
+                        v,
+                        cx,
+                        IntoJsContext {
+                            parent_key_name: None,
+                        },
+                    )?;
                     r.set(cx, k as u32, vv)?;
                 }
 
@@ -133,20 +188,44 @@ impl CLRepr {
                 let r = cx.empty_object();
 
                 for (k, v) in obj.into_iter() {
-                    let r_k = cx.string(k);
-                    let r_v = Self::into_js_impl(v, cx)?;
+                    let r_k = cx.string(k.clone());
+                    let r_v = Self::into_js_impl(
+                        v,
+                        cx,
+                        IntoJsContext {
+                            parent_key_name: Some(k),
+                        },
+                    )?;
 
                     r.set(cx, r_k, r_v)?;
                 }
 
                 r.upcast()
             }
+            CLRepr::PyFunction(py_fn) => {
+                let wrapper = JsPyFunctionWrapper {
+                    fun: py_fn,
+                    _fun_name: tcx.parent_key_name,
+                };
+                let obj_this = cx.boxed(RefCell::new(wrapper)).upcast::<JsValue>();
+
+                let cl_repr_fn = JsFunction::new(cx, cl_repr_py_function_wrapper)?;
+                let binded_fun = bind_method(cx, cl_repr_fn, obj_this)?;
+
+                binded_fun.upcast()
+            }
             CLRepr::Null => cx.undefined().upcast(),
         })
     }
 
-    pub fn into_js<'a, C: Context<'a>>(self, mut cx: C) -> JsResult<'a, JsValue> {
-        Self::into_js_impl(self, &mut cx)
+    pub fn into_js<'a, C: Context<'a>>(self, cx: &mut C) -> JsResult<'a, JsValue> {
+        Self::into_js_impl(
+            self,
+            cx,
+            IntoJsContext {
+                parent_key_name: None,
+            },
+        )
     }
 
     pub fn into_py_impl(from: CLRepr, py: Python) -> Result<PyObject, PyErr> {
@@ -177,6 +256,11 @@ impl CLRepr {
                 r.to_object(py)
             }
             CLRepr::Null => py.None(),
+            CLRepr::PyFunction(_) => {
+                return Err(PyErr::new::<PyNotImplementedError, _>(
+                    "Unable to map PyFunction to python",
+                ))
+            }
         })
     }
 

@@ -126,14 +126,14 @@ impl PyRuntime {
                                                 Err(err) => {
                                                     cx.throw_error(format!("Python error: {}", err))
                                                 }
-                                                Ok(r) => r.into_js(cx),
+                                                Ok(r) => r.into_js(&mut cx),
                                             };
                                             l
                                         });
                                     });
                                 }
                                 PyScheduledFunResult::Ready(r) => {
-                                    deferred.settle_with(&js_channel, |cx| r.into_js(cx));
+                                    deferred.settle_with(&js_channel, |mut cx| r.into_js(&mut cx));
                                 }
                             };
                         }
