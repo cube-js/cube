@@ -293,6 +293,12 @@ export function movePivotItem(
     nextPivotConfig[destinationAxis][lastIndex] === 'measures'
   ) {
     destinationIndex = lastIndex - 1;
+  } else if (
+    sourceAxis !== destinationAxis &&
+    destinationIndex > lastIndex &&
+    nextPivotConfig[destinationAxis][lastIndex] === 'measures'
+  ) {
+    destinationIndex -= 1;
   }
 
   nextPivotConfig[sourceAxis].splice(sourceIndex, 1);
