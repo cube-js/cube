@@ -260,14 +260,16 @@ impl QueueRemoteFs {
                             continue;
                         }
 
-                        if let Ok(metadata) = entry.metadata() {
+                        let should_deleted = if let Ok(metadata) = entry.metadata() {
                             match metadata.created() {
                                 Ok(created) => {
                                     if created
                                         .elapsed()
                                         .map_or(true, |e| e < cleanup_local_files_delay)
                                     {
-                                        continue;
+                                        false
+                                    } else {
+                                        true
                                     }
                                 }
                                 Err(e) => {
@@ -276,11 +278,15 @@ impl QueueRemoteFs {
                                         entry.file_name(),
                                         e
                                     );
+                                    false
                                 }
                             }
                         } else {
-                            continue;
+                            false
                         };
+                        if !should_deleted {
+                            continue;
+                        }
 
                         local_files.insert(file_name);
                     }
