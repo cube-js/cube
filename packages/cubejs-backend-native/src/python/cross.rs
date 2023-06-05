@@ -44,8 +44,11 @@ fn cl_repr_py_function_wrapper(mut cx: FunctionContext) -> JsResult<JsPromise> {
 
     let mut arguments = Vec::with_capacity(cx.len() as usize);
 
-    for i in 0..cx.len() {
-        arguments.push(CLRepr::from_js_ref(cx.argument::<JsValue>(0)?, &mut cx)?);
+    for arg_idx in 0..cx.len() {
+        arguments.push(CLRepr::from_js_ref(
+            cx.argument::<JsValue>(arg_idx)?,
+            &mut cx,
+        )?);
     }
 
     let py_method = this.borrow().fun.clone();
