@@ -165,7 +165,7 @@ jobs:
     strategy:
       matrix:
         node-version: [16.x]
-        python-version: ["fallback"]
+        python-version: ["3.9", "3.10", "3.11", "fallback"]
         os-version: [windows-2019, macos-11]
         include:
           - os: windows-2019
@@ -179,6 +179,14 @@ jobs:
             package_target_libc: unknown
             # bsd tar has a different format with Sparse files which breaks download script
             tar_executable: gtar
+        exclude:
+          # We dont plan to support windows for native-python
+          - os-version: windows-2019
+            python-version: "3.11"
+          - os-version: windows-2019
+            python-version: "3.10"
+          - os-version: windows-2019
+            python-version: "3.9"
       fail-fast: false
 
     steps:
