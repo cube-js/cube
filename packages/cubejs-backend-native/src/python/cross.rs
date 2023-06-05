@@ -56,7 +56,7 @@ fn cl_repr_py_function_wrapper(mut cx: FunctionContext) -> JsResult<JsPromise> {
 }
 
 struct IntoJsContext {
-    parent_key_name: Option<String>
+    parent_key_name: Option<String>,
 }
 
 impl CLRepr {
@@ -155,7 +155,11 @@ impl CLRepr {
         Ok(Self::Null)
     }
 
-    fn into_js_impl<'a, C: Context<'a>>(from: CLRepr, cx: &mut C, tcx: IntoJsContext) -> JsResult<'a, JsValue> {
+    fn into_js_impl<'a, C: Context<'a>>(
+        from: CLRepr,
+        cx: &mut C,
+        tcx: IntoJsContext,
+    ) -> JsResult<'a, JsValue> {
         Ok(match from {
             CLRepr::String(v) => cx.string(v).upcast(),
             CLRepr::Bool(v) => cx.boolean(v).upcast(),
@@ -165,9 +169,13 @@ impl CLRepr {
                 let r = cx.empty_array();
 
                 for (k, v) in arr.into_iter().enumerate() {
-                    let vv = Self::into_js_impl(v, cx, IntoJsContext {
-                        parent_key_name: None,
-                    })?;
+                    let vv = Self::into_js_impl(
+                        v,
+                        cx,
+                        IntoJsContext {
+                            parent_key_name: None,
+                        },
+                    )?;
                     r.set(cx, k as u32, vv)?;
                 }
 
@@ -178,9 +186,13 @@ impl CLRepr {
 
                 for (k, v) in obj.into_iter() {
                     let r_k = cx.string(k.clone());
-                    let r_v = Self::into_js_impl(v, cx, IntoJsContext {
-                        parent_key_name: Some(k),
-                    })?;
+                    let r_v = Self::into_js_impl(
+                        v,
+                        cx,
+                        IntoJsContext {
+                            parent_key_name: Some(k),
+                        },
+                    )?;
 
                     r.set(cx, r_k, r_v)?;
                 }
@@ -188,7 +200,10 @@ impl CLRepr {
                 r.upcast()
             }
             CLRepr::PyFunction(py_fn) => {
-                let wrapper = JsPyFunctionWrapper { fun: py_fn, _fun_name: tcx.parent_key_name };
+                let wrapper = JsPyFunctionWrapper {
+                    fun: py_fn,
+                    _fun_name: tcx.parent_key_name,
+                };
                 let obj_this = cx.boxed(RefCell::new(wrapper)).upcast::<JsValue>();
 
                 let cl_repr_fn = JsFunction::new(cx, cl_repr_py_function_wrapper)?;
@@ -201,9 +216,13 @@ impl CLRepr {
     }
 
     pub fn into_js<'a, C: Context<'a>>(self, cx: &mut C) -> JsResult<'a, JsValue> {
-        Self::into_js_impl(self, cx, IntoJsContext {
-            parent_key_name: None,
-        })
+        Self::into_js_impl(
+            self,
+            cx,
+            IntoJsContext {
+                parent_key_name: None,
+            },
+        )
     }
 
     pub fn into_py_impl(from: CLRepr, py: Python) -> Result<PyObject, PyErr> {
