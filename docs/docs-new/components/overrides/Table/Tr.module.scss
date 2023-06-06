@@ -1,0 +1,26 @@
+.Tr {
+  //border: 1px solid var(--dark_05);
+  //border-radius: 0.5rem;
+
+  //&:last-child td {
+  //  border-bottom: none;
+  //}
+
+  &:last-of-type th:first-of-type {
+    border-top-left-radius: 0.5rem;
+  }
+
+  &:last-of-type th:last-of-type {
+    border-top-right-radius: 0.5rem;
+  }
+
+  &:last-of-type td:first-of-type {
+    border-bottom-left-radius: 0.5rem;
+    border-bottom: none;
+  }
+
+  &:last-of-type td:last-of-type {
+    border-bottom-right-radius: 0.5rem;
+    border-bottom: none;
+  }
+}

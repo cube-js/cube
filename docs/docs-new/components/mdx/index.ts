@@ -22,6 +22,11 @@ import { CloudPromoBlock } from '@/components/mdx/CloudPromoBlock/CloudPromoBloc
 import { EventPromoBlock } from '@/components/mdx/EventPromoBlock/EventPromoBlock';
 import { H1 } from '@/components/overrides/Headings/H1';
 import { Link } from '../overrides/Anchor/Link';
+import { Table } from '@/components/overrides/Table/Table';
+import { Td } from '@/components/overrides/Table/Td';
+import { Th } from '@/components/overrides/Table/Th';
+import { Tr } from '@/components/overrides/Table/Tr';
+
 export const components = {
   ...Buttons,
   CaseStudyPromoBlock,
@@ -48,6 +53,11 @@ export const components = {
   Screenshot,
   YouTubeVideo,
 
+  // Overrides
   h1: H1,
   a: Link,
+  table: Table,
+  td: Td,
+  th: Th,
+  tr: Tr,
 };
