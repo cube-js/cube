@@ -936,7 +936,7 @@ const overrides: Record<string, Override> = {
   "Reference/Configuration/Environment-Variables-Reference.mdx": {
     ready: true,
     path: "reference/configuration/environment-variables",
-    title: "Environment-variables",
+    title: "Environment variables",
   },
   "Reference/Frontend/@cubejs-client-vue.mdx": {
     ready: true,
