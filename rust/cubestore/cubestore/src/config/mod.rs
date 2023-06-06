@@ -37,6 +37,7 @@ use crate::telemetry::tracing::{TracingHelper, TracingHelperImpl};
 use crate::telemetry::{
     start_agent_event_loop, start_track_event_loop, stop_agent_event_loop, stop_track_event_loop,
 };
+use crate::util::memory::{MemoryHandler, MemoryHandlerImpl};
 use crate::CubeError;
 use datafusion::cube_ext;
 use datafusion::physical_plan::parquet::{LruParquetMetadataCache, NoopParquetMetadataCache};
@@ -1761,7 +1762,7 @@ impl Config {
 
         self.injector
             .register_typed_with_default::<dyn QueryExecutor, _, _, _>(async move |i| {
-                QueryExecutorImpl::new(i.get_service_typed().await)
+                QueryExecutorImpl::new(i.get_service_typed().await, i.get_service_typed().await)
             })
             .await;
 
@@ -1779,6 +1780,10 @@ impl Config {
             .register_typed_with_default::<dyn TracingHelper, _, _, _>(async move |_| {
                 TracingHelperImpl::new()
             })
+            .await;
+
+        self.injector
+            .register_typed::<dyn MemoryHandler, _, _, _>(async move |_| MemoryHandlerImpl::new())
             .await;
 
         let query_cache_to_move = query_cache.clone();
