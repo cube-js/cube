@@ -2,8 +2,8 @@
 //! You can find overview of the protocol at
 //! <https://www.postgresql.org/docs/10/protocol.html>
 
-#![feature(backtrace)]
-#![feature(type_ascription)]
+#![feature(provide_any)]
+#![feature(error_generic_member_access)]
 
 mod decoding;
 mod encoding;

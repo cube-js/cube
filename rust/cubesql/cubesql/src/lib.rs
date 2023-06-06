@@ -3,15 +3,14 @@
     clippy::nonstandard_macro_braces,
 )]
 #![feature(test)]
-#![feature(backtrace)]
+#![feature(provide_any)]
+#![feature(error_generic_member_access)]
 #![feature(async_closure)]
 #![feature(drain_filter)]
 #![feature(box_patterns)]
 #![feature(slice_internals)]
-#![feature(total_cmp)]
 #![feature(vec_into_raw_parts)]
 #![feature(hash_set_entry)]
-#![feature(map_first_last)]
 // #![feature(trace_macros)]
 #![recursion_limit = "1024"]
 

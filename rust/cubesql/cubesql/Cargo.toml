@@ -10,8 +10,7 @@ homepage = "https://cube.dev"
 
 [dependencies]
 datafusion = { git = 'https://github.com/cube-js/arrow-datafusion.git', rev = "104887f467aaa7172bcfc8b96200231e115bc177", default-features = false, features = ["regex_expressions", "unicode_expressions"] }
-anyhow = "1.0"
-thiserror = "1.0"
+thiserror = "1.0.40"
 cubeclient = { path = "../cubeclient" }
 pg-srv = { path = "../pg-srv" }
 sqlparser = { git = 'https://github.com/cube-js/sqlparser-rs.git', rev = "b3b40586d4c32a218ffdfcb0462e7e216cf3d6eb" }

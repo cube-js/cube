@@ -1,4 +1,4 @@
-use std::{collections::HashMap, error::Error, io};
+use std::{collections::HashMap, io};
 
 use std::{sync::Arc, time::SystemTime};
 
@@ -8,12 +8,10 @@ use datafusion::prelude::DataFrame as DFDataFrame;
 
 use log::{debug, error, trace};
 
-//use msql_srv::*;
 use msql_srv::{
     AsyncMysqlIntermediary, AsyncMysqlShim, Column, ErrorKind, InitWriter, ParamParser,
     QueryResultWriter, StatementMetaWriter,
 };
-
 use tokio::{
     net::TcpListener,
     sync::{watch, RwLock},
