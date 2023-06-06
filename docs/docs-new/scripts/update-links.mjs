@@ -1312,23 +1312,15 @@ async function updateMarkdownLinks() {
 
   const ff = [
     // Weird spacing around MDX components
-    "Configuration/Connecting-to-the-Database.mdx",
-    "Configuration/Connecting-to-Downstream-Tools.mdx",
-    "Configuration/Downstream/Budibase.mdx",
-    "Configuration/Downstream/Retool.mdx",
-    "Configuration/VPC/Connecting-with-a-VPC.mdx",
-    "Getting-Started/Overview.mdx",
-    "Workspace/Single-Sign-On/Overview.mdx",
+    // "Configuration/Connecting-to-the-Database.mdx",
+    // "Configuration/Connecting-to-Downstream-Tools.mdx",
+    // "Configuration/VPC/Connecting-with-a-VPC.mdx",
+    // "Getting-Started/Overview.mdx",
+    // "Workspace/Single-Sign-On/Overview.mdx",
 
-    // Issues with link text and URL being the same
-    // "Cube.js-Introduction.mdx",
-    // "Frontend-Integrations/Introduction.mdx",
-    // "Frontend-Integrations/Introduction-vue.mdx",
-    // "Frontend-Integrations/Introduction-react.mdx",
-    // "Frontend-Integrations/Introduction-angular.mdx",
-    // "Frontend-Integrations/Real-Time-Data-Fetch.mdx",
-    // "Getting-Started/Core/02-Create-a-project.mdx",
-    // "Workspace/Developer-Playground.mdx",
+    // ## Loses code formatting
+    // "Configuration/Downstream/Budibase.mdx",
+    // "Configuration/Downstream/Retool.mdx",
 
     // Replaces HTML escape characters incorrectly
     // "Reference/Frontend/@cubejs-client-vue.mdx",
@@ -1346,7 +1338,7 @@ async function updateMarkdownLinks() {
 
     const linksPlugin = createLinksPlugin(urlMap);
     const result = await remark()
-      // .use(remarkGfm)
+      .use(remarkGfm)
       // .use(remarkMdx)
       // .use(linksPlugin)
       .process(data);
@@ -1354,8 +1346,25 @@ async function updateMarkdownLinks() {
     // console.log(result);
 
     const cleanupWeirdSlashes = (content) => content.replaceAll(/\\([\[<*|])/g, '$1');
+    const fixGridItems = (content) => content
+      .replaceAll('/> <GridItem', '/>\n<GridItem')
+      .replaceAll('/> </Grid>', '/>\n</Grid>')
+      .replaceAll('> <GridItem', '>\n<GridItem')
+      .replaceAll('/>{" "}', '/>\n')
+      .replaceAll(/^<GridItem/mg, '  <GridItem')
+      .replaceAll('  {" "}', '');
 
-    const prettyResult = formatWithPrettier(cleanupWeirdSlashes(String(result)));
+    const fixSameValueLinks = (content) => content.replaceAll(/<(http:\/\/localhost:4000.*)>/g, '[$1]($1)');
+    const fixImgSrc = (content) => content.replaceAll(/src="<(https:\/\/.*)>"/g, 'src="$1"');
+
+    let prettyResult = String(result);
+    prettyResult = cleanupWeirdSlashes(prettyResult);
+    prettyResult = fixGridItems(prettyResult);
+    prettyResult = fixSameValueLinks(prettyResult);
+    prettyResult = fixImgSrc(prettyResult);
+    prettyResult = formatWithPrettier(prettyResult).replaceAll('/>{" "}', '/>');
+
+    // const prettyResult = formatWithPrettier(cleanupWeirdSlashes(String(result)));
     // const prettyResult = String(result);
     const newFile = ['', frontmatter, `\n\n${prettyResult}`].join('---');
 
