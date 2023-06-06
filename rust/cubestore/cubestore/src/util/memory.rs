@@ -2,7 +2,7 @@ use crate::config::injection::DIService;
 use crate::CubeError;
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::fmt::Debug;
-use std::sync::atomic::{AtomicUsize, Ordering::SeqCst};
+use std::sync::atomic::{AtomicUsize, Ordering::Relaxed};
 use std::sync::Arc;
 
 pub trait MemoryHandler: DIService + Debug + Send + Sync {
@@ -34,20 +34,20 @@ unsafe impl GlobalAlloc for TrackingAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         let ret = System.alloc(layout);
         if !ret.is_null() {
-            self.allocated.fetch_add(layout.size(), SeqCst);
+            self.allocated.fetch_add(layout.size(), Relaxed);
         }
         ret
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
         System.dealloc(ptr, layout);
-        self.allocated.fetch_sub(layout.size(), SeqCst);
+        self.allocated.fetch_sub(layout.size(), Relaxed);
     }
 }
 
 impl TrackingAllocator {
     pub fn allocated(&self) -> usize {
-        self.allocated.load(SeqCst)
+        self.allocated.load(Relaxed)
     }
 }
 
