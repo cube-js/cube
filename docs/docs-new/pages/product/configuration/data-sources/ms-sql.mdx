@@ -13,7 +13,7 @@ redirect_from:
 
 ## Setup
 
-###  Manual
+### Manual
 
 Add the following to a `.env` file in your Cube project:
 
@@ -87,14 +87,14 @@ Database][ref-recipe-enable-ssl].
 
 ## Additional Configuration
 
-###  Windows Authentication
+### Windows Authentication
 
 To connect to a MSSQL database using Windows Authentication (also sometimes
 known as `trustedConnection`), instantiate the driver with
 `trustedConnection: true` in your `cube.js` configuration file:
 
 ```javascript
-const MssqlDriver = require('@cubejs-backend/mssql-driver');
+const MssqlDriver = require("@cubejs-backend/mssql-driver");
 module.exports = {
   driverFactory: ({ dataSource }) =>
     new MssqlDriver({ database: dataSource, trustedConnection: true }),
@@ -103,10 +103,11 @@ module.exports = {
 
 [mssql]: https://www.microsoft.com/en-gb/sql-server/sql-server-2019
 [ref-caching-using-preaggs-build-strats]:
-  /caching/using-pre-aggregations#pre-aggregation-build-strategies
+  /product/caching/using-pre-aggregations#pre-aggregation-build-strategies
 [ref-config-multiple-ds-decorating-env]:
-  /config/multiple-data-sources#configuring-data-sources-with-environment-variables-decorated-environment-variables
-[ref-recipe-enable-ssl]: /recipes/enable-ssl-connections-to-database
+  /product/configuration/advanced/multiple-data-sources#configuring-data-sources-with-environment-variables-decorated-environment-variables
+[ref-recipe-enable-ssl]:
+  /guides/recipes/data-sources/using-ssl-connections-to-data-source
 [ref-schema-ref-types-formats-countdistinctapprox]:
-  /schema/reference/types-and-formats#count-distinct-approx
+  /product/data-modeling/reference/types-and-formats#count-distinct-approx
 [self-preaggs-simple]: #simple

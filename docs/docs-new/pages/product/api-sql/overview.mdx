@@ -7,7 +7,9 @@ redirect_from:
 
 <SuccessBox>
 
-**We’re running a survey to better understand how you use Cube.** Please take a moment to [share with us what you think](https://forms.gle/b7iQHpocAXfpNfeR7). It will mean the world to us.
+**We’re running a survey to better understand how you use Cube.** Please take a
+moment to [share with us what you think](https://forms.gle/b7iQHpocAXfpNfeR7).
+It will mean the world to us.
 
 </SuccessBox>
 
@@ -24,7 +26,7 @@ The Cube SQL API allows querying Cube via Postgres-compatible SQL. It enables
 the use of BI applications, Python notebooks, reverse ETL tools, and other
 downstream tools on top of Cube.
 
-###  Supported Tools
+### Supported Tools
 
 Cube SQL API has been tested with
 
@@ -73,8 +75,8 @@ GROUP BY 1
 ```
 
 The SQL API transforms `SELECT` query fragments from **cube tables** into
-[Cube's internal query format](/query-format). This process is called **Cube
-query rewrite**.
+[Cube's internal query format](/product/api-rest/query-format). This process is
+called **Cube query rewrite**.
 
 The SQL query above would be rewritten into the following Cube query:
 
@@ -153,7 +155,7 @@ query rewrite and pushdown. Please refer to the reference to see whether
 specific functions, operators or expressions are supported in Cube query
 rewrite.
 
-###  Aggregated vs Non-aggregated queries
+### Aggregated vs Non-aggregated queries
 
 There are two types of queries supported against **cube tables**: aggregated and
 non-aggregated. Aggregated are those with `GROUP BY` statement, and
@@ -185,7 +187,7 @@ SELECT status, SUM(count) FROM orders GROUP BY 1
 SELECT status, MEASURE(count) FROM orders GROUP BY 1
 ```
 
-###  Filtering
+### Filtering
 
 Cube supports most simple equality operators like `=`, `<>`, `<`, `<=`, `>`,
 `>=` as well as `IN` and `LIKE` operators. Cube tries to push down all filters
@@ -193,7 +195,7 @@ into Cube query. In some cases, SQL filters aren't available in Cube and can be
 done in a post-processing phase. Time dimension filters will be converted to
 time dimension date ranges whenever it's possible.
 
-###  Ordering
+### Ordering
 
 Cube tries to push down all `ORDER BY` statements into Cube Query.
 
@@ -233,7 +235,7 @@ possibility of a wrong result if there are more than 50,000 rows. Given that
 queries to Cube are usually aggregated, it is rare that they may return more
 than 50,000 rows, but keep that limitation in mind when designing your queries.
 
-###  Limit
+### Limit
 
 Limit push down is supported by Cube however, a limit over 50,000 can't be
 overridden. In future versions, paging and streaming would be used to avoid this
@@ -241,9 +243,9 @@ limitation.
 
 ## Enabling SQL API in Cube Cloud
 
-To enable the SQL API in Cube Cloud, click&nbsp;<Btn>Deploy SQL API</Btn> from
-the&nbsp;<Btn>Overview</Btn> page, then click <Btn>How to connect your BI
-tool</Btn>. You should then see the following screen:
+To enable the SQL API in Cube Cloud, click <Btn>Deploy SQL API</Btn> from
+the <Btn>Overview</Btn> page, then click <Btn>How to connect your BI tool</Btn>.
+You should then see the following screen:
 
 ![SQL API details modal|690x428](https://ucarecdn.com/67508334-1641-43ec-9d50-a8f64629992b/)
 
@@ -337,7 +339,7 @@ cube=> SELECT MEASURE(count), status, DATE_TRUNC('month', created_at) date FROM 
                     55 | shipped    | 2016-05-01 00:00:00.000000
 ```
 
-###  Querying Dimensions
+### Querying Dimensions
 
 Querying dimensions is straightforward, simply add any required fields to the
 `SELECT` clause.
@@ -352,7 +354,7 @@ cube=> SELECT status FROM orders;
 (3 rows)
 ```
 
-###  Querying Measures
+### Querying Measures
 
 Measures can similarly be queried through Cube SQL.
 
@@ -480,7 +482,7 @@ SELECT max_value FROM orders
 SELECT MAX(max_value) FROM orders
 ```
 
-###  Querying Segments
+### Querying Segments
 
 Any segments defined in a data model can also be used in Cube SQL queries.
 Looking at the data model below, we have one segment `is_completed`:
@@ -516,5 +518,5 @@ Segments must be used as `boolean` types in Cube SQL queries:
 WHERE is_completed = true
 ```
 
-[ref-config-js]: /config
+[ref-config-js]: /reference/configuration/config
 [ref-dynamic-schemas]: /schema/dynamic-schema-creation

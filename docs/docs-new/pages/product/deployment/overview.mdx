@@ -121,7 +121,7 @@ by our CTO, [Pavel][gh-pavel].
 
 </InfoBox>
 
-###  Cube Store Router
+### Cube Store Router
 
 <div style={{ textAlign: "center" }}>
   <img
@@ -140,9 +140,9 @@ from Cube Store directly. Cube **only** communicates with the Router, and does
 not interact with Workers directly.
 
 [ref-caching-inspect-sql]:
-  /caching/using-pre-aggregations#inspecting-pre-aggregations
+  /product/caching/using-pre-aggregations#inspecting-pre-aggregations
 
-###  Cube Store Worker
+### Cube Store Worker
 
 <div style={{ textAlign: "center" }}>
   <img
@@ -159,7 +159,7 @@ selections and pre-aggregation warmup. Workers **do not** interact with each
 other directly, and instead rely on the Router to distribute queries and manage
 any associated metadata.
 
-###  Scaling
+### Scaling
 
 Although Cube Store _can_ be run in single-instance mode, this is often
 unsuitable for production deployments. For high concurrency and data throughput,
@@ -171,7 +171,7 @@ concurrency as you require.
 A sample Docker Compose stack setting Cube Store cluster up might look like:
 
 ```yaml
-version: '2.2'
+version: "2.2"
 
 services:
   cubestore_router:
@@ -210,7 +210,7 @@ services:
       - .cubestore:/cube/data
 ```
 
-###  Storage
+### Storage
 
 Cube Store makes use of a separate storage layer for storing metadata as well as
 for persisting pre-aggregations as Parquet files. Cube Store can use both AWS S3
@@ -220,7 +220,7 @@ cluster run on a single machine.
 A simplified example using AWS S3 might look like:
 
 ```yaml
-version: '2.2'
+version: "2.2"
 services:
   cubestore_router:
     image: cubejs/cubestore:latest
@@ -269,14 +269,16 @@ guide][blog-migration-guide].
   https://github.com/cube-js/cube/tree/master/examples/kubernetes
 [gh-cube-examples-k8s-helm]:
   https://github.com/cube-js/cube/tree/master/examples/helm-charts
-[ref-deploy-prod-list]: /deployment/production-checklist
-[ref-deploy-cubecloud]: /deployment/platforms/cube-cloud
-[ref-deploy-docker]: /deployment/platforms/docker
-[ref-config-env]: /reference/environment-variables
-[ref-config-js]: /config
-[ref-conf-ref-schemapath]: /config#options-reference-schema-path
+[ref-deploy-prod-list]: /product/deployment/production-checklist
+[ref-deploy-cubecloud]: /product/deployment/cloud/overview
+[ref-deploy-docker]: /product/deployment/core
+[ref-config-env]: /reference/configuration/environment-variables
+[ref-config-js]: /reference/configuration/config
+[ref-conf-ref-schemapath]:
+  /reference/configuration/config#options-reference-schema-path
 [redis]: https://redis.io
-[ref-config-redis]: /reference/environment-variables#cubejs-redis-password
+[ref-config-redis]:
+  /reference/configuration/environment-variables#cubejs-redis-password
 [blog-details]: https://cube.dev/blog/how-you-win-by-using-cube-store-part-1
 [blog-migration-guide]:
   https://cube.dev/blog/how-you-win-by-using-cube-store-part-1#how-to-migrate-to-cube-store

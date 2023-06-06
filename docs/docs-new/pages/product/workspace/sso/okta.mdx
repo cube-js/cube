@@ -24,11 +24,11 @@ Single sign-on with Okta is available in Cube Cloud on
 First, we'll enable SAML 2.0 authentication in Cube Cloud. To do this, log in to
 Cube Cloud and
 
-1. Click your username from the top-right corner, then click <Btn>Team &
-   Security</Btn>.
+1.  Click your username from the top-right corner, then click <Btn>Team &
+    Security</Btn>.
 
-2. On the <Btn>Authentication & SSO</Btn> tab, ensure <Btn>SAML 2.0</Btn> is
-   enabled:
+2.  On the <Btn>Authentication & SSO</Btn> tab, ensure <Btn>SAML 2.0</Btn> is
+    enabled:
 
 <Screenshot
   alt="Cube Cloud Team Authentication and SSO tab"
@@ -44,21 +44,21 @@ integration in Okta.
 Next, we'll create a [SAML app integration for Cube Cloud in
 Okta][okta-docs-create-saml-app].
 
-1. Log in to your Okta organization as an administrator, then navigate to the
-   Admin Console by clicking <Btn>Admin</Btn> in the top-right corner.
+1.  Log in to your Okta organization as an administrator, then navigate to the
+    Admin Console by clicking <Btn>Admin</Btn> in the top-right corner.
 
-2. Click <Btn>Applications > Applications</Btn> from the navigation on the left
-   of the screen, then click <Btn>Create App Integration</Btn>, then
-   select&nbsp;<Btn>SAML 2.0</Btn> and click <Btn>Next</Btn>.
+2.  Click <Btn>Applications > Applications</Btn> from the navigation on the left
+    of the screen, then click <Btn>Create App Integration</Btn>, then
+    select <Btn>SAML 2.0</Btn> and click <Btn>Next</Btn>.
 
 <Screenshot src="https://ucarecdn.com/16c9a49c-727f-46de-aa06-9534f92d3104/" />
 
-3. Enter a name for your application and click <Btn>Next</Btn>. You can
-   optionally upload a logo for the application, but this is not required.
+3.  Enter a name for your application and click <Btn>Next</Btn>. You can
+    optionally upload a logo for the application, but this is not required.
 
 <Screenshot src="https://ucarecdn.com/693fa44c-fb78-4eda-a25f-fa645f9679e4/" />
 
-4. Enter the following values in the <Btn>SAML Settings</Btn> section:
+4.  Enter the following values in the <Btn>SAML Settings</Btn> section:
 
 | Name                        | Description                                                 |
 | --------------------------- | ----------------------------------------------------------- |
@@ -67,8 +67,8 @@ Okta][okta-docs-create-saml-app].
 
 <Screenshot src="https://ucarecdn.com/f7e49547-e0ad-4fa3-902b-536e5926a0bc/" />
 
-5. Scroll down to the <Btn>Attribute Statements</Btn> section and create the
-   following entries:
+5.  Scroll down to the <Btn>Attribute Statements</Btn> section and create the
+    following entries:
 
 | Name    | Name format | Value            |
 | ------- | ----------- | ---------------- |
@@ -77,8 +77,8 @@ Okta][okta-docs-create-saml-app].
 
 <Screenshot src="https://ucarecdn.com/413cc680-68fc-46ac-9124-caed1f61df2f/" />
 
-6. Click <Btn>Next</Btn> to go to the <Btn>Feedback</Btn> screen, fill in any
-   necessary details and then <Btn>Finish</Btn> to complete the integration:
+6.  Click <Btn>Next</Btn> to go to the <Btn>Feedback</Btn> screen, fill in any
+    necessary details and then <Btn>Finish</Btn> to complete the integration:
 
 <Screenshot src="https://ucarecdn.com/a6ec09dc-0cd6-46e6-991b-3e158a44ffa4/" />
 
@@ -100,12 +100,12 @@ Certificate</Btn> values, as we will need them in the next step.
 In this step, we'll finalise the configuration by entering the values from our
 SAML integration in Okta into Cube Cloud.
 
-1. From the same <Btn>Authentication & SSO > SAML 2.0</Btn> tab, click the
-   <Btn>Advanced Settings</Btn> tab:
+1.  From the same <Btn>Authentication & SSO > SAML 2.0</Btn> tab, click the
+    <Btn>Advanced Settings</Btn> tab:
 
 <Screenshot src="https://ucarecdn.com/5359c52e-69c1-45fa-baf2-d3bb07d72634/" />
 
-2. Enter the following values in the <Btn>SAML Settings</Btn> section:
+2.  Enter the following values in the <Btn>SAML Settings</Btn> section:
 
 | Name                        | Description                                            |
 | --------------------------- | ------------------------------------------------------ |
@@ -113,18 +113,18 @@ SAML integration in Okta into Cube Cloud.
 | Identity Provider Login URL | Use the <Btn>Sign on URL</Btn> value from Okta         |
 | Certificate                 | Use the <Btn>Signing Certificate</Btn> value from Okta |
 
-3. Scroll down and click <Btn>Save SAML 2.0 Settings</Btn> to save the changes.
+3.  Scroll down and click <Btn>Save SAML 2.0 Settings</Btn> to save the changes.
 
 ## Log in with Okta
 
 The last step is to start using SAML authentication. To do this, use the
 following instructions:
 
-1. Click your username from the top-right corner, then click <Btn>Team &
-   Security</Btn>.
+1.  Click your username from the top-right corner, then click <Btn>Team &
+    Security</Btn>.
 
-2. On the <Btn>Authentication & SSO</Btn> tab, scroll down to <Btn>SAML
-   2.0</Btn> and copy the <Btn>Single Sign On URL</Btn> value:
+2.  On the <Btn>Authentication & SSO</Btn> tab, scroll down to <Btn>SAML
+    2.0</Btn> and copy the <Btn>Single Sign On URL</Btn> value:
 
 <Screenshot
   alt="Cube Cloud Team Authentication and SSO tab"
@@ -132,10 +132,10 @@ following instructions:
   highlight="inset(54% 3% 39% 3% round 10px)"
 />
 
-3. Open a new browser tab and paste the <Btn>Single Sign On URL</Btn> value into
-   the address bar, then press <Btn>Enter</Btn>. You should be redirected to
-   Okta to log in, and after a successful login, you should be redirected back
-   to Cube Cloud.
+3.  Open a new browser tab and paste the <Btn>Single Sign On URL</Btn> value
+    into the address bar, then press <Btn>Enter</Btn>. You should be redirected
+    to Okta to log in, and after a successful login, you should be redirected
+    back to Cube Cloud.
 
 [okta-docs-create-saml-app]:
   https://help.okta.com/en-us/Content/Topics/Apps/Apps_App_Integration_Wizard_SAML.htm

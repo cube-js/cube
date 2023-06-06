@@ -25,22 +25,22 @@ Let's add the role verification in the `cube.js` file.
 module.exports = {
   queryRewrite: (query, { securityContext }) => {
     if (!securityContext.role) {
-      throw new Error('No role found in Security Context!');
+      throw new Error("No role found in Security Context!");
     }
 
-    if (securityContext.role == 'manager') {
+    if (securityContext.role == "manager") {
       query.filters.push({
-        member: 'orders.status',
-        operator: 'equals',
-        values: ['shipped', 'completed'],
+        member: "orders.status",
+        operator: "equals",
+        values: ["shipped", "completed"],
       });
     }
 
-    if (securityContext.role == 'operator') {
+    if (securityContext.role == "operator") {
       query.filters.push({
-        member: 'orders.status',
-        operator: 'equals',
-        values: ['processing'],
+        member: "orders.status",
+        operator: "equals",
+        values: ["processing"],
       });
     }
 
@@ -79,12 +79,12 @@ We have received different data depending on the user's role.
 [
   {
     "orders.status": "completed",
-    "orders.count": "3346"
+    "orders.count": "3346",
   },
   {
     "orders.status": "shipped",
-    "orders.count": "3300"
-  }
+    "orders.count": "3300",
+  },
 ]
 ```
 
@@ -93,8 +93,8 @@ We have received different data depending on the user's role.
 [
   {
     "orders.status": "processing",
-    "orders.count": "3354"
-  }
+    "orders.count": "3354",
+  },
 ]
 ```
 

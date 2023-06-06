@@ -97,16 +97,12 @@ cubes:
   - name: teachers
     extends: users
     sql: >
-      SELECT *
-      FROM {users.sql()}
-      WHERE type = 'teacher'
+      SELECT * FROM {users.sql()} WHERE type = 'teacher'
 
   - name: students
     extends: users
     sql: >
-      SELECT *
-      FROM {users.sql()}
-      WHERE type = 'student'
+      SELECT * FROM {users.sql()} WHERE type = 'student'
 ```
 
 ```javascript
@@ -170,5 +166,6 @@ cube(`lessons`, {
 
 </CodeTabs>
 
-[ref-schema-advanced-extend]: /schema/advanced/extending-cubes
-[ref-schema-ref-cubes-extends]: /schema/reference/cube#extends
+[ref-schema-advanced-extend]:
+  /product/data-modeling/advanced/code-reusability-extending-cubes
+[ref-schema-ref-cubes-extends]: /product/data-modeling/reference/cube#extends

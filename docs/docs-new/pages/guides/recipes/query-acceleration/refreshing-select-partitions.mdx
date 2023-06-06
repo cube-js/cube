@@ -70,7 +70,7 @@ cube(`orders`, {
       granularity: `day`,
       partition_granularity: `month`, // this is where we specify the partition
       refresh_key: {
-        sql: `SELECT max(updated_at) FROM public.orders` // check for updates of the updated_at property
+        sql: `SELECT max(updated_at) FROM public.orders`, // check for updates of the updated_at property
       },
     },
   },
@@ -133,9 +133,8 @@ cubes:
         partition_granularity: month # this is where we specify the partition
         refreshKey:
           sql: >
-            SELECT max(updated_at)
-            FROM public.orders
-            WHERE {FILTER_PARAMS.orders.created_at.filter('created_at')}
+            SELECT max(updated_at) FROM public.orders WHERE
+            {FILTER_PARAMS.orders.created_at.filter('created_at')}
 ```
 
 ```javascript
@@ -151,7 +150,7 @@ cube(`orders`, {
         sql: `
           SELECT max(updated_at)
           FROM public.orders
-          WHERE ${FILTER_PARAMS.orders.created_at.filter('created_at')}`
+          WHERE ${FILTER_PARAMS.orders.created_at.filter("created_at")}`,
       },
     },
   },
@@ -201,26 +200,26 @@ them has been updated when an order changed its status:
     "orders.number": "1",
     "orders.status": "processing",
     "orders.created_at": "2021-08-10T14:26:40.000",
-    "orders.updated_at": "2021-08-10T14:26:40.000"
+    "orders.updated_at": "2021-08-10T14:26:40.000",
   },
   {
     "orders.number": "2",
     "orders.status": "completed",
     "orders.created_at": "2021-08-20T13:21:38.000",
-    "orders.updated_at": "2021-08-20T13:21:38.000"
+    "orders.updated_at": "2021-08-20T13:21:38.000",
   },
   {
     "orders.number": "3",
     "orders.status": "shipped",
     "orders.created_at": "2021-09-01T10:27:38.000",
-    "orders.updated_at": "2021-09-01T10:27:38.000"
+    "orders.updated_at": "2021-09-01T10:27:38.000",
   },
   {
     "orders.number": "4",
     "orders.status": "completed",
     "orders.created_at": "2021-09-20T10:27:38.000",
-    "orders.updated_at": "2021-09-20T10:27:38.000"
-  }
+    "orders.updated_at": "2021-09-20T10:27:38.000",
+  },
 ]
 ```
 
@@ -231,26 +230,26 @@ them has been updated when an order changed its status:
     "orders.number": "1",
     "orders.status": "shipped",
     "orders.created_at": "2021-08-10T14:26:40.000",
-    "orders.updated_at": "2021-09-30T06:45:28.000"
+    "orders.updated_at": "2021-09-30T06:45:28.000",
   },
   {
     "orders.number": "2",
     "orders.status": "completed",
     "orders.created_at": "2021-08-20T13:21:38.000",
-    "orders.updated_at": "2021-08-20T13:21:38.000"
+    "orders.updated_at": "2021-08-20T13:21:38.000",
   },
   {
     "orders.number": "3",
     "orders.status": "shipped",
     "orders.created_at": "2021-09-01T10:27:38.000",
-    "orders.updated_at": "2021-09-01T10:27:38.000"
+    "orders.updated_at": "2021-09-01T10:27:38.000",
   },
   {
     "orders.number": "4",
     "orders.status": "completed",
     "orders.created_at": "2021-09-20T10:27:38.000",
-    "orders.updated_at": "2021-09-20T10:27:38.000"
-  }
+    "orders.updated_at": "2021-09-20T10:27:38.000",
+  },
 ]
 ```
 

@@ -62,8 +62,7 @@ cubes:
     segments:
       - name: sf_users
         sql: >
-          {CUBE}.location = 'San Francisco' OR
-          {CUBE}.state = 'CA'
+          {CUBE}.location = 'San Francisco' OR {CUBE}.state = 'CA'
 ```
 
 </CodeTabs>
@@ -103,7 +102,7 @@ After defining a segment, you can pass it in [query object][ref-backend-query]:
 
 ## Parameters
 
-###  name
+### name
 
 The `name` parameter serves as the identifier of a segment. It must be unique
 among all segments, dimensions, and measures within a cube and follow the
@@ -135,7 +134,7 @@ cubes:
 
 </CodeTabs>
 
-###  public
+### public
 
 The `public` property is used to manage the visibility of a segment. Valid
 values for `public` are `true` and `false`. When set to `false`, this segment
@@ -165,7 +164,7 @@ cubes:
 
 </CodeTabs>
 
-###  sql
+### sql
 
 The `sql` parameter defines how a segment would filter out a subset of data. It
 takes any SQL expression that would be valid within a `WHERE` statement.
@@ -246,11 +245,13 @@ In this case following queries are equivalent:
 ```json
 {
   "measures": ["users.count"],
-  "filters": [{
-    "member": "users.location",
-    "operator": "equals",
-    "values": ["San Francisco"]
-  }]
+  "filters": [
+    {
+      "member": "users.location",
+      "operator": "equals",
+      "values": ["San Francisco"]
+    }
+  ]
 }
 ```
 
@@ -263,8 +264,8 @@ and
 }
 ```
 
-This case is a bad candidate for segment usage and a filter on a dimension works better
-here. `users.location` filter value can change a lot for user queries and
+This case is a bad candidate for segment usage and a filter on a dimension works
+better here. `users.location` filter value can change a lot for user queries and
 `users.sf_users` segment won't be used much in this case.
 
 A good candidate case for a segment is when you have a complex filtering
@@ -295,12 +296,11 @@ cubes:
     segments:
       - name: sf_ny_users
         sql: >
-          {CUBE}.location = 'San Francisco' OR
-          {CUBE}.location like '%New York%'
+          {CUBE}.location = 'San Francisco' OR {CUBE}.location like '%New York%'
 ```
 
 </CodeTabs>
 
-[ref-backend-query]: /query-format
-[ref-schema-gen]: /recipes/schema-generation
-[ref-naming]: /data-modeling/syntax#naming
+[ref-backend-query]: /product/api-rest/query-format
+[ref-schema-gen]: /guides/recipes/code-reusability/schema-generation
+[ref-naming]: /product/data-modeling/fundamentals/syntax#naming

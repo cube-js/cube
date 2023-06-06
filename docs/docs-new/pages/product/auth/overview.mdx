@@ -18,18 +18,18 @@ The diagram below shows how it works during the request processing in Cube:
 
 Authentication is handled outside of Cube. A typical use case would be:
 
-1. A web server serves an HTML page containing the Cube client, which needs to
-   communicate securely with the Cube API.
-2. The web server should generate a JWT with an expiry to achieve this. The
-   server could include the token in the HTML it serves or provide the token to
-   the frontend via an XHR request, which is then stored it in local storage or
-   a cookie.
-3. The JavaScript client is initialized using this token, and includes it in
-   calls to the Cube API.
-4. The token is received by Cube, and verified using any available JWKS (if
-   configured)
-5. Once decoded, the token claims are injected into the [security
-   context][ref-sec-ctx].
+1.  A web server serves an HTML page containing the Cube client, which needs to
+    communicate securely with the Cube API.
+2.  The web server should generate a JWT with an expiry to achieve this. The
+    server could include the token in the HTML it serves or provide the token to
+    the frontend via an XHR request, which is then stored it in local storage or
+    a cookie.
+3.  The JavaScript client is initialized using this token, and includes it in
+    calls to the Cube API.
+4.  The token is received by Cube, and verified using any available JWKS (if
+    configured)
+5.  Once decoded, the token claims are injected into the [security
+    context][ref-sec-ctx].
 
 <InfoBox>
 
@@ -65,10 +65,10 @@ In Node.js, the following code shows how to generate a token which will expire
 in 30 days. We recommend using the `jsonwebtoken` package for this.
 
 ```javascript
-const jwt = require('jsonwebtoken');
-const CUBE_API_SECRET = 'secret';
+const jwt = require("jsonwebtoken");
+const CUBE_API_SECRET = "secret";
 
-const cubejsToken = jwt.sign({}, CUBE_API_SECRET, { expiresIn: '30d' });
+const cubejsToken = jwt.sign({}, CUBE_API_SECRET, { expiresIn: "30d" });
 ```
 
 Then, in a web server or cloud function, create a route which generates and
@@ -78,17 +78,17 @@ your token using your own user authentication and authorization:
 ```javascript
 app.use((req, res, next) => {
   if (!req.user) {
-    res.redirect('/login');
+    res.redirect("/login");
     return;
   }
   next();
 });
 
-app.get('/auth/cubejs-token', (req, res) => {
+app.get("/auth/cubejs-token", (req, res) => {
   res.json({
     // Take note: cubejs expects the JWT payload to contain an object!
     token: jwt.sign(req.user, process.env.CUBEJS_API_SECRET, {
-      expiresIn: '1d',
+      expiresIn: "1d",
     }),
   });
 });
@@ -123,11 +123,12 @@ can then use it to query the Cube API.
 <InfoBox>
 
 Looking for a guide on how to connect a specific identity provider? Check out
-our recipes for using [Auth0][ref-recipe-auth0] or [AWS Cognito][ref-recipe-cognito] with Cube.
+our recipes for using [Auth0][ref-recipe-auth0] or [AWS
+Cognito][ref-recipe-cognito] with Cube.
 
 </InfoBox>
 
-###  Configuration
+### Configuration
 
 As mentioned previously, Cube supports verifying JWTs using industry-standard
 JWKS. The JWKS can be provided either from a URL, or as a JSON object conforming
@@ -140,7 +141,7 @@ Add the following to your `cube.js` configuration file:
 ```javascript
 module.exports = {
   jwt: {
-    key: '<JWK_AS_STRING>',
+    key: "<JWK_AS_STRING>",
   },
 };
 ```
@@ -165,7 +166,7 @@ Add the following to your `cube.js` configuration file:
 ```javascript
 module.exports = {
   jwt: {
-    jwkUrl: '<URL_TO_JWKS_JSON>',
+    jwkUrl: "<URL_TO_JWKS_JSON>",
   },
 };
 ```
@@ -176,7 +177,7 @@ Or configure the same using environment variables:
 CUBEJS_JWK_URL='<URL_TO_JWKS_JSON>'
 ```
 
-###  Verifying claims
+### Verifying claims
 
 Cube can also verify the audience, subject and issuer claims in JWTs. Similarly
 to JWK configuration, these can also be configured in the `cube.js`
@@ -185,9 +186,9 @@ configuration file:
 ```javascript
 module.exports = {
   jwt: {
-    audience: '<AUDIENCE_FROM_IDENTITY_PROVIDER>',
-    issuer: ['<ISSUER_FROM_IDENTITY_PROVIDER>'],
-    subject: '<SUBJECT_FROM_IDENTITY_PROVIDER>',
+    audience: "<AUDIENCE_FROM_IDENTITY_PROVIDER>",
+    issuer: ["<ISSUER_FROM_IDENTITY_PROVIDER>"],
+    subject: "<SUBJECT_FROM_IDENTITY_PROVIDER>",
   },
 };
 ```
@@ -200,7 +201,7 @@ CUBEJS_JWT_ISSUER='<ISSUER_FROM_IDENTITY_PROVIDER>'
 CUBEJS_JWT_SUBJECT='<SUBJECT_FROM_IDENTITY_PROVIDER>'
 ```
 
-###  Custom claims namespace
+### Custom claims namespace
 
 Cube can also extract claims defined in custom namespaces. Simply specify the
 namespace in your `cube.js` configuration file:
@@ -208,12 +209,12 @@ namespace in your `cube.js` configuration file:
 ```javascript
 module.exports = {
   jwt: {
-    claimsNamespace: 'my-custom-namespace',
+    claimsNamespace: "my-custom-namespace",
   },
 };
 ```
 
-###  Caching
+### Caching
 
 Cube caches JWKS by default when
 [`CUBEJS_JWK_URL` or `jwt.jwkUrl` is specified](#configuration).
@@ -247,10 +248,10 @@ you might do the following:
 module.exports = {
   checkAuth: async (req, auth) => {
     try {
-      const userInfo = await getUserFromLDAP(req.get('X-LDAP-User-ID'));
+      const userInfo = await getUserFromLDAP(req.get("X-LDAP-User-ID"));
       req.securityContext = userInfo;
     } catch {
-      throw new Error('Could not authenticate user from LDAP');
+      throw new Error("Could not authenticate user from LDAP");
     }
   },
 };
@@ -260,10 +261,10 @@ module.exports = {
   https://github.com/auth0/node-jsonwebtoken#token-expiration-exp-claim
 [link-jwt-libs]: https://jwt.io/#libraries-io
 [link-jwk-ref]: https://tools.ietf.org/html/rfc7517#section-4
-[ref-config-check-auth]: /config#check-auth
+[ref-config-check-auth]: /reference/configuration/config#check-auth
 [ref-config-migrate-cubejs]:
-  /configuration/overview#migration-from-express-to-docker-template
-[ref-recipe-auth0]: /recipes/authn-with-auth0
-[ref-recipe-cognito]: /recipes/authn-with-aws-cognito
-[ref-sec-ctx]: /security/context
+  /product/configuration/overview#migration-from-express-to-docker-template
+[ref-recipe-auth0]: /guides/recipes/auth/auth0-guide
+[ref-recipe-cognito]: /guides/recipes/auth/aws-cognito
+[ref-sec-ctx]: /product/auth/context
 [link-slack]: https://slack.cube.dev/

@@ -19,7 +19,7 @@ Here's a short video guide on how to connect Retool to Cube.
 > Don't have a Cube project yet?
 > [Learn how to get started here](https://cube.dev/docs/getting-started/cloud/overview).
 
-###  Cube Cloud
+### Cube Cloud
 
 Click the "How to connect" link on the Overview page, navigate to the REST API
 tab. You will see your connection credentials, the REST API URL and the
@@ -27,7 +27,7 @@ authorization token:
 
 <Screenshot src="https://ucarecdn.com/5e861647-21df-407d-951d-6a88d5ed9f97/" />
 
-###  Self-hosted Cube
+### Self-hosted Cube
 
 For a Cube instance publicly available at a specific `HOST`, the REST API URL
 would be `HOST/cubejs-api/v1`. Please refer to the
@@ -76,9 +76,7 @@ Because the name of the Retool query in the example is `OrdersByMonth`, using
 the data binding curly brackets will populate the charts with data from the REST
 API.
 
-```
-{{ OrdersByMonth.data.data }}
-```
+    {{ OrdersByMonth.data.data }}
 
 Reference the name of the query in your Retool charts.
 

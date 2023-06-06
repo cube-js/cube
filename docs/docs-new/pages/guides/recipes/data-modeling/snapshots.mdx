@@ -8,7 +8,8 @@ redirect_from:
 <InfoBox>
 
 This functionality only works with data models written in JavaScript, not YAML.
-For more information, check out the [Data Modeling Syntax][ref-modeling-syntax] page.
+For more information, check out the [Data Modeling Syntax][ref-modeling-syntax]
+page.
 
 </InfoBox>
 
@@ -23,8 +24,8 @@ date for a cube with `Product Id`, `Status`, and `Changed At` dimensions.
 
 We can consider the status property to be a
 [slowly changing dimension](https://en.wikipedia.org/wiki/Slowly_changing_dimension)
-(SCD) of type 2. Modeling data with slowly changing dimensions is an
-essential part of the data engineering skillset.
+(SCD) of type 2. Modeling data with slowly changing dimensions is an essential
+part of the data engineering skillset.
 
 </InfoBox>
 
@@ -170,7 +171,7 @@ change:
 [
   {
     "status_snapshots.count": 25,
-  }
+  },
 ]
 ```
 
@@ -181,4 +182,4 @@ Please feel free to check out the
 or run it with the `docker-compose up` command. You'll see the result, including
 queried data, in the console.
 
-[ref-modeling-syntax]: /data-modeling/syntax
+[ref-modeling-syntax]: /product/data-modeling/fundamentals/syntax

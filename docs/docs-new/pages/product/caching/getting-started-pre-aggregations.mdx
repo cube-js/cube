@@ -223,35 +223,35 @@ background as a scheduled process, unless configured otherwise.
 Cube selects the best available pre-aggregation based on the incoming queries it
 receives via the API. The process for selection is summarized below:
 
-1. Are all measures of type `count`, `sum`, `min`, `max` or
-   `count_distinct_approx`?
+1.  Are all measures of type `count`, `sum`, `min`, `max` or
+    `count_distinct_approx`?
 
-2. If yes, then check if
+2.  If yes, then check if
 
-   - The pre-aggregation contains all dimensions, filter dimensions and leaf
-     measures from the query
-   - The measures aren't multiplied ([via a `one_to_many`
-     relationship][ref-schema-joins-rel])
+    - The pre-aggregation contains all dimensions, filter dimensions and leaf
+      measures from the query
+    - The measures aren't multiplied ([via a `one_to_many`
+      relationship][ref-schema-joins-rel])
 
-3. If no, then check if
+3.  If no, then check if
 
-   - The query's time dimension granularity is set
-   - All query filter dimensions are included in query dimensions
-   - The pre-aggregation defines the **exact** set of dimensions and measures
-     used in the query
+    - The query's time dimension granularity is set
+    - All query filter dimensions are included in query dimensions
+    - The pre-aggregation defines the **exact** set of dimensions and measures
+      used in the query
 
 You can find a complete flowchart [here][self-select-pre-agg].
 
-###  Additivity
+### Additivity
 
 So far, we've described pre-aggregations as aggregated versions of your existing
 data. However, there are some rules that apply when Cube uses the
 pre-aggregation. The **additivity** of fields specified in both the query and in
 the pre-aggregation determines this.
 
-So what is additivity? Let's add another cube called `line_items` to the previous
-example to demonstrate. Many `line_items` can belong to any order from the `orders` cube, and are
-[joined][ref-schema-joins] as such:
+So what is additivity? Let's add another cube called `line_items` to the
+previous example to demonstrate. Many `line_items` can belong to any order from
+the `orders` cube, and are [joined][ref-schema-joins] as such:
 
 <CodeTabs>
 
@@ -356,7 +356,7 @@ cubes:
         type: sum
         sql: price
         format: currency
-  
+
     # ...
 ```
 
@@ -378,7 +378,7 @@ cube(`line_items`, {
       format: `currency`,
     },
   },
-  
+
   // ...
 });
 ```
@@ -394,7 +394,7 @@ additive** query. Additive leaf measures can only be of the following
 
 [ref-schema-types-measure]: /types-and-formats#measures-types
 
-###  Non-Additivity
+### Non-Additivity
 
 Using the same sample data for `line_items`, there's a `profit_margin` field
 which is different for each row. However, despite the value being numerical, it
@@ -467,7 +467,7 @@ our cube **as a [dimension][ref-schema-dims]**:
 cubes:
   - name: line_items
     # ...
-  
+
     dimensions:
       # ...
 
@@ -482,14 +482,14 @@ cubes:
 ```javascript
 cube(`line_items`, {
   // ...
-  
+
   dimensions: {
     // ...
 
     profit_margin: {
       sql: `profit_margin`,
       type: `number`,
-      format: 'percentage',
+      format: "percentage",
     },
   },
 
@@ -626,8 +626,8 @@ cube(`line_items`, {
     my_rollup: {
       // ...
 
-      measures: [ count_distinct_products ],
-    }
+      measures: [count_distinct_products],
+    },
   },
 
   // ...
@@ -636,7 +636,7 @@ cube(`line_items`, {
 
 </CodeTabs>
 
-###  Selecting the pre-aggregation
+### Selecting the pre-aggregation
 
 To recap what we've learnt so far:
 
@@ -697,15 +697,16 @@ Some extra considerations for pre-aggregation selection:
   [`use_original_sql_pre_aggregations`][ref-schema-preaggs-origsql].
 
 [ref-caching-preaggs-cubestore]:
-  /caching/using-pre-aggregations#pre-aggregations-storage
-[ref-caching-preaggs-refresh]: /caching/using-pre-aggregations#refresh-strategy
+  /product/caching/using-pre-aggregations#pre-aggregations-storage
+[ref-caching-preaggs-refresh]:
+  /product/caching/using-pre-aggregations#refresh-strategy
 [ref-caching-preaggs-storage]:
-  /caching/using-pre-aggregations#pre-aggregations-storage
-[ref-schema-dims]: /schema/reference/dimensions
-[ref-schema-joins]: /schema/reference/joins
-[ref-schema-joins-rel]: /schema/reference/joins#relationship
-[ref-schema-preaggs]: /schema/reference/pre-aggregations
+  /product/caching/using-pre-aggregations#pre-aggregations-storage
+[ref-schema-dims]: /product/data-modeling/reference/dimensions
+[ref-schema-joins]: /product/data-modeling/reference/joins
+[ref-schema-joins-rel]: /product/data-modeling/reference/joins#relationship
+[ref-schema-preaggs]: /product/data-modeling/reference/pre-aggregations
 [ref-schema-preaggs-origsql]:
-  /schema/reference/pre-aggregations#type-originalsql
+  /product/data-modeling/reference/pre-aggregations#type-originalsql
 [self-select-pre-agg]: #selecting-the-pre-aggregation
 [wiki-gcd]: https://en.wikipedia.org/wiki/Greatest_common_divisor

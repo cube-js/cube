@@ -120,7 +120,7 @@ query hasn't changed, the cached value will be returned. Otherwise, an SQL query
 will be executed against either the pre-aggregations storage or the source
 database to populate the cache with the results and return them.
 
-###  Refresh Keys
+### Refresh Keys
 
 Cube takes great care to prevent unnecessary queries from hitting your database.
 The first stage caching system caches query results, but Cube needs a way to
@@ -156,8 +156,8 @@ cube(`orders`, {
 
 </CodeTabs>
 
-With the following `refresh_key`, Cube will only refresh the data if the value of
-`MAX(created_at)` changes. By default, Cube will check this `refresh_key`
+With the following `refresh_key`, Cube will only refresh the data if the value
+of `MAX(created_at)` changes. By default, Cube will check this `refresh_key`
 every 10 seconds:
 
 <CodeTabs>
@@ -196,19 +196,19 @@ If background refresh is disabled, Cube will refresh the cache during query
 execution. Since this could lead to delays in responding to end-users, we
 recommend always enabling background refresh.
 
-###  Default Refresh Keys
+### Default Refresh Keys
 
 The default values for `refresh_key` are
 
 - `every: 2 minute` for BigQuery, Athena, Snowflake, and Presto.
 - `every: 10 second` for all other databases.
 
-You can use a custom SQL query to check if a refresh is required by changing
-the [`refresh_key`][ref-schema-ref-cube-refresh-key] property in a cube. Often, a
+You can use a custom SQL query to check if a refresh is required by changing the
+[`refresh_key`][ref-schema-ref-cube-refresh-key] property in a cube. Often, a
 `MAX(updated_at_timestamp)` for OLTP data is a viable option, or examining a
 metadata table for whatever system is managing the data to see when it last ran.
 
-###  Disabling the cache
+### Disabling the cache
 
 There's no straightforward way to disable caching in Cube. The reason is that
 Cube not only stores cached values but also uses the cache as a point of
@@ -254,11 +254,13 @@ every pre-aggregation's details: the list of queries it serves and all its
 versions.
 
 [link-cube-cloud]: https://cube.dev/cloud
-[ref-config-preagg-schema]: /config#pre-aggregations-schema
-[ref-dev-playground]: /dev-tools/dev-playground
-[ref-development-mode]: /configuration/overview#development-mode
-[ref-production-checklist]: /deployment/production-checklist
+[ref-config-preagg-schema]:
+  /reference/configuration/config#pre-aggregations-schema
+[ref-dev-playground]: /product/workspace/playground
+[ref-development-mode]: /product/configuration/overview#development-mode
+[ref-production-checklist]: /product/deployment/production-checklist
 [ref-production-checklist-refresh]:
-  /deployment/production-checklist#set-up-refresh-worker
-[ref-schema-ref-cube-refresh-key]: /schema/reference/cube#refresh-key
-[ref-schema-ref-preaggs]: /schema/reference/pre-aggregations
+  /product/deployment/production-checklist#set-up-refresh-worker
+[ref-schema-ref-cube-refresh-key]:
+  /product/data-modeling/reference/cube#refresh-key
+[ref-schema-ref-preaggs]: /product/data-modeling/reference/pre-aggregations

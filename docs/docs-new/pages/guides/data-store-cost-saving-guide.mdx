@@ -5,41 +5,41 @@ redirect_from:
 
 # Data Store Cost Saving Guide
 
-As a semantic layer, Cube supports various [data sources][ref-config-data-sources],
-including cloud-based data warehouses and regular databases, and various
-[use cases][ref-intro] such as embedded analytics and business intelligence.
+As a semantic layer, Cube supports various [data
+sources][ref-config-data-sources], including cloud-based data warehouses and
+regular databases, and various [use cases][ref-intro] such as embedded analytics
+and business intelligence.
 
 Depending on the upstream data source and the use case, Cube can be configured
 in a way that provides the best economic effect and maximizes cost savings.
 
 ## Reducing Data Store Usage
 
-Cloud-based data stores commonly use two pricing models: *on-demand*, when you
-get charged for the storage and compute resources used to process each query,
-or *flat-rate*, when queries consume an pre-agreed resource quota.
+Cloud-based data stores commonly use two pricing models: _on-demand_, when you
+get charged for the storage and compute resources used to process each query, or
+_flat-rate_, when queries consume an pre-agreed resource quota.
 
-Regardless of the pricing model, it's usually a good idea to implement
-measures that reduce usage:
+Regardless of the pricing model, it's usually a good idea to implement measures
+that reduce usage:
 
-- In case of the on-demand model, reduced usage will directly lead to a
-reduced  bill.
-- In case of the flat-rate model, reduced usage will reduce resource
-contention and leave more spare resources to other consumers (e.g., for ad-hoc
-exploration) or allow to reduce the allocated quota, leading to a reduced
-bill.
+- In case of the on-demand model, reduced usage will directly lead to a reduced
+  bill.
+- In case of the flat-rate model, reduced usage will reduce resource contention
+  and leave more spare resources to other consumers (e.g., for ad-hoc
+  exploration) or allow to reduce the allocated quota, leading to a reduced
+  bill.
 
-Often, reducing data store usage allows cloud-based
-[data warehouses][snowflake-auto-suspend] and
-[regular databases][neon-auto-suspend] to more frequently auto-suspend their
-compute resources or scale them down to zero.
+Often, reducing data store usage allows cloud-based [data
+warehouses][snowflake-auto-suspend] and [regular databases][neon-auto-suspend]
+to more frequently auto-suspend their compute resources or scale them down to
+zero.
 
 ### Using pre-aggregations
 
 Cube queries upstream data sources for the following purposes:
 
-- Serving interactive queries, incoming to any of
-[supported APIs][ref-config-apis], and populating the first, in-memory, layer
-of caching.
+- Serving interactive queries, incoming to any of [supported
+  APIs][ref-config-apis], and populating the first, in-memory, layer of caching.
 - Populating pre-aggregations, the second layer of [caching][ref-caching].
 - Ensuring and checking the freshness of data in both layers of caching.
 
@@ -50,10 +50,9 @@ most effective way to reduce data store usage and costs.
 
 <InfoBox>
 
-When defining your data model or generally operating the semantic
-layer, consider [inspecting your queries][ref-query-history] and
-[configuring necessary pre-aggregations][ref-caching-using-pre-aggs] on a
-periodic basis.
+When defining your data model or generally operating the semantic layer,
+consider [inspecting your queries][ref-query-history] and [configuring necessary
+pre-aggregations][ref-caching-using-pre-aggs] on a periodic basis.
 
 </InfoBox>
 
@@ -78,12 +77,12 @@ to check the status of any query.
 
 ### Refreshing data timely
 
-Pre-aggregations are populated by Cube on [schedule][ref-pre-agg-refresh-key],
-a [condition][ref-pre-agg-refresh-key], or an external trigger. Adjusting the
-timing and frequency of pre-aggregation refresh in accordance with your use
-case can substantially reduce the data store usage and costs. For example, if
-you know that data is loaded and transformed in a data warehouse daily, it
-makes sense to refresh pre-aggregations with the same cadence.
+Pre-aggregations are populated by Cube on [schedule][ref-pre-agg-refresh-key], a
+[condition][ref-pre-agg-refresh-key], or an external trigger. Adjusting the
+timing and frequency of pre-aggregation refresh in accordance with your use case
+can substantially reduce the data store usage and costs. For example, if you
+know that data is loaded and transformed in a data warehouse daily, it makes
+sense to refresh pre-aggregations with the same cadence.
 
 <InfoBox>
 
@@ -93,11 +92,11 @@ pre-aggregations according to your use case.
 </InfoBox>
 
 In real-time use cases, when queries should return fresh data, it is still
-possible to leverage pre-aggregations. Cube supports
-[lambda pre-aggregations][ref-caching-lambda-pre-aggs] which transparently
-combine cached data and recent data from the data store. Lambda
-pre-aggregations can reduce data store usage in cases when queries span both
-historical and recent data.
+possible to leverage pre-aggregations. Cube supports [lambda
+pre-aggregations][ref-caching-lambda-pre-aggs] which transparently combine
+cached data and recent data from the data store. Lambda pre-aggregations can
+reduce data store usage in cases when queries span both historical and recent
+data.
 
 <InfoBox>
 
@@ -113,14 +112,14 @@ data that change in time by appending new rows, not updating the existing ones.
 In that case, data can be partitioned by a time dimension and only metrics
 calculated from the last partition would need to be updated when new data
 arrives. For example, the volume of sales at Acme Corporation in year 2022
-doesn't change when new orders are made in 2023; however, the volume of sales
-in year 2023 will be changing as new orders are made during that year.
-Caching metrics for historical data and refreshing time-series data
-incrementally can help drastically reduce data source usage.
+doesn't change when new orders are made in 2023; however, the volume of sales in
+year 2023 will be changing as new orders are made during that year. Caching
+metrics for historical data and refreshing time-series data incrementally can
+help drastically reduce data source usage.
 
-Cube supports [partitioned and incrementally refreshed][ref-caching-partitioning-pre-aggs]
-pre-aggregations that, on update, retrieve only the last partition of data
-from the data store.
+Cube supports [partitioned and incrementally
+refreshed][ref-caching-partitioning-pre-aggs] pre-aggregations that, on update,
+retrieve only the last partition of data from the data store.
 
 <InfoBox>
 
@@ -131,13 +130,13 @@ partition.
 
 </InfoBox>
 
-Moreover, Cube supports customizable update windows that
-may span more than one partition, supporting use cases when relatively fresh
-historical data is indeed being updated. For example, financial transactions
-are often [settled in two or three business days][wiki-settlement-cycle];
-however, certain facts about transactions can change between their creation
-and settlement—but never after a transaction was settled. In this case, it
-makes sense to use an update window that spans from creation to settlement. 
+Moreover, Cube supports customizable update windows that may span more than one
+partition, supporting use cases when relatively fresh historical data is indeed
+being updated. For example, financial transactions are often [settled in two or
+three business days][wiki-settlement-cycle]; however, certain facts about
+transactions can change between their creation and settlement—but never after a
+transaction was settled. In this case, it makes sense to use an update window
+that spans from creation to settlement.
 
 <InfoBox>
 
@@ -146,20 +145,25 @@ when data outside the last partition can be updated.
 
 </InfoBox>
 
-[ref-config-data-sources]: /config/databases
-[ref-intro]: /introduction
-[ref-caching]: /caching
-[ref-pre-agg-refresh-key]: /schema/reference/pre-aggregations#parameters-refresh-key
-[ref-config-apis]: /config/downstream#ap-is-references
-[ref-caching-using-pre-aggs]: /caching/pre-aggregations/getting-started
-[ref-query-history]: /cloud/inspecting-queries
-[ref-caching-using-pre-aggs]: /caching/using-pre-aggregations
-[ref-caching-rollup-only-mode]: /caching/using-pre-aggregations#rollup-only-mode
-[ref-caching-lambda-pre-aggs]: /caching/pre-aggregations/lambda-pre-aggregations
+[ref-config-data-sources]: /product/configuration/data-sources
+[ref-intro]: /product/introduction
+[ref-caching]: /product/caching/overview
+[ref-pre-agg-refresh-key]:
+  /product/data-modeling/reference/pre-aggregations#parameters-refresh-key
+[ref-config-apis]: /product/configuration/visualization-tools#ap-is-references
+[ref-caching-using-pre-aggs]: /product/caching/getting-started-pre-aggregations
+[ref-query-history]: /product/workspace/query-inspection
+[ref-caching-using-pre-aggs]: /product/caching/using-pre-aggregations
+[ref-caching-rollup-only-mode]:
+  /product/caching/using-pre-aggregations#rollup-only-mode
+[ref-caching-lambda-pre-aggs]: /product/caching/lambda-pre-aggregations
 [wiki-fact-table]: https://en.wikipedia.org/wiki/Fact_table
 [wiki-time-series]: https://en.wikipedia.org/wiki/Time_series
-[ref-caching-partitioning-pre-aggs]: /caching/using-pre-aggregations#partitioning
+[ref-caching-partitioning-pre-aggs]:
+  /product/caching/using-pre-aggregations#partitioning
 [wiki-settlement-cycle]: https://en.wikipedia.org/wiki/T%2B2
-[ref-workspace-pre-aggs]: http://localhost:8000/cloud/inspecting-pre-aggregations
-[snowflake-auto-suspend]: https://docs.snowflake.com/en/user-guide/warehouses-overview#auto-suspension-and-auto-resumption
+[ref-workspace-pre-aggs]:
+  http://localhost:8000/cloud/inspecting-pre-aggregations
+[snowflake-auto-suspend]:
+  https://docs.snowflake.com/en/user-guide/warehouses-overview#auto-suspension-and-auto-resumption
 [neon-auto-suspend]: https://neon.tech/docs/introduction/autoscaling

@@ -32,7 +32,7 @@ block**][wiki-cidr-block] used by Cube Cloud to connect to your VPC.
 
 ## Setup
 
-###  VPC Peering Request
+### VPC Peering Request
 
 After receiving the information above, Cube Cloud will send a [VPC peering
 request][aws-docs-vpc-peering] that must be accepted. This can be done either
@@ -42,7 +42,7 @@ tool.
 To [accept the VPC peering request][aws-docs-vpc-peering-accept] through the AWS
 Web Console, follow the instructions below:
 
-1. Open the [Amazon VPC console](https://console.aws.amazon.com/vpc/).
+1.  Open the [Amazon VPC console](https://console.aws.amazon.com/vpc/).
 
   <WarningBox>
 
@@ -51,13 +51,13 @@ Web Console, follow the instructions below:
 
   </WarningBox>
 
-2. Use the Region selector to choose the Region of the accepter VPC.
+2.  Use the Region selector to choose the Region of the accepter VPC.
 
-3. In the navigation pane, choose <Btn>Peering connections</Btn>.
+3.  In the navigation pane, choose <Btn>Peering connections</Btn>.
 
-4. Select the pending VPC peering connection (the status should be
-   `pending-acceptance`), then choose <Btn>Actions</Btn>, followed by&nbsp;
-   &ZeroWidthSpace;<Btn>Accept request</Btn>.
+4.  Select the pending VPC peering connection (the status should be
+    `pending-acceptance`), then choose <Btn>Actions</Btn>, followed by 
+    ​<Btn>Accept request</Btn>.
 
   <WarningBox>
 
@@ -66,10 +66,11 @@ Web Console, follow the instructions below:
 
   </WarningBox>
 
-5. When prompted for confirmation, choose <Btn>Accept request</Btn>.
+5.  When prompted for confirmation, choose <Btn>Accept request</Btn>.
 
-6. Choose <Btn>Modify my route tables now</Btn> to add a route to the VPC route
-   table so that you can send and receive traffic across the peering connection.
+6.  Choose <Btn>Modify my route tables now</Btn> to add a route to the VPC route
+    table so that you can send and receive traffic across the peering
+    connection.
 
 <InfoBox>
 
@@ -78,7 +79,7 @@ For more information about peering connection lifecycle statuses, check out the
 
 </InfoBox>
 
-###  Updating security groups
+### Updating security groups
 
 The initial VPC setup will not allow traffic from Cube Cloud; this is because
 [the security group][aws-docs-vpc-security-group] for the database will need to
@@ -90,7 +91,7 @@ This can be achieved by adding a new security group rule:
 | -------- | ---------- | --------------------------------------------- |
 | TCP      | 3306       | The Cube Cloud CIDR block for the AWS region. |
 
-###  Update route tables
+### Update route tables
 
 The final step is to update route tables in your VPC to allow traffic from Cube
 Cloud to reach your database. The Cube Cloud CIDR block must be added to the

@@ -43,9 +43,9 @@ the following example, we call it `batch`. Please note, it must have a
 `time_dimension` and `partition_granularity` specified. Cube will use these
 properties to union batch data with freshly-retrieved source data.
 
-You may also control the batch part of your data with the `build_range_start` and
-`build_range_end` properties of a pre-aggregation to determine a specific window
-for your batched data.
+You may also control the batch part of your data with the `build_range_start`
+and `build_range_end` properties of a pre-aggregation to determine a specific
+window for your batched data.
 
 Next, you need to create a lambda pre-aggregation. To do that, create
 pre-aggregation with type `rollup_lambda`, specify rollups you would like to use
@@ -84,14 +84,14 @@ cubes:
 ```
 
 ```javascript
-cube('users', {
+cube("users", {
   // ...
 
   pre_aggregations: {
     lambda: {
       type: `rollup_lambda`,
       union_with_source_data: true,
-      rollups: [CUBE.batch]
+      rollups: [CUBE.batch],
     },
 
     batch: {
@@ -101,14 +101,14 @@ cube('users', {
       granularity: `day`,
       partition_granularity: `day`,
       build_range_start: {
-        sql: `SELECT '2020-01-01'`
+        sql: `SELECT '2020-01-01'`,
       },
       build_range_end: {
-        sql: `SELECT '2022-05-30'`
+        sql: `SELECT '2022-05-30'`,
       },
     },
   },
-})
+});
 ```
 
 </CodeTabs>
@@ -178,7 +178,7 @@ cubes:
 
 ```javascript
 // This cube uses a streaming SQL data source such as ksqlDB
-cube('streaming_users', {
+cube("streaming_users", {
   // ...
 
   pre_aggregations: {
@@ -194,13 +194,13 @@ cube('streaming_users', {
 });
 
 // This cube uses a data source such as ClickHouse or BigQuery
-cube('users', {
+cube("users", {
   // ...
 
   pre_aggregations: {
     batch_streaming_lambda: {
       type: `rollup_lambda`,
-      rollups: [users.batch, streaming_users.streaming]
+      rollups: [users.batch, streaming_users.streaming],
     },
 
     batch: {
@@ -211,10 +211,10 @@ cube('users', {
       granularity: `day`,
       partition_granularity: `day`,
       build_range_start: {
-        sql: `SELECT '2020-01-01'`
+        sql: `SELECT '2020-01-01'`,
       },
       build_range_end: {
-        sql: `SELECT '2022-05-30'`
+        sql: `SELECT '2022-05-30'`,
       },
     },
   },
@@ -223,4 +223,5 @@ cube('users', {
 
 </CodeTabs>
 
-[streaming-pre-agg]: /caching/using-pre-aggregations#streaming-pre-aggregations
+[streaming-pre-agg]:
+  /product/caching/using-pre-aggregations#streaming-pre-aggregations

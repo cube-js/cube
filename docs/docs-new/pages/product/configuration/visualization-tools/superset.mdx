@@ -24,7 +24,7 @@ here][ref-getting-started].
 
 </InfoBox>
 
-###  Cube Cloud
+### Cube Cloud
 
 Click **How to connect your BI tool** link on the Overview page, navigate to the
 SQL API tab and enable it. Once enabled, you should see the screen like the one
@@ -32,7 +32,7 @@ below with your connection credentials:
 
 <Screenshot src="https://cubedev-blog-images.s3.us-east-2.amazonaws.com/bac4cfb4-d89c-46fa-a7d4-552c2ece4a18.GIF" />
 
-###  Self-hosted Cube
+### Self-hosted Cube
 
 You need to set the following environment variables to enable the Cube SQL API.
 These credentials will be required to connect to Cube from Superset later.
@@ -43,7 +43,7 @@ CUBEJS_SQL_USER=myusername
 CUBEJS_SQL_PASSWORD=mypassword
 ```
 
-###  Connecting from Superset
+### Connecting from Superset
 
 Apache Superset connects to Cube as to a Postgres database.
 
@@ -125,25 +125,26 @@ Now, we can explore this dataset. Let's create a new chart of type line with
   src="https://ucarecdn.com/c509c6fb-f633-4ded-ae94-d4768978c47a/"
 />
 
-We can select the `COUNT(*)` as a metric and `created_at` as the time column with
-a time grain of `month`.
+We can select the `COUNT(*)` as a metric and `created_at` as the time column
+with a time grain of `month`.
 
 The `COUNT(*)` aggregate function is being mapped to a measure of type
-[count](/schema/reference/types-and-formats#measures-types-count) in Cube's
-**Orders** data model file.
+[count](/product/data-modeling/reference/types-and-formats#measures-types-count)
+in Cube's **Orders** data model file.
 
 ## Additional Configuration
 
-###  Pre-Aggregations
+### Pre-Aggregations
 
 To allow queries from Superset to match pre-aggregations in Cube, [the
-`allow_non_strict_date_range_match` property][ref-schema-ref-preagg-allownonstrict]
-must be set to `true` in the pre-aggregation definition. This is because
-Superset uses loose date ranges when generating SQL queries.
+`allow_non_strict_date_range_match`
+property][ref-schema-ref-preagg-allownonstrict] must be set to `true` in the
+pre-aggregation definition. This is because Superset uses loose date ranges when
+generating SQL queries.
 
-[ref-getting-started]: /getting-started/cloud/overview
+[ref-getting-started]: /product/getting-started/cloud/overview
 [ref-schema-ref-preagg-allownonstrict]:
-  /schema/reference/pre-aggregations#allow-non-strict-date-range-match
+  /product/data-modeling/reference/pre-aggregations#allow-non-strict-date-range-match
 [superset]: https://superset.apache.org/
 [superset-docs-installation-docker]:
   https://superset.apache.org/docs/installation/installing-superset-using-docker-compose

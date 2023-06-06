@@ -9,7 +9,8 @@ redirect_from:
 <InfoBox>
 
 This functionality only works with data models written in JavaScript, not YAML.
-For more information, check out the [Data Modeling Syntax][ref-modeling-syntax] page.
+For more information, check out the [Data Modeling Syntax][ref-modeling-syntax]
+page.
 
 </InfoBox>
 
@@ -52,7 +53,7 @@ cube(`PurchaseFunnel`, {
         eventsView: {
           sql: `select * from events where event = 'purchase_product'`,
         },
-        timeToConvert: '1 day',
+        timeToConvert: "1 day",
       },
     ],
   }),
@@ -64,7 +65,7 @@ not straight forward, the SQL code itself is quite complicated, even for such a
 small funnel.
 
 <a href="#" class="accordion-trigger" id="show-sql-accordion">
-  {' '}
+  {" "}
   Show Funnel's SQL
 </a>
 
@@ -162,7 +163,7 @@ LIMIT
 
 ## Funnel parameters
 
-###  userId
+### userId
 
 A unique key to identify the users moving through the funnel.
 
@@ -172,7 +173,7 @@ userId: {
 }
 ```
 
-###  nextStepUserId
+### nextStepUserId
 
 In the situation where `user_id` changes between steps, you can pass a unique
 key to join two adjacent steps. For example, if a user signs in after having
@@ -206,21 +207,21 @@ cube(`OnboardingFunnel`, {
         nextStepUserId: {
           sql: `user_id`,
         },
-        timeToConvert: '1 day',
+        timeToConvert: "1 day",
       },
       {
         name: `Action`,
         eventsView: {
           sql: `select user_id as id from actions`,
         },
-        timeToConvert: '1 day',
+        timeToConvert: "1 day",
       },
     ],
   }),
 });
 ```
 
-###  time
+### time
 
 A timestamp of the event.
 
@@ -230,7 +231,7 @@ time: {
 }
 ```
 
-###  steps
+### steps
 
 An array of steps. Each step has 2 required and 1 optional parameters:
 
@@ -251,7 +252,7 @@ steps: [
     eventsView: {
       sql: `select * from events where event = 'purchase_product'`,
     },
-    timeToConvert: '1 day',
+    timeToConvert: "1 day",
   },
 ];
 ```
@@ -290,7 +291,7 @@ Cube is based on
 
 Funnel-based cubes have the following structure:
 
-###  Measures
+### Measures
 
 - **conversions** - Count of conversions in the funnel. The most useful when
   broken down by **steps**. It's the classic funnel view.
@@ -298,7 +299,7 @@ Funnel-based cubes have the following structure:
   to inspect a specific step, or set of steps, and find out how a conversion has
   changed over time.
 
-###  Dimensions
+### Dimensions
 
 - **step** - Describes funnels' steps. Use it to break down **conversions** or
   **conversionsPercent** by steps, or to filter for a specific step.
@@ -311,12 +312,12 @@ In the following example, we use the `conversions` measure along with the
 <iframe
   src="https://codesandbox.io/embed/nw87w1nnjm?fontsize=14"
   style={{
-      width: "100%",
-      height:500,
-      border:0,
-      borderRadius: 4,
-      overflow:"hidden"
-    }}
+    width: "100%",
+    height: 500,
+    border: 0,
+    borderRadius: 4,
+    overflow: "hidden",
+  }}
   sandbox="allow-modals allow-forms allow-popups allow-scripts allow-same-origin"
 ></iframe>
 
@@ -344,7 +345,8 @@ cube(`PurchaseFunnel`, {
 });
 ```
 
-[ref-modeling-syntax]: /data-modeling/syntax
-[ref-partitioned-rollups]: /caching/using-pre-aggregations#time-partitioning
+[ref-modeling-syntax]: /product/data-modeling/fundamentals/syntax
+[ref-partitioned-rollups]:
+  /product/caching/using-pre-aggregations#time-partitioning
 [ref-schema-ref-preaggs-origsql]:
-  /schema/reference/pre-aggregations#type-originalsql
+  /product/data-modeling/reference/pre-aggregations#type-originalsql

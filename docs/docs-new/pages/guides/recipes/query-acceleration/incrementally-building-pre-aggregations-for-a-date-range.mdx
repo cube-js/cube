@@ -33,8 +33,7 @@ cubes:
           id AS user_id,
           created_at
         FROM public.users
-      ),
-      organizations AS (
+      ), organizations AS (
         (
           SELECT
             md5(company) AS id,
@@ -46,8 +45,7 @@ cubes:
             1,
             2
         )
-      )
-      SELECT
+      ) SELECT
         users.*,
         organizations.name AS org_name
       FROM
@@ -182,9 +180,9 @@ cubes:
           id AS user_id,
           created_at
         FROM public.users
-        WHERE {FILTER_PARAMS.users_with_organizations.created_at.filter('created_at')}
-      ),
-      organizations AS (
+        WHERE
+      {FILTER_PARAMS.users_with_organizations.created_at.filter('created_at')}
+      ), organizations AS (
         (
           SELECT
             md5(company) AS id,
@@ -196,8 +194,7 @@ cubes:
             1,
             2
         )
-      )
-      SELECT
+      ) SELECT
         users.*,
         organizations.name AS org_name
       FROM
@@ -209,7 +206,7 @@ cubes:
 ```
 
 ```javascript
-cube('users_with_organizations', {
+cube("users_with_organizations", {
   sql: `
 WITH users AS (
     SELECT
@@ -217,7 +214,9 @@ WITH users AS (
       id AS user_id,
       created_at
     FROM public.users
-    WHERE ${FILTER_PARAMS.users_with_organizations.created_at.filter('created_at')}
+    WHERE ${FILTER_PARAMS.users_with_organizations.created_at.filter(
+      "created_at"
+    )}
 ),
 organizations AS (
   (
@@ -256,7 +255,9 @@ used to apply the build ranges as defined by `build_range_start` and
 `build_range_end`.
 
 [ref-schema-ref-preagg-buildrange]:
-  /schema/reference/pre-aggregations#parameters-build-range-start-and-build-range-end
-[ref-schema-ref-cube-filterparam]: /schema/reference/cube#filter-params
+  /product/data-modeling/reference/pre-aggregations#parameters-build-range-start-and-build-range-end
+[ref-schema-ref-cube-filterparam]:
+  /product/data-modeling/reference/cube#filter-params
 [self-config-aws-athena]: /config/databases/aws-athena/
-[self-config-google-bigquery]: /config/databases/google-bigquery
+[self-config-google-bigquery]:
+  /product/configuration/data-sources/google-bigquery

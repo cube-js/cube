@@ -50,7 +50,7 @@ The `options` object is passed directly to
 components or services:
 
 ```typescript
-import { CubejsClient } from '@cubejs-client/ngx';
+import { CubejsClient } from "@cubejs-client/ngx";
 
 export class AppComponent {
   constructor(private cubejs: CubejsClient) {}
@@ -58,13 +58,13 @@ export class AppComponent {
   ngOnInit() {
     this.cubejs
       .load({
-        measures: ['some_measure'],
+        measures: ["some_measure"],
       })
       .subscribe(
         (resultSet) => {
           this.data = resultSet.chartPivot();
         },
-        (err) => console.log('HTTP Error', err)
+        (err) => console.log("HTTP Error", err)
       );
   }
 }

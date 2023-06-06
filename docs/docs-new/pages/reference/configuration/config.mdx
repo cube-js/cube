@@ -112,7 +112,7 @@ interface FileContent {
 }
 ```
 
-###  dbType
+### dbType
 
 <WarningBox>
 
@@ -131,20 +131,20 @@ If no option is passed, Cube will lookup for environment variable
 
 Called only once per [`appId`][self-opts-ctx-to-appid].
 
-###  schemaPath
+### schemaPath
 
 Path to data model files. The default value is `/model`.
 
-###  basePath
+### basePath
 
-[REST API](/rest-api) base path. The default value is `/cubejs-api`.
+[REST API](/reference/rest-api) base path. The default value is `/cubejs-api`.
 
-###  webSocketsBasePath
+### webSocketsBasePath
 
 The base path for the websockets server. By default, the WebSockets server will
 run on the root path.
 
-###  logger
+### logger
 
 A function to setup a custom logger. It accepts the following arguments:
 
@@ -159,7 +159,7 @@ module.exports = {
 };
 ```
 
-###  driverFactory
+### driverFactory
 
 Set a custom database driver. The function accepts context object as an argument
 to allow dynamically loading database drivers, which is usually used in
@@ -192,7 +192,7 @@ module.exports = {
 };
 ```
 
-###  contextToAppId
+### contextToAppId
 
 It is a [Multitenancy Setup][ref-multitenancy] option.
 
@@ -209,7 +209,7 @@ module.exports = {
 };
 ```
 
-###  contextToOrchestratorId
+### contextToOrchestratorId
 
 <WarningBox>
 
@@ -244,7 +244,7 @@ module.exports = {
 };
 ```
 
-###  repositoryFactory
+### repositoryFactory
 
 This option allows to customize the repository for Cube data model files. It is
 a function, which accepts a context object and can dynamically select
@@ -276,7 +276,7 @@ module.exports = {
 };
 ```
 
-###  checkAuth
+### checkAuth
 
 Used in both REST and WebSockets API. Can be an `async` function. Default
 implementation parses [JSON Web Tokens (JWT)][link-jwt] in `Authorization`
@@ -297,7 +297,7 @@ module.exports = {
 };
 ```
 
-###  checkSqlAuth
+### checkSqlAuth
 
 Used in [SQL API][ref-sql-api], and can be an `async` function. Default
 implementation verify username & password from environment variables:
@@ -323,7 +323,7 @@ module.exports = {
 };
 ```
 
-###  canSwitchSqlUser
+### canSwitchSqlUser
 
 Used in [SQL API][ref-sql-api], and can be an `async` function. Default
 implementation depends on `CUBEJS_SQL_SUPERUSER` and return `true` when it's
@@ -349,7 +349,7 @@ module.exports = {
 };
 ```
 
-###  queryRewrite
+### queryRewrite
 
 <WarningBox>
 
@@ -381,7 +381,7 @@ module.exports = {
 };
 ```
 
-###  preAggregationsSchema
+### preAggregationsSchema
 
 Schema name to use for storing pre-aggregations. For some drivers like MySQL
 it's name for pre-aggregation database as there's no database schema concept
@@ -416,7 +416,7 @@ module.exports = {
 };
 ```
 
-###  schemaVersion
+### schemaVersion
 
 Schema version can be used to tell Cube that the data model should be recompiled
 in case it depends on dynamic definitions fetched from some external database or
@@ -435,7 +435,7 @@ module.exports = {
 };
 ```
 
-###  scheduledRefreshTimer
+### scheduledRefreshTimer
 
 <WarningBox>
 
@@ -480,7 +480,7 @@ You may also need to configure
 [`scheduledRefreshTimeZones`][self-opts-sched-refresh-tz] and
 [`scheduledRefreshContexts`][self-opts-sched-refresh-ctxs].
 
-###  scheduledRefreshTimeZones
+### scheduledRefreshTimeZones
 
 All time-based calculations performed within Cube are timezone-aware. Using this
 property you can specify multiple timezones in [TZ Database Name][link-wiki-tz]
@@ -502,7 +502,7 @@ comma-separated list of timezones to refresh in
 CUBEJS_SCHEDULED_REFRESH_TIMEZONES=America/Los_Angeles,UTC
 ```
 
-###  scheduledRefreshContexts
+### scheduledRefreshContexts
 
 When trying to configure scheduled refreshes for pre-aggregations that use the
 `securityContext` inside `contextToAppId` or `contextToOrchestratorId`, you must
@@ -537,7 +537,7 @@ module.exports = {
 };
 ```
 
-###  extendContext
+### extendContext
 
 Option to extend the `RequestContext` with custom values. This method is called
 on each request. Can be async.
@@ -575,29 +575,29 @@ cube(`Users`, {
 });
 ```
 
-###  compilerCacheSize
+### compilerCacheSize
 
 Maximum number of compiled data models to persist with in-memory cache. Defaults
 to 250, but optimum value will depend on deployed environment. When the max is
 reached, will start dropping the least recently used data models from the cache.
 
-###  maxCompilerCacheKeepAlive
+### maxCompilerCacheKeepAlive
 
 Maximum length of time in ms to keep compiled data models in memory. Default
 keeps data models in memory indefinitely.
 
-###  updateCompilerCacheKeepAlive
+### updateCompilerCacheKeepAlive
 
 Providing `updateCompilerCacheKeepAlive: true` keeps frequently used data models
 in memory by reseting their `maxCompilerCacheKeepAlive` every time they are
 accessed.
 
-###  allowUngroupedWithoutPrimaryKey
+### allowUngroupedWithoutPrimaryKey
 
 Providing `allowUngroupedWithoutPrimaryKey: true` disables primary key inclusion
 check for `ungrouped` queries.
 
-###  telemetry
+### telemetry
 
 Cube collects high-level anonymous usage statistics for servers started in
 development mode. It doesn't track any credentials, data model contents or
@@ -613,7 +613,7 @@ module.exports = {
 };
 ```
 
-###  http
+### http
 
 #### cors
 
@@ -635,7 +635,7 @@ module.exports = {
 };
 ```
 
-###  jwt
+### jwt
 
 #### jwkUrl
 
@@ -672,12 +672,12 @@ JWTs][link-jwt-ref-sub]. Can also be set using `CUBEJS_JWT_SUBJECT`.
 A namespace within the decoded JWT under which any custom claims can be found.
 Can also be set using `CUBEJS_JWT_CLAIMS_NAMESPACE`.
 
-###  cacheAndQueueDriver
+### cacheAndQueueDriver
 
 The cache and queue driver to use for the Cube.js deployment. Defaults to
 `memory` in development, `cubestore` in production.
 
-###  orchestratorOptions
+### orchestratorOptions
 
 <WarningBox>
 
@@ -723,13 +723,13 @@ module.exports = {
 };
 ```
 
-###  allowJsDuplicatePropsInSchema
+### allowJsDuplicatePropsInSchema
 
 Boolean to enable or disable a check duplicate property names in all objects of
 a data model. The default value is `false`, and it is means the compiler would
 use the additional transpiler for check duplicates.
 
-###  initApp
+### initApp
 
 <WarningBox>
 
@@ -754,7 +754,7 @@ module.exports = {
 };
 ```
 
-###  processSubscriptionsInterval
+### processSubscriptionsInterval
 
 This property controls how often Websocket client subscriptions are refreshed.
 Defaults to `5000`.
@@ -782,7 +782,7 @@ Timeout and interval options' values are in seconds.
 
 `RequestContext` object is filled by context data on a HTTP request level.
 
-###  securityContext
+### securityContext
 
 Defined as `req.securityContext` which should be set by
 [`checkAuth`][self-opts-checkauth]. Default implementation of
@@ -832,30 +832,33 @@ module.exports = {
 [link-jwt-ref-sub]: https://tools.ietf.org/html/rfc7519#section-4.1.2
 [link-jwt-ref-aud]: https://tools.ietf.org/html/rfc7519#section-4.1.3
 [link-wiki-tz]: https://en.wikipedia.org/wiki/Tz_database
-[ref-caching-up-to-date]: /caching#keeping-cache-up-to-date
-[ref-development-mode]: /configuration/overview#development-mode
-[ref-multitenancy]: /config/multitenancy
-[ref-rest-api]: /rest-api
-[ref-sql-api]: /backend/sql
-[ref-rest-api-sched-refresh]: /rest-api#v-1-run-scheduled-refresh
+[ref-caching-up-to-date]: /product/caching/overview#keeping-cache-up-to-date
+[ref-development-mode]: /product/configuration/overview#development-mode
+[ref-multitenancy]: /product/configuration/advanced/multitenancy
+[ref-rest-api]: /reference/rest-api
+[ref-sql-api]: /product/api-sql/overview
+[ref-rest-api-sched-refresh]: /reference/rest-api#v-1-run-scheduled-refresh
 [ref-pre-aggregations-refresh-key]:
-  /schema/reference/pre-aggregations#refresh-key
-[ref-schema-cube-ref-refresh-key]: /schema/reference/cube#refresh-key
-[ref-schema-cube-ref-ctx-sec-ctx]: /schema/reference/cube#security-context
-[ref-schema-ref-preaggs-rollup]: /schema/reference/pre-aggregations#type-rollup
-[ref-sec]: /security
-[ref-sec-ctx]: /security/context
+  /product/data-modeling/reference/pre-aggregations#refresh-key
+[ref-schema-cube-ref-refresh-key]:
+  /product/data-modeling/reference/cube#refresh-key
+[ref-schema-cube-ref-ctx-sec-ctx]:
+  /product/data-modeling/reference/cube#security-context
+[ref-schema-ref-preaggs-rollup]:
+  /product/data-modeling/reference/pre-aggregations#type-rollup
+[ref-sec]: /product/auth/overview
+[ref-sec-ctx]: /product/auth/context
 [self-opts-req-ctx]: #request-context
 [self-opts-checkauth]: #check-auth
 [self-pre-aggregations-schema]: #options-reference-pre-aggregations-schema
 [self-opts-ctx-to-appid]: #context-to-app-id
 [self-driver-factory]: #driver-factory
-[ref-schema-ref-datasource]: /schema/reference/cube#data-source
+[ref-schema-ref-datasource]: /product/data-modeling/reference/cube#data-source
 [self-opts-sched-refresh-ctxs]: #scheduled-refresh-contexts
 [self-opts-sched-refresh-tz]: #scheduled-refresh-time-zones
 [self-repofactory]: #repositoryFactory
 [self-schemafilerepo]: #schema-file-repository
 [self-schemapath]: #schemaPath
 [ref-exec-environment-globals]:
-  /schema/reference/execution-environment#node-js-globals-process-env-console-log-and-others
-[ref-environment-variables]: /reference/environment-variables
+  /product/data-modeling/advanced/schema-execution-environment#node-js-globals-process-env-console-log-and-others
+[ref-environment-variables]: /reference/configuration/environment-variables

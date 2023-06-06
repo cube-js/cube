@@ -9,20 +9,20 @@ redirect_from:
 
 The `create` command generates barebones Cube app.
 
-###  Usage
+### Usage
 
 ```bash{promptUser: user}
 npx cubejs-cli create APP-NAME -d DB-TYPE [-t TEMPLATE]
 ```
 
-###  Flags
+### Flags
 
 | Parameter                   | Description                                  | Values                                                                                                                  |
 | --------------------------- | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
 | `-d, --db-type <db-type>`   | Preconfigure Cube app for selected database. | `postgres`, `mysql`, `athena`, `mongobi`, `bigquery`, `redshift`, `mssql`, `clickhouse`, `snowflake`, `presto`, `druid` |
 | `-t, --template <template>` | Framework running Cube backend.              | `docker` (default), `express`, `serverless`, `serverless-aws`                                                           |
 
-###  Example
+### Example
 
 Create app called `demo-app` using default (`docker`) template and `mysql`
 database:
@@ -42,7 +42,7 @@ npx cubejs-cli create demo-app -t express -d mysql
 <WarningBox>
 
 To define configuration you should use `cube.js` configuration file. See
-[available options](/config).
+[available options](/reference/configuration/config).
 
 </WarningBox>
 
@@ -60,7 +60,7 @@ With debug information:
 npx cubejs-cli server --debug
 ```
 
-###  Usage
+### Usage
 
 ```bash{promptUser: user}
 npx cubejs-cli server
@@ -70,21 +70,21 @@ npx cubejs-cli server
 
 The `generate` command helps to build data models for existing database tables.
 You can only run `generate` from the Cube app directory. This command requires
-an active [database connection](/config/databases).
+an active [database connection](/product/configuration/data-sources).
 
-###  Usage
+### Usage
 
 ```bash{promptUser: user}
 npx cubejs-cli generate -t TABLE-NAMES
 ```
 
-###  Flags
+### Flags
 
 | Parameter               | Description                                                 | Values                      |
 | ----------------------- | ----------------------------------------------------------- | --------------------------- |
 | `-t, --tables <tables>` | Comma delimited list of tables to generate data models for. | `TABLE-NAME-1,TABLE-NAME-2` |
 
-###  Example
+### Example
 
 Generate data model files for tables `orders` and `customers`:
 
@@ -102,22 +102,22 @@ _Use these manually generated tokens in production with caution._ <br/> _Please
 refer to the [Security Guide](https://cube.dev/docs/security) for production
 security best practices._
 
-###  Usage
+### Usage
 
 ```bash{promptUser: user}
 npx cubejs-cli token -e TOKEN-EXPIRY -s SECRET -p FOO=BAR -u BAZ=QUX
 ```
 
-###  Flags
+### Flags
 
-| Parameter                                       | Description                                                                   | Example                                        |
-| ----------------------------------------------- | ----------------------------------------------------------------------------- | ---------------------------------------------- |
-| -e, --expiry &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; | Token expiry. Set to 0 for no expiry (default: "30 days")                     | `1 day`, `30 days` &nbsp; &nbsp; &nbsp; &nbsp; |
-| -s, --secret                                    | Cube app secret. Also can be set via environment variable `CUBEJS_API_SECRET` | -                                              |
-| -p, --payload                                   | Token Payload                                                                 | `foo=bar`, `userId=2`                          |
-| -u, --user-context                              | Token USER_CONTEXT Payload                                                    | `baz=qux`, `companyId=5`                       |
+| Parameter              | Description                                                                   | Example                    |
+| ---------------------- | ----------------------------------------------------------------------------- | -------------------------- |
+| -e, --expiry           | Token expiry. Set to 0 for no expiry (default: "30 days")                     | `1 day`, `30 days`         |
+| -s, --secret           | Cube app secret. Also can be set via environment variable `CUBEJS_API_SECRET` | -                          |
+| -p, --payload          | Token Payload                                                                 | `foo=bar`, `userId=2`      |
+| -u, --user-context     | Token USER_CONTEXT Payload                                                    | `baz=qux`, `companyId=5`   |
 
-###  Example
+### Example
 
 Generate token with 1 day expiry and payload `{ 'appId': 1, 'userId': 2 }`:
 

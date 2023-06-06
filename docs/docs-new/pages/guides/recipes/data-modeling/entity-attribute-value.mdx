@@ -25,7 +25,7 @@ cube(`users`, {
 
   joins: {
     orders: {
-      relationship: 'one_to_many',
+      relationship: "one_to_many",
       sql: `${CUBE}.id = ${orders.user_id}`,
     },
   },
@@ -72,13 +72,13 @@ Currently, the dataset contains orders in the following statuses:
 ```javascript
 [
   {
-    'orders.status': 'completed',
+    "orders.status": "completed",
   },
   {
-    'orders.status': 'processing',
+    "orders.status": "processing",
   },
   {
-    'orders.status': 'shipped',
+    "orders.status": "shipped",
   },
 ];
 ```
@@ -94,7 +94,7 @@ their orders in any of these statuses. In terms of the EAV model:
 
 Let's explore some possible ways to model that.
 
-###  Static attributes
+### Static attributes
 
 We already know that the following statuses are present in the dataset:
 `completed`, `processing`, and `shipped`. Let's assume this set of statuses is
@@ -154,22 +154,22 @@ doesn't have orders in this status).
 ```javascript
 [
   {
-    'users_statuses_joins.name': 'Ally Blanda',
-    'users_statuses_joins.completed_created_at': '2019-03-05T00:00:00.000',
-    'users_statuses_joins.processing_created_at': null,
-    'users_statuses_joins.shipped_created_at': '2019-04-06T00:00:00.000',
+    "users_statuses_joins.name": "Ally Blanda",
+    "users_statuses_joins.completed_created_at": "2019-03-05T00:00:00.000",
+    "users_statuses_joins.processing_created_at": null,
+    "users_statuses_joins.shipped_created_at": "2019-04-06T00:00:00.000",
   },
   {
-    'users_statuses_joins.name': 'Cayla Mayert',
-    'users_statuses_joins.completed_created_at': '2019-06-14T00:00:00.000',
-    'users_statuses_joins.processing_created_at': '2021-05-20T00:00:00.000',
-    'users_statuses_joins.shipped_created_at': null,
+    "users_statuses_joins.name": "Cayla Mayert",
+    "users_statuses_joins.completed_created_at": "2019-06-14T00:00:00.000",
+    "users_statuses_joins.processing_created_at": "2021-05-20T00:00:00.000",
+    "users_statuses_joins.shipped_created_at": null,
   },
   {
-    'users_statuses_joins.name': 'Concepcion Maggio',
-    'users_statuses_joins.completed_created_at': null,
-    'users_statuses_joins.processing_created_at': '2020-07-14T00:00:00.000',
-    'users_statuses_joins.shipped_created_at': '2019-07-19T00:00:00.000',
+    "users_statuses_joins.name": "Concepcion Maggio",
+    "users_statuses_joins.completed_created_at": null,
+    "users_statuses_joins.processing_created_at": "2020-07-14T00:00:00.000",
+    "users_statuses_joins.shipped_created_at": "2019-07-19T00:00:00.000",
   },
 ];
 ```
@@ -178,7 +178,7 @@ The drawback is that when the set of statuses changes, we'll need to amend the
 cube definition in several places: update selected values and joins in SQL as
 well as update the dimensions. Let's see how to work around that.
 
-###  Static attributes, DRY version
+### Static attributes, DRY version
 
 We can embrace the
 [Don't Repeat Yourself](https://en.wikipedia.org/wiki/Don%27t_repeat_yourself)
@@ -188,7 +188,7 @@ so we can move all repeated code patterns into handy functions and iterate over
 statuses in relevant parts of the cube's code.
 
 ```javascript
-const statuses = ['completed', 'processing', 'shipped'];
+const statuses = ["completed", "processing", "shipped"];
 
 const createValue = (status, index) =>
   `MIN(orders_${index}.created_at) AS created_at_${index}`;
@@ -210,9 +210,9 @@ cube(`users_statuses_DRY`, {
     SELECT
       users.first_name,
       users.last_name,
-      ${statuses.map(createValue).join(',')}
+      ${statuses.map(createValue).join(",")}
     FROM public.users AS users
-    ${statuses.map(createJoin).join('')}
+    ${statuses.map(createJoin).join("")}
     GROUP BY 1, 2
   `,
 
@@ -239,7 +239,7 @@ The new `users_statuses_DRY` cube is functionally identical to the
 data. However, there's still a static list of statuses present in the cube's
 source code. Let's work around that next.
 
-###  Dynamic attributes
+### Dynamic attributes
 
 We can eliminate the list of statuses from the cube's code by loading this list
 from an external source, e.g., the data source. Here's the code from the
@@ -248,7 +248,7 @@ statuses from the database. Note that it uses the `pg` package (Node.js client
 for Postgres) and reuses the credentials from Cube.
 
 ```javascript
-const { Pool } = require('pg');
+const { Pool } = require("pg");
 
 const pool = new Pool({
   host: process.env.CUBEJS_DB_HOST,
@@ -278,7 +278,7 @@ function that allows the data model to be created
 [dynamically](https://cube.dev/docs/schema/advanced/dynamic-schema-creation).
 
 ```javascript
-const fetchStatuses = require('../fetch').fetchStatuses;
+const fetchStatuses = require("../fetch").fetchStatuses;
 
 asyncModule(async () => {
   const statuses = await fetchStatuses();
@@ -303,9 +303,9 @@ asyncModule(async () => {
       SELECT
         users.first_name,
         users.last_name,
-        ${statuses.map(createValue).join(',')}
+        ${statuses.map(createValue).join(",")}
       FROM public.users AS users
-      ${statuses.map(createJoin).join('')}
+      ${statuses.map(createJoin).join("")}
       GROUP BY 1, 2
     `,
 

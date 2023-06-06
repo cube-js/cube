@@ -50,18 +50,17 @@ switching between the <Btn>API</Btn> and <Btn>Database</Btn> tabs.
   src="https://ucarecdn.com/951a2a64-bc9b-4277-b2fe-4cc88dbf4f49/"
 />
 
-###  All Queries and Top Queries
+### All Queries and Top Queries
 
 Clicking <Btn>All Queries</Btn> will show all queries in order of recency,
-while&nbsp;<Btn>Top Queries</Btn> will show the most-frequently executed
-queries:
+while <Btn>Top Queries</Btn> will show the most-frequently executed queries:
 
 <Screenshot
   highlight="inset(30% 65% 64% 7% round 10px)"
   src="https://ucarecdn.com/951a2a64-bc9b-4277-b2fe-4cc88dbf4f49/"
 />
 
-###  Filtering
+### Filtering
 
 You can also use filters to find problematic queries; you can filter by query
 duration, cache status, whether the query was accelerated, and by failing
@@ -91,21 +90,21 @@ and even view the raw query by clicking <Btn>❮/❯</Btn>:
 
 To drill down on a specific query, click it to see more information.
 
-###  Query
+### Query
 
 The <Btn>Query</Btn> tab shows the raw JSON query sent to the Cube Cloud
 deployment.
 
 <Screenshot src="https://ucarecdn.com/3c0490be-757d-46cd-ba2d-d7c93a7acf4e/" />
 
-###  Errors
+### Errors
 
 If the query failed, the <Btn>Errors</Btn> tab will show you the error message
 and stacktrace:
 
 <Screenshot src="https://ucarecdn.com/858633a0-4ee3-4dec-adb6-1d91ca30919f/" />
 
-###  SQL
+### SQL
 
 The <Btn>SQL</Btn> tab shows the generated SQL query sent by Cube to either your
 data source **or** Cube Store if the query was accelerated with a
@@ -121,7 +120,7 @@ Runner][ref-workspace-sqlrunner] by clicking <Btn>▶️</Btn>:
   src="https://ucarecdn.com/537f7269-654d-479c-a0cc-abc2941f9b5a/"
 />
 
-###  Pre-Aggregations
+### Pre-Aggregations
 
 The <Btn>Pre-Aggregations</Btn> tab shows the
 [pre-aggregation][ref-caching-gs-preaggs] used to accelerate this query, if one
@@ -137,7 +136,7 @@ screen:
 Clicking <Btn>Accelerate</Btn> takes you to the Rollup Designer, where you can
 add a pre-aggregation to accelerate similar queries in the future.
 
-###  Queue Graph
+### Queue Graph
 
 The <Btn>Queue Graph</Btn> tab details any activity in the query queue while
 processing the query. This may include other queries that were being processed
@@ -148,7 +147,7 @@ or were waiting in the queue by Cube Cloud at the same time as this query:
 A large number of queries in the queue may indicate that your deployment is
 under-provisioned, and you may want to consider scaling up your deployment.
 
-###  Flame Graph
+### Flame Graph
 
 The <Btn>Flame Graph</Btn> tab shows a [flame graph][datadog-kb-flamegraph] of a
 query's execution time across resources in the Cube Cloud deployment. This is
@@ -159,7 +158,7 @@ help identify bottlenecks in your Cube deployment or data source.
 
 ## Inspecting Database Queries
 
-###  Query
+### Query
 
 For Database requests, the <Btn>Query</Btn> tab shows the SQL query compiled by
 Cube that is executed on the data source:
@@ -169,7 +168,7 @@ Cube that is executed on the data source:
 This can be useful for debugging queries that are failing or taking a long time,
 as you can copy the query and run it directly against your data source.
 
-###  Errors
+### Errors
 
 If the query failed, the <Btn>Errors</Btn> tab will show you the error message
 and stacktrace:
@@ -178,10 +177,10 @@ and stacktrace:
 
 Errors here generally indicate a problem with querying the data source. The
 generated SQL query can be copied from
-the&nbsp;<Btn>[Query](#inspecting-database-queries-query)</Btn> tab and run
-directly against your data source to debug the issue.
+the <Btn>[Query](#inspecting-database-queries-query)</Btn> tab and run directly
+against your data source to debug the issue.
 
-###  Events
+### Events
 
 The <Btn>Events</Btn> tab shows all data source-related events that occurred
 while the query is in the query execution queue:
@@ -190,8 +189,8 @@ while the query is in the query execution queue:
 
 [datadog-kb-flamegraph]:
   https://www.datadoghq.com/knowledge-center/distributed-tracing/flame-graph/
-[ref-caching-gs-preaggs]: /caching/pre-aggregations/getting-started
-[ref-conf-db]: /config/databases
-[ref-deployment-api-instance]: /deployment/overview#api-instances
-[ref-deployment-refresh-worker]: /deployment/overview#refresh-worker
-[ref-workspace-sqlrunner]: /cloud/sql-runner
+[ref-caching-gs-preaggs]: /product/caching/getting-started-pre-aggregations
+[ref-conf-db]: /product/configuration/data-sources
+[ref-deployment-api-instance]: /product/deployment/overview#api-instances
+[ref-deployment-refresh-worker]: /product/deployment/overview#refresh-worker
+[ref-workspace-sqlrunner]: /product/workspace/sql-runner

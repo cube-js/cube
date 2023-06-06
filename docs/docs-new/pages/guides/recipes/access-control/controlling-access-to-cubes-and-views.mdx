@@ -20,7 +20,7 @@ module.exports = {
   },
   extendContext: ({ securityContext }) => {
     return {
-      isFinance: securityContext.department === 'finance',
+      isFinance: securityContext.department === "finance",
     };
   },
 };
@@ -72,14 +72,11 @@ cube(`users`, {
 });
 
 // total_revenue_per_customer.js
-view('total_revenue_per_customer', {
+view("total_revenue_per_customer", {
   description: `Total revenue per customer`,
   public: COMPILE_CONTEXT.security_context.isFinance,
 
-  includes: [
-    orders.total_revenue,
-    users.company,
-  ],
+  includes: [orders.total_revenue, users.company],
 });
 ```
 

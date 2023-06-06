@@ -23,7 +23,7 @@ here][ref-getting-started].
 
 </InfoBox>
 
-###  Cube Cloud
+### Cube Cloud
 
 Click **Deploy SQL API** and then the **How to connect your BI tool** link on
 the Overview page of your Cube deployment. Navigate to the **BIs and
@@ -32,7 +32,7 @@ your connection credentials:
 
 <Screenshot src="https://ucarecdn.com/78a4b90c-da5a-4d1f-9775-59ce6e7baad0/" />
 
-###  Self-hosted Cube
+### Self-hosted Cube
 
 You need to set the following environment variables to enable the Cube SQL API.
 These credentials will be required to connect to Cube from Observable later.
@@ -49,7 +49,7 @@ Observable connects to Cube as to a Postgres database.
 
 <Screenshot src="https://ucarecdn.com/2f0577f5-4717-4001-bfef-050827c5a415/" />
 
-###  Querying data with SQL API
+### Querying data with SQL API
 
 Your cubes will be exposed as tables, where both your measures and dimensions
 are columns.
@@ -91,7 +91,7 @@ You can also create a visualization of the executed SQL query.
 > Don't have a Cube project yet?
 > [Learn how to get started here](https://cube.dev/docs/getting-started/cloud/overview).
 
-###  Cube Cloud
+### Cube Cloud
 
 Click the "How to connect" link on the Overview page, navigate to the REST API
 tab. You will see your connection credentials, the REST API URL and the
@@ -99,7 +99,7 @@ authorization token:
 
 <Screenshot src="https://ucarecdn.com/5e861647-21df-407d-951d-6a88d5ed9f97/" />
 
-###  Self-hosted Cube
+### Self-hosted Cube
 
 For a Cube instance publicly available at a specific `HOST`, the REST API URL
 would be `HOST/cubejs-api/v1`. Please refer to the
@@ -117,7 +117,7 @@ won't expire soon.
 
 Observable connects to Cube through the REST API.
 
-###  Querying data with REST API
+### Querying data with REST API
 
 First, add two generic **JavaScript** cells:
 
@@ -134,7 +134,7 @@ their respective cells.
 
 ```javascript
 cubeRestApi =
-  'https://thirsty-raccoon.aws-eu-central-1.cubecloudapp.dev/cubejs-api/v1/load';
+  "https://thirsty-raccoon.aws-eu-central-1.cubecloudapp.dev/cubejs-api/v1/load";
 ```
 
 Because the Cube REST API has the format of `HOST/cubejs-api/v1`, don't forget
@@ -142,7 +142,7 @@ to add the `/load` endpoint to the end of the data source API.
 
 ```javascript
 cubeRestApiJwtToken =
-  'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE2NTgzMzM3OTZ9.gUOoDgo_RJka_ZANdwSw3v8GkM4ZzH9LjxrxKxkGAk0';
+  "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE2NTgzMzM3OTZ9.gUOoDgo_RJka_ZANdwSw3v8GkM4ZzH9LjxrxKxkGAk0";
 ```
 
 Also make sure to add the token next to the Bearer part of the Authorization
@@ -159,15 +159,15 @@ for your JSON query.
 ```javascript
 jsonQuery = {
   query: {
-    measures: ['orders.count'],
+    measures: ["orders.count"],
     timeDimensions: [
       {
-        dimension: 'orders.created_at',
-        granularity: 'month',
+        dimension: "orders.created_at",
+        granularity: "month",
       },
     ],
     order: {
-      'orders.created_at': 'asc',
+      "orders.created_at": "asc",
     },
   },
 };
@@ -179,10 +179,10 @@ request in the cell. Don't forget to put the `jsonBody` object inside the
 
 ```javascript
 orders_over_time = fetch(cubeRestApi, {
-  method: 'POST',
+  method: "POST",
   headers: {
     Authorization: cubeRestApiJwtToken,
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
   },
   body: JSON.stringify(jsonQuery),
 })
@@ -210,6 +210,6 @@ You can also create a visualization of the executed REST API request.
   />
 </div>
 
-[ref-getting-started]: /getting-started/cloud/overview
-[ref-sql-api]: /backend/sql
+[ref-getting-started]: /product/getting-started/cloud/overview
+[ref-sql-api]: /product/api-sql/overview
 [ref-rest-api]: /backend/rest-api

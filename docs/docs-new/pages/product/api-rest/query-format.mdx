@@ -7,7 +7,9 @@ redirect_from:
 
 <SuccessBox>
 
-**We’re running a survey to better understand how you use Cube.** Please take a moment to [share with us what you think](https://forms.gle/b7iQHpocAXfpNfeR7). It will mean the world to us.
+**We’re running a survey to better understand how you use Cube.** Please take a
+moment to [share with us what you think](https://forms.gle/b7iQHpocAXfpNfeR7).
+It will mean the world to us.
 
 </SuccessBox>
 
@@ -102,7 +104,7 @@ A Query has the following properties:
 }
 ```
 
-###  Default order
+### Default order
 
 If the `order` property is not specified in the query, Cube sorts results by
 default using the following rules:
@@ -112,7 +114,7 @@ default using the following rules:
 - The first measure, descending. If no measure exists...
 - The first dimension, ascending.
 
-###  Alternative order format
+### Alternative order format
 
 Also you can control the ordering of the `order` specification, Cube support
 alternative order format - array of tuples:
@@ -141,7 +143,7 @@ A filter is a Javascript object with the following properties:
 - `values`: An array of values for the filter. Values must be of type String. If
   you need to pass a date, pass it as a string in `YYYY-MM-DD` format.
 
-###  Filtering Dimensions vs Filtering Measures
+### Filtering Dimensions vs Filtering Measures
 
 Filters are applied differently to dimensions and measures.
 
@@ -153,9 +155,9 @@ results after the measure has been calculated.
 
 Only some operators are available for measures. For dimensions, the available
 operators depend on the
-[type of the dimension](/schema/reference/types-and-formats#types).
+[type of the dimension](/product/data-modeling/reference/types-and-formats#types).
 
-###  equals
+### equals
 
 Use it when you need an exact match. It supports multiple values.
 
@@ -170,7 +172,7 @@ Use it when you need an exact match. It supports multiple values.
 }
 ```
 
-###  notEquals
+### notEquals
 
 The opposite operator of `equals`. It supports multiple values.
 
@@ -185,7 +187,7 @@ The opposite operator of `equals`. It supports multiple values.
 }
 ```
 
-###  contains
+### contains
 
 The `contains` filter acts as a wildcard case-insensitive `LIKE` operator. In
 the majority of SQL backends it uses `ILIKE` operator with values being
@@ -201,7 +203,7 @@ surrounded by `%`. It supports multiple values.
 }
 ```
 
-###  notContains
+### notContains
 
 The opposite operator of `contains`. It supports multiple values.
 
@@ -226,7 +228,7 @@ This operator adds `IS NULL` check to include `NULL` values unless you add
 }
 ```
 
-###  startsWith
+### startsWith
 
 The `startsWith` filter acts as a case-insensitive `LIKE` operator with a
 wildcard at the beginning. In the majority of SQL backends, it uses the `ILIKE`
@@ -242,7 +244,7 @@ operator with `%` at the start of each value. It supports multiple values.
 }
 ```
 
-###  endsWith
+### endsWith
 
 The `endsWith` filter acts as a case-insensitive `LIKE` operator with a wildcard
 at the end. In the majority of SQL backends, it uses the `ILIKE` operator with
@@ -258,7 +260,7 @@ at the end. In the majority of SQL backends, it uses the `ILIKE` operator with
 }
 ```
 
-###  gt
+### gt
 
 The `gt` operator means **greater than** and is used with measures or dimensions
 of type `number`.
@@ -274,7 +276,7 @@ of type `number`.
 }
 ```
 
-###  gte
+### gte
 
 The `gte` operator means **greater than or equal to** and is used with measures
 or dimensions of type `number`.
@@ -290,7 +292,7 @@ or dimensions of type `number`.
 }
 ```
 
-###  lt
+### lt
 
 The `lt` operator means **less than** and is used with measures or dimensions of
 type `number`.
@@ -306,7 +308,7 @@ type `number`.
 }
 ```
 
-###  lte
+### lte
 
 The `lte` operator means **less than or equal to** and is used with measures or
 dimensions of type `number`.
@@ -322,7 +324,7 @@ dimensions of type `number`.
 }
 ```
 
-###  set
+### set
 
 Operator `set` checks whether the value of the member **is not** `NULL`. You
 don't need to pass `values` for this operator.
@@ -337,7 +339,7 @@ don't need to pass `values` for this operator.
 }
 ```
 
-###  notSet
+### notSet
 
 An opposite to the `set` operator. It checks whether the value of the member
 **is** `NULL`. You don't need to pass `values` for this operator.
@@ -352,7 +354,7 @@ An opposite to the `set` operator. It checks whether the value of the member
 }
 ```
 
-###  inDateRange
+### inDateRange
 
 <WarningBox>
 
@@ -384,7 +386,7 @@ There is a convenient way to use date filters with grouping -
 }
 ```
 
-###  notInDateRange
+### notInDateRange
 
 <WarningBox>
 
@@ -409,7 +411,7 @@ dates. The values format is the same as for `inDateRange`.
 }
 ```
 
-###  beforeDate
+### beforeDate
 
 <WarningBox>
 
@@ -434,7 +436,7 @@ values should be an array of one element in `YYYY-MM-DD` format.
 }
 ```
 
-###  afterDate
+### afterDate
 
 <WarningBox>
 
@@ -458,7 +460,7 @@ The same as `beforeDate`, but is used to get all results after a specific date.
 }
 ```
 
-###  measureFilter
+### measureFilter
 
 The `measureFilter` operator is used to apply an existing measure's filters to
 the current query.
@@ -571,7 +573,7 @@ const resultSet = await cubejsApi.load({
 });
 ```
 
-###  Relative date range
+### Relative date range
 
 You can also use a string with a relative date range in the `dateRange`
 property, for example:
@@ -604,16 +606,16 @@ refer to its documentation for more examples.
 
 </InfoBox>
 
-[ref-recipe-pagination]: /recipes/pagination
+[ref-recipe-pagination]: /guides/recipes/queries/pagination
 [ref-client-core-resultset-drilldown]:
   /@cubejs-client-core#result-set-drill-down
 [ref-schema-ref-preaggs-refreshkey]:
-  /schema/reference/pre-aggregations#parameters-refresh-key
+  /product/data-modeling/reference/pre-aggregations#parameters-refresh-key
 [ref-schema-ref-preaggs-refreshkey-every]:
-  /schema/reference/pre-aggregations#parameters-refresh-key-every
+  /product/data-modeling/reference/pre-aggregations#parameters-refresh-key-every
 [ref-schema-ref-preaggs-dimensions]:
-  /schema/reference/pre-aggregations#parameters-dimensions
+  /product/data-modeling/reference/pre-aggregations#parameters-dimensions
 [ref-schema-ref-preaggs-time-dimension]:
-  /schema/reference/pre-aggregations#parameters-time-dimension
+  /product/data-modeling/reference/pre-aggregations#parameters-time-dimension
 [ref-relative-date-range]: #relative-date-range
 [chrono-website]: https://github.com/wanasit/chrono

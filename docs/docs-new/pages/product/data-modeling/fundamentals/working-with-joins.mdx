@@ -123,10 +123,12 @@ query:
 {
   "dimensions": ["orders.status", "customers.company"],
   "measures": ["orders.count"],
-  "timeDimensions": [{
-    "dimension": "orders.created_at"
-  }],
-  "order": {"customers.company": "asc"}
+  "timeDimensions": [
+    {
+      "dimension": "orders.created_at"
+    }
+  ],
+  "order": { "customers.company": "asc" }
 }
 ```
 
@@ -218,8 +220,8 @@ A many-to-many relationship occurs when multiple records in a cube are
 associated with multiple records in another cube.
 
 For example, let's say we have two cubes, `topics` and `posts`, pointing to the
-`topics` and `posts` tables in our database, respectively. A `post` can have more
-than one `topic`, and a `topic` may have more than one `post`.
+`topics` and `posts` tables in our database, respectively. A `post` can have
+more than one `topic`, and a `topic` may have more than one `post`.
 
 In a database, you would most likely have an associative table (also known as a
 junction table or cross-reference table). In our example, this table name might
@@ -245,9 +247,9 @@ relationships.
 </div>
 
 In the same way the `post_topics` table was specifically created to handle this
-association in the database, we need to create an associative cube `post_topics`,
-and declare the relationships from it to `topics` cube and from `posts` to
-`post_topics`.
+association in the database, we need to create an associative cube
+`post_topics`, and declare the relationships from it to `topics` cube and from
+`posts` to `post_topics`.
 
 <InfoBox>
 
@@ -370,7 +372,7 @@ cubes:
 
 </CodeTabs>
 
-###  Using virtual associative cube
+### Using virtual associative cube
 
 Sometimes there is no associative table in the database, when in reality, there
 is a many-to-many relationship. In this case, the solution is to extract some
@@ -488,8 +490,7 @@ cubes:
         campaign_name,
         customer_name,
         MIN(created_at) AS started_at
-      FROM emails
-      GROUP BY 1, 2, 3
+      FROM emails GROUP BY 1, 2, 3
 
     measures:
       - name: count
@@ -596,8 +597,8 @@ cubes:
       - name: campaigns
         relationship: many_to_one
         sql: >
-          {CUBE}.campaign_id = {campaigns.id} AND
-          {CUBE}.customer_name = {campaigns.customer_name}
+          {CUBE}.campaign_id = {campaigns.id} AND {CUBE}.customer_name =
+          {campaigns.customer_name}
 
     measures:
       - name: count
@@ -625,7 +626,7 @@ cubes:
         sql: >
           {CUBE}.customer_name = {transactions.customer_name} AND
           {CUBE}.campaign_id = {transactions.campaign_id}
-    
+
     dimensions:
       - name: id
         sql: id
@@ -642,7 +643,8 @@ cubes:
 ## Directions of joins
 
 The direction of [joins][ref-schema-ref-joins] greatly influences the final
-result set. It can be explicitly controlled on a [view][ref-schema-ref-view] level.
+result set. It can be explicitly controlled on a [view][ref-schema-ref-view]
+level.
 
 As an example, let's take two cubes, `orders` and `customers`:
 
@@ -711,13 +713,13 @@ cubes:
       - name: total_revenue
         sql: revenue
         type: sum
-    
+
     dimensions:
       - name: id
         sql: id
         type: number
         primary_key: true
-    
+
       - name: customer_id
         sql: customer_id
         type: number
@@ -729,7 +731,7 @@ cubes:
       - name: count
         sql: id
         type: count
-    
+
     dimensions:
       - name: id
         sql: id
@@ -739,13 +741,15 @@ cubes:
 
 </CodeTabs>
 
-With the given data model, we have two valid analytics use cases that require different join directions.
+With the given data model, we have two valid analytics use cases that require
+different join directions.
 
-__The first case is to calculate the total revenue per customer.__
-To do this, we'll use the `total_revenue` measure that is defined on the orders cube. 
-We need to be aware that orders can be placed without customer registration (anonymous customers/guest checkouts). 
-Therefore, we should start the join from the `orders` cube onto the `customers` cube to ensure that we do not lose data from anonymous orders.
-
+**The first case is to calculate the total revenue per customer.** To do this,
+we'll use the `total_revenue` measure that is defined on the orders cube. We
+need to be aware that orders can be placed without customer registration
+(anonymous customers/guest checkouts). Therefore, we should start the join from
+the `orders` cube onto the `customers` cube to ensure that we do not lose data
+from anonymous orders.
 
 <CodeTabs>
 
@@ -766,33 +770,30 @@ views:
 ```
 
 ```javascript
-view(`total_revenue_per_customer`, {
-
-});
+view(`total_revenue_per_customer`, {});
 ```
 
 </CodeTabs>
 
-
 We can query this view as follows:
-
-
 
 ```json
 {
   "dimensions": ["total_revenue_per_customer.company"],
   "measures": ["total_revenue_per_customer.total_revenue"],
-  "timeDimensions": [{
-    "dimension": "total_revenue_per_customer.created_at"
-  }]
+  "timeDimensions": [
+    {
+      "dimension": "total_revenue_per_customer.created_at"
+    }
+  ]
 }
 ```
 
-
-__The second case is to find customers who have not placed any orders.__
-We will use the count measure on the customers cube for that. 
-In this case, we should join the customers cube with the orders cube to find customers with zero orders placed.
-The reverse order of joins would result in a dataset without data for customers with no orders.
+**The second case is to find customers who have not placed any orders.** We will
+use the count measure on the customers cube for that. In this case, we should
+join the customers cube with the orders cube to find customers with zero orders
+placed. The reverse order of joins would result in a dataset without data for
+customers with no orders.
 
 <CodeTabs>
 
@@ -803,35 +804,39 @@ views:
 
     cubes:
       - join_path: customers
-        includes: 
+        includes:
           - company
 
       - join_path: customers.orders
         prefix: true
-        includes: 
+        includes:
           - created_at
           - count
 ```
 
 ```javascript
+
 ```
+
 </CodeTabs>
-
-
 
 We can then query the cube as follows:
 
 ```json
 {
   "dimensions": ["customers_without_orders.company"],
-  "timeDimensions": [{
-    "dimension": "customers_without_orders.orders_created_at"
-  }],
-  "filters": [{
-    "member": "customers_without_orders.orders_count",
-    "operator": "equals",
-    "values": ["0"]
-  }]
+  "timeDimensions": [
+    {
+      "dimension": "customers_without_orders.orders_created_at"
+    }
+  ],
+  "filters": [
+    {
+      "member": "customers_without_orders.orders_count",
+      "operator": "equals",
+      "values": ["0"]
+    }
+  ]
 }
 ```
 
@@ -908,11 +913,11 @@ cube(`organizations`, {
 cubes:
   - name: users
     # ...
-    
+
     measures:
       - name: count
         type: count
-    
+
     dimensions:
       - name: id
         sql: id
@@ -967,8 +972,8 @@ You'll get an error:
 `Error: Can't find join path to join 'users', 'organizations'`. The problem is
 that joins are directed and if we try to connect `users` and `organizations`
 there's no path from `users` to `organizations` or either from `organizations`
-to `users`. One possible solution is to move the `users → organization_users` join
-from `organization_users` cube to `users`, although this affects the query
+to `users`. One possible solution is to move the `users → organization_users`
+join from `organization_users` cube to `users`, although this affects the query
 semantics and thus the final results:
 
 <CodeTabs>
@@ -1026,10 +1031,11 @@ cubes:
 
 </CodeTabs>
 
-[ref-schema-ref-view]: /schema/reference/view
-[ref-schema-ref-joins]: /schema/reference/joins
+[ref-schema-ref-view]: /product/data-modeling/reference/view
+[ref-schema-ref-joins]: /product/data-modeling/reference/joins
 [ref-schema-ref-joins-relationship]:
-  /schema/reference/joins#parameters-relationship
+  /product/data-modeling/reference/joins#parameters-relationship
 [self-many-to-many-no-assoc-table]:
   #many-to-many-relationship-without-an-associative-table
-[self-join-direction]: /schema/fundamentals/joins#directions-of-joins
+[self-join-direction]:
+  /product/data-modeling/fundamentals/working-with-joins#directions-of-joins

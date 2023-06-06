@@ -52,11 +52,11 @@ query depending on the `tenantId` within the [Security Context][ref-sec-ctx].
 module.exports = {
   queryRewrite: (query, { securityContext }) => {
     if (!securityContext.tenantId) {
-      throw new Error('No id found in Security Context!');
+      throw new Error("No id found in Security Context!");
     } else {
       query.filters.push({
-        member: 'orders.tenant_id',
-        operator: 'equals',
+        member: "orders.tenant_id",
+        operator: "equals",
         values: [securityContext.tenantId],
       });
 
@@ -74,12 +74,12 @@ When we want to bypass the RLS we defined above, we need to create a sort of
 "superuser" only accessible when authenticating via the SQL API. We need to
 define two new things for this to work:
 
-1. Leverage the [`checkSqlAuth()`][ref-conf-ref-checksqlauth] configuration
-   option to inject a new property into the Security Context that defines a
-   superuser. In this case, we'll call it `isSuperUser`.
+1.  Leverage the [`checkSqlAuth()`][ref-conf-ref-checksqlauth] configuration
+    option to inject a new property into the Security Context that defines a
+    superuser. In this case, we'll call it `isSuperUser`.
 
-2. Handle the new `isSuperUser` property in our previously defined
-   `queryRewrite` to bypass the filter push.
+2.  Handle the new `isSuperUser` property in our previously defined
+    `queryRewrite` to bypass the filter push.
 
 ```javascript
 module.exports = {
@@ -97,11 +97,11 @@ module.exports = {
     if (securityContext.isSuperUser) {
       return query;
     } else if (!securityContext.tenantId) {
-      throw new Error('No id found in Security Context!');
+      throw new Error("No id found in Security Context!");
     } else {
       query.filters.push({
-        member: 'orders.tenant_id',
-        operator: 'equals',
+        member: "orders.tenant_id",
+        operator: "equals",
         values: [securityContext.tenantId],
       });
 
@@ -114,7 +114,9 @@ module.exports = {
 With this exception in place we should be able to query all the customers' data
 via the SQL API without being hindered by the row-level security checks.
 
-[ref-cloud-o11y-logs]: /cloud/workspace/logs
-[ref-conf-ref-checksqlauth]: /config#options-reference-check-sql-auth
-[ref-conf-ref-queryrewrite]: /config#options-reference-query-rewrite
-[ref-sec-ctx]: /security/context
+[ref-cloud-o11y-logs]: /product/monitoring/log-export
+[ref-conf-ref-checksqlauth]:
+  /reference/configuration/config#options-reference-check-sql-auth
+[ref-conf-ref-queryrewrite]:
+  /reference/configuration/config#options-reference-query-rewrite
+[ref-sec-ctx]: /product/auth/context

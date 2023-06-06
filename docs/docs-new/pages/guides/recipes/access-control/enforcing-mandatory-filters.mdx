@@ -27,8 +27,8 @@ module.exports = {
   queryRewrite: (query) => {
     query.filters.push({
       member: `orders.created_at`,
-      operator: 'afterDate',
-      values: ['2019-12-30'],
+      operator: "afterDate",
+      values: ["2019-12-30"],
     });
 
     return query;
@@ -81,24 +81,24 @@ Completed orders:
 ```javascript
 [
   {
-    'orders.number': 78,
-    'orders.created_at': '2020-01-01T00:00:00.000',
+    "orders.number": 78,
+    "orders.created_at": "2020-01-01T00:00:00.000",
   },
   {
-    'orders.number': 43,
-    'orders.created_at': '2020-01-02T00:00:00.000',
+    "orders.number": 43,
+    "orders.created_at": "2020-01-02T00:00:00.000",
   },
   {
-    'orders.number': 87,
-    'orders.created_at': '2020-01-04T00:00:00.000',
+    "orders.number": 87,
+    "orders.created_at": "2020-01-04T00:00:00.000",
   },
   {
-    'orders.number': 45,
-    'orders.created_at': '2020-01-04T00:00:00.000',
+    "orders.number": 45,
+    "orders.created_at": "2020-01-04T00:00:00.000",
   },
   {
-    'orders.number': 28,
-    'orders.created_at': '2020-01-05T00:00:00.000',
+    "orders.number": 28,
+    "orders.created_at": "2020-01-05T00:00:00.000",
   },
 ];
 ```
@@ -108,24 +108,24 @@ Shipped orders:
 ```javascript
 [
   {
-    'orders.number': 57,
-    'orders.created_at': '2019-12-31T00:00:00.000',
+    "orders.number": 57,
+    "orders.created_at": "2019-12-31T00:00:00.000",
   },
   {
-    'orders.number': 38,
-    'orders.created_at': '2020-01-01T00:00:00.000',
+    "orders.number": 38,
+    "orders.created_at": "2020-01-01T00:00:00.000",
   },
   {
-    'orders.number': 10,
-    'orders.created_at': '2020-01-02T00:00:00.000',
+    "orders.number": 10,
+    "orders.created_at": "2020-01-02T00:00:00.000",
   },
   {
-    'orders.number': 19,
-    'orders.created_at': '2020-01-02T00:00:00.000',
+    "orders.number": 19,
+    "orders.created_at": "2020-01-02T00:00:00.000",
   },
   {
-    'orders.number': 15,
-    'orders.created_at': '2020-01-02T00:00:00.000',
+    "orders.number": 15,
+    "orders.created_at": "2020-01-02T00:00:00.000",
   },
 ];
 ```

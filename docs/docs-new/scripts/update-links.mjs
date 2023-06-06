@@ -1310,24 +1310,7 @@ async function updateMarkdownLinks() {
   // await writeFile('output.json', JSON.stringify(filteredUrls, null, 2));
   // console.log(mdxFiles.length, Object.keys(overrides).length, filtered.length);
 
-  const ff = [
-    // Weird spacing around MDX components
-    // "Configuration/Connecting-to-the-Database.mdx",
-    // "Configuration/Connecting-to-Downstream-Tools.mdx",
-    // "Configuration/VPC/Connecting-with-a-VPC.mdx",
-    // "Getting-Started/Overview.mdx",
-    // "Workspace/Single-Sign-On/Overview.mdx",
-
-    // ## Loses code formatting
-    // "Configuration/Downstream/Budibase.mdx",
-    // "Configuration/Downstream/Retool.mdx",
-
-    // Replaces HTML escape characters incorrectly
-    // "Reference/Frontend/@cubejs-client-vue.mdx",
-    // "Reference/SQL-API/SQL-Functions-and-Operators.mdx",
-  ];
-  // const ff = Object.keys(overrides);
-  await Promise.all(ff.map(async (oldPath) => {
+  await Promise.all(Object.keys(overrides).map(async (oldPath) => {
     const override = overrides[oldPath];
     const targetFilePath = `pages/${override.path}.mdx`;
     const file = await readFile(targetFilePath, "utf8");
@@ -1340,7 +1323,7 @@ async function updateMarkdownLinks() {
     const result = await remark()
       .use(remarkGfm)
       // .use(remarkMdx)
-      // .use(linksPlugin)
+      .use(linksPlugin)
       .process(data);
 
     // console.log(result);
@@ -1356,12 +1339,16 @@ async function updateMarkdownLinks() {
 
     const fixSameValueLinks = (content) => content.replaceAll(/<(http:\/\/localhost:4000.*)>/g, '[$1]($1)');
     const fixImgSrc = (content) => content.replaceAll(/src="<(https:\/\/.*)>"/g, 'src="$1"');
+    const fixAnchorHref = (content) => content
+      .replaceAll(/href="<(https:\/\/.*)>"/g, 'href="$1"')
+      .replaceAll('target="\\_blank"', 'target="_blank"')
 
     let prettyResult = String(result);
     prettyResult = cleanupWeirdSlashes(prettyResult);
     prettyResult = fixGridItems(prettyResult);
     prettyResult = fixSameValueLinks(prettyResult);
     prettyResult = fixImgSrc(prettyResult);
+    prettyResult = fixAnchorHref(prettyResult);
     prettyResult = formatWithPrettier(prettyResult).replaceAll('/>{" "}', '/>');
 
     // const prettyResult = formatWithPrettier(cleanupWeirdSlashes(String(result)));
@@ -1370,6 +1357,16 @@ async function updateMarkdownLinks() {
 
     await writeFile(targetFilePath, newFile);
   }));
+
+  const message = [
+    '\n------------------------------',
+    'Remember to manually update the following files:\n',
+    'reference/sql-api/sql-functions-and-operators.mdx',
+    'reference/frontend/cubejs-client-vue.mdx',
+    '------------------------------\n',
+  ];
+
+  console.warn(message.join('\n'));
 }
 
 async function main() {

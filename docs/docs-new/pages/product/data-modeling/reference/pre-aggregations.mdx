@@ -14,13 +14,13 @@ table.
 If Cube finds a suitable pre-aggregation rule, database querying becomes a
 multi-stage process:
 
-1. Cube checks if an up-to-date copy of the pre-aggregation exists.
+1.  Cube checks if an up-to-date copy of the pre-aggregation exists.
 
-2. Cube will execute a query against the pre-aggregated tables instead of the
-   raw data.
+2.  Cube will execute a query against the pre-aggregated tables instead of the
+    raw data.
 
-Pre-aggregations can be defined in the `pre_aggregations` available on each cube.
-A more in-depth diagram detailing how pre-aggregations are selected can be
+Pre-aggregations can be defined in the `pre_aggregations` available on each
+cube. A more in-depth diagram detailing how pre-aggregations are selected can be
 [found here][ref-caching-preaggs-selecting-preaggs].
 
 Pre-aggregations must have, at minimum, a name and a type. Pre-aggregations must
@@ -28,7 +28,7 @@ include all dimensions, measures, and filters you will query with.
 
 ## Parameters
 
-###  name
+### name
 
 The `name` parameter serves as the identifier of a pre-aggregation. It must be
 unique among all pre-aggregations within a cube and follow the [naming
@@ -67,7 +67,7 @@ cubes:
 This `name`, along with the name of the cube, will be used as a prefix for
 pre-aggregation tables created in the database.
 
-###  type
+### type
 
 Cube supports the following types of pre-aggregations:
 
@@ -94,15 +94,15 @@ functions][wiki-composable-agg-fn]. Additive measure types are: `count`, `sum`,
 `min`, `max` or `count_distinct_approx`. The performance boost in this case is
 based on two main properties of additive rollup pre-aggregations:
 
-1. A rollup pre-aggregation table usually contains many fewer rows than its'
-   corresponding original fact table. The fewer dimensions that are selected for
-   roll-up means fewer rows in the materialized result. A smaller number of rows
-   therefore means less time to query rollup pre-aggregation tables.
+1.  A rollup pre-aggregation table usually contains many fewer rows than its'
+    corresponding original fact table. The fewer dimensions that are selected
+    for roll-up means fewer rows in the materialized result. A smaller number of
+    rows therefore means less time to query rollup pre-aggregation tables.
 
-2. If your query is a subset of dimensions and measures of an additive rollup,
-   then it can be used to calculate a query without accessing the raw data. The
-   more dimensions and measures are selected for roll-up, the more queries can
-   use this particular rollup.
+2.  If your query is a subset of dimensions and measures of an additive rollup,
+    then it can be used to calculate a query without accessing the raw data. The
+    more dimensions and measures are selected for roll-up, the more queries can
+    use this particular rollup.
 
 Rollup definitions can contain members from a single cube as well as from
 multiple cubes. In case of multiple cubes being involved, the join query will be
@@ -162,12 +162,12 @@ not recommended or generally supported.
 They often do not provide much in the way of performance directly, but there are
 two specific applications:
 
-1. They can be used in tandem with the
-   [`use_original_sql_pre_aggregations`][self-origsql-preaggs] option in other
-   rollup pre-aggregations.
+1.  They can be used in tandem with the
+    [`use_original_sql_pre_aggregations`][self-origsql-preaggs] option in other
+    rollup pre-aggregations.
 
-2. Situations where it is not possible to use a `rollup` pre-aggregations, such
-   as [funnels][ref-recipe-funnels].
+2.  Situations where it is not possible to use a `rollup` pre-aggregations, such
+    as [funnels][ref-recipe-funnels].
 
 For example, to pre-aggregate all completed orders, you could do the following:
 
@@ -193,10 +193,8 @@ cube(`completed_orders`, {
 cubes:
   - name: completed_orders
     sql: >
-      SELECT *
-      FROM orders
-      WHERE completed = true
-    
+      SELECT * FROM orders WHERE completed = true
+
     pre_aggregations:
       - name: main
         type: original_sql
@@ -228,11 +226,11 @@ to them.
 
 <WarningBox>
 
-`rollup_join` is an ephemeral pre-aggregation that relies on referenced rollups when
-queries are executed. Setting
-[`scheduled_refresh`](#parameters-scheduled-refresh) to `true` is unnecessary for
-`rollup_join` and will result in an error. Appropriate freshness controls should
-be set on referenced rollups instead.
+`rollup_join` is an ephemeral pre-aggregation that relies on referenced rollups
+when queries are executed. Setting
+[`scheduled_refresh`](#parameters-scheduled-refresh) to `true` is unnecessary
+for `rollup_join` and will result in an error. Appropriate freshness controls
+should be set on referenced rollups instead.
 
 </WarningBox>
 
@@ -254,10 +252,7 @@ cube(`users`, {
 
   pre_aggregations: {
     users_rollup: {
-      dimensions: [
-        CUBE.id,
-        CUBE.name
-      ],
+      dimensions: [CUBE.id, CUBE.name],
     },
   },
 
@@ -481,10 +476,10 @@ scenarios where real-time data is required.
 
 [Lambda pre-aggregations][ref-caching-lambda-preaggs] can be used to combine
 data from a data source and a pre-aggregation, or even from multiple
-pre-aggregations across different cubes that share the same dimensions
-and measures.
+pre-aggregations across different cubes that share the same dimensions and
+measures.
 
-###  measures
+### measures
 
 The `measures` property is an array of [measures from the
 cube][ref-schema-measures] that should be included in the pre-aggregation:
@@ -513,7 +508,7 @@ cube(`orders`, {
 cubes:
   - name: orders
     sql_table: orders
-    
+
     pre_aggregations:
       - name: users_rollup
         measures:
@@ -526,7 +521,7 @@ cubes:
 
 </CodeTabs>
 
-###  dimensions
+### dimensions
 
 The `dimensions` property is an array of [dimensions from the
 cube][ref-schema-dimensions] that should be included in the pre-aggregation:
@@ -556,7 +551,7 @@ cube(`orders`, {
 cubes:
   - name: orders
     sql_table: orders
-        
+
     pre_aggregations:
       - name: users_rollup
         dimensions:
@@ -570,7 +565,7 @@ cubes:
 
 </CodeTabs>
 
-###  time_dimension
+### time_dimension
 
 The `time_dimension` property can be any [`dimension`][ref-schema-dimensions] of
 type [`time`][ref-schema-types-dim-time]. All other measures and dimensions in
@@ -616,7 +611,7 @@ cube(`orders`, {
 cubes:
   - name: orders
     sql_table: orders
-        
+
     pre_aggregations:
       - name: orders_by_status
         measures:
@@ -645,7 +640,7 @@ cubes:
 A [`granularity`][self-granularity] **must** also be included in the
 pre-aggregation definition.
 
-###  granularity
+### granularity
 
 The `granularity` property defines the granularity of data _within_ the
 pre-aggregation. If set to `week`, for example, then Cube will pre-aggregate the
@@ -691,7 +686,7 @@ The value can be one of `second`, `minute`, `hour`, `day`, `week`, `month`,
 `quarter` or `year`. This property is required when using
 [`time_dimension`][self-timedimension].
 
-###  segments
+### segments
 
 The `segments` property is an array of [segments from the
 cube][ref-schema-segments] that can target the pre-aggregation:
@@ -727,7 +722,7 @@ cube(`orders`, {
 cubes:
   - name: orders
     sql_table: orders
-    
+
     pre_aggregations:
       - name: main
         measures:
@@ -738,7 +733,7 @@ cubes:
     measures:
       - name: count
         type: count
-    
+
     segments:
       - name: only_complete
         sql: "{CUBE}.status = 'completed'"
@@ -746,7 +741,7 @@ cubes:
 
 </CodeTabs>
 
-###  partition_granularity
+### partition_granularity
 
 The `partition_granularity` defines the granularity for each
 [partition][ref-caching-partitioning] of the pre-aggregation:
@@ -810,7 +805,7 @@ cause out of memory.
 
 </WarningBox>
 
-###  refresh_key
+### refresh_key
 
 Cube can also take care of keeping pre-aggregations up to date with the
 `refresh_key` property. By default, it is set to `every: '1 hour'`.
@@ -856,7 +851,7 @@ cubes:
           - CUBE.count
         refresh_key:
           sql: SELECT MAX(created_at) FROM orders
-    
+
     # ...
 ```
 
@@ -1015,8 +1010,8 @@ cubes:
 
 <WarningBox>
 
-Incremental refreshes without a defined `update_window` will only update the last
-partition as determined by the pre-aggregation's `partition_granularity`.
+Incremental refreshes without a defined `update_window` will only update the
+last partition as determined by the pre-aggregation's `partition_granularity`.
 
 </WarningBox>
 
@@ -1075,7 +1070,7 @@ cubes:
           every: 1 day
           incremental: true
           update_window: 7 day
-    
+
     # ...
 ```
 
@@ -1128,7 +1123,7 @@ cubes:
 
 </CodeTabs>
 
-###  use_original_sql_pre_aggregations
+### use_original_sql_pre_aggregations
 
 Cube supports multi-stage pre-aggregations by reusing original SQL
 pre-aggregations in rollups through the `use_original_sql_pre_aggregations`
@@ -1141,8 +1136,8 @@ underlying SQL calculations every time it builds new rollup tables.
 
 `original_sql` pre-aggregations **must only** be used when [storing
 pre-aggregations in the source database][ref-caching-using-preaggs-internal].
-This also means that `original_sql` pre-aggregations require `readOnly: false` to
-be set on their respective database driver.
+This also means that `original_sql` pre-aggregations require `readOnly: false`
+to be set on their respective database driver.
 
 </WarningBox>
 
@@ -1185,11 +1180,8 @@ cube(`orders`, {
 cubes:
   - name: orders
     sql: >
-      SELECT * FROM orders1
-      UNION ALL
-      SELECT * FROM orders2
-      UNION ALL
-      SELECT * FROM orders3
+      SELECT * FROM orders1 UNION ALL SELECT * FROM orders2 UNION ALL SELECT *
+      FROM orders3
 
     pre_aggregations:
       - name: main
@@ -1214,21 +1206,21 @@ cubes:
 
 </CodeTabs>
 
-###  scheduled_refresh
+### scheduled_refresh
 
 To always keep pre-aggregations up-to-date, you can set
 `scheduled_refresh: true`. This option defaults to `true`. If set to `false`,
 pre-aggregations will always be built on-demand. The
-[`refresh_key`][self-refreshkey] is used to determine if there's a need to update
-specific pre-aggregations on each scheduled refresh run. For partitioned
+[`refresh_key`][self-refreshkey] is used to determine if there's a need to
+update specific pre-aggregations on each scheduled refresh run. For partitioned
 pre-aggregations, `min` and `max` dates for
 [`time_dimension`][self-timedimension] are checked to determine range for the
 refresh.
 
 Each time a scheduled refresh is run, it takes every pre-aggregation partition
 starting with most recent ones in time and checks if the
-[`refresh_key`][self-refreshkey] has changed. If a change was detected, then that
-partition will be refreshed.
+[`refresh_key`][self-refreshkey] has changed. If a change was detected, then
+that partition will be refreshed.
 
 In development mode, Cube runs the background refresh by default and will
 refresh all pre-aggregations which have `scheduled_refresh: true`.
@@ -1270,19 +1262,19 @@ cubes:
         time_dimension: CUBE.created_at
         granularity: day
         partition_granularity: month
-    
+
     # ...
 ```
 
 </CodeTabs>
 
-###  build_range_start and build_range_end
+### build_range_start and build_range_end
 
 <WarningBox>
 
 Currently `build_range_start` and `build_range_end` doesn't have any effect on
-pre-aggregations without `partition_granularity`. This behavior can be changed in
-future versions.
+pre-aggregations without `partition_granularity`. This behavior can be changed
+in future versions.
 
 </WarningBox>
 
@@ -1349,16 +1341,16 @@ cubes:
           sql: SELECT NOW() - INTERVAL '300 day'
         build_range_end:
           sql: SELECT NOW()
-    
+
     # ...
 ```
 
 </CodeTabs>
 
 It can be used together with the pre-aggregation's `refresh_key` to define
-granular update settings. Set `refresh_key.update_window` to the interval in which
-your data can change and `build_range_start` to the earliest point of time when
-history should be available.
+granular update settings. Set `refresh_key.update_window` to the interval in
+which your data can change and `build_range_start` to the earliest point of time
+when history should be available.
 
 In the following example, `refresh_key.update_window` is `1 week` and
 `build_range_start` is `SELECT NOW() - INTERVAL '365 day'`, so the scheduled
@@ -1415,7 +1407,7 @@ cubes:
 
 </CodeTabs>
 
-###  union_with_source_data
+### union_with_source_data
 
 This option allows combining a pre-aggregation with fresh data retrieved from
 the data source; this is extremely useful in scenarios where latency can be
@@ -1455,7 +1447,7 @@ cubes:
 
 </CodeTabs>
 
-###  indexes
+### indexes
 
 In case of pre-aggregation tables having significant cardinality, you might want
 to create indexes for them in databases which support it. This can be done as
@@ -1557,16 +1549,17 @@ cubes:
 
 </CodeTabs>
 
-###  Aggregating indexes
+### Aggregating indexes
 
 Cube Store also supports aggregating indexes that contain **only** specified
 columns and pre-aggregated measures in the pre-aggregation definition.
 [Queries][ref-api-ref-query-ref] that can target aggregating indexes must have
 the following characteristics:
 
-1. They cannot make use of any `filters` other than for those dimensions that
-   are included in that index
-2. **All** dimensions used in the query must be defined in the aggregating index
+1.  They cannot make use of any `filters` other than for those dimensions that
+    are included in that index
+2.  **All** dimensions used in the query must be defined in the aggregating
+    index
 
 Queries that do not have the above can still make use of regular indexes so
 performance can still be optimized.
@@ -1585,7 +1578,7 @@ definition:
 ```javascript
 cube(`orders`, {
   sql_table: `orders`,
-  
+
   pre_aggregations: {
     category_and_date: {
       measures: [CUBE.count],
@@ -1637,27 +1630,30 @@ cubes:
 </CodeTabs>
 
 [ref-api-ref-query-ref]: https://cube.dev/docs/query-format#query-properties
-[ref-caching-lambda-preaggs]: /caching/pre-aggregations/lambda-pre-aggregations
-[ref-caching-partitioning]: /caching/using-pre-aggregations#partitioning
+[ref-caching-lambda-preaggs]: /product/caching/lambda-pre-aggregations
+[ref-caching-partitioning]: /product/caching/using-pre-aggregations#partitioning
 [ref-caching-preaggs-target]:
-  /caching/pre-aggregations/getting-started#ensuring-pre-aggregations-are-targeted-by-queries
+  /product/caching/getting-started-pre-aggregations#ensuring-pre-aggregations-are-targeted-by-queries
 [ref-caching-preaggs-selecting-preaggs]:
-  /caching/pre-aggregations/getting-started#ensuring-pre-aggregations-are-targeted-by-queries-selecting-the-pre-aggregation
+  /product/caching/getting-started-pre-aggregations#ensuring-pre-aggregations-are-targeted-by-queries-selecting-the-pre-aggregation
 [ref-caching-using-preaggs-internal]:
-  /caching/using-pre-aggregations#pre-aggregations-storage
-[ref-config-downstream-superset]: /config/downstream/superset
+  /product/caching/using-pre-aggregations#pre-aggregations-storage
+[ref-config-downstream-superset]:
+  /product/configuration/visualization-tools/superset
 [ref-config-driverfactory]: /config/#driver-factory
-[ref-cube-refreshkey]: /schema/reference/cube#refresh-key
+[ref-cube-refreshkey]: /product/data-modeling/reference/cube#refresh-key
 [ref-production-checklist-refresh]:
-  /deployment/production-checklist#set-up-refresh-worker
-[ref-recipe-funnels]: /recipes/funnels
-[ref-sqlalias]: /schema/reference/cube#sql-alias
-[ref-schema-ref-cube-datasource]: /schema/reference/cube#parameters-data-source
-[ref-schema-dimensions]: /schema/reference/dimensions
-[ref-schema-measures]: /schema/reference/measures
-[ref-schema-segments]: /schema/reference/segments
-[ref-schema-types-dim-time]: /schema/reference/types-and-formats#types-time
-[ref-naming]: /data-modeling/syntax#naming
+  /product/deployment/production-checklist#set-up-refresh-worker
+[ref-recipe-funnels]: /guides/recipes/analytics/funnels
+[ref-sqlalias]: /product/data-modeling/reference/cube#sql-alias
+[ref-schema-ref-cube-datasource]:
+  /product/data-modeling/reference/cube#parameters-data-source
+[ref-schema-dimensions]: /product/data-modeling/reference/dimensions
+[ref-schema-measures]: /product/data-modeling/reference/measures
+[ref-schema-segments]: /product/data-modeling/reference/segments
+[ref-schema-types-dim-time]:
+  /product/data-modeling/reference/types-and-formats#types-time
+[ref-naming]: /product/data-modeling/fundamentals/syntax#naming
 [self-granularity]: #granularity
 [self-incremental]: #refresh-key-incremental
 [self-origsql-preaggs]: #use-original-sql-pre-aggregations

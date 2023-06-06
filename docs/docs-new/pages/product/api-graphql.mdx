@@ -7,7 +7,9 @@ redirect_from:
 
 <SuccessBox>
 
-**We’re running a survey to better understand how you use Cube.** Please take a moment to [share with us what you think](https://forms.gle/b7iQHpocAXfpNfeR7). It will mean the world to us.
+**We’re running a survey to better understand how you use Cube.** Please take a
+moment to [share with us what you think](https://forms.gle/b7iQHpocAXfpNfeR7).
+It will mean the world to us.
 
 </SuccessBox>
 
@@ -100,7 +102,7 @@ The equivalent query to the REST API endpoint would look like this:
 }
 ```
 
-###  Modifying time dimension granularity
+### Modifying time dimension granularity
 
 The granularity for a time dimension can easily be changed by specifying it in
 the query:
@@ -132,7 +134,7 @@ you prefer to not specify a granularity, then use `value`:
 }
 ```
 
-###  Specifying filters and ranges
+### Specifying filters and ranges
 
 Filters can be set on the load query or on a specific cube. Specifying the
 filter on the load query applies it to all cubes in the query. Filters can be
@@ -178,7 +180,7 @@ query GetOrders($byStatus: Boolean) {
 }
 ```
 
-###  Querying multiple cubes
+### Querying multiple cubes
 
 Using the same `orders` cube as before, let's try and get the numbers of
 products for each order status too. We can do this by adding the `products` cube
@@ -201,4 +203,5 @@ to our query as follows:
 }
 ```
 
-[ref-schema-ref-preagg-granularity]: /schema/reference/pre-aggregations#parameters-granularity
+[ref-schema-ref-preagg-granularity]:
+  /product/data-modeling/reference/pre-aggregations#parameters-granularity

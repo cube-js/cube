@@ -12,44 +12,52 @@ information is required:
 
 - **Virtual Network Name:** This can be found in the Virtual Networks section of
   the [Azure Portal][azure-console].
-- **Tenant ID:** This can be found under `Azure Active Directory` > `Properties` >
-  `Tenant ID` in the [Azure Portal][azure-console].
+- **Tenant ID:** This can be found under `Azure Active Directory` >
+  `Properties` > `Tenant ID` in the [Azure Portal][azure-console].
 
 ## Setup
 
-For cross-tenant peering in Azure, you are supposed to assign the peering role to
-the service principal of the peering party.
+For cross-tenant peering in Azure, you are supposed to assign the peering role
+to the service principal of the peering party.
 
-Using the steps outlined below, you would register Cube Cloud tenant at your organization
-and grant peering access to Cube Cloud service principal.
+Using the steps outlined below, you would register Cube Cloud tenant at your
+organization and grant peering access to Cube Cloud service principal.
 
 ### Add Cube tenant to your organization
 
-First you should add the Cube Cloud tenant to your organization. To do this, open
-the [Azure Portal][azure-console] and go to `Azure Active Directory` > `External
-Identities` > `Cross-tenant access settings` > `Organizational Settings` > `Add
-Organization`.
+First you should add the Cube Cloud tenant to your organization. To do this,
+open the [Azure Portal][azure-console] and go to `Azure Active Directory` >
+`External Identities` > `Cross-tenant access settings` >
+`Organizational Settings` > `Add Organization`.
 
 For Tenant ID, enter `197e5263-87f4-4ce1-96c4-351b0c0c714a`.
 
-Make sure that `B2B Collaboration` > `Inbound Access` > `Applications` is set to `Allows access`.
+Make sure that `B2B Collaboration` > `Inbound Access` > `Applications` is set to
+`Allows access`.
 
 ### Register Cube Cloud service principal at your organization
 
-To register the Cube Cloud service principal for your organization, follow these steps:
+To register the Cube Cloud service principal for your organization, follow these
+steps:
 
-1. Log in with an account that has permissions to register Enterprise applications.
-2. Open a browser tab and go to the following URL, replacing "TenantID" with your tenant ID:
-https://login.microsoftonline.com/TenantID/oauth2/authorize?client_id=0c5d0d4b-6cee-402e-9a08-e5b79f199481&response_type=code&redirect_uri=https%3A%2F%2Fwww.microsoft.com%2F
-3. The Cube Cloud service principal has specific credentials. Check that the following details match exactly what you see on the dialog box that pops up:
+1.  Log in with an account that has permissions to register Enterprise
+    applications.
+2.  Open a browser tab and go to the following URL, replacing "TenantID" with
+    your tenant ID:
+    <https://login.microsoftonline.com/TenantID/oauth2/authorize?client_id=0c5d0d4b-6cee-402e-9a08-e5b79f199481&response_type=code&redirect_uri=https%3A%2F%2Fwww.microsoft.com%2F>
+3.  The Cube Cloud service principal has specific credentials. Check that the
+    following details match exactly what you see on the dialog box that pops up:
+
 - Client ID: `0c5d0d4b-6cee-402e-9a08-e5b79f199481`
 - Name: `cube-dedicated-infra-sp`
 
-Once you have confirmed that all the information is correct, select "Consent on behalf of your organization" and click "Accept".
+Once you have confirmed that all the information is correct, select "Consent on
+behalf of your organization" and click "Accept".
 
 ### Grant peering permissions to Cube Cloud service principal on your `Virtual Network`
 
-As `peering role` you can use built-in `Network Contributor` or create custom role (e.g. `cube-peering-role`) with the following permissions:
+As `peering role` you can use built-in `Network Contributor` or create custom
+role (e.g. `cube-peering-role`) with the following permissions:
 
 - `Microsoft.Network/virtualNetworks/virtualNetworkPeerings/write`
 - `Microsoft.Network/virtualNetworks/peer/action`
@@ -57,32 +65,36 @@ As `peering role` you can use built-in `Network Contributor` or create custom ro
 - `Microsoft.Network/virtualNetworks/virtualNetworkPeerings/read`
 - `Microsoft.Network/virtualNetworks/virtualNetworkPeerings/delete`
 
-On the [Azure Portal][azure-console], go to `Virtual networks` > *Virtual
-Network Name* > `Access Control (IAM)` > `Add` > `Add role assignment` and fill in the following details:
+On the [Azure Portal][azure-console], go to `Virtual networks` > _Virtual
+Network Name_ > `Access Control (IAM)` > `Add` > `Add role assignment` and fill
+in the following details:
+
 - Role = `Network Contributor` or `cube-peering-role`
 - Members: `cube-dedicated-infra-sp`
 
 ### Firewall
 
-Make sure that your firewall rules allow inbound and outbound traffic to IP/port your database is listening at.
+Make sure that your firewall rules allow inbound and outbound traffic to IP/port
+your database is listening at.
 
 ## Information required by Cube Cloud support
 
 When you are reaching out Cube Cloud support please provide following
 information:
 
-- **Virtual Network ID:** You can find it at `Virtual Networks` > *Virtual
-  Network Name* > `Overview` > `JSON view` > `Resource ID` on [Azure
+- **Virtual Network ID:** You can find it at `Virtual Networks` > _Virtual
+  Network Name_ > `Overview` > `JSON view` > `Resource ID` on [Azure
   Portal][azure-console].
 - **Virtual Network Address Spaces:** You can find it at `Virtual Networks` >
-  *Virtual Network Name* > `Overview` > `JSON view` > `properties` >
+  _Virtual Network Name_ > `Overview` > `JSON view` > `properties` >
   `addressSpace` on [Azure Portal][azure-console].
 - **Tenant ID:** You can find it in `Azure Active Directory` > `Properties` >
   `Tenant ID` section of [Azure Portal][azure-console].
 
 ## Supported Regions
 
-We support all general-purpose regions. Cube Store is currently located only in `US Central`
-so pre-aggregations performance might depend on geographical proximity to it.
+We support all general-purpose regions. Cube Store is currently located only in
+`US Central` so pre-aggregations performance might depend on geographical
+proximity to it.
 
 [azure-console]: https://portal.azure.com

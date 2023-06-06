@@ -51,7 +51,7 @@ where Cube Store is running.
 You can also use Docker Compose to achieve the same:
 
 ```yaml
-version: '2.2'
+version: "2.2"
 services:
   cubestore:
     image: cubejs/cubestore:latest
@@ -154,7 +154,7 @@ A sample Docker Compose stack for the single machine setting this up might look
 like:
 
 ```yaml
-version: '2.2'
+version: "2.2"
 services:
   cubestore_router:
     restart: always
@@ -241,7 +241,7 @@ data corruption errors.
 A simplified example using AWS S3 might look like:
 
 ```yaml
-version: '2.2'
+version: "2.2"
 services:
   cubestore_router:
     image: cubejs/cubestore:latest
@@ -277,7 +277,7 @@ can be configured by [CUBESTORE_DATA_DIR][ref-config-env] environment variable.
 It is advised to use local SSDs for this scratch space to maximize querying
 performance.
 
-###  AWS
+### AWS
 
 Cube Store can retrieve security credentials from instance metadata
 automatically. This means you can skip defining the
@@ -300,5 +300,5 @@ this reason, we recommend running your Cube Store cluster on a network that only
 allows requests from the Cube deployment.
 
 [link-wsl2]: https://docs.microsoft.com/en-us/windows/wsl/install-win10
-[ref-caching-partitioning]: /caching/using-pre-aggregations#partitioning
-[ref-config-env]: /reference/environment-variables
+[ref-caching-partitioning]: /product/caching/using-pre-aggregations#partitioning
+[ref-config-env]: /reference/configuration/environment-variables

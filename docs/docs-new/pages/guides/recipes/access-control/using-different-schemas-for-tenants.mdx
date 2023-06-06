@@ -41,7 +41,7 @@ pre-aggregations for them, if needed.
 Our `cube.js` file will look like this:
 
 ```javascript
-const { FileRepository } = require('@cubejs-backend/server-core');
+const { FileRepository } = require("@cubejs-backend/server-core");
 
 module.exports = {
   contextToAppId: ({ securityContext }) =>
@@ -51,8 +51,8 @@ module.exports = {
     new FileRepository(`model/${securityContext.tenant}`),
 
   scheduledRefreshContexts: () => [
-    { securityContext: { tenant: 'avocado' } },
-    { securityContext: { tenant: 'mango' } },
+    { securityContext: { tenant: "avocado" } },
+    { securityContext: { tenant: "mango" } },
   ],
 };
 ```
@@ -70,13 +70,10 @@ This is the `products` cube for the `avocado` tenant:
 cubes:
   - name: products
     sql: >
-      SELECT *
-      FROM public.Products
-      WHERE MOD (id, 2) = 1
+      SELECT * FROM public.Products WHERE MOD (id, 2) = 1
 ```
 
 ```javascript
-
 cube(`products`, {
   sql: `SELECT *
     FROM public.Products
@@ -96,9 +93,7 @@ This is the `products` cube for the `mango` tenant:
 cubes:
   - name: products
     sql: >
-      SELECT *
-      FROM public.Products
-      WHERE MOD (id, 2) = 0
+      SELECT * FROM public.Products WHERE MOD (id, 2) = 0
 ```
 
 ```javascript
@@ -128,10 +123,10 @@ To fetch the products, we will send two identical queries with different JWTs:
 
 ```json5
 {
-  "sub": "1234567890",
-  "tenant": "Mango",
-  "iat": 1000000000,
-  "exp": 5000000000
+  sub: "1234567890",
+  tenant: "Mango",
+  iat: 1000000000,
+  exp: 5000000000,
 }
 ```
 
@@ -153,7 +148,7 @@ We will receive different data for each tenant, as expected:
   {
     "products.id": 5,
     "products.name": "Handcrafted Rubber Chicken",
-  }
+  },
 ]
 ```
 
@@ -171,7 +166,7 @@ We will receive different data for each tenant, as expected:
   {
     "products.id": 6,
     "products.name": "Handcrafted Plastic Chair",
-  }
+  },
 ]
 ```
 

@@ -39,7 +39,7 @@ Later, you can `import` into the cube whenever needed:
 
 ```javascript
 // in Users.js
-import { TEST_USER_IDS } from './constants';
+import { TEST_USER_IDS } from "./constants";
 
 cube(`users`, {
   // ...
@@ -54,7 +54,7 @@ cube(`users`, {
 
   segments: {
     exclude_test_users: {
-      sql: `${CUBE}.id NOT IN (${TEST_USER_IDS.join(', ')})`,
+      sql: `${CUBE}.id NOT IN (${TEST_USER_IDS.join(", ")})`,
     },
   },
 });
@@ -77,7 +77,7 @@ export const parseDateWithTimeZone = (column) =>
 
 ```javascript
 // in events.js
-import { parseDateWithTimeZone } from './helpers';
+import { parseDateWithTimeZone } from "./helpers";
 
 cube(`events`, {
   sql_table: `events`,
@@ -85,7 +85,7 @@ cube(`events`, {
 
   dimensions: {
     date: {
-      sql: `${parseDateWithTimeZone('date')}`,
+      sql: `${parseDateWithTimeZone("date")}`,
       type: `time`,
     },
   },
@@ -111,7 +111,7 @@ which is located in a parent directory.
 
 ```javascript
 // in model/sales/orders.js
-import { capitalize } from './schema_utils';
+import { capitalize } from "./schema_utils";
 ```
 
 ```javascript
@@ -144,8 +144,8 @@ default the environment variable to the value `dev`.
 ```javascript
 // in utils.js
 const environment =
-  typeof process.env.ENVIRONMENT === 'undefined'
-    ? 'dev'
+  typeof process.env.ENVIRONMENT === "undefined"
+    ? "dev"
     : process.env.ENVIRONMENT.toLowerCase();
 exports.environment = () => environment;
 ```
@@ -155,17 +155,19 @@ environment value.
 
 ```javascript
 // in model/sales/orders.js
-import { environment } from '../utils'
-const isProdOrStaging = ["prod", "staging"].includes(environment())
+import { environment } from "../utils";
+const isProdOrStaging = ["prod", "staging"].includes(environment());
 
 cube(`orders`, {
   // ...
 
-  pre_aggregations: isProdOrStaging ? {
-    main: {
-      // ...
-    }
-  } : {}, // No pre-aggregations unless environment is prod or stagging
+  pre_aggregations: isProdOrStaging
+    ? {
+        main: {
+          // ...
+        },
+      }
+    : {}, // No pre-aggregations unless environment is prod or stagging
 });
 ```
 
@@ -174,4 +176,4 @@ cube(`orders`, {
 [mdn-js-es6-import]:
   https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/import
 [ref-schema-string-time-dims]:
-  /schema/fundamentals/additional-concepts#string-time-dimensions
+  /product/data-modeling/fundamentals/additional-concepts#string-time-dimensions

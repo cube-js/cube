@@ -30,8 +30,7 @@ measure parameter.
 cubes:
   - name: active_users
     sql: >
-      SELECT user_id, created_at
-      FROM public.orders
+      SELECT user_id, created_at FROM public.orders
 
     measures:
       - name: monthly_active_users
@@ -58,7 +57,8 @@ cubes:
       - name: wau_to_mau
         title: WAU to MAU
         type: number
-        sql: "100.000 * {weekly_active_users} / NULLIF({monthly_active_users}, 0)"
+        sql:
+          "100.000 * {weekly_active_users} / NULLIF({monthly_active_users}, 0)"
         format: percent
 
     dimensions:

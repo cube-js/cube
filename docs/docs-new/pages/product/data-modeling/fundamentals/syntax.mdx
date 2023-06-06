@@ -77,8 +77,7 @@ Common rules apply to names of entities within the data model. All names must:
 - start with a letter
 - consist of letters, numbers, and underscore (`_`) symbols only
 
-It is also recommended that names use [snake
-case][wiki-snake-case].
+It is also recommended that names use [snake case][wiki-snake-case].
 
 Good examples of names:
 
@@ -90,14 +89,18 @@ Good examples of names:
 
 ## Scoping
 
-Cubes have three types of members: measures, dimensions and segments. Members have full names and short names:
-* Each member can be referenced either by its full name (`<cube_name>.<member_name>`) 
-* or by its short name (`<member_name>`) __if member exists within the same cube__. 
+Cubes have three types of members: measures, dimensions and segments. Members
+have full names and short names:
 
-There is also a handy `CUBE` context variable which
-references the current cube. Important difference between same cube references
-is `CUBE.<member-Name>` references are resolved runtime as opposed to compile
-time `<member_name>` references.
+- Each member can be referenced either by its full name
+  (`<cube_name>.<member_name>`)
+- or by its short name (`<member_name>`) **if member exists within the same
+  cube**.
+
+There is also a handy `CUBE` context variable which references the current cube.
+Important difference between same cube references is `CUBE.<member-Name>`
+references are resolved runtime as opposed to compile time `<member_name>`
+references.
 
 Using the `CUBE` referencing causes its alias to be used in SQL queries. For
 example, to avoid ambiguity in the `name` dimension in the following example, we
@@ -204,12 +207,13 @@ LEFT JOIN contacts "contacts"
   ON "users".contact_id = "contacts".id
 ```
 
-
 ## SQL blocks
 
-Cube requires you to provide SQL snippets in `sql` and `sql_table` parameters. 
-The SQL code you provide in these parameters should match your database SQL dialect. 
-Cube enables you to reference existing objects in SQL blocks with Python-like `{}` interpolation syntax in YAML models and `${}` interpolation operator in JS models.
+Cube requires you to provide SQL snippets in `sql` and `sql_table` parameters.
+The SQL code you provide in these parameters should match your database SQL
+dialect. Cube enables you to reference existing objects in SQL blocks with
+Python-like `{}` interpolation syntax in YAML models and `${}` interpolation
+operator in JS models.
 
 <CodeTabs>
 
@@ -221,24 +225,22 @@ cube(`orders`, {
     total_amount_shipped: {
       sql: `${CUBE.amount}`,
       type: `sum`,
-      filters: [
-        { sql: `${CUBE.status} = 'shipped'` }
-      ]
-    }
+      filters: [{ sql: `${CUBE.status} = 'shipped'` }],
+    },
   },
 
   dimensions: {
     status: {
       sql: `${CUBE}.status`,
-      type: `string`
+      type: `string`,
     },
 
     amount: {
       sql: `${line_items.total_amount}`,
       type: `number`,
-      sub_query: true
-    }
-  }
+      sub_query: true,
+    },
+  },
 });
 ```
 
@@ -269,7 +271,8 @@ cubes:
 
 ## Referring to objects
 
-To write reusable data models, it is important to be able to reference existing objects, such as measures or dimensions.
+To write reusable data models, it is important to be able to reference existing
+objects, such as measures or dimensions.
 
 In most cases you can just list objects as-is.
 
@@ -303,33 +306,36 @@ cubes:
 
 </CodeTabs>
 
-
-Inside [SQL blocks][self-sql-blocks] you need to use interpolation syntax, `{}` for YAML models and `${}` for JS models.
-
-
+Inside [SQL blocks][self-sql-blocks] you need to use interpolation syntax, `{}`
+for YAML models and `${}` for JS models.
 
 ## Context Variables
 
-Cube provides the following context variables you can access inside your data model
+Cube provides the following context variables you can access inside your data
+model
 
-* __FILTER_PARAMS__: It helps to optimize SQL that powers Cube, e.g. hint your database optimizer to use a specific index 
-or filter out partitions or shards in your cloud data warehouse so you won't be billed for scanning those.
-* __SQL_UTILS__: Provides useful utils functions.
-* __CUBE__: Handy helper to reference members via full names. Learn more about its usage in [scoping section][self-scoping].
-* __COMPILE_CONTEXT__: it is being used to create dynamic data models. It is advanced concept and you can [read about it here][ref-dynamic-data-models]. 
+- **FILTER_PARAMS**: It helps to optimize SQL that powers Cube, e.g. hint your
+  database optimizer to use a specific index or filter out partitions or shards
+  in your cloud data warehouse so you won't be billed for scanning those.
+- **SQL_UTILS**: Provides useful utils functions.
+- **CUBE**: Handy helper to reference members via full names. Learn more about
+  its usage in [scoping section][self-scoping].
+- **COMPILE_CONTEXT**: it is being used to create dynamic data models. It is
+  advanced concept and you can [read about it here][ref-dynamic-data-models].
 
 You can find [Context variables reference here][ref-context-variables]
-
-
 
 [self-folder-structure]: #folder-structure
 [self-naming]: #naming
 [self-syntax]: #code-syntax
 [self-scoping]: #scoping
 [self-sql-blocks]: #sql-blocks
-[ref-dynamic-data-models]: /schema/advanced/dynamic-schema-creation
-[ref-context-variables]: /schema/reference/cube#context-variables
-[ref-config-model-path]: /config#options-reference-schema-path
-[ref-config-repository-factory]: /config#options-reference-repository-factory
+[ref-dynamic-data-models]:
+  /product/data-modeling/advanced/dynamic-schema-creation
+[ref-context-variables]: /product/data-modeling/reference/cube#context-variables
+[ref-config-model-path]:
+  /reference/configuration/config#options-reference-schema-path
+[ref-config-repository-factory]:
+  /reference/configuration/config#options-reference-repository-factory
 [wiki-snake-case]: https://en.wikipedia.org/wiki/Snake_case
 [wiki-yaml]: https://en.wikipedia.org/wiki/YAML

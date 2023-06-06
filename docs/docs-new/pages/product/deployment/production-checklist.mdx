@@ -104,7 +104,7 @@ following sizing estimates are based on default settings and are very generic,
 which may not fit your Cube use case, so you should always tweak resources based
 on consumption patterns you see.
 
-###  Memory and CPU
+### Memory and CPU
 
 Each Cube cluster should contain at least 2 Cube API instances. Every Cube API
 instance should have at least 3GB of RAM and 2 CPU cores allocated for it.
@@ -126,7 +126,7 @@ allocated for it. Every Cube Store worker node should have at least 8GB of RAM
 and 4 CPU cores allocated for it. The Cube Store cluster should have at least
 two worker nodes.
 
-###  RPS and data volume
+### RPS and data volume
 
 Depending on data model size, every Core Cube API instance can serve 1 to 10
 requests per second. Every Core Cube Store router node can serve 50-100 queries
@@ -141,22 +141,22 @@ differ as it has different Cube runtime.
   https://cube.dev/blog/migrating-from-self-hosted-to-cube-cloud/
 [link-caddy]: https://caddyserver.com/
 [link-cube-cloud]: https://cubecloud.dev
-[link-cubejs-dev-vs-prod]: /configuration/overview#development-mode
+[link-cubejs-dev-vs-prod]: /product/configuration/overview#development-mode
 [link-k8s-healthcheck-api]:
   https://kubernetes.io/docs/reference/using-api/health-checks/
 [link-kong]: https://konghq.com/kong/
 [link-nginx]: https://www.nginx.com/
 [link-nginx-docs]: https://nginx.org/en/docs/http/configuring_https_servers.html
 [ref-config-connect-db]: /connecting-to-the-database
-[ref-caching-cubestore]: /caching/running-in-production
+[ref-caching-cubestore]: /product/caching/running-in-production
 [ref-conf-ref-env-cachequeue-driver]:
-  /reference/environment-variables#cubejs-cache-and-queue-driver
+  /reference/configuration/environment-variables#cubejs-cache-and-queue-driver
 [ref-conf-ref-env-preaggs-schema]:
-  /reference/environment-variables#cubejs-pre-aggregations-schema
-[ref-env-vars]: /reference/environment-variables
-[ref-schema-ref-preaggs]: /schema/reference/pre-aggregations
-[ref-api-scheduled-refresh]: /rest-api#v-1-run-scheduled-refresh
-[ref-sec-ctx]: /security/context
-[ref-config-jwt]: /config#jwt
-[ref-api-readyz]: /rest-api#readyz
-[ref-api-livez]: /rest-api#livez
+  /reference/configuration/environment-variables#cubejs-pre-aggregations-schema
+[ref-env-vars]: /reference/configuration/environment-variables
+[ref-schema-ref-preaggs]: /product/data-modeling/reference/pre-aggregations
+[ref-api-scheduled-refresh]: /reference/rest-api#v-1-run-scheduled-refresh
+[ref-sec-ctx]: /product/auth/context
+[ref-config-jwt]: /reference/configuration/config#jwt
+[ref-api-readyz]: /reference/rest-api#readyz
+[ref-api-livez]: /reference/rest-api#livez

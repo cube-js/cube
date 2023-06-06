@@ -13,7 +13,7 @@ redirect_from:
 
 ## Setup
 
-###  Manual
+### Manual
 
 Add the following to a `.env` file in your Cube project:
 
@@ -45,8 +45,8 @@ CUBEJS_DB_SCHEMA=my_trino_schema
 ### count_distinct_approx
 
 Measures of type
-[`count_distinct_approx`][ref-schema-ref-types-formats-countdistinctapprox] can be
-used in pre-aggregations when using Trino as a source database. To learn more
+[`count_distinct_approx`][ref-schema-ref-types-formats-countdistinctapprox] can
+be used in pre-aggregations when using Trino as a source database. To learn more
 about Trino support for approximate aggregate functions, [click
 here][trino-docs-approx-agg-fns].
 
@@ -61,7 +61,8 @@ Database][ref-recipe-enable-ssl].
 [trino-docs-approx-agg-fns]:
   https://trino.io/docs/current/functions/aggregate.html#approximate-aggregate-functions
 [ref-config-multiple-ds-decorating-env]:
-  /config/multiple-data-sources#configuring-data-sources-with-environment-variables-decorated-environment-variables
-[ref-recipe-enable-ssl]: /recipes/enable-ssl-connections-to-database
+  /product/configuration/advanced/multiple-data-sources#configuring-data-sources-with-environment-variables-decorated-environment-variables
+[ref-recipe-enable-ssl]:
+  /guides/recipes/data-sources/using-ssl-connections-to-data-source
 [ref-schema-ref-types-formats-countdistinctapprox]:
-  /schema/reference/types-and-formats#count-distinct-approx
+  /product/data-modeling/reference/types-and-formats#count-distinct-approx

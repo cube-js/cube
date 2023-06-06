@@ -35,32 +35,32 @@ module.exports = {
   // Selects the database connection configuration based on the tenant name
   driverFactory: ({ securityContext }) => {
     if (!securityContext.tenant) {
-      throw new Error('No tenant found in Security Context!');
+      throw new Error("No tenant found in Security Context!");
     }
 
-    if (securityContext.tenant === 'Avocado Inc') {
+    if (securityContext.tenant === "Avocado Inc") {
       return {
-        type: 'postgres',
-        database: 'localDB',
-        host: 'postgres',
-        user: 'postgres',
-        password: 'example',
-        port: '5432',
+        type: "postgres",
+        database: "localDB",
+        host: "postgres",
+        user: "postgres",
+        password: "example",
+        port: "5432",
       };
     }
 
-    if (securityContext.tenant === 'Mango Inc') {
+    if (securityContext.tenant === "Mango Inc") {
       return {
-        type: 'postgres',
-        database: 'ecom',
-        host: 'demo-db.cube.dev',
-        user: 'cube',
-        password: '12345',
-        port: '5432',
+        type: "postgres",
+        database: "ecom",
+        host: "demo-db.cube.dev",
+        user: "cube",
+        password: "12345",
+        port: "5432",
       };
     }
 
-    throw new Error('Unknown tenant in Security Context');
+    throw new Error("Unknown tenant in Security Context");
   },
 };
 ```
@@ -74,30 +74,30 @@ access to the data model of other tenants.
 ```json5
 // JWT payload for "Avocado Inc"
 {
-  "sub": "1234567890",
-  "tenant": "Avocado Inc",
-  "iat": 1000000000,
-  "exp": 5000000000
+  sub: "1234567890",
+  tenant: "Avocado Inc",
+  iat: 1000000000,
+  exp: 5000000000,
 }
 ```
 
 ```json5
 // JWT payload for "Mango Inc"
 {
-  "sub": "1234567890",
-  "tenant": "Mango Inc",
-  "iat": 1000000000,
-  "exp": 5000000000
+  sub: "1234567890",
+  tenant: "Mango Inc",
+  iat: 1000000000,
+  exp: 5000000000,
 }
 ```
 
 ```json5
 // JWT payload for "Peach Inc"
 {
-  "sub": "1234567890",
-  "tenant": "Peach Inc",
-  "iat": 1000000000,
-  "exp": 5000000000
+  sub: "1234567890",
+  tenant: "Peach Inc",
+  iat: 1000000000,
+  exp: 5000000000,
 }
 ```
 
@@ -144,7 +144,7 @@ tenant's name:
 
 ```json5
 // Peach Inc error:
-{"error": "Error: Unknown tenant in Security Context"}
+{ error: "Error: Unknown tenant in Security Context" }
 ```
 
 ## Source code

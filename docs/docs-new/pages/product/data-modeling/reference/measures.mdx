@@ -13,7 +13,7 @@ Any measure should have the following properties: `name`, `sql` and `type`.
 
 ## Parameters
 
-###  name
+### name
 
 The `name` parameter serves as the identifier of a measure. It must be unique
 among all measures, dimensions, and segments within a cube and follow the
@@ -56,7 +56,7 @@ cubes:
 
 </CodeTabs>
 
-###  description
+### description
 
 You can add details to a measure’s definition via the `description` parameter:
 
@@ -90,7 +90,7 @@ cubes:
 
 </CodeTabs>
 
-###  drill_members
+### drill_members
 
 Using the `drill_members` parameter, you can define a set of [drill
 down][ref-drilldowns] fields for the measure. `drill_members` is defined as an
@@ -109,13 +109,7 @@ cube(`orders`, {
     revenue: {
       type: `sum`,
       sql: `price`,
-      drill_members: [
-        id,
-        price,
-        status,
-        products.name,
-        products.id
-      ],
+      drill_members: [id, price, status, products.name, products.id],
     },
   },
 });
@@ -140,7 +134,7 @@ cubes:
 
 </CodeTabs>
 
-###  filters
+### filters
 
 If you want to add some conditions for a metric's calculation, you should use
 the `filters` parameter. The syntax looks like the following:
@@ -176,7 +170,7 @@ cubes:
 
 </CodeTabs>
 
-###  format
+### format
 
 `format` is an optional parameter. It is used to format the output of measures
 in different ways, for example, as currency for `revenue`. Please refer to the
@@ -213,7 +207,7 @@ cubes:
 
 </CodeTabs>
 
-###  meta
+### meta
 
 Custom metadata. Can be used to pass any information to the frontend.
 
@@ -250,7 +244,7 @@ cubes:
 
 </CodeTabs>
 
-###  rolling_window
+### rolling_window
 
 If you want to calculate some metric within a window, for example a week or a
 month, you should use a `rolling_window` parameter. The `trailing` and `leading`
@@ -341,7 +335,7 @@ cubes:
 
 </CodeTabs>
 
-###  public
+### public
 
 <InfoBox>
 
@@ -383,7 +377,7 @@ cubes:
 
 </CodeTabs>
 
-###  sql
+### sql
 
 `sql` is a required parameter. It can take any valid SQL expression depending on
 the `type` of the measure. Please refer to the [Measure Types
@@ -418,7 +412,7 @@ cubes:
 
 </CodeTabs>
 
-###  title
+### title
 
 You can use the `title` parameter to change a measure’s displayed name. By
 default, Cube will humanize your measure key to create a display name. In order
@@ -454,7 +448,7 @@ cubes:
 
 </CodeTabs>
 
-###  type
+### type
 
 `type` is a required parameter. There are various types that can be assigned to
 a measure. Please refer to the [Measure
@@ -529,8 +523,9 @@ You can create calculated measures from several joined cubes. In this case, a
 join will be created automatically.
 
 [ref-schema-ref-types-formats-measures-types]:
-  /schema/reference/types-and-formats#measure-types
+  /product/data-modeling/reference/types-and-formats#measure-types
 [ref-schema-ref-types-formats-measures-formats]:
-  /schema/reference/types-and-formats#measure-formats
-[ref-drilldowns]: /schema/fundamentals/additional-concepts#drilldowns
-[ref-naming]: /data-modeling/syntax#naming
+  /product/data-modeling/reference/types-and-formats#measure-formats
+[ref-drilldowns]:
+  /product/data-modeling/fundamentals/additional-concepts#drilldowns
+[ref-naming]: /product/data-modeling/fundamentals/syntax#naming

@@ -9,7 +9,8 @@ redirect_from:
 <InfoBox>
 
 This functionality only works with data models written in JavaScript, not YAML.
-For more information, check out the [Data Modeling Syntax][ref-modeling-syntax] page.
+For more information, check out the [Data Modeling Syntax][ref-modeling-syntax]
+page.
 
 </InfoBox>
 
@@ -95,22 +96,20 @@ measures to calculate the number of events and number of page views only, using
 a filter on `event` column.
 
 ```javascript
-cube('events', {
+cube("events", {
   // ...,
 
   measures: {
     count: {
       sql: `event_id`,
-      type: `count`
+      type: `count`,
     },
 
     page_views_count: {
       sql: `event_id`,
       type: `count`,
-      filters: [
-        { sql: `${CUBE}.event = 'pageview'` }
-      ]
-    }
+      filters: [{ sql: `${CUBE}.event = 'pageview'` }],
+    },
   },
 });
 ```
@@ -120,32 +119,32 @@ events and pageviews. Next, we’re going to add dimensions to be able to filter
 events in a specific time range and for specific types.
 
 ```javascript
-cube('events', {
+cube("events", {
   // ...,
 
   dimensions: {
     anonymous_id: {
       sql: `anonymous_id`,
       type: `number`,
-      primary_key: true
+      primary_key: true,
     },
 
     event_id: {
       sql: `event_id`,
       type: `number`,
-      primary_key: true
+      primary_key: true,
     },
 
     timestamp: {
       sql: `timestamp`,
-      type: `time`
+      type: `time`,
     },
 
     event: {
       sql: `event`,
-      type: `string`
-    }
-  }
+      type: `string`,
+    },
+  },
 });
 ```
 
@@ -207,39 +206,39 @@ for each session. Having this in place, we can already count sessions and plot a
 time series chart of sessions.
 
 ```javascript
-cube('sessions', {
+cube("sessions", {
   // ...,
 
   measures: {
     count: {
       sql: `session_id`,
-      type: `count`
-    }
+      type: `count`,
+    },
   },
 
   dimensions: {
     anonymous_id: {
       sql: `anonymous_id`,
       type: `number`,
-      primary_key: true
+      primary_key: true,
     },
 
     session_id: {
       sql: `session_id`,
       type: `number`,
-      primary_key: true
+      primary_key: true,
     },
 
     start_at: {
       sql: `session_start_at`,
-      type: `time`
+      type: `time`,
     },
 
     next_start_at: {
       sql: `next_session_start_at`,
-      type: `time`
+      type: `time`,
     },
-  }
+  },
 });
 ```
 
@@ -249,13 +248,13 @@ The next step is to identify the events contained within the session and the
 events ending the session. It’s required to get metrics such as session duration
 and events per session, or to identify sessions where specific events occurred
 (we’re going to use that for funnel analysis later on). We’re going to
-[declare a join](/schema/reference/joins) such that the `events` cube has a `many_to_one`
-relation to the `sessions` cube, and specify a condition, such as all users' events from
-session start (inclusive) till the start of the next session (exclusive) belong
-to that session.
+[declare a join](/product/data-modeling/reference/joins) such that the `events`
+cube has a `many_to_one` relation to the `sessions` cube, and specify a
+condition, such as all users' events from session start (inclusive) till the
+start of the next session (exclusive) belong to that session.
 
 ```javascript
-cube('events', {
+cube("events", {
   // ...,
 
   joins: {
@@ -265,29 +264,30 @@ cube('events', {
         ${events.anonymous_id} = ${sessions.anonymous_id}
         AND ${events.timestamp} >= ${sessions.start_at}
         AND (${events.timestamp} < ${sessions.next_start_at} or ${sessions.next_start_at} is null)
-      `
-    }
-  }
+      `,
+    },
+  },
 });
 ```
 
 To determine the end of the session, we’re going to use the
-[`subQuery` feature](/schema/fundamentals/additional-concepts#subquery) in Cube.
+[`subQuery` feature](/product/data-modeling/fundamentals/additional-concepts#subquery)
+in Cube.
 
 ```javascript
-cube('events', {
+cube("events", {
   // ...,
 
   measures: {
     last_event_timestamp: {
       sql: `timestamp`,
       type: `max`,
-      public: false
-    }
+      public: false,
+    },
   },
 });
 
-cube('sessions', {
+cube("sessions", {
   // ...,
 
   dimensions: {
@@ -295,32 +295,30 @@ cube('sessions', {
       sql: `${events.last_event_timestamp}`,
       type: `time`,
       subQuery: true,
-      public: false
+      public: false,
     },
 
     end_at: {
-      sql:
-    `CASE WHEN ${end_raw} + INTERVAL '1 minutes' > ${CUBE}.next_session_start_at
+      sql: `CASE WHEN ${end_raw} + INTERVAL '1 minutes' > ${CUBE}.next_session_start_at
          THEN ${CUBE}.next_session_start_at
          ELSE ${end_raw} + INTERVAL '30 minutes'
          END`,
-      type: `time`
+      type: `time`,
     },
 
     duration_minutes: {
       sql: `datediff(minutes, ${CUBE}.session_start_at, ${end_at})`,
-      type: `number`
-    }
+      type: `number`,
+    },
   },
 
   measures: {
     average_duration_minutes: {
       type: `avg`,
-      sql: `${duration_minutes}`
-    }
+      sql: `${duration_minutes}`,
+    },
   },
 });
-
 ```
 
 ## Mapping Sessions to Users
@@ -369,14 +367,14 @@ We need to declare a relationship between `identifies` and `sessions`, where
 session has a `many_to_one` relationship with identity.
 
 ```javascript
-cube('sessions', {
+cube("sessions", {
   // ...,
 
   joins: {
     identifies: {
       relationship: `many_to_one`,
-      sql: `${identifies.anonymous_id} = ${sessions.anonymous_id}`
-    }
+      sql: `${identifies.anonymous_id} = ${sessions.anonymous_id}`,
+    },
   },
 });
 ```
@@ -386,15 +384,15 @@ Once we have it, we can create a dimension `user_id`, which will be either a
 the identity of a visitor, which means that this visitor never signed in.
 
 ```javascript
-cube('sessions', {
+cube("sessions", {
   // ...,
 
   dimensions: {
     user_id: {
       sql: `coalesce(${identifies.user_id}, ${CUBE}.anonymous_id)`,
-      type: `string`
-    }
-  }
+      type: `string`,
+    },
+  },
 });
 ```
 
@@ -402,19 +400,19 @@ Based on the just-created dimension, we can add two new metrics: the count of
 users and the average sessions per user.
 
 ```javascript
-cube('sessions', {
+cube("sessions", {
   // ...,
 
   measures: {
     users_count: {
       sql: `${user_id}`,
-      type: `count_distinct`
+      type: `count_distinct`,
     },
 
     average_sessions_per_user: {
       sql: `${count}::NUMERIC / NULLIF(${users_count}, 0)`,
-      type: `number`
-    }
+      type: `number`,
+    },
   },
 });
 ```
@@ -425,28 +423,27 @@ on top of it.
 
 ## More metrics for Sessions
 
-###  Number of Events per Session
+### Number of Events per Session
 
-This one is super easy to add with a subQuery dimension. We just calculate the number
-of events, which we already have as a measure in the `events` cube, as a dimension
-in the `sessions` cube.
+This one is super easy to add with a subQuery dimension. We just calculate the
+number of events, which we already have as a measure in the `events` cube, as a
+dimension in the `sessions` cube.
 
 ```javascript
-cube('sessions', {
+cube("sessions", {
   // ...,
 
   dimensions: {
     number_events: {
       sql: `${events.count}`,
       type: `number`,
-      subQuery: true
-    }
+      subQuery: true,
+    },
   },
 });
-
 ```
 
-###  Bounce Rate
+### Bounce Rate
 
 A bounced session is usually defined as a session with only one event. Since
 we’ve just defined the number of events per session, we can easily add a
@@ -455,56 +452,58 @@ this dimension, we can add two measures to the Sessions cube as well - a count
 of bounced sessions and a bounce rate.
 
 ```javascript
-cube('sessions', {
+cube("sessions", {
   // ...,
 
   dimensions: {
     is_bounced: {
-     type: `string`,
+      type: `string`,
       case: {
-        when: [ { sql: `${number_events} = 1`, label: `True` }],
-        else: { label: `False` }
-      }
-    }
+        when: [{ sql: `${number_events} = 1`, label: `True` }],
+        else: { label: `False` },
+      },
+    },
   },
 
   measures: {
     bounced_count: {
       sql: `session_id`,
       type: `count`,
-      filters: [{
-        sql: `${is_bounced} = 'True'`
-      }]
+      filters: [
+        {
+          sql: `${is_bounced} = 'True'`,
+        },
+      ],
     },
 
     bounce_rate: {
       sql: `100.00 * ${bounced_count} / NULLIF(${count}, 0)`,
       type: `number`,
-      format: `percent`
-    }
+      format: `percent`,
+    },
   },
 });
 ```
 
-###  First Referrer
+### First Referrer
 
 We already have this column in place in our base table. We’re just going to
 define a dimension on top of this.
 
 ```javascript
-cube('sessions', {
+cube("sessions", {
   // ...,
 
   measures: {
     first_referrer: {
       type: `string`,
-      sql: `first_referrer`
-    }
+      sql: `first_referrer`,
+    },
   },
 });
 ```
 
-###  Sessions New vs Returning
+### Sessions New vs Returning
 
 Same as for the first referrer. We already have a `session_sequence` field in
 the base table, which we can use for the `is_first` dimension. If
@@ -512,17 +511,17 @@ the base table, which we can use for the `is_first` dimension. If
 repeated session.
 
 ```javascript
-cube('sessions', {
+cube("sessions", {
   // ...,
 
   dimensions: {
     is_first: {
       type: `string`,
       case: {
-        when: [{ sql: `${CUBE}.session_sequence = 1`, label: `First`}],
-        else: { label: `Repeat` }
-      }
-    }
+        when: [{ sql: `${CUBE}.session_sequence = 1`, label: `First` }],
+        else: { label: `Repeat` },
+      },
+    },
   },
 
   measures: {
@@ -530,22 +529,20 @@ cube('sessions', {
       description: `Repeat Sessions Count`,
       sql: `session_id`,
       type: `count`,
-      filters: [
-        { sql: `${is_first} = 'Repeat'` }
-      ]
+      filters: [{ sql: `${is_first} = 'Repeat'` }],
     },
 
     repeat_percent: {
       description: `Percent of Repeat Sessions`,
       sql: `100.00 * ${repeat_count} / NULLIF(${count}, 0)`,
       type: `number`,
-      format: `percent`
+      format: `percent`,
     },
   },
 });
 ```
 
-###  Filter Sessions, where user performs specific event
+### Filter Sessions, where user performs specific event
 
 Often, you want to select specific sessions where a user performed some
 important action. In the example below, we’ll filter out sessions where the
@@ -554,7 +551,7 @@ important action. In the example below, we’ll filter out sessions where the
 Define a measure on the Events cube to count only `form_submitted` events.
 
 ```javascript
-cube('events', {
+cube("events", {
   // ...,
 
   // Add this measure to the `events` cube
@@ -562,10 +559,8 @@ cube('events', {
     form_submitted_count: {
       sql: `event_id`,
       type: `count`,
-      filters: [
-        { sql: `${CUBE}.event = 'form_submitted'` }
-      ]
-    }
+      filters: [{ sql: `${CUBE}.event = 'form_submitted'` }],
+    },
   },
 });
 ```
@@ -573,7 +568,7 @@ cube('events', {
 Define a dimension `form_submitted_count` on the Sessions using subQuery.
 
 ```javascript
-cube('sessions', {
+cube("sessions", {
   // ...,
 
   // Add this dimension to the `sessions` cube
@@ -581,8 +576,8 @@ cube('sessions', {
     form_submitted_count: {
       sql: `${events.form_submitted_count}`,
       type: `number`,
-      subQuery: true
-    }
+      subQuery: true,
+    },
   },
 });
 ```
@@ -591,7 +586,7 @@ Create a measure to count only sessions where `form_submitted_count` is greater
 than 0.
 
 ```javascript
-cube('sessions', {
+cube("sessions", {
   // ...,
 
   // Add this measure to the `sessions` cube
@@ -599,11 +594,8 @@ cube('sessions', {
     with_form_submitted_count: {
       type: `count`,
       sql: `session_id`,
-      filters: [
-        { sql: `${form_submitted_count} > 0` }
-      ]
-    }
-
+      filters: [{ sql: `${form_submitted_count} > 0` }],
+    },
   },
 });
 ```
@@ -611,4 +603,4 @@ cube('sessions', {
 Now we can use the `with_form_submitted_count` measure to get only sessions when
 the `form_submitted` event occurred.
 
-[ref-modeling-syntax]: /data-modeling/syntax
+[ref-modeling-syntax]: /product/data-modeling/fundamentals/syntax

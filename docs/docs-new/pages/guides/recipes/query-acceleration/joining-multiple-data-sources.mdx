@@ -21,29 +21,29 @@ option in the `cube.js` configuration file:
 ```javascript
 module.exports = {
   driverFactory: ({ dataSource }) => {
-    if (dataSource === 'suppliers') {
+    if (dataSource === "suppliers") {
       return {
-        type: 'postgres',
-        database: 'recipes',
-        host: 'demo-db-recipes.cube.dev',
-        user: 'cube',
-        password: '12345',
-        port: '5432',
+        type: "postgres",
+        database: "recipes",
+        host: "demo-db-recipes.cube.dev",
+        user: "cube",
+        password: "12345",
+        port: "5432",
       };
     }
 
-    if (dataSource === 'products') {
+    if (dataSource === "products") {
       return {
-        type: 'postgres',
-        database: 'ecom',
-        host: 'demo-db-recipes.cube.dev',
-        user: 'cube',
-        password: '12345',
-        port: '5432',
+        type: "postgres",
+        database: "ecom",
+        host: "demo-db-recipes.cube.dev",
+        user: "cube",
+        password: "12345",
+        port: "5432",
       };
     }
 
-    throw new Error('dataSource is undefined');
+    throw new Error("dataSource is undefined");
   },
 };
 ```
@@ -52,9 +52,10 @@ module.exports = {
 
 First, we'll define
 [rollup](https://cube.dev/docs/schema/reference/pre-aggregations#parameters-type-rollup)
-pre-aggregations for `products` and `suppliers`. Note that these pre-aggregations should
-contain the dimension on which they're joined. In this case, it's the `supplier_id`
-dimension in the `products` cube, and the `id` dimension in the `suppliers` cube:
+pre-aggregations for `products` and `suppliers`. Note that these
+pre-aggregations should contain the dimension on which they're joined. In this
+case, it's the `supplier_id` dimension in the `products` cube, and the `id`
+dimension in the `suppliers` cube:
 
 <CodeTabs>
 
@@ -81,7 +82,7 @@ cubes:
 ```
 
 ```javascript
-cube('products', {
+cube("products", {
   // ...
 
   pre_aggregations: {
@@ -91,8 +92,8 @@ cube('products', {
       indexes: {
         category_index: {
           columns: [supplier_id],
-        }
-      }
+        },
+      },
     },
   },
 
@@ -104,7 +105,7 @@ cube('products', {
   },
 
   // ...
-})
+});
 ```
 
 </CodeTabs>
@@ -130,7 +131,7 @@ cubes:
 ```
 
 ```javascript
-cube('suppliers', {
+cube("suppliers", {
   // ...
 
   pre_aggregations: {
@@ -140,17 +141,17 @@ cube('suppliers', {
       indexes: {
         category_index: {
           columns: [id],
-        }
-      }
-    }
-  }
-})
+        },
+      },
+    },
+  },
+});
 ```
 
 </CodeTabs>
 
-Then, we'll also define a `rollup_join` pre-aggregation in the `products` cube, which will enable
-aggregating data from multiple data sources:
+Then, we'll also define a `rollup_join` pre-aggregation in the `products` cube,
+which will enable aggregating data from multiple data sources:
 
 <CodeTabs>
 
@@ -172,7 +173,7 @@ cubes:
 ```
 
 ```javascript
-cube('products', {
+cube("products", {
   // ...
 
   pre_aggregations: {
@@ -180,8 +181,8 @@ cube('products', {
       type: `rollup_join`,
       dimensions: [suppliers.email, suppliers.company, name],
       rollups: [suppliers.suppliers_rollup, products_rollup],
-    }
-  }
+    },
+  },
 });
 ```
 
@@ -197,11 +198,7 @@ email, with the following query:
   "order": {
     "products.name": "asc"
   },
-  "dimensions": [
-    "products.name",
-    "suppliers.company",
-    "suppliers.email"
-  ],
+  "dimensions": ["products.name", "suppliers.company", "suppliers.email"],
   "limit": 3
 }
 ```

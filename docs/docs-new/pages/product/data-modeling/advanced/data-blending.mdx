@@ -196,10 +196,10 @@ correlate. You can simply pass the queries to the Cube client, and it will merge
 the results which will let you easily display it on the chart.
 
 ```javascript
-import cubejs from '@cubejs-client/core';
+import cubejs from "@cubejs-client/core";
 
-const API_URL = 'http://localhost:4000';
-const CUBEJS_TOKEN = 'YOUR_TOKEN';
+const API_URL = "http://localhost:4000";
+const CUBEJS_TOKEN = "YOUR_TOKEN";
 
 const cubejsApi = cubejs(CUBEJS_TOKEN, {
   apiUrl: `${API_URL}/cubejs-api/v1`,
@@ -207,20 +207,24 @@ const cubejsApi = cubejs(CUBEJS_TOKEN, {
 
 const queries = [
   {
-    measures: ['online_orders.revenue'],
-    timeDimensions: [{
-      dimension: 'online_orders.created_at',
-      granularity: 'day',
-      dateRange: ['2020-08-01', '2020-08-07'],
-    }],
+    measures: ["online_orders.revenue"],
+    timeDimensions: [
+      {
+        dimension: "online_orders.created_at",
+        granularity: "day",
+        dateRange: ["2020-08-01", "2020-08-07"],
+      },
+    ],
   },
   {
-    measures: ['retail_orders.revenue'],
-    timeDimensions: [{
-      dimension: 'retail_orders.created_at',
-      granularity: 'day',
-      dateRange: ['2020-08-01', '2020-08-07'],
-    }],
+    measures: ["retail_orders.revenue"],
+    timeDimensions: [
+      {
+        dimension: "retail_orders.created_at",
+        granularity: "day",
+        dateRange: ["2020-08-01", "2020-08-07"],
+      },
+    ],
   },
 ];
 

@@ -21,8 +21,8 @@ defined, these drill members will always be used to show underlying data when
 drilling into that measure.
 
 Let’s consider the following example of our imaginary e-commerce store. We have
-the `orders` cube, which describes orders in our store. It’s connected to `users` and
-`products`.
+the `orders` cube, which describes orders in our store. It’s connected to
+`users` and `products`.
 
 <CodeTabs>
 
@@ -274,7 +274,7 @@ cube(`sales_managers`, {
 
   dimensions: {
     // ...
-    
+
     deals_amount: {
       sql: `SUM(${deals.amount})`, // Doesn't work, because `amount` is not a measure on `deals`
       type: `number`,
@@ -363,7 +363,7 @@ cubes:
 
 </CodeTabs>
 
-###  Under the hood
+### Under the hood
 
 Based on the subquery dimension definition, Cube will create a query that will
 include the primary key dimension of the main cube and all
@@ -452,7 +452,7 @@ considered in this case.
 [bq-parse-timestamp]:
   https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#parse_timestamp
 [ref-cubejs-client-ref-resultset-drilldown]: /@cubejs-client-core#drill-down
-[ref-schema-ref-dimensions]: /schema/reference/dimensions
-[ref-schema-ref-joins]: /schema/reference/joins
-[ref-schema-ref-measures]: /schema/reference/measures
+[ref-schema-ref-dimensions]: /product/data-modeling/reference/dimensions
+[ref-schema-ref-joins]: /product/data-modeling/reference/joins
+[ref-schema-ref-measures]: /product/data-modeling/reference/measures
 [wiki-correlated-subquery]: https://en.wikipedia.org/wiki/Correlated_subquery

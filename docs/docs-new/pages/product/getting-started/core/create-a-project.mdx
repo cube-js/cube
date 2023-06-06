@@ -21,7 +21,7 @@ touch docker-compose.yml
 Open the `docker-compose.yml` file and add the following content:
 
 ```yaml
-version: '2.2'
+version: "2.2"
 
 services:
   cube:
@@ -36,9 +36,9 @@ services:
 ```
 
 Note that we're setting the `CUBEJS_DEV_MODE` environment variable to `true` to
-enable the [Development Mode](/configuration/overview#development-mode). This is
-handy for local development but not suitable for
-[production](/deployment/production-checklist).
+enable the [Development Mode](/product/configuration/overview#development-mode).
+This is handy for local development but not suitable for
+[production](/product/deployment/production-checklist).
 
 <InfoBox>
 
@@ -92,26 +92,25 @@ credentials below:
 </InfoBox>
 
 After selecting the data source, enter valid credentials for it and
-click&nbsp;<Btn>Apply</Btn>. Check the [Connecting to Databases][ref-conf-db]
-page for more details on specific data sources.
+click <Btn>Apply</Btn>. Check the [Connecting to Databases][ref-conf-db] page
+for more details on specific data sources.
 
 <Screenshot src="https://ucarecdn.com/ca898215-9d0a-4bae-ad2b-33fd89a525f8/" />
 
 You should see tables available to you from the configured database; select the
-`orders` table. After selecting the table, click&nbsp;<Btn>Generate Data
-Model</Btn> and pick either&nbsp;<Btn>YAML</Btn> (recommended)
-or&nbsp;<Btn>JavaScript</Btn> format:
+`orders` table. After selecting the table, click <Btn>Generate Data Model</Btn>
+and pick either <Btn>YAML</Btn> (recommended) or <Btn>JavaScript</Btn> format:
 
 <Screenshot src="https://ucarecdn.com/c43d0904-d744-429b-96a8-af7a8db959e0/" />
 
 Finally, click <Btn>Build</Btn> in the dialog, which should take you to
-the&nbsp;<Btn>Build</Btn> page.
+the <Btn>Build</Btn> page.
 
 You're now ready for the next step, [querying the
 data][ref-getting-started-core-query-cube].
 
 [powershell-docs]: https://learn.microsoft.com/en-us/powershell/
-[ref-conf-db]: /config/databases
-[ref-getting-started-core-query-cube]: /getting-started/core/query-data
-[ref-devtools-playground]: /dev-tools/dev-playground
+[ref-conf-db]: /product/configuration/data-sources
+[ref-getting-started-core-query-cube]: /product/getting-started/core/query-data
+[ref-devtools-playground]: /product/workspace/playground
 [wsl2-docs]: https://learn.microsoft.com/en-us/windows/wsl/install

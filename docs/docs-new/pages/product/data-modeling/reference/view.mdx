@@ -19,10 +19,10 @@ paths.
   />
 </div>
 
-Views **can not** have their own members. Instead, use the `cubes` or `includes` parameters
-to include measures and dimensions from other cubes into the view. In the
-example below, we create a new view `active_users` which is made up of properties
-from the `users` cube:
+Views **can not** have their own members. Instead, use the `cubes` or `includes`
+parameters to include measures and dimensions from other cubes into the view. In
+the example below, we create a new view `active_users` which is made up of
+properties from the `users` cube:
 
 <CodeTabs>
 
@@ -37,28 +37,25 @@ view(`orders`, {
         `total_amount`,
         `total_amount_shipped`,
         `count`,
-        `average_order_value`
-      ]
+        `average_order_value`,
+      ],
     },
     {
       join_path: base_orders.line_items.products,
       includes: [
         {
           name: `name`,
-          alias: `product`
-        }
-      ]
+          alias: `product`,
+        },
+      ],
     },
     {
       join_path: base_orders.users,
       prefix: true,
       includes: `*`,
-      excludes: [
-        `company`
-      ]
-
-    }
-  ]
+      excludes: [`company`],
+    },
+  ],
 });
 ```
 
@@ -75,9 +72,9 @@ views:
           - total_amount_shipped
           - count
           - average_order_value
-      
+
       - join_path: base_orders.line_items.products
-        includes: 
+        includes:
           - name: name
             alias: product
 
@@ -91,12 +88,11 @@ views:
 
 </CodeTabs>
 
-
 Views can be queried the same way as cubes; the example below show how to query
 the above view with SQL API:
 
 ```sql
-SELECT 
+SELECT
   users_city,
   MEASURE(total_amount)
 FROM orders
@@ -108,7 +104,7 @@ pre-aggregations defined by the underlying cubes.
 
 ## Parameters
 
-###  name
+### name
 
 The `name` parameter serves as the identifier of a view. It must be unique among
 _all cubes and views_ within a deployment and follow the [naming
@@ -127,7 +123,7 @@ views:
 
 </CodeTabs>
 
-###  description
+### description
 
 A description of the view allows your team to better understand what its purpose
 is. It is a very simple and yet useful tool that gives a hint to everyone and
@@ -149,10 +145,11 @@ views:
 
 </CodeTabs>
 
-###  cubes
+### cubes
 
-Use `cubes` parameter in view to include exposed cubes in bulk.
-You can build your view by combining multiple joined cubes together and specifying the path by which they should be joined for that particular view. 
+Use `cubes` parameter in view to include exposed cubes in bulk. You can build
+your view by combining multiple joined cubes together and specifying the path by
+which they should be joined for that particular view.
 
 <CodeTabs>
 
@@ -204,9 +201,9 @@ views:
           - total_amount_shipped
           - count
           - average_order_value
-      
+
       - join_path: base_orders.line_items.products
-        includes: 
+        includes:
           - name: name
             alias: product
 
@@ -217,20 +214,26 @@ views:
           - company
 
 ```
+
 </CodeTabs>
 
-When listing cubes to expose, you need to provide a `join_path` parameter. It uses dot notation to describe the join path: `cube_1.cube_2.cube_3`.
-For the root cube of the view, just put the cube name as in the example above for `base_orders`.
+When listing cubes to expose, you need to provide a `join_path` parameter. It
+uses dot notation to describe the join path: `cube_1.cube_2.cube_3`. For the
+root cube of the view, just put the cube name as in the example above for
+`base_orders`.
 
-The other required parameter inside the `cubes` block is `includes`. You can simply list measures, dimensions, or segments you'd like to include.
-In case you need to rename some of them, you can provide `name` and `alias` parameters.
-Alternatively, you can use the `excludes` parameter in conjunction with the includes all definition `includes: *`.
+The other required parameter inside the `cubes` block is `includes`. You can
+simply list measures, dimensions, or segments you'd like to include. In case you
+need to rename some of them, you can provide `name` and `alias` parameters.
+Alternatively, you can use the `excludes` parameter in conjunction with the
+includes all definition `includes: *`.
 
-Optionally, if you'd like to prefix exposed measures, dimensions, or segments with the cube name, you can use the `prefix: true` parameter.
-It will prefix them with the cube name, e.g. `users_city`. You can use the `alias` parameter to rename the cube for the prefixing purpose.
+Optionally, if you'd like to prefix exposed measures, dimensions, or segments
+with the cube name, you can use the `prefix: true` parameter. It will prefix
+them with the cube name, e.g. `users_city`. You can use the `alias` parameter to
+rename the cube for the prefixing purpose.
 
-
-###  includes
+### includes
 
 The `includes` property is used to bulk add measures or dimensions to a view.
 
@@ -266,7 +269,7 @@ views:
 
 </CodeTabs>
 
-###  public
+### public
 
 <InfoBox>
 
@@ -288,16 +291,16 @@ views:
 
 ```javascript
 view(`orders`, {
-  public: false
+  public: false,
 });
 ```
 
 </CodeTabs>
 
-
-You can also use `COMPILE_CONTEXT` for dynamic visibility if necessary, check out our [Controlling access to cubes and views
-](https://cube.dev/docs/recipes/controlling-access-to-cubes-and-views) recipe.
-
+You can also use `COMPILE_CONTEXT` for dynamic visibility if necessary, check
+out our
+[Controlling access to cubes and views ](https://cube.dev/docs/recipes/controlling-access-to-cubes-and-views)
+recipe.
 
 <CodeTabs>
 
@@ -306,11 +309,7 @@ view(`arr`, {
   description: `Annual Recurring Revenue`,
   public: COMPILE_CONTEXT.security_context.is_finance,
 
-  includes: [
-    revenue.arr,
-    revenue.date,
-    customers.plan
-  ],
+  includes: [revenue.arr, revenue.date, customers.plan],
 });
 ```
 
@@ -335,6 +334,7 @@ context, read the [Controlling access to cubes and views
 recipe][ref-recipe-control-access-cubes-views].
 
 [ref-recipe-control-access-cubes-views]:
-  /recipes/controlling-access-to-cubes-and-views
-[ref-schema-joins-direction]: /schema/fundamentals/joins#directions-of-joins
-[ref-naming]: /data-modeling/syntax#naming
+  /guides/recipes/access-control/controlling-access-to-cubes-and-views
+[ref-schema-joins-direction]:
+  /product/data-modeling/fundamentals/working-with-joins#directions-of-joins
+[ref-naming]: /product/data-modeling/fundamentals/syntax#naming

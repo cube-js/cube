@@ -7,25 +7,31 @@ redirect_from:
 
 This style guide includes best practices on data modeling in Cube.
 
-While Cube allows for certain flexibility with regards to data modeling, following this
-fairly opinionated style guide helps create maintainable semantic layers and reduce effort
-to support them in the long run.
+While Cube allows for certain flexibility with regards to data modeling,
+following this fairly opinionated style guide helps create maintainable semantic
+layers and reduce effort to support them in the long run.
 
 This style guide is intended to be used by:
-* All users of Cube Cloud and self-hosted Cube Core deployments.
-* Solution integrators from the [Cube Partner Network][cpn].
-* Cube team (for demo projects, documentation, and customer engagements).
+
+- All users of Cube Cloud and self-hosted Cube Core deployments.
+- Solution integrators from the [Cube Partner Network][cpn].
+- Cube team (for demo projects, documentation, and customer engagements).
 
 ## Syntax
 
-* Default to [YAML syntax][ref-syntax-model] for data modeling. Use JavaScript syntax for dynamic data models only.
-* Use [snake case][ref-syntax-naming] when using either YAML or JavaScript syntax.
-* Follow the recommendations on [YAML syntax][self-yaml] and [SQL syntax][self-sql] below.
+- Default to [YAML syntax][ref-syntax-model] for data modeling. Use JavaScript
+  syntax for dynamic data models only.
+- Use [snake case][ref-syntax-naming] when using either YAML or JavaScript
+  syntax.
+- Follow the recommendations on [YAML syntax][self-yaml] and [SQL
+  syntax][self-sql] below.
 
 ## Folder structure
 
-* Put [cube and view files][ref-syntax-folder-structure] in `model/cubes` and `model/views` folders.
-* Within these folders, create subfolders to reflect your business units structure.
+- Put [cube and view files][ref-syntax-folder-structure] in `model/cubes` and
+  `model/views` folders.
+- Within these folders, create subfolders to reflect your business units
+  structure.
 
 ```tree
 cube_project
@@ -40,17 +46,21 @@ cube_project
         ├── product
         │   └── cloud_tenants.yml
         └── sales
-            └── opportunities.yml 
+            └── opportunities.yml
 ```
-
 
 ## Cubes
 
-* Cubes should remain private; set [`public: false`][ref-public] for all cubes. Only views can be exposed to visualization tools.
-* A cube's name should represent a business entity and be plural. If a cube's name may clash with a view's name, add the `base_` prefix to the cube's name, e.g., `base_opportunities.yml`.
-* If possible, use [`sql_table`][ref-sql-table] instead of `sql`, i.e., use `sql_table: schema.table` instead of `sql: SELECT * FROM schema.table`.
-* Use `many_to_one`, `one_to_many`, `one_to_one` [join relationship types][ref-join-rel] instead of `belongs_to`, `has_many`, `has_one`.
-* Applicable [cube parameters][ref-cube-params] should be ordered as follows:
+- Cubes should remain private; set [`public: false`][ref-public] for all cubes.
+  Only views can be exposed to visualization tools.
+- A cube's name should represent a business entity and be plural. If a cube's
+  name may clash with a view's name, add the `base_` prefix to the cube's name,
+  e.g., `base_opportunities.yml`.
+- If possible, use [`sql_table`][ref-sql-table] instead of `sql`, i.e., use
+  `sql_table: schema.table` instead of `sql: SELECT * FROM schema.table`.
+- Use `many_to_one`, `one_to_many`, `one_to_one` [join relationship
+  types][ref-join-rel] instead of `belongs_to`, `has_many`, `has_one`.
+- Applicable [cube parameters][ref-cube-params] should be ordered as follows:
   - `name`
   - `sql_alias`
   - `extends`
@@ -69,11 +79,12 @@ cube_project
 
 ### Dimensions & measures
 
-* Primary key of the cube should be the first dimension listed.
-* Applicable [dimension][ref-dimension-params] and [measure parameters][ref-measure-params] should be ordered as follows:
+- Primary key of the cube should be the first dimension listed.
+- Applicable [dimension][ref-dimension-params] and [measure
+  parameters][ref-measure-params] should be ordered as follows:
   - `name`
   - `title`
-  - `description` 
+  - `description`
   - `sql`
   - `type`
   - `primary_key`
@@ -82,7 +93,7 @@ cube_project
   - `format`
   - `filters`
   - `drill_members`
-* Use `title` and `description` if the name is not intuitive.
+- Use `title` and `description` if the name is not intuitive.
 
 ### Example cube
 
@@ -91,12 +102,12 @@ cubes:
   - name: line_items
     sql_table: public.line_items
     public: false
-      
+
     joins:
       - name: products
         sql: "{CUBE}.product_id = {products.id}"
         relationship: many_to_one
-        
+
       - name: orders
         sql: "{CUBE}.order_id = {orders.id}"
         relationship: many_to_one
@@ -106,7 +117,7 @@ cubes:
         sql: id
         type: number
         primary_key: true
-        
+
       - name: created_date
         sql: created_at
         type: time
@@ -122,8 +133,9 @@ cubes:
 
 ## Views
 
-* Views should be designed for data consumers and optimized for consumption in visualization tools.
-* Applicable [view parameters][ref-view-params] should be ordered as follows:
+- Views should be designed for data consumers and optimized for consumption in
+  visualization tools.
+- Applicable [view parameters][ref-view-params] should be ordered as follows:
   - `name`
   - `description`
   - `includes`
@@ -147,39 +159,41 @@ views:
           - total_amlunt_shipped
           - count
           - average_order_value
-      
+
       - join_path: base_orders.line_items.products
-        includes: 
+        includes:
           - name: name
             alias: product
 
       - join_path: base_orders.line_items.products.product_categories
-        includes: 
+        includes:
           - name: name
             alias: product_category
 
       - join_path: base_orders.users
         prefix: true
-        includes: 
+        includes:
           - city
 ```
 
 ## SQL style guide
 
-* Indent with 2 spaces.
-* Use trailing commas.
-* Use upper case for SQL keywords and function names.
-* Use `!=` instead of `<>`.
-* Always use the `AS` keyword when aliasing columns, expressions, and tables.
-* Unless SQL query is a trivial one-liner, start SQL query from the new line.
-* Use new lines, optimize for readability and maintainability.
-* Use [common table expressions (CTE)][wiki-cte] rather than subqueries.
-* When joining multiple tables, always prefix the column names with the table name/alias.
-* Use single quotes for strings.
-* Avoid initialisms and unnecessary table aliases.
-* If there's only one thing in the list (e.g., projection expressions in `SELECT`), put it on the same line as the opening keyword.
-* If there are multiple things in the list, put each one on its own line (including the first one), indented one level more than the opening keyword.
-
+- Indent with 2 spaces.
+- Use trailing commas.
+- Use upper case for SQL keywords and function names.
+- Use `!=` instead of `<>`.
+- Always use the `AS` keyword when aliasing columns, expressions, and tables.
+- Unless SQL query is a trivial one-liner, start SQL query from the new line.
+- Use new lines, optimize for readability and maintainability.
+- Use [common table expressions (CTE)][wiki-cte] rather than subqueries.
+- When joining multiple tables, always prefix the column names with the table
+  name/alias.
+- Use single quotes for strings.
+- Avoid initialisms and unnecessary table aliases.
+- If there's only one thing in the list (e.g., projection expressions in
+  `SELECT`), put it on the same line as the opening keyword.
+- If there are multiple things in the list, put each one on its own line
+  (including the first one), indented one level more than the opening keyword.
 
 ### Example SQL
 
@@ -191,8 +205,7 @@ cubes:
         id,
         first_name,
         last_name
-      FROM public.users
-      WHERE state = 'CA'
+      FROM public.users WHERE state = 'CA'
 
     dimensions:
       - name: id
@@ -211,17 +224,17 @@ cubes:
     measures:
       - name: count
         type: count
-
 ```
 
 ## YAML style guide
 
-* Use `.yml` extension instead of `.yaml`.
-* Indent with 2 spaces.
-* Indent list items.
-* Use a new line to separate list items that are dictionaries, where appropriate.
-* Make sure lines are no longer than 80 characters.
-* If quotes are needed around a string, use double quotes.
+- Use `.yml` extension instead of `.yaml`.
+- Indent with 2 spaces.
+- Indent list items.
+- Use a new line to separate list items that are dictionaries, where
+  appropriate.
+- Make sure lines are no longer than 80 characters.
+- If quotes are needed around a string, use double quotes.
 
 ### Example YAML
 
@@ -239,7 +252,7 @@ cubes:
       - name: city
         sql: city
         type: string
-        
+
       - name: lifetime_value
         sql: "{line_items.total_amount}"
         type: number
@@ -256,12 +269,12 @@ cubes:
 
 ## JavaScript style guide
 
-* Indent with 2 spaces.
-* Don't use trailing semicolons.
-* Don't use trailing commas after last elements of arrays and objects. 
-* Use a new line to separate list items that are objects, where appropriate.
-* Make sure lines are no longer than 80 characters.
-* If quotes are needed around a string, use [backticks][wiki-backtick].
+- Indent with 2 spaces.
+- Don't use trailing semicolons.
+- Don't use trailing commas after last elements of arrays and objects.
+- Use a new line to separate list items that are objects, where appropriate.
+- Make sure lines are no longer than 80 characters.
+- If quotes are needed around a string, use [backticks][wiki-backtick].
 
 ### Example YAML
 
@@ -273,53 +286,55 @@ cube(`users`, {
     id: {
       sql: `id`,
       type: `number`,
-      primary_key: true
+      primary_key: true,
     },
 
     city: {
       sql: `city`,
-      type: `string`
+      type: `string`,
     },
-        
+
     lifetime_value: {
       sql: `${line_items.total_amount}`,
       type: `number`,
-      sub_query: true
-    }
+      sub_query: true,
+    },
   },
 
   measures: {
     count: {
-      type: `count`
+      type: `count`,
     },
 
     total_orders_amount: {
       sql: `${lifetime_value}`,
-      type: `sum`
-    }
-  }
-})
+      type: `sum`,
+    },
+  },
+});
 ```
 
 ## Credits
 
 This style guide was inspired in part by:
 
-* [Brooklyn Data' SQL style guide](https://github.com/brooklyn-data/co/blob/main/sql_style_guide.md)
-* [LAMS Style Guide](https://looker-open-source.github.io/look-at-me-sideways/rules.html)
+- [Brooklyn Data' SQL style guide](https://github.com/brooklyn-data/co/blob/main/sql_style_guide.md)
+- [LAMS Style Guide](https://looker-open-source.github.io/look-at-me-sideways/rules.html)
 
 [cpn]: https://cube.dev/consulting/cube-partner-network
-[ref-syntax-model]: /data-modeling/syntax#model-syntax
-[ref-syntax-naming]: /data-modeling/syntax#naming
-[ref-syntax-folder-structure]: /data-modeling/syntax#folder-structure
-[ref-public]: /schema/reference/cube#parameters-public
-[ref-sql-table]: /schema/reference/cube#parameters-sql-table
-[ref-join-rel]: /schema/reference/joins#parameters-relationship
-[ref-cube-params]: /schema/reference/cube#parameters
-[ref-measure-params]: /schema/reference/measures#parameters
-[ref-dimension-params]: /schema/reference/dimensions#parameters
-[ref-view-params]: /schema/reference/view#parameters
+[ref-syntax-model]: /product/data-modeling/fundamentals/syntax#model-syntax
+[ref-syntax-naming]: /product/data-modeling/fundamentals/syntax#naming
+[ref-syntax-folder-structure]:
+  /product/data-modeling/fundamentals/syntax#folder-structure
+[ref-public]: /product/data-modeling/reference/cube#parameters-public
+[ref-sql-table]: /product/data-modeling/reference/cube#parameters-sql-table
+[ref-join-rel]: /product/data-modeling/reference/joins#parameters-relationship
+[ref-cube-params]: /product/data-modeling/reference/cube#parameters
+[ref-measure-params]: /product/data-modeling/reference/measures#parameters
+[ref-dimension-params]: /product/data-modeling/reference/dimensions#parameters
+[ref-view-params]: /product/data-modeling/reference/view#parameters
 [self-yaml]: #yaml-style-guide
 [self-sql]: #sql-style-guide
-[wiki-cte]: https://en.wikipedia.org/wiki/Hierarchical_and_recursive_queries_in_SQL#Common_table_expression
+[wiki-cte]:
+  https://en.wikipedia.org/wiki/Hierarchical_and_recursive_queries_in_SQL#Common_table_expression
 [wiki-backtick]: https://en.wikipedia.org/wiki/Backtick

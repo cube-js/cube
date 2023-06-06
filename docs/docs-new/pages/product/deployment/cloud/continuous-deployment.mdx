@@ -15,7 +15,7 @@ deployment and keeping the two in sync.
 
 First, go to the <Btn>Build & Deploy</Btn> tab on the <Btn>Settings</Btn> screen
 to make sure your deployment is configured to deploy with Git. Then
-click&nbsp;<Btn>Generate Git credentials</Btn> to obtain Git credentials:
+click <Btn>Generate Git credentials</Btn> to obtain Git credentials:
 
 <Screenshot src="https://ucarecdn.com/c79702ad-7a86-4a31-ac0c-9d64ccf91413/" />
 
@@ -60,19 +60,19 @@ You can use [the CLI][ref-workspace-cli] to set up continuous deployment for a
 Git repository. You can also use it to manually deploy changes without
 continuous deployment.
 
-###  Manual Deploys
+### Manual Deploys
 
 You can deploy your Cube project manually. This method uploads data models and
 configuration files directly from your local project directory.
 
 You can obtain a Cube Cloud deploy token from your
-deployment's&nbsp;<Btn>Settings</Btn> screen.
+deployment's <Btn>Settings</Btn> screen.
 
 ```bash{promptUser: user}
 npx cubejs-cli deploy --token TOKEN
 ```
 
-###  Continuous Deployment
+### Continuous Deployment
 
 You can use Cube CLI with your continuous integration tool.
 
@@ -111,4 +111,4 @@ jobs:
           CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
 ```
 
-[ref-workspace-cli]: /using-the-cubejs-cli
+[ref-workspace-cli]: /product/workspace/cli

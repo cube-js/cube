@@ -23,8 +23,8 @@ Pre-Aggregations are available in Cube Cloud on
 ## Exploring pre-aggregations
 
 You can switch between [pre-aggregations](#pre-aggregations) and
-[build history](#build-history) by switching between the&nbsp;
-&ZeroWidthSpace;<Btn>Pre-Aggregations</Btn> and <Btn>Build History</Btn> tabs.
+[build history](#build-history) by switching between the 
+​<Btn>Pre-Aggregations</Btn> and <Btn>Build History</Btn> tabs.
 
 ## Pre-aggregations
 
@@ -35,7 +35,7 @@ build took to complete, the total size of the pre-aggregated data, and how many
 partitions the data is split across. To see more information about a specific
 pre-aggregation, click on it.
 
-###  Partitions
+### Partitions
 
 The <Btn>Partitions</Btn> tab shows all partitions (as specified by
 [`partitionGranularity`][ref-model-ref-preaggs-partition-granularity]) of the
@@ -70,7 +70,7 @@ then clicking the <Btn>Build Selected</Btn> button:
   src="https://ucarecdn.com/99c72537-51d4-44ce-8df1-ea1a9cc3feaf/"
 />
 
-###  Definition
+### Definition
 
 The <Btn>Definition</Btn> tab shows how the [pre-aggregation is defined in the
 data model][ref-model-ref-preaggs] without having to switch to the <Btn>Data
@@ -78,17 +78,17 @@ Model</Btn> page:
 
 <Screenshot src="https://ucarecdn.com/4e8f203a-bd6b-4316-86ff-b742ccbc78a4/" />
 
-###  Preview
+### Preview
 
-To see a sample of the data contained in the pre-aggregation, click the&nbsp;
-&ZeroWidthSpace;<Btn>Preview</Btn> tab:
+To see a sample of the data contained in the pre-aggregation, click the 
+​<Btn>Preview</Btn> tab:
 
 <Screenshot src="https://ucarecdn.com/7f5059bb-3bc9-492e-9c69-3b614f3feca5/" />
 
 This can be used to verify that the data within the pre-aggregation is being
 built correctly.
 
-###  Used By
+### Used By
 
 The <Btn>Used By</Btn> tab shows recent queries that used this pre-aggregation
 for acceleration:
@@ -98,7 +98,7 @@ for acceleration:
 This is especially useful for checking that the pre-aggregation is being used as
 expected by queries sent to the deployment.
 
-###  Indexes
+### Indexes
 
 [Indexes][ref-model-ref-preaggs-index] significantly improve the performance of
 configured pre-aggregations. The <Btn>Indexes</Btn> tab displays any configured
@@ -119,11 +119,11 @@ To see more information about a specific build, click on it:
 
 <Screenshot src="https://ucarecdn.com/2f2d4366-35a6-42be-aac6-f554d824f8d3/" />
 
-[ref-caching-gs-preaggs]: /caching/pre-aggregations/getting-started
+[ref-caching-gs-preaggs]: /product/caching/getting-started-pre-aggregations
 [ref-caching-using-preaggs-refresh]:
-  /caching/using-pre-aggregations#refresh-strategy
-[ref-model-ref-preaggs]: /schema/reference/pre-aggregations
+  /product/caching/using-pre-aggregations#refresh-strategy
+[ref-model-ref-preaggs]: /product/data-modeling/reference/pre-aggregations
 [ref-model-ref-preaggs-index]:
-  /schema/reference/pre-aggregations#parameters-indexes
+  /product/data-modeling/reference/pre-aggregations#parameters-indexes
 [ref-model-ref-preaggs-partition-granularity]:
-  /schema/reference/pre-aggregations#parameters-partition-granularity
+  /product/data-modeling/reference/pre-aggregations#parameters-partition-granularity

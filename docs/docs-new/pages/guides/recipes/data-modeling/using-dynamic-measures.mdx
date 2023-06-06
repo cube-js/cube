@@ -8,7 +8,8 @@ redirect_from:
 <InfoBox>
 
 This functionality only works with data models written in JavaScript, not YAML.
-For more information, check out the [Data Modeling Syntax][ref-modeling-syntax] page.
+For more information, check out the [Data Modeling Syntax][ref-modeling-syntax]
+page.
 
 </InfoBox>
 
@@ -17,10 +18,11 @@ For more information, check out the [Data Modeling Syntax][ref-modeling-syntax] 
 We want to understand the distribution of orders by their statuses. Let's
 imagine that new order statuses can be added in the future, or we get a list of
 statuses from an external API. To calculate the orders percentage distribution,
-we need to create several [measures](/schema/fundamentals/concepts#measures)
-that refer to each other. But we don't want to manually change the data model for
-each new status. To solve this, we will create a
-[schema dynamically](/schema/advanced/dynamic-schema-creation).
+we need to create several
+[measures](/product/data-modeling/fundamentals/concepts#measures) that refer to
+each other. But we don't want to manually change the data model for each new
+status. To solve this, we will create a
+[schema dynamically](/product/data-modeling/advanced/dynamic-schema-creation).
 
 ## Data modeling
 
@@ -30,7 +32,7 @@ two measures for this. To calculate a percentage, we'll create a measure that
 refers to another measure.
 
 ```javascript
-const statuses = ['processing', 'shipped', 'completed'];
+const statuses = ["processing", "shipped", "completed"];
 
 const createTotalByStatusMeasure = (status) => ({
   [`total_${status}_orders`]: {
@@ -86,9 +88,9 @@ distribution and easily create new measures just by adding a new status.
 ```javascript
 [
   {
-    'orders.percentage_of_processing': '33.54',
-    'orders.percentage_of_shipped': '33.00',
-    'orders.percentage_of_completed': '33.46',
+    "orders.percentage_of_processing": "33.54",
+    "orders.percentage_of_shipped": "33.00",
+    "orders.percentage_of_completed": "33.46",
   },
 ];
 ```
@@ -100,4 +102,4 @@ Please feel free to check out the
 or run it with the `docker-compose up` command. You'll see the result, including
 queried data, in the console.
 
-[ref-modeling-syntax]: /data-modeling/syntax
+[ref-modeling-syntax]: /product/data-modeling/fundamentals/syntax

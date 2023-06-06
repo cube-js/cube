@@ -5,7 +5,8 @@ redirect_from:
 
 # Using dbt
 
-You can leverage Cube on top of dbt models by pointing cubes to dbt models in your database.
+You can leverage Cube on top of dbt models by pointing cubes to dbt models in
+your database.
 
 <CodeTabs>
 
@@ -17,7 +18,7 @@ cubes:
 
 ```javascript
 cube(`orders`, {
-  sql_table: `my_dbt_schema.my_dbt_orders_model`
+  sql_table: `my_dbt_schema.my_dbt_orders_model`,
 });
 ```
 
@@ -27,9 +28,11 @@ cube(`orders`, {
 
 <WarningBox>
 
-Previously, Cube provided the `@cubejs-backend/dbt-schema-extension` package to read metric definitions from dbt.
-Due to the [change in direction][dbt-deprecation] at dbt, we have deprecated this package as well.
-When a new `dbt_metrics` package becomes available, we will update and reintroduce our integration.
+Previously, Cube provided the `@cubejs-backend/dbt-schema-extension` package to
+read metric definitions from dbt. Due to the [change in
+direction][dbt-deprecation] at dbt, we have deprecated this package as well.
+When a new `dbt_metrics` package becomes available, we will update and
+reintroduce our integration.
 
 </WarningBox>
 

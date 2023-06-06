@@ -43,8 +43,8 @@ for daily or weekly retention.
 
 The SQL code in this guide is Postgres-compliant. The final SQL code may be
 different depending on your database. Also, this technique requires at least 1
-user to be active during the month, otherwise this month will not be included
-in the months' list.
+user to be active during the month, otherwise this month will not be included in
+the months' list.
 
 </InfoBox>
 
@@ -59,25 +59,21 @@ cubes:
         date_trunc('month', users.created_at) as signup_month,
         months_list.activity_month as activity_month,
         data.monthly_pageviews
-      FROM users
-      LEFT JOIN
-      (
+      FROM users LEFT JOIN (
         SELECT
-          DISTINCT (date_trunc('month', pages.original_timestamp)) as activity_month
+          DISTINCT (date_trunc('month', pages.original_timestamp)) as
+      activity_month
         FROM pages
-      ) as months_list
-      ON months_list.activity_month >= date_trunc('month', users.created_at)
-      LEFT JOIN
-      (
+      ) as months_list ON months_list.activity_month >= date_trunc('month',
+      users.created_at) LEFT JOIN (
         SELECT
           p.user_id,
           date_trunc('month', p.original_timestamp) as activity_month,
           COUNT(DISTINCT p.id) as monthly_pageviews
         FROM pages p
         GROUP BY 1,2
-      ) as data
-      ON data.activity_month = months_list.activity_month
-      AND data.user_id = users.id
+      ) as data ON data.activity_month = months_list.activity_month AND
+      data.user_id = users.id
 ```
 
 ```javascript
@@ -115,7 +111,7 @@ The SQL above provides the base table for our retention cube. It would show
 signup months and activity months with pageviews:
 
 | user_id | signup_month | activity_month | monthly_pageviews |
-|---------|--------------|----------------|-------------------|
+| ------- | ------------ | -------------- | ----------------- |
 | 1       | 1/18         | 1/18           | 10                |
 | 1       | 1/18         | 2/18           | 5                 |
 | 1       | 1/18         | 3/18           | 0                 |
@@ -181,7 +177,12 @@ cube(`monthly_retention`, {
       sql: `100.0 * ${total_active_count} / NULLIF(${total_count}, 0)`,
       type: `number`,
       format: `percent`,
-      drill_members: [users.email, bots.team, bots.last_seen, percentage_of_active],
+      drill_members: [
+        users.email,
+        bots.team,
+        bots.last_seen,
+        percentage_of_active,
+      ],
     },
   },
 });
@@ -232,8 +233,7 @@ cube(`monthly_retention`, {
 <InfoBox>
 
 Note, we are explicitly setting the `signup_month` timezone. `date_trunc`
-returns UTC dates and not setting a correct timezone would lead to wrong
-results due to time shift.
+returns UTC dates and not setting a correct timezone would lead to wrong results
+due to time shift.
 
 </InfoBox>
-

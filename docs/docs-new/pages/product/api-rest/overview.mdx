@@ -7,20 +7,22 @@ redirect_from:
 
 <SuccessBox>
 
-**We’re running a survey to better understand how you use Cube.** Please take a moment to [share with us what you think](https://forms.gle/b7iQHpocAXfpNfeR7). It will mean the world to us.
+**We’re running a survey to better understand how you use Cube.** Please take a
+moment to [share with us what you think](https://forms.gle/b7iQHpocAXfpNfeR7).
+It will mean the world to us.
 
 </SuccessBox>
 
 ## Prerequisites
 
-###  Base path
+### Base path
 
 REST API is used to communicate with Cube backend. All requests are prefixed
 with **basePath** described in
 [Backend Server Core](@cubejs-backend-server-core). By default, it is set to
 `/cubejs-api`.
 
-###  Authentication
+### Authentication
 
 Cube uses API tokens to authorize requests and also for passing additional
 security context, which can be used in the
@@ -34,13 +36,13 @@ how to generate it.
 In the development environment the token is not required for authorization, but
 you can still use it to pass a security context.
 
-###  Example request
+### Example request
 
 ```bash{promptUser: user}
 curl -H "Authorization: EXAMPLE-API-TOKEN" https://example.com/cubejs-api/v1/sql
 ```
 
-###  Configuring CORS
+### Configuring CORS
 
 REST API supports [Cross-Origin Resource Sharing (CORS)][mdn-cors].
 
@@ -59,7 +61,7 @@ module.exports = {
 
 Please see [configuration options][ref-config-cors] for details.
 
-###  Continue wait
+### Continue wait
 
 If the request takes too long to be processed, Cube Backend responds with
 `{ "error": "Continue wait" }` and 200 status code. This is how the long polling
@@ -82,7 +84,7 @@ Possible reasons of **Continue wait**:
 - There are many queries requested and Cube backend queues them to save database
   from overloading.
 
-###  Error Handling
+### Error Handling
 
 Cube REST API has basic errors and HTTP Error codes for all requests.
 
@@ -93,7 +95,7 @@ Cube REST API has basic errors and HTTP Error codes for all requests.
 | 403    | Invalid token                  | The auth token provided is not valid. It may be expired or have invalid signature.                   |
 | 500    | Error message                  | Cube internal server error. Check error message for details.                                         |
 
-###  Request Span Annotation
+### Request Span Annotation
 
 For monitoring tools such as Cube Cloud proper request span annotation should be
 provided in `x-request-id` header of a request. Each request id should consist
@@ -103,7 +105,7 @@ should be unique for each separate request. `spanId` should define user
 interaction span such us `Continue wait` retry cycle and it's value shouldn't
 change during one single interaction.
 
-###  Pagination
+### Pagination
 
 Cube supports paginated requests for the `/v1/load` endpoint by including
 [`limit` and `offset` parameters][ref-api-ref-query-format] in the query. For
@@ -126,10 +128,11 @@ example, the following query will retrieve rows 101-200 from the `Orders` cube:
 ```
 
 [mdn-cors]: https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS
-[ref-config-js]: /config
-[ref-config-queryrewrite]: /config#query-rewrite
-[ref-conf-queue-opts]: /config#queue-options
-[ref-api-ref-query-format]: /query-format#query-properties
-[ref-config-cors]: /config#http
-[ref-schema-ref-cube-refresh-key]: /schema/reference/cube#refresh-key
-[ref-security]: /security
+[ref-config-js]: /reference/configuration/config
+[ref-config-queryrewrite]: /reference/configuration/config#query-rewrite
+[ref-conf-queue-opts]: /reference/configuration/config#queue-options
+[ref-api-ref-query-format]: /product/api-rest/query-format#query-properties
+[ref-config-cors]: /reference/configuration/config#http
+[ref-schema-ref-cube-refresh-key]:
+  /product/data-modeling/reference/cube#refresh-key
+[ref-security]: /product/auth/overview

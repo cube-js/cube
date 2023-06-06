@@ -14,7 +14,7 @@ redirect_from:
 
 ## Setup
 
-###  Manual
+### Manual
 
 Add the following to a `.env` file in your Cube project:
 
@@ -28,13 +28,13 @@ CUBEJS_AWS_ATHENA_WORKGROUP=primary
 CUBEJS_AWS_ATHENA_CATALOG=AwsDataCatalog
 ```
 
-###  Cube Cloud
+### Cube Cloud
 
 <InfoBox heading="Allowing connections from Cube Cloud IP">
 
-In some cases you'll need to allow connections from your Cube Cloud deployment IP
-address to your database. You can copy the IP address from either the Database
-Setup step in deployment creation, or from <Btn>Settings →
+In some cases you'll need to allow connections from your Cube Cloud deployment
+IP address to your database. You can copy the IP address from either the
+Database Setup step in deployment creation, or from <Btn>Settings →
 Configuration</Btn> in your deployment.
 
 </InfoBox>
@@ -47,19 +47,21 @@ the required fields:
   src="https://ucarecdn.com/d30fa31d-e6ea-4a73-9950-1786634a1e32/"
 />
 
-Cube Cloud also supports connecting to data sources within private VPCs. If you already have VPCs enabled in
-your account, check out the [VPC documentation][ref-cloud-conf-vpc] to learn how
-to get started.
+Cube Cloud also supports connecting to data sources within private VPCs. If you
+already have VPCs enabled in your account, check out the [VPC
+documentation][ref-cloud-conf-vpc] to learn how to get started.
 
 <SuccessBox>
 
-VPC connectivity is available in Cube Cloud on [Premium](https://cube.dev/pricing) tier. [Contact us][cube-contact] for details.
+VPC connectivity is available in Cube Cloud on
+[Premium](https://cube.dev/pricing) tier. [Contact us][cube-contact] for
+details.
 
 </SuccessBox>
 
 [cube-pricing]: https://cube.dev/pricing/
 [cube-contact]: https://cube.dev/contact/
-[ref-cloud-conf-vpc]: /cloud/configuration/connecting-with-a-vpc
+[ref-cloud-conf-vpc]: /product/configuration/vpc
 
 ## Environment Variables
 
@@ -79,8 +81,8 @@ VPC connectivity is available in Cube Cloud on [Premium](https://cube.dev/pricin
 ### count_distinct_approx
 
 Measures of type
-[`count_distinct_approx`][ref-schema-ref-types-formats-countdistinctapprox] can be
-used in pre-aggregations when using AWS Athena as a source database. To learn
+[`count_distinct_approx`][ref-schema-ref-types-formats-countdistinctapprox] can
+be used in pre-aggregations when using AWS Athena as a source database. To learn
 more about AWS Athena's support for approximate aggregate functions, [click
 here][aws-athena-docs-approx-agg-fns].
 
@@ -153,11 +155,12 @@ connections are made over HTTPS.
   https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-regions-availability-zones.html#concepts-available-regions
 [aws-athena-docs-approx-agg-fns]:
   https://prestodb.io/docs/0.217/functions/aggregate.html#approximate-aggregate-functions
-[ref-caching-large-preaggs]: /caching/using-pre-aggregations#export-bucket
+[ref-caching-large-preaggs]:
+  /product/caching/using-pre-aggregations#export-bucket
 [ref-caching-using-preaggs-build-strats]:
-  /caching/using-pre-aggregations#pre-aggregation-build-strategies
+  /product/caching/using-pre-aggregations#pre-aggregation-build-strategies
 [ref-config-multiple-ds-decorating-env]:
-  /config/multiple-data-sources#configuring-data-sources-with-environment-variables-decorated-environment-variables
+  /product/configuration/advanced/multiple-data-sources#configuring-data-sources-with-environment-variables-decorated-environment-variables
 [ref-schema-ref-types-formats-countdistinctapprox]:
-  /schema/reference/types-and-formats#count-distinct-approx
+  /product/data-modeling/reference/types-and-formats#count-distinct-approx
 [self-preaggs-batching]: #batching

@@ -6,7 +6,8 @@ redirect_from:
 # Multiple Data Sources
 
 Cube supports connecting to multiple data sources, so that different
-[cubes](/schema/reference/cube) reference data from different databases.
+[cubes](/product/data-modeling/reference/cube) reference data from different
+databases.
 
 Usually, data sources are configured **statically** (see below). However, Cube
 can also lookup data sources **dynamically** which is useful in complex
@@ -60,8 +61,9 @@ pages][ref-config-db].
 
 ## Data model
 
-Use the [`data_source`](/schema/reference/cube#parameters-data-source) property
-to set a data source for each cube:
+Use the
+[`data_source`](/product/data-modeling/reference/cube#parameters-data-source)
+property to set a data source for each cube:
 
 <CodeTabs>
 
@@ -94,18 +96,20 @@ cube(`orders_from_other_data_source`, {
 
 </CodeTabs>
 
-[ref-config-ref-env]: /reference/environment-variables
-[ref-config-ref-driverfactory]: /config#options-reference-driver-factory
-[ref-config-db]: /config/databases
+[ref-config-ref-env]: /reference/configuration/environment-variables
+[ref-config-ref-driverfactory]:
+  /reference/configuration/config#options-reference-driver-factory
+[ref-config-db]: /product/configuration/data-sources
 [ref-config-multitenancy]:
-  /config/multitenancy#multitenancy-multitenancy-vs-multiple-data-sources
+  /product/configuration/advanced/multitenancy#multitenancy-multitenancy-vs-multiple-data-sources
 
 ## Cube Cloud
 
 Follow these steps to connect to multiple data sources in Cube Cloud:
 
 - Set up the `default` database connection when creating a new deployment.
-- Ensure you have the correct [multitenancy](/config/multitenancy) configuration
-  in your `cube.js` file.
-- Configure the corresponding environment variables in&nbsp;<Btn>Settings →
+- Ensure you have the correct
+  [multitenancy](/product/configuration/advanced/multitenancy) configuration in
+  your `cube.js` file.
+- Configure the corresponding environment variables in <Btn>Settings →
   Environment variables</Btn>.

@@ -11,7 +11,6 @@ exposed through the [querying API][ref-backend-restapi] that allows end-users to
 query a wide variety of analytical queries without modifying the data model
 itself.
 
-
 Let’s use a users table with the following columns as an example:
 
 | id  | paying | city          | company_name |
@@ -36,9 +35,9 @@ allows building well-organized and reusable SQL.
 
 In Cube, [cubes][ref-schema-cube] are used to organize entities and connections
 between entities. Usually one cube is created for each table in the database,
-such as `users`, `orders`, `products`, etc. In the `sql_table` parameter of the cube
-we define a base table for this cube. In our case, the base table is simply our
-`users` table.
+such as `users`, `orders`, `products`, etc. In the `sql_table` parameter of the
+cube we define a base table for this cube. In our case, the base table is simply
+our `users` table.
 
 <CodeTabs>
 
@@ -124,10 +123,10 @@ cubes:
 </CodeTabs>
 
 Let's break down the above code snippet piece-by-piece. After defining the base
-table for the cube (with the `sql_table` property), we create a `count` measure in the
-`measures` block. The `count` [type][ref-schema-types-formats] and sql `id`
-means that when this measure will be requested via an API, Cube will generate
-and execute the following SQL:
+table for the cube (with the `sql_table` property), we create a `count` measure
+in the `measures` block. The `count` [type][ref-schema-types-formats] and sql
+`id` means that when this measure will be requested via an API, Cube will
+generate and execute the following SQL:
 
 ```sql
 SELECT COUNT(id) AS count
@@ -291,15 +290,15 @@ As with other measures, `paying_percentage` can be used with dimensions.
 
 ## 5. Next Steps
 
-1. [Examples][ref-examples]
-2. [Query format][ref-backend-query-format]
-3. [REST API][ref-backend-restapi]
-4. [Data model reference documentation][ref-schema-cube]
+1.  [Examples][ref-examples]
+2.  [Query format][ref-backend-query-format]
+3.  [REST API][ref-backend-restapi]
+4.  [Data model reference documentation][ref-schema-cube]
 
-[ref-backend-restapi]: /rest-api
-[ref-schema-cube]: /schema/reference/cube
-[ref-schema-measures]: /schema/reference/measures
-[ref-schema-dimensions]: /schema/reference/dimensions
-[ref-schema-types-formats]: /schema/reference/types-and-formats
-[ref-examples]: /examples
-[ref-backend-query-format]: /query-format
+[ref-backend-restapi]: /reference/rest-api
+[ref-schema-cube]: /product/data-modeling/reference/cube
+[ref-schema-measures]: /product/data-modeling/reference/measures
+[ref-schema-dimensions]: /product/data-modeling/reference/dimensions
+[ref-schema-types-formats]: /product/data-modeling/reference/types-and-formats
+[ref-examples]: /guides/examples
+[ref-backend-query-format]: /product/api-rest/query-format

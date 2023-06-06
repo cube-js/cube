@@ -111,14 +111,8 @@ This query will match the pre-aggregation above and, thus, will be accelerated:
 
 ```json
 {
-  "measures": [
-    "users.distinct_ages",
-    "users.avg_age",
-    "users.p90_age"
-  ],
-  "dimensions": [
-    "users.gender"
-  ]
+  "measures": ["users.distinct_ages", "users.avg_age", "users.p90_age"],
+  "dimensions": ["users.gender"]
 }
 ```
 
@@ -128,17 +122,13 @@ accelerated:
 
 ```json
 {
-  "measures": [
-    "users.distinct_ages",
-    "users.avg_age",
-    "users.p90_age"
-  ]
+  "measures": ["users.distinct_ages", "users.avg_age", "users.p90_age"]
 }
 ```
 
 Let's explore some possible workarounds.
 
-###  Replacing with approximate additive measures
+### Replacing with approximate additive measures
 
 Often, non-additive `count_distinct` measures can be changed to have the
 [`count_distinct_approx` type](https://cube.dev/docs/schema/reference/types-and-formats#measures-types-count-distinct-approx)
@@ -179,13 +169,13 @@ cube(`users`, {
 
 </CodeTabs>
 
-###  Decomposing into a formula with additive measures
+### Decomposing into a formula with additive measures
 
 Non-additive `avg` measures can be rewritten as
 [calculated measures](https://cube.dev/docs/schema/reference/measures#calculated-measures)
 that reference additive measures only. Then, this additive measures can be used
-in pre-aggregations.
-Please note, however, that you shouldn't include `avg_age` measure in your pre-aggregation as it renders it non-additive.
+in pre-aggregations. Please note, however, that you shouldn't include `avg_age`
+measure in your pre-aggregation as it renders it non-additive.
 
 For example, the `avg_age` measure can be rewritten as follows:
 
@@ -214,7 +204,6 @@ cubes:
           - count
         dimensions:
           - gender
-  
 ```
 
 ```javascript
@@ -234,7 +223,7 @@ cube(`users`, {
       type: `count`,
     },
   },
-  
+
   pre_aggregations: {
     main: {
       measures: [age_sum, count],
@@ -246,7 +235,7 @@ cube(`users`, {
 
 </CodeTabs>
 
-###  Providing multiple pre-aggregations
+### Providing multiple pre-aggregations
 
 If the two workarounds described above don't apply to your use case, feel free
 to create additional pre-aggregations with definitions that fully match your

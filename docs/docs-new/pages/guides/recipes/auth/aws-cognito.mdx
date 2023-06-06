@@ -19,7 +19,7 @@ If you haven't already created a User Pool, please follow [the instructions in
 the AWS Cognito documentation][link-aws-cognito-hosted-ui] to create one, along
 with enabling the Hosted UI.
 
-###  Custom claims
+### Custom claims
 
 To add custom claims to the JWT, you will need to associate [a Lambda
 function][link-aws-lambda] to the [Pre Token Generation event
@@ -42,10 +42,10 @@ exports.handler = (event, context, callback) => {
   event.response = {
     claimsOverrideDetails: {
       claimsToAddOrOverride: {
-        'http://localhost:4000/': JSON.stringify({
-          company_id: 'company1',
+        "http://localhost:4000/": JSON.stringify({
+          company_id: "company1",
           user_id: event.request.userAttributes.sub,
-          roles: ['user'],
+          roles: ["user"],
         }),
       },
     },
@@ -84,7 +84,7 @@ CUBEJS_JWT_CLAIMS_NAMESPACE=<CLAIMS_NAMESPACE>
 
 ## Testing with the Developer Playground
 
-###  Retrieving a JWT
+### Retrieving a JWT
 
 Go to the [OpenID Playground from Auth0][link-openid-playground] to and click
 Configuration.
@@ -157,7 +157,7 @@ verify the JWT signature as well as decode the identity token:
   />
 </div>
 
-###  Set JWT in Developer Playground
+### Set JWT in Developer Playground
 
 Now open the Developer Playground (at `http://localhost:4000`) and on the Build
 page, click Add Security Context.
@@ -192,4 +192,4 @@ models using the [Security Context][ref-sec-ctx] should now work as expected.
   https://docs.aws.amazon.com/cognito/latest/developerguide/user-pool-lambda-pre-token-generation.html#aws-lambda-triggers-pre-token-generation-example-1
 [link-aws-lambda]: https://docs.aws.amazon.com/lambda/latest/dg/welcome.html
 [link-openid-playground]: https://openidconnect.net/
-[ref-sec-ctx]: /security/context
+[ref-sec-ctx]: /product/auth/context

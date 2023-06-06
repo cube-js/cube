@@ -38,7 +38,7 @@ Using macOS or Windows? Use `CUBEJS_DB_HOST=host.docker.internal` instead of
 </InfoBox>
 
 ```yaml
-version: '2.2'
+version: "2.2"
 
 services:
   cube_api:
@@ -117,9 +117,9 @@ services:
 
 ## Set up reverse proxy
 
-In production, the Cube API should be served over an HTTPS connection to
-ensure security of the data in-transit. We recommend using a reverse proxy; as
-an example, let's use [NGINX][link-nginx].
+In production, the Cube API should be served over an HTTPS connection to ensure
+security of the data in-transit. We recommend using a reverse proxy; as an
+example, let's use [NGINX][link-nginx].
 
 <InfoBox>
 
@@ -178,11 +178,11 @@ post][medium-letsencrypt-nginx] may be useful.
 
 ## Security
 
-###  Use JSON Web Tokens
+### Use JSON Web Tokens
 
-Cube can be configured to use industry-standard JSON Web Key Sets for
-securing its API and limiting access to data. To do this, we'll define the
-relevant options on our Cube API instance:
+Cube can be configured to use industry-standard JSON Web Key Sets for securing
+its API and limiting access to data. To do this, we'll define the relevant
+options on our Cube API instance:
 
 <WarningBox>
 
@@ -219,11 +219,11 @@ services:
       - cube_refresh_worker
 ```
 
-###  Securing Cube Store
+### Securing Cube Store
 
-All Cube Store nodes (both router and workers) should only be accessible to
-Cube API instances and refresh workers. To do this with Docker Compose, we
-simply need to make sure that none of the Cube Store services have any exposed
+All Cube Store nodes (both router and workers) should only be accessible to Cube
+API instances and refresh workers. To do this with Docker Compose, we simply
+need to make sure that none of the Cube Store services have any exposed
 
 ## Monitoring
 
@@ -257,7 +257,7 @@ Docker Hub][link-cubejs-docker]. Then update your `docker-compose.yml` to use
 the tag:
 
 ```yaml
-version: '2.2'
+version: "2.2"
 
 services:
   cube_api:
@@ -318,7 +318,7 @@ docker build -t <YOUR-USERNAME>/cubejs-custom-build .
 Finally, update your `docker-compose.yml` to use your newly-built image:
 
 ```yaml
-version: '2.2'
+version: "2.2"
 
 services:
   cube_api:
@@ -346,6 +346,7 @@ services:
 [link-cubejs-docker]: https://hub.docker.com/r/cubejs/cube
 [link-docker-app]: https://www.docker.com/products/docker-app
 [link-nginx]: https://www.nginx.com/
-[ref-config-js]: /config
-[ref-config-queryrewrite]: /config#query-rewrite
-[ref-config-sched-ref-ctx]: /config#scheduled-refresh-contexts
+[ref-config-js]: /reference/configuration/config
+[ref-config-queryrewrite]: /reference/configuration/config#query-rewrite
+[ref-config-sched-ref-ctx]:
+  /reference/configuration/config#scheduled-refresh-contexts

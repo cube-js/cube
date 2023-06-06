@@ -9,7 +9,8 @@ redirect_from:
 <InfoBox>
 
 This functionality only works with data models written in JavaScript, not YAML.
-For more information, check out the [Data Modeling Syntax][ref-modeling-syntax] page.
+For more information, check out the [Data Modeling Syntax][ref-modeling-syntax]
+page.
 
 </InfoBox>
 
@@ -22,20 +23,20 @@ etc. In this case, it would make sense to create a **single** Cube for
 customers, which should be backed by a union table from all customers tables.
 
 It would be annoying to union all required tables manually. Luckily, since Cube
-supports modelling data in JavaScript, we have the full power of JavaScript at our disposal.
-We can write a function, which will generate a union table from **all** our
-customers’ tables:
+supports modelling data in JavaScript, we have the full power of JavaScript at
+our disposal. We can write a function, which will generate a union table from
+**all** our customers’ tables:
 
 ```javascript
 // model/utils.js
 const customerTableNames = [
-  { name: 'Albert Einstein', tablePrefix: 'albert_einstein' },
-  { name: 'Blaise Pascal', tablePrefix: 'blaise_pascal' },
-  { name: 'Isaac Newton', tablePrefix: 'isaac_newton' },
-  { name: 'Charles Darwin', tablePrefix: 'charles_darwin' },
-  { name: 'Michael Faraday', tablePrefix: 'michael_faraday' },
-  { name: 'Enrico Fermi', tablePrefix: 'enrico_fermi' },
-  { name: 'Thomas Edison', tablePrefix: 'thomas_edison' },
+  { name: "Albert Einstein", tablePrefix: "albert_einstein" },
+  { name: "Blaise Pascal", tablePrefix: "blaise_pascal" },
+  { name: "Isaac Newton", tablePrefix: "isaac_newton" },
+  { name: "Charles Darwin", tablePrefix: "charles_darwin" },
+  { name: "Michael Faraday", tablePrefix: "michael_faraday" },
+  { name: "Enrico Fermi", tablePrefix: "enrico_fermi" },
+  { name: "Thomas Edison", tablePrefix: "thomas_edison" },
 ];
 
 export function unionData() {
@@ -51,7 +52,7 @@ export function unionData() {
                   from ${p.tablePrefix}_customer
                   `
     )
-    .join(' UNION ALL ');
+    .join(" UNION ALL ");
 }
 ```
 
@@ -60,7 +61,7 @@ Then we can use the `unionData()` function inside the `Customers` cube.
 certain customers.
 
 ```javascript
-import { unionData } from '../utils';
+import { unionData } from "../utils";
 
 cube(`customers`, {
   sql: unionData(),
@@ -80,4 +81,4 @@ cube(`customers`, {
 });
 ```
 
-[ref-modeling-syntax]: /data-modeling/syntax
+[ref-modeling-syntax]: /product/data-modeling/fundamentals/syntax

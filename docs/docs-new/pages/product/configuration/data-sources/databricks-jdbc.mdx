@@ -13,7 +13,7 @@ redirect_from:
 
 ## Setup
 
-###  Environment Variables
+### Environment Variables
 
 Add the following to a `.env` file in your Cube project:
 
@@ -29,7 +29,7 @@ CUBEJS_DB_DATABRICKS_TOKEN=XXXXX
 CUBEJS_DB_DATABRICKS_ACCEPT_POLICY=true
 ```
 
-###  Docker
+### Docker
 
 Create a `.env` file [as above](#setup-environment-variables), then extend the
 `cubejs/cube:jdk` Docker image tag to build a Cube image with the JDBC driver:
@@ -158,12 +158,13 @@ bucket][self-preaggs-export-bucket] **must be** configured.
   https://docs.databricks.com/dev-tools/api/latest/authentication.html#token-management
 [gh-cubejs-jdbc-install]:
   https://github.com/cube-js/cube/blob/master/packages/cubejs-jdbc-driver/README.md#java-installation
-[ref-caching-large-preaggs]: /caching/using-pre-aggregations#export-bucket
+[ref-caching-large-preaggs]:
+  /product/caching/using-pre-aggregations#export-bucket
 [ref-caching-using-preaggs-build-strats]:
-  /caching/using-pre-aggregations#pre-aggregation-build-strategies
+  /product/caching/using-pre-aggregations#pre-aggregation-build-strategies
 [ref-config-multiple-ds-decorating-env]:
-  /config/multiple-data-sources#configuring-data-sources-with-environment-variables-decorated-environment-variables
+  /product/configuration/advanced/multiple-data-sources#configuring-data-sources-with-environment-variables-decorated-environment-variables
 [ref-schema-ref-types-formats-countdistinctapprox]:
-  /schema/reference/types-and-formats#count-distinct-approx
+  /product/data-modeling/reference/types-and-formats#count-distinct-approx
 [self-preaggs-simple]: #simple
 [self-preaggs-export-bucket]: #export-bucket

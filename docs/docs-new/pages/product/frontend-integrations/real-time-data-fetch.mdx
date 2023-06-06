@@ -26,13 +26,13 @@ Clients can be switched to Web Sockets by passing `WebSocketTransport` to
 `CubejsApi` constructor:
 
 ```javascript
-import cubejs from '@cubejs-client/core';
-import WebSocketTransport from '@cubejs-client/ws-transport';
+import cubejs from "@cubejs-client/core";
+import WebSocketTransport from "@cubejs-client/ws-transport";
 
 const cubejsApi = cubejs({
   transport: new WebSocketTransport({
     authorization: CUBEJS_TOKEN,
-    apiUrl: 'ws://localhost:4000/',
+    apiUrl: "ws://localhost:4000/",
   }),
 });
 ```
@@ -41,28 +41,28 @@ const cubejsApi = cubejs({
 
 Multiple APIs are provided to support data subscription scenarios.
 
-###  Vanilla JavaScript
+### Vanilla JavaScript
 
 ```javascript
-import cubejs from '@cubejs-client/core';
-import WebSocketTransport from '@cubejs-client/ws-transport';
+import cubejs from "@cubejs-client/core";
+import WebSocketTransport from "@cubejs-client/ws-transport";
 
 const cubejsApi = cubejs({
   transport: new WebSocketTransport({
     authorization: CUBEJS_TOKEN,
-    apiUrl: 'ws://localhost:4000/',
+    apiUrl: "ws://localhost:4000/",
   }),
 });
 
 // Create a subscription
 const subscription = cubejsApi.subscribe(
   {
-    measures: ['logs.count'],
+    measures: ["logs.count"],
     timeDimensions: [
       {
-        dimension: 'logs.time',
-        granularity: 'hour',
-        dateRange: 'last 1440 minutes',
+        dimension: "logs.time",
+        granularity: "hour",
+        dateRange: "last 1440 minutes",
       },
     ],
   },
@@ -78,10 +78,10 @@ const subscription = cubejsApi.subscribe(
 subscription.unsubscribe();
 ```
 
-###  React hooks
+### React hooks
 
 ```javascript
-import { useCubeQuery } from '@cubejs-client/react';
+import { useCubeQuery } from "@cubejs-client/react";
 
 const Chart = ({ query }) => {
   const { resultSet, error, isLoading } = useCubeQuery(query, {
@@ -108,8 +108,9 @@ const Chart = ({ query }) => {
 ## Refresh Rate
 
 As in the case of a regular data fetch, real-time data fetch obeys
-[`refresh_key` refresh rules](caching#refresh-keys). In order to provide a desired
-refresh rate, `refresh_key` should reflect the rate of change of the underlying
-data set; the querying time should also be much less than the desired refresh
-rate. Please use the [`every`](/schema/reference/cube#refresh-key)
-parameter to adjust the refresh interval.
+[`refresh_key` refresh rules](caching#refresh-keys). In order to provide a
+desired refresh rate, `refresh_key` should reflect the rate of change of the
+underlying data set; the querying time should also be much less than the desired
+refresh rate. Please use the
+[`every`](/product/data-modeling/reference/cube#refresh-key) parameter to adjust
+the refresh interval.

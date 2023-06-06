@@ -167,8 +167,8 @@ the data between multiple tables, splitting them by a defined attribute. Cube
 can be configured to incrementally refresh only the last set of partitions
 through the `updateWindow` property. This leads to faster refresh times due to
 unnecessary data not being reloaded, and even reduced cost for some databases
-like [BigQuery](/config/databases/google-bigquery) or
-[AWS Athena](/config/databases/aws-athena).
+like [BigQuery](/product/configuration/data-sources/google-bigquery) or
+[AWS Athena](/product/configuration/data-sources/aws-athena).
 
 Any `rollup` pre-aggregation can be partitioned by time using the
 `partition_granularity` property in [a pre-aggregation
@@ -214,8 +214,8 @@ cube(`orders`, {
       refresh_key: {
         every: `1 day`,
         incremental: true,
-        update_window: `3 months`
-      }
+        update_window: `3 months`,
+      },
     },
   },
 });
@@ -242,9 +242,10 @@ the measure is low.
 The order in which columns are specified in the index is **very** important;
 suboptimal ordering can lead to diminished performance. To improve the
 performance of an index the main thing to consider is the order of the columns
-defined in it. 
+defined in it.
 
 The rule of thumb for index column order is:
+
 - Single value filters come first
 - `GROUP BY` columns come second
 - Everything else used in the query comes afterward
@@ -267,7 +268,7 @@ The pre-aggregation code would look as follows:
 <CodeTabs>
 
 ```javascript
-cube('orders', {
+cube("orders", {
   // ...
 
   pre_aggregations: {
@@ -376,7 +377,7 @@ define an index as follows:
 <CodeTabs>
 
 ```javascript
-cube('orders', {
+cube("orders", {
   // ...
 
   pre_aggregations: {
@@ -401,7 +402,7 @@ cubes:
     pre_aggregations:
       - name: main
         # ...
-        
+
         indexes:
           - name: category_productname_zipcode_index
             columns:
@@ -422,11 +423,16 @@ Then the data within `category_productname_zipcode_index` would look like:
 | Furniture        | Plastic Chair | 88524    | 2023-01-01 11:00:00 | 3000        |
 | Electronics      | Keyboard      | 88524    | 2023-01-01 11:00:00 | 2000        |
 
-`product_category` column comes first as it's a single value filter. 
-Then `zip_code` as it's `GROUP BY` column.
-`product_name` comes last as it's a multiple value filter.
+`product_category` column comes first as it's a single value filter. Then
+`zip_code` as it's `GROUP BY` column. `product_name` comes last as it's a
+multiple value filter.
 
-It might sound counter-intuitive to have `GROUP BY` columns before filter ones, however Cube Store always performs scans on sorted data, and if `GROUP BY` matches index ordering, merge sort-based algorithms are used for querying, which are usually much faster than hash-based group by in case of index ordering doesn't match the query. If in doubt, always use `EXPLAIN` and `EXPLAIN ANALYZE` in Cube Store to figure out the final query plan.
+It might sound counter-intuitive to have `GROUP BY` columns before filter ones,
+however Cube Store always performs scans on sorted data, and if `GROUP BY`
+matches index ordering, merge sort-based algorithms are used for querying, which
+are usually much faster than hash-based group by in case of index ordering
+doesn't match the query. If in doubt, always use `EXPLAIN` and `EXPLAIN ANALYZE`
+in Cube Store to figure out the final query plan.
 
 ### Aggregated indexes
 
@@ -438,7 +444,7 @@ Example:
 <CodeTabs>
 
 ```javascript
-cube('orders', {
+cube("orders", {
   // ...
 
   pre_aggregations: {
@@ -447,7 +453,7 @@ cube('orders', {
 
       indexes: {
         // ...
-        
+
         zip_code_index: {
           columns: [zip_code],
           type: `aggregate`,
@@ -462,7 +468,7 @@ cube('orders', {
 cubes:
   - name: orders
     # ...
-    
+
     pre_aggregations:
       - name: main
         # ...
@@ -524,7 +530,7 @@ SELECT * FROM information_schema.tables;
 These pre-aggregations are stored as Parquet files under the `.cubestore/`
 folder in the project root during development.
 
-###  EXPLAIN queries
+### EXPLAIN queries
 
 Cube Store's MySQL protocol also supports `EXPLAIN` and `EXPLAIN ANALYZE`
 queries both of which are useful for determining how much processing a query
@@ -641,7 +647,7 @@ cube(`orders`, {
   joins: {
     users: {
       sql: `${CUBE.user_id} = ${users.id}`,
-      relationship: `many_to_one`
+      relationship: `many_to_one`,
     },
   },
 });
@@ -777,7 +783,7 @@ Cube supports three different strategies for building pre-aggregations. To see
 which strategies your database supports, please refer to its individual page
 from [Connecting to the Database][ref-config-db].
 
-###  Simple
+### Simple
 
 When using the simple strategy, Cube will use the source database as a temporary
 staging area for writing pre-aggregations to determine column types. The data is
@@ -800,7 +806,7 @@ or [Export Bucket][self-export-bucket] strategies instead.
   />
 </div>
 
-###  Batching
+### Batching
 
 Batching is a more performant strategy where Cube sends compressed CSVs for Cube
 Store to ingest.
@@ -817,7 +823,7 @@ Store to ingest.
 The performance scales to the amount of memory available on the Cube instance.
 Batching is automatically enabled for any databases that can support it.
 
-###  Export bucket
+### Export bucket
 
 <WarningBox>
 
@@ -865,40 +871,45 @@ You don’t need to define `refresh_key` for streaming pre-aggregations. Whether
 pre-aggregation is streaming or not is defined by the data source.
 
 Currently, Cube supports only one streaming data source -
-[ksqlDB](/config/databases/ksqldb). All pre-aggregations where data source is
-ksqlDB are streaming.
+[ksqlDB](/product/configuration/data-sources/ksqldb). All pre-aggregations where
+data source is ksqlDB are streaming.
 
 We are working on supporting more data sources for streaming pre-aggregations,
 please [let us know](https://cube.dev/contact) if you are interested in early
 access to any of these drivers or would like Cube to support any other SQL
 streaming engine.
 
-[ref-caching-in-mem-default-refresh-key]: /caching#default-refresh-keys
-[ref-config-db]: /config/databases
-[ref-config-driverfactory]: /config#driver-factory
-[ref-config-env-rolluponly]: /reference/environment-variables#cubejs-rollup-only
-[ref-config-extdriverfactory]: /config#external-driver-factory
-[ref-connect-db-athena]: /config/databases/aws-athena
-[ref-connect-db-redshift]: /config/databases/aws-redshift
-[ref-connect-db-bigquery]: /config/databases/google-bigquery
-[ref-connect-db-mysql]: /config/databases/mysql
-[ref-connect-db-postgres]: /config/databases/postgres
-[ref-connect-db-snowflake]: /config/databases/snowflake
+[ref-caching-in-mem-default-refresh-key]:
+  /product/caching/overview#default-refresh-keys
+[ref-config-db]: /product/configuration/data-sources
+[ref-config-driverfactory]: /reference/configuration/config#driver-factory
+[ref-config-env-rolluponly]:
+  /reference/configuration/environment-variables#cubejs-rollup-only
+[ref-config-extdriverfactory]:
+  /reference/configuration/config#external-driver-factory
+[ref-connect-db-athena]: /product/configuration/data-sources/aws-athena
+[ref-connect-db-redshift]: /product/configuration/data-sources/aws-redshift
+[ref-connect-db-bigquery]: /product/configuration/data-sources/google-bigquery
+[ref-connect-db-mysql]: /product/configuration/data-sources/mysql
+[ref-connect-db-postgres]: /product/configuration/data-sources/postgres
+[ref-connect-db-snowflake]: /product/configuration/data-sources/snowflake
 [ref-schema-timedimension]: /types-and-formats#types-time
-[ref-schema-ref-preaggs]: /schema/reference/pre-aggregations
-[ref-schema-ref-preaggs-index]: /schema/reference/pre-aggregations#indexes
+[ref-schema-ref-preaggs]: /product/data-modeling/reference/pre-aggregations
+[ref-schema-ref-preaggs-index]:
+  /product/data-modeling/reference/pre-aggregations#indexes
 [ref-schema-ref-preaggs-refresh-key]:
-  /schema/reference/pre-aggregations#refresh-key
+  /product/data-modeling/reference/pre-aggregations#refresh-key
 [ref-schema-ref-preaggs-refresh-key-every]:
-  /schema/reference/pre-aggregations#refresh-key-every
+  /product/data-modeling/reference/pre-aggregations#refresh-key-every
 [ref-schema-ref-preaggs-refresh-key-sql]:
-  /schema/reference/pre-aggregations#refresh-key-sql
-[ref-deploy-refresh-wrkr]: /deployment/overview#refresh-worker
+  /product/data-modeling/reference/pre-aggregations#refresh-key-sql
+[ref-deploy-refresh-wrkr]: /product/deployment/overview#refresh-worker
 [ref-schema-ref-preaggs-sched-refresh]:
-  /schema/reference/pre-aggregations#scheduled-refresh
-[ref-prod-list-refresh]: /deployment/production-checklist#set-up-refresh-worker
+  /product/data-modeling/reference/pre-aggregations#scheduled-refresh
+[ref-prod-list-refresh]:
+  /product/deployment/production-checklist#set-up-refresh-worker
 [ref-original-sql]:
-  /schema/reference/pre-aggregations#parameters-type-originalsql
+  /product/data-modeling/reference/pre-aggregations#parameters-type-originalsql
 [self-batching]: #batching
 [self-export-bucket]: #export-bucket
 [wiki-partitioning]: https://en.wikipedia.org/wiki/Partition_(database)

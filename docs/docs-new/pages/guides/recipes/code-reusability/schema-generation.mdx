@@ -9,7 +9,8 @@ redirect_from:
 <InfoBox>
 
 This functionality only works with data models written in JavaScript, not YAML.
-For more information, check out the [Data Modeling Syntax][ref-modeling-syntax] page.
+For more information, check out the [Data Modeling Syntax][ref-modeling-syntax]
+page.
 
 </InfoBox>
 
@@ -25,7 +26,7 @@ want to create a separate user count measure for each event.
 It can be done as simple as
 
 ```javascript
-const events = ['app_engagement', 'login', 'purchase'];
+const events = ["app_engagement", "login", "purchase"];
 
 cube(`events`, {
   sql_table: `events`,
@@ -64,8 +65,8 @@ code. This configuration can be reused using
 [export / import feature](export-import).
 
 Please refer to the
-[`asyncModule()`](/schema/reference/execution-environment#async-module)
+[`asyncModule()`](/product/data-modeling/advanced/schema-execution-environment#async-module)
 documentation to learn how to use databases and other data sources for data
 model generation.
 
-[ref-modeling-syntax]: /data-modeling/syntax
+[ref-modeling-syntax]: /product/data-modeling/fundamentals/syntax

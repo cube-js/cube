@@ -66,13 +66,12 @@ cube(`Orders`, {
 ## Query
 
 To select orders that belong to a particular page, we can use the `limit` and
-`offset` query properties. First, let's get the number of all orders that we have.
+`offset` query properties. First, let's get the number of all orders that we
+have.
 
 ```json
 {
-  "measures": [
-    "orders.count"
-  ]
+  "measures": ["orders.count"]
 }
 ```
 
@@ -80,9 +79,7 @@ Then, let's retrieve first batch (page) of five orders:
 
 ```json
 {
-  "dimensions": [
-    "orders.number"
-  ],
+  "dimensions": ["orders.number"],
   "order": {
     "orders.number": "asc"
   },
@@ -94,9 +91,7 @@ Now, let's retrieve the second batch (page) of five orders:
 
 ```json
 {
-  "dimensions": [
-    "orders.number"
-  ],
+  "dimensions": ["orders.number"],
   "order": {
     "orders.number": "asc"
   },
@@ -114,7 +109,7 @@ We have received five orders per query and can use them as we want.
 
 [
   {
-    'orders.count': '10000',
+    "orders.count": "10000",
   },
 ];
 ```
@@ -124,19 +119,19 @@ We have received five orders per query and can use them as we want.
 
 [
   {
-    'orders.number': 1,
+    "orders.number": 1,
   },
   {
-    'orders.number': 2,
+    "orders.number": 2,
   },
   {
-    'orders.number': 3,
+    "orders.number": 3,
   },
   {
-    'orders.number': 4,
+    "orders.number": 4,
   },
   {
-    'orders.number': 5,
+    "orders.number": 5,
   },
 ];
 ```
@@ -146,19 +141,19 @@ We have received five orders per query and can use them as we want.
 
 [
   {
-    'orders.number': 6,
+    "orders.number": 6,
   },
   {
-    'orders.number': 7,
+    "orders.number": 7,
   },
   {
-    'orders.number': 8,
+    "orders.number": 8,
   },
   {
-    'orders.number': 9,
+    "orders.number": 9,
   },
   {
-    'orders.number': 10,
+    "orders.number": 10,
   },
 ];
 ```

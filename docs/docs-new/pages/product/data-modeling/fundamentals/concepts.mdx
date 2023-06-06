@@ -44,7 +44,7 @@ your database using the [`sql_table` property][ref-schema-ref-sql-table]:
 
 ```javascript
 cube(`orders`, {
-  sql_table: `orders`
+  sql_table: `orders`,
 });
 ```
 
@@ -56,7 +56,8 @@ cubes:
 
 </CodeTabs>
 
-You can also use the [`sql` property][ref-schema-ref-sql] to accommodate more complex SQL queries:
+You can also use the [`sql` property][ref-schema-ref-sql] to accommodate more
+complex SQL queries:
 
 <CodeTabs>
 
@@ -66,7 +67,7 @@ cube(`orders`, {
     SELECT *
     FROM orders, line_items
     WHERE orders.id = line_items.order_id
-  `
+  `,
 });
 ```
 
@@ -74,9 +75,7 @@ cube(`orders`, {
 cubes:
   - name: orders
     sql: >
-      SELECT *
-      FROM orders, line_items
-      WHERE orders.id = line_items.order_id
+      SELECT * FROM orders, line_items WHERE orders.id = line_items.order_id
 ```
 
 </CodeTabs>
@@ -88,10 +87,10 @@ data model with which data consumers can interact. They are useful for defining
 metrics, managing governance and data access, and controlling ambiguous join
 paths.
 
-Views **can not** have their own members. Instead, use the `cubes` or `includes` parameters
-to include measures and dimensions from other cubes into the view. In the
-example below, we create a new view `active_users` which is made up of properties
-from the `users` cube:
+Views **can not** have their own members. Instead, use the `cubes` or `includes`
+parameters to include measures and dimensions from other cubes into the view. In
+the example below, we create a new view `active_users` which is made up of
+properties from the `users` cube:
 
 <CodeTabs>
 
@@ -106,28 +105,25 @@ view(`orders`, {
         `total_amount`,
         `total_amount_shipped`,
         `count`,
-        `average_order_value`
-      ]
+        `average_order_value`,
+      ],
     },
     {
       join_path: base_orders.line_items.products,
       includes: [
         {
           name: `name`,
-          alias: `product`
-        }
-      ]
+          alias: `product`,
+        },
+      ],
     },
     {
       join_path: base_orders.users,
       prefix: true,
       includes: `*`,
-      excludes: [
-        `company`
-      ]
-
-    }
-  ]
+      excludes: [`company`],
+    },
+  ],
 });
 ```
 
@@ -144,9 +140,9 @@ views:
           - total_amount_shipped
           - count
           - average_order_value
-      
+
       - join_path: base_orders.line_items.products
-        includes: 
+        includes:
           - name: name
             alias: product
 
@@ -528,15 +524,18 @@ cubes:
 A more thorough introduction can be found in [Getting Started with
 Pre-Aggregations][ref-caching-preaggs-intro].
 
-[ref-backend-query-filters]: /query-format#filters-format
-[ref-caching-preaggs-intro]: /caching/pre-aggregations/getting-started
+[ref-backend-query-filters]: /product/api-rest/query-format#filters-format
+[ref-caching-preaggs-intro]: /product/caching/getting-started-pre-aggregations
 [ref-caching-use-preaggs-partition-time]:
-  /caching/using-pre-aggregations#time-partitioning
-[ref-schema-dimension-types]: /schema/reference/types-and-formats#types
-[ref-schema-measure-types]: /schema/reference/types-and-formats#measures-types
-[ref-schema-ref-joins-types]: /schema/reference/joins#relationship
-[ref-schema-ref-sql]: /schema/reference/cube#sql
-[ref-schema-ref-sql-table]: /schema/reference/cube#sql-table
+  /product/caching/using-pre-aggregations#time-partitioning
+[ref-schema-dimension-types]:
+  /product/data-modeling/reference/types-and-formats#types
+[ref-schema-measure-types]:
+  /product/data-modeling/reference/types-and-formats#measures-types
+[ref-schema-ref-joins-types]:
+  /product/data-modeling/reference/joins#relationship
+[ref-schema-ref-sql]: /product/data-modeling/reference/cube#sql
+[ref-schema-ref-sql-table]: /product/data-modeling/reference/cube#sql-table
 [ref-tutorial-incremental-preagg]: /incremental-pre-aggregations
 [self-dimensions]: #dimensions
 [self-measures]: #measures

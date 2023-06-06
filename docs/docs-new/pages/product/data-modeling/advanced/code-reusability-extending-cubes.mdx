@@ -83,9 +83,9 @@ cube(`base_events`, {
 
 </CodeTabs>
 
-The `product_purchases` and `page_views` cubes are extended from `base_events` and
-define only the specific dimensions: `product_name` for product purchases and
-`page_path` for page views.
+The `product_purchases` and `page_views` cubes are extended from `base_events`
+and define only the specific dimensions: `product_name` for product purchases
+and `page_path` for page views.
 
 <CodeTabs>
 
@@ -151,9 +151,8 @@ in any `sql` property, then extending cubes can do one of two things:
   cubes:
     - name: product_purchases
       sql: >
-        SELECT *
-        FROM events
-        WHERE {FILTER_PARAMS.product_purchases.timestamp.filter('time')}
+        SELECT * FROM events WHERE
+        {FILTER_PARAMS.product_purchases.timestamp.filter('time')}
 
       # ...
   ```
@@ -163,7 +162,7 @@ in any `sql` property, then extending cubes can do one of two things:
     sql: `
       SELECT *
       FROM events
-      WHERE ${FILTER_PARAMS.product_purchases.timestamp.filter('time')}
+      WHERE ${FILTER_PARAMS.product_purchases.timestamp.filter("time")}
     `,
 
     // ...
@@ -174,16 +173,14 @@ in any `sql` property, then extending cubes can do one of two things:
 
 - Put all filters inside the base cube and reference all specific cubes filters
   using `AND`. The unused filters will be rendered to `1 = 1` in the SQL query.
-  
+
   <CodeTabs>
 
   ```yaml
   cubes:
     - name: base_events
       sql: >
-        SELECT *
-        FROM events
-        WHERE
+        SELECT * FROM events WHERE
           {FILTER_PARAMS.base_events.timestamp.filter('time')} AND
           {FILTER_PARAMS.product_purchases.timestamp.filter('time')} AND
           {FILTER_PARAMS.page_views.timestamp.filter('time')}
@@ -210,6 +207,7 @@ in any `sql` property, then extending cubes can do one of two things:
 
 [mdn-js-objects]:
   https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object
-[ref-schema-concepts-cubes]: /schema/fundamentals/concepts#cubes
-[ref-schema-ref-cube-extends]: /schema/reference/cube#extends
-[ref-schema-ref-cube-filter-params]: /schema/reference/cube#filter-params
+[ref-schema-concepts-cubes]: /product/data-modeling/fundamentals/concepts#cubes
+[ref-schema-ref-cube-extends]: /product/data-modeling/reference/cube#extends
+[ref-schema-ref-cube-filter-params]:
+  /product/data-modeling/reference/cube#filter-params

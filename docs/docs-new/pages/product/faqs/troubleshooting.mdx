@@ -31,10 +31,10 @@ This usually means Cube can't create a pre-aggregation table, which could be due
 to a few different reasons. Further down the error log, you should see more
 details which will help narrow down the scope of the issue.
 
-| If you see…                                              | The issue is likely…                                                                                                                                                                 | Recommendation                                                                                            |
-| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| If you see…                                              | The issue is likely…                                                                                                                                                                     | Recommendation                                                                                            |
+| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | `has a key that already exists in Name index`            | Multi-tenancy setup missing following configuration setting: <pre><code>{"preAggregationsSchema: ({ securityContext }) => `pre_aggregations_${securityContext.tenantId},`"}</code></pre> | Update configuration.                                                                                     |
-| `Error: Query execution timeout after 10 min of waiting` | Pre-aggregation is too large to be built.                                                                                                                                            | Try enabling [export bucket][ref-caching-using-preaggs-export-bucket] or reducing `partitionGranularity`. |
+| `Error: Query execution timeout after 10 min of waiting` | Pre-aggregation is too large to be built.                                                                                                                                                | Try enabling [export bucket][ref-caching-using-preaggs-export-bucket] or reducing `partitionGranularity`. |
 
 For any other error types, feel free to reach out to us in our support chat.
 
@@ -47,7 +47,7 @@ variable, or in the `cube.js` file:
 ```javascript
 module.exports = {
   // You can define one or multiple timezones based on your requirements
-  scheduledRefreshTimeZones: ['America/Vancouver', 'America/Toronto'],
+  scheduledRefreshTimeZones: ["America/Vancouver", "America/Toronto"],
 };
 ```
 
@@ -66,4 +66,4 @@ to the latest version every time it's released on the next build or settings
 update.
 
 [ref-caching-using-preaggs-export-bucket]:
-  /caching/using-pre-aggregations#pre-aggregation-build-strategies-export-bucket
+  /product/caching/using-pre-aggregations#pre-aggregation-build-strategies-export-bucket

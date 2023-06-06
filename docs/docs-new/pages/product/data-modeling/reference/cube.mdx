@@ -86,11 +86,11 @@ cubes:
 
 Cubes have three types of members: measures, dimensions and segments. Each
 member can be referenced either by its fully-qualified name
-(`<cube_name>.<member_name>`) or by its short version (`<member_name>`) if member
-exists within the same cube. There is also a handy `CUBE` context variable which
-references the current cube. Important difference between same cube references
-is `CUBE.<member-Name>` references are resolved runtime as opposed to compile
-time `<member_name>` references.
+(`<cube_name>.<member_name>`) or by its short version (`<member_name>`) if
+member exists within the same cube. There is also a handy `CUBE` context
+variable which references the current cube. Important difference between same
+cube references is `CUBE.<member-Name>` references are resolved runtime as
+opposed to compile time `<member_name>` references.
 
 Using the `CUBE` referencing causes its alias to be used in SQL queries. For
 example, to avoid ambiguity in the `name` dimension in the following example, we
@@ -192,7 +192,7 @@ LEFT JOIN contacts "contacts"
 
 ## Parameters
 
-###  name
+### name
 
 The `name` parameter serves as the identifier of a cube. It must be unique among
 _all cubes and views_ within a deployment and follow the [naming
@@ -214,7 +214,7 @@ cubes:
 
 </CodeTabs>
 
-###  data_source
+### data_source
 
 Each cube can have its own `data_source` name to support scenarios where data
 should be fetched from multiple databases. The value of the `data_source`
@@ -240,7 +240,7 @@ cubes:
 
 </CodeTabs>
 
-###  description
+### description
 
 Use a description in your cubes to allow your team to better understand what
 this cube is about. It is a very simple and yet useful tool that gives a hint to
@@ -266,7 +266,7 @@ cubes:
 
 </CodeTabs>
 
-###  extends
+### extends
 
 You can extend cubes in order to reuse all declared members of a cube. In the
 example below, `extended_order_facts` will reuse the `sql` and `count` measures
@@ -349,7 +349,7 @@ cube(`extended_order_facts`, {
 });
 ```
 
-###  public
+### public
 
 <InfoBox>
 
@@ -383,7 +383,7 @@ To learn more about using `public` to control visibility based on security
 context, read the [Controlling access to cubes and views
 recipe][ref-recipe-control-access-cubes-views].
 
-###  refresh_key
+### refresh_key
 
 Cube's caching layer uses `refresh_key` queries to get the current version of
 content for a specific cube. If a query result changes, Cube will invalidate all
@@ -516,32 +516,32 @@ SELECT FLOOR(EXTRACT(EPOCH FROM NOW()) / 5)
 
 - Standard cron syntax
 
-```
-*    *    *    *    *
-┬    ┬    ┬    ┬    ┬
-│    │    │    │    |
-│    │    │    │    └ day of week (0 - 7) (0 or 7 is Sun)
-│    │    │    └───── month (1 - 12)
-│    │    └────────── day of month (1 - 31, L)
-│    └─────────────── hour (0 - 23)
-└──────────────────── minute (0 - 59)
-```
+<!---->
+
+    *    *    *    *    *
+    ┬    ┬    ┬    ┬    ┬
+    │    │    │    │    |
+    │    │    │    │    └ day of week (0 - 7) (0 or 7 is Sun)
+    │    │    │    └───── month (1 - 12)
+    │    │    └────────── day of month (1 - 31, L)
+    │    └─────────────── hour (0 - 23)
+    └──────────────────── minute (0 - 59)
 
 - Advanced cron format with support for seconds
 
-```
-*    *    *    *    *    *
-┬    ┬    ┬    ┬    ┬    ┬
-│    │    │    │    │    |
-│    │    │    │    │    └ day of week (0 - 7) (0 or 7 is Sun)
-│    │    │    │    └───── month (1 - 12)
-│    │    │    └────────── day of month (1 - 31, L)
-│    │    └─────────────── hour (0 - 23)
-│    └──────────────────── minute (0 - 59)
-└───────────────────────── second (0 - 59, optional)
-```
+<!---->
 
-###  rewrite_queries
+    *    *    *    *    *    *
+    ┬    ┬    ┬    ┬    ┬    ┬
+    │    │    │    │    │    |
+    │    │    │    │    │    └ day of week (0 - 7) (0 or 7 is Sun)
+    │    │    │    │    └───── month (1 - 12)
+    │    │    │    └────────── day of month (1 - 31, L)
+    │    │    └─────────────── hour (0 - 23)
+    │    └──────────────────── minute (0 - 59)
+    └───────────────────────── second (0 - 59, optional)
+
+### rewrite_queries
 
 Set this flag to true if you want Cube to rewrite your queries after final SQL
 has been generated. This may be helpful to apply filter pushdown optimizations
@@ -567,7 +567,7 @@ cubes:
 
 </CodeTabs>
 
-###  sql
+### sql
 
 The `sql` parameter specifies the SQL that will be used to generate a table that
 will be queried by a cube. It can be any valid SQL query, but usually it takes
@@ -607,7 +607,7 @@ It is recommended to prefer the [`sql_table`](#parameters-sql-table) property
 over the `sql` property for all cubes that are supposed to use queries like
 this: `SELECT * FROM table`.
 
-###  sql_table
+### sql_table
 
 The `sql_table` property is used as a concise way for defining a cube that uses
 a query like this: `SELECT * FROM table`. Instead of using the
@@ -630,7 +630,7 @@ cubes:
 
 </CodeTabs>
 
-###  sql_alias
+### sql_alias
 
 Use `sql_alias` when auto-generated cube alias prefix is too long and truncated
 by DB such as Postgres:
@@ -656,7 +656,7 @@ cubes:
 It'll generate aliases for members such as `ofacts__count`. `sql_alias` affects
 all member names including pre-aggregation table names.
 
-###  title
+### title
 
 Use `title` to change the display name of the cube. By default, Cube will
 humanize the cube's name, so for instance, `users_orders` would become
@@ -685,7 +685,7 @@ cubes:
 
 ## Context Variables
 
-###  Filter Params
+### Filter Params
 
 `FILTER_PARAMS` allows you to use filter values during SQL generation. You can
 add it for any valid SQL expression as in the case of dimensions. This is useful
@@ -701,14 +701,18 @@ FILTER_PARAMS.<CUBE_NAME>.<FILTER_NAME>.filter(expression)
 
 <WarningBox>
 
-Heavy usage of FILTER_PARAMS is considered a bad practice. It usually leads to hard to maintain data model.
+Heavy usage of FILTER_PARAMS is considered a bad practice. It usually leads to
+hard to maintain data model.
 
-Good rule of thumb is to use FILTER_PARAMS only for predicate pushdown performance optimizations.
+Good rule of thumb is to use FILTER_PARAMS only for predicate pushdown
+performance optimizations.
 
-If you find yourself relying a lot on FILTER_PARAMS, it might mean you'll need to 
+If you find yourself relying a lot on FILTER_PARAMS, it might mean you'll need
+to
 
-1. Rethink your data modeling and potentially move some transformations upstream 
-2. Reconsider choice of underlying database
+1.  Rethink your data modeling and potentially move some transformations
+    upstream
+2.  Reconsider choice of underlying database
 
 </WarningBox>
 
@@ -722,7 +726,7 @@ cube(`order_facts`, {
   sql: `
     SELECT *
     FROM orders
-    WHERE ${FILTER_PARAMS.order_facts.date.filter('date')}
+    WHERE ${FILTER_PARAMS.order_facts.date.filter("date")}
   `,
 
   measures: {
@@ -744,9 +748,7 @@ cube(`order_facts`, {
 cubes:
   - name: order_facts
     sql: >
-      SELECT *
-      FROM orders
-      WHERE {FILTER_PARAMS.order_facts.date.filter('date')}
+      SELECT * FROM orders WHERE {FILTER_PARAMS.order_facts.date.filter('date')}
 
     measures:
       - name: count
@@ -776,11 +778,13 @@ for the `['2018-01-01', '2018-12-31']` date range passed for the
 ```json
 {
   "measures": ["order_facts.count"],
-  "time_dimensions": [{
-    "dimension": "order_facts.date",
-    "granularity": "day",
-    "dateRange": ["2018-01-01", "2018-12-31"]
-  }]
+  "time_dimensions": [
+    {
+      "dimension": "order_facts.date",
+      "granularity": "day",
+      "dateRange": ["2018-01-01", "2018-12-31"]
+    }
+  ]
 }
 ```
 
@@ -797,10 +801,12 @@ cube(`events`, {
   sql: `
     SELECT *
     FROM schema.\`events*\`
-    WHERE ${FILTER_PARAMS.events.date.filter((from, to) => `
+    WHERE ${FILTER_PARAMS.events.date.filter(
+      (from, to) => `
       _TABLE_SUFFIX >= FORMAT_TIMESTAMP('%Y%m%d', TIMESTAMP(${from})) AND
       _TABLE_SUFFIX <= FORMAT_TIMESTAMP('%Y%m%d', TIMESTAMP(${to}))
-    `)}
+    `
+    )}
   `,
 
   dimensions: {
@@ -812,11 +818,11 @@ cube(`events`, {
 });
 ```
 
-###  Security Context
+### Security Context
 
 <WarningBox>
 
-`SECURITY_CONTEXT` is deprecated and may be removed in the upcoming versions. 
+`SECURITY_CONTEXT` is deprecated and may be removed in the upcoming versions.
 Use [`queryRewrite`][ref-config-queryrewrite] instead.
 
 </WarningBox>
@@ -853,9 +859,7 @@ cube(`orders`, {
 cubes:
   - name: orders
     sql: >
-      SELECT *
-      FROM orders
-      WHERE {SECURITY_CONTEXT.email.filter('email')}
+      SELECT * FROM orders WHERE {SECURITY_CONTEXT.email.filter('email')}
 
     dimensions:
       - name: date
@@ -874,7 +878,7 @@ cube(`orders`, {
   sql: `
     SELECT *
     FROM orders
-    WHERE ${SECURITY_CONTEXT.email.requiredFilter('email')}
+    WHERE ${SECURITY_CONTEXT.email.requiredFilter("email")}
   `,
 
   dimensions: {
@@ -890,9 +894,8 @@ cube(`orders`, {
 cubes:
   - name: orders
     sql: >
-      SELECT *
-      FROM orders
-      WHERE {SECURITY_CONTEXT.email.requiredFilter('email')}
+      SELECT * FROM orders WHERE
+      {SECURITY_CONTEXT.email.requiredFilter('email')}
 
     dimensions:
       - name: date
@@ -901,7 +904,6 @@ cubes:
 ```
 
 </CodeTabs>
-
 
 You can access values of context variables directly in JavaScript in order to
 use it during your SQL generation. For example:
@@ -916,7 +918,9 @@ Use of this feature entails SQL injection security risk. Use it with caution.
 cube(`orders`, {
   sql: `
     SELECT *
-    FROM ${SECURITY_CONTEXT.type.unsafeValue() === "employee" ? "employee" : "public"}.orders
+    FROM ${
+      SECURITY_CONTEXT.type.unsafeValue() === "employee" ? "employee" : "public"
+    }.orders
   `,
 
   dimensions: {
@@ -928,14 +932,14 @@ cube(`orders`, {
 });
 ```
 
-###  SQL Utils
+### SQL Utils
 
 #### convertTz
 
 In case you need to convert your timestamp to user request timezone in cube or
 member SQL you can use `SQL_UTILS.convertTz()` method. Note that Cube will
 automatically convert timezones for `timeDimensions` fields in
-[queries](/query-format#query-properties).
+[queries](/product/api-rest/query-format#query-properties).
 
 <WarningBox>
 
@@ -990,7 +994,7 @@ cubes:
 
 </CodeTabs>
 
-###  Compile context
+### Compile context
 
 There's a global `COMPILE_CONTEXT` that captured as
 [`RequestContext`][ref-config-req-ctx] at the time of data model compilation. It
@@ -1020,14 +1024,14 @@ cubes:
 
 </CodeTabs>
 
-[ref-config-driverfactory]: /config#driver-factory
-[ref-config-ext-ctx]: /config#extend-context
-[ref-config-queryrewrite]: /config#query-rewrite
-[ref-config-req-ctx]: /config#request-context
-[ref-dev-playground]: /dev-tools/dev-playground
+[ref-config-driverfactory]: /reference/configuration/config#driver-factory
+[ref-config-ext-ctx]: /reference/configuration/config#extend-context
+[ref-config-queryrewrite]: /reference/configuration/config#query-rewrite
+[ref-config-req-ctx]: /reference/configuration/config#request-context
+[ref-dev-playground]: /product/workspace/playground
 [ref-recipe-control-access-cubes-views]:
-  /recipes/controlling-access-to-cubes-and-views
-[ref-restapi-meta]: /rest-api#v-1-meta
-[ref-restapi-sql]: /rest-api#v-1-sql
-[ref-sec-ctx]: /security/context
-[ref-naming]: /data-modeling/syntax#naming
+  /guides/recipes/access-control/controlling-access-to-cubes-and-views
+[ref-restapi-meta]: /reference/rest-api#v-1-meta
+[ref-restapi-sql]: /reference/rest-api#v-1-sql
+[ref-sec-ctx]: /product/auth/context
+[ref-naming]: /product/data-modeling/fundamentals/syntax#naming

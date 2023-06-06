@@ -111,16 +111,16 @@ module.exports = {
     const cubeNames = [
       ...(query.dimensions || []),
       ...(query.measures || []),
-    ].map((e) => e.split('.')[0]);
+    ].map((e) => e.split(".")[0]);
 
-    if (cubeNames.includes('products')) {
+    if (cubeNames.includes("products")) {
       if (!securityContext.email) {
-        throw new Error('No email found in Security Context!');
+        throw new Error("No email found in Security Context!");
       }
 
       query.filters.push({
         member: `suppliers.email`,
-        operator: 'equals',
+        operator: "equals",
         values: [securityContext.email],
       });
     }
@@ -159,10 +159,10 @@ We have received different data depending on the supplier's email.
 // purus.accumsan@Proin.org
 [
   {
-    'products.name': 'Awesome Soft Salad',
+    "products.name": "Awesome Soft Salad",
   },
   {
-    'products.name': 'Rustic Granite Gloves',
+    "products.name": "Rustic Granite Gloves",
   },
 ];
 ```
@@ -171,7 +171,7 @@ We have received different data depending on the supplier's email.
 // gravida.sit.amet@risus.net
 [
   {
-    'products.name': 'Incredible Granite Cheese',
+    "products.name": "Incredible Granite Cheese",
   },
 ];
 ```

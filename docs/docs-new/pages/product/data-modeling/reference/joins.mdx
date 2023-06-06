@@ -57,7 +57,7 @@ practice to have a separate cube for such an operation.
 
 ## Parameters
 
-###  name
+### name
 
 The name must match the name of the joined cube and, thus, follow the [naming
 conventions][ref-naming].
@@ -93,7 +93,7 @@ cubes:
 
 </CodeTabs>
 
-###  relationship
+### relationship
 
 The `relationship` property is used to describe the type of the relationship
 between joined cubes. It’s important to properly define the type of relationship
@@ -244,7 +244,7 @@ cubes:
 
 </CodeTabs>
 
-###  sql
+### sql
 
 `sql` is necessary to indicate a related column between cubes. It is important
 to properly specify a matching column when creating joins. Take a look at the
@@ -395,7 +395,9 @@ cubes:
 
     dimensions:
       - name: id
-        sql: "{CUBE}.user_id || '-' || {CUBE}.signup_week || '-' || {CUBE}.activity_week"
+        sql:
+          "{CUBE}.user_id || '-' || {CUBE}.signup_week || '-' ||
+          {CUBE}.activity_week"
         type: string
         primary_key: true
 ```
@@ -405,10 +407,10 @@ cubes:
 ## CUBE reference
 
 When you have several joined cubes, you should accurately use columns’ names to
-avoid any mistakes. One way to make no mistakes is to use the `CUBE`
-reference. It allows you to specify columns’ names in cubes without any
-ambiguity. During the implementation of the query, this reference will be used
-as an alias for a basic cube. Take a look at the following example:
+avoid any mistakes. One way to make no mistakes is to use the `CUBE` reference.
+It allows you to specify columns’ names in cubes without any ambiguity. During
+the implementation of the query, this reference will be used as an alias for a
+basic cube. Take a look at the following example:
 
 <CodeTabs>
 
@@ -517,7 +519,7 @@ cubes:
 
   - name: c
     # ...
-    
+
     dimensions:
       - name: category
         sql: category
@@ -539,12 +541,13 @@ Joins `a → b` and `b → c` will be resolved automatically. Cube uses the
 [Dijkstra algorithm][wiki-djikstra-alg] to find a join path between cubes given
 requested members.
 
-[ref-restapi-query-filter-op-set]: /query-format#set
+[ref-restapi-query-filter-op-set]: /product/api-rest/query-format#set
 [ref-schema-fundamentals-join-dir]:
-  /schema/fundamentals/joins#directions-of-joins
-[ref-schema-cube-sql]: /schema/reference/cube#parameters-sql
-[ref-schema-data-blenging]: /schema/advanced/data-blending#data-blending
-[ref-naming]: /data-modeling/syntax#naming
+  /product/data-modeling/fundamentals/working-with-joins#directions-of-joins
+[ref-schema-cube-sql]: /product/data-modeling/reference/cube#parameters-sql
+[ref-schema-data-blenging]:
+  /product/data-modeling/advanced/data-blending#data-blending
+[ref-naming]: /product/data-modeling/fundamentals/syntax#naming
 [wiki-djikstra-alg]: https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm
 [wiki-left-join]: https://en.wikipedia.org/wiki/Join_(SQL)#Left_outer_join
 [wiki-1-1]: https://en.wikipedia.org/wiki/One-to-one_(data_model)

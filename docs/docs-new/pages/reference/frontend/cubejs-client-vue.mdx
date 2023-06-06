@@ -14,19 +14,19 @@ Vue.js app.
 abstracts state management and API calls to Cube Backend. It uses scoped slot
 props technique.
 
-###  Props
+### Props
 
-| Name                   | Type                                                                                                                                          | Description                                                                                                                                                                                                  |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| cubejsApi              | [CubejsApi](@cubejs-client-core#cubejs-api)                                                                                                   | `CubejsApi` instance to use                                                                                                                                                                                  |
-| initialChartType?      | [ChartType](#types-chart-type)                                                                                                                | The type of chart to display initially. Default is `line`.                                                                                                                                                   |
-| disableHeuristics?     | boolean                                                                                                                                       | Defaults to `false`. This means that the default heuristics will be applied. For example: when the query is empty and you select a measure that has a default time dimension it will be pushed to the query. |
-| query?                 | Query                                                                                                                                         | Query parameters ([learn more about the format](/query-format)). This property is reactive - if you change the object here, the internal query values will be overwritten. This is not two-way.              |
-| stateChangeHeuristics? | (**state**: [QueryBuilderState](#types-query-builder-query-builder-state)) => _[QueryBuilderState](#types-query-builder-query-builder-state)_ | A function that accepts the `newState` just before it's applied. You can use it to override the **defaultHeuristics** or to tweak the query or the vizState in any way.                                      |
-| initialVizState?       | [VizState](#types-viz-state)                                                                                                                  | -                                                                                                                                                                                                            |
-| wrapWithQueryRenderer? | boolean                                                                                                                                       | Defaults to `true`. Use QueryRenderer to render. Set this to `false` to use your own QueryRenderer.                                                                                                          |
+| Name                   | Type                                                                                                                                          | Description                                                                                                                                                                                                      |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| cubejsApi              | [CubejsApi](@cubejs-client-core#cubejs-api)                                                                                                   | `CubejsApi` instance to use                                                                                                                                                                                      |
+| initialChartType?      | [ChartType](#types-chart-type)                                                                                                                | The type of chart to display initially. Default is `line`.                                                                                                                                                       |
+| disableHeuristics?     | boolean                                                                                                                                       | Defaults to `false`. This means that the default heuristics will be applied. For example: when the query is empty and you select a measure that has a default time dimension it will be pushed to the query.     |
+| query?                 | Query                                                                                                                                         | Query parameters ([learn more about the format](/product/api-rest/query-format)). This property is reactive - if you change the object here, the internal query values will be overwritten. This is not two-way. |
+| stateChangeHeuristics? | (**state**: [QueryBuilderState](#types-query-builder-query-builder-state)) => _[QueryBuilderState](#types-query-builder-query-builder-state)_ | A function that accepts the `newState` just before it's applied. You can use it to override the **defaultHeuristics** or to tweak the query or the vizState in any way.                                          |
+| initialVizState?       | [VizState](#types-viz-state)                                                                                                                  | -                                                                                                                                                                                                                |
+| wrapWithQueryRenderer? | boolean                                                                                                                                       | Defaults to `true`. Use QueryRenderer to render. Set this to `false` to use your own QueryRenderer.                                                                                                              |
 
-###  Slots
+### Slots
 
 #### Default Slot
 
@@ -78,14 +78,15 @@ rendering.
 - `setOffset`, `removeOffset` - functions to control the number of rows skipped
   before results returned. Use with limit to control pagination.
 
-###  Example
+### Example
 
 <a
-  href="https://codesandbox.io/s/vue-js-query-builder-with-vue-js-0ydws"
-  target="_blank"
+href="https://codesandbox.io/s/vue-js-query-builder-with-vue-js-0ydws"
+target="_blank"
+
 >
-  Open in CodeSandbox
-</a>
+
+Open in CodeSandbox </a>
 
 ```html
 <template>
@@ -112,20 +113,20 @@ rendering.
 </template>
 
 <script>
-  import cubejs from '@cubejs-client/core';
-  import Multiselect from 'vue-multiselect';
-  import { QueryBuilder } from '@cubejs-client/vue';
-  import ChartRenderer from './ChartRenderer.vue';
+  import cubejs from "@cubejs-client/core";
+  import Multiselect from "vue-multiselect";
+  import { QueryBuilder } from "@cubejs-client/vue";
+  import ChartRenderer from "./ChartRenderer.vue";
 
   const API_URL =
-    'https://awesome-ecom.gcp-us-central1.cubecloudapp.dev/cubejs-api/v1';
+    "https://awesome-ecom.gcp-us-central1.cubecloudapp.dev/cubejs-api/v1";
   const CUBEJS_TOKEN =
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1OTQ2NjY4OTR9.0fdi5cuDZ2t3OSrPOMoc3B1_pwhnWj4ZmM3FHEX7Aus';
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1OTQ2NjY4OTR9.0fdi5cuDZ2t3OSrPOMoc3B1_pwhnWj4ZmM3FHEX7Aus";
 
   const cubejsApi = cubejs(CUBEJS_TOKEN, { apiUrl: API_URL });
 
   export default {
-    name: 'QueryBuilderExample',
+    name: "QueryBuilderExample",
     components: {
       Multiselect,
       QueryBuilder,
@@ -136,8 +137,8 @@ rendering.
         measures: [],
         timeDimensions: [
           {
-            dimension: 'LineItems.createdAt',
-            granularity: 'month',
+            dimension: "LineItems.createdAt",
+            granularity: "month",
           },
         ],
       };
@@ -165,16 +166,16 @@ rendering.
 `<QueryRenderer />` Vue component takes a query, fetches the given query, and
 uses the slot scoped props to render the resulting data.
 
-###  Props
+### Props
 
-| Name      | Type                  | Description                                                                                                                                                                                                                                                                                                                       |
-| --------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| cubejsApi | CubejsApi             | `CubejsApi` instance to use                                                                                                                                                                                                                                                                                                       |
-| loadSql?  | "only" &#124; boolean | Indicates whether the generated by Cube SQL Code should be requested. See [rest-api#sql](rest-api#v-1-sql). When set to `only` then only the request to [/v1/sql](rest-api#v-1-sql) will be performed. When set to `true` the sql request will be performed along with the query request. Will not be performed if set to `false` |
-| queries?  | object                | -                                                                                                                                                                                                                                                                                                                                 |
-| query     | Query                 | Analytic query. [Learn more about it's format](query-format)                                                                                                                                                                                                                                                                      |
+| Name      | Type      | Description                                                  |
+| --------- | --------- | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| cubejsApi | CubejsApi | `CubejsApi` instance to use                                  |
+| loadSql?  | "only"    | boolean                                                      | Indicates whether the generated by Cube SQL Code should be requested. See [rest-api#sql](rest-api#v-1-sql). When set to `only` then only the request to [/v1/sql](rest-api#v-1-sql) will be performed. When set to `true` the sql request will be performed along with the query request. Will not be performed if set to `false` |
+| queries?  | object    | -                                                            |
+| query     | Query     | Analytic query. [Learn more about it's format](query-format) |
 
-###  Slots
+### Slots
 
 #### Default Slot
 
@@ -199,39 +200,37 @@ rendering.
 - `error`: the error.
 - `sqlQuery`: the attempted query.
 
-###  Example
+### Example
 
 ```html
 <template>
   <query-renderer :cubejs-api="cubejsApi" :query="query" v-if="cubejsApi">
-    <template #default="{ resultSet }">
-      
-    </template>
+    <template #default="{ resultSet }"> </template>
 
     <template #empty> Loading... </template>
   </query-renderer>
 </template>
 
 <script>
-  import cubejs from '@cubejs-client/core';
-  import { QueryRenderer } from '@cubejs-client/vue';
+  import cubejs from "@cubejs-client/core";
+  import { QueryRenderer } from "@cubejs-client/vue";
 
-  const cubejsApi = cubejs('YOUR-CUBEJS-API-TOKEN', {
-    apiUrl: 'http://localhost:4000/cubejs-api/v1',
+  const cubejsApi = cubejs("YOUR-CUBEJS-API-TOKEN", {
+    apiUrl: "http://localhost:4000/cubejs-api/v1",
   });
 
   export default {
-    name: 'QueryRendererExample',
+    name: "QueryRendererExample",
     components: {
       QueryRenderer,
     },
     data() {
       const query = {
-        measures: ['LineItems.count', 'LineItems.quantity', 'Orders.count'],
+        measures: ["LineItems.count", "LineItems.quantity", "Orders.count"],
         timeDimensions: [
           {
-            dimension: 'LineItems.createdAt',
-            granularity: 'month',
+            dimension: "LineItems.createdAt",
+            granularity: "month",
           },
         ],
       };
@@ -265,18 +264,18 @@ rendering.
 
 ## Types
 
-###  ChartType
+### ChartType
 
 > **ChartType**: _"line" | "bar" | "table" | "area" | "number" | "pie"_
 
-###  QueryBuilderState
+### QueryBuilderState
 
 | Name       | Type                               |
 | ---------- | ---------------------------------- |
 | query      | [Query](@cubejs-client-core#query) |
 | chartType? | [ChartType](#types-chart-type)     |
 
-###  VizState
+### VizState
 
 | Name                       | Type                                            |
 | -------------------------- | ----------------------------------------------- |

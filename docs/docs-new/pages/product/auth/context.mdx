@@ -80,12 +80,12 @@ module.exports = {
   queryRewrite: (query, { securityContext }) => {
     // Ensure `securityContext` has an `id` property
     if (!securityContext.user_id) {
-      throw new Error('No id found in Security Context!');
+      throw new Error("No id found in Security Context!");
     }
 
     query.filters.push({
-      member: 'orders.user_id',
-      operator: 'equals',
+      member: "orders.user_id",
+      operator: "equals",
       values: [securityContext.user_id],
     });
 
@@ -97,11 +97,11 @@ module.exports = {
 To test this, we can generate an API token as follows:
 
 ```javascript
-const jwt = require('jsonwebtoken');
-const CUBE_API_SECRET = 'secret';
+const jwt = require("jsonwebtoken");
+const CUBE_API_SECRET = "secret";
 
 const cubejsToken = jwt.sign({ user_id: 42 }, CUBEJS_API_SECRET, {
-  expiresIn: '30d',
+  expiresIn: "30d",
 });
 ```
 
@@ -173,15 +173,15 @@ cube(`orders`, {
 
   measures: {
     count: {
-      type: `count`
-    }
-  }
-})
+      type: `count`,
+    },
+  },
+});
 ```
 
 </CodeTabs>
 
-###  Usage with pre-aggregations
+### Usage with pre-aggregations
 
 To generate pre-aggregations that rely on `COMPILE_CONTEXT`, [configure
 `scheduledRefreshContexts` in your `cube.js` configuration
@@ -196,11 +196,12 @@ build one from a JSON object.
 
 [link-auth0-jwks]:
   https://auth0.com/docs/tokens/json-web-tokens/json-web-key-sets
-[link-multitenancy]: /config/multitenancy
-[ref-config-queryrewrite]: /config#query-rewrite
-[ref-config-sched-refresh]: /config#scheduled-refresh-contexts
-[ref-config-sec-ctx]: /config#security-context
-[ref-schema-sec-ctx]: /schema/reference/cube#security-context
+[link-multitenancy]: /product/configuration/advanced/multitenancy
+[ref-config-queryrewrite]: /reference/configuration/config#query-rewrite
+[ref-config-sched-refresh]:
+  /reference/configuration/config#scheduled-refresh-contexts
+[ref-config-sec-ctx]: /reference/configuration/config#security-context
+[ref-schema-sec-ctx]: /product/data-modeling/reference/cube#security-context
 [ref-cubes-compile-ctx]: https://cube.dev/docs/cube#compile-context
 [ref-devtools-playground]:
-  /dev-tools/dev-playground#editing-the-security-context
+  /product/workspace/playground#editing-the-security-context
