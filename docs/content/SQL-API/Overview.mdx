@@ -6,9 +6,20 @@ permalink: /backend/sql
 menuOrder: 1
 ---
 
-The SQL API allows querying Cube with Postgres-compatible SQL dialect.
-It enables the use of BI applications, Python notebooks, reverse ETL tools,
-and other downstream tools on top of Cube.
+SQL API enables Cube to deliver data over the
+[Postgres-compatible protocol][postgres-protocol] to certain kinds
+of data applications, including but not limited to the following ones:
+
+* [Business intelligence (BI) and data exploration][ref-bi] tools, e.g.,
+[Superset][ref-superset] or [Tableau][ref-tableau]
+* [Data notebooks][ref-notebooks], e.g., [Jupyter][ref-jupyter] or
+[Hex][ref-hex]
+* Reverse ETL tools, e.g., Census or Hightouch
+* [Low-code tools][ref-low-code], e.g., [Retool][ref-retool]
+* Automated jobs
+
+Often, the SQL API is used to enable internal or self-serve
+[business intelligence][cube-issbi] use cases.
 
 ### <--{"id" : "SQL API"}--> Supported Tools
 
@@ -526,3 +537,13 @@ WHERE is_completed = true
 [ref-sql-api-auth]: /backend/sql/security
 [ref-config-checksqlauth]: /config#options-reference-check-sql-auth
 [ref-config-canswitchsqluser]: /config#options-reference-can-switch-sql-user
+[ref-bi]: /config/downstream#bi-data-exploration-tools
+[ref-superset]: /config/downstream/superset
+[ref-tableau]: /config/downstream/tableau
+[ref-notebooks]: /config/downstream#notebooks
+[ref-jupyter]: /config/downstream/jupyter
+[ref-hex]: /config/downstream/hex
+[ref-low-code]: /config/downstream#low-code-tools-internal-tool-builders
+[ref-retool]: /config/downstream/retool
+[postgres-protocol]: https://www.postgresql.org/docs/current/protocol.html
+[cube-issbi]: https://cube.dev/use-cases/semantic-layer

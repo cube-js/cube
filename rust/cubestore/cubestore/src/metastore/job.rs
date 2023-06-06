@@ -38,6 +38,22 @@ fn get_job_type_index(j: &JobType) -> u32 {
     }
 }
 
+/// Get the priority of a job type. Higher numbers are higher priority.
+fn get_job_type_priority(j: &JobType) -> u32 {
+    match j {
+        JobType::WalPartitioning => 1000,
+        JobType::PartitionCompaction => 1000,
+        JobType::TableImport => 1000,
+        JobType::Repartition => 1000,
+        JobType::TableImportCSV(_) => 1000,
+        JobType::MultiPartitionSplit => 1000,
+        JobType::FinishMultiSplit => 1000,
+        JobType::RepartitionChunk => 1000,
+        JobType::InMemoryChunksCompaction => 10000,
+        JobType::NodeInMemoryChunksCompaction(_) => 10000,
+    }
+}
+
 #[derive(Clone, Serialize, Deserialize, Debug, Hash, Eq, PartialEq)]
 pub enum JobStatus {
     Scheduled(String),
@@ -109,6 +125,10 @@ impl Job {
             JobType::TableImportCSV(location) if Table::is_stream_location(location) => true,
             _ => false,
         }
+    }
+
+    pub fn priority(&self) -> u32 {
+        get_job_type_priority(&self.job_type)
     }
 }
 

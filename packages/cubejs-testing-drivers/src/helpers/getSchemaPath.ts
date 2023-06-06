@@ -18,7 +18,7 @@ export function getSchemaPath(type: string, suf?: string): [path: string, file: 
   ));
   _content.cubes.forEach(
     (cube: {
-      name: 'Products' | 'Customers' | 'ECommerce',
+      name: 'Products' | 'Customers' | 'ECommerce' | 'BigECommerce',
       [prop: string]: unknown
     }) => {
       let name = '';
@@ -32,8 +32,11 @@ export function getSchemaPath(type: string, suf?: string): [path: string, file: 
         case 'ECommerce':
           name = tables.ecommerce;
           break;
+        case 'BigECommerce':
+          name = tables.bigecommerce;
+          break;
         default:
-          throw new Error('Cube name is missing.');
+          throw new Error(`Cube name is unsupported: ${cube.name}`);
       }
       name = suf ? `${name}_${suf}` : name;
       cube.sql = `select * from ${name}`;

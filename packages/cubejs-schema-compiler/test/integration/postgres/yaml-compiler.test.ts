@@ -203,6 +203,10 @@ cubes:
         measures:
           - weeklyActive
         timeDimension: time
+        indexes:
+          - name: weeklyActive
+            columns:
+              - weeklyActive
         granularity: day
     `);
     await compiler.compile();

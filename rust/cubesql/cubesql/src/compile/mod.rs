@@ -53,11 +53,11 @@ use self::{
             create_has_schema_privilege_udf, create_hour_udf, create_if_udf, create_instr_udf,
             create_interval_mul_udf, create_isnull_udf, create_json_build_object_udf,
             create_least_udf, create_locate_udf, create_makedate_udf, create_measure_udaf,
-            create_minute_udf, create_mod_udf, create_pg_backend_pid_udf,
-            create_pg_datetime_precision_udf, create_pg_encoding_to_char_udf,
-            create_pg_expandarray_udtf, create_pg_get_constraintdef_udf, create_pg_get_expr_udf,
-            create_pg_get_indexdef_udf, create_pg_get_serial_sequence_udf,
-            create_pg_get_userbyid_udf, create_pg_is_other_temp_schema, create_pg_my_temp_schema,
+            create_minute_udf, create_pg_backend_pid_udf, create_pg_datetime_precision_udf,
+            create_pg_encoding_to_char_udf, create_pg_expandarray_udtf,
+            create_pg_get_constraintdef_udf, create_pg_get_expr_udf, create_pg_get_indexdef_udf,
+            create_pg_get_serial_sequence_udf, create_pg_get_userbyid_udf,
+            create_pg_is_other_temp_schema, create_pg_my_temp_schema,
             create_pg_numeric_precision_udf, create_pg_numeric_scale_udf,
             create_pg_table_is_visible_udf, create_pg_total_relation_size_udf,
             create_pg_truetypid_udf, create_pg_truetypmod_udf, create_pg_type_is_visible_udf,
@@ -66,6 +66,7 @@ use self::{
             create_str_to_date_udf, create_time_format_udf, create_timediff_udf,
             create_to_char_udf, create_to_date_udf, create_to_regtype_udf, create_ucase_udf,
             create_unnest_udtf, create_user_udf, create_version_udf, create_year_udf,
+            register_fun_stubs,
         },
     },
     parser::parse_sql_to_statement,
@@ -1182,7 +1183,6 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_pg_encoding_to_char_udf());
         ctx.register_udf(create_array_to_string_udf());
         ctx.register_udf(create_charindex_udf());
-        ctx.register_udf(create_mod_udf());
         ctx.register_udf(create_to_regtype_udf());
         ctx.register_udf(create_pg_get_indexdef_udf());
 
@@ -1198,6 +1198,9 @@ WHERE `TABLE_SCHEMA` = '{}'",
         // redshift
         ctx.register_udf(create_datediff_udf());
         ctx.register_udf(create_dateadd_udf());
+
+        // fn stubs
+        ctx = register_fun_stubs(ctx);
 
         ctx
     }
@@ -11222,6 +11225,42 @@ ORDER BY \"COUNT(count)\" DESC"
             "localtimestamp",
             execute_query(
                 "SELECT localtimestamp = current_timestamp".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_current_date() -> Result<(), CubeError> {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT CURRENT_DATE AS \"COL\"".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = &query_plan.print(true).unwrap();
+
+        let re = Regex::new(r#"Date32\("\d+"\)"#).unwrap();
+        let logical_plan = re
+            .replace_all(logical_plan, "Date32(\"0\")")
+            .as_ref()
+            .to_string();
+
+        assert_eq!(
+            logical_plan,
+            "Projection: Date32(\"0\") AS COL\
+            \n  EmptyRelation",
+        );
+
+        insta::assert_snapshot!(
+            "current_date",
+            execute_query(
+                "SELECT current_timestamp::date = current_date".to_string(),
                 DatabaseProtocol::PostgreSQL
             )
             .await?

@@ -3,6 +3,77 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.24](https://github.com/cube-js/cube/compare/v0.33.23...v0.33.24) (2023-06-05)
+
+
+### Bug Fixes
+
+* **native:** Allow to load Python extensions (export public symbols) ([d95cddc](https://github.com/cube-js/cube/commit/d95cddcb477667fa1c6a1f01a3b6571230af8efb))
+
+
+### Features
+
+* **native:** Python - support async functions ([9232af5](https://github.com/cube-js/cube/commit/9232af5b0b833dcfde10ae7b637bdadc1c4ac972))
+* **native:** Python - support more functions in cube.py ([#6687](https://github.com/cube-js/cube/issues/6687)) ([1d10c5b](https://github.com/cube-js/cube/commit/1d10c5b29815672e9e739e3b3a89537a8d0e9404))
+
+
+
+
+
+## [0.33.23](https://github.com/cube-js/cube/compare/v0.33.22...v0.33.23) (2023-06-01)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+
+
+
+
+## [0.33.22](https://github.com/cube-js/cube/compare/v0.33.21...v0.33.22) (2023-05-31)
+
+
+### Features
+
+* **docker:** Enable python builds for x64 ([#6671](https://github.com/cube-js/cube/issues/6671)) ([bc78f2d](https://github.com/cube-js/cube/commit/bc78f2d70b15c05b54e0d169620d7c2c40847fc9))
+
+
+
+
+
+## [0.33.21](https://github.com/cube-js/cube/compare/v0.33.20...v0.33.21) (2023-05-31)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+
+
+
+
+## [0.33.20](https://github.com/cube-js/cube/compare/v0.33.19...v0.33.20) (2023-05-31)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+
+
+
+
+## [0.33.19](https://github.com/cube-js/cube/compare/v0.33.18...v0.33.19) (2023-05-30)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+
+
+
+
+## [0.33.18](https://github.com/cube-js/cube/compare/v0.33.17...v0.33.18) (2023-05-29)
+
+
+### Features
+
+* **native:** Initial support for cube.py (Python configuration) ([#6465](https://github.com/cube-js/cube/issues/6465)) ([9086be4](https://github.com/cube-js/cube/commit/9086be4bc8e727733f11c08240b463f8f64c879d))
+
+
+
+
+
 ## [0.33.15](https://github.com/cube-js/cube/compare/v0.33.14...v0.33.15) (2023-05-26)
 
 **Note:** Version bump only for package @cubejs-backend/native
