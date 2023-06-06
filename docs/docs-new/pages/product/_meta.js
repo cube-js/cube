@@ -12,5 +12,5 @@ module.exports = {
   "workspace": "Workspace",
   "deployment": "Deployment",
   "monitoring": "Monitoring",
-  "faq": "FAQs"
+  "faqs": "FAQs"
 }

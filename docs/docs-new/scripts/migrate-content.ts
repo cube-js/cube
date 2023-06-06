@@ -86,7 +86,7 @@ const overrides: Record<string, Override> = {
       workspace: "Workspace",
       deployment: "Deployment",
       monitoring: "Monitoring",
-      faq: "FAQs",
+      faqs: "FAQs",
     },
   },
 
