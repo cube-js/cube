@@ -105,7 +105,7 @@ const overrides: Record<string, Override> = {
   },
 
   // Core
-  
+
   "Getting-Started/Core/01-Overview.mdx": {
     ready: true,
     path: "product/getting-started/core/overview",
@@ -248,6 +248,11 @@ const overrides: Record<string, Override> = {
     ready: true,
     path: "product/configuration/vpc/gcp",
     title: "Connecting with a VPC on GCP",
+    meta: {
+      'aws': 'AWS',
+      'azure': 'Azure',
+      'gcp': 'GCP',
+    }
   },
   "Configuration/VPC/Connecting-with-a-VPC-Azure.mdx": {
     ready: true,
@@ -861,6 +866,7 @@ const overrides: Record<string, Override> = {
       "custom-domains": "Custom domains",
       "deployment-types": "Deployment types",
       pricing: "Pricing",
+      limits: "Limits",
     },
   },
   "Deployment/Cloud/Auto-Suspension.mdx": {
@@ -882,6 +888,11 @@ const overrides: Record<string, Override> = {
     ready: true,
     path: "product/deployment/cloud/deployment-types",
     title: "Deployment types",
+  },
+  "Deployment/Cloud/Limits.mdx": {
+    ready: true,
+    path: "product/deployment/cloud/limits",
+    title: "Limits",
   },
   "Deployment/Cloud/Pricing.mdx": {
     ready: true,

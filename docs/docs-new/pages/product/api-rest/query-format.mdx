@@ -5,14 +5,6 @@ redirect_from:
 
 # Query format
 
-<SuccessBox>
-
-**We’re running a survey to better understand how you use Cube.** Please take a
-moment to [share with us what you think](https://forms.gle/b7iQHpocAXfpNfeR7).
-It will mean the world to us.
-
-</SuccessBox>
-
 Cube Queries are plain JavaScript objects, describing an analytics query. The
 basic elements of a query (query members) are `measures`, `dimensions`, and
 `segments`.
@@ -469,7 +461,7 @@ This usually happens when you call
 [`ResultSet.drilldown()`][ref-client-core-resultset-drilldown], which will
 return a query for the drill members. If the original query has a filter on a
 measure, that filter will be added as otherwise the drilldown query will lose
-that context.
+that context. Not supported by pre-aggregations.
 
 - Applied to measures.
 

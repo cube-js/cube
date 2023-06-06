@@ -32,11 +32,11 @@ query pre-aggregations on-demand.
 Development Instances do not provide high-availability nor do they guarantee
 fast response times. Development Instances also hibernate after 60 minutes of
 inactivity, which can cause the first request after hibernation to take
-additional time to process. They also have a 10,000 queries per day limit, and
-are limited to a maximum of 2 Cube Store Workers. We **strongly** advise not
-using a development instance in a production environment, it is for testing and
-learning about Cube only and will not deliver a production-level experience for
-your users.
+additional time to process. They also have [limits][ref-limits] on the maximum
+number of queries per day and the maximum number of Cube Store Workers. We
+**strongly** advise not using a development instance in a production
+environment, it is for testing and learning about Cube only and will not deliver
+a production-level experience for your users.
 
 You can try a Cube Cloud development instance by
 [signing up for Cube Cloud](https://cubecloud.dev/auth/signup) to try it free
@@ -65,7 +65,7 @@ workloads. It consists of several key components, including starting with 2 Cube
 API instances, 1 Cube Refresh Worker and 2 Cube Store Routers - all of which run
 on dedicated infrastructure. The cluster can automatically scale to meet the
 needs of your workload by adding more components as necessary; check the
-[Limits section](#limits) below.
+[Scalability section](#scalability) below.
 
 ## Production multi-cluster
 
@@ -96,7 +96,7 @@ Cube Cloud routes traffic between clusters based on
 Each cluster is billed separately, and all clusters can use auto-scaling to
 match demand.
 
-## Limits
+## Scalability
 
 Cube Cloud also allows adding additional infrastructure to your deployment to
 increase scalability and performance beyond what is available with each
@@ -104,16 +104,13 @@ Production Deployment.
 
 ### Cube Store Worker
 
-|                           | Free Tier | Starter | Premium | Enterprise |        Enterprise Premier        |
-| ------------------------- | :-------: | :-----: | :-----: | :--------: | :------------------------------: |
-| Maximum number of workers |     2     |   16    |   16    |     16     | [Talk to Sales][cube-contact-us] |
-
 Cube Store Workers are used to build and persist pre-aggregations. Each Worker
-has a **maximum of 150GB** of storage; additional Cube Store workers can be
-added to your deployment to both increase storage space and improve
-pre-aggregation performance. A **minimum of 2** Cube Store Workers is required
-for pre-aggregations; this can be adjusted. For a rough estimate, it will take
-approximately 2 Cube Store Workers per 4 gigs of pre-aggregated data per day.
+has a **maximum of 150GB** of storage; [additional Cube Store
+workers][ref-limits] can be added to your deployment to both increase storage
+space and improve pre-aggregation performance. A **minimum of 2** Cube Store
+Workers is required for pre-aggregations; this can be adjusted. For a rough
+estimate, it will take approximately 2 Cube Store Workers per 4 GB of
+pre-aggregated data per day.
 
 <InfoBox>
 
@@ -136,15 +133,11 @@ dropdown:
 
 ### Cube API Instance
 
-|                 | Free Tier | Starter |  Premium  | Enterprise | Enterprise Premier |
-| --------------- | :-------: | :-----: | :-------: | :--------: | :----------------: |
-| Queries per day |   1,000   | 50,000  | Unlimited | Unlimited  |     Unlimited      |
-
 With a Production Deployment, 2 Cube API Instances are included. That said, it
-is very common to use more, and additional Cube API instances can be added to
-your deployment to increase the throughput of your queries. A rough estimate is
-that 1 Cube API Instance is needed for every 5-10 requests-per-second served.
-Cube API Instances can also auto-scale as needed.
+is very common to use more, and [additional API instances][ref-limits] can be
+added to your deployment to increase the throughput of your queries. A rough
+estimate is that 1 Cube API Instance is needed for every 5-10
+requests-per-second served. Cube API Instances can also auto-scale as needed.
 
 To change how many Cube API instances are available in the Production Cluster,
 go to the deployment’s <Btn>Settings</Btn> screen, and open
@@ -166,6 +159,6 @@ and select from the available options:
   src="https://ucarecdn.com/fbde6a1e-734a-4091-8edd-922dc1ee7e1c/"
 />
 
-[cube-contact-us]: https://cube.dev/contact
 [ref-conf-ref-ctx-to-app-id]:
   /reference/configuration/config#options-reference-context-to-app-id
+[ref-limits]: /product/deployment/cloud/limits#resources

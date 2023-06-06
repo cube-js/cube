@@ -1,0 +1,72 @@
+---
+redirect_from:
+  - /cloud/limits
+---
+
+# Limits
+
+Cube Cloud implements limits on resource usage on account and deployment levels
+to ensure the best experience for all Cube Cloud users.
+
+<SuccessBox>
+
+Limits apply to Cube Cloud accounts on [all tiers](https://cube.dev/pricing).
+
+</SuccessBox>
+
+## Limit types
+
+Each limit can be of one of the following types:
+
+- _Hard limit_ either has a threshold that can't be exceeded or prevents further
+  use of a resource when a threshhold is hit until a cool-down period passes
+  (e.g., until the next day starts) or the limit is increased (e.g., when a Cube
+  Cloud account upgrades to another tier).
+- _Soft limit_ may allow further use of a resource after a threshold is hit.
+
+## Resources
+
+The following resources are subject to limits, depending on [deployment
+types][ref-deployment-types] and [pricing tiers][ref-pricing]:
+
+| Resource                                                        | Free Tier |  Starter  |  Premium  | Enterprise |      Enterprise Premier       |
+| --------------------------------------------------------------- | :-------: | :-------: | :-------: | :--------: | :---------------------------: |
+| Number of deployments                                           |     2     | Unlimited | Unlimited | Unlimited  |           Unlimited           |
+| Number of API instances                                         |     1     |    20     |    20     |     20     | [Contact us][cube-contact-us] |
+| Number of Cube Store workers                                    |     2     |    16     |    16     |     16     | [Contact us][cube-contact-us] |
+| Queries per day ([development instance][ref-dev-instance])      |   1,000   |  10,000   | Unlimited | Unlimited  |           Unlimited           |
+| Queries per day ([production cluster][ref-prod-cluster])        |     —     |  50,000   | Unlimited | Unlimited  |           Unlimited           |
+| Queries processed by [Query History][ref-query-history] per day |   1,000   |  50,000   |  100,000  |  200,000   |            300,000            |
+
+### Number of deployments
+
+This is a hard limit. Consider upgrading to [another tier][ref-pricing].
+
+### Number of API instances
+
+This is a hard limit. Consider upgrading to [another tier][ref-pricing].
+
+### Number of Cube Store workers
+
+This is a hard limit. Consider upgrading to [another tier][ref-pricing].
+
+### Queries per day
+
+This is a hard limit. When a threshold is hit, further queries will not be
+processed. In that case, consider upgrading a development instance to a
+production cluster. Alternatively, consider upgrading to [another
+tier][ref-pricing].
+
+### Queries processed by Query History per day
+
+This is a soft limit. When a threshold is hit, query processing will be stopped.
+Please [contact support][cube-contact-us] for further assistance.
+
+[ref-deployment-types]: /product/deployment/cloud/deployment-types
+[ref-pricing]: /product/deployment/cloud/pricing
+[ref-query-history]: /product/workspace/query-inspection
+[ref-dev-instance]:
+  /product/deployment/cloud/deployment-types#development-instance
+[ref-prod-cluster]:
+  /product/deployment/cloud/deployment-types#production-cluster
+[cube-contact-us]: https://cube.dev/contact

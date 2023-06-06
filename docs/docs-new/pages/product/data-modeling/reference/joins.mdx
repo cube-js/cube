@@ -325,8 +325,8 @@ cubes:
 
 <InfoBox>
 
-Setting `primary_key` to `true` will change the default value of the `shown`
-parameter to `false`. If you still want `shown` to be `true` — set it manually.
+Setting `primary_key` to `true` will change the default value of the `public`
+parameter to `false`. If you still want `public` to be `true` — set it manually.
 
 </InfoBox>
 
@@ -341,7 +341,7 @@ cube(`orders`, {
       sql: `id`,
       type: `number`,
       primary_key: true,
-      shown: true,
+      public: true,
     },
   },
 });
@@ -357,7 +357,7 @@ cubes:
         sql: id
         type: number
         primary_key: true
-        shown: true
+        public: true
 ```
 
 </CodeTabs>

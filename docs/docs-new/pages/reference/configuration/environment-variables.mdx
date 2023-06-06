@@ -544,6 +544,15 @@ The username used to connect to the database.
 | ------------------------- | ---------------------- | --------------------- |
 | A valid database username | N/A                    | N/A                   |
 
+## `CUBEJS_DEFAULT_API_SCOPES`
+
+[API scopes][ref-rest-scopes] used to allow or disallow access to REST API
+endpoints.
+
+| Possible Values                                                                | Default in Development | Default in Production |
+| ------------------------------------------------------------------------------ | ---------------------- | --------------------- |
+| A comma-delimited string with any combination of [API scopes][ref-rest-scopes] | `meta,data,graphql`    | `meta,data,graphql`   |
+
 ## `CUBEJS_DEV_MODE`
 
 If `true`, enables development mode.
@@ -1274,6 +1283,7 @@ The port for a Cube deployment to listen to API connections on.
   /reference/configuration/config#pre-aggregations-schema
 [ref-config-sched-refresh-timer]:
   /reference/configuration/config#scheduled-refresh-timer
+[ref-rest-scopes]: /product/api-rest/overview#configuration-api-scopes
 [snowflake-docs-account-id]:
   https://docs.snowflake.com/en/user-guide/admin-account-identifier.html
 [snowflake-docs-connection-options]:

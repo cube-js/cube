@@ -5,22 +5,110 @@ redirect_from:
 
 # Overview
 
-<SuccessBox>
+REST API enables Cube to deliver data over the HTTP protocol to certain kinds of
+data applications, including but not limited to the following ones:
 
-**We’re running a survey to better understand how you use Cube.** Please take a
-moment to [share with us what you think](https://forms.gle/b7iQHpocAXfpNfeR7).
-It will mean the world to us.
+- Most commonly, front-end applications
+- Some [data notebooks][ref-notebooks], e.g., [Observable][ref-observable]
+- Some AI-based applications, e.g., [Delphi][ref-delphi]
+- [Low-code tools][ref-low-code], e.g., [Retool][ref-retool]
+- Automated jobs
 
-</SuccessBox>
+Often, the REST API is used to enable [embedded analytics][cube-ea] and
+[real-time analytics][cube-rta] use cases.
 
-## Prerequisites
+<InfoBox>
+
+If you've chosen [GraphQL][graphql] as a query language for your front-end
+application, consider using the [GraphQL API][ref-graphql-api] that Cube also
+provides.
+
+</InfoBox>
+
+## Configuration
 
 ### Base path
 
-REST API is used to communicate with Cube backend. All requests are prefixed
-with **basePath** described in
-[Backend Server Core](@cubejs-backend-server-core). By default, it is set to
-`/cubejs-api`.
+By default, all REST API endpoints are prefixed with a base path of
+`/cubejs-api`, e.g., the `/v1/load` endpoint will be available at
+`/cubejs-api/v1/load`.
+
+<InfoBox>
+
+Exception: `/livez` and `/readyz` endpoints are not prefixed with a base path.
+
+</InfoBox>
+
+You can set a desired base path using the [`basePath`][ref-conf-basepath]
+configuration option.
+
+### API scopes
+
+Each REST API endpoint belongs to an API scope, e.g., the `/v1/load` endpoint
+belongs to the `data` scope. API scopes allow to secure access to API endpoints
+by making them accessible to specific users only or disallowing access for
+everyone. By default, API endpoints in all scopes, except for `jobs`, are
+accessible for everyone.
+
+| API scope | REST API endpoints                                                                        | Accessible by default? |
+| --------- | ----------------------------------------------------------------------------------------- | ---------------------- |
+| `meta`    | [`/v1/meta`][ref-ref-meta]                                                                | ✅ Yes                 |
+| `data`    | [`/v1/load`][ref-ref-load], [`/v1/sql`][ref-ref-sql]                                      | ✅ Yes                 |
+| `graphql` | `/graphql`                                                                                | ✅ Yes                 |
+| `jobs`    | [`/v1/run-scheduled-refresh`][ref-ref-rsr]<br/>[`/v1/pre-aggregations/jobs`][ref-ref-paj] | ❌ No                  |
+
+<InfoBox>
+
+Exception: `/livez` and `/readyz` endpoints don't belong to any scope. Access to
+these endpoints can't be controlled using API scopes.
+
+</InfoBox>
+
+You can set accessible API scopes _for all requests_ using the
+`CUBEJS_DEFAULT_API_SCOPES` environment variable. For example, to disallow
+access to the GraphQL API for everyone, set `CUBEJS_DEFAULT_API_SCOPES` to
+`meta,data`.
+
+You can also select accessible API scopes _for each request_ using the
+[`contextToApiScopes`][ref-conf-contexttoapiscopes] configuration option, based
+on the provided [security context][ref-security-context]. For example, to
+restrict access to the `/v1/meta` endpoint to service accounts only, you can set
+`CUBEJS_DEFAULT_API_SCOPES` to `data,graphql` and use the following
+configuration in the `cube.js` file, assuming that service accounts have
+`service: true` in their security context:
+
+```javascript
+module.exports = {
+  contextToApiScopes: (securityContext, defaultScopes) => {
+    if (securityContext.service) {
+      return ["meta", ...defaultScopes];
+    }
+
+    return defaultScopes;
+  },
+};
+```
+
+### CORS
+
+REST API supports [Cross-Origin Resource Sharing (CORS)][mdn-cors]. By default,
+requests from any origin (`*`) are allowed.
+
+You can configure CORS using the [`http.cors`][ref-config-cors] configuration
+option. For example, to allow requests from a specific domain only, use the
+following configuration in the `cube.js` file:
+
+```javascript
+module.exports = {
+  http: {
+    cors: {
+      origin: "https://example.com",
+    },
+  },
+};
+```
+
+## Prerequisites
 
 ### Authentication
 
@@ -41,25 +129,6 @@ you can still use it to pass a security context.
 ```bash{promptUser: user}
 curl -H "Authorization: EXAMPLE-API-TOKEN" https://example.com/cubejs-api/v1/sql
 ```
-
-### Configuring CORS
-
-REST API supports [Cross-Origin Resource Sharing (CORS)][mdn-cors].
-
-By default, requests from any origin (`*`) are allowed. To allow requests from a
-specific domain only, use the following configuration in the `cube.js` file:
-
-```javascript
-module.exports = {
-  http: {
-    cors: {
-      origin: "https://example.com",
-    },
-  },
-};
-```
-
-Please see [configuration options][ref-config-cors] for details.
 
 ### Continue wait
 
@@ -136,3 +205,22 @@ example, the following query will retrieve rows 101-200 from the `Orders` cube:
 [ref-schema-ref-cube-refresh-key]:
   /product/data-modeling/reference/cube#refresh-key
 [ref-security]: /product/auth/overview
+[ref-notebooks]: /product/configuration/visualization-tools#notebooks
+[ref-observable]: /product/configuration/visualization-tools/observable
+[ref-delphi]: /product/configuration/visualization-tools/delphi
+[ref-low-code]:
+  /product/configuration/visualization-tools#low-code-tools-internal-tool-builders
+[ref-retool]: /product/configuration/visualization-tools/retool
+[ref-conf-basepath]: /reference/configuration/config#options-reference-base-path
+[ref-conf-contexttoapiscopes]:
+  /reference/configuration/config#options-reference-context-to-api-scopes
+[ref-ref-load]: /reference/rest-api#v-1-load
+[ref-ref-meta]: /reference/rest-api#v-1-meta
+[ref-ref-sql]: /reference/rest-api#v-1-sql
+[ref-ref-rsr]: /reference/rest-api#v-1-run-scheduled-refresh
+[ref-ref-paj]: /reference/rest-api#v-1-pre-aggregations-jobs
+[ref-security-context]: /product/auth/context
+[ref-graphql-api]: /product/api-graphql
+[cube-ea]: https://cube.dev/use-cases/embedded-analytics
+[cube-rta]: https://cube.dev/use-cases/real-time-analytics
+[graphql]: https://graphql.org

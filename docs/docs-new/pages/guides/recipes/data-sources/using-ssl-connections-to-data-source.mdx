@@ -5,13 +5,9 @@ redirect_from:
 
 # Using SSL Connections to a data source
 
-Cube supports SSL-encrypted connections for:
-
-- [ClickHouse][ref-config-db-clickhouse]
-- [MongoDB][ref-config-db-mongodb]
-- [MS SQL][ref-config-db-mssql]
-- [MySQL][ref-config-db-mysql]
-- [Postgres][ref-config-db-postgres]
+Cube supports SSL-encrypted connections to various data sources. Please check
+the documentation for a particular [data source][ref-config-db] for specific
+instructions.
 
 ## Cube Core
 
@@ -90,9 +86,5 @@ Add the following environment variables:
 
 [nodejs-docs-tls-options]:
   https://nodejs.org/docs/latest/api/tls.html#tls_tls_createsecurecontext_options
-[ref-config-db-clickhouse]: /product/configuration/data-sources/clickhouse
-[ref-config-db-mongodb]: /product/configuration/data-sources/mongodb
-[ref-config-db-mssql]: /product/configuration/data-sources/ms-sql
-[ref-config-db-mysql]: /product/configuration/data-sources/mysql
-[ref-config-db-postgres]: /product/configuration/data-sources/postgres
+[ref-config-db]: /product/configuration/data-sources
 [ref-env-var]: /reference/configuration/environment-variables

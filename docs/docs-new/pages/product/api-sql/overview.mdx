@@ -5,26 +5,20 @@ redirect_from:
 
 # Overview
 
-<SuccessBox>
+SQL API enables Cube to deliver data over the [Postgres-compatible
+protocol][postgres-protocol] to certain kinds of data applications, including
+but not limited to the following ones:
 
-**We’re running a survey to better understand how you use Cube.** Please take a
-moment to [share with us what you think](https://forms.gle/b7iQHpocAXfpNfeR7).
-It will mean the world to us.
+- [Business intelligence (BI) and data exploration][ref-bi] tools, e.g.,
+  [Superset][ref-superset] or [Tableau][ref-tableau]
+- [Data notebooks][ref-notebooks], e.g., [Jupyter][ref-jupyter] or
+  [Hex][ref-hex]
+- Reverse ETL tools, e.g., Census or Hightouch
+- [Low-code tools][ref-low-code], e.g., [Retool][ref-retool]
+- Automated jobs
 
-</SuccessBox>
-
-<WarningBox heading={`Migration to Postgres protocol`}>
-
-This is documentation of Cube’s SQL API for the Postgres protocol. The MySQL
-protocol used in the first versions of the Cube SQL API is no longer being
-developed and will be phased out soon. Please consider migrating to the Postgres
-protocol.
-
-</WarningBox>
-
-The Cube SQL API allows querying Cube via Postgres-compatible SQL. It enables
-the use of BI applications, Python notebooks, reverse ETL tools, and other
-downstream tools on top of Cube.
+Often, the SQL API is used to enable internal or self-serve [business
+intelligence][cube-issbi] use cases.
 
 ### Supported Tools
 
@@ -45,8 +39,12 @@ Cube SQL API has been tested with
 - Jupyter notebook
 - Hightouch
 
+<InfoBox>
+
 Please see [this GitHub issue](https://github.com/cube-js/cube/issues/3906) for
 the tools roadmap and to suggest and vote for tools of your interest.
+
+</InfoBox>
 
 ## Querying Fundamentals
 
@@ -520,3 +518,14 @@ WHERE is_completed = true
 
 [ref-config-js]: /reference/configuration/config
 [ref-dynamic-schemas]: /schema/dynamic-schema-creation
+[ref-bi]: /product/configuration/visualization-tools#bi-data-exploration-tools
+[ref-superset]: /product/configuration/visualization-tools/superset
+[ref-tableau]: /product/configuration/visualization-tools/tableau
+[ref-notebooks]: /product/configuration/visualization-tools#notebooks
+[ref-jupyter]: /product/configuration/visualization-tools/jupyter
+[ref-hex]: /product/configuration/visualization-tools/hex
+[ref-low-code]:
+  /product/configuration/visualization-tools#low-code-tools-internal-tool-builders
+[ref-retool]: /product/configuration/visualization-tools/retool
+[postgres-protocol]: https://www.postgresql.org/docs/current/protocol.html
+[cube-issbi]: https://cube.dev/use-cases/semantic-layer

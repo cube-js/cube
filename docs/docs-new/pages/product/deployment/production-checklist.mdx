@@ -133,9 +133,12 @@ requests per second. Every Core Cube Store router node can serve 50-100 queries
 per second. As a rule of thumb, you should provision 1 Cube Store worker node
 per one Cube Store partition or 1M of rows scanned in a query. For example if
 your queries scan 16M of rows per query, you should have at least 16 Cube Store
-worker nodes provisioned. `EXPLAIN ANALYZE` can be used to see partitions
-involved in a Cube Store query. Cube Cloud ballpark performance numbers can
-differ as it has different Cube runtime.
+worker nodes provisioned. Please note that the number of raw data rows doesn't
+usually equal the number of rows in pre-aggregation. At the same time, queries
+don't usually scan all the data in pre-aggregations, as Cube Store uses
+partition pruning to optimize queries. `EXPLAIN ANALYZE` can be used to see
+scanned partitions involved in a Cube Store query. Cube Cloud ballpark
+performance numbers can differ as it has different Cube runtime.
 
 [blog-migrate-to-cube-cloud]:
   https://cube.dev/blog/migrating-from-self-hosted-to-cube-cloud/

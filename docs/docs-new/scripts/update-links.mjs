@@ -827,6 +827,11 @@ const overrides = {
     path: "product/deployment/cloud/deployment-types",
     title: "Deployment types",
   },
+  "Deployment/Cloud/Limits.mdx": {
+    ready: true,
+    path: "product/deployment/cloud/limits",
+    title: "Limits",
+  },
   "Deployment/Cloud/Pricing.mdx": {
     ready: true,
     path: "product/deployment/cloud/pricing",
