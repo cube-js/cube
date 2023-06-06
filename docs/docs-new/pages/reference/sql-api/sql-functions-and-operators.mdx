@@ -26,9 +26,9 @@ Returns true if the first `datatype` is less than the second.
 Within a Cube Query Rewrite, this operator may behave differently. Use the table
 below for support:
 
-|                | Selections | Projections | Outer Query                              |
-| -------------- | ---------- | ----------- | ---------------------------------------- |
-| <code><</code> | ✅         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
+|                   | Selections | Projections | Outer Query                              |
+| ----------------- | ---------- | ----------- | ---------------------------------------- |
+| <code>&lt;</code> | ✅         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
 
 The example below uses `<` in a selection within a Cube query rewrite:
 
@@ -62,9 +62,9 @@ Returns true if the first `datatype` is greater than the second.
 Within a Cube Query Rewrite, this operator may behave differently. Use the table
 below for support:
 
-|                | Selections | Projections | Outer Query                              |
-| -------------- | ---------- | ----------- | ---------------------------------------- |
-| <code>></code> | ✅         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
+|                   | Selections | Projections | Outer Query                              |
+| ----------------- | ---------- | ----------- | ---------------------------------------- |
+| <code>&gt;</code> | ✅         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
 
 The example below uses `>` in a selection within a Cube query rewrite:
 
@@ -99,9 +99,9 @@ Returns true if the first `datatype` is less than or equal to the second.
 Within a Cube Query Rewrite, this operator may behave differently. Use the table
 below for support:
 
-|                 | Selections | Projections | Outer Query                              |
-| --------------- | ---------- | ----------- | ---------------------------------------- |
-| <code><=</code> | ✅         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
+|                        | Selections | Projections | Outer Query                              |
+| ---------------------- | ---------- | ----------- | ---------------------------------------- |
+| <code>&lt;&#61;</code> | ✅         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
 
 The example below uses `<=` in a selection within a Cube query rewrite:
 
@@ -135,9 +135,9 @@ Returns true if the first `datatype` is greater than or equal to the second.
 Within a Cube Query Rewrite, this operator may behave differently. Use the table
 below for support:
 
-|                 | Selections | Projections | Outer Query                              |
-| --------------- | ---------- | ----------- | ---------------------------------------- |
-| <code>>=</code> | ✅         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
+|                        | Selections | Projections | Outer Query                              |
+| ---------------------- | ---------- | ----------- | ---------------------------------------- |
+| <code>&gt;&#61;</code> | ✅         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
 
 The example below uses `>=` in a selection within a Cube query rewrite:
 
@@ -172,9 +172,9 @@ Returns true if the first `datatype` is equal to the second.
 Within a Cube Query Rewrite, this operator may behave differently. Use the table
 below for support:
 
-|                | Selections | Projections | Outer Query                              |
-| -------------- | ---------- | ----------- | ---------------------------------------- |
-| <code>=</code> | ✅         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
+|                    | Selections | Projections | Outer Query                              |
+| ------------------ | ---------- | ----------- | ---------------------------------------- |
+| <code>&#61;</code> | ✅         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
 
 The example below uses `=` in a selection within a Cube query rewrite:
 
@@ -209,9 +209,9 @@ Returns true if the first `datatype` is not equal to the second.
 Within a Cube Query Rewrite, this operator may behave differently. Use the table
 below for support:
 
-|                                    | Selections | Projections | Outer Query                              |
-| ---------------------------------- | ---------- | ----------- | ---------------------------------------- |
-| <code>!=</code> or <code><></code> | ✅         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
+|                                              | Selections | Projections | Outer Query                              |
+| -------------------------------------------- | ---------- | ----------- | ---------------------------------------- |
+| <code>!&#61;</code> or <code>&lt;&gt;</code> | ✅         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
 
 The example below uses `!=` in a selection within a Cube query rewrite:
 
@@ -317,9 +317,9 @@ string || string
 
 Concatenates the first `string` with the `second`.
 
-|        | Selections | Projections | Outer Query |
-| ------ | ---------- | ----------- | ----------- | --- | ---------------------------------------- |
-| <code> |            | </code>     | ✅          | ❌  | [✅][ref-backend-sql-query-fundamentals] |
+|                           | Selections | Projections | Outer Query                              |
+| ------------------------- | ---------- | ----------- | ---------------------------------------- |
+| <code>&vert;&vert;</code> | ✅         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
 
 The example below uses `||` in a selection within a Cube query rewrite:
 

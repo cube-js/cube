@@ -516,30 +516,30 @@ SELECT FLOOR(EXTRACT(EPOCH FROM NOW()) / 5)
 
 - Standard cron syntax
 
-<!---->
-
-    *    *    *    *    *
-    ┬    ┬    ┬    ┬    ┬
-    │    │    │    │    |
-    │    │    │    │    └ day of week (0 - 7) (0 or 7 is Sun)
-    │    │    │    └───── month (1 - 12)
-    │    │    └────────── day of month (1 - 31, L)
-    │    └─────────────── hour (0 - 23)
-    └──────────────────── minute (0 - 59)
+```text
+*    *    *    *    *
+┬    ┬    ┬    ┬    ┬
+│    │    │    │    |
+│    │    │    │    └ day of week (0 - 7) (0 or 7 is Sun)
+│    │    │    └───── month (1 - 12)
+│    │    └────────── day of month (1 - 31, L)
+│    └─────────────── hour (0 - 23)
+└──────────────────── minute (0 - 59)
+```
 
 - Advanced cron format with support for seconds
 
-<!---->
-
-    *    *    *    *    *    *
-    ┬    ┬    ┬    ┬    ┬    ┬
-    │    │    │    │    │    |
-    │    │    │    │    │    └ day of week (0 - 7) (0 or 7 is Sun)
-    │    │    │    │    └───── month (1 - 12)
-    │    │    │    └────────── day of month (1 - 31, L)
-    │    │    └─────────────── hour (0 - 23)
-    │    └──────────────────── minute (0 - 59)
-    └───────────────────────── second (0 - 59, optional)
+```text
+*    *    *    *    *    *
+┬    ┬    ┬    ┬    ┬    ┬
+│    │    │    │    │    |
+│    │    │    │    │    └ day of week (0 - 7) (0 or 7 is Sun)
+│    │    │    │    └───── month (1 - 12)
+│    │    │    └────────── day of month (1 - 31, L)
+│    │    └─────────────── hour (0 - 23)
+│    └──────────────────── minute (0 - 59)
+└───────────────────────── second (0 - 59, optional)
+```
 
 ### rewrite_queries
 
