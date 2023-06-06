@@ -7,4 +7,16 @@
   &:hover {
     border-bottom: 1px solid var(--purple_bright);
   }
+
+  &:has(> code) {
+    border-bottom: none;
+
+    &:hover {
+      border-bottom: none;
+
+      > code {
+        border-color: var(--purple_bright);
+      }
+    }
+  }
 }
