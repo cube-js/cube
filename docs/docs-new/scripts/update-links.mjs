@@ -4,6 +4,7 @@ import {
 } from "fs/promises";
 import { remark } from 'remark';
 import remarkGfm from 'remark-gfm';
+import remarkMdx from 'remark-mdx';
 import prettier from 'prettier';
 import { visit } from 'unist-util-visit';
 import glob from "glob";
@@ -1309,12 +1310,31 @@ async function updateMarkdownLinks() {
   // await writeFile('output.json', JSON.stringify(filteredUrls, null, 2));
   // console.log(mdxFiles.length, Object.keys(overrides).length, filtered.length);
 
-  // const ff = [
-  //   'Examples-Tutorials-Recipes/Examples.mdx',
-  //   'REST-API/REST-API.mdx',
-  //   "Reference/Configuration/Environment-Variables-Reference.mdx",
-  // ];
-  const ff = Object.keys(overrides);
+  const ff = [
+    // Weird spacing around MDX components
+    "Configuration/Connecting-to-the-Database.mdx",
+    "Configuration/Connecting-to-Downstream-Tools.mdx",
+    "Configuration/Downstream/Budibase.mdx",
+    "Configuration/Downstream/Retool.mdx",
+    "Configuration/VPC/Connecting-with-a-VPC.mdx",
+    "Getting-Started/Overview.mdx",
+    "Workspace/Single-Sign-On/Overview.mdx",
+
+    // Issues with link text and URL being the same
+    // "Cube.js-Introduction.mdx",
+    // "Frontend-Integrations/Introduction.mdx",
+    // "Frontend-Integrations/Introduction-vue.mdx",
+    // "Frontend-Integrations/Introduction-react.mdx",
+    // "Frontend-Integrations/Introduction-angular.mdx",
+    // "Frontend-Integrations/Real-Time-Data-Fetch.mdx",
+    // "Getting-Started/Core/02-Create-a-project.mdx",
+    // "Workspace/Developer-Playground.mdx",
+
+    // Replaces HTML escape characters incorrectly
+    // "Reference/Frontend/@cubejs-client-vue.mdx",
+    // "Reference/SQL-API/SQL-Functions-and-Operators.mdx",
+  ];
+  // const ff = Object.keys(overrides);
   await Promise.all(ff.map(async (oldPath) => {
     const override = overrides[oldPath];
     const targetFilePath = `pages/${override.path}.mdx`;
@@ -1326,13 +1346,17 @@ async function updateMarkdownLinks() {
 
     const linksPlugin = createLinksPlugin(urlMap);
     const result = await remark()
-      .use(remarkGfm)
-      .use(linksPlugin)
+      // .use(remarkGfm)
+      // .use(remarkMdx)
+      // .use(linksPlugin)
       .process(data);
 
     // console.log(result);
 
-    const prettyResult = formatWithPrettier(String(result));
+    const cleanupWeirdSlashes = (content) => content.replaceAll(/\\([\[<*|])/g, '$1');
+
+    const prettyResult = formatWithPrettier(cleanupWeirdSlashes(String(result)));
+    // const prettyResult = String(result);
     const newFile = ['', frontmatter, `\n\n${prettyResult}`].join('---');
 
     await writeFile(targetFilePath, newFile);
