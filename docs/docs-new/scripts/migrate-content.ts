@@ -105,6 +105,7 @@ const overrides: Record<string, Override> = {
   },
 
   // Core
+  
   "Getting-Started/Core/01-Overview.mdx": {
     ready: true,
     path: "product/getting-started/core/overview",
