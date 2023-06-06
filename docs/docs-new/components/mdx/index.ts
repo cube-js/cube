@@ -21,7 +21,7 @@ import { CaseStudyPromoBlock } from '@/components/mdx/CaseStudyPromoBlock/CaseSt
 import { CloudPromoBlock } from '@/components/mdx/CloudPromoBlock/CloudPromoBlock';
 import { EventPromoBlock } from '@/components/mdx/EventPromoBlock/EventPromoBlock';
 import { H1 } from '@/components/overrides/Headings/H1';
-
+import { Link } from '../overrides/Anchor/Link';
 export const components = {
   ...Buttons,
   CaseStudyPromoBlock,
@@ -49,4 +49,5 @@ export const components = {
   YouTubeVideo,
 
   h1: H1,
+  a: Link,
 };

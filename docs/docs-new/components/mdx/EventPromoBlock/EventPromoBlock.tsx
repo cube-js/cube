@@ -1,8 +1,8 @@
 import classnames from 'classnames/bind';
 import { addDays, format, formatDistanceToNow, isAfter, isWithinInterval } from 'date-fns';
 import Image from 'next/image';
-import Link from 'next/link';
 
+import { Link } from '@/components/overrides/Anchor/Link';
 import * as styles from './EventPromoBlock.module.scss';
 import UpcomingIcon from './upcoming.svg';
 import NowIcon from './now.svg';

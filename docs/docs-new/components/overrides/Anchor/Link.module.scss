@@ -1,0 +1,10 @@
+.Link {
+  color: var(--purple_bright);
+  border-bottom: 1px solid var(--purple_04_a30);
+  padding-bottom: 3px;
+  border-radius: 0;
+
+  &:hover {
+    border-bottom: 1px solid var(--purple_bright);
+  }
+}
