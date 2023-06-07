@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.25](https://github.com/cube-js/cube/compare/v0.33.24...v0.33.25) (2023-06-07)
+
+
+### Bug Fixes
+
+* schema generation joins and quotes ([#6695](https://github.com/cube-js/cube/issues/6695)) ([85dd2b5](https://github.com/cube-js/cube/commit/85dd2b55daba9a0fed3c13131d9c8acae600e136))
+* Support indexes in pre-aggs in yaml ([#6587](https://github.com/cube-js/cube/issues/6587)) ([eaec97d](https://github.com/cube-js/cube/commit/eaec97d99a386e39be937ae8770d422512b482ff))
+
+
+
+
+
 ## [0.33.24](https://github.com/cube-js/cube/compare/v0.33.23...v0.33.24) (2023-06-05)
 
 
