@@ -6,23 +6,32 @@ redirect_from:
 
 # Superset
 
-You can connect a Cube project to [Apache Superset][superset] using the Cube SQL
-API. [Apache Superset][superset] is an open-source data exploration and
-visualization platform, commonly used to visualize business metrics and
-performance.
+[Apache Superset][superset] is a popular open-source data exploration and
+visualization platform. [Preset][preset] is a fully-managed service for
+Superset.
 
-Here's a short video guide on how to connect Apache Superset to Cube.
+## Semantic Layer Sync
+
+It is recommended to use [Semantic Layer Sync][ref-sls] to connect Cube to
+Superset or Preset. It automatically synchronizes the [data
+model][ref-data-model] between Cube and Superset or Preset.
+
+## SQL API
+
+You can also use the [SQL API][ref-sql-api] to connect Cube to Superset or
+Preset.
+
+<WarningBox>
+
+[Semantic Layer Sync][ref-sls] is the recommended way to connect Superset or
+Preset to Cube. If you're using the SQL API, consider migrating to Semantic
+Layer Sync.
+
+</WarningBox>
+
+Here's a short video guide:
 
 <LoomVideo url="https://www.loom.com/embed/3e85b7fe3fef4c7bbb8b255ad3f2c675" />
-
-## Enable Cube SQL API
-
-<InfoBox>
-
-Don't have a Cube project yet? [Learn how to get started
-here][ref-getting-started].
-
-</InfoBox>
 
 ### Cube Cloud
 
@@ -148,3 +157,7 @@ generating SQL queries.
 [superset]: https://superset.apache.org/
 [superset-docs-installation-docker]:
   https://superset.apache.org/docs/installation/installing-superset-using-docker-compose
+[preset]: https://preset.io
+[ref-sls]: /product/workspace/semantic-layer-sync
+[ref-sql-api]: /product/api-sql/overview
+[ref-data-model]: /product/data-modeling/overview

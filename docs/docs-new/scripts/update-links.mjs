@@ -705,13 +705,14 @@ const overrides = {
     title: "Playground",
     meta: {
       playground: "Playground",
+      "data-model": "Data Model",
+      "semantic-layer-sync": "Semantic Layer Sync",
+      "sql-runner": "SQL Runner",
+      "query-history": "Query History",
+      "pre-aggregation-inspection": "Pre-Aggregations",
+      "access-control": "Access control",
       sso: "Single Sign-On",
       "dev-mode": "Development mode",
-      "cube-ide": "Cube IDE",
-      "query-inspection": "Query inspection",
-      "pre-aggregation-inspection": "Pre-aggregation inspection",
-      "access-control": "Access control",
-      "sql-runner": "SQL Runner",
       preferences: "Preferences",
       cli: "CLI",
     },
@@ -742,18 +743,18 @@ const overrides = {
   },
   "Workspace/Cube-IDE.mdx": {
     ready: true,
-    path: "product/workspace/cube-ide",
-    title: "Cube IDE",
+    path: "product/workspace/data-model",
+    title: "Data Model",
   },
   "Workspace/Inspecting-Queries.mdx": {
     ready: true,
-    path: "product/workspace/query-inspection",
-    title: "Query inspection",
+    path: "product/workspace/query-history",
+    title: "Query History",
   },
   "Workspace/Inspecting-Pre-aggregations.mdx": {
     ready: true,
-    path: "product/workspace/pre-aggregation-inspection",
-    title: "Pre-aggregation inspection",
+    path: "product/workspace/pre-aggregations",
+    title: "Pre-Aggregations",
   },
   "Workspace/Access-Control.mdx": {
     ready: true,
@@ -774,6 +775,11 @@ const overrides = {
     ready: true,
     path: "product/workspace/cli",
     title: "CLI",
+  },
+  "Workspace/Semantic-Layer-Sync.mdx": {
+    ready: true,
+    path: "product/workspace/semantic-layer-sync",
+    title: "Semantic Layer Sync",
   },
 
   // Deployment

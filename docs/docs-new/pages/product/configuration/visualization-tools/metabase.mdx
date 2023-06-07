@@ -5,22 +5,30 @@ redirect_from:
 
 # Metabase
 
-You can connect to Cube from Metabase by using the [Cube SQL API][ref-sql-api].
-Metabase is the easy, open-source way to help everyone in your company work with
-data like an analyst.
+[Metabase][metabase-oss] is an open-source way to help everyone in your company
+to ask questions and learn from data. There's also a fully-managed [cloud
+service][metabase] for Metabase.
 
-Here's a short video guide on how to connect Metabase to Cube.
+## Semantic Layer Sync
+
+It is recommended to use [Semantic Layer Sync][ref-sls] to connect Cube to
+Metabase. It automatically synchronizes the [data model][ref-data-model] between
+Cube and Metabase.
+
+## SQL API
+
+You can also use the [SQL API][ref-sql-api] to connect Cube to Metabase.
+
+<WarningBox>
+
+[Semantic Layer Sync][ref-sls] is the recommended way to connect Metabase to
+Cube. If you're using the SQL API, consider migrating to Semantic Layer Sync.
+
+</WarningBox>
+
+Here's a short video guide:
 
 <LoomVideo url="https://www.loom.com/embed/38752bb23e5244d1a43675795c470a53" />
-
-## Enable Cube SQL API
-
-<InfoBox>
-
-Don't have a Cube project yet? [Learn how to get started
-here][ref-getting-started].
-
-</InfoBox>
 
 ### Cube Cloud
 
@@ -92,3 +100,8 @@ well.
 
 [ref-getting-started]: /product/getting-started/cloud/overview
 [ref-sql-api]: /product/api-sql/overview
+[metabase-oss]: https://github.com/metabase/metabase
+[metabase]: https://www.metabase.com
+[ref-sls]: /product/workspace/semantic-layer-sync
+[ref-sql-api]: /product/api-sql/overview
+[ref-data-model]: /product/data-modeling/overview

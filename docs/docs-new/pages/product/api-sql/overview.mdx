@@ -22,7 +22,7 @@ intelligence][cube-issbi] use cases.
 
 ### Supported Tools
 
-Cube SQL API has been tested with
+Cube SQL API has been tested with the following tools:
 
 - psql CLI
 - Apache Superset
@@ -41,10 +41,33 @@ Cube SQL API has been tested with
 
 <InfoBox>
 
-Please see [this GitHub issue](https://github.com/cube-js/cube/issues/3906) for
-the tools roadmap and to suggest and vote for tools of your interest.
+Please use [this GitHub issue](https://github.com/cube-js/cube/issues/3906) to
+suggest tools of your interest and vote for already proposed ones.
 
 </InfoBox>
+
+## Configuration
+
+### Cube Core
+
+SQL API is configured via [environment variables][ref-config-env].
+
+To enable the SQL API, set `CUBEJS_PG_SQL_PORT` to a port number you'd like to
+connect to with a Postgres-compatible tool.
+
+Use `CUBEJS_SQL_USER` and `CUBEJS_SQL_PASSWORD` to configure credentials
+required to connect to the SQL API. You can also use
+[`checkSqlAuth`][ref-config-checksqlauth],
+[`canSwitchSqlUser`][ref-config-canswitchsqluser], and `CUBEJS_SQL_SUPER_USER`
+to configure [custom authentication][ref-sql-api-auth].
+
+### Cube Cloud
+
+To enable the SQL API in Cube Cloud, click <Btn>Deploy SQL API</Btn> on
+the <Btn>Overview</Btn> page, then click <Btn>How to connect your BI tool</Btn>.
+You should then see the following screen:
+
+![SQL API details modal|690x428](https://ucarecdn.com/67508334-1641-43ec-9d50-a8f64629992b/)
 
 ## Querying Fundamentals
 
@@ -238,14 +261,6 @@ than 50,000 rows, but keep that limitation in mind when designing your queries.
 Limit push down is supported by Cube however, a limit over 50,000 can't be
 overridden. In future versions, paging and streaming would be used to avoid this
 limitation.
-
-## Enabling SQL API in Cube Cloud
-
-To enable the SQL API in Cube Cloud, click <Btn>Deploy SQL API</Btn> from
-the <Btn>Overview</Btn> page, then click <Btn>How to connect your BI tool</Btn>.
-You should then see the following screen:
-
-![SQL API details modal|690x428](https://ucarecdn.com/67508334-1641-43ec-9d50-a8f64629992b/)
 
 ## Examples
 
@@ -518,6 +533,12 @@ WHERE is_completed = true
 
 [ref-config-js]: /reference/configuration/config
 [ref-dynamic-schemas]: /schema/dynamic-schema-creation
+[ref-config-env]: /reference/configuration/environment-variables
+[ref-sql-api-auth]: /product/api-sql/security
+[ref-config-checksqlauth]:
+  /reference/configuration/config#options-reference-check-sql-auth
+[ref-config-canswitchsqluser]:
+  /reference/configuration/config#options-reference-can-switch-sql-user
 [ref-bi]: /product/configuration/visualization-tools#bi-data-exploration-tools
 [ref-superset]: /product/configuration/visualization-tools/superset
 [ref-tableau]: /product/configuration/visualization-tools/tableau

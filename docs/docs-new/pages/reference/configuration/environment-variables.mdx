@@ -687,7 +687,8 @@ The maximum number of partitions each pre-aggregation in a cube can use.
 
 ## `CUBEJS_PG_SQL_PORT`
 
-The port to listen to Postgres-compatible connections on.
+The port used by the [SQL API][ref-sql-api] to listen to Postgres-compatible
+connections on.
 
 | Possible Values     | Default in Development | Default in Production |
 | ------------------- | ---------------------- | --------------------- |
@@ -858,7 +859,7 @@ The path where Cube loads data models from.
 
 ## `CUBEJS_SQL_PASSWORD`
 
-Required password to access SQL API.
+A password required to access the [SQL API][ref-sql-api].
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
@@ -866,11 +867,18 @@ Required password to access SQL API.
 
 ## `CUBEJS_SQL_PORT`
 
-The port to listen to MySQL compatibility connections on.
+The port used by the [SQL API][ref-sql-api] to listen to MySQL-compatible
+connections on.
 
 | Possible Values     | Default in Development | Default in Production |
 | ------------------- | ---------------------- | --------------------- |
 | A valid port number | N/A                    | N/A                   |
+
+<WarningBox>
+
+This environment variable is deprecated. Use `CUBEJS_PG_SQL_PORT` instead.
+
+</WarningBox>
 
 ## `CUBEJS_SQL_SUPER_USER`
 
@@ -882,7 +890,7 @@ A name of specific user who will be allowed to change security context.
 
 ## `CUBEJS_SQL_USER`
 
-Required username to access SQL API.
+A username required to access the [SQL API][ref-sql-api].
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
@@ -1295,3 +1303,4 @@ The port for a Cube deployment to listen to API connections on.
 [snowflake-docs-warehouse]:
   https://docs.snowflake.com/en/user-guide/warehouses.html
 [wiki-tz-database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+[ref-sql-api]: /product/api-sql/overview

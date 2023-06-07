@@ -1,0 +1,227 @@
+---
+redirect_from:
+  - /semantic-layer-sync
+---
+
+# Semantic Layer Sync
+
+Semantic Layer Sync synchronizes the [data model][ref-data-model] of a semantic
+layer between Cube and BI tools. It's the easiest way to connect a BI tool to
+Cube.
+
+<SuccessBox>
+
+Semantic Layer Sync is available in Cube Cloud on
+[all tiers](https://cube.dev/pricing).
+
+</SuccessBox>
+
+Semantic Layer Sync programmatically connects a BI tool to Cube via the [SQL
+API][ref-sql-api] and creates or updates BI-specific entities that correspond to
+entities within the data model in Cube, e.g., cubes, views, measures,
+dimensions:
+
+| Cube                        | BI tool                   |
+| --------------------------- | ------------------------- |
+| Deployment, branch          | Database                  |
+| Cube, view                  | Dataset, table            |
+| Measure, dimension, segment | Column, dimension, metric |
+
+## Creating syncs
+
+You can create a new sync by navigating to the <Btn>Semantic Layer Sync</Btn>
+tab on the <Btn>BI Integrations</Btn> page and clicking <Btn>+ Create
+Sync</Btn>.
+
+<Screenshot src="https://ucarecdn.com/d4f4c753-ea8f-459b-aec2-73846da06b41/" />
+
+Follow the steps in the wizard to create a sync with any of supported BI tools.
+
+### Supported tools
+
+Semantic Layer Sync supports the following BI tools:
+
+- [Apache Superset](#creating-syncs-apache-superset) (self-hosted) and
+  [Preset](#creating-syncs-preset) (managed)
+- [Metabase](#creating-syncs-metabase) (self-hosted and managed)
+
+<InfoBox>
+
+We're working on bringing support for more BI tools, e.g., Power BI and Tableau.
+Please [reach out to us](https://forms.gle/eEit9Pa7ZXSoFxb86) if you're
+interested in using Semantic Layer Sync with other BI tools.
+
+</InfoBox>
+
+### Configuration
+
+Under the hood, Semantic Layer Sync configuration is kept using the
+`semanticLayerSync` option in the `cube.js` configuration file.
+
+This function returns an array of configured syncs. It can also be asynchronous,
+allowing for dynamic definition of syncs, e.g., loading the configuration from a
+remote API endpoint.
+
+Each sync is configured with a mandatory `name` and a `type` as well as the
+`config` object with BI-specific credentials, e.g., a workspace URL and an API
+key. `config` also includes the `database` name that will be created and updated
+in the corresponding BI tool.
+
+A sync can be disabled by setting `active` to `false`; such syncs will not run
+automatically. If `active` is undefined, a sync is considered enabled.
+
+Example configuration with a single disabled sync:
+
+```javascript
+module.exports = {
+  semanticLayerSync: () => {
+    return [
+      {
+        type: "superset",
+        name: "Superset Sync",
+        active: false,
+        config: {
+          user: "mail@example.com",
+          password: "4dceae-606a03-93ae6dc7",
+          url: "superset.example.com",
+          database: "Cube Cloud: staging-deployment",
+        },
+      },
+    ];
+  },
+};
+```
+
+### Apache Superset
+
+Data model is synchronized via [Superset API][superset-api] which uses a `user`
+name and a `password` for authentication. You can use your own user name and
+password or create a new service account. You can copy a `url` at any page of
+your Superset workspace.
+
+Example `cube.js` confguration file for Superset:
+
+```javascript
+module.exports = {
+  semanticLayerSync: () => {
+    return [
+      {
+        type: "superset",
+        name: "Superset Sync",
+        config: {
+          user: "mail@example.com",
+          password: "4dceae-606a03-93ae6dc7",
+          url: "superset.example.com",
+          database: "Cube Cloud: production-deployment",
+        },
+      },
+    ];
+  },
+};
+```
+
+### Preset
+
+Data model is synchronized via [Preset API][preset-api] which uses API keys for
+authentication. You can generate a new API key in your [user
+settings][preset-user-settings] in Preset to obtain an `api_token` and an
+`api_secret`. You can also copy a `workspace_url` at any page of your Preset
+workspace.
+
+Example `cube.js` confguration file for Preset:
+
+```javascript
+module.exports = {
+  semanticLayerSync: () => {
+    return [
+      {
+        type: "preset",
+        name: "Preset Sync",
+        config: {
+          api_token: "07988f63-c200-499e-97c9-ba137d8918aa",
+          api_secret:
+            "c19fbab4fd4945899795d32898f2e1165bef8e5ee653499e92f083b3d088aecb",
+          workspace_url: "12345678.us1a.app.preset.io",
+          database: "Cube Cloud: production-deployment",
+        },
+      },
+    ];
+  },
+};
+```
+
+### Metabase
+
+Data model is synchronized via [Metabase API][metabase-api] which uses a `user`
+name and a `password` for authentication. You can use your own user name and
+password or create a new service account. You can copy a `url` at any page of
+your Metabase workspace.
+
+Example `cube.js` confguration file for Metabase:
+
+```javascript
+module.exports = {
+  semanticLayerSync: () => {
+    return [
+      {
+        type: "metabase",
+        name: "Metabase Sync",
+        config: {
+          user: "mail@example.com",
+          password: "4dceae-606a03-93ae6dc7",
+          url: "example.metabaseapp.com",
+          database: "Cube Cloud: production-deployment",
+        },
+      },
+    ];
+  },
+};
+```
+
+When a sync is run, Metabase will send an email with a new login notification.
+You can ignore such emails, [configure Metabase][metabase-skip-emails] to skip
+sending them, or use a service account with a different email address:
+
+<Screenshot src="https://ucarecdn.com/2e7ac466-73a5-4dd6-9c85-ed98d9df8979/" />
+
+## Running syncs
+
+When the data model is updated, all configured syncs will automatically run.
+
+You can also run a sync manually by navigationg to the <Btn>Semantic Layer
+Sync</Btn> tab on the <Btn>BI Integrations</Btn> page and clicking <Btn>Start
+Sync</Btn> next to a relevant sync.
+
+<Screenshot src="https://ucarecdn.com/e48cef02-cc89-466d-a293-11a04aacb116/" />
+
+During the sync, Cube will either create from scratch or update a database in
+the corresponding BI tool and the data model associated with it. Syncing a
+branch in [development mode][ref-dev-mode] will create a separate database,
+leaving the one associated with the production branch intact.
+
+## Viewing history
+
+You can view the history of runs for a particular sync by navigating to
+the <Btn>Semantic Layer Sync</Btn> tab on the <Btn>BI Integrations</Btn> page
+and clicking <Btn>Show History</Btn> next to a relevant sync.
+
+<Screenshot src="https://ucarecdn.com/a3cc5fc8-8458-483e-999c-5654eb8072b4/" />
+
+Example log output:
+
+    2023-05-29T19:08:28.021: Semantic Layer Sync Started
+    2023-05-29T19:08:33.008: Semantic Layer Sync Completed
+
+[ref-data-model]: /product/data-modeling/overview
+[ref-sql-api]: /product/api-sql/overview
+[ref-config-sls]:
+  /reference/configuration/config#options-reference-semantic-layer-sync
+[ref-workspace-sls]: /workspace/bi-integrations
+[ref-dev-mode]: /product/workspace/dev-mode
+[preset-api]: https://api-docs.preset.io
+[preset-user-settings]: https://manage.app.preset.io/app/user
+[superset-api]: https://superset.apache.org/docs/api/
+[metabase-api]:
+  https://www.metabase.com/learn/administration/metabase-api#authenticate-your-requests-with-a-session-token
+[metabase-skip-emails]:
+  https://www.metabase.com/docs/latest/configuring-metabase/environment-variables#mb_send_email_on_first_login_from_new_device

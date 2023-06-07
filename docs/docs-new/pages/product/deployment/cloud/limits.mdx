@@ -52,19 +52,24 @@ This is a hard limit. Consider upgrading to [another tier][ref-pricing].
 
 ### Queries per day
 
-This is a hard limit. When a threshold is hit, further queries will not be
-processed. In that case, consider upgrading a development instance to a
-production cluster. Alternatively, consider upgrading to [another
-tier][ref-pricing].
+This is a hard limit. Usage is calculated per Cube Cloud account, i.e., in total
+for all deployments within an account.
+
+When a threshold is hit, further queries will not be processed. In that case,
+consider upgrading a development instance to a production cluster.
+Alternatively, consider upgrading to [another tier][ref-pricing].
 
 ### Queries processed by Query History per day
 
-This is a soft limit. When a threshold is hit, query processing will be stopped.
-Please [contact support][cube-contact-us] for further assistance.
+This is a soft limit. Usage is calculated per Cube Cloud account, i.e., in total
+for all deployments within an account.
+
+When a threshold is hit, query processing will be stopped. Please [contact
+support][cube-contact-us] for further assistance.
 
 [ref-deployment-types]: /product/deployment/cloud/deployment-types
 [ref-pricing]: /product/deployment/cloud/pricing
-[ref-query-history]: /product/workspace/query-inspection
+[ref-query-history]: /product/workspace/query-history
 [ref-dev-instance]:
   /product/deployment/cloud/deployment-types#development-instance
 [ref-prod-cluster]:
