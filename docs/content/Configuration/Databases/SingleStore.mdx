@@ -1,0 +1,149 @@
+---
+title: SingleStore
+permalink: /config/databases/singlestore
+---
+
+## What is SingleStore?
+
+SingleStore is a MySQL-compatible, high performance analytical database which is also capable of handling your transactional workload - something many cloud data warehouses and analytical databases are not a good fit for.
+
+By connecting through Cube Cloud, you gain all the benefits of the Semantic layer: 
+ - A built-in REST API endpoint to connect your data apps
+ - Consolidated semantic layer so you and your users can trust your metrics and definitions
+ - Faster performance with caching and pre-aggregations
+ - Consolidated and flexible security model via tokens 
+
+
+## Prerequisites
+
+- The hostname for the [SingleStore][singlestore] workspace
+- The username/password for the [SingleStore][singlestore] workspace
+- The name of the database to use from the [SingleStore][singlestore] workspace
+
+## Setup <--{"id" : "Setup"}-->
+
+### Connecting from a New Cube Cloud Deployment
+
+Here's a short video guide on how to connect Cube Cloud to SingleStore:
+
+<LoomVideo url="https://www.loom.com/share/e44b4c87c38e4994bab6c3e08b2952f8" />
+
+To get started, create a deployment in Cube Cloud.  This can be a free trial from cube.dev if you don’t already have an account.
+
+<Screenshot src="https://ucarecdn.com/6d0f104f-1f20-41b8-bd83-faf03e54eb77/" />
+
+Choose “MySQL” from the list of Database connections
+
+<Screenshot src="https://ucarecdn.com/17751111-18f2-4594-99db-bffec7e74050/" />
+
+To complete the connection information, begin by logging into your SingleStore portal.
+
+Your hostname can be found on your workspace connection page: (your cloud) -> Workspaces -> (your workspace) -> Connect Directly
+
+<Screenshot src="https://ucarecdn.com/7475d0f2-689d-4e6e-be66-2c2cb71edef4/" />
+
+<Screenshot src="https://ucarecdn.com/42077d21-7cff-4a37-98ee-7e0a46d2db94/" />
+
+Your database should be the exact name of the database from the SingleStore portal
+
+<Screenshot src="https://ucarecdn.com/c133903c-ddf2-406d-8e5c-c399b3a9090a/" />
+
+Cube is considered a third-party SQL client and we cannot login with the SingleStore cloud user account. So, we need to use a SQL username and password.  You can find your Admin credentials on the workspace “Access” page
+
+<Screenshot src="https://ucarecdn.com/a755f553-efab-49c5-b9ba-6a647376b5ba/" />
+
+The port defaults to 3306, which is valid, and your screen should be filled out completely, ready to hit “Apply” and establish the connection.
+
+<Screenshot src="https://ucarecdn.com/6e648d4d-ad08-4b62-8071-2a23c846a2c6/" />
+
+###  Connecting Manually
+
+If you’re setting up the SingleStore connection via the configuration page or adding it as a second datasource to a deployment that already has a primary data connection, you can use the following parameters.
+
+<InfoBox>
+
+SingleStore is MySQL-compatible, so you can use Cube's MySQL database connection steps to connect to your workspace.
+
+</InfoBox>
+
+Add the following to a `.env` file in your Cube project:
+
+```dotenv
+CUBEJS_DB_TYPE=mysql
+CUBEJS_DB_HOST=svc-1234.cloud-region.svc.singlestore.com
+CUBEJS_DB_NAME=my_singlestore_database
+CUBEJS_DB_USER=singlestore_user
+CUBEJS_DB_PASS=**********
+```
+
+## Environment Variables
+
+| Environment Variable | Description                                                                         | Possible Values           | Required | [Supports multiple data sources?][ref-config-multiple-ds-decorating-env] |
+| -------------------- | ----------------------------------------------------------------------------------- | ------------------------- | :------: | :----------------------------------------------------------------------: |
+| `CUBEJS_DB_HOST`     | The host URL for a database                                                         | A valid database host URL |    ✅    |                                    ✅                                    |
+| `CUBEJS_DB_PORT`     | The port for the database connection                                                | A valid port number       |    ❌    |                                    ✅                                    |
+| `CUBEJS_DB_NAME`     | The name of the database to connect to                                              | A valid database name     |    ✅    |                                    ✅                                    |
+| `CUBEJS_DB_USER`     | The username used to connect to the database                                        | A valid database username |    ✅    |                                    ✅                                    |
+| `CUBEJS_DB_PASS`     | The password used to connect to the database                                        | A valid database password |    ✅    |                                    ✅                                    |
+| `CUBEJS_DB_SSL`      | If `true`, enables SSL encryption for database connections from Cube                | `true`, `false`           |    ❌    |                                    ✅                                    |
+| `CUBEJS_CONCURRENCY` | The number of concurrent connections each queue has to the database. Default is `2` | A valid number            |    ❌    |                                    ❌                                    |
+| `CUBEJS_DB_MAX_POOL` | The maximum number of concurrent database connections to pool. Default is `8`       | A valid number            |    ❌    |                                    ✅                                    |
+
+## Pre-Aggregation Feature Support
+
+### count_distinct_approx
+
+Measures of type
+[`count_distinct_approx`][ref-schema-ref-types-formats-countdistinctapprox] can
+not be used in pre-aggregations when using SingleStore as a source database.
+
+## Pre-Aggregation Build Strategies
+
+<InfoBox>
+
+To learn more about pre-aggregation build strategies, [head
+here][ref-caching-using-preaggs-build-strats].
+
+</InfoBox>
+
+| Feature       | Works with read-only mode? | Is default? |
+| ------------- | :------------------------: | :---------: |
+| Batching      |             ✅             |     ✅      |
+| Export Bucket |             -              |      -      |
+
+By default, SingleStore uses [batching][self-preaggs-batching] to build
+pre-aggregations.
+
+### Batching
+
+No extra configuration is required to configure batching for SingleStore.
+
+### Export Bucket
+
+SingleStore does not support export buckets.
+
+## SQL Functions
+
+Some SQL functions differ between MySQL and SingleStore, for example 
+`GEOGRAPHY_LATITUDE ( point )` (SingleStore) vs `ST_Latitude( point )` (MySQL).  Be sure
+to use the [SingleStore docs][singlestore-docs] for syntax reference.
+
+## SSL
+
+To enable SSL-encrypted connections between Cube and SingleStore, set the
+`CUBEJS_DB_SSL` environment variable to `true`. For more information on how to
+configure custom certificates, please check out [Enable SSL Connections to the
+Database][ref-recipe-enable-ssl].
+
+
+[singlestore]: https://www.singlestore.com/
+[ref-caching-using-preaggs-build-strats]:
+  /caching/using-pre-aggregations#pre-aggregation-build-strategies
+[ref-config-multiple-ds-decorating-env]:
+  /config/multiple-data-sources#configuring-data-sources-with-environment-variables-decorated-environment-variables
+[ref-recipe-enable-ssl]: /recipes/enable-ssl-connections-to-database
+[ref-schema-ref-types-formats-countdistinctapprox]:
+  /schema/reference/types-and-formats#count-distinct-approx
+[self-preaggs-batching]: #batching
+[self-ssl]: #ssl
+[singlestore-docs]: https://docs.singlestore.com/managed-service/en/reference/sql-reference.html
