@@ -545,11 +545,11 @@ impl ProcessingLoop for MySqlServer {
                         None,
                     );
 
-                    if let Some(bt) = e.backtrace() {
-                        trace!("{}", bt.to_string());
-                    } else {
+                    // if let Some(bt) = e.backtrace() {
+                    //     trace!("{}", bt.to_string());
+                    // } else {
                         trace!("Backtrace: not found");
-                    }
+                    // }
                 }
 
                 // Handler can finish with panic, it's why we are using additional channel to drop session by moving it here
