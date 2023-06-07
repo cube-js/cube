@@ -1,0 +1,303 @@
+---
+redirect_from:
+  - /caching/running-in-production
+---
+
+# Running in production
+Cube makes use of two different kinds of cache:
+
+- In-memory storage of query results
+- Pre-aggregations
+
+Cube Store is enabled by default when running Cube in development mode. In
+production, Cube Store **must** run as a separate process. The easiest way to do
+this is to use the official Docker images for Cube and Cube Store.
+
+<InfoBox>
+
+Using Windows? We **strongly** recommend using [WSL2 for Windows 10][link-wsl2]
+to run the following commands.
+
+</InfoBox>
+
+You can run Cube Store with Docker with the following command:
+
+```bash{promptUser: user}
+docker run -p 3030:3030 cubejs/cubestore
+```
+
+<InfoBox>
+
+Cube Store can further be configured via environment variables. To see a
+complete reference, please consult the `CUBESTORE_*` environment variables in
+the [Environment Variables reference][ref-config-env].
+
+</InfoBox>
+
+Next, run Cube and tell it to connect to Cube Store running on `localhost` (on
+the default port `3030`):
+
+```bash{outputLines: 2-4}
+docker run -p 4000:4000 \
+  -e CUBEJS_CUBESTORE_HOST=localhost \
+  -v ${PWD}:/cube/conf \
+  cubejs/cube
+```
+
+In the command above, we're specifying `CUBEJS_CUBESTORE_HOST` to let Cube know
+where Cube Store is running.
+
+You can also use Docker Compose to achieve the same:
+
+```yaml
+version: '2.2'
+services:
+  cubestore:
+    image: cubejs/cubestore:latest
+    environment:
+      - CUBESTORE_REMOTE_DIR=/cube/data
+    volumes:
+      - .cubestore:/cube/data
+
+  cube:
+    image: cubejs/cube:latest
+    ports:
+      - 4000:4000
+    environment:
+      - CUBEJS_CUBESTORE_HOST=localhost
+    depends_on:
+      - cubestore
+    links:
+      - cubestore
+    volumes:
+      - ./model:/cube/conf/model
+```
+
+## Architecture
+
+<div style={{ textAlign: "center" }}>
+  <img
+    alt="Cube Store cluster with Cube"
+    src="https://ucarecdn.com/28747c64-bc0e-4f2c-a438-e5a112c68436/"
+    style={{ border: "none" }}
+    width="100%"
+  />
+</div>
+
+A Cube Store cluster consists of at least one Router and one or more Worker
+instances. Cube sends queries to the Cube Store Router, which then distributes
+the queries to the Cube Store Workers. The Workers then execute the queries and
+return the results to the Router, which in turn returns the results to Cube.
+
+## Scaling
+
+<WarningBox>
+
+Cube Store _can_ be run in a single instance mode, but this is usually
+unsuitable for production deployments. For high concurrency and data throughput,
+we **strongly** recommend running Cube Store as a cluster of multiple instances
+instead.
+
+</WarningBox>
+
+Scaling Cube Store for a higher concurrency is relatively simple when running in
+cluster mode. Because [the storage layer](#storage) is decoupled from the query
+processing engine, you can horizontally scale your Cube Store cluster for as
+much concurrency as you require.
+
+In cluster mode, Cube Store runs two kinds of nodes:
+
+- one or more **router** nodes handle incoming client connections, manage
+  database metadata and serve simple queries.
+- multiple **worker** nodes which execute SQL queries
+
+Cube Store querying performance is optimal when the count of partitions in a
+single query is less than or equal to the worker count. For example, you have a
+200 million rows table that is partitioned by day, which is ten daily Cube
+partitions or 100 Cube Store partitions in total. The query sent by the user
+contains filters, and the resulting scan requires reading 16 Cube Store
+partitions in total. Optimal query performance, in this case, can be achieved
+with 16 or more workers. You can use `EXPLAIN` and `EXPLAIN ANALYZE` SQL
+commands to see how many partitions would be used in a specific Cube Store
+query.
+
+Resources required for the main node and workers can vary depending on the
+configuration. With default settings, you should expect to allocate at least 4
+CPUs and up to 8GB per main or worker node.
+
+The configuration required for each node can be found in the table below. More
+information about these variables can be found [in the Environment Variables
+reference][ref-config-env].
+
+| Environment Variable    | Specify on Router? | Specify on Worker? |
+| ----------------------- | ------------------ | ------------------ |
+| `CUBESTORE_SERVER_NAME` | Yes                | Yes                |
+| `CUBESTORE_META_PORT`   | Yes                | -                  |
+| `CUBESTORE_WORKERS`     | Yes                | Yes                |
+| `CUBESTORE_WORKER_PORT` | -                  | Yes                |
+| `CUBESTORE_META_ADDR`   | -                  | Yes                |
+
+`CUBESTORE_WORKERS` and `CUBESTORE_META_ADDR` variables should be set with
+stable addresses, which should not change. You can use stable DNS names and put
+load balancers in front of your worker and router instances to fulfill stable
+name requirements in environments where stable IP addresses can't be guaranteed.
+
+<InfoBox>
+
+To fully take advantage of the worker nodes in the cluster, we **strongly**
+recommend using [partitioned pre-aggregations][ref-caching-partitioning].
+
+</InfoBox>
+
+A sample Docker Compose stack for the single machine setting this up might look
+like:
+
+```yaml
+version: '2.2'
+services:
+  cubestore_router:
+    restart: always
+    image: cubejs/cubestore:latest
+    environment:
+      - CUBESTORE_SERVER_NAME=cubestore_router:9999
+      - CUBESTORE_META_PORT=9999
+      - CUBESTORE_WORKERS=cubestore_worker_1:9001,cubestore_worker_2:9001
+      - CUBESTORE_REMOTE_DIR=/cube/data
+    volumes:
+      - .cubestore:/cube/data
+  cubestore_worker_1:
+    restart: always
+    image: cubejs/cubestore:latest
+    environment:
+      - CUBESTORE_SERVER_NAME=cubestore_worker_1:9001
+      - CUBESTORE_WORKER_PORT=9001
+      - CUBESTORE_META_ADDR=cubestore_router:9999
+      - CUBESTORE_WORKERS=cubestore_worker_1:9001,cubestore_worker_2:9001
+      - CUBESTORE_REMOTE_DIR=/cube/data
+    depends_on:
+      - cubestore_router
+    volumes:
+      - .cubestore:/cube/data
+  cubestore_worker_2:
+    restart: always
+    image: cubejs/cubestore:latest
+    environment:
+      - CUBESTORE_SERVER_NAME=cubestore_worker_2:9001
+      - CUBESTORE_WORKER_PORT=9001
+      - CUBESTORE_META_ADDR=cubestore_router:9999
+      - CUBESTORE_WORKERS=cubestore_worker_1:9001,cubestore_worker_2:9001
+      - CUBESTORE_REMOTE_DIR=/cube/data
+    depends_on:
+      - cubestore_router
+    volumes:
+      - .cubestore:/cube/data
+  cube:
+    image: cubejs/cube:latest
+    ports:
+      - 4000:4000
+    environment:
+      - CUBEJS_CUBESTORE_HOST=cubestore_router
+    depends_on:
+      - cubestore_router
+    volumes:
+      - .:/cube/conf
+```
+
+## Replication and High Availability
+
+The open-source version of Cube Store doesn't support replicating any of its
+nodes. The router node and every worker node should always have only one
+instance copy if served behind the load balancer or service address. Replication
+will lead to undefined behavior of the cluster, including connection errors and
+data loss. If any cluster node is down, it'll lead to a complete cluster outage.
+If Cube Store replication and high availability are required, please consider
+using Cube Cloud.
+
+## Storage
+
+<WarningBox>
+
+Cube Store can only use one type of remote storage at runtime.
+
+</WarningBox>
+
+Cube Store makes use of a separate storage layer for storing metadata as well as
+for persisting pre-aggregations as Parquet files. Cube Store [can be configured
+to use either AWS S3 or Google Cloud Storage][ref-config-env]. If desired, local
+path on the server can also be used in case all Cube Store cluster nodes are
+co-located on a single machine.
+
+<WarningBox>
+
+Cube Store requires strong consistency guarantees from underlying distributed
+storage. AWS S3, Google Cloud Storage, and Azure Blob Storage (Cube Cloud only)
+are the only known implementations that provide strong consistency. Using other
+implementations in production is discouraged and can lead to consistency and
+data corruption errors.
+
+</WarningBox>
+
+A simplified example using AWS S3 might look like:
+
+```yaml
+version: '2.2'
+services:
+  cubestore_router:
+    image: cubejs/cubestore:latest
+    environment:
+      - CUBESTORE_SERVER_NAME=cubestore_router:9999
+      - CUBESTORE_META_PORT=9999
+      - CUBESTORE_WORKERS=cubestore_worker_1:9001
+      - CUBESTORE_S3_BUCKET=<BUCKET_NAME_IN_S3>
+      - CUBESTORE_S3_REGION=<BUCKET_REGION_IN_S3>
+      - CUBESTORE_AWS_ACCESS_KEY_ID=<AWS_ACCESS_KEY_ID>
+      - CUBESTORE_AWS_SECRET_ACCESS_KEY=<AWS_SECRET_ACCESS_KEY>
+  cubestore_worker_1:
+    image: cubejs/cubestore:latest
+    environment:
+      - CUBESTORE_SERVER_NAME=cubestore_worker_1:9001
+      - CUBESTORE_WORKER_PORT=9001
+      - CUBESTORE_META_ADDR=cubestore_router:9999
+      - CUBESTORE_WORKERS=cubestore_worker_1:9001
+      - CUBESTORE_S3_BUCKET=<BUCKET_NAME_IN_S3>
+      - CUBESTORE_S3_REGION=<BUCKET_REGION_IN_S3>
+      - CUBESTORE_AWS_ACCESS_KEY_ID=<AWS_ACCESS_KEY_ID>
+      - CUBESTORE_AWS_SECRET_ACCESS_KEY=<AWS_SECRET_ACCESS_KEY>
+    depends_on:
+      - cubestore_router
+```
+
+### Local Storage
+
+Separately from remote storage, Cube Store requires local scratch space to warm
+up partitions by downloading Parquet files before querying them. By default,
+this directory should be mounted to `.cubestore/data` dir inside contained and
+can be configured by [CUBESTORE_DATA_DIR][ref-config-env] environment variable.
+It is advised to use local SSDs for this scratch space to maximize querying
+performance.
+
+###  AWS
+
+Cube Store can retrieve security credentials from instance metadata
+automatically. This means you can skip defining the
+`CUBESTORE_AWS_ACCESS_KEY_ID` and `CUBESTORE_AWS_SECRET_ACCESS_KEY` environment
+variables.
+
+<WarningBox>
+
+Cube Store currently does not take the key expiration time returned from
+instance metadata into account; instead the refresh duration for the key is
+defined by `CUBESTORE_AWS_CREDS_REFRESH_EVERY_MINS`, which is set to `180` by
+default.
+
+</WarningBox>
+
+## Security
+
+Cube Store currently does not have any in-built authentication mechanisms. For
+this reason, we recommend running your Cube Store cluster on a network that only
+allows requests from the Cube deployment.
+
+[link-wsl2]: https://docs.microsoft.com/en-us/windows/wsl/install-win10
+[ref-caching-partitioning]: /caching/using-pre-aggregations#partitioning
+[ref-config-env]: /reference/environment-variables

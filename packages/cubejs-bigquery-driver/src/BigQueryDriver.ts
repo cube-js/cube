@@ -20,7 +20,7 @@ import {
 } from '@google-cloud/bigquery';
 import { Bucket, Storage } from '@google-cloud/storage';
 import {
-  BaseDriver, DownloadTableCSVData,
+  BaseDriver, DownloadQueryResultsOptions, DownloadQueryResultsResult, DownloadTableCSVData,
   DriverInterface, QueryOptions, StreamTableData,
 } from '@cubejs-backend/base-driver';
 import { Query } from '@google-cloud/bigquery/build/src/bigquery';
@@ -148,7 +148,9 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
 
   public async testConnection() {
     await this.bigquery.query({
-      query: 'SELECT ? AS number', params: ['1']
+      query: 'SELECT ? AS number',
+      params: ['1'],
+      jobTimeoutMs: this.testConnectionTimeout(),
     });
   }
 

@@ -33,8 +33,8 @@ const menuOrder = [
   'Monitoring',
   'Examples & Tutorials',
   'FAQs',
-  'Release Notes',
-  'Reference',
+  'Guides',
+  'Reference'
 ];
 
 const nameRules: Record<string, string> = {
@@ -128,9 +128,7 @@ const MainMenu: React.FC<Props> = (props = defaultProps) => {
                       }
                     );
 
-                    return item === 'Release Notes'
-                      ? subItems.reverse().map(nodeParser)
-                      : subItems.map(nodeParser);
+                    return subItems.map(nodeParser);
                   }
                   return (
                     <Menu.ItemGroup key={subCategory} title={subCategory}>
@@ -141,6 +139,7 @@ const MainMenu: React.FC<Props> = (props = defaultProps) => {
               </Menu.SubMenu>
             );
           })}
+          <MenuItem to="https://cube.dev/blog/category/changelog" title="Changelog" />
         </Menu>
       </div>
     </Col>

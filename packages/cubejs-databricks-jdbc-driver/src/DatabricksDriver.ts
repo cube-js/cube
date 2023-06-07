@@ -8,7 +8,6 @@ import {
   getEnv,
   assertDataSource,
 } from '@cubejs-backend/shared';
-import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { S3, GetObjectCommand } from '@aws-sdk/client-s3';
@@ -27,8 +26,6 @@ import {
 } from '@cubejs-backend/jdbc-driver';
 import { DatabricksQuery } from './DatabricksQuery';
 import { downloadJDBCDriver } from './installer';
-
-const { version } = require('../../package.json');
 
 export type DatabricksDriverConfiguration = JDBCDriverConfiguration &
   {
@@ -211,7 +208,7 @@ export class DatabricksDriver extends JDBCDriver {
           conf?.token ||
           getEnv('databrickToken', { dataSource }) ||
           '',
-        UserAgentEntry: `CubeDev+Cube/${version} (Databricks)`,
+        UserAgentEntry: `CubeDev_Cube`,
       },
       catalog:
         conf?.catalog ||
@@ -564,16 +561,15 @@ export class DatabricksDriver extends JDBCDriver {
   }
 
   /**
-   * Determines whether export bucket feature is configured or no.
-   * @returns {boolean}
+   * Determines whether export bucket feature is configured or not.
    */
   public async isUnloadSupported() {
     return this.config.exportBucket !== undefined;
   }
 
   /**
-   * Returns an object with the links to unloaded to the export bucket
-   * data to the Cubestore.
+   * Returns to the Cubestore an object with links to unloaded to an
+   * export bucket data.
    */
   public async unload(tableName: string, options: UnloadOptions) {
     if (!['azure', 's3'].includes(this.config.bucketType as string)) {
@@ -581,20 +577,20 @@ export class DatabricksDriver extends JDBCDriver {
         this.config.bucketType
       }`);
     }
-
     const tableFullName = `${
-      this.config.catalog ? `${this.config.catalog}.` : ''
+      this.config.catalog
+        ? `${this.config.catalog}.`
+        : ''
     }${tableName}`;
-
-    const types = options.query ?
-      await this.unloadWithSql(tableFullName, options.query.sql, options.query.params) :
-      await this.unloadWithTable(tableFullName);
-
+    const types = options.query
+      ? await this.unloadWithSql(
+        tableFullName,
+        options.query.sql,
+        options.query.params,
+      )
+      : await this.unloadWithTable(tableFullName);
     const pathname = `${this.config.exportBucket}/${tableFullName}.csv`;
-    const csvFile = await this.getCsvFiles(
-      pathname,
-    );
-
+    const csvFile = await this.getCsvFiles(pathname);
     return {
       exportBucketCsvEscapeSymbol: this.config.exportBucketCsvEscapeSymbol,
       csvFile,
@@ -604,7 +600,7 @@ export class DatabricksDriver extends JDBCDriver {
   }
 
   /**
-   * Unload data from the SQL query to the export bucket.
+   * Unload data from a SQL query to an export bucket.
    */
   private async unloadWithSql(tableFullName: string, sql: string, params: unknown[]) {
     const types = await this.queryColumnTypes(sql, params);
@@ -615,7 +611,7 @@ export class DatabricksDriver extends JDBCDriver {
   }
 
   /**
-   * Unload data from the temp table to the export bucket.
+   * Unload data from a temp table to an export bucket.
    */
   private async unloadWithTable(tableFullName: string) {
     const types = await this.tableColumnTypes(tableFullName);
@@ -627,7 +623,7 @@ export class DatabricksDriver extends JDBCDriver {
   }
 
   /**
-   * Returns an array of signed URLs of the unloaded csv files.
+   * Returns an array of signed URLs of unloaded csv files.
    */
   private async getCsvFiles(
     pathname: string,

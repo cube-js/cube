@@ -18,8 +18,7 @@ export class JavaScriptSchemaFormatter extends BaseSchemaFormatter {
   }
 
   protected render(descriptor: SchemaDescriptor, level: number, appendComment = ''): string {
-    // eslint-disable-next-line prefer-template
-    const lineSeparator = ',\n' + (level < 2 ? '\n' : '');
+    const lineSeparator = `,\n${level < 2 ? '\n' : ''}`;
 
     if (Array.isArray(descriptor)) {
       const items = descriptor.map(desc => this.render(desc, level + 1)).join(', ');

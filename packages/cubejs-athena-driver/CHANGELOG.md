@@ -3,6 +3,176 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.24](https://github.com/cube-js/cube/compare/v0.33.23...v0.33.24) (2023-06-05)
+
+**Note:** Version bump only for package @cubejs-backend/athena-driver
+
+
+
+
+
+## [0.33.21](https://github.com/cube-js/cube/compare/v0.33.20...v0.33.21) (2023-05-31)
+
+**Note:** Version bump only for package @cubejs-backend/athena-driver
+
+
+
+
+
+## [0.33.20](https://github.com/cube-js/cube/compare/v0.33.19...v0.33.20) (2023-05-31)
+
+**Note:** Version bump only for package @cubejs-backend/athena-driver
+
+
+
+
+
+## [0.33.19](https://github.com/cube-js/cube/compare/v0.33.18...v0.33.19) (2023-05-30)
+
+**Note:** Version bump only for package @cubejs-backend/athena-driver
+
+
+
+
+
+## [0.33.18](https://github.com/cube-js/cube/compare/v0.33.17...v0.33.18) (2023-05-29)
+
+**Note:** Version bump only for package @cubejs-backend/athena-driver
+
+
+
+
+
+## [0.33.15](https://github.com/cube-js/cube/compare/v0.33.14...v0.33.15) (2023-05-26)
+
+
+### Bug Fixes
+
+* **athena-driver:** Internal: Error during planning: Coercion from [Utf8, Utf8] to the signature Exact([Utf8, Timestamp(Nanosecond, None)]) failed for athena pre-aggregations ([#6655](https://github.com/cube-js/cube/issues/6655)) ([46f7dbd](https://github.com/cube-js/cube/commit/46f7dbdeb0a9f55640d0f7afd7edb67ec101a43a))
+
+
+
+
+
+## [0.33.13](https://github.com/cube-js/cube/compare/v0.33.12...v0.33.13) (2023-05-25)
+
+**Note:** Version bump only for package @cubejs-backend/athena-driver
+
+
+
+
+
+## [0.33.11](https://github.com/cube-js/cube/compare/v0.33.10...v0.33.11) (2023-05-22)
+
+**Note:** Version bump only for package @cubejs-backend/athena-driver
+
+
+
+
+
+## [0.33.9](https://github.com/cube-js/cube/compare/v0.33.8...v0.33.9) (2023-05-18)
+
+**Note:** Version bump only for package @cubejs-backend/athena-driver
+
+
+
+
+
+## [0.33.8](https://github.com/cube-js/cube/compare/v0.33.7...v0.33.8) (2023-05-17)
+
+
+### Bug Fixes
+
+* **athena-driver:** Fix partitioned pre-aggregations and column values with `,` through export bucket ([#6596](https://github.com/cube-js/cube/issues/6596)) ([1214cab](https://github.com/cube-js/cube/commit/1214cabf69f9e6216c516d05acadfe7e6178cccf))
+
+
+
+
+
+## [0.33.7](https://github.com/cube-js/cube/compare/v0.33.6...v0.33.7) (2023-05-16)
+
+**Note:** Version bump only for package @cubejs-backend/athena-driver
+
+
+
+
+
+## [0.33.6](https://github.com/cube-js/cube/compare/v0.33.5...v0.33.6) (2023-05-13)
+
+**Note:** Version bump only for package @cubejs-backend/athena-driver
+
+
+
+
+
+## [0.33.5](https://github.com/cube-js/cube/compare/v0.33.4...v0.33.5) (2023-05-11)
+
+**Note:** Version bump only for package @cubejs-backend/athena-driver
+
+
+
+
+
+## [0.33.4](https://github.com/cube-js/cube/compare/v0.33.3...v0.33.4) (2023-05-07)
+
+**Note:** Version bump only for package @cubejs-backend/athena-driver
+
+
+
+
+
+## [0.33.2](https://github.com/cube-js/cube/compare/v0.33.1...v0.33.2) (2023-05-04)
+
+**Note:** Version bump only for package @cubejs-backend/athena-driver
+
+
+
+
+
+# [0.33.0](https://github.com/cube-js/cube/compare/v0.32.31...v0.33.0) (2023-05-02)
+
+**Note:** Version bump only for package @cubejs-backend/athena-driver
+
+
+
+
+
+## [0.32.31](https://github.com/cube-js/cube/compare/v0.32.30...v0.32.31) (2023-05-02)
+
+**Note:** Version bump only for package @cubejs-backend/athena-driver
+
+
+
+
+
+## [0.32.30](https://github.com/cube-js/cube/compare/v0.32.29...v0.32.30) (2023-04-28)
+
+**Note:** Version bump only for package @cubejs-backend/athena-driver
+
+
+
+
+
+## [0.32.29](https://github.com/cube-js/cube/compare/v0.32.28...v0.32.29) (2023-04-25)
+
+
+### Features
+
+* **athena-driver:** read-only unload ([#6469](https://github.com/cube-js/cube/issues/6469)) ([d3fee7c](https://github.com/cube-js/cube/commit/d3fee7cbefe5c415573c4d2507b7e61a48f0c91a))
+* **snowflake-driver:** streaming export, read-only unload ([#6452](https://github.com/cube-js/cube/issues/6452)) ([67565b9](https://github.com/cube-js/cube/commit/67565b975c16f93070de0346056c6a3865bc9fd8))
+
+
+
+
+
+## [0.32.28](https://github.com/cube-js/cube/compare/v0.32.27...v0.32.28) (2023-04-19)
+
+**Note:** Version bump only for package @cubejs-backend/athena-driver
+
+
+
+
+
 ## [0.32.27](https://github.com/cube-js/cube/compare/v0.32.26...v0.32.27) (2023-04-14)
 
 **Note:** Version bump only for package @cubejs-backend/athena-driver

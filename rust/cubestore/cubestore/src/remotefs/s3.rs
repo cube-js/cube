@@ -274,13 +274,17 @@ impl RemoteFs for S3RemoteFs {
     }
 
     async fn list_with_metadata(&self, remote_prefix: &str) -> Result<Vec<RemoteFile>, CubeError> {
-        app_metrics::REMOTE_FS_OPERATION_CORE.add_with_tags(
-            1,
-            Some(&vec!["operation:list".to_string(), "driver:s3".to_string()]),
-        );
         let path = self.s3_path(remote_prefix);
         let bucket = self.bucket.read().unwrap().clone();
         let list = cube_ext::spawn_blocking(move || bucket.list_blocking(path, None)).await??;
+        let pages_count = list.len();
+        app_metrics::REMOTE_FS_OPERATION_CORE.add_with_tags(
+            pages_count as i64,
+            Some(&vec!["operation:list".to_string(), "driver:s3".to_string()]),
+        );
+        if pages_count > 100 {
+            log::warn!("S3 list returned more than 100 pages: {}", pages_count);
+        }
         let leading_slash = Regex::new(format!("^{}", self.s3_path("")).as_str()).unwrap();
         let result = list
             .iter()

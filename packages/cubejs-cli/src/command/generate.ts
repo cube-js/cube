@@ -1,7 +1,7 @@
 import fs from 'fs-extra';
 import path from 'path';
 import { CommanderStatic } from 'commander';
-import { isDockerImage, requireFromPackage, packageExists } from '@cubejs-backend/shared';
+import { isDockerImage, requireFromPackage, packageExists, getEnv } from '@cubejs-backend/shared';
 import type { ServerContainer as ServerContainerType } from '@cubejs-backend/server';
 
 import { displayError, event } from '../utils';
@@ -79,8 +79,9 @@ const generate = async (options) => {
   );
   const scaffoldingTemplate = new ScaffoldingTemplate(dbSchema, driver);
   const { tables, dataSource } = options;
+
   const files = scaffoldingTemplate.generateFilesByTableNames(tables, { dataSource });
-  await Promise.all(files.map(file => fs.writeFile(path.join('schema', file.fileName), file.content)));
+  await Promise.all(files.map(file => fs.writeFile(path.join(getEnv('schemaPath'), 'cubes', file.fileName), file.content)));
 
   await event({
     event: 'Generate Schema Success',

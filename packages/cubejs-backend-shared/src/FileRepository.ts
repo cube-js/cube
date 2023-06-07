@@ -22,8 +22,14 @@ export class FileRepository implements SchemaFileRepository {
     return path.join(process.cwd(), this.repositoryPath);
   }
 
-  protected async getFiles(dir: string, fileList: string[] = []) {
-    const files = await fs.readdir(path.join(this.localPath(), dir));
+  protected async getFiles(dir: string, fileList: string[] = []): Promise<string[]> {
+    let files: string[] = [];
+    
+    try {
+      files = await fs.readdir(path.join(this.localPath(), dir));
+    } catch (e) {
+      throw new Error(`Model files not found. Please make sure the "${this.repositoryPath}" directory exists and contains model files.`);
+    }
 
     // eslint-disable-next-line no-restricted-syntax
     for (const file of files) {

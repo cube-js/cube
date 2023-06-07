@@ -131,8 +131,6 @@ export const mainTestSet = testSet([
   ...skippedTestSet,
   ...withOrderingTestSet,
   ...withoutOrderingTestSet,
-  hiddenMember,
-  hiddenCube,
   viewMetaExposed
 ]);
 

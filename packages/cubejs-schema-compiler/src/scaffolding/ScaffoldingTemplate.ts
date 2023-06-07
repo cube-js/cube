@@ -1,13 +1,12 @@
 import { MemberReference } from './descriptors/MemberReference';
 import { ValueWithComments } from './descriptors/ValueWithComments';
-import { JavaScriptSchemaFormatter, YamlSchemaFormatter } from './formatters';
+import { BaseSchemaFormatter, JavaScriptSchemaFormatter, YamlSchemaFormatter } from './formatters';
 import {
   CubeDescriptor,
   CubeDescriptorMember,
   DatabaseSchema,
   TableName,
 } from './ScaffoldingSchema';
-import { BaseSchemaFormatter } from './formatters/BaseSchemaFormatter';
 
 export type SchemaContext = {
   dataSource?: string;
@@ -31,18 +30,25 @@ export enum SchemaFormat {
   Yaml = 'yaml',
 }
 
+export type ScaffoldingTemplateOptions = {
+  format?: SchemaFormat,
+  snakeCase?: boolean
+};
+
 export class ScaffoldingTemplate {
   private formatStrategy: BaseSchemaFormatter;
 
   public constructor(
     dbSchema: DatabaseSchema,
     private readonly driver,
-    format?: SchemaFormat
+    protected readonly options: ScaffoldingTemplateOptions = {
+      snakeCase: false
+    }
   ) {
     this.formatStrategy =
-      format === SchemaFormat.Yaml
-        ? new YamlSchemaFormatter(dbSchema, this.driver)
-        : new JavaScriptSchemaFormatter(dbSchema, this.driver);
+      options.format === SchemaFormat.Yaml
+        ? new YamlSchemaFormatter(dbSchema, this.driver, { snakeCase: Boolean(this.options.snakeCase) })
+        : new JavaScriptSchemaFormatter(dbSchema, this.driver, { snakeCase: Boolean(this.options.snakeCase) });
   }
 
   public generateFilesByTableNames(
@@ -51,7 +57,7 @@ export class ScaffoldingTemplate {
   ) {
     return this.formatStrategy.generateFilesByTableNames(
       tableNames,
-      schemaContext
+      schemaContext,
     );
   }
 

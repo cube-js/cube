@@ -1,7 +1,6 @@
 {
   "cube": {
     "environment": {
-      "CUBEJS_DEV_MODE": "true",
       "CUBEJS_API_SECRET": "mysupersecret",
       "CUBEJS_CACHE_AND_QUEUE_DRIVER": "cubestore",
       "CUBEJS_CUBESTORE_HOST": "store",
@@ -29,6 +28,12 @@
     "CREATE_SUB_PREFIX": "(",
     "CREATE_SUB_SUFFIX": ");"
   },
+  "tables": {
+    "products": "products",
+    "customers": "customers",
+    "ecommerce": "ecommerce",
+    "bigecommerce": "bigecommerce"
+  },
   "preAggregations": {
     "Products": [],
     "Customers": [],
@@ -38,7 +43,8 @@
     "---------------------------------------",
     "Driver tests                           ",
     "---------------------------------------",
-    "must stream from the data source",
+    "must download query from the data source via memory",
+    "must download query from the data source via stream",
 
     "---------------------------------------",
     "Core tests                             ",
@@ -65,6 +71,9 @@
     "querying Products: dimensions -- doesn't work wo ordering",
     "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- rounding in athena",
     "querying ECommerce: total sales, total profit by month + order (date) + total -- doesn't work with the BigQuery",
-    "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- noisy test"
+    "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- noisy test",
+    "querying ECommerce: partitioned pre-agg",
+    "querying ECommerce: partitioned pre-agg higher granularity",
+    "querying BigECommerce: partitioned pre-agg"
   ]
 }

@@ -3,6 +3,251 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.24](https://github.com/cube-js/cube/compare/v0.33.23...v0.33.24) (2023-06-05)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.33.23](https://github.com/cube-js/cube/compare/v0.33.22...v0.33.23) (2023-06-01)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.33.22](https://github.com/cube-js/cube/compare/v0.33.21...v0.33.22) (2023-05-31)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.33.21](https://github.com/cube-js/cube/compare/v0.33.20...v0.33.21) (2023-05-31)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.33.20](https://github.com/cube-js/cube/compare/v0.33.19...v0.33.20) (2023-05-31)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.33.19](https://github.com/cube-js/cube/compare/v0.33.18...v0.33.19) (2023-05-30)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.33.18](https://github.com/cube-js/cube/compare/v0.33.17...v0.33.18) (2023-05-29)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.33.15](https://github.com/cube-js/cube/compare/v0.33.14...v0.33.15) (2023-05-26)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.33.14](https://github.com/cube-js/cube/compare/v0.33.13...v0.33.14) (2023-05-25)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.33.13](https://github.com/cube-js/cube/compare/v0.33.12...v0.33.13) (2023-05-25)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.33.12](https://github.com/cube-js/cube/compare/v0.33.11...v0.33.12) (2023-05-22)
+
+
+### Bug Fixes
+
+* Invalid query format: \"filters[0]\" does not match any of the allowed types for `or` query ([a3b4cd6](https://github.com/cube-js/cube/commit/a3b4cd67455f9839024495f332f8f4e2963d64ce))
+
+
+
+
+
+## [0.33.11](https://github.com/cube-js/cube/compare/v0.33.10...v0.33.11) (2023-05-22)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.33.10](https://github.com/cube-js/cube/compare/v0.33.9...v0.33.10) (2023-05-19)
+
+
+### Bug Fixes
+
+* remove noisy Warning: Attribute `filter.dimension` is deprecated. Please use 'member' instead of 'dimension' ([546227a](https://github.com/cube-js/cube/commit/546227a96c5c41078c82a75d7e4697dfd505e181))
+
+
+
+
+
+## [0.33.9](https://github.com/cube-js/cube/compare/v0.33.8...v0.33.9) (2023-05-18)
+
+
+### Bug Fixes
+
+* Invalid query format: \"filters[0]\" does not match any of the allowed types if queryRewrite is using non string values ([ac57b4c](https://github.com/cube-js/cube/commit/ac57b4c15cb39392faa75a01c042fdd5ecb19af9))
+
+
+
+
+
+## [0.33.8](https://github.com/cube-js/cube/compare/v0.33.7...v0.33.8) (2023-05-17)
+
+
+### Bug Fixes
+
+* **graphql:** exclude empty cubes, revert equals/notEquals type ([#6619](https://github.com/cube-js/cube/issues/6619)) ([fab1b6a](https://github.com/cube-js/cube/commit/fab1b6abe198b1d83b4484bae66108782e62887c))
+
+
+
+
+
+## [0.33.7](https://github.com/cube-js/cube/compare/v0.33.6...v0.33.7) (2023-05-16)
+
+
+### Bug Fixes
+
+* Limit override isn't respected in queryRewrite ([#6605](https://github.com/cube-js/cube/issues/6605)) ([172c39b](https://github.com/cube-js/cube/commit/172c39b6fb2609f003a364efb63d8091e39607a0))
+
+
+
+
+
+## [0.33.6](https://github.com/cube-js/cube/compare/v0.33.5...v0.33.6) (2023-05-13)
+
+
+### Bug Fixes
+
+* LIMIT is not enforced ([#6586](https://github.com/cube-js/cube/issues/6586)) ([8ca5234](https://github.com/cube-js/cube/commit/8ca52342944b9767f2c34591a9241bf31cf78c71))
+
+
+
+
+
+## [0.33.5](https://github.com/cube-js/cube/compare/v0.33.4...v0.33.5) (2023-05-11)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.33.4](https://github.com/cube-js/cube/compare/v0.33.3...v0.33.4) (2023-05-07)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.33.3](https://github.com/cube-js/cube/compare/v0.33.2...v0.33.3) (2023-05-05)
+
+
+### Bug Fixes
+
+* **graphql:** Pre-aggregations aren't used for GraphQL queries with date range ([#6549](https://github.com/cube-js/cube/issues/6549)) ([a343f4d](https://github.com/cube-js/cube/commit/a343f4d2f0bdf62120e99fb3252f6460f4a85e8e))
+
+
+
+
+
+## [0.33.2](https://github.com/cube-js/cube/compare/v0.33.1...v0.33.2) (2023-05-04)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+# [0.33.0](https://github.com/cube-js/cube/compare/v0.32.31...v0.33.0) (2023-05-02)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.32.31](https://github.com/cube-js/cube/compare/v0.32.30...v0.32.31) (2023-05-02)
+
+
+### Bug Fixes
+
+* **cubesql:** Streaming error logging ([e27a525](https://github.com/cube-js/cube/commit/e27a5252380a55682f450bf057767074394179a2))
+
+
+
+
+
+## [0.32.30](https://github.com/cube-js/cube/compare/v0.32.29...v0.32.30) (2023-04-28)
+
+
+### Bug Fixes
+
+* Always log authentication errors for debugging purpose ([2c309b7](https://github.com/cube-js/cube/commit/2c309b7d8122c19397a649e51d4b2a032361f8ee))
+* model style guide, views folder ([#6493](https://github.com/cube-js/cube/issues/6493)) ([1fa7f99](https://github.com/cube-js/cube/commit/1fa7f994551e05fd2ef417bd2ee7f472881bc2bc))
+
+
+### Features
+
+* **gateway:** GraphQL snake case support ([#6480](https://github.com/cube-js/cube/issues/6480)) ([45a46d0](https://github.com/cube-js/cube/commit/45a46d0556c07842830bf55447f4f575fc158ef6))
+* **playground:** cube type tag, public cubes ([#6482](https://github.com/cube-js/cube/issues/6482)) ([cede7a7](https://github.com/cube-js/cube/commit/cede7a71f7d2e8d9dc221669b6b1714ee146d8ea))
+
+
+
+
+
+## [0.32.29](https://github.com/cube-js/cube/compare/v0.32.28...v0.32.29) (2023-04-25)
+
+
+### Bug Fixes
+
+* **api-gateway:** passing defaultApiScope env to the contextToApiScopesFn ([#6485](https://github.com/cube-js/cube/issues/6485)) ([b2da950](https://github.com/cube-js/cube/commit/b2da950509e48bdfcd5d6f282f81a00b3794d559))
+
+
+
+
+
+## [0.32.28](https://github.com/cube-js/cube/compare/v0.32.27...v0.32.28) (2023-04-19)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
 ## [0.32.27](https://github.com/cube-js/cube/compare/v0.32.26...v0.32.27) (2023-04-14)
 
 **Note:** Version bump only for package @cubejs-backend/api-gateway

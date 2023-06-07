@@ -14,7 +14,8 @@ will take precedence over environment variables.
 <InfoBox>
 
 When using Docker, ensure that the `cube.js` configuration file and your
-`schema/` folder are mounted to `/cube/conf` within the Docker container.
+`model/` [folder][ref-folder-structure] are mounted to `/cube/conf` within the
+Docker container.
 
 </InfoBox>
 
@@ -22,14 +23,10 @@ When using Docker, ensure that the `cube.js` configuration file and your
 
 You can set environment variables in&nbsp;<Btn>Settings → Configuration</Btn>:
 
-<div style="text-align: center">
-  <img
-    alt="Cube Cloud Environment Variables Screen"
-    src="https://ucarecdn.com/b47693b9-f770-4e01-a0d1-60e3fcf19e23/"
-    style="border: none"
-    width="100%"
-  />
-</div>
+<Screenshot
+  alt="Cube Cloud Environment Variables Screen"
+  src="https://ucarecdn.com/b47693b9-f770-4e01-a0d1-60e3fcf19e23/"
+/>
 
 ## Development Mode
 
@@ -65,8 +62,8 @@ using the `CUBEJS_DB_MAX_POOL` environment variable; if changing this from the
 default, you must ensure that the new value is greater than the number of
 concurrent connections used by Cube's query queues and refresh scheduler.
 
+[ref-folder-structure]: /data-modeling/syntax#folder-structure
 [link-config]: /config
 [link-dev-playground]: /dev-tools/dev-playground
 [link-env-vars]: /reference/environment-variables
 [link-scheduled-refresh]: /schema/reference/pre-aggregations#scheduled-refresh
-

@@ -1,0 +1,337 @@
+---
+title: Syntax
+permalink: /data-modeling/syntax
+category: Data Modeling
+subCategory: Fundamentals
+menuOrder: 11
+redirect_from:
+  - /schema/fundamentals/working-with-yaml
+  - /schema/getting-started/yaml
+---
+
+Entities within the data model (e.g., cubes, views, etc.) should be placed under
+the `model` [folder][self-folder-structure], follow [naming
+conventions][self-naming], and be defined using a supported
+[syntax][self-syntax].
+
+## Folder structure
+
+Data model files should be placed inside the `model` folder. You can use the
+[`schemaPath` configuration option][ref-config-model-path] to override the
+folder name or the [`repositoryFactory` configuration
+option][ref-config-repository-factory] to dynamically define the folder name and
+data model file contents.
+
+It's recommended to place each cube or view in a separate file, in `model/cubes`
+and `model/views` folders, respectively. Example:
+
+```tree
+model
+├── cubes
+│   ├── orders.yml
+│   ├── products.yml
+│   └── users.yml
+└── views
+    └── revenue.yml
+```
+
+## Model syntax
+
+Cube supports two ways to define data model files: with [YAML][wiki-yaml] or
+JavaScript syntax.
+
+<InfoBox>
+
+YAML syntax is supported since v0.31.0.
+
+</InfoBox>
+
+YAML data model files should have the `.yml` extension, whereas JavaScript data
+model files should end with `.js`.
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  sql: `
+    SELECT *
+    FROM
+      orders,
+      line_items
+    WHERE orders.id = line_items.order_id
+  `,
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    sql: >
+      SELECT * FROM orders, line_items WHERE orders.id = line_items.order_id
+```
+
+</CodeTabs>
+
+## Naming
+
+Common rules apply to names of entities within the data model. All names must:
+
+- start with a letter
+- consist of letters, numbers, and underscore (`_`) symbols only
+
+It is also recommended that names use [snake
+case][wiki-snake-case]<!-- and follow the style guide -->.
+
+Good examples of names:
+
+- `orders`, `stripe_invoices`, or `base_payments` (cubes)
+- `opportunities`, `cloud_accounts`, or `arr` (views)
+- `count`, `avg_price`, or `total_amount_shipped` (measures)
+- `name`, `is_shipped`, or `created_at` (dimensions)
+- `main`, `orders_by_status`, or `lambda_invoices` (pre-aggregations)
+
+## Scoping
+
+Cubes have three types of members: measures, dimensions and segments. Members have full names and short names:
+* Each member can be referenced either by its full name (`<cube_name>.<member_name>`) 
+* or by its short name (`<member_name>`) __if member exists within the same cube__. 
+
+There is also a handy `CUBE` context variable which
+references the current cube. Important difference between same cube references
+is `CUBE.<member-Name>` references are resolved runtime as opposed to compile
+time `<member_name>` references.
+
+Using the `CUBE` referencing causes its alias to be used in SQL queries. For
+example, to avoid ambiguity in the `name` dimension in the following example, we
+use the `CUBE` context variable to explicitly reference the `name` property from
+the `users` cube:
+
+<CodeTabs>
+
+```javascript
+cube(`users`, {
+  sql_table: `users`,
+
+  joins: {
+    contacts: {
+      sql: `${CUBE}.contact_id = ${contacts.id}`,
+      relationship: `one_to_one`,
+    },
+  },
+
+  dimensions: {
+    id: {
+      sql: `${CUBE}.id`,
+      type: `number`,
+      primary_key: true,
+    },
+
+    name: {
+      sql: `COALESCE(${CUBE}.name, ${contacts.name})`,
+      type: `string`,
+    },
+  },
+});
+
+cube(`contacts`, {
+  sql_table: `contacts`,
+
+  dimensions: {
+    id: {
+      sql: `${CUBE}.id`,
+      type: `number`,
+      primary_key: true,
+    },
+
+    name: {
+      sql: `${CUBE}.name`,
+      type: `string`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: users
+    sql_table: users
+
+    joins:
+      - name: contacts
+        sql: "{CUBE}.contact_id = {contacts.id}"
+        relationship: one_to_one
+
+    dimensions:
+      - name: id
+        sql: "{CUBE}.id"
+        type: number
+        primary_key: true
+
+      - name: name
+        sql: "COALESCE({CUBE.name}, {contacts.name})"
+        type: string
+
+  - name: contacts
+    sql_table: contacts
+
+    dimensions:
+      - name: id
+        sql: "{CUBE}.id"
+        type: number
+        primary_key: true
+
+      - name: name
+        sql: "{CUBE}.name"
+        type: string
+```
+
+</CodeTabs>
+
+Referencing a foreign cube in the `sql` parameter instructs Cube to build an
+implicit join to this cube. Using the data model above, we'll use a query as an
+example:
+
+```json
+{
+  "dimensions": ["users.name"]
+}
+```
+
+The resulting SQL output from [`/v1/sql`][ref-restapi-sql] would look like:
+
+```sql
+SELECT COALESCE("users".name, "contacts".name) "users__name"
+FROM users "users"
+LEFT JOIN contacts "contacts"
+  ON "users".contact_id = "contacts".id
+```
+
+
+## SQL blocks
+
+Cube requires you to provide SQL snippets in `sql` and `sql_table` parameters. 
+The SQL code you provide in these parameters should match your database SQL dialect. 
+Cube enables you to reference existing objects in SQL blocks with Python-like `{}` interpolation syntax in YAML models and `${}` interpolation operator in JS models.
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  sql_table: `public.orders`,
+
+  measures: {
+    total_amount_shipped: {
+      sql: `${CUBE.amount}`,
+      type: `sum`,
+      filters: [
+        { sql: `${CUBE.status} = 'shipped'` }
+      ]
+    }
+  },
+
+  dimensions: {
+    status: {
+      sql: `${CUBE}.status`,
+      type: `string`
+    },
+
+    amount: {
+      sql: `${line_items.total_amount}`,
+      type: `number`,
+      sub_query: true
+    }
+  }
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    sql_table: public.orders
+
+    measures:
+      - name: total_amount_shipped
+        sql: "{CUBE.amount}"
+        type: sum
+        filters:
+          - sql: "{CUBE.status} = 'shipped'"
+
+    dimensions:
+      - name: status
+        sql: "{CUBE}.status"
+        type: string
+
+      - name: amount
+        sql: "{line_items.total_amount}"
+        type: number
+        sub_query: true
+```
+
+</CodeTabs>
+
+## Referring to objects
+
+To write reusable data models, it is important to be able to reference existing objects, such as measures or dimensions.
+
+In most cases you can just list objects as-is.
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  sql_table: `orders`,
+
+  pre_aggregations: {
+    orders_by_status: {
+      dimensions: [CUBE.status],
+      measures: [CUBE.count],
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    sql_table: orders
+
+    pre_aggregations:
+      - name: orders_by_status
+        dimensions:
+          - CUBE.status
+        measures:
+          - CUBE.count
+```
+
+</CodeTabs>
+
+
+Inside [SQL blocks][self-sql-blocks] you need to use interpolation syntax, `{}` for YAML models and `${}` for JS models.
+
+
+
+## Context Variables
+
+Cube provides the following context variables you can access inside your data model
+
+* __FILTER_PARAMS__: It helps to optimize SQL that powers Cube, e.g. hint your database optimizer to use a specific index 
+or filter out partitions or shards in your cloud data warehouse so you won't be billed for scanning those.
+* __SQL_UTILS__: Provides useful utils functions.
+* __CUBE__: Handy helper to reference members via full names. Learn more about its usage in [scoping section][self-scoping].
+* __COMPILE_CONTEXT__: it is being used to create dynamic data models. It is advanced concept and you can [read about it here][ref-dynamic-data-models]. 
+
+You can find [Context variables reference here][ref-context-variables]
+
+
+
+[self-folder-structure]: #folder-structure
+[self-naming]: #naming
+[self-syntax]: #code-syntax
+[self-scoping]: #scoping
+[self-sql-blocks]: #sql-blocks
+[ref-dynamic-data-models]: /schema/advanced/dynamic-schema-creation
+[ref-context-variables]: /schema/reference/cube#context-variables
+[ref-config-model-path]: /config#options-reference-schema-path
+[ref-config-repository-factory]: /config#options-reference-repository-factory
+[wiki-snake-case]: https://en.wikipedia.org/wiki/Snake_case
+[wiki-yaml]: https://en.wikipedia.org/wiki/YAML

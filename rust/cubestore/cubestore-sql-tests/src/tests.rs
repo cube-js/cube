@@ -103,6 +103,10 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             "create_table_with_csv_no_header",
             create_table_with_csv_no_header,
         ),
+        t(
+            "create_table_with_csv_no_header_and_delimiter",
+            create_table_with_csv_no_header_and_delimiter,
+        ),
         t("create_table_with_url", create_table_with_url),
         t("create_table_fail_and_retry", create_table_fail_and_retry),
         t("empty_crash", empty_crash),
@@ -233,12 +237,17 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("cache_compaction", cache_compaction),
         t("cache_set_nx", cache_set_nx),
         t("cache_prefix_keys", cache_prefix_keys),
-        t("queue_full_workflow", queue_full_workflow),
+        t("queue_full_workflow_v1", queue_full_workflow_v1),
+        t("queue_full_workflow_v2", queue_full_workflow_v2),
+        t("queue_latest_result_v1", queue_latest_result_v1),
         t("queue_retrieve_extended", queue_retrieve_extended),
-        t("queue_ack_then_result", queue_ack_then_result),
+        t("queue_ack_then_result_v1", queue_ack_then_result_v1),
+        t("queue_ack_then_result_v2", queue_ack_then_result_v2),
         t("queue_orphaned_timeout", queue_orphaned_timeout),
-        t("queue_heartbeat", queue_heartbeat),
-        t("queue_merge_extra", queue_merge_extra),
+        t("queue_heartbeat_by_id", queue_heartbeat_by_id),
+        t("queue_heartbeat_by_path", queue_heartbeat_by_path),
+        t("queue_merge_extra_by_path", queue_merge_extra_by_path),
+        t("queue_merge_extra_by_id", queue_merge_extra_by_id),
         t(
             "queue_multiple_result_blocking",
             queue_multiple_result_blocking,
@@ -2152,6 +2161,34 @@ async fn create_table_with_csv_no_header(service: Box<dyn SqlClient>) {
     );
 }
 
+async fn create_table_with_csv_no_header_and_delimiter(service: Box<dyn SqlClient>) {
+    let file = write_tmp_file(indoc! {"
+        apple\u{0001}2
+        banana\u{0001}3
+    "})
+    .unwrap();
+    let path = file.path().to_string_lossy();
+    let _ = service
+        .exec_query("CREATE SCHEMA IF NOT EXISTS test")
+        .await
+        .unwrap();
+    let _ = service
+        .exec_query(format!("CREATE TABLE test.table (`fruit` text, `number` int) WITH (input_format = 'csv_no_header', delimiter = '^A') LOCATION '{}'", path).as_str())
+        .await
+        .unwrap();
+    let result = service
+        .exec_query("SELECT * FROM test.table")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&result),
+        vec![
+            vec![TableValue::String("apple".to_string()), TableValue::Int(2)],
+            vec![TableValue::String("banana".to_string()), TableValue::Int(3)]
+        ]
+    );
+}
+
 async fn create_table_with_url(service: Box<dyn SqlClient>) {
     let url = "https://data.wprdc.org/dataset/0b584c84-7e35-4f4d-a5a2-b01697470c0f/resource/e95dd941-8e47-4460-9bd8-1e51c194370b/download/bikepghpublic.csv";
 
@@ -3984,7 +4021,7 @@ async fn topk_hll(service: Box<dyn SqlClient>) {
         )
         .await
         .unwrap();
-    assert_eq!(to_rows(&r), rows(&[("d", 10383), ("b", 9722), ("c", 171)]));
+    assert_eq!(to_rows(&r), rows(&[("b", 9722), ("d", 9722), ("c", 171)]));
 
     let r = service
         .exec_query(
@@ -3993,13 +4030,13 @@ async fn topk_hll(service: Box<dyn SqlClient>) {
                                UNION ALL \
                                SELECT * FROM s.Data2) AS `Data` \
                          GROUP BY 1 \
-                         HAVING cardinality(merge(hits)) < 10000
+                         HAVING cardinality(merge(hits)) < 9000
                          ORDER BY 2 DESC \
-                         LIMIT 3",
+                         LIMIT 2",
         )
         .await
         .unwrap();
-    assert_eq!(to_rows(&r), rows(&[("b", 9722), ("c", 171), ("h", 164)]));
+    assert_eq!(to_rows(&r), rows(&[("c", 171), ("h", 164)]));
     let r = service
         .exec_query(
             "SELECT `url` `url`, cardinality(merge(hits)) `hits` \
@@ -5486,7 +5523,7 @@ async fn ksql_simple(service: Box<dyn SqlClient>) {
                 .await
                 .unwrap();
             if res.len() == 0 {
-                futures_timer::Delay::new(Duration::from_millis(100)).await;
+                tokio::time::sleep(Duration::from_millis(100)).await;
                 continue;
             }
             if res.len() == 1 {
@@ -8073,31 +8110,156 @@ async fn limit_pushdown_unique_key(service: Box<dyn SqlClient>) {
     );
 }
 
-async fn queue_full_workflow(service: Box<dyn SqlClient>) {
-    service
+// Testing new rescheduling for old results which works on top of TTL
+// With V1 API it should return latest result after each ACK
+async fn queue_latest_result_v1(service: Box<dyn SqlClient>) {
+    let service = Arc::new(service);
+
+    for interval_id in 1..5 {
+        let add_response = service
+            .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:1" "payload";"#)
+            .await
+            .unwrap();
+        assert_queue_add_columns(&add_response);
+        assert_eq!(
+            add_response.get_rows(),
+            &vec![Row::new(vec![
+                TableValue::String(interval_id.to_string()),
+                TableValue::Boolean(true),
+                TableValue::Int(1)
+            ])]
+        );
+
+        let retrieve_response = service
+            .exec_query(r#"QUEUE RETRIEVE CONCURRENCY 1 "STANDALONE#queue:1""#)
+            .await
+            .unwrap();
+        assert_queue_retrieve_columns(&retrieve_response);
+        assert_eq!(
+            retrieve_response.get_rows(),
+            &vec![Row::new(vec![
+                TableValue::String("payload".to_string()),
+                TableValue::Null,
+                TableValue::Int(0),
+                TableValue::String("1".to_string()),
+                // id
+                TableValue::String(interval_id.to_string()),
+            ]),]
+        );
+
+        let ack_res = service
+            .exec_query(&format!(
+                r#"QUEUE ACK "STANDALONE#queue:1" "result:{}""#,
+                interval_id
+            ))
+            .await
+            .unwrap();
+        assert_eq!(
+            ack_res.get_rows(),
+            &vec![Row::new(vec![TableValue::Boolean(true)])]
+        );
+
+        let blocking_res = service
+            .exec_query(r#"QUEUE RESULT_BLOCKING 5000 "STANDALONE#queue:1""#)
+            .await
+            .unwrap();
+        assert_eq!(
+            blocking_res.get_rows(),
+            &vec![Row::new(vec![
+                TableValue::String(format!("result:{}", interval_id)),
+                TableValue::String("success".to_string())
+            ]),]
+        );
+    }
+}
+
+async fn queue_full_workflow_v1(service: Box<dyn SqlClient>) {
+    let add_response = service
         .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:1" "payload1";"#)
         .await
         .unwrap();
+    assert_queue_add_columns(&add_response);
+    assert_eq!(
+        add_response.get_rows(),
+        &vec![Row::new(vec![
+            TableValue::String("1".to_string()),
+            TableValue::Boolean(true),
+            TableValue::Int(1)
+        ])]
+    );
 
-    service
+    let add_response = service
         .exec_query(r#"QUEUE ADD PRIORITY 10 "STANDALONE#queue:2" "payload2";"#)
         .await
         .unwrap();
+    assert_queue_add_columns(&add_response);
+    assert_eq!(
+        add_response.get_rows(),
+        &vec![Row::new(vec![
+            TableValue::String("2".to_string()),
+            TableValue::Boolean(true),
+            TableValue::Int(2)
+        ])]
+    );
 
-    service
+    let add_response = service
         .exec_query(r#"QUEUE ADD PRIORITY 100 "STANDALONE#queue:3" "payload3";"#)
         .await
         .unwrap();
+    assert_queue_add_columns(&add_response);
+    assert_eq!(
+        add_response.get_rows(),
+        &vec![Row::new(vec![
+            TableValue::String("3".to_string()),
+            TableValue::Boolean(true),
+            TableValue::Int(3)
+        ])]
+    );
 
-    service
+    let add_response = service
         .exec_query(r#"QUEUE ADD PRIORITY 50 "STANDALONE#queue:4" "payload4";"#)
         .await
         .unwrap();
+    assert_queue_add_columns(&add_response);
+    assert_eq!(
+        add_response.get_rows(),
+        &vec![Row::new(vec![
+            TableValue::String("4".to_string()),
+            TableValue::Boolean(true),
+            TableValue::Int(4)
+        ])]
+    );
 
-    service
+    let add_response = service
         .exec_query(r#"QUEUE ADD PRIORITY -1 "STANDALONE#queue:5" "payload5";"#)
         .await
         .unwrap();
+    assert_queue_add_columns(&add_response);
+    assert_eq!(
+        add_response.get_rows(),
+        &vec![Row::new(vec![
+            TableValue::String("5".to_string()),
+            TableValue::Boolean(true),
+            TableValue::Int(5)
+        ])]
+    );
+
+    // deduplication check
+    {
+        let add_response = service
+            .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:1" "payload1";"#)
+            .await
+            .unwrap();
+        assert_queue_add_columns(&add_response);
+        assert_eq!(
+            add_response.get_rows(),
+            &vec![Row::new(vec![
+                TableValue::String("1".to_string()),
+                TableValue::Boolean(false),
+                TableValue::Int(5)
+            ])]
+        );
+    }
 
     {
         let pending_response = service
@@ -8157,21 +8319,14 @@ async fn queue_full_workflow(service: Box<dyn SqlClient>) {
             .exec_query(r#"QUEUE RETRIEVE CONCURRENCY 1 "STANDALONE#queue:3""#)
             .await
             .unwrap();
-        assert_eq!(
-            retrieve_response.get_columns(),
-            &vec![
-                Column::new("payload".to_string(), ColumnType::String, 0),
-                Column::new("extra".to_string(), ColumnType::String, 1),
-                Column::new("pending".to_string(), ColumnType::Int, 2),
-                Column::new("active".to_string(), ColumnType::String, 3),
-            ]
-        );
+        assert_queue_retrieve_columns(&retrieve_response);
         assert_eq!(
             retrieve_response.get_rows(),
             &vec![Row::new(vec![
                 TableValue::String("payload3".to_string()),
                 TableValue::Null,
                 TableValue::Int(4),
+                TableValue::String("3".to_string()),
                 TableValue::String("3".to_string()),
             ]),]
         );
@@ -8183,15 +8338,7 @@ async fn queue_full_workflow(service: Box<dyn SqlClient>) {
             .exec_query(r#"QUEUE RETRIEVE CONCURRENCY 1 "STANDALONE#queue:4""#)
             .await
             .unwrap();
-        assert_eq!(
-            retrieve_response.get_columns(),
-            &vec![
-                Column::new("payload".to_string(), ColumnType::String, 0),
-                Column::new("extra".to_string(), ColumnType::String, 1),
-                Column::new("pending".to_string(), ColumnType::Int, 2),
-                Column::new("active".to_string(), ColumnType::String, 3),
-            ]
-        );
+        assert_queue_retrieve_columns(&retrieve_response);
         assert_eq!(retrieve_response.get_rows().len(), 0);
     }
 
@@ -8225,10 +8372,14 @@ async fn queue_full_workflow(service: Box<dyn SqlClient>) {
         let ack = async move {
             tokio::time::sleep(Duration::from_millis(1000)).await;
 
-            service_to_move
+            let ack_result = service_to_move
                 .exec_query(r#"QUEUE ACK "STANDALONE#queue:3" "result:3""#)
                 .await
-                .unwrap()
+                .unwrap();
+            assert_eq!(
+                ack_result.get_rows(),
+                &vec![Row::new(vec![TableValue::Boolean(true)])]
+            )
         };
 
         let (blocking_res, _ack_res) = join!(blocking, ack);
@@ -8288,6 +8439,297 @@ async fn queue_full_workflow(service: Box<dyn SqlClient>) {
     }
 }
 
+async fn queue_full_workflow_v2(service: Box<dyn SqlClient>) {
+    let add_response = service
+        .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:1" "payload1";"#)
+        .await
+        .unwrap();
+    assert_queue_add_columns(&add_response);
+    assert_eq!(
+        add_response.get_rows(),
+        &vec![Row::new(vec![
+            TableValue::String("1".to_string()),
+            TableValue::Boolean(true),
+            TableValue::Int(1)
+        ])]
+    );
+
+    let add_response = service
+        .exec_query(r#"QUEUE ADD PRIORITY 10 "STANDALONE#queue:2" "payload2";"#)
+        .await
+        .unwrap();
+    assert_queue_add_columns(&add_response);
+    assert_eq!(
+        add_response.get_rows(),
+        &vec![Row::new(vec![
+            TableValue::String("2".to_string()),
+            TableValue::Boolean(true),
+            TableValue::Int(2)
+        ])]
+    );
+
+    let add_response = service
+        .exec_query(r#"QUEUE ADD PRIORITY 100 "STANDALONE#queue:3" "payload3";"#)
+        .await
+        .unwrap();
+    assert_queue_add_columns(&add_response);
+    assert_eq!(
+        add_response.get_rows(),
+        &vec![Row::new(vec![
+            TableValue::String("3".to_string()),
+            TableValue::Boolean(true),
+            TableValue::Int(3)
+        ])]
+    );
+
+    let add_response = service
+        .exec_query(r#"QUEUE ADD PRIORITY 50 "STANDALONE#queue:4" "payload4";"#)
+        .await
+        .unwrap();
+    assert_queue_add_columns(&add_response);
+    assert_eq!(
+        add_response.get_rows(),
+        &vec![Row::new(vec![
+            TableValue::String("4".to_string()),
+            TableValue::Boolean(true),
+            TableValue::Int(4)
+        ])]
+    );
+
+    let add_response = service
+        .exec_query(r#"QUEUE ADD PRIORITY -1 "STANDALONE#queue:5" "payload5";"#)
+        .await
+        .unwrap();
+    assert_queue_add_columns(&add_response);
+    assert_eq!(
+        add_response.get_rows(),
+        &vec![Row::new(vec![
+            TableValue::String("5".to_string()),
+            TableValue::Boolean(true),
+            TableValue::Int(5)
+        ])]
+    );
+
+    // deduplication check
+    {
+        let add_response = service
+            .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:1" "payload1";"#)
+            .await
+            .unwrap();
+        assert_queue_add_columns(&add_response);
+        assert_eq!(
+            add_response.get_rows(),
+            &vec![Row::new(vec![
+                TableValue::String("1".to_string()),
+                TableValue::Boolean(false),
+                TableValue::Int(5)
+            ])]
+        );
+    }
+
+    {
+        let pending_response = service
+            .exec_query(r#"QUEUE PENDING "STANDALONE#queue""#)
+            .await
+            .unwrap();
+        assert_eq!(
+            pending_response.get_columns(),
+            &vec![
+                Column::new("id".to_string(), ColumnType::String, 0),
+                Column::new("status".to_string(), ColumnType::String, 1),
+                Column::new("extra".to_string(), ColumnType::String, 2),
+            ]
+        );
+        assert_eq!(
+            pending_response.get_rows(),
+            &vec![
+                Row::new(vec![
+                    TableValue::String("3".to_string()),
+                    TableValue::String("pending".to_string()),
+                    TableValue::Null
+                ]),
+                Row::new(vec![
+                    TableValue::String("4".to_string()),
+                    TableValue::String("pending".to_string()),
+                    TableValue::Null
+                ]),
+                Row::new(vec![
+                    TableValue::String("2".to_string()),
+                    TableValue::String("pending".to_string()),
+                    TableValue::Null
+                ]),
+                Row::new(vec![
+                    TableValue::String("1".to_string()),
+                    TableValue::String("pending".to_string()),
+                    TableValue::Null
+                ]),
+                Row::new(vec![
+                    TableValue::String("5".to_string()),
+                    TableValue::String("pending".to_string()),
+                    TableValue::Null
+                ]),
+            ]
+        );
+    }
+
+    {
+        let active_response = service
+            .exec_query(r#"QUEUE ACTIVE "STANDALONE#queue""#)
+            .await
+            .unwrap();
+        assert_eq!(active_response.get_rows().len(), 0);
+    }
+
+    {
+        let retrieve_response = service
+            .exec_query(r#"QUEUE RETRIEVE CONCURRENCY 1 "STANDALONE#queue:3""#)
+            .await
+            .unwrap();
+        assert_queue_retrieve_columns(&retrieve_response);
+        assert_eq!(
+            retrieve_response.get_rows(),
+            &vec![Row::new(vec![
+                TableValue::String("payload3".to_string()),
+                TableValue::Null,
+                TableValue::Int(4),
+                TableValue::String("3".to_string()),
+                TableValue::String("3".to_string()),
+            ]),]
+        );
+    }
+
+    {
+        // concurrency limit
+        let retrieve_response = service
+            .exec_query(r#"QUEUE RETRIEVE CONCURRENCY 1 "STANDALONE#queue:4""#)
+            .await
+            .unwrap();
+        assert_queue_retrieve_columns(&retrieve_response);
+        assert_eq!(retrieve_response.get_rows().len(), 0);
+    }
+
+    {
+        let active_response = service
+            .exec_query(r#"QUEUE ACTIVE "STANDALONE#queue""#)
+            .await
+            .unwrap();
+        assert_eq!(
+            active_response.get_rows(),
+            &vec![Row::new(vec![
+                TableValue::String("3".to_string()),
+                TableValue::String("active".to_string()),
+                TableValue::Null
+            ]),]
+        );
+    }
+
+    let service = Arc::new(service);
+
+    {
+        let service_to_move = service.clone();
+        let blocking = async move {
+            service_to_move
+                .exec_query(r#"QUEUE RESULT_BLOCKING 5000 3"#)
+                .await
+                .unwrap()
+        };
+
+        let service_to_move = service.clone();
+        let ack = async move {
+            tokio::time::sleep(Duration::from_millis(1000)).await;
+
+            let ack_result = service_to_move
+                .exec_query(r#"QUEUE ACK 3 "result:3""#)
+                .await
+                .unwrap();
+            assert_eq!(
+                ack_result.get_rows(),
+                &vec![Row::new(vec![TableValue::Boolean(true)])]
+            )
+        };
+
+        let (blocking_res, _ack_res) = join!(blocking, ack);
+        assert_eq!(
+            blocking_res.get_rows(),
+            &vec![Row::new(vec![
+                TableValue::String("result:3".to_string()),
+                TableValue::String("success".to_string())
+            ]),]
+        );
+    }
+
+    // previous job was finished
+    {
+        let active_response = service
+            .exec_query(r#"QUEUE ACTIVE "STANDALONE#queue""#)
+            .await
+            .unwrap();
+        assert_eq!(active_response.get_rows().len(), 0);
+    }
+
+    // get
+    {
+        let get_response = service.exec_query(r#"QUEUE GET 2"#).await.unwrap();
+        assert_eq!(
+            get_response.get_rows(),
+            &vec![Row::new(vec![
+                TableValue::String("payload2".to_string()),
+                TableValue::Null
+            ]),]
+        );
+    }
+
+    // cancel job
+    {
+        let cancel_response = service.exec_query(r#"QUEUE CANCEL 2"#).await.unwrap();
+        assert_eq!(
+            cancel_response.get_rows(),
+            &vec![Row::new(vec![
+                TableValue::String("payload2".to_string()),
+                TableValue::Null
+            ]),]
+        );
+
+        // assertion that job was removed
+        let get_response = service.exec_query(r#"QUEUE GET 2"#).await.unwrap();
+        assert_eq!(get_response.get_rows().len(), 0);
+    }
+}
+
+fn assert_queue_add_columns(response: &Arc<DataFrame>) {
+    assert_eq!(
+        response.get_columns(),
+        &vec![
+            Column::new("id".to_string(), ColumnType::String, 0),
+            Column::new("added".to_string(), ColumnType::Boolean, 1),
+            Column::new("pending".to_string(), ColumnType::Int, 2),
+        ]
+    );
+}
+
+fn assert_queue_retrieve_columns(response: &Arc<DataFrame>) {
+    assert_eq!(
+        response.get_columns(),
+        &vec![
+            Column::new("payload".to_string(), ColumnType::String, 0),
+            Column::new("extra".to_string(), ColumnType::String, 1),
+            Column::new("pending".to_string(), ColumnType::Int, 2),
+            Column::new("active".to_string(), ColumnType::String, 3),
+            Column::new("id".to_string(), ColumnType::String, 4),
+        ]
+    );
+}
+
+fn assert_queue_result_blocking_columns(response: &Arc<DataFrame>) {
+    assert_eq!(
+        response.get_columns(),
+        &vec![
+            Column::new("payload".to_string(), ColumnType::String, 0),
+            Column::new("type".to_string(), ColumnType::String, 1),
+        ]
+    );
+}
+
 async fn queue_retrieve_extended(service: Box<dyn SqlClient>) {
     service
         .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:1" "payload1";"#)
@@ -8309,21 +8751,14 @@ async fn queue_retrieve_extended(service: Box<dyn SqlClient>) {
             .exec_query(r#"QUEUE RETRIEVE CONCURRENCY 1 "STANDALONE#queue:1""#)
             .await
             .unwrap();
-        assert_eq!(
-            retrieve_response.get_columns(),
-            &vec![
-                Column::new("payload".to_string(), ColumnType::String, 0),
-                Column::new("extra".to_string(), ColumnType::String, 1),
-                Column::new("pending".to_string(), ColumnType::Int, 2),
-                Column::new("active".to_string(), ColumnType::String, 3),
-            ]
-        );
+        assert_queue_retrieve_columns(&retrieve_response);
         assert_eq!(
             retrieve_response.get_rows(),
             &vec![Row::new(vec![
                 TableValue::String("payload1".to_string()),
                 TableValue::Null,
                 TableValue::Int(2),
+                TableValue::String("1".to_string()),
                 TableValue::String("1".to_string()),
             ]),]
         );
@@ -8335,15 +8770,7 @@ async fn queue_retrieve_extended(service: Box<dyn SqlClient>) {
             .exec_query(r#"QUEUE RETRIEVE EXTENDED CONCURRENCY 1 "STANDALONE#queue:2""#)
             .await
             .unwrap();
-        assert_eq!(
-            retrieve_response.get_columns(),
-            &vec![
-                Column::new("payload".to_string(), ColumnType::String, 0),
-                Column::new("extra".to_string(), ColumnType::String, 1),
-                Column::new("pending".to_string(), ColumnType::Int, 2),
-                Column::new("active".to_string(), ColumnType::String, 3),
-            ]
-        );
+        assert_queue_retrieve_columns(&retrieve_response);
         assert_eq!(
             retrieve_response.get_rows(),
             &vec![Row::new(vec![
@@ -8351,6 +8778,7 @@ async fn queue_retrieve_extended(service: Box<dyn SqlClient>) {
                 TableValue::Null,
                 TableValue::Int(2),
                 TableValue::String("1".to_string()),
+                TableValue::Null,
             ]),]
         );
     }
@@ -8360,15 +8788,7 @@ async fn queue_retrieve_extended(service: Box<dyn SqlClient>) {
             .exec_query(r#"QUEUE RETRIEVE EXTENDED CONCURRENCY 2 "STANDALONE#queue:2""#)
             .await
             .unwrap();
-        assert_eq!(
-            retrieve_response.get_columns(),
-            &vec![
-                Column::new("payload".to_string(), ColumnType::String, 0),
-                Column::new("extra".to_string(), ColumnType::String, 1),
-                Column::new("pending".to_string(), ColumnType::Int, 2),
-                Column::new("active".to_string(), ColumnType::String, 3),
-            ]
-        );
+        assert_queue_retrieve_columns(&retrieve_response);
         assert_eq!(
             retrieve_response.get_rows(),
             &vec![Row::new(vec![
@@ -8376,21 +8796,50 @@ async fn queue_retrieve_extended(service: Box<dyn SqlClient>) {
                 TableValue::Null,
                 TableValue::Int(1),
                 TableValue::String("1,2".to_string()),
+                TableValue::String("2".to_string()),
             ]),]
         );
     }
 }
 
-async fn queue_ack_then_result(service: Box<dyn SqlClient>) {
+async fn queue_ack_then_result_v1(service: Box<dyn SqlClient>) {
     service
         .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:5555" "payload1";"#)
         .await
         .unwrap();
 
-    service
+    let ack_result = service
         .exec_query(r#"QUEUE ACK "STANDALONE#queue:5555" "result:5555""#)
         .await
         .unwrap();
+    assert_eq!(
+        ack_result.get_rows(),
+        &vec![Row::new(vec![TableValue::Boolean(true)])]
+    );
+
+    // double ack for result
+    {
+        let ack_result = service
+            .exec_query(r#"QUEUE ACK "STANDALONE#queue:5555" "result:5555""#)
+            .await
+            .unwrap();
+        assert_eq!(
+            ack_result.get_rows(),
+            &vec![Row::new(vec![TableValue::Boolean(false)])]
+        );
+    }
+
+    // ack on unknown queue item
+    {
+        let ack_result = service
+            .exec_query(r#"QUEUE ACK "STANDALONE#queue:123456" "result:5555""#)
+            .await
+            .unwrap();
+        assert_eq!(
+            ack_result.get_rows(),
+            &vec![Row::new(vec![TableValue::Boolean(false)])]
+        );
+    }
 
     let result = service
         .exec_query(r#"QUEUE RESULT "STANDALONE#queue:5555""#)
@@ -8419,6 +8868,84 @@ async fn queue_ack_then_result(service: Box<dyn SqlClient>) {
         .unwrap();
 
     assert_eq!(result.get_rows().len(), 0);
+}
+
+async fn queue_ack_then_result_v2(service: Box<dyn SqlClient>) {
+    let add_response = service
+        .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:5555" "payload1";"#)
+        .await
+        .unwrap();
+    assert_queue_add_columns(&add_response);
+
+    let ack_result = service
+        .exec_query(r#"QUEUE ACK 1 "result:5555""#)
+        .await
+        .unwrap();
+    assert_eq!(
+        ack_result.get_rows(),
+        &vec![Row::new(vec![TableValue::Boolean(true)])]
+    );
+
+    // double ack for result, should be restricted
+    {
+        let ack_result = service
+            .exec_query(r#"QUEUE ACK 1 "result:5555""#)
+            .await
+            .unwrap();
+        assert_eq!(
+            ack_result.get_rows(),
+            &vec![Row::new(vec![TableValue::Boolean(false)])]
+        );
+    }
+
+    // ack on unknown queue item
+    {
+        let ack_result = service
+            .exec_query(r#"QUEUE ACK 10 "result:5555""#)
+            .await
+            .unwrap();
+        assert_eq!(
+            ack_result.get_rows(),
+            &vec![Row::new(vec![TableValue::Boolean(false)])]
+        );
+    }
+
+    let result = service
+        .exec_query(r#"QUEUE RESULT "STANDALONE#queue:5555""#)
+        .await
+        .unwrap();
+
+    assert_eq!(
+        result.get_columns(),
+        &vec![
+            Column::new("payload".to_string(), ColumnType::String, 0),
+            Column::new("type".to_string(), ColumnType::String, 1),
+        ]
+    );
+    assert_eq!(
+        result.get_rows(),
+        &vec![Row::new(vec![
+            TableValue::String("result:5555".to_string()),
+            TableValue::String("success".to_string())
+        ]),]
+    );
+
+    // second call should not return anything, because first call should mark result as ready to delete
+    let result = service
+        .exec_query(r#"QUEUE RESULT "STANDALONE#queue:5555""#)
+        .await
+        .unwrap();
+    assert_eq!(result.get_rows().len(), 0);
+
+    tokio::time::sleep(Duration::new(1, 0)).await;
+
+    // should return, because we use id
+    let result = service
+        .exec_query(r#"QUEUE RESULT_BLOCKING 1000 1"#)
+        .await
+        .unwrap();
+    assert_queue_result_blocking_columns(&result);
+    assert_eq!(result.get_rows().len(), 1);
 }
 
 async fn queue_orphaned_timeout(service: Box<dyn SqlClient>) {
@@ -8489,7 +9016,7 @@ async fn queue_orphaned_timeout(service: Box<dyn SqlClient>) {
     assert_eq!(res.len(), 2);
 }
 
-async fn queue_heartbeat(service: Box<dyn SqlClient>) {
+async fn queue_heartbeat_by_path(service: Box<dyn SqlClient>) {
     service
         .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:1" "payload1";"#)
         .await
@@ -8518,7 +9045,33 @@ async fn queue_heartbeat(service: Box<dyn SqlClient>) {
     }
 }
 
-async fn queue_merge_extra(service: Box<dyn SqlClient>) {
+async fn queue_heartbeat_by_id(service: Box<dyn SqlClient>) {
+    service
+        .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:1" "payload1";"#)
+        .await
+        .unwrap();
+
+    let res = service
+        .exec_query(r#"SELECT heartbeat FROM system.queue WHERE prefix = 'STANDALONE#queue'"#)
+        .await
+        .unwrap();
+    assert_eq!(res.get_rows(), &vec![Row::new(vec![TableValue::Null,]),]);
+
+    service.exec_query(r#"QUEUE HEARTBEAT 1;"#).await.unwrap();
+
+    let res = service
+        .exec_query(r#"SELECT heartbeat FROM system.queue WHERE prefix = 'STANDALONE#queue'"#)
+        .await
+        .unwrap();
+
+    let row = res.get_rows().first().unwrap();
+    match row.values().first().unwrap() {
+        TableValue::Timestamp(_) => {}
+        other => panic!("heartbeat must be a timestamp type, actual: {:?}", other),
+    }
+}
+
+async fn queue_merge_extra_by_path(service: Box<dyn SqlClient>) {
     service
         .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:1" "payload1";"#)
         .await
@@ -8574,6 +9127,56 @@ async fn queue_merge_extra(service: Box<dyn SqlClient>) {
     }
 }
 
+async fn queue_merge_extra_by_id(service: Box<dyn SqlClient>) {
+    service
+        .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:1" "payload1";"#)
+        .await
+        .unwrap();
+
+    // extra must be empty after creation
+    {
+        let res = service.exec_query(r#"QUEUE GET 1;"#).await.unwrap();
+        assert_eq!(
+            res.get_columns(),
+            &vec![
+                Column::new("payload".to_string(), ColumnType::String, 0),
+                Column::new("extra".to_string(), ColumnType::String, 1),
+            ]
+        );
+        assert_eq!(
+            res.get_rows(),
+            &vec![Row::new(vec![
+                TableValue::String("payload1".to_string()),
+                TableValue::Null
+            ]),]
+        );
+    }
+
+    service
+        .exec_query(r#"QUEUE MERGE_EXTRA 1 '{"first": true}';"#)
+        .await
+        .unwrap();
+
+    // extra should contains first field
+    {
+        let res = service.exec_query(r#"QUEUE GET 1;"#).await.unwrap();
+        assert_eq!(
+            res.get_columns(),
+            &vec![
+                Column::new("payload".to_string(), ColumnType::String, 0),
+                Column::new("extra".to_string(), ColumnType::String, 1),
+            ]
+        );
+        assert_eq!(
+            res.get_rows(),
+            &vec![Row::new(vec![
+                TableValue::String("payload1".to_string()),
+                TableValue::String("{\"first\": true}".to_string())
+            ]),]
+        );
+    }
+}
+
 async fn queue_multiple_result_blocking(service: Box<dyn SqlClient>) {
     service
         .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:12345" "payload1";"#)
@@ -8603,10 +9206,14 @@ async fn queue_multiple_result_blocking(service: Box<dyn SqlClient>) {
         let ack = async move {
             tokio::time::sleep(Duration::from_millis(1000)).await;
 
-            service_to_move
+            let ack_result = service_to_move
                 .exec_query(r#"QUEUE ACK "STANDALONE#queue:12345" "result:12345""#)
                 .await
-                .unwrap()
+                .unwrap();
+            assert_eq!(
+                ack_result.get_rows(),
+                &vec![Row::new(vec![TableValue::Boolean(true)])]
+            )
         };
 
         let (blocking1_res, blocking2_res, _ack_res) = join!(blocking1, blocking2, ack);

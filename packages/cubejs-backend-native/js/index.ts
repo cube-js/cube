@@ -117,7 +117,10 @@ function wrapNativeFunctionWithChannelCallback(
 };
 
 const errorString = (err: any) =>
-  err.message || err.stack?.toString() || typeof err === 'string' ? err.toString() : JSON.stringify(err);
+  err.error ||
+    err.message ||
+    err.stack?.toString() ||
+    (typeof err === 'string' ? err.toString() : JSON.stringify(err));
 
 // TODO: Refactor - define classes
 function wrapNativeFunctionWithStream(
@@ -195,6 +198,11 @@ export const setupLogger = (logger: (extra: any) => unknown, logLevel: LogLevel)
     native.setupLogger({logger: wrapNativeFunctionWithChannelCallback(logger), logLevel});
 }
 
+export const isFallbackBuild = (): boolean => {
+    const native = loadNative();
+    return native.isFallbackBuild();
+}
+
 export type SqlInterfaceInstance = { __typename: 'sqlinterfaceinstance' };
 
 export const registerInterface = async (options: SQLInterfaceOptions): Promise<SqlInterfaceInstance> => {
@@ -234,4 +242,36 @@ export const shutdownInterface = async (instance: SqlInterfaceInstance): Promise
     await native.shutdownInterface(instance);
 
     await new Promise((resolve) => setTimeout(resolve, 2000));
+}
+
+export interface PyConfiguration {
+    checkAuth?: (req: unknown, authorization: string) => Promise<void>
+    queryRewrite?: (query: unknown, ctx: unknown) => Promise<unknown>
+    contextToApiScopes?: () => Promise<string[]>
+}
+
+export const pythonLoadConfig = async (context: string, options: { file: string }): Promise<PyConfiguration> => {
+    if (isFallbackBuild()) {
+        throw new Error('Python is not supported in fallback build');
+    }
+
+    const native = loadNative();
+    const config = await native.pythonLoadConfig(context, options);
+
+    if (config.checkAuth) {
+        const nativeCheckAuth = config.checkAuth;
+        config.checkAuth = async (req: any, authorization: string) => {
+            return nativeCheckAuth(
+              // Req is a large object, let's simplify it
+              {
+                  url: req.url,
+                  method: req.method,
+                  headers: req.headers,
+              },
+              authorization
+            );
+        };
+    }
+
+    return config;
 }

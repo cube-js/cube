@@ -58,7 +58,7 @@ class MSSqlDriver extends BaseDriver {
       user: getEnv('dbUser', { dataSource }),
       password: getEnv('dbPass', { dataSource }),
       domain: getEnv('dbDomain', { dataSource }),
-      requestTimeout: 10 * 60 * 1000, // 10 minutes
+      requestTimeout: getEnv('dbQueryTimeout') * 1000,
       options: {
         encrypt: getEnv('dbSsl', { dataSource }),
         useUTC: false
@@ -124,11 +124,16 @@ class MSSqlDriver extends BaseDriver {
       request.on('error', (err) => {
         reject(err);
       });
+      stream.on('error', (err) => {
+        reject(err);
+      })
     });
     return {
       rowStream: stream,
       types: fields,
-      release: async () => {},
+      release: async () => {
+        request.cancel();
+      },
     };
   }
 
@@ -159,24 +164,26 @@ class MSSqlDriver extends BaseDriver {
         case sql.Int:
         case sql.SmallInt:
         case sql.TinyInt:
+        case sql.BigInt:
           type = 'int';
           break;
         // float
-        case sql.Real:
         case sql.Money:
         case sql.SmallMoney:
         case sql.Numeric:
-          type = 'float';
+        case sql.Decimal:
+          type = 'decimal';
           break;
         // double
+        case sql.Real:
         case sql.Float:
-        case sql.Decimal:
           type = 'double';
           break;
         // strings
         case sql.Char:
         case sql.NChar:
         case sql.Text:
+        case sql.NText:
         case sql.VarChar:
         case sql.NVarChar:
         case sql.Xml:
@@ -184,16 +191,16 @@ class MSSqlDriver extends BaseDriver {
           break;
         // date and time
         case sql.Time:
-          type = 'date';
+          type = 'time';
           break;
         case sql.Date:
-          type = 'date';
+          type = 'timestamp';
           break;
         case sql.DateTime:
         case sql.DateTime2:
         case sql.SmallDateTime:
         case sql.DateTimeOffset:
-          type = 'date';
+          type = 'timestamp';
           break;
         // others
         case sql.UniqueIdentifier:
@@ -204,6 +211,7 @@ class MSSqlDriver extends BaseDriver {
         case sql.UDT:
         case sql.Geography:
         case sql.Geometry:
+        case sql.TVP:
           type = 'string';
           break;
         // unknown
@@ -211,7 +219,7 @@ class MSSqlDriver extends BaseDriver {
           type = 'string';
           break;
       }
-      return { name: fields[field].name, type };
+      return { name: fields[field].name, type: this.toGenericType(type) };
     });
   }
 

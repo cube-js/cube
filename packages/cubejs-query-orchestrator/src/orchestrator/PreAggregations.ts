@@ -8,7 +8,7 @@ import {
   FROM_PARTITION_RANGE,
   getEnv,
   inDbTimeZone,
-  MAX_SOURCE_ROW_LIMIT, reformatInIsoLocal,
+  MAX_SOURCE_ROW_LIMIT, MaybeCancelablePromise, reformatInIsoLocal,
   timeSeries,
   TO_PARTITION_RANGE,
   utcToLocalTimeZone,
@@ -1062,11 +1062,15 @@ export class PreAggregationLoader {
     dropSourceTempTable: boolean,
   ) {
     if (withTempTable && dropSourceTempTable) {
-      const actualTables = await client.getTablesQuery(this.preAggregation.preAggregationsSchema);
-      const mappedActualTables = actualTables.map(t => `${this.preAggregation.preAggregationsSchema}.${t.table_name || t.TABLE_NAME}`);
-      if (mappedActualTables.includes(targetTableName)) {
-        await client.dropTable(targetTableName);
-      }
+      await this.withDropLock(false, async () => {
+        this.logger('Dropping source temp table', queryOptions);
+
+        const actualTables = await client.getTablesQuery(this.preAggregation.preAggregationsSchema);
+        const mappedActualTables = actualTables.map(t => `${this.preAggregation.preAggregationsSchema}.${t.table_name || t.TABLE_NAME}`);
+        if (mappedActualTables.includes(targetTableName)) {
+          await client.dropTable(targetTableName);
+        }
+      });
     }
 
     // We must clean orphaned in any cases: success or exception
@@ -1222,7 +1226,9 @@ export class PreAggregationLoader {
     let tableData: DownloadTableData;
 
     if (externalDriverCapabilities.csvImport && client.unload && await client.isUnloadSupported(this.getUnloadOptions())) {
-      tableData = await saveCancelFn(client.unload(table, this.getUnloadOptions()));
+      tableData = await saveCancelFn(
+        client.unload(table, this.getUnloadOptions()),
+      );
     } else if (externalDriverCapabilities.streamImport && client.stream) {
       tableData = await saveCancelFn(
         client.stream(`SELECT * FROM ${table}`, [], this.getStreamingOptions())
@@ -1258,7 +1264,12 @@ export class PreAggregationLoader {
 
     let tableData: DownloadTableData;
     if (externalDriverCapabilities.csvImport && client.unload && await client.isUnloadSupported(this.getUnloadOptions())) {
-      return saveCancelFn(client.unload(table, { ...this.getUnloadOptions(), query: { sql, params } }));
+      return saveCancelFn(
+        client.unload(
+          table,
+          { ...this.getUnloadOptions(), query: { sql, params } },
+        )
+      );
     } else if (externalDriverCapabilities.streamImport && client.stream) {
       tableData = await saveCancelFn(
         client.stream(sql, params, this.getStreamingOptions())
@@ -1279,7 +1290,7 @@ export class PreAggregationLoader {
     }
 
     if (!tableData.types && client.queryColumnTypes) {
-      tableData.types = await saveCancelFn(client.queryColumnTypes(sql));
+      tableData.types = await saveCancelFn(client.queryColumnTypes(sql, params));
     }
 
     return tableData;
@@ -1362,6 +1373,11 @@ export class PreAggregationLoader {
     });
   }
 
+  private async withDropLock<T>(external: boolean, lockFn: () => MaybeCancelablePromise<T>): Promise<boolean> {
+    const lockKey = this.dropLockKey(external);
+    return this.queryCache.withLock(lockKey, 60 * 5, lockFn);
+  }
+
   protected async dropOrphanedTables(
     client: DriverInterface,
     justCreatedTable: string,
@@ -1371,12 +1387,8 @@ export class PreAggregationLoader {
   ) {
     await this.preAggregations.addTableUsed(justCreatedTable);
 
-    const lockKey = external
-      ? 'drop-orphaned-tables-external'
-      : `drop-orphaned-tables:${this.preAggregation.dataSource}`;
-
-    return this.queryCache.withLock(lockKey, 60 * 5, async () => {
-      this.logger('Dropping orphaned tables', queryOptions);
+    return this.withDropLock(external, async () => {
+      this.logger('Dropping orphaned tables', { ...queryOptions, external });
       const actualTables = await client.getTablesQuery(
         this.preAggregation.preAggregationsSchema,
       );
@@ -1429,9 +1441,16 @@ export class PreAggregationLoader {
       await Promise.all(toDrop.map(table => saveCancelFn(client.dropTable(table))));
       this.logger('Dropping orphaned tables completed', {
         ...queryOptions,
+        external,
         tablesToDrop: JSON.stringify(toDrop),
       });
     });
+  }
+
+  private dropLockKey(external: boolean) {
+    return external
+      ? 'drop-orphaned-tables-external'
+      : `drop-orphaned-tables:${this.preAggregation.dataSource}`;
   }
 }
 

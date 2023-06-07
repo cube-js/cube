@@ -1,5 +1,6 @@
 use crate::cachestore::{
-    CacheItem, CacheStore, QueueItem, QueueItemStatus, QueueResultResponse, QueueRetrieveResponse,
+    CacheItem, CacheStore, QueueItem, QueueItemStatus, QueueKey, QueueResult, QueueResultResponse,
+    QueueRetrieveResponse,
 };
 use crate::metastore::job::{Job, JobStatus, JobType};
 use crate::metastore::multi_index::{MultiIndex, MultiPartition};
@@ -96,10 +97,12 @@ impl MetaStore for MetaStoreMock {
         _build_range_end: Option<DateTime<Utc>>,
         _seal_at: Option<DateTime<Utc>>,
         _select_statement: Option<String>,
+        _source_columns: Option<Vec<Column>>,
         _stream_offset: Option<StreamOffset>,
         _unique_key_column_names: Option<Vec<String>>,
         _aggregates: Option<Vec<(String, String)>>,
         _partition_split_threshold: Option<u64>,
+        _trace_obj: Option<String>,
     ) -> Result<IdRow<Table>, CubeError> {
         panic!("MetaStore mock!")
     }
@@ -634,7 +637,7 @@ impl MetaStore for MetaStoreMock {
         &self,
         _old_ids: Vec<u64>,
         _new_seq_pointer: Option<Vec<Option<SeqPointer>>>,
-    ) -> Result<IdRow<ReplayHandle>, CubeError> {
+    ) -> Result<Option<IdRow<ReplayHandle>>, CubeError> {
         panic!("MetaStore mock!")
     }
 
@@ -697,6 +700,41 @@ impl MetaStore for MetaStoreMock {
     async fn get_jobs_on_non_exists_nodes(&self) -> Result<Vec<IdRow<Job>>, CubeError> {
         panic!("MetaStore mock!")
     }
+    async fn get_trace_obj_by_table_id(&self, _table_id: u64) -> Result<Option<String>, CubeError> {
+        panic!("MetaStore mock!")
+    }
+    async fn get_partition_out_of_queue(
+        &self,
+        _partition_id: u64,
+    ) -> Result<IdRow<Partition>, CubeError> {
+        panic!("MetaStore mock!")
+    }
+    async fn get_partitions_for_in_memory_compaction(
+        &self,
+        _node: String,
+    ) -> Result<
+        Vec<(
+            IdRow<Partition>,
+            IdRow<Index>,
+            IdRow<Table>,
+            Vec<IdRow<Chunk>>,
+        )>,
+        CubeError,
+    > {
+        panic!("MetaStore mock!")
+    }
+    async fn get_all_node_in_memory_chunks(
+        &self,
+        _node: String,
+    ) -> Result<Vec<IdRow<Chunk>>, CubeError> {
+        panic!("MetaStore mock!")
+    }
+    async fn get_table_indexes_out_of_queue(
+        &self,
+        _table_id: u64,
+    ) -> Result<Vec<IdRow<Index>>, CubeError> {
+        panic!("MetaStore mock!")
+    }
 }
 
 crate::di_service!(MetaStoreMock, [MetaStore]);
@@ -741,6 +779,14 @@ impl CacheStore for CacheStoreMock {
         panic!("CacheStore mock!")
     }
 
+    async fn queue_results_all(&self) -> Result<Vec<IdRow<QueueResult>>, CubeError> {
+        panic!("CacheStore mock!")
+    }
+
+    async fn queue_results_multi_delete(&self, _ids: Vec<u64>) -> Result<(), CubeError> {
+        panic!("CacheStore mock!")
+    }
+
     async fn queue_add(
         &self,
         _item: QueueItem,
@@ -749,10 +795,6 @@ impl CacheStore for CacheStoreMock {
     }
 
     async fn queue_truncate(&self) -> Result<(), CubeError> {
-        panic!("CacheStore mock!")
-    }
-
-    async fn queue_get(&self, _key: String) -> Result<Option<IdRow<QueueItem>>, CubeError> {
         panic!("CacheStore mock!")
     }
 
@@ -774,39 +816,46 @@ impl CacheStore for CacheStoreMock {
         panic!("CacheStore mock!")
     }
 
-    async fn queue_cancel(&self, _key: String) -> Result<Option<IdRow<QueueItem>>, CubeError> {
+    async fn queue_get(&self, _key: QueueKey) -> Result<Option<IdRow<QueueItem>>, CubeError> {
         panic!("CacheStore mock!")
     }
 
-    async fn queue_heartbeat(&self, _key: String) -> Result<(), CubeError> {
+    async fn queue_cancel(&self, _key: QueueKey) -> Result<Option<IdRow<QueueItem>>, CubeError> {
         panic!("CacheStore mock!")
     }
 
-    async fn queue_retrieve(
+    async fn queue_heartbeat(&self, _key: QueueKey) -> Result<(), CubeError> {
+        panic!("CacheStore mock!")
+    }
+
+    async fn queue_retrieve_by_path(
         &self,
-        _key: String,
+        _path: String,
         _allow_concurrency: u32,
     ) -> Result<QueueRetrieveResponse, CubeError> {
         panic!("CacheStore mock!")
     }
 
-    async fn queue_ack(&self, _key: String, _result: Option<String>) -> Result<(), CubeError> {
+    async fn queue_ack(&self, _key: QueueKey, _result: Option<String>) -> Result<bool, CubeError> {
         panic!("CacheStore mock!")
     }
 
-    async fn queue_result(&self, _key: String) -> Result<Option<QueueResultResponse>, CubeError> {
+    async fn queue_result_by_path(
+        &self,
+        _path: String,
+    ) -> Result<Option<QueueResultResponse>, CubeError> {
         panic!("CacheStore mock!")
     }
 
     async fn queue_result_blocking(
         &self,
-        _key: String,
+        _key: QueueKey,
         _timeout: u64,
     ) -> Result<Option<QueueResultResponse>, CubeError> {
         panic!("CacheStore mock!")
     }
 
-    async fn queue_merge_extra(&self, _key: String, _payload: String) -> Result<(), CubeError> {
+    async fn queue_merge_extra(&self, _key: QueueKey, _payload: String) -> Result<(), CubeError> {
         panic!("CacheStore mock!")
     }
 

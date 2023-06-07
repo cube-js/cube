@@ -3,6 +3,195 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.24](https://github.com/cube-js/cube/compare/v0.33.23...v0.33.24) (2023-06-05)
+
+
+### Features
+
+* **cubestore:** Priorities for job types ([#6502](https://github.com/cube-js/cube/issues/6502)) ([a457c5d](https://github.com/cube-js/cube/commit/a457c5da23b95be55e09e68c759e23f1299d17bf))
+
+
+
+
+
+## [0.33.21](https://github.com/cube-js/cube/compare/v0.33.20...v0.33.21) (2023-05-31)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.33.20](https://github.com/cube-js/cube/compare/v0.33.19...v0.33.20) (2023-05-31)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.33.19](https://github.com/cube-js/cube/compare/v0.33.18...v0.33.19) (2023-05-30)
+
+
+### Features
+
+* **native:** Publish builds with Python 3.9, 3.10 for Linux ([#6666](https://github.com/cube-js/cube/issues/6666)) ([0b1c7b8](https://github.com/cube-js/cube/commit/0b1c7b8bd13947a7c43d4f91d425a9124a4dde77))
+
+
+
+
+
+## [0.33.18](https://github.com/cube-js/cube/compare/v0.33.17...v0.33.18) (2023-05-29)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.33.13](https://github.com/cube-js/cube/compare/v0.33.12...v0.33.13) (2023-05-25)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.33.11](https://github.com/cube-js/cube/compare/v0.33.10...v0.33.11) (2023-05-22)
+
+
+### Bug Fixes
+
+* **docker:** Don't load native on alpine (not supported), fix [#6510](https://github.com/cube-js/cube/issues/6510) ([#6636](https://github.com/cube-js/cube/issues/6636)) ([a01d2f9](https://github.com/cube-js/cube/commit/a01d2f953973eee79b6135f7883ecff56bb71486))
+
+
+### Features
+
+* **cubestore:** Optimization of inmemory chunk operations for streaming ([#6354](https://github.com/cube-js/cube/issues/6354)) ([146798a](https://github.com/cube-js/cube/commit/146798affff184cab489628a1a40611b7fb5879a))
+
+
+
+
+
+## [0.33.9](https://github.com/cube-js/cube.js/compare/v0.33.8...v0.33.9) (2023-05-18)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.33.7](https://github.com/cube-js/cube/compare/v0.33.6...v0.33.7) (2023-05-16)
+
+
+### Features
+
+* **cubestore:** Queue - allow to GET by processingId ([#6608](https://github.com/cube-js/cube/issues/6608)) ([f0c1156](https://github.com/cube-js/cube/commit/f0c11565426b5604bae665fc52d5b416f4f055d2))
+* **cubestore:** Queue - delete results via scheduler ([#6515](https://github.com/cube-js/cube/issues/6515)) ([8e1ab20](https://github.com/cube-js/cube/commit/8e1ab2044a92f9e71918085a31716a784cd5bb9f))
+
+
+
+
+
+## [0.33.6](https://github.com/cube-js/cube.js/compare/v0.33.5...v0.33.6) (2023-05-13)
+
+
+### Bug Fixes
+
+* **cubestore:** Optimize unique constraint check on insert ([c227ae9](https://github.com/cube-js/cube.js/commit/c227ae9f72cfd66fd47e60fc567c2fde88ebc932))
+* **cubestore:** Schedule compaction without blocking rw loop ([f9bbbac](https://github.com/cube-js/cube.js/commit/f9bbbac278898d02d50e6ff5911658d5e8caf7e3))
+
+
+### Features
+
+* **cubestore:** Queue - support cancel, ack, result_blocking by processingId ([#6551](https://github.com/cube-js/cube.js/issues/6551)) ([2e82839](https://github.com/cube-js/cube.js/commit/2e82839586f18d8b9ba385ab6f8e5641113ccf0c))
+* **cubestore:** Support custom CSV delimiters ([#6597](https://github.com/cube-js/cube.js/issues/6597)) ([f8c2c88](https://github.com/cube-js/cube.js/commit/f8c2c888150e9436c90de9ecd45f540bb0314855))
+
+
+
+
+
+## [0.33.5](https://github.com/cube-js/cube.js/compare/v0.33.4...v0.33.5) (2023-05-11)
+
+
+### Features
+
+* **cubestore:** Support converting Int16/32, UInt16/32 for DataFrame ([#6569](https://github.com/cube-js/cube.js/issues/6569)) ([5e0fd4f](https://github.com/cube-js/cube.js/commit/5e0fd4fd73717d50c1a0684e840d987fb95df495))
+
+
+
+
+
+## [0.33.4](https://github.com/cube-js/cube.js/compare/v0.33.3...v0.33.4) (2023-05-07)
+
+
+### Features
+
+* **cubestore:** Projection in kafka streaming queries ([#6479](https://github.com/cube-js/cube.js/issues/6479)) ([e0495a9](https://github.com/cube-js/cube.js/commit/e0495a9f46dd8a78fce069b31382fdeec37da8d0))
+
+
+
+
+
+## [0.33.2](https://github.com/cube-js/cube/compare/v0.33.1...v0.33.2) (2023-05-04)
+
+
+### Bug Fixes
+
+* **cubestore:** Queue - protect possible race condition on GET_RESULT_BLOCKING ([#6535](https://github.com/cube-js/cube/issues/6535)) ([d962c05](https://github.com/cube-js/cube/commit/d962c058f703a5f5156c36ceb8cae074b8d15d02))
+
+
+### Features
+
+* **cubestore:** Queue - allow to do merge_extra, heartbeat by processingId ([#6534](https://github.com/cube-js/cube/issues/6534)) ([bf8df29](https://github.com/cube-js/cube/commit/bf8df29c261625f588faf65984047026d760020a))
+* **cubestore:** Queue - expose processingId in queue_add ([#6540](https://github.com/cube-js/cube/issues/6540)) ([24b4798](https://github.com/cube-js/cube/commit/24b4798fb5e26b2be0f04f3e1af76c1b8516a9b8))
+* **cubestore:** Queue - expose processingId in queue_retrieve ([#6530](https://github.com/cube-js/cube/issues/6530)) ([43913ce](https://github.com/cube-js/cube/commit/43913ce459e1b60dd04f3a23aed1c617de0e0422))
+* **cubestore:** Queue - return success marker on ack (set result) ([e8814bf](https://github.com/cube-js/cube/commit/e8814bf5ebd18431f0d4a61db7fee2a519a5bdd8))
+
+
+
+
+
+# [0.33.0](https://github.com/cube-js/cube.js/compare/v0.32.31...v0.33.0) (2023-05-02)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.32.30](https://github.com/cube-js/cube.js/compare/v0.32.29...v0.32.30) (2023-04-28)
+
+
+### Bug Fixes
+
+* **cubestore:** Error in Sparse HLL entry parsing ([#6498](https://github.com/cube-js/cube.js/issues/6498)) ([9719cdc](https://github.com/cube-js/cube.js/commit/9719cdcc39461948e85ea7f2c4bdae377a8dba83))
+
+
+
+
+
+## [0.32.29](https://github.com/cube-js/cube/compare/v0.32.28...v0.32.29) (2023-04-25)
+
+
+### Features
+
+* **cubestore:** Split partitions by filesize ([#6435](https://github.com/cube-js/cube/issues/6435)) ([5854add](https://github.com/cube-js/cube/commit/5854add7a65c39e05ba71c2a558032671797ec26))
+* **cubestore:** Traffic tracing for streaming ([#6379](https://github.com/cube-js/cube/issues/6379)) ([37a33e6](https://github.com/cube-js/cube/commit/37a33e65234740a8028c340334510facbea896d7))
+* Make configurable cubestore metrics address ([#6437](https://github.com/cube-js/cube/issues/6437)) Thanks [@fbalicchia](https://github.com/fbalicchia) ! ([16d0bcb](https://github.com/cube-js/cube/commit/16d0bcb1489c512f91c21970e21769c9882bfedc))
+
+
+
+
+
+## [0.32.28](https://github.com/cube-js/cube/compare/v0.32.27...v0.32.28) (2023-04-19)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
 ## [0.32.25](https://github.com/cube-js/cube/compare/v0.32.24...v0.32.25) (2023-04-12)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore

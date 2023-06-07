@@ -27,6 +27,9 @@ declare global {
 
 const STORAGE_KEY = 'cube-docs.default-code-lang';
 
+// If present, the tab with this language should go first
+const PREFERRED_LANG = 'yaml';
+
 export interface CodeTabsProps {
   children: Array<{
     props: {
@@ -37,10 +40,10 @@ export interface CodeTabsProps {
 }
 
 export const CodeTabs: FC<CodeTabsProps> = ({ children }) => {
-  const [selectedTab, setSelectedTab] = useState(0);
+  const [selectedTab, setSelectedTab] = useState(PREFERRED_LANG);
   const tabs = useMemo(
-    () =>
-      children.reduce<Record<string, number>>((dict, tab, i) => {
+    () => {
+      let tabs = children.reduce<Record<string, number>>((dict, tab, i) => {
         const result = {
           ...dict,
         };
@@ -48,7 +51,21 @@ export const CodeTabs: FC<CodeTabsProps> = ({ children }) => {
           result[tab.props['data-language']] = i;
         }
         return result;
-      }, {}),
+      }, {});
+      
+      // Place the tab with the prefferred lamguage on the first position
+      let tabWithPreferredLangKey = Object.keys(tabs).find(key => key === PREFERRED_LANG);
+      if (tabWithPreferredLangKey !== undefined) {
+        let tabWithPreferredLangValue = tabs[tabWithPreferredLangKey];
+        delete tabs[tabWithPreferredLangKey];
+        tabs = {
+          [tabWithPreferredLangKey]: tabWithPreferredLangValue,
+          ...tabs
+        };
+      }
+
+      return tabs;
+    },
     children
   );
 
@@ -57,14 +74,14 @@ export const CodeTabs: FC<CodeTabsProps> = ({ children }) => {
 
     if (defaultLang) {
       if (tabs[defaultLang] !== undefined) {
-        setSelectedTab(tabs[defaultLang]);
+        setSelectedTab(defaultLang);
       }
     }
 
     const syncHanlder = (e: CustomEvent<{ lang: string }>) => {
       const lang = e.detail.lang;
       if (tabs[lang] !== undefined) {
-        setSelectedTab(tabs[lang]);
+        setSelectedTab(lang);
       }
     };
 
@@ -72,7 +89,7 @@ export const CodeTabs: FC<CodeTabsProps> = ({ children }) => {
       if (e.key === STORAGE_KEY) {
         const lang = e.newValue;
         if (lang && tabs[lang] !== undefined) {
-          setSelectedTab(tabs[lang]);
+          setSelectedTab(lang);
         }
       }
     };
@@ -89,9 +106,12 @@ export const CodeTabs: FC<CodeTabsProps> = ({ children }) => {
   return (
     <div className={classes.CodeBlock}>
       <div className={classes.CodeBlocks__tabs}>
-        {children
-          .filter((tab) => !!tab.props['data-language'])
+        {Object
+          .entries(tabs)
+          .map(tab => children.find(child => child.props['data-language'] === tab[0]))
+          .filter((tab) => tab !== undefined && !!tab.props['data-language'])
           .map((tab, i) => {
+            if (tab === undefined) return;
             let lang = tab.props['data-language'];
             if (lang === 'js') {
               lang = 'javascript';
@@ -100,11 +120,11 @@ export const CodeTabs: FC<CodeTabsProps> = ({ children }) => {
               <div
                 key={i}
                 className={cn('CodeBlocks__tab', {
-                  [classes.SelectedTab]: i === selectedTab,
+                  [classes.SelectedTab]: lang === selectedTab,
                 })}
                 onClick={() => {
                   if (
-                    i !== selectedTab &&
+                    lang !== selectedTab &&
                     (lang === 'javascript' || lang === 'yaml')
                   ) {
                     localStorage.setItem(STORAGE_KEY, lang);
@@ -116,7 +136,7 @@ export const CodeTabs: FC<CodeTabsProps> = ({ children }) => {
                       })
                     );
                   }
-                  setSelectedTab(i);
+                  setSelectedTab(lang);
                 }}
               >
                 {langs[lang] || lang}
@@ -125,7 +145,7 @@ export const CodeTabs: FC<CodeTabsProps> = ({ children }) => {
           })}
       </div>
 
-      {children && children[selectedTab].props.children}
+      {children && children.find(child => child.props['data-language'] === selectedTab)?.props.children}
     </div>
   );
 };

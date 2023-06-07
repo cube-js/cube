@@ -101,13 +101,13 @@ export class CubejsServerCore {
    */
   public static getDriverMaxPool = getDriverMaxPool;
 
-  public readonly repository: FileRepository;
+  public repository: FileRepository;
 
   protected devServer: DevServer | undefined;
 
   protected readonly orchestratorStorage: OrchestratorStorage = new OrchestratorStorage();
 
-  protected readonly repositoryFactory: ((context: RequestContext) => SchemaFileRepository) | (() => FileRepository);
+  protected repositoryFactory: ((context: RequestContext) => SchemaFileRepository) | (() => FileRepository);
 
   protected contextToDbType: DbTypeAsyncFn;
 
@@ -345,8 +345,8 @@ export class CubejsServerCore {
         () => this.handleScheduledRefreshInterval({}),
         {
           interval: scheduledRefreshTimer,
-          onDuplicatedExecution: (intervalId) => this.logger('Refresh Scheduler Interval Error', {
-            error: `Previous interval #${intervalId} was not finished with ${scheduledRefreshTimer} interval`
+          onDuplicatedExecution: (intervalId) => this.logger('Refresh Scheduler Interval', {
+            warning: `Previous interval #${intervalId} was not finished with ${scheduledRefreshTimer} interval`
           }),
           onDuplicatedStateResolved: (intervalId, elapsed) => this.logger('Refresh Scheduler Long Execution', {
             warning: `Interval #${intervalId} finished after ${formatDuration(elapsed)}`
@@ -372,6 +372,7 @@ export class CubejsServerCore {
     this.driver = null;
     this.options.externalDbType = this.options.externalDbType ||
       <DatabaseType | undefined>process.env.CUBEJS_EXT_DB_TYPE;
+    this.options.schemaPath = process.env.CUBEJS_SCHEMA_PATH || this.options.schemaPath;
     this.contextToExternalDbType = wrapToFnIfNeeded(this.options.externalDbType);
   }
 
@@ -528,6 +529,9 @@ export class CubejsServerCore {
 
     this.reloadEnvVariables();
 
+    this.repository = new FileRepository(this.options.schemaPath);
+    this.repositoryFactory = this.options.repositoryFactory || (() => this.repository);
+    
     this.startScheduledRefreshTimer();
   }
 

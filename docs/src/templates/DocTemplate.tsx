@@ -36,6 +36,7 @@ import {
   WarningBox,
 } from '../components/AlertBox/AlertBox';
 import { LoomVideo } from '../components/LoomVideo/LoomVideo';
+import { YouTubeVideo } from '../components/YouTubeVideo/YouTubeVideo';
 import { Grid } from '../components/Grid/Grid';
 import { GridItem } from '../components/Grid/GridItem';
 import ScrollSpyH2 from '../components/Headers/ScrollSpyH2';
@@ -58,6 +59,7 @@ const components = {
   SuccessBox,
   WarningBox,
   LoomVideo,
+  YouTubeVideo,
   Grid,
   GridItem,
   GitHubCodeBlock,
@@ -326,24 +328,6 @@ class DocTemplate extends Component<Props, State> {
           <div className={cx(styles.docContent, 'docContent')}>
             <div className={styles.titleWrapper}>
               <h1 id={kebabCase(frontmatter.title)}>{frontmatter.title}</h1>
-              {frontmatter.releaseDate && frontmatter.releaseLink && (
-                <div className={styles.releaseNotesMeta}>
-                  <time
-                    dateTime={frontmatter.releaseDate}
-                    className={styles.releaseDate}
-                  >
-                    {dayjs(frontmatter.releaseDate).format('MMM DD, YYYY')}
-                  </time>
-                  <a
-                    className={styles.releaseLink}
-                    href={frontmatter.releaseLink}
-                    rel="noopener"
-                    target="_blank"
-                  >
-                    <Icon type="github" /> GitHub
-                  </a>
-                </div>
-              )}
             </div>
             <MDX {...this.props} />
             {!isDisableFeedbackBlock && (
@@ -370,8 +354,6 @@ export const pageQuery = graphql`
         category
         frameworkOfChoice
         isDisableFeedbackBlock
-        releaseDate
-        releaseLink
       }
     }
   }

@@ -3,6 +3,105 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.24](https://github.com/cube-js/cube/compare/v0.33.23...v0.33.24) (2023-06-05)
+
+
+### Features
+
+* **cubesql:** Support `CURRENT_DATE` scalar function ([ec928a6](https://github.com/cube-js/cube/commit/ec928a67f05ed91517b556b701581d8d04370cc7))
+
+
+
+
+
+## [0.33.23](https://github.com/cube-js/cube/compare/v0.33.22...v0.33.23) (2023-06-01)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+
+
+
+
+## [0.33.11](https://github.com/cube-js/cube/compare/v0.33.10...v0.33.11) (2023-05-22)
+
+
+### Features
+
+* Improve LangChain support ([15e51bc](https://github.com/cube-js/cube/commit/15e51bcb19ce22c38b71f4685484295fc637e44c))
+
+
+
+
+
+## [0.33.6](https://github.com/cube-js/cube.js/compare/v0.33.5...v0.33.6) (2023-05-13)
+
+
+### Bug Fixes
+
+* **cubesql:** Improve NULL comparison with int/bool ([de1be39](https://github.com/cube-js/cube.js/commit/de1be39d07ceec5d87d6c7aef8adb65fbe246ee3))
+
+
+
+
+
+## [0.33.5](https://github.com/cube-js/cube.js/compare/v0.33.4...v0.33.5) (2023-05-11)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+
+
+
+
+## [0.33.2](https://github.com/cube-js/cube/compare/v0.33.1...v0.33.2) (2023-05-04)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+
+
+
+
+# [0.33.0](https://github.com/cube-js/cube.js/compare/v0.32.31...v0.33.0) (2023-05-02)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+
+
+
+
+## [0.32.31](https://github.com/cube-js/cube.js/compare/v0.32.30...v0.32.31) (2023-05-02)
+
+
+### Features
+
+* **cubesql:** psqlodbc driver support ([fcfc7ea](https://github.com/cube-js/cube.js/commit/fcfc7ea9f8bfd027aa549d139b9ed12b773594ec))
+
+
+
+
+
+## [0.32.30](https://github.com/cube-js/cube.js/compare/v0.32.29...v0.32.30) (2023-04-28)
+
+
+### Bug Fixes
+
+* **cubesql:** Resolve Grafana introspection issues ([db32377](https://github.com/cube-js/cube.js/commit/db32377f6e6d45c8c16b12ee7e51fdf1e9687fc9))
+
+
+
+
+
+## [0.32.28](https://github.com/cube-js/cube/compare/v0.32.27...v0.32.28) (2023-04-19)
+
+
+### Features
+
+* **cubesql:** Support new Thoughtspot introspection ([a04c83a](https://github.com/cube-js/cube/commit/a04c83a070ddbd2924528ce5e7ecf10c7b4f235c))
+* **cubesql:** Support psql's `\list` command ([0b30def](https://github.com/cube-js/cube/commit/0b30def71aa5bb53dbc59ddb6a4b63bd59eda95a))
+
+
+
+
+
 ## [0.32.19](https://github.com/cube-js/cube/compare/v0.32.18...v0.32.19) (2023-04-03)
 
 

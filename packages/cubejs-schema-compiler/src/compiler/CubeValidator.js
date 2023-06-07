@@ -449,6 +449,16 @@ const MeasuresSchema = Joi.object().pattern(identifierRegex, Joi.alternatives().
   ]
 ));
 
+const SegmentsSchema = Joi.object().pattern(identifierRegex, Joi.object().keys({
+  aliases: Joi.array().items(Joi.string()),
+  sql: Joi.func().required(),
+  title: Joi.string(),
+  description: Joi.string(),
+  meta: Joi.any(),
+  shown: Joi.boolean().strict(),
+  public: Joi.boolean().strict(),
+}));
+
 /* *****************************
  * ATTENTION:
  * In case of adding/removing/changing any Joi.func() field that needs to be transpiled,
@@ -512,13 +522,7 @@ const baseSchema = {
       sql: Joi.func().required()
     })
   )),
-  segments: Joi.object().pattern(identifierRegex, Joi.object().keys({
-    aliases: Joi.array().items(Joi.string()),
-    sql: Joi.func().required(),
-    title: Joi.string(),
-    description: Joi.string(),
-    meta: Joi.any()
-  })),
+  segments: SegmentsSchema,
   preAggregations: PreAggregationsAlternatives,
 };
 
@@ -535,16 +539,16 @@ const viewSchema = inherit(baseSchema, {
   excludes: Joi.func(),
   cubes: Joi.array().items(
     Joi.object().keys({
-      cube: Joi.func().required(),
+      joinPath: Joi.func().required(),
       prefix: Joi.boolean(),
-      name: Joi.string(),
+      alias: Joi.string(),
       includes: Joi.alternatives([
         Joi.string().valid('*'),
         Joi.array().items(Joi.alternatives([
           Joi.string().required(),
           Joi.object().keys({
-            member: Joi.string().required(),
-            name: Joi.string()
+            name: Joi.string().required(),
+            alias: Joi.string()
           })
         ]))
       ]).required(),

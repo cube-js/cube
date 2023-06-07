@@ -71,8 +71,7 @@ import {
   normalizeQuery,
   normalizeQueryCancelPreAggregations,
   normalizeQueryPreAggregationPreview,
-  normalizeQueryPreAggregations,
-  validatePostRewrite,
+  normalizeQueryPreAggregations, remapToQueryAdapterFormat,
 } from './query';
 import { cachedHandler } from './cached-handler';
 import { createJWKsFetcher } from './jwk';
@@ -120,7 +119,7 @@ class ApiGateway {
   protected readonly contextToApiScopesFn: ContextToApiScopesFn;
 
   protected readonly contextToApiScopesDefFn: ContextToApiScopesFn =
-    async () => ['liveliness', 'graphql', 'meta', 'data'];
+    async () => ['graphql', 'meta', 'data'];
 
   protected readonly checkAuthMiddleware: CheckAuthMiddlewareFn;
 
@@ -182,11 +181,10 @@ class ApiGateway {
     ];
 
     /** **************************************************************
-     * Liveliness scope                                              *
+     * No scope                                              *
      *************************************************************** */
 
     // @todo Should we pass requestLoggerMiddleware?
-    // @todo Should we add scope assert here?
 
     const guestMiddlewares = [];
 
@@ -194,7 +192,7 @@ class ApiGateway {
     app.get('/livez', guestMiddlewares, cachedHandler(this.liveness));
 
     /** **************************************************************
-     * Graphql scope                                                 *
+     * graphql scope                                                 *
      *************************************************************** */
 
     app.use(
@@ -240,7 +238,7 @@ class ApiGateway {
     );
 
     /** **************************************************************
-     * Data scope                                                    *
+     * data scope                                                    *
      *************************************************************** */
 
     app.get(`${this.basePath}/v1/load`, userMiddlewares, (async (req, res) => {
@@ -304,7 +302,7 @@ class ApiGateway {
     }));
 
     /** **************************************************************
-     * Meta scope                                                    *
+     * meta scope                                                    *
      *************************************************************** */
 
     app.get(
@@ -325,6 +323,7 @@ class ApiGateway {
       }
     );
 
+    // Used by Rollup Designer
     app.post(
       `${this.basePath}/v1/pre-aggregations/can-use`,
       [
@@ -357,7 +356,7 @@ class ApiGateway {
     );
 
     /** **************************************************************
-     * Jobs scope                                                    *
+     * jobs scope                                                    *
      *************************************************************** */
 
     app.get(
@@ -490,15 +489,15 @@ class ApiGateway {
     }
   }
 
-  private filterVisibleItemsInMeta(_context: RequestContext, metaConfig: any) {
+  private filterVisibleItemsInMeta(context: RequestContext, metaConfig: any) {
     function visibilityFilter(item) {
-      // Hidden items shouldn't be accessible through API everywhere for consistency.
-      return item.isVisible;
+      return getEnv('devMode') || context.signedWithPlaygroundAuthSecret || item.isVisible;
     }
 
     return metaConfig
       .map((cube) => ({
         config: {
+          public: cube.isVisible,
           ...cube.config,
           measures: cube.config.measures?.filter(visibilityFilter),
           dimensions: cube.config.dimensions?.filter(visibilityFilter),
@@ -1105,20 +1104,37 @@ class ApiGateway {
 
     const queries = Array.isArray(query) ? query : [query];
 
-    const normalizedQueries: NormalizedQuery[] = await Promise.all(
+    this.log({
+      type: 'Query Rewrite',
+      query
+    }, context);
+
+    const startTime = new Date().getTime();
+
+    let normalizedQueries: NormalizedQuery[] = await Promise.all(
       queries.map(
-        async (currentQuery) => validatePostRewrite(
-          await this.queryRewrite(
-            normalizeQuery(currentQuery),
-            context
-          )
-        )
+        async (currentQuery) => {
+          const normalizedQuery = normalizeQuery(currentQuery, persistent);
+          const rewrite = await this.queryRewrite(
+            normalizedQuery,
+            context,
+          );
+          return normalizeQuery(
+            rewrite,
+            persistent,
+          );
+        }
       )
     );
 
-    normalizedQueries.forEach((q) => {
-      this.processQueryLimit(q, persistent);
-    });
+    this.log({
+      type: 'Query Rewrite completed',
+      normalizedQueries,
+      duration: new Date().getTime() - startTime,
+      query
+    }, context);
+
+    normalizedQueries = normalizedQueries.map(q => remapToQueryAdapterFormat(q));
 
     if (normalizedQueries.find((currentQuery) => !currentQuery)) {
       throw new Error('queryTransformer returned null query. Please check your queryTransformer implementation');
@@ -1136,29 +1152,6 @@ class ApiGateway {
     }
 
     return [queryType, normalizedQueries];
-  }
-
-  /**
-   * Asserts query limit, sets the default value if neccessary.
-   *
-   * @throw {Error}
-   */
-  public processQueryLimit(query: NormalizedQuery, persistent = false): void {
-    const def = getEnv('dbQueryDefaultLimit') <= getEnv('dbQueryLimit')
-      ? getEnv('dbQueryDefaultLimit')
-      : getEnv('dbQueryLimit');
-
-    if (!persistent) {
-      if (
-        typeof query.limit === 'number' &&
-        query.limit > getEnv('dbQueryLimit')
-      ) {
-        throw new Error('The query limit has been exceeded.');
-      }
-      query.limit = typeof query.limit === 'number'
-        ? query.limit
-        : def;
-    }
   }
 
   public async sql({ query, context, res }: QueryRequest) {
@@ -1463,15 +1456,18 @@ class ApiGateway {
         stream: await this.getAdapterApi(context).streamQuery(q),
       };
       return _stream;
-    } catch (e) {
-      // TODO handle error log
-      this.log({
-        type: 'Streaming Error',
+    } catch (err: any) {
+      const e = err.message === 'Continue wait' ? { error: 'Continue wait' } : err;
+      this.handleError({
+        e,
+        context,
         query,
-        error: (<Error>e).message,
-        duration: this.duration(requestStarted),
-      }, context);
-      throw e;
+        res: (errorObj) => {
+          throw errorObj;
+        },
+        requestStarted
+      });
+      return null;
     }
   }
 
@@ -1917,14 +1913,13 @@ class ApiGateway {
           req.securityContext = await checkAuthFn(auth, secret);
           req.signedWithPlaygroundAuthSecret = Boolean(internalOptions?.isPlaygroundCheckAuth);
         } catch (e) {
+          this.log({
+            type: (e as Error).message,
+            token: auth,
+            error: (e as Error).stack || (e as Error).toString()
+          }, <any>req);
           if (this.enforceSecurityChecks) {
             throw new CubejsHandlerError(403, 'Forbidden', 'Invalid token');
-          } else {
-            this.log({
-              type: (e as Error).message,
-              token: auth,
-              error: (e as Error).stack || (e as Error).toString()
-            }, <any>req);
           }
         }
       } else if (this.enforceSecurityChecks) {
@@ -1983,7 +1978,7 @@ class ApiGateway {
           );
         } else {
           scopes.forEach((p) => {
-            if (['liveliness', 'graphql', 'meta', 'data', 'jobs'].indexOf(p) === -1) {
+            if (['graphql', 'meta', 'data', 'jobs'].indexOf(p) === -1) {
               throw new Error(
                 `A user-defined contextToApiScopes function returns a wrong scope: ${p}`
               );
@@ -2009,14 +2004,14 @@ class ApiGateway {
     const scopes =
       await this.contextToApiScopesFn(
         securityContext || {},
-        await this.contextToApiScopesDefFn(),
+        getEnv('defaultApiScope') || await this.contextToApiScopesDefFn(),
       );
     const permited = scopes.indexOf(scope) >= 0;
     if (!permited) {
       throw new CubejsHandlerError(
         403,
         'Forbidden',
-        `Api scope is missed: ${scope}`
+        `API scope is missing: ${scope}`
       );
     }
   }

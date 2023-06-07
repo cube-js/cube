@@ -25,7 +25,11 @@ cube(\`sales\`, {
     salesDatetime: {
       type: 'time',
       sql: 'sales_datetime'
-    }
+    },
+    isShiped: {
+      type: 'boolean',
+      sql: 'is_shiped',
+    },
   }
 });
 `,
@@ -58,4 +62,28 @@ cube(\`sales\`, {
       'DATE_TRUNC(\'DAY\', "sales".sales_datetime)'
     );
   }));
-});
+
+  it('should cast BOOLEAN', () => compiler.compile().then(() => {
+    const query = new FireboltQuery(
+      { joinGraph, cubeEvaluator, compiler },
+      {
+        measures: ['sales.count'],
+        filters: [
+          {
+            member: "sales.isShiped",
+            operator: "equals",
+            values: ["true"]
+          }
+        ]
+      }
+    )
+
+    const queryAndParams = query.buildSqlAndParams();
+
+    expect(queryAndParams[0]).toContain(
+      '("sales".is_shiped = CAST(? AS BOOL))'
+    );
+
+    expect(queryAndParams[1]).toEqual(["true"]);
+  }))
+})

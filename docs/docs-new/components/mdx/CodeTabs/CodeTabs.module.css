@@ -1,0 +1,72 @@
+.CodeBlock {
+  --code_bg: #43436B;
+  --gray_02: hsl(225, 4%, 39%, 1);
+  --white: #FFFFFF;
+
+  position: relative;
+  background-color: var(--code_bg);
+  border-radius: 4px;
+  overflow: hidden;
+  margin: 24px 0;
+}
+
+.CodeBlock > pre {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.CodeBlock__copyFloating {
+  position: absolute;
+  top: 48px;
+  right: 8px;
+  border-radius: 4px;
+  opacity: 0;
+}
+
+.CodeBlock:hover .CodeBlock__copyFloating {
+  opacity: 1;
+}
+
+.CodeBlocks__tabs {
+  display: flex;
+  align-items: center;
+  margin: 0;
+  padding: 0;
+  list-style-type: none;
+  overflow: hidden;
+  box-shadow: inset 0px -1px 0px var(--gray_02);
+}
+
+.CodeBlocks__tab {
+  padding: 0 16px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  font-weight: 500;
+  font-size: 16px;
+  line-height: 24px;
+  color: var(--white);
+  transition: background-color 0.3s, color 0.3s, box-shadow 0.3s;
+  cursor: pointer;
+}
+
+.CodeBlocks__tab::before {
+  background-image: none !important;
+}
+
+
+.SelectedTab {
+  --pink: hsl(342, 100%, 70%, 1);
+  --pink_bg_a10: hsl(342, 95%, 70%, 0.1);
+  cursor: default;
+  background-color: var(--pink_bg_a10);
+  box-shadow: inset 0px -2.6px 0px var(--pink);
+}
+
+
+.CodeBlocks__tab:hover {
+  --pink_bright:hsl(342, 95%, 59%, 1);
+  color: var(--pink_bright);
+  box-shadow: inset 0px -2.6px 0px hsl(342, 100%, 82%);
+}
+

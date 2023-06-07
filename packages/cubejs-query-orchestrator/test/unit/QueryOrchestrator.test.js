@@ -8,6 +8,7 @@ class MockDriver {
     this.tablesReady = [];
     this.executedQueries = [];
     this.cancelledQueries = [];
+    this.droppedTables = [];
     this.csvImport = csvImport;
     this.now = new Date().getTime();
     this.schemaData = schemaData;
@@ -95,8 +96,22 @@ class MockDriver {
   }
 
   async dropTable(tableName) {
+    if (this.droppedTables.indexOf(tableName) !== -1) {
+      throw new Error(`Can't drop table twice: ${tableName}`);
+    }
+    this.droppedTables.push(tableName);
+    console.log(`Driver drops ${tableName}`);
+    if (!this.tablesObj.find(t => (t.tableName || t) === tableName)) {
+      throw new Error(`Can't drop missing table: ${tableName}`);
+    }
+    await this.query(`DROP TABLE ${tableName}`);
+    if (this.tablesDropDelay) {
+      await this.delay(this.tablesDropDelay);
+    }
+    if (!this.tablesObj.find(t => (t.tableName || t) === tableName)) {
+      throw new Error(`Can't drop missing table: ${tableName}`);
+    }
     this.tablesObj = this.tablesObj.filter(t => (t.tableName || t) !== tableName);
-    return this.query(`DROP TABLE ${tableName}`);
   }
 
   async downloadTable(table, { csvImport } = {}) {
@@ -117,10 +132,6 @@ class MockDriver {
   capabilities() {
     return {};
   }
-  
-  tablesSchema() {
-    return this.schemaData;
-  }
 
   async streamQuery(sql) {
     return Readable.from((await this.query(sql)).map(r => (typeof r === 'string' ? { query: r } : r)));
@@ -128,8 +139,8 @@ class MockDriver {
 }
 
 class ExternalMockDriver extends MockDriver {
-  constructor({ schemaData } = {}) {
-    super({ schemaData });
+  constructor() {
+    super();
     this.indexes = [];
     this.csvFiles = [];
   }
@@ -223,7 +234,7 @@ describe('QueryOrchestrator', () => {
     const csvMockDriverLocal = new MockDriver({ csvImport: 'true' });
     const mockDriverUnloadWithoutTempTableSupportLocal = new MockDriverUnloadWithoutTempTableSupport();
     const streamingSourceMockDriverLocal = new StreamingSourceMockDriver();
-    const externalMockDriverLocal = new ExternalMockDriver({ schemaData });
+    const externalMockDriverLocal = new ExternalMockDriver();
 
     const redisPrefix = `ORCHESTRATOR_TEST_${testCount++}`;
     const driverFactory = (dataSource) => {
@@ -280,6 +291,7 @@ describe('QueryOrchestrator', () => {
         preAggregationsOptions: {
           ...options('p1').preAggregationsOptions,
           dropPreAggregationsWithoutTouch: true,
+          touchTablePersistTime: 1,
         },
       });
     mockDriver = mockDriverLocal;
@@ -1636,11 +1648,6 @@ describe('QueryOrchestrator', () => {
     expect(mockDriver.tables).toContainEqual(expect.stringMatching(/orders_delay/));
   });
 
-  test('fetch table schema', async () => {
-    const schema = await queryOrchestrator.fetchSchema('foo');
-    expect(schema).toEqual(schemaData);
-  });
-
   test('streaming simple', async () => {
     const query = (id) => ({
       query: `SELECT * FROM stb_pre_aggregations.orders_d WHERE id = ${id}`,
@@ -1714,8 +1721,39 @@ describe('QueryOrchestrator', () => {
     }));
   });
 
-  test('fetch table schema from external db', async () => {
-    const schema = await queryOrchestrator.fetchSchema(undefined, true);
-    expect(schema).toEqual(schemaData);
+  test('drop lock', async () => {
+    mockDriver.tablesDropDelay = 300;
+    for (let i = 0; i < 10; i++) {
+      const promises = [];
+      for (let j = 0; j < 10; j++) {
+        // eslint-disable-next-line no-loop-func
+        promises.push((async () => {
+          await mockDriver.delay(100 * j);
+          await queryOrchestratorDropWithoutTouch.fetchQuery({
+            query: `SELECT * FROM stb_pre_aggregations.orders_d2018110${j}`,
+            values: [],
+            cacheKeyQueries: {
+              renewalThreshold: 21600,
+              queries: []
+            },
+            preAggregations: [{
+              preAggregationsSchema: 'stb_pre_aggregations',
+              tableName: `stb_pre_aggregations.orders_d2018110${j}`,
+              loadSql: [`CREATE TABLE stb_pre_aggregations.orders_d2018110${j} AS SELECT * FROM public.orders_d`, []],
+              invalidateKeyQueries: [['SELECT NOW()', [], {
+                renewalThreshold: 0.001
+              }]],
+              external: true,
+            }],
+            requestId: `drop lock ${i}-${j}`
+          });
+        })());
+      }
+
+      await Promise.all(promises);
+
+      await mockDriver.delay(200);
+    }
+    // expect(mockDriver.tables).toContainEqual(expect.stringMatching(/orders_delay/));
   });
 });

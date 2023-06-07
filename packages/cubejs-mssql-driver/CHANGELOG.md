@@ -3,6 +3,138 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.24](https://github.com/cube-js/cube/compare/v0.33.23...v0.33.24) (2023-06-05)
+
+**Note:** Version bump only for package @cubejs-backend/mssql-driver
+
+
+
+
+
+## [0.33.21](https://github.com/cube-js/cube/compare/v0.33.20...v0.33.21) (2023-05-31)
+
+**Note:** Version bump only for package @cubejs-backend/mssql-driver
+
+
+
+
+
+## [0.33.20](https://github.com/cube-js/cube/compare/v0.33.19...v0.33.20) (2023-05-31)
+
+**Note:** Version bump only for package @cubejs-backend/mssql-driver
+
+
+
+
+
+## [0.33.19](https://github.com/cube-js/cube/compare/v0.33.18...v0.33.19) (2023-05-30)
+
+
+### Bug Fixes
+
+* **mssql-driver:** Handle BigInt and other mismatched types ([9cebfef](https://github.com/cube-js/cube/commit/9cebfefbe44d2606195f2f2add0579687c2f4461)), closes [#6658](https://github.com/cube-js/cube/issues/6658)
+
+
+
+
+
+## [0.33.18](https://github.com/cube-js/cube/compare/v0.33.17...v0.33.18) (2023-05-29)
+
+**Note:** Version bump only for package @cubejs-backend/mssql-driver
+
+
+
+
+
+## [0.33.17](https://github.com/cube-js/cube/compare/v0.33.16...v0.33.17) (2023-05-29)
+
+
+### Bug Fixes
+
+* **mssql-driver:** Server crashes on streaming errors ([2e81345](https://github.com/cube-js/cube/commit/2e81345059c14c0880e8b7d1bde7c9d04e497bfa))
+
+
+
+
+
+## [0.33.16](https://github.com/cube-js/cube/compare/v0.33.15...v0.33.16) (2023-05-28)
+
+
+### Bug Fixes
+
+* **mssql-driver:** Pre-aggregations builds hang up if over 10K of rows ([#6661](https://github.com/cube-js/cube/issues/6661)) ([9b20ff4](https://github.com/cube-js/cube/commit/9b20ff4ef78acbb65ebea80adceb227bf96b1727))
+
+
+
+
+
+## [0.33.11](https://github.com/cube-js/cube/compare/v0.33.10...v0.33.11) (2023-05-22)
+
+**Note:** Version bump only for package @cubejs-backend/mssql-driver
+
+
+
+
+
+## [0.33.8](https://github.com/cube-js/cube/compare/v0.33.7...v0.33.8) (2023-05-17)
+
+**Note:** Version bump only for package @cubejs-backend/mssql-driver
+
+
+
+
+
+## [0.33.7](https://github.com/cube-js/cube/compare/v0.33.6...v0.33.7) (2023-05-16)
+
+**Note:** Version bump only for package @cubejs-backend/mssql-driver
+
+
+
+
+
+## [0.33.2](https://github.com/cube-js/cube/compare/v0.33.1...v0.33.2) (2023-05-04)
+
+**Note:** Version bump only for package @cubejs-backend/mssql-driver
+
+
+
+
+
+# [0.33.0](https://github.com/cube-js/cube/compare/v0.32.31...v0.33.0) (2023-05-02)
+
+**Note:** Version bump only for package @cubejs-backend/mssql-driver
+
+
+
+
+
+## [0.32.30](https://github.com/cube-js/cube/compare/v0.32.29...v0.32.30) (2023-04-28)
+
+**Note:** Version bump only for package @cubejs-backend/mssql-driver
+
+
+
+
+
+## [0.32.29](https://github.com/cube-js/cube/compare/v0.32.28...v0.32.29) (2023-04-25)
+
+**Note:** Version bump only for package @cubejs-backend/mssql-driver
+
+
+
+
+
+## [0.32.28](https://github.com/cube-js/cube/compare/v0.32.27...v0.32.28) (2023-04-19)
+
+
+### Bug Fixes
+
+* **mssql-driver:** release stream connection ([#6453](https://github.com/cube-js/cube/issues/6453)) ([7113fa1](https://github.com/cube-js/cube/commit/7113fa1247f3761c9fde5f8d1af8de6036350e72))
+
+
+
+
+
 ## [0.32.26](https://github.com/cube-js/cube/compare/v0.32.25...v0.32.26) (2023-04-13)
 
 **Note:** Version bump only for package @cubejs-backend/mssql-driver

@@ -1,12 +1,12 @@
-import { Component, FunctionComponent, lazy, Suspense } from 'react';
+import { Component, FunctionComponent, Suspense } from 'react';
 import {
   CodeOutlined,
   CodeSandboxOutlined,
   CopyOutlined,
   DownOutlined,
   PlusOutlined,
+  ThunderboltOutlined,
   QuestionCircleOutlined,
-  SyncOutlined,
 } from '@ant-design/icons';
 import { Dropdown, Menu, Modal } from 'antd';
 import { getParameters } from 'codesandbox-import-utils/lib/api/define';
@@ -20,7 +20,6 @@ import { Button, Card, CubeLoader } from './atoms';
 import PrismCode from './PrismCode';
 import { playgroundAction } from './events';
 import { codeSandboxDefinition, copyToClipboard } from './utils';
-import DashboardSource from './DashboardSource';
 import { GraphQLIcon } from './shared/icons/GraphQLIcon';
 import { loadable } from './loadable';
 
@@ -44,7 +43,7 @@ const StyledCard: any = styled(Card)`
   .ant-card-head {
     position: sticky;
     top: 0;
-    z-index: 100;
+    z-index: 1;
     background: white;
   }
 
@@ -137,7 +136,6 @@ type ChartContainerProps = {
   hideActions: boolean;
   chartType: ChartType;
   isGraphQLSupported: boolean;
-  dashboardSource?: DashboardSource;
   error?: Error;
   resultSet?: ResultSet;
   [k: string]: any;
@@ -238,13 +236,11 @@ class ChartContainer extends Component<
       resultSet,
       error,
       render,
-      dashboardSource,
       hideActions,
       query,
       chartingLibrary,
       setChartLibrary,
       chartLibraries,
-      history,
       framework,
       setFramework,
       meta,
@@ -414,7 +410,7 @@ class ChartContainer extends Component<
 
             <Button
               data-testid="cache-btn"
-              icon={<SyncOutlined />}
+              icon={<ThunderboltOutlined />}
               size="small"
               type={activeTab === 'cache' ? 'primary' : 'default'}
               disabled={!!frameworkItem?.placeholder || isFetchingMeta}
@@ -439,52 +435,6 @@ class ChartContainer extends Component<
           >
             Edit
           </Button>
-
-          {dashboardSource && (
-            <Button
-              data-testid="add-to-dashboard-btn"
-              onClick={async () => {
-                this.setState({ addingToDashboard: true });
-                const canAddChart = await dashboardSource.canAddChart();
-
-                if (typeof canAddChart === 'boolean' && canAddChart) {
-                  playgroundAction('Add to Dashboard');
-                  await dashboardSource.addChart(codeExample);
-                  this.setState({
-                    redirectToDashboard: true,
-                    addingToDashboard: false,
-                  });
-                } else if (!canAddChart) {
-                  this.setState({ addingToDashboard: false });
-                  Modal.error({
-                    title:
-                      'Your dashboard app does not support adding of static charts',
-                    content: 'Please use static dashboard template',
-                  });
-                } else {
-                  this.setState({ addingToDashboard: false });
-                  Modal.error({
-                    title: 'There is an error loading your dashboard app',
-                    content: canAddChart,
-                    okText: 'Fix',
-                    okCancel: true,
-                    onOk() {
-                      history.push('/dashboard');
-                    },
-                  });
-                }
-              }}
-              icon={<PlusOutlined />}
-              size="small"
-              loading={addingToDashboard}
-              disabled={!!frameworkItem?.placeholder || isFetchingMeta}
-              type="primary"
-            >
-              {addingToDashboard
-                ? 'Preparing dashboard app. It may take a while. Please check console for progress...'
-                : 'Add to Dashboard'}
-            </Button>
-          )}
         </SectionRow>
       </form>
     );

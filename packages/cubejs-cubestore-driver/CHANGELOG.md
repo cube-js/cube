@@ -3,6 +3,165 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.24](https://github.com/cube-js/cube/compare/v0.33.23...v0.33.24) (2023-06-05)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore-driver
+
+
+
+
+
+## [0.33.21](https://github.com/cube-js/cube/compare/v0.33.20...v0.33.21) (2023-05-31)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore-driver
+
+
+
+
+
+## [0.33.20](https://github.com/cube-js/cube/compare/v0.33.19...v0.33.20) (2023-05-31)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore-driver
+
+
+
+
+
+## [0.33.19](https://github.com/cube-js/cube/compare/v0.33.18...v0.33.19) (2023-05-30)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore-driver
+
+
+
+
+
+## [0.33.18](https://github.com/cube-js/cube/compare/v0.33.17...v0.33.18) (2023-05-29)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore-driver
+
+
+
+
+
+## [0.33.13](https://github.com/cube-js/cube/compare/v0.33.12...v0.33.13) (2023-05-25)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore-driver
+
+
+
+
+
+## [0.33.11](https://github.com/cube-js/cube/compare/v0.33.10...v0.33.11) (2023-05-22)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore-driver
+
+
+
+
+
+## [0.33.9](https://github.com/cube-js/cube/compare/v0.33.8...v0.33.9) (2023-05-18)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore-driver
+
+
+
+
+
+## [0.33.8](https://github.com/cube-js/cube/compare/v0.33.7...v0.33.8) (2023-05-17)
+
+
+### Bug Fixes
+
+* **athena-driver:** Fix partitioned pre-aggregations and column values with `,` through export bucket ([#6596](https://github.com/cube-js/cube/issues/6596)) ([1214cab](https://github.com/cube-js/cube/commit/1214cabf69f9e6216c516d05acadfe7e6178cccf))
+
+
+### Features
+
+* **cubestore-driver:** Queue - protect possible race condition (query def) [#6616](https://github.com/cube-js/cube/issues/6616)) ([60294de](https://github.com/cube-js/cube/commit/60294defff88ee96d95d1d34b1fe17fccdb17b71))
+
+
+
+
+
+## [0.33.7](https://github.com/cube-js/cube/compare/v0.33.6...v0.33.7) (2023-05-16)
+
+
+### Features
+
+* **cubestore-driver:** Queue - protect race conditions ([#6598](https://github.com/cube-js/cube/issues/6598)) ([d503598](https://github.com/cube-js/cube/commit/d50359845d388ccadc8d5a7233ed7317849558f4))
+
+
+
+
+
+## [0.33.6](https://github.com/cube-js/cube/compare/v0.33.5...v0.33.6) (2023-05-13)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore-driver
+
+
+
+
+
+## [0.33.5](https://github.com/cube-js/cube/compare/v0.33.4...v0.33.5) (2023-05-11)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore-driver
+
+
+
+
+
+## [0.33.4](https://github.com/cube-js/cube/compare/v0.33.3...v0.33.4) (2023-05-07)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore-driver
+
+
+
+
+
+## [0.33.2](https://github.com/cube-js/cube/compare/v0.33.1...v0.33.2) (2023-05-04)
+
+
+### Features
+
+* **cubestore-driver:** Queue - track orphaned set result ([f97fbdc](https://github.com/cube-js/cube/commit/f97fbdcbe1e8c98d568f0614be8074e32d22343f))
+* **cubestore:** Queue - expose processingId in queue_retrieve ([#6530](https://github.com/cube-js/cube/issues/6530)) ([43913ce](https://github.com/cube-js/cube/commit/43913ce459e1b60dd04f3a23aed1c617de0e0422))
+
+
+
+
+
+# [0.33.0](https://github.com/cube-js/cube/compare/v0.32.31...v0.33.0) (2023-05-02)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore-driver
+
+
+
+
+
+## [0.32.30](https://github.com/cube-js/cube/compare/v0.32.29...v0.32.30) (2023-04-28)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore-driver
+
+
+
+
+
+## [0.32.29](https://github.com/cube-js/cube/compare/v0.32.28...v0.32.29) (2023-04-25)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore-driver
+
+
+
+
+
+## [0.32.28](https://github.com/cube-js/cube/compare/v0.32.27...v0.32.28) (2023-04-19)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore-driver
+
+
+
+
+
 ## [0.32.26](https://github.com/cube-js/cube/compare/v0.32.25...v0.32.26) (2023-04-13)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore-driver

@@ -13,6 +13,7 @@ export interface DriverTestsOptions {
   csvNoHeader?: boolean
   // Some drivers unload from a CTAS query, others unload from a stream.
   wrapLoadQueryWithCtas?: boolean
+  delimiter?: string
 }
 
 export class DriverTests {
@@ -83,9 +84,13 @@ export class DriverTests {
     const data = await this.driver.unload(tableName, { maxFileSize: 64 });
     expect(data.csvFile.length).toEqual(1);
     const string = await downloadAndGunzip(data.csvFile[0]);
+    let expectedCsvRows = this.getExpectedCsvRows();
+    if (this.options.delimiter) {
+      expectedCsvRows = expectedCsvRows.replaceAll(/,/g, this.options.delimiter);
+    }
     const expectedRows = this.options.csvNoHeader
-      ? DriverTests.skipFirstLine(this.getExpectedCsvRows())
-      : this.getExpectedCsvRows();
+      ? DriverTests.skipFirstLine(expectedCsvRows)
+      : expectedCsvRows;
     expect(string.trim()).toEqual(expectedRows);
   }
 

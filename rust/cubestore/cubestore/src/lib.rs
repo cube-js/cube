@@ -50,6 +50,7 @@ pub mod mysql;
 pub mod queryplanner;
 pub mod remotefs;
 pub mod scheduler;
+pub mod shared;
 pub mod sql;
 pub mod store;
 pub mod streaming;
@@ -75,6 +76,7 @@ pub enum CubeErrorCauseType {
     User,
     Internal,
     CorruptData,
+    WrongConnection,
     Panic,
 }
 
@@ -126,6 +128,14 @@ impl CubeError {
         }
     }
 
+    pub fn wrong_connection(message: String) -> CubeError {
+        CubeError {
+            message,
+            backtrace: String::new(),
+            cause: CubeErrorCauseType::WrongConnection,
+        }
+    }
+
     pub fn panic(message: String) -> CubeError {
         CubeError {
             message,
@@ -137,6 +147,13 @@ impl CubeError {
     pub fn is_corrupt_data(&self) -> bool {
         match self.cause {
             CubeErrorCauseType::CorruptData => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_wrong_connection(&self) -> bool {
+        match self.cause {
+            CubeErrorCauseType::WrongConnection => true,
             _ => false,
         }
     }

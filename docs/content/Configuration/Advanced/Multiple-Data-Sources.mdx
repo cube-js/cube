@@ -61,22 +61,39 @@ pages][ref-config-db].
 
 ## Data model
 
-Use the [`dataSource`](/schema/reference/cube#parameters-data-source) property
+Use the [`data_source`](/schema/reference/cube#parameters-data-source) property
 to set a data source for each cube:
 
-```javascript
-cube('Orders', {
-  ...,
+<CodeTabs>
 
-  dataSource: 'default',
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    data_source: default
+
+  - name: orders_from_other_data_source
+    # ...
+
+    data_source: other_data_source
+```
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  data_source: `default`,
 });
 
-cube('OrdersFromOtherDataSource', {
-  ...,
+cube(`orders_from_other_data_source`, {
+  // ...
 
-  dataSource: 'datasource1',
+  data_source: `other_data_source`,
 });
 ```
+
+</CodeTabs>
 
 [ref-config-ref-env]: /reference/environment-variables
 [ref-config-ref-driverfactory]: /config#options-reference-driver-factory

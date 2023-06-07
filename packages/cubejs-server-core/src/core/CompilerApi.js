@@ -49,18 +49,33 @@ export class CompilerApi {
     }
 
     if (!this.compilers || this.compilerVersion !== compilerVersion) {
-      this.logger(this.compilers ? 'Recompiling schema' : 'Compiling schema', {
-        version: compilerVersion,
-        requestId
-      });
-      this.compilers = await compile(this.repository, {
-        allowNodeRequire: this.allowNodeRequire,
-        compileContext: this.compileContext,
-        allowJsDuplicatePropsInSchema: this.allowJsDuplicatePropsInSchema,
-        standalone: this.standalone,
-      });
-      this.compilerVersion = compilerVersion;
-      this.queryFactory = await this.createQueryFactory(this.compilers);
+      try {
+        this.logger(this.compilers ? 'Recompiling schema' : 'Compiling schema', {
+          version: compilerVersion,
+          requestId
+        });
+
+        this.compilers = await compile(this.repository, {
+          allowNodeRequire: this.allowNodeRequire,
+          compileContext: this.compileContext,
+          allowJsDuplicatePropsInSchema: this.allowJsDuplicatePropsInSchema,
+          standalone: this.standalone,
+        });
+        this.compilerVersion = compilerVersion;
+        this.queryFactory = await this.createQueryFactory(this.compilers);
+
+        this.logger('Compiling schema completed', {
+          version: compilerVersion,
+          requestId,
+        });
+      } catch (e) {
+        this.logger('Compiling schema error', {
+          version: compilerVersion,
+          requestId,
+          error: (e.stack || e).toString()
+        });
+        throw e;
+      }
     }
 
     return this.compilers;

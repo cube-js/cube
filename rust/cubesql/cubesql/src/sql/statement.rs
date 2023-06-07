@@ -6,7 +6,9 @@ use pg_srv::{
     protocol::{ErrorCode, ErrorResponse},
     BindValue, PgType,
 };
-use sqlparser::ast::{self, Expr, Function, FunctionArgExpr, Ident, Value};
+use sqlparser::ast::{
+    self, ArrayAgg, Expr, Function, FunctionArg, FunctionArgExpr, Ident, ObjectName, Value,
+};
 use std::{collections::HashMap, error::Error};
 
 use super::types::{ColumnFlags, ColumnType};
@@ -210,6 +212,20 @@ trait Visitor<'ast, E: Error> {
             Expr::Position { expr, r#in } => {
                 self.visit_expr(expr)?;
                 self.visit_expr(r#in)?;
+            }
+            Expr::ArrayAgg(ArrayAgg {
+                expr,
+                order_by,
+                limit,
+                ..
+            }) => {
+                self.visit_expr(expr)?;
+                if let Some(order_by) = order_by {
+                    self.visit_expr(&mut order_by.expr)?;
+                }
+                if let Some(limit) = limit {
+                    self.visit_expr(limit)?;
+                }
             }
         };
 
@@ -813,7 +829,29 @@ impl<'ast> Visitor<'ast, ConnectionError> for CastReplacer {
                     "timestamptz" => {
                         self.visit_expr(&mut *cast_expr)?;
 
-                        *data_type = ast::DataType::Timestamp
+                        *data_type = ast::DataType::Timestamp;
+                    }
+                    "regtype" => {
+                        self.visit_expr(&mut *cast_expr)?;
+
+                        if let Expr::Identifier(_) = &**cast_expr {
+                            *expr = Expr::Function(Function {
+                                name: ObjectName(vec![Ident {
+                                    value: "format_type".to_string(),
+                                    quote_style: None,
+                                }]),
+                                args: vec![
+                                    FunctionArg::Unnamed(FunctionArgExpr::Expr(*cast_expr.clone())),
+                                    FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::Value(
+                                        Value::Null,
+                                    ))),
+                                ],
+                                over: None,
+                                distinct: false,
+                                special: false,
+                                approximate: false,
+                            })
+                        }
                     }
                     // TODO:
                     _ => (),

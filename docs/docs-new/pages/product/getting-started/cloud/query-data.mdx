@@ -1,0 +1,118 @@
+---
+redirect_from:
+  - /getting-started/cloud/query-data
+---
+
+# Query data
+In this step, you will learn how to query your data using the data models you
+created in the previous step. Cube Cloud provides several ways to query your
+data, and we'll go over them here.
+
+## Developer Playground
+
+The Developer Playground is a web-based tool that allows you to query your data
+without connecting any tools or writing any code. It's a fastest way to explore
+your data.
+
+Navigate to the <Btn>Playground</Btn> page in Cube Cloud:
+
+<Screenshot
+  alt="Cube Cloud Deployment Developer Playground Screen"
+  src="https://ucarecdn.com/43394d9a-a309-46a1-952d-ccbce10078aa/"
+/>
+
+Next, you will select the measures and dimensions you want to query, and then
+run the query. Let's do this for the `orders` cube you generated in the previous
+step.
+
+Click <Btn>+ Measure</Btn> to display the available measures and add
+`orders.count`, then click <Btn>Run</Btn>:
+
+<Screenshot
+  alt="Cube Cloud Deployment Developer Playground Screen with a selected measure"
+  src="https://ucarecdn.com/2c13f612-cb29-4e44-8695-09d46d782240/"
+/>
+
+Next, click <Btn>+ Dimension</Btn> for available dimensions, add
+`orders.status`, and then click <Btn>Run</Btn> again:
+
+<Screenshot
+  alt="Cube Cloud Deployment Developer Playground Screen with selected measures and dimensions"
+  src="https://ucarecdn.com/0ade1c53-df71-417b-88e6-3966341e33f3/"
+/>
+
+Please feel free to experiment: select other measures or dimensions, pick a
+granularity for the time dimension instead of&nbsp;<Btn>w/o grouping</Btn>, or
+choose another chart type instead of&nbsp;<Btn>Table</Btn>.
+
+## GraphQL API
+
+From the deployment's Overview page, you can copy the GraphQL API URL for the
+deployment:
+
+<Screenshot
+  alt="Cube Cloud Deployment Overview Screen"
+  src="https://ucarecdn.com/7fa603ae-6100-4492-91e4-564d311f701e/"
+/>
+
+To see an example of how to query the GraphQL API using `curl`, click <Btn>How
+to connect your application</Btn>:
+
+<Screenshot
+  alt="Cube Cloud Deployment Screen with How to connect your application over GraphQL dialog open"
+  src="https://ucarecdn.com/4a153b5d-f746-451b-8c93-ab7891d98b47/"
+/>
+
+## REST API
+
+<Screenshot
+  alt="Cube Cloud Deployment Overview Screen"
+  src="https://ucarecdn.com/7fa603ae-6100-4492-91e4-564d311f701e/"
+/>
+
+To see an example of how to query the REST API using `curl`, click <Btn>How to
+connect your application</Btn>:
+
+<Screenshot
+  alt="Cube Cloud Deployment Screen with How to connect your application over REST dialog open"
+  src="https://ucarecdn.com/30f90999-dd1b-495c-97c7-4656e61e65c1/"
+/>
+
+## SQL API
+
+First, navigate to the <Btn>Settings</Btn> page and enable the SQL API.
+
+Then, on the <Btn>Overview</Btn> page, click <Btn>How to connect</Btn>, which
+will open instructions on connecting different tools to the SQL API. You should
+see a screen with your connection credentials:
+
+<Screenshot src="https://ucarecdn.com/1ae24899-ffb5-4e28-b4e3-2cdcc6871a09/" />
+
+We can test it by running the provided `psql` command:
+
+```bash{outputLines: 2-14}
+PGPASSWORD=c9fba08a9b41f69f698b00134587d325 \
+  psql -h fierce-bear.sql.aws-eu-central-1.cubecloudapp.dev \
+  -p 5432 \
+  -U cube fierce-bear
+
+psql (14.5, server 14.2 (Cube SQL))
+SSL connection (protocol: TLSv1.3, cipher: TLS_AES_256_GCM_SHA384, bits: 256, compression: off)
+Type "help" for help.
+
+fierce-bear=> SELECT COUNT(*) FROM orders;
+ COUNT(UInt8(1))
+-----------------
+           10000
+(1 row)
+```
+
+Since the SQL API is Postgres-compatible, please make sure to
+select&nbsp;<Btn>Postgres</Btn> as the database type when [connecting from BI
+tools][ref-downstream].
+
+Now that we've seen how to use Cube's APIs, let's take a look at [how to add
+pre-aggregations][next] to speed up your queries.
+
+[ref-downstream]: /config/downstream
+[next]: /getting-started/cloud/add-a-pre-aggregation

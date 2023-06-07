@@ -88,13 +88,13 @@ export class JDBCDriver extends BaseDriver {
 
       /**
        * Time to wait for a response from a connection after validation
-       * request before determining it as not valid. Default - 10000 ms.
+       * request before determining it as not valid. Default - 60000 ms.
        */
       testConnectionTimeout?: number,
     } = {}
   ) {
     super({
-      testConnectionTimeout: config.testConnectionTimeout,
+      testConnectionTimeout: config.testConnectionTimeout || 60000,
     });
 
     const dataSource =
@@ -172,7 +172,7 @@ export class JDBCDriver extends BaseDriver {
       softIdleTimeoutMillis: 30000,
       idleTimeoutMillis: 30000,
       testOnBorrow: true,
-      acquireTimeoutMillis: 20000,
+      acquireTimeoutMillis: 120000,
       ...(poolOptions || {})
     }) as ExtendedPool;
   }
