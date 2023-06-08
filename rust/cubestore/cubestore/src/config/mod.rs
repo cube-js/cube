@@ -987,7 +987,7 @@ impl Config {
                 compaction_chunks_count_threshold: env_parse("CUBESTORE_CHUNKS_COUNT_THRESHOLD", 4),
                 compaction_chunks_in_memory_size_threshold: env_parse_size(
                     "CUBESTORE_COMPACTION_CHUNKS_IN_MEMORY_SIZE_THRESHOLD",
-                    3 * 1024 * 1024 * 1024,
+                    1 * 1024 * 1024 * 1024,
                     None,
                     Some(1 * 1024 * 1024 * 1024),
                 ) as u64,
