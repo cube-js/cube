@@ -22,8 +22,6 @@ module.exports = {
   //   },
   // },
 
-  docs: "[Demo] MDX Components",
-
   product: {
     type: "page",
     title: "Docs",
