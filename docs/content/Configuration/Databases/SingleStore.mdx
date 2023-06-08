@@ -3,6 +3,12 @@ title: SingleStore
 permalink: /config/databases/singlestore
 ---
 
+<InfoBox>
+
+SingleStore is MySQL-compatible, so you can use Cube's MySQL database connection steps to connect to your workspace.
+
+</InfoBox>
+
 ## What is SingleStore?
 
 SingleStore is a MySQL-compatible, high performance analytical database which is also capable of handling your transactional workload - something many cloud data warehouses and analytical databases are not a good fit for.
@@ -59,12 +65,6 @@ The port defaults to 3306, which is valid, and your screen should be filled out 
 ###  Connecting Manually
 
 If you’re setting up the SingleStore connection via the configuration page or adding it as a second datasource to a deployment that already has a primary data connection, you can use the following parameters.
-
-<InfoBox>
-
-SingleStore is MySQL-compatible, so you can use Cube's MySQL database connection steps to connect to your workspace.
-
-</InfoBox>
 
 Add the following to a `.env` file in your Cube project:
 
