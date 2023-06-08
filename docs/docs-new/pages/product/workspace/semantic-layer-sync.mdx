@@ -55,12 +55,12 @@ interested in using Semantic Layer Sync with other BI tools.
 
 ### Configuration
 
-Under the hood, Semantic Layer Sync configuration is kept using the
-`semanticLayerSync` option in the `cube.js` configuration file.
+Under the hood, Semantic Layer Sync is configured using the `semanticLayerSync`
+option in the `cube.js` configuration file.
 
-This function returns an array of configured syncs. It can also be asynchronous,
-allowing for dynamic definition of syncs, e.g., loading the configuration from a
-remote API endpoint.
+This function accepts a security context and returns an array of configured
+syncs. It can also be asynchronous, allowing for dynamic definition of syncs,
+e.g., loading the configuration from a remote API endpoint.
 
 Each sync is configured with a mandatory `name` and a `type` as well as the
 `config` object with BI-specific credentials, e.g., a workspace URL and an API
@@ -74,7 +74,7 @@ Example configuration with a single disabled sync:
 
 ```javascript
 module.exports = {
-  semanticLayerSync: () => {
+  semanticLayerSync: ({ securityContext }) => {
     return [
       {
         type: "superset",
@@ -92,6 +92,84 @@ module.exports = {
 };
 ```
 
+### Multitenancy
+
+If multiple security contexts are defined via the
+[`scheduledRefreshContexts`][ref-config-contexts] configuration option,
+`semanticLayerSync` can provide custom configuration for each of them.
+
+<WarningBox>
+
+By default, multitenancy support in `semanticLayerSync` is disabled. Please
+contact support to enable multitenancy support in `semanticLayerSync` for your
+Cube Cloud account.
+
+</WarningBox>
+
+You can synchronize the data model of each tenant to a different BI tool or a
+different database in a single BI tool, or implement another scenario that makes
+sense in your use case.
+
+Example configuration for the case when each department wants have their data
+model synchronized to a dedicated database in a BI tool:
+
+```javascript
+module.exports = {
+  semanticLayerSync: ({ securityContext }) => {
+    const department = securityContext.department;
+
+    return [
+      {
+        type: "metabase",
+        name: `Metabase Sync for ${department}`,
+        config: {
+          user: "mail@example.com",
+          password: "4dceae-606a03-93ae6dc7",
+          url: "example.metabaseapp.com",
+          database: `Cube Cloud: ${department}`,
+        },
+      },
+    ];
+  },
+};
+```
+
+Example confguration for the case when only `admin` data model should be
+synchronized with a couple of BI tools:
+
+```javascript
+module.exports = {
+  semanticLayerSync: ({ securityContext }) => {
+    if (securityContext.role === "admin") {
+      return [
+        {
+          type: "superset",
+          name: "Superset Sync",
+          config: {
+            user: "mail@example.com",
+            password: "4dceae-606a03-93ae6dc7",
+            url: "superset.example.com",
+            database: "Cube Cloud: sls-test (admin)",
+          },
+        },
+        {
+          type: "preset",
+          name: "Preset Sync",
+          config: {
+            api_token: "07988f63-c200-499e-97c9-ba137d8918aa",
+            api_secret: "c19fbab4fd4945899795d32898f2e1165bef8e5ee653",
+            workspace_url: "12345678.us1a.app.preset.io",
+            database: "Cube Cloud: sls-test (admin)",
+          },
+        },
+      ];
+    } else {
+      return []; // Only sync the 'admin' data model
+    }
+  },
+};
+```
+
 ### Apache Superset
 
 Data model is synchronized via [Superset API][superset-api] which uses a `user`
@@ -103,7 +181,7 @@ Example `cube.js` confguration file for Superset:
 
 ```javascript
 module.exports = {
-  semanticLayerSync: () => {
+  semanticLayerSync: ({ securityContext }) => {
     return [
       {
         type: "superset",
@@ -132,7 +210,7 @@ Example `cube.js` confguration file for Preset:
 
 ```javascript
 module.exports = {
-  semanticLayerSync: () => {
+  semanticLayerSync: ({ securityContext }) => {
     return [
       {
         type: "preset",
@@ -161,7 +239,7 @@ Example `cube.js` confguration file for Metabase:
 
 ```javascript
 module.exports = {
-  semanticLayerSync: () => {
+  semanticLayerSync: ({ securityContext }) => {
     return [
       {
         type: "metabase",
@@ -188,6 +266,16 @@ sending them, or use a service account with a different email address:
 
 When the data model is updated, all configured syncs will automatically run.
 
+<WarningBox>
+
+If data model is updated dynamically and the
+[`schemaVersion`][ref-config-schemaversion] configuration option is used to
+track data model changes, syncs will not automatically run. This behavior is
+disabled by default. Please contact support to enable running syncs when the
+data model is updated dynamically for your Cube Cloud account.
+
+</WarningBox>
+
 You can also run a sync manually by navigationg to the <Btn>Semantic Layer
 Sync</Btn> tab on the <Btn>BI Integrations</Btn> page and clicking <Btn>Start
 Sync</Btn> next to a relevant sync.
@@ -207,15 +295,14 @@ and clicking <Btn>Show History</Btn> next to a relevant sync.
 
 <Screenshot src="https://ucarecdn.com/a3cc5fc8-8458-483e-999c-5654eb8072b4/" />
 
-Example log output:
-
-    2023-05-29T19:08:28.021: Semantic Layer Sync Started
-    2023-05-29T19:08:33.008: Semantic Layer Sync Completed
-
 [ref-data-model]: /product/data-modeling/overview
 [ref-sql-api]: /product/api-sql/overview
 [ref-config-sls]:
   /reference/configuration/config#options-reference-semantic-layer-sync
+[ref-config-contexts]:
+  /reference/configuration/config#options-reference-scheduled-refresh-contexts
+[ref-config-schemaversion]:
+  /reference/configuration/config#options-reference-schema-version
 [ref-workspace-sls]: /workspace/bi-integrations
 [ref-dev-mode]: /product/workspace/dev-mode
 [preset-api]: https://api-docs.preset.io
