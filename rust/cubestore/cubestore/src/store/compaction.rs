@@ -525,7 +525,10 @@ impl CompactionService for CompactionServiceImpl {
         }
 
         let mut data = Vec::new();
+        let mut chunks_to_use = Vec::new();
+        let mut total_size = 0;
         let num_columns = index.get_row().columns().len();
+
         for chunk in chunks.iter() {
             for b in self
                 .chunk_store
@@ -543,9 +546,18 @@ impl CompactionService for CompactionServiceImpl {
                     index,
                     chunk
                 );
-                data.push(b)
+                for col in b.columns() {
+                    total_size += col.get_array_memory_size();
+                }
+                data.push(b);
+            }
+            chunks_to_use.push(chunk.clone());
+            if total_size > self.config.compaction_chunks_in_memory_size_threshold() as usize {
+                break;
             }
         }
+
+        let chunks = chunks_to_use;
 
         let store = ParquetTableStore::new(index.get_row().clone(), ROW_GROUP_SIZE);
         let old_partition_remote = match &new_chunk {
@@ -1464,6 +1476,9 @@ mod tests {
             });
 
         config.expect_partition_split_threshold().returning(|| 20);
+        config
+            .expect_compaction_chunks_in_memory_size_threshold()
+            .returning(|| 3 * 1024 * 1024 * 1024);
 
         config
             .expect_partition_size_split_threshold_bytes()
