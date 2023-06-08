@@ -5,7 +5,7 @@ import { langs } from "./dictionary";
 import { Pre } from "nextra/components";
 
 import classnames from "classnames/bind";
-import classes from "./CodeTabs.module.css";
+import classes from "./CodeTabs.module.scss";
 const cn = classnames.bind(classes);
 
 interface CustomEventMap {
@@ -90,8 +90,11 @@ export const CodeTabs: FC<CodeTabsProps> = ({ children }) => {
   }, []);
 
   return (
-    <div className="mt-6">
-      <div className="flex rounded-t-xl -mb-6 bg-primary-700/5 dark:nx-bg-primary-300/10 nx-text-gray-700 dark:nx-text-gray-200">
+    <div className={cn('mt-6', 'CodeBlock')}>
+      <div className={cn(
+        "flex rounded-t-xl -mb-6 bg-primary-700/5 dark:nx-bg-primary-300/10 nx-text-gray-700 dark:nx-text-gray-200",
+        'CodeBlock__Tabs',
+      )}>
         {children
           .filter((tab) => !!tab.props["data-language"])
           .map((tab, i) => {

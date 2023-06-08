@@ -1,14 +1,17 @@
 .CodeBlock {
-  position: relative;
-  background-color: var(--dark_bg);
-  border-radius: 4px;
-  overflow: hidden;
-  margin: 24px 0;
+  //position: relative;
+  //background-color: var(--dark_bg);
+  //border-radius: 4px;
+  //overflow: hidden;
+  //margin: 24px 0;
 }
 
-.CodeBlock > pre {
-  margin-top: 0;
-  margin-bottom: 0;
+.CodeBlock :global(pre) {
+  //background-color: var(--dark_bg);
+}
+
+.CodeBlock :global(pre > code > .line) {
+  padding: 0;
 }
 
 .CodeBlock__copyFloating {
@@ -21,6 +24,16 @@
 
 .CodeBlock:hover .CodeBlock__copyFloating {
   opacity: 1;
+}
+
+.CodeBlock__Tabs {
+  //background-color: var(--dark_bg);
+  box-shadow: inset 0px -1px 0px var(--dark_05_a12);
+
+  > div:first-child {
+    border-top-left-radius: 0.75rem;
+    //border-top-right-radius: 0.75rem;
+  }
 }
 
 .CodeBlocks__tabs {
@@ -58,6 +71,7 @@
   cursor: default;
   background-color: var(--purple_bg_a08);
   box-shadow: inset 0px -2.6px 0px var(--purple_bright);
+
 }
 
 
