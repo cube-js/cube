@@ -39,7 +39,6 @@ export type Frontmatter = {
   category: string;
   menuOrder?: number;
   subCategory?: string;
-  frameworkOfChoice?: string;
 };
 
 export type MarkdownNode = {

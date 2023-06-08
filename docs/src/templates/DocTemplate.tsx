@@ -352,7 +352,6 @@ export const pageQuery = graphql`
         menuTitle
         scope
         category
-        frameworkOfChoice
         isDisableFeedbackBlock
       }
     }
