@@ -8,20 +8,20 @@ menuOrder: 52
 ---
 
 [Apache Airflow][airflow] is a popular open-source workflow scheduler commonly
-used for data orchestration. [Astro][astro] is a fully-managed service for
+used for data orchestration. [Astro][astro] is a fully managed service for
 Airflow by [Astronomer][astro].
 
 This guide demonstrates how to setup Cube and Airflow to work together so that
 Airflow can push changes from upstream data sources to Cube via the
 [Orchestration API][ref-orchestration-api].
 
-## Operators
+## Tasks
 
-In Airflow, each pipeline is represented as a directed acyclic graph (or
-DAG) of tasks. Tasks are implemented using the Python programming language,
-and they are instances of the `Operator` class. Operators can perform various
-tasks: poll for some precondition, perform extract-load-transform (ETL) jobs,
-or trigger external systems like Cube.
+In Airflow, pipelines are represented by directed acyclic graphs (DAGs),
+Python function decorated with a `@dag` decorator. DAGs include calls to
+tasks, implemented as instances of the `Operator` class. Operators can
+perform various tasks: poll for some precondition, perform
+extract-load-transform (ETL), or trigger external systems like Cube.
 
 Integration between Cube and Airflow is enabled by the
 [`airflow-provider-cube`][github-airflow-provider-cube] package that provides
