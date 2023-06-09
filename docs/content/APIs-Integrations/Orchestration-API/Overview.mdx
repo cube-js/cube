@@ -23,21 +23,24 @@ Under the hood, the Orchestration API is exposed via the
 [`/v1/pre-aggregations/jobs`][ref-ref-jobs-endpoint] endpoint of the
 [REST API][ref-rest-api].
 
+## Guides
+
+Check the following guides to get tool-specific instructions:
+
+<Grid imageSize={[56, 56]}>
+  <GridItem
+    url="orchestration-api/airflow"
+    imageUrl="https://static.cube.dev/icons/airflow.svg"
+    title="Apache Airflow"
+  />
+</Grid>
+
 ## Configuration
 
 Orchestration API is enabled by default but inaccessible due to the default
 [API scopes][ref-api-scopes] configuration. To allow access to the
 Orchestration API, enable the `jobs` scope, e.g., by setting the
 `CUBEJS_DEFAULT_API_SCOPES` environment variable to `meta,data,graphql,jobs`.
-
-[ref-scheduled-refresh]: /schema/reference/pre-aggregations#parameters-scheduled-refresh
-[cube-ea]: https://cube.dev/use-cases/embedded-analytics
-[cube-issbi]: https://cube.dev/use-cases/semantic-layer
-[cube-rta]: https://cube.dev/use-cases/real-time-analytics
-[ref-lambda-pre-aggs]: /caching/pre-aggregations/lambda-pre-aggregations
-[ref-rest-api]: /http-api/rest
-[ref-api-scopes]: /http-api/rest#configuration-api-scopes
-[ref-ref-jobs-endpoint]: /rest-api#v-1-pre-aggregations-jobs
 
 ## Building pre-aggregations
 
@@ -55,3 +58,12 @@ to rebuild:
 - Pre-aggregations using specific cubes (e.g., refresh data from some tables)
 - Pre-aggregations using cubes from specific data sources (e.g., refresh data
 from some Snowflake connection)
+
+[ref-scheduled-refresh]: /schema/reference/pre-aggregations#parameters-scheduled-refresh
+[cube-ea]: https://cube.dev/use-cases/embedded-analytics
+[cube-issbi]: https://cube.dev/use-cases/semantic-layer
+[cube-rta]: https://cube.dev/use-cases/real-time-analytics
+[ref-lambda-pre-aggs]: /caching/pre-aggregations/lambda-pre-aggregations
+[ref-rest-api]: /http-api/rest
+[ref-api-scopes]: /http-api/rest#configuration-api-scopes
+[ref-ref-jobs-endpoint]: /rest-api#v-1-pre-aggregations-jobs
