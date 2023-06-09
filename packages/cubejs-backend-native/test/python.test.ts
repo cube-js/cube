@@ -67,7 +67,11 @@ suite('Python', () => {
     const input = {
       str: 'string',
       int_number: 1,
+      int_max_number: Number.MAX_VALUE,
+      int_min_number: Number.MIN_VALUE,
       float_number: 3.1415,
+      nan_number: NaN,
+      infinity_number: 10 ** 10000,
       bool_true: true,
       bool_false: false,
       undefined_field: undefined,
