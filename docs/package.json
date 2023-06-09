@@ -52,7 +52,7 @@
     "@types/react-helmet": "^6.1.0",
     "@types/react-html-parser": "^2.0.1",
     "@types/react-scroll": "^1.8.2",
-    "gatsby": "^3",
+    "gatsby": "^4",
     "gatsby-link": "^3",
     "gatsby-plugin-antd": "^2.0.2",
     "gatsby-plugin-catch-links": "^3",
