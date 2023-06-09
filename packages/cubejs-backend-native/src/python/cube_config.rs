@@ -88,7 +88,7 @@ impl Finalize for CubeConfigPy {}
 
 impl CubeConfigPy {
     #[allow(clippy::wrong_self_convention)]
-    pub fn to_object<'a, C: Context<'a>>(mut self, mut cx: &mut C) -> JsResult<'a, JsValue> {
+    pub fn to_object<'a, C: Context<'a>>(self, cx: &mut C) -> JsResult<'a, JsValue> {
         let obj = CLRepr::Object(self.properties);
         obj.into_js(cx)
     }
