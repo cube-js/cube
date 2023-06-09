@@ -41,18 +41,49 @@ suite('Python', () => {
       queryRewrite: expect.any(Function),
     });
 
-    if (config.checkAuth) {
-      await config.checkAuth({ requestId: 'test' }, 'MY_SECRET_TOKEN');
-    } else {
-      throw new Error('checkAuth was defined in config.py');
+    if (!config.checkAuth) {
+      throw new Error('checkAuth was not defined in config.py');
     }
+
+    await config.checkAuth(
+      { requestId: 'test' },
+      'MY_SECRET_TOKEN'
+    );
   });
 
   test('context_to_api_scopes', async () => {
-    if (config.contextToApiScopes) {
-      expect(await config.contextToApiScopes()).toEqual(['meta', 'data', 'jobs']);
-    } else {
-      throw new Error('contextToApiScopes was defined in config.py');
+    if (!config.contextToApiScopes) {
+      throw new Error('contextToApiScopes was not defined in config.py');
     }
+
+    expect(await config.contextToApiScopes()).toEqual(['meta', 'data', 'jobs']);
+  });
+
+  test('testing converting js -> python -> js', async () => {
+    if (!config.queryRewrite) {
+      throw new Error('queryRewrite was not defined in config.py');
+    }
+
+    const input = {
+      str: 'string',
+      int_number: 1,
+      float_number: 3.1415,
+      bool_true: true,
+      bool_false: false,
+      undefined_field: undefined,
+      obj: {
+        field_str: 'string',
+      },
+      array_int: [1, 2, 3, 4, 5],
+      array_obj: [{
+        field_str_first: 'string',
+      }, {
+        field_str_second: 'string',
+      }]
+    };
+
+    expect(await config.queryRewrite(input, {})).toEqual(
+      input
+    );
   });
 });
