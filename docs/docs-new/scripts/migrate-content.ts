@@ -808,7 +808,7 @@ const overrides: Record<string, Override> = {
     path: "product/workspace/dev-mode",
     title: "Development mode",
   },
-  "Workspace/Cube-IDE.mdx": {
+  "Workspace/Data-Model.mdx": {
     ready: true,
     path: "product/workspace/data-model",
     title: "Data Model",

@@ -7,12 +7,13 @@ redirect_from:
 
 # Data Model
 
-With the Cube IDE, you can write and test and your Cube data models from your
-browser.
+With the web-based data model editor, you can write and test and your Cube [data
+model][ref-data-modeling] from your browser.
 
 <SuccessBox>
 
-Cube IDE is available in Cube Cloud on [all tiers](https://cube.dev/pricing).
+Data model editor is available in Cube Cloud on
+[all tiers](https://cube.dev/pricing).
 
 </SuccessBox>
 
@@ -33,13 +34,7 @@ changes, allowing you to quickly test API changes from your applications.
 To enter development mode, navigate to the <Btn>Data Model</Btn> screen and
 click <Btn>Enter Development Mode</Btn>.
 
-<div style={{ textAlign: "center" }}>
-  <img
-    src="https://ucarecdn.com/f96a2b0e-a413-4126-84ef-45e73acbb5e0/"
-    style={{ border: "none" }}
-    width="100%"
-  />
-</div>
+<Screenshot src="https://ucarecdn.com/f96a2b0e-a413-4126-84ef-45e73acbb5e0/" />
 
 When development mode is active, a grey bar will be visible at the top of the
 screen. It provides several useful controls and indicators:
@@ -50,32 +45,60 @@ screen. It provides several useful controls and indicators:
 - 'Copy API URL' will copy the API URL to the clipboard for the current
   development branch.
 
-<div style={{ textAlign: "center" }}>
-  <img
-    src="https://ucarecdn.com/915e829d-39a7-4d65-b5d4-678bc7545a6f/"
-    style={{ border: "none" }}
-    width="100%"
-  />
-</div>
+<Screenshot src="https://ucarecdn.com/915e829d-39a7-4d65-b5d4-678bc7545a6f/" />
 
 You can exit development mode by clicking <Btn>Exit</Btn> in the grey banner. If
 you've been editing a data model and navigate away, Cube Cloud will warn you if
 there are any unsaved changes:
 
-![Unsaved changes warning modal|690x431](https://ucarecdn.com/67b8e943-0043-4398-84fc-91d83765ed10/)
+<Screenshot
+  src="https://ucarecdn.com/67b8e943-0043-4398-84fc-91d83765ed10/"
+  alt="Unsaved changes warning modal"
+/>
+
+## Data Graph
+
+In addition to exploring the code of data model files, you can view the visual
+representation of the data model, including relations between cubes.
+Click <Btn>Show Graph</Btn> in the top right part of the data model editor to
+open Data Graph:
+
+<Screenshot src="https://ucarecdn.com/30b7fa8c-fb9f-43fb-af1d-4ef98aae2829/" />
+
+Data Graph visualizes [cubes][ref-cubes] and [joins][ref-joins] between them as
+an [entity-relationship diagram][wiki-erd] (ERD). It allows to have a bird's-eye
+view of the data model and visually detect connected parts, i.e., groups of
+cubes that don't have any relationships with other groups.
+
+For clarity, only dimensions and custom SQL expressions used in joins are shown.
+Join [relationship types][ref-join-types] are depicted with the crow's foot
+notation:
+
+- Dash represents `one` in `one_to_one` and `one_to_many` types
+- Crow's foot represents `many` in `one_to_many` and `many_to_one` types
+
+You can pan and zoom the visualization, search cubes using the input box, hover
+over cubes to highlight their relationships, and click <Btn>Show Code</Btn> to
+view their code.
 
 ## Git integration
 
 To add more Git branches to your Cube Cloud deployment and/or switch between
 them, click the branch name in the status bar:
 
-![Branch switcher|685x500](https://ucarecdn.com/a3ea164f-b93c-4c83-b7a3-697dd025b74a/)
+<Screenshot
+  src="https://ucarecdn.com/a3ea164f-b93c-4c83-b7a3-697dd025b74a/"
+  alt="Branch switcher"
+/>
 
 Speaking of Git branches, you can now easily add and remove branches with the
 same switcher; click <Btn>Add Branch</Btn> and enter a name for the new branch
 in the popup:
 
-![Create a new branch|690x431](https://ucarecdn.com/15ea528f-4a54-40a1-83c7-2f67738a3e8b/)
+<Screenshot
+  src="https://ucarecdn.com/15ea528f-4a54-40a1-83c7-2f67738a3e8b/"
+  alt="Create a new branch"
+/>
 
 These branches are shared, meaning everyone who has access to the deployment can
 see and edit them. This makes them extremely useful for out-of-band experiments
@@ -85,7 +108,10 @@ CI/CD process.
 Unused branches can also be deleted. Ensure you are already on the branch you
 want to delete, then open the switcher and click <Btn>Remove Branch</Btn>:
 
-![Delete a branch|685x500](https://ucarecdn.com/f1d37fe6-a6ae-4d78-a801-133639daf1ec/)
+<Screenshot
+  src="https://ucarecdn.com/f1d37fe6-a6ae-4d78-a801-133639daf1ec/"
+  alt="Delete a branch"
+/>
 
 ## Generating models
 
@@ -94,4 +120,13 @@ deployment creation. The <Btn>Generate Data Model</Btn> on the <Btn>Data
 Model</Btn> page will let you re-generate models from your source database, or
 alternatively add rollups to existing data models:
 
-![Generate rollups or data model modal|690x428](https://ucarecdn.com/b83b8b21-7894-4363-9b0e-5f390b50cd6f/)
+<Screenshot
+  src="https://ucarecdn.com/b83b8b21-7894-4363-9b0e-5f390b50cd6f/"
+  alt="Generate rollups or data model modal"
+/>
+
+[ref-data-modeling]: /product/data-modeling/overview
+[ref-cubes]: /product/data-modeling/reference/cube
+[ref-joins]: /product/data-modeling/reference/joins
+[ref-join-types]: /product/data-modeling/reference/joins#parameters-relationship
+[wiki-erd]: https://en.wikipedia.org/wiki/Entity–relationship_model
