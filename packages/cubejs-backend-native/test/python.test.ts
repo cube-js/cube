@@ -59,7 +59,7 @@ suite('Python', () => {
     expect(await config.contextToApiScopes()).toEqual(['meta', 'data', 'jobs']);
   });
 
-  test('testing converting js -> python -> js', async () => {
+  test('cross language converting (js -> python -> js)', async () => {
     if (!config.queryRewrite) {
       throw new Error('queryRewrite was not defined in config.py');
     }
