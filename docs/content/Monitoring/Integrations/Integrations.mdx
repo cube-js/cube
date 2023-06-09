@@ -33,7 +33,9 @@ destinations][vector-docs-sinks], also known as _sinks_.
 
 ## Guides
 
-Check the following guide to get tool-specific instructions:
+Monitoring integrations work with various popular monitoring tools. Check
+the following guides and configuration examples to get tool-specific
+instructions:
 
 <Grid imageSize={[56, 56]}>
   <GridItem
@@ -43,21 +45,43 @@ Check the following guide to get tool-specific instructions:
   />
 </Grid>
 
-## Configuration for logs
+## Configuration
 
-To enable logs export, create or reuse a
+To enable monitoring integrations, navigate
+to&nbsp;<Btn>Settings → Monitoring Integrations</Btn> and
+click&nbsp;<Btn>Enable Vector</Btn> to add a Vector agent to your deployment.
+
+<Screenshot src="https://ucarecdn.com/69897171-2b1c-4611-8260-ab7a0515fdcc/"/>
+
+Additionally, create or reuse a
 [`vector.toml` configration file][vector-docs-config] next to your `cube.js`
-configration file. This file is used to keep sinks configration. You have to
-commit this file for the configuration to take effect.
+file. This file is used to keep sinks configration. You have to commit this
+file for the configuration to take effect.
 
-### <--{"id" : "Configuration for logs"}--> Inputs
+### <--{"id" : "Configuration"}--> Environment variables
+
+You can use environment variables prefixed with `CUBE_CLOUD_LOG_EXPORT_`
+to reference configuration parameters securely in the `vector.toml` file.
+
+Example configuration for exporting logs to
+[Datadog][vector-docs-sinks-datadog]:
+
+```toml
+[sinks.datadog]
+type = "datadog_logs"
+default_api_key = "$CUBE_CLOUD_LOG_EXPORT_DATADOG_API_KEY"
+```
+
+### <--{"id" : "Configuration"}--> Inputs for logs
 
 Sinks accept the `inputs` option that allows to specify which components of
-a Cube Cloud deployment should export their logs: 
+a Cube Cloud deployment should export their logs. Supported inputs:
 
-| Inputs                                                                                |
-| ------------------------------------------------------------------------------------- |
-| `cubejs-server`<br/>`refresh-scheduler`<br/>`ext-db`<br/>`warmup-job`<br/>`cubestore` |
+- `cubejs-server`
+- `refresh-scheduler`
+- `ext-db`
+- `warmup-job`
+- `cubestore`
 
 Example configuration for exporting logs to
 [Datadog][vector-docs-sinks-datadog]:
@@ -87,7 +111,7 @@ If not specified, only `error` and `info` logs will be exported.
 | `debug`   | ❌ No                |
 | `trace`   | ❌ No                |
 
-### <--{"id" : "Configuration for logs"}--> Sinks
+### <--{"id" : "Configuration"}--> Sinks for logs
 
 You can use a [wide range of destinations][vector-docs-sinks] for logs,
 including the following ones:
@@ -123,28 +147,7 @@ levels = [
 ]
 ```
 
-### <--{"id" : "Configuration for logs"}--> Environment variables
-
-You can use environment variables prefixed with `CUBE_CLOUD_LOG_EXPORT_`
-to reference configuration parameters securely in the `vector.toml` file.
-
-Example configuration for exporting logs to
-[Datadog][vector-docs-sinks-datadog]:
-
-```toml
-[sinks.datadog]
-type = "datadog_logs"
-default_api_key = "$CUBE_CLOUD_LOG_EXPORT_DATADOG_API_KEY"
-```
-
-## Configuration for metrics
-
-To enable metrics export, create or reuse a
-[`vector.toml` configration file][vector-docs-config] next to your `cube.js`
-configration file. This file is used to keep sinks configration. You have to
-commit this file for the configuration to take effect.
-
-### <--{"id" : "Configuration for metrics"}--> Inputs
+### <--{"id" : "Configuration"}--> Inputs for metrics
 
 Metrics are exported using the `metrics` input. You can filter them by
 providing an array of metric names via the `list` option.
@@ -190,7 +193,7 @@ inputs = [
 ]
 ```
 
-### <--{"id" : "Configuration for metrics"}--> Sinks
+### <--{"id" : "Configuration"}--> Sinks for metrics
 
 Metrics are exported in the Prometheus format which is compatible with
 the following sinks:
@@ -199,14 +202,6 @@ the following sinks:
 [Prometheus][prometheus], compatible with [Mimir][mimir])
 - [`prometheus_remote_write`][vector-docs-sinks-prometheus] (compatible with
 [Grafana Cloud][grafana-cloud])
-
-Note that metrics export should be explicitly enabled. To do so, navigate
-to&nbsp;<Btn>Settings → Monitoring Integrations</Btn> and
-click&nbsp;<Btn>Enable Vector</Btn>. Obtained credentials can be used to
-create a data source in an external service that will scrape metrics from
-Cube Cloud:
-
-<Screenshot src="https://ucarecdn.com/69897171-2b1c-4611-8260-ab7a0515fdcc/"/>
 
 Example configuration for exporting all metrics from `cubejs-server` to
 [Prometheus][vector-docs-sinks-prometheus-exporter] using the
@@ -232,8 +227,6 @@ inputs = [
   "cubejs-server"
 ]
 ```
-
-### <--{"id" : "Configuration for metrics"}--> Environment variables
 
 You can customize the user name and password for `prometheus_exporter` by
 setting `CUBE_CLOUD_LOG_EXPORT_METRICS_USER` and
