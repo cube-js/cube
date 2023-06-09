@@ -491,8 +491,8 @@ const overrides: Record<string, Override> = {
     meta: {
       overview: "Overview",
       fundamentals: "Fundamentals",
-      reference: "Reference",
       advanced: "Advanced",
+      reference: "Reference",
     },
   },
 
@@ -502,6 +502,12 @@ const overrides: Record<string, Override> = {
     ready: true,
     path: "product/data-modeling/fundamentals/concepts",
     title: "Concepts",
+    meta: {
+      concepts: "Concepts",
+      syntax: "Syntax",
+      "working-with-joins": "Working with Joins",
+      "additional-concepts": "Additional Concepts",
+    }
   },
   "Schema/Fundamentals/Syntax.mdx": {
     ready: true,
@@ -511,12 +517,12 @@ const overrides: Record<string, Override> = {
   "Schema/Fundamentals/Working-with-Joins.mdx": {
     ready: true,
     path: "product/data-modeling/fundamentals/working-with-joins",
-    title: "Working-with-Joins",
+    title: "Working with Joins",
   },
   "Schema/Fundamentals/Additional-Concepts.mdx": {
     ready: true,
     path: "product/data-modeling/fundamentals/additional-concepts",
-    title: "Additional-Concepts",
+    title: "Additional Concepts",
   },
 
   // data modeling / reference
