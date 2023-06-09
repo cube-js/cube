@@ -51,12 +51,15 @@ To enable monitoring integrations, navigate
 to&nbsp;<Btn>Settings → Monitoring Integrations</Btn> and
 click&nbsp;<Btn>Enable Vector</Btn> to add a Vector agent to your deployment.
 
-<Screenshot src="https://ucarecdn.com/69897171-2b1c-4611-8260-ab7a0515fdcc/"/>
+<Screenshot src="https://ucarecdn.com/7db3949b-83b9-48ae-b4b6-bd2afeda5001/"/>
 
-Additionally, create or reuse a
-[`vector.toml` configration file][vector-docs-config] next to your `cube.js`
-file. This file is used to keep sinks configration. You have to commit this
-file for the configuration to take effect.
+Under&nbsp;<Btn>Metrics export</Btn>, you will see credentials for the
+`prometheus_exporter` sink, in case you'd like to setup
+[metrics export][self-sinks-for-metrics].
+
+Additionally, create a [`vector.toml` configration file][vector-docs-config]
+next to your `cube.js` file. This file is used to keep sinks configration.
+You have to commit this file for Vector configuration to take effect.
 
 ### <--{"id" : "Configuration"}--> Environment variables
 
@@ -232,6 +235,7 @@ You can customize the user name and password for `prometheus_exporter` by
 setting `CUBE_CLOUD_LOG_EXPORT_METRICS_USER` and
 `CUBE_CLOUD_LOG_EXPORT_METRICS_PASSWORD` environment variables, respectively.
 
+[self-sinks-for-metrics]: #configuration-sinks-for-metrics
 [ref-vpc]: /cloud/configuration/connecting-with-a-vpc
 [vector]: https://vector.dev/
 [vector-docs-config]: https://vector.dev/docs/reference/configuration/
