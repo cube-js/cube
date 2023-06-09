@@ -9,7 +9,7 @@ redirect_from:
 ---
 
 With the web-based data model editor, you can write and test and your Cube
-data model from your browser.
+[data model][ref-data-modeling] from your browser.
 
 <SuccessBox>
 
@@ -56,6 +56,31 @@ there are any unsaved changes:
   alt="Unsaved changes warning modal"
 />
 
+## Data Graph
+
+In addition to exploring the code of data model files, you can view the
+visual representation of the data model, including relations between cubes.
+Click&nbsp;<Btn>Show Graph</Btn> in the top right part of the data model
+editor to open Data Graph:
+
+<Screenshot src="https://ucarecdn.com/30b7fa8c-fb9f-43fb-af1d-4ef98aae2829/"/>
+
+Data Graph visualizes [cubes][ref-cubes] and [joins][ref-joins] between them
+as an [entity-relationship diagram][wiki-erd] (ERD). It allows to have a
+bird's-eye view of the data model and visually detect connected parts, i.e.,
+groups of cubes that don't have any relationships with other groups.
+
+For clarity, only dimensions and custom SQL expressions used in joins are
+shown. Join [relationship types][ref-join-types] are depicted with the crow's foot
+notation:
+
+- Dash represents `one` in `one_to_one` and `one_to_many` types
+- Crow's foot represents `many` in `one_to_many` and `many_to_one` types
+
+You can pan and zoom the visualization, search cubes using the input box,
+hover over cubes to highlight their relationships, and
+click&nbsp;<Btn>Show Code</Btn> to view their code.
+
 ## Git integration
 
 To add more Git branches to your Cube Cloud deployment and/or switch between
@@ -99,3 +124,9 @@ alternatively add rollups to existing data models:
   src="https://ucarecdn.com/b83b8b21-7894-4363-9b0e-5f390b50cd6f/"
   alt="Generate rollups or data model modal"
 />
+
+[ref-data-modeling]: /schema/getting-started
+[ref-cubes]: /schema/reference/cube
+[ref-joins]: /schema/reference/joins
+[ref-join-types]: /schema/reference/joins#parameters-relationship
+[wiki-erd]: https://en.wikipedia.org/wiki/Entity–relationship_model
