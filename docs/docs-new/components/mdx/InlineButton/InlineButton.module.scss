@@ -11,4 +11,15 @@
   margin-right: 4px;
   border: 1px solid var(--dark_05);
   box-shadow: 2px 2px 0 var(--dark_05);
+
+  &:hover {
+    &:has(> a) {
+      border-color: var(--purple_bright);
+    }
+  }
+
+  a,
+  a:hover {
+    border-bottom: none;
+  }
 }
