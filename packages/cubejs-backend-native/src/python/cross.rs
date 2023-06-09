@@ -98,8 +98,13 @@ impl CLRepr {
             let v = from.downcast_or_throw::<JsBoolean, _>(cx)?;
             Ok(CLRepr::Bool(v.value(cx)))
         } else if from.is_a::<JsNumber, _>(cx) {
-            let v = from.downcast_or_throw::<JsNumber, _>(cx)?;
-            Ok(CLRepr::Float(v.value(cx)))
+            let v = from.downcast_or_throw::<JsNumber, _>(cx)?.value(cx);
+
+            if v == (v as i64) as f64 {
+                Ok(CLRepr::Int(v as i64))
+            } else {
+                Ok(CLRepr::Float(v))
+            }
         } else if from.is_a::<JsNull, _>(cx) || from.is_a::<JsUndefined, _>(cx) {
             Ok(CLRepr::Null)
         } else if from.is_a::<JsPromise, _>(cx) {
@@ -234,8 +239,9 @@ impl CLRepr {
             CLRepr::Bool(v) => PyBool::new(py, v).to_object(py),
             CLRepr::Float(v) => PyFloat::new(py, v).to_object(py),
             CLRepr::Int(v) => {
-                // TODO(ovr): FIX ME
-                PyFloat::new(py, v as f64).to_object(py)
+                let py_int: &PyInt = unsafe { py.from_owned_ptr(pyo3::ffi::PyLong_FromLong(v)) };
+
+                py_int.to_object(py)
             }
             CLRepr::Array(arr) => {
                 let mut elements = Vec::with_capacity(arr.len());
