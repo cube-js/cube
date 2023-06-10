@@ -2,7 +2,7 @@ import type { DocsThemeConfig } from "nextra-theme-docs";
 import { components } from "@/components/mdx";
 import { CubeLogo } from "@/components/common/CubeLogo";
 import { Footer } from "@/components/common/Footer";
-import { SearchTrigger } from "@cube-dev/marketing-ui";
+import { SearchIcon, SearchTrigger } from '@cube-dev/marketing-ui';
 import { MainLayout } from '@/components/layouts/MainLayout';
 
 const repo = "https://github.com/cube-js/cube";
@@ -39,6 +39,9 @@ const config: DocsThemeConfig = {
     //     : title;
     //   return (<>{normalizedTitle}</>);
     // },
+  },
+  search: {
+    component: <SearchTrigger><SearchIcon /></SearchTrigger>,
   },
   gitTimestamp: () => null,
   footer: {
