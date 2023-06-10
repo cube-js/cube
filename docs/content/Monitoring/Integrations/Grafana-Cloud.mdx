@@ -5,87 +5,104 @@ category: Monitoring
 menuOrder: 11
 ---
 
-This guide demonstrates how to set up Cube Cloud to forward logs to a hosted Loki
-instance on Grafana Cloud.
+[Grafana Cloud][grafana] is a popular fully managed observability service.
+This guide demonstrates how to set up Cube Cloud to export logs to Grafana
+Cloud.
 
-To enable log export, first go to the deployment's settings page and turn it on:
+## Configuration
 
-<Screenshot
-  alt="Cube Cloud Settings Screen showing Log Export toggle"
-  src="https://ucarecdn.com/8f1d395a-3317-4107-97ce-e0b6ed238aff/"
-/>
+First, enable [monitoring integrations][ref-monitoring-integrations] in Cube
+Cloud.
 
-## Secrets
+### <--{"id" : "Configuration"}--> Exporting logs
 
-<InfoBox>
+To export logs to Grafana Cloud, go to your account and get credentials
+for Loki, the logging service in Grafana Cloud:
 
-Only environment variables prefixed with `CUBE_CLOUD_LOG_EXPORT_` can be
-referenced in the `vector.toml` configuration file.
+<Screenshot src="https://ucarecdn.com/c71e7fa1-6164-4d6e-ad01-3df1d749a655/"/>
 
-</InfoBox>
+Then, configure the [`loki`][vector-loki] sink in your
+[`vector.toml` configuration file][ref-monitoring-integrations-conf].
 
-First, go to your deployment's environment variables, then add the
-authentication credentials for the Grafana Cloud-hosted Loki instance. We can
-define as many environment variables as we need, but we must prefix them with
-`CUBE_CLOUD_LOG_EXPORT_` so that we can use them in our Vector configuration
-file later.
-
-<Screenshot
-  alt="Cube Cloud Settings Screen showing Log Export environment variables"
-  src="https://ucarecdn.com/2221cbed-fa8a-4ca9-be0b-9ceafcee9f37/"
-/>
-
-## Vector
-
-Now, enter Development Mode and add a file called `vector.toml` to your Cube
-project. Open the newly-created file, and then add any relevant sink
-configuration. We'll also want to use the environment variables we defined
-earlier:
+Example configuration:
 
 ```toml
 [sinks.loki]
 type = "loki"
-inputs = [ "cubejs-server", "refresh-scheduler", "ext-db" ]
-endpoint = "https://logs-prod-us-central1.grafana.net"
+inputs = [
+  "cubejs-server",
+  "refresh-scheduler",
+  "ext-db",
+  "warmup-job",
+  "cubestore"
+]
+endpoint = "https://logs-prod-012.grafana.net"
+
+[sinks.loki.auth]
+strategy = "basic"
+user = "618504"
+password = "eyJrIjoiMDVmMzE4MTk4ZDY1NGE5NWQ3Y2M2Yjk0MzE0M2JkZmJjNTMzMzU5ZCIsIm4iOiJrZXkiLCJpZCI6ODc1NzE5fQ=="
 
 [sinks.loki.encoding]
 codec = "json"
 
+[sinks.loki.cubestore]
+levels = [
+  "trace",
+  "info",
+  "debug",
+  "error"
+]
+
 [sinks.loki.labels]
 app = "cube-cloud"
 env = "production"
-
-[sinks.loki.auth]
-strategy = "basic"
-user = "$CUBE_CLOUD_LOG_EXPORT_LOKI_USER"
-password = "$CUBE_CLOUD_LOG_EXPORT_LOKI_PASS"
-
-[sinks.loki_cubestore]
-type = "loki"
-inputs = [ "cubestore" ]
-endpoint = "https://logs-prod-us-central1.grafana.net"
-
-[sinks.loki_cubestore.encoding]
-codec = "json"
-
-[sinks.loki_cubestore.labels]
-app = "cube-store"
-env = "production"
-
-[sinks.loki_cubestore.auth]
-strategy = "basic"
-user = "$CUBE_CLOUD_LOG_EXPORT_LOKI_USER"
-password = "$CUBE_CLOUD_LOG_EXPORT_LOKI_PASS"
-
-[sinks.loki_cubestore.cubestore]
-levels = [ "trace", "info", "debug", "error" ]
 ```
 
-Once done, save the file and commit it to your repository. Once you're back on
-the&nbsp;<Btn>Overview</Btn> page, you should now see a
-new&nbsp;<Btn>Log Export</Btn> resource:
+Commit the configuration for Vector, it should take effect in a minute.
+Then, navigate to&nbsp;<Btn>Logs</Btn> in Grafana Cloud and watch the logs
+coming.
 
-<Screenshot
-  alt="Cube Cloud Overview screen showing Log Export resource"
-  src="https://ucarecdn.com/468d4cda-0d26-4928-87f0-17df6185d9ce/"
-/>
+<!-- Add screenshot -->
+
+### <--{"id" : "Configuration"}--> Exporting metrics
+
+To export metrics to Grafana Cloud, go to your account and get credentials
+for Prometheus, the metrics service in Grafana Cloud:
+
+<Screenshot src="https://ucarecdn.com/ab6eeba4-921b-4e35-b15d-dcc371669c8c/"/>
+
+Then, configure the [`prometheus_remote_write`][vector-prometheus-rw] sink
+in your [`vector.toml` configuration file][ref-monitoring-integrations-conf].
+
+Example configuration:
+
+```toml
+[sinks.prometheus]
+type = "prometheus_remote_write"
+inputs = [
+  "metrics"
+]
+endpoint = "https://prometheus-prod-24-prod-eu-west-2.grafana.net/api/prom/push"
+
+[sinks.prometheus.auth]
+strategy = "basic"
+user = "1033221"
+password = "eyJrIjoiYTg1OTQ2OGY4Yzg3MTQxODc5OTA4NDUxMGM4NTA2ZDQ3ZjliYWZjOCIsIm4iOiJwcnciLCJpZCI6ODc1NzE5fQ=="
+```
+
+Commit the configuration for Vector, it should take effect in a minute.
+Then, navigate to&nbsp;<Btn>Explore</Btn> in Grafana Cloud, select metrics
+from the drop down:
+
+<Screenshot src="https://ucarecdn.com/27d7402d-6a9f-4266-ab38-a2196fb19129/"/>
+
+Then, you can create visualizations and add them to a dashboard:
+
+<Screenshot src="https://ucarecdn.com/1f6dafd9-5122-4153-a733-adb31351bc9d/"/>
+
+[grafana]: https://grafana.com
+[vector-loki]: https://vector.dev/docs/reference/configuration/sinks/loki/
+[vector-prometheus-rw]: https://vector.dev/docs/reference/configuration/sinks/prometheus_remote_write/
+[ref-monitoring-integrations]: /monitoring/integrations
+[ref-monitoring-integrations-conf]: /monitoring/integrations#configuration
