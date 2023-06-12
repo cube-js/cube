@@ -58,14 +58,14 @@ const Header: React.FC<Props> = (props) => (
           {/*  Community*/}
           {/*</Button>*/}
 
-          {/*<Button*/}
-          {/*  href="https://cube.dev/docs-next"*/}
-          {/*  target="_blank"*/}
-          {/*  className={styles.headerButton}*/}
-          {/*>*/}
-          {/*  <Icon style={{ fontSize: '22px' }} type="bulb" />*/}
-          {/*  Try out the new look!*/}
-          {/*</Button>*/}
+          <Button
+            href="https://cube.dev/docs-next"
+            target="_blank"
+            className={styles.headerButton}
+          >
+            <Icon style={{ fontSize: '22px' }} type="bulb" />
+            Try out the new look!
+          </Button>
 
           <Button
             href="https://slack.cube.dev/"

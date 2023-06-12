@@ -348,6 +348,8 @@ pub trait ConfigObj: DIService {
 
     fn compaction_chunks_count_threshold(&self) -> u64;
 
+    fn compaction_chunks_in_memory_size_threshold(&self) -> u64;
+
     fn compaction_chunks_max_lifetime_threshold(&self) -> u64;
 
     fn compaction_in_memory_chunks_max_lifetime_threshold(&self) -> u64;
@@ -478,6 +480,7 @@ pub struct ConfigObjImpl {
     pub max_partition_split_threshold: u64,
     pub compaction_chunks_total_size_threshold: u64,
     pub compaction_chunks_count_threshold: u64,
+    pub compaction_chunks_in_memory_size_threshold: u64,
     pub compaction_chunks_max_lifetime_threshold: u64,
     pub compaction_in_memory_chunks_max_lifetime_threshold: u64,
     pub compaction_in_memory_chunks_size_limit: u64,
@@ -566,6 +569,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn compaction_chunks_count_threshold(&self) -> u64 {
         self.compaction_chunks_count_threshold
+    }
+
+    fn compaction_chunks_in_memory_size_threshold(&self) -> u64 {
+        self.compaction_chunks_in_memory_size_threshold
     }
 
     fn compaction_in_memory_chunks_size_limit(&self) -> u64 {
@@ -978,6 +985,12 @@ impl Config {
                     1048576 * 8,
                 ),
                 compaction_chunks_count_threshold: env_parse("CUBESTORE_CHUNKS_COUNT_THRESHOLD", 4),
+                compaction_chunks_in_memory_size_threshold: env_parse_size(
+                    "CUBESTORE_COMPACTION_CHUNKS_IN_MEMORY_SIZE_THRESHOLD",
+                    1 * 1024 * 1024 * 1024,
+                    None,
+                    Some(1 * 1024 * 1024 * 1024),
+                ) as u64,
                 compaction_chunks_total_size_threshold: env_parse(
                     "CUBESTORE_CHUNKS_TOTAL_SIZE_THRESHOLD",
                     1048576 * 2,
@@ -1199,6 +1212,7 @@ impl Config {
                 partition_size_split_threshold_bytes: 2 * 1024,
                 max_partition_split_threshold: 20,
                 compaction_chunks_count_threshold: 1,
+                compaction_chunks_in_memory_size_threshold: 3 * 1024 * 1024 * 1024,
                 compaction_chunks_total_size_threshold: 10,
                 compaction_chunks_max_lifetime_threshold: 600,
                 compaction_in_memory_chunks_max_lifetime_threshold: 60,
