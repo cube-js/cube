@@ -50,6 +50,12 @@ impl Display for LikeType {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Hash)]
+pub enum WrappedSelectType {
+    Projection,
+    Aggregate,
+}
+
 crate::plan_to_language! {
     pub enum LogicalPlanLanguage {
         Projection {
@@ -237,6 +243,27 @@ crate::plan_to_language! {
             expr: Box<Expr>,
             key: Box<Expr>,
         },
+
+        WrappedSelect {
+            select_type: WrappedSelectType,
+            projection_expr: Vec<Expr>,
+            group_expr: Vec<Expr>,
+            aggr_expr: Vec<Expr>,
+            from: Arc<LogicalPlan>,
+            joins: Vec<LogicalPlan>,
+            filter_expr: Vec<Expr>,
+            having_expr: Vec<Expr>,
+            limit: Option<usize>,
+            offset: Option<usize>,
+            order_expr: Vec<Expr>,
+            alias: Option<String>,
+        },
+        WrappedSelectJoin {
+            input: Arc<LogicalPlan>,
+            expr: Arc<Expr>,
+            join_type: JoinType,
+        },
+
         CubeScan {
             alias_to_cube: Vec<(String, String)>,
             members: Vec<LogicalPlan>,
@@ -669,6 +696,93 @@ fn udaf_expr(fun_name: impl Display, args: Vec<impl Display>) -> String {
 
 fn limit(skip: impl Display, fetch: impl Display, input: impl Display) -> String {
     format!("(Limit {} {} {})", skip, fetch, input)
+}
+
+fn wrapped_select(
+    select_type: impl Display,
+    projection_expr: impl Display,
+    group_expr: impl Display,
+    aggr_expr: impl Display,
+    from: impl Display,
+    joins: impl Display,
+    filter_expr: impl Display,
+    having_expr: impl Display,
+    limit: impl Display,
+    offset: impl Display,
+    order_expr: impl Display,
+    alias: impl Display,
+) -> String {
+    format!(
+        "(WrappedSelect {} {} {} {} {} {} {} {} {} {} {} {})",
+        select_type,
+        projection_expr,
+        group_expr,
+        aggr_expr,
+        from,
+        joins,
+        filter_expr,
+        having_expr,
+        limit,
+        offset,
+        order_expr,
+        alias
+    )
+}
+
+fn wrapped_select_projection_expr(left: impl Display, right: impl Display) -> String {
+    format!("(WrappedSelectProjectionExpr {} {})", left, right)
+}
+
+fn wrapped_select_projection_expr_empty_tail() -> String {
+    "WrappedSelectProjectionExpr".to_string()
+}
+
+fn wrapped_select_group_expr(left: impl Display, right: impl Display) -> String {
+    format!("(WrappedSelectGroupExpr {} {})", left, right)
+}
+
+fn wrapped_select_group_expr_empty_tail() -> String {
+    "WrappedSelectGroupExpr".to_string()
+}
+
+fn wrapped_select_aggr_expr(left: impl Display, right: impl Display) -> String {
+    format!("(WrappedSelectAggrExpr {} {})", left, right)
+}
+
+fn wrapped_select_aggr_expr_empty_tail() -> String {
+    "WrappedSelectAggrExpr".to_string()
+}
+
+fn wrapped_select_joins(left: impl Display, right: impl Display) -> String {
+    format!("(WrappedSelectJoins {} {})", left, right)
+}
+
+fn wrapped_select_joins_empty_tail() -> String {
+    "WrappedSelectJoins".to_string()
+}
+
+fn wrapped_select_filter_expr(left: impl Display, right: impl Display) -> String {
+    format!("(WrappedSelectFilterExpr {} {})", left, right)
+}
+
+fn wrapped_select_filter_expr_empty_tail() -> String {
+    "WrappedSelectFilterExpr".to_string()
+}
+
+fn wrapped_select_having_expr(left: impl Display, right: impl Display) -> String {
+    format!("(WrappedSelectHavingExpr {} {})", left, right)
+}
+
+fn wrapped_select_having_expr_empty_tail() -> String {
+    "WrappedSelectHavingExpr".to_string()
+}
+
+fn wrapped_select_order_expr(left: impl Display, right: impl Display) -> String {
+    format!("(WrappedSelectOrderExpr {} {})", left, right)
+}
+
+fn wrapped_select_order_expr_empty_tail() -> String {
+    "WrappedSelectOrderExpr".to_string()
 }
 
 fn aggregate(

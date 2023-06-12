@@ -28,6 +28,10 @@ use futures::Stream;
 use log::warn;
 
 use crate::{
+    compile::{
+        engine::df::wrapper::{CubeScanWrapperExecutionPlan, CubeScanWrapperNode},
+        rewrite::WrappedSelectType,
+    },
     sql::AuthContextRef,
     transport::{CubeStreamReceiver, LoadRequestMeta, TransportService},
     CubeError,
@@ -36,6 +40,7 @@ use chrono::{Datelike, NaiveDate, NaiveDateTime};
 use datafusion::{
     arrow::{array::TimestampNanosecondBuilder, datatypes::TimeUnit},
     execution::context::TaskContext,
+    logical_plan::JoinType,
     scalar::ScalarValue,
 };
 use serde_json::{json, Value};
@@ -59,6 +64,7 @@ pub struct CubeScanNode {
     pub request: V1LoadRequestQuery,
     pub auth_context: AuthContextRef,
     pub options: CubeScanOptions,
+    pub used_cubes: Vec<String>,
 }
 
 impl CubeScanNode {
@@ -68,6 +74,7 @@ impl CubeScanNode {
         request: V1LoadRequestQuery,
         auth_context: AuthContextRef,
         options: CubeScanOptions,
+        used_cubes: Vec<String>,
     ) -> Self {
         Self {
             schema,
@@ -75,6 +82,7 @@ impl CubeScanNode {
             request,
             auth_context,
             options,
+            used_cubes,
         }
     }
 }
@@ -118,40 +126,106 @@ impl UserDefinedLogicalNode for CubeScanNode {
             request: self.request.clone(),
             auth_context: self.auth_context.clone(),
             options: self.options.clone(),
+            used_cubes: self.used_cubes.clone(),
         })
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct CubeScanWrapperNode {
-    input: Arc<LogicalPlan>,
+pub struct WrappedSelectNode {
+    pub schema: DFSchemaRef,
+    pub select_type: WrappedSelectType,
+    pub projection_expr: Vec<Expr>,
+    pub group_expr: Vec<Expr>,
+    pub aggr_expr: Vec<Expr>,
+    pub from: Arc<LogicalPlan>,
+    pub joins: Vec<(Arc<LogicalPlan>, Expr, JoinType)>,
+    pub filter_expr: Vec<Expr>,
+    pub having_expr: Vec<Expr>,
+    pub limit: Option<usize>,
+    pub offset: Option<usize>,
+    pub order_expr: Vec<Expr>,
+    pub alias: Option<String>,
 }
 
-impl CubeScanWrapperNode {
-    pub fn new(input: Arc<LogicalPlan>) -> Self {
-        Self { input }
+impl WrappedSelectNode {
+    pub fn new(
+        schema: DFSchemaRef,
+        select_type: WrappedSelectType,
+        projection_expr: Vec<Expr>,
+        group_expr: Vec<Expr>,
+        aggr_expr: Vec<Expr>,
+        from: Arc<LogicalPlan>,
+        joins: Vec<(Arc<LogicalPlan>, Expr, JoinType)>,
+        filter_expr: Vec<Expr>,
+        having_expr: Vec<Expr>,
+        limit: Option<usize>,
+        offset: Option<usize>,
+        order_expr: Vec<Expr>,
+        alias: Option<String>,
+    ) -> Self {
+        Self {
+            schema,
+            select_type,
+            projection_expr,
+            group_expr,
+            aggr_expr,
+            from,
+            joins,
+            filter_expr,
+            having_expr,
+            limit,
+            offset,
+            order_expr,
+            alias,
+        }
     }
 }
 
-impl UserDefinedLogicalNode for CubeScanWrapperNode {
+impl UserDefinedLogicalNode for WrappedSelectNode {
     fn as_any(&self) -> &dyn Any {
         self
     }
 
     fn inputs(&self) -> Vec<&LogicalPlan> {
-        vec![&self.input]
+        let mut inputs = vec![self.from.as_ref()];
+        inputs.extend(self.joins.iter().map(|(j, _, _)| j.as_ref()));
+        inputs
     }
 
     fn schema(&self) -> &DFSchemaRef {
-        self.input.schema()
+        &self.schema
     }
 
     fn expressions(&self) -> Vec<Expr> {
-        vec![]
+        let mut exprs = vec![];
+        exprs.extend(self.projection_expr.clone());
+        exprs.extend(self.group_expr.clone());
+        exprs.extend(self.aggr_expr.clone());
+        exprs.extend(self.joins.iter().map(|(_, expr, _)| expr.clone()));
+        exprs.extend(self.filter_expr.clone());
+        exprs.extend(self.having_expr.clone());
+        exprs.extend(self.order_expr.clone());
+        exprs
     }
 
     fn fmt_for_explain(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "CubeScanWrapper")
+        write!(
+            f,
+            "WrappedSelect: select_type={:?}, projection_expr={:?}, group_expr={:?}, aggregate_expr={:?}, from={:?}, joins={:?}, filter_expr={:?}, having_expr={:?}, limit={:?}, offset={:?}, order_expr={:?}, alias={:?}",
+            self.select_type,
+            self.projection_expr,
+            self.group_expr,
+            self.aggr_expr,
+            self.from,
+            self.joins,
+            self.filter_expr,
+            self.having_expr,
+            self.limit,
+            self.offset,
+            self.order_expr,
+            self.alias,
+        )
     }
 
     fn from_template(
@@ -159,12 +233,82 @@ impl UserDefinedLogicalNode for CubeScanWrapperNode {
         exprs: &[datafusion::logical_plan::Expr],
         inputs: &[datafusion::logical_plan::LogicalPlan],
     ) -> std::sync::Arc<dyn UserDefinedLogicalNode + Send + Sync> {
-        assert_eq!(inputs.len(), 1, "input size inconsistent");
-        assert_eq!(exprs.len(), 0, "expression size inconsistent");
+        assert_eq!(inputs.len(), self.inputs().len(), "input size inconsistent");
+        assert_eq!(
+            exprs.len(),
+            self.expressions().len(),
+            "expression size inconsistent"
+        );
 
-        Arc::new(CubeScanWrapperNode {
-            input: Arc::new(inputs[0].clone()),
-        })
+        let from = Arc::new(inputs[0].clone());
+        let joins = (1..self.joins.len() + 1)
+            .map(|i| Arc::new(inputs[i].clone()))
+            .collect::<Vec<_>>();
+        let mut joins_expr = vec![];
+        let join_types = self
+            .joins
+            .iter()
+            .map(|(_, _, t)| t.clone())
+            .collect::<Vec<_>>();
+        let mut filter_expr = vec![];
+        let mut having_expr = vec![];
+        let mut order_expr = vec![];
+        let mut projection_expr = vec![];
+        let mut group_expr = vec![];
+        let mut aggregate_expr = vec![];
+        let limit = None;
+        let offset = None;
+        let alias = None;
+
+        let mut exprs_iter = exprs.iter();
+        for _ in self.projection_expr.iter() {
+            projection_expr.push(exprs_iter.next().unwrap().clone());
+        }
+
+        for _ in self.group_expr.iter() {
+            group_expr.push(exprs_iter.next().unwrap().clone());
+        }
+
+        for _ in self.aggr_expr.iter() {
+            aggregate_expr.push(exprs_iter.next().unwrap().clone());
+        }
+
+        for _ in self.joins.iter() {
+            joins_expr.push(exprs_iter.next().unwrap().clone());
+        }
+
+        for _ in self.filter_expr.iter() {
+            filter_expr.push(exprs_iter.next().unwrap().clone());
+        }
+
+        for _ in self.having_expr.iter() {
+            having_expr.push(exprs_iter.next().unwrap().clone());
+        }
+
+        for _ in self.order_expr.iter() {
+            order_expr.push(exprs_iter.next().unwrap().clone());
+        }
+
+        Arc::new(WrappedSelectNode::new(
+            self.schema.clone(),
+            self.select_type.clone(),
+            projection_expr,
+            group_expr,
+            aggregate_expr,
+            from,
+            joins
+                .into_iter()
+                .zip(joins_expr)
+                .zip(join_types)
+                .map(|((plan, expr), join_type)| (plan, expr, join_type))
+                .collect(),
+            filter_expr,
+            having_expr,
+            limit,
+            offset,
+            order_expr,
+            alias,
+        ))
     }
 }
 
@@ -200,6 +344,25 @@ impl ExtensionPlanner for CubeScanExtensionPlanner {
                     options: scan_node.options.clone(),
                     meta: self.meta.clone(),
                 }))
+            } else if let Some(wrapper_node) = node.as_any().downcast_ref::<CubeScanWrapperNode>() {
+                // TODO
+                // assert_eq!(logical_inputs.len(), 0, "Inconsistent number of inputs");
+                // assert_eq!(physical_inputs.len(), 0, "Inconsistent number of inputs");
+
+                Some(Arc::new(CubeScanWrapperExecutionPlan::new(
+                    SchemaRef::new(wrapper_node.schema().as_ref().into()),
+                    wrapper_node.wrapped_plan.clone(),
+                    wrapper_node.wrapped_sql.as_ref().ok_or_else(|| {
+                        DataFusionError::Internal(format!(
+                            "Wrapped SQL is not set for wrapper node. Optimization wasn't performed: {:?}",
+                            wrapper_node
+                        ))
+                    })?.to_string(),
+                    self.transport.clone(),
+                    self.meta.clone(),
+                    wrapper_node.meta.clone(),
+                    wrapper_node.auth_context.clone(),
+                )))
             } else {
                 None
             },

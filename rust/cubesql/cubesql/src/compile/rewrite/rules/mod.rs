@@ -43,6 +43,7 @@ pub fn replacer_push_down_node(
 pub fn replacer_pull_up_node(
     name: &str,
     list_node: &str,
+    substitute_list_node: &str,
     replacer_node: impl Fn(String) -> String,
 ) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
     let pull_up_rule = rewrite(
@@ -53,7 +54,7 @@ pub fn replacer_pull_up_node(
             replacer_node("?left".to_string()),
             replacer_node("?right".to_string())
         ),
-        replacer_node(format!("({} ?left ?right)", list_node)),
+        replacer_node(format!("({} ?left ?right)", substitute_list_node)),
     );
     vec![pull_up_rule]
 }

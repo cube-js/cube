@@ -194,20 +194,31 @@ impl SqlGenerator for SqlGeneratorMock {
 
 pub fn get_test_tenant_ctx() -> Arc<MetaContext> {
     let sql_generator: Arc<dyn SqlGenerator + Send + Sync> = Arc::new(SqlGeneratorMock {
-        sql_templates: Arc::new(SqlTemplates {
-            functions: vec![
-                ("SUM".to_string(), "SUM({{ column }})".to_string()),
-                ("MIN".to_string(), "MIN({{ column }})".to_string()),
-                ("MAX".to_string(), "MAX({{ column }})".to_string()),
-                ("COUNT".to_string(), "COUNT({{ column }})".to_string()),
-                (
-                    "COUNT_DISTINCT".to_string(),
-                    "COUNT(DISTINCT {{ column }})".to_string(),
-                ),
-            ]
-            .into_iter()
-            .collect(),
-        }),
+        sql_templates: Arc::new(
+            SqlTemplates::new(
+                vec![
+                    ("SUM".to_string(), "SUM({{ args | join(sep=\", \") }})".to_string()),
+                    ("MIN".to_string(), "MIN({{ args | join(sep=\", \") }})".to_string()),
+                    ("MAX".to_string(), "MAX({{ args | join(sep=\", \") }})".to_string()),
+                    ("COUNT".to_string(), "COUNT({{ args | join(sep=\", \") }})".to_string()),
+                    (
+                        "COUNT_DISTINCT".to_string(),
+                        "COUNT(DISTINCT {{ args | join(sep=\", \") }})".to_string(),
+                    ),
+                ]
+                .into_iter()
+                .collect(),
+                vec![(
+                    "select".to_string(),
+                    r#"SELECT {% for col in group_by %}{{col.expr}} "{{col.alias}}",{% endfor %}{% for col in aggregate %}{{col.expr}} "{{col.alias}}"{% if loop.last %}{% else %},{% endif %}{% endfor %} 
+                    FROM ({{ from }}) AS {{ from_alias }} 
+                    {% if group_by %} GROUP BY {% for col in group_by %}{{ loop.index }}{% if loop.last %}{% else %},{% endif %}{% endfor %}{% endif %}"#.to_string(),
+                )]
+                .into_iter()
+                .collect(),
+            )
+            .unwrap(),
+        ),
     });
     Arc::new(MetaContext::new(
         get_test_meta(),

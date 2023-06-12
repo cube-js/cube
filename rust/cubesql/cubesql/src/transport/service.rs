@@ -4,9 +4,13 @@ use cubeclient::{
     models::{V1LoadRequest, V1LoadRequestQuery, V1LoadResponse},
 };
 
-use datafusion::arrow::{datatypes::SchemaRef, record_batch::RecordBatch};
+use datafusion::{
+    arrow::{datatypes::SchemaRef, record_batch::RecordBatch},
+    physical_plan::aggregates::AggregateFunction,
+};
 use serde_derive::*;
 use std::{collections::HashMap, fmt::Debug, sync::Arc, time::Duration};
+use tera::{Context, Tera};
 use tokio::{
     sync::{mpsc::Receiver, RwLock as RwLockAsync},
     time::Instant,
@@ -71,11 +75,6 @@ pub trait TransportService: Send + Sync + Debug {
         schema: SchemaRef,
         member_fields: Vec<MemberField>,
     ) -> Result<CubeStreamReceiver, CubeError>;
-}
-
-#[derive(Debug)]
-pub struct SqlTemplates {
-    pub functions: HashMap<String, String>,
 }
 
 #[async_trait]
@@ -200,5 +199,103 @@ impl TransportService for HttpTransport {
         _member_fields: Vec<MemberField>,
     ) -> Result<CubeStreamReceiver, CubeError> {
         panic!("Does not work for standalone mode yet");
+    }
+}
+
+#[derive(Debug)]
+pub struct SqlTemplates {
+    pub functions: HashMap<String, String>,
+    pub statements: HashMap<String, String>,
+    tera: Tera,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AliasedColumn {
+    pub expr: String,
+    pub alias: String,
+}
+
+impl SqlTemplates {
+    pub fn new(
+        functions: HashMap<String, String>,
+        statements: HashMap<String, String>,
+    ) -> Result<Self, CubeError> {
+        let mut tera = Tera::default();
+        for (name, template) in functions.iter() {
+            tera.add_raw_template(&format!("functions/{}", name), template)
+                .map_err(|e| {
+                    CubeError::internal(format!(
+                        "Error parsing template {} '{}': {}",
+                        name, template, e
+                    ))
+                })?;
+        }
+
+        for (name, template) in statements.iter() {
+            tera.add_raw_template(&format!("statements/{}", name), template)
+                .map_err(|e| {
+                    CubeError::internal(format!(
+                        "Error parsing template {} '{}': {}",
+                        name, template, e
+                    ))
+                })?;
+        }
+
+        Ok(Self {
+            functions,
+            statements,
+            tera,
+        })
+    }
+
+    pub fn aggregate_function_name(
+        &self,
+        aggregate_function: AggregateFunction,
+        distinct: bool,
+    ) -> String {
+        if aggregate_function == AggregateFunction::Count && distinct {
+            return "COUNT_DISTINCT".to_string();
+        }
+        aggregate_function.to_string()
+    }
+
+    pub fn select(
+        &self,
+        from: String,
+        group_by: Vec<AliasedColumn>,
+        aggregate: Vec<AliasedColumn>,
+        alias: String,
+        filter: Option<String>,
+        having: Option<String>,
+        order_by: Vec<AliasedColumn>,
+    ) -> Result<String, CubeError> {
+        let mut context = Context::new();
+        context.insert("from", &from);
+        context.insert("group_by", &group_by);
+        context.insert("aggregate", &aggregate);
+        context.insert("from_alias", &alias);
+        self.tera
+            .render("statements/select", &context)
+            .map_err(|e| CubeError::internal(format!("Error rendering select template: {}", e)))
+    }
+
+    pub fn aggregate_function(
+        &self,
+        aggregate_function: AggregateFunction,
+        args: Vec<String>,
+        distinct: bool,
+    ) -> Result<String, CubeError> {
+        let mut context = Context::new();
+        context.insert("args", &args);
+        context.insert("distinct", &distinct);
+        let function = self.aggregate_function_name(aggregate_function, distinct);
+        self.tera
+            .render(&format!("functions/{}", function), &context)
+            .map_err(|e| {
+                CubeError::internal(format!(
+                    "Error rendering aggregate template '{}': {}",
+                    function, e
+                ))
+            })
     }
 }

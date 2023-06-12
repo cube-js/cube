@@ -1,14 +1,17 @@
 use crate::{
     compile::{
         engine::{
-            df::scan::{CubeScanNode, CubeScanOptions, CubeScanWrapperNode, MemberField},
+            df::{
+                scan::{CubeScanNode, CubeScanOptions, MemberField, WrappedSelectNode},
+                wrapper::CubeScanWrapperNode,
+            },
             provider::CubeContext,
         },
         rewrite::{
             analysis::LogicalPlanAnalysis, rewriter::Rewriter, AggregateFunctionExprDistinct,
             AggregateFunctionExprFun, AggregateSplit, AggregateUDFExprFun, AliasExprAlias,
             AnyExprOp, BetweenExprNegated, BinaryExprOp, CastExprDataType, ChangeUserMemberValue,
-            ColumnExprColumn, CubeScanLimit, CubeScanOffset, DimensionName,
+            ColumnExprColumn, CubeScanAliasToCube, CubeScanLimit, CubeScanOffset, DimensionName,
             EmptyRelationProduceOneRow, FilterMemberMember, FilterMemberOp, FilterMemberValues,
             FilterOpOp, InListExprNegated, JoinJoinConstraint, JoinJoinType, JoinLeftOn,
             JoinRightOn, LikeExprEscapeChar, LikeExprLikeType, LikeExprNegated, LikeType,
@@ -20,6 +23,8 @@ use crate::{
             TableScanFetch, TableScanProjection, TableScanSourceTableName, TableScanTableName,
             TableUDFExprFun, TimeDimensionDateRange, TimeDimensionGranularity, TimeDimensionName,
             TryCastExprDataType, UnionAlias, WindowFunctionExprFun, WindowFunctionExprWindowFrame,
+            WrappedSelectAlias, WrappedSelectJoinJoinType, WrappedSelectLimit, WrappedSelectOffset,
+            WrappedSelectSelectType, WrappedSelectType,
         },
     },
     sql::AuthContextRef,
@@ -1143,6 +1148,8 @@ impl LanguageToLogicalPlanConverter {
             LogicalPlanLanguage::Extension(params) => {
                 let node = match self.best_expr.index(params[0]) {
                     LogicalPlanLanguage::CubeScan(cube_scan_params) => {
+                        let alias_to_cube =
+                            match_data_node!(node_by_id, cube_scan_params[0], CubeScanAliasToCube);
                         let members =
                             match_list_node!(node_by_id, cube_scan_params[1], CubeScanMembers);
                         let order =
@@ -1594,6 +1601,7 @@ impl LanguageToLogicalPlanConverter {
                                 change_user,
                                 max_records,
                             },
+                            alias_to_cube.into_iter().map(|(_, c)| c).unique().collect(),
                         ))
                     }
                     x => panic!("Unexpected extension node: {:?}", x),
@@ -1604,7 +1612,82 @@ impl LanguageToLogicalPlanConverter {
             LogicalPlanLanguage::CubeScanWrapper(params) => {
                 let input = Arc::new(self.to_logical_plan(params[0])?);
                 LogicalPlan::Extension(Extension {
-                    node: Arc::new(CubeScanWrapperNode::new(input)),
+                    node: Arc::new(CubeScanWrapperNode::new(
+                        input,
+                        self.cube_context.meta.clone(),
+                        self.auth_context.clone(),
+                    )),
+                })
+            }
+            LogicalPlanLanguage::WrappedSelect(params) => {
+                let select_type = match_data_node!(node_by_id, params[0], WrappedSelectSelectType);
+                let projection_expr = match_expr_list_node!(
+                    node_by_id,
+                    to_expr,
+                    params[1],
+                    WrappedSelectProjectionExpr
+                );
+                let group_expr =
+                    match_expr_list_node!(node_by_id, to_expr, params[2], WrappedSelectGroupExpr);
+                let aggr_expr =
+                    match_expr_list_node!(node_by_id, to_expr, params[3], WrappedSelectAggrExpr);
+                let from = Arc::new(self.to_logical_plan(params[4])?);
+                let joins = match_list_node!(node_by_id, params[5], WrappedSelectJoins)
+                    .into_iter()
+                    .map(|j| {
+                        if let LogicalPlanLanguage::WrappedSelectJoin(params) = j {
+                            let input = Arc::new(self.to_logical_plan(params[0])?);
+                            let join_expr = to_expr(params[1])?;
+                            let join_type =
+                                match_data_node!(node_by_id, params[2], WrappedSelectJoinJoinType);
+                            Ok((input, join_expr, join_type))
+                        } else {
+                            panic!("Unexpected join node: {:?}", j)
+                        }
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+
+                let filter_expr =
+                    match_expr_list_node!(node_by_id, to_expr, params[6], WrappedSelectFilterExpr);
+                let having_expr =
+                    match_expr_list_node!(node_by_id, to_expr, params[7], WrappedSelectHavingExpr);
+                let limit = match_data_node!(node_by_id, params[8], WrappedSelectLimit);
+                let offset = match_data_node!(node_by_id, params[9], WrappedSelectOffset);
+                let order_expr =
+                    match_expr_list_node!(node_by_id, to_expr, params[10], WrappedSelectOrderExpr);
+                let alias = match_data_node!(node_by_id, params[11], WrappedSelectAlias);
+
+                let group_expr = normalize_cols(group_expr, &from)?;
+                let aggr_expr = normalize_cols(aggr_expr, &from)?;
+                let projection_expr = normalize_cols(projection_expr, &from)?;
+                let all_expr = match select_type {
+                    WrappedSelectType::Projection => projection_expr.clone(),
+                    WrappedSelectType::Aggregate => {
+                        group_expr.iter().chain(aggr_expr.iter()).cloned().collect()
+                    }
+                };
+                let schema = Arc::new(DFSchema::new_with_metadata(
+                    // TODO support joins schema
+                    exprlist_to_fields(all_expr.iter(), from.schema())?,
+                    HashMap::new(),
+                )?);
+
+                LogicalPlan::Extension(Extension {
+                    node: Arc::new(WrappedSelectNode::new(
+                        schema,
+                        select_type,
+                        projection_expr,
+                        group_expr,
+                        aggr_expr,
+                        from,
+                        joins,
+                        filter_expr,
+                        having_expr,
+                        limit,
+                        offset,
+                        order_expr,
+                        alias,
+                    )),
                 })
             }
             LogicalPlanLanguage::Union(params) => {

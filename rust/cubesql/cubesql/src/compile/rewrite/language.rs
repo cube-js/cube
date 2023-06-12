@@ -206,6 +206,26 @@ macro_rules! variant_field_struct {
         }
     };
 
+    ($variant:ident, $var_field:ident, Vec<JoinType>) => {
+        paste::item! {
+            #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
+            pub struct [<$variant $var_field:camel>](Vec<Column>);
+
+            impl FromStr for [<$variant $var_field:camel>] {
+                type Err = CubeError;
+                fn from_str(_s: &str) -> Result<Self, Self::Err> {
+                    Err(CubeError::internal("Conversion from string is not supported".to_string()))
+                }
+            }
+
+            impl std::fmt::Display for [<$variant $var_field:camel>] {
+                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                    write!(f, "{:?}", self.0)
+                }
+            }
+        }
+    };
+
     ($variant:ident, $var_field:ident, Arc<AggregateUDF>) => {
         paste::item! {
             #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
@@ -434,6 +454,15 @@ macro_rules! variant_field_struct {
                 LikeType::Like => "Like",
                 LikeType::ILike => "ILike",
                 LikeType::SimilarTo => "SimilarTo",
+            }
+        );
+    };
+
+    ($variant:ident, $var_field:ident, WrappedSelectType) => {
+        $crate::variant_field_struct!(
+            @enum_struct $variant, $var_field, { WrappedSelectType } -> {
+                WrappedSelectType::Projection => "Projection",
+                WrappedSelectType::Aggregate => "Aggregate",
             }
         );
     };
