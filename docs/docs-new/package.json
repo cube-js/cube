@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "postbuild": "next-sitemap",
     "start": "next start",
     "migrate-content": "ts-node ./scripts/migrate-content.ts",
     "update-links": "ts-node --esm scripts/update-links.mjs"
@@ -19,6 +20,7 @@
     "cubedev-tracking": "^1.1.0",
     "date-fns": "^2.30.0",
     "next": "^13.2.4",
+    "next-sitemap": "^4.1.3",
     "nextra": "^2.4.0",
     "nextra-theme-docs": "^2.4.0",
     "react": "^18.2.0",
