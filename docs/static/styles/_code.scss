@@ -44,7 +44,7 @@ blockquote > code,
 li > code,
 p > code {
 	padding: 4px 6px;
-	white-space: nowrap;
+	white-space: break-spaces;
 }
 
 :global(.mjx-chtml.MJXc-display) {

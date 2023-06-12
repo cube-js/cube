@@ -5,6 +5,7 @@ pub mod lock;
 pub mod logger;
 mod malloc_trim_loop;
 pub mod maybe_owned;
+pub mod memory;
 pub mod metrics;
 #[cfg(not(target_os = "windows"))]
 pub mod respawn;

@@ -102,7 +102,6 @@ type QueryOrderType =
  * ApiScopes data type.
  */
 type ApiScopes =
-  'liveliness' |
   'graphql' |
   'meta' |
   'data' |

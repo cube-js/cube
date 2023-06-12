@@ -1,15 +1,18 @@
 #![feature(async_closure)]
 
+extern crate findshlibs;
+
 mod auth;
 mod channel;
 mod config;
 mod logger;
+#[cfg(feature = "python")]
+mod python;
 mod stream;
 mod transport;
 mod utils;
 
 use once_cell::sync::OnceCell;
-
 use std::sync::Arc;
 
 use auth::NodeBridgeAuthService;
@@ -186,11 +189,25 @@ fn shutdown_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
     Ok(promise)
 }
 
+fn is_fallback_build(mut cx: FunctionContext) -> JsResult<JsBoolean> {
+    #[cfg(feature = "python")]
+    {
+        return Ok(JsBoolean::new(&mut cx, false));
+    }
+
+    #[allow(unreachable_code)]
+    Ok(JsBoolean::new(&mut cx, true))
+}
+
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("setupLogger", setup_logger)?;
     cx.export_function("registerInterface", register_interface)?;
     cx.export_function("shutdownInterface", shutdown_interface)?;
+    cx.export_function("isFallbackBuild", is_fallback_build)?;
+
+    #[cfg(feature = "python")]
+    python::python_register_module(cx)?;
 
     Ok(())
 }

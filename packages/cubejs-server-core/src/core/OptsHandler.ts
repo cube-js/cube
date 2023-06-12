@@ -300,7 +300,7 @@ export class OptsHandler {
         // concurrency specified in cube.js
         return options;
       } else {
-        const envConcurrency: number = getEnv('concurrency');
+        const envConcurrency: number = getEnv('concurrency', { dataSource });
         if (envConcurrency) {
           // concurrency specified in CUBEJS_CONCURRENCY
           return {

@@ -73,7 +73,7 @@ export class YamlCompiler {
     cubeObj.measures = this.yamlArrayToObj(cubeObj.measures || [], 'measure', errorsReport);
     cubeObj.dimensions = this.yamlArrayToObj(cubeObj.dimensions || [], 'dimension', errorsReport);
     cubeObj.segments = this.yamlArrayToObj(cubeObj.segments || [], 'segment', errorsReport);
-    cubeObj.preAggregations = this.yamlArrayToObj(cubeObj.preAggregations || [], 'segment', errorsReport);
+    cubeObj.preAggregations = this.yamlArrayToObj(cubeObj.preAggregations || [], 'preAggregation', errorsReport);
     cubeObj.joins = this.yamlArrayToObj(cubeObj.joins || [], 'join', errorsReport);
 
     return this.transpileYaml(cubeObj, [], cubeObj.name, errorsReport);
@@ -222,7 +222,10 @@ export class YamlCompiler {
       return {};
     }
 
-    const remapped = yamlArray.map(({ name, ...rest }) => {
+    const remapped = yamlArray.map(({ name, indexes, ...rest }) => {
+      if (memberType === 'preAggregation' && indexes) {
+        indexes = this.yamlArrayToObj(indexes || [], `${memberType}.index`, errorsReport);
+      }
       if (!name) {
         errorsReport.error(`name isn't defined for ${memberType}: ${YAML.stringify(rest)}`);
         return {};

@@ -5,9 +5,6 @@
       "path": "packages/cubejs-backend-shared"
     },
     {
-      "path": "packages/cubejs-backend-native"
-    },
-    {
       "path": "packages/cubejs-templates"
     },
     {
@@ -15,9 +12,6 @@
     },
     {
       "path": "packages/cubejs-backend-maven"
-    },
-    {
-      "path": "packages/cubejs-api-gateway"
     },
     {
       "path": "packages/cubejs-base-driver"
@@ -36,6 +30,12 @@
     },
     {
       "path": "packages/cubejs-testing-shared"
+    },
+    {
+      "path": "packages/cubejs-backend-native"
+    },
+    {
+      "path": "packages/cubejs-api-gateway"
     },
     {
       "path": "packages/cubejs-testing"

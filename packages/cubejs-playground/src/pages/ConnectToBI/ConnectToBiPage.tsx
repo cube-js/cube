@@ -18,7 +18,9 @@ import supersetSvg from '../../img/bi/superset.svg';
 import tableauSvg from '../../img/bi/tableau.svg';
 import hightouchSvg from '../../img/bi/hightouch.svg';
 import thoughtSpot from '../../img/bi/thoughtspot.svg';
+import semanticLayer from '../../img/semantic-layer.svg';
 import { Content, Header } from '../components/Ui';
+import { Flex } from '../../grid';
 
 const { Paragraph, Link } = Typography;
 
@@ -290,11 +292,7 @@ type BIFields = {
 };
 
 const BI_FIELDS: BIFields = {
-  Generic: [
-    POSTGRESQL_FIELD,
-    PG_SNIPPET_FIELD,
-    ...BASE_CREDENTIALS,
-  ],
+  Generic: [POSTGRESQL_FIELD, PG_SNIPPET_FIELD, ...BASE_CREDENTIALS],
 
   PowerBI: [
     POSTGRESQL_FIELD,
@@ -528,37 +526,69 @@ export function ConnectToBiPage() {
         <Typography.Title>Connect to BI</Typography.Title>
       </Header>
 
-      <Content>
-        <Paragraph>
-          With Cube SQL API you can query Cube via Postgres-compatible SQL.
-          It enables the use of BI applications and other visualization tools on top of Cube. <br />
-          <Link href="https://cube.dev/docs/config/downstream" target="_blank">Learn more about SQL API and connecting to BI tools in Cube docs ↗ </Link>
-        </Paragraph>
-        <Tabs defaultActiveKey="1" tabPosition="left" size="small">
-          {Object.entries(BI_KEYS).map(([key, title]) => (
-            <Tabs.TabPane
-              key={key}
-              tab={
-                <Space>
-                  <BiIcon type={key as any} />
-
-                  {title}
-                </Space>
-              }
+      <Flex gap={3}>
+        <Content>
+          <Paragraph>
+            With Cube SQL API you can query Cube via Postgres-compatible SQL. It
+            enables the use of BI applications and other visualization tools on
+            top of Cube. <br />
+            <Link
+              href="https://cube.dev/docs/config/downstream"
+              target="_blank"
             >
-              <SpaceFlex
-                direction="vertical"
-                style={{
-                  minWidth: 600,
-                  padding: '20px 15px',
-                }}
+              Learn more about SQL API and connecting to BI tools in Cube docs ↗{' '}
+            </Link>
+          </Paragraph>
+
+          <Tabs defaultActiveKey="1" tabPosition="left" size="small">
+            {Object.entries(BI_KEYS).map(([key, title]) => (
+              <Tabs.TabPane
+                key={key}
+                tab={
+                  <Space>
+                    <BiIcon type={key as any} />
+
+                    {title}
+                  </Space>
+                }
               >
-                {getFields(BI_FIELDS[key], cubeSqlCredentials)}
-              </SpaceFlex>
-            </Tabs.TabPane>
-          ))}
-        </Tabs>
-      </Content>
+                <SpaceFlex
+                  direction="vertical"
+                  style={{
+                    minWidth: 600,
+                    padding: '20px 15px',
+                  }}
+                >
+                  {getFields(BI_FIELDS[key], cubeSqlCredentials)}
+                </SpaceFlex>
+              </Tabs.TabPane>
+            ))}
+          </Tabs>
+        </Content>
+
+        <Flex
+          direction="column"
+          alignItems="center"
+          style={{
+            gap: 32,
+            maxWidth: 600,
+          }}
+        >
+          <Typography.Text>
+            Connect Cube to one or more BI tools to enable self-service
+            analytics based on the metrics defined in the semantic layer.
+          </Typography.Text>
+
+          <Typography.Link
+            href="https://cubecloud.dev/auth/signup"
+            target="_blank"
+          >
+            Try on Cube Cloud
+          </Typography.Link>
+
+          <img src={semanticLayer} />
+        </Flex>
+      </Flex>
     </>
   );
 }

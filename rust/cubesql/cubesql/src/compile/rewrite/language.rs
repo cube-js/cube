@@ -361,6 +361,7 @@ macro_rules! variant_field_struct {
                 BuiltinScalarFunction::ToDayInterval => "ToDayInterval",
                 BuiltinScalarFunction::Now => "Now",
                 BuiltinScalarFunction::UtcTimestamp => "UtcTimestamp",
+                BuiltinScalarFunction::CurrentDate => "CurrentDate",
                 BuiltinScalarFunction::Translate => "Translate",
                 BuiltinScalarFunction::Trim => "Trim",
                 BuiltinScalarFunction::Upper => "Upper",

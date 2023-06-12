@@ -641,6 +641,39 @@ describe('OptsHandler class', () => {
   );
 
   test(
+    'multi data source concurrency',
+    async () => {
+      process.env.CUBEJS_DATASOURCES = 'default,postgres';
+      process.env.CUBEJS_DS_POSTGRES_CONCURRENCY = '10';
+      process.env.CUBEJS_DS_POSTGRES_DB_TYPE = 'postgres';
+      process.env.CUBEJS_DB_TYPE = 'postgres';
+
+      const core = new CubejsServerCoreExposed({
+        ...conf,
+        dbType: undefined,
+        driverFactory: () => ({ type: <DatabaseType>process.env.CUBEJS_DB_TYPE }),
+        orchestratorOptions: () => ({}),
+      });
+
+      const opts = (<any>core.getOrchestratorApi(<RequestContext>{})).options;
+
+      expect(opts.queryCacheOptions.queueOptions).toBeDefined();
+      expect(typeof opts.queryCacheOptions.queueOptions).toEqual('function');
+      expect(await opts.queryCacheOptions.queueOptions()).toEqual({
+        concurrency: 2,
+      });
+      expect(await opts.queryCacheOptions.queueOptions('postgres')).toEqual({
+        concurrency: 10,
+      });
+
+      delete process.env.CUBEJS_DATASOURCES;
+      delete process.env.CUBEJS_DS_POSTGRES_CONCURRENCY;
+      delete process.env.CUBEJS_DS_POSTGRES_DB_TYPE;
+      delete process.env.CUBEJS_DB_TYPE;
+    }
+  );
+
+  test(
     'must configure queueOptions with conficured orchestratorOptions function, ' +
     'with CUBEJS_CONCURRENCY and with default driver concurrency',
     async () => {
@@ -1057,7 +1090,7 @@ describe('OptsHandler class', () => {
     const permissions = await gateway.contextToApiScopesFn();
     expect(permissions).toBeDefined();
     expect(Array.isArray(permissions)).toBeTruthy();
-    expect(permissions).toEqual(['liveliness', 'graphql', 'meta', 'data']);
+    expect(permissions).toEqual(['graphql', 'meta', 'data']);
   });
 
   test('must set env api scopes if fn not specified', async () => {
@@ -1094,7 +1127,6 @@ describe('OptsHandler class', () => {
     process.env.CUBEJS_PRE_AGGREGATIONS_BUILDER = 'false';
 
     type ApiScopes =
-      'liveliness' |
       'graphql' |
       'meta' |
       'data' |
@@ -1128,7 +1160,6 @@ describe('OptsHandler class', () => {
     process.env.CUBEJS_PRE_AGGREGATIONS_BUILDER = 'false';
 
     type ApiScopes =
-      'liveliness' |
       'graphql' |
       'meta' |
       'data' |
@@ -1144,7 +1175,7 @@ describe('OptsHandler class', () => {
         database: 'database',
       }),
       contextToApiScopes: async () => new Promise((resolve) => {
-        resolve(['liveliness', 'graphql', 'meta', 'data', 'job'] as unknown as ApiScopes[]);
+        resolve(['graphql', 'meta', 'data', 'job'] as unknown as ApiScopes[]);
       }),
     });
 
@@ -1172,7 +1203,7 @@ describe('OptsHandler class', () => {
         database: 'database',
       }),
       contextToApiScopes: async () => new Promise((resolve) => {
-        resolve(['liveliness', 'graphql', 'meta', 'data', 'jobs']);
+        resolve(['graphql', 'meta', 'data', 'jobs']);
       }),
     });
 
@@ -1180,6 +1211,6 @@ describe('OptsHandler class', () => {
     const permissions = await gateway.contextToApiScopesFn();
     expect(permissions).toBeDefined();
     expect(Array.isArray(permissions)).toBeTruthy();
-    expect(permissions).toEqual(['liveliness', 'graphql', 'meta', 'data', 'jobs']);
+    expect(permissions).toEqual(['graphql', 'meta', 'data', 'jobs']);
   });
 });

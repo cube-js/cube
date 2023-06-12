@@ -8,6 +8,7 @@ use std::time::Duration;
 use async_trait::async_trait;
 use deadqueue::unlimited;
 use futures::future::join_all;
+use futures::future::BoxFuture;
 use ipc_channel::ipc;
 use ipc_channel::ipc::{IpcReceiver, IpcSender};
 use log::error;
@@ -334,9 +335,10 @@ where
     let runtime = tokio_builder.build().unwrap();
     worker_setup(&runtime);
     runtime.block_on(async move {
-        let config = Config::default();
-        config.configure_injector().await;
+        let config = get_worker_config().await;
         let services = config.worker_services().await;
+
+        spawn_background_processes(config.clone());
 
         loop {
             let res = rx.recv();
@@ -369,15 +371,61 @@ fn worker_setup(runtime: &Runtime) {
     }
 }
 
+async fn get_worker_config() -> Config {
+    let custom_fn = SELECT_WORKER_CONFIGURE_FN.read().unwrap();
+    if let Some(func) = custom_fn.as_ref() {
+        func().await
+    } else {
+        let config = Config::default();
+        config.configure_injector().await;
+        config
+    }
+}
+
+fn spawn_background_processes(config: Config) {
+    let custom_fn = SELECT_WORKER_SPAWN_BACKGROUND_FN.read().unwrap();
+    if let Some(func) = custom_fn.as_ref() {
+        func(config);
+    }
+}
+
 lazy_static! {
     static ref SELECT_WORKER_SETUP: std::sync::RwLock<Option<Box<dyn Fn(&Runtime) + Send + Sync>>> =
         std::sync::RwLock::new(None);
 }
 
+lazy_static! {
+    static ref SELECT_WORKER_CONFIGURE_FN: std::sync::RwLock<Option<Box<dyn Fn() -> BoxFuture<'static, Config> + Send + Sync>>> =
+        std::sync::RwLock::new(None);
+}
+
+lazy_static! {
+    static ref SELECT_WORKER_SPAWN_BACKGROUND_FN: std::sync::RwLock<Option<Box<dyn Fn(Config) + Send + Sync>>> =
+        std::sync::RwLock::new(None);
+}
+
 pub fn register_select_worker_setup(f: fn(&Runtime)) {
-    let mut startup = SELECT_WORKER_SETUP.write().unwrap();
-    assert!(startup.is_none(), "select worker setup already registered");
-    *startup = Some(Box::new(f));
+    let mut setup = SELECT_WORKER_SETUP.write().unwrap();
+    assert!(setup.is_none(), "select worker setup already registered");
+    *setup = Some(Box::new(f));
+}
+
+pub fn register_select_worker_configure_fn(f: fn() -> BoxFuture<'static, Config>) {
+    let mut func = SELECT_WORKER_CONFIGURE_FN.write().unwrap();
+    assert!(
+        func.is_none(),
+        "select worker configure function already registered"
+    );
+    *func = Some(Box::new(f));
+}
+
+pub fn register_select_worker_spawn_background_fn(f: fn(Config)) {
+    let mut func = SELECT_WORKER_SPAWN_BACKGROUND_FN.write().unwrap();
+    assert!(
+        func.is_none(),
+        "select worker spawn background function already registered"
+    );
+    *func = Some(Box::new(f));
 }
 
 #[cfg(test)]

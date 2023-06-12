@@ -463,6 +463,42 @@ impl CompactionService for CompactionServiceImpl {
         }
 
         let partition_id = partition.get_id();
+
+        let mut data = Vec::new();
+        let mut chunks_to_use = Vec::new();
+        let mut total_size = 0;
+        let num_columns = index.get_row().columns().len();
+
+        for chunk in chunks.iter() {
+            for b in self
+                .chunk_store
+                .get_chunk_columns_with_preloaded_meta(
+                    chunk.clone(),
+                    partition.clone(),
+                    index.clone(),
+                )
+                .await?
+            {
+                assert_eq!(
+                    num_columns,
+                    b.num_columns(),
+                    "Column len mismatch for {:?} and {:?}",
+                    index,
+                    chunk
+                );
+                for col in b.columns() {
+                    total_size += col.get_array_memory_size();
+                }
+                data.push(b);
+            }
+            chunks_to_use.push(chunk.clone());
+            if total_size > self.config.compaction_chunks_in_memory_size_threshold() as usize {
+                break;
+            }
+        }
+
+        let chunks = chunks_to_use;
+
         let chunks_row_count = chunks
             .iter()
             .map(|c| c.get_row().get_row_count())
@@ -484,6 +520,7 @@ impl CompactionService for CompactionServiceImpl {
                 )
             }
         };
+
         let mut total_rows = chunks_row_count;
         if new_chunk.is_none() {
             total_rows += partition.get_row().main_table_row_count();
@@ -521,29 +558,6 @@ impl CompactionService for CompactionServiceImpl {
                         .create_partition(Partition::new_child(&partition, None))
                         .await?,
                 );
-            }
-        }
-
-        let mut data = Vec::new();
-        let num_columns = index.get_row().columns().len();
-        for chunk in chunks.iter() {
-            for b in self
-                .chunk_store
-                .get_chunk_columns_with_preloaded_meta(
-                    chunk.clone(),
-                    partition.clone(),
-                    index.clone(),
-                )
-                .await?
-            {
-                assert_eq!(
-                    num_columns,
-                    b.num_columns(),
-                    "Column len mismatch for {:?} and {:?}",
-                    index,
-                    chunk
-                );
-                data.push(b)
             }
         }
 
@@ -1464,6 +1478,9 @@ mod tests {
             });
 
         config.expect_partition_split_threshold().returning(|| 20);
+        config
+            .expect_compaction_chunks_in_memory_size_threshold()
+            .returning(|| 3 * 1024 * 1024 * 1024);
 
         config
             .expect_partition_size_split_threshold_bytes()

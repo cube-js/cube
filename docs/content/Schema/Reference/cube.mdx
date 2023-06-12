@@ -520,7 +520,7 @@ SELECT FLOOR(EXTRACT(EPOCH FROM NOW()) / 5)
 
 - Standard cron syntax
 
-```
+```text
 *    *    *    *    *
 ┬    ┬    ┬    ┬    ┬
 │    │    │    │    |
@@ -533,7 +533,7 @@ SELECT FLOOR(EXTRACT(EPOCH FROM NOW()) / 5)
 
 - Advanced cron format with support for seconds
 
-```
+```text
 *    *    *    *    *    *
 ┬    ┬    ┬    ┬    ┬    ┬
 │    │    │    │    │    |
@@ -709,9 +709,9 @@ Heavy usage of FILTER_PARAMS is considered a bad practice. It usually leads to h
 
 Good rule of thumb is to use FILTER_PARAMS only for predicate pushdown performance optimizations.
 
-If you find yourself relying a lot on FILTER_PARAMS, it might mean you'll need to 
+If you find yourself relying a lot on FILTER_PARAMS, it might mean you'll need to
 
-1. Rethink your data modeling and potentially move some transformations upstream 
+1. Rethink your data modeling and potentially move some transformations upstream
 2. Reconsider choice of underlying database
 
 </WarningBox>
@@ -820,7 +820,7 @@ cube(`events`, {
 
 <WarningBox>
 
-`SECURITY_CONTEXT` is deprecated and may be removed in the upcoming versions. 
+`SECURITY_CONTEXT` is deprecated and may be removed in the upcoming versions.
 Use [`queryRewrite`][ref-config-queryrewrite] instead.
 
 </WarningBox>

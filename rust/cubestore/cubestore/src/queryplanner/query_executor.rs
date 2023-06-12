@@ -13,6 +13,7 @@ use crate::store::DataFrame;
 use crate::table::data::rows_to_columns;
 use crate::table::parquet::CubestoreParquetMetadataCache;
 use crate::table::{Row, TableValue, TimestampValue};
+use crate::util::memory::MemoryHandler;
 use crate::{app_metrics, CubeError};
 use arrow::array::{
     make_array, Array, ArrayRef, BinaryArray, BooleanArray, Float64Array, Int16Array, Int32Array,
@@ -99,6 +100,7 @@ crate::di_service!(MockQueryExecutor, [QueryExecutor]);
 
 pub struct QueryExecutorImpl {
     parquet_metadata_cache: Arc<dyn CubestoreParquetMetadataCache>,
+    memory_handler: Arc<dyn MemoryHandler>,
 }
 
 crate::di_service!(QueryExecutorImpl, [QueryExecutor]);
@@ -283,9 +285,13 @@ impl QueryExecutor for QueryExecutorImpl {
 }
 
 impl QueryExecutorImpl {
-    pub fn new(parquet_metadata_cache: Arc<dyn CubestoreParquetMetadataCache>) -> Arc<Self> {
+    pub fn new(
+        parquet_metadata_cache: Arc<dyn CubestoreParquetMetadataCache>,
+        memory_handler: Arc<dyn MemoryHandler>,
+    ) -> Arc<Self> {
         Arc::new(QueryExecutorImpl {
             parquet_metadata_cache,
+            memory_handler,
         })
     }
 
@@ -301,6 +307,7 @@ impl QueryExecutorImpl {
                 .with_query_planner(Arc::new(CubeQueryPlanner::new_on_router(
                     cluster,
                     serialized_plan,
+                    self.memory_handler.clone(),
                 ))),
         )))
     }
@@ -313,7 +320,10 @@ impl QueryExecutorImpl {
             ExecutionConfig::new()
                 .with_batch_size(4096)
                 .with_concurrency(1)
-                .with_query_planner(Arc::new(CubeQueryPlanner::new_on_worker(serialized_plan))),
+                .with_query_planner(Arc::new(CubeQueryPlanner::new_on_worker(
+                    serialized_plan,
+                    self.memory_handler.clone(),
+                ))),
         )))
     }
 }

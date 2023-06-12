@@ -46,34 +46,34 @@ describe('Gateway Api Scopes', () => {
       .set('Authorization', AUTH_TOKEN)
       .expect(403);
     expect(res.body && res.body.error)
-      .toStrictEqual('Api scope is missed: graphql');
+      .toStrictEqual('API scope is missing: graphql');
 
     res = await request(app)
       .get('/cubejs-api/v1/meta')
       .set('Authorization', AUTH_TOKEN)
       .expect(403);
     expect(res.body && res.body.error)
-      .toStrictEqual('Api scope is missed: meta');
+      .toStrictEqual('API scope is missing: meta');
 
     res = await request(app)
       .get('/cubejs-api/v1/load')
       .set('Authorization', AUTH_TOKEN)
       .expect(403);
     expect(res.body && res.body.error)
-      .toStrictEqual('Api scope is missed: data');
+      .toStrictEqual('API scope is missing: data');
 
     res = await request(app)
       .post('/cubejs-api/v1/pre-aggregations/jobs')
       .set('Authorization', AUTH_TOKEN)
       .expect(403);
     expect(res.body && res.body.error)
-      .toStrictEqual('Api scope is missed: jobs');
+      .toStrictEqual('API scope is missing: jobs');
 
     delete process.env.CUBEJS_DEFAULT_API_SCOPES;
     apiGateway.release();
   });
 
-  test('Liveliness declined', async () => {
+  test('/readyz and /livez accessible', async () => {
     const { app, apiGateway } = createApiGateway({
       contextToApiScopes: async () => new Promise((resolve) => {
         resolve(['graphql', 'meta', 'data', 'jobs']);
@@ -96,7 +96,7 @@ describe('Gateway Api Scopes', () => {
   test('GraphQL declined', async () => {
     const { app, apiGateway } = createApiGateway({
       contextToApiScopes: async () => new Promise((resolve) => {
-        resolve(['liveliness', 'meta', 'data', 'jobs']);
+        resolve(['meta', 'data', 'jobs']);
       }),
     });
 
@@ -106,7 +106,7 @@ describe('Gateway Api Scopes', () => {
       .expect(403);
 
     expect(res.body && res.body.error)
-      .toStrictEqual('Api scope is missed: graphql');
+      .toStrictEqual('API scope is missing: graphql');
 
     apiGateway.release();
   });
@@ -114,7 +114,7 @@ describe('Gateway Api Scopes', () => {
   test('Meta declined', async () => {
     const { app, apiGateway } = createApiGateway({
       contextToApiScopes: async () => new Promise((resolve) => {
-        resolve(['liveliness', 'graphql', 'data', 'jobs']);
+        resolve(['graphql', 'data', 'jobs']);
       }),
     });
 
@@ -124,7 +124,7 @@ describe('Gateway Api Scopes', () => {
       .expect(403);
 
     expect(res1.body && res1.body.error)
-      .toStrictEqual('Api scope is missed: meta');
+      .toStrictEqual('API scope is missing: meta');
 
     const res2 = await request(app)
       .post('/cubejs-api/v1/pre-aggregations/can-use')
@@ -132,7 +132,7 @@ describe('Gateway Api Scopes', () => {
       .expect(403);
 
     expect(res2.body && res2.body.error)
-      .toStrictEqual('Api scope is missed: meta');
+      .toStrictEqual('API scope is missing: meta');
 
     apiGateway.release();
   });
@@ -140,7 +140,7 @@ describe('Gateway Api Scopes', () => {
   test('Data declined', async () => {
     const { app, apiGateway } = createApiGateway({
       contextToApiScopes: async () => new Promise((resolve) => {
-        resolve(['liveliness', 'graphql', 'meta', 'jobs']);
+        resolve(['graphql', 'meta', 'jobs']);
       }),
     });
 
@@ -150,7 +150,7 @@ describe('Gateway Api Scopes', () => {
       .expect(403);
 
     expect(res1.body && res1.body.error)
-      .toStrictEqual('Api scope is missed: data');
+      .toStrictEqual('API scope is missing: data');
 
     const res2 = await request(app)
       .post('/cubejs-api/v1/load')
@@ -158,7 +158,7 @@ describe('Gateway Api Scopes', () => {
       .expect(403);
 
     expect(res2.body && res2.body.error)
-      .toStrictEqual('Api scope is missed: data');
+      .toStrictEqual('API scope is missing: data');
 
     const res3 = await request(app)
       .get('/cubejs-api/v1/subscribe')
@@ -166,7 +166,7 @@ describe('Gateway Api Scopes', () => {
       .expect(403);
 
     expect(res3.body && res3.body.error)
-      .toStrictEqual('Api scope is missed: data');
+      .toStrictEqual('API scope is missing: data');
 
     const res4 = await request(app)
       .get('/cubejs-api/v1/sql')
@@ -174,7 +174,7 @@ describe('Gateway Api Scopes', () => {
       .expect(403);
 
     expect(res4.body && res4.body.error)
-      .toStrictEqual('Api scope is missed: data');
+      .toStrictEqual('API scope is missing: data');
 
     const res5 = await request(app)
       .post('/cubejs-api/v1/sql')
@@ -183,7 +183,7 @@ describe('Gateway Api Scopes', () => {
       .expect(403);
 
     expect(res5.body && res5.body.error)
-      .toStrictEqual('Api scope is missed: data');
+      .toStrictEqual('API scope is missing: data');
 
     const res6 = await request(app)
       .get('/cubejs-api/v1/dry-run')
@@ -191,7 +191,7 @@ describe('Gateway Api Scopes', () => {
       .expect(403);
 
     expect(res6.body && res6.body.error)
-      .toStrictEqual('Api scope is missed: data');
+      .toStrictEqual('API scope is missing: data');
 
     const res7 = await request(app)
       .post('/cubejs-api/v1/dry-run')
@@ -200,7 +200,7 @@ describe('Gateway Api Scopes', () => {
       .expect(403);
 
     expect(res7.body && res7.body.error)
-      .toStrictEqual('Api scope is missed: data');
+      .toStrictEqual('API scope is missing: data');
 
     apiGateway.release();
   });
@@ -208,7 +208,7 @@ describe('Gateway Api Scopes', () => {
   test('Jobs declined', async () => {
     const { app, apiGateway } = createApiGateway({
       contextToApiScopes: async () => new Promise((resolve) => {
-        resolve(['liveliness', 'graphql', 'data', 'meta']);
+        resolve(['graphql', 'data', 'meta']);
       }),
     });
 
@@ -218,7 +218,7 @@ describe('Gateway Api Scopes', () => {
       .expect(403);
 
     expect(res1.body && res1.body.error)
-      .toStrictEqual('Api scope is missed: jobs');
+      .toStrictEqual('API scope is missing: jobs');
 
     const res2 = await request(app)
       .get('/cubejs-api/v1/run-scheduled-refresh')
@@ -226,7 +226,7 @@ describe('Gateway Api Scopes', () => {
       .expect(403);
 
     expect(res2.body && res2.body.error)
-      .toStrictEqual('Api scope is missed: jobs');
+      .toStrictEqual('API scope is missing: jobs');
 
     apiGateway.release();
   });

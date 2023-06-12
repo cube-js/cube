@@ -6,7 +6,6 @@ import omit from 'lodash/omit';
 
 import MenuItem from '../templates/MenuItem';
 import * as styles from '../../../static/styles/index.module.scss';
-import { useFrameworkOfChoice } from '../../stores/frameworkOfChoice';
 import {
   Frontmatter,
   MarkdownNode,
@@ -24,10 +23,7 @@ const menuOrder = [
   'Data Modeling',
   'Caching',
   'Authentication & Authorization',
-  'REST API',
-  'GraphQL API',
-  'SQL API',
-  'Frontend Integrations',
+  'APIs & Integrations',
   'Workspace',
   'Deployment',
   'Monitoring',
@@ -77,7 +73,6 @@ const defaultProps: Props = {
 
 const MainMenu: React.FC<Props> = (props = defaultProps) => {
   const menuProps = omit(props, ['mobileMode', 'scope']);
-  const [frameworkOfChoice] = useFrameworkOfChoice();
 
   return (
     <Col
@@ -118,16 +113,7 @@ const MainMenu: React.FC<Props> = (props = defaultProps) => {
               >
                 {Object.keys(filteredSubcategoryData).map((subCategory) => {
                   if (subCategory === 'nocat') {
-                    const subItems = filteredSubcategoryData[subCategory].filter(
-                      (subItem: MarkdownNode) => {
-                        return (
-                          !subItem.frontmatter.frameworkOfChoice ||
-                          subItem.frontmatter.frameworkOfChoice ===
-                            frameworkOfChoice
-                        );
-                      }
-                    );
-
+                    const subItems = filteredSubcategoryData[subCategory];
                     return subItems.map(nodeParser);
                   }
                   return (

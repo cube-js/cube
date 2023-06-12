@@ -9,7 +9,9 @@ use async_trait::async_trait;
 use cubeclient::models::{V1LoadRequestQuery, V1LoadResult, V1LoadResultAnnotation};
 pub use datafusion::{
     arrow::{
-        array::{ArrayRef, BooleanBuilder, Float64Builder, Int64Builder, StringBuilder},
+        array::{
+            ArrayRef, BooleanBuilder, Date32Builder, Float64Builder, Int64Builder, StringBuilder,
+        },
         datatypes::{DataType, SchemaRef},
         error::{ArrowError, Result as ArrowResult},
         record_batch::RecordBatch,
@@ -30,7 +32,7 @@ use crate::{
     transport::{CubeStreamReceiver, LoadRequestMeta, TransportService},
     CubeError,
 };
-use chrono::NaiveDateTime;
+use chrono::{Datelike, NaiveDate, NaiveDateTime};
 use datafusion::{
     arrow::{array::TimestampNanosecondBuilder, datatypes::TimeUnit},
     execution::context::TaskContext,
@@ -727,8 +729,7 @@ pub fn transform_response<V: ValueObject>(
                     {
                         (FieldValue::String(s), builder) => {
                             let timestamp = NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%dT%H:%M:%S.%f")
-                        .or_else(|_| NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%d %H:%M:%S.%f")
-                        )
+                                .or_else(|_| NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%d %H:%M:%S.%f"))
                                 .map_err(|e| {
                                     DataFusionError::Execution(format!(
                                         "Can't parse timestamp: '{}': {}",
@@ -745,6 +746,43 @@ pub fn transform_response<V: ValueObject>(
                     },
                     {
                         (ScalarValue::TimestampNanosecond(v, None), builder) => builder.append_option(v.clone())?,
+                    }
+                )
+            }
+            DataType::Date32 => {
+                build_column!(
+                    DataType::Date32,
+                    Date32Builder,
+                    response,
+                    field_name,
+                    {
+                        (FieldValue::String(s), builder) => {
+                            let date = NaiveDate::parse_from_str(s.as_str(), "%Y-%m-%d")
+                                .map_err(|e| {
+                                    DataFusionError::Execution(format!(
+                                        "Can't parse date: '{}': {}",
+                                        s, e
+                                    ))
+                                });
+                            match date {
+                                Ok(date) => {
+                                    let epoch = NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
+                                    let days_since_epoch = date.num_days_from_ce()  - epoch.num_days_from_ce();
+                                    builder.append_value(days_since_epoch)?;
+                                }
+                                Err(error) => {
+                                    log::error!(
+                                        "Unable to parse value as Date32: {}",
+                                        error.to_string()
+                                    );
+
+                                    builder.append_null()?
+                                }
+                            }
+                        }
+                    },
+                    {
+                        (ScalarValue::Date32(v), builder) => builder.append_option(v.clone())?,
                     }
                 )
             }

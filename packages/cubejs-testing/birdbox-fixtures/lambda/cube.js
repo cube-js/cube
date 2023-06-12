@@ -5,6 +5,6 @@ module.exports = {
     },
   },
   contextToApiScopes: async () => new Promise((resolve) => {
-    resolve(['liveliness', 'graphql', 'meta', 'data', 'jobs']);
+    resolve(['graphql', 'meta', 'data', 'jobs']);
   }),
 };
