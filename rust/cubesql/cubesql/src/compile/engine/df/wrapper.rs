@@ -13,7 +13,8 @@ use datafusion::{
         Column, DFSchemaRef, Expr, LogicalPlan, UserDefinedLogicalNode,
     },
     physical_plan::{
-        DisplayFormatType, ExecutionPlan, Partitioning, SendableRecordBatchStream, Statistics,
+        aggregates::AggregateFunction, DisplayFormatType, ExecutionPlan, Partitioning,
+        SendableRecordBatchStream, Statistics,
     },
 };
 use itertools::Itertools;
@@ -312,6 +313,14 @@ impl CubeScanWrapperNode {
                 } => {
                     let mut sql_args = Vec::new();
                     for arg in args {
+                        if let AggregateFunction::Count = fun {
+                            if !distinct {
+                                if let Expr::Literal(_) = arg {
+                                    sql_args.push("*".to_string());
+                                    break;
+                                }
+                            }
+                        }
                         sql_args.push(
                             Self::generate_sql_for_expr(plan.clone(), sql_generator.clone(), arg)
                                 .await?,

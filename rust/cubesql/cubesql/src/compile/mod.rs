@@ -1587,6 +1587,10 @@ pub fn find_cube_scans_deep_search(
             if let LogicalPlan::Extension(ext) = plan {
                 if let Some(scan_node) = ext.node.as_any().downcast_ref::<CubeScanNode>() {
                     self.0.push(scan_node.clone());
+                } else if let Some(wrapper_node) =
+                    ext.node.as_any().downcast_ref::<CubeScanWrapperNode>()
+                {
+                    wrapper_node.wrapped_plan.accept(self)?;
                 }
             }
             Ok(true)
