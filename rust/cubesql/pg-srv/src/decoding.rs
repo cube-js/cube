@@ -34,15 +34,19 @@ pub trait FromProtocolValue {
 impl FromProtocolValue for String {
     fn from_text(raw: &Vec<u8>) -> Result<Self, ProtocolError> {
         String::from_utf8(raw.clone()).map_err(|err| {
-            ErrorResponse::error(ErrorCode::ProtocolViolation, err.to_string()).into():
-                ProtocolError
+            ProtocolError::from(ErrorResponse::error(
+                ErrorCode::ProtocolViolation,
+                err.to_string(),
+            ))
         })
     }
 
     fn from_binary(raw: &Vec<u8>) -> Result<Self, ProtocolError> {
         String::from_utf8(raw.clone()).map_err(|err| {
-            ErrorResponse::error(ErrorCode::ProtocolViolation, err.to_string()).into():
-                ProtocolError
+            ProtocolError::from(ErrorResponse::error(
+                ErrorCode::ProtocolViolation,
+                err.to_string(),
+            ))
         })
     }
 }
@@ -50,13 +54,17 @@ impl FromProtocolValue for String {
 impl FromProtocolValue for i64 {
     fn from_text(raw: &Vec<u8>) -> Result<Self, ProtocolError> {
         let as_str = String::from_utf8(raw.clone()).map_err(|err| {
-            ErrorResponse::error(ErrorCode::ProtocolViolation, err.to_string()).into():
-                ProtocolError
+            ProtocolError::from(ErrorResponse::error(
+                ErrorCode::ProtocolViolation,
+                err.to_string(),
+            ))
         })?;
 
         as_str.parse::<i64>().map_err(|err| {
-            ErrorResponse::error(ErrorCode::ProtocolViolation, err.to_string()).into():
-                ProtocolError
+            ProtocolError::from(ErrorResponse::error(
+                ErrorCode::ProtocolViolation,
+                err.to_string(),
+            ))
         })
     }
 
@@ -74,7 +82,7 @@ impl FromProtocolValue for bool {
                 ErrorCode::ProtocolViolation,
                 format!("Unable to decode bool from text, actual: {}", other),
             )
-            .into(): ProtocolError),
+            .into()),
         }
     }
 
@@ -86,7 +94,7 @@ impl FromProtocolValue for bool {
                 ErrorCode::ProtocolViolation,
                 format!("Unable to decode bool from binary, actual: {}", other),
             )
-            .into(): ProtocolError),
+            .into()),
         }
     }
 }
@@ -95,7 +103,7 @@ impl FromProtocolValue for bool {
 mod tests {
     use crate::*;
 
-    use crate::protocol::Format;
+    use crate::protocol::{ErrorCode, ErrorResponse, Format};
     use bytes::BytesMut;
 
     fn assert_test_decode<T: ToProtocolValue + FromProtocolValue + std::cmp::PartialEq>(
@@ -132,6 +140,17 @@ mod tests {
         assert_test_decode(false, Format::Binary)?;
         assert_test_decode(1_i64, Format::Binary)?;
         assert_test_decode(100_i64, Format::Binary)?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_error_bt() -> Result<(), ProtocolError> {
+        let err = ProtocolError::from(
+            ErrorResponse::error(ErrorCode::ActiveSqlTransaction, "test".to_string())
+        );
+
+        assert_eq!(err.backtrace().is_some(), true);
 
         Ok(())
     }
