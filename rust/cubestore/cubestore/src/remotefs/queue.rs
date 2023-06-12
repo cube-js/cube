@@ -563,6 +563,7 @@ mod test {
     use super::*;
     use crate::config::Config;
     use crate::remotefs::LocalDirRemoteFs;
+    use futures_timer::Delay;
     use std::env;
     use std::fs::File;
     use std::io::Write;
@@ -678,6 +679,65 @@ mod test {
             .unwrap();
 
         path
+    }
+    #[tokio::test]
+    async fn queue_cleanup_local_files() {
+        Config::test("cleanup_local_files")
+            .update_config(|mut c| {
+                c.local_files_cleanup_delay_secs = 2;
+                c.local_files_cleanup_interval_secs = 1;
+                c
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
+                let meta_store = services.meta_store;
+                let remote_fs = services.injector.get_service_typed::<dyn RemoteFs>().await;
+                let _ = service.exec_query("CREATE SCHEMA test").await.unwrap();
+                let _ = service
+                    .exec_query("CREATE TABLE test.tst (a int, b int)")
+                    .await
+                    .unwrap();
+                let _ = service
+                    .exec_query("INSERT INTO test.tst (a, b) VALUES (10, 10), (20 , 20)")
+                    .await
+                    .unwrap();
+                let _ = service
+                    .exec_query("INSERT INTO test.tst (a, b) VALUES (20, 20), (40 , 40)")
+                    .await
+                    .unwrap();
+                let files = meta_store.get_all_filenames().await.unwrap();
+                assert_eq!(files.len(), 2);
+                for f in files.iter() {
+                    let path = remote_fs.local_file(&f).await.unwrap();
+                    assert!(Path::new(&path).exists());
+                }
+                let path = remote_fs.local_file("metastore").await.unwrap();
+                assert!(Path::new(&path).exists());
+
+                meta_store
+                    .delete_chunks_without_checks(vec![1])
+                    .await
+                    .unwrap();
+
+                assert_eq!(meta_store.get_all_filenames().await.unwrap().len(), 1);
+                for f in files.iter() {
+                    let path = remote_fs.local_file(&f).await.unwrap();
+                    assert!(Path::new(&path).exists());
+                }
+                Delay::new(Duration::from_millis(3000)).await; // TODO logger init conflict
+
+                let path = remote_fs.local_file(&files[0]).await.unwrap();
+                assert!(!Path::new(&path).exists());
+
+                let path = remote_fs.local_file(&files[1]).await.unwrap();
+                assert!(Path::new(&path).exists());
+
+                let path = remote_fs.local_file("metastore").await.unwrap();
+                assert!(Path::new(&path).exists());
+
+                let _ = service.exec_query("SELECT * FROM test.tst").await.unwrap();
+            })
+            .await;
     }
     #[tokio::test]
     async fn queue_upload() {
