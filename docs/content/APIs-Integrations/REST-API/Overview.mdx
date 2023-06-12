@@ -1,9 +1,9 @@
 ---
 title: REST API
-menuTitle: Overview
 permalink: /http-api/rest
-category: REST API
-menuOrder: 1
+category: APIs & Integrations
+subCategory: REST API
+menuOrder: 11
 ---
 
 REST API enables Cube to deliver data over the HTTP protocol to certain kinds
@@ -25,7 +25,15 @@ application, consider using the [GraphQL API][ref-graphql-api] that Cube also pr
 
 </InfoBox>
 
+Under the hood, REST API also provides endpoints for
+[GraphQL API][ref-graphql-api] and [Orchestration API][ref-orchestration-api].
+However, they target specific use cases and are not usually considered part
+of the REST API.
+
 ## Configuration
+
+REST API is enabled by default and secured using [API scopes][self-api-scopes]
+and [CORS][self-cors].
 
 ### <--{"id" : "Configuration"}--> Base path
 
@@ -218,6 +226,9 @@ example, the following query will retrieve rows 101-200 from the `Orders` cube:
 [ref-ref-paj]: /rest-api#v-1-pre-aggregations-jobs
 [ref-security-context]: /security/context
 [ref-graphql-api]: /http-api/graphql
+[ref-orchestration-api]: /orchestration-api
 [cube-ea]: https://cube.dev/use-cases/embedded-analytics
 [cube-rta]: https://cube.dev/use-cases/real-time-analytics
 [graphql]: https://graphql.org
+[self-api-scopes]: #configuration-api-scopes
+[self-cors]: #configuration-cors
