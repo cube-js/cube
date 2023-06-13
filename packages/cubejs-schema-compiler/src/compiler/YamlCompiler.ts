@@ -35,8 +35,6 @@ export class YamlCompiler {
       content: renderTemplate(file.fileName, compileContext),
     };
 
-    console.log(compiledFile);
-
     return this.compileYamlFile(
       compiledFile,
       errorsReport,
