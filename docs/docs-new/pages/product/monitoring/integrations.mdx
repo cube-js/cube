@@ -29,10 +29,7 @@ Under the hood, Cube Cloud uses [Vector][vector], an open-source tool for
 collecting and delivering monitoring data. It supports a [wide range of
 destinations][vector-docs-sinks], also known as _sinks_.
 
-<img
-  src="https://ucarecdn.com/17dbc263-2be4-4b7d-9f34-270cd66e878b/"
-  style="border: 0;"
-/>
+<Diagram src="https://ucarecdn.com/17dbc263-2be4-4b7d-9f34-270cd66e878b/" />
 
 ## Guides
 
@@ -237,7 +234,12 @@ inputs = [
 ]
 ```
 
-You can customize the user name and password for `prometheus_exporter` by
+Navigate to <Btn>Settings → Monitoring Integrations</Btn> to take the
+credentials `prometheus_exporter` under <Btn>Metrics export</Btn>:
+
+<Screenshot src="https://ucarecdn.com/7db3949b-83b9-48ae-b4b6-bd2afeda5001/" />
+
+You can also customize the user name and password for `prometheus_exporter` by
 setting `CUBE_CLOUD_LOG_EXPORT_METRICS_USER` and
 `CUBE_CLOUD_LOG_EXPORT_METRICS_PASSWORD` environment variables, respectively.
 
