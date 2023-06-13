@@ -1,16 +1,14 @@
 use crate::python::cross::{CLRepr, CLReprKind, CLReprObject};
-use cubesql::CubeError;
 use minijinja as mj;
-use minijinja::value::{Object, ObjectKind, SeqObject, StructObject, Value, ValueKind};
-use std::fmt::{Display, Formatter, Pointer};
+use minijinja::value::{Object, ObjectKind, SeqObject, StructObject, Value};
 
 #[derive(Debug)]
 struct JinjaDynamicObject {
     pub(crate) inner: CLReprObject,
 }
 
-impl Display for JinjaDynamicObject {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+impl std::fmt::Display for JinjaDynamicObject {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Display::fmt(&self.inner, f)
     }
 }
@@ -51,8 +49,8 @@ struct JinjaSequenceObject {
     pub(crate) inner: Vec<CLRepr>,
 }
 
-impl Display for JinjaSequenceObject {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+impl std::fmt::Display for JinjaSequenceObject {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "[")?;
 
         for element in &self.inner {

@@ -9,7 +9,6 @@ use pyo3::{Py, PyAny, PyErr, PyObject, Python, ToPyObject};
 use std::cell::RefCell;
 use std::collections::hash_map::IntoIter;
 use std::collections::HashMap;
-use std::fmt::Display;
 
 #[derive(Debug, Clone)]
 pub struct CLReprObject(pub(crate) HashMap<String, CLRepr>);
@@ -38,6 +37,7 @@ impl std::fmt::Display for CLReprObject {
     }
 }
 
+#[allow(unused)]
 #[derive(Debug)]
 pub enum CLReprKind {
     String,
@@ -108,6 +108,7 @@ struct IntoJsContext {
 }
 
 impl CLRepr {
+    #[allow(unused)]
     pub fn kind(&self) -> CLReprKind {
         match self {
             CLRepr::String(_) => CLReprKind::String,

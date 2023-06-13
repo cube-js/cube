@@ -1,6 +1,5 @@
 use crate::python::cross::CLRepr;
 use crate::python::template::mj_value::to_minijinja_value;
-use cubesql::CubeError;
 use log::trace;
 use minijinja as mj;
 use neon::context::Context;
@@ -14,7 +13,7 @@ fn template_engine<'a, C: Context<'a>>(
     static STATE: OnceCell<Mutex<mj::Environment>> = OnceCell::new();
 
     STATE.get_or_try_init(|| {
-        let mut engine = mj::Environment::new();
+        let engine = mj::Environment::new();
 
         Ok(Mutex::new(engine))
     })
