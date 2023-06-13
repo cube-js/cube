@@ -10,3 +10,6 @@ print:
   array_bool: {{ COMPILE_CONTEXT.array_bool }}
   security_context:
     userId: {{ COMPILE_CONTEXT.securityContext.userId }}
+  env_var:
+    exist: {{ env_var('NODE_ENV') }}
+    unknown_fallback: {{ env_var('UNKNOWN_ENV', 'value') }}

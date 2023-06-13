@@ -167,7 +167,12 @@ exports[`Jinja render 07.yml.jinja: 07.yml.jinja 1`] = `
       FROM app_data.payments"
 `;
 
-exports[`Jinja render 08.yml.jinja: 08.yml.jinja 1`] = `""`;
+exports[`Jinja render 08.yml.jinja: 08.yml.jinja 1`] = `
+"{ cubes:
+  - name: cube_08
+    sql_table: public.orders
+    data_source: postgres }"
+`;
 
 exports[`Jinja render dump_context.yml.jinja: dump_context.yml.jinja 1`] = `
 "<pre></pre>
@@ -181,5 +186,8 @@ print:
   array_int: [9, 8, 7, 6, 5, 0, 1, 2, 3, 4]
   array_bool: [true, false, false, true]
   security_context:
-    userId: 1"
+    userId: 1
+  env_var:
+    exist: test
+    unknown_fallback: value"
 `;

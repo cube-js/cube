@@ -13,7 +13,26 @@ fn template_engine<'a, C: Context<'a>>(
     static STATE: OnceCell<Mutex<mj::Environment>> = OnceCell::new();
 
     STATE.get_or_try_init(|| {
-        let engine = mj::Environment::new();
+        let mut engine = mj::Environment::new();
+        engine.add_function(
+            "env_var",
+            |var_name: String, var_default: Option<String>, _state: &minijinja::State| {
+                if let Ok(value) = std::env::var(&var_name) {
+                    return Ok(mj::value::Value::from(value));
+                }
+
+                if let Some(var_default) = var_default {
+                    return Ok(mj::value::Value::from(var_default));
+                }
+
+                let err = minijinja::Error::new(
+                    mj::ErrorKind::UndefinedError,
+                    format!("unknown env variable {}", var_name),
+                );
+
+                Err(err)
+            },
+        );
 
         Ok(Mutex::new(engine))
     })
