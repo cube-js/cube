@@ -7,10 +7,10 @@ use pyo3::exceptions::{PyNotImplementedError, PyTypeError};
 use pyo3::types::{PyBool, PyDict, PyFloat, PyFunction, PyInt, PyList, PyString};
 use pyo3::{Py, PyAny, PyErr, PyObject, Python, ToPyObject};
 use std::cell::RefCell;
-use std::collections::hash_map::IntoIter;
+use std::collections::hash_map::{IntoIter, Iter};
 use std::collections::HashMap;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct CLReprObject(pub(crate) HashMap<String, CLRepr>);
 
 impl CLReprObject {
@@ -28,6 +28,16 @@ impl CLReprObject {
 
     pub fn into_iter(self) -> IntoIter<String, CLRepr> {
         self.0.into_iter()
+    }
+
+    pub fn iter(&self) -> Iter<String, CLRepr> {
+        self.0.iter()
+    }
+}
+
+impl std::fmt::Debug for CLReprObject {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(&self.0, f)
     }
 }
 

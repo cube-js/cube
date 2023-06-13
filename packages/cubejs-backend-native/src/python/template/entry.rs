@@ -1,4 +1,4 @@
-use crate::python::cross::CLRepr;
+use crate::python::cross::{CLRepr, CLReprObject};
 use crate::python::template::mj_value::to_minijinja_value;
 use log::trace;
 use minijinja as mj;
@@ -80,12 +80,11 @@ fn render_template(mut cx: FunctionContext) -> JsResult<JsString> {
         }
     };
 
-    let compile_context = to_minijinja_value(template_ctx);
-    let ctx = mj::context! {
-        COMPILE_CONTEXT => compile_context,
-    };
+    let mut ctx = CLReprObject::new();
+    ctx.insert("COMPILE_CONTEXT".to_string(), template_ctx);
 
-    match template.render(ctx) {
+    let compile_context = to_minijinja_value(CLRepr::Object(ctx));
+    match template.render(compile_context) {
         Ok(r) => Ok(cx.string(r)),
         Err(err) => {
             trace!("jinja render template error: {:?}", err);

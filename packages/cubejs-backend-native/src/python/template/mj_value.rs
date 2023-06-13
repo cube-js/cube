@@ -1,10 +1,16 @@
 use crate::python::cross::{CLRepr, CLReprKind, CLReprObject};
 use minijinja as mj;
 use minijinja::value::{Object, ObjectKind, SeqObject, StructObject, Value};
+use std::sync::Arc;
 
-#[derive(Debug)]
 struct JinjaDynamicObject {
     pub(crate) inner: CLReprObject,
+}
+
+impl std::fmt::Debug for JinjaDynamicObject {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(&self.inner, f)
+    }
 }
 
 impl std::fmt::Display for JinjaDynamicObject {
@@ -16,6 +22,17 @@ impl std::fmt::Display for JinjaDynamicObject {
 impl StructObject for JinjaDynamicObject {
     fn get_field(&self, name: &str) -> Option<Value> {
         self.inner.get(name).map(|v| to_minijinja_value(v.clone()))
+    }
+
+    fn fields(&self) -> Vec<Arc<String>> {
+        self.inner
+            .iter()
+            .map(|(k, _)| Arc::new(k.clone()))
+            .collect()
+    }
+
+    fn field_count(&self) -> usize {
+        self.inner.iter().len()
     }
 }
 
