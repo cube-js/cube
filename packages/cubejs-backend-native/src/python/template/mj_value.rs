@@ -104,11 +104,7 @@ pub fn to_minijinja_value(from: CLRepr) -> Value {
         CLRepr::Float(v) => Value::from(v),
         CLRepr::Int(v) => Value::from(v),
         CLRepr::Bool(v) => Value::from(v),
-        // TODO(ovr): fix me
-        CLRepr::Null => panic!(
-            "Converting from {:?} to minijinja::Value is not supported",
-            CLReprKind::Null
-        ),
+        CLRepr::Null => Value::from(()),
         CLRepr::PyFunction(_) => panic!(
             "Converting from {:?} to minijinja::Value is not supported",
             CLReprKind::PyFunction
