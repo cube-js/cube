@@ -6,8 +6,9 @@ import { parse } from '@babel/parser';
 import babelGenerator from '@babel/generator';
 import babelTraverse from '@babel/traverse';
 import R from 'ramda';
-import { AbstractExtension } from '../extensions';
+import { loadTemplates } from '@cubejs-backend/native';
 
+import { AbstractExtension } from '../extensions';
 import { UserError } from './UserError';
 import { ErrorReporter } from './ErrorReporter';
 
@@ -48,25 +49,44 @@ export class DataSchemaCompiler {
     }
   }
 
+  /**
+   * @protected
+   */
+  async doCompile() {
+    const files = await this.repository.dataSchemaFiles();
+    const templates = [];
+
+    for (const file of files) {
+      if (file.fileName.endsWith('.jinja')) {
+        templates.push(file);
+      }
+    }
+
+    if (templates.length) {
+      loadTemplates(templates);
+    }
+
+    const toCompile = files.filter((f) => !this.filesToCompile || this.filesToCompile.indexOf(f.fileName) !== -1);
+
+    const errorsReport = new ErrorReporter(null, [], this.errorReport);
+    this.errorsReport = errorsReport;
+
+    // TODO: required in order to get pre transpile compilation work
+    const transpile = () => toCompile.map(f => this.transpileFile(f, errorsReport)).filter(f => !!f);
+
+    const compilePhase = (compilers) => this.compileCubeFiles(compilers, transpile(), errorsReport);
+
+    return compilePhase({ cubeCompilers: this.cubeNameCompilers })
+      .then(() => compilePhase({ cubeCompilers: this.preTranspileCubeCompilers }))
+      .then(() => compilePhase({
+        cubeCompilers: this.cubeCompilers,
+        contextCompilers: this.contextCompilers,
+      }));
+  }
+
   compile() {
     if (!this.compilePromise) {
-      this.compilePromise = this.repository.dataSchemaFiles().then((files) => {
-        const toCompile = files.filter((f) => !this.filesToCompile || this.filesToCompile.indexOf(f.fileName) !== -1);
-
-        const errorsReport = new ErrorReporter(null, [], this.errorReport);
-        this.errorsReport = errorsReport;
-        // TODO: required in order to get pre transpile compilation work
-        const transpile = () => toCompile.map(f => this.transpileFile(f, errorsReport)).filter(f => !!f);
-
-        const compilePhase = (compilers) => this.compileCubeFiles(compilers, transpile(), errorsReport);
-
-        return compilePhase({ cubeCompilers: this.cubeNameCompilers })
-          .then(() => compilePhase({ cubeCompilers: this.preTranspileCubeCompilers }))
-          .then(() => compilePhase({
-            cubeCompilers: this.cubeCompilers,
-            contextCompilers: this.contextCompilers,
-          }));
-      }).then((res) => {
+      this.compilePromise = this.doCompile().then((res) => {
         if (!this.omitErrors) {
           this.throwIfAnyErrors();
         }
@@ -78,7 +98,9 @@ export class DataSchemaCompiler {
   }
 
   transpileFile(file, errorsReport) {
-    if (R.endsWith('.yml', file.fileName) || R.endsWith('.yaml', file.fileName)) {
+    if (R.endsWith('.yml.jinja', file.fileName) || R.endsWith('.yaml.jinja', file.fileName)) {
+      return file;
+    } else if (R.endsWith('.yml', file.fileName) || R.endsWith('.yaml', file.fileName)) {
       return file;
     } else if (R.endsWith('.js', file.fileName)) {
       return this.transpileJsFile(file, errorsReport);
@@ -171,6 +193,8 @@ export class DataSchemaCompiler {
     compiledFiles[file.fileName] = true;
     if (R.endsWith('.js', file.fileName)) {
       this.compileJsFile(file, errorsReport, cubes, contexts, exports, asyncModules, toCompile, compiledFiles);
+    } else if (R.endsWith('.yml.jinja', file.fileName) || R.endsWith('.yaml.jinja', file.fileName)) {
+      this.yamlCompiler.compileYamlWithJinjaFile(file, errorsReport, cubes, contexts, exports, asyncModules, toCompile, compiledFiles, this.compileContext);
     } else if (R.endsWith('.yml', file.fileName) || R.endsWith('.yaml', file.fileName)) {
       this.yamlCompiler.compileYamlFile(file, errorsReport, cubes, contexts, exports, asyncModules, toCompile, compiledFiles);
     }

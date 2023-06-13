@@ -9,6 +9,7 @@ mod logger;
 #[cfg(feature = "python")]
 mod python;
 mod stream;
+mod template;
 mod transport;
 mod utils;
 
@@ -206,8 +207,10 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("shutdownInterface", shutdown_interface)?;
     cx.export_function("isFallbackBuild", is_fallback_build)?;
 
+    template::template_register_module(&mut cx)?;
+
     #[cfg(feature = "python")]
-    python::python_register_module(cx)?;
+    python::python_register_module(&mut cx)?;
 
     Ok(())
 }

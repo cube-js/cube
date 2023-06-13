@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { Writable } from 'stream';
+import { FileContent } from '@cubejs-backend/shared';
 // import { getEnv } from '@cubejs-backend/shared';
 
 export interface BaseMeta {
@@ -275,3 +276,13 @@ export const pythonLoadConfig = async (context: string, options: { file: string 
 
     return config;
 }
+
+export const loadTemplates = (templates: FileContent[]): string => {
+  const native = loadNative();
+  return native.loadTemplates(templates);
+};
+
+export const renderTemplate = (templateName: string, context: unknown): string => {
+  const native = loadNative();
+  return native.renderTemplate(templateName, context);
+};

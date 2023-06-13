@@ -1,8 +1,8 @@
-import { FakeRowStream } from '@cubejs-backend/testing-shared';
 import mysql from 'mysql2/promise';
 
 import * as native from '../js';
 import metaFixture from './meta';
+import { FakeRowStream } from './response-fake';
 
 const logger = jest.fn(({ event }) => {
   if (!event.error.includes('load - strange response, success which contains error')) {
