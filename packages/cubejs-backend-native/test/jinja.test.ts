@@ -1,17 +1,17 @@
 import fs from 'fs';
 import path from 'path';
 
-import * as native from '../js';
 import { FileContent } from '@cubejs-backend/shared';
+import * as native from '../js';
 
 const suite = native.isFallbackBuild() ? xdescribe : describe;
 
 function testTemplateBySnapshot(templateName: string, ctx: unknown) {
   test(`render ${templateName}`, async () => {
-    let actual = native.renderTemplate(templateName, ctx);
+    const actual = native.renderTemplate(templateName, ctx);
 
     expect(actual).toMatchSnapshot(templateName);
-  })
+  });
 }
 
 suite('Jinja', () => {
@@ -32,7 +32,7 @@ suite('Jinja', () => {
 
     for (let i = 1; i < 9; i++) {
       templates.push(
-          loadTemplateFile(`0${i}.yml.jinja`)
+        loadTemplateFile(`0${i}.yml.jinja`)
       );
     }
 
@@ -40,21 +40,21 @@ suite('Jinja', () => {
   });
 
   testTemplateBySnapshot('dump_context.yml.jinja', {
-    'bool_true': true,
-    'bool_false': false,
-    'string': 'test string',
-    'int': 1,
-    'float': 3.1415,
-    'array_int': [9, 8, 7, 6, 5, 0, 1, 2, 3, 4],
-    'array_bool': [true, false, false, true],
-    'null': null,
-    'undefined': undefined,
+    bool_true: true,
+    bool_false: false,
+    string: 'test string',
+    int: 1,
+    float: 3.1415,
+    array_int: [9, 8, 7, 6, 5, 0, 1, 2, 3, 4],
+    array_bool: [true, false, false, true],
+    null: null,
+    undefined,
     securityContext: {
       userId: 1,
     }
-  })
+  });
 
   for (let i = 1; i < 9; i++) {
-    testTemplateBySnapshot(`0${i}.yml.jinja`, {})
+    testTemplateBySnapshot(`0${i}.yml.jinja`, {});
   }
 });
