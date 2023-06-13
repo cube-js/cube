@@ -14,6 +14,7 @@ fn template_engine<'a, C: Context<'a>>(
 
     STATE.get_or_try_init(|| {
         let mut engine = mj::Environment::new();
+        engine.set_debug(false);
         engine.add_function(
             "env_var",
             |var_name: String, var_default: Option<String>, _state: &minijinja::State| {
@@ -26,7 +27,7 @@ fn template_engine<'a, C: Context<'a>>(
                 }
 
                 let err = minijinja::Error::new(
-                    mj::ErrorKind::UndefinedError,
+                    mj::ErrorKind::InvalidOperation,
                     format!("unknown env variable {}", var_name),
                 );
 
@@ -40,7 +41,6 @@ fn template_engine<'a, C: Context<'a>>(
 
 fn load_templates(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let input = cx.argument::<JsArray>(0)?.to_vec(&mut cx)?;
-    // let mut templates = Vec::with_capacity(input.len() as usize);
 
     let mut engine = template_engine(&mut cx)?.lock().unwrap();
     for to_load in input {
