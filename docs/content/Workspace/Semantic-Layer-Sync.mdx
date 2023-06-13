@@ -20,10 +20,7 @@ Semantic Layer Sync programmatically connects a BI tool to Cube via the
 [SQL API][ref-sql-api] and creates or updates BI-specific entities that correspond to
 entities within the data model in Cube, e.g., cubes, views, measures, dimensions.
 
-<img
-  src="https://ucarecdn.com/f598f41c-36ec-4ed9-960f-7c902a77ed74/"
-  style="border: 0;"
-/>
+<Diagram src="https://ucarecdn.com/f598f41c-36ec-4ed9-960f-7c902a77ed74/" />
 
 In general, here's how Cube entities match BI-specific ones:
 
@@ -137,7 +134,7 @@ module.exports = {
 ```
 
 Example confguration for the case when only `admin` data model should be
-synchronized with a couple of BI tools: 
+synchronized with a couple of BI tools:
 
 ```javascript
 module.exports = {
@@ -228,7 +225,7 @@ module.exports = {
 Data model is synchronized via [Metabase API][metabase-api] which uses a
 `user` name and a `password` for authentication. You can use your own user
 name and password or create a new service account. You can copy a `url` at
-any page of your Metabase workspace. 
+any page of your Metabase workspace.
 
 Example `cube.js` confguration file for Metabase:
 
