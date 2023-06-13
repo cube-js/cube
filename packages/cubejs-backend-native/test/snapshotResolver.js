@@ -1,4 +1,17 @@
 const path = require('path');
+const fs = require('fs');
+const native = require('../dist/js');
+
+// Ugly hack to ignore obsolete snapshots for fallback build
+// https://github.com/jestjs/jest/issues/4898
+if (native.isFallbackBuild()) {
+  const snapshotsDir = path.join(process.cwd(), 'test', '__snapshots__');
+  if (fs.existsSync(snapshotsDir)) {
+    fs.rmSync(snapshotsDir, {
+      recursive: true
+    });
+  }
+}
 
 function resolveSnapshotPath(testPath, snapshotExtension) {
   const testSourcePath = testPath.replace('dist/', '');
