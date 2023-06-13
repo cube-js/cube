@@ -688,15 +688,15 @@ const overrides: Record<string, Override> = {
     ready: true,
     path: "product/apis-integrations/rest-api",
     title: "Overview",
-    meta: {
-      "query-format": "Query format",
-      "real-time-data-fetch": "Real-Time data fetch",
-    },
   },
   "APIs-Integrations/REST-API/Query-Format.mdx": {
     ready: true,
     path: "product/apis-integrations/rest-api/query-format",
     title: "Query format",
+    meta: {
+      "query-format": "Query format",
+      "real-time-data-fetch": "Real-Time data fetch",
+    },
   },
 
   // graphql api
