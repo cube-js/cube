@@ -47,7 +47,7 @@ import { ParameterTable } from '../components/ReferenceDocs/ParameterTable';
 import { Snippet, SnippetGroup } from '../components/Snippets/SnippetGroup';
 import { CodeTabs } from '../components/CodeTabs';
 import InlineButton from '../components/InlineButton/InlineButton';
-import { Screenshot } from '../components/Screenshot';
+import { Diagram, Screenshot } from '../components/Screenshot';
 
 const MyH4: React.FC<{ children: string }> = ({ children }) => {
   return (<h4 id={kebabCase(children)} name={kebabCase(children)}>{children}</h4>);
@@ -74,6 +74,7 @@ const components = {
   CodeTabs,
   Btn: InlineButton,
   Screenshot,
+  Diagram,
 };
 
 const MDX = (props) => (
