@@ -1,3 +1,6 @@
+use crate::python::cross::CLRepr;
+use crate::python::template::mj_value::to_minijinja_value;
+use cubesql::CubeError;
 use log::trace;
 use minijinja as mj;
 use neon::context::Context;
@@ -12,7 +15,6 @@ fn template_engine<'a, C: Context<'a>>(
 
     STATE.get_or_try_init(|| {
         let mut engine = mj::Environment::new();
-        // engine.add_test()
 
         Ok(Mutex::new(engine))
     })
@@ -47,6 +49,8 @@ fn load_templates(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 
 fn render_template(mut cx: FunctionContext) -> JsResult<JsString> {
     let template_name = cx.argument::<JsString>(0)?;
+    let template_ctx = CLRepr::from_js_ref(cx.argument::<JsValue>(1)?, &mut cx)?;
+
     let engine = template_engine(&mut cx)?.lock().unwrap();
 
     let template = match engine.get_template(&template_name.value(&mut cx)) {
@@ -58,7 +62,15 @@ fn render_template(mut cx: FunctionContext) -> JsResult<JsString> {
         }
     };
 
-    let ctx = mj::context! {};
+    let compile_context = match to_minijinja_value(template_ctx) {
+        Ok(cc) => cc,
+        Err(err) => {
+            return cx.throw_error(format!("{}", err));
+        }
+    };
+    let ctx = mj::context! {
+        COMPILE_CONTEXT => compile_context,
+    };
 
     match template.render(ctx) {
         Ok(r) => Ok(cx.string(r)),

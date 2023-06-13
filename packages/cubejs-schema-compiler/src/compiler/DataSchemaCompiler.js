@@ -194,7 +194,17 @@ export class DataSchemaCompiler {
     if (R.endsWith('.js', file.fileName)) {
       this.compileJsFile(file, errorsReport, cubes, contexts, exports, asyncModules, toCompile, compiledFiles);
     } else if (R.endsWith('.yml.jinja', file.fileName) || R.endsWith('.yaml.jinja', file.fileName)) {
-      this.yamlCompiler.compileYamlWithJinjaFile(file, errorsReport, cubes, contexts, exports, asyncModules, toCompile, compiledFiles, this.compileContext);
+      this.yamlCompiler.compileYamlWithJinjaFile(
+        file,
+        errorsReport,
+        cubes,
+        contexts,
+        exports,
+        asyncModules,
+        toCompile,
+        compiledFiles,
+        this.standalone ? {} : this.cloneCompileContextWithGetterAlias(this.compileContext)
+      );
     } else if (R.endsWith('.yml', file.fileName) || R.endsWith('.yaml', file.fileName)) {
       this.yamlCompiler.compileYamlFile(file, errorsReport, cubes, contexts, exports, asyncModules, toCompile, compiledFiles);
     }

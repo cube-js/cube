@@ -85,7 +85,8 @@
     ],
     "setupFilesAfterEnv": [
       "<rootDir>/dist/test/setup/index.js"
-    ]
+    ],
+    "snapshotResolver": "<rootDir>/test/snapshotResolver.js"
   },
   "eslintConfig": {
     "extends": "../cubejs-linter"

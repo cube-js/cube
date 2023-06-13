@@ -30,16 +30,15 @@ export class YamlCompiler {
   }
 
   public compileYamlWithJinjaFile(file: FileContent, errorsReport: ErrorReporter, cubes, contexts, exports, asyncModules, toCompile, compiledFiles, compileContext) {
-    console.log({
-      contexts,
-      compileContext
-    });
+    const compiledFile = {
+      fileName: file.fileName,
+      content: renderTemplate(file.fileName, compileContext),
+    };
+
+    console.log(compiledFile);
 
     return this.compileYamlFile(
-      {
-        fileName: file.fileName,
-        content: renderTemplate(file.fileName, {}),
-      },
+      compiledFile,
       errorsReport,
       cubes,
       contexts,

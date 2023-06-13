@@ -1,5 +1,6 @@
 use crate::python::cube_config::CubeConfigPy;
 use crate::python::runtime::py_runtime_init;
+use crate::python::template;
 use neon::prelude::*;
 use pyo3::prelude::*;
 
@@ -45,6 +46,8 @@ pub fn python_register_module(cx: &mut ModuleContext) -> NeonResult<()> {
     super::linux_dylib::load_python_symbols();
 
     cx.export_function("pythonLoadConfig", python_load_config)?;
+
+    template::template_register_module(cx)?;
 
     Ok(())
 }
