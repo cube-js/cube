@@ -277,9 +277,14 @@ export const pythonLoadConfig = async (context: string, options: { file: string 
     return config;
 }
 
-export const loadTemplates = (templates: FileContent[]): string => {
+export const loadTemplate = (templateName: string, templateContent: string): void => {
   const native = loadNative();
-  return native.loadTemplates(templates);
+  return native.loadTemplate(templateName, templateContent);
+};
+
+export const clearTemplates = (): void => {
+  const native = loadNative();
+  return native.clearTemplates();
 };
 
 export const renderTemplate = (templateName: string, context: unknown): string => {

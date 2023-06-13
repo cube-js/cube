@@ -5,7 +5,60 @@ use minijinja as mj;
 use neon::context::Context;
 use neon::prelude::*;
 use once_cell::sync::OnceCell;
+use std::error::Error;
 use std::sync::Mutex;
+
+trait NeonMiniJinjaContext {
+    fn throw_from_mj_error<T>(&mut self, err: mj::Error) -> NeonResult<T>;
+}
+
+impl<'a> NeonMiniJinjaContext for FunctionContext<'a> {
+    fn throw_from_mj_error<T>(&mut self, err: mj::Error) -> NeonResult<T> {
+        let codeblock = if let Some(source) = err.template_source() {
+            let lines: Vec<_> = source.lines().enumerate().collect();
+            let idx = err.line().unwrap_or(1).saturating_sub(1);
+            let skip = idx.saturating_sub(3);
+
+            let pre = lines.iter().skip(skip).take(3.min(idx)).collect::<Vec<_>>();
+            let post = lines.iter().skip(idx + 1).take(3).collect::<Vec<_>>();
+
+            let mut content = "".to_string();
+
+            for (idx, line) in pre {
+                content += &format!("{:>4} | {}\r\n", idx + 1, line);
+            }
+
+            if let Some(_span) = err.range() {
+                // TODO(ovr): improve
+                content += &format!(
+                    "     i {}{} {}\r\n",
+                    " ".repeat(0),
+                    "^".repeat(24),
+                    err.kind(),
+                );
+            } else {
+                content += &format!("     | {}\r\n", "^".repeat(24));
+            }
+
+            for (idx, line) in post {
+                content += &format!("{:>4} | {}\r\n", idx + 1, line);
+            }
+
+            format!("{}\r\n{}\r\n{}", "-".repeat(79), content, "-".repeat(79))
+        } else {
+            "".to_string()
+        };
+
+        if let Some(next_err) = err.source() {
+            self.throw_error(format!(
+                "{} caused by: {:#}\r\n{}",
+                err, next_err, codeblock
+            ))
+        } else {
+            self.throw_error(format!("{}\r\n{}", err, codeblock))
+        }
+    }
+}
 
 fn template_engine<'a, C: Context<'a>>(
     _cx: &mut C,
@@ -14,7 +67,7 @@ fn template_engine<'a, C: Context<'a>>(
 
     STATE.get_or_try_init(|| {
         let mut engine = mj::Environment::new();
-        engine.set_debug(false);
+        engine.set_debug(true);
         engine.add_function(
             "env_var",
             |var_name: String, var_default: Option<String>, _state: &minijinja::State| {
@@ -39,28 +92,27 @@ fn template_engine<'a, C: Context<'a>>(
     })
 }
 
-fn load_templates(mut cx: FunctionContext) -> JsResult<JsUndefined> {
-    let input = cx.argument::<JsArray>(0)?.to_vec(&mut cx)?;
+fn load_template(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+    let template_name = cx.argument::<JsString>(0)?;
+    let template_content = cx.argument::<JsString>(1)?;
 
     let mut engine = template_engine(&mut cx)?.lock().unwrap();
-    for to_load in input {
-        let to_load_obj: Handle<JsObject> = to_load.downcast_or_throw(&mut cx)?;
 
-        if let Err(err) = engine.add_template_owned(
-            to_load_obj
-                .get_value(&mut cx, "fileName")?
-                .to_string(&mut cx)?
-                .value(&mut cx),
-            to_load_obj
-                .get_value(&mut cx, "content")?
-                .to_string(&mut cx)?
-                .value(&mut cx),
-        ) {
-            trace!("jinja load error: {:?}", err);
+    if let Err(err) = engine.add_template_owned(
+        template_name.value(&mut cx),
+        template_content.value(&mut cx),
+    ) {
+        trace!("jinja load error: {:?}", err);
 
-            return cx.throw_error(format!("{}", err));
-        }
+        return cx.throw_from_mj_error(err);
     }
+
+    Ok(cx.undefined())
+}
+
+fn clear_templates(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+    let mut engine = template_engine(&mut cx)?.lock().unwrap();
+    engine.clear_templates();
 
     Ok(cx.undefined())
 }
@@ -76,7 +128,7 @@ fn render_template(mut cx: FunctionContext) -> JsResult<JsString> {
         Err(err) => {
             trace!("jinja get template error: {:?}", err);
 
-            return cx.throw_error(format!("{}", err));
+            return cx.throw_from_mj_error(err);
         }
     };
 
@@ -89,13 +141,14 @@ fn render_template(mut cx: FunctionContext) -> JsResult<JsString> {
         Err(err) => {
             trace!("jinja render template error: {:?}", err);
 
-            cx.throw_error(format!("{}", err))
+            cx.throw_from_mj_error(err)
         }
     }
 }
 
 pub fn template_register_module(cx: &mut ModuleContext) -> NeonResult<()> {
-    cx.export_function("loadTemplates", load_templates)?;
+    cx.export_function("loadTemplate", load_template)?;
+    cx.export_function("clearTemplates", clear_templates)?;
     cx.export_function("renderTemplate", render_template)?;
 
     Ok(())

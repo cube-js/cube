@@ -1,7 +1,6 @@
 import fs from 'fs';
 import path from 'path';
 
-import { FileContent } from '@cubejs-backend/shared';
 import * as native from '../js';
 
 const suite = native.isFallbackBuild() ? xdescribe : describe;
@@ -14,29 +13,34 @@ function testTemplateBySnapshot(templateName: string, ctx: unknown) {
   });
 }
 
+function testLoadBrokenTemplateBySnapshot(templateName: string) {
+  test(`render ${templateName}`, async () => {
+    try {
+      loadTemplateFile(templateName);
+
+      throw new Error(`Template ${templateName} should throw an error!`);
+    } catch (e) {
+      expect(e).toMatchSnapshot(templateName);
+    }
+  });
+}
+
+function loadTemplateFile(fileName: string): void {
+  const content = fs.readFileSync(path.join(process.cwd(), 'test', 'templates', fileName), 'utf8');
+
+  native.loadTemplate(fileName, content);
+}
+
 suite('Jinja', () => {
-  function loadTemplateFile(fileName: string): FileContent {
-    const content = fs.readFileSync(path.join(process.cwd(), 'test', 'templates', fileName), 'utf8');
-
-    return {
-      fileName,
-      content
-    };
-  }
-
   beforeAll(async () => {
-    const templates = [
-      loadTemplateFile('.utils.jinja'),
-      loadTemplateFile('dump_context.yml.jinja'),
-    ];
+    native.clearTemplates();
+
+    loadTemplateFile('.utils.jinja');
+    loadTemplateFile('dump_context.yml.jinja');
 
     for (let i = 1; i < 9; i++) {
-      templates.push(
-        loadTemplateFile(`0${i}.yml.jinja`)
-      );
+      loadTemplateFile(`0${i}.yml.jinja`)
     }
-
-    native.loadTemplates(templates);
   });
 
   testTemplateBySnapshot('dump_context.yml.jinja', {
@@ -53,6 +57,7 @@ suite('Jinja', () => {
       userId: 1,
     }
   });
+  testLoadBrokenTemplateBySnapshot('template_error.jinja');
 
   for (let i = 1; i < 9; i++) {
     testTemplateBySnapshot(`0${i}.yml.jinja`, {});

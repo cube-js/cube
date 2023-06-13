@@ -6,7 +6,7 @@ import { parse } from '@babel/parser';
 import babelGenerator from '@babel/generator';
 import babelTraverse from '@babel/traverse';
 import R from 'ramda';
-import { loadTemplates } from '@cubejs-backend/native';
+import { loadTemplate, clearTemplates } from '@cubejs-backend/native';
 
 import { AbstractExtension } from '../extensions';
 import { UserError } from './UserError';
@@ -53,19 +53,9 @@ export class DataSchemaCompiler {
    * @protected
    */
   async doCompile() {
+    clearTemplates();
+
     const files = await this.repository.dataSchemaFiles();
-    const templates = [];
-
-    for (const file of files) {
-      if (file.fileName.endsWith('.jinja')) {
-        templates.push(file);
-      }
-    }
-
-    if (templates.length) {
-      loadTemplates(templates);
-    }
-
     const toCompile = files.filter((f) => !this.filesToCompile || this.filesToCompile.indexOf(f.fileName) !== -1);
 
     const errorsReport = new ErrorReporter(null, [], this.errorReport);
@@ -98,7 +88,9 @@ export class DataSchemaCompiler {
   }
 
   transpileFile(file, errorsReport) {
-    if (R.endsWith('.yml.jinja', file.fileName) || R.endsWith('.yaml.jinja', file.fileName)) {
+    if (R.endsWith('.jinja', file.fileName)) {
+      loadTemplate(file.fileName, file.content);
+
       return file;
     } else if (R.endsWith('.yml', file.fileName) || R.endsWith('.yaml', file.fileName)) {
       return file;

@@ -193,3 +193,17 @@ print:
     exist: test
     unknown_fallback: value"
 `;
+
+exports[`Jinja render template_error.jinja: template_error.jinja 1`] = `
+[Error: syntax error: unknown statement unexpected_block_name (in template_error.jinja:10)
+-------------------------------------------------------------------------------
+   7 | 7
+   8 | {%- for country in countries %}
+   9 | 9
+     i ^^^^^^^^^^^^^^^^^^^^^^^^ syntax error
+  11 | 11
+  12 | 12
+  13 | 13
+
+-------------------------------------------------------------------------------]
+`;
