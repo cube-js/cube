@@ -5,6 +5,12 @@ import * as native from '../js';
 
 const suite = native.isFallbackBuild() ? xdescribe : describe;
 
+function loadTemplateFile(fileName: string): void {
+  const content = fs.readFileSync(path.join(process.cwd(), 'test', 'templates', fileName), 'utf8');
+
+  native.loadTemplate(fileName, content);
+}
+
 function testTemplateBySnapshot(templateName: string, ctx: unknown) {
   test(`render ${templateName}`, async () => {
     const actual = native.renderTemplate(templateName, ctx);
@@ -25,12 +31,6 @@ function testLoadBrokenTemplateBySnapshot(templateName: string) {
   });
 }
 
-function loadTemplateFile(fileName: string): void {
-  const content = fs.readFileSync(path.join(process.cwd(), 'test', 'templates', fileName), 'utf8');
-
-  native.loadTemplate(fileName, content);
-}
-
 suite('Jinja', () => {
   beforeAll(async () => {
     native.clearTemplates();
@@ -39,7 +39,7 @@ suite('Jinja', () => {
     loadTemplateFile('dump_context.yml.jinja');
 
     for (let i = 1; i < 9; i++) {
-      loadTemplateFile(`0${i}.yml.jinja`)
+      loadTemplateFile(`0${i}.yml.jinja`);
     }
   });
 
