@@ -62,12 +62,7 @@ fn render_template(mut cx: FunctionContext) -> JsResult<JsString> {
         }
     };
 
-    let compile_context = match to_minijinja_value(template_ctx) {
-        Ok(cc) => cc,
-        Err(err) => {
-            return cx.throw_error(format!("{}", err));
-        }
-    };
+    let compile_context = to_minijinja_value(template_ctx);
     let ctx = mj::context! {
         COMPILE_CONTEXT => compile_context,
     };

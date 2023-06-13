@@ -168,3 +168,18 @@ exports[`Jinja render 07.yml.jinja: 07.yml.jinja 1`] = `
 `;
 
 exports[`Jinja render 08.yml.jinja: 08.yml.jinja 1`] = `""`;
+
+exports[`Jinja render dump_context.yml.jinja: dump_context.yml.jinja 1`] = `
+"<pre></pre>
+
+print:
+  bool_true: true
+  bool_false: false
+  string: test string
+  int: 1.0
+  float: 3.1415
+  array_int: [9.0, 8.0, 7.0, 6.0, 5.0, 0.0, 1.0, 2.0, 3.0, 4.0]
+  array_bool: [true, false, false, true]
+  security_context:
+    userId: 1.0"
+`;

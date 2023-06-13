@@ -27,7 +27,7 @@ suite('Jinja', () => {
   beforeAll(async () => {
     const templates = [
       loadTemplateFile('.utils.jinja'),
-      loadTemplateFile('dump_context.jinja'),
+      loadTemplateFile('dump_context.yml.jinja'),
     ];
 
     for (let i = 1; i < 9; i++) {
@@ -39,10 +39,18 @@ suite('Jinja', () => {
     native.loadTemplates(templates);
   });
 
-  // testTemplateBySnapshot('dump_context.jinja', {
-  //   '1_bool_true': true,
-  //   '2_bool_false': false,
-  // })
+  testTemplateBySnapshot('dump_context.yml.jinja', {
+    'bool_true': true,
+    'bool_false': false,
+    'string': 'test string',
+    'int': 1,
+    'float': 3.1415,
+    'array_int': [9, 8, 7, 6, 5, 0, 1, 2, 3, 4],
+    'array_bool': [true, false, false, true],
+    securityContext: {
+      userId: 1,
+    }
+  })
 
   for (let i = 1; i < 9; i++) {
     testTemplateBySnapshot(`0${i}.yml.jinja`, {})
