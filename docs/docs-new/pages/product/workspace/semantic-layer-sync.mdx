@@ -6,8 +6,7 @@ redirect_from:
 # Semantic Layer Sync
 
 Semantic Layer Sync synchronizes the [data model][ref-data-model] of a semantic
-layer between Cube and BI tools. It's the easiest way to connect a BI tool to
-Cube.
+layer from Cube to BI tools. It's the easiest way to connect a BI tool to Cube.
 
 <SuccessBox>
 
@@ -19,7 +18,14 @@ Semantic Layer Sync is available in Cube Cloud on
 Semantic Layer Sync programmatically connects a BI tool to Cube via the [SQL
 API][ref-sql-api] and creates or updates BI-specific entities that correspond to
 entities within the data model in Cube, e.g., cubes, views, measures,
-dimensions:
+dimensions.
+
+<img
+  src="https://ucarecdn.com/f598f41c-36ec-4ed9-960f-7c902a77ed74/"
+  style="border: 0;"
+/>
+
+In general, here's how Cube entities match BI-specific ones:
 
 | Cube                        | BI tool                   |
 | --------------------------- | ------------------------- |
@@ -296,7 +302,7 @@ and clicking <Btn>Show History</Btn> next to a relevant sync.
 <Screenshot src="https://ucarecdn.com/a3cc5fc8-8458-483e-999c-5654eb8072b4/" />
 
 [ref-data-model]: /product/data-modeling/overview
-[ref-sql-api]: /product/api-sql/overview
+[ref-sql-api]: /product/apis-integrations/sql-api
 [ref-config-sls]:
   /reference/configuration/config#options-reference-semantic-layer-sync
 [ref-config-contexts]:

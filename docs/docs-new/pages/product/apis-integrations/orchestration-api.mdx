@@ -1,0 +1,76 @@
+---
+redirect_from:
+  - /orchestration-api
+---
+
+# Orchestration API
+
+Orchestration API enables Cube to work with data orchestration tools and let
+them _push_ changes from upstream data sources to Cube, as opposed to letting
+Cube _pull_ changes from upstream data sources via the
+[`scheduledRefresh`][ref-scheduled-refresh] configration option of
+pre-aggregations.
+
+<Diagram src="https://ucarecdn.com/edfc0423-b1f9-4917-989b-be766caa7d9e/" />
+
+Orchestration API can be used to implement both [embedded analytics][cube-ea]
+and internal or self-serve [business intelligence][cube-issbi] use cases. When
+implementing [real-time analytics][cube-rta], consider pulling data from
+upstream data sources with [lambda pre-aggregations][ref-lambda-pre-aggs].
+
+Under the hood, the Orchestration API is exposed via the
+[`/v1/pre-aggregations/jobs`][ref-ref-jobs-endpoint] endpoint of the [REST
+API][ref-rest-api].
+
+## Supported tools
+
+Orchestration API has integration packages to work with popular data
+orchestration tools. Check the following guides to get tool-specific
+instructions:
+
+<Grid imageSize={[56, 56]}>
+  <GridItem
+    url="orchestration-api/airflow"
+    imageUrl="https://static.cube.dev/icons/airflow.svg"
+    title="Apache Airflow"
+  />
+  <GridItem
+    url="orchestration-api/prefect"
+    imageUrl="https://static.cube.dev/icons/prefect.svg"
+    title="Prefect"
+  />
+</Grid>
+
+## Configuration
+
+Orchestration API is enabled by default but inaccessible due to the default [API
+scopes][ref-api-scopes] configuration. To allow access to the Orchestration API,
+enable the `jobs` scope, e.g., by setting the `CUBEJS_DEFAULT_API_SCOPES`
+environment variable to `meta,data,graphql,jobs`.
+
+## Building pre-aggregations
+
+Orchestration API allows to trigger pre-aggregation builds programmatically. It
+can be useful for data orchestration tools to push changes from upstream data
+sources to Cube or for any third parties to invalidate and rebuild
+pre-aggregations on demand.
+
+You can trigger pre-aggregation builds and check build statuses using the
+[`/v1/pre-aggregations/jobs`][ref-ref-jobs-endpoint] endpoint. It is possible to
+rebuild:
+
+- All pre-aggregations
+- Specific pre-aggregations (e.g., refresh data from some columns)
+- Pre-aggregations using specific cubes (e.g., refresh data from some tables)
+- Pre-aggregations using cubes from specific data sources (e.g., refresh data
+  from some Snowflake connection)
+
+[ref-scheduled-refresh]:
+  /product/data-modeling/reference/pre-aggregations#parameters-scheduled-refresh
+[cube-ea]: https://cube.dev/use-cases/embedded-analytics
+[cube-issbi]: https://cube.dev/use-cases/semantic-layer
+[cube-rta]: https://cube.dev/use-cases/real-time-analytics
+[ref-lambda-pre-aggs]: /product/caching/lambda-pre-aggregations
+[ref-rest-api]: /product/apis-integrations/rest-api
+[ref-api-scopes]: /product/apis-integrations/rest-api#configuration-api-scopes
+[ref-ref-jobs-endpoint]: /reference/rest-api#v-1-pre-aggregations-jobs

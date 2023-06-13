@@ -78,11 +78,7 @@ const overrides: Record<string, Override> = {
       "data-modeling": "Data Modeling",
       caching: "Caching",
       auth: "Authentication & Authorization",
-      "api-rest": "REST API",
-      "api-graphql": "GraphQL API",
-      "api-sql": "SQL API",
-
-      "frontend-integrations": "Frontend Integrations",
+      "apis-integrations": "APIs & Integrations",
       workspace: "Workspace",
       deployment: "Deployment",
       monitoring: "Monitoring",
@@ -678,69 +674,97 @@ const overrides: Record<string, Override> = {
     title: "Security context",
   },
 
+  // apis overview
+
+  "APIs-Integrations/Overview.mdx": {
+    ready: true,
+    path: "product/apis-integrations",
+    title: "APIs & Integrations",
+  },
+
   // rest api
 
-  "REST-API/REST-API.mdx": {
+  "APIs-Integrations/REST-API/Overview.mdx": {
     ready: true,
-    path: "product/api-rest/overview",
+    path: "product/apis-integrations/rest-api",
     title: "Overview",
     meta: {
-      overview: "Overview",
       "query-format": "Query format",
+      "real-time-data-fetch": "Real-Time data fetch",
     },
   },
-  "REST-API/Query-Format.mdx": {
+  "APIs-Integrations/REST-API/Query-Format.mdx": {
     ready: true,
-    path: "product/api-rest/query-format",
+    path: "product/apis-integrations/rest-api/query-format",
     title: "Query format",
   },
 
   // graphql api
 
-  "GraphQL-API/GraphQL-API.mdx": {
+  "APIs-Integrations/GraphQL-API/Overview.mdx": {
     ready: true,
-    path: "product/api-graphql",
+    path: "product/apis-integrations/graphql-api",
     title: "GraphQL API",
+    meta: {
+      "sql-api": "SQL API",
+      "rest-api": "REST API",
+      "graphql-api": "GraphQL API",
+      "javascript-sdk": "JavaScript SDK",
+      "orchestration-api": "Orchestration API",
+    }
   },
 
   // sql api
 
-  "SQL-API/Overview.mdx": {
+  "APIs-Integrations/SQL-API/Overview.mdx": {
     ready: true,
-    path: "product/api-sql/overview",
+    path: "product/apis-integrations/sql-api",
     title: "Overview",
+  },
+  "APIs-Integrations/SQL-API/Authentication-and-Authorization.mdx": {
+    ready: true,
+    path: "product/apis-integrations/sql-api/security",
+    title: "Authentication and Authorization",
     meta: {
-      overview: "Overview",
       security: "Authentication and Authorization",
       joins: "Joins",
     },
   },
-  "SQL-API/Authentication-and-Authorization.mdx": {
+  "APIs-Integrations/SQL-API/Joins.mdx": {
     ready: true,
-    path: "product/api-sql/security",
-    title: "Authentication and Authorization",
-  },
-  "SQL-API/Joins.mdx": {
-    ready: true,
-    path: "product/api-sql/joins",
+    path: "product/apis-integrations/sql-api/joins",
     title: "Joins",
   },
   // "SQL-API/Template.mdx": {},
 
+  // orchestration api
+
+  "APIs-Integrations/Orchestration-API/Overview.mdx": {
+    ready: true,
+    path: "product/apis-integrations/orchestration-api",
+    title: "Orchestration API",
+  },
+  "APIs-Integrations/Orchestration-API/Airflow.mdx": {
+    ready: true,
+    path: "product/apis-integrations/orchestration-api/airflow",
+    title: "Integration with Apache Airflow",
+  },
+  "APIs-Integrations/Orchestration-API/Prefect.mdx": {
+    ready: true,
+    path: "product/apis-integrations/orchestration-api/prefect",
+    title: "Integration with Prefect",
+  },
+
   // frontend
 
-  "Frontend-Integrations/Introduction.mdx": {
+  "APIs-Integrations/Frontend-Integrations/Introduction.mdx": {
     ready: true,
-    path: "product/frontend-integrations/introduction",
+    path: "product/apis-integrations/javascript-sdk",
     title: "Introduction",
-    meta: {
-      introduction: "Introduction",
-      "real-time-data-fetch": "Real-Time data fetch",
-    },
   },
-  "Frontend-Integrations/Introduction-vue.mdx": {
+  "APIs-Integrations/Frontend-Integrations/Introduction-vue.mdx": {
     ready: true,
-    path: "product/frontend-integrations/introduction/vue",
+    path: "product/apis-integrations/javascript-sdk/vue",
     title: "Vue",
     meta: {
       react: "React",
@@ -748,19 +772,19 @@ const overrides: Record<string, Override> = {
       angular: "Angular",
     },
   },
-  "Frontend-Integrations/Introduction-react.mdx": {
+  "APIs-Integrations/Frontend-Integrations/Introduction-react.mdx": {
     ready: true,
-    path: "product/frontend-integrations/introduction/react",
+    path: "product/apis-integrations/javascript-sdk/react",
     title: "React",
   },
-  "Frontend-Integrations/Introduction-angular.mdx": {
+  "APIs-Integrations/Frontend-Integrations/Introduction-angular.mdx": {
     ready: true,
-    path: "product/frontend-integrations/introduction/angular",
+    path: "product/apis-integrations/javascript-sdk/angular",
     title: "Angular",
   },
-  "Frontend-Integrations/Real-Time-Data-Fetch.mdx": {
+  "APIs-Integrations/REST-API/Real-Time-Data-Fetch.mdx": {
     ready: true,
-    path: "product/frontend-integrations/real-time-data-fetch",
+    path: "product/apis-integrations/rest-api/real-time-data-fetch",
     title: "Real-Time data fetch",
   },
 
@@ -924,13 +948,27 @@ const overrides: Record<string, Override> = {
     title: "Alerts",
     meta: {
       alerts: "Alerts",
-      "log-export": "Log Export",
+      "integrations": "Integrations",
     },
   },
-  "Monitoring/Log-Export.mdx": {
+  "Monitoring/Integrations/Integrations.mdx": {
     ready: true,
-    path: "product/monitoring/log-export",
-    title: "Log Export",
+    path: "product/monitoring/integrations",
+    title: "Monitoring Integrations",
+  },
+  "Monitoring/Integrations/Grafana-Cloud.mdx": {
+    ready: true,
+    path: "product/monitoring/integrations/grafana-cloud",
+    title: "Integration with Grafana Cloud",
+    meta: {
+      "datadog": "Datadog",
+      "grafana-cloud": "Grafana Cloud",
+    }
+  },
+  "Monitoring/Integrations/Datadog.mdx": {
+    ready: true,
+    path: "product/monitoring/integrations/datadog",
+    title: "Integration with Datadog",
   },
 
   // reference

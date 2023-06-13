@@ -15,6 +15,13 @@ case.
 Under the hood, the GraphQL API is exposed via the `/graphql` endpoint of the
 [REST API][ref-rest-api].
 
+## Configuration
+
+GraphQL API is enabled by default and secured using [API scopes][ref-api-scopes]
+and [CORS][ref-cors]. To disallow access to GraphQL API, disable the `graphql`
+scope, e.g., by setting the `CUBEJS_DEFAULT_API_SCOPES` environment variable to
+`meta,data`.
+
 ## Getting started
 
 First, ensure you're running Cube v0.28.58 or later. Then start the project
@@ -207,6 +214,8 @@ to our query as follows:
 
 [ref-schema-ref-preagg-granularity]:
   /product/data-modeling/reference/pre-aggregations#parameters-granularity
-[ref-rest-api]: /product/api-rest/overview
+[ref-rest-api]: /product/apis-integrations/rest-api
+[ref-api-scopes]: /product/apis-integrations/rest-api#configuration-api-scopes
+[ref-cors]: /product/apis-integrations/rest-api#configuration-cors
 [graphql]: https://graphql.org
 [cube-ea]: https://cube.dev/use-cases/embedded-analytics

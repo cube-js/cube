@@ -1,3 +1,14 @@
+.diagram {
+  position: relative;
+  width: 100%;
+  margin: 1.5rem 0;
+  overflow: hidden;
+
+  > img {
+    margin: 0;
+  }
+}
+
 .screenshot {
   position: relative;
   width: 100%;
@@ -6,10 +17,10 @@
   filter: drop-shadow(0px 0px 24px rgba(15, 15, 35, 0.12));
   margin: 1.5rem 0;
   overflow: hidden;
-}
 
-.screenshot > img {
-  margin: 0 !important;
+  > img {
+    margin: 0;
+  }
 }
 
 .highlight {

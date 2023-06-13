@@ -25,7 +25,15 @@ provides.
 
 </InfoBox>
 
+Under the hood, REST API also provides endpoints for [GraphQL
+API][ref-graphql-api] and [Orchestration API][ref-orchestration-api]. However,
+they target specific use cases and are not usually considered part of the REST
+API.
+
 ## Configuration
+
+REST API is enabled by default and secured using [API scopes][self-api-scopes]
+and [CORS][self-cors].
 
 ### Base path
 
@@ -200,7 +208,8 @@ example, the following query will retrieve rows 101-200 from the `Orders` cube:
 [ref-config-js]: /reference/configuration/config
 [ref-config-queryrewrite]: /reference/configuration/config#query-rewrite
 [ref-conf-queue-opts]: /reference/configuration/config#queue-options
-[ref-api-ref-query-format]: /product/api-rest/query-format#query-properties
+[ref-api-ref-query-format]:
+  /product/apis-integrations/rest-api/query-format#query-properties
 [ref-config-cors]: /reference/configuration/config#http
 [ref-schema-ref-cube-refresh-key]:
   /product/data-modeling/reference/cube#refresh-key
@@ -220,7 +229,10 @@ example, the following query will retrieve rows 101-200 from the `Orders` cube:
 [ref-ref-rsr]: /reference/rest-api#v-1-run-scheduled-refresh
 [ref-ref-paj]: /reference/rest-api#v-1-pre-aggregations-jobs
 [ref-security-context]: /product/auth/context
-[ref-graphql-api]: /product/api-graphql
+[ref-graphql-api]: /product/apis-integrations/graphql-api
+[ref-orchestration-api]: /product/apis-integrations/orchestration-api
 [cube-ea]: https://cube.dev/use-cases/embedded-analytics
 [cube-rta]: https://cube.dev/use-cases/real-time-analytics
 [graphql]: https://graphql.org
+[self-api-scopes]: #configuration-api-scopes
+[self-cors]: #configuration-cors

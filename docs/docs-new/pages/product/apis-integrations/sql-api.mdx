@@ -29,9 +29,7 @@ but not limited to the following ones:
 Often, the SQL API is used to enable internal or self-serve [business
 intelligence][cube-issbi] use cases.
 
-### Supported Tools
-
-Cube SQL API has been tested with the following tools:
+SQL API has been tested with the following tools:
 
 - psql CLI
 - Apache Superset
@@ -59,10 +57,9 @@ suggest tools of your interest and vote for already proposed ones.
 
 ### Cube Core
 
-SQL API is configured via [environment variables][ref-config-env].
-
-To enable the SQL API, set `CUBEJS_PG_SQL_PORT` to a port number you'd like to
-connect to with a Postgres-compatible tool.
+SQL API is disabled by default. To enable the SQL API, set the
+`CUBEJS_PG_SQL_PORT` to a port number you'd like to connect to with a
+Postgres-compatible tool.
 
 Use `CUBEJS_SQL_USER` and `CUBEJS_SQL_PASSWORD` to configure credentials
 required to connect to the SQL API. You can also use
@@ -72,11 +69,12 @@ to configure [custom authentication][ref-sql-api-auth].
 
 ### Cube Cloud
 
-To enable the SQL API in Cube Cloud, click <Btn>Deploy SQL API</Btn> on
-the <Btn>Overview</Btn> page, then click <Btn>How to connect your BI tool</Btn>.
-You should then see the following screen:
+SQL API is enabled by default. You can find credentials for the SQL API on
+the <Btn>Overview</Btn> page by clicking <Btn>Connect to SQL API</Btn>.
 
-![SQL API details modal|690x428](https://ucarecdn.com/67508334-1641-43ec-9d50-a8f64629992b/)
+You can also customize `CUBEJS_PG_SQL_PORT`, `CUBEJS_SQL_USER`, and
+`CUBEJS_SQL_PASSWORD` environment variables by navigating to <Btn>Settings →
+Configration</Btn>.
 
 ## Querying Fundamentals
 
@@ -105,8 +103,8 @@ GROUP BY 1
 ```
 
 The SQL API transforms `SELECT` query fragments from **cube tables** into
-[Cube's internal query format](/product/api-rest/query-format). This process is
-called **Cube query rewrite**.
+[Cube's internal query format](/product/apis-integrations/rest-api/query-format).
+This process is called **Cube query rewrite**.
 
 The SQL query above would be rewritten into the following Cube query:
 
@@ -543,7 +541,7 @@ WHERE is_completed = true
 [ref-config-js]: /reference/configuration/config
 [ref-dynamic-schemas]: /schema/dynamic-schema-creation
 [ref-config-env]: /reference/configuration/environment-variables
-[ref-sql-api-auth]: /product/api-sql/security
+[ref-sql-api-auth]: /product/apis-integrations/sql-api/security
 [ref-config-checksqlauth]:
   /reference/configuration/config#options-reference-check-sql-auth
 [ref-config-canswitchsqluser]:

@@ -5,19 +5,31 @@ redirect_from:
 
 # Single Sign-On
 
-As an account administrator, you can manage how your team accesses Cube Cloud
-using Single Sign-On (SSO). Cube Cloud supports logging in with Google, GitHub,
-Okta and SAML.
+As an account administrator, you can manage how your team accesses Cube Cloud.
+There are options to log in using email and password, a GitHub account, or a
+Google account.
 
-To manage single sign-on settings, click your username from the top-right corner
-and click <Btn>Team & Security</Btn>:
+Cube Cloud also provides single sign-on (SSO) via identity provides supporting
+industry-proven [SAML 2.0 protocol][wiki-saml], e.g., Okta, Google Workspace,
+Azure AD, etc.
 
-<Screenshot
-  alt="Cube Cloud Team Authentication and SSO tab"
-  src="https://ucarecdn.com/72248967-9b77-4a7e-970c-162b96861e4a/"
+<SuccessBox>
+
+Single sign-on is available in Cube Cloud on
+[Enterprise](https://cube.dev/pricing) tier.
+[Contact us](https://cube.dev/contact) for details.
+
+</SuccessBox>
+
+<Diagram
+  src="https://ucarecdn.com/a624b18f-8019-43ab-948f-169249cbc1cb/"
+  style="border: 0;"
 />
 
-## Configuring Single Sign-On
+## Guides
+
+Single sign-on works with various identity providers. Check the following guides
+to get tool-specific instructions:
 
 <Grid imageSize={[56, 56]}>
   <GridItem
@@ -26,3 +38,16 @@ and click <Btn>Team & Security</Btn>:
     title="Okta"
   />
 </Grid>
+
+## Configuration
+
+To manage sign-in and single sign-on settings, click your user name from the
+top-right corner, navigate to <Btn>Team & Security</Btn>, and switch to
+the <Btn>Authentication & SSO</Btn> tab:
+
+<Screenshot
+  alt="Cube Cloud Team Authentication and SSO tab"
+  src="https://ucarecdn.com/72248967-9b77-4a7e-970c-162b96861e4a/"
+/>
+
+[wiki-saml]: https://en.wikipedia.org/wiki/SAML_2.0

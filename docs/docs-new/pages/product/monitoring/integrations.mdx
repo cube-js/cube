@@ -1,0 +1,269 @@
+---
+redirect_from:
+  - /cloud/workspace/logs
+  - /monitoring/integrations
+---
+
+# Monitoring Integrations
+
+Cube Cloud allows exporting logs and metrics to external monitoring tools so you
+can leverage your existing monitoring stack and retain logs and metrics for the
+long term.
+
+<SuccessBox>
+
+Monitoring integrations are available in Cube Cloud on
+[Enterprise](https://cube.dev/pricing) tier.
+[Contact us](https://cube.dev/contact) for details.
+
+</SuccessBox>
+
+<InfoBox>
+
+Monitoring integrations are only available for [dedicated VPC][ref-vpc]
+deployments.
+
+</InfoBox>
+
+Under the hood, Cube Cloud uses [Vector][vector], an open-source tool for
+collecting and delivering monitoring data. It supports a [wide range of
+destinations][vector-docs-sinks], also known as _sinks_.
+
+<img
+  src="https://ucarecdn.com/17dbc263-2be4-4b7d-9f34-270cd66e878b/"
+  style="border: 0;"
+/>
+
+## Guides
+
+Monitoring integrations work with various popular monitoring tools. Check the
+following guides and configuration examples to get tool-specific instructions:
+
+<Grid imageSize={[56, 56]}>
+  <GridItem
+    url="datadog"
+    imageUrl="https://static.cube.dev/icons/datadog.svg"
+    title="Datadog"
+  />
+  <GridItem
+    url="grafana-cloud"
+    imageUrl="https://static.cube.dev/icons/grafana.svg"
+    title="Grafana Cloud"
+  />
+</Grid>
+
+## Configuration
+
+To enable monitoring integrations, navigate to <Btn>Settings → Monitoring
+Integrations</Btn> and click <Btn>Enable Vector</Btn> to add a Vector agent to
+your deployment.
+
+<Screenshot src="https://ucarecdn.com/7db3949b-83b9-48ae-b4b6-bd2afeda5001/" />
+
+Under <Btn>Metrics export</Btn>, you will see credentials for the
+`prometheus_exporter` sink, in case you'd like to setup [metrics
+export][self-sinks-for-metrics].
+
+Additionally, create a [`vector.toml` configration file][vector-docs-config]
+next to your `cube.js` file. This file is used to keep sinks configration. You
+have to commit this file for Vector configuration to take effect.
+
+### Environment variables
+
+You can use environment variables prefixed with `CUBE_CLOUD_LOG_EXPORT_` to
+reference configuration parameters securely in the `vector.toml` file.
+
+Example configuration for exporting logs to
+[Datadog][vector-docs-sinks-datadog]:
+
+```toml
+[sinks.datadog]
+type = "datadog_logs"
+default_api_key = "$CUBE_CLOUD_LOG_EXPORT_DATADOG_API_KEY"
+```
+
+### Inputs for logs
+
+Sinks accept the `inputs` option that allows to specify which components of a
+Cube Cloud deployment should export their logs. Supported inputs:
+
+- `cubejs-server`
+- `refresh-scheduler`
+- `ext-db`
+- `warmup-job`
+- `cubestore`
+
+Example configuration for exporting logs to
+[Datadog][vector-docs-sinks-datadog]:
+
+```toml
+[sinks.datadog]
+type = "datadog_logs"
+inputs = [
+  "cubejs-server",
+  "refresh-scheduler",
+  "ext-db",
+  "warmup-job",
+  "cubestore"
+]
+default_api_key = "da8850ce554b4f03ac50537612e48fb1"
+compression = "gzip"
+```
+
+When exporting Cube Store logs using the `cubestore` input, you can filter logs
+by providing an array of their severity levels via the `levels` option. If not
+specified, only `error` and `info` logs will be exported.
+
+| Level   | Exported by default? |
+| ------- | -------------------- |
+| `error` | ✅ Yes               |
+| `info`  | ✅ Yes               |
+| `debug` | ❌ No                |
+| `trace` | ❌ No                |
+
+### Sinks for logs
+
+You can use a [wide range of destinations][vector-docs-sinks] for logs,
+including the following ones:
+
+- [AWS Cloudwatch][vector-docs-sinks-cloudwatch]
+- [AWS S3][vector-docs-sinks-s3], [Google Cloud Storage][vector-docs-sinks-gcs],
+  and [Azure Blob Storage][vector-docs-sinks-azureblob]
+- [Datadog][vector-docs-sinks-datadog]
+
+Example configuration for exporting all logs, including all Cube Store logs to
+[Azure Blob Storage][vector-docs-sinks-azureblob]:
+
+```toml
+[sinks.azure]
+type = "azure_blob"
+container_name = "my-logs"
+connection_string = "DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=storageaccountkeybase64encoded;EndpointSuffix=core.windows.net"
+inputs = [
+  "cubejs-server",
+  "refresh-scheduler",
+  "ext-db",
+  "warmup-job",
+  "cubestore"
+]
+
+[sinks.azure.cubestore]
+levels = [
+  "trace",
+  "info",
+  "debug",
+  "error"
+]
+```
+
+### Inputs for metrics
+
+Metrics are exported using the `metrics` input. You can filter them by providing
+an array of metric names via the `list` option.
+
+| Name                     | Type                                     | Applies to           | Description                                    |
+| ------------------------ | ---------------------------------------- | -------------------- | ---------------------------------------------- |
+| `cpu`                    | [`gauge`][vector-docs-metrics-gauge]     | Node of a deployment | Percent of free CPU against requests           |
+| `memory`                 | [`gauge`][vector-docs-metrics-gauge]     | Node of a deployment | Percent of free Memory against requests        |
+| `requests-count`         | [`counter`][vector-docs-metrics-counter] | Deployment           | Total number of processed requests             |
+| `requests-errors-count`  | [`counter`][vector-docs-metrics-counter] | Deployment           | Number of requests processed with errors       |
+| `requests-success-count` | [`counter`][vector-docs-metrics-counter] | Deployment           | Number of requests processed successfully      |
+| `requests-duration`      | [`counter`][vector-docs-metrics-counter] | Deployment           | Total time taken to process requests (seconds) |
+
+You can further filter exported metrics by providing an array of `inputs` that
+applies to metics only.
+
+Example configuration for exporting all metrics from `cubejs-server` to
+[Prometheus][vector-docs-sinks-prometheus] using the `prometheus_remote_write`
+sink:
+
+```toml
+[sinks.prometheus]
+type = "prometheus_remote_write"
+inputs = [
+  "metrics"
+]
+endpoint = "https://prometheus.example.com:8087/api/v1/write"
+
+[sinks.prometheus.auth]
+# Strategy, credentials, etc.
+
+[sinks.prometheus.metrics]
+list = [
+  "cpu",
+  "memory",
+  "requests-count",
+  "requests-errors-count",
+  "requests-success-count",
+  "requests-duration"
+]
+inputs = [
+  "cubejs-server"
+]
+```
+
+### Sinks for metrics
+
+Metrics are exported in the Prometheus format which is compatible with the
+following sinks:
+
+- [`prometheus_exporter`][vector-docs-sinks-prometheus-exporter] (native to
+  [Prometheus][prometheus], compatible with [Mimir][mimir])
+- [`prometheus_remote_write`][vector-docs-sinks-prometheus] (compatible with
+  [Grafana Cloud][grafana-cloud])
+
+Example configuration for exporting all metrics from `cubejs-server` to
+[Prometheus][vector-docs-sinks-prometheus-exporter] using the
+`prometheus_exporter` sink:
+
+```toml
+[sinks.prometheus]
+type = "prometheus_exporter"
+inputs = [
+  "metrics"
+]
+
+[sinks.prometheus.metrics]
+list = [
+  "cpu",
+  "memory",
+  "requests-count",
+  "requests-errors-count",
+  "requests-success-count",
+  "requests-duration"
+]
+inputs = [
+  "cubejs-server"
+]
+```
+
+You can customize the user name and password for `prometheus_exporter` by
+setting `CUBE_CLOUD_LOG_EXPORT_METRICS_USER` and
+`CUBE_CLOUD_LOG_EXPORT_METRICS_PASSWORD` environment variables, respectively.
+
+[self-sinks-for-metrics]: #configuration-sinks-for-metrics
+[ref-vpc]: /product/configuration/vpc
+[vector]: https://vector.dev/
+[vector-docs-config]: https://vector.dev/docs/reference/configuration/
+[vector-docs-sinks]: https://vector.dev/docs/reference/configuration/sinks/
+[vector-docs-sinks-cloudwatch]:
+  https://vector.dev/docs/reference/configuration/sinks/aws_cloudwatch_logs/
+[vector-docs-sinks-s3]:
+  https://vector.dev/docs/reference/configuration/sinks/aws_s3/
+[vector-docs-sinks-azureblob]:
+  https://vector.dev/docs/reference/configuration/sinks/azure_blob/
+[vector-docs-sinks-gcs]:
+  https://vector.dev/docs/reference/configuration/sinks/gcp_cloud_storage/
+[vector-docs-sinks-datadog]:
+  https://vector.dev/docs/reference/configuration/sinks/datadog_logs/
+[vector-docs-sinks-prometheus]:
+  https://vector.dev/docs/reference/configuration/sinks/prometheus_remote_write/
+[vector-docs-sinks-prometheus-exporter]:
+  https://vector.dev/docs/reference/configuration/sinks/prometheus_exporter/
+[vector-docs-metrics-gauge]:
+  https://vector.dev/docs/about/under-the-hood/architecture/data-model/metric/#gauge
+[vector-docs-metrics-counter]:
+  https://vector.dev/docs/about/under-the-hood/architecture/data-model/metric/#counter
+[prometheus]: https://prometheus.io
+[mimir]: https://grafana.com/oss/mimir/
+[grafana-cloud]: https://grafana.com/products/cloud/
