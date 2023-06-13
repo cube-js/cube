@@ -1,6 +1,6 @@
 use crate::python::cross::{CLRepr, CLReprObject};
 use crate::python::template::mj_value::to_minijinja_value;
-use log::trace;
+use log::{error, trace};
 use minijinja as mj;
 use neon::context::Context;
 use neon::prelude::*;
@@ -60,36 +60,66 @@ impl<'a> NeonMiniJinjaContext for FunctionContext<'a> {
     }
 }
 
+#[derive(Debug)]
+struct EngineOptions {
+    debug_info: bool,
+}
+
+static TEMPLATE_ENGINE: OnceCell<Mutex<mj::Environment>> = OnceCell::new();
+
+fn init_template_engine<'a, C: Context<'a>>(_cx: &mut C, opts: EngineOptions) -> NeonResult<()> {
+    let mut engine = mj::Environment::new();
+    engine.set_debug(opts.debug_info);
+    engine.add_function(
+        "env_var",
+        |var_name: String, var_default: Option<String>, _state: &minijinja::State| {
+            if let Ok(value) = std::env::var(&var_name) {
+                return Ok(mj::value::Value::from(value));
+            }
+
+            if let Some(var_default) = var_default {
+                return Ok(mj::value::Value::from(var_default));
+            }
+
+            let err = minijinja::Error::new(
+                mj::ErrorKind::InvalidOperation,
+                format!("unknown env variable {}", var_name),
+            );
+
+            Err(err)
+        },
+    );
+
+    if let Err(_) = TEMPLATE_ENGINE.set(Mutex::new(engine)) {
+        error!("Unable to init jinja engine, it was already started");
+    }
+
+    Ok(())
+}
+
 fn template_engine<'a, C: Context<'a>>(
-    _cx: &mut C,
+    cx: &mut C,
 ) -> NeonResult<&'static Mutex<mj::Environment<'static>>> {
-    static STATE: OnceCell<Mutex<mj::Environment>> = OnceCell::new();
+    if let Some(engine) = TEMPLATE_ENGINE.get() {
+        Ok(engine)
+    } else {
+        cx.throw_error("Unable to get jinja engine: It was not initialized".to_string())
+    }
+}
 
-    STATE.get_or_try_init(|| {
-        let mut engine = mj::Environment::new();
-        engine.set_debug(true);
-        engine.add_function(
-            "env_var",
-            |var_name: String, var_default: Option<String>, _state: &minijinja::State| {
-                if let Ok(value) = std::env::var(&var_name) {
-                    return Ok(mj::value::Value::from(value));
-                }
+fn init_jinja_engine(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+    let options = cx.argument::<JsObject>(0)?;
 
-                if let Some(var_default) = var_default {
-                    return Ok(mj::value::Value::from(var_default));
-                }
+    let debug_info: Handle<JsBoolean> = options
+        .get_value(&mut cx, "debug_info")?
+        .downcast_or_throw(&mut cx)?;
 
-                let err = minijinja::Error::new(
-                    mj::ErrorKind::InvalidOperation,
-                    format!("unknown env variable {}", var_name),
-                );
+    let options = EngineOptions {
+        debug_info: debug_info.value(&mut cx),
+    };
+    init_template_engine(&mut cx, options)?;
 
-                Err(err)
-            },
-        );
-
-        Ok(Mutex::new(engine))
-    })
+    Ok(cx.undefined())
 }
 
 fn load_template(mut cx: FunctionContext) -> JsResult<JsUndefined> {
@@ -147,6 +177,7 @@ fn render_template(mut cx: FunctionContext) -> JsResult<JsString> {
 }
 
 pub fn template_register_module(cx: &mut ModuleContext) -> NeonResult<()> {
+    cx.export_function("initJinjaEngine", init_jinja_engine)?;
     cx.export_function("loadTemplate", load_template)?;
     cx.export_function("clearTemplates", clear_templates)?;
     cx.export_function("renderTemplate", render_template)?;

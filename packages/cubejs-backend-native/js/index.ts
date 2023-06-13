@@ -277,6 +277,10 @@ export const pythonLoadConfig = async (context: string, options: { file: string 
     return config;
 }
 
+export const initJinjaEngine = (options: { debug_info?: boolean }): void => {
+    const native = loadNative();
+    return native.initJinjaEngine(options);
+};
 export const loadTemplate = (templateName: string, templateContent: string): void => {
   const native = loadNative();
   return native.loadTemplate(templateName, templateContent);

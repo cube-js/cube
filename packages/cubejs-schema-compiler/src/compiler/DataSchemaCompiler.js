@@ -6,11 +6,15 @@ import { parse } from '@babel/parser';
 import babelGenerator from '@babel/generator';
 import babelTraverse from '@babel/traverse';
 import R from 'ramda';
-import { loadTemplate, clearTemplates } from '@cubejs-backend/native';
+import { loadTemplate, clearTemplates, isFallbackBuild, initJinjaEngine } from '@cubejs-backend/native';
 
+import { getEnv, isNativeSupported } from '@cubejs-backend/shared';
 import { AbstractExtension } from '../extensions';
 import { UserError } from './UserError';
 import { ErrorReporter } from './ErrorReporter';
+
+const NATIVE_IS_SUPPORTED = isNativeSupported();
+const NATIVE_IS_FALLBACK_BUILD = isFallbackBuild();
 
 const moduleFileCache = {};
 
@@ -53,7 +57,12 @@ export class DataSchemaCompiler {
    * @protected
    */
   async doCompile() {
-    clearTemplates();
+    if (NATIVE_IS_SUPPORTED && !NATIVE_IS_FALLBACK_BUILD) {
+      initJinjaEngine({
+        debug_info: getEnv('devMode'),
+      });
+      clearTemplates();
+    }
 
     const files = await this.repository.dataSchemaFiles();
     const toCompile = files.filter((f) => !this.filesToCompile || this.filesToCompile.indexOf(f.fileName) !== -1);
@@ -89,6 +98,20 @@ export class DataSchemaCompiler {
 
   transpileFile(file, errorsReport) {
     if (R.endsWith('.jinja', file.fileName)) {
+      if (NATIVE_IS_SUPPORTED !== true) {
+        throw new Error(
+          `Native extension is required to process jinja files. ${NATIVE_IS_SUPPORTED.reason}. Read more: ` +
+          'https://github.com/cube-js/cube/blob/master/packages/cubejs-backend-native/README.md#supported-architectures-and-platforms'
+        );
+      }
+
+      if (NATIVE_IS_FALLBACK_BUILD) {
+        throw new Error(
+          'Unable to load jinja file because you are using the fallback build of native extension. Read more: ' +
+          'https://github.com/cube-js/cube/blob/master/packages/cubejs-backend-native/README.md#supported-architectures-and-platforms'
+        );
+      }
+
       loadTemplate(file.fileName, file.content);
 
       return file;
