@@ -26,7 +26,7 @@ const overrides = {
       workspace: "Workspace",
       deployment: "Deployment",
       monitoring: "Monitoring",
-      faq: "FAQs",
+      faqs: "FAQs",
     },
   },
 
@@ -34,34 +34,32 @@ const overrides = {
 
   "Getting-Started/Overview.mdx": {
     ready: true,
-    path: "product/getting-started/overview",
+    path: "product/getting-started",
     title: "Getting started with Cube",
-    meta: {
-      overview: "Overview",
-      core: "Cube Core",
-      cloud: "Cube Cloud",
-      "migrate-from-core": "Migrate from Cube Core",
-    },
   },
 
   // Core
 
   "Getting-Started/Core/01-Overview.mdx": {
     ready: true,
-    path: "product/getting-started/core/overview",
+    path: "product/getting-started/core",
     title: "Getting started with Cube Core",
     meta: {
-      overview: "Overview",
-      "create-a-project": "Create a project",
-      "query-data": "Query data",
-      "add-a-pre-aggregation": "Add a pre-aggregation",
-      "learn-more": "Learn more",
+      core: "Cube Core",
+      cloud: "Cube Cloud",
+      "migrate-from-core": "Migrate from Cube Core",
     },
   },
   "Getting-Started/Core/02-Create-a-project.mdx": {
     ready: true,
     path: "product/getting-started/core/create-a-project",
     title: "Create a project",
+    meta: {
+      "create-a-project": "Create a project",
+      "query-data": "Query data",
+      "add-a-pre-aggregation": "Add a pre-aggregation",
+      "learn-more": "Learn more",
+    },
   },
   "Getting-Started/Core/03-Query-data.mdx": {
     ready: true,
@@ -83,21 +81,20 @@ const overrides = {
 
   "Getting-Started/Cloud/01-Overview.mdx": {
     ready: true,
-    path: "product/getting-started/cloud/overview",
+    path: "product/getting-started/cloud",
     title: "Getting started with Cube Cloud",
+  },
+  "Getting-Started/Cloud/02-Create-a-deployment.mdx": {
+    ready: true,
+    path: "product/getting-started/cloud/create-a-deployment",
+    title: "Create a deployment",
     meta: {
-      overview: "Overview",
       "create-a-deployment": "Create a deployment",
       "generate-models": "Generate models",
       "query-data": "Query data",
       "add-a-pre-aggregation": "Add a pre-aggregation",
       "learn-more": "Learn more",
     },
-  },
-  "Getting-Started/Cloud/02-Create-a-deployment.mdx": {
-    ready: true,
-    path: "product/getting-started/cloud/create-a-deployment",
-    title: "Create a deployment",
   },
   "Getting-Started/Cloud/03-Generate-models.mdx": {
     ready: true,
@@ -156,15 +153,8 @@ const overrides = {
   // configuration
   "Configuration/Overview.mdx": {
     ready: true,
-    path: "product/configuration/overview",
+    path: "product/configuration",
     title: "Overview",
-    meta: {
-      overview: "Overview",
-      "data-sources": "Connecting to data sources",
-      "visualization-tools": "Connecting to visualization tools",
-      vpc: "Connecting with a VPC",
-      advanced: "Advanced",
-    },
   },
 
   "Configuration/Advanced/Multitenancy.mdx": {
@@ -183,11 +173,22 @@ const overrides = {
     ready: true,
     path: "product/configuration/vpc",
     title: "Connecting with a VPC",
+    meta: {
+      "data-sources": "Connecting to data sources",
+      "visualization-tools": "Connecting to visualization tools",
+      vpc: "Connecting with a VPC",
+      advanced: "Advanced",
+    },
   },
   "Configuration/VPC/Connecting-with-a-VPC-GCP.mdx": {
     ready: true,
     path: "product/configuration/vpc/gcp",
     title: "Connecting with a VPC on GCP",
+    meta: {
+      'aws': 'AWS',
+      'azure': 'Azure',
+      'gcp': 'GCP',
+    }
   },
   "Configuration/VPC/Connecting-with-a-VPC-Azure.mdx": {
     ready: true,
@@ -426,8 +427,8 @@ const overrides = {
     meta: {
       overview: "Overview",
       fundamentals: "Fundamentals",
-      reference: "Reference",
       advanced: "Advanced",
+      reference: "Reference",
     },
   },
 
@@ -437,6 +438,12 @@ const overrides = {
     ready: true,
     path: "product/data-modeling/fundamentals/concepts",
     title: "Concepts",
+    meta: {
+      concepts: "Concepts",
+      syntax: "Syntax",
+      "working-with-joins": "Working with Joins",
+      "additional-concepts": "Additional Concepts",
+    }
   },
   "Schema/Fundamentals/Syntax.mdx": {
     ready: true,
@@ -446,12 +453,12 @@ const overrides = {
   "Schema/Fundamentals/Working-with-Joins.mdx": {
     ready: true,
     path: "product/data-modeling/fundamentals/working-with-joins",
-    title: "Working-with-Joins",
+    title: "Working with Joins",
   },
   "Schema/Fundamentals/Additional-Concepts.mdx": {
     ready: true,
     path: "product/data-modeling/fundamentals/additional-concepts",
-    title: "Additional-Concepts",
+    title: "Additional Concepts",
   },
 
   // data modeling / reference
@@ -558,21 +565,20 @@ const overrides = {
 
   "Caching/Overview.mdx": {
     ready: true,
-    path: "product/caching/overview",
+    path: "product/caching",
     title: "Overview",
+  },
+  "Caching/Getting-Started-Pre-Aggregations.mdx": {
+    ready: true,
+    path: "product/caching/getting-started-pre-aggregations",
+    title: "Getting started with pre-aggregations",
     meta: {
-      overview: "Overview",
       "getting-started-pre-aggregations":
         "Getting started with pre-aggregations",
       "using-pre-aggregations": "Using pre-aggregations",
       "lambda-pre-aggregations": "Lambda pre-aggregations",
       "running-in-production": "Running in production",
     },
-  },
-  "Caching/Getting-Started-Pre-Aggregations.mdx": {
-    ready: true,
-    path: "product/caching/getting-started-pre-aggregations",
-    title: "Getting started with pre-aggregations",
   },
   "Caching/Using-Pre-Aggregations.mdx": {
     ready: true,
@@ -594,17 +600,16 @@ const overrides = {
 
   "Auth/Overview.mdx": {
     ready: true,
-    path: "product/auth/overview",
+    path: "product/auth",
     title: "Overview",
-    meta: {
-      overview: "Overview",
-      context: "Security context",
-    },
   },
   "Auth/Security-Context.mdx": {
     ready: true,
     path: "product/auth/context",
     title: "Security context",
+    meta: {
+      context: "Security context",
+    },
   },
 
   // apis overview
@@ -733,8 +738,8 @@ const overrides = {
       "semantic-layer-sync": "Semantic Layer Sync",
       "sql-runner": "SQL Runner",
       "query-history": "Query History",
-      "pre-aggregation-inspection": "Pre-Aggregations",
-      "access-control": "Access control",
+      "pre-aggregations": "Pre-Aggregations",
+      "access-control": "Access Control",
       sso: "Single Sign-On",
       "dev-mode": "Development mode",
       preferences: "Preferences",
@@ -746,19 +751,19 @@ const overrides = {
     path: "product/workspace/sso",
     title: "Single Sign-On",
   },
-  "Workspace/Single-Sign-On/SAML.mdx": {
-    ready: true,
-    path: "product/workspace/sso/saml",
-    title: "SAML",
-    meta: {
-      saml: "SAML",
-      okta: "Okta",
-    },
-  },
+  // "Workspace/Single-Sign-On/SAML.mdx": {
+  //   ready: true,
+  //   path: "product/workspace/sso/saml",
+  //   title: "SAML",
+  // },
   "Workspace/Single-Sign-On/Okta.mdx": {
     ready: true,
     path: "product/workspace/sso/okta",
     title: "Okta",
+    meta: {
+      // saml: "SAML",
+      okta: "Okta",
+    },
   },
   "Workspace/Development-API.mdx": {
     ready: true,
@@ -783,7 +788,7 @@ const overrides = {
   "Workspace/Access-Control.mdx": {
     ready: true,
     path: "product/workspace/access-control",
-    title: "Access control",
+    title: "Access Control",
   },
   "Workspace/SQL-Runner.mdx": {
     ready: true,
@@ -807,40 +812,38 @@ const overrides = {
   },
 
   // Deployment
-
   "Deployment/Overview.mdx": {
     ready: true,
-    path: "product/deployment/overview",
+    path: "product/deployment",
     title: "Overview",
-    meta: {
-      overview: "Overview",
-      "production-checklist": "Production checklist",
-      cloud: "Cube Cloud",
-      core: "Cube Core",
-    },
   },
   "Deployment/Production-Checklist.mdx": {
     ready: true,
     path: "product/deployment/production-checklist",
     title: "Production checklist",
+    meta: {
+      "production-checklist": "Production checklist",
+      cloud: "Cube Cloud",
+      core: "Cube Core",
+    },
   },
   "Deployment/Cloud/Overview.mdx": {
     ready: true,
-    path: "product/deployment/cloud/overview",
+    path: "product/deployment/cloud",
     title: "Overview",
-    meta: {
-      overview: "Overview",
-      "auto-suspension": "Auto-suspension",
-      "continuous-deployment": "Continuous deployment",
-      "custom-domains": "Custom domains",
-      "deployment-types": "Deployment types",
-      pricing: "Pricing",
-    },
   },
   "Deployment/Cloud/Auto-Suspension.mdx": {
     ready: true,
     path: "product/deployment/cloud/auto-suspension",
     title: "Auto-suspension",
+    meta: {
+      "auto-suspension": "Auto-suspension",
+      "continuous-deployment": "Continuous deployment",
+      "custom-domains": "Custom domains",
+      "deployment-types": "Deployment types",
+      pricing: "Pricing",
+      limits: "Limits",
+    },
   },
   "Deployment/Cloud/Continuous-Deployment.mdx": {
     ready: true,
@@ -918,7 +921,7 @@ const overrides = {
   "Reference/Configuration/Environment-Variables-Reference.mdx": {
     ready: true,
     path: "reference/configuration/environment-variables",
-    title: "Environment-variables",
+    title: "Environment variables",
   },
   "Reference/Frontend/@cubejs-client-vue.mdx": {
     ready: true,

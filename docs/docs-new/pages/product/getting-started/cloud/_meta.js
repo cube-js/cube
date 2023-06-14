@@ -1,5 +1,4 @@
 module.exports = {
-  "overview": "Overview",
   "create-a-deployment": "Create a deployment",
   "generate-models": "Generate models",
   "query-data": "Query data",
