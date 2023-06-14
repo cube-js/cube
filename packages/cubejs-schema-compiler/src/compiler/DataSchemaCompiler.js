@@ -59,7 +59,7 @@ export class DataSchemaCompiler {
   async doCompile() {
     if (NATIVE_IS_SUPPORTED && !NATIVE_IS_FALLBACK_BUILD) {
       initJinjaEngine({
-        debug_info: getEnv('devMode'),
+        debugInfo: getEnv('devMode'),
       });
       clearTemplates();
     }

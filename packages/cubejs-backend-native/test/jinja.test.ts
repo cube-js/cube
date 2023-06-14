@@ -33,6 +33,9 @@ function testLoadBrokenTemplateBySnapshot(templateName: string) {
 
 suite('Jinja', () => {
   beforeAll(async () => {
+    native.initJinjaEngine({
+      debugInfo: true
+    });
     native.clearTemplates();
 
     loadTemplateFile('.utils.jinja');

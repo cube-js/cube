@@ -111,7 +111,7 @@ fn init_jinja_engine(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let options = cx.argument::<JsObject>(0)?;
 
     let debug_info: Handle<JsBoolean> = options
-        .get_value(&mut cx, "debug_info")?
+        .get_value(&mut cx, "debugInfo")?
         .downcast_or_throw(&mut cx)?;
 
     let options = EngineOptions {

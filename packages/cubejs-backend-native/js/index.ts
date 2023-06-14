@@ -277,7 +277,7 @@ export const pythonLoadConfig = async (context: string, options: { file: string 
     return config;
 }
 
-export const initJinjaEngine = (options: { debug_info?: boolean }): void => {
+export const initJinjaEngine = (options: { debugInfo?: boolean }): void => {
     const native = loadNative();
     return native.initJinjaEngine(options);
 };
