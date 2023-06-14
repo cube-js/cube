@@ -1,10 +1,9 @@
 import R from 'ramda';
 import { BaseDriver } from '@cubejs-backend/query-orchestrator';
 import { pausePromise, SchemaFileRepository } from '@cubejs-backend/shared';
-import { CubejsServerCore, DatabaseType } from '../../src';
+import { CubejsServerCore } from '../../src';
 import { RefreshScheduler } from '../../src/core/RefreshScheduler';
 import { CompilerApi } from '../../src/core/CompilerApi';
-import { OrchestratorApi } from '../../src/core/OrchestratorApi';
 
 const schemaContent = `
 cube('Foo', {
@@ -386,7 +385,7 @@ const setupScheduler = ({ repository, useOriginalSqlPreAggregations, skipAssertS
     }
   );
 
-  jest.spyOn(serverCore, 'getCompilerApi').mockImplementation(() => compilerApi);
+  jest.spyOn(serverCore, 'getCompilerApi').mockImplementation(async () => compilerApi);
 
   const refreshScheduler = new RefreshScheduler(serverCore);
   return { refreshScheduler, compilerApi, mockDriver };

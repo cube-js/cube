@@ -465,8 +465,8 @@ export class CubejsServerCore {
 
   protected createApiGatewayInstance(
     apiSecret: string,
-    getCompilerApi: (context: RequestContext) => CompilerApi,
-    getOrchestratorApi: (context: RequestContext) => OrchestratorApi,
+    getCompilerApi: (context: RequestContext) => Promise<CompilerApi>,
+    getOrchestratorApi: (context: RequestContext) => Promise<OrchestratorApi>,
     logger: LoggerFn,
     options: ApiGatewayOptions
   ): ApiGateway {
@@ -487,8 +487,8 @@ export class CubejsServerCore {
     }
   }
 
-  public getCompilerApi(context: RequestContext) {
-    const appId = this.contextToAppId(context);
+  public async getCompilerApi(context: RequestContext) {
+    const appId = await this.contextToAppId(context);
     let compilerApi = this.compilerCache.get(appId);
     const currentSchemaVersion = this.options.schemaVersion && (() => this.options.schemaVersion(context));
 
@@ -535,8 +535,8 @@ export class CubejsServerCore {
     this.startScheduledRefreshTimer();
   }
 
-  public getOrchestratorApi(context: RequestContext): OrchestratorApi {
-    const orchestratorId = this.contextToOrchestratorId(context);
+  public async getOrchestratorApi(context: RequestContext): Promise<OrchestratorApi> {
+    const orchestratorId = await this.contextToOrchestratorId(context);
 
     if (this.orchestratorStorage.has(orchestratorId)) {
       return this.orchestratorStorage.get(orchestratorId);

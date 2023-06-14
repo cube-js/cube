@@ -59,7 +59,7 @@ export const preAggregationVersionEntriesResultFactory = () => ({
   }
 });
 
-export const compilerApi = jest.fn().mockImplementation(() => ({
+export const compilerApi = jest.fn().mockImplementation(async () => ({
   async getSql() {
     return {
       sql: ['SELECT * FROM test', []],

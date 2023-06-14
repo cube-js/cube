@@ -122,8 +122,8 @@ export type DatabaseType =
   | 'questdb'
   | 'materialize';
 
-export type ContextToAppIdFn = (context: RequestContext) => string;
-export type ContextToOrchestratorIdFn = (context: RequestContext) => string;
+export type ContextToAppIdFn = (context: RequestContext) => string | Promise<string>;
+export type ContextToOrchestratorIdFn = (context: RequestContext) => string | Promise<string>;
 
 export type OrchestratorOptionsFn = (context: RequestContext) => OrchestratorOptions;
 

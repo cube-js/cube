@@ -43,14 +43,14 @@ async function requestBothGetAndPost(app, { url, query, body }, assert) {
 }
 
 const API_SECRET = 'secret';
-function createApiGateway(
+async function createApiGateway(
   adapterApi: any = new AdapterApiMock(),
   dataSourceStorage: any = new DataSourceStorageMock(),
   options: Partial<ApiGatewayOptions> = {}
 ) {
   process.env.NODE_ENV = 'production';
 
-  const apiGateway = new ApiGateway(API_SECRET, compilerApi, () => adapterApi, logger, {
+  const apiGateway = new ApiGateway(API_SECRET, compilerApi, async () => adapterApi, logger, {
     standalone: true,
     dataSourceStorage,
     basePath: '/cubejs-api',
@@ -72,7 +72,7 @@ function createApiGateway(
 
 describe('API Gateway', () => {
   test('bad token', async () => {
-    const { app } = createApiGateway();
+    const { app } = await createApiGateway();
 
     const res = await request(app)
       .get('/cubejs-api/v1/load?query={"measures":["Foo.bar"]}')
@@ -82,7 +82,7 @@ describe('API Gateway', () => {
   });
 
   test('bad token with schema', async () => {
-    const { app } = createApiGateway();
+    const { app } = await createApiGateway();
 
     const res = await request(app)
       .get('/cubejs-api/v1/load?query={"measures":["Foo.bar"]}')
@@ -92,14 +92,14 @@ describe('API Gateway', () => {
   });
 
   test('requires auth', async () => {
-    const { app } = createApiGateway();
+    const { app } = await createApiGateway();
 
     const res = await request(app).get('/cubejs-api/v1/load?query={"measures":["Foo.bar"]}').expect(403);
     expect(res.body && res.body.error).toStrictEqual('Authorization header isn\'t set');
   });
 
   test('passes correct token', async () => {
-    const { app } = createApiGateway();
+    const { app } = await createApiGateway();
 
     const res = await request(app)
       .get('/cubejs-api/v1/load?query={}')
@@ -111,7 +111,7 @@ describe('API Gateway', () => {
   });
 
   test('passes correct token with auth schema', async () => {
-    const { app } = createApiGateway();
+    const { app } = await createApiGateway();
 
     const res = await request(app)
       .get('/cubejs-api/v1/load?query={}')
@@ -124,7 +124,7 @@ describe('API Gateway', () => {
   });
 
   test('catch error requestContextMiddleware', async () => {
-    const { app } = createApiGateway(
+    const { app } = await createApiGateway(
       new AdapterApiMock(),
       new DataSourceStorageMock(),
       {
@@ -159,7 +159,7 @@ describe('API Gateway', () => {
       return query;
     });
 
-    const { app } = createApiGateway(
+    const { app } = await createApiGateway(
       new AdapterApiMock(),
       new DataSourceStorageMock(),
       {
@@ -199,7 +199,7 @@ describe('API Gateway', () => {
       return query;
     });
 
-    const { app } = createApiGateway(
+    const { app } = await createApiGateway(
       new AdapterApiMock(),
       new DataSourceStorageMock(),
       {
@@ -228,7 +228,7 @@ describe('API Gateway', () => {
   });
 
   test('null filter values', async () => {
-    const { app } = createApiGateway();
+    const { app } = await createApiGateway();
 
     const res = await request(app)
       .get(
@@ -241,7 +241,7 @@ describe('API Gateway', () => {
   });
 
   test('dry-run', async () => {
-    const { app } = createApiGateway();
+    const { app } = await createApiGateway();
 
     const query = {
       measures: ['Foo.bar']
@@ -285,7 +285,7 @@ describe('API Gateway', () => {
   });
 
   test('normalize filter number values', async () => {
-    const { app } = createApiGateway();
+    const { app } = await createApiGateway();
 
     const query = {
       measures: ['Foo.bar'],
@@ -350,7 +350,7 @@ describe('API Gateway', () => {
   });
 
   test('normalize empty filters', async () => {
-    const { app } = createApiGateway();
+    const { app } = await createApiGateway();
 
     const res = await request(app)
       .get(
@@ -363,7 +363,7 @@ describe('API Gateway', () => {
   });
 
   test('normalize queryRewrite limit', async () => {
-    const { app } = createApiGateway(
+    const { app } = await createApiGateway(
       new AdapterApiMock(),
       new DataSourceStorageMock(),
       {
@@ -422,7 +422,7 @@ describe('API Gateway', () => {
   });
 
   test('normalize order', async () => {
-    const { app } = createApiGateway();
+    const { app } = await createApiGateway();
 
     const query = {
       measures: ['Foo.bar'],
@@ -469,7 +469,7 @@ describe('API Gateway', () => {
   });
 
   test('date range padding', async () => {
-    const { app } = createApiGateway();
+    const { app } = await createApiGateway();
 
     const res = await request(app)
       .get(
@@ -485,7 +485,7 @@ describe('API Gateway', () => {
   });
 
   test('order support object format', async () => {
-    const { app } = createApiGateway();
+    const { app } = await createApiGateway();
 
     const query = {
       measures: ['Foo.bar'],
@@ -502,7 +502,7 @@ describe('API Gateway', () => {
   });
 
   test('order support array of tuples', async () => {
-    const { app } = createApiGateway();
+    const { app } = await createApiGateway();
 
     const query = {
       measures: ['Foo.bar'],
@@ -523,7 +523,7 @@ describe('API Gateway', () => {
   });
 
   test('post http method for load route', async () => {
-    const { app } = createApiGateway();
+    const { app } = await createApiGateway();
 
     const query = {
       measures: ['Foo.bar'],
@@ -547,7 +547,7 @@ describe('API Gateway', () => {
   });
 
   test('meta endpoint to get schema information', async () => {
-    const { app } = createApiGateway();
+    const { app } = await createApiGateway();
 
     const res = await request(app)
       .get('/cubejs-api/v1/meta')
@@ -559,12 +559,13 @@ describe('API Gateway', () => {
   });
 
   test('meta endpoint extended to get schema information with additional data', async () => {
-    const { app } = createApiGateway();
+    const { app } = await createApiGateway();
 
     const res = await request(app)
       .get('/cubejs-api/v1/meta?extended')
       .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
       .expect(200);
+
     expect(res.body).toHaveProperty('cubes');
     expect(res.body.cubes[0]?.name).toBe('Foo');
     expect(res.body.cubes[0]?.hasOwnProperty('sql')).toBe(true);
@@ -586,7 +587,7 @@ describe('API Gateway', () => {
     });
 
     test('multi query with a flag', async () => {
-      const { app } = createApiGateway();
+      const { app } = await createApiGateway();
 
       const res = await request(app)
         .get(`/cubejs-api/v1/load?${searchParams.toString()}`)
@@ -604,7 +605,7 @@ describe('API Gateway', () => {
     });
 
     test('multi query without a flag', async () => {
-      const { app } = createApiGateway();
+      const { app } = await createApiGateway();
 
       searchParams.delete('queryType');
 
@@ -616,7 +617,7 @@ describe('API Gateway', () => {
     });
 
     test('regular query', async () => {
-      const { app } = createApiGateway();
+      const { app } = await createApiGateway();
 
       const query = JSON.stringify({
         measures: ['Foo.bar'],
@@ -652,9 +653,9 @@ describe('API Gateway', () => {
 
     const scheduledRefreshTimeZonesFactory = () => (['UTC', 'America/Los_Angeles']);
 
-    const appPrepareFactory = (scope?: string[]) => {
+    const appPrepareFactory = async (scope?: string[]) => {
       const playgroundAuthSecret = 'test12345';
-      const { app } = createApiGateway(
+      const { app } = await createApiGateway(
         new AdapterApiMock(),
         new DataSourceStorageMock(),
         {
@@ -672,14 +673,14 @@ describe('API Gateway', () => {
     };
 
     const notAllowedTestFactory = ({ route, method = 'get' }) => async () => {
-      const { app } = appPrepareFactory();
+      const { app } = await appPrepareFactory();
       return request(app)[method](`/cubejs-system/v1/${route}`)
         .set('Content-type', 'application/json')
         .expect(403);
     };
 
     const notAllowedWithUserTokenTestFactory = ({ route, method = 'get' }) => async () => {
-      const { app, tokenUser } = appPrepareFactory();
+      const { app, tokenUser } = await appPrepareFactory();
 
       return request(app)[method](`/cubejs-system/v1/${route}`)
         .set('Content-type', 'application/json')
@@ -688,7 +689,7 @@ describe('API Gateway', () => {
     };
 
     const notExistsTestFactory = ({ route, method = 'get' }) => async () => {
-      const { app } = createApiGateway();
+      const { app } = await createApiGateway();
 
       return request(app)[method](`/cubejs-system/v1/${route}`)
         .set('Content-type', 'application/json')
@@ -696,7 +697,7 @@ describe('API Gateway', () => {
     };
 
     const successTestFactory = ({ route, method = 'get', successBody = {}, successResult, scope = [''] }) => async () => {
-      const { app, token } = appPrepareFactory(scope);
+      const { app, token } = await appPrepareFactory(scope);
 
       const req = request(app)[method](`/cubejs-system/v1/${route}`)
         .set('Content-type', 'application/json')
@@ -721,7 +722,7 @@ describe('API Gateway', () => {
         body: {},
       }[]
     }) => async () => {
-      const { app, token } = appPrepareFactory(scope);
+      const { app, token } = await appPrepareFactory(scope);
 
       for (const payload of wrongPayloads) {
         const req = request(app).post(`/cubejs-system/v1/${route}`)
@@ -772,7 +773,7 @@ describe('API Gateway', () => {
 
   describe('healtchecks', () => {
     test('readyz (standalone)', async () => {
-      const { app, adapterApi } = createApiGateway();
+      const { app, adapterApi } = await createApiGateway();
 
       const res = await request(app)
         .get('/readyz')
@@ -787,7 +788,7 @@ describe('API Gateway', () => {
     });
 
     test('readyz (standalone)', async () => {
-      const { app, adapterApi } = createApiGateway();
+      const { app, adapterApi } = await createApiGateway();
 
       const res = await request(app)
         .get('/readyz')
@@ -812,7 +813,7 @@ describe('API Gateway', () => {
         }
       }
 
-      const { app, adapterApi } = createApiGateway(new AdapterApiUnhealthyMock());
+      const { app, adapterApi } = await createApiGateway(new AdapterApiUnhealthyMock());
 
       const res = await request(app)
         .get('/readyz')
@@ -837,7 +838,7 @@ describe('API Gateway', () => {
         }
       }
 
-      const { app, dataSourceStorage } = createApiGateway(new AdapterApiMock(), new DataSourceStorageUnhealthyMock());
+      const { app, dataSourceStorage } = await createApiGateway(new AdapterApiMock(), new DataSourceStorageUnhealthyMock());
 
       const res = await request(app)
         .get('/livez')

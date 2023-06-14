@@ -38,7 +38,8 @@ import {
   PreAggJob,
   PreAggJobStatusItem,
   PreAggJobStatusObject,
-  PreAggJobStatusResponse, SqlApiRequest,
+  PreAggJobStatusResponse,
+  SqlApiRequest,
 } from './types/request';
 import {
   CheckAuthInternalOptions,
@@ -214,7 +215,7 @@ class ApiGateway {
         },
       ],
       async (req, res) => {
-        const compilerApi = this.getCompilerApi(req.context);
+        const compilerApi = await this.getCompilerApi(req.context);
         let schema = compilerApi.getGraphQLSchema();
         if (!schema) {
           let metaConfig = await compilerApi.metaConfig({
@@ -511,7 +512,8 @@ class ApiGateway {
 
     try {
       await this.assertApiScope('meta', context.securityContext);
-      const metaConfig = await this.getCompilerApi(context).metaConfig({
+      const compilerApi = await this.getCompilerApi(context);
+      const metaConfig = await compilerApi.metaConfig({
         requestId: context.requestId,
       });
       const cubes = this.filterVisibleItemsInMeta(context, metaConfig).map(cube => cube.config);
@@ -531,7 +533,8 @@ class ApiGateway {
 
     try {
       await this.assertApiScope('meta', context.securityContext);
-      const metaConfigExtended = await this.getCompilerApi(context).metaConfigExtended({
+      const compilerApi = await this.getCompilerApi(context);
+      const metaConfigExtended = await compilerApi.metaConfigExtended({
         requestId: context.requestId,
       });
       const { metaConfig, cubeDefinitions } = metaConfigExtended;
@@ -566,7 +569,7 @@ class ApiGateway {
   public async getPreAggregations({ cacheOnly, context, res }: { cacheOnly?: boolean, context: RequestContext, res: ResponseResultFn }) {
     const requestStarted = new Date();
     try {
-      const compilerApi = this.getCompilerApi(context);
+      const compilerApi = await this.getCompilerApi(context);
       const preAggregations = await compilerApi.preAggregations();
 
       const preAggregationPartitions = await this.refreshScheduler()
@@ -600,8 +603,8 @@ class ApiGateway {
         this.parseQueryParam(query),
         { timezones: this.scheduledRefreshTimeZones }
       );
-      const orchestratorApi = this.getAdapterApi(context);
-      const compilerApi = this.getCompilerApi(context);
+      const orchestratorApi = await this.getAdapterApi(context);
+      const compilerApi = await this.getCompilerApi(context);
 
       const preAggregationPartitions = await this.refreshScheduler()
         .preAggregationPartitions(
@@ -661,7 +664,7 @@ class ApiGateway {
       query = normalizeQueryPreAggregationPreview(this.parseQueryParam(query));
       const { preAggregationId, versionEntry, timezone } = query;
 
-      const orchestratorApi = this.getAdapterApi(context);
+      const orchestratorApi = await this.getAdapterApi(context);
 
       const preAggregationPartitions = await this.refreshScheduler()
         .preAggregationPartitions(
@@ -863,7 +866,7 @@ class ApiGateway {
     context: RequestContext,
     selector: PreAggsSelector
   ): Promise<string[]> {
-    const compiler = this.getCompilerApi(context);
+    const compiler = await this.getCompilerApi(context);
     const { timezones } = selector;
     const preaggs = await compiler.preAggregations({
       dataSources: selector.dataSources,
@@ -909,8 +912,8 @@ class ApiGateway {
     const promise: Promise<(PreAggJobStatusItem | undefined)[]> = Promise.all(
       selector.map(async (selected, i) => {
         const ctx = { ...context, ...selected.context };
-        const orchestrator = this.getAdapterApi(ctx);
-        const compiler = this.getCompilerApi(ctx);
+        const orchestrator = await this.getAdapterApi(ctx);
+        const compiler = await this.getCompilerApi(ctx);
         const sel: PreAggsSelector = {
           cubes: [selected.preagg.split('.')[0]],
           preAggregations: [selected.preagg],
@@ -1068,7 +1071,7 @@ class ApiGateway {
   ) {
     const requestStarted = new Date();
     try {
-      const orchestratorApi = this.getAdapterApi(context);
+      const orchestratorApi = await this.getAdapterApi(context);
       res({
         result: await orchestratorApi.getPreAggregationQueueStates()
       });
@@ -1085,7 +1088,7 @@ class ApiGateway {
     const requestStarted = new Date();
     try {
       const { queryKeys, dataSource } = normalizeQueryCancelPreAggregations(this.parseQueryParam(query));
-      const orchestratorApi = this.getAdapterApi(context);
+      const orchestratorApi = await this.getAdapterApi(context);
       res({
         result: await orchestratorApi.cancelPreAggregationQueriesFromQueue(queryKeys, dataSource)
       });
@@ -1179,7 +1182,7 @@ class ApiGateway {
       const [queryType, normalizedQueries] = await this.getNormalizedQueries(query, context);
 
       const sqlQueries = await Promise.all<any>(
-        normalizedQueries.map((normalizedQuery) => this.getCompilerApi(context).getSql(
+        normalizedQueries.map(async (normalizedQuery) => (await this.getCompilerApi(context)).getSql(
           this.coerceForSqlQuery({ ...normalizedQuery, memberToAlias }, context),
           {
             includeDebugInfo: getEnv('devMode') || context.signedWithPlaygroundAuthSecret,
@@ -1207,7 +1210,7 @@ class ApiGateway {
     const requestStarted = new Date();
 
     try {
-      const compilerApi = this.getCompilerApi(context);
+      const compilerApi = await this.getCompilerApi(context);
       const query = {
         requestId: context.requestId,
       };
@@ -1293,7 +1296,7 @@ class ApiGateway {
       const [queryType, normalizedQueries] = await this.getNormalizedQueries(query, context);
 
       const sqlQueries = await Promise.all<any>(
-        normalizedQueries.map((normalizedQuery) => this.getCompilerApi(context).getSql(
+        normalizedQueries.map(async (normalizedQuery) => (await this.getCompilerApi(context)).getSql(
           this.coerceForSqlQuery(normalizedQuery, context),
           {
             includeDebugInfo: getEnv('devMode') || context.signedWithPlaygroundAuthSecret
@@ -1330,7 +1333,7 @@ class ApiGateway {
       normalizedQueries.map(
         async (normalizedQuery, index) => {
           const loadRequestSQLStarted = new Date();
-          const sqlQuery = await this.getCompilerApi(context)
+          const sqlQuery = await (await this.getCompilerApi(context))
             .getSql(
               this.coerceForSqlQuery(normalizedQuery, context)
             );
@@ -1390,8 +1393,7 @@ class ApiGateway {
     }
     const [response, total] = await Promise.all(
       queries.map(async (query) => {
-        const res = await this
-          .getAdapterApi(context)
+        const res = await (await this.getAdapterApi(context))
           .executeQuery(query);
         return res;
       })
@@ -1495,7 +1497,7 @@ class ApiGateway {
         originalQuery: query,
         normalizedQuery: normalizedQueries[0],
         streamingQuery: q,
-        stream: await this.getAdapterApi(context).streamQuery(q),
+        stream: await (await this.getAdapterApi(context)).streamQuery(q),
       };
       return _stream;
     } catch (err: any) {
@@ -1546,10 +1548,10 @@ class ApiGateway {
       const [queryType, normalizedQueries] =
         await this.getNormalizedQueries(query, context);
 
-      let metaConfigResult = await this
-        .getCompilerApi(context).metaConfig({
-          requestId: context.requestId
-        });
+      let metaConfigResult = await (await this
+        .getCompilerApi(context)).metaConfig({
+        requestId: context.requestId
+      });
 
       metaConfigResult = this.filterVisibleItemsInMeta(context, metaConfigResult);
 
@@ -1664,10 +1666,10 @@ class ApiGateway {
       const [queryType, normalizedQueries] =
         await this.getNormalizedQueries(query, context);
 
-      let metaConfigResult = await this
-        .getCompilerApi(context).metaConfig({
-          requestId: context.requestId
-        });
+      const compilerApi = await this.getCompilerApi(context);
+      let metaConfigResult = await compilerApi.metaConfig({
+        requestId: context.requestId
+      });
 
       metaConfigResult = this.filterVisibleItemsInMeta(context, metaConfigResult);
 
@@ -1690,8 +1692,11 @@ class ApiGateway {
           persistent: true,
           forceNoCache: true,
         };
+
+        const adapterApi = await this.getAdapterApi(context);
+
         return {
-          stream: await this.getAdapterApi(context).streamQuery(q),
+          stream: await adapterApi.streamQuery(q),
         };
       };
 
@@ -1711,9 +1716,8 @@ class ApiGateway {
         if (request.streaming) {
           results = [await streamResponse(finalQuery)];
         } else {
-          const response = await this
-            .getAdapterApi(context)
-            .executeQuery(finalQuery);
+          const adapterApi = await this.getAdapterApi(context);
+          const response = await adapterApi.executeQuery(finalQuery);
 
           const annotation = prepareAnnotation(
             metaConfigResult, normalizedQueries[0]
@@ -1791,7 +1795,7 @@ class ApiGateway {
     }
   }
 
-  public subscribeQueueEvents({ context, signedWithPlaygroundAuthSecret, connectionId, res }) {
+  public async subscribeQueueEvents({ context, signedWithPlaygroundAuthSecret, connectionId, res }) {
     if (this.enforceSecurityChecks && !signedWithPlaygroundAuthSecret) {
       throw new CubejsHandlerError(
         403,
@@ -1799,11 +1803,11 @@ class ApiGateway {
         'Only for signed with playground auth secret'
       );
     }
-    return this.getAdapterApi(context).subscribeQueueEvents(connectionId, res);
+    return (await this.getAdapterApi(context)).subscribeQueueEvents(connectionId, res);
   }
 
-  public unSubscribeQueueEvents({ context, connectionId }) {
-    return this.getAdapterApi(context).unSubscribeQueueEvents(connectionId);
+  public async unSubscribeQueueEvents({ context, connectionId }) {
+    return (await this.getAdapterApi(context)).unSubscribeQueueEvents(connectionId);
   }
 
   public async subscribe({
@@ -1866,7 +1870,7 @@ class ApiGateway {
     return query as Query | Query[];
   }
 
-  protected getCompilerApi(context) {
+  protected async getCompilerApi(context) {
     if (typeof this.compilerApi === 'function') {
       return this.compilerApi(context);
     }
@@ -1874,7 +1878,7 @@ class ApiGateway {
     return this.compilerApi;
   }
 
-  protected getAdapterApi(context) {
+  protected async getAdapterApi(context) {
     if (typeof this.adapterApi === 'function') {
       return this.adapterApi(context);
     }
