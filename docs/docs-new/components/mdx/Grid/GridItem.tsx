@@ -1,4 +1,5 @@
 import classnames from 'classnames/bind';
+import Link from 'next/link';
 import React from 'react';
 import styles from './GridItem.module.css';
 
@@ -15,7 +16,7 @@ export const GridItem = ({
   title,
   url,
 }: GridItemProps) => (
-  <a className={cn('GridItem__Wrapper')} href={url}>
+  <Link className={cn('GridItem__Wrapper')} href={url}>
     <div className={cn('GridItem')}>
       <img
         className={cn('GridItem__Image')}
@@ -24,5 +25,5 @@ export const GridItem = ({
       />
       <span className={cn('GridItem__Title')}>{title}</span>
     </div>
-  </a>
+  </Link>
 );
