@@ -14,7 +14,6 @@ import { UserError } from './UserError';
 import { ErrorReporter } from './ErrorReporter';
 
 const NATIVE_IS_SUPPORTED = isNativeSupported();
-const NATIVE_IS_FALLBACK_BUILD = isFallbackBuild();
 
 const moduleFileCache = {};
 
@@ -57,7 +56,7 @@ export class DataSchemaCompiler {
    * @protected
    */
   async doCompile() {
-    if (NATIVE_IS_SUPPORTED && !NATIVE_IS_FALLBACK_BUILD) {
+    if (NATIVE_IS_SUPPORTED && !isFallbackBuild()) {
       initJinjaEngine({
         debugInfo: getEnv('devMode'),
       });
@@ -105,7 +104,7 @@ export class DataSchemaCompiler {
         );
       }
 
-      if (NATIVE_IS_FALLBACK_BUILD) {
+      if (isFallbackBuild()) {
         throw new Error(
           'Unable to load jinja file because you are using the fallback build of native extension. Read more: ' +
           'https://github.com/cube-js/cube/blob/master/packages/cubejs-backend-native/README.md#supported-architectures-and-platforms'
