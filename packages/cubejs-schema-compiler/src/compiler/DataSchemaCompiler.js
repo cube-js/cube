@@ -6,10 +6,15 @@ import { parse } from '@babel/parser';
 import babelGenerator from '@babel/generator';
 import babelTraverse from '@babel/traverse';
 import R from 'ramda';
-import { AbstractExtension } from '../extensions';
+import { loadTemplate, clearTemplates, isFallbackBuild, initJinjaEngine } from '@cubejs-backend/native';
 
+import { getEnv, isNativeSupported } from '@cubejs-backend/shared';
+import { AbstractExtension } from '../extensions';
 import { UserError } from './UserError';
 import { ErrorReporter } from './ErrorReporter';
+
+const NATIVE_IS_SUPPORTED = isNativeSupported();
+const NATIVE_IS_FALLBACK_BUILD = isFallbackBuild();
 
 const moduleFileCache = {};
 
@@ -48,25 +53,39 @@ export class DataSchemaCompiler {
     }
   }
 
+  /**
+   * @protected
+   */
+  async doCompile() {
+    if (NATIVE_IS_SUPPORTED && !NATIVE_IS_FALLBACK_BUILD) {
+      initJinjaEngine({
+        debugInfo: getEnv('devMode'),
+      });
+      clearTemplates();
+    }
+
+    const files = await this.repository.dataSchemaFiles();
+    const toCompile = files.filter((f) => !this.filesToCompile || this.filesToCompile.indexOf(f.fileName) !== -1);
+
+    const errorsReport = new ErrorReporter(null, [], this.errorReport);
+    this.errorsReport = errorsReport;
+
+    // TODO: required in order to get pre transpile compilation work
+    const transpile = () => toCompile.map(f => this.transpileFile(f, errorsReport)).filter(f => !!f);
+
+    const compilePhase = (compilers) => this.compileCubeFiles(compilers, transpile(), errorsReport);
+
+    return compilePhase({ cubeCompilers: this.cubeNameCompilers })
+      .then(() => compilePhase({ cubeCompilers: this.preTranspileCubeCompilers }))
+      .then(() => compilePhase({
+        cubeCompilers: this.cubeCompilers,
+        contextCompilers: this.contextCompilers,
+      }));
+  }
+
   compile() {
     if (!this.compilePromise) {
-      this.compilePromise = this.repository.dataSchemaFiles().then((files) => {
-        const toCompile = files.filter((f) => !this.filesToCompile || this.filesToCompile.indexOf(f.fileName) !== -1);
-
-        const errorsReport = new ErrorReporter(null, [], this.errorReport);
-        this.errorsReport = errorsReport;
-        // TODO: required in order to get pre transpile compilation work
-        const transpile = () => toCompile.map(f => this.transpileFile(f, errorsReport)).filter(f => !!f);
-
-        const compilePhase = (compilers) => this.compileCubeFiles(compilers, transpile(), errorsReport);
-
-        return compilePhase({ cubeCompilers: this.cubeNameCompilers })
-          .then(() => compilePhase({ cubeCompilers: this.preTranspileCubeCompilers }))
-          .then(() => compilePhase({
-            cubeCompilers: this.cubeCompilers,
-            contextCompilers: this.contextCompilers,
-          }));
-      }).then((res) => {
+      this.compilePromise = this.doCompile().then((res) => {
         if (!this.omitErrors) {
           this.throwIfAnyErrors();
         }
@@ -78,7 +97,25 @@ export class DataSchemaCompiler {
   }
 
   transpileFile(file, errorsReport) {
-    if (R.endsWith('.yml', file.fileName) || R.endsWith('.yaml', file.fileName)) {
+    if (R.endsWith('.jinja', file.fileName)) {
+      if (NATIVE_IS_SUPPORTED !== true) {
+        throw new Error(
+          `Native extension is required to process jinja files. ${NATIVE_IS_SUPPORTED.reason}. Read more: ` +
+          'https://github.com/cube-js/cube/blob/master/packages/cubejs-backend-native/README.md#supported-architectures-and-platforms'
+        );
+      }
+
+      if (NATIVE_IS_FALLBACK_BUILD) {
+        throw new Error(
+          'Unable to load jinja file because you are using the fallback build of native extension. Read more: ' +
+          'https://github.com/cube-js/cube/blob/master/packages/cubejs-backend-native/README.md#supported-architectures-and-platforms'
+        );
+      }
+
+      loadTemplate(file.fileName, file.content);
+
+      return file;
+    } else if (R.endsWith('.yml', file.fileName) || R.endsWith('.yaml', file.fileName)) {
       return file;
     } else if (R.endsWith('.js', file.fileName)) {
       return this.transpileJsFile(file, errorsReport);
@@ -169,8 +206,21 @@ export class DataSchemaCompiler {
     }
 
     compiledFiles[file.fileName] = true;
+
     if (R.endsWith('.js', file.fileName)) {
       this.compileJsFile(file, errorsReport, cubes, contexts, exports, asyncModules, toCompile, compiledFiles);
+    } else if (R.endsWith('.yml.jinja', file.fileName)) {
+      this.yamlCompiler.compileYamlWithJinjaFile(
+        file,
+        errorsReport,
+        cubes,
+        contexts,
+        exports,
+        asyncModules,
+        toCompile,
+        compiledFiles,
+        this.standalone ? {} : this.cloneCompileContextWithGetterAlias(this.compileContext)
+      );
     } else if (R.endsWith('.yml', file.fileName) || R.endsWith('.yaml', file.fileName)) {
       this.yamlCompiler.compileYamlFile(file, errorsReport, cubes, contexts, exports, asyncModules, toCompile, compiledFiles);
     }

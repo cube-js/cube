@@ -78,7 +78,7 @@ function createRowGenerator(query: any, total: number) {
 }
 
 export class FakeRowStream extends stream.Readable {
-  protected readonly genNext: (i: number) => Record<string, string>;
+  protected readonly genNext: (_i: number) => Record<string, string>;
 
   protected readonly limit: number;
 

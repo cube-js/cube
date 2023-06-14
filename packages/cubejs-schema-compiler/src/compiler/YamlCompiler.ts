@@ -3,6 +3,7 @@ import * as t from '@babel/types';
 import { parse } from '@babel/parser';
 import babelGenerator from '@babel/generator';
 import babelTraverse from '@babel/traverse';
+import { renderTemplate } from '@cubejs-backend/native';
 
 import type { FileContent } from '@cubejs-backend/shared';
 
@@ -26,6 +27,24 @@ export class YamlCompiler {
   public dataSchemaCompiler: DataSchemaCompiler | null = null;
 
   public constructor(private cubeSymbols: CubeSymbols, private cubeDictionary: CubeDictionary) {
+  }
+
+  public compileYamlWithJinjaFile(file: FileContent, errorsReport: ErrorReporter, cubes, contexts, exports, asyncModules, toCompile, compiledFiles, compileContext) {
+    const compiledFile = {
+      fileName: file.fileName,
+      content: renderTemplate(file.fileName, compileContext),
+    };
+
+    return this.compileYamlFile(
+      compiledFile,
+      errorsReport,
+      cubes,
+      contexts,
+      exports,
+      asyncModules,
+      toCompile,
+      compiledFiles
+    );
   }
 
   public compileYamlFile(file: FileContent, errorsReport: ErrorReporter, cubes, contexts, exports, asyncModules, toCompile, compiledFiles) {
@@ -97,7 +116,8 @@ export class YamlCompiler {
           }
         }
       }
-    } 
+    }
+
     if (propertyPath[propertyPath.length - 1] === 'extends') {
       const ast = this.parsePythonAndTranspileToJs(obj, errorsReport);
       return this.astIntoArrowFunction(ast, obj, cubeName, name => this.cubeDictionary.resolveCube(name));
@@ -111,6 +131,7 @@ export class YamlCompiler {
     } else if (typeof obj === 'boolean') {
       return t.booleanLiteral(obj);
     }
+
     if (typeof obj === 'object') {
       if (Array.isArray(obj)) {
         return t.arrayExpression(obj.map((value, i) => this.transpileYaml(value, propertyPath.concat(i.toString()), cubeName, errorsReport)));

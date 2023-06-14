@@ -34,7 +34,6 @@
   ],
   "devDependencies": {
     "@cubejs-backend/linter": "^0.33.0",
-    "@cubejs-backend/testing-shared": "^0.33.25",
     "@types/jest": "^26",
     "@types/node": "^14",
     "cargo-cp-artifact": "^0.1",
@@ -85,7 +84,8 @@
     ],
     "setupFilesAfterEnv": [
       "<rootDir>/dist/test/setup/index.js"
-    ]
+    ],
+    "snapshotResolver": "<rootDir>/test/snapshotResolver.js"
   },
   "eslintConfig": {
     "extends": "../cubejs-linter"

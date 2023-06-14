@@ -7,11 +7,60 @@ use pyo3::exceptions::{PyNotImplementedError, PyTypeError};
 use pyo3::types::{PyBool, PyDict, PyFloat, PyFunction, PyInt, PyList, PyString};
 use pyo3::{Py, PyAny, PyErr, PyObject, Python, ToPyObject};
 use std::cell::RefCell;
+use std::collections::hash_map::{IntoIter, Iter};
 use std::collections::HashMap;
 
-pub type CLReprObject = HashMap<String, CLRepr>;
+#[derive(Clone)]
+pub struct CLReprObject(pub(crate) HashMap<String, CLRepr>);
 
+impl CLReprObject {
+    pub fn new() -> Self {
+        Self(HashMap::new())
+    }
+
+    pub fn get(&self, key: &str) -> Option<&CLRepr> {
+        self.0.get(key)
+    }
+
+    pub fn insert(&mut self, key: String, value: CLRepr) -> Option<CLRepr> {
+        self.0.insert(key, value)
+    }
+
+    pub fn into_iter(self) -> IntoIter<String, CLRepr> {
+        self.0.into_iter()
+    }
+
+    pub fn iter(&self) -> Iter<String, CLRepr> {
+        self.0.iter()
+    }
+}
+
+impl std::fmt::Debug for CLReprObject {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(&self.0, f)
+    }
+}
+
+impl std::fmt::Display for CLReprObject {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(&self.0, f)
+    }
+}
+
+#[allow(unused)]
 #[derive(Debug)]
+pub enum CLReprKind {
+    String,
+    Bool,
+    Float,
+    Int,
+    Array,
+    Object,
+    PyFunction,
+    Null,
+}
+
+#[derive(Debug, Clone)]
 pub enum CLRepr {
     String(String),
     Bool(bool),
@@ -21,6 +70,12 @@ pub enum CLRepr {
     Object(CLReprObject),
     PyFunction(Py<PyFunction>),
     Null,
+}
+
+impl std::fmt::Display for CLRepr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(&self, f)
+    }
 }
 
 pub struct JsPyFunctionWrapper {
@@ -63,6 +118,20 @@ struct IntoJsContext {
 }
 
 impl CLRepr {
+    #[allow(unused)]
+    pub fn kind(&self) -> CLReprKind {
+        match self {
+            CLRepr::String(_) => CLReprKind::String,
+            CLRepr::Bool(_) => CLReprKind::Bool,
+            CLRepr::Float(_) => CLReprKind::Float,
+            CLRepr::Int(_) => CLReprKind::Int,
+            CLRepr::Array(_) => CLReprKind::Array,
+            CLRepr::Object(_) => CLReprKind::Object,
+            CLRepr::PyFunction(_) => CLReprKind::PyFunction,
+            CLRepr::Null => CLReprKind::Null,
+        }
+    }
+
     pub fn from_js_ref<'a, C: Context<'a>>(
         from: Handle<'a, JsValue>,
         cx: &mut C,
@@ -82,7 +151,7 @@ impl CLRepr {
 
             Ok(CLRepr::Array(r))
         } else if from.is_a::<JsObject, _>(cx) {
-            let mut obj = HashMap::new();
+            let mut obj = CLReprObject::new();
 
             let v = from.downcast_or_throw::<JsObject, _>(cx)?;
             let properties = v.get_own_property_names(cx)?;
@@ -132,7 +201,7 @@ impl CLRepr {
                 Self::Int(i)
             } else if v.get_type().is_subclass_of::<PyDict>()? {
                 let d = v.downcast::<PyDict>()?;
-                let mut obj = HashMap::new();
+                let mut obj = CLReprObject::new();
 
                 for (k, v) in d.iter() {
                     if k.get_type().is_subclass_of::<PyString>()? {
