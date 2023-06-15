@@ -784,7 +784,8 @@ export class QueryCache {
     options: {
       requestId?: string;
       skipRefreshKeyWaitForRenew?: boolean;
-      dataSource: string
+      dataSource: string,
+      // parentCacheKey
     }
   ) {
     return cacheKeyQueries.map((q) => {
@@ -803,6 +804,7 @@ export class QueryCache {
           dataSource: options.dataSource,
           useInMemory: true,
           external: queryOptions?.external,
+          // parentCacheKey
         },
       );
     });
