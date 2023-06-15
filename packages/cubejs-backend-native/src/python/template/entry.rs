@@ -113,7 +113,8 @@ impl JinjaEngine {
             .downcast_or_throw::<BoxedJinjaEngine, _>(&mut cx)?;
 
         let template_name = cx.argument::<JsString>(0)?;
-        let template_ctx = CLRepr::from_js_ref(cx.argument::<JsValue>(1)?, &mut cx)?;
+        let template_compile_context = CLRepr::from_js_ref(cx.argument::<JsValue>(1)?, &mut cx)?;
+        let template_python_context = CLRepr::from_js_ref(cx.argument::<JsValue>(2)?, &mut cx)?;
 
         let engine = &this.borrow().inner;
         let template = match engine.get_template(&template_name.value(&mut cx)) {
@@ -125,10 +126,18 @@ impl JinjaEngine {
             }
         };
 
-        let mut ctx = CLReprObject::new();
-        ctx.insert("COMPILE_CONTEXT".to_string(), template_ctx);
+        let mut to_jinja_ctx = CLReprObject::new();
+        to_jinja_ctx.insert("COMPILE_CONTEXT".to_string(), template_compile_context);
 
-        let compile_context = to_minijinja_value(CLRepr::Object(ctx));
+        if !template_python_context.is_null() {
+            for (py_symbol_name, pysymbol_repr) in
+                template_python_context.downcast_to_object().into_iter()
+            {
+                to_jinja_ctx.insert(py_symbol_name, pysymbol_repr);
+            }
+        }
+
+        let compile_context = to_minijinja_value(CLRepr::Object(to_jinja_ctx));
         match template.render(compile_context) {
             Ok(r) => Ok(cx.string(r)),
             Err(err) => {

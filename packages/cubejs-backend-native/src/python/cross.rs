@@ -9,6 +9,7 @@ use pyo3::{Py, PyAny, PyErr, PyObject, Python, ToPyObject};
 use std::cell::RefCell;
 use std::collections::hash_map::{IntoIter, Iter};
 use std::collections::HashMap;
+use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct CLReprObject(pub(crate) HashMap<String, CLRepr>);
@@ -56,10 +57,16 @@ pub enum CLReprKind {
     Int,
     Array,
     Object,
+    JsFunction,
     PyFunction,
+    PyExternalFunction,
     Null,
 }
 
+/// Cross language representation is abstraction to transfer values between
+/// JavaScript and Python across Rust. Converting between two different languages requires
+/// to use Context which is available on the call (one for python and one for js), which result as
+/// blocking.
 #[derive(Debug, Clone)]
 pub enum CLRepr {
     String(String),
@@ -68,7 +75,11 @@ pub enum CLRepr {
     Int(i64),
     Array(Vec<CLRepr>),
     Object(CLReprObject),
+    JsFunction(Arc<Root<JsFunction>>),
     PyFunction(Py<PyFunction>),
+    /// Special type to transfer functions through JavaScript
+    /// In JS it's an external object. It's not the same as Function.
+    PyExternalFunction(Py<PyFunction>),
     Null,
 }
 
@@ -85,7 +96,7 @@ pub struct JsPyFunctionWrapper {
 
 impl Finalize for JsPyFunctionWrapper {}
 
-type BoxedJsPyFunctionWrapper = JsBox<RefCell<JsPyFunctionWrapper>>;
+pub type BoxedJsPyFunctionWrapper = JsBox<RefCell<JsPyFunctionWrapper>>;
 
 fn cl_repr_py_function_wrapper(mut cx: FunctionContext) -> JsResult<JsPromise> {
     #[cfg(build = "debug")]
@@ -107,7 +118,10 @@ fn cl_repr_py_function_wrapper(mut cx: FunctionContext) -> JsResult<JsPromise> {
     }
 
     let py_method = this.borrow().fun.clone();
-    let py_runtime = py_runtime(&mut cx)?;
+    let py_runtime = match py_runtime() {
+        Ok(r) => r,
+        Err(err) => return cx.throw_error(format!("Unable to init python runtime: {:?}", err)),
+    };
     py_runtime.call_async_with_promise_callback(py_method, arguments, deferred);
 
     Ok(promise)
@@ -118,6 +132,20 @@ struct IntoJsContext {
 }
 
 impl CLRepr {
+    pub fn is_null(&self) -> bool {
+        match self {
+            CLRepr::Null => true,
+            _ => false,
+        }
+    }
+
+    pub fn downcast_to_object(self) -> CLReprObject {
+        match self {
+            CLRepr::Object(obj) => obj,
+            _ => panic!("downcast_to_object rejected, actual: {:?}", self.kind()),
+        }
+    }
+
     #[allow(unused)]
     pub fn kind(&self) -> CLReprKind {
         match self {
@@ -127,11 +155,14 @@ impl CLRepr {
             CLRepr::Int(_) => CLReprKind::Int,
             CLRepr::Array(_) => CLReprKind::Array,
             CLRepr::Object(_) => CLReprKind::Object,
+            CLRepr::JsFunction(_) => CLReprKind::JsFunction,
             CLRepr::PyFunction(_) => CLReprKind::PyFunction,
+            CLRepr::PyExternalFunction(_) => CLReprKind::PyExternalFunction,
             CLRepr::Null => CLReprKind::Null,
         }
     }
 
+    /// Convert javascript value to CLRepr
     pub fn from_js_ref<'a, C: Context<'a>>(
         from: Handle<'a, JsValue>,
         cx: &mut C,
@@ -177,16 +208,25 @@ impl CLRepr {
         } else if from.is_a::<JsNull, _>(cx) || from.is_a::<JsUndefined, _>(cx) {
             Ok(CLRepr::Null)
         } else if from.is_a::<JsPromise, _>(cx) {
-            cx.throw_error("Unsupported conversion from JsPromise to Py")?
-        } else if from.is_a::<JsFunction, _>(cx) {
-            cx.throw_error("Unsupported conversion from JsFunction to Py")?
+            cx.throw_error("Unsupported conversion from JsPromise to CLRepr")?
         } else if from.is_a::<JsDate, _>(cx) {
-            cx.throw_error("Unsupported conversion from JsDate to Py")?
+            cx.throw_error("Unsupported conversion from JsDate to CLRepr")?
+        } else if from.is_a::<BoxedJsPyFunctionWrapper, _>(cx) {
+            let ref_wrap = from.downcast_or_throw::<BoxedJsPyFunctionWrapper, _>(cx)?;
+            let fun = ref_wrap.borrow().fun.clone();
+
+            Ok(CLRepr::PyFunction(fun))
+        } else if from.is_a::<JsFunction, _>(cx) {
+            let fun = from.downcast_or_throw::<JsFunction, _>(cx)?;
+            let fun_root = fun.root(cx);
+
+            Ok(CLRepr::JsFunction(Arc::new(fun_root)))
         } else {
-            cx.throw_error(format!("Unsupported conversion from {:?} to Py", from))
+            cx.throw_error(format!("Unsupported conversion from {:?} to CLRepr", from))
         }
     }
 
+    /// Convert python value to CLRepr
     pub fn from_python_ref(v: &PyAny) -> Result<Self, PyErr> {
         if !v.is_none() {
             return Ok(if v.get_type().is_subclass_of::<PyString>()? {
@@ -288,7 +328,22 @@ impl CLRepr {
 
                 binded_fun.upcast()
             }
+            CLRepr::PyExternalFunction(py_fn) => {
+                let wrapper = JsPyFunctionWrapper {
+                    fun: py_fn,
+                    _fun_name: tcx.parent_key_name,
+                };
+                let external_obj = cx.boxed(RefCell::new(wrapper)).upcast::<JsValue>();
+
+                external_obj.upcast()
+            }
             CLRepr::Null => cx.undefined().upcast(),
+            CLRepr::JsFunction(fun) => {
+                let unwrapper_fun =
+                    Arc::try_unwrap(fun).expect("Unable to unwrap Arc on Root<JsFunction>");
+
+                unwrapper_fun.into_inner(cx).upcast()
+            }
         })
     }
 
@@ -331,9 +386,19 @@ impl CLRepr {
                 r.to_object(py)
             }
             CLRepr::Null => py.None(),
+            CLRepr::PyExternalFunction(_) => {
+                return Err(PyErr::new::<PyNotImplementedError, _>(
+                    "Unable to represent PyExternalFunction in Python",
+                ))
+            }
+            CLRepr::JsFunction(_) => {
+                return Err(PyErr::new::<PyNotImplementedError, _>(
+                    "Unable to represent JsFunction in Python",
+                ))
+            }
             CLRepr::PyFunction(_) => {
                 return Err(PyErr::new::<PyNotImplementedError, _>(
-                    "Unable to map PyFunction to python",
+                    "Unable to represent PyFunction in Python",
                 ))
             }
         })

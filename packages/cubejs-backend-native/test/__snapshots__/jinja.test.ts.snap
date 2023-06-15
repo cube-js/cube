@@ -174,6 +174,28 @@ exports[`Jinja render 08.yml.jinja: 08.yml.jinja 1`] = `
     data_source: postgres }"
 `;
 
+exports[`Jinja render data-model.yml.jinja: data-model.yml.jinja 1`] = `
+"cubes:
+
+  - name: cube_from_api
+    measures:
+      - name: count
+        type: count
+      - name: total
+        type: sum
+        sql: amount
+
+  - name: cube_from_api_with_dimensions
+    measures:
+      - name: active_users
+        type: count_distinct
+        sql: user_id
+    dimensions:
+      - name: city
+        type: string
+        sql: city_column"
+`;
+
 exports[`Jinja render dump_context.yml.jinja: dump_context.yml.jinja 1`] = `
 "<pre></pre>
 
