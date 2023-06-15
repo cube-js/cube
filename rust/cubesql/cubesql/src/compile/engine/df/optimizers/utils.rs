@@ -313,6 +313,474 @@ pub fn rewrite(expr: &Expr, map: &HashMap<Column, Option<Expr>>) -> Result<Optio
     })
 }
 
+/// Recursively rewrites an expression's column names using the provided rewrite map.
+/// If any rewrites were applied, returns the new expression wrapped in Some.
+/// Otherwise, returns None.
+pub fn rewrite_columns(expr: &Expr, map: &HashMap<String, String>) -> Option<Expr> {
+    match expr {
+        Expr::Alias(expr, name) => {
+            rewrite_columns(expr, map).map(|expr| Expr::Alias(Box::new(expr), name.clone()))
+        }
+        // Outer columns are not considered
+        Expr::OuterColumn(_, _) => None,
+        Expr::Column(column) => {
+            if column.relation.is_some() {
+                None
+            } else {
+                map.get(&column.name).map(|name| {
+                    Expr::Column(Column {
+                        relation: None,
+                        name: name.clone(),
+                    })
+                })
+            }
+        }
+        Expr::ScalarVariable(_, _) => None,
+        Expr::Literal(_) => None,
+        Expr::BinaryExpr { left, op, right } => {
+            let rewrites = match (rewrite_columns(left, map), rewrite_columns(right, map)) {
+                (None, None) => None,
+                (m_left, m_right) => Some((
+                    m_left
+                        .map(|left| Box::new(left))
+                        .unwrap_or_else(|| left.clone()),
+                    m_right
+                        .map(|right| Box::new(right))
+                        .unwrap_or_else(|| right.clone()),
+                )),
+            };
+            rewrites.map(|(left, right)| Expr::BinaryExpr {
+                left,
+                op: op.clone(),
+                right,
+            })
+        }
+        Expr::AnyExpr { left, op, right } => {
+            let rewrites = match (rewrite_columns(left, map), rewrite_columns(right, map)) {
+                (None, None) => None,
+                (m_left, m_right) => Some((
+                    m_left
+                        .map(|left| Box::new(left))
+                        .unwrap_or_else(|| left.clone()),
+                    m_right
+                        .map(|right| Box::new(right))
+                        .unwrap_or_else(|| right.clone()),
+                )),
+            };
+            rewrites.map(|(left, right)| Expr::AnyExpr {
+                left,
+                op: op.clone(),
+                right,
+            })
+        }
+        Expr::Like(Like {
+            negated,
+            expr,
+            pattern,
+            escape_char,
+        }) => {
+            let rewrites = match (rewrite_columns(expr, map), rewrite_columns(pattern, map)) {
+                (None, None) => None,
+                (m_expr, m_pattern) => Some((
+                    m_expr
+                        .map(|expr| Box::new(expr))
+                        .unwrap_or_else(|| expr.clone()),
+                    m_pattern
+                        .map(|pattern| Box::new(pattern))
+                        .unwrap_or_else(|| pattern.clone()),
+                )),
+            };
+            rewrites.map(|(expr, pattern)| {
+                Expr::Like(Like {
+                    negated: negated.clone(),
+                    expr,
+                    pattern,
+                    escape_char: escape_char.clone(),
+                })
+            })
+        }
+        Expr::ILike(Like {
+            negated,
+            expr,
+            pattern,
+            escape_char,
+        }) => {
+            let rewrites = match (rewrite_columns(expr, map), rewrite_columns(pattern, map)) {
+                (None, None) => None,
+                (m_expr, m_pattern) => Some((
+                    m_expr
+                        .map(|expr| Box::new(expr))
+                        .unwrap_or_else(|| expr.clone()),
+                    m_pattern
+                        .map(|pattern| Box::new(pattern))
+                        .unwrap_or_else(|| pattern.clone()),
+                )),
+            };
+            rewrites.map(|(expr, pattern)| {
+                Expr::ILike(Like {
+                    negated: negated.clone(),
+                    expr,
+                    pattern,
+                    escape_char: escape_char.clone(),
+                })
+            })
+        }
+        Expr::SimilarTo(Like {
+            negated,
+            expr,
+            pattern,
+            escape_char,
+        }) => {
+            let rewrites = match (rewrite_columns(expr, map), rewrite_columns(pattern, map)) {
+                (None, None) => None,
+                (m_expr, m_pattern) => Some((
+                    m_expr
+                        .map(|expr| Box::new(expr))
+                        .unwrap_or_else(|| expr.clone()),
+                    m_pattern
+                        .map(|pattern| Box::new(pattern))
+                        .unwrap_or_else(|| pattern.clone()),
+                )),
+            };
+            rewrites.map(|(expr, pattern)| {
+                Expr::SimilarTo(Like {
+                    negated: negated.clone(),
+                    expr,
+                    pattern,
+                    escape_char: escape_char.clone(),
+                })
+            })
+        }
+        Expr::Not(expr) => rewrite_columns(expr, map).map(|expr| Expr::Not(Box::new(expr))),
+        Expr::IsNotNull(expr) => {
+            rewrite_columns(expr, map).map(|expr| Expr::IsNotNull(Box::new(expr)))
+        }
+        Expr::IsNull(expr) => rewrite_columns(expr, map).map(|expr| Expr::IsNull(Box::new(expr))),
+        Expr::Negative(expr) => {
+            rewrite_columns(expr, map).map(|expr| Expr::Negative(Box::new(expr)))
+        }
+        Expr::GetIndexedField { expr, key } => {
+            let rewrites = match (rewrite_columns(expr, map), rewrite_columns(key, map)) {
+                (None, None) => None,
+                (m_expr, m_key) => Some((
+                    m_expr
+                        .map(|expr| Box::new(expr))
+                        .unwrap_or_else(|| expr.clone()),
+                    m_key
+                        .map(|key| Box::new(key))
+                        .unwrap_or_else(|| key.clone()),
+                )),
+            };
+            rewrites.map(|(expr, key)| Expr::GetIndexedField { expr, key })
+        }
+        Expr::Between {
+            expr,
+            negated,
+            low,
+            high,
+        } => {
+            let rewrites = match (
+                rewrite_columns(expr, map),
+                rewrite_columns(low, map),
+                rewrite_columns(high, map),
+            ) {
+                (None, None, None) => None,
+                (m_expr, m_low, m_high) => Some((
+                    m_expr
+                        .map(|expr| Box::new(expr))
+                        .unwrap_or_else(|| expr.clone()),
+                    m_low
+                        .map(|low| Box::new(low))
+                        .unwrap_or_else(|| low.clone()),
+                    m_high
+                        .map(|high| Box::new(high))
+                        .unwrap_or_else(|| high.clone()),
+                )),
+            };
+            rewrites.map(|(expr, low, high)| Expr::Between {
+                expr,
+                negated: negated.clone(),
+                low,
+                high,
+            })
+        }
+        Expr::Case {
+            expr,
+            when_then_expr,
+            else_expr,
+        } => {
+            let mut did_rewrite_exprs = false;
+            let expr = match expr {
+                Some(expr) => match rewrite_columns(expr, map) {
+                    Some(expr) => {
+                        did_rewrite_exprs = true;
+                        Some(Box::new(expr))
+                    }
+                    _ => Some(expr.clone()),
+                },
+                _ => None,
+            };
+            let when_then_expr = when_then_expr
+                .iter()
+                .map(|(when, then)| {
+                    match (rewrite_columns(when, map), rewrite_columns(then, map)) {
+                        (None, None) => (when.clone(), then.clone()),
+                        (m_when, m_then) => {
+                            did_rewrite_exprs = true;
+                            (
+                                m_when
+                                    .map(|when| Box::new(when))
+                                    .unwrap_or_else(|| when.clone()),
+                                m_then
+                                    .map(|then| Box::new(then))
+                                    .unwrap_or_else(|| then.clone()),
+                            )
+                        }
+                    }
+                })
+                .collect::<Vec<_>>();
+            let else_expr = match else_expr {
+                Some(else_expr) => match rewrite_columns(else_expr, map) {
+                    Some(else_expr) => {
+                        did_rewrite_exprs = true;
+                        Some(Box::new(else_expr))
+                    }
+                    _ => Some(else_expr.clone()),
+                },
+                _ => None,
+            };
+            if did_rewrite_exprs {
+                Some(Expr::Case {
+                    expr,
+                    when_then_expr,
+                    else_expr,
+                })
+            } else {
+                None
+            }
+        }
+        Expr::Cast { expr, data_type } => rewrite_columns(expr, map).map(|expr| Expr::Cast {
+            expr: Box::new(expr),
+            data_type: data_type.clone(),
+        }),
+        Expr::TryCast { expr, data_type } => rewrite_columns(expr, map).map(|expr| Expr::TryCast {
+            expr: Box::new(expr),
+            data_type: data_type.clone(),
+        }),
+        Expr::Sort {
+            expr,
+            asc,
+            nulls_first,
+        } => rewrite_columns(expr, map).map(|expr| Expr::Sort {
+            expr: Box::new(expr),
+            asc: asc.clone(),
+            nulls_first: nulls_first.clone(),
+        }),
+        Expr::ScalarFunction { fun, args } => {
+            let mut did_rewrite_exprs = false;
+            let args = args
+                .iter()
+                .map(|arg| {
+                    rewrite_columns(arg, map)
+                        .map(|arg| {
+                            did_rewrite_exprs = true;
+                            arg
+                        })
+                        .unwrap_or_else(|| arg.clone())
+                })
+                .collect::<Vec<_>>();
+            if did_rewrite_exprs {
+                Some(Expr::ScalarFunction {
+                    fun: fun.clone(),
+                    args,
+                })
+            } else {
+                None
+            }
+        }
+        Expr::ScalarUDF { fun, args } => {
+            let mut did_rewrite_exprs = false;
+            let args = args
+                .iter()
+                .map(|arg| {
+                    rewrite_columns(arg, map)
+                        .map(|arg| {
+                            did_rewrite_exprs = true;
+                            arg
+                        })
+                        .unwrap_or_else(|| arg.clone())
+                })
+                .collect::<Vec<_>>();
+            if did_rewrite_exprs {
+                Some(Expr::ScalarUDF {
+                    fun: fun.clone(),
+                    args,
+                })
+            } else {
+                None
+            }
+        }
+        Expr::TableUDF { fun, args } => {
+            let mut did_rewrite_exprs = false;
+            let args = args
+                .iter()
+                .map(|arg| {
+                    rewrite_columns(arg, map)
+                        .map(|arg| {
+                            did_rewrite_exprs = true;
+                            arg
+                        })
+                        .unwrap_or_else(|| arg.clone())
+                })
+                .collect::<Vec<_>>();
+            if did_rewrite_exprs {
+                Some(Expr::TableUDF {
+                    fun: fun.clone(),
+                    args,
+                })
+            } else {
+                None
+            }
+        }
+        Expr::AggregateFunction {
+            fun,
+            args,
+            distinct,
+        } => {
+            let mut did_rewrite_exprs = false;
+            let args = args
+                .iter()
+                .map(|arg| {
+                    rewrite_columns(arg, map)
+                        .map(|arg| {
+                            did_rewrite_exprs = true;
+                            arg
+                        })
+                        .unwrap_or_else(|| arg.clone())
+                })
+                .collect::<Vec<_>>();
+            if did_rewrite_exprs {
+                Some(Expr::AggregateFunction {
+                    fun: fun.clone(),
+                    args,
+                    distinct: *distinct,
+                })
+            } else {
+                None
+            }
+        }
+        Expr::WindowFunction {
+            fun,
+            args,
+            partition_by,
+            order_by,
+            window_frame,
+        } => {
+            let mut did_rewrite_exprs = false;
+            let args = args
+                .iter()
+                .map(|arg| {
+                    rewrite_columns(arg, map)
+                        .map(|arg| {
+                            did_rewrite_exprs = true;
+                            arg
+                        })
+                        .unwrap_or_else(|| arg.clone())
+                })
+                .collect::<Vec<_>>();
+            let partition_by = partition_by
+                .iter()
+                .map(|expr| {
+                    rewrite_columns(expr, map)
+                        .map(|expr| {
+                            did_rewrite_exprs = true;
+                            expr
+                        })
+                        .unwrap_or_else(|| expr.clone())
+                })
+                .collect::<Vec<_>>();
+            let order_by = order_by
+                .iter()
+                .map(|expr| {
+                    rewrite_columns(expr, map)
+                        .map(|expr| {
+                            did_rewrite_exprs = true;
+                            expr
+                        })
+                        .unwrap_or_else(|| expr.clone())
+                })
+                .collect::<Vec<_>>();
+            if did_rewrite_exprs {
+                Some(Expr::WindowFunction {
+                    fun: fun.clone(),
+                    args,
+                    partition_by,
+                    order_by,
+                    window_frame: window_frame.clone(),
+                })
+            } else {
+                None
+            }
+        }
+        Expr::AggregateUDF { fun, args } => {
+            let mut did_rewrite_exprs = false;
+            let args = args
+                .iter()
+                .map(|arg| {
+                    rewrite_columns(arg, map)
+                        .map(|arg| {
+                            did_rewrite_exprs = true;
+                            arg
+                        })
+                        .unwrap_or_else(|| arg.clone())
+                })
+                .collect::<Vec<_>>();
+            if did_rewrite_exprs {
+                Some(Expr::AggregateUDF {
+                    fun: fun.clone(),
+                    args,
+                })
+            } else {
+                None
+            }
+        }
+        Expr::InList {
+            expr,
+            list,
+            negated,
+        } => {
+            let mut did_rewrite_exprs = false;
+            let expr = rewrite_columns(expr, map)
+                .map(|expr| {
+                    did_rewrite_exprs = true;
+                    Box::new(expr)
+                })
+                .unwrap_or_else(|| expr.clone());
+            let list = list
+                .iter()
+                .map(|expr| {
+                    rewrite_columns(expr, map)
+                        .map(|expr| {
+                            did_rewrite_exprs = true;
+                            expr
+                        })
+                        .unwrap_or_else(|| expr.clone())
+                })
+                .collect::<Vec<_>>();
+            if did_rewrite_exprs {
+                Some(Expr::InList {
+                    expr,
+                    list,
+                    negated: *negated,
+                })
+            } else {
+                None
+            }
+        }
+        Expr::Wildcard | Expr::QualifiedWildcard { .. } => None,
+    }
+}
+
 /// Recursively checks if the passed expr is a constant (always evaluates to the same result).
 pub fn is_const_expr(expr: &Expr) -> bool {
     match expr {
