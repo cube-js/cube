@@ -18,13 +18,14 @@ use datafusion::{
     },
 };
 use itertools::Itertools;
+use serde_derive::*;
 use std::{any::Any, fmt, future::Future, pin::Pin, result, sync::Arc};
 
 #[derive(Debug, Clone)]
 pub struct CubeScanWrapperExecutionPlan {
     schema: SchemaRef,
     wrapped_plan: Arc<LogicalPlan>,
-    wrapped_sql: String,
+    wrapped_sql: SqlQuery,
     transport: Arc<dyn TransportService>,
     request_meta: LoadRequestMeta,
     meta: Arc<MetaContext>,
@@ -35,7 +36,7 @@ impl CubeScanWrapperExecutionPlan {
     pub fn new(
         schema: SchemaRef,
         wrapped_plan: Arc<LogicalPlan>,
-        wrapped_sql: String,
+        wrapped_sql: SqlQuery,
         transport: Arc<dyn TransportService>,
         request_meta: LoadRequestMeta,
         meta: Arc<MetaContext>,
@@ -53,12 +54,33 @@ impl CubeScanWrapperExecutionPlan {
     }
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct SqlQuery {
+    pub sql: String,
+    pub values: Vec<String>,
+}
+
+impl SqlQuery {
+    pub fn new(sql: String, values: Vec<String>) -> Self {
+        Self { sql, values }
+    }
+
+    pub fn add_value(&mut self, value: String) -> usize {
+        self.values.push(value);
+        self.values.len()
+    }
+
+    pub fn replace_sql(&mut self, sql: String) {
+        self.sql = sql;
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct CubeScanWrapperNode {
     pub wrapped_plan: Arc<LogicalPlan>,
     pub meta: Arc<MetaContext>,
     pub auth_context: AuthContextRef,
-    pub wrapped_sql: Option<String>,
+    pub wrapped_sql: Option<SqlQuery>,
 }
 
 impl CubeScanWrapperNode {
@@ -75,7 +97,7 @@ impl CubeScanWrapperNode {
         }
     }
 
-    pub fn with_sql(&self, sql: String) -> Self {
+    pub fn with_sql(&self, sql: SqlQuery) -> Self {
         Self {
             wrapped_plan: self.wrapped_plan.clone(),
             meta: self.meta.clone(),
@@ -89,10 +111,12 @@ impl CubeScanWrapperNode {
     pub async fn generate_sql(
         &self,
         transport: Arc<dyn TransportService>,
+        load_request_meta: Arc<LoadRequestMeta>,
     ) -> result::Result<Self, CubeError> {
         let sql = Self::generate_sql_for_node(
             Arc::new(self.clone()),
             transport,
+            load_request_meta,
             self.wrapped_plan.clone(),
         )
         .await
@@ -103,12 +127,13 @@ impl CubeScanWrapperNode {
     pub fn generate_sql_for_node(
         plan: Arc<Self>,
         transport: Arc<dyn TransportService>,
+        load_request_meta: Arc<LoadRequestMeta>,
         node: Arc<LogicalPlan>,
     ) -> Pin<
         Box<
-            dyn Future<Output = result::Result<(Option<String>, Option<String>, String), CubeError>>
-                + Send
-                + Sync,
+            dyn Future<
+                    Output = result::Result<(Option<String>, Option<String>, SqlQuery), CubeError>,
+                > + Send,
         >,
     > {
         Box::pin(async move {
@@ -157,6 +182,13 @@ impl CubeScanWrapperNode {
                                 node
                             )));
                         }
+                        let sql = transport
+                            .sql(
+                                node.request,
+                                node.auth_context,
+                                load_request_meta.as_ref().clone(),
+                            )
+                            .await?;
                         // TODO
                         return Ok((
                             Some(data_sources[0].clone()),
@@ -166,7 +198,7 @@ impl CubeScanWrapperNode {
                                 .iter()
                                 .next()
                                 .and_then(|f| f.qualifier().cloned()),
-                            "SELECT * FROM cube".to_string(),
+                            sql.sql,
                         ));
                     } else if let Some(WrappedSelectNode {
                         schema,
@@ -185,9 +217,10 @@ impl CubeScanWrapperNode {
                     }) = wrapped_select_node
                     {
                         // TODO support joins
-                        let (data_source, from_alias, sql) = Self::generate_sql_for_node(
+                        let (data_source, from_alias, mut sql) = Self::generate_sql_for_node(
                             plan.clone(),
                             transport.clone(),
+                            load_request_meta.clone(),
                             from.clone(),
                         )
                         .await?;
@@ -230,28 +263,26 @@ impl CubeScanWrapperNode {
                                     alias: expr.name(&schema)?, // TODO use from schema instead?
                                 });
                             }
-                            Ok((
-                                Some(data_source),
-                                alias,
-                                generator
-                                    .get_sql_templates()
-                                    .select(
-                                        sql,
-                                        group_by,
-                                        aggregate,
-                                        // TODO
-                                        from_alias.unwrap_or("".to_string()),
-                                        None,
-                                        None,
-                                        Vec::new(),
-                                    )
-                                    .map_err(|e| {
-                                        DataFusionError::Internal(format!(
-                                            "Can't generate SQL for wrapped select: {}",
-                                            e
-                                        ))
-                                    })?,
-                            ))
+                            let resulting_sql = generator
+                                .get_sql_templates()
+                                .select(
+                                    sql.sql.to_string(),
+                                    group_by,
+                                    aggregate,
+                                    // TODO
+                                    from_alias.unwrap_or("".to_string()),
+                                    None,
+                                    None,
+                                    Vec::new(),
+                                )
+                                .map_err(|e| {
+                                    DataFusionError::Internal(format!(
+                                        "Can't generate SQL for wrapped select: {}",
+                                        e
+                                    ))
+                                })?;
+                            sql.replace_sql(resulting_sql.clone());
+                            Ok((Some(data_source), alias, sql))
                         } else {
                             Err(CubeError::internal(format!(
                                 "Can't generate SQL for wrapped select: no data source for {:?}",
@@ -280,7 +311,7 @@ impl CubeScanWrapperNode {
         plan: Arc<Self>,
         sql_generator: Arc<dyn SqlGenerator>,
         expr: Expr,
-    ) -> Pin<Box<dyn Future<Output = Result<String>> + Send + Sync>> {
+    ) -> Pin<Box<dyn Future<Output = Result<String>> + Send>> {
         Box::pin(async move {
             match expr {
                 // Expr::Alias(_, _) => {}
@@ -437,7 +468,11 @@ impl ExecutionPlan for CubeScanWrapperExecutionPlan {
     fn fmt_as(&self, t: DisplayFormatType, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match t {
             DisplayFormatType::Default => {
-                write!(f, "CubeScanWrapperExecutionPlan, SQL: {}", self.wrapped_sql)
+                write!(
+                    f,
+                    "CubeScanWrapperExecutionPlan, SQL: {}",
+                    self.wrapped_sql.sql
+                )
             }
         }
     }

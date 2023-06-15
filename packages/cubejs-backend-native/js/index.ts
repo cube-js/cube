@@ -54,6 +54,7 @@ export type SQLInterfaceOptions = {
     nonce?: string,
     checkAuth: (payload: CheckAuthPayload) => CheckAuthResponse | Promise<CheckAuthResponse>,
     load: (payload: LoadPayload) => unknown | Promise<unknown>,
+    sql: (payload: LoadPayload) => unknown | Promise<unknown>,
     meta: (payload: MetaPayload) => unknown | Promise<unknown>,
     stream: (payload: LoadPayload) => unknown | Promise<unknown>,
     sqlGenerators: (paramsJson: string) => unknown | Promise<unknown>,
@@ -263,11 +264,16 @@ export const registerInterface = async (options: SQLInterfaceOptions): Promise<S
         throw new Error('options.sqlGenerators must be a function');
     }
 
+    if (typeof options.sql != 'function') {
+        throw new Error('options.sql must be a function');
+    }
+
     const native = loadNative();
     return native.registerInterface({
         ...options,
         checkAuth: wrapNativeFunctionWithChannelCallback(options.checkAuth),
         load: wrapNativeFunctionWithChannelCallback(options.load),
+        sql: wrapNativeFunctionWithChannelCallback(options.sql),
         meta: wrapNativeFunctionWithChannelCallback(options.meta),
         stream: wrapNativeFunctionWithStream(options.stream),
         sqlGenerators: wrapRawNativeFunctionWithChannelCallback(options.sqlGenerators),

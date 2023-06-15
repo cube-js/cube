@@ -357,7 +357,7 @@ impl ExtensionPlanner for CubeScanExtensionPlanner {
                             "Wrapped SQL is not set for wrapper node. Optimization wasn't performed: {:?}",
                             wrapper_node
                         ))
-                    })?.to_string(),
+                    })?.clone(),
                     self.transport.clone(),
                     self.meta.clone(),
                     wrapper_node.meta.clone(),
@@ -1015,6 +1015,7 @@ mod tests {
     use crate::{
         compile::MetaContext,
         sql::{session::DatabaseProtocol, HttpAuthContext},
+        transport::SqlResponse,
         CubeError,
     };
     use cubeclient::models::V1LoadResponse;
@@ -1049,6 +1050,15 @@ mod tests {
             // Load meta information about cubes
             async fn meta(&self, _ctx: AuthContextRef) -> Result<Arc<MetaContext>, CubeError> {
                 panic!("It's a fake transport");
+            }
+
+            async fn sql(
+                &self,
+                query: V1LoadRequestQuery,
+                ctx: AuthContextRef,
+                meta_fields: LoadRequestMeta,
+            ) -> Result<SqlResponse, CubeError> {
+                todo!()
             }
 
             // Execute load query

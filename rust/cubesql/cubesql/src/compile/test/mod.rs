@@ -8,13 +8,14 @@ use cubeclient::models::{
 use datafusion::arrow::datatypes::SchemaRef;
 
 use crate::{
-    compile::engine::df::scan::MemberField,
+    compile::engine::df::{scan::MemberField, wrapper::SqlQuery},
     sql::{
         session::DatabaseProtocol, AuthContextRef, AuthenticateResponse, HttpAuthContext,
         ServerManager, Session, SessionManager, SqlAuthService,
     },
     transport::{
-        CubeStreamReceiver, LoadRequestMeta, SqlGenerator, SqlTemplates, TransportService,
+        CubeStreamReceiver, LoadRequestMeta, SqlGenerator, SqlResponse, SqlTemplates,
+        TransportService,
     },
     CubeError,
 };
@@ -305,6 +306,17 @@ pub fn get_test_transport() -> Arc<dyn TransportService> {
         // Load meta information about cubes
         async fn meta(&self, _ctx: AuthContextRef) -> Result<Arc<MetaContext>, CubeError> {
             panic!("It's a fake transport");
+        }
+
+        async fn sql(
+            &self,
+            query: V1LoadRequestQuery,
+            ctx: AuthContextRef,
+            meta_fields: LoadRequestMeta,
+        ) -> Result<SqlResponse, CubeError> {
+            Ok(SqlResponse {
+                sql: SqlQuery::new("SELECT 1".to_string(), vec![]),
+            })
         }
 
         // Execute load query

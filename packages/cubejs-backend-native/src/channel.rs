@@ -264,9 +264,8 @@ fn get_sql_templates(
         );
     }
 
-    Ok(SqlTemplates {
-        functions: functions_map,
-    })
+    // TODO
+    Ok(SqlTemplates::new(functions_map, HashMap::new())?)
 }
 
 // TODO impl drop for SqlGenerator

@@ -104,7 +104,10 @@ pub mod service;
 pub mod test;
 
 pub use crate::transport::ctx::*;
-use crate::{compile::engine::df::wrapper::CubeScanWrapperNode, transport::TransportService};
+use crate::{
+    compile::engine::df::wrapper::CubeScanWrapperNode,
+    transport::{LoadRequestMeta, TransportService},
+};
 pub use error::{CompilationError, CompilationResult};
 
 #[derive(Clone)]
@@ -870,7 +873,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         statement: &Box<ast::Statement>,
         verbose: bool,
         analyze: bool,
-    ) -> Pin<Box<dyn Future<Output = Result<QueryPlan, CompilationError>> + Send + Sync>> {
+    ) -> Pin<Box<dyn Future<Output = Result<QueryPlan, CompilationError>> + Send>> {
         let self_cloned = self.clone();
 
         let statement = statement.clone();
@@ -1332,9 +1335,12 @@ WHERE `TABLE_SCHEMA` = '{}'",
         };
 
         log::debug!("Rewrite: {:#?}", rewrite_plan);
-        let rewrite_plan =
-            Self::evaluate_wrapped_sql(self.session_manager.server.transport.clone(), rewrite_plan)
-                .await?;
+        let rewrite_plan = Self::evaluate_wrapped_sql(
+            self.session_manager.server.transport.clone(),
+            Arc::new(self.state.get_load_request_meta()),
+            rewrite_plan,
+        )
+        .await?;
         if let Some(qtrace) = qtrace {
             qtrace.set_best_plan_and_cube_scans(&rewrite_plan);
         }
@@ -1348,8 +1354,9 @@ WHERE `TABLE_SCHEMA` = '{}'",
 
     fn evaluate_wrapped_sql(
         transport_service: Arc<dyn TransportService>,
+        load_request_meta: Arc<LoadRequestMeta>,
         plan: LogicalPlan,
-    ) -> Pin<Box<dyn Future<Output = CompilationResult<LogicalPlan>> + Send + Sync>> {
+    ) -> Pin<Box<dyn Future<Output = CompilationResult<LogicalPlan>> + Send>> {
         Box::pin(async move {
             if let LogicalPlan::Extension(Extension { node }) = &plan {
                 // .cloned() is to avoid borrowing Any to comply with Send + Sync
@@ -1359,7 +1366,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
                     return Ok(LogicalPlan::Extension(Extension {
                         node: Arc::new(
                             wrapper
-                                .generate_sql(transport_service.clone())
+                                .generate_sql(transport_service.clone(), load_request_meta.clone())
                                 .await
                                 .map_err(|e| CompilationError::internal(e.to_string()))?,
                         ),
@@ -1369,7 +1376,12 @@ WHERE `TABLE_SCHEMA` = '{}'",
             let mut children = Vec::new();
             for input in plan.inputs() {
                 children.push(
-                    Self::evaluate_wrapped_sql(transport_service.clone(), input.clone()).await?,
+                    Self::evaluate_wrapped_sql(
+                        transport_service.clone(),
+                        load_request_meta.clone(),
+                        input.clone(),
+                    )
+                    .await?,
                 );
             }
             from_plan(&plan, plan.expressions().as_slice(), children.as_slice())

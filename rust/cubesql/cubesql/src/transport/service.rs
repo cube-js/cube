@@ -17,7 +17,10 @@ use tokio::{
 };
 
 use crate::{
-    compile::{engine::df::scan::MemberField, MetaContext},
+    compile::{
+        engine::df::{scan::MemberField, wrapper::SqlQuery},
+        MetaContext,
+    },
     sql::{AuthContextRef, HttpAuthContext},
     CubeError,
 };
@@ -54,10 +57,23 @@ impl LoadRequestMeta {
     }
 }
 
+#[derive(Debug, Deserialize)]
+pub struct SqlResponse {
+    pub sql: SqlQuery,
+}
+
 #[async_trait]
 pub trait TransportService: Send + Sync + Debug {
     // Load meta information about cubes
     async fn meta(&self, ctx: AuthContextRef) -> Result<Arc<MetaContext>, CubeError>;
+
+    // Get sql for query to be used in wrapped SQL query
+    async fn sql(
+        &self,
+        query: V1LoadRequestQuery,
+        ctx: AuthContextRef,
+        meta_fields: LoadRequestMeta,
+    ) -> Result<SqlResponse, CubeError>;
 
     // Execute load query
     async fn load(
@@ -164,6 +180,15 @@ impl TransportService for HttpTransport {
         });
 
         Ok(value)
+    }
+
+    async fn sql(
+        &self,
+        query: V1LoadRequestQuery,
+        ctx: AuthContextRef,
+        meta_fields: LoadRequestMeta,
+    ) -> Result<SqlResponse, CubeError> {
+        todo!()
     }
 
     async fn load(

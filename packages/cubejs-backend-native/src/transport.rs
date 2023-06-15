@@ -6,7 +6,7 @@ use std::fmt::Display;
 use async_trait::async_trait;
 use cubeclient::models::{V1Error, V1LoadRequestQuery, V1LoadResponse, V1MetaResponse};
 use cubesql::compile::engine::df::scan::{MemberField, SchemaRef};
-use cubesql::transport::SqlGenerator;
+use cubesql::transport::{SqlGenerator, SqlResponse};
 use cubesql::{
     di_service,
     sql::AuthContextRef,
@@ -28,6 +28,7 @@ use crate::{
 pub struct NodeBridgeTransport {
     channel: Arc<Channel>,
     on_load: Arc<Root<JsFunction>>,
+    on_sql: Arc<Root<JsFunction>>,
     on_meta: Arc<Root<JsFunction>>,
     on_load_stream: Arc<Root<JsFunction>>,
     sql_generators: Arc<Root<JsFunction>>,
@@ -37,6 +38,7 @@ impl NodeBridgeTransport {
     pub fn new(
         channel: Channel,
         on_load: Root<JsFunction>,
+        on_sql: Root<JsFunction>,
         on_meta: Root<JsFunction>,
         on_load_stream: Root<JsFunction>,
         sql_generators: Root<JsFunction>,
@@ -44,6 +46,7 @@ impl NodeBridgeTransport {
         Self {
             channel: Arc::new(channel),
             on_load: Arc::new(on_load),
+            on_sql: Arc::new(on_sql),
             on_meta: Arc::new(on_meta),
             on_load_stream: Arc::new(on_load_stream),
             sql_generators: Arc::new(sql_generators),
@@ -156,6 +159,15 @@ impl TransportService for NodeBridgeTransport {
             cube_to_data_source,
             data_source_to_sql_generator,
         )))
+    }
+
+    async fn sql(
+        &self,
+        query: V1LoadRequestQuery,
+        ctx: AuthContextRef,
+        meta_fields: LoadRequestMeta,
+    ) -> Result<SqlResponse, CubeError> {
+        todo!()
     }
 
     async fn load(
