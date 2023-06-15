@@ -22,6 +22,7 @@ use arrow::error::ArrowError;
 use cubehll::HllError;
 use cubezetasketch::ZetaError;
 use datafusion::cube_ext::catch_unwind::PanicError;
+use deepsize::DeepSizeOf;
 use flexbuffers::{DeserializationError, ReaderError};
 use log::SetLoggerError;
 use parquet::errors::ParquetError;
@@ -62,7 +63,7 @@ pub mod util;
 pub use datafusion::cube_ext::spawn;
 pub use datafusion::cube_ext::spawn_blocking;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, DeepSizeOf)]
 pub struct CubeError {
     pub message: String,
     pub backtrace: String,
@@ -71,7 +72,7 @@ pub struct CubeError {
 
 impl std::error::Error for CubeError {}
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, DeepSizeOf)]
 pub enum CubeErrorCauseType {
     User,
     Internal,
