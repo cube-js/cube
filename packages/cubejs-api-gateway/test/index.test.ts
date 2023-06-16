@@ -745,7 +745,7 @@ describe('API Gateway', () => {
         method: 'post',
         successBody: {
           query: {
-            extended: true,
+            minimized: false,
             timezones: ['UTC'],
             preAggregations: [
               {

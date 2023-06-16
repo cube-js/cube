@@ -295,7 +295,7 @@ describe('lambda', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         query: {
-          extended: true,
+          minimized: false,
           preAggregations: [
             {
               id: 'Orders.ordersByCompletedAtLambda'

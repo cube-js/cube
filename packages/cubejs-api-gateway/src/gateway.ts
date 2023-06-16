@@ -624,7 +624,7 @@ class ApiGateway {
         preAggregation,
         timezones,
         partitions: partitions.map(partition => ({
-          ...(query.extended ? partition : {}),
+          ...(query.minimized ? {} : partition),
           dataSource: partition.dataSource,
           preAggregationId: partition.preAggregationId,
           tableName: partition.tableName,
