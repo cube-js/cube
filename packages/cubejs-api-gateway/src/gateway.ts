@@ -624,10 +624,13 @@ class ApiGateway {
         preAggregation,
         timezones,
         partitions: partitions.map(partition => ({
-          ...partition,
+          ...(query.extended ? partition : {}),
+          dataSource: partition.dataSource,
+          preAggregationId: partition.preAggregationId,
+          tableName: partition.tableName,
+          type: partition.type,
           versionEntries: versionEntriesResult?.versionEntriesByTableName[partition?.tableName] || [],
           structureVersion: versionEntriesResult?.structureVersionsByTableName[partition?.tableName] || [],
-          loadSql: null,
         })),
       });
 
