@@ -156,37 +156,132 @@ jobs:
           tag: ${{ github.ref }}
           overwrite: true
 
-  native:
+  native_macos:
     runs-on: ${{ matrix.os-version }}
     timeout-minutes: 90
-    env:
-      NODE_PRE_GYP_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    name: Build ${{ matrix.os-version }} ${{ matrix.target }} ${{ matrix.node-version }} Python ${{ matrix.python-version }}
+    strategy:
+      matrix:
+        node-version: [16.x]
+        os-version: ["macos-11"]
+        target: ["x86_64-apple-darwin", "aarch64-apple-darwin"]
+        include:
+          - target: x86_64-apple-darwin
+            package_target_arch: x64
+            package_target_platform: darwin
+            package_target_libc: unknown
+            tar_executable: gtar
+          - target: aarch64-apple-darwin
+            package_target_arch: arm64
+            package_target_platform: darwin
+            package_target_libc: unknown
+            tar_executable: gtar
+          # Support Python build for x64
+          - target: x86_64-apple-darwin
+            python-version: "3.9"
+          - target: x86_64-apple-darwin
+            python-version: "3.10"
+          - target: x86_64-apple-darwin
+            python-version: "3.11"
+          # fallback
+          - target: x86_64-apple-darwin
+            python-version: "fallback"
+          - target: aarch64-apple-darwin
+            python-version: "fallback"
+      fail-fast: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2022-03-22
+          override: true
+          components: rustfmt
+          target: ${{ matrix.target }}
+      - name: Install Python
+        uses: actions/setup-python@v4
+        if: (matrix.python-version != 'fallback')
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
+        shell: bash
+      - name: Restore yarn cache
+        uses: actions/cache@v3
+        with:
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
+      - name: Set Yarn version
+        run: yarn policies set-version v1.22.19
+      - name: Copy yarn.lock file
+        run: cp yarn.lock packages/cubejs-docker
+      - name: Yarn install
+        uses: nick-invision/retry@v2
+        env:
+          CUBESTORE_SKIP_POST_INSTALL: true
+        with:
+          max_attempts: 3
+          retry_on: error
+          retry_wait_seconds: 15
+          timeout_minutes: 20
+          command: yarn install --frozen-lockfile
+      - name: Compile TypeScript
+        run: yarn tsc
+      - name: Build native
+        run: cd packages/cubejs-backend-native && npm run native:build-release
+      - name: Build native (fallback)
+        if: (matrix.python-version == 'fallback')
+        run: cd packages/cubejs-backend-native && npm run native:build-release
+        env:
+          CARGO_BUILD_TARGET: ${{ matrix.target }}
+      - name: Build native (with Python)
+        if: (matrix.python-version != 'fallback')
+        env:
+          PYO3_PYTHON: python${{ matrix.python-version }}
+          CARGO_BUILD_TARGET: ${{ matrix.target }}
+        run: cd packages/cubejs-backend-native && npm run native:build-release-python
+      - name: Archive release asset
+        shell: bash
+        run: |
+          cd packages/cubejs-backend-native
+          rm -rf native
+          mkdir native
+          cp index.node native/index.node
+          ${{ matrix.tar_executable }} -czvf native.tar.gz native
+      - name: Upload to Release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: packages/cubejs-backend-native/native.tar.gz
+          # Example: native-linux-arm64-glibc.tar.gz
+          asset_name: native-${{ matrix.package_target_platform }}-${{ matrix.package_target_arch }}-${{ matrix.package_target_libc }}-${{ matrix.python-version }}.tar.gz
+          tag: ${{ github.ref }}
+          overwrite: true
+
+  native_windows:
+    runs-on: ${{ matrix.os-version }}
+    timeout-minutes: 90
     name: Build ${{ matrix.os-version }} ${{ matrix.node-version }} Python ${{ matrix.python-version }}
     strategy:
       matrix:
         node-version: [16.x]
-        python-version: ["3.9", "3.10", "3.11", "fallback"]
-        os-version: [windows-2019, macos-11]
+        python-version: ["fallback"]
+        os-version: [windows-2019]
         include:
           - os-version: windows-2019
             package_target_arch: x64
             package_target_platform: win32
             package_target_libc: unknown
             tar_executable: tar
-          - os-version: macos-11
-            package_target_arch: x64
-            package_target_platform: darwin
-            package_target_libc: unknown
-            # bsd tar has a different format with Sparse files which breaks download script
-            tar_executable: gtar
-        exclude:
-          # We dont plan to support windows for native-python
-          - os-version: windows-2019
-            python-version: "3.11"
-          - os-version: windows-2019
-            python-version: "3.10"
-          - os-version: windows-2019
-            python-version: "3.9"
       fail-fast: false
 
     steps:
@@ -194,7 +289,6 @@ jobs:
         uses: actions/checkout@v3
       - name: Disable rustup update (issue workaround for Windows)
         run: rustup set auto-self-update disable
-        if: contains(runner.os, 'windows')
         shell: bash
       - name: Install Rust
         uses: actions-rs/toolchain@v1
