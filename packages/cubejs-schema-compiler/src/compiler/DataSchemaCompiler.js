@@ -57,7 +57,7 @@ export class DataSchemaCompiler {
    */
   async doCompile() {
     const files = await this.repository.dataSchemaFiles();
-    const hasJinjaTemplate = files.filter((file) => file.fileName.endsWith('.jinja'));
+    const hasJinjaTemplate = files.find((file) => file.fileName.endsWith('.jinja'));
 
     if (hasJinjaTemplate && NATIVE_IS_SUPPORTED && !isFallbackBuild()) {
       initJinjaEngine({
