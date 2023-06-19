@@ -68,9 +68,28 @@ export function isNativeSupported(): IsNativeSupportedResult {
         reason: 'You are using linux distro with Musl which is not supported'
       };
     }
+
+    return true;
   }
 
-  return true;
+  if (process.platform === 'win32') {
+    return true;
+  }
+
+  // TODO(ovr): https://github.com/cube-js/cube/pull/6093
+  if (process.platform === 'darwin' && process.arch === 'x64') {
+    return true;
+  }
+
+  displayCLIWarningOnce(
+    'is-native-supported',
+    `Unable to load native extension. You are using a ${process.platform}-${process.arch} platform which is not supported. Read more: ` +
+    'https://github.com/cube-js/cube/blob/master/packages/cubejs-backend-native/README.md#supported-architectures-and-platforms'
+  );
+
+  return {
+    reason: `You are using ${process.platform}-${process.arch} platform which is not supported`
+  };
 }
 
 export enum LibraryExistsResult {
