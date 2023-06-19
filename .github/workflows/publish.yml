@@ -159,8 +159,6 @@ jobs:
   native_macos:
     runs-on: ${{ matrix.os-version }}
     timeout-minutes: 90
-    env:
-      NODE_PRE_GYP_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     name: Build ${{ matrix.os-version }} ${{ matrix.node-version }} Python ${{ matrix.python-version }}
     strategy:
       matrix:
@@ -261,8 +259,6 @@ jobs:
   native_windows:
     runs-on: ${{ matrix.os-version }}
     timeout-minutes: 90
-    env:
-      NODE_PRE_GYP_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     name: Build ${{ matrix.os-version }} ${{ matrix.node-version }} Python ${{ matrix.python-version }}
     strategy:
       matrix:
