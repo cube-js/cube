@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.28](https://github.com/cube-js/cube/compare/v0.33.27...v0.33.28) (2023-06-19)
+
+
+### Bug Fixes
+
+* **native:** Correct support detection (disable on darwin-aaarch64) ([#6737](https://github.com/cube-js/cube/issues/6737)) ([53c6ee9](https://github.com/cube-js/cube/commit/53c6ee9bddfb679dad28d88352e11b2f8a39e6ca))
+* **schema:** Load jinja engine only when jinja templates exist ([#6741](https://github.com/cube-js/cube/issues/6741)) ([75469a6](https://github.com/cube-js/cube/commit/75469a67b58d0a730b29b57d4f05a4049462bf10))
+
+
+
+
+
 ## [0.33.27](https://github.com/cube-js/cube/compare/v0.33.26...v0.33.27) (2023-06-17)
 
 

@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.28](https://github.com/cube-js/cube/compare/v0.33.27...v0.33.28) (2023-06-19)
+
+
+### Bug Fixes
+
+* **schema:** Load jinja engine only when jinja templates exist ([#6741](https://github.com/cube-js/cube/issues/6741)) ([75469a6](https://github.com/cube-js/cube/commit/75469a67b58d0a730b29b57d4f05a4049462bf10))
+
+
+
+
+
 ## [0.33.26](https://github.com/cube-js/cube/compare/v0.33.25...v0.33.26) (2023-06-14)
 
 
