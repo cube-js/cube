@@ -91,6 +91,9 @@ fn init_template_engine<'a, C: Context<'a>>(_cx: &mut C, opts: EngineOptions) ->
     );
 
     if let Err(_) = TEMPLATE_ENGINE.set(Mutex::new(engine)) {
+        // I am working on a new jinja engine implementation on top of isolated instances per tenant
+        // to support multi tenancy
+        #[cfg(debug_assertions)]
         error!("Unable to init jinja engine, it was already started");
     }
 
