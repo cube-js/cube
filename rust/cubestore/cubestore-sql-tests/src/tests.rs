@@ -1969,7 +1969,7 @@ async fn create_table_with_location(service: Box<dyn SqlClient>) {
         file.write_all("5,New York,\"\",2021-01-25 19:12:23 UTC\n".as_bytes())
             .await
             .unwrap();
-        file.write_all("6,New York,\"\",\"\\N\"\n".as_bytes())
+        file.write_all("6,New York,\\\\N,\"\\N\"\n".as_bytes())
             .await
             .unwrap();
 
