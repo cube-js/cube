@@ -165,6 +165,7 @@ jobs:
         node-version: [16.x]
         os-version: ["macos-11"]
         target: ["x86_64-apple-darwin", "aarch64-apple-darwin"]
+        python-version: ["3.9", "3.10", "3.11", "fallback"]
         include:
           - target: x86_64-apple-darwin
             package_target_arch: x64
@@ -176,18 +177,14 @@ jobs:
             package_target_platform: darwin
             package_target_libc: unknown
             tar_executable: gtar
-          # Support Python build for x64
-          - target: x86_64-apple-darwin
+        exclude:
+          # Disable python builds for aarch64 (not ready)
+          - target: "aarch64-unknown-linux-gnu"
             python-version: "3.9"
-          - target: x86_64-apple-darwin
+          - target: "aarch64-unknown-linux-gnu"
             python-version: "3.10"
-          - target: x86_64-apple-darwin
+          - target: "aarch64-unknown-linux-gnu"
             python-version: "3.11"
-          # fallback
-          - target: x86_64-apple-darwin
-            python-version: "fallback"
-          - target: aarch64-apple-darwin
-            python-version: "fallback"
       fail-fast: false
 
     steps:
