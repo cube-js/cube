@@ -179,11 +179,11 @@ jobs:
             tar_executable: gtar
         exclude:
           # Disable python builds for aarch64 (not ready)
-          - target: "aarch64-unknown-linux-gnu"
+          - target: "aarch64-apple-darwin"
             python-version: "3.9"
-          - target: "aarch64-unknown-linux-gnu"
+          - target: "aarch64-apple-darwin"
             python-version: "3.10"
-          - target: "aarch64-unknown-linux-gnu"
+          - target: "aarch64-apple-darwin"
             python-version: "3.11"
       fail-fast: false
 
