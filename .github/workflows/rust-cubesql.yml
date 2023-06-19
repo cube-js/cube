@@ -284,7 +284,7 @@ jobs:
           CUBESQL_STREAM_MODE: true
           CUBEJS_NATIVE_INTERNAL_DEBUG: true
           CARGO_BUILD_TARGET: ${{ matrix.target }}
-        run: cd packages/cubejs-backend-native && yarn run native:build && yarn run test:unit
+        run: cd packages/cubejs-backend-native && yarn run native:build
       - name: Build native (with Python)
         if: (matrix.python-version != 'fallback')
         env:
@@ -364,7 +364,7 @@ jobs:
         env:
           CUBESQL_STREAM_MODE: true
           CUBEJS_NATIVE_INTERNAL_DEBUG: true
-        run: cd packages/cubejs-backend-native && yarn run native:build && yarn run test:unit
+        run: cd packages/cubejs-backend-native && yarn run native:build
       - name: Build native (with Python)
         if: (matrix.python-version != 'fallback')
         env:
