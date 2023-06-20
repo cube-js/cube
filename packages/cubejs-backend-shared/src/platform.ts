@@ -56,7 +56,7 @@ type IsNativeSupportedResult = true | {
 };
 
 export function isNativeSupported(): IsNativeSupportedResult {
-  if (process.platform === 'linux') {
+  if (process.platform === 'linux' && ['x64', 'arm64'].includes(process.arch)) {
     if (detectLibc() === 'musl') {
       displayCLIWarningOnce(
         'is-native-supported',
@@ -72,12 +72,11 @@ export function isNativeSupported(): IsNativeSupportedResult {
     return true;
   }
 
-  if (process.platform === 'win32') {
+  if (process.platform === 'darwin' && ['x64', 'arm64'].includes(process.arch)) {
     return true;
   }
 
-  // TODO(ovr): https://github.com/cube-js/cube/pull/6093
-  if (process.platform === 'darwin' && process.arch === 'x64') {
+  if (process.platform === 'win32' && process.arch === 'x64') {
     return true;
   }
 
