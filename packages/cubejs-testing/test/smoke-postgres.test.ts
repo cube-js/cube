@@ -75,7 +75,6 @@ describe('postgres pa', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         query: {
-          minimized: false,
           preAggregations: [
             {
               id

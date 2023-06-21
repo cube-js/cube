@@ -618,19 +618,25 @@ class ApiGateway {
           compilerApi.preAggregationsSchema
         );
 
+      const checkExpand = (path: string) => !query.expand || query.expand?.includes(path);
+
       const mergePartitionsAndVersionEntries = () => ({ errors, preAggregation, partitions, invalidateKeyQueries, timezones }) => ({
         errors,
         invalidateKeyQueries,
         preAggregation,
         timezones,
         partitions: partitions.map(partition => ({
-          ...(query.minimized ? {} : partition),
-          dataSource: partition.dataSource,
-          preAggregationId: partition.preAggregationId,
-          tableName: partition.tableName,
-          type: partition.type,
-          versionEntries: versionEntriesResult?.versionEntriesByTableName[partition?.tableName] || [],
-          structureVersion: versionEntriesResult?.structureVersionsByTableName[partition?.tableName] || [],
+          ...(checkExpand('partitions.details') ? partition : {}),
+          ...(checkExpand('partitions.meta') ? {
+            dataSource: partition.dataSource,
+            preAggregationId: partition.preAggregationId,
+            tableName: partition.tableName,
+            type: partition.type,
+          } : {}),
+          ...(checkExpand('partitions.versions') ? {
+            versionEntries: versionEntriesResult?.versionEntriesByTableName[partition?.tableName] || [],
+            structureVersion: versionEntriesResult?.structureVersionsByTableName[partition?.tableName] || [],
+          } : {}),
         })),
       });
 

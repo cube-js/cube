@@ -254,7 +254,7 @@ const remapToQueryAdapterFormat = (query) => (query ? {
 } : query);
 
 const queryPreAggregationsSchema = Joi.object().keys({
-  minimized: Joi.boolean(),
+  expand: Joi.array().items(Joi.string()),
   metadata: Joi.object(),
   timezone: Joi.string(),
   timezones: Joi.array().items(Joi.string()),
@@ -276,7 +276,7 @@ const normalizeQueryPreAggregations = (query, defaultValues) => {
     metadata: query.metadata,
     timezones: query.timezones || (query.timezone && [query.timezone]) || defaultValues?.timezones || ['UTC'],
     preAggregations: query.preAggregations,
-    minimized: query.minimized
+    expand: query.expand
   };
 };
 
