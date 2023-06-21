@@ -618,6 +618,57 @@ describe('Single datasources', () => {
     expect(getEnv('dbExportBucketAzureKey', { dataSource: 'wrong' })).toBeUndefined();
   });
 
+  test('getEnv("dbExportBucketTenantId")', () => {
+    process.env.CUBEJS_DB_EXPORT_BUCKET_TENANT_ID = 'default1';
+    expect(getEnv('dbExportBucketTenantId', { dataSource: 'default' })).toEqual('default1');
+    expect(getEnv('dbExportBucketTenantId', { dataSource: 'postgres' })).toEqual('default1');
+    expect(getEnv('dbExportBucketTenantId', { dataSource: 'wrong' })).toEqual('default1');
+
+    process.env.CUBEJS_DB_EXPORT_BUCKET_TENANT_ID = 'default2';
+    expect(getEnv('dbExportBucketTenantId', { dataSource: 'default' })).toEqual('default2');
+    expect(getEnv('dbExportBucketTenantId', { dataSource: 'postgres' })).toEqual('default2');
+    expect(getEnv('dbExportBucketTenantId', { dataSource: 'wrong' })).toEqual('default2');
+
+    delete process.env.CUBEJS_DB_EXPORT_BUCKET_TENANT_ID;
+    expect(getEnv('dbExportBucketTenantId', { dataSource: 'default' })).toBeUndefined();
+    expect(getEnv('dbExportBucketTenantId', { dataSource: 'postgres' })).toBeUndefined();
+    expect(getEnv('dbExportBucketTenantId', { dataSource: 'wrong' })).toBeUndefined();
+  });
+
+  test('getEnv("dbExportBucketClientId")', () => {
+    process.env.CUBEJS_DB_EXPORT_BUCKET_CLIENT_ID = 'default1';
+    expect(getEnv('dbExportBucketClientId', { dataSource: 'default' })).toEqual('default1');
+    expect(getEnv('dbExportBucketClientId', { dataSource: 'postgres' })).toEqual('default1');
+    expect(getEnv('dbExportBucketClientId', { dataSource: 'wrong' })).toEqual('default1');
+
+    process.env.CUBEJS_DB_EXPORT_BUCKET_CLIENT_ID = 'default2';
+    expect(getEnv('dbExportBucketClientId', { dataSource: 'default' })).toEqual('default2');
+    expect(getEnv('dbExportBucketClientId', { dataSource: 'postgres' })).toEqual('default2');
+    expect(getEnv('dbExportBucketClientId', { dataSource: 'wrong' })).toEqual('default2');
+
+    delete process.env.CUBEJS_DB_EXPORT_BUCKET_CLIENT_ID;
+    expect(getEnv('dbExportBucketClientId', { dataSource: 'default' })).toBeUndefined();
+    expect(getEnv('dbExportBucketClientId', { dataSource: 'postgres' })).toBeUndefined();
+    expect(getEnv('dbExportBucketClientId', { dataSource: 'wrong' })).toBeUndefined();
+  });
+
+  test('getEnv("dbExportBucketClientSecret")', () => {
+    process.env.CUBEJS_DB_EXPORT_BUCKET_CLIENT_SECRET = 'default1';
+    expect(getEnv('dbExportBucketClientSecret', { dataSource: 'default' })).toEqual('default1');
+    expect(getEnv('dbExportBucketClientSecret', { dataSource: 'postgres' })).toEqual('default1');
+    expect(getEnv('dbExportBucketClientSecret', { dataSource: 'wrong' })).toEqual('default1');
+
+    process.env.CUBEJS_DB_EXPORT_BUCKET_CLIENT_SECRET = 'default2';
+    expect(getEnv('dbExportBucketClientSecret', { dataSource: 'default' })).toEqual('default2');
+    expect(getEnv('dbExportBucketClientSecret', { dataSource: 'postgres' })).toEqual('default2');
+    expect(getEnv('dbExportBucketClientSecret', { dataSource: 'wrong' })).toEqual('default2');
+
+    delete process.env.CUBEJS_DB_EXPORT_BUCKET_CLIENT_SECRET;
+    expect(getEnv('dbExportBucketClientSecret', { dataSource: 'default' })).toBeUndefined();
+    expect(getEnv('dbExportBucketClientSecret', { dataSource: 'postgres' })).toBeUndefined();
+    expect(getEnv('dbExportBucketClientSecret', { dataSource: 'wrong' })).toBeUndefined();
+  });
+
   test('getEnv("dbExportIntegration")', () => {
     process.env.CUBEJS_DB_EXPORT_INTEGRATION = 'default1';
     expect(getEnv('dbExportIntegration', { dataSource: 'default' })).toEqual('default1');
