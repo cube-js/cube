@@ -18,7 +18,9 @@ import {
   ContainerSASPermissions,
   SASProtocol,
   generateBlobSASQueryParameters,
+  BlobSASSignatureValues,
 } from '@azure/storage-blob';
+import { ClientSecretCredential } from '@azure/identity';
 import { DriverCapabilities, QueryOptions, UnloadOptions } from '@cubejs-backend/base-driver';
 import {
   JDBCDriver,
@@ -89,6 +91,21 @@ export type DatabricksDriverConfiguration = JDBCDriverConfiguration &
      * Databricks security token (PWD).
      */
     token?: string,
+
+    /**
+     * Azure tenant id
+     */
+    tenantId?: string,
+
+    /**
+     * Azure service principle client id
+     */
+    clientId?: string,
+
+    /**
+     * Azure service principle client sceret
+     */
+    clientSecret?: string,
   };
 
 async function fileExistsOr(
@@ -244,6 +261,16 @@ export class DatabricksDriver extends JDBCDriver {
         getEnv('dbExportBucketAzureKey', { dataSource }),
       exportBucketCsvEscapeSymbol:
         getEnv('dbExportBucketCsvEscapeSymbol', { dataSource }),
+      // Azure service principle
+      tenantId:
+        conf?.tenantId ||
+        getEnv('dbExportBucketTenantId', { dataSource }),
+      clientId:
+        conf?.clientId ||
+        getEnv('dbExportBucketClientId', { dataSource }),
+      clientSecret:
+        conf?.clientSecret ||
+        getEnv('dbExportBucketClientSecret', { dataSource }),
     };
     super(config);
     this.config = config;
@@ -657,10 +684,16 @@ export class DatabricksDriver extends JDBCDriver {
       pathname.split(`${this.config.exportBucket}/`)[1];
     const expr = new RegExp(`${foldername}\\/.*\\.csv$`, 'i');
 
-    const credential = new StorageSharedKeyCredential(
-      account,
-      this.config.azureKey as string,
-    );
+    const credential = this.config.azureKey
+      ? new StorageSharedKeyCredential(
+        account,
+        this.config.azureKey as string,
+      )
+      : new ClientSecretCredential(
+        this.config.tenantId as string,
+        this.config.clientId as string,
+        this.config.clientSecret as string,
+      );
     const blobClient = new BlobServiceClient(
       `https://${account}.blob.core.windows.net`,
       credential,
@@ -669,19 +702,30 @@ export class DatabricksDriver extends JDBCDriver {
     const blobsList = containerClient.listBlobsFlat({ prefix: foldername });
     for await (const blob of blobsList) {
       if (blob.name && expr.test(blob.name)) {
-        const sas = generateBlobSASQueryParameters(
-          {
-            containerName: container,
-            blobName: blob.name,
-            permissions: ContainerSASPermissions.parse('r'),
-            startsOn: new Date(new Date().valueOf()),
-            expiresOn:
-              new Date(new Date().valueOf() + 1000 * 60 * 60),
-            protocol: SASProtocol.Https,
-            version: '2020-08-04',
-          },
-          credential,
-        ).toString();
+        const startsOnDate = new Date(new Date().valueOf());
+        const expiresOnDate = new Date(new Date().valueOf() + 1000 * 60 * 60);
+        const signatureValues: BlobSASSignatureValues = {
+          containerName: container,
+          blobName: blob.name,
+          permissions: ContainerSASPermissions.parse('r'),
+          startsOn: startsOnDate,
+          expiresOn: expiresOnDate,
+          protocol: SASProtocol.Https,
+          version: '2020-08-04',
+        };        
+        const sas = credential instanceof StorageSharedKeyCredential
+          ? generateBlobSASQueryParameters(
+            signatureValues,
+            credential,
+          ).toString()
+          : generateBlobSASQueryParameters(
+            signatureValues,
+            await blobClient.getUserDelegationKey(
+              startsOnDate,
+              expiresOnDate,
+            ),
+            account
+          ).toString();
         csvFile.push(`https://${
           account
         }.blob.core.windows.net/${

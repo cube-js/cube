@@ -734,6 +734,45 @@ const variables: Record<string, (...args: any) => any> = {
   ),
 
   /**
+   * Tenant ID for the Azure based export bucket srorage.
+   */
+    dbExportBucketTenantId: ({
+      dataSource,
+    }: {
+      dataSource: string,
+    }) => (
+      process.env[
+        keyByDataSource('CUBEJS_DB_EXPORT_BUCKET_TENANT_ID', dataSource)
+      ]
+    ),
+  
+    /**
+     * Client ID for the Azure based export bucket srorage.
+     */
+    dbExportBucketClientId: ({
+      dataSource,
+    }: {
+      dataSource: string,
+    }) => (
+      process.env[
+        keyByDataSource('CUBEJS_DB_EXPORT_BUCKET_CLIENT_ID', dataSource)
+      ]
+    ),
+  
+    /**
+     * Client Secret for the Azure based export bucket srorage.
+     */
+    dbExportBucketClientSecret: ({
+      dataSource,
+    }: {
+      dataSource: string,
+    }) => (
+      process.env[
+        keyByDataSource('CUBEJS_DB_EXPORT_BUCKET_CLIENT_SECRET', dataSource)
+      ]
+    ),  
+
+  /**
    * Export bucket options for Integration based.
    */
   dbExportIntegration: ({
