@@ -67,7 +67,7 @@ Create a new file named `cube.py` with the following contents:
 
 ```python
 from dagster import asset
-from dagster_cube import cube_resource
+from dagster_cube.cube_resource import CubeResource
 
 @asset
 def cube_query_workflow():
