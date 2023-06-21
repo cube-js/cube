@@ -712,7 +712,7 @@ export class DatabricksDriver extends JDBCDriver {
           expiresOn: expiresOnDate,
           protocol: SASProtocol.Https,
           version: '2020-08-04',
-        };        
+        };
         const sas = credential instanceof StorageSharedKeyCredential
           ? generateBlobSASQueryParameters(
             signatureValues,
