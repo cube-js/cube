@@ -59,6 +59,8 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
       stageQueryKey: options.stageQueryKey,
       priority,
       requestId: options.requestId,
+      cacheExecutionId: options.cacheExecutionId,
+      queueExecutionId: options.queueExecutionId,
       addedToQueueTime: new Date().getTime()
     };
 
