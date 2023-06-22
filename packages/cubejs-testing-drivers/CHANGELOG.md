@@ -3,6 +3,44 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.29](https://github.com/cube-js/cube/compare/v0.33.28...v0.33.29) (2023-06-20)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+
+
+
+
+## [0.33.28](https://github.com/cube-js/cube/compare/v0.33.27...v0.33.28) (2023-06-19)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+
+
+
+
+## [0.33.27](https://github.com/cube-js/cube.js/compare/v0.33.26...v0.33.27) (2023-06-17)
+
+
+### Bug Fixes
+
+* Support unescaped `\\N` as NULL value for Snowflake driver ([#6735](https://github.com/cube-js/cube.js/issues/6735)) ([1f92ba6](https://github.com/cube-js/cube.js/commit/1f92ba6f5407f82703c8920b27a3a3e5a16fea41)), closes [#6693](https://github.com/cube-js/cube.js/issues/6693)
+
+
+
+
+
+## [0.33.26](https://github.com/cube-js/cube/compare/v0.33.25...v0.33.26) (2023-06-14)
+
+
+### Features
+
+* **schema:** Initial support for jinja templates ([#6704](https://github.com/cube-js/cube/issues/6704)) ([338d1b7](https://github.com/cube-js/cube/commit/338d1b7ed03fc074c06fb028f731c9817ba8d419))
+
+
+
+
+
 ## [0.33.25](https://github.com/cube-js/cube/compare/v0.33.24...v0.33.25) (2023-06-07)
 
 **Note:** Version bump only for package @cubejs-backend/testing-drivers

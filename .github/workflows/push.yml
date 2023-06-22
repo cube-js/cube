@@ -60,7 +60,7 @@ jobs:
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2022-03-08
+          toolchain: nightly-2022-03-22
           override: true
           components: rustfmt
       - name: Install Node.js ${{ matrix.node-version }}
@@ -115,7 +115,7 @@ jobs:
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2022-03-08
+          toolchain: nightly-2022-03-22
           override: true
           components: rustfmt
       - name: Install Node.js 16.x
@@ -162,7 +162,7 @@ jobs:
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2022-03-08
+          toolchain: nightly-2022-03-22
           override: true
           components: rustfmt
       - name: Install Node.js 16.x
@@ -229,7 +229,7 @@ jobs:
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2022-03-08
+          toolchain: nightly-2022-03-22
           override: true
           components: rustfmt
       - name: Install Node.js ${{ matrix.node-version }}
@@ -376,7 +376,7 @@ jobs:
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2022-03-08
+          toolchain: nightly-2022-03-22
           override: true
           components: rustfmt
       - name: Install Node.js ${{ matrix.node-version }}

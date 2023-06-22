@@ -207,7 +207,7 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("isFallbackBuild", is_fallback_build)?;
 
     #[cfg(feature = "python")]
-    python::python_register_module(cx)?;
+    python::python_register_module(&mut cx)?;
 
     Ok(())
 }

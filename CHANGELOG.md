@@ -3,6 +3,59 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.29](https://github.com/cube-js/cube/compare/v0.33.28...v0.33.29) (2023-06-20)
+
+
+### Features
+
+* **native:** Support darwin-aaarch64 ([#6745](https://github.com/cube-js/cube/issues/6745)) ([ea53e8d](https://github.com/cube-js/cube/commit/ea53e8d83c7d516e541e78175eac5534c7ea7531))
+
+
+
+
+
+## [0.33.28](https://github.com/cube-js/cube/compare/v0.33.27...v0.33.28) (2023-06-19)
+
+
+### Bug Fixes
+
+* **native:** Correct support detection (disable on darwin-aaarch64) ([#6737](https://github.com/cube-js/cube/issues/6737)) ([53c6ee9](https://github.com/cube-js/cube/commit/53c6ee9bddfb679dad28d88352e11b2f8a39e6ca))
+* **schema:** Load jinja engine only when jinja templates exist ([#6741](https://github.com/cube-js/cube/issues/6741)) ([75469a6](https://github.com/cube-js/cube/commit/75469a67b58d0a730b29b57d4f05a4049462bf10))
+
+
+
+
+
+## [0.33.27](https://github.com/cube-js/cube/compare/v0.33.26...v0.33.27) (2023-06-17)
+
+
+### Bug Fixes
+
+* Support unescaped `\\N` as NULL value for Snowflake driver ([#6735](https://github.com/cube-js/cube/issues/6735)) ([1f92ba6](https://github.com/cube-js/cube/commit/1f92ba6f5407f82703c8920b27a3a3e5a16fea41)), closes [#6693](https://github.com/cube-js/cube/issues/6693)
+
+
+
+
+
+## [0.33.26](https://github.com/cube-js/cube/compare/v0.33.25...v0.33.26) (2023-06-14)
+
+
+### Bug Fixes
+
+* Correct duration for refresh sheduler interval warning ([#6724](https://github.com/cube-js/cube/issues/6724)) ([3482d29](https://github.com/cube-js/cube/commit/3482d293463c861848b18b773e43ba732ec56a4f))
+* **cubestore:** Out of memory on partition compaction ([#6705](https://github.com/cube-js/cube/issues/6705)) ([980b898](https://github.com/cube-js/cube/commit/980b8985e25928cc62446b76bb8d1182b10353ec))
+
+
+### Features
+
+* **native:** Python - support int64 ([#6709](https://github.com/cube-js/cube/issues/6709)) ([34497ab](https://github.com/cube-js/cube/commit/34497ab2bc0807159a21ba9a4a76b4702038a8e6))
+* **presto-driver:** Set query timeout as query_max_run_time to avoid orphaned queries after query timeout ([d6332cf](https://github.com/cube-js/cube/commit/d6332cf824cb0e282b67188fd5618808a7a158bd))
+* **schema:** Initial support for jinja templates ([#6704](https://github.com/cube-js/cube/issues/6704)) ([338d1b7](https://github.com/cube-js/cube/commit/338d1b7ed03fc074c06fb028f731c9817ba8d419))
+
+
+
+
+
 ## [0.33.25](https://github.com/cube-js/cube/compare/v0.33.24...v0.33.25) (2023-06-07)
 
 

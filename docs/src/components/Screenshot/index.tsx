@@ -37,3 +37,14 @@ export const Screenshot = (props: ScreenshotProps) => {
   );
 };
 
+export const Diagram = (props: ScreenshotProps) => (
+  <div className={styles.diagram} style={{ textAlign: 'center'}}>
+    {props.highlight ? (<ScreenshotHighlight {...props} />) : null}
+    <img
+      alt={props.alt}
+      src={props.src}
+      style={{ border: 'none', filter: props.highlight ? 'brightness(0.5)' : 'none' }}
+      width="100%"
+    />
+  </div>
+)

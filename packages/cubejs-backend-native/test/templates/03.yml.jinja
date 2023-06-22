@@ -1,0 +1,14 @@
+{%- set countries = ["au", "us"] %}
+
+cubes:
+  - name: cube_03
+    sql: >
+      {%- for country in countries %}
+      SELECT 
+        *,
+        '{{ country }}' as country
+      FROM {{ country }}_orders
+      {% if not loop.last %}
+      UNION ALL
+      {% endif %}
+      {%- endfor %}

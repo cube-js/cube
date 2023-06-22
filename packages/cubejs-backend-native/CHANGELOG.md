@@ -3,6 +3,37 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.29](https://github.com/cube-js/cube/compare/v0.33.28...v0.33.29) (2023-06-20)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+
+
+
+
+## [0.33.28](https://github.com/cube-js/cube/compare/v0.33.27...v0.33.28) (2023-06-19)
+
+
+### Bug Fixes
+
+* **schema:** Load jinja engine only when jinja templates exist ([#6741](https://github.com/cube-js/cube/issues/6741)) ([75469a6](https://github.com/cube-js/cube/commit/75469a67b58d0a730b29b57d4f05a4049462bf10))
+
+
+
+
+
+## [0.33.26](https://github.com/cube-js/cube/compare/v0.33.25...v0.33.26) (2023-06-14)
+
+
+### Features
+
+* **native:** Python - support int64 ([#6709](https://github.com/cube-js/cube/issues/6709)) ([34497ab](https://github.com/cube-js/cube/commit/34497ab2bc0807159a21ba9a4a76b4702038a8e6))
+* **schema:** Initial support for jinja templates ([#6704](https://github.com/cube-js/cube/issues/6704)) ([338d1b7](https://github.com/cube-js/cube/commit/338d1b7ed03fc074c06fb028f731c9817ba8d419))
+
+
+
+
+
 ## [0.33.25](https://github.com/cube-js/cube/compare/v0.33.24...v0.33.25) (2023-06-07)
 
 **Note:** Version bump only for package @cubejs-backend/native

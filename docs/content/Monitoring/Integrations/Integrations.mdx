@@ -29,7 +29,7 @@ Under the hood, Cube Cloud uses [Vector][vector], an open-source tool for
 collecting and delivering monitoring data. It supports a [wide range of
 destinations][vector-docs-sinks], also known as _sinks_.
 
-<img src="https://ucarecdn.com/c02b28d5-4336-4053-88d6-ed25b543f208/"/>
+<Diagram src="https://ucarecdn.com/17dbc263-2be4-4b7d-9f34-270cd66e878b/" />
 
 ## Guides
 
@@ -68,7 +68,7 @@ You have to commit this file for Vector configuration to take effect.
 
 ### <--{"id" : "Configuration"}--> Environment variables
 
-You can use environment variables prefixed with `CUBE_CLOUD_LOG_EXPORT_`
+You can use environment variables prefixed with `CUBE_CLOUD_MONITORING_`
 to reference configuration parameters securely in the `vector.toml` file.
 
 Example configuration for exporting logs to
@@ -77,7 +77,7 @@ Example configuration for exporting logs to
 ```toml
 [sinks.datadog]
 type = "datadog_logs"
-default_api_key = "$CUBE_CLOUD_LOG_EXPORT_DATADOG_API_KEY"
+default_api_key = "$CUBE_CLOUD_MONITORING_DATADOG_API_KEY"
 ```
 
 ### <--{"id" : "Configuration"}--> Inputs for logs
@@ -236,9 +236,14 @@ inputs = [
 ]
 ```
 
-You can customize the user name and password for `prometheus_exporter` by
-setting `CUBE_CLOUD_LOG_EXPORT_METRICS_USER` and
-`CUBE_CLOUD_LOG_EXPORT_METRICS_PASSWORD` environment variables, respectively.
+Navigate to&nbsp;<Btn>Settings → Monitoring Integrations</Btn> to take the
+credentials `prometheus_exporter`  under&nbsp;<Btn>Metrics export</Btn>:
+
+<Screenshot src="https://ucarecdn.com/7db3949b-83b9-48ae-b4b6-bd2afeda5001/"/>
+
+You can also customize the user name and password for `prometheus_exporter` by
+setting `CUBE_CLOUD_MONITORING_METRICS_USER` and
+`CUBE_CLOUD_MONITORING_METRICS_PASSWORD` environment variables, respectively.
 
 [self-sinks-for-metrics]: #configuration-sinks-for-metrics
 [ref-vpc]: /cloud/configuration/connecting-with-a-vpc

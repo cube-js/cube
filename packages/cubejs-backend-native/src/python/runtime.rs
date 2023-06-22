@@ -179,6 +179,6 @@ pub fn py_runtime<'a, C: Context<'a>>(cx: &mut C) -> NeonResult<&PyRuntime> {
     if let Some(runtime) = PY_RUNTIME.get() {
         Ok(runtime)
     } else {
-        cx.throw_error("Unable to get PyRuntime, probably it was not initialized".to_string())
+        cx.throw_error("Unable to get PyRuntime: It was not initialized".to_string())
     }
 }

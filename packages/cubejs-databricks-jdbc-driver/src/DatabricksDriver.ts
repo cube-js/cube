@@ -208,7 +208,7 @@ export class DatabricksDriver extends JDBCDriver {
           conf?.token ||
           getEnv('databrickToken', { dataSource }) ||
           '',
-        UserAgentEntry: `CubeDev_Cube`,
+        UserAgentEntry: 'CubeDev_Cube',
       },
       catalog:
         conf?.catalog ||

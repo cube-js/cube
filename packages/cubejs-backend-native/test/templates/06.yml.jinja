@@ -1,0 +1,18 @@
+{%- macro dimension(column_name, type='string', primary_key=False) -%}
+      - name: {{ column_name }}
+        sql: {{ column_name }}
+        type: {{ type }}
+        {% if primary_key -%}
+        primary_key: true
+        {% endif -%} 
+{% endmacro -%}
+
+cubes:
+  - name: cube_06
+    sql_table: public.orders
+
+    dimensions:
+      {{ dimension('id', 'number', primary_key=True) }}
+      {{ dimension('status') }}
+      {{ dimension('created_at', 'time') }}
+      {{ dimension('completed_at', 'time') }}

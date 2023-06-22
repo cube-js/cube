@@ -1,5 +1,15 @@
 @import "../../../static/styles/variables.scss";
 
+.diagram {
+  position: relative;
+  width: 100%;
+  margin-bottom: 24px;
+
+  > img {
+    margin: 0 !important;
+  }
+}
+
 .screenshot {
   position: relative;
   width: 100%;

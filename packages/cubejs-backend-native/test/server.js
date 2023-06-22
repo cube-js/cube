@@ -1,4 +1,5 @@
-const { FakeRowStream } = require('@cubejs-backend/testing-shared');
+import { FakeRowStream } from './response-fake';
+
 const native = require('../js/index');
 const meta_fixture = require('./meta');
 

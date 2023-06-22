@@ -132,7 +132,7 @@ impl ImportFormat {
                         let value_buf = parser.next_value()?;
                         let value = value_buf.as_ref();
 
-                        if value == "" || value == "\\N" {
+                        if value == "" || value == "\\N" || value == "\\\\N" {
                             row[*insert_pos] = TableValue::Null;
                         } else {
                             let mut value_buf_opt = Some(value_buf);
