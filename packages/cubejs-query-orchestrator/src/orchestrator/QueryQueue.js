@@ -630,7 +630,6 @@ export class QueryQueue {
    */
   async processQuerySkipQueue(query) {
     const startQueryTime = (new Date()).getTime();
-    console.log(1);
     this.logger('Performing query', {
       queueSize: 0,
       queryKey: query.queryKey,
