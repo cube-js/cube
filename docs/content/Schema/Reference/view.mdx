@@ -226,7 +226,7 @@ For the root cube of the view, just put the cube name as in the example above fo
 
 The other required parameter inside the `cubes` block is `includes`. You can simply list measures, dimensions, or segments you'd like to include.
 In case you need to rename some of them, you can provide `name` and `alias` parameters.
-Alternatively, you can use the `excludes` parameter in conjunction with the includes all definition `includes: *`.
+Alternatively, you can use the `excludes` parameter in conjunction with the includes all definition `includes: "*"`.
 
 Optionally, if you'd like to prefix exposed measures, dimensions, or segments with the cube name, you can use the `prefix: true` parameter.
 It will prefix them with the cube name, e.g. `users_city`. You can use the `alias` parameter to rename the cube for the prefixing purpose.
