@@ -10,7 +10,13 @@ const branch = "master";
 const path = "/docs/docs-new/";
 
 const config: DocsThemeConfig = {
-  logo: CubeLogo,
+  logo: (
+    <>
+      <CubeLogo />
+      {/*{'v0.31.31'}*/}
+    </>
+  ),
+  logoLink: "https://cube.dev",
   docsRepositoryBase: `${repo}/blob/${branch}${path}`,
   project: {
     link: repo,
