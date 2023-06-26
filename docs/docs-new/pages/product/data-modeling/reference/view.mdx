@@ -80,10 +80,9 @@ views:
 
       - join_path: base_orders.users
         prefix: true
-        includes: *
+        includes: "*"
         excludes:
           - company
-
 ```
 
 </CodeTabs>
@@ -209,10 +208,9 @@ views:
 
       - join_path: base_orders.users
         prefix: true
-        includes: *
+        includes: "*"
         excludes:
           - company
-
 ```
 
 </CodeTabs>
@@ -226,7 +224,7 @@ The other required parameter inside the `cubes` block is `includes`. You can
 simply list measures, dimensions, or segments you'd like to include. In case you
 need to rename some of them, you can provide `name` and `alias` parameters.
 Alternatively, you can use the `excludes` parameter in conjunction with the
-includes all definition `includes: *`.
+includes all definition `includes: "*"`.
 
 Optionally, if you'd like to prefix exposed measures, dimensions, or segments
 with the cube name, you can use the `prefix: true` parameter. It will prefix

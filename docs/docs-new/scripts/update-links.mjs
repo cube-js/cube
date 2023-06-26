@@ -687,6 +687,11 @@ const overrides = {
     path: "product/apis-integrations/orchestration-api/airflow",
     title: "Integration with Apache Airflow",
   },
+  "APIs-Integrations/Orchestration-API/Dagster.mdx": {
+    ready: true,
+    path: "product/apis-integrations/orchestration-api/dagster",
+    title: "Integration with Dagster",
+  },
   "APIs-Integrations/Orchestration-API/Prefect.mdx": {
     ready: true,
     path: "product/apis-integrations/orchestration-api/prefect",

@@ -67,7 +67,7 @@ have to commit this file for Vector configuration to take effect.
 
 ### Environment variables
 
-You can use environment variables prefixed with `CUBE_CLOUD_LOG_EXPORT_` to
+You can use environment variables prefixed with `CUBE_CLOUD_MONITORING_` to
 reference configuration parameters securely in the `vector.toml` file.
 
 Example configuration for exporting logs to
@@ -76,7 +76,7 @@ Example configuration for exporting logs to
 ```toml
 [sinks.datadog]
 type = "datadog_logs"
-default_api_key = "$CUBE_CLOUD_LOG_EXPORT_DATADOG_API_KEY"
+default_api_key = "$CUBE_CLOUD_MONITORING_DATADOG_API_KEY"
 ```
 
 ### Inputs for logs
@@ -240,8 +240,8 @@ credentials `prometheus_exporter` under <Btn>Metrics export</Btn>:
 <Screenshot src="https://ucarecdn.com/7db3949b-83b9-48ae-b4b6-bd2afeda5001/" />
 
 You can also customize the user name and password for `prometheus_exporter` by
-setting `CUBE_CLOUD_LOG_EXPORT_METRICS_USER` and
-`CUBE_CLOUD_LOG_EXPORT_METRICS_PASSWORD` environment variables, respectively.
+setting `CUBE_CLOUD_MONITORING_METRICS_USER` and
+`CUBE_CLOUD_MONITORING_METRICS_PASSWORD` environment variables, respectively.
 
 [self-sinks-for-metrics]: #configuration-sinks-for-metrics
 [ref-vpc]: /product/configuration/vpc
