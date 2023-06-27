@@ -27,8 +27,8 @@ once_cell = "1.10"
 libc = "0.2"
 findshlibs = "0.10.2"
 convert_case = "0.6.0"
-minijinja = { git = "https://github.com/mitsuhiko/minijinja.git", rev = "efdb9bee8b893b423157035631cfe3ae694c45cd", features = ["json", "loader"] }
 # python
+minijinja = { git = "https://github.com/mitsuhiko/minijinja.git", rev = "efdb9bee8b893b423157035631cfe3ae694c45cd", features = ["json", "loader"], optional = true }
 pyo3 = { version = "0.18.3", features = [], optional = true }
 pyo3-asyncio = { version = "0.18.0", features = ["tokio-runtime", "attributes"], optional = true }
 
@@ -38,5 +38,5 @@ default-features = false
 features = ["napi-1", "napi-4", "napi-6", "channel-api", "promise-api", "task-api", "proc-macros"]
 
 [features]
-default = ["pyo3", "pyo3-asyncio"]
-python = []
+default = []
+python = ["pyo3", "pyo3-asyncio", "minijinja"]

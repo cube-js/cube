@@ -56,14 +56,16 @@ export class DataSchemaCompiler {
    * @protected
    */
   async doCompile() {
-    if (NATIVE_IS_SUPPORTED && !isFallbackBuild()) {
+    const files = await this.repository.dataSchemaFiles();
+    const hasJinjaTemplate = files.find((file) => file.fileName.endsWith('.jinja'));
+
+    if (hasJinjaTemplate && NATIVE_IS_SUPPORTED && !isFallbackBuild()) {
       initJinjaEngine({
         debugInfo: getEnv('devMode'),
       });
       clearTemplates();
     }
 
-    const files = await this.repository.dataSchemaFiles();
     const toCompile = files.filter((f) => !this.filesToCompile || this.filesToCompile.indexOf(f.fileName) !== -1);
 
     const errorsReport = new ErrorReporter(null, [], this.errorReport);

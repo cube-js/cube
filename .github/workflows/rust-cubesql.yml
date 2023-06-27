@@ -129,6 +129,14 @@ jobs:
         node-version: [14, 16, 18]
         python-version: ["3.9", "3.10", "3.11", "fallback"]
         target: ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"]
+        # minimize number of jobs
+        exclude:
+          - node-version: 18
+            target: "aarch64-unknown-linux-gnu"
+          - node-version: 14
+            target: "aarch64-unknown-linux-gnu"
+          - python-version: 3.10
+            target: "aarch64-unknown-linux-gnu"
       fail-fast: false
     container:
       image: cubejs/rust-cross:${{ matrix.target }}-30052023
@@ -201,7 +209,97 @@ jobs:
           CUBEJS_NATIVE_INTERNAL_DEBUG: true
         run: cd packages/cubejs-testing && yarn smoke:cubesql
 
-  native:
+  native_macos:
+    needs: [lint]
+    runs-on: ${{ matrix.os-version }}
+    timeout-minutes: 60
+    name: Build ${{ matrix.os-version }} ${{ matrix.target }} ${{ matrix.node-version }} with Python ${{ matrix.python-version }}
+
+    strategy:
+      matrix:
+        # We do not need to test under all versions, we do it under linux
+        node-version: [16.x]
+        os-version: ["macos-11"]
+        target: ["x86_64-apple-darwin", "aarch64-apple-darwin"]
+        include:
+          - target: x86_64-apple-darwin
+            python-version: "3.9"
+          - target: x86_64-apple-darwin
+            python-version: "3.10"
+          - target: x86_64-apple-darwin
+            python-version: "3.11"
+          - target: x86_64-apple-darwin
+            python-version: "fallback"
+          - target: aarch64-apple-darwin
+            python-version: "fallback"
+      fail-fast: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2022-03-22
+          override: true
+          components: rustfmt
+          target: ${{ matrix.target }}
+      - name: Install Python
+        uses: actions/setup-python@v4
+        if: (matrix.python-version != 'fallback')
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Set Yarn version
+        run: yarn policies set-version v1.22.19
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
+        shell: bash
+      - name: Restore yarn cache
+        uses: actions/cache@v3
+        with:
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
+      - name: Yarn install
+        uses: nick-invision/retry@v2
+        env:
+          CUBESTORE_SKIP_POST_INSTALL: true
+        with:
+          max_attempts: 3
+          retry_on: error
+          retry_wait_seconds: 15
+          timeout_minutes: 20
+          command: yarn install --frozen-lockfile
+      - name: Lerna tsc
+        run: yarn tsc
+      - name: Build native (fallback)
+        if: (matrix.python-version == 'fallback')
+        env:
+          CUBESQL_STREAM_MODE: true
+          CUBEJS_NATIVE_INTERNAL_DEBUG: true
+          CARGO_BUILD_TARGET: ${{ matrix.target }}
+        run: cd packages/cubejs-backend-native && yarn run native:build
+      - name: Build native (with Python)
+        if: (matrix.python-version != 'fallback')
+        env:
+          PYO3_PYTHON: python${{ matrix.python-version }}
+          CARGO_BUILD_TARGET: ${{ matrix.target }}
+        run: cd packages/cubejs-backend-native && yarn run native:build-debug-python
+      - name: Tests
+        # We cannot test arm64 on x64
+        if: (matrix.target == 'x86_64-apple-darwin')
+        env:
+          CUBESQL_STREAM_MODE: true
+          CUBEJS_NATIVE_INTERNAL_DEBUG: true
+        run: cd packages/cubejs-backend-native && yarn run test:unit
+
+  native_windows:
     needs: [lint]
     runs-on: ${{ matrix.os-version }}
     timeout-minutes: 60
@@ -209,18 +307,10 @@ jobs:
 
     strategy:
       matrix:
-        # We don't need to test under all versions, we do it under linux
+        # We do not need to test under all versions, we do it under linux
         node-version: [16.x]
-        os-version: [windows-2019, macos-11]
-        python-version: ["3.9", "3.10", "3.11", "fallback"]
-        exclude:
-          # We dont plan to support windows for native-python
-          - os-version: windows-2019
-            python-version: "3.9"
-          - os-version: windows-2019
-            python-version: "3.10"
-          - os-version: windows-2019
-            python-version: "3.11"
+        os-version: [windows-2019]
+        python-version: ["fallback"]
       fail-fast: false
 
     steps:
@@ -228,7 +318,6 @@ jobs:
         uses: actions/checkout@v3
       - name: Disable rustup update (issue workaround for Windows)
         run: rustup set auto-self-update disable
-        if: contains(runner.os, 'windows')
         shell: bash
       - name: Install Rust
         uses: actions-rs/toolchain@v1
@@ -275,7 +364,7 @@ jobs:
         env:
           CUBESQL_STREAM_MODE: true
           CUBEJS_NATIVE_INTERNAL_DEBUG: true
-        run: cd packages/cubejs-backend-native && yarn run native:build && yarn run test:unit
+        run: cd packages/cubejs-backend-native && yarn run native:build
       - name: Build native (with Python)
         if: (matrix.python-version != 'fallback')
         env:
