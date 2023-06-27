@@ -10,6 +10,7 @@
     "build": "next build",
     "postbuild": "next-sitemap",
     "start": "next start",
+    "create-redirects": "ts-node --esm scripts/create-redirects.mjs",
     "migrate-content": "ts-node ./scripts/migrate-content.ts",
     "update-links": "ts-node --esm scripts/update-links.mjs"
   },
