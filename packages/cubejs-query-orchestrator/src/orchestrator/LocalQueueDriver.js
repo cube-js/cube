@@ -116,7 +116,6 @@ export class LocalQueueDriverConnection {
       priority,
       requestId: options.requestId,
       cacheExecutionId: options.cacheExecutionId,
-      queueExecutionId: options.queueExecutionId,
       addedToQueueTime: new Date().getTime()
     };
     const key = this.redisHash(queryKey);

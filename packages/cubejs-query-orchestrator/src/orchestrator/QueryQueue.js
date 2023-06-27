@@ -189,7 +189,6 @@ export class QueryQueue {
     priority,
     options,
   ) {
-    const queueExecutionId = crypto.randomBytes(16).toString('hex');
     options = options || {};
     if (this.skipQueue) {
       const queryDef = {
@@ -200,7 +199,6 @@ export class QueryQueue {
         priority,
         requestId: options.requestId,
         cacheExecutionId: options.cacheExecutionId,
-        queueExecutionId,
         addedToQueueTime: new Date().getTime(),
       };
       this.logger('Waiting for query', {
@@ -209,7 +207,6 @@ export class QueryQueue {
         queuePrefix: this.redisQueuePrefix,
         requestId: options.requestId,
         cacheExecutionId: options.cacheExecutionId,
-        queueExecutionId,
         waitingForRequestId: queryDef.requestId
       });
       if (queryHandler === 'stream') {
@@ -252,7 +249,7 @@ export class QueryQueue {
       const orphanedTime = time + (orphanedTimeout * 1000);
 
       const [added, queueId, queueSize, addedToQueueTime] = await queueConnection.addToQueue(
-        keyScore, queryKey, orphanedTime, queryHandler, query, priority, { ...options, queueExecutionId }
+        keyScore, queryKey, orphanedTime, queryHandler, query, priority, options
       );
 
       if (added > 0) {
@@ -263,7 +260,6 @@ export class QueryQueue {
           queuePrefix: this.redisQueuePrefix,
           requestId: options.requestId,
           cacheExecutionId: options.cacheExecutionId,
-          queueExecutionId,
           metadata: query.metadata,
           preAggregationId: query.preAggregation?.preAggregationId,
           newVersionEntry: query.newVersionEntry,
@@ -286,7 +282,6 @@ export class QueryQueue {
           queuePrefix: this.redisQueuePrefix,
           requestId: options.requestId,
           cacheExecutionId: options.cacheExecutionId,
-          queueExecutionId,
           activeQueryKeys: active,
           toProcessQueryKeys: toProcess,
           active: active.indexOf(queryKeyHash) !== -1,
@@ -468,7 +463,6 @@ export class QueryQueue {
           queuePrefix: this.redisQueuePrefix,
           requestId: query.requestId,
           cacheExecutionId: query.cacheExecutionId,
-          queueExecutionId: query.queueExecutionId,
           metadata: query.query?.metadata,
           preAggregationId: query.query?.preAggregation?.preAggregationId,
           newVersionEntry: query.query?.newVersionEntry,
@@ -503,7 +497,6 @@ export class QueryQueue {
             queuePrefix: this.redisQueuePrefix,
             requestId: query.requestId,
             cacheExecutionId: query.cacheExecutionId,
-            queueExecutionId: query.queueExecutionId,
             metadata: query.query?.metadata,
             preAggregationId: query.query?.preAggregation?.preAggregationId,
             newVersionEntry: query.query?.newVersionEntry,
@@ -636,7 +629,6 @@ export class QueryQueue {
       queuePrefix: this.redisQueuePrefix,
       requestId: query.requestId,
       cacheExecutionId: query.cacheExecutionId,
-      queueExecutionId: query.queueExecutionId,
       timeInQueue: 0
     });
     let executionResult;
@@ -661,7 +653,6 @@ export class QueryQueue {
         queuePrefix: this.redisQueuePrefix,
         requestId: query.requestId,
         cacheExecutionId: query.cacheExecutionId,
-        queueExecutionId: query.queueExecutionId,
         timeInQueue: 0
       });
     } catch (e) {
@@ -675,7 +666,6 @@ export class QueryQueue {
         queuePrefix: this.redisQueuePrefix,
         requestId: query.requestId,
         cacheExecutionId: query.cacheExecutionId,
-        queueExecutionId: query.queueExecutionId,
         timeInQueue: 0,
         error: (e.stack || e).toString()
       });
@@ -686,7 +676,6 @@ export class QueryQueue {
             queuePrefix: this.redisQueuePrefix,
             requestId: query.requestId,
             cacheExecutionId: query.cacheExecutionId,
-            queueExecutionId: query.queueExecutionId,
           });
           await handler(query);
         }
@@ -736,7 +725,6 @@ export class QueryQueue {
           queuePrefix: this.redisQueuePrefix,
           requestId: query.requestId,
           cacheExecutionId: query.cacheExecutionId,
-          queueExecutionId: query.queueExecutionId,
           timeInQueue,
           metadata: query.query?.metadata,
           preAggregationId: query.query?.preAggregation?.preAggregationId,
@@ -784,7 +772,6 @@ export class QueryQueue {
                           queuePrefix: this.redisQueuePrefix,
                           requestId: query.requestId,
                           cacheExecutionId: query.cacheExecutionId,
-                          queueExecutionId: query.queueExecutionId,
                           metadata: query.query?.metadata,
                           preAggregationId: query.query?.preAggregation?.preAggregationId,
                           newVersionEntry: query.query?.newVersionEntry,
@@ -808,7 +795,6 @@ export class QueryQueue {
             queuePrefix: this.redisQueuePrefix,
             requestId: query.requestId,
             cacheExecutionId: query.cacheExecutionId,
-            queueExecutionId: query.queueExecutionId,
             timeInQueue,
             metadata: query.query?.metadata,
             preAggregationId: query.query?.preAggregation?.preAggregationId,
@@ -828,7 +814,6 @@ export class QueryQueue {
             queuePrefix: this.redisQueuePrefix,
             requestId: query.requestId,
             cacheExecutionId: query.cacheExecutionId,
-            queueExecutionId: query.queueExecutionId,
             timeInQueue,
             metadata: query.query?.metadata,
             preAggregationId: query.query?.preAggregation?.preAggregationId,
@@ -846,7 +831,6 @@ export class QueryQueue {
                 queuePrefix: this.redisQueuePrefix,
                 requestId: queryWithCancelHandle.requestId,
                 cacheExecutionId: queryWithCancelHandle.cacheExecutionId,
-                queueExecutionId: queryWithCancelHandle.queueExecutionId,
                 metadata: queryWithCancelHandle.query?.metadata,
                 preAggregationId: queryWithCancelHandle.query?.preAggregation?.preAggregationId,
                 newVersionEntry: queryWithCancelHandle.query?.newVersionEntry,
@@ -868,7 +852,6 @@ export class QueryQueue {
             queuePrefix: this.redisQueuePrefix,
             requestId: query.requestId,
             cacheExecutionId: query.cacheExecutionId,
-            queueExecutionId: query.queueExecutionId,
             metadata: query.query?.metadata,
             preAggregationId: query.query?.preAggregation?.preAggregationId,
             newVersionEntry: query.query?.newVersionEntry,
@@ -893,7 +876,6 @@ export class QueryQueue {
           queryKey: query && query.queryKey || queryKeyHashed,
           requestId: query && query.requestId,
           cacheExecutionId: query.cacheExecutionId,
-          queueExecutionId: query.queueExecutionId,
           queuePrefix: this.redisQueuePrefix,
           processingLockAcquired,
           query,
@@ -910,7 +892,6 @@ export class QueryQueue {
             queryKey: query && query.queryKey || queryKeyHashed,
             requestId: query && query.requestId,
             cacheExecutionId: query.cacheExecutionId,
-            queueExecutionId: query.queueExecutionId,
             queuePrefix: this.redisQueuePrefix,
             processingLockAcquired,
             query,
@@ -926,7 +907,6 @@ export class QueryQueue {
         queryKey: query && query.queryKey || queryKeyHashed,
         requestId: query && query.requestId,
         cacheExecutionId: query.cacheExecutionId,
-        queueExecutionId: query.queueExecutionId,
         error: (e.stack || e).toString(),
         queuePrefix: this.redisQueuePrefix
       });

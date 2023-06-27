@@ -107,7 +107,6 @@ export class RedisQueueDriverConnection implements QueueDriverConnectionInterfac
       priority,
       requestId: options.requestId,
       cacheExecutionId: options.cacheExecutionId,
-      queueExecutionId: options.queueExecutionId,
       addedToQueueTime: new Date().getTime()
     };
 

@@ -43,7 +43,6 @@ export interface AddToQueueOptions {
   requestId: string,
   orphanedTimeout?: number,
   cacheExecutionId?: string,
-  queueExecutionId?: string,
 }
 
 export interface QueueDriverOptions {
