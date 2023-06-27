@@ -618,7 +618,10 @@ class ApiGateway {
           compilerApi.preAggregationsSchema
         );
 
-      const checkExpand = (path: string) => !query.expand || query.expand?.includes(path);
+      const checkExpand = (path: string | RegExp) => !query.expand ||
+        (path instanceof RegExp
+          ? query.expand.some((p: string) => path.test(p))
+          : query.expand.includes(path));
 
       const mergePartitionsAndVersionEntries = () => ({ errors, preAggregation, partitions, invalidateKeyQueries, timezones }) => ({
         errors,
