@@ -3886,6 +3886,17 @@
   resolved "https://registry.yarnpkg.com/@cubejs-backend/dotenv/-/dotenv-9.0.2.tgz#c3679091b702f0fd38de120c5a63943fcdc0dcbf"
   integrity sha512-yC1juhXEjM7K97KfXubDm7WGipd4Lpxe+AT8XeTRE9meRULrKlw0wtE2E8AQkGOfTBn+P1SCkePQ/BzIbOh1VA==
 
+"@cubejs-backend/jdbc@^0.7.6":
+  version "0.7.6"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/jdbc/-/jdbc-0.7.6.tgz#b41ab040d3bf34db0e36979b6490ab76377408b6"
+  integrity sha512-Ngs1tlFsoxpsFcWSDK/WsQMX7F6erGw1MfbyphYWBJnTbZVsa3mkDObeHgzOSvCDhDYlFB4W0hDiJE+SR0loug==
+  dependencies:
+    async "3.2.4"
+    java "^0.12.2"
+    lodash "4.17.21"
+    uuid "9.0.0"
+    winston "3.8.2"
+
 "@cubejs-backend/shared@0.33.20":
   version "0.33.20"
   resolved "https://registry.yarnpkg.com/@cubejs-backend/shared/-/shared-0.33.20.tgz#3d9fa60041599cca9fe4c04df05daa4b8ab8675f"
@@ -17484,16 +17495,6 @@ javascript-stringify@^2.0.1:
   version "2.1.0"
   resolved "https://registry.yarnpkg.com/javascript-stringify/-/javascript-stringify-2.1.0.tgz#27c76539be14d8bd128219a2d731b09337904e79"
   integrity sha512-JVAfqNPTvNq3sB/VHQJAFxN/sPgKnsKrCwyRt15zwNCdrMMJDdcEOdubuy+DuJYYdm0ox1J4uzEuYKkN+9yhVg==
-
-"jdbc@git+https://github.com/cube-js/node-jdbc#ed53c221c859246d7fc57654d7f6fa19ff19f2b4":
-  version "0.7.6"
-  resolved "git+https://github.com/cube-js/node-jdbc#ed53c221c859246d7fc57654d7f6fa19ff19f2b4"
-  dependencies:
-    async "3.2.4"
-    java "^0.12.2"
-    lodash "4.17.21"
-    uuid "9.0.0"
-    winston "3.8.2"
 
 jest-changed-files@^24.9.0:
   version "24.9.0"
