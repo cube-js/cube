@@ -25,6 +25,7 @@ use crate::remotefs::minio::MINIORemoteFs;
 use crate::remotefs::queue::QueueRemoteFs;
 use crate::remotefs::s3::S3RemoteFs;
 use crate::remotefs::{LocalDirRemoteFs, RemoteFs};
+use crate::remotefs::cleanup::RemoteFsCleanup;
 use crate::scheduler::SchedulerImpl;
 use crate::sql::cache::SqlResultCache;
 use crate::sql::{SqlService, SqlServiceImpl};
@@ -108,6 +109,14 @@ impl CubeServices {
         futures.push(cube_ext::spawn(async move {
             QueueRemoteFs::wait_processing_loops(remote_fs.clone()).await
         }));
+
+        if self.injector.has_service_typed::<RemoteFsCleanup>().await {
+            let cleanup = self.injector.get_service_typed::<RemoteFsCleanup>().await;
+            futures.push(cube_ext::spawn(async move {
+                cleanup.wait_local_cleanup_loop().await;
+                Ok(())
+            }));
+        }
 
         if !self.cluster.is_select_worker() {
             let rocks_meta_store = self.rocks_meta_store.clone().unwrap();
@@ -1775,6 +1784,17 @@ impl Config {
                 ))
             })
             .await;
+
+        self.injector
+            .register_typed::<RemoteFsCleanup, _, _, _>(async move |i| {
+                Arc::new(RemoteFsCleanup::new(
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                ))
+            })
+            .await;
+
     }
 
     pub async fn configure_common(&self) {
