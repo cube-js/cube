@@ -20,12 +20,12 @@ use crate::metastore::{
 use crate::mysql::{MySqlServer, SqlAuthDefaultImpl, SqlAuthService};
 use crate::queryplanner::query_executor::{QueryExecutor, QueryExecutorImpl};
 use crate::queryplanner::{QueryPlanner, QueryPlannerImpl};
+use crate::remotefs::cleanup::RemoteFsCleanup;
 use crate::remotefs::gcs::GCSRemoteFs;
 use crate::remotefs::minio::MINIORemoteFs;
 use crate::remotefs::queue::QueueRemoteFs;
 use crate::remotefs::s3::S3RemoteFs;
 use crate::remotefs::{LocalDirRemoteFs, RemoteFs};
-use crate::remotefs::cleanup::RemoteFsCleanup;
 use crate::scheduler::SchedulerImpl;
 use crate::sql::cache::SqlResultCache;
 use crate::sql::{SqlService, SqlServiceImpl};
@@ -227,6 +227,11 @@ impl CubeServices {
         if self.injector.has_service_typed::<SchedulerImpl>().await {
             let scheduler = self.injector.get_service_typed::<SchedulerImpl>().await;
             scheduler.stop_processing_loops()?;
+        }
+
+        if self.injector.has_service_typed::<RemoteFsCleanup>().await {
+            let cleanup = self.injector.get_service_typed::<RemoteFsCleanup>().await;
+            cleanup.stop();
         }
 
         if self
@@ -1794,7 +1799,6 @@ impl Config {
                 ))
             })
             .await;
-
     }
 
     pub async fn configure_common(&self) {
@@ -1803,7 +1807,6 @@ impl Config {
                 QueueRemoteFs::new(
                     i.get_service_typed::<dyn ConfigObj>().await,
                     i.get_service("original_remote_fs").await,
-                    i.get_service_typed().await,
                 )
             })
             .await;

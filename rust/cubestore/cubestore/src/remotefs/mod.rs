@@ -1,8 +1,8 @@
+pub mod cleanup;
 pub mod gcs;
 pub mod minio;
 pub mod queue;
 pub mod s3;
-pub mod cleanup;
 
 use crate::config::injection::DIService;
 use crate::di_service;
