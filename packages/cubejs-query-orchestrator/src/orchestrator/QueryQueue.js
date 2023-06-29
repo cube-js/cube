@@ -198,21 +198,23 @@ export class QueryQueue {
         stageQueryKey: options.stageQueryKey,
         priority,
         requestId: options.requestId,
-        cacheExecutionId: options.cacheExecutionId,
         addedToQueueTime: new Date().getTime(),
       };
+      // TODO: generate queueId
+      const queueId = 'queueId';
       this.logger('Waiting for query', {
+        queueId,
+        cacheSpanId: options.cacheSpanId,
         queueSize: 0,
         queryKey: queryDef.queryKey,
         queuePrefix: this.redisQueuePrefix,
         requestId: options.requestId,
-        cacheExecutionId: options.cacheExecutionId,
         waitingForRequestId: queryDef.requestId
       });
       if (queryHandler === 'stream') {
         throw new Error('Streaming queries to Cube Store aren\'t supported');
       }
-      const result = await this.processQuerySkipQueue(queryDef);
+      const result = await this.processQuerySkipQueue(queryDef, queueId);
       return this.parseResult(result);
     }
 
@@ -254,12 +256,13 @@ export class QueryQueue {
 
       if (added > 0) {
         this.logger('Added to queue', {
+          queueId,
+          cacheSpanId: options.cacheSpanId,
           priority,
           queueSize,
           queryKey,
           queuePrefix: this.redisQueuePrefix,
           requestId: options.requestId,
-          cacheExecutionId: options.cacheExecutionId,
           metadata: query.metadata,
           preAggregationId: query.preAggregation?.preAggregationId,
           newVersionEntry: query.newVersionEntry,
@@ -277,11 +280,12 @@ export class QueryQueue {
 
       if (queryDef) {
         this.logger('Waiting for query', {
+          queueId,
+          cacheSpanId: options.cacheSpanId,
           queueSize,
           queryKey: queryDef.queryKey,
           queuePrefix: this.redisQueuePrefix,
           requestId: options.requestId,
-          cacheExecutionId: options.cacheExecutionId,
           activeQueryKeys: active,
           toProcessQueryKeys: toProcess,
           active: active.indexOf(queryKeyHash) !== -1,
@@ -462,7 +466,6 @@ export class QueryQueue {
           queryKey: query.queryKey,
           queuePrefix: this.redisQueuePrefix,
           requestId: query.requestId,
-          cacheExecutionId: query.cacheExecutionId,
           metadata: query.query?.metadata,
           preAggregationId: query.query?.preAggregation?.preAggregationId,
           newVersionEntry: query.query?.newVersionEntry,
@@ -496,7 +499,6 @@ export class QueryQueue {
             queryKey: query.queryKey,
             queuePrefix: this.redisQueuePrefix,
             requestId: query.requestId,
-            cacheExecutionId: query.cacheExecutionId,
             metadata: query.query?.metadata,
             preAggregationId: query.query?.preAggregation?.preAggregationId,
             newVersionEntry: query.query?.newVersionEntry,
@@ -621,14 +623,14 @@ export class QueryQueue {
    * @param {*} query
    * @returns {Promise<{ result: undefined | Object, error: string | undefined }>}
    */
-  async processQuerySkipQueue(query) {
+  async processQuerySkipQueue(query, queueId) {
     const startQueryTime = (new Date()).getTime();
     this.logger('Performing query', {
+      queueId,
       queueSize: 0,
       queryKey: query.queryKey,
       queuePrefix: this.redisQueuePrefix,
       requestId: query.requestId,
-      cacheExecutionId: query.cacheExecutionId,
       timeInQueue: 0
     });
     let executionResult;
@@ -647,12 +649,12 @@ export class QueryQueue {
         )
       };
       this.logger('Performing query completed', {
+        queueId,
         queueSize: 0,
         duration: ((new Date()).getTime() - startQueryTime),
         queryKey: query.queryKey,
         queuePrefix: this.redisQueuePrefix,
         requestId: query.requestId,
-        cacheExecutionId: query.cacheExecutionId,
         timeInQueue: 0
       });
     } catch (e) {
@@ -660,22 +662,22 @@ export class QueryQueue {
         error: (e.message || e).toString() // TODO error handling
       };
       this.logger('Error while querying', {
+        queueId,
         queueSize: 0,
         duration: ((new Date()).getTime() - startQueryTime),
         queryKey: query.queryKey,
         queuePrefix: this.redisQueuePrefix,
         requestId: query.requestId,
-        cacheExecutionId: query.cacheExecutionId,
         timeInQueue: 0,
         error: (e.stack || e).toString()
       });
       if (e instanceof TimeoutError) {
         if (handler) {
           this.logger('Cancelling query due to timeout', {
+            queueId,
             queryKey: query.queryKey,
             queuePrefix: this.redisQueuePrefix,
             requestId: query.requestId,
-            cacheExecutionId: query.cacheExecutionId,
           });
           await handler(query);
         }
@@ -719,12 +721,12 @@ export class QueryQueue {
         const startQueryTime = (new Date()).getTime();
         const timeInQueue = (new Date()).getTime() - query.addedToQueueTime;
         this.logger('Performing query', {
+          queueId,
           processingId,
           queueSize,
           queryKey: query.queryKey,
           queuePrefix: this.redisQueuePrefix,
           requestId: query.requestId,
-          cacheExecutionId: query.cacheExecutionId,
           timeInQueue,
           metadata: query.query?.metadata,
           preAggregationId: query.query?.preAggregation?.preAggregationId,
@@ -767,11 +769,11 @@ export class QueryQueue {
                         return queueConnection.optimisticQueryUpdate(queryKeyHashed, { cancelHandler }, processingId, queueId);
                       } catch (e) {
                         this.logger('Error while query update', {
+                          queueId,
                           queryKey: query.queryKey,
                           error: e.stack || e,
                           queuePrefix: this.redisQueuePrefix,
                           requestId: query.requestId,
-                          cacheExecutionId: query.cacheExecutionId,
                           metadata: query.query?.metadata,
                           preAggregationId: query.query?.preAggregation?.preAggregationId,
                           newVersionEntry: query.query?.newVersionEntry,
@@ -788,13 +790,13 @@ export class QueryQueue {
           }
 
           this.logger('Performing query completed', {
+            queueId,
             processingId,
             queueSize,
             duration: ((new Date()).getTime() - startQueryTime),
             queryKey: query.queryKey,
             queuePrefix: this.redisQueuePrefix,
             requestId: query.requestId,
-            cacheExecutionId: query.cacheExecutionId,
             timeInQueue,
             metadata: query.query?.metadata,
             preAggregationId: query.query?.preAggregation?.preAggregationId,
@@ -807,13 +809,13 @@ export class QueryQueue {
             error: (e.message || e).toString() // TODO error handling
           };
           this.logger('Error while querying', {
+            queueId,
             processingId,
             queueSize,
             duration: ((new Date()).getTime() - startQueryTime),
             queryKey: query.queryKey,
             queuePrefix: this.redisQueuePrefix,
             requestId: query.requestId,
-            cacheExecutionId: query.cacheExecutionId,
             timeInQueue,
             metadata: query.query?.metadata,
             preAggregationId: query.query?.preAggregation?.preAggregationId,
@@ -826,11 +828,11 @@ export class QueryQueue {
             const queryWithCancelHandle = await queueConnection.getQueryDef(queryKeyHashed);
             if (queryWithCancelHandle) {
               this.logger('Cancelling query due to timeout', {
+                queueId,
                 processingId,
                 queryKey: queryWithCancelHandle.queryKey,
                 queuePrefix: this.redisQueuePrefix,
                 requestId: queryWithCancelHandle.requestId,
-                cacheExecutionId: queryWithCancelHandle.cacheExecutionId,
                 metadata: queryWithCancelHandle.query?.metadata,
                 preAggregationId: queryWithCancelHandle.query?.preAggregation?.preAggregationId,
                 newVersionEntry: queryWithCancelHandle.query?.newVersionEntry,
@@ -846,12 +848,12 @@ export class QueryQueue {
 
         if (!(await queueConnection.setResultAndRemoveQuery(queryKeyHashed, executionResult, processingId, queueId))) {
           this.logger('Orphaned execution result', {
+            queueId,
             processingId,
             warn: 'Result for query was not set due to processing lock wasn\'t acquired',
             queryKey: query.queryKey,
             queuePrefix: this.redisQueuePrefix,
             requestId: query.requestId,
-            cacheExecutionId: query.cacheExecutionId,
             metadata: query.query?.metadata,
             preAggregationId: query.query?.preAggregation?.preAggregationId,
             newVersionEntry: query.query?.newVersionEntry,
@@ -872,10 +874,10 @@ export class QueryQueue {
         // }
 
         this.logger('Skip processing', {
+          queueId,
           processingId,
           queryKey: query && query.queryKey || queryKeyHashed,
           requestId: query && query.requestId,
-          cacheExecutionId: query.cacheExecutionId,
           queuePrefix: this.redisQueuePrefix,
           processingLockAcquired,
           query,
@@ -887,11 +889,11 @@ export class QueryQueue {
         const currentProcessingId = await queueConnection.freeProcessingLock(queryKeyHashed, processingId, activated);
         if (currentProcessingId) {
           this.logger('Skipping free processing lock', {
+            queueId,
             processingId,
             currentProcessingId,
             queryKey: query && query.queryKey || queryKeyHashed,
             requestId: query && query.requestId,
-            cacheExecutionId: query.cacheExecutionId,
             queuePrefix: this.redisQueuePrefix,
             processingLockAcquired,
             query,
@@ -904,9 +906,9 @@ export class QueryQueue {
       }
     } catch (e) {
       this.logger('Queue storage error', {
+        queueId,
         queryKey: query && query.queryKey || queryKeyHashed,
         requestId: query && query.requestId,
-        cacheExecutionId: query.cacheExecutionId,
         error: (e.stack || e).toString(),
         queuePrefix: this.redisQueuePrefix
       });

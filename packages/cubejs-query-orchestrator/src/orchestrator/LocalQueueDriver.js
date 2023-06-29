@@ -115,7 +115,6 @@ export class LocalQueueDriverConnection {
       stageQueryKey: options.stageQueryKey,
       priority,
       requestId: options.requestId,
-      cacheExecutionId: options.cacheExecutionId,
       addedToQueueTime: new Date().getTime()
     };
     const key = this.redisHash(queryKey);
