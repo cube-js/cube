@@ -15,9 +15,9 @@ export class OracleDBRunner extends DbRunnerAbstract {
       .withEnv('ORACLE_PASSWORD', 'test')
       .withHealthCheck({
         test: 'healthcheck.sh',
-        interval: 2 * 1000,
+        interval: 5 * 1000,
         timeout: 15 * 1000,
-        retries: 5,
+        retries: 12,
         startPeriod: (isCI() ? 60 : 30) * 1000
       })
       .withWaitStrategy(Wait.forHealthCheck())
