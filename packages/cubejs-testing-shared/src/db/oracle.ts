@@ -18,7 +18,7 @@ export class OracleDBRunner extends DbRunnerAbstract {
         interval: 5 * 1000,
         timeout: 15 * 1000,
         retries: 12,
-        startPeriod: (isCI() ? 60 : 30) * 1000
+        startPeriod: 60000
       })
       .withWaitStrategy(Wait.forHealthCheck())
       .withExposedPorts(1521);
