@@ -110,8 +110,6 @@ export class QueryQueue {
 
     this.processUid = options.processUid || getProcessUid();
 
-    this.counter = 0;
-
     const queueDriverOptions = {
       redisQueuePrefix: this.redisQueuePrefix,
       concurrency: this.concurrency,
@@ -202,7 +200,7 @@ export class QueryQueue {
         requestId: options.requestId,
         addedToQueueTime: new Date().getTime(),
       };
-      const queueId = `${this.processUid}-${this.counter++}`;
+      const queueId = this.queueDriver.generateQueueId();
       this.logger('Waiting for query', {
         queueId,
         cacheSpanId: options.cacheSpanId,

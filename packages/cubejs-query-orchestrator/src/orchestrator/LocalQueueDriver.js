@@ -108,7 +108,9 @@ export class LocalQueueDriverConnection {
    * @returns {AddedTuple}
    */
   addToQueue(keyScore, queryKey, orphanedTime, queryHandler, query, priority, options) {
+    const queueId = this.driver.generateQueueId();
     const queryQueueObj = {
+      queueId,
       queryHandler,
       query,
       queryKey,
@@ -142,8 +144,7 @@ export class LocalQueueDriverConnection {
 
     return [
       added,
-      // this driver doesnt support queue id
-      null,
+      queueId,
       Object.keys(this.toProcess).length,
       queryQueueObj.addedToQueueTime
     ];
@@ -271,8 +272,7 @@ export class LocalQueueDriverConnection {
 
     return [
       added,
-      // this driver doesnt support queue id
-      null,
+      this.queryDef[key]?.queueId,
       this.queueArray(this.active),
       Object.keys(this.toProcess).length,
       this.queryDef[key],
