@@ -340,8 +340,7 @@ jobs:
       - name: Lerna tsc
         run: yarn tsc
       - uses: Swatinem/rust-cache@v1
-        run:
-          working-directory: ./rust/cubestore
+        working-directory: ./rust/cubestore
         with:
           shared-key: cubestore
           key: ubuntu-20.04
@@ -468,8 +467,7 @@ jobs:
       - name: Lerna tsc
         run: yarn tsc
       - uses: Swatinem/rust-cache@v1
-        run:
-          working-directory: ./rust/cubestore
+        working-directory: ./rust/cubestore
         with:
           shared-key: cubestore
           key: ubuntu-20.04
