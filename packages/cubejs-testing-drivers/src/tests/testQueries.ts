@@ -1359,5 +1359,19 @@ export function testQueries(type: string): void {
       });
       expect(response.rawData()).toMatchSnapshot();
     });
+
+    execute('querying BigECommerce: null sum', async () => {
+      const response = await client.load({
+        measures: [
+          'BigECommerce.totalSales',
+        ],
+        filters: [{
+          member: 'BigECommerce.id',
+          operator: 'equals',
+          values: ['8958']
+        }]
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
   });
 }

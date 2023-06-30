@@ -342,6 +342,7 @@ jobs:
       - uses: Swatinem/rust-cache@v1
         with:
           working-directory: ./rust/cubestore
+          shared-key: cubestore
           key: ubuntu-20.04
       - name: Build cubestore
         uses: actions-rs/cargo@v1
@@ -468,6 +469,7 @@ jobs:
       - uses: Swatinem/rust-cache@v1
         with:
           working-directory: ./rust/cubestore
+          shared-key: cubestore
           key: ubuntu-20.04
       - name: Build cubestore
         uses: actions-rs/cargo@v1
