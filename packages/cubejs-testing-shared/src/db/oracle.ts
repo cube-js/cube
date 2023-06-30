@@ -13,14 +13,7 @@ export class OracleDBRunner extends DbRunnerAbstract {
 
     const container = new GenericContainer(`gvenzl/oracle-xe:${version}`)
       .withEnv('ORACLE_PASSWORD', 'test')
-      .withHealthCheck({
-        test: 'healthcheck.sh',
-        interval: 5 * 1000,
-        timeout: 15 * 1000,
-        retries: 12,
-        startPeriod: 60000
-      })
-      .withWaitStrategy(Wait.forHealthCheck())
+      .withWaitStrategy(Wait.forLogMessage('DATABASE IS READY TO USE'))
       .withExposedPorts(1521);
 
     if (options.volumes) {
