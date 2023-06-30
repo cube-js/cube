@@ -1,22 +1,17 @@
 import type { DocsThemeConfig } from "nextra-theme-docs";
 import { components } from "@/components/mdx";
-import { CubeLogo } from "@/components/common/CubeLogo";
+// import { CubeLogo } from "@/components/common/CubeLogo";
 import { Footer } from "@/components/common/Footer";
 import { SearchIcon, SearchTrigger } from '@cube-dev/marketing-ui';
 import { MainLayout } from '@/components/layouts/MainLayout';
+import { LogoWithVersion } from '@/components/common/LogoWithVersion/LogoWithVersion';
 
 const repo = "https://github.com/cube-js/cube";
 const branch = "master";
 const path = "/docs/docs-new/";
 
 const config: DocsThemeConfig = {
-  logo: (
-    <>
-      <CubeLogo />
-      {/*{'v0.31.31'}*/}
-    </>
-  ),
-  logoLink: "https://cube.dev",
+  logo: LogoWithVersion,
   docsRepositoryBase: `${repo}/blob/${branch}${path}`,
   project: {
     link: repo,
