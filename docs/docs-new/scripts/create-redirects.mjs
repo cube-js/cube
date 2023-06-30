@@ -1340,16 +1340,14 @@ async function createRedirects() {
     const file = await readFile(filePath, "utf8");
     const data = frontmatter(file);
 
-    // console.log({ data })
-
-    if (!data.attributes.redirect_from) {
-      return null;
+    if (!(override && override.ready && override.path)) {
+      return null
     }
 
     const urlsToRedirect = [
-      ...data.attributes.redirect_from,
-      data.attributes.permalink !== override.path ? data.attributes.permalink : null,
-    ];
+      data.attributes.permalink !== `/${override.path}` ? data.attributes.permalink : null,
+      ...(data.attributes.redirect_from || []),
+    ].filter(Boolean);
 
     return urlsToRedirect.flatMap((oldUrl) => {
       return {
