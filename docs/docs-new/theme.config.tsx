@@ -12,6 +12,7 @@ const path = "/docs/docs-new/";
 
 const config: DocsThemeConfig = {
   logo: LogoWithVersion,
+  logoLink: undefined,
   docsRepositoryBase: `${repo}/blob/${branch}${path}`,
   project: {
     link: repo,
