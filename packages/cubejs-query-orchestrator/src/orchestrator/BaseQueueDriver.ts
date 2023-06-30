@@ -12,8 +12,8 @@ export abstract class BaseQueueDriver implements QueueDriverInterface {
 
   public counter = 0;
 
-  public generateQueueId() {
-    return `${this.processUid}-${this.counter++}`;
+  public generateQueueId(): number {
+    return this.counter++;
   }
 
   public redisHash(queryKey: QueryKey): QueryKeyHash {
