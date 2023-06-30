@@ -10,7 +10,17 @@
     "permanent": true
   },
   {
+    "source": "/introduction",
+    "destination": "/product/introduction",
+    "permanent": true
+  },
+  {
     "source": "/cloud/dev-tools/dev-playground",
+    "destination": "/product/workspace/playground",
+    "permanent": true
+  },
+  {
+    "source": "/dev-tools/dev-playground",
     "destination": "/product/workspace/playground",
     "permanent": true
   },
@@ -25,12 +35,27 @@
     "permanent": true
   },
   {
+    "source": "/cloud/workspace/cube-ide",
+    "destination": "/product/workspace/data-model",
+    "permanent": true
+  },
+  {
     "source": "/cloud/dev-tools/alerts/",
     "destination": "/product/monitoring/alerts",
     "permanent": true
   },
   {
+    "source": "/cloud/workspace/alerts",
+    "destination": "/product/monitoring/alerts",
+    "permanent": true
+  },
+  {
     "source": "/tutorials",
+    "destination": "/guides/examples",
+    "permanent": true
+  },
+  {
+    "source": "/examples",
     "destination": "/guides/examples",
     "permanent": true
   },
@@ -45,17 +70,27 @@
     "permanent": true
   },
   {
+    "source": "/deployment/overview",
+    "destination": "/product/deployment",
+    "permanent": true
+  },
+  {
     "source": "/connecting-to-the-database",
     "destination": "/product/configuration/data-sources",
     "permanent": true
   },
   {
-    "source": "/cloud/workspace/logs",
-    "destination": "/product/monitoring/integrations",
+    "source": "/config/databases",
+    "destination": "/product/configuration/data-sources",
     "permanent": true
   },
   {
     "source": "/types-and-formats",
+    "destination": "/product/data-modeling/reference/types-and-formats",
+    "permanent": true
+  },
+  {
+    "source": "/schema/reference/types-and-formats",
     "destination": "/product/data-modeling/reference/types-and-formats",
     "permanent": true
   },
@@ -65,7 +100,17 @@
     "permanent": true
   },
   {
+    "source": "/schema/reference/segments",
+    "destination": "/product/data-modeling/reference/segments",
+    "permanent": true
+  },
+  {
     "source": "/pre-aggregations",
+    "destination": "/product/data-modeling/reference/pre-aggregations",
+    "permanent": true
+  },
+  {
+    "source": "/schema/reference/pre-aggregations",
     "destination": "/product/data-modeling/reference/pre-aggregations",
     "permanent": true
   },
@@ -75,7 +120,17 @@
     "permanent": true
   },
   {
+    "source": "/schema/reference/measures",
+    "destination": "/product/data-modeling/reference/measures",
+    "permanent": true
+  },
+  {
     "source": "/joins",
+    "destination": "/product/data-modeling/reference/joins",
+    "permanent": true
+  },
+  {
+    "source": "/schema/reference/joins",
     "destination": "/product/data-modeling/reference/joins",
     "permanent": true
   },
@@ -85,7 +140,17 @@
     "permanent": true
   },
   {
+    "source": "/schema/reference/dimensions",
+    "destination": "/product/data-modeling/reference/dimensions",
+    "permanent": true
+  },
+  {
     "source": "/cube",
+    "destination": "/product/data-modeling/reference/cube",
+    "permanent": true
+  },
+  {
+    "source": "/schema/reference/cube",
     "destination": "/product/data-modeling/reference/cube",
     "permanent": true
   },
@@ -100,12 +165,22 @@
     "permanent": true
   },
   {
+    "source": "/schema/fundamentals/joins",
+    "destination": "/product/data-modeling/fundamentals/working-with-joins",
+    "permanent": true
+  },
+  {
     "source": "/schema/fundamentals/working-with-yaml",
     "destination": "/product/data-modeling/fundamentals/syntax",
     "permanent": true
   },
   {
     "source": "/schema/getting-started/yaml",
+    "destination": "/product/data-modeling/fundamentals/syntax",
+    "permanent": true
+  },
+  {
+    "source": "/data-modeling/syntax",
     "destination": "/product/data-modeling/fundamentals/syntax",
     "permanent": true
   },
@@ -125,7 +200,17 @@
     "permanent": true
   },
   {
+    "source": "/schema/fundamentals/additional-concepts",
+    "destination": "/product/data-modeling/fundamentals/additional-concepts",
+    "permanent": true
+  },
+  {
     "source": "/schema-execution-environment",
+    "destination": "/product/data-modeling/advanced/schema-execution-environment",
+    "permanent": true
+  },
+  {
+    "source": "/schema/reference/execution-environment",
     "destination": "/product/data-modeling/advanced/schema-execution-environment",
     "permanent": true
   },
@@ -140,7 +225,17 @@
     "permanent": true
   },
   {
+    "source": "/schema/advanced/polymorphic-cubes",
+    "destination": "/product/data-modeling/advanced/polymorphic-cubes",
+    "permanent": true
+  },
+  {
     "source": "/schema/dynamic-schema-creation",
+    "destination": "/product/data-modeling/advanced/dynamic-schema-creation",
+    "permanent": true
+  },
+  {
+    "source": "/schema/advanced/dynamic-schema-creation",
     "destination": "/product/data-modeling/advanced/dynamic-schema-creation",
     "permanent": true
   },
@@ -155,12 +250,22 @@
     "permanent": true
   },
   {
+    "source": "/schema/advanced/data-blending",
+    "destination": "/product/data-modeling/advanced/data-blending",
+    "permanent": true
+  },
+  {
     "source": "/extending-cubes",
     "destination": "/product/data-modeling/advanced/code-reusability-extending-cubes",
     "permanent": true
   },
   {
     "source": "/recipes/extending-cubes",
+    "destination": "/product/data-modeling/advanced/code-reusability-extending-cubes",
+    "permanent": true
+  },
+  {
+    "source": "/schema/advanced/extending-cubes",
     "destination": "/product/data-modeling/advanced/code-reusability-extending-cubes",
     "permanent": true
   },
@@ -175,6 +280,21 @@
     "permanent": true
   },
   {
+    "source": "/schema/advanced/export-import",
+    "destination": "/product/data-modeling/advanced/code-reusability-export-and-import",
+    "permanent": true
+  },
+  {
+    "source": "/cloud/workspace/logs",
+    "destination": "/product/monitoring/integrations",
+    "permanent": true
+  },
+  {
+    "source": "/monitoring/integrations",
+    "destination": "/product/monitoring/integrations",
+    "permanent": true
+  },
+  {
     "source": "/getting-started-docker",
     "destination": "/product/getting-started/core",
     "permanent": true
@@ -185,7 +305,17 @@
     "permanent": true
   },
   {
+    "source": "/getting-started/core/overview",
+    "destination": "/product/getting-started/core",
+    "permanent": true
+  },
+  {
     "source": "/recipes/using-apache-superset-with-cube-sql",
+    "destination": "/product/configuration/visualization-tools/superset",
+    "permanent": true
+  },
+  {
+    "source": "/config/downstream/superset",
     "destination": "/product/configuration/visualization-tools/superset",
     "permanent": true
   },
@@ -195,7 +325,17 @@
     "permanent": true
   },
   {
+    "source": "/config/databases/presto",
+    "destination": "/product/configuration/data-sources/presto",
+    "permanent": true
+  },
+  {
     "source": "/dynamically-union-tables",
+    "destination": "/guides/recipes/data-modeling/dynamic-union-tables",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/dynamically-union-tables",
     "destination": "/guides/recipes/data-modeling/dynamic-union-tables",
     "permanent": true
   },
@@ -205,7 +345,17 @@
     "permanent": true
   },
   {
+    "source": "/recipes/schema-generation",
+    "destination": "/guides/recipes/code-reusability/schema-generation",
+    "permanent": true
+  },
+  {
     "source": "/security/jwt/auth0",
+    "destination": "/guides/recipes/auth/auth0-guide",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/authn-with-auth0",
     "destination": "/guides/recipes/auth/auth0-guide",
     "permanent": true
   },
@@ -215,7 +365,17 @@
     "permanent": true
   },
   {
+    "source": "/recipes/authn-with-aws-cognito",
+    "destination": "/guides/recipes/auth/aws-cognito",
+    "permanent": true
+  },
+  {
     "source": "/funnels",
+    "destination": "/guides/recipes/analytics/funnels",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/funnels",
     "destination": "/guides/recipes/analytics/funnels",
     "permanent": true
   },
@@ -225,12 +385,27 @@
     "permanent": true
   },
   {
+    "source": "/recipes/event-analytics",
+    "destination": "/guides/recipes/analytics/event-analytics",
+    "permanent": true
+  },
+  {
     "source": "/cohort-retention",
     "destination": "/guides/recipes/analytics/cohort-retention",
     "permanent": true
   },
   {
+    "source": "/recipes/cohort-retention",
+    "destination": "/guides/recipes/analytics/cohort-retention",
+    "permanent": true
+  },
+  {
     "source": "/active-users",
+    "destination": "/guides/recipes/analytics/active-users",
+    "permanent": true
+  },
+  {
+    "source": "/recipes/active-users",
     "destination": "/guides/recipes/analytics/active-users",
     "permanent": true
   }

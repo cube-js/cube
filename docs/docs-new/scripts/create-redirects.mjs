@@ -1346,7 +1346,12 @@ async function createRedirects() {
       return null;
     }
 
-    return data.attributes.redirect_from.flatMap((oldUrl) => {
+    const urlsToRedirect = [
+      ...data.attributes.redirect_from,
+      data.attributes.permalink !== override.path ? data.attributes.permalink : null,
+    ];
+
+    return urlsToRedirect.flatMap((oldUrl) => {
       return {
         source: oldUrl,
         destination: `/${override.path}`,
