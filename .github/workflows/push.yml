@@ -339,7 +339,7 @@ jobs:
           command: yarn install --frozen-lockfile
       - name: Lerna tsc
         run: yarn tsc
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
         with:
           working-directory: ./rust/cubestore
           shared-key: cubestore
@@ -466,7 +466,7 @@ jobs:
         run: yarn build
       - name: Lerna tsc
         run: yarn tsc
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
         with:
           working-directory: ./rust/cubestore
           shared-key: cubestore
