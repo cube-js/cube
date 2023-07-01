@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.31](https://github.com/cube-js/cube/compare/v0.33.30...v0.33.31) (2023-07-01)
+
+
+### Bug Fixes
+
+* **cubestore:** FreeInMemoryChunks fires if there is no inmemory chunks ([#6771](https://github.com/cube-js/cube/issues/6771)) ([f9cfd77](https://github.com/cube-js/cube/commit/f9cfd770a646f45c44e554d5b16ba2cddd8b1c48))
+* **databricks-jdbc-driver:** Return NULL decimal as NULL instead of 0 ([#6768](https://github.com/cube-js/cube/issues/6768)) ([c2ab19d](https://github.com/cube-js/cube/commit/c2ab19d86d6144e4f91f9e8fb681e17e87bfcef3))
+
+
+
+
+
 ## [0.33.30](https://github.com/cube-js/cube/compare/v0.33.29...v0.33.30) (2023-06-23)
 
 
