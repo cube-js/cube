@@ -341,7 +341,7 @@ jobs:
         run: yarn tsc
       - uses: Swatinem/rust-cache@v2
         with:
-          working-directory: ./rust/cubestore
+          workspaces: ./rust/cubestore -> target
           shared-key: cubestore
           key: ubuntu-20.04
       - name: Build cubestore
@@ -468,7 +468,7 @@ jobs:
         run: yarn tsc
       - uses: Swatinem/rust-cache@v2
         with:
-          working-directory: ./rust/cubestore
+          workspaces: ./rust/cubestore -> target
           shared-key: cubestore
           key: ubuntu-20.04
       - name: Build cubestore
