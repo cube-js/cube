@@ -200,7 +200,7 @@ export class QueryQueue {
         requestId: options.requestId,
         addedToQueueTime: new Date().getTime(),
       };
-      const queueId = this.queueDriver.generateQueueId();
+      const queueId = this.queueDriver.generateQueueId ? this.queueDriver.generateQueueId() : undefined;
       this.logger('Waiting for query', {
         queueId,
         cacheSpanId: options.cacheSpanId,
