@@ -235,11 +235,7 @@ impl RemoteFsCleanup {
 mod test {
     use super::*;
     use crate::config::Config;
-    use crate::remotefs::LocalDirRemoteFs;
     use futures_timer::Delay;
-    use std::env;
-    use std::fs::File;
-    use std::io::Write;
 
     #[tokio::test]
     async fn queue_cleanup_local_files() {

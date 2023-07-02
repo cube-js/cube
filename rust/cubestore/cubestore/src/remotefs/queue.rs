@@ -347,7 +347,6 @@ mod test {
     use super::*;
     use crate::config::Config;
     use crate::remotefs::LocalDirRemoteFs;
-    use futures_timer::Delay;
     use std::env;
     use std::fs::File;
     use std::io::Write;
