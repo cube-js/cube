@@ -2,6 +2,9 @@
 module.exports = {
   exclude: ['*/_meta'],
   siteUrl: process.env.SITE_URL || 'https://cube.dev/docs-next',
-  generateRobotsTxt: true, // (optional)
+  generateRobotsTxt: true, // (optional),
+  robotsTxtOptions: {
+    policies: [{ userAgent: '*', disallow: '/' }],
+  },
   // ...other options
 }
