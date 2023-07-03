@@ -250,6 +250,8 @@ export class YamlCompiler {
       if (!name) {
         errorsReport.error(`name isn't defined for ${memberType}: ${YAML.stringify(rest)}`);
         return {};
+      } else if (indexes) {
+        return { [name]: { indexes, ...rest } };
       } else {
         return { [name]: rest };
       }
