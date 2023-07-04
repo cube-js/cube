@@ -2,6 +2,7 @@ import { BaseFilter, BaseQuery } from '@cubejs-backend/schema-compiler';
 
 type Granularity = 'day' | 'week' | 'hour' | 'minute' | 'second' | 'month' | 'quarter' | 'year';
 
+// duckdb timestamptz is interperted as string by cubejs
 const dateTrunc = (granularity: Granularity, date: string) => `DATE_TRUNC('${granularity}', ${date})::timestamp`;
 
 const GRANULARITY_TO_INTERVAL: Record<Granularity, (date: string) => string> = {
