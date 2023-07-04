@@ -203,7 +203,7 @@ export class QueryQueue {
       const queueId = this.queueDriver.generateQueueId ? this.queueDriver.generateQueueId() : undefined;
       this.logger('Waiting for query', {
         queueId,
-        cacheSpanId: options.cacheSpanId,
+        spanId: options.spanId,
         queueSize: 0,
         queryKey: queryDef.queryKey,
         queuePrefix: this.redisQueuePrefix,
@@ -256,7 +256,7 @@ export class QueryQueue {
       if (added > 0) {
         this.logger('Added to queue', {
           queueId,
-          cacheSpanId: options.cacheSpanId,
+          spanId: options.spanId,
           priority,
           queueSize,
           queryKey,
@@ -280,7 +280,7 @@ export class QueryQueue {
       if (queryDef) {
         this.logger('Waiting for query', {
           queueId,
-          cacheSpanId: options.cacheSpanId,
+          spanId: options.spanId,
           queueSize,
           queryKey: queryDef.queryKey,
           queuePrefix: this.redisQueuePrefix,
