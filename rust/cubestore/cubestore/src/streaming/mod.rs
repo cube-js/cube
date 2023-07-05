@@ -251,8 +251,9 @@ impl StreamingService for StreamingServiceImpl {
             .await?;
         let mut stream = BufferedStream::new(
             stream,
-            self.config_obj.wal_split_threshold() as usize,
+            self.config_obj.streaming_wal_rows_split_threshold() as usize,
             Duration::from_millis(1000),
+            self.config_obj.streaming_wal_size_split_threshold() as usize,
         );
 
         let finish = |builders: Vec<Box<dyn ArrayBuilder>>| {
@@ -1137,6 +1138,7 @@ mod tests {
             c.compaction_chunks_total_size_threshold = 100000;
             c.stale_stream_timeout = 1;
             c.wal_split_threshold = 1638;
+            c.streaming_wal_rows_split_threshold = 1638;
             c.compaction_in_memory_chunks_schedule_period_secs = 0;
             c
         }).start_with_injector_override(async move |injector| {
@@ -1295,6 +1297,7 @@ mod tests {
             c.compaction_chunks_total_size_threshold = 100000;
             c.stale_stream_timeout = 1;
             c.wal_split_threshold = 1638;
+            c.streaming_wal_rows_split_threshold = 1638;
             c.compaction_in_memory_chunks_schedule_period_secs = 0;
             c
         }).start_with_injector_override(async move |injector| {
@@ -1433,6 +1436,7 @@ mod tests {
             c.compaction_chunks_total_size_threshold = 100000;
             c.stale_stream_timeout = 1;
             c.wal_split_threshold = 1638;
+            c.streaming_wal_rows_split_threshold = 1638;
             c
         }).start_with_injector_override(async move |injector| {
             injector.register_typed::<dyn KafkaClientService, _, _, _>(async move |_| {
@@ -1497,6 +1501,7 @@ mod tests {
             c.compaction_chunks_total_size_threshold = 100000;
             c.stale_stream_timeout = 1;
             c.wal_split_threshold = 1638;
+            c.streaming_wal_rows_split_threshold = 1638;
             c
         }).start_with_injector_override(async move |injector| {
             injector.register_typed::<dyn KafkaClientService, _, _, _>(async move |_| {
@@ -1565,6 +1570,7 @@ mod tests {
             c.compaction_chunks_total_size_threshold = 100000;
             c.stale_stream_timeout = 1;
             c.wal_split_threshold = 1638;
+            c.streaming_wal_rows_split_threshold = 1638;
             c
         }).start_with_injector_override(async move |injector| {
             injector.register_typed::<dyn KafkaClientService, _, _, _>(async move |_| {
@@ -1710,6 +1716,7 @@ mod tests {
             c.compaction_chunks_total_size_threshold = 100000;
             c.stale_stream_timeout = 1;
             c.wal_split_threshold = 1638;
+            c.streaming_wal_rows_split_threshold = 1638;
             c
         }).start_with_injector_override(async move |injector| {
             injector.register_typed::<dyn KafkaClientService, _, _, _>(async move |_| {

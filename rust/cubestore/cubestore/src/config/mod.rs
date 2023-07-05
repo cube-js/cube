@@ -368,6 +368,10 @@ pub trait ConfigObj: DIService {
 
     fn wal_split_threshold(&self) -> u64;
 
+    fn streaming_wal_rows_split_threshold(&self) -> u64;
+
+    fn streaming_wal_size_split_threshold(&self) -> u64;
+
     fn select_worker_pool_size(&self) -> usize;
 
     fn job_runners_count(&self) -> usize;
@@ -470,7 +474,13 @@ pub trait ConfigObj: DIService {
 
     fn local_files_cleanup_interval_secs(&self) -> u64;
 
+    fn remote_files_cleanup_interval_secs(&self) -> u64;
+
     fn local_files_cleanup_size_threshold(&self) -> u64;
+
+    fn local_files_cleanup_delay_secs(&self) -> u64;
+
+    fn remote_files_cleanup_delay_secs(&self) -> u64;
 }
 
 #[derive(Debug, Clone)]
@@ -490,6 +500,8 @@ pub struct ConfigObjImpl {
     pub compaction_in_memory_chunks_ratio_check_threshold: u64,
     pub compaction_in_memory_chunks_schedule_period_secs: u64,
     pub wal_split_threshold: u64,
+    pub streaming_wal_rows_split_threshold: u64,
+    pub streaming_wal_size_split_threshold: u64,
     pub data_dir: PathBuf,
     pub dump_dir: Option<PathBuf>,
     pub store_provider: FileStoreProvider,
@@ -544,7 +556,10 @@ pub struct ConfigObjImpl {
     pub transport_max_message_size: usize,
     pub transport_max_frame_size: usize,
     pub local_files_cleanup_interval_secs: u64,
+    pub remote_files_cleanup_interval_secs: u64,
     pub local_files_cleanup_size_threshold: u64,
+    pub local_files_cleanup_delay_secs: u64,
+    pub remote_files_cleanup_delay_secs: u64,
 }
 
 crate::di_service!(ConfigObjImpl, [ConfigObj]);
@@ -609,6 +624,14 @@ impl ConfigObj for ConfigObjImpl {
 
     fn wal_split_threshold(&self) -> u64 {
         self.wal_split_threshold
+    }
+
+    fn streaming_wal_rows_split_threshold(&self) -> u64 {
+        self.streaming_wal_rows_split_threshold
+    }
+
+    fn streaming_wal_size_split_threshold(&self) -> u64 {
+        self.streaming_wal_size_split_threshold
     }
 
     fn select_worker_pool_size(&self) -> usize {
@@ -812,8 +835,20 @@ impl ConfigObj for ConfigObjImpl {
         self.local_files_cleanup_interval_secs
     }
 
+    fn remote_files_cleanup_interval_secs(&self) -> u64 {
+        self.remote_files_cleanup_interval_secs
+    }
+
     fn local_files_cleanup_size_threshold(&self) -> u64 {
         self.local_files_cleanup_size_threshold
+    }
+
+    fn local_files_cleanup_delay_secs(&self) -> u64 {
+        self.local_files_cleanup_delay_secs
+    }
+
+    fn remote_files_cleanup_delay_secs(&self) -> u64 {
+        self.remote_files_cleanup_delay_secs
     }
 }
 
@@ -1105,6 +1140,15 @@ impl Config {
                 download_concurrency: env_parse("CUBESTORE_MAX_ACTIVE_DOWNLOADS", 8),
                 max_ingestion_data_frames: env_parse("CUBESTORE_MAX_DATA_FRAMES", 4),
                 wal_split_threshold: env_parse("CUBESTORE_WAL_SPLIT_THRESHOLD", 1048576 / 2),
+                streaming_wal_rows_split_threshold: env_parse(
+                    "CUBESTORE_STREAMING_WAL_ROWS_SPLIT_THRESHOLD",
+                    200000,
+                ),
+                streaming_wal_size_split_threshold: env_parse(
+                    "CUBESTORE_STREAMING_WAL_SIZE_SPLIT_THRESHOLD",
+                    100 * 1024 * 1024,
+                ),
+
                 job_runners_count: env_parse("CUBESTORE_JOB_RUNNERS", 4),
                 long_term_job_runners_count: env_parse("CUBESTORE_LONG_TERM_JOB_RUNNERS", 32),
                 connection_timeout: 60,
@@ -1187,7 +1231,11 @@ impl Config {
                 ),
                 local_files_cleanup_interval_secs: env_parse(
                     "CUBESTORE_LOCAL_FILES_CLEANUP_INTERVAL_SECS",
-                    3 * 600,
+                    600,
+                ),
+                remote_files_cleanup_interval_secs: env_parse(
+                    "CUBESTORE_REMOTE_FILES_CLEANUP_INTERVAL_SECS",
+                    6 * 600,
                 ),
                 local_files_cleanup_size_threshold: env_parse_size(
                     "CUBESTORE_LOCAL_FILES_CLEANUP_SIZE_THRESHOLD",
@@ -1195,6 +1243,14 @@ impl Config {
                     None,
                     None,
                 ) as u64,
+                local_files_cleanup_delay_secs: env_parse(
+                    "CUBESTORE_LOCAL_FILES_CLEANUP_DELAY_SECS",
+                    600,
+                ),
+                remote_files_cleanup_delay_secs: env_parse(
+                    "CUBESTORE_REMOTE_FILES_CLEANUP_DELAY_SECS",
+                    3600,
+                ),
             }),
         }
     }
@@ -1252,6 +1308,8 @@ impl Config {
                 download_concurrency: 8,
                 max_ingestion_data_frames: 4,
                 wal_split_threshold: 262144,
+                streaming_wal_rows_split_threshold: 262144,
+                streaming_wal_size_split_threshold: 350 * 1024 * 1024,
                 connection_timeout: 60,
                 server_name: "localhost".to_string(),
                 upload_to_remote: true,
@@ -1280,7 +1338,10 @@ impl Config {
                 transport_max_message_size: 64 << 20,
                 transport_max_frame_size: 16 << 20,
                 local_files_cleanup_interval_secs: 600,
+                remote_files_cleanup_interval_secs: 600,
                 local_files_cleanup_size_threshold: 0,
+                local_files_cleanup_delay_secs: 600,
+                remote_files_cleanup_delay_secs: 3600,
             }),
         }
     }
@@ -1747,6 +1808,7 @@ impl Config {
                 QueueRemoteFs::new(
                     i.get_service_typed::<dyn ConfigObj>().await,
                     i.get_service("original_remote_fs").await,
+                    i.get_service_typed().await,
                 )
             })
             .await;
