@@ -907,7 +907,7 @@ impl SchedulerImpl {
             if last_deleted_chunks_release
                 .elapsed()
                 .ok()
-                .map_or(false, |d| d >= Duration::from_secs(2))
+                .map_or(false, |d| d >= Duration::from_secs(1))
             {
                 let chunks_to_delete = {
                     let mut chunks = self.in_memory_chunks_to_delete.lock().await;
@@ -919,22 +919,24 @@ impl SchedulerImpl {
                         result
                     }
                 };
-                let chunks_to_delete = chunks_to_delete.into_iter().into_group_map();
-                for (node, ids) in chunks_to_delete {
-                    if !ids.is_empty() {
-                        if let Err(e) = self
-                            .cluster
-                            .free_deleted_memory_chunks(&node, ids.clone())
-                            .await
-                        {
-                            log::error!(
-                                "Error while trying release in memory chunks in node {}: {}",
-                                node,
-                                e
-                            );
+                if !chunks_to_delete.is_empty() {
+                    let chunks_to_delete = chunks_to_delete.into_iter().into_group_map();
+                    for (node, ids) in chunks_to_delete {
+                        if !ids.is_empty() {
+                            if let Err(e) = self
+                                .cluster
+                                .free_deleted_memory_chunks(&node, ids.clone())
+                                .await
+                            {
+                                log::error!(
+                                    "Error while trying release in memory chunks in node {}: {}",
+                                    node,
+                                    e
+                                );
 
-                            let mut chunks = self.in_memory_chunks_to_delete.lock().await;
-                            chunks.extend(ids.iter().map(|v| (node.clone(), *v)));
+                                let mut chunks = self.in_memory_chunks_to_delete.lock().await;
+                                chunks.extend(ids.iter().map(|v| (node.clone(), *v)));
+                            }
                         }
                     }
                 }
