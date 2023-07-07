@@ -1997,6 +1997,14 @@ Array [
 ]
 `;
 
+exports[`Queries with the @cubejs-backend/databricks-jdbc-driver querying BigECommerce: null boolean 1`] = `
+Array [
+  Object {
+    "BigECommerce.returning": null,
+  },
+]
+`;
+
 exports[`Queries with the @cubejs-backend/databricks-jdbc-driver querying BigECommerce: null sum 1`] = `
 Array [
   Object {
