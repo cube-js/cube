@@ -3,7 +3,7 @@ import * as t from '@babel/types';
 import { parse } from '@babel/parser';
 import babelGenerator from '@babel/generator';
 import babelTraverse from '@babel/traverse';
-import { renderTemplate } from '@cubejs-backend/native';
+import { JinjaEngine, newJinjaEngine } from '@cubejs-backend/native';
 
 import type { FileContent } from '@cubejs-backend/shared';
 
@@ -15,6 +15,7 @@ import { nonStringFields } from './CubeValidator';
 import { CubeDictionary } from './CubeDictionary';
 import { ErrorReporter } from './ErrorReporter';
 import { camelizeCube } from './utils';
+import { getEnv } from '@cubejs-backend/shared';
 
 type EscapeStateStack = {
   inFormattedStr?: boolean;
@@ -26,13 +27,27 @@ type EscapeStateStack = {
 export class YamlCompiler {
   public dataSchemaCompiler: DataSchemaCompiler | null = null;
 
+  protected jinjaEngine: JinjaEngine | null = null;
+
   public constructor(private cubeSymbols: CubeSymbols, private cubeDictionary: CubeDictionary) {
+  }
+
+  protected getJinjaEngine(): JinjaEngine {
+    if (this.jinjaEngine) {
+      return this.jinjaEngine;
+    }
+
+    this.jinjaEngine = newJinjaEngine({
+      debugInfo: getEnv('devMode'),
+    });
+
+    return this.jinjaEngine;
   }
 
   public compileYamlWithJinjaFile(file: FileContent, errorsReport: ErrorReporter, cubes, contexts, exports, asyncModules, toCompile, compiledFiles, compileContext) {
     const compiledFile = {
       fileName: file.fileName,
-      content: renderTemplate(file.fileName, compileContext),
+      content: this.getJinjaEngine().renderTemplate(file.fileName, compileContext),
     };
 
     return this.compileYamlFile(

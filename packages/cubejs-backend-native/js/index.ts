@@ -277,21 +277,12 @@ export const pythonLoadConfig = async (context: string, options: { file: string 
     return config;
 }
 
-export const initJinjaEngine = (options: { debugInfo?: boolean }): void => {
+export interface JinjaEngine {
+    loadTemplate(templateName: string, templateContent: string): void;
+    renderTemplate(templateName: string, context: unknown): string;
+}
+
+export const newJinjaEngine = (options: { debugInfo?: boolean }): JinjaEngine => {
     const native = loadNative();
-    return native.initJinjaEngine(options);
-};
-export const loadTemplate = (templateName: string, templateContent: string): void => {
-  const native = loadNative();
-  return native.loadTemplate(templateName, templateContent);
-};
-
-export const clearTemplates = (): void => {
-  const native = loadNative();
-  return native.clearTemplates();
-};
-
-export const renderTemplate = (templateName: string, context: unknown): string => {
-  const native = loadNative();
-  return native.renderTemplate(templateName, context);
+    return native.newJinjaEngine(options);
 };
