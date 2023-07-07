@@ -7,6 +7,7 @@ import { JinjaEngine, newJinjaEngine } from '@cubejs-backend/native';
 
 import type { FileContent } from '@cubejs-backend/shared';
 
+import { getEnv } from '@cubejs-backend/shared';
 import { CubePropContextTranspiler, transpiledFields, transpiledFieldsPatterns } from './transpilers';
 import { PythonParser } from '../parser/PythonParser';
 import { CubeSymbols } from './CubeSymbols';
@@ -15,7 +16,6 @@ import { nonStringFields } from './CubeValidator';
 import { CubeDictionary } from './CubeDictionary';
 import { ErrorReporter } from './ErrorReporter';
 import { camelizeCube } from './utils';
-import { getEnv } from '@cubejs-backend/shared';
 
 type EscapeStateStack = {
   inFormattedStr?: boolean;

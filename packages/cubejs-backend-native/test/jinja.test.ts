@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 
 import * as native from '../js';
-import {JinjaEngine, newJinjaEngine} from "../js";
+import { JinjaEngine, newJinjaEngine } from '../js';
 
 const suite = native.isFallbackBuild() ? xdescribe : describe;
 
@@ -35,7 +35,7 @@ function testLoadBrokenTemplateBySnapshot(engine: JinjaEngine, templateName: str
 suite('Jinja', () => {
   const jinjaEngine = native.newJinjaEngine({
     debugInfo: true
-  })
+  });
 
   beforeAll(async () => {
     loadTemplateFile(jinjaEngine, '.utils.jinja');
