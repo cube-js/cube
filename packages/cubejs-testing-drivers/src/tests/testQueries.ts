@@ -1373,5 +1373,19 @@ export function testQueries(type: string): void {
       });
       expect(response.rawData()).toMatchSnapshot();
     });
+
+    execute('querying BigECommerce: null boolean', async () => {
+      const response = await client.load({
+        dimensions: [
+          'BigECommerce.returning',
+        ],
+        filters: [{
+          member: 'BigECommerce.id',
+          operator: 'equals',
+          values: ['8958']
+        }]
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
   });
 }
