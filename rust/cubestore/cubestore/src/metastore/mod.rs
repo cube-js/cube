@@ -969,6 +969,8 @@ pub trait MetaStore: DIService + Send + Sync {
         &self,
     ) -> Result<Vec<(IdRow<Partition>, Vec<IdRow<Chunk>>)>, CubeError>;
 
+    async fn get_all_filenames(&self) -> Result<Vec<String>, CubeError>;
+
     fn chunks_table(&self) -> ChunkMetaStoreTable;
     async fn create_chunk(
         &self,
@@ -3310,6 +3312,26 @@ impl MetaStore for RocksMetaStore {
                 }
             }
             Ok(partitions)
+        })
+        .await
+    }
+    async fn get_all_filenames(&self) -> Result<Vec<String>, CubeError> {
+        self.read_operation_out_of_queue(|db| {
+            let mut filenames = Vec::new();
+            for c in ChunkRocksTable::new(db.clone()).table_scan(db.snapshot)? {
+                let c = c?;
+                if !c.row.in_memory {
+                    filenames.push(c.row.get_full_name(c.id));
+                }
+            }
+
+            for p in PartitionRocksTable::new(db.clone()).table_scan(db.snapshot)? {
+                let p = p?;
+                if let Some(filename) = p.row.get_full_name(p.id) {
+                    filenames.push(filename);
+                }
+            }
+            Ok(filenames)
         })
         .await
     }

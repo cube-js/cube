@@ -735,6 +735,10 @@ impl MetaStore for MetaStoreMock {
     ) -> Result<Vec<IdRow<Index>>, CubeError> {
         panic!("MetaStore mock!")
     }
+
+    async fn get_all_filenames(&self) -> Result<Vec<String>, CubeError> {
+        panic!("MetaStore mock!")
+    }
 }
 
 crate::di_service!(MetaStoreMock, [MetaStore]);
