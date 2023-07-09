@@ -20,6 +20,7 @@ pub use rocks_store::*;
 pub use rocks_table::*;
 
 use crate::cluster::node_name_by_partition;
+use crate::metastore::partition::partition_file_name;
 use async_trait::async_trait;
 use log::info;
 use rocksdb::{BlockBasedOptions, Cache, Env, MergeOperands, Options, DB};
@@ -3327,8 +3328,9 @@ impl MetaStore for RocksMetaStore {
 
             for p in PartitionRocksTable::new(db.clone()).table_scan(db.snapshot)? {
                 let p = p?;
-                if let Some(filename) = p.row.get_full_name(p.id) {
-                    filenames.push(filename);
+                if p.row.active || p.row.main_table_row_count == 0 {
+                    //maint_table_row_count == 0 means that partition is just created
+                    filenames.push(partition_file_name(p.id, p.row.suffix()));
                 }
             }
             Ok(filenames)
