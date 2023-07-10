@@ -3,6 +3,33 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.33](https://github.com/cube-js/cube/compare/v0.33.32...v0.33.33) (2023-07-08)
+
+
+### Features
+
+* **schema:** Support multitenancy for jinja templates ([#6793](https://github.com/cube-js/cube/issues/6793)) ([fb59e59](https://github.com/cube-js/cube/commit/fb59e590b09e13bfaecb794a9db7d0b861f38d3f))
+
+
+
+
+
+## [0.33.32](https://github.com/cube-js/cube/compare/v0.33.31...v0.33.32) (2023-07-07)
+
+
+### Bug Fixes
+
+* **databricks-jdbc-driver:** Return NULL as NULL instead of false for boolean ([#6791](https://github.com/cube-js/cube/issues/6791)) ([7eb02f5](https://github.com/cube-js/cube/commit/7eb02f569464d801ec71215503bc9b3679b5e856))
+
+
+### Features
+
+* **docker:** Upgrade Node.js to 16.20.1 ([#6789](https://github.com/cube-js/cube/issues/6789)) ([5da7562](https://github.com/cube-js/cube/commit/5da7562013b6696d3c5da96112990fc8d48290ce))
+
+
+
+
+
 ## [0.33.31](https://github.com/cube-js/cube/compare/v0.33.30...v0.33.31) (2023-07-01)
 
 

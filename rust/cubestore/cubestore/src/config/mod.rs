@@ -20,6 +20,7 @@ use crate::metastore::{
 use crate::mysql::{MySqlServer, SqlAuthDefaultImpl, SqlAuthService};
 use crate::queryplanner::query_executor::{QueryExecutor, QueryExecutorImpl};
 use crate::queryplanner::{QueryPlanner, QueryPlannerImpl};
+use crate::remotefs::cleanup::RemoteFsCleanup;
 use crate::remotefs::gcs::GCSRemoteFs;
 use crate::remotefs::minio::MINIORemoteFs;
 use crate::remotefs::queue::QueueRemoteFs;
@@ -108,6 +109,14 @@ impl CubeServices {
         futures.push(cube_ext::spawn(async move {
             QueueRemoteFs::wait_processing_loops(remote_fs.clone()).await
         }));
+
+        if self.injector.has_service_typed::<RemoteFsCleanup>().await {
+            let cleanup = self.injector.get_service_typed::<RemoteFsCleanup>().await;
+            futures.push(cube_ext::spawn(async move {
+                cleanup.wait_local_cleanup_loop().await;
+                Ok(())
+            }));
+        }
 
         if !self.cluster.is_select_worker() {
             let rocks_meta_store = self.rocks_meta_store.clone().unwrap();
@@ -218,6 +227,11 @@ impl CubeServices {
         if self.injector.has_service_typed::<SchedulerImpl>().await {
             let scheduler = self.injector.get_service_typed::<SchedulerImpl>().await;
             scheduler.stop_processing_loops()?;
+        }
+
+        if self.injector.has_service_typed::<RemoteFsCleanup>().await {
+            let cleanup = self.injector.get_service_typed::<RemoteFsCleanup>().await;
+            cleanup.stop();
         }
 
         if self
@@ -470,7 +484,13 @@ pub trait ConfigObj: DIService {
 
     fn local_files_cleanup_interval_secs(&self) -> u64;
 
+    fn remote_files_cleanup_interval_secs(&self) -> u64;
+
     fn local_files_cleanup_size_threshold(&self) -> u64;
+
+    fn local_files_cleanup_delay_secs(&self) -> u64;
+
+    fn remote_files_cleanup_delay_secs(&self) -> u64;
 }
 
 #[derive(Debug, Clone)]
@@ -544,7 +564,10 @@ pub struct ConfigObjImpl {
     pub transport_max_message_size: usize,
     pub transport_max_frame_size: usize,
     pub local_files_cleanup_interval_secs: u64,
+    pub remote_files_cleanup_interval_secs: u64,
     pub local_files_cleanup_size_threshold: u64,
+    pub local_files_cleanup_delay_secs: u64,
+    pub remote_files_cleanup_delay_secs: u64,
 }
 
 crate::di_service!(ConfigObjImpl, [ConfigObj]);
@@ -812,8 +835,20 @@ impl ConfigObj for ConfigObjImpl {
         self.local_files_cleanup_interval_secs
     }
 
+    fn remote_files_cleanup_interval_secs(&self) -> u64 {
+        self.remote_files_cleanup_interval_secs
+    }
+
     fn local_files_cleanup_size_threshold(&self) -> u64 {
         self.local_files_cleanup_size_threshold
+    }
+
+    fn local_files_cleanup_delay_secs(&self) -> u64 {
+        self.local_files_cleanup_delay_secs
+    }
+
+    fn remote_files_cleanup_delay_secs(&self) -> u64 {
+        self.remote_files_cleanup_delay_secs
     }
 }
 
@@ -1187,7 +1222,11 @@ impl Config {
                 ),
                 local_files_cleanup_interval_secs: env_parse(
                     "CUBESTORE_LOCAL_FILES_CLEANUP_INTERVAL_SECS",
-                    3 * 600,
+                    600,
+                ),
+                remote_files_cleanup_interval_secs: env_parse(
+                    "CUBESTORE_REMOTE_FILES_CLEANUP_INTERVAL_SECS",
+                    6 * 600,
                 ),
                 local_files_cleanup_size_threshold: env_parse_size(
                     "CUBESTORE_LOCAL_FILES_CLEANUP_SIZE_THRESHOLD",
@@ -1195,6 +1234,14 @@ impl Config {
                     None,
                     None,
                 ) as u64,
+                local_files_cleanup_delay_secs: env_parse(
+                    "CUBESTORE_LOCAL_FILES_CLEANUP_DELAY_SECS",
+                    600,
+                ),
+                remote_files_cleanup_delay_secs: env_parse(
+                    "CUBESTORE_REMOTE_FILES_CLEANUP_DELAY_SECS",
+                    3600,
+                ),
             }),
         }
     }
@@ -1280,7 +1327,10 @@ impl Config {
                 transport_max_message_size: 64 << 20,
                 transport_max_frame_size: 16 << 20,
                 local_files_cleanup_interval_secs: 600,
+                remote_files_cleanup_interval_secs: 600,
                 local_files_cleanup_size_threshold: 0,
+                local_files_cleanup_delay_secs: 600,
+                remote_files_cleanup_delay_secs: 3600,
             }),
         }
     }
@@ -1735,6 +1785,16 @@ impl Config {
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     metastore_event_sender_to_move.subscribe(),
+                    i.get_service_typed().await,
+                ))
+            })
+            .await;
+
+        self.injector
+            .register_typed::<RemoteFsCleanup, _, _, _>(async move |i| {
+                Arc::new(RemoteFsCleanup::new(
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
                     i.get_service_typed().await,
                 ))
             })

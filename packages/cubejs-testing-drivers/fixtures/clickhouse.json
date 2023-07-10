@@ -118,6 +118,7 @@
     "querying ECommerce: partitioned pre-agg",
     "querying ECommerce: partitioned pre-agg higher granularity",
     "querying BigECommerce: partitioned pre-agg",
-    "querying BigECommerce: null sum"
+    "querying BigECommerce: null sum",
+    "querying BigECommerce: null boolean"
   ]
 }

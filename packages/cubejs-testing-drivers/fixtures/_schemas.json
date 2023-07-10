@@ -211,6 +211,11 @@
           "name": "profit",
           "sql": "profit",
           "type": "number"
+        },
+        {
+          "name": "returning",
+          "sql": "returning",
+          "type": "boolean"
         }
       ],
       "measures": [
