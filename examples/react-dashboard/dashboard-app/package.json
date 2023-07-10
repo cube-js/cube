@@ -75,7 +75,7 @@
     "recharts": "^1.8.0",
     "resolve": "1.10.0",
     "sass-loader": "7.1.0",
-    "semver": "6.0.0",
+    "semver": "6.3.1",
     "style-loader": "0.23.1",
     "styled-components": "^4.4.0",
     "terser-webpack-plugin": "1.2.3",
