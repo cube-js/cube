@@ -121,7 +121,7 @@ export abstract class BaseSchemaFormatter {
       : {
         sql: `SELECT * FROM ${table}`,
       };
-
+      
     return {
       cube: tableSchema.cube,
       ...sqlOption,
@@ -139,7 +139,7 @@ export abstract class BaseSchemaFormatter {
           },
         }))
         .reduce((a, b) => ({ ...a, ...b }), {}),
-      dimensions: tableSchema.dimensions
+      dimensions: tableSchema.dimensions.sort((a) => (a.isPrimaryKey ? -1 : 0))
         .map((m) => ({
           [this.memberName(m)]: {
             sql: this.sqlForMember(m),
