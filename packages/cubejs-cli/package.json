@@ -42,7 +42,7 @@
     "jsonwebtoken": "^8.5.1",
     "request": "^2.88.2",
     "request-promise": "^4.2.5",
-    "semver": "^7.3.2",
+    "semver": "^6.3.1",
     "source-map-support": "^0.5.19"
   },
   "resolutions": {

@@ -56,7 +56,7 @@
     "cors": "^2.8.4",
     "express": "^4.17.1",
     "jsonwebtoken": "^8.4.0",
-    "semver": "^7.3.2",
+    "semver": "^6.3.1",
     "source-map-support": "^0.5.19",
     "ws": "^7.1.2"
   },
