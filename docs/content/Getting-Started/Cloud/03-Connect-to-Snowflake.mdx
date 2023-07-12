@@ -51,35 +51,15 @@ The last step is to connect Cube Cloud to Snowflake. First, select it from the g
 
 Enter your Credentials for Snowflake.
 
-**Username**. Your Snowflake username. Please note, it is usually **not** your email address.
+- **Username:** Your Snowflake username. Please note, it is usually **not** your email address.
+- **Password:** Your Snowflake password.
+- **Database:** `CUBE_DEMO`, that is the database we've created in the previous step.
+- **Account:** Your snowflake account identifier. You can find it in your Snowflake URL as the `account_locator` part.
+- **Region:** Your Snowflake account region. You can find it in your Snowflake URL. If your URL includes a `cloud` part, use both the `cloud_region_id` and `cloud` together e.g. `us-east-2.aws`, otherwise just use `cloud_region_id`
+- **Warehouse:** `CUBE_DEMO_WH`, that is the warehouse we've created in the previous step.
+- **Role:** You can leave it blank.
 
-**Password**. Your Snowflake password.
-
-**Database**. `CUBE_DEMO`, that is the database we've created in the previous step.
-
-**Account**. Your snowflake account identifier. You can find it in your Snowflake URL 
-
-```
-<account_locator>.<cloud_region_id>.<cloud>.snowflakecomputing.com
-``` 
-You need to take the `account_locator` part.
-
-**Region**. Your Snowflake account region. You can take it from the URL. 
-
-```
-<account_locator>.<cloud_region_id>.<cloud>.snowflakecomputing.com
-or
-<account_locator>.<cloud_region_id>.snowflakecomputing.com
-```
-
-It might have the `cloud` part. If your URL has cloud the part use it like this `us-east-2.aws` if not just use `us-east-2`.
-
-
-**Warehouse**. `CUBE_DEMO_WH`, that is the warehouse we've created in the previous step.
-
-**Role**. You can leave it blank.
-
-Click "Apply", Cube Cloud will test the connection and proceed to the next step.
+Click <Btn>Apply</Btn>, Cube Cloud will test the connection and proceed to the next step.
 
 ## Generate data model from your Snowflake schema
 
