@@ -19,7 +19,7 @@
     "tsc": "tsc",
     "watch": "tsc -w",
     "test": "npm run unit",
-    "unit": "jest dist/test",
+    "unit": "jest dist/test --forceExit",
     "lint": "eslint src/* --ext .ts",
     "lint:fix": "eslint --fix src/* --ext .ts",
     "postinstall": "node bin/post-install"
