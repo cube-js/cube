@@ -2,9 +2,10 @@ import fs from 'fs';
 import path from 'path';
 
 import * as native from '../js';
-import { JinjaEngine, newJinjaEngine } from '../js';
+import type { JinjaEngine } from '../js';
 
 const suite = native.isFallbackBuild() ? xdescribe : describe;
+const nativeInstance = new native.NativeInstance();
 
 function loadTemplateFile(engine: native.JinjaEngine, fileName: string): void {
   const content = fs.readFileSync(path.join(process.cwd(), 'test', 'templates', fileName), 'utf8');
@@ -12,9 +13,25 @@ function loadTemplateFile(engine: native.JinjaEngine, fileName: string): void {
   engine.loadTemplate(fileName, content);
 }
 
+async function loadPythonCtxFromUtils() {
+  const content = fs.readFileSync(path.join(process.cwd(), 'test', 'templates', 'utils.py'), 'utf8');
+  return nativeInstance.loadPythonContext(
+    'utils.py',
+    content
+  );
+}
+
 function testTemplateBySnapshot(engine: JinjaEngine, templateName: string, ctx: unknown) {
   test(`render ${templateName}`, async () => {
-    const actual = engine.renderTemplate(templateName, ctx);
+    const actual = engine.renderTemplate(templateName, ctx, null);
+
+    expect(actual).toMatchSnapshot(templateName);
+  });
+}
+
+function testTemplateWithPythonCtxBySnapshot(engine: JinjaEngine, templateName: string, ctx: unknown) {
+  test(`render ${templateName}`, async () => {
+    const actual = engine.renderTemplate(templateName, ctx, await loadPythonCtxFromUtils());
 
     expect(actual).toMatchSnapshot(templateName);
   });
@@ -32,14 +49,26 @@ function testLoadBrokenTemplateBySnapshot(engine: JinjaEngine, templateName: str
   });
 }
 
+suite('Python models', () => {
+  it('load utils.py', async () => {
+    const pythonModule = await loadPythonCtxFromUtils();
+
+    expect(pythonModule).toEqual({
+      load_data: expect.any(Object),
+      load_data_sync: expect.any(Object),
+    });
+  });
+});
+
 suite('Jinja', () => {
-  const jinjaEngine = native.newJinjaEngine({
+  const jinjaEngine = nativeInstance.newJinjaEngine({
     debugInfo: true
   });
 
   beforeAll(async () => {
     loadTemplateFile(jinjaEngine, '.utils.jinja');
     loadTemplateFile(jinjaEngine, 'dump_context.yml.jinja');
+    loadTemplateFile(jinjaEngine, 'data-model.yml.jinja');
 
     for (let i = 1; i < 9; i++) {
       loadTemplateFile(jinjaEngine, `0${i}.yml.jinja`);
@@ -60,6 +89,8 @@ suite('Jinja', () => {
       userId: 1,
     }
   });
+  testTemplateWithPythonCtxBySnapshot(jinjaEngine, 'data-model.yml.jinja', {});
+
   testLoadBrokenTemplateBySnapshot(jinjaEngine, 'template_error.jinja');
 
   for (let i = 1; i < 9; i++) {

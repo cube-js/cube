@@ -6,7 +6,7 @@ import { parse } from '@babel/parser';
 import babelGenerator from '@babel/generator';
 import babelTraverse from '@babel/traverse';
 import R from 'ramda';
-import { clearTemplates, isFallbackBuild, initJinjaEngine } from '@cubejs-backend/native';
+import { isFallbackBuild } from '@cubejs-backend/native';
 
 import { getEnv, isNativeSupported } from '@cubejs-backend/shared';
 import { AbstractExtension } from '../extensions';
@@ -34,8 +34,10 @@ export class DataSchemaCompiler {
     this.compilerCache = options.compilerCache;
     this.errorReport = options.errorReport;
     this.standalone = options.standalone;
+    this.nativeInstance = options.nativeInstance;
     this.yamlCompiler = options.yamlCompiler;
     this.yamlCompiler.dataSchemaCompiler = this;
+    this.pythonContext = null;
   }
 
   compileObjects(compileServices, objects, errorsReport) {
@@ -55,8 +57,38 @@ export class DataSchemaCompiler {
   /**
    * @protected
    */
+  async loadPythonContext(files) {
+    const modules = await Promise.all(files.filter((f) => f.fileName.endsWith('.py')).map(async (file) => {
+      const exports = await this.nativeInstance.loadPythonContext(
+        file.fileName,
+        file.content
+      );
+
+      return {
+        fileName: file.fileName,
+        exports
+      };
+    }));
+
+    const res = {};
+
+    for (const mod of modules) {
+      for (const [symbolName, symbolFun] of Object.entries(mod.exports)) {
+        res[symbolName] = symbolFun;
+      }
+    }
+
+    return res;
+  }
+
+  /**
+   * @protected
+   */
   async doCompile() {
     const files = await this.repository.dataSchemaFiles();
+
+    this.pythonContext = await this.loadPythonContext(files);
+
     const toCompile = files.filter((f) => !this.filesToCompile || this.filesToCompile.indexOf(f.fileName) !== -1);
 
     const errorsReport = new ErrorReporter(null, [], this.errorReport);
@@ -211,7 +243,8 @@ export class DataSchemaCompiler {
         asyncModules,
         toCompile,
         compiledFiles,
-        this.standalone ? {} : this.cloneCompileContextWithGetterAlias(this.compileContext)
+        this.standalone ? {} : this.cloneCompileContextWithGetterAlias(this.compileContext),
+        this.pythonContext
       );
     } else if (R.endsWith('.yml', file.fileName) || R.endsWith('.yaml', file.fileName)) {
       this.yamlCompiler.compileYamlFile(file, errorsReport, cubes, contexts, exports, asyncModules, toCompile, compiledFiles);

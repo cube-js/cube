@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import R from 'ramda';
 import { createQuery, compile, queryClass, PreAggregations, QueryFactory } from '@cubejs-backend/schema-compiler';
+import { NativeInstance } from '@cubejs-backend/native';
 
 export class CompilerApi {
   /**
@@ -23,6 +24,7 @@ export class CompilerApi {
     this.allowJsDuplicatePropsInSchema = options.allowJsDuplicatePropsInSchema;
     this.sqlCache = options.sqlCache;
     this.standalone = options.standalone;
+    this.nativeInstance = this.createNativeInstance();
   }
 
   setGraphQLSchema(schema) {
@@ -31,6 +33,10 @@ export class CompilerApi {
 
   getGraphQLSchema() {
     return this.graphqlSchema;
+  }
+
+  createNativeInstance() {
+    return new NativeInstance();
   }
 
   async getCompilers({ requestId } = {}) {
@@ -60,6 +66,7 @@ export class CompilerApi {
           compileContext: this.compileContext,
           allowJsDuplicatePropsInSchema: this.allowJsDuplicatePropsInSchema,
           standalone: this.standalone,
+          nativeInterface: this.createNativeInstance(),
         });
         this.compilerVersion = compilerVersion;
         this.queryFactory = await this.createQueryFactory(this.compilers);
@@ -228,6 +235,7 @@ export class CompilerApi {
         compileContext: this.compileContext,
         allowJsDuplicatePropsInSchema: this.allowJsDuplicatePropsInSchema,
         standalone: this.standalone,
+        nativeInstance: this.nativeInstance,
       });
     }
 

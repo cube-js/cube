@@ -34,6 +34,7 @@
     "@cubejs-backend/dotenv": "^9.0.2",
     "@cubejs-backend/query-orchestrator": "^0.33.33",
     "@cubejs-backend/schema-compiler": "^0.33.33",
+    "@cubejs-backend/native": "^0.33.29",
     "@cubejs-backend/shared": "^0.33.29",
     "@cubejs-backend/templates": "^0.33.29",
     "codesandbox-import-utils": "^2.1.12",

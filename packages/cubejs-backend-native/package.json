@@ -23,8 +23,8 @@
     "test:python": "CUBEJS_NATIVE_INTERNAL_DEBUG=true CUBESQL_LOG_LEVEL=trace CUBESQL_PG_PORT=5555 node dist/test/python.js",
     "test:unit": "jest --forceExit",
     "test:cargo": "cargo test",
-    "lint": "eslint test/ --ext .ts",
-    "lint:fix": "eslint --fix test/ --ext .ts"
+    "lint": "eslint test/ js/ --ext .ts",
+    "lint:fix": "eslint --fix test/ js/ --ext .ts"
   },
   "engines": {
     "node": "^14.0.0 || ^16.0.0 || >=17.0.0"
