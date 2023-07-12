@@ -66,7 +66,7 @@ export class CompilerApi {
           compileContext: this.compileContext,
           allowJsDuplicatePropsInSchema: this.allowJsDuplicatePropsInSchema,
           standalone: this.standalone,
-          nativeInterface: this.createNativeInstance(),
+          nativeInstance: this.nativeInstance,
         });
         this.compilerVersion = compilerVersion;
         this.queryFactory = await this.createQueryFactory(this.compilers);
