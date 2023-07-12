@@ -72,7 +72,10 @@ You can find the credentials to connect to Cube on the BI Integrations page unde
 After connecting, create a new dataset in Superset and select "orders_view" as a table. 
 Now you can map Superset metrics and columns to Cube's measures and dimensions.
 
-![mapping-superset-to-cube](https://ucarecdn.com/24543165-34ef-4687-aeac-298aa29bacd5/)
+<Diagram
+  alt="Mapping Superset to Cube"
+  src="https://ucarecdn.com/24543165-34ef-4687-aeac-298aa29bacd5/"
+/>
 
 As you can see, we use the `MEASURE` function in the "SQL expression" field. This function informs Cube that we are querying the measure and that it should be evaluated based on Cube's data model. You can now query Cube from Superset, as shown in the image below.
 
