@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/testing-drivers",
-  "version": "0.33.34",
+  "version": "0.33.35",
   "description": "Cube.js drivers test suite",
   "author": "Cube Dev, Inc.",
   "license": "MIT",
@@ -51,7 +51,7 @@
     "@cubejs-backend/postgres-driver": "^0.33.34",
     "@cubejs-backend/query-orchestrator": "^0.33.34",
     "@cubejs-backend/redshift-driver": "^0.33.34",
-    "@cubejs-backend/server-core": "^0.33.34",
+    "@cubejs-backend/server-core": "^0.33.35",
     "@cubejs-backend/shared": "^0.33.34",
     "@cubejs-backend/testing-shared": "^0.33.34",
     "@cubejs-client/core": "^0.33.12",
