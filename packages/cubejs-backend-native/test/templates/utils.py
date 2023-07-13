@@ -1,6 +1,22 @@
 from cube import context_func
 
 @context_func
+def arg_sum_integers(a, b):
+  return a + b
+
+@context_func
+def arg_bool(a):
+  return a + 0
+
+@context_func
+def arg_str(a):
+  return a
+
+@context_func
+def arg_null(a):
+  return a
+
+@context_func
 def load_data_sync():
    client = MyApiClient("google.com")
    return client.load_data()

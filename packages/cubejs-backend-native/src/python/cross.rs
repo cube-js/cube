@@ -7,7 +7,7 @@ use pyo3::exceptions::{PyNotImplementedError, PyTypeError};
 use pyo3::types::{PyBool, PyDict, PyFloat, PyFunction, PyInt, PyList, PyString};
 use pyo3::{Py, PyAny, PyErr, PyObject, Python, ToPyObject};
 use std::cell::RefCell;
-use std::collections::hash_map::{IntoIter, Iter};
+use std::collections::hash_map::{IntoIter, Iter, Keys};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -33,6 +33,10 @@ impl CLReprObject {
 
     pub fn iter(&self) -> Iter<String, CLRepr> {
         self.0.iter()
+    }
+
+    pub fn keys(&self) -> Keys<'_, String, CLRepr> {
+        self.0.keys()
     }
 }
 

@@ -2,9 +2,10 @@ use crate::python::cross::{CLRepr, CLReprKind, CLReprObject};
 use crate::python::runtime::py_runtime;
 use crate::tokio_runtime;
 use minijinja as mj;
-use minijinja::value::{Object, ObjectKind, SeqObject, StructObject, Value};
+use minijinja::value::{Object, ObjectKind, SeqObject, StructObject, Value, ValueKind};
 use pyo3::types::PyFunction;
 use pyo3::Py;
+use std::convert::TryInto;
 use std::sync::Arc;
 
 struct JinjaPythonFunction {
@@ -41,16 +42,15 @@ impl Object for JinjaPythonFunction {
     }
 
     fn call(&self, _state: &mj::State, args: &[Value]) -> Result<Value, mj::Error> {
-        if args.len() > 0 {
-            return Err(mj::Error::new(
-                mj::ErrorKind::EvalBlock,
-                "Passing argument to python functions is not supported".to_string(),
-            ));
+        let mut arguments = Vec::with_capacity(args.len());
+
+        for arg in args {
+            arguments.push(from_minijinja_value(arg)?);
         }
 
         let py_runtime = py_runtime()
             .map_err(|err| mj::Error::new(mj::ErrorKind::EvalBlock, format!("Error: {}", err)))?;
-        let call_future = py_runtime.call_async(self.inner.clone(), vec![]);
+        let call_future = py_runtime.call_async(self.inner.clone(), arguments);
 
         let tokio = tokio_runtime()
             .map_err(|err| mj::Error::new(mj::ErrorKind::EvalBlock, format!("Error: {}", err)))?;
@@ -91,11 +91,8 @@ impl StructObject for JinjaDynamicObject {
         self.inner.get(name).map(|v| to_minijinja_value(v.clone()))
     }
 
-    fn fields(&self) -> Vec<Arc<String>> {
-        self.inner
-            .iter()
-            .map(|(k, _)| Arc::new(k.clone()))
-            .collect()
+    fn fields(&self) -> Vec<Arc<str>> {
+        self.inner.keys().map(|x| x.to_string().into()).collect()
     }
 
     fn field_count(&self) -> usize {
@@ -177,6 +174,37 @@ impl Object for JinjaSequenceObject {
             minijinja::ErrorKind::InvalidOperation,
             "insecure method call",
         ))
+    }
+}
+
+pub fn from_minijinja_value(from: &mj::value::Value) -> Result<CLRepr, mj::Error> {
+    match from.kind() {
+        ValueKind::Undefined | ValueKind::None => Ok(CLRepr::Null),
+        ValueKind::Bool => Ok(CLRepr::Bool(from.is_true())),
+        ValueKind::Number => {
+            if let Ok(rv) = TryInto::<i64>::try_into(from.clone()) {
+                Ok(CLRepr::Int(rv))
+            } else if let Ok(rv) = TryInto::<f64>::try_into(from.clone()) {
+                Ok(CLRepr::Float(rv))
+            } else {
+                Err(mj::Error::new(
+                    mj::ErrorKind::InvalidOperation,
+                    format!("Converting from {:?} to python is not supported", from),
+                ))
+            }
+        }
+        ValueKind::String => {
+            if from.is_safe() {
+                // TODO: Danger?
+                Ok(CLRepr::String(from.as_str().unwrap().to_string()))
+            } else {
+                Ok(CLRepr::String(from.as_str().unwrap().to_string()))
+            }
+        }
+        other => Err(mj::Error::new(
+            mj::ErrorKind::InvalidOperation,
+            format!("Converting from {:?} to python is not supported", other),
+        )),
     }
 }
 
