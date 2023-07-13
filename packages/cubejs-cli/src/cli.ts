@@ -9,6 +9,7 @@ import { configureTypegenCommand } from './command/typegen';
 import { configureAuthCommand } from './command/auth';
 import { loadCliManifest } from './utils';
 import { configureValidateCommand } from './command/validate';
+import { configureAggregationCommand } from './command/aggregation-warmup';
 
 const packageJson = loadCliManifest();
 
@@ -32,6 +33,7 @@ program
   await configureDeployCommand(program);
   await configureServerCommand(program);
   await configureValidateCommand(program);
+  await configureAggregationCommand(program);
 
   if (!process.argv.slice(2).length) {
     program.help();
