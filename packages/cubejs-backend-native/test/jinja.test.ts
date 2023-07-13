@@ -56,6 +56,10 @@ suite('Python models', () => {
     expect(pythonModule).toEqual({
       load_data: expect.any(Object),
       load_data_sync: expect.any(Object),
+      arg_bool: expect.any(Object),
+      arg_sum_integers: expect.any(Object),
+      arg_str: expect.any(Object),
+      arg_null: expect.any(Object),
     });
   });
 });
@@ -69,6 +73,7 @@ suite('Jinja', () => {
     loadTemplateFile(jinjaEngine, '.utils.jinja');
     loadTemplateFile(jinjaEngine, 'dump_context.yml.jinja');
     loadTemplateFile(jinjaEngine, 'data-model.yml.jinja');
+    loadTemplateFile(jinjaEngine, 'arguments-test.yml.jinja');
 
     for (let i = 1; i < 9; i++) {
       loadTemplateFile(jinjaEngine, `0${i}.yml.jinja`);
@@ -90,6 +95,7 @@ suite('Jinja', () => {
     }
   });
   testTemplateWithPythonCtxBySnapshot(jinjaEngine, 'data-model.yml.jinja', {});
+  testTemplateWithPythonCtxBySnapshot(jinjaEngine, 'arguments-test.yml.jinja', {});
 
   testLoadBrokenTemplateBySnapshot(jinjaEngine, 'template_error.jinja');
 
