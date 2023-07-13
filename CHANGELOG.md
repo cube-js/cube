@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.36](https://github.com/cube-js/cube/compare/v0.33.35...v0.33.36) (2023-07-13)
+
+
+### Features
+
+* **schema:** Support passing arguments for [@context](https://github.com/context)_func in jinja templates ([#6882](https://github.com/cube-js/cube/issues/6882)) ([25f149a](https://github.com/cube-js/cube/commit/25f149aaa1d028c671e37612c819aa211117b026))
+
+
+
+
+
 ## [0.33.35](https://github.com/cube-js/cube/compare/v0.33.34...v0.33.35) (2023-07-12)
 
 **Note:** Version bump only for package cubejs
