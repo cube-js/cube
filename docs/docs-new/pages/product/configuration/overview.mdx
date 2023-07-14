@@ -1,0 +1,67 @@
+---
+redirect_from:
+  - /configuration/overview
+---
+
+# Overview
+Cube can be configured in two ways. The first is through [options][link-config]
+in a configuration file, commonly known as the `cube.js` file, and secondly,
+through [environment variables][link-env-vars]. Values specified in `cube.js`
+will take precedence over environment variables.
+
+<InfoBox>
+
+When using Docker, ensure that the `cube.js` configuration file and your
+`model/` [folder][ref-folder-structure] are mounted to `/cube/conf` within the
+Docker container.
+
+</InfoBox>
+
+## Cube Cloud
+
+You can set environment variables in&nbsp;<Btn>Settings → Configuration</Btn>:
+
+<Screenshot
+  alt="Cube Cloud Environment Variables Screen"
+  src="https://ucarecdn.com/b47693b9-f770-4e01-a0d1-60e3fcf19e23/"
+/>
+
+## Development Mode
+
+Cube can be run in an insecure, development mode by setting the
+`CUBEJS_DEV_MODE` environment variable to `true`. Putting Cube in development
+mode does the following:
+
+- Disables authentication checks
+- Enables Cube Store in single instance mode
+- Enables background refresh for in-memory cache and [scheduled
+  pre-aggregations][link-scheduled-refresh]
+- Allows another log level to be set (`trace`)
+- Enables [Developer Playground][link-dev-playground] on `http://localhost:4000`
+- Uses `memory` instead of `cubestore` as the default cache/queue engine
+- Logs incorrect/invalid configuration for `externalRefresh` /`waitForRenew`
+  instead of throwing errors
+
+## Concurrency and pooling
+
+<InfoBox>
+
+All Cube database drivers come with presets for concurrency and pooling that
+work out-of-the-box. The following information is included as a reference.
+
+</InfoBox>
+
+For increased performance, Cube uses multiple concurrent connections to
+configured data sources. The `CUBEJS_CONCURRENCY` environment variable controls
+concurrency settings for query queues and the refresh scheduler as well as the
+maximum concurrent connections. For databases that support connection pooling,
+the maximum number of concurrent connections to the database can also be set by
+using the `CUBEJS_DB_MAX_POOL` environment variable; if changing this from the
+default, you must ensure that the new value is greater than the number of
+concurrent connections used by Cube's query queues and refresh scheduler.
+
+[ref-folder-structure]: /data-modeling/syntax#folder-structure
+[link-config]: /config
+[link-dev-playground]: /dev-tools/dev-playground
+[link-env-vars]: /reference/environment-variables
+[link-scheduled-refresh]: /schema/reference/pre-aggregations#scheduled-refresh

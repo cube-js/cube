@@ -539,16 +539,16 @@ const viewSchema = inherit(baseSchema, {
   excludes: Joi.func(),
   cubes: Joi.array().items(
     Joi.object().keys({
-      cube: Joi.func().required(),
+      joinPath: Joi.func().required(),
       prefix: Joi.boolean(),
-      name: Joi.string(),
+      alias: Joi.string(),
       includes: Joi.alternatives([
         Joi.string().valid('*'),
         Joi.array().items(Joi.alternatives([
           Joi.string().required(),
           Joi.object().keys({
-            member: Joi.string().required(),
-            name: Joi.string()
+            name: Joi.string().required(),
+            alias: Joi.string()
           })
         ]))
       ]).required(),

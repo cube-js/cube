@@ -1900,6 +1900,7 @@ impl RewriteRules for SplitRules {
                     "?cube", "?fun", "?arg", "?column", "?alias", true,
                 ),
             ),
+            // Thoughtspot [APPROXIMATE] COUNT(DISTINCT column) for search suggestions
             transforming_rewrite(
                 "split-push-down-aggr-approx-distinct-dimension-fun-inner-replacer",
                 inner_aggregate_split_replacer(
@@ -1930,6 +1931,39 @@ impl RewriteRules for SplitRules {
                         "?alias_to_cube",
                     )],
                     "AggregateFunctionExprDistinct:false",
+                ),
+                self.transform_outer_aggr_dimension("?alias_to_cube", "?column"),
+            ),
+            transforming_rewrite(
+                "split-push-down-aggr-count-distinct-dimension-fun-inner-replacer",
+                inner_aggregate_split_replacer(
+                    agg_fun_expr(
+                        "Count",
+                        vec![column_expr("?column")],
+                        "AggregateFunctionExprDistinct:true",
+                    ),
+                    "?alias_to_cube",
+                ),
+                inner_aggregate_split_replacer(column_expr("?column"), "?alias_to_cube"),
+                self.transform_inner_dimension("?alias_to_cube", "?column"),
+            ),
+            transforming_rewrite(
+                "split-push-down-aggr-count-distinct-dimension-fun-outer-aggr-replacer",
+                outer_aggregate_split_replacer(
+                    agg_fun_expr(
+                        "Count",
+                        vec![column_expr("?column")],
+                        "AggregateFunctionExprDistinct:true",
+                    ),
+                    "?alias_to_cube",
+                ),
+                agg_fun_expr(
+                    "Count",
+                    vec![outer_aggregate_split_replacer(
+                        column_expr("?column"),
+                        "?alias_to_cube",
+                    )],
+                    "AggregateFunctionExprDistinct:true",
                 ),
                 self.transform_outer_aggr_dimension("?alias_to_cube", "?column"),
             ),
@@ -3284,6 +3318,913 @@ impl RewriteRules for SplitRules {
                     cast_expr_explicit(
                         column_expr("?outer_column"),
                         ArrowDataType::Date32,
+                    ),
+                    "?alias",
+                ),
+                self.transform_original_expr_to_alias_and_column(
+                    "?expr",
+                    "?alias",
+                    Some("?outer_column"),
+                ),
+            ),
+            // CAST(EXTRACT(YEAR FROM "ta_1"."orderDt") || '-' || 1 || '-01' AS DATE)
+            transforming_chain_rewrite(
+                "split-thoughtspot-pg-date-trunc-year-inner-replacer",
+                inner_aggregate_split_replacer("?expr", "?alias_to_cube"),
+                vec![(
+                    "?expr",
+                    cast_expr_explicit(
+                        binary_expr(
+                            binary_expr(
+                                binary_expr(
+                                    fun_expr(
+                                        "DatePart",
+                                        vec![
+                                            literal_string("YEAR"),
+                                            column_expr("?column"),
+                                        ],
+                                    ),
+                                    "||",
+                                    literal_string("-"),
+                                ),
+                                "||",
+                                literal_int(1),
+                            ),
+                            "||",
+                            literal_string("-01"),
+                        ),
+                        ArrowDataType::Date32,
+                    ),
+                )],
+                alias_expr(
+                    fun_expr(
+                        "DateTrunc",
+                        vec![literal_string("year"), column_expr("?column")],
+                    ),
+                    "?alias",
+                ),
+                self.transform_original_expr_to_alias_and_column("?expr", "?alias", None),
+            ),
+            transforming_chain_rewrite(
+                "split-thoughtspot-pg-date-trunc-year-outer-replacer",
+                outer_projection_split_replacer("?expr", "?alias_to_cube"),
+                vec![(
+                    "?expr",
+                    cast_expr_explicit(
+                        binary_expr(
+                            binary_expr(
+                                binary_expr(
+                                    fun_expr(
+                                        "DatePart",
+                                        vec![
+                                            literal_string("YEAR"),
+                                            column_expr("?column"),
+                                        ],
+                                    ),
+                                    "||",
+                                    literal_string("-"),
+                                ),
+                                "||",
+                                literal_int(1),
+                            ),
+                            "||",
+                            literal_string("-01"),
+                        ),
+                        ArrowDataType::Date32,
+                    ),
+                )],
+                alias_expr(
+                    cast_expr_explicit(
+                        column_expr("?outer_column"),
+                        ArrowDataType::Date32,
+                    ),
+                    "?alias",
+                ),
+                self.transform_original_expr_to_alias_and_column(
+                    "?expr",
+                    "?alias",
+                    Some("?outer_column"),
+                ),
+            ),
+            transforming_chain_rewrite(
+                "split-thoughtspot-pg-date-trunc-year-outer-aggr-replacer",
+                outer_aggregate_split_replacer("?expr", "?alias_to_cube"),
+                vec![(
+                    "?expr",
+                    cast_expr_explicit(
+                        binary_expr(
+                            binary_expr(
+                                binary_expr(
+                                    fun_expr(
+                                        "DatePart",
+                                        vec![
+                                            literal_string("YEAR"),
+                                            column_expr("?column"),
+                                        ],
+                                    ),
+                                    "||",
+                                    literal_string("-"),
+                                ),
+                                "||",
+                                literal_int(1),
+                            ),
+                            "||",
+                            literal_string("-01"),
+                        ),
+                        ArrowDataType::Date32,
+                    ),
+                )],
+                alias_expr(
+                    cast_expr_explicit(
+                        column_expr("?outer_column"),
+                        ArrowDataType::Date32,
+                    ),
+                    "?alias",
+                ),
+                self.transform_original_expr_to_alias_and_column(
+                    "?expr",
+                    "?alias",
+                    Some("?outer_column"),
+                ),
+            ),
+            // CAST(EXTRACT(YEAR FROM "ta_1"."completedAt") || '-' || ((FLOOR(((EXTRACT(MONTH FROM "ta_1"."completedAt") - 1) / NULLIF(3,0))) * 3) + 1) || '-01' AS DATE) AS "ca_2"
+            transforming_chain_rewrite(
+                "split-thoughtspot-pg-date-trunc-quarter-inner-replacer",
+                inner_aggregate_split_replacer("?expr", "?alias_to_cube"),
+                vec![(
+                    "?expr",
+                    cast_expr_explicit(
+                        binary_expr(
+                            binary_expr(
+                                binary_expr(
+                                    fun_expr(
+                                        "DatePart",
+                                        vec![
+                                            literal_string("YEAR"),
+                                            column_expr("?column"),
+                                        ],
+                                    ),
+                                    "||",
+                                    literal_string("-"),
+                                ),
+                                "||",
+                                binary_expr(
+                                    binary_expr(
+                                        fun_expr(
+                                            "Floor",
+                                            vec![
+                                                binary_expr(
+                                                    binary_expr(
+                                                        fun_expr(
+                                                            "DatePart",
+                                                            vec![
+                                                                literal_string("MONTH"),
+                                                                column_expr("?column"),
+                                                            ],
+                                                        ),
+                                                        "-",
+                                                        literal_int(1),
+                                                    ),
+                                                    "/",
+                                                    fun_expr(
+                                                        "NullIf",
+                                                        vec![
+                                                            literal_int(3),
+                                                            literal_int(0),
+                                                        ],
+                                                    ),
+                                                )
+                                            ],
+                                        ),
+                                        "*",
+                                        literal_int(3),
+                                    ),
+                                    "+",
+                                    literal_int(1),
+                                ),
+                            ),
+                            "||",
+                            literal_string("-01"),
+                        ),
+                        ArrowDataType::Date32,
+                    ),
+                )],
+                alias_expr(
+                    fun_expr(
+                        "DateTrunc",
+                        vec![literal_string("quarter"), column_expr("?column")],
+                    ),
+                    "?alias",
+                ),
+                self.transform_original_expr_to_alias_and_column("?expr", "?alias", None),
+            ),
+            transforming_chain_rewrite(
+                "split-thoughtspot-pg-date-trunc-quarter-outer-replacer",
+                outer_projection_split_replacer("?expr", "?alias_to_cube"),
+                vec![(
+                    "?expr",
+                    cast_expr_explicit(
+                        binary_expr(
+                            binary_expr(
+                                binary_expr(
+                                    fun_expr(
+                                        "DatePart",
+                                        vec![
+                                            literal_string("YEAR"),
+                                            column_expr("?column"),
+                                        ],
+                                    ),
+                                    "||",
+                                    literal_string("-"),
+                                ),
+                                "||",
+                                binary_expr(
+                                    binary_expr(
+                                        fun_expr(
+                                            "Floor",
+                                            vec![
+                                                binary_expr(
+                                                    binary_expr(
+                                                        fun_expr(
+                                                            "DatePart",
+                                                            vec![
+                                                                literal_string("MONTH"),
+                                                                column_expr("?column"),
+                                                            ],
+                                                        ),
+                                                        "-",
+                                                        literal_int(1),
+                                                    ),
+                                                    "/",
+                                                    fun_expr(
+                                                        "NullIf",
+                                                        vec![
+                                                            literal_int(3),
+                                                            literal_int(0),
+                                                        ],
+                                                    ),
+                                                )
+                                            ],
+                                        ),
+                                        "*",
+                                        literal_int(3),
+                                    ),
+                                    "+",
+                                    literal_int(1),
+                                ),
+                            ),
+                            "||",
+                            literal_string("-01"),
+                        ),
+                        ArrowDataType::Date32,
+                    ),
+                )],
+                alias_expr(
+                    cast_expr_explicit(
+                        column_expr("?outer_column"),
+                        ArrowDataType::Date32,
+                    ),
+                    "?alias",
+                ),
+                self.transform_original_expr_to_alias_and_column(
+                    "?expr",
+                    "?alias",
+                    Some("?outer_column"),
+                ),
+            ),
+            transforming_chain_rewrite(
+                "split-thoughtspot-pg-date-trunc-quarter-outer-aggr-replacer",
+                outer_aggregate_split_replacer("?expr", "?alias_to_cube"),
+                vec![(
+                    "?expr",
+                    cast_expr_explicit(
+                        binary_expr(
+                            binary_expr(
+                                binary_expr(
+                                    fun_expr(
+                                        "DatePart",
+                                        vec![
+                                            literal_string("YEAR"),
+                                            column_expr("?column"),
+                                        ],
+                                    ),
+                                    "||",
+                                    literal_string("-"),
+                                ),
+                                "||",
+                                binary_expr(
+                                    binary_expr(
+                                        fun_expr(
+                                            "Floor",
+                                            vec![
+                                                binary_expr(
+                                                    binary_expr(
+                                                        fun_expr(
+                                                            "DatePart",
+                                                            vec![
+                                                                literal_string("MONTH"),
+                                                                column_expr("?column"),
+                                                            ],
+                                                        ),
+                                                        "-",
+                                                        literal_int(1),
+                                                    ),
+                                                    "/",
+                                                    fun_expr(
+                                                        "NullIf",
+                                                        vec![
+                                                            literal_int(3),
+                                                            literal_int(0),
+                                                        ],
+                                                    ),
+                                                )
+                                            ],
+                                        ),
+                                        "*",
+                                        literal_int(3),
+                                    ),
+                                    "+",
+                                    literal_int(1),
+                                ),
+                            ),
+                            "||",
+                            literal_string("-01"),
+                        ),
+                        ArrowDataType::Date32,
+                    ),
+                )],
+                alias_expr(
+                    cast_expr_explicit(
+                        column_expr("?outer_column"),
+                        ArrowDataType::Date32,
+                    ),
+                    "?alias",
+                ),
+                self.transform_original_expr_to_alias_and_column(
+                    "?expr",
+                    "?alias",
+                    Some("?outer_column"),
+                ),
+            ),
+            // (MOD(CAST((EXTRACT(MONTH FROM "ta_1"."completedAt") - 1) AS numeric), 3) + 1)
+            transforming_chain_rewrite(
+                "split-thoughtspot-pg-extract-month-of-quarter-inner-replacer",
+                inner_aggregate_split_replacer("?expr", "?alias_to_cube"),
+                vec![(
+                    "?expr",
+                    binary_expr(
+                        binary_expr(
+                            cast_expr(
+                                binary_expr(
+                                    fun_expr(
+                                        "DatePart",
+                                        vec![
+                                            literal_string("MONTH"),
+                                            column_expr("?column"),
+                                        ],
+                                    ),
+                                    "-",
+                                    literal_int(1),
+                                ),
+                                // TODO: explicitly test Decimal(38, 10)
+                                "?numeric",
+                            ),
+                            "%",
+                            literal_int(3),
+                        ),
+                        "+",
+                        literal_int(1),
+                    ),
+                )],
+                alias_expr(
+                    fun_expr(
+                        "DateTrunc",
+                        vec![literal_string("month"), column_expr("?column")],
+                    ),
+                    "?alias",
+                ),
+                self.transform_original_expr_to_alias_and_column("?expr", "?alias", None),
+            ),
+            transforming_chain_rewrite(
+                "split-thoughtspot-pg-extract-month-of-quarter-outer-aggr-replacer",
+                outer_aggregate_split_replacer("?expr", "?alias_to_cube"),
+                vec![(
+                    "?expr",
+                    binary_expr(
+                        binary_expr(
+                            cast_expr(
+                                binary_expr(
+                                    fun_expr(
+                                        "DatePart",
+                                        vec![
+                                            literal_string("MONTH"),
+                                            column_expr("?column"),
+                                        ],
+                                    ),
+                                    "-",
+                                    literal_int(1),
+                                ),
+                                // TODO: explicitly test Decimal(38, 10)
+                                "?numeric",
+                            ),
+                            "%",
+                            literal_int(3),
+                        ),
+                        "+",
+                        literal_int(1),
+                    ),
+                )],
+                alias_expr(
+                    binary_expr(
+                        binary_expr(
+                            binary_expr(
+                                fun_expr(
+                                    "DatePart",
+                                    vec![literal_string("month"), column_expr("?outer_column")],
+                                ),
+                                "-",
+                                literal_int(1),
+                            ),
+                            "%",
+                            literal_int(3),
+                        ),
+                        "+",
+                        literal_int(1),
+                    ),
+                    "?alias",
+                ),
+                self.transform_original_expr_to_alias_and_column(
+                    "?expr",
+                    "?alias",
+                    Some("?outer_column"),
+                ),
+            ),
+            // (CAST("ta_1"."completedAt" AS date) - CAST((CAST(EXTRACT(YEAR FROM "ta_1"."completedAt") || '-' || EXTRACT(MONTH FROM "ta_1"."completedAt") || '-01' AS DATE) + ((EXTRACT(MONTH FROM "ta_1"."completedAt") - 1) * -1) * INTERVAL '1 month') AS date) + 1)
+            transforming_chain_rewrite(
+                "split-thoughtspot-pg-extract-day-of-year-inner-replacer",
+                inner_aggregate_split_replacer("?expr", "?alias_to_cube"),
+                vec![(
+                    "?expr",
+                    binary_expr(
+                        binary_expr(
+                            cast_expr_explicit(
+                                column_expr("?column"),
+                                ArrowDataType::Date32,
+                            ),
+                            "-",
+                            cast_expr_explicit(
+                                binary_expr(
+                                    cast_expr_explicit(
+                                        binary_expr(
+                                            binary_expr(
+                                                binary_expr(
+                                                    fun_expr(
+                                                        "DatePart",
+                                                        vec![literal_string("YEAR"), column_expr("?column")],
+                                                    ),
+                                                    "||",
+                                                    literal_string("-"),
+                                                ),
+                                                "||",
+                                                fun_expr(
+                                                    "DatePart",
+                                                    vec![literal_string("MONTH"), column_expr("?column")],
+                                                ),
+                                            ),
+                                            "||",
+                                            literal_string("-01"),
+                                        ),
+                                        ArrowDataType::Date32,
+                                    ),
+                                    "+",
+                                    binary_expr(
+                                        binary_expr(
+                                            binary_expr(
+                                                fun_expr(
+                                                    "DatePart",
+                                                    vec![literal_string("MONTH"), column_expr("?column")],
+                                                ),
+                                                "-",
+                                                literal_int(1),
+                                            ),
+                                            "*",
+                                            literal_int(-1),
+                                        ),
+                                        "*",
+                                        literal_expr("?interval"),
+                                    ),
+                                ),
+                                ArrowDataType::Date32,
+                            ),
+                        ),
+                        "+",
+                        literal_int(1),
+                    ),
+                )],
+                alias_expr(
+                    fun_expr(
+                        "DateTrunc",
+                        vec![literal_string("day"), column_expr("?column")],
+                    ),
+                    "?alias",
+                ),
+                self.transform_original_expr_to_alias_and_column_with_chain_transform(
+                    "?expr",
+                    "?alias",
+                    None,
+                    self.transform_is_interval_of_granularity("?interval", "month"),
+                ),
+            ),
+            transforming_chain_rewrite(
+                "split-thoughtspot-pg-extract-day-of-year-outer-aggr-replacer",
+                outer_aggregate_split_replacer("?expr", "?alias_to_cube"),
+                vec![(
+                    "?expr",
+                    binary_expr(
+                        binary_expr(
+                            cast_expr_explicit(
+                                column_expr("?column"),
+                                ArrowDataType::Date32,
+                            ),
+                            "-",
+                            cast_expr_explicit(
+                                binary_expr(
+                                    cast_expr_explicit(
+                                        binary_expr(
+                                            binary_expr(
+                                                binary_expr(
+                                                    fun_expr(
+                                                        "DatePart",
+                                                        vec![literal_string("YEAR"), column_expr("?column")],
+                                                    ),
+                                                    "||",
+                                                    literal_string("-"),
+                                                ),
+                                                "||",
+                                                fun_expr(
+                                                    "DatePart",
+                                                    vec![literal_string("MONTH"), column_expr("?column")],
+                                                ),
+                                            ),
+                                            "||",
+                                            literal_string("-01"),
+                                        ),
+                                        ArrowDataType::Date32,
+                                    ),
+                                    "+",
+                                    binary_expr(
+                                        binary_expr(
+                                            binary_expr(
+                                                fun_expr(
+                                                    "DatePart",
+                                                    vec![literal_string("MONTH"), column_expr("?column")],
+                                                ),
+                                                "-",
+                                                literal_int(1),
+                                            ),
+                                            "*",
+                                            literal_int(-1),
+                                        ),
+                                        "*",
+                                        literal_expr("?interval"),
+                                    ),
+                                ),
+                                ArrowDataType::Date32,
+                            ),
+                        ),
+                        "+",
+                        literal_int(1),
+                    ),
+                )],
+                alias_expr(
+                    binary_expr(
+                        binary_expr(
+                            cast_expr_explicit(
+                                column_expr("?outer_column"),
+                                ArrowDataType::Date32,
+                            ),
+                            "-",
+                            cast_expr_explicit(
+                                fun_expr(
+                                    "DateTrunc",
+                                    vec![literal_string("year"), column_expr("?outer_column")],
+                                ),
+                                ArrowDataType::Date32,
+                            ),
+                        ),
+                        "+",
+                        literal_int(1),
+                    ),
+                    "?alias",
+                ),
+                self.transform_original_expr_to_alias_and_column_with_chain_transform(
+                    "?expr",
+                    "?alias",
+                    Some("?outer_column"),
+                    self.transform_is_interval_of_granularity("?interval", "month"),
+                ),
+            ),
+            // (CAST("ta_1"."completedAt" AS date) - CAST((CAST(EXTRACT(YEAR FROM "ta_1"."completedAt") || '-' || EXTRACT(MONTH FROM "ta_1"."completedAt") || '-01' AS DATE) + (((MOD(CAST((EXTRACT(MONTH FROM "ta_1"."completedAt") - 1) AS numeric), 3) + 1) - 1) * -1) * INTERVAL '1 month') AS date) + 1)
+            transforming_chain_rewrite(
+                "split-thoughtspot-pg-extract-day-of-quarter-inner-replacer",
+                inner_aggregate_split_replacer("?expr", "?alias_to_cube"),
+                vec![(
+                    "?expr",
+                    binary_expr(
+                        binary_expr(
+                            cast_expr_explicit(
+                                column_expr("?column"),
+                                ArrowDataType::Date32,
+                            ),
+                            "-",
+                            cast_expr_explicit(
+                                binary_expr(
+                                    cast_expr_explicit(
+                                        binary_expr(
+                                            binary_expr(
+                                                binary_expr(
+                                                    fun_expr(
+                                                        "DatePart",
+                                                        vec![literal_string("YEAR"), column_expr("?column")],
+                                                    ),
+                                                    "||",
+                                                    literal_string("-"),
+                                                ),
+                                                "||",
+                                                fun_expr(
+                                                    "DatePart",
+                                                    vec![literal_string("MONTH"), column_expr("?column")],
+                                                ),
+                                            ),
+                                            "||",
+                                            literal_string("-01"),
+                                        ),
+                                        ArrowDataType::Date32,
+                                    ),
+                                    "+",
+                                    binary_expr(
+                                        binary_expr(
+                                            binary_expr(
+                                                binary_expr(
+                                                    binary_expr(
+                                                        cast_expr(
+                                                            binary_expr(
+                                                                fun_expr(
+                                                                    "DatePart",
+                                                                    vec![literal_string("MONTH"), column_expr("?column")],
+                                                                ),
+                                                                "-",
+                                                                literal_int(1),
+                                                            ),
+                                                            // TODO: explicitly test Decimal(38, 10)
+                                                            "?numeric",
+                                                        ),
+                                                        "%",
+                                                        literal_int(3),
+                                                    ),
+                                                    "+",
+                                                    literal_int(1),
+                                                ),
+                                                "-",
+                                                literal_int(1),
+                                            ),
+                                            "*",
+                                            literal_int(-1),
+                                        ),
+                                        "*",
+                                        literal_expr("?interval"),
+                                    ),
+                                ),
+                                ArrowDataType::Date32,
+                            ),
+                        ),
+                        "+",
+                        literal_int(1),
+                    ),
+                )],
+                alias_expr(
+                    fun_expr(
+                        "DateTrunc",
+                        vec![literal_string("day"), column_expr("?column")],
+                    ),
+                    "?alias",
+                ),
+                self.transform_original_expr_to_alias_and_column_with_chain_transform(
+                    "?expr",
+                    "?alias",
+                    None,
+                    self.transform_is_interval_of_granularity("?interval", "month"),
+                ),
+            ),
+            transforming_chain_rewrite(
+                "split-thoughtspot-pg-extract-day-of-quarter-outer-aggr-replacer",
+                outer_aggregate_split_replacer("?expr", "?alias_to_cube"),
+                vec![(
+                    "?expr",
+                    binary_expr(
+                        binary_expr(
+                            cast_expr_explicit(
+                                column_expr("?column"),
+                                ArrowDataType::Date32,
+                            ),
+                            "-",
+                            cast_expr_explicit(
+                                binary_expr(
+                                    cast_expr_explicit(
+                                        binary_expr(
+                                            binary_expr(
+                                                binary_expr(
+                                                    fun_expr(
+                                                        "DatePart",
+                                                        vec![literal_string("YEAR"), column_expr("?column")],
+                                                    ),
+                                                    "||",
+                                                    literal_string("-"),
+                                                ),
+                                                "||",
+                                                fun_expr(
+                                                    "DatePart",
+                                                    vec![literal_string("MONTH"), column_expr("?column")],
+                                                ),
+                                            ),
+                                            "||",
+                                            literal_string("-01"),
+                                        ),
+                                        ArrowDataType::Date32,
+                                    ),
+                                    "+",
+                                    binary_expr(
+                                        binary_expr(
+                                            binary_expr(
+                                                binary_expr(
+                                                    binary_expr(
+                                                        cast_expr(
+                                                            binary_expr(
+                                                                fun_expr(
+                                                                    "DatePart",
+                                                                    vec![literal_string("MONTH"), column_expr("?column")],
+                                                                ),
+                                                                "-",
+                                                                literal_int(1),
+                                                            ),
+                                                            // TODO: explicitly test Decimal(38, 10)
+                                                            "?numeric",
+                                                        ),
+                                                        "%",
+                                                        literal_int(3),
+                                                    ),
+                                                    "+",
+                                                    literal_int(1),
+                                                ),
+                                                "-",
+                                                literal_int(1),
+                                            ),
+                                            "*",
+                                            literal_int(-1),
+                                        ),
+                                        "*",
+                                        literal_expr("?interval"),
+                                    ),
+                                ),
+                                ArrowDataType::Date32,
+                            ),
+                        ),
+                        "+",
+                        literal_int(1),
+                    ),
+                )],
+                alias_expr(
+                    binary_expr(
+                        binary_expr(
+                            cast_expr_explicit(
+                                column_expr("?outer_column"),
+                                ArrowDataType::Date32,
+                            ),
+                            "-",
+                            cast_expr_explicit(
+                                fun_expr(
+                                    "DateTrunc",
+                                    vec![literal_string("quarter"), column_expr("?outer_column")],
+                                ),
+                                ArrowDataType::Date32,
+                            ),
+                        ),
+                        "+",
+                        literal_int(1),
+                    ),
+                    "?alias",
+                ),
+                self.transform_original_expr_to_alias_and_column_with_chain_transform(
+                    "?expr",
+                    "?alias",
+                    Some("?outer_column"),
+                    self.transform_is_interval_of_granularity("?interval", "month"),
+                ),
+            ),
+            // (MOD(CAST((CAST("ta_1"."completedAt" AS date) - CAST(DATE '1970-01-01' AS date) + 3) AS numeric), 7) + 1)
+            transforming_chain_rewrite(
+                "split-thoughtspot-pg-extract-day-of-week-inner-replacer",
+                inner_aggregate_split_replacer("?expr", "?alias_to_cube"),
+                vec![(
+                    "?expr",
+                    binary_expr(
+                        binary_expr(
+                            cast_expr(
+                                binary_expr(
+                                    binary_expr(
+                                        cast_expr_explicit(
+                                            column_expr("?column"),
+                                            ArrowDataType::Date32,
+                                        ),
+                                        "-",
+                                        cast_expr_explicit(
+                                            cast_expr_explicit(
+                                                literal_string("1970-01-01"),
+                                                ArrowDataType::Date32,
+                                            ),
+                                            ArrowDataType::Date32,
+                                        ),
+                                    ),
+                                    "+",
+                                    literal_int(3),
+                                ),
+                                // TODO: explicitly test Decimal(38, 10)
+                                "?numeric",
+                            ),
+                            "%",
+                            literal_int(7),
+                        ),
+                        "+",
+                        literal_int(1),
+                    ),
+                )],
+                alias_expr(
+                    fun_expr(
+                        "DateTrunc",
+                        vec![literal_string("day"), column_expr("?column")],
+                    ),
+                    "?alias",
+                ),
+                self.transform_original_expr_to_alias_and_column(
+                    "?expr",
+                    "?alias",
+                    None,
+                ),
+            ),
+            transforming_chain_rewrite(
+                "split-thoughtspot-pg-extract-day-of-week-outer-aggr-replacer",
+                outer_aggregate_split_replacer("?expr", "?alias_to_cube"),
+                vec![(
+                    "?expr",
+                    binary_expr(
+                        binary_expr(
+                            cast_expr(
+                                binary_expr(
+                                    binary_expr(
+                                        cast_expr_explicit(
+                                            column_expr("?column"),
+                                            ArrowDataType::Date32,
+                                        ),
+                                        "-",
+                                        cast_expr_explicit(
+                                            cast_expr_explicit(
+                                                literal_string("1970-01-01"),
+                                                ArrowDataType::Date32,
+                                            ),
+                                            ArrowDataType::Date32,
+                                        ),
+                                    ),
+                                    "+",
+                                    literal_int(3),
+                                ),
+                                // TODO: explicitly test Decimal(38, 10)
+                                "?numeric",
+                            ),
+                            "%",
+                            literal_int(7),
+                        ),
+                        "+",
+                        literal_int(1),
+                    ),
+                )],
+                alias_expr(
+                    binary_expr(
+                        binary_expr(
+                            cast_expr_explicit(
+                                column_expr("?outer_column"),
+                                ArrowDataType::Date32,
+                            ),
+                            "-",
+                            cast_expr_explicit(
+                                fun_expr(
+                                    "DateTrunc",
+                                    vec![literal_string("week"), column_expr("?outer_column")],
+                                ),
+                                ArrowDataType::Date32,
+                            ),
+                        ),
+                        "+",
+                        literal_int(1),
                     ),
                     "?alias",
                 ),
@@ -5910,6 +6851,25 @@ impl SplitRules {
                 ])),
             );
             true
+        }
+    }
+
+    fn transform_is_interval_of_granularity(
+        &self,
+        interval_var: &'static str,
+        granularity: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let interval_var = var!(interval_var);
+        move |egraph, subst| {
+            if let Some(expected_interval) = utils::granularity_str_to_interval(granularity) {
+                for interval in var_iter!(egraph[subst[interval_var]], LiteralExprValue).cloned() {
+                    if expected_interval == interval {
+                        return true;
+                    }
+                }
+            }
+
+            false
         }
     }
 }

@@ -169,7 +169,7 @@ export class ScaffoldingSchema {
         const definition = {
           schema, table, tableDefinition, tableName
         };
-        const tableizeName = inflection.tableize(table);
+        const tableizeName = inflection.tableize(this.fixCase(table));
         const parts = tableizeName.split('_');
         const tableNamesFromParts = R.range(0, parts.length - 1).map(toDrop => inflection.tableize(R.drop(toDrop, parts).join('_')));
         const names = R.uniq([table, tableizeName].concat(tableNamesFromParts));
@@ -228,7 +228,7 @@ export class ScaffoldingSchema {
 
       if (column.columnType !== 'time') {
         res.isPrimaryKey = column.attributes?.includes('primaryKey') ||
-          column.name.toLowerCase() === 'id';
+          this.fixCase(column.name) === 'id';
       }
       return res;
     });
@@ -238,7 +238,7 @@ export class ScaffoldingSchema {
     return tableDefinition.filter(
       column => (!column.name.startsWith('_') &&
         (this.columnType(column) === 'number') &&
-        (this.options.includeNonDictionaryMeasures ? column.name.toLowerCase() !== 'id' : this.fromMeasureDictionary(column)))
+        (this.options.includeNonDictionaryMeasures ? this.fixCase(column.name) !== 'id' : this.fromMeasureDictionary(column)))
     ).map(column => ({
       name: column.name,
       types: ['sum', 'avg', 'min', 'max'],
@@ -248,14 +248,14 @@ export class ScaffoldingSchema {
   }
 
   protected fromMeasureDictionary(column) {
-    return !column.name.match(new RegExp(idRegex, 'i')) && !!MEASURE_DICTIONARY.find(word => column.name.toLowerCase().endsWith(word));
+    return !column.name.match(new RegExp(idRegex, 'i')) && !!MEASURE_DICTIONARY.find(word => this.fixCase(column.name).endsWith(word));
   }
 
   protected dimensionColumns(tableDefinition: any) {
     const dimensionColumns = tableDefinition.filter(
       column => !column.name.startsWith('_') && this.columnType(column) === 'string' ||
         column.attributes?.includes('primaryKey') ||
-        column.name.toLowerCase() === 'id'
+        this.fixCase(column.name) === 'id'
     );
 
     const timeColumns = R.pipe(
@@ -269,15 +269,25 @@ export class ScaffoldingSchema {
 
     return dimensionColumns.concat(timeColumns);
   }
+  
+  private fixCase(value: string) {
+    if (this.options.snakeCase) {
+      return toSnakeCase(value);
+    }
+    
+    return value.toLocaleLowerCase();
+  }
 
   protected joins(tableName: TableName, tableDefinition) {
     return R.unnest(tableDefinition
-      .filter(column => (column.name.match(new RegExp(idRegex, 'i')) && column.name.toLowerCase() !== 'id'))
+      .filter(column => (column.name.match(new RegExp(idRegex, 'i')) && this.fixCase(column.name) !== 'id'))
       .map(column => {
         const withoutId = column.name.replace(new RegExp(idRegex, 'i'), '');
         const tablesToJoin = this.tableNamesToTables[withoutId] ||
-          this.tableNamesToTables[inflection.tableize(withoutId)];
-
+          this.tableNamesToTables[inflection.tableize(withoutId)] ||
+          this.tableNamesToTables[this.fixCase(withoutId)] ||
+          this.tableNamesToTables[(inflection.tableize(this.fixCase(withoutId)))];
+          
         if (!tablesToJoin) {
           return null;
         }
@@ -286,8 +296,8 @@ export class ScaffoldingSchema {
           if (tableName === definition.tableName) {
             return null;
           }
-          let columnForJoin = definition.tableDefinition.find(c => c.name.toLowerCase() === column.name.toLowerCase());
-          columnForJoin = columnForJoin || definition.tableDefinition.find(c => c.name.toLowerCase() === 'id');
+          let columnForJoin = definition.tableDefinition.find(c => this.fixCase(c.name) === this.fixCase(column.name));
+          columnForJoin = columnForJoin || definition.tableDefinition.find(c => this.fixCase(c.name) === 'id');
           if (!columnForJoin) {
             return null;
           }
@@ -310,7 +320,7 @@ export class ScaffoldingSchema {
   }
 
   protected timeColumnIndex(column): number {
-    const name = column.name.toLowerCase();
+    const name = this.fixCase(column.name);
     if (name.indexOf('create') !== -1) {
       return 0;
     } else if (name.indexOf('update') !== -1) {
@@ -321,7 +331,7 @@ export class ScaffoldingSchema {
   }
 
   protected columnType(column): ColumnType {
-    const type = column.type.toLowerCase();
+    const type = this.fixCase(column.type);
     if (['time', 'date'].find(t => type.indexOf(t) !== -1)) {
       return ColumnType.Time;
     } else if (['int', 'dec', 'double', 'numb'].find(t => type.indexOf(t) !== -1)) {

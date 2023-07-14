@@ -15,5 +15,6 @@
     "removeComments": false,
     "preserveConstEnums": true
   },
-  "include": ["./src/**/*"]
+  "include": ["./src/**/*"],
+  "exclude": ["./docs-new/**/*"]
 }

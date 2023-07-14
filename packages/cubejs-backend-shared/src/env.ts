@@ -1,6 +1,7 @@
 /* eslint-disable no-restricted-syntax */
 import { get } from 'env-var';
 import { displayCLIWarning } from './cli';
+import { isNativeSupported } from './platform';
 
 export class InvalidConfiguration extends Error {
   public constructor(key: string, value: any, description: string) {
@@ -45,17 +46,11 @@ export function asPortNumber(input: number, envName: string) {
 }
 
 /**
- * Multiple data sources cache.
- */
-let dataSourcesCache: string[];
-
-/**
  * Determines whether multiple data sources were declared or not.
  */
 function isMultipleDataSources(): boolean {
   // eslint-disable-next-line no-use-before-define
-  dataSourcesCache = dataSourcesCache || getEnv('dataSources');
-  return dataSourcesCache.length > 0;
+  return getEnv('dataSources').length > 0;
 }
 
 /**
@@ -66,7 +61,8 @@ function isMultipleDataSources(): boolean {
 export function assertDataSource(dataSource = 'default'): string {
   if (!isMultipleDataSources()) {
     return dataSource;
-  } else if (dataSourcesCache.indexOf(dataSource) >= 0) {
+    // eslint-disable-next-line no-use-before-define
+  } else if (getEnv('dataSources').indexOf(dataSource) >= 0) {
     return dataSource;
   } else {
     throw new Error(
@@ -183,7 +179,11 @@ const variables: Record<string, (...args: any) => any> = {
     .asIntPositive(),
   dockerImageVersion: () => get('CUBEJS_DOCKER_IMAGE_VERSION')
     .asString(),
-  concurrency: () => get('CUBEJS_CONCURRENCY').asInt(),
+  concurrency: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => get(keyByDataSource('CUBEJS_CONCURRENCY', dataSource)).asInt(),
   // It's only excepted for CI, nothing else.
   internalExceptions: () => get('INTERNAL_EXCEPTIONS_YOU_WILL_BE_FIRED')
     .default('false')
@@ -1528,6 +1528,10 @@ const variables: Record<string, (...args: any) => any> = {
     return undefined;
   },
   pgSqlPort: () => {
+    if (process.env.CUBEJS_PG_SQL_PORT === 'false') {
+      return undefined;
+    }
+    
     const port = asFalseOrPort(process.env.CUBEJS_PG_SQL_PORT || 'false', 'CUBEJS_PG_SQL_PORT');
     if (port) {
       return port;
@@ -1538,7 +1542,15 @@ const variables: Record<string, (...args: any) => any> = {
       .asBoolStrict();
 
     if (isDevMode) {
-      return 15432;
+      if (isNativeSupported()) {
+        return 15432;
+      } else {
+        displayCLIWarning(
+          'Native module is not supported on your platform. Please use official docker image as a recommended way'
+        );
+
+        return false;
+      }
     }
 
     return undefined;

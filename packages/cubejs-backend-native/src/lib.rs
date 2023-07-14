@@ -1,20 +1,23 @@
 #![feature(async_closure)]
 
+extern crate findshlibs;
+
 mod auth;
 mod channel;
 mod config;
 mod logger;
+#[cfg(feature = "python")]
+mod python;
 mod stream;
 mod transport;
 mod utils;
 
 use once_cell::sync::OnceCell;
-
 use std::sync::Arc;
 
 use auth::NodeBridgeAuthService;
 use config::NodeConfig;
-use cubesql::{config::CubeServices, telemetry::ReportingLogger};
+use cubesql::{config::CubeServices, telemetry::ReportingLogger, CubeError};
 use log::Level;
 use logger::NodeBridgeLogger;
 use neon::prelude::*;
@@ -34,14 +37,21 @@ impl SQLInterface {
     }
 }
 
-fn runtime<'a, C: Context<'a>>(cx: &mut C) -> NeonResult<&'static Runtime> {
+fn tokio_runtime_node<'a, C: Context<'a>>(cx: &mut C) -> NeonResult<&'static Runtime> {
+    match tokio_runtime() {
+        Ok(r) => Ok(r),
+        Err(err) => cx.throw_error(err.to_string()),
+    }
+}
+
+fn tokio_runtime() -> Result<&'static Runtime, CubeError> {
     static RUNTIME: OnceCell<Runtime> = OnceCell::new();
 
     RUNTIME.get_or_try_init(|| {
         Builder::new_multi_thread()
             .enable_all()
             .build()
-            .or_else(|err| cx.throw_error(err.to_string()))
+            .map_err(|err| CubeError::internal(err.to_string()))
     })
 }
 
@@ -128,7 +138,7 @@ fn register_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let (deferred, promise) = cx.promise();
     let channel = cx.channel();
 
-    let runtime = runtime(&mut cx)?;
+    let runtime = tokio_runtime_node(&mut cx)?;
     let transport_service = NodeBridgeTransport::new(
         cx.channel(),
         transport_load,
@@ -173,7 +183,7 @@ fn shutdown_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let channel = cx.channel();
 
     let services = interface.services.clone();
-    let runtime = runtime(&mut cx)?;
+    let runtime = tokio_runtime_node(&mut cx)?;
 
     runtime.block_on(async move {
         let _ = services
@@ -186,11 +196,25 @@ fn shutdown_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
     Ok(promise)
 }
 
+fn is_fallback_build(mut cx: FunctionContext) -> JsResult<JsBoolean> {
+    #[cfg(feature = "python")]
+    {
+        return Ok(JsBoolean::new(&mut cx, false));
+    }
+
+    #[allow(unreachable_code)]
+    Ok(JsBoolean::new(&mut cx, true))
+}
+
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("setupLogger", setup_logger)?;
     cx.export_function("registerInterface", register_interface)?;
     cx.export_function("shutdownInterface", shutdown_interface)?;
+    cx.export_function("isFallbackBuild", is_fallback_build)?;
+
+    #[cfg(feature = "python")]
+    python::python_register_module(&mut cx)?;
 
     Ok(())
 }

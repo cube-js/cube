@@ -1,0 +1,32 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`snowflake int column data type: preAggTableTypes 1`] = `
+Array [
+  Object {
+    "name": "orders__status",
+    "type": "text",
+  },
+  Object {
+    "name": "orders__total_amount",
+    "type": "int",
+  },
+  Object {
+    "name": "orders__total_decimal_amount",
+    "type": "decimal(5)",
+  },
+  Object {
+    "name": "orders__total_float_amount",
+    "type": "float",
+  },
+]
+`;
+
+exports[`snowflake int column data type: query 1`] = `
+Array [
+  Object {
+    "Orders.totalAmount": "1700",
+    "Orders.totalDecimalAmount": "501.75",
+    "Orders.totalFloatAmount": "1702.5",
+  },
+]
+`;

@@ -19,6 +19,7 @@ use datafusion::physical_plan::sort::SortExec;
 use datafusion::physical_plan::ExecutionPlan;
 use itertools::{repeat_n, Itertools};
 
+use crate::queryplanner::check_memory::CheckMemoryExec;
 use crate::queryplanner::filter_by_key_range::FilterByKeyRangeExec;
 use crate::queryplanner::panic::{PanicWorkerExec, PanicWorkerNode};
 use crate::queryplanner::planning::{ClusterSendNode, Snapshot, WorkerExec};
@@ -50,6 +51,7 @@ pub struct PPOptions {
     pub show_aggregations: bool,
     // Applies only to physical plan.
     pub show_output_hints: bool,
+    pub show_check_memory_nodes: bool,
 }
 
 pub fn pp_phys_plan(p: &dyn ExecutionPlan) -> String {
@@ -279,6 +281,13 @@ fn pp_sort_columns(first_agg: usize, cs: &[SortColumn]) -> String {
 }
 
 fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, out: &mut String) {
+    if p.as_any().is::<CheckMemoryExec>() && !o.show_check_memory_nodes {
+        //We don't show CheckMemoryExec in plan by default
+        if let Some(child) = p.children().first() {
+            pp_phys_plan_indented(child.as_ref(), indent, o, out)
+        }
+        return;
+    }
     pp_instance(p, indent, o, out);
     if p.as_any().is::<ClusterSendExec>() {
         // Do not show children of ClusterSend. This is a hack to avoid rewriting all tests.

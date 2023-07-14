@@ -40,6 +40,7 @@ export function camelizeCube(cube: any): unknown {
   camelizeObjectPart(cube.measures, false);
   camelizeObjectPart(cube.dimensions, false);
   camelizeObjectPart(cube.preAggregations, false);
+  camelizeObjectPart(cube.cubes, false);
 
   return cube;
 }

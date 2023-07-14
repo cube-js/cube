@@ -193,26 +193,26 @@ export class CubeEvaluator extends CubeSymbols {
    */
   membersFromCubes(cubes, type, errorReporter) {
     return R.unnest(cubes.map(cubeInclude => {
-      const fullPath = this.evaluateReferences(null, cubeInclude.cube, { collectJoinHints: true });
+      const fullPath = this.evaluateReferences(null, cubeInclude.joinPath, { collectJoinHints: true });
       const split = fullPath.split('.');
       const cubeReference = split[split.length - 1];
-      const cubeName = cubeInclude.name || cubeReference;
+      const cubeName = cubeInclude.alias || cubeReference;
       let includes;
+      const fullMemberName = (memberName) => (cubeInclude.prefix ? `${cubeName}_${memberName}` : memberName);
       if (cubeInclude.includes === '*') {
         const membersObj = this.symbols[cubeReference]?.cubeObj()?.[type] || {};
-        includes = Object.keys(membersObj).map(memberName => ({ member: `${fullPath}.${memberName}` }));
+        includes = Object.keys(membersObj).map(memberName => ({ member: `${fullPath}.${memberName}`, name: fullMemberName(memberName) }));
       } else {
         includes = cubeInclude.includes.map(include => {
-          const member = include.member || include;
+          const member = include.alias || include;
           if (member.indexOf('.') !== -1) {
             errorReporter.error(`Paths aren't allowed in cube includes but '${member}' provided as include member`);
           }
-          let name = include.name || member;
-          name = cubeInclude.prefix ? `${cubeName}_${name}` : name;
-          if (include.member) {
-            const resolvedMember = this.symbols[cubeReference]?.cubeObj()?.[type]?.[include.member];
+          const name = fullMemberName(include.alias || member);
+          if (include.name) {
+            const resolvedMember = this.symbols[cubeReference]?.cubeObj()?.[type]?.[include.name];
             return resolvedMember ? {
-              member: `${fullPath}.${include.member}`,
+              member: `${fullPath}.${include.name}`,
               name,
             } : undefined;
           } else {

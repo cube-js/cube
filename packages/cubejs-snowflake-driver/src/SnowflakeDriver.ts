@@ -230,7 +230,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     }
 
     this.config = {
-      readOnly: true,
+      readOnly: false,
       account: getEnv('snowflakeAccount', { dataSource }),
       region: getEnv('snowflakeRegion', { dataSource }),
       warehouse: getEnv('snowflakeWarehouse', { dataSource }),
@@ -401,7 +401,10 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
    * Returns to the Cubestore an object with links to unloaded to the
    * export bucket data.
    */
-  public async unload(tableName: string, options: UnloadOptions): Promise<DownloadTableCSVData> {
+  public async unload(
+    tableName: string,
+    options: UnloadOptions,
+  ): Promise<DownloadTableCSVData> {
     if (!this.config.exportBucket) {
       throw new Error('Export bucket is not configured.');
     }
@@ -427,7 +430,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     if (!options.query) {
       throw new Error('Unload query is missed.');
     } else {
-      const types = await this.queryColumnTypes(options.query.sql);
+      const types = await this.queryColumnTypes(options.query.sql, options.query.params);
       const connection = await this.getConnection();
       const { bucketType, bucketName } =
         <SnowflakeDriverExportBucket> this.config.exportBucket;
@@ -438,7 +441,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       const result = await this.execute<UnloadResponse[]>(
         connection,
         unloadSql,
-        [],
+        options.query.params,
         false,
       );
       if (!result) {
@@ -451,11 +454,11 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   /**
    * Returns an array of queried fields meta info.
    */
-  public async queryColumnTypes(sql: string): Promise<TableStructure> {
+  public async queryColumnTypes(sql: string, params?: unknown[]): Promise<TableStructure> {
     const connection = await this.getConnection();
     return new Promise((resolve, reject) => connection.execute({
       sqlText: `${sql} LIMIT 0`,
-      binds: [],
+      binds: <string[] | undefined>params,
       fetchAsString: ['Number'],
       complete: (err, stmt) => {
         if (err) {
@@ -463,23 +466,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
           return;
         }
         const types: {name: string, type: string}[] =
-          stmt.getColumns().map((column) => {
-            const type = {
-              name: column.getName().toLowerCase(),
-              type: '',
-            };
-            if (column.isNumber()) {
-              // @ts-ignore
-              if (column.getPrecision() === 0) {
-                type.type = 'int';
-              } else {
-                type.type = 'decimal';
-              }
-            } else {
-              type.type = this.toGenericType(column.getType());
-            }
-            return type;
-          });
+          this.getTypes(stmt);
         resolve(types);
       },
     }));
@@ -715,23 +702,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
         }
         const hydrationMap = this.generateHydrationMap(stmt.getColumns());
         const types: {name: string, type: string}[] =
-          stmt.getColumns().map((column) => {
-            const type = {
-              name: column.getName().toLowerCase(),
-              type: '',
-            };
-            if (column.isNumber()) {
-              // @ts-ignore
-              if (column.getPrecision() === 0) {
-                type.type = 'int';
-              } else {
-                type.type = 'decimal';
-              }
-            } else {
-              type.type = this.toGenericType(column.getType());
-            }
-            return type;
-          });
+          this.getTypes(stmt);
         if (rows && rows.length && Object.keys(hydrationMap).length) {
           for (const row of rows) {
             for (const [field, toValue] of Object.entries(hydrationMap)) {
@@ -776,23 +747,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       }
     }));
     const types: {name: string, type: string}[] =
-      stmt.getColumns().map((column) => {
-        const type = {
-          name: column.getName().toLowerCase(),
-          type: '',
-        };
-        if (column.isNumber()) {
-          // @ts-ignore
-          if (column.getPrecision() === 0) {
-            type.type = 'int';
-          } else {
-            type.type = 'decimal';
-          }
-        } else {
-          type.type = this.toGenericType(column.getType());
-        }
-        return type;
-      });
+      this.getTypes(stmt);
     const hydrationMap = this.generateHydrationMap(stmt.getColumns());
     if (Object.keys(hydrationMap).length) {
       const rowStream = new HydrationStream(hydrationMap);
@@ -812,6 +767,28 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
         //
       }
     };
+  }
+
+  private getTypes(stmt: Statement) {
+    return stmt.getColumns().map((column) => {
+      const type = {
+        name: column.getName().toLowerCase(),
+        type: '',
+      };
+      if (column.isNumber()) {
+        // @ts-ignore
+        if (column.getScale() === 0) {
+          type.type = 'int';
+        } else if (column.getScale() && column.getScale() <= 10) {
+          type.type = 'decimal';
+        } else {
+          type.type = this.toGenericType(column.getType());
+        }
+      } else {
+        type.type = this.toGenericType(column.getType());
+      }
+      return type;
+    });
   }
 
   protected generateHydrationMap(columns: Column[]): HydrationMap {

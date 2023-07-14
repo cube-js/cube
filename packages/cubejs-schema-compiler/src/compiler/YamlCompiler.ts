@@ -3,9 +3,11 @@ import * as t from '@babel/types';
 import { parse } from '@babel/parser';
 import babelGenerator from '@babel/generator';
 import babelTraverse from '@babel/traverse';
+import { JinjaEngine, NativeInstance } from '@cubejs-backend/native';
 
 import type { FileContent } from '@cubejs-backend/shared';
 
+import { getEnv } from '@cubejs-backend/shared';
 import { CubePropContextTranspiler, transpiledFields, transpiledFieldsPatterns } from './transpilers';
 import { PythonParser } from '../parser/PythonParser';
 import { CubeSymbols } from './CubeSymbols';
@@ -25,7 +27,54 @@ type EscapeStateStack = {
 export class YamlCompiler {
   public dataSchemaCompiler: DataSchemaCompiler | null = null;
 
-  public constructor(private cubeSymbols: CubeSymbols, private cubeDictionary: CubeDictionary) {
+  protected jinjaEngine: JinjaEngine | null = null;
+
+  public constructor(
+    private readonly cubeSymbols: CubeSymbols,
+    private readonly cubeDictionary: CubeDictionary,
+    private readonly nativeInstance: NativeInstance,
+  ) {
+  }
+
+  protected getJinjaEngine(): JinjaEngine {
+    if (this.jinjaEngine) {
+      return this.jinjaEngine;
+    }
+
+    this.jinjaEngine = this.nativeInstance.newJinjaEngine({
+      debugInfo: getEnv('devMode'),
+    });
+
+    return this.jinjaEngine;
+  }
+
+  public compileYamlWithJinjaFile(
+    file: FileContent,
+    errorsReport: ErrorReporter,
+    cubes,
+    contexts,
+    exports,
+    asyncModules,
+    toCompile,
+    compiledFiles,
+    compileContext,
+    pythonContext
+  ) {
+    const compiledFile = {
+      fileName: file.fileName,
+      content: this.getJinjaEngine().renderTemplate(file.fileName, compileContext, pythonContext),
+    };
+
+    return this.compileYamlFile(
+      compiledFile,
+      errorsReport,
+      cubes,
+      contexts,
+      exports,
+      asyncModules,
+      toCompile,
+      compiledFiles
+    );
   }
 
   public compileYamlFile(file: FileContent, errorsReport: ErrorReporter, cubes, contexts, exports, asyncModules, toCompile, compiledFiles) {
@@ -73,7 +122,7 @@ export class YamlCompiler {
     cubeObj.measures = this.yamlArrayToObj(cubeObj.measures || [], 'measure', errorsReport);
     cubeObj.dimensions = this.yamlArrayToObj(cubeObj.dimensions || [], 'dimension', errorsReport);
     cubeObj.segments = this.yamlArrayToObj(cubeObj.segments || [], 'segment', errorsReport);
-    cubeObj.preAggregations = this.yamlArrayToObj(cubeObj.preAggregations || [], 'segment', errorsReport);
+    cubeObj.preAggregations = this.yamlArrayToObj(cubeObj.preAggregations || [], 'preAggregation', errorsReport);
     cubeObj.joins = this.yamlArrayToObj(cubeObj.joins || [], 'join', errorsReport);
 
     return this.transpileYaml(cubeObj, [], cubeObj.name, errorsReport);
@@ -97,7 +146,9 @@ export class YamlCompiler {
           }
         }
       }
-    } else if (propertyPath[propertyPath.length - 1] === 'extends') {
+    }
+
+    if (propertyPath[propertyPath.length - 1] === 'extends') {
       const ast = this.parsePythonAndTranspileToJs(obj, errorsReport);
       return this.astIntoArrowFunction(ast, obj, cubeName, name => this.cubeDictionary.resolveCube(name));
     } else if (typeof obj === 'string') {
@@ -110,6 +161,7 @@ export class YamlCompiler {
     } else if (typeof obj === 'boolean') {
       return t.booleanLiteral(obj);
     }
+
     if (typeof obj === 'object') {
       if (Array.isArray(obj)) {
         return t.arrayExpression(obj.map((value, i) => this.transpileYaml(value, propertyPath.concat(i.toString()), cubeName, errorsReport)));
@@ -221,10 +273,15 @@ export class YamlCompiler {
       return {};
     }
 
-    const remapped = yamlArray.map(({ name, ...rest }) => {
+    const remapped = yamlArray.map(({ name, indexes, ...rest }) => {
+      if (memberType === 'preAggregation' && indexes) {
+        indexes = this.yamlArrayToObj(indexes || [], `${memberType}.index`, errorsReport);
+      }
       if (!name) {
         errorsReport.error(`name isn't defined for ${memberType}: ${YAML.stringify(rest)}`);
         return {};
+      } else if (indexes) {
+        return { [name]: { indexes, ...rest } };
       } else {
         return { [name]: rest };
       }

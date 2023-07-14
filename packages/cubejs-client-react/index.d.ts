@@ -330,6 +330,8 @@ declare module '@cubejs-client/react' {
 
   // todo: CubeMember
   export type AvailableCube<T = any> = {
+    type: 'cube' | 'view';
+    public: boolean;
     cubeName: string;
     cubeTitle: string;
     members: T[];

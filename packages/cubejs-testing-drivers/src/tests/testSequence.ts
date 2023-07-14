@@ -35,7 +35,7 @@ export function testSequence(type: string): void {
       env = await runEnvironment(type, 'core');
       process.env.CUBEJS_REFRESH_WORKER = 'true';
       process.env.CUBEJS_CUBESTORE_HOST = '127.0.0.1';
-      process.env.CUBEJS_CUBESTORE_PORT = `${env.store.port}`;
+      process.env.CUBEJS_CUBESTORE_PORT = process.env.CUBEJS_CUBESTORE_PORT ? process.env.CUBEJS_CUBESTORE_PORT : `${env.store.port}`;
       process.env.CUBEJS_CUBESTORE_USER = 'root';
       process.env.CUBEJS_CUBESTORE_PASS = 'root';
       process.env.CUBEJS_CACHE_AND_QUEUE_DRIVER = 'memory'; // memory, cubestore
@@ -47,9 +47,6 @@ export function testSequence(type: string): void {
       source = drivers.source;
       storage = drivers.storage;
       query = getCreateQueries(type, 'core');
-      if (fixtures.cast.USE_SCHEMA) {
-        await source.query(fixtures.cast.USE_SCHEMA);
-      }
       await Promise.all(query.map(async (q) => {
         await source.query(q);
       }));
@@ -57,18 +54,16 @@ export function testSequence(type: string): void {
       patchDriver(storage);
       core = getCore(type, 'cubestore', source, storage);
     });
-  
+
     afterAll(async () => {
-      if (fixtures.cast.USE_SCHEMA) {
-        await source.query(fixtures.cast.USE_SCHEMA);
-      }
-      await Promise.all([
-        'ecommerce_core',
-        'customers_core',
-        'products_core',
-      ].map(async (t) => {
-        await source.dropTable(t);
-      }));
+      const tables = Object
+        .keys(fixtures.tables)
+        .map((key: string) => `${fixtures.tables[key]}_core`);
+      await Promise.all(
+        tables.map(async (t) => {
+          await source.dropTable(t);
+        })
+      );
       await source.release();
       await storage.release();
       await core.shutdown();

@@ -11,17 +11,35 @@ import { getFixtures } from './getFixtures';
 export function getSchemaPath(type: string, suf?: string): [path: string, file: string] {
   const _path = path.resolve(process.cwd(), './.temp/schema');
   const _file = 'ecommerce.yaml';
-  const { preAggregations } = getFixtures(type);
+  const { tables, preAggregations } = getFixtures(type);
   const _content = JSON.parse(fs.readFileSync(
     path.resolve(process.cwd(), './fixtures/_schemas.json'),
     'utf-8'
   ));
   _content.cubes.forEach(
     (cube: {
-      name: 'Products' | 'Customers' | 'ECommerce',
+      name: 'Products' | 'Customers' | 'ECommerce' | 'BigECommerce',
       [prop: string]: unknown
     }) => {
-      cube.sql = suf ? `${cube.sql}_${suf}` : cube.sql;
+      let name = '';
+      switch (cube.name) {
+        case 'Customers':
+          name = tables.customers;
+          break;
+        case 'Products':
+          name = tables.products;
+          break;
+        case 'ECommerce':
+          name = tables.ecommerce;
+          break;
+        case 'BigECommerce':
+          name = tables.bigecommerce;
+          break;
+        default:
+          throw new Error(`Cube name is unsupported: ${cube.name}`);
+      }
+      name = suf ? `${name}_${suf}` : name;
+      cube.sql = `select * from ${name}`;
       const pre_aggregations: {
         [x: string]: unknown;
         name: string;

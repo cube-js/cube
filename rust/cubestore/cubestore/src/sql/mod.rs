@@ -234,6 +234,7 @@ impl SqlServiceImpl {
         build_range_end: Option<DateTime<Utc>>,
         seal_at: Option<DateTime<Utc>>,
         select_statement: Option<String>,
+        source_table: Option<String>,
         stream_offset: Option<String>,
         indexes: Vec<Statement>,
         unique_key: Option<Vec<Ident>>,
@@ -347,6 +348,7 @@ impl SqlServiceImpl {
                     build_range_end,
                     seal_at,
                     select_statement,
+                    None,
                     stream_offset,
                     unique_key.map(|keys| keys.iter().map(|c| c.value.to_string()).collect()),
                     aggregates.map(|keys| {
@@ -404,6 +406,18 @@ impl SqlServiceImpl {
             None
         };
 
+        let source_columns = if let Some(source_table) = source_table {
+            let mut parser = CubeStoreParser::new(&source_table)?;
+            let cols = parser
+                .parse_streaming_source_table()
+                .map_err(|e| CubeError::user(format!("Unexpected source_table param: {}", e)))?;
+            let res = convert_columns_type(&cols)
+                .map_err(|e| CubeError::user(format!("Unexpected source_table param: {}", e)))?;
+            Some(res)
+        } else {
+            None
+        };
+
         let table = self
             .db
             .create_table(
@@ -417,6 +431,7 @@ impl SqlServiceImpl {
                 build_range_end,
                 seal_at,
                 select_statement,
+                source_columns,
                 stream_offset,
                 unique_key.map(|keys| keys.iter().map(|c| c.value.to_string()).collect()),
                 aggregates.map(|keys| {
@@ -954,7 +969,7 @@ impl SqlService for SqlServiceImpl {
                 }
                 let schema_name = &nv[0].value;
                 let table_name = &nv[1].value;
-                let import_format = with_options
+                let mut import_format = with_options
                     .iter()
                     .find(|&opt| opt.name.value == "input_format")
                     .map_or(Result::Ok(ImportFormat::CSV), |option| {
@@ -975,6 +990,49 @@ impl SqlService for SqlServiceImpl {
                             ))),
                         }
                     })?;
+
+                let delimiter = with_options
+                    .iter()
+                    .find(|&opt| opt.name.value == "delimiter")
+                    .map_or(Ok(None), |option| match &option.value {
+                        Value::SingleQuotedString(delimiter) => match delimiter.as_str() {
+                            "tab" => Ok(Some('\t')),
+                            "^A" => Ok(Some('\u{0001}')),
+                            s if s.len() != 1 => {
+                                Err(CubeError::user(format!("Bad delimiter {}", option.value)))
+                            }
+                            s => Ok(Some(s.chars().next().unwrap())),
+                        },
+                        _ => Err(CubeError::user(format!("Bad delimiter {}", option.value))),
+                    })?;
+
+                if let Some(delimiter) = delimiter {
+                    import_format = match import_format {
+                        ImportFormat::CSV => ImportFormat::CSVOptions {
+                            delimiter: Some(delimiter),
+                            has_header: true,
+                            escape: None,
+                            quote: None,
+                        },
+                        ImportFormat::CSVNoHeader => ImportFormat::CSVOptions {
+                            delimiter: Some(delimiter),
+                            has_header: false,
+                            escape: None,
+                            quote: None,
+                        },
+                        ImportFormat::CSVOptions {
+                            has_header,
+                            escape,
+                            quote,
+                            ..
+                        } => ImportFormat::CSVOptions {
+                            delimiter: Some(delimiter),
+                            has_header,
+                            escape,
+                            quote,
+                        },
+                    }
+                }
                 let build_range_end = with_options
                     .iter()
                     .find(|&opt| opt.name.value == "build_range_end")
@@ -1013,6 +1071,18 @@ impl SqlService for SqlServiceImpl {
                             option.value
                         ))),
                     })?;
+                let source_table = with_options
+                    .iter()
+                    .find(|&opt| opt.name.value == "source_table")
+                    .map_or(Result::Ok(None), |option| match &option.value {
+                        Value::SingleQuotedString(source_table) => {
+                            Result::Ok(Some(source_table.clone()))
+                        }
+                        _ => Result::Err(CubeError::user(format!(
+                            "Bad source_table {}",
+                            option.value
+                        ))),
+                    })?;
                 let stream_offset = with_options
                     .iter()
                     .find(|&opt| opt.name.value == "stream_offset")
@@ -1037,6 +1107,7 @@ impl SqlService for SqlServiceImpl {
                         build_range_end,
                         seal_at,
                         select_statement,
+                        source_table,
                         stream_offset,
                         indexes,
                         unique_key,
@@ -1801,6 +1872,7 @@ mod tests {
     use std::time::Duration;
     use std::{env, fs};
 
+    use crate::store::compaction::CompactionService;
     use async_compression::tokio::write::GzipEncoder;
     use futures_timer::Delay;
     use itertools::Itertools;
@@ -1822,7 +1894,7 @@ mod tests {
 
     use super::*;
     use crate::cachestore::RocksCacheStore;
-    use crate::queryplanner::pretty_printers::pp_phys_plan;
+    use crate::queryplanner::pretty_printers::{pp_phys_plan, pp_phys_plan_ext, PPOptions};
     use crate::remotefs::queue::QueueRemoteFs;
     use crate::scheduler::SchedulerImpl;
     use crate::table::data::{cmp_min_rows, cmp_row_key_heap};
@@ -1994,6 +2066,7 @@ mod tests {
                 TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
+                TableValue::String("NULL".to_string()),
                 TableValue::String("".to_string()),
                 TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
@@ -2096,6 +2169,7 @@ mod tests {
                 TableValue::String("2022-10-05 01:00:00 UTC".to_string()),
                 TableValue::String("false".to_string()),
                 TableValue::String("SELECT * FROM test WHERE created_at > '2022-05-01 00:00:00'".to_string()),
+                TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
                 TableValue::String("".to_string()),
@@ -2673,6 +2747,62 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn check_memory_test() {
+        Config::test("check_memory_test")
+            .update_config(|mut c| {
+                c.partition_split_threshold = 25;
+                c.compaction_chunks_count_threshold = 0;
+                c
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
+
+                service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+                service
+                    .exec_query("CREATE TABLE foo.numbers (num decimal)")
+                    .await
+                    .unwrap();
+
+                for _ in 0..2 {
+                    let t = (0..100).map(|i| format!("({i})")).join(", ");
+                    service
+                        .exec_query(&format!("INSERT INTO foo.numbers (num) VALUES {}", t))
+                        .await
+                        .unwrap();
+                }
+
+                let mut opts = PPOptions::default();
+                opts.show_check_memory_nodes = true;
+
+                let plans = service
+                    .plan_query("SELECT sum(num) from foo.numbers where num = 50")
+                    .await
+                    .unwrap();
+                let plan_regexp = Regex::new(r"ParquetScan.*\.parquet").unwrap();
+
+                let expected = "Projection, [SUM(foo.numbers.num)@0:SUM(num)]\
+                \n  FinalHashAggregate\
+                \n    Worker\
+                \n      PartialHashAggregate\
+                \n        Filter\
+                \n          MergeSort\
+                \n            Scan, index: default:1:[1]:sort_on[num], fields: *\
+                \n              FilterByKeyRange\
+                \n                CheckMemoryExec\
+                \n                  ParquetScan\
+                \n              FilterByKeyRange\
+                \n                CheckMemoryExec\
+                \n                  ParquetScan";
+                let plan = pp_phys_plan_ext(plans.worker.as_ref(), &opts);
+                let p = plan_regexp.replace_all(&plan, "ParquetScan");
+                println!("pp {}", p);
+                assert_eq!(p, expected);
+            })
+            .await;
+    }
+
+    #[tokio::test]
     async fn delete_middle_main() {
         Config::test("delete_middle_main")
             .update_config(|mut c| {
@@ -2990,7 +3120,7 @@ mod tests {
                 let last_active_partition = active_partitions.iter().next().unwrap();
 
                 // Wait for GC tasks to drop files
-                Delay::new(Duration::from_millis(3000)).await;
+                Delay::new(Duration::from_millis(4000)).await;
 
                 let remote_fs = services.injector.get_service_typed::<dyn RemoteFs>().await;
                 let files = remote_fs
@@ -3017,7 +3147,7 @@ mod tests {
         Config::test("inmemory_compaction")
             .update_config(|mut c| {
                 c.partition_split_threshold = 1000000;
-                c.compaction_chunks_count_threshold = 6;
+                c.compaction_chunks_count_threshold = 2;
                 c.not_used_timeout = 0;
                 c.compaction_in_memory_chunks_count_threshold = 5;
                 c.compaction_in_memory_chunks_max_lifetime_threshold = 1;
@@ -3025,6 +3155,10 @@ mod tests {
             })
             .start_test(async move |services| {
                 let service = services.sql_service;
+                let compaction_service = services
+                    .injector
+                    .get_service_typed::<dyn CompactionService>()
+                    .await;
 
                 service.exec_query("CREATE SCHEMA foo").await.unwrap();
 
@@ -3043,7 +3177,10 @@ mod tests {
                         .unwrap();
                 }
 
-                Delay::new(Duration::from_millis(1500)).await;
+                compaction_service
+                    .compact_in_memory_chunks(1)
+                    .await
+                    .unwrap();
 
                 let active_partitions = services
                     .meta_store
@@ -3061,7 +3198,6 @@ mod tests {
                 assert_eq!(chunks.len(), 1);
                 assert_eq!(chunks.first().unwrap().get_row().get_row_count(), 6);
                 assert_eq!(chunks.first().unwrap().get_row().in_memory(), true);
-                //waiting for more then compaction_chunks_count_threshold
                 Delay::new(Duration::from_millis(2000)).await;
                 for i in 0..6 {
                     service
@@ -3074,6 +3210,10 @@ mod tests {
                         .await
                         .unwrap();
                 }
+                compaction_service
+                    .compact_in_memory_chunks(1)
+                    .await
+                    .unwrap();
                 Delay::new(Duration::from_millis(2000)).await;
                 let active_partitions = services
                     .meta_store
@@ -3864,6 +4004,58 @@ mod tests {
                 .exec_query("CREATE TABLE test.events_by_type_fail_2 (`EVENT` text, `KSQL_COL_0` int) WITH (select_statement = 'SELECT * FROM (SELECT * FROM EVENTS_BY_TYPE WHERE time >= \\'2022-01-01\\' AND time < \\'2022-02-01\\')') unique key (`EVENT`) location 'stream://ksql/EVENTS_BY_TYPE'")
                 .await
                 .expect_err("Validation should fail");
+        }).await;
+    }
+
+    #[tokio::test]
+    async fn create_stream_table_with_projection() {
+        Config::test("create_stream_table_with_projection").update_config(|mut c| {
+            c.partition_split_threshold = 2;
+            c
+        }).start_test(async move |services| {
+            let service = services.sql_service;
+            let metastore = services.meta_store;
+
+            let _ = service.exec_query("CREATE SCHEMA test").await.unwrap();
+
+            service
+                .exec_query("CREATE SOURCE OR UPDATE kafka AS 'kafka' VALUES (user = 'foo', password = 'bar', host = 'localhost:9092')")
+                .await
+                .unwrap();
+
+            let _ = service
+                .exec_query("CREATE TABLE test.events_1 (a int, b int) WITH (\
+                select_statement = 'SELECT a as a, b + c as b FROM EVENTS_BY_TYPE WHERE c > 10',\
+                source_table = 'CREATE TABLE events1 (a int, b int, c int)'
+                            ) unique key (`a`) location 'stream://kafka/EVENTS_BY_TYPE/0'")
+                .await
+                .unwrap();
+            let table = metastore.get_table("test".to_string(), "events_1".to_string()).await.unwrap();
+            assert_eq!(
+                table.get_row().source_columns(),
+                &Some(vec![
+                     Column::new("a".to_string(), ColumnType::Int, 0),
+                     Column::new("b".to_string(), ColumnType::Int, 1),
+                     Column::new("c".to_string(), ColumnType::Int, 2),
+                ])
+            );
+            let _ = service
+                .exec_query("CREATE TABLE test.events_1 (a int, b int) WITH (\
+                select_statement = 'SELECT a as a, b + c  as b FROM EVENTS_BY_TYPE WHERE c > 10',\
+                source_table = 'TABLE events1 (a int, b int, c int)'
+                            ) unique key (`a`) location 'stream://kafka/EVENTS_BY_TYPE/0'")
+                    .await
+                    .expect_err("Validation should fail");
+
+            let _ = service
+                .exec_query("CREATE TABLE test.events_1 (a int, b int) WITH (\
+                select_statement = 'SELECT a as a, b + c as b FROM EVENTS_BY_TYPE WHERE c > 10',\
+                source_table = 'CREATE TABLE events1 (a int, b int, c int'
+                            ) unique key (`a`) location 'stream://kafka/EVENTS_BY_TYPE/0'")
+                    .await
+                    .expect_err("Validation should fail");
+
+
         }).await;
     }
 

@@ -24,7 +24,7 @@ Response
   query.
 - `data` - Formatted dataset of query results.
 - `annotation` - Metadata for query. Contains descriptions for all query items.
-  - `title` - Human readable title from data schema.
+  - `title` - Human readable title from the data model.
   - `shortTitle` - Short title for visualization usage (ex. chart overlay)
   - `type` - Data type
 
@@ -35,7 +35,7 @@ Example request:
 curl \
   -H "Authorization: EXAMPLE-API-TOKEN" \
   -G \
-  --data-urlencode 'query={"measures":["Users.count"]}' \
+  --data-urlencode 'query={"measures":["users.count"]}' \
   http://localhost:4000/cubejs-api/v1/load
 
 # Request with http method POST
@@ -44,39 +44,37 @@ curl \
  -X POST  \
  -H "Content-Type: application/json" \
  -H "Authorization: EXAMPLE-API-TOKEN" \
- --data '{"query": {"measures":["Users.count"]}}' \
+ --data '{"query": {"measures":["users.count"]}}' \
  http://localhost:4000/cubejs-api/v1/load
 ```
 
 Example response:
 
-```javascript
+```json
 {
-  query:{
-    measures:[
-      "Users.count"
-    ],
-    filters:[],
-    timezone:"UTC",
-    dimensions:[],
-    timeDimensions:[]
+  "query": {
+    "measures": ["users.count"],
+    "filters": [],
+    "timezone": "UTC",
+    "dimensions": [],
+    "timeDimensions": []
   },
-  data:[
+  "data": [
     {
-      "Users.count":"700"
+      "users.count": "700"
     }
   ],
-  annotation:{
-    measures:{
-      "Users.count":{
-        title:"Users Count",
-        shortTitle:"Count",
-        type:"number"
+  "annotation": {
+    "measures": {
+      "users.count": {
+        "title": "Users Count",
+        "shortTitle": "Count",
+        "type": "number"
       }
     },
-    dimensions:{},
-    segments:{},
-    timeDimensions:{}
+    "dimensions": {},
+    "segments": {},
+    "timeDimensions": {}
   }
 }
 ```
@@ -115,41 +113,35 @@ Example request:
 curl \
   -H "Authorization: EXAMPLE-API-TOKEN" \
   -G \
-  --data-urlencode 'query={"measures":["Users.count"],
-  "timeDimensions":[{"dimension": "Users.createdAt","granularity":"day","dateRange":["2019-03-01","2019-03-31"]}]}' \
+  --data-urlencode 'query={"measures":["users.count"],
+  "timeDimensions":[{"dimension": "users.createdAt","granularity":"day","dateRange":["2019-03-01","2019-03-31"]}]}' \
   http://localhost:4000/cubejs-api/v1/sql
 ```
 
 Example response:
 
-```javascript
+```json
 {
-  sql:{
-    sql:[
+  "sql": {
+    "sql": [
       "SELECT\n      date_trunc('day', (users.created_at::timestamptz AT TIME ZONE 'UTC')) \"users.created_at_date\", count(users.id) \"users.count\"\n    FROM\n      public.users AS users\n  WHERE (users.created_at >= $1::timestamptz AND users.created_at <= $2::timestamptz) GROUP BY 1 ORDER BY 1 ASC LIMIT 10000",
-      [
-        "2019-03-01T00:00:00Z",
-        "2019-03-31T23:59:59Z"
-      ]
+      ["2019-03-01T00:00:00Z", "2019-03-31T23:59:59Z"]
     ],
-    timeDimensionAlias:"users.created_at_date",
-    timeDimensionField:"Users.createdAt",
-    order:[
+    "timeDimensionAlias": "users.created_at_date",
+    "timeDimensionField": "users.createdAt",
+    "order": [
       {
-        id:"Users.createdAt",
-        desc:false
+        "id": "users.createdAt",
+        "desc": false
       }
     ],
-    cacheKeyQueries:{
-      queries:[
-        [
-          "select max(users.created_at) from public.users AS users",
-          []
-        ]
+    "cacheKeyQueries": {
+      "queries": [
+        ["select max(users.created_at) from public.users AS users", []]
       ],
-      renewalThreshold:21600
+      "renewalThreshold": 21600
     },
-    preAggregations:[]
+    "preAggregations": []
   }
 }
 ```
@@ -158,7 +150,7 @@ Example response:
 
 <InfoBox>Require `meta` permission.</InfoBox>
 
-Get meta-information for cubes defined in data schema
+Get meta-information for cubes defined in the data model.
 
 Response
 
@@ -182,37 +174,37 @@ curl \
 
 Example response:
 
-```javascript
+```json
 {
-  cubes: [
+  "cubes": [
     {
-      name: 'Users',
-      title: 'Users',
-      connectedComponent: 1,
-      measures: [
+      "name": "Users",
+      "title": "Users",
+      "connectedComponent": 1,
+      "measures": [
         {
-          name: 'Users.count',
-          title: 'Users Count',
-          shortTitle: 'Count',
-          aliasName: 'users.count',
-          type: 'number',
-          aggType: 'count',
-          drillMembers: ['Users.id', 'Users.city', 'Users.createdAt'],
-        },
+          "name": "users.count",
+          "title": "Users Count",
+          "shortTitle": "Count",
+          "aliasName": "users.count",
+          "type": "number",
+          "aggType": "count",
+          "drillMembers": ["users.id", "users.city", "users.createdAt"]
+        }
       ],
-      dimensions: [
+      "dimensions": [
         {
-          name: 'Users.city',
-          title: 'Users City',
-          type: 'string',
-          aliasName: 'users.city',
-          shortTitle: 'City',
-          suggestFilterValues: true,
-        },
+          "name": "users.city",
+          "title": "Users City",
+          "type": "string",
+          "aliasName": "users.city",
+          "shortTitle": "City",
+          "suggestFilterValues": true
+        }
       ],
-      segments: [],
-    },
-  ];
+      "segments": []
+    }
+  ]
 }
 ```
 
@@ -250,35 +242,81 @@ curl \
   http://localhost:4000/cubejs-api/v1/run-scheduled-refresh
 ```
 
-### <--{"id" : "API Reference"}--> /v1/pre-aggregations/jobs
+## `/v1/pre-aggregations/jobs`
 
 <InfoBox>Require `jobs` permission.</InfoBox>
 
-Submit pre-aggregation build jobs and retrieve their refresh status.
+Trigger pre-aggregation build jobs or retrieve statuses of such jobs.
 
-#### Submitting a job
+### <--{"id" : "/v1/pre-aggregations/jobs"}--> Triggering jobs
 
-| Parameter                  | Description                                                        | Required |
-| -------------------------- | ------------------------------------------------------------------ | -------- |
-| `action`                   | Submitting a job requires using the `post` action                  | ✅       |
-| `selector.contexts`        | An array of contexts to use                                        | ✅       |
-| `selector.timezones`       | An array of timezones to use                                       | ❌       |
-| `selector.datasources`     | An array of data source names of the pre-aggregation to build      | ❌       |
-| `selector.cubes`           | An array of cube names which contain the pre-aggregations to build | ❌       |
-| `selector.preAggregations` | An array of pre-aggregation names to build                         | ❌       |
+| Parameter                  | Description                                                    | Required |
+| -------------------------- | -------------------------------------------------------------- | -------- |
+| `action`                   | Use `post` to trigger jobs                                     | ✅       |
+| `selector.contexts`        | Array of objects, each containing a `securityContext`          | ✅       |
+| `selector.timezones`       | Array of timezones                                             | ✅       |
+| `selector.datasources`     | Array of data source names which have pre-aggregations defined | ❌       |
+| `selector.cubes`           | Array of cube names which contain pre-aggregations             | ❌       |
+| `selector.preAggregations` | Array of pre-aggregation names                                 | ❌       |
 
-To submit a job, send a `POST` request with a payload including the `action` and
-`selector` properties. The response will include the `jobId` of the submitted
-job.
+To trigger pre-aggregation builds, send a `POST` request with a payload
+including `post` as the `action` and `selector` properties. The response will
+contain an array of `tokens` (identifiers) of triggered jobs.
 
-Example request:
+Example request triggering builds of all pre-aggregations defined in all cubes
+using an empty security context and a `UTC` timezone:
 
-```bash{outputLines: 2-5}
+```bash{outputLines: 2-12}
 curl \
-  -d '{"action": "post", "selector": { "preAggregations": ["Orders.ordersByStatus"]}}' \
+  -d '{
+    "action": "post",
+    "selector": {
+      "contexts": [{ "securityContext": {} }],
+      "timezones": ["UTC"]
+    }
+  }' \
   -H "Authorization: EXAMPLE-API-TOKEN" \
+  -H "Content-Type: application/json" \
   -X POST \
-  https://localhost:4000/cubejs-system/v1/pre-aggregations/jobs
+  https://localhost:4000/cubejs-api/v1/pre-aggregations/jobs
+```
+
+Example request triggering builds of all pre-aggregations defined in the
+`orders` cube using an empty security context and a `UTC` timezone:
+
+```bash{outputLines: 2-13}
+curl \
+  -d '{
+    "action": "post",
+    "selector": {
+      "contexts": [{ "securityContext": {} }],
+      "timezones": ["UTC"],
+      "cubes": ["orders"]
+    }
+  }' \
+  -H "Authorization: EXAMPLE-API-TOKEN" \
+  -H "Content-Type: application/json" \
+  -X POST \
+  https://localhost:4000/cubejs-api/v1/pre-aggregations/jobs
+```
+
+Example request triggering builds of the `main` pre-aggregation defined in the
+`orders` cube using an empty security context and a `UTC` timezone:
+
+```bash{outputLines: 2-13}
+curl \
+  -d '{
+    "action": "post",
+    "selector": {
+      "contexts": [{ "securityContext": {} }],
+      "timezones": ["UTC"],
+      "preAggregations": ["orders.main"]
+    }
+  }' \
+  -H "Authorization: EXAMPLE-API-TOKEN" \
+  -H "Content-Type: application/json" \
+  -X POST \
+  https://localhost:4000/cubejs-api/v1/pre-aggregations/jobs
 ```
 
 Example response:
@@ -292,25 +330,34 @@ Example response:
 ]
 ```
 
-#### Retrieving statuses for a job
+### <--{"id" : "/v1/pre-aggregations/jobs"}--> Retrieving statuses of jobs
 
-| Parameter | Description                                                                              | Required |
-| --------- | ---------------------------------------------------------------------------------------- | -------- |
-| `action`  | Retrieving a job requires using the `get` action                                         | ✅       |
-| `resType` | If `object` is specified, the response is returned as an JSON object instead of an array | ❌       |
-| `tokens`  | An array of strings representing pre-aggregation build jobs                              | ✅       |
+| Parameter | Description                                                       | Required |
+| --------- | ----------------------------------------------------------------- | -------- |
+| `action`  | Use `get` to retrieve statuses of previously triggered jobs       | ✅       |
+| `tokens`  | Array of `tokens` returned when triggering jobs                   | ✅       |
+| `resType` | Use `object` to get a JSON object instead of an array in response | ❌       |
 
-To retrieve the status of a previously submitted job, send a `POST` request with
-a `tokens` property.
+To retrieve statuses of previously triggered jobs, send a `POST` request with
+a payload including the `tokens` property.
 
 Example request:
 
-```bash{outputLines: 2-5}
+```bash{outputLines: 2-14}
 curl \
-  -d '{"action": "get", "tokens": ["e9a6a0c55885cea5371348500ce7d7dc","d1329b6c8d152e734fc4dcf7307b1b58","6f4ea38373663fffc4334a576574845b","ea903b10634b2f3141b35a2529870e89"]}' \
+  -d '{
+    "action": "get",
+    "tokens": [
+      "e9a6a0c55885cea5371348500ce7d7dc",
+      "d1329b6c8d152e734fc4dcf7307b1b58",
+      "6f4ea38373663fffc4334a576574845b",
+      "ea903b10634b2f3141b35a2529870e89"
+    ]
+  }' \
   -H "Authorization: EXAMPLE-API-TOKEN" \
+  -H "Content-Type: application/json" \
   -X POST \
-  https://localhost:4000/cubejs-system/v1/pre-aggregations/jobs
+  https://localhost:4000/cubejs-api/v1/pre-aggregations/jobs
 ```
 
 Example response:
@@ -322,14 +369,10 @@ Example response:
     "table": "prod_pre_aggregations.orders_category_and_date_hod0x3hf_03krd5ns_1hop3hn",
     "status": "processing",
     "selector": {
-      "cubes": ["Orders"],
-      "preAggregations": ["Orders.categoryAndDate"],
+      "cubes": ["orders"],
+      "preAggregations": ["orders.category_and_date"],
       "contexts": [
-        {
-          "securityContext": {
-            "tenant": "tenant_1"
-          }
-        }
+        { "securityContext": { "tenant": "tenant_1" } }
       ],
       "timezones": ["UTC"],
       "dataSources": ["default"]
@@ -340,16 +383,12 @@ Example response:
     "table": "prod_pre_aggregations.orders_category_and_date_mzfp445f_r2h2isa5_1hop3hn",
     "status": "processing",
     "selector": {
-      "cubes": ["Orders"],
-      "preAggregations": ["Orders.categoryAndDate"],
+      "cubes": ["orders"],
+      "preAggregations": ["orders.category_and_date"],
       "contexts": [
-        {
-          "securityContext": {
-            "tenant": "tenant_1"
-          }
-        }
+        { "securityContext": { "tenant": "tenant_1" } }
       ],
-      "timezones": ["America/Los_Angeles"],
+      "timezones": ["UTC"],
       "dataSources": ["default"]
     }
   },
@@ -358,14 +397,10 @@ Example response:
     "table": "prod_pre_aggregations.orders_category_and_date_hod0x3hf_03krd5ns_1hop3hn",
     "status": "missing_partition",
     "selector": {
-      "cubes": ["Orders"],
-      "preAggregations": ["Orders.categoryAndDate"],
+      "cubes": ["orders"],
+      "preAggregations": ["orders.category_and_date"],
       "contexts": [
-        {
-          "securityContext": {
-            "tenant": "tenant_2"
-          }
-        }
+        { "securityContext": { "tenant": "tenant_1" } }
       ],
       "timezones": ["UTC"],
       "dataSources": ["default"]
@@ -376,105 +411,16 @@ Example response:
     "table": "prod_pre_aggregations.orders_category_and_date_mzfp445f_r2h2isa5_1hop3hn",
     "status": "missing_partition",
     "selector": {
-      "cubes": ["Orders"],
-      "preAggregations": ["Orders.categoryAndDate"],
+      "cubes": ["orders"],
+      "preAggregations": ["orders.category_and_date"],
       "contexts": [
-        {
-          "securityContext": {
-            "tenant": "tenant_2"
-          }
-        }
+        { "securityContext": { "tenant": "tenant_1" } }
       ],
-      "timezones": ["America/Los_Angeles"],
+      "timezones": ["UTC"],
       "dataSources": ["default"]
     }
   }
 ]
-```
-
-Example request with `resType: object`:
-
-```bash{outputLines: 2-5}
-curl \
-  -d '{"action": "get", "resType": "object", "tokens": ["e9a6a0c55885cea5371348500ce7d7dc","d1329b6c8d152e734fc4dcf7307b1b58","6f4ea38373663fffc4334a576574845b","ea903b10634b2f3141b35a2529870e89"]}' \
-  -H "Authorization: EXAMPLE-API-TOKEN" \
-  -X POST \
-  https://localhost:4000/cubejs-system/v1/pre-aggregations/jobs
-```
-
-Example response with `resType: object`:
-
-```json
-{
-  "e9a6a0c55885cea5371348500ce7d7dc": {
-    "table": "prod_pre_aggregations.orders_category_and_date_hod0x3hf_03krd5ns_1hop3hn",
-    "status": "processing",
-    "selector": {
-      "cubes": ["Orders"],
-      "preAggregations": ["Orders.categoryAndDate"],
-      "contexts": [
-        {
-          "securityContext": {
-            "tenant": "tenant_1"
-          }
-        }
-      ],
-      "timezones": ["UTC"],
-      "dataSources": ["default"]
-    }
-  },
-  "d1329b6c8d152e734fc4dcf7307b1b58": {
-    "table": "prod_pre_aggregations.orders_category_and_date_mzfp445f_r2h2isa5_1hop3hn",
-    "status": "processing",
-    "selector": {
-      "cubes": ["Orders"],
-      "preAggregations": ["Orders.categoryAndDate"],
-      "contexts": [
-        {
-          "securityContext": {
-            "tenant": "tenant_1"
-          }
-        }
-      ],
-      "timezones": ["America/Los_Angeles"],
-      "dataSources": ["default"]
-    }
-  },
-  "6f4ea38373663fffc4334a576574845b": {
-    "table": "prod_pre_aggregations.orders_category_and_date_hod0x3hf_03krd5ns_1hop3hn",
-    "status": "missing_partition",
-    "selector": {
-      "cubes": ["Orders"],
-      "preAggregations": ["Orders.categoryAndDate"],
-      "contexts": [
-        {
-          "securityContext": {
-            "tenant": "tenant_2"
-          }
-        }
-      ],
-      "timezones": ["UTC"],
-      "dataSources": ["default"]
-    }
-  },
-  "ea903b10634b2f3141b35a2529870e89": {
-    "table": "prod_pre_aggregations.orders_category_and_date_mzfp445f_r2h2isa5_1hop3hn",
-    "status": "missing_partition",
-    "selector": {
-      "cubes": ["Orders"],
-      "preAggregations": ["Orders.categoryAndDate"],
-      "contexts": [
-        {
-          "securityContext": {
-            "tenant": "tenant_2"
-          }
-        }
-      ],
-      "timezones": ["America/Los_Angeles"],
-      "dataSources": ["default"]
-    }
-  }
-}
 ```
 
 ## `/readyz`

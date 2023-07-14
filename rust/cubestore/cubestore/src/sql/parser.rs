@@ -1,6 +1,7 @@
-use crate::cachestore::QueueItemStatus;
+use crate::cachestore::{QueueItemStatus, QueueKey};
 use sqlparser::ast::{
-    HiveDistributionStyle, Ident, ObjectName, Query, SqlOption, Statement as SQLStatement, Value,
+    ColumnDef, HiveDistributionStyle, Ident, ObjectName, Query, SqlOption,
+    Statement as SQLStatement, Value,
 };
 use sqlparser::dialect::keywords::Keyword;
 use sqlparser::dialect::Dialect;
@@ -99,7 +100,7 @@ pub enum QueueCommand {
         value: String,
     },
     Get {
-        key: Ident,
+        key: QueueKey,
     },
     ToCancel {
         prefix: Ident,
@@ -113,17 +114,17 @@ pub enum QueueCommand {
         sort_by_priority: bool,
     },
     Cancel {
-        key: Ident,
+        key: QueueKey,
     },
     Heartbeat {
-        key: Ident,
+        key: QueueKey,
     },
     Ack {
-        key: Ident,
+        key: QueueKey,
         result: Option<String>,
     },
     MergeExtra {
-        key: Ident,
+        key: QueueKey,
         payload: String,
     },
     Retrieve {
@@ -135,7 +136,7 @@ pub enum QueueCommand {
         key: Ident,
     },
     ResultBlocking {
-        key: Ident,
+        key: QueueKey,
         timeout: u64,
     },
     Truncate {},
@@ -222,6 +223,22 @@ impl<'a> CubeStoreParser<'a> {
         }
     }
 
+    fn parse_queue_key(&mut self) -> Result<QueueKey, ParserError> {
+        match self.parser.peek_token() {
+            Token::Word(w) => {
+                self.parser.next_token();
+
+                Ok(QueueKey::ByPath(w.to_ident().value))
+            }
+            Token::SingleQuotedString(v) => {
+                self.parser.next_token();
+
+                Ok(QueueKey::ByPath(v))
+            }
+            _ => Ok(QueueKey::ById(self.parse_integer("id", false)?)),
+        }
+    }
+
     pub fn parse_create(&mut self) -> Result<Statement, ParserError> {
         if self.parser.parse_keyword(Keyword::SCHEMA) {
             self.parse_create_schema()
@@ -233,6 +250,23 @@ impl<'a> CubeStoreParser<'a> {
             self.parse_create_source()
         } else {
             Ok(Statement::Statement(self.parser.parse_create()?))
+        }
+    }
+
+    pub fn parse_streaming_source_table(&mut self) -> Result<Vec<ColumnDef>, ParserError> {
+        if self.parser.parse_keyword(Keyword::CREATE) && self.parser.parse_keyword(Keyword::TABLE) {
+            let statement = self.parser.parse_create_table_ext(false, false, false)?;
+            if let SQLStatement::CreateTable { columns, .. } = statement {
+                Ok(columns)
+            } else {
+                Err(ParserError::ParserError(
+                    "source_table param should be CREATE TABLE statement".to_string(),
+                ))
+            }
+        } else {
+            Err(ParserError::ParserError(
+                "source_table param should be CREATE TABLE statement".to_string(),
+            ))
         }
     }
 
@@ -413,13 +447,13 @@ impl<'a> CubeStoreParser<'a> {
                 }
             }
             "cancel" => QueueCommand::Cancel {
-                key: self.parser.parse_identifier()?,
+                key: self.parse_queue_key()?,
             },
             "heartbeat" => QueueCommand::Heartbeat {
-                key: self.parser.parse_identifier()?,
+                key: self.parse_queue_key()?,
             },
             "ack" => {
-                let key = self.parser.parse_identifier()?;
+                let key = self.parse_queue_key()?;
                 let result = if self.parser.parse_keyword(Keyword::NULL) {
                     None
                 } else {
@@ -429,11 +463,11 @@ impl<'a> CubeStoreParser<'a> {
                 QueueCommand::Ack { key, result }
             }
             "merge_extra" => QueueCommand::MergeExtra {
-                key: self.parser.parse_identifier()?,
+                key: self.parse_queue_key()?,
                 payload: self.parser.parse_literal_string()?,
             },
             "get" => QueueCommand::Get {
-                key: self.parser.parse_identifier()?,
+                key: self.parse_queue_key()?,
             },
             "stalled" => {
                 let heartbeat_timeout = Some(self.parse_integer("heartbeat timeout", false)?);
@@ -516,7 +550,7 @@ impl<'a> CubeStoreParser<'a> {
 
                 QueueCommand::ResultBlocking {
                     timeout,
-                    key: self.parser.parse_identifier()?,
+                    key: self.parse_queue_key()?,
                 }
             }
             "truncate" => QueueCommand::Truncate {},

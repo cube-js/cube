@@ -1,7 +1,7 @@
 ######################################################################
 # Base image                                                         #
 ######################################################################
-FROM node:16.19.1-bullseye-slim AS base
+FROM node:16.20.1-bullseye-slim AS base
 
 ARG IMAGE_VERSION=dev
 
@@ -173,7 +173,7 @@ FROM base AS final
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
-    && apt-get install -y ca-certificates \
+    && apt-get install -y ca-certificates python3 libpython3-dev \
     && apt-get clean
 
 COPY --from=build /cubejs .

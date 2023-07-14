@@ -3,6 +3,69 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.26](https://github.com/cube-js/cube/compare/v0.33.25...v0.33.26) (2023-06-14)
+
+**Note:** Version bump only for package @cubejs-client/playground
+
+
+
+
+
+## [0.33.12](https://github.com/cube-js/cube/compare/v0.33.11...v0.33.12) (2023-05-22)
+
+**Note:** Version bump only for package @cubejs-client/playground
+
+
+
+
+
+## [0.33.5](https://github.com/cube-js/cube/compare/v0.33.4...v0.33.5) (2023-05-11)
+
+
+### Bug Fixes
+
+* **cubejs-playground:** sticky bar styles ([#6558](https://github.com/cube-js/cube/issues/6558)) ([c4864c5](https://github.com/cube-js/cube/commit/c4864c508ffd42bebbc8e1fb8d98523fa1d252b7))
+
+
+
+
+
+## [0.33.2](https://github.com/cube-js/cube/compare/v0.33.1...v0.33.2) (2023-05-04)
+
+
+### Bug Fixes
+
+* **cubejs-playground:** remove less file import ([#6537](https://github.com/cube-js/cube/issues/6537)) ([2a4de4b](https://github.com/cube-js/cube/commit/2a4de4b85746ed8c74c57b2cd18c6f69f2e65bd4))
+
+
+
+
+
+# [0.33.0](https://github.com/cube-js/cube/compare/v0.32.31...v0.33.0) (2023-05-02)
+
+**Note:** Version bump only for package @cubejs-client/playground
+
+
+
+
+
+## [0.32.30](https://github.com/cube-js/cube/compare/v0.32.29...v0.32.30) (2023-04-28)
+
+
+### Bug Fixes
+
+* **cubejs-playground:** SL-58 CC-1686 text and icon fixes ([#6490](https://github.com/cube-js/cube/issues/6490)) ([1fa96f0](https://github.com/cube-js/cube/commit/1fa96f04b7068887c0541f2fcfba51400b8ddc3c))
+* model style guide, views folder ([#6493](https://github.com/cube-js/cube/issues/6493)) ([1fa7f99](https://github.com/cube-js/cube/commit/1fa7f994551e05fd2ef417bd2ee7f472881bc2bc))
+
+
+### Features
+
+* **playground:** cube type tag, public cubes ([#6482](https://github.com/cube-js/cube/issues/6482)) ([cede7a7](https://github.com/cube-js/cube/commit/cede7a71f7d2e8d9dc221669b6b1714ee146d8ea))
+
+
+
+
+
 ## [0.32.24](https://github.com/cube-js/cube/compare/v0.32.23...v0.32.24) (2023-04-10)
 
 **Note:** Version bump only for package @cubejs-client/playground

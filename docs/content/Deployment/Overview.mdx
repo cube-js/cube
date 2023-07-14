@@ -42,7 +42,7 @@ API instances.
 
 API instances and Refresh Workers can be configured via [environment
 variables][ref-config-env] or the [`cube.js` configuration file][ref-config-js].
-They also need access to the data schema files. Cube Store clusters can be
+They also need access to the data model files. Cube Store clusters can be
 configured via environment variables.
 
 You can find an example Docker Compose configuration for a Cube deployment in
@@ -57,21 +57,22 @@ requests between multiple API instances.
 
 The [Cube Docker image][dh-cubejs] is used for API Instance.
 
-API instance needs to be configured via environment variables, cube.js file and
-has access to the data schema files.
+API instances can be configured via environment variables or the `cube.js`
+configuration file, and **must** have access to the data model files (as
+specified by [`schemaPath`][ref-conf-ref-schemapath].
 
 ## Refresh Worker
 
 A Refresh Worker updates pre-aggregations and invalidates the in-memory cache in
-the background. They also keep the refresh keys up-to-date for all defined
-schemas and pre-aggregations. Please note that the in-memory cache is just
-invalidated but not populated by Refresh Worker. In-memory cache is populated
-lazily during querying. On the other hand, pre-aggregations are eagerly
-populated and kept up-to-date by Refresh Worker.
+the background. They also keep the refresh keys up-to-date for all data models
+and pre-aggregations. Please note that the in-memory cache is just invalidated
+but not populated by Refresh Worker. In-memory cache is populated lazily during
+querying. On the other hand, pre-aggregations are eagerly populated and kept
+up-to-date by Refresh Worker.
 
-[Cube Docker image][dh-cubejs] can be used for creating Refresh Workers; to make
-the service act as a Refresh Worker, `CUBEJS_REFRESH_WORKER=true` should be set
-in the environment variables.
+The [Cube Docker image][dh-cubejs] can be used for creating Refresh Workers; to
+make the service act as a Refresh Worker, `CUBEJS_REFRESH_WORKER=true` should be
+set in the environment variables.
 
 ## Cube Store
 
@@ -275,6 +276,7 @@ guide][blog-migration-guide].
 [ref-deploy-docker]: /deployment/platforms/docker
 [ref-config-env]: /reference/environment-variables
 [ref-config-js]: /config
+[ref-conf-ref-schemapath]: /config#options-reference-schema-path
 [redis]: https://redis.io
 [ref-config-redis]: /reference/environment-variables#cubejs-redis-password
 [blog-details]: https://cube.dev/blog/how-you-win-by-using-cube-store-part-1

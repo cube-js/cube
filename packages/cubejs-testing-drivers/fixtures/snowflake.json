@@ -1,7 +1,6 @@
 {
   "cube": {
     "environment": {
-      "CUBEJS_DEV_MODE": "true",
       "CUBEJS_API_SECRET": "mysupersecret",
       "CUBEJS_CACHE_AND_QUEUE_DRIVER": "cubestore",
       "CUBEJS_CUBESTORE_HOST": "store",
@@ -15,7 +14,12 @@
       "CUBEJS_DB_SNOWFLAKE_ACCOUNT": "qna80818.us-east-1",
       "CUBEJS_DB_SNOWFLAKE_REGION": "us-east-1",
       "CUBEJS_DB_SNOWFLAKE_WAREHOUSE": "COMPUTE_WH",
-      "CUBEJS_DB_SNOWFLAKE_ROLE": "PUBLIC"
+      "CUBEJS_DB_SNOWFLAKE_ROLE": "PUBLIC",
+      "CUBEJS_DB_EXPORT_BUCKET": "athena-drivers-tests-preaggs",
+      "CUBEJS_DB_EXPORT_BUCKET_TYPE": "s3",
+      "CUBEJS_DB_EXPORT_BUCKET_AWS_KEY": "${DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY}",
+      "CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET": "${DRIVERS_TESTS_ATHENA_CUBEJS_AWS_SECRET}",
+      "CUBEJS_DB_EXPORT_BUCKET_AWS_REGION": "us-east-1"
     },
     "ports" : ["4000"]
   },
@@ -27,13 +31,62 @@
     "CREATE_TBL_PREFIX": "CREATE TABLE ",
     "CREATE_TBL_SUFFIX": " AS ",
     "CREATE_SUB_PREFIX": "(",
-    "CREATE_SUB_SUFFIX": ");",
-    "USE_SCHEMA": "USE SCHEMA public;"
+    "CREATE_SUB_SUFFIX": ");"
+  },
+  "tables": {
+    "products": "public.products",
+    "customers": "public.customers",
+    "ecommerce": "public.ecommerce",
+    "bigecommerce": "public.bigecommerce"
   },
   "preAggregations": {
     "Products": [],
-    "Customers": [],
-    "ECommerce": []
+    "Customers": [
+      {
+        "name": "RA",
+        "measures": ["CUBE.count", "CUBE.runningTotal"]
+      }
+    ],
+    "ECommerce": [
+      {
+        "name": "SA",
+        "dimensions": ["CUBE.productName"],
+        "measures": [
+          "CUBE.totalQuantity",
+          "CUBE.avgDiscount",
+          "CUBE.totalSales",
+          "CUBE.totalProfit"
+        ]
+      },
+      {
+        "name": "TA",
+        "time_dimension": "CUBE.orderDate",
+        "granularity": "month",
+        "partition_granularity": "month",
+        "dimensions": ["CUBE.productName"],
+        "measures": [
+          "CUBE.totalQuantity",
+          "CUBE.avgDiscount",
+          "CUBE.totalSales",
+          "CUBE.totalProfit"
+        ]
+      }
+    ],
+    "BigECommerce": [
+      {
+        "name": "TA",
+        "time_dimension": "CUBE.orderDate",
+        "granularity": "month",
+        "partition_granularity": "year",
+        "dimensions": ["CUBE.productName", "CUBE.id"],
+        "measures": [
+          "CUBE.totalQuantity",
+          "CUBE.avgDiscount",
+          "CUBE.totalSales",
+          "CUBE.totalProfit"
+        ]
+      }
+    ]
   },
   "skip": [
     "---------------------------------------",
@@ -51,18 +104,13 @@
     "for the ECommerce.TimeAnalysisExternal",
 
     "---------------------------------------",
-    "Full tests                             ",
-    "---------------------------------------",
-    "must built pre-aggregations",
-    "querying Customers: dimentions + order + total + offset",
-    "querying ECommerce: dimentions + order + total + offset",
-
-    "---------------------------------------",
     "SKIPED FOR ALL                         ",
     "---------------------------------------",
     "querying Products: dimensions -- doesn't work wo ordering",
     "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- rounding in athena",
     "querying ECommerce: total sales, total profit by month + order (date) + total -- doesn't work with the BigQuery",
-    "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- noisy test"
+    "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- noisy test",
+    "querying BigECommerce: null sum",
+    "querying BigECommerce: null boolean"
   ]
 }

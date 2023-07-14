@@ -83,7 +83,7 @@ The name of the AWS Athena catalog to use for queries.
 ## `CUBEJS_DB_SCHEMA`
 
 The name of the schema to use as `information_schema` filter. Reduces count of
-tables loaded during schema generation.
+tables loaded during data model generation.
 
 | Possible Values     | Default in Development | Default in Production |
 | ------------------- | ---------------------- | --------------------- |
@@ -93,9 +93,9 @@ tables loaded during schema generation.
 
 The cache and queue driver to use for the Cube deployment.
 
-| Possible Values   | Default in Development | Default in Production |
-| ----------------- | ---------------------- | --------------------- |
-| `cubestore`, `memory` | `memory`               | `cubestore`               |
+| Possible Values       | Default in Development | Default in Production |
+| --------------------- | ---------------------- | --------------------- |
+| `cubestore`, `memory` | `memory`               | `cubestore`           |
 
 ## `CUBEJS_CONCURRENCY`
 
@@ -545,6 +545,15 @@ The username used to connect to the database.
 | ------------------------- | ---------------------- | --------------------- |
 | A valid database username | N/A                    | N/A                   |
 
+## `CUBEJS_DEFAULT_API_SCOPES`
+
+[API scopes][ref-rest-scopes] used to allow or disallow access to REST API
+endpoints.
+
+| Possible Values                                                                | Default in Development | Default in Production |
+| ------------------------------------------------------------------------------ | ---------------------- | --------------------- |
+| A comma-delimited string with any combination of [API scopes][ref-rest-scopes] | `meta,data,graphql`    | `meta,data,graphql`   |
+
 ## `CUBEJS_DEV_MODE`
 
 If `true`, enables development mode.
@@ -560,8 +569,9 @@ touch within [`CUBEJS_TOUCH_PRE_AGG_TIMEOUT`](#cubejs-touch-pre-agg-timeout).
 Pre-aggregations are touched whenever they are rebuilt or a Refresh Worker
 checks its freshness. The first drop will be initiated when the Refresh Worker
 is able to check freshness for every `scheduledRefresh: true` pre-aggregation.
-If you have multiple Refresh Workers with different schema versions sharing the
-same Cube Store cluster, then touches from both refresh workers are respected.
+If you have multiple Refresh Workers with different data model versions sharing
+the same Cube Store cluster, then touches from both refresh workers are
+respected.
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
@@ -678,7 +688,8 @@ The maximum number of partitions each pre-aggregation in a cube can use.
 
 ## `CUBEJS_PG_SQL_PORT`
 
-The port to listen to Postgres-compatible connections on.
+The port used by the [SQL API][ref-sql-api] to listen to Postgres-compatible
+connections on.
 
 | Possible Values     | Default in Development | Default in Production |
 | ------------------- | ---------------------- | --------------------- |
@@ -712,8 +723,8 @@ pre-aggregations.
 
 <WarningBox>
 
-This environment variable is deprecated. Update to v0.32.0 or later
-to use Cube Store instead of Redis.
+This environment variable is deprecated. Update to v0.32.0 or later to use Cube
+Store instead of Redis.
 
 </WarningBox>
 
@@ -727,8 +738,8 @@ The password used to connect to the Redis server.
 
 <WarningBox>
 
-This environment variable is deprecated. Update to v0.32.0 or later
-to use Cube Store instead of Redis.
+This environment variable is deprecated. Update to v0.32.0 or later to use Cube
+Store instead of Redis.
 
 </WarningBox>
 
@@ -744,8 +755,8 @@ than [`CUBEJS_REDIS_POOL_MIN`](#cubejs-redis-pool-min).
 
 <WarningBox>
 
-This environment variable is deprecated. Update to v0.32.0 or later
-to use Cube Store instead of Redis.
+This environment variable is deprecated. Update to v0.32.0 or later to use Cube
+Store instead of Redis.
 
 </WarningBox>
 
@@ -761,8 +772,8 @@ than [`CUBEJS_REDIS_POOL_MAX`](#cubejs-redis-pool-max).
 
 <WarningBox>
 
-This environment variable is deprecated. Update to v0.32.0 or later
-to use Cube Store instead of Redis.
+This environment variable is deprecated. Update to v0.32.0 or later to use Cube
+Store instead of Redis.
 
 </WarningBox>
 
@@ -777,8 +788,8 @@ authentication.
 
 <WarningBox>
 
-This environment variable is deprecated. Update to v0.32.0 or later
-to use Cube Store instead of Redis.
+This environment variable is deprecated. Update to v0.32.0 or later to use Cube
+Store instead of Redis.
 
 </WarningBox>
 
@@ -792,8 +803,8 @@ The host URL for a Redis server.
 
 <WarningBox>
 
-This environment variable is deprecated. Update to v0.32.0 or later
-to use Cube Store instead of Redis.
+This environment variable is deprecated. Update to v0.32.0 or later to use Cube
+Store instead of Redis.
 
 </WarningBox>
 
@@ -841,15 +852,15 @@ for][ref-config-sched-refresh-timer]. Used in conjunction with
 
 ## `CUBEJS_SCHEMA_PATH`
 
-The path where Cube loads schemas from.
+The path where Cube loads data models from.
 
-| Possible Values                      | Default in Development | Default in Production |
-| ------------------------------------ | ---------------------- | --------------------- |
-| A valid path containing Cube schemas | `schema`               | `schema`              |
+| Possible Values                          | Default in Development | Default in Production |
+| ---------------------------------------- | ---------------------- | --------------------- |
+| A valid path containing Cube data models | `schema`               | `schema`              |
 
 ## `CUBEJS_SQL_PASSWORD`
 
-Required password to access SQL API.
+A password required to access the [SQL API][ref-sql-api].
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
@@ -857,11 +868,18 @@ Required password to access SQL API.
 
 ## `CUBEJS_SQL_PORT`
 
-The port to listen to MySQL compatibility connections on.
+The port used by the [SQL API][ref-sql-api] to listen to MySQL-compatible
+connections on.
 
 | Possible Values     | Default in Development | Default in Production |
 | ------------------- | ---------------------- | --------------------- |
 | A valid port number | N/A                    | N/A                   |
+
+<WarningBox>
+
+This environment variable is deprecated. Use `CUBEJS_PG_SQL_PORT` instead.
+
+</WarningBox>
 
 ## `CUBEJS_SQL_SUPER_USER`
 
@@ -873,7 +891,7 @@ A name of specific user who will be allowed to change security context.
 
 ## `CUBEJS_SQL_USER`
 
-Required username to access SQL API.
+A username required to access the [SQL API][ref-sql-api].
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
@@ -1273,6 +1291,7 @@ The port for a Cube deployment to listen to API connections on.
   /config/multiple-data-sources#configuring-data-sources-with-environment-variables-decorated-environment-variables
 [ref-config-preagg-schema-name]: /config#pre-aggregations-schema
 [ref-config-sched-refresh-timer]: /config#scheduled-refresh-timer
+[ref-rest-scopes]: /http-api/rest#configuration-api-scopes
 [snowflake-docs-account-id]:
   https://docs.snowflake.com/en/user-guide/admin-account-identifier.html
 [snowflake-docs-connection-options]:
@@ -1284,3 +1303,4 @@ The port for a Cube deployment to listen to API connections on.
 [snowflake-docs-warehouse]:
   https://docs.snowflake.com/en/user-guide/warehouses.html
 [wiki-tz-database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+[ref-sql-api]: /backend/sql

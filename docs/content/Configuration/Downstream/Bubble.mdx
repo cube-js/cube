@@ -22,13 +22,7 @@ Click the "How to connect" link on the Overview page, navigate to the REST API
 tab. You will see your connection credentials, the REST API URL and the
 authorization token:
 
-<div style="text-align: center">
-  <img
-    src="https://ucarecdn.com/5e861647-21df-407d-951d-6a88d5ed9f97/"
-    style="border: none"
-    width="80%"
-  />
-</div>
+<Screenshot src="https://ucarecdn.com/5e861647-21df-407d-951d-6a88d5ed9f97/" />
 
 ### <--{"id" : "Use REST API in Cube"}--> Self-hosted Cube
 
@@ -52,25 +46,13 @@ Navigate to the plugins. Select and install the API connector plugin.
 
 Click "Add another API".
 
-<div style="text-align: center">
-  <img
-    src="https://ucarecdn.com/a2e85b6e-b321-40d8-ba56-2dc4b7d7f50b/"
-    style="border: none"
-    width="80%"
-  />
-</div>
+<Screenshot src="https://ucarecdn.com/a2e85b6e-b321-40d8-ba56-2dc4b7d7f50b/" />
 
 Next, set the "Authentication" as "Private key in header", and copy and paste
 Cube's Authorization token. Additionally, make sure to add a shared header for
 all calls by setting `content-type` to `application/json`.
 
-<div style="text-align: center">
-  <img
-    src="https://ucarecdn.com/8bf3d936-1886-4bc0-b6c4-10bb76adb21f/"
-    style="border: none"
-    width="80%"
-  />
-</div>
+<Screenshot src="https://ucarecdn.com/8bf3d936-1886-4bc0-b6c4-10bb76adb21f/" />
 
 ## Create a POST request in Bubble
 
@@ -80,36 +62,16 @@ Copy and paste the Cube REST API, including the `/load` path, in the API field.
 Make sure to select "Use as: Action", and use the `JSON` "data type" and "body
 type".
 
-<div style="text-align: center">
-  <img
-    src="https://ucarecdn.com/5f857c2f-ba88-40a9-9112-b4368a19b608/"
-    style="border: none"
-    width="80%"
-  />
-</div>
+<Screenshot src="https://ucarecdn.com/5f857c2f-ba88-40a9-9112-b4368a19b608/" />
 
 Get your Cube query in the JSON
 [query format](https://cube.dev/docs/query-format) ready. You can copy it from
-Cube’s Playground or compose manually:
-
-<div style="text-align: center">
-  <img
-    src="https://ucarecdn.com/d2104545-cba1-4b63-84ab-d9d0a7051d7f/"
-    style="border: none"
-    width="50%"
-  />
-</div>
+Cube’s Playground or compose manually.
 
 Paste the JSON query in the **Body**. Make sure to add a `query` parameter for
 your JSON query.
 
-<div style="text-align: center">
-  <img
-    src="https://ucarecdn.com/4e86bc38-56bb-44bc-b99d-6b55bb963761/"
-    style="border: none"
-    width="80%"
-  />
-</div>
+<Screenshot src="https://ucarecdn.com/4e86bc38-56bb-44bc-b99d-6b55bb963761/" />
 
 Next, hit "Initialize / Reinitialize call".
 
@@ -122,13 +84,7 @@ state `OrdersByMonth` and selected the `data` field of the API response. Make
 sure to toggle the "This state is a list" checkbox as well. While setting the
 state's value you will need to select "Result of step 1" and the `data` field.
 
-<div style="text-align: center">
-  <img
-    src="https://ucarecdn.com/9f7a98e2-6ba8-463b-bbee-059fd29da4ab/"
-    style="border: none"
-    width="80%"
-  />
-</div>
+<Screenshot src="https://ucarecdn.com/9f7a98e2-6ba8-463b-bbee-059fd29da4ab/" />
 
 ## Display the data in Bubble
 
@@ -140,20 +96,8 @@ series categories and series data. For the series categories and series data you
 need to select the `index` and `OrdersByMonth` state followed by the data point
 you want to use in order to populate the chart.
 
-<div style="text-align: center">
-  <img
-    src="https://ucarecdn.com/c2684ea0-5cad-4fee-9496-e9bc745ea68c/"
-    style="border: none"
-    width="80%"
-  />
-</div>
+<Screenshot src="https://ucarecdn.com/c2684ea0-5cad-4fee-9496-e9bc745ea68c/" />
 
 Once you open the "Preview" you'll see your nicely rendered charts.
 
-<div style="text-align: center">
-  <img
-    src="https://ucarecdn.com/1e1790fc-a5ed-4921-b1f1-7cd326ea6932/"
-    style="border: none"
-    width="80%"
-  />
-</div>
+<Screenshot src="https://ucarecdn.com/1e1790fc-a5ed-4921-b1f1-7cd326ea6932/" />

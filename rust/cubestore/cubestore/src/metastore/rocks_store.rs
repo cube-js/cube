@@ -381,6 +381,7 @@ impl<T: Clone> IdRow<T> {
     pub fn new(id: u64, row: T) -> IdRow<T> {
         IdRow { id, row }
     }
+
     pub fn get_id(&self) -> u64 {
         self.id
     }
@@ -857,6 +858,41 @@ impl RocksStore {
             self.details.get_name(),
             time.elapsed()?
         );
+
+        Ok(())
+    }
+
+    pub async fn healthcheck(&self) -> Result<(), CubeError> {
+        self.read_operation(move |_| {
+            // read_operation will call getSnapshot, which is enough to test that RocksDB works
+            Ok(())
+        })
+        .await?;
+
+        let db_path = self.db.path();
+
+        // read/write operation doesnt check fs status
+        tokio::fs::metadata(db_path).await.map_err(|err| {
+            CubeError::internal(format!(
+                "Error while checking database for {}: {}",
+                self.details.get_name(),
+                err
+            ))
+        })?;
+
+        for live_file in self.db.live_files()? {
+            let file_name = live_file.name.trim_start_matches(std::path::MAIN_SEPARATOR);
+            tokio::fs::metadata(db_path.join(file_name).as_path())
+                .await
+                .map_err(|err| {
+                    CubeError::internal(format!(
+                        "Error while checking live file \"{}\" for {}: {}",
+                        file_name,
+                        self.details.get_name(),
+                        err
+                    ))
+                })?;
+        }
 
         Ok(())
     }

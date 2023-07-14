@@ -6,14 +6,15 @@ import {
   Query,
   validateQuery,
   TransformedQuery,
+  getQueryMembers,
 } from '@cubejs-client/core';
 import {
   QueryBuilder,
   SchemaChangeProps,
   VizState,
 } from '@cubejs-client/react';
-import { Col, Row, Space } from 'antd';
-import { PlaySquareOutlined } from '@ant-design/icons';
+import { Alert, Col, Row, Space } from 'antd';
+import { SyncOutlined } from '@ant-design/icons';
 import React, { RefObject, useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
 
@@ -23,7 +24,6 @@ import ChartContainer from '../../../ChartContainer';
 import { SectionHeader, SectionRow } from '../../../components';
 import ChartRenderer from '../../../components/ChartRenderer/ChartRenderer';
 import Settings from '../../../components/Settings/Settings';
-import DashboardSource from '../../../DashboardSource';
 import { playgroundAction } from '../../../events';
 import {
   useDeepEffect,
@@ -36,7 +36,7 @@ import MemberGroup from '../../../QueryBuilder/MemberGroup';
 import SelectChartType from '../../../QueryBuilder/SelectChartType';
 import TimeGroup from '../../../QueryBuilder/TimeGroup';
 import { UIFramework } from '../../../types';
-import { dispatchPlaygroundEvent } from '../../../utils';
+import { containsPrivateFields, dispatchPlaygroundEvent } from '../../../utils';
 import {
   useChartRendererState,
   useChartRendererStateMethods,
@@ -171,7 +171,6 @@ export type PlaygroundQueryBuilderProps = {
   cubejsToken: string;
   queryId: string;
   defaultQuery?: Query;
-  dashboardSource?: DashboardSource;
   schemaVersion?: number;
   initialVizState?: VizState;
   extra?: React.FC<any>;
@@ -193,7 +192,6 @@ export function PlaygroundQueryBuilder({
   cubejsToken,
   defaultQuery,
   queryId,
-  dashboardSource,
   schemaVersion = 0,
   initialVizState,
   extra: Extra,
@@ -329,7 +327,12 @@ export function PlaygroundQueryBuilder({
           // @ts-ignore
           parsedDateRange = query.timeDimensions[0].dateRange;
         }
-        
+
+        const hasPrivateFields = containsPrivateFields(
+          getQueryMembers(query),
+          meta
+        );
+
         const queriesEqual = areQueriesEqual(
           validateQuery(query),
           validateQuery(queryRef.current)
@@ -424,6 +427,14 @@ export function PlaygroundQueryBuilder({
                       />
                     </Section>
                   </Row>
+
+                  {hasPrivateFields ? (
+                    <Alert
+                      type="warning"
+                      message="Some of the fields you have selected are private and will not be available for querying in production."
+                      style={{ marginTop: 16 }}
+                    />
+                  ) : null}
                 </Card>
 
                 <SectionRow
@@ -484,7 +495,7 @@ export function PlaygroundQueryBuilder({
 
                     {resultSetExists && queriesEqual ? (
                       <Button
-                        icon={<PlaySquareOutlined />}
+                        icon={<SyncOutlined />}
                         onClick={async () => {
                           await refreshToken();
 
@@ -536,7 +547,6 @@ export function PlaygroundQueryBuilder({
                     pivotConfig={pivotConfig}
                     framework={framework}
                     chartingLibrary={chartingLibrary}
-                    dashboardSource={dashboardSource}
                     setFramework={(currentFramework) => {
                       if (currentFramework !== framework) {
                         setQueryLoading(queryId, false);

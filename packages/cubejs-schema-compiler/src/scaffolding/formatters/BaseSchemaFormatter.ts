@@ -99,13 +99,20 @@ export abstract class BaseSchemaFormatter {
   }
 
   protected eligibleIdentifier(name: string) {
-    return !!name.match(/^[a-z0-9_]+$/);
+    return !!name.match(/^[a-z0-9_]+$/i);
   }
 
   public schemaDescriptorForTable(tableSchema: TableSchema, schemaContext: SchemaContext = {}) {
     const table = `${
       tableSchema.schema?.length ? `${this.escapeName(tableSchema.schema)}.` : ''
     }${this.escapeName(tableSchema.table)}`;
+
+    const { dataSource, ...contextProps } = schemaContext;
+
+    let dataSourceProp = {};
+    if (dataSource) {
+      dataSourceProp = this.options.snakeCase ? { data_source: dataSource } : { dataSource };
+    }
 
     const sqlOption = this.options.snakeCase
       ? {
@@ -114,17 +121,12 @@ export abstract class BaseSchemaFormatter {
       : {
         sql: `SELECT * FROM ${table}`,
       };
-
+      
     return {
       cube: tableSchema.cube,
       ...sqlOption,
-      [this.options.snakeCase ? 'pre_aggregations' : 'preAggregations']: new ValueWithComments(
-        null,
-        [
-          'Pre-Aggregations definitions go here',
-          'Learn more here: https://cube.dev/docs/caching/pre-aggregations/getting-started',
-        ]
-      ),
+      ...dataSourceProp,
+
       joins: tableSchema.joins
         .map((j) => ({
           [j.cubeToJoin]: {
@@ -134,6 +136,18 @@ export abstract class BaseSchemaFormatter {
             relationship: this.options.snakeCase
               ? JOIN_RELATIONSHIP_MAP[j.relationship]
               : j.relationship,
+          },
+        }))
+        .reduce((a, b) => ({ ...a, ...b }), {}),
+      dimensions: tableSchema.dimensions.sort((a) => (a.isPrimaryKey ? -1 : 0))
+        .map((m) => ({
+          [this.memberName(m)]: {
+            sql: this.sqlForMember(m),
+            type: m.type ?? m.types[0],
+            title: this.memberTitle(m),
+            [this.options.snakeCase ? 'primary_key' : 'primaryKey']: m.isPrimaryKey
+              ? true
+              : undefined,
           },
         }))
         .reduce((a, b) => ({ ...a, ...b }), {}),
@@ -150,23 +164,20 @@ export abstract class BaseSchemaFormatter {
             type: 'count',
           },
         }),
-      dimensions: tableSchema.dimensions
-        .map((m) => ({
-          [this.memberName(m)]: {
-            sql: this.sqlForMember(m),
-            type: m.type ?? m.types[0],
-            title: this.memberTitle(m),
-            [this.options.snakeCase ? 'primary_key' : 'primaryKey']: m.isPrimaryKey
-              ? true
-              : undefined,
-          },
-        }))
-        .reduce((a, b) => ({ ...a, ...b }), {}),
+
       ...(this.options.snakeCase
         ? Object.fromEntries(
-          Object.entries(schemaContext).map(([key, value]) => [toSnakeCase(key), value])
+          Object.entries(contextProps).map(([key, value]) => [toSnakeCase(key), value])
         )
-        : schemaContext),
+        : contextProps),
+
+      [this.options.snakeCase ? 'pre_aggregations' : 'preAggregations']: new ValueWithComments(
+        null,
+        [
+          'Pre-aggregation definitions go here.',
+          'Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started',
+        ]
+      ),
     };
   }
 
@@ -195,10 +206,6 @@ export abstract class BaseSchemaFormatter {
           dimensions: [],
         }
       );
-
-      const dimensionNames = cubeMembers.dimensions
-        .filter((d) => d.included || d.included == null)
-        .map((d) => d.name);
 
       return {
         ...generatedDescriptor,

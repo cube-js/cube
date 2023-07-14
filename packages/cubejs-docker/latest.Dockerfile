@@ -1,4 +1,4 @@
-FROM node:16.19.1-bullseye-slim as builder
+FROM node:16.20.1-bullseye-slim as builder
 
 WORKDIR /cube
 COPY . .
@@ -9,14 +9,15 @@ RUN yarn config set network-timeout 120000 -g
 
 # Required for node-oracledb to buld on ARM64
 RUN apt-get update \
-    && apt-get install -y python3 gcc g++ make cmake \
+    # libpython3-dev is needed to trigger post-installer to download native with python
+    && apt-get install -y python3 libpython3-dev gcc g++ make cmake \
     && rm -rf /var/lib/apt/lists/*
 
 # We are copying root yarn.lock file to the context folder during the Publish GH
 # action. So, a process will use the root lock file here.
 RUN yarn install --prod && yarn cache clean
 
-FROM node:16.19.1-bullseye-slim
+FROM node:16.20.1-bullseye-slim
 
 ARG IMAGE_VERSION=unknown
 
@@ -25,7 +26,7 @@ ENV CUBEJS_DOCKER_IMAGE_TAG=latest
 
 RUN DEBIAN_FRONTEND=noninteractive \
     && apt-get update \
-    && apt-get install -y --no-install-recommends rxvt-unicode libssl1.1 \
+    && apt-get install -y --no-install-recommends rxvt-unicode libssl1.1 python3 libpython3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 RUN yarn policies set-version v1.22.19

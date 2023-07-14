@@ -28,13 +28,7 @@ the Overview page of your Cube deployment. Navigate to the **BIs and
 Visualization Tools** tab. You should see the screen like the one below with
 your connection credentials:
 
-<div style="text-align: center">
-  <img
-    src="https://ucarecdn.com/78a4b90c-da5a-4d1f-9775-59ce6e7baad0/"
-    style="border: none"
-    width="80%"
-  />
-</div>
+<Screenshot src="https://ucarecdn.com/78a4b90c-da5a-4d1f-9775-59ce6e7baad0/" />
 
 ### <--{"id" : "Use SQL API in Cube"}--> Self-hosted Cube
 
@@ -51,13 +45,7 @@ CUBEJS_SQL_PASSWORD=mypassword
 
 Observable connects to Cube as to a Postgres database.
 
-<div style="text-align: center">
-  <img
-    src="https://ucarecdn.com/2f0577f5-4717-4001-bfef-050827c5a415/"
-    style="border: none"
-    width="80%"
-  />
-</div>
+<Screenshot src="https://ucarecdn.com/2f0577f5-4717-4001-bfef-050827c5a415/" />
 
 ### <--{"id" : "Connecting Cube SQL API from Observable"}--> Querying data with SQL API
 
@@ -107,13 +95,7 @@ Click the "How to connect" link on the Overview page, navigate to the REST API
 tab. You will see your connection credentials, the REST API URL and the
 authorization token:
 
-<div style="text-align: center">
-  <img
-    src="https://ucarecdn.com/5e861647-21df-407d-951d-6a88d5ed9f97/"
-    style="border: none"
-    width="80%"
-  />
-</div>
+<Screenshot src="https://ucarecdn.com/5e861647-21df-407d-951d-6a88d5ed9f97/" />
 
 ### <--{"id" : "Use REST API in Cube"}--> Self-hosted Cube
 
@@ -166,15 +148,7 @@ header.
 
 Get your Cube query in the JSON
 [query format](https://cube.dev/docs/query-format) ready. You can copy it from
-Cube's Playground or compose manually:
-
-<div style="text-align: center">
-  <img
-    src="https://ucarecdn.com/d2104545-cba1-4b63-84ab-d9d0a7051d7f/"
-    style="border: none"
-    width="50%"
-  />
-</div>
+Cube's Playground or compose manually.
 
 Paste the JSON query in another JavaScript cell as an object literal and give it
 a name, I chose `jsonBody` for simplicity. Make sure to add a `query` parameter
@@ -183,15 +157,15 @@ for your JSON query.
 ```javascript
 jsonQuery = {
   query: {
-    measures: ['Orders.count'],
+    measures: ['orders.count'],
     timeDimensions: [
       {
-        dimension: 'Orders.createdAt',
+        dimension: 'orders.created_at',
         granularity: 'month',
       },
     ],
     order: {
-      'Orders.createdAt': 'asc',
+      'orders.created_at': 'asc',
     },
   },
 };

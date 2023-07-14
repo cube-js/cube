@@ -48,7 +48,7 @@ interface Args {
   log: Log,
 }
 
-export type DriverType = 'postgresql' | 'postgres' | 'multidb' | 'materialize' | 'crate' | 'bigquery' | 'athena' | 'postgresql-cubestore' | 'firebolt' | 'questdb' | 'redshift' | 'databricks-jdbc' | 'prestodb' | 'mssql' | 'trino' | 'oracle' | 'duckdb';
+export type DriverType = 'postgresql' | 'postgres' | 'multidb' | 'materialize' | 'crate' | 'bigquery' | 'athena' | 'postgresql-cubestore' | 'firebolt' | 'questdb' | 'redshift' | 'databricks-jdbc' | 'prestodb' | 'mssql' | 'trino' | 'oracle' | 'duckdb' | 'snowflake';
 
 export type Schemas = string[];
 
@@ -108,6 +108,7 @@ const driverNameToFolderNameMapper: Record<DriverType, string> = {
   trino: 'postgresql',
   oracle: 'oracle',
   duckdb: 'postgresql',
+  snowflake: 'snowflake',
 };
 
 /**

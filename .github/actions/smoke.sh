@@ -4,14 +4,14 @@ set -eo pipefail
 # Debug log for test containers
 export DEBUG=testcontainers
 
+echo "::group::Oracle"
+yarn lerna run --concurrency 1 --stream --no-prefix smoke:oracle
+echo "::endgroup::"
+
 echo "::group::DuckDB"
 # Should we create a separate job integration-duckdb? I believe not, because it works fast.
 yarn lerna run --concurrency 1 --stream --no-prefix integration:duckdb
 yarn lerna run --concurrency 1 --stream --no-prefix smoke:duckdb
-echo "::endgroup::"
-
-echo "::group::Oracle"
-yarn lerna run --concurrency 1 --stream --no-prefix smoke:oracle
 echo "::endgroup::"
 
 echo "::group::Postgres"
@@ -39,6 +39,9 @@ yarn lerna run --concurrency 1 --stream --no-prefix smoke:multidb
 echo "::endgroup::"
 
 echo "::group::Prestodb"
+docker rm -vf $(docker ps -aq)
+docker rmi -f $(docker images -aq)
+docker pull ahanaio/prestodb-sandbox:0.281
 yarn lerna run --concurrency 1 --stream --no-prefix smoke:prestodb
 echo "::endgroup::"
 

@@ -259,6 +259,7 @@ describe('API Gateway', () => {
               timezone: 'UTC',
               order: [],
               filters: [],
+              rowLimit: 10000,
               limit: 10000,
               dimensions: [],
               timeDimensions: [],
@@ -271,6 +272,191 @@ describe('API Gateway', () => {
             timezone: 'UTC',
             order: [],
             filters: [],
+            rowLimit: 10000,
+            limit: 10000,
+            dimensions: [],
+            timeDimensions: [],
+            queryType: 'regularQuery'
+          },
+          transformedQueries: [null]
+        });
+      }
+    );
+  });
+
+  test('normalize filter number values', async () => {
+    const { app } = createApiGateway();
+
+    const query = {
+      measures: ['Foo.bar'],
+      filters: [{
+        member: 'Foo.bar',
+        operator: 'gte',
+        values: [10.5]
+      }, {
+        member: 'Foo.bar',
+        operator: 'gte',
+        values: [0]
+      }, {
+        or: [{
+          member: 'Foo.bar',
+          operator: 'gte',
+          values: [10.5]
+        }, {
+          member: 'Foo.bar',
+          operator: 'gte',
+          values: [0]
+        }]
+      }]
+    };
+
+    return requestBothGetAndPost(
+      app,
+      { url: '/cubejs-api/v1/dry-run', query: { query: JSON.stringify(query) }, body: { query } },
+      (res) => {
+        expect(res.body.normalizedQueries).toStrictEqual([
+          {
+            measures: ['Foo.bar'],
+            timezone: 'UTC',
+            order: [],
+            filters: [{
+              member: 'Foo.bar',
+              operator: 'gte',
+              values: ['10.5']
+            }, {
+              member: 'Foo.bar',
+              operator: 'gte',
+              values: ['0']
+            }, {
+              or: [{
+                member: 'Foo.bar',
+                operator: 'gte',
+                values: ['10.5']
+              }, {
+                member: 'Foo.bar',
+                operator: 'gte',
+                values: ['0']
+              }]
+            }],
+            rowLimit: 10000,
+            limit: 10000,
+            dimensions: [],
+            timeDimensions: [],
+            queryType: 'regularQuery'
+          }
+        ]);
+      }
+    );
+  });
+
+  test('normalize empty filters', async () => {
+    const { app } = createApiGateway();
+
+    const res = await request(app)
+      .get(
+        '/cubejs-api/v1/load?query={"measures":["Foo.bar"],"filters":[{"member":"Foo.bar","operator":"equals","values":[]}]}'
+      )
+      .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+      .expect(400);
+    console.log(res.body);
+    expect(res.body.error).toMatch(/Values required for filter/);
+  });
+
+  test('normalize queryRewrite limit', async () => {
+    const { app } = createApiGateway(
+      new AdapterApiMock(),
+      new DataSourceStorageMock(),
+      {
+        checkAuth: (req: Request, authorization) => {
+          if (authorization) {
+            jwt.verify(authorization, API_SECRET);
+            req.authInfo = authorization;
+          }
+        },
+        queryRewrite: async (query, context) => {
+          query.limit = 2;
+          return query;
+        }
+      }
+    );
+
+    const query = {
+      measures: ['Foo.bar']
+    };
+
+    return requestBothGetAndPost(
+      app,
+      { url: '/cubejs-api/v1/dry-run', query: { query: JSON.stringify(query) }, body: { query } },
+      (res) => {
+        expect(res.body).toStrictEqual({
+          queryType: 'regularQuery',
+          normalizedQueries: [
+            {
+              measures: ['Foo.bar'],
+              timezone: 'UTC',
+              order: [],
+              filters: [],
+              rowLimit: 2,
+              limit: 2,
+              dimensions: [],
+              timeDimensions: [],
+              queryType: 'regularQuery'
+            }
+          ],
+          queryOrder: [{ id: 'desc' }],
+          pivotQuery: {
+            measures: ['Foo.bar'],
+            timezone: 'UTC',
+            order: [],
+            filters: [],
+            rowLimit: 2,
+            limit: 2,
+            dimensions: [],
+            timeDimensions: [],
+            queryType: 'regularQuery'
+          },
+          transformedQueries: [null]
+        });
+      }
+    );
+  });
+
+  test('normalize order', async () => {
+    const { app } = createApiGateway();
+
+    const query = {
+      measures: ['Foo.bar'],
+      order: {
+        'Foo.bar': 'desc'
+      }
+    };
+
+    return requestBothGetAndPost(
+      app,
+      { url: '/cubejs-api/v1/dry-run', query: { query: JSON.stringify(query) }, body: { query } },
+      (res) => {
+        expect(res.body).toStrictEqual({
+          queryType: 'regularQuery',
+          normalizedQueries: [
+            {
+              measures: ['Foo.bar'],
+              order: [{ id: 'Foo.bar', desc: true }],
+              timezone: 'UTC',
+              filters: [],
+              rowLimit: 10000,
+              limit: 10000,
+              dimensions: [],
+              timeDimensions: [],
+              queryType: 'regularQuery'
+            }
+          ],
+          queryOrder: [{ id: 'desc' }],
+          pivotQuery: {
+            measures: ['Foo.bar'],
+            order: [{ id: 'Foo.bar', desc: true }],
+            timezone: 'UTC',
+            filters: [],
+            rowLimit: 10000,
             limit: 10000,
             dimensions: [],
             timeDimensions: [],

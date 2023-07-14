@@ -115,7 +115,7 @@ export function createCancelableInterval<T>(
   let intervalId: number = 0;
   let duplicatedExecutionTracked: boolean = false;
 
-  const timeout = setInterval(
+  const timerId = setInterval(
     async () => {
       if (execution) {
         if (options.onDuplicatedExecution) {
@@ -152,7 +152,7 @@ export function createCancelableInterval<T>(
 
   return {
     cancel: async (waitExecution: boolean = true) => {
-      clearInterval(timeout);
+      clearInterval(timerId);
 
       if (execution) {
         await execution.cancel(waitExecution);

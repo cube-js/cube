@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"SELECT current_setting('server_version_num')::int/100 as version\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++---------+
+| version |
++---------+
+| 1400    |
++---------+

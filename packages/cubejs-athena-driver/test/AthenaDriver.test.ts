@@ -27,6 +27,7 @@ describe('AthenaDriver', () => {
         expectStringFields: true,
         csvNoHeader: true,
         wrapLoadQueryWithCtas: true,
+        delimiter: '\x01',
       }
     );
   });
@@ -41,10 +42,6 @@ describe('AthenaDriver', () => {
 
   test('stream', async () => {
     await tests.testStream();
-  });
-
-  test('unload', async () => {
-    await tests.testUnload();
   });
 
   test('unload CSV escape symbol', async () => {

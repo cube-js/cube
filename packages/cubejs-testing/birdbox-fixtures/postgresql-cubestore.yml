@@ -16,6 +16,7 @@ services:
       CUBEJS_CUBESTORE_HOST: cubestore
       CUBEJS_PLAYGROUND_AUTH_SECRET: mysupersecret
       CUBEJS_CACHE_AND_QUEUE_DRIVER: memory
+      CUBEJS_SCHEMA_PATH: schema
     depends_on:
       - db
       - cubestore

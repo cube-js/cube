@@ -1,7 +1,7 @@
 ARG DEV_BUILD_IMAGE=cubejs/cube:build
 
 FROM $DEV_BUILD_IMAGE as build
-FROM node:16.19.1-bullseye-slim
+FROM node:16.20.1-bullseye-slim
 
 ARG IMAGE_VERSION=dev
 
@@ -10,7 +10,7 @@ ENV CUBEJS_DOCKER_IMAGE_TAG=latest
 
 RUN DEBIAN_FRONTEND=noninteractive \
     && apt-get update \
-    && apt-get install -y --no-install-recommends rxvt-unicode libssl1.1 \
+    && apt-get install -y --no-install-recommends rxvt-unicode libssl1.1 python3 libpython3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 ENV TERM rxvt-unicode

@@ -203,6 +203,10 @@ cubes:
         measures:
           - weeklyActive
         timeDimension: time
+        indexes:
+          - name: weeklyActive
+            columns:
+              - weeklyActive
         granularity: day
     `);
     await compiler.compile();
@@ -299,12 +303,12 @@ cubes:
     const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
 cubes:
   - name: orders
-    sql: "SELECT 1 as id, 1 as customer_id, '2022-01-01' as \\"timestamp\\" WHERE {FILTER_PARAMS.orders.time.filter(\\"timestamp\\")}"
+    sql: "SELECT 1 as id, 1 as customer_id, TO_TIMESTAMP('2022-01-01', 'YYYY-MM-DD') as timestamp WHERE {FILTER_PARAMS.orders.time.filter(\\"timestamp\\")}"
     
     joins:
       - name: customers
-        sql: "{orders}.customer_id = {customers}.id"
-        relationship: belongs_to
+        sql: "{CUBE}.customer_id = {customers}.id"
+        relationship: many_to_one
     
     measures:
       - name: count
@@ -312,7 +316,7 @@ cubes:
 
     dimensions:
       - name: id
-        sql: id
+        sql: "{CUBE}.id"
         type: string
         primary_key: true
         
@@ -327,6 +331,33 @@ cubes:
         time_dimension: orders.time
         granularity: day
 
+  - name: line_items
+    sql: "SELECT 1 as id, 1 as order_id, 100 as price"
+
+    joins:
+      - name: orders
+        sql: "{CUBE.order_id} = {orders.id}"
+        relationship: many_to_one
+
+    dimensions:
+      - name: id
+        sql: "{CUBE}.id"
+        type: string
+        primary_key: true
+
+      - name: order_id
+        sql: "{CUBE}.order_id"
+        type: number
+
+      - name: price
+        sql: "{CUBE}.price"
+        type: number
+
+    measures:
+      - name: count
+        type: count
+  
+  
   - name: customers
     sql: "SELECT 1 as id, 'Foo' as name"
     
@@ -345,25 +376,32 @@ cubes:
         type: string
         
 views:
-  - name: orders_view
+  - name: line_items_view
+
     cubes:
-      - cube: orders
+      - join_path: line_items
+        includes: "*"
+
+      - join_path: line_items.orders
         prefix: true
-        includes:
+        includes: "*"
+        excludes: 
           - count
-          - member: time
-            name: date
-      - cube: orders.customers
-        includes:
-          - name
+      
+      - join_path: line_items.orders.customers
+        alias: aliased_customers
+        prefix: true
+        includes: 
+          - name: name
+            alias: full_name
     `);
     await compiler.compile();
 
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
-      measures: ['orders_view.orders_count'],
-      dimensions: ['orders_view.name'],
+      measures: ['line_items_view.count'],
+      dimensions: ['line_items_view.aliased_customers_full_name'],
       timeDimensions: [{
-        dimension: 'orders_view.orders_date',
+        dimension: 'line_items_view.orders_time',
         granularity: 'day',
         dateRange: ['2022-01-01', '2022-01-03']
       }],
@@ -371,16 +409,13 @@ views:
       preAggregationsSchema: ''
     });
 
-    console.log(query.buildSqlAndParams());
-
     const res = await dbRunner.evaluateQueryWithPreAggregations(query);
-    console.log(JSON.stringify(res));
 
     expect(res).toEqual(
       [{
-        orders_view__orders_count: '1',
-        orders_view__name: 'Foo',
-        orders_view__orders_date_day: '2022-01-01T00:00:00.000Z',
+        line_items_view__aliased_customers_full_name: 'Foo',
+        line_items_view__count: '1',
+        line_items_view__orders_time_day: '2022-01-01T00:00:00.000Z',
       }]
     );
   });
@@ -438,5 +473,42 @@ cubes:
         active_users__weekly_active: '1',
       }]
     );
+  });
+
+  it('COMPILE_CONTEXT', async () => {
+    const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
+    cubes:
+      - name: orders
+        sql: "SELECT 1 as id, 'completed' as status"
+        public: COMPILE_CONTEXT.security_context.can_see_orders
+
+        measures:
+          - name: count
+            type: count
+    `,
+    {},
+    {
+      compileContext: {
+        authInfo: null,
+        securityContext: { can_see_orders: true },
+        requestId: 'XXX'
+      }
+    });
+
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'orders.count'
+      ],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles'
+    });
+
+    return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
+      expect(res).toEqual(
+        [{ orders__count: '1' }]
+      );
+    });
   });
 });

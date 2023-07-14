@@ -6,7 +6,6 @@ import omit from 'lodash/omit';
 
 import MenuItem from '../templates/MenuItem';
 import * as styles from '../../../static/styles/index.module.scss';
-import { useFrameworkOfChoice } from '../../stores/frameworkOfChoice';
 import {
   Frontmatter,
   MarkdownNode,
@@ -24,17 +23,14 @@ const menuOrder = [
   'Data Modeling',
   'Caching',
   'Authentication & Authorization',
-  'REST API',
-  'GraphQL API',
-  'SQL API',
-  'Frontend Integrations',
+  'APIs & Integrations',
   'Workspace',
   'Deployment',
   'Monitoring',
   'Examples & Tutorials',
   'FAQs',
-  'Release Notes',
-  'Reference',
+  'Guides',
+  'Reference'
 ];
 
 const nameRules: Record<string, string> = {
@@ -77,7 +73,6 @@ const defaultProps: Props = {
 
 const MainMenu: React.FC<Props> = (props = defaultProps) => {
   const menuProps = omit(props, ['mobileMode', 'scope']);
-  const [frameworkOfChoice] = useFrameworkOfChoice();
 
   return (
     <Col
@@ -118,19 +113,8 @@ const MainMenu: React.FC<Props> = (props = defaultProps) => {
               >
                 {Object.keys(filteredSubcategoryData).map((subCategory) => {
                   if (subCategory === 'nocat') {
-                    const subItems = filteredSubcategoryData[subCategory].filter(
-                      (subItem: MarkdownNode) => {
-                        return (
-                          !subItem.frontmatter.frameworkOfChoice ||
-                          subItem.frontmatter.frameworkOfChoice ===
-                            frameworkOfChoice
-                        );
-                      }
-                    );
-
-                    return item === 'Release Notes'
-                      ? subItems.reverse().map(nodeParser)
-                      : subItems.map(nodeParser);
+                    const subItems = filteredSubcategoryData[subCategory];
+                    return subItems.map(nodeParser);
                   }
                   return (
                     <Menu.ItemGroup key={subCategory} title={subCategory}>
@@ -141,6 +125,7 @@ const MainMenu: React.FC<Props> = (props = defaultProps) => {
               </Menu.SubMenu>
             );
           })}
+          <MenuItem to="https://cube.dev/blog/category/changelog" title="Changelog" />
         </Menu>
       </div>
     </Col>

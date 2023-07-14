@@ -2,7 +2,6 @@
 import { Cast } from 'src/dataset';
 
 export type Fixture = {
-  cast: Cast,
   cube: {
     environment: {
       [key: string]: string,
@@ -21,10 +20,12 @@ export type Fixture = {
     ports: string[],
     [key: string]: any,
   },
+  cast: Cast,
+  tables: {
+    [table: string]: string,
+  },
   preAggregations?: {
-    Products: [{ name: string, [prop: string]: unknown }],
-    Customers: [{ name: string, [prop: string]: unknown }],
-    ECommerce: [{ name: string, [prop: string]: unknown }],
+    [cube: string]: [{ name: string, [prop: string]: unknown }],
   },
   skip?: string[],
 };

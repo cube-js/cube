@@ -39,6 +39,22 @@ type Props = {
   className?: string;
 };
 
+const NewLookButton = () => {
+  const currentUrl = typeof window !== 'undefined' ? window.location.href : 'https://cube.dev/docs';
+  const nextUrl = currentUrl.replace('cube.dev/docs', 'cube.dev/docs-next');
+
+  return (
+    <Button
+      href={nextUrl}
+      target="_blank"
+      className={styles.headerButton}
+    >
+      <Icon style={{ fontSize: '22px' }} type="bulb" />
+      Try out the new look!
+    </Button>
+  );
+}
+
 const Header: React.FC<Props> = (props) => (
   <Layout.Header className={props.className}>
     <div className={styles.searchDimmer}></div>
@@ -57,8 +73,11 @@ const Header: React.FC<Props> = (props) => (
           {/*<Button href="https://github.com/statsbotco/cube.js#community" className={styles.headerButton}>*/}
           {/*  Community*/}
           {/*</Button>*/}
+
+          <NewLookButton />
+
           <Button
-            href="https://cubejs-community.herokuapp.com/"
+            href="https://slack.cube.dev/"
             target="_blank"
             className={styles.headerButton}
           >
