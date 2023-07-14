@@ -261,7 +261,7 @@ function whereArgToQueryFilters(
   metaConfig: any[] = []
 ) {
   const queryFilters: any[] = [];
-  
+
   Object.keys(whereArg).forEach((key) => {
     if (['OR', 'AND'].includes(key)) {
       queryFilters.push({
@@ -283,7 +283,7 @@ function whereArgToQueryFilters(
       // }
       if (Object.keys(whereArg[key]).length > 1) {
         const cubeExists = metaConfig.find((cube) => cube.config.name === key);
-        
+
         queryFilters.push(
           ...whereArgToQueryFilters(
             {
@@ -316,7 +316,7 @@ function whereArgToQueryFilters(
       Object.entries<any>(whereArg[key]).forEach(([member, filters]) => {
         Object.entries(filters).forEach(([operator, value]) => {
           const cubeExists = metaConfig.find((cube) => cube.config.name === key);
-          
+
           queryFilters.push({
             member: prefix
               ? `${prefix}.${key}`
@@ -367,7 +367,7 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
     if (cube.public === false) {
       return false;
     }
-    
+
     return ([...cube.config.measures, ...cube.config.dimensions].filter((member) => member.isVisible)).length > 0;
   }
 
@@ -494,6 +494,7 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
       t.nonNull.field('cube', {
         type: list(nonNull('Result')),
         args: {
+          groupBy: list(stringArg()),  // new groupBy arg
           where: arg({
             type: 'RootWhereInput'
           }),
@@ -505,12 +506,31 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
             type: 'RootOrderByInput'
           }),
         },
-        resolve: async (_, { where, limit, offset, timezone, orderBy, renewQuery }, { req, apiGateway }, infos) => {
+        resolve: async (_, { groupBy, where, limit, offset, timezone, orderBy, renewQuery }, { req, apiGateway }, infos) => {
           const measures: string[] = [];
           const dimensions: string[] = [];
           const timeDimensions: any[] = [];
           let filters: any[] = [];
           const order: [string, 'asc' | 'desc'][] = [];
+
+          // GroupBy validation
+          if (!Array.isArray(groupBy)) {
+            throw new Error("`groupBy` argument should be an array of strings.");
+          }
+
+          // Extract all existing column names
+          const existingColumns = metaConfig.flatMap((cube) => [...cube.config.measures, ...cube.config.dimensions].map(item => item.name));
+
+          // Validate each groupBy entry
+          groupBy.forEach(columnName => {
+            if (typeof columnName !== 'string') {
+              throw new Error("All entries in `groupBy` argument should be strings.");
+            }
+
+            if (!existingColumns.includes(columnName)) {
+              throw new Error(`'${columnName}' in 'groupBy' argument is not a valid column name.`);
+            }
+          });
 
           if (where) {
             filters = whereArgToQueryFilters(where, undefined, metaConfig);
@@ -526,7 +546,7 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
 
           getFieldNodeChildren(infos.fieldNodes[0], infos).forEach(cubeNode => {
             const cubeExists = metaConfig.find((cube) => cube.config.name === cubeNode.name.value);
-            
+
             const cubeName = cubeExists ? (cubeNode.name.value) : capitalize(cubeNode.name.value);
             const orderByArg = getArgumentValue(cubeNode, 'orderBy', infos.variableValues);
             // todo: throw if both RootOrderByInput and [Cube]OrderByInput provided
@@ -560,24 +580,26 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
               if (memberType === MemberType.MEASURES) {
                 measures.push(key);
               } else if (memberType === MemberType.DIMENSIONS) {
-                const granularityNodes = getFieldNodeChildren(memberNode, infos);
-                if (granularityNodes.length > 0) {
-                  granularityNodes.forEach(granularityNode => {
-                    const granularityName = granularityNode.name.value;
-                    if (granularityName === 'value') {
-                      dimensions.push(key);
-                    } else {
-                      timeDimensions.push({
-                        dimension: key,
-                        granularity: granularityName,
-                        ...(dateRangeFilters[key] ? {
-                          dateRange: dateRangeFilters[key],
-                        } : null)
-                      });
-                    }
-                  });
-                } else {
-                  dimensions.push(`${cubeName}.${memberName}`);
+                if (groupBy.includes(memberName)) {  // only add the dimension if it's in the groupBy arg
+                  const granularityNodes = getFieldNodeChildren(memberNode, infos);
+                  if (granularityNodes.length > 0) {
+                    granularityNodes.forEach(granularityNode => {
+                      const granularityName = granularityNode.name.value;
+                      if (granularityName === 'value') {
+                        dimensions.push(key);
+                      } else {
+                        timeDimensions.push({
+                          dimension: key,
+                          granularity: granularityName,
+                          ...(dateRangeFilters[key] ? {
+                            dateRange: dateRangeFilters[key],
+                          } : null)
+                        });
+                      }
+                    });
+                  } else {
+                    dimensions.push(`${cubeName}.${memberName}`);
+                  }
                 }
               }
             });
