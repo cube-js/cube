@@ -3,7 +3,7 @@ import * as t from '@babel/types';
 import { parse } from '@babel/parser';
 import babelGenerator from '@babel/generator';
 import babelTraverse from '@babel/traverse';
-import { JinjaEngine, newJinjaEngine } from '@cubejs-backend/native';
+import { JinjaEngine, NativeInstance } from '@cubejs-backend/native';
 
 import type { FileContent } from '@cubejs-backend/shared';
 
@@ -29,7 +29,11 @@ export class YamlCompiler {
 
   protected jinjaEngine: JinjaEngine | null = null;
 
-  public constructor(private cubeSymbols: CubeSymbols, private cubeDictionary: CubeDictionary) {
+  public constructor(
+    private readonly cubeSymbols: CubeSymbols,
+    private readonly cubeDictionary: CubeDictionary,
+    private readonly nativeInstance: NativeInstance,
+  ) {
   }
 
   protected getJinjaEngine(): JinjaEngine {
@@ -37,17 +41,28 @@ export class YamlCompiler {
       return this.jinjaEngine;
     }
 
-    this.jinjaEngine = newJinjaEngine({
+    this.jinjaEngine = this.nativeInstance.newJinjaEngine({
       debugInfo: getEnv('devMode'),
     });
 
     return this.jinjaEngine;
   }
 
-  public compileYamlWithJinjaFile(file: FileContent, errorsReport: ErrorReporter, cubes, contexts, exports, asyncModules, toCompile, compiledFiles, compileContext) {
+  public compileYamlWithJinjaFile(
+    file: FileContent,
+    errorsReport: ErrorReporter,
+    cubes,
+    contexts,
+    exports,
+    asyncModules,
+    toCompile,
+    compiledFiles,
+    compileContext,
+    pythonContext
+  ) {
     const compiledFile = {
       fileName: file.fileName,
-      content: this.getJinjaEngine().renderTemplate(file.fileName, compileContext),
+      content: this.getJinjaEngine().renderTemplate(file.fileName, compileContext, pythonContext),
     };
 
     return this.compileYamlFile(
