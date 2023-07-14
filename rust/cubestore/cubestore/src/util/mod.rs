@@ -1,4 +1,5 @@
 pub mod aborting_join_handle;
+pub mod batch_memory;
 pub mod decimal;
 pub mod error;
 pub mod lock;
