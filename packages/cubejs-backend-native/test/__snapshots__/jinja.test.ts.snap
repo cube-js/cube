@@ -232,6 +232,7 @@ exports[`Jinja render template_error.jinja: template_error.jinja 1`] = `
    7 | 7
    8 | {%- for country in countries %}
    9 | 9
+  10 > {%- unexpected_block_name %}
      i ^^^^^^^^^^^^^^^^^^^^^^^^ syntax error
   11 | 11
   12 | 12
