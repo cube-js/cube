@@ -580,7 +580,7 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
               if (memberType === MemberType.MEASURES) {
                 measures.push(key);
               } else if (memberType === MemberType.DIMENSIONS) {
-                if (groupBy.includes(memberName)) {  // only add the dimension if it's in the groupBy arg
+                if (groupBy.length > 0 && groupBy.includes(memberName)) {  // only add the dimension if it's in the groupBy arg
                   const granularityNodes = getFieldNodeChildren(memberNode, infos);
                   if (granularityNodes.length > 0) {
                     granularityNodes.forEach(granularityNode => {
