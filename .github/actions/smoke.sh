@@ -52,3 +52,7 @@ echo "::endgroup::"
 echo "::group::MS SQL"
 yarn lerna run --concurrency 1 --stream --no-prefix smoke:mssql
 echo "::endgroup::"
+
+echo "::group::MongoBI"
+yarn lerna run --concurrency 1 --stream --no-prefix smoke:mongobi
+echo "::endgroup::"

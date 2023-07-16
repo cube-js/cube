@@ -9,7 +9,11 @@ describe('MongoBiDriver', () => {
   jest.setTimeout(2 * 60 * 1000);
 
   beforeAll(async () => {
+    const MONGO_TAG = process.env.TEST_MONGO_TAG || '6.0';
+    const MONGOBI_VERSION = process.env.TEST_MONGOBI_VERSION || 'mongodb-bi-linux-x86_64-ubuntu2004-v2.14.8';
+
     environment = await new DockerComposeEnvironment('./test', 'docker-compose.yml')
+      .withEnvironment({ MONGO_TAG, MONGOBI_VERSION })
       .withWaitStrategy('mongosqld', Wait.forLogMessage('obtained initial schema'))
       .up();
 

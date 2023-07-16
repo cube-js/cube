@@ -2,7 +2,7 @@ version: '3'
 
 services:
   mongo:
-    image: mongo:6.0
+    image: mongo:${MONGO_TAG}
     ports:
       - 27017:27017
     volumes:
@@ -10,7 +10,10 @@ services:
         
   mongosqld:
     container_name: mongosqld
-    build: ./
+    build: 
+      context: ./
+      args:
+        MONGOBI: ${MONGOBI_VERSION}
     ports:
       - 3307:3307
     depends_on:
