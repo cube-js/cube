@@ -140,37 +140,37 @@ const overrides: Record<string, Override> = {
     path: "product/getting-started/cloud",
     title: "Getting started with Cube Cloud",
   },
-  "Getting-Started/Cloud/02-Create-a-deployment.mdx": {
+  "Getting-Started/Cloud/02-Load data.mdx": {
     ready: true,
-    path: "product/getting-started/cloud/create-a-deployment",
-    title: "Create a deployment",
+    path: "product/getting-started/cloud/load-data",
+    title: "Load data",
     meta: {
-      "create-a-deployment": "Create a deployment",
-      "generate-models": "Generate models",
-      "query-data": "Query data",
-      "add-a-pre-aggregation": "Add a pre-aggregation",
-      "learn-more": "Learn more",
+      "load-data": "Load data",
+      "connect-to-snowflake": "Connect to Snowflake",
+      "create-data-model": "Create data model",
+      "query-from-bi": "Query from BI",
+      "query-from-react-app": "Query from React",
     },
   },
-  "Getting-Started/Cloud/03-Generate-models.mdx": {
+  "Getting-Started/Cloud/03-Connect-to-Snowflake.mdx": {
     ready: true,
-    path: "product/getting-started/cloud/generate-models",
-    title: "Generate models",
+    path: "product/getting-started/cloud/connect-to-snowflake",
+    title: "Connect to Snowflake",
   },
-  "Getting-Started/Cloud/04-Query-data.mdx": {
+  "Getting-Started/Cloud/04-Create-data-model.mdx": {
     ready: true,
-    path: "product/getting-started/cloud/query-data",
-    title: "Query data",
+    path: "product/getting-started/cloud/create-data-model",
+    title: "Create your first data model",
   },
-  "Getting-Started/Cloud/05-Add-a-pre-aggregation.mdx": {
+  "Getting-Started/Cloud/05-Query-from-BI.mdx": {
     ready: true,
-    path: "product/getting-started/cloud/add-a-pre-aggregation",
-    title: "Add a pre-aggregation",
+    path: "product/getting-started/cloud/query-from-bi",
+    title: "Query from a BI tool",
   },
-  "Getting-Started/Cloud/06-Learn-more.mdx": {
+  "Getting-Started/Cloud/06-Query-from-React.mdx": {
     ready: true,
-    path: "product/getting-started/cloud/learn-more",
-    title: "Learn more",
+    path: "product/getting-started/cloud/query-from-react-app",
+    title: "Query from a React app",
   },
 
   "Getting-Started/Migrate-from-Core/Upload-with-CLI.mdx": {
