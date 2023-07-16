@@ -1,0 +1,33 @@
+.diagram {
+  position: relative;
+  width: 100%;
+  margin: 1.5rem 0;
+  overflow: hidden;
+
+  > img {
+    margin: 0;
+  }
+}
+
+.screenshot {
+  position: relative;
+  width: 100%;
+  border: 1px solid var(--dark_05);
+  border-radius: 6px;
+  filter: drop-shadow(0px 0px 24px rgba(15, 15, 35, 0.12));
+  margin: 1.5rem 0;
+  overflow: hidden;
+
+  > img {
+    margin: 0;
+  }
+}
+
+.highlight {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  background-repeat: no-repeat;
+  background-size: contain;
+  z-index: 9999;
+}

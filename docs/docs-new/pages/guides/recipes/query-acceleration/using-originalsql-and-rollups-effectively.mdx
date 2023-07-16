@@ -3,7 +3,8 @@ redirect_from:
   - /recipes/using-originalsql-and-rollups-effectively
 ---
 
-# using-originalsql-and-rollups-effectively
+# Using originalSql and rollup pre-aggregations effectively
+
 ## Use case
 
 For cubes that are built from an expensive SQL query, we can optimize
@@ -47,7 +48,7 @@ cubes:
 ```
 
 ```javascript
-cube('orders', {
+cube("orders", {
   sql: `<YOUR_EXPENSIVE_SQL_QUERY HERE>`,
 
   pre_aggregations: {
@@ -66,7 +67,7 @@ cube('orders', {
   },
 
   // ...
-})
+});
 ```
 
 </CodeTabs>
@@ -77,6 +78,6 @@ With the above data model, the `main` pre-aggregation is built from the `base`
 pre-aggregation.
 
 [ref-schema-ref-preaggs-type-origsql]:
-  /schema/reference/pre-aggregations#parameters-type-originalsql
+  /product/data-modeling/reference/pre-aggregations#parameters-type-originalsql
 [ref-schema-ref-preaggs-use-origsql]:
   https://cube.dev/docs/schema/reference/pre-aggregations#use-original-sql-pre-aggregations

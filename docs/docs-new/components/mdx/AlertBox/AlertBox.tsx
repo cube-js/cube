@@ -31,9 +31,21 @@ const typeMapping: Record<AlertBoxTypes, CalloutType> = {
   success: 'default',
 }
 
+const iconMapping: Record<string, any> = {
+  'danger': '🚫',
+  info: 'ℹ️',
+  warning: '⚠️',
+  success: '✅',
+};
+
 export const AlertBox = ({ children, heading, type }: AlertBoxProps) => {
   const header = heading
-    ? <div className={classes.AlertBox__header}>{heading}</div>
+    ? (
+      <div className={classes.AlertBox__header}>
+        <span className={cn('AlertBox__HeaderIcon')}>{iconMapping[type]}</span>
+        {heading}
+      </div>
+    )
     : null;
 
   return (
