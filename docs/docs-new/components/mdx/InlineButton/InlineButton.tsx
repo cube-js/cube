@@ -1,5 +1,5 @@
 import React from "react";
-import classes from "./InlineButton.module.css";
+import classes from "./InlineButton.module.scss";
 
 export type InlineButtonProps = {
   children: string;

@@ -3,6 +3,60 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.36](https://github.com/cube-js/cube/compare/v0.33.35...v0.33.36) (2023-07-13)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+
+
+
+
+## [0.33.35](https://github.com/cube-js/cube/compare/v0.33.34...v0.33.35) (2023-07-12)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+
+
+
+
+## [0.33.34](https://github.com/cube-js/cube/compare/v0.33.33...v0.33.34) (2023-07-12)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+
+
+
+
+## [0.33.33](https://github.com/cube-js/cube.js/compare/v0.33.32...v0.33.33) (2023-07-08)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+
+
+
+
+## [0.33.32](https://github.com/cube-js/cube.js/compare/v0.33.31...v0.33.32) (2023-07-07)
+
+
+### Bug Fixes
+
+* **databricks-jdbc-driver:** Return NULL as NULL instead of false for boolean ([#6791](https://github.com/cube-js/cube.js/issues/6791)) ([7eb02f5](https://github.com/cube-js/cube.js/commit/7eb02f569464d801ec71215503bc9b3679b5e856))
+
+
+
+
+
+## [0.33.31](https://github.com/cube-js/cube.js/compare/v0.33.30...v0.33.31) (2023-07-01)
+
+
+### Bug Fixes
+
+* **databricks-jdbc-driver:** Return NULL decimal as NULL instead of 0 ([#6768](https://github.com/cube-js/cube.js/issues/6768)) ([c2ab19d](https://github.com/cube-js/cube.js/commit/c2ab19d86d6144e4f91f9e8fb681e17e87bfcef3))
+
+
+
+
+
 ## [0.33.29](https://github.com/cube-js/cube/compare/v0.33.28...v0.33.29) (2023-06-20)
 
 **Note:** Version bump only for package @cubejs-backend/testing-drivers

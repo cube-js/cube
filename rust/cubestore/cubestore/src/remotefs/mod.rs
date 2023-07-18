@@ -1,3 +1,4 @@
+pub mod cleanup;
 pub mod gcs;
 pub mod minio;
 pub mod queue;

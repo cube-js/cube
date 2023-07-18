@@ -4,6 +4,7 @@ redirect_from:
 ---
 
 # SQL Runner
+
 The SQL Runner is a tool that allows you to execute SQL queries from Cube Cloud
 on your data source or Cube Store. It can be used to inform the development of
 the data model, for ad-hoc querying as well as debugging SQL queries generated
@@ -16,7 +17,12 @@ The SQL Runner is available in Cube Cloud on
 
 </SuccessBox>
 
-<Screenshot src="https://ucarecdn.com/6d443059-b990-4735-81c1-78a490aa2f25/" />
+<video width="100%" controls>
+  <source
+    src="https://ucarecdn.com/8cbdd639-e86b-4190-bbaa-37122c39bc01/video.mp4"
+    type="video/mp4"
+  />
+</video>
 
 ## Executing queries
 
@@ -57,10 +63,12 @@ will be executed with the default security context. If one is provided, then the
 **Schema Explorer** will reload to reflect the data source available to the
 security context.
 
-[ref-conf-ref-driverfactory]: /config#options-reference-driver-factory
-[ref-recipe-multi-src-same-model]: /recipes/multiple-sources-same-schema
+[ref-conf-ref-driverfactory]:
+  /reference/configuration/config#options-reference-driver-factory
+[ref-recipe-multi-src-same-model]:
+  /guides/recipes/data-sources/multiple-sources-same-schema
 
-###  Scheduled Refresh Contexts
+### Scheduled Refresh Contexts
 
 If you have configured
 [`scheduledRefreshContexts`][ref-conf-scheduled-refresh-ctx] in your deployment,
@@ -70,7 +78,7 @@ select an existing context:
 
 <Screenshot src="https://ucarecdn.com/f3664be8-8214-4b27-88bb-f8cd85fc934f/" />
 
-###  Custom Contexts
+### Custom Contexts
 
 The SQL Runner also allows providing an ad-hoc security context as a JSON
 string. From the same dropdown under **Security Context**, click the <Btn>Custom
@@ -92,4 +100,4 @@ in a data model should be a `numeric`).
 
 [cubecloud-signup]: https://cubecloud.dev/auth/signup
 [ref-conf-scheduled-refresh-ctx]:
-  /config#options-reference-scheduled-refresh-contexts
+  /reference/configuration/config#options-reference-scheduled-refresh-contexts

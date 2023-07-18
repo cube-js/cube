@@ -3,6 +3,75 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.36](https://github.com/cube-js/cube/compare/v0.33.35...v0.33.36) (2023-07-13)
+
+
+### Features
+
+* **schema:** Support passing arguments for [@context](https://github.com/context)_func in jinja templates ([#6882](https://github.com/cube-js/cube/issues/6882)) ([25f149a](https://github.com/cube-js/cube/commit/25f149aaa1d028c671e37612c819aa211117b026))
+
+
+
+
+
+## [0.33.35](https://github.com/cube-js/cube/compare/v0.33.34...v0.33.35) (2023-07-12)
+
+**Note:** Version bump only for package cubejs
+
+
+
+
+
+## [0.33.34](https://github.com/cube-js/cube/compare/v0.33.33...v0.33.34) (2023-07-12)
+
+
+### Features
+
+* **schema:** Support python [@context](https://github.com/context)_func for jinja templates ([#6729](https://github.com/cube-js/cube/issues/6729)) ([2f2be58](https://github.com/cube-js/cube/commit/2f2be58d49e4baf2b389a94ba2c782f8579022ab))
+
+
+
+
+
+## [0.33.33](https://github.com/cube-js/cube/compare/v0.33.32...v0.33.33) (2023-07-08)
+
+
+### Features
+
+* **schema:** Support multitenancy for jinja templates ([#6793](https://github.com/cube-js/cube/issues/6793)) ([fb59e59](https://github.com/cube-js/cube/commit/fb59e590b09e13bfaecb794a9db7d0b861f38d3f))
+
+
+
+
+
+## [0.33.32](https://github.com/cube-js/cube/compare/v0.33.31...v0.33.32) (2023-07-07)
+
+
+### Bug Fixes
+
+* **databricks-jdbc-driver:** Return NULL as NULL instead of false for boolean ([#6791](https://github.com/cube-js/cube/issues/6791)) ([7eb02f5](https://github.com/cube-js/cube/commit/7eb02f569464d801ec71215503bc9b3679b5e856))
+
+
+### Features
+
+* **docker:** Upgrade Node.js to 16.20.1 ([#6789](https://github.com/cube-js/cube/issues/6789)) ([5da7562](https://github.com/cube-js/cube/commit/5da7562013b6696d3c5da96112990fc8d48290ce))
+
+
+
+
+
+## [0.33.31](https://github.com/cube-js/cube/compare/v0.33.30...v0.33.31) (2023-07-01)
+
+
+### Bug Fixes
+
+* **cubestore:** FreeInMemoryChunks fires if there is no inmemory chunks ([#6771](https://github.com/cube-js/cube/issues/6771)) ([f9cfd77](https://github.com/cube-js/cube/commit/f9cfd770a646f45c44e554d5b16ba2cddd8b1c48))
+* **databricks-jdbc-driver:** Return NULL decimal as NULL instead of 0 ([#6768](https://github.com/cube-js/cube/issues/6768)) ([c2ab19d](https://github.com/cube-js/cube/commit/c2ab19d86d6144e4f91f9e8fb681e17e87bfcef3))
+
+
+
+
+
 ## [0.33.30](https://github.com/cube-js/cube/compare/v0.33.29...v0.33.30) (2023-06-23)
 
 
