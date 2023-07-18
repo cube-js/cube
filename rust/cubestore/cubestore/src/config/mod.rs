@@ -1,11 +1,11 @@
-#![allow(deprecated)] // 'vtable' and 'TraitObject' are deprecated.
+#![allow(deprecated)] // 'vtable' and 'TraitObject' are deprecated.confi
 pub mod injection;
 pub mod processing_loop;
 
 use crate::cachestore::{
     CacheStore, CacheStoreSchedulerImpl, ClusterCacheStoreClient, LazyRocksCacheStore,
 };
-use crate::cluster::rate_limiter::{ProcessRateLimiter, ProcessRateLimiterImpl};
+use crate::cluster::rate_limiter::{BasicProcessRateLimiter, ProcessRateLimiter};
 use crate::cluster::transport::{
     ClusterTransport, ClusterTransportImpl, MetaStoreTransport, MetaStoreTransportImpl,
 };
@@ -1758,17 +1758,7 @@ impl Config {
 
         self.injector
             .register_typed::<dyn ProcessRateLimiter, _, _, _>(async move |_| {
-                ProcessRateLimiterImpl::new(
-                    env_parse(
-                        "CUBESTORE_DATA_PROCESSING_RATE_LIMIT",
-                        1 * 1024 * 1024 * 1024,
-                    ),
-                    env_parse(
-                        "CUBESTORE_DATA_PROCESSING_RATE_BURST",
-                        50 * 1024 * 1024 * 1024,
-                    ),
-                    env_parse("CUBESTORE_DATA_PROCESSING_RATE_DEPOSIT", 500 * 1024),
-                )
+                BasicProcessRateLimiter::new()
             })
             .await;
 

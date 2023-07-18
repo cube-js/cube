@@ -11,7 +11,7 @@ use crate::cluster::worker_pool::{worker_main, MessageProcessor, WorkerPool};
 
 use crate::ack_error;
 use crate::cluster::message::NetworkMessage;
-use crate::cluster::rate_limiter::ProcessRateLimiter;
+use crate::cluster::rate_limiter::{ProcessRateLimiter, TaskType};
 use crate::cluster::transport::{ClusterTransport, MetaStoreTransport, WorkerConnection};
 use crate::config::injection::{DIService, Injector};
 use crate::config::{is_router, WorkerServices};
@@ -914,16 +914,17 @@ impl JobRunner {
                     let compaction_service = self.compaction_service.clone();
                     let partition_id = *partition_id;
                     let process_rate_limiter = self.process_rate_limiter.clone();
+                    let timeout = Some(Duration::from_secs(self.config_obj.import_job_timeout()));
                     Ok(cube_ext::spawn(async move {
                         process_rate_limiter
-                            .wait_for_allow(Some(Duration::from_secs(120)))
+                            .wait_for_allow(TaskType::Job, timeout)
                             .await?; //TODO config, may be same ad orphaned timeout
                         let data_loaded_size = DataLoadedSize::new();
                         let res = compaction_service
                             .compact(partition_id, data_loaded_size.clone())
                             .await;
                         process_rate_limiter
-                            .commit_task_usage(data_loaded_size.get() as i64)
+                            .commit_task_usage(TaskType::Job, data_loaded_size.get() as i64)
                             .await;
                         res
                     }))
@@ -1006,6 +1007,7 @@ impl JobRunner {
                     let import_service = self.import_service.clone();
                     let location = location.to_string();
                     let process_rate_limiter = self.process_rate_limiter.clone();
+                    let timeout = Some(Duration::from_secs(self.config_obj.import_job_timeout()));
                     Ok(cube_ext::spawn(async move {
                         let is_streaming = Table::is_stream_location(&location);
                         let data_loaded_size = if is_streaming {
@@ -1015,7 +1017,7 @@ impl JobRunner {
                         };
                         if !is_streaming {
                             process_rate_limiter
-                                .wait_for_allow(Some(Duration::from_secs(120)))
+                                .wait_for_allow(TaskType::Job, timeout)
                                 .await?; //TODO config, may be same ad orphaned timeout
                         }
                         let res = import_service
@@ -1024,7 +1026,7 @@ impl JobRunner {
                             .await;
                         if let Some(data_loaded) = &data_loaded_size {
                             process_rate_limiter
-                                .commit_task_usage(data_loaded.get() as i64)
+                                .commit_task_usage(TaskType::Job, data_loaded.get() as i64)
                                 .await;
                         }
                         res
@@ -1038,16 +1040,17 @@ impl JobRunner {
                     let chunk_store = self.chunk_store.clone();
                     let chunk_id = *chunk_id;
                     let process_rate_limiter = self.process_rate_limiter.clone();
+                    let timeout = Some(Duration::from_secs(self.config_obj.import_job_timeout()));
                     Ok(cube_ext::spawn(async move {
                         process_rate_limiter
-                            .wait_for_allow(Some(Duration::from_secs(120)))
+                            .wait_for_allow(TaskType::Job, timeout)
                             .await?; //TODO config, may be same ad orphaned timeout
                         let data_loaded_size = DataLoadedSize::new();
                         let res = chunk_store
                             .repartition_chunk(chunk_id, data_loaded_size.clone())
                             .await;
                         process_rate_limiter
-                            .commit_task_usage(data_loaded_size.get() as i64)
+                            .commit_task_usage(TaskType::Job, data_loaded_size.get() as i64)
                             .await;
                         res
                     }))
@@ -1377,18 +1380,23 @@ impl ClusterImpl {
         plan_node: SerializedPlan,
     ) -> Result<(SchemaRef, Vec<SerializedRecordBatchStream>), CubeError> {
         self.process_rate_limiter
-            .wait_for_allow(Some(Duration::from_secs(self.config_obj.query_timeout())))
+            .wait_for_allow(
+                TaskType::Job,
+                Some(Duration::from_secs(self.config_obj.query_timeout())),
+            )
             .await?;
         let res = self.run_local_select_worker_impl(plan_node).await;
         match res {
             Ok((schema, records, data_loaded_size)) => {
                 self.process_rate_limiter
-                    .commit_task_usage(data_loaded_size as i64)
+                    .commit_task_usage(TaskType::Select, data_loaded_size as i64)
                     .await;
                 Ok((schema, records))
             }
             Err(e) => {
-                self.process_rate_limiter.commit_task_usage(0).await;
+                self.process_rate_limiter
+                    .commit_task_usage(TaskType::Select, 0)
+                    .await;
                 Err(e)
             }
         }
