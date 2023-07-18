@@ -166,6 +166,8 @@ export type DownloadQueryResultsResult = DownloadQueryResultsBase & (DownloadTab
 // eslint-disable-next-line camelcase
 export type TableQueryResult = { table_name?: string, TABLE_NAME?: string };
 
+export type SchemaQueryResult = { schemaName: string };
+
 export interface DriverInterface {
   createSchemaIfNotExists(schemaName: string): Promise<void>;
   uploadTableWithIndexes(
@@ -179,6 +181,8 @@ export interface DriverInterface {
   queryColumnTypes: (sql: string, params?: unknown[]) => Promise<{ name: any; type: string; }[]>;
   // eslint-disable-next-line camelcase
   getTablesQuery: (schemaName: string) => Promise<TableQueryResult[]>;
+  // Returns all schemas for current database
+  getSchemasQuery: () => Promise<SchemaQueryResult[]>;
   // Remove table from database
   dropTable: (tableName: string, options?: QueryOptions) => Promise<unknown>;
   // Download data from Query (for readOnly)

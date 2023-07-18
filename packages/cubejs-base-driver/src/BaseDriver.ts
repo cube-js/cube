@@ -77,6 +77,8 @@ const DB_BIG_INT_MIN = BigInt('-9223372036854775808');
 const DB_INT_MAX = 2147483647;
 const DB_INT_MIN = -2147483648;
 
+const IGNORED_DB_SCHEMAS = ['information_schema', 'mysql', 'performance_schema', 'sys', 'INFORMATION_SCHEMA'];
+
 // Order of keys is important here: from more specific to less specific
 const DbTypeValueMatcher: Record<string, ((v: any) => boolean)> = {
   timestamp: (v) => v instanceof Date || v.toString().match(/^\d\d\d\d-\d\d-\d\dT\d\d:\d\d:\d\d/),
@@ -147,7 +149,7 @@ export abstract class BaseDriver implements DriverInterface {
              columns.table_schema as ${this.quoteIdentifier('table_schema')},
              columns.data_type as ${this.quoteIdentifier('data_type')}
       FROM information_schema.columns
-      WHERE columns.table_schema NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys', 'INFORMATION_SCHEMA')
+      WHERE columns.table_schema NOT IN (${this.getIgnoredSchemas()})
    `;
   }
 
@@ -306,6 +308,12 @@ export abstract class BaseDriver implements DriverInterface {
     );
   }
 
+  public getSchemasQuery() {
+    return this.query<{ schemaName: string }>(
+      `SELECT schema_name FROM information_schema.schemata WHERE schema_name NOT IN (${this.getIgnoredSchemas()}))`,
+    );
+  }
+
   public loadPreAggregationIntoTable(_preAggregationTableName: string, loadSql: string, params: any, options: any) {
     return this.query(loadSql, params, options);
   }
@@ -407,6 +415,10 @@ export abstract class BaseDriver implements DriverInterface {
     return `"${identifier}"`;
   }
 
+  protected singleQuoteIdentifier(identifier: string): string {
+    return `'${identifier}'`;
+  }
+
   protected cancelCombinator(fn: any) {
     return cancelCombinator(fn);
   }
@@ -446,5 +458,9 @@ export abstract class BaseDriver implements DriverInterface {
 
   public wrapQueryWithLimit(query: { query: string, limit: number}) {
     query.query = `SELECT * FROM (${query.query}) AS t LIMIT ${query.limit}`;
+  }
+
+  protected getIgnoredSchemas() {
+    return IGNORED_DB_SCHEMAS.map(schema => this.singleQuoteIdentifier(schema)).join(', ');
   }
 }
