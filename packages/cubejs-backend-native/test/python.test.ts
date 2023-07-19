@@ -6,29 +6,29 @@ import { PyConfiguration } from '../js';
 
 const suite = native.isFallbackBuild() ? xdescribe : describe;
 
-suite('Python', () => {
-  async function loadConfigurationFile() {
-    const content = await fs.readFile(path.join(process.cwd(), 'test', 'config.py'), 'utf8');
-    console.log('content', {
-      content
-    });
+async function loadConfigurationFile(fileName: string) {
+  const content = await fs.readFile(path.join(process.cwd(), 'test', fileName), 'utf8');
+  console.log('content', {
+    content
+  });
 
-    const config = await native.pythonLoadConfig(
-      content,
-      {
-        file: 'config.py'
-      }
-    );
+  const config = await native.pythonLoadConfig(
+    content,
+    {
+      file: 'config.py'
+    }
+  );
 
-    console.log('loaded config', config);
+  console.log('loaded config', config);
 
-    return config;
-  }
+  return config;
+}
 
+suite('Python Config', () => {
   let config: PyConfiguration;
 
   beforeAll(async () => {
-    config = await loadConfigurationFile();
+    config = await loadConfigurationFile('config.py');
   });
 
   test('async checkAuth', async () => {
@@ -88,6 +88,29 @@ suite('Python', () => {
 
     expect(await config.queryRewrite(input, {})).toEqual(
       input
+    );
+  });
+});
+
+suite('Scoped Python Config', () => {
+  test('test', async () => {
+    const config = await loadConfigurationFile('scoped-config.py');
+    expect(config).toEqual({
+      schemaPath: 'models',
+      pgSqlPort: 5555,
+      telemetry: false,
+      contextToApiScopes: expect.any(Function),
+      checkAuth: expect.any(Function),
+      queryRewrite: expect.any(Function),
+    });
+
+    if (!config.checkAuth) {
+      throw new Error('checkAuth was not defined in config.py');
+    }
+
+    await config.checkAuth(
+      { requestId: 'test' },
+      'MY_SECRET_TOKEN'
     );
   });
 });

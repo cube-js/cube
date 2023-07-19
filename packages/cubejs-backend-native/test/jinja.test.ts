@@ -13,8 +13,8 @@ function loadTemplateFile(engine: native.JinjaEngine, fileName: string): void {
   engine.loadTemplate(fileName, content);
 }
 
-async function loadPythonCtxFromUtils() {
-  const content = fs.readFileSync(path.join(process.cwd(), 'test', 'templates', 'utils.py'), 'utf8');
+async function loadPythonCtxFromUtils(fileName: string) {
+  const content = fs.readFileSync(path.join(process.cwd(), 'test', 'templates', fileName), 'utf8');
   return nativeInstance.loadPythonContext(
     'utils.py',
     content
@@ -31,7 +31,7 @@ function testTemplateBySnapshot(engine: JinjaEngine, templateName: string, ctx: 
 
 function testTemplateWithPythonCtxBySnapshot(engine: JinjaEngine, templateName: string, ctx: unknown) {
   test(`render ${templateName}`, async () => {
-    const actual = engine.renderTemplate(templateName, ctx, await loadPythonCtxFromUtils());
+    const actual = engine.renderTemplate(templateName, ctx, await loadPythonCtxFromUtils('utils.py'));
 
     expect(actual).toMatchSnapshot(templateName);
   });
@@ -51,7 +51,20 @@ function testLoadBrokenTemplateBySnapshot(engine: JinjaEngine, templateName: str
 
 suite('Python models', () => {
   it('load utils.py', async () => {
-    const pythonModule = await loadPythonCtxFromUtils();
+    const pythonModule = await loadPythonCtxFromUtils('utils.py');
+
+    expect(pythonModule).toEqual({
+      load_data: expect.any(Object),
+      load_data_sync: expect.any(Object),
+      arg_bool: expect.any(Object),
+      arg_sum_integers: expect.any(Object),
+      arg_str: expect.any(Object),
+      arg_null: expect.any(Object),
+    });
+  });
+
+  it('load scoped-utils.py', async () => {
+    const pythonModule = await loadPythonCtxFromUtils('scoped-utils.py');
 
     expect(pythonModule).toEqual({
       load_data: expect.any(Object),
