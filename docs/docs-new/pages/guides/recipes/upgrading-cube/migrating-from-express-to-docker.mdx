@@ -4,6 +4,7 @@ redirect_from:
 ---
 
 # Migrating from Express to Docker
+
 Since [`v0.23`][link-v-023-release], Cube CLI uses the `docker` template instead
 of `express` as a default for project creation, and it is the recommended route
 for production. To migrate you should move all Cube dependencies in
@@ -52,7 +53,7 @@ You should also rename your `index.js` file to `cube.js` and replace the
 For an `index.js` like the following:
 
 ```javascript
-const CubejsServer = require('@cubejs-backend/server');
+const CubejsServer = require("@cubejs-backend/server");
 
 const server = new CubejsServer({
   logger: (msg, params) => {
@@ -66,7 +67,7 @@ server
     console.log(`🚀 Cube API server (${version}) is listening on ${port}`);
   })
   .catch((e) => {
-    console.error('Fatal error during server start: ');
+    console.error("Fatal error during server start: ");
     console.error(e.stack || e);
   });
 ```
@@ -85,7 +86,7 @@ Finally, add a `docker-compose.yml` file alongside the `cube.js` configuration
 file:
 
 ```yaml
-version: '2.2'
+version: "2.2"
 
 services:
   cube:

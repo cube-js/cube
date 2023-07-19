@@ -336,6 +336,12 @@ To learn more about using `public` to control visibility based on security
 context, read the [Controlling access to cubes and views
 recipe][ref-recipe-control-access-cubes-views].
 
+## Using views with pre-aggregations
+
+Pre-aggregations defined for original Cube members would still work when used in view queries.
+Please note that pre-aggregations use the same leaf members matching algorithm used for Cubes.
+As a consequence, all measures and dimensions included in pre-aggregation should be leaf members in order to be matched by view query.
+
 [ref-recipe-control-access-cubes-views]:
   /recipes/controlling-access-to-cubes-and-views
 [ref-schema-joins-direction]: /schema/fundamentals/joins#directions-of-joins

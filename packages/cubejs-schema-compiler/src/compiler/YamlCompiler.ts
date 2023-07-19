@@ -3,10 +3,11 @@ import * as t from '@babel/types';
 import { parse } from '@babel/parser';
 import babelGenerator from '@babel/generator';
 import babelTraverse from '@babel/traverse';
-import { renderTemplate } from '@cubejs-backend/native';
+import { JinjaEngine, NativeInstance } from '@cubejs-backend/native';
 
 import type { FileContent } from '@cubejs-backend/shared';
 
+import { getEnv } from '@cubejs-backend/shared';
 import { CubePropContextTranspiler, transpiledFields, transpiledFieldsPatterns } from './transpilers';
 import { PythonParser } from '../parser/PythonParser';
 import { CubeSymbols } from './CubeSymbols';
@@ -26,13 +27,42 @@ type EscapeStateStack = {
 export class YamlCompiler {
   public dataSchemaCompiler: DataSchemaCompiler | null = null;
 
-  public constructor(private cubeSymbols: CubeSymbols, private cubeDictionary: CubeDictionary) {
+  protected jinjaEngine: JinjaEngine | null = null;
+
+  public constructor(
+    private readonly cubeSymbols: CubeSymbols,
+    private readonly cubeDictionary: CubeDictionary,
+    private readonly nativeInstance: NativeInstance,
+  ) {
   }
 
-  public compileYamlWithJinjaFile(file: FileContent, errorsReport: ErrorReporter, cubes, contexts, exports, asyncModules, toCompile, compiledFiles, compileContext) {
+  protected getJinjaEngine(): JinjaEngine {
+    if (this.jinjaEngine) {
+      return this.jinjaEngine;
+    }
+
+    this.jinjaEngine = this.nativeInstance.newJinjaEngine({
+      debugInfo: getEnv('devMode'),
+    });
+
+    return this.jinjaEngine;
+  }
+
+  public compileYamlWithJinjaFile(
+    file: FileContent,
+    errorsReport: ErrorReporter,
+    cubes,
+    contexts,
+    exports,
+    asyncModules,
+    toCompile,
+    compiledFiles,
+    compileContext,
+    pythonContext
+  ) {
     const compiledFile = {
       fileName: file.fileName,
-      content: renderTemplate(file.fileName, compileContext),
+      content: this.getJinjaEngine().renderTemplate(file.fileName, compileContext, pythonContext),
     };
 
     return this.compileYamlFile(

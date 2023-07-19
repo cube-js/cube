@@ -3,6 +3,49 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.36](https://github.com/cube-js/cube/compare/v0.33.35...v0.33.36) (2023-07-13)
+
+**Note:** Version bump only for package @cubejs-backend/docker
+
+
+
+
+
+## [0.33.35](https://github.com/cube-js/cube/compare/v0.33.34...v0.33.35) (2023-07-12)
+
+**Note:** Version bump only for package @cubejs-backend/docker
+
+
+
+
+
+## [0.33.34](https://github.com/cube-js/cube/compare/v0.33.33...v0.33.34) (2023-07-12)
+
+**Note:** Version bump only for package @cubejs-backend/docker
+
+
+
+
+
+## [0.33.33](https://github.com/cube-js/cube.js/compare/v0.33.32...v0.33.33) (2023-07-08)
+
+**Note:** Version bump only for package @cubejs-backend/docker
+
+
+
+
+
+## [0.33.32](https://github.com/cube-js/cube.js/compare/v0.33.31...v0.33.32) (2023-07-07)
+
+
+### Features
+
+* **docker:** Upgrade Node.js to 16.20.1 ([#6789](https://github.com/cube-js/cube.js/issues/6789)) ([5da7562](https://github.com/cube-js/cube.js/commit/5da7562013b6696d3c5da96112990fc8d48290ce))
+
+
+
+
+
 ## [0.33.31](https://github.com/cube-js/cube.js/compare/v0.33.30...v0.33.31) (2023-07-01)
 
 **Note:** Version bump only for package @cubejs-backend/docker

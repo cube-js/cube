@@ -28,9 +28,6 @@ export function memberTitle(this: DeclarationReflection) {
 
 
   md.push(heading(headingLevel));
-  if (parentName) {
-    md.push(`<--{"id" : "${parentName}"}--> `);
-  }
   md.push(this.name);
   return md.join(' ');
 }

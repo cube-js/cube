@@ -3886,10 +3886,10 @@
   resolved "https://registry.yarnpkg.com/@cubejs-backend/dotenv/-/dotenv-9.0.2.tgz#c3679091b702f0fd38de120c5a63943fcdc0dcbf"
   integrity sha512-yC1juhXEjM7K97KfXubDm7WGipd4Lpxe+AT8XeTRE9meRULrKlw0wtE2E8AQkGOfTBn+P1SCkePQ/BzIbOh1VA==
 
-"@cubejs-backend/jdbc@^0.7.6":
-  version "0.7.6"
-  resolved "https://registry.yarnpkg.com/@cubejs-backend/jdbc/-/jdbc-0.7.6.tgz#b41ab040d3bf34db0e36979b6490ab76377408b6"
-  integrity sha512-Ngs1tlFsoxpsFcWSDK/WsQMX7F6erGw1MfbyphYWBJnTbZVsa3mkDObeHgzOSvCDhDYlFB4W0hDiJE+SR0loug==
+"@cubejs-backend/jdbc@^0.7.6-1":
+  version "0.7.6-1"
+  resolved "https://registry.yarnpkg.com/@cubejs-backend/jdbc/-/jdbc-0.7.6-1.tgz#b49af3a2b307492860e9c1fd4120543f6468f2e3"
+  integrity sha512-MbUmCtWDvPoGPItCJDAPAIat1dl8apZ9rS5RymBfaIHkJS9snEE7vS7opxtgAqMvsyWX+37FC+j6x5rNfFRrgw==
   dependencies:
     async "3.2.4"
     java "^0.12.2"

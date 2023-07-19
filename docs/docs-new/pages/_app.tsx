@@ -4,12 +4,19 @@ import "@/styles/globals.css";
 import "@/styles/palette.css";
 import "@/styles/typography.css";
 import "@/styles/math.css";
+import "@/styles/images.css";
 import "katex/dist/katex.min.css";
 import "@cube-dev/marketing-ui/dist/index.css";
 
 import localFont from "next/font/local";
 import { Inter } from "next/font/google";
 import { SearchProvider } from "@cube-dev/marketing-ui";
+
+export const SourceCodePro = localFont({
+  src: "../fonts/SourceCodePro-Regular.woff2",
+  weight: "400",
+  style: "normal",
+});
 
 export const JetBrainsMono = localFont({
   src: "../fonts/JetBrainsMono-Regular.woff2",
@@ -63,28 +70,10 @@ export default function MyApp({ Component, pageProps }: AppProps) {
       <style jsx global>{`
         :root {
           --font: ${inter.style.fontFamily};
-          --font-creapro: ${CeraPro.style.fontFamily};
+          --font-title: ${CeraPro.style.fontFamily};
           --font-mono: ${JetBrainsMono.style.fontFamily};
+          --font-code: ${SourceCodePro.style.fontFamily};
           --cube-font: ${CeraPro.style.fontFamily};
-        }
-
-        body {
-        }
-
-        h1,
-        h2,
-        h3,
-        h4,
-        h5,
-        h6 {
-          font-family: ${CeraPro.style.fontFamily};
-        }
-
-        code,
-        kbd,
-        samp,
-        pre {
-          font-family: var(--font-mono);
         }
       `}</style>
       <Component {...pageProps} />

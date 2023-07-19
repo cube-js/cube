@@ -4,6 +4,7 @@ redirect_from:
 ---
 
 # Production checklist
+
 <InfoBox>
 
 Thinking of migrating to the cloud instead? [Click
@@ -19,9 +20,10 @@ deployment.
 
 When running Cube in production environments, make sure development mode is
 disabled both on API Instances and Refresh Worker. Running Cube in development
-mode in a production environment can lead to security vulnerabilities. You can
-read more on the differences between [production and development mode
-here][link-cubejs-dev-vs-prod].
+mode in a production environment can lead to security vulnerabilities. Enabling
+Development Mode in Cube Cloud is not recommended. Development Mode will expose
+your data to the internet. You can read more on the differences between
+[production and development mode here][link-cubejs-dev-vs-prod].
 
 <InfoBox>
 
@@ -103,7 +105,7 @@ following sizing estimates are based on default settings and are very generic,
 which may not fit your Cube use case, so you should always tweak resources based
 on consumption patterns you see.
 
-###  Memory and CPU
+### Memory and CPU
 
 Each Cube cluster should contain at least 2 Cube API instances. Every Cube API
 instance should have at least 3GB of RAM and 2 CPU cores allocated for it.
@@ -125,37 +127,40 @@ allocated for it. Every Cube Store worker node should have at least 8GB of RAM
 and 4 CPU cores allocated for it. The Cube Store cluster should have at least
 two worker nodes.
 
-###  RPS and data volume
+### RPS and data volume
 
 Depending on data model size, every Core Cube API instance can serve 1 to 10
 requests per second. Every Core Cube Store router node can serve 50-100 queries
 per second. As a rule of thumb, you should provision 1 Cube Store worker node
 per one Cube Store partition or 1M of rows scanned in a query. For example if
 your queries scan 16M of rows per query, you should have at least 16 Cube Store
-worker nodes provisioned. `EXPLAIN ANALYZE` can be used to see partitions
-involved in a Cube Store query. Cube Cloud ballpark performance numbers can
-differ as it has different Cube runtime.
+worker nodes provisioned. Please note that the number of raw data rows doesn't
+usually equal the number of rows in pre-aggregation. At the same time, queries
+don't usually scan all the data in pre-aggregations, as Cube Store uses
+partition pruning to optimize queries. `EXPLAIN ANALYZE` can be used to see
+scanned partitions involved in a Cube Store query. Cube Cloud ballpark
+performance numbers can differ as it has different Cube runtime.
 
 [blog-migrate-to-cube-cloud]:
   https://cube.dev/blog/migrating-from-self-hosted-to-cube-cloud/
 [link-caddy]: https://caddyserver.com/
 [link-cube-cloud]: https://cubecloud.dev
-[link-cubejs-dev-vs-prod]: /configuration/overview#development-mode
+[link-cubejs-dev-vs-prod]: /product/configuration#development-mode
 [link-k8s-healthcheck-api]:
   https://kubernetes.io/docs/reference/using-api/health-checks/
 [link-kong]: https://konghq.com/kong/
 [link-nginx]: https://www.nginx.com/
 [link-nginx-docs]: https://nginx.org/en/docs/http/configuring_https_servers.html
 [ref-config-connect-db]: /connecting-to-the-database
-[ref-caching-cubestore]: /caching/running-in-production
+[ref-caching-cubestore]: /product/caching/running-in-production
 [ref-conf-ref-env-cachequeue-driver]:
-  /reference/environment-variables#cubejs-cache-and-queue-driver
+  /reference/configuration/environment-variables#cubejs-cache-and-queue-driver
 [ref-conf-ref-env-preaggs-schema]:
-  /reference/environment-variables#cubejs-pre-aggregations-schema
-[ref-env-vars]: /reference/environment-variables
-[ref-schema-ref-preaggs]: /schema/reference/pre-aggregations
-[ref-api-scheduled-refresh]: /rest-api#v-1-run-scheduled-refresh
-[ref-sec-ctx]: /security/context
-[ref-config-jwt]: /config#jwt
-[ref-api-readyz]: /rest-api#readyz
-[ref-api-livez]: /rest-api#livez
+  /reference/configuration/environment-variables#cubejs-pre-aggregations-schema
+[ref-env-vars]: /reference/configuration/environment-variables
+[ref-schema-ref-preaggs]: /product/data-modeling/reference/pre-aggregations
+[ref-api-scheduled-refresh]: /reference/rest-api#v-1-run-scheduled-refresh
+[ref-sec-ctx]: /product/auth/context
+[ref-config-jwt]: /reference/configuration/config#jwt
+[ref-api-readyz]: /reference/rest-api#readyz
+[ref-api-livez]: /reference/rest-api#livez

@@ -1,0 +1,18 @@
+.CloudPromoBlock__Wrapper {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  padding: 0.75rem 1rem;
+  background: linear-gradient(270.09deg, #F6E7FF 0.07%, #FFF2F6 99.94%);
+  border-radius: 0.5rem;
+  margin: 1.5rem 0;
+}
+
+.CloudPromoBlock__Logo {
+  margin-bottom: 0.25rem;
+}
+
+.CloudPromoBlock__Logo > img {
+  height: 2rem;
+  width: auto;
+}
