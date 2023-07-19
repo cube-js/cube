@@ -42,6 +42,7 @@ export interface AddToQueueOptions {
   stageQueryKey: string,
   requestId: string,
   orphanedTimeout?: number,
+  queueId?: QueueId,
 }
 
 export interface QueueDriverOptions {
@@ -100,5 +101,4 @@ export interface QueueDriverInterface {
   redisHash(queryKey: QueryKey): QueryKeyHash;
   createConnection(): Promise<QueueDriverConnectionInterface>;
   release(connection: QueueDriverConnectionInterface): void;
-  generateQueueId?: () => QueueId;
 }

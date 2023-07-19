@@ -327,10 +327,6 @@ export class CubeStoreQueueDriver implements QueueDriverInterface {
     protected readonly options: QueueDriverOptions
   ) {}
 
-  private counter = 0;
-
-  public generateQueueId = (): number => this.counter++;
-
   protected connection: CubeStoreDriver | null = null;
 
   public redisHash(queryKey: QueryKey): QueryKeyHash {

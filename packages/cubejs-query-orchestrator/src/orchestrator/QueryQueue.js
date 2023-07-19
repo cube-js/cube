@@ -1,4 +1,3 @@
-import crypto from 'crypto';
 import R from 'ramda';
 import { EventEmitter } from 'events';
 import { getEnv, getProcessUid } from '@cubejs-backend/shared';
@@ -168,6 +167,12 @@ export class QueryQueue {
     return stream;
   }
 
+  counter = 0;
+
+  generateQueueId() {
+    return this.counter++;
+  }
+
   /**
    * Push query to the queue and call `QueryQueue.reconcileQueue()` method if
    * `options.skipQueue` is set to `false`, execute query skipping queue
@@ -190,6 +195,8 @@ export class QueryQueue {
     options,
   ) {
     options = options || {};
+    options.queueId = this.generateQueueId();
+
     if (this.skipQueue) {
       const queryDef = {
         queryHandler,
@@ -200,9 +207,9 @@ export class QueryQueue {
         requestId: options.requestId,
         addedToQueueTime: new Date().getTime(),
       };
-      const queueId = this.queueDriver.generateQueueId ? this.queueDriver.generateQueueId() : undefined;
+
       this.logger('Waiting for query', {
-        queueId,
+        queueId: options.queueId,
         spanId: options.spanId,
         queueSize: 0,
         queryKey: queryDef.queryKey,
@@ -213,7 +220,7 @@ export class QueryQueue {
       if (queryHandler === 'stream') {
         throw new Error('Streaming queries to Cube Store aren\'t supported');
       }
-      const result = await this.processQuerySkipQueue(queryDef, queueId);
+      const result = await this.processQuerySkipQueue(queryDef, options.queueId);
       return this.parseResult(result);
     }
 
