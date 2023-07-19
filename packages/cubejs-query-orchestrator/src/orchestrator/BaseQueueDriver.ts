@@ -10,7 +10,7 @@ export abstract class BaseQueueDriver implements QueueDriverInterface {
   public constructor(protected processUid: string) {
   }
 
-  public counter = 0;
+  private counter = 0;
 
   public generateQueueId = (): number => this.counter++;
 
