@@ -106,6 +106,7 @@ export class LocalQueueDriverConnection {
    * @param {number} priority
    * @param {*} options
    * @returns {AddedTuple}
+   * 
    */
   addToQueue(keyScore, queryKey, orphanedTime, queryHandler, query, priority, options) {
     const queryQueueObj = {
