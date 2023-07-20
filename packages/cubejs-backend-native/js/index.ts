@@ -248,13 +248,13 @@ export interface PyConfiguration {
     contextToApiScopes?: () => Promise<string[]>
 }
 
-export const pythonLoadConfig = async (context: string, options: { file: string }): Promise<PyConfiguration> => {
+export const pythonLoadConfig = async (content: string, options: { file: string }): Promise<PyConfiguration> => {
   if (isFallbackBuild()) {
     throw new Error('Python is not supported in fallback build');
   }
 
   const native = loadNative();
-  const config = await native.pythonLoadConfig(context, options);
+  const config = await native.pythonLoadConfig(content, options);
 
   if (config.checkAuth) {
     const nativeCheckAuth = config.checkAuth;

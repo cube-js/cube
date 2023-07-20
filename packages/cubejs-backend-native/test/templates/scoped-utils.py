@@ -1,3 +1,4 @@
+source_code = """
 from cube import context_func
 
 @context_func
@@ -45,3 +46,9 @@ async def load_data():
       ]
     }
     return api_response
+"""
+
+__execution_context_globals = {}
+__execution_context_locals = {}
+
+exec(source_code, __execution_context_globals, __execution_context_locals)

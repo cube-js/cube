@@ -5,7 +5,7 @@ use crate::python::runtime::py_runtime_init;
 use crate::python::template;
 use neon::prelude::*;
 use pyo3::prelude::*;
-use pyo3::types::{PyFunction, PyList, PyString, PyTuple};
+use pyo3::types::{PyDict, PyFunction, PyList, PyString, PyTuple};
 
 fn python_load_config(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let config_file_content = cx.argument::<JsString>(0)?.value(&mut cx);
@@ -23,7 +23,12 @@ fn python_load_config(mut cx: FunctionContext) -> JsResult<JsPromise> {
         PyModule::from_code(py, cube_conf_code, "__init__.py", "cube.conf")?;
 
         let config_module = PyModule::from_code(py, &config_file_content, "config.py", "")?;
-        let settings_py = config_module.getattr("settings")?;
+        let settings_py = if config_module.hasattr("__execution_context_locals")? {
+            let execution_context_locals = config_module.getattr("__execution_context_locals")?;
+            execution_context_locals.get_item("settings")?
+        } else {
+            config_module.getattr("settings")?
+        };
 
         let mut cube_conf = CubeConfigPy::new();
 
@@ -61,25 +66,43 @@ fn python_load_model(mut cx: FunctionContext) -> JsResult<JsPromise> {
         PyModule::from_code(py, &cube_code, "__init__.py", "cube")?;
 
         let model_module = PyModule::from_code(py, &model_content, &model_file_name, "")?;
-
-        let inspect_module = py.import("inspect")?;
-        let args = (model_module, inspect_module.getattr("isfunction")?);
-        let functions_with_names = inspect_module
-            .call_method1("getmembers", args)?
-            .downcast::<PyList>()?;
         let mut collected_functions = CLReprObject::new();
 
-        for function_details in functions_with_names.iter() {
-            let function_details = function_details.downcast::<PyTuple>()?;
-            let fun_name = function_details.get_item(0)?.downcast::<PyString>()?;
-            let fun = function_details.get_item(1)?.downcast::<PyFunction>()?;
+        if model_module.hasattr("__execution_context_locals")? {
+            let execution_context_locals = model_module
+                .getattr("__execution_context_locals")?
+                .downcast::<PyDict>()?;
 
-            let has_attr = fun.hasattr("cube_context_func")?;
-            if has_attr {
-                let fun: Py<PyFunction> = fun.into();
-                collected_functions.insert(fun_name.to_string(), CLRepr::PyExternalFunction(fun));
+            for (local_key, local_value) in execution_context_locals.iter() {
+                if local_value.is_instance_of::<PyFunction>()? {
+                    let has_attr = local_value.hasattr("cube_context_func")?;
+                    if has_attr {
+                        let fun: Py<PyFunction> = local_value.downcast::<PyFunction>()?.into();
+                        collected_functions
+                            .insert(local_key.to_string(), CLRepr::PyExternalFunction(fun));
+                    }
+                }
             }
-        }
+        } else {
+            let inspect_module = py.import("inspect")?;
+            let args = (model_module, inspect_module.getattr("isfunction")?);
+            let functions_with_names = inspect_module
+                .call_method1("getmembers", args)?
+                .downcast::<PyList>()?;
+
+            for function_details in functions_with_names.iter() {
+                let function_details = function_details.downcast::<PyTuple>()?;
+                let fun_name = function_details.get_item(0)?.downcast::<PyString>()?;
+                let fun = function_details.get_item(1)?.downcast::<PyFunction>()?;
+
+                let has_attr = fun.hasattr("cube_context_func")?;
+                if has_attr {
+                    let fun: Py<PyFunction> = fun.into();
+                    collected_functions
+                        .insert(fun_name.to_string(), CLRepr::PyExternalFunction(fun));
+                }
+            }
+        };
 
         Ok(CubePythonModel::new(collected_functions))
     });
