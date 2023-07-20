@@ -196,7 +196,6 @@ export class QueryQueue {
   ) {
     options = options || {};
     options.queueId = this.generateQueueId();
-
     if (this.skipQueue) {
       const queryDef = {
         queryHandler,
@@ -207,7 +206,6 @@ export class QueryQueue {
         requestId: options.requestId,
         addedToQueueTime: new Date().getTime(),
       };
-
       this.logger('Waiting for query', {
         queueId: options.queueId,
         spanId: options.spanId,
