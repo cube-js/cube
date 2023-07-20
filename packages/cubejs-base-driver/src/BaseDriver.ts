@@ -284,10 +284,14 @@ export abstract class BaseDriver implements DriverInterface {
     return sortByKeys(result);
   }
 
-  public tablesSchema() {
+  public async tablesSchema(tables?: string[]) {
+    if (tables && tables.length === 0) {
+      return {};
+    }
     const query = this.informationSchemaQuery();
 
-    return this.query(query).then(data => reduce(this.informationColumnsSchemaReducer, {}, data));
+    const data = await this.query(query);
+    return reduce(this.informationColumnsSchemaReducer, {}, data);
   }
 
   public async createSchemaIfNotExists(schemaName: string): Promise<void> {
@@ -310,7 +314,7 @@ export abstract class BaseDriver implements DriverInterface {
 
   public getSchemasQuery() {
     return this.query<{ schemaName: string }>(
-      `SELECT schema_name FROM information_schema.schemata WHERE schema_name NOT IN (${this.getIgnoredSchemas()}))`,
+      `SELECT schema_name FROM information_schema.schemata WHERE schema_name NOT IN (${this.getIgnoredSchemas()})`,
     );
   }
 

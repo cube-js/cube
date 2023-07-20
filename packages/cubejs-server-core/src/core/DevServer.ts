@@ -120,6 +120,34 @@ export class DevServer {
       res.json({ tablesSchema });
     }));
 
+    /** WIP */
+    app.get('/playground/list-schemas', catchErrors(async (req, res) => {
+      // this.cubejsServer.event('Dev Server List Schemas');
+      const driver = await this.cubejsServer.getDriver({
+        dataSource: req.body.dataSource || 'default',
+        authInfo: null,
+        securityContext: null,
+        requestId: getRequestIdFromRequest(req),
+      });
+
+      const schemas = await driver.getSchemasQuery();
+      res.json({ schemas });
+    }));
+
+    /** WIP */
+    app.get('/playground/list-tables', catchErrors(async (req, res) => {
+      // this.cubejsServer.event('Dev Server List Tables');
+      const driver = await this.cubejsServer.getDriver({
+        dataSource: req.body.dataSource || 'default',
+        authInfo: null,
+        securityContext: null,
+        requestId: getRequestIdFromRequest(req),
+      });
+      
+      const tables = await driver.getTablesQuery(req.query.schemaName);
+      res.json({ tables });
+    }));
+
     app.get('/playground/files', catchErrors(async (req, res) => {
       this.cubejsServer.event('Dev Server Files Load');
       const files = await this.cubejsServer.repository.dataSchemaFiles();
