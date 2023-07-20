@@ -6,16 +6,23 @@ subCategory: Cube Cloud
 menuOrder: 4
 ---
 
-Cube follows a dataset-oriented data modeling approach, which is inspired by and expands upon dimensional modeling. 
+<InfoBox heading="Get Started with Cube Cloud & Snowflake">
+
+[Join our upcoming Office Hours on July 26 at 9am PST](https://cube.dev/events/unlock-data-cube-snowflake) on Getting Started with Cube Cloud and Snowflake.
+Learn how to easily connect Cube Cloud and Snowflake, load your data, and integrate your BI tools.
+
+</InfoBox>
+
+Cube follows a dataset-oriented data modeling approach, which is inspired by and expands upon dimensional modeling.
 Cube incorporates this approach and provides a practical framework for implementing dataset-oriented data modeling.
 
-When building a data model in Cube, you work with two dataset-centric objects: **cubes** and **views**. 
-**Cubes** usually represent business entities such as customers, line items, and orders. 
-In cubes, you define all the calculations within the measures and dimensions of these entities. 
+When building a data model in Cube, you work with two dataset-centric objects: **cubes** and **views**.
+**Cubes** usually represent business entities such as customers, line items, and orders.
+In cubes, you define all the calculations within the measures and dimensions of these entities.
 Additionally, you define relationships between cubes, such as "an order has many line items" or "a user may place multiple orders."
 
-**Views** sit on top of a data graph of cubes and create a facade of your entire data model, with which data consumers can interact. 
-You can think of views as the final data products for your data consumers - BI users, data apps, AI agents, etc. 
+**Views** sit on top of a data graph of cubes and create a facade of your entire data model, with which data consumers can interact.
+You can think of views as the final data products for your data consumers - BI users, data apps, AI agents, etc.
 When building views, you select measures and dimensions from different connected cubes and present them as a single dataset to BI or data apps.
 
 <Diagram
@@ -70,10 +77,10 @@ cubes:
 
 As you can see, we already have a `count` measure that we can use to calculate the total count of our orders.
 
-Let's add an additional measure to the `orders` cube to calculate only **completed orders**. 
-The `status` dimension in the `orders` cube reflects the three possible statuses: **processing**, **shipped**, or **completed**. 
-We will create a new measure `completed_count` by using a filter on that dimension. 
-To do this, we will use a [filter parameter](/schema/reference/measures#parameters-filters) of the measure 
+Let's add an additional measure to the `orders` cube to calculate only **completed orders**.
+The `status` dimension in the `orders` cube reflects the three possible statuses: **processing**, **shipped**, or **completed**.
+We will create a new measure `completed_count` by using a filter on that dimension.
+To do this, we will use a [filter parameter](/schema/reference/measures#parameters-filters) of the measure
 and [refer](/data-modeling/syntax#referring-to-objects) to the existing dimension.
 
 Add the following measure definition to your `model/cubes/orders.yml` file. It should be included within the `measures` block.
@@ -168,7 +175,7 @@ views:
 
       - join_path: orders.users
         prefix: true
-        includes: 
+        includes:
           - city
           - age
           - state
