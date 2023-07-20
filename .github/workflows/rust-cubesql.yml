@@ -190,24 +190,28 @@ jobs:
         if: (matrix.python-version == 'fallback')
         env:
           CARGO_BUILD_TARGET: ${{ matrix.target }}
-        run: cd packages/cubejs-backend-native && yarn run native:build-debug
+        working-directory: ./packages/cubejs-backend-native
+        run: yarn run native:build-debug
       - name: Build native (with Python)
         if: (matrix.python-version != 'fallback')
         env:
           PYO3_PYTHON: python${{ matrix.python-version }}
           CARGO_BUILD_TARGET: ${{ matrix.target }}
-        run: cd packages/cubejs-backend-native && yarn run native:build-debug-python
+        working-directory: ./packages/cubejs-backend-native
+        run: yarn run native:build-debug-python
       - name: Test native (GNU only)
         if: (matrix.target == 'x86_64-unknown-linux-gnu')
         env:
           CUBESQL_STREAM_MODE: true
           CUBEJS_NATIVE_INTERNAL_DEBUG: true
-        run: cd packages/cubejs-backend-native && yarn run test:unit
+        working-directory: ./packages/cubejs-backend-native
+        run: yarn run test:unit
       - name: Run E2E Smoke testing over whole Cube (GNU only)
         if: (matrix.target == 'x86_64-unknown-linux-gnu')
         env:
           CUBEJS_NATIVE_INTERNAL_DEBUG: true
-        run: cd packages/cubejs-testing && yarn smoke:cubesql
+        working-directory: ./packages/cubejs-testing
+        run: yarn smoke:cubesql
 
   native_macos:
     needs: [lint]
