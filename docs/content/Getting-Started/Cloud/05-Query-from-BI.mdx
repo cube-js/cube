@@ -6,8 +6,15 @@ subCategory: Cube Cloud
 menuOrder: 5
 ---
 
-You can query Cube using a BI or visualization tool through the Cube SQL API. 
-To provide a good end-user experience in your BI tool, we recommend mapping the BI's data model to Cube's semantic layer. 
+<InfoBox heading="Get Started with Cube Cloud & Snowflake">
+
+[Join our upcoming Office Hours on July 26 at 9am PST](https://cube.dev/events/unlock-data-cube-snowflake) on Getting Started with Cube Cloud and Snowflake.
+Learn how to easily connect Cube Cloud and Snowflake, load your data, and integrate your BI tools.
+
+</InfoBox>
+
+You can query Cube using a BI or visualization tool through the Cube SQL API.
+To provide a good end-user experience in your BI tool, we recommend mapping the BI's data model to Cube's semantic layer.
 This can be done automatically with Semantic Layer Sync or manually.
 
 ## Semantic Layer Sync
@@ -17,8 +24,8 @@ that correspond to entities within the data model in Cube, such as cubes, views,
 
 <Diagram src="https://ucarecdn.com/c270ae45-d14c-4896-b41f-1ab4973f00f0/" />
 
-Semantic Layer Sync will synchronize all public cubes and views with connected BI tools. 
-We recommend making your cubes private and only exposing views. Both cubes and views are public by default. 
+Semantic Layer Sync will synchronize all public cubes and views with connected BI tools.
+We recommend making your cubes private and only exposing views. Both cubes and views are public by default.
 To make cubes private, set the [public](/schema/reference/cube#parameters-public) parameter to `false`.
 
 ```yaml
@@ -28,14 +35,14 @@ cubes:
     public: false
 ```
 
-Let’s create our first Semantic Layer Sync with [Apache Superset](https://superset.apache.org/)! 
+Let’s create our first Semantic Layer Sync with [Apache Superset](https://superset.apache.org/)!
 
-You can create a new sync by navigating to the <Btn>Semantic Layer Sync</Btn> tab on the <Btn>BI Integrations</Btn> page and clicking <Btn>+ Create Sync</Btn>. 
+You can create a new sync by navigating to the <Btn>Semantic Layer Sync</Btn> tab on the <Btn>BI Integrations</Btn> page and clicking <Btn>+ Create Sync</Btn>.
 Follow the steps in the wizard to create a sync.
 
 Under the hood, Semantic Layer Sync is configured using the `semanticLayerSync` option in the `cube.js` configuration file.
 
-Cube uses the Superset API, which requires a `user` and `password` for authentication. 
+Cube uses the Superset API, which requires a `user` and `password` for authentication.
 You can use your own username and password or create a new service account. You can copy a `URL` from any page of your Superset workspace.
 
 Example `cube.js` configuration file for Superset:
@@ -56,20 +63,20 @@ module.exports = {
 };
 ```
 
-Replace the fields for user, password, and URL with your Superset credentials, then click on <Btn>Save All</Btn>. 
+Replace the fields for user, password, and URL with your Superset credentials, then click on <Btn>Save All</Btn>.
 You can now go to the <Btn>BI Integrations</Btn> page and trigger the synchronization of your newly created semantic layer.
 
-After running the sync, navigate to your Superset instance. You should see the `orders_view` dataset that was created in Superset. 
+After running the sync, navigate to your Superset instance. You should see the `orders_view` dataset that was created in Superset.
 Cube automatically maps all metrics and dimensions in Superset to measures and dimensions in the Cube data model.
 
 ## Manual Setup
 
-Alternatively, you can connect to Cube and create all the mappings manually. 
+Alternatively, you can connect to Cube and create all the mappings manually.
 To do this, navigate to your Apache Superset instance and connect to Cube Cloud as if it were a Postgres database.
 
 You can find the credentials to connect to Cube on the <Btn>BI Integrations</Btn> page under the <Btn>SQL API Connection</Btn> tab.
 
-After connecting, create a new dataset in Superset and select "orders_view" as a table. 
+After connecting, create a new dataset in Superset and select "orders_view" as a table.
 Now you can map Superset metrics and columns to Cube's measures and dimensions.
 
 <Diagram
