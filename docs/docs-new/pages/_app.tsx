@@ -65,7 +65,6 @@ export default function MyApp({ Component, pageProps }: AppProps) {
       algoliaAppId={process.env.NEXT_PUBLIC_ALGOLIA_APP_ID}
       algoliaApiKey={process.env.NEXT_PUBLIC_ALGOLIA_API_KEY}
       algoliaIndexName={process.env.NEXT_PUBLIC_ALGOLIA_INDEX_NAME}
-      baseUrl="/"
     >
       <style jsx global>{`
         :root {
