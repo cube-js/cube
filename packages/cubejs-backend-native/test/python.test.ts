@@ -8,21 +8,21 @@ const suite = native.isFallbackBuild() ? xdescribe : describe;
 // TODO(ovr): Find what is going wrong with parallel tests & python on Linux
 const darwinSuite = process.platform === 'darwin' && !native.isFallbackBuild() ? describe : xdescribe;
 
-async function loadConfigurationFile(file: string) {
-  const content = await fs.readFile(path.join(process.cwd(), 'test', file), 'utf8');
+async function loadConfigurationFile(fileName: string) {
+  const content = await fs.readFile(path.join(process.cwd(), 'test', fileName), 'utf8');
   console.log('content', {
     content,
-    file
+    fileName
   });
 
   const config = await native.pythonLoadConfig(
     content,
     {
-      file
+      fileName
     }
   );
 
-  console.log(`loaded config ${file}`, config);
+  console.log(`loaded config ${fileName}`, config);
 
   return config;
 }
