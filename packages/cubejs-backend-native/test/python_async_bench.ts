@@ -17,7 +17,7 @@ import * as native from '../js';
   const config = await native.pythonLoadConfig(
     content,
     {
-      file: 'config.py'
+      fileName: 'config.py'
     }
   );
 

@@ -248,7 +248,7 @@ export interface PyConfiguration {
     contextToApiScopes?: () => Promise<string[]>
 }
 
-export const pythonLoadConfig = async (content: string, options: { file: string }): Promise<PyConfiguration> => {
+export const pythonLoadConfig = async (content: string, options: { fileName: string }): Promise<PyConfiguration> => {
   if (isFallbackBuild()) {
     throw new Error('Python is not supported in fallback build');
   }

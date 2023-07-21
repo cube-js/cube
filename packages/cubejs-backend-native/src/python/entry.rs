@@ -8,7 +8,11 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyFunction, PyList, PyString, PyTuple};
 
 fn python_load_config(mut cx: FunctionContext) -> JsResult<JsPromise> {
-    let config_file_content = cx.argument::<JsString>(0)?.value(&mut cx);
+    let file_content_arg = cx.argument::<JsString>(0)?.value(&mut cx);
+    let options_arg = cx.argument::<JsObject>(1)?;
+    let options_file_name = options_arg
+        .get::<JsString, _, _>(&mut cx, "fileName")?
+        .value(&mut cx);
 
     let (deferred, promise) = cx.promise();
     let channel = cx.channel();
@@ -22,7 +26,7 @@ fn python_load_config(mut cx: FunctionContext) -> JsResult<JsPromise> {
         ));
         PyModule::from_code(py, cube_conf_code, "__init__.py", "cube.conf")?;
 
-        let config_module = PyModule::from_code(py, &config_file_content, "config.py", "")?;
+        let config_module = PyModule::from_code(py, &file_content_arg, &options_file_name, "")?;
         let settings_py = if config_module.hasattr("__execution_context_locals")? {
             let execution_context_locals = config_module.getattr("__execution_context_locals")?;
             execution_context_locals.get_item("settings")?
