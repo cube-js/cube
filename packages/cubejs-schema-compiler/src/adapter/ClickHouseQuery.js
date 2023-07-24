@@ -1,12 +1,17 @@
+import { getEnv } from '@cubejs-backend/shared';
+import moment from 'moment-timezone';
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
-import { UserError } from '../compiler/UserError';
+import { UserError } from '../compiler';
+import { BaseMeasure } from './BaseMeasure';
+import { BaseDimension } from './BaseDimension';
 
 const GRANULARITY_TO_INTERVAL = {
-  day: 'Day',
-  hour: 'Hour',
-  minute: 'Minute',
   second: 'Second',
+  minute: 'Minute',
+  hour: 'Hour',
+  day: 'Day',
+  week: 'Week',
   month: 'Month',
   quarter: 'Quarter',
   year: 'Year',
@@ -105,23 +110,7 @@ export class ClickHouseQuery extends BaseQuery {
   }
 
   getFieldAlias(id) {
-    const equalIgnoreCase = (a, b) => (
-      typeof a === 'string' && typeof b === 'string' && a.toUpperCase() === b.toUpperCase()
-    );
-
-    let field;
-
-    field = this.dimensionsForSelect().find(
-      d => equalIgnoreCase(d.dimension, id),
-    );
-
-    if (field) {
-      return field.aliasName();
-    }
-
-    field = this.measures.find(
-      d => equalIgnoreCase(d.measure, id) || equalIgnoreCase(d.expressionName, id),
-    );
+    const field = this.getField(id);
 
     if (field) {
       return field.aliasName();
@@ -134,7 +123,6 @@ export class ClickHouseQuery extends BaseQuery {
     //
     // ClickHouse doesn't support order by index column, so map these to the alias names
     //
-
     if (!hash || !hash.id) {
       return null;
     }
@@ -146,6 +134,16 @@ export class ClickHouseQuery extends BaseQuery {
     }
 
     const direction = hash.desc ? 'DESC' : 'ASC';
+    const field = this.getField(hash.id);
+    const fieldType = this.getFieldType(field);
+
+    if (this.withFill && fieldType === 'time') {
+      const interval = this.withFillInterval(field?.granularity);
+      const fillRange = this.withFillRange(hash);
+
+      return `${fieldAlias} ${direction} WITH FILL${fillRange}${interval}`;
+    }
+
     return `${fieldAlias} ${direction}`;
   }
 
@@ -239,6 +237,88 @@ export class ClickHouseQuery extends BaseQuery {
 
   createIndexSql(indexName, tableName, escapedColumns) {
     return `ALTER TABLE ${tableName} ADD INDEX ${indexName} (${escapedColumns.join(', ')}) TYPE minmax GRANULARITY 1`;
+  }
+
+  getField(id) {
+    const equalIgnoreCase = (a, b) => (
+      typeof a === 'string' && typeof b === 'string' && a.toUpperCase() === b.toUpperCase()
+    );
+
+    let field;
+
+    field = this.dimensionsForSelect().find(
+      d => equalIgnoreCase(d.dimension, id),
+    );
+
+    if (field) {
+      return field;
+    }
+
+    field = this.measures.find(
+      d => equalIgnoreCase(d.measure, id) || equalIgnoreCase(d.expressionName, id),
+    );
+
+    return field;
+  }
+
+  getFieldType(field) {
+    let definition = {};
+
+    if (field instanceof BaseMeasure) {
+      definition = field.measureDefinition();
+    } else if (field instanceof BaseDimension) {
+      definition = field.dimensionDefinition();
+    }
+
+    return definition?.type;
+  }
+
+  get withFill() {
+    return getEnv('clickhouseWithFill', { dataSource: this.dataSource }) === 'true';
+  }
+
+  maximumDateRange() {
+    return this.allFilters
+      .filter(f => ['inDateRange', 'in_date_range'].includes(f.operator))
+      .reduce((dateRange, filter) => {
+        // Date ranges require two values to be able to compare
+        if (!filter.values || filter.values.length < 2) {
+          return dateRange;
+        }
+
+        const start = moment.tz(filter.values[0], this.query.timezone).startOf('day');
+        const end = moment.tz(filter.values[1], this.query.timezone).endOf('day');
+
+        if (dateRange.start === null || start.diff(dateRange.start, 'days') < 0) {
+          dateRange.start = start;
+        }
+
+        if (dateRange.end === null || end.diff(dateRange.end, 'days') > 0) {
+          dateRange.end = end;
+        }
+
+        return dateRange;
+      }, { start: null, end: null });
+  }
+
+  withFillInterval(granularity) {
+    if (!granularity || !GRANULARITY_TO_INTERVAL[granularity]) {
+      return '';
+    }
+
+    return ` STEP INTERVAL 1 ${GRANULARITY_TO_INTERVAL[granularity].toUpperCase()}`;
+  }
+
+  withFillRange(hash) {
+    const maximumDateRange = this.maximumDateRange();
+    const fromDate = hash.desc ? maximumDateRange.end : maximumDateRange.start;
+    const toDate = hash.desc ? maximumDateRange.start : maximumDateRange.end;
+
+    if (fromDate === null || toDate === null) {
+      return '';
+    }
+
+    return ` FROM parseDateTimeBestEffort('${fromDate.format(moment.HTML5_FMT.DATETIME_LOCAL_MS)}') TO parseDateTimeBestEffort('${toDate.format(moment.HTML5_FMT.DATETIME_LOCAL_MS)}')`;
   }
 
   sqlTemplates() {
