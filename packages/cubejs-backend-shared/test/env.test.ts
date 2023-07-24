@@ -94,4 +94,14 @@ describe('getEnv', () => {
     process.env.CUBEJS_LIVE_PREVIEW = 'false';
     expect(getEnv('livePreview')).toBe(false);
   });
+
+  test('clickhouseWithFill', () => {
+    expect(getEnv('clickhouseWithFill', { dataSource: 'default' })).toBeUndefined();
+
+    process.env.CUBEJS_DB_CLICKHOUSE_WITHFILL = 'true';
+    expect(getEnv('clickhouseWithFill', { dataSource: 'default' })).toBe('true');
+
+    process.env.CUBEJS_DB_CLICKHOUSE_WITHFILL = 'false';
+    expect(getEnv('clickhouseWithFill', { dataSource: 'default' })).toBe('false');
+  });
 });

@@ -990,6 +990,19 @@ const variables: Record<string, (...args: any) => any> = {
     ]
   ),
 
+  /**
+   * Clickhouse WITH FILL flag.
+   */
+  clickhouseWithFill: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_CLICKHOUSE_WITHFILL', dataSource)
+    ]
+  ),
+
   /** ****************************************************************
    * ElasticSearch Driver                                            *
    ***************************************************************** */
