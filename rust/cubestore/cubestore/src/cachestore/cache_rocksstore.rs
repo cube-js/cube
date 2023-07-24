@@ -22,7 +22,7 @@ use crate::CubeError;
 use async_trait::async_trait;
 
 use futures_timer::Delay;
-use rocksdb::{BlockBasedOptions, Cache, Options, DB};
+use rocksdb::{BlockBasedOptions, Cache, DBCompressionType, Options, DB};
 
 use crate::cachestore::compaction::CompactionPreloadedState;
 use crate::cachestore::listener::RocksCacheStoreListener;
@@ -97,6 +97,7 @@ impl RocksStoreDetails for RocksCacheStoreDetails {
         };
 
         opts.set_block_based_table_factory(&block_opts);
+        opts.set_compression_type(rocksdb_config.compression_type);
 
         DB::open(&opts, path)
             .map_err(|err| CubeError::internal(format!("DB::open error for cachestore: {}", err)))
