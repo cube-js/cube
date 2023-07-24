@@ -4,13 +4,16 @@ redirect_from:
 ---
 
 # Development mode
-Development mode allows to test and debug the data model in
-an isolated environment before releasing any changes to production. When the development mode is enabled, a new set of API endpoints is deployed specifically
-for the branch.
+
+Development mode allows to test and debug the data model in an isolated
+environment before releasing any changes to production. When the development
+mode is enabled, a new set of API endpoints is deployed specifically for the
+branch.
 
 <SuccessBox>
 
-Development mode is available in Cube Cloud on [all tiers](https://cube.dev/pricing). 
+Development mode is available in Cube Cloud on
+[all tiers](https://cube.dev/pricing).
 
 </SuccessBox>
 
@@ -33,19 +36,19 @@ endpoints for the branch:
 The Development API has some limitations compared to Production, and it is
 important to be aware of these as they may affect your development process.
 
-###  Autoscaling
+### Autoscaling
 
 The Development API **does not** support autoscaling. If you need to test
 autoscaling, we recommend creating a separate deployment using a different Git
 branch of the same repository.
 
-###  Scheduled refresh
+### Scheduled refresh
 
 Scheduled refresh is also disabled in the Development API. If you need to test
 scheduled refreshes, we recommend creating a separate deployment using a
 different Git branch of the same repository.
 
-###  Cube version guarantees
+### Cube version guarantees
 
 The version of Cube used in the Development API **is not** guaranteed to be the
 same each time. If this affects your development process, we recommend reaching

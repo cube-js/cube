@@ -233,8 +233,6 @@ jobs:
           command: yarn install --frozen-lockfile
       - name: Compile TypeScript
         run: yarn tsc
-      - name: Build native
-        run: cd packages/cubejs-backend-native && npm run native:build-release
       - name: Build native (fallback)
         if: (matrix.python-version == 'fallback')
         run: cd packages/cubejs-backend-native && npm run native:build-release
@@ -329,8 +327,6 @@ jobs:
           command: yarn install --frozen-lockfile
       - name: Compile TypeScript
         run: yarn tsc
-      - name: Build native
-        run: cd packages/cubejs-backend-native && npm run native:build-release
       - name: Build native (fallback)
         if: (matrix.python-version == 'fallback')
         run: cd packages/cubejs-backend-native && npm run native:build-release

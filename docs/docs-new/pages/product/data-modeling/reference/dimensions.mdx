@@ -5,15 +5,16 @@ redirect_from:
 ---
 
 # Dimensions
+
 The `dimensions` property contains a set of dimensions. You can think about a
-dimension as an attribute related to a measure, e.g. the measure `user_count` can
-have dimensions like `country`, `age`, `occupation`, etc.
+dimension as an attribute related to a measure, e.g. the measure `user_count`
+can have dimensions like `country`, `age`, `occupation`, etc.
 
 Any dimension should have the following properties: `name`, `sql` and `type`.
 
 ## Parameters
 
-###  name
+### name
 
 The `name` parameter serves as the identifier of a dimension. It must be unique
 among all dimensions, measures, and segments within a cube and follow the
@@ -53,7 +54,7 @@ cubes:
 
 </CodeTabs>
 
-###  case
+### case
 
 The `case` statement is used to define if/then/else conditions to display data.
 It contains two parameters: `when` and `then`. The first `when` statement
@@ -146,7 +147,7 @@ cube(`products`, {
 });
 ```
 
-###  description
+### description
 
 You can add details to a dimension's definition via the `description` property:
 
@@ -180,7 +181,44 @@ cubes:
 
 </CodeTabs>
 
-###  meta
+### format
+
+`format` is an optional parameter. It is used to format the output of dimensions
+in different ways, for example, a link for `external_url`. Please refer to the
+[Dimension Formats][ref-schema-ref-dims-formats] for the full list of supported
+formats.
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  measures: {
+    total: {
+      sql: `amount`,
+      type: `running_total`,
+      format: `currency`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: total
+        sql: amount
+        type: running_total
+        format: currency
+```
+
+</CodeTabs>
+
+### meta
 
 Custom metadata. Can be used to pass any information to the frontend.
 
@@ -217,7 +255,7 @@ cubes:
 
 </CodeTabs>
 
-###  primaryKey
+### primaryKey
 
 Specify which dimension is a primary key for a cube. The default value is
 `false`.
@@ -261,7 +299,7 @@ cubes:
 
 </CodeTabs>
 
-###  propagate_filters_to_sub_query
+### propagate_filters_to_sub_query
 
 When this statement is set to `true`, the filters applied to the query will be
 passed to the [subquery][self-subquery].
@@ -298,7 +336,7 @@ cubes:
 
 </CodeTabs>
 
-###  public
+### public
 
 <InfoBox>
 
@@ -340,12 +378,12 @@ cubes:
 
 </CodeTabs>
 
-###  sql
+### sql
 
 `sql` is a required parameter. It can take any valid SQL expression depending on
-the `type` of the dimension. Please refer to the [Dimension Types
-Guide][ref-schema-ref-types-formats-dimension-types] for detailed information on
-the corresponding `sql` parameter.
+the `type` of the dimension. Please refer to the [Dimension
+Types][ref-schema-ref-dims-types] to understand what the `sql` parameter should
+be for a given dimension type.
 
 <CodeTabs>
 
@@ -375,7 +413,7 @@ cube(`orders`, {
 
 </CodeTabs>
 
-###  sub_query
+### sub_query
 
 The `sub_query` statement allows you to reference a measure in a dimension. It's
 an advanced concept and you can learn more about it [here][ref-subquery].
@@ -410,7 +448,7 @@ cubes:
 
 </CodeTabs>
 
-###  title
+### title
 
 You can use the `title` parameter to change a dimension's displayed name. By
 default, Cube will humanize your dimension key to create a display name. In
@@ -446,9 +484,45 @@ cubes:
 
 </CodeTabs>
 
-[ref-schema-ref-joins]: /schema/reference/joins
-[ref-schema-ref-types-formats-dimension-types]:
-  /schema/reference/types-and-formats#dimensions-types
-[ref-subquery]: /schema/fundamentals/additional-concepts#subquery
+### type
+
+`type` is a required parameter. There are various types that can be assigned to
+a dimension. Please refer to the [Dimension Types][ref-schema-ref-dims-types]
+for the full list of dimension types.
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  dimensions: {
+    rating: {
+      sql: `rating`,
+      type: `number`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    dimensions:
+      - name: rating
+        sql: rating
+        type: number
+```
+
+</CodeTabs>
+
+[ref-schema-ref-joins]: /product/data-modeling/reference/joins
+[ref-subquery]: /product/data-modeling/fundamentals/additional-concepts#subquery
 [self-subquery]: #sub-query
-[ref-naming]: /data-modeling/syntax#naming
+[ref-naming]: /product/data-modeling/fundamentals/syntax#naming
+[ref-schema-ref-dims-types]:
+  /product/data-modeling/reference/types-and-formats#dimension-types
+[ref-schema-ref-dims-formats]:
+  /product/data-modeling/reference/types-and-formats#dimension-formats

@@ -28,6 +28,8 @@ impl<'a> NeonMiniJinjaContext for FunctionContext<'a> {
                 content += &format!("{:>4} | {}\r\n", idx + 1, line);
             }
 
+            content += &format!("{:>4} > {}\r\n", idx + 1, lines[idx].1);
+
             if let Some(_span) = err.range() {
                 // TODO(ovr): improve
                 content += &format!(

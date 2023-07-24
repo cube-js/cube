@@ -4,11 +4,13 @@ redirect_from:
   - /recipes/schema-generation
 ---
 
-# /Code-reusability/schema-generation
+# Implementing Schema Generation
+
 <InfoBox>
 
 This functionality only works with data models written in JavaScript, not YAML.
-For more information, check out the [Data Modeling Syntax][ref-modeling-syntax] page.
+For more information, check out the [Data Modeling Syntax][ref-modeling-syntax]
+page.
 
 </InfoBox>
 
@@ -24,7 +26,7 @@ want to create a separate user count measure for each event.
 It can be done as simple as
 
 ```javascript
-const events = ['app_engagement', 'login', 'purchase'];
+const events = ["app_engagement", "login", "purchase"];
 
 cube(`events`, {
   sql_table: `events`,
@@ -59,12 +61,14 @@ and
 [`Array.reduce`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/reduce)
 to add user count measure definitions based on `events` array. This approach
 allows you to maintain list of events in very concise manner without boilerplate
-code. This configuration can be reused using
-[export / import feature](export-import).
+code. This configuration can be reused using [export / import
+feature][ref-export-import].
 
 Please refer to the
-[`asyncModule()`](/schema/reference/execution-environment#async-module)
+[`asyncModule()`](/product/data-modeling/advanced/schema-execution-environment#async-module)
 documentation to learn how to use databases and other data sources for data
 model generation.
 
-[ref-modeling-syntax]: /data-modeling/syntax
+[ref-modeling-syntax]: /product/data-modeling/fundamentals/syntax
+[ref-export-import]:
+  /product/data-modeling/advanced/code-reusability-export-and-import

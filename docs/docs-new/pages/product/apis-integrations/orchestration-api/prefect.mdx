@@ -1,0 +1,137 @@
+---
+redirect_from:
+  - /orchestration-api/prefect
+---
+
+# Integration with Prefect
+
+[Prefect][prefect] is a popular open-source orchestrator for data-intensive
+workflows. [Prefect Cloud][prefect-cloud] is a fully managed service for
+Prefect.
+
+This guide demonstrates how to setup Cube and Prefect to work together so that
+Prefect can push changes from upstream data sources to Cube via the
+[Orchestration API][ref-orchestration-api].
+
+## Tasks
+
+In Prefect, each workflow is represented by flows, Python functions decorated
+with a `@flow` decorator. Flows include calls to tasks, Python functions
+decorated with a `@task` decorator, as well as to child flows. Tasks represent
+distinct pieces of work executed within a flow. They can perform various jobs:
+poll for some precondition, perform extract-load-transform (ETL), or trigger
+external systems like Cube.
+
+Integration between Cube and Prefect is enabled by the
+[`prefect-cubejs`][github-prefect-cubejs] package.
+
+<InfoBox>
+
+Cube and Prefect integration package was originally contributed by
+[Alessandro Lollo](https://github.com/AlessandroLollo), Data Engineering Manager
+at Cloud Academy
+([case study](https://cube.dev/case-studies/cloud-academy-and-cube)), for which
+we're very grateful.
+
+</InfoBox>
+
+The package provides the following tasks:
+
+- `run_query` for querying Cube via the [`/v1/load`][ref-load-endpoint] endpoint
+  of the [REST API][ref-rest-api].
+- `build_pre_aggregations` for triggering pre-aggregation builds via the
+  [`/v1/pre-aggregations/jobs`][ref-ref-jobs-endpoint] endpoint of the
+  [Orchestration API][ref-orchestration-api].
+
+Please refer to the [package documentation][github-prefect-cubejs-docs] for
+details and options reference.
+
+## Installation
+
+Install [Prefect][prefect-docs-install].
+
+Create a new directory:
+
+```bash
+mkdir cube-prefect
+cd cube-prefect
+```
+
+Install the integration package:
+
+```bash
+pip install prefect-cubejs
+```
+
+## Configuration
+
+Create a new workflow named `cube_query.py` with the following contents. As you
+can see, the `run_query` task accepts a Cube query via the `query` option.
+
+```python
+from prefect import flow
+from prefect_cubejs.tasks import (
+  run_query
+)
+
+@flow
+def cube_query_workflow():
+  run_query(
+    url="https://awesome-ecom.gcp-us-central1.cubecloudapp.dev/cubejs-api",
+    api_secret="SECRET",
+    query="""{
+      "measures": ["Orders.count"],
+      "dimensions": ["Orders.status"]
+    }"""
+  )
+
+cube_query_workflow()
+```
+
+Create a new workflow named `cube_build.py` with the following contents. As you
+can see, the `build_pre_aggregations` task accepts a pre-aggregation selector
+via the `selector` option.
+
+```python
+from prefect import flow
+from prefect_cubejs.tasks import (
+  build_pre_aggregations
+)
+
+@flow
+def cube_build_workflow():
+  build_pre_aggregations(
+    url="https://awesome-ecom.gcp-us-central1.cubecloudapp.dev/cubejs-api",
+    api_secret="SECRET",
+    selector={
+      "contexts": [
+        {"securityContext": {}}
+      ],
+      "timezones": ["UTC"]
+    },
+    wait_for_job_run_completion=True
+  )
+
+cube_build_workflow()
+```
+
+## Running workflows
+
+Now, you can run these workflows:
+
+```bash
+python cube_query.py
+python cube_build.py
+```
+
+[prefect]: https://www.prefect.io
+[prefect-cloud]: https://www.prefect.io/cloud/
+[prefect-docs-install]:
+  https://docs.prefect.io/2.10.13/getting-started/installation/#install-prefect
+[github-prefect-cubejs]: https://github.com/AlessandroLollo/prefect-cubejs
+[github-prefect-cubejs-docs]:
+  https://alessandrolollo.github.io/prefect-cubejs/tasks/
+[ref-load-endpoint]: /reference/rest-api#v-1-load
+[ref-ref-jobs-endpoint]: /reference/rest-api#v-1-pre-aggregations-jobs
+[ref-rest-api]: /product/apis-integrations/rest-api
+[ref-orchestration-api]: /product/apis-integrations/orchestration-api

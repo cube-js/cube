@@ -1,5 +1,11 @@
 import React, { CSSProperties } from 'react';
-import styles from './styles.module.css';
+// import styles from './styles.module.scss';
+
+import classnames from 'classnames/bind';
+
+import * as styles from './styles.module.scss';
+
+const cn = classnames.bind(styles);
 
 interface ScreenshotProps {
   alt?: string;
@@ -15,7 +21,7 @@ interface ScreenshotProps {
 
 const ScreenshotHighlight = ({ highlight, src }: ScreenshotProps) => (
   <div
-    className={styles.highlight}
+    className={cn('highlight')}
     style={{
       backgroundImage: `url(${src})`,
       clipPath: highlight,
@@ -25,7 +31,7 @@ const ScreenshotHighlight = ({ highlight, src }: ScreenshotProps) => (
 
 export const Screenshot = (props: ScreenshotProps) => {
   return (
-    <div className={styles.screenshot} style={{ textAlign: 'center'}}>
+    <div className={cn('screenshot')} style={{ textAlign: 'center'}}>
       {props.highlight ? (<ScreenshotHighlight {...props} />) : null}
       <img
         alt={props.alt}
@@ -37,3 +43,14 @@ export const Screenshot = (props: ScreenshotProps) => {
   );
 };
 
+export const Diagram = (props: ScreenshotProps) => (
+  <div className={cn('diagram')} style={{ textAlign: 'center'}}>
+    {props.highlight ? (<ScreenshotHighlight {...props} />) : null}
+    <img
+      alt={props.alt}
+      src={props.src}
+      style={{ border: 'none', filter: props.highlight ? 'brightness(0.5)' : 'none' }}
+      width="100%"
+    />
+  </div>
+)

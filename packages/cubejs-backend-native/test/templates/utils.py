@@ -23,15 +23,6 @@ def load_data_sync():
 
 @context_func
 async def load_data():
-   client = MyApiClient("google.com")
-   return client.load_data()
-
-class MyApiClient:
-  def __init__(self, api_url):
-    self.api_url = api_url
-
-  # mock API call
-  def load_data(self):
     api_response = {
       "cubes": [
         {

@@ -4,6 +4,7 @@ redirect_from:
 ---
 
 # SQL functions and operators
+
 <InfoBox>
 
 This page describes the difference in behaviour of SQL functions and operators
@@ -14,7 +15,7 @@ behaviour is the same as described in the [PostgreSQL documentation][pg-docs].
 
 ## Comparison Functions and Operators
 
-###  Less than
+### Less than
 
 ```sql
 datatype < datatype
@@ -50,7 +51,7 @@ WHERE o.number < 1000;
 (1 row)
 ```
 
-###  Greater than
+### Greater than
 
 ```sql
 datatype > datatype
@@ -87,7 +88,7 @@ WHERE o.number > 1000;
 (1 row)
 ```
 
-###  Less than or equal to
+### Less than or equal to
 
 ```sql
 datatype <= datatype
@@ -123,7 +124,7 @@ WHERE o.number <= 1000;
 (1 row)
 ```
 
-###  Greater than or equal to
+### Greater than or equal to
 
 ```sql
 datatype >= datatype
@@ -160,7 +161,7 @@ WHERE o.number >= 1000;
 (1 row)
 ```
 
-###  Equal
+### Equal
 
 ```sql
 datatype = datatype
@@ -197,7 +198,7 @@ WHERE o.status = 'completed';
 (1 row)
 ```
 
-###  Not equal
+### Not equal
 
 ```sql
 datatype != datatype
@@ -234,7 +235,7 @@ WHERE o.status <> 'completed';
 (1 row)
 ```
 
-###  BETWEEN
+### BETWEEN
 
 ```sql
 datatype BETWEEN datatype AND datatype
@@ -272,7 +273,7 @@ WHERE o.number BETWEEN 1 AND 100000;
 
 ## Mathematical Functions and Operators
 
-###  TRUNC
+### TRUNC
 
 ```sql
 TRUNC(numeric)
@@ -344,7 +345,7 @@ LIMIT 1;
 (1 rows)
 ```
 
-###  BIT_LENGTH
+### BIT_LENGTH
 
 ```sql
 BIT_LENGTH(string)
@@ -368,7 +369,7 @@ LIMIT 1;
 (1 row)
 ```
 
-###  CHAR_LENGTH
+### CHAR_LENGTH
 
 ```sql
 CHAR_LENGTH(string)
@@ -393,7 +394,7 @@ LIMIT 1;
 (1 row)
 ```
 
-###  LOWER
+### LOWER
 
 ```sql
 LOWER(string)
@@ -427,7 +428,7 @@ LIMIT 1;
 (1 row)
 ```
 
-###  OCTET_LENGTH
+### OCTET_LENGTH
 
 ```sql
 OCTET_LENGTH(string)
@@ -451,7 +452,7 @@ LIMIT 1;
 (1 row)
 ```
 
-###  SUBSTRING
+### SUBSTRING
 
 ```sql
 SUBSTRING (string [ FROM start integer ] [ FOR count integer ])
@@ -487,7 +488,7 @@ LIMIT 1;
 (1 row)
 ```
 
-###  TRIM
+### TRIM
 
 ```sql
 TRIM ([ LEADING | TRAILING | BOTH ] [ characters text ] FROM string)
@@ -514,7 +515,7 @@ LIMIT 1;
 cube=>
 ```
 
-###  UPPER
+### UPPER
 
 ```sql
 UPPER(string)
@@ -538,7 +539,7 @@ LIMIT 1;
 (1 row)
 ```
 
-###  STARTS_WITH
+### STARTS_WITH
 
 ```sql
 starts_with (string, prefix)
@@ -574,7 +575,7 @@ LIMIT 1;
 
 ## Pattern Matching
 
-###  LIKE
+### LIKE
 
 ```sql
 string LIKE pattern
@@ -598,7 +599,7 @@ WHERE orders.status LIKE 'completed';
 (1 row)
 ```
 
-###  REGEXP_SUBSTR
+### REGEXP_SUBSTR
 
 ```sql
 REGEXP_SUBSTR(string, pattern)
@@ -621,7 +622,7 @@ LIMIT 1;
 
 ## Aggregation Functions
 
-###  COUNT
+### COUNT
 
 ```sql
 COUNT(*)
@@ -635,11 +636,11 @@ Counts the number of rows. If `*` is specified, the count returned is the
 | ------- | ---------- | ---------------------------- | ---------------------------------------- |
 | `COUNT` | ❌         | ✅ <sup>1</sup> <sup>2</sup> | [✅][ref-backend-sql-query-fundamentals] |
 
-1. `COUNT` can **only** be used to query measures of type
-   [`count`][ref-schema-ref-measure-types-count] inside Cube query rewrites.
+1.  `COUNT` can **only** be used to query measures of type
+    [`count`][ref-schema-ref-measure-types-count] inside Cube query rewrites.
 
-2. If `*` is specified, Cube will query the **first** measure of type `count`
-   found in the cube
+2.  If `*` is specified, Cube will query the **first** measure of type `count`
+    found in the cube
 
 The example below uses `COUNT` in a projection within a Cube query rewrite:
 
@@ -662,7 +663,7 @@ SELECT COUNT(orders.count) FROM orders;
 (1 row)
 ```
 
-###  MEASURE
+### MEASURE
 
 ```sql
 MEASURE(measure)
@@ -682,7 +683,7 @@ SELECT MEASURE(orders.count) FROM orders;
 (1 row)
 ```
 
-###  SUM
+### SUM
 
 ```sql
 SUM(col)
@@ -694,8 +695,8 @@ Computes the sum of the non-null input values.
 | ----- | ---------- | --------------- | ---------------------------------------- |
 | `SUM` | ❌         | ✅ <sup>1</sup> | [✅][ref-backend-sql-query-fundamentals] |
 
-1. `SUM` can **only** be used to query measures of type
-   [`sum`][ref-schema-ref-measure-types-sum] inside Cube query rewrites.
+1.  `SUM` can **only** be used to query measures of type
+    [`sum`][ref-schema-ref-measure-types-sum] inside Cube query rewrites.
 
 The example below uses `SUM` with a measure of type `sum` in a projection within
 a Cube query rewrite:
@@ -708,7 +709,7 @@ SELECT SUM(number) FROM orders;
 (1 row)
 ```
 
-###  AVG
+### AVG
 
 ```sql
 AVG(col)
@@ -720,8 +721,8 @@ Computes the average (arithmetic mean) of all the non-null input values.
 | ----- | ---------- | --------------- | ---------------------------------------- |
 | `AVG` | ❌         | ✅ <sup>1</sup> | [✅][ref-backend-sql-query-fundamentals] |
 
-1. `AVG` can **only** be used to query measures of type
-   [`avg`][ref-schema-ref-measure-types-avg] inside Cube query rewrites.
+1.  `AVG` can **only** be used to query measures of type
+    [`avg`][ref-schema-ref-measure-types-avg] inside Cube query rewrites.
 
 The example below uses `AVG` with a measure of type `avg` in a projection within
 a Cube query rewrite:
@@ -734,7 +735,7 @@ SELECT AVG(avgNumber) FROM orders;
 (1 row)
 ```
 
-###  MIN
+### MIN
 
 ```sql
 MIN(col)
@@ -747,8 +748,8 @@ string or date/time value.
 | ----- | ---------- | --------------- | ---------------------------------------- |
 | `MIN` | ❌         | ✅ <sup>1</sup> | [✅][ref-backend-sql-query-fundamentals] |
 
-1. `MIN` can **only** be used to query measures of type
-   [`min`][ref-schema-ref-measure-types-min] inside Cube query rewrites.
+1.  `MIN` can **only** be used to query measures of type
+    [`min`][ref-schema-ref-measure-types-min] inside Cube query rewrites.
 
 The example below uses `MIN` with a measure of type `min` in a projection within
 a Cube query rewrite:
@@ -761,7 +762,7 @@ SELECT MIN(min_number) FROM orders;
 (1 row)
 ```
 
-###  MAX
+### MAX
 
 ```sql
 MAX(col)
@@ -774,8 +775,8 @@ string or date/time value.
 | ----- | ---------- | --------------- | ---------------------------------------- |
 | `MAX` | ❌         | ✅ <sup>1</sup> | [✅][ref-backend-sql-query-fundamentals] |
 
-1. `MAX` can **only** be used to query measures of type
-   [`max`][ref-schema-ref-measure-types-max] inside Cube query rewrites.
+1.  `MAX` can **only** be used to query measures of type
+    [`max`][ref-schema-ref-measure-types-max] inside Cube query rewrites.
 
 The example below uses `MAX` with a measure of type `max` in a projection within
 a Cube query rewrite:
@@ -790,7 +791,7 @@ SELECT MAX(max_number) FROM orders;
 
 ## Date/Time Functions
 
-###  TO_TIMESTAMP
+### TO_TIMESTAMP
 
 ```sql
 TO_TIMESTAMP(string, string)
@@ -816,7 +817,7 @@ WHERE TO_TIMESTAMP('2020-01-01 00:00:00', 'yyyy-MM-dd HH24:mi:ss') < orders.crea
 (1 row)
 ```
 
-###  LOCALTIMESTAMP
+### LOCALTIMESTAMP
 
 ```sql
 LOCALTIMESTAMP()
@@ -840,7 +841,7 @@ WHERE LOCALTIMESTAMP() > orders.createdAt;
 (1 row)
 ```
 
-###  NOW
+### NOW
 
 ```sql
 NOW()
@@ -864,7 +865,7 @@ WHERE NOW() > orders.createdAt;
 (1 row)
 ```
 
-###  EXTRACT
+### EXTRACT
 
 ```sql
 EXTRACT(field FROM source)
@@ -894,7 +895,7 @@ LIMIT 1;
 (1 row)
 ```
 
-###  DATE_TRUNC
+### DATE_TRUNC
 
 ```sql
 DATE_TRUNC(field, source)
@@ -927,7 +928,7 @@ LIMIT 1;
 
 ## Conditional Expressions
 
-###  CASE
+### CASE
 
 ```sql
 CASE WHEN condition THEN result
@@ -965,7 +966,7 @@ GROUP BY 1;
 (1 row)
 ```
 
-###  COALESCE
+### COALESCE
 
 ```sql
 COALESCE(value [, ...])
@@ -996,7 +997,7 @@ GROUP BY 2;
 (3 rows)
 ```
 
-###  NULLIF
+### NULLIF
 
 ```sql
 NULLIF(value1, value2)
@@ -1025,7 +1026,7 @@ GROUP BY 1;
 
 ## Row and Array comparisons
 
-###  IN
+### IN
 
 ```sql
 expression IN (value [, ...])
@@ -1049,7 +1050,7 @@ SELECT COUNT(*) FROM orders WHERE status IN ('shipped', 'completed');
 (1 row)
 ```
 
-###  NOT IN
+### NOT IN
 
 ```sql
 expression NOT IN (value [, ...])
@@ -1076,17 +1077,18 @@ SELECT COUNT(*) FROM orders WHERE status NOT IN ('shipped', 'completed');
 [pg-docs]: https://www.postgresql.org/docs/current/
 [pg-docs-datetime-formats]:
   https://www.postgresql.org/docs/14/functions-formatting.html#FUNCTIONS-FORMATTING-DATETIME-TABLE
-[ref-backend-sql-query-fundamentals]: /backend/sql#querying-fundamentals
+[ref-backend-sql-query-fundamentals]:
+  /product/apis-integrations/sql-api#querying-fundamentals
 [ref-schema-ref-measure-types]:
-  /schema/reference/types-and-formats#measures-types
+  /product/data-modeling/reference/types-and-formats#measures-types
 [ref-schema-ref-measure-types-avg]:
-  /schema/reference/types-and-formats#measures-types-avg
+  /product/data-modeling/reference/types-and-formats#measures-types-avg
 [ref-schema-ref-measure-types-count]:
-  /schema/reference/types-and-formats#measures-types-count
+  /product/data-modeling/reference/types-and-formats#measures-types-count
 [ref-schema-ref-measure-types-max]:
-  /schema/reference/types-and-formats#measures-types-max
+  /product/data-modeling/reference/types-and-formats#measures-types-max
 [ref-schema-ref-measure-types-min]:
-  /schema/reference/types-and-formats#measures-types-min
+  /product/data-modeling/reference/types-and-formats#measures-types-min
 [ref-schema-ref-measure-types-sum]:
-  /schema/reference/types-and-formats#measures-types-sum
+  /product/data-modeling/reference/types-and-formats#measures-types-sum
 [self-ref-row-array-in]: #row-and-array-comparisons-in
