@@ -22,7 +22,7 @@ use crate::CubeError;
 use async_trait::async_trait;
 
 use futures_timer::Delay;
-use rocksdb::{BlockBasedOptions, Cache, DBCompressionType, Options, DB};
+use rocksdb::{BlockBasedOptions, Cache, Options, DB};
 
 use crate::cachestore::compaction::CompactionPreloadedState;
 use crate::cachestore::listener::RocksCacheStoreListener;
