@@ -6,6 +6,7 @@ module.exports = {
   "query-history": "Query History",
   "pre-aggregations": "Pre-Aggregations",
   "access-control": "Access Control",
+  "budgets": "Budgets",
   "sso": "Single Sign-On",
   "dev-mode": "Development mode",
   "preferences": "Preferences",
