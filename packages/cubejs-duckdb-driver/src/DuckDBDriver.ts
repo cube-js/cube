@@ -25,7 +25,7 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
   protected initPromise: Promise<Database> | null = null;
 
   public constructor(
-    config: DuckDBDriverConfiguration,
+    config: DuckDBDriverConfiguration = {},
   ) {
     super();
 
