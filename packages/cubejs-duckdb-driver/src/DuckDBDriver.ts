@@ -25,7 +25,7 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
   protected initPromise: Promise<Database> | null = null;
 
   public constructor(
-    config: DuckDBDriverConfiguration,
+    config: DuckDBDriverConfiguration = {},
   ) {
     super();
 
@@ -40,7 +40,9 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
   }
 
   protected async initDatabase(): Promise<Database> {
-    const db = new Database(':memory:');
+    const token = getEnv('duckdbMotherDuckToken', this.config);
+    
+    const db = new Database(token ? `md:?motherduck_token=${token}` : ':memory:');
     const conn = db.connect();
 
     if (this.config.enableHttpFs) {
