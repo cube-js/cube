@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/duckdb-driver",
-  "description": "Cube.js DuckDB database driver",
+  "description": "Cube DuckDB database driver",
   "author": "Cube Dev, Inc.",
   "version": "0.33.38",
   "repository": {

@@ -1369,6 +1369,16 @@ const variables: Record<string, (...args: any) => any> = {
     ]
   ),
 
+  duckdbMotherDuckToken: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_DUCKDB_MOTHERDUCK_TOKEN', dataSource)
+    ]
+  ),
+
   /**
    * Presto catalog.
    */
