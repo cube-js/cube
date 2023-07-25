@@ -50,19 +50,27 @@ class MSSqlDriver extends BaseDriver {
       config.dataSource ||
       assertDataSource('default');
 
-    this.config = {
-      readOnly: true,
-      server: getEnv('dbHost', { dataSource }),
-      database: getEnv('dbName', { dataSource }),
-      port: getEnv('dbPort', { dataSource }),
-      user: getEnv('dbUser', { dataSource }),
-      password: getEnv('dbPass', { dataSource }),
-      domain: getEnv('dbDomain', { dataSource }),
-      requestTimeout: getEnv('dbQueryTimeout') * 1000,
-      options: {
-        encrypt: getEnv('dbSsl', { dataSource }),
-        useUTC: false
-      },
+      this.config = {
+        readOnly: true,
+        server: getEnv('dbHost', { dataSource }),
+        database: getEnv('dbName', { dataSource }),
+        port: getEnv('dbPort', { dataSource }),
+        user: getEnv('dbUser', { dataSource }),
+        password: getEnv('dbPass', { dataSource }),
+        domain: getEnv('dbDomain', { dataSource }),
+        requestTimeout: getEnv('dbQueryTimeout') * 1000,
+        options: {
+          encrypt: getEnv('dbSsl', { dataSource }),
+          useUTC: false
+        },
+        authentication: {
+          type: 'azure-active-directory-service-principal-secret',
+          options: {
+            clientId: process.env.CUBEJS_AZURE_CLIENTID,
+            clientSecret: process.env.CUBEJS_AZURE_CLIENTSECRET,
+            tenantId: process.env.CUBEJS_AZURE_TENANTID
+          }
+        },
       pool: {
         max:
           config.maxPoolSize ||
