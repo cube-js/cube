@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.39](https://github.com/cube-js/cube/compare/v0.33.38...v0.33.39) (2023-07-25)
+
+
+### Features
+
+* support motherduck token ([#6948](https://github.com/cube-js/cube/issues/6948)) ([f056088](https://github.com/cube-js/cube/commit/f056088e4e9aed4866629fcd6adfe263367b2661))
+
+
+
+
+
 ## [0.33.38](https://github.com/cube-js/cube/compare/v0.33.37...v0.33.38) (2023-07-21)
 
 **Note:** Version bump only for package cubejs

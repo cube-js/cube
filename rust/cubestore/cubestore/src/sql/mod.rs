@@ -1408,7 +1408,7 @@ impl SqlService for SqlServiceImpl {
                                 .0,
                             worker: self
                                 .query_executor
-                                .worker_plan(worker_plan, mocked_names, chunk_ids_to_batches)
+                                .worker_plan(worker_plan, mocked_names, chunk_ids_to_batches, None)
                                 .await?
                                 .0,
                         });

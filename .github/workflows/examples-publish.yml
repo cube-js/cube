@@ -525,31 +525,6 @@ jobs:
           CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH_REAL_TIME_DASHBOARD }}
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
-  vue-query-builder:
-    runs-on: ubuntu-20.04
-    timeout-minutes: 30
-
-    steps:
-      - uses: actions/checkout@v3
-
-      - uses: pheel/path-watcher-action@v1
-        id: modified
-        with:
-          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/vue-query-builder/*,examples/vue-query-builder/**'
-
-      - if: steps.modified.outputs.modified
-        uses: actions/setup-node@v3
-        with:
-          node-version: 14.x
-
-      - if: steps.modified.outputs.modified
-        run: .github/actions/deploy-example.sh
-        env:
-          EXAMPLE_SLUG: vue-query-builder
-          EXAMPLE_FRONTEND_BUILD_SUBDIRECTORY: dist/
-          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH_VUE_QUERY_BUILDER }}
-          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-
   web-analytics:
     runs-on: ubuntu-20.04
     timeout-minutes: 30
@@ -769,7 +744,7 @@ jobs:
           EXAMPLE_SLUG: multitenancy-workshop
           EXAMPLE_CUBE_SKIP: 1
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-  
+
   aws-web-analytics:
     runs-on: ubuntu-20.04
     timeout-minutes: 30
@@ -794,7 +769,7 @@ jobs:
           EXAMPLE_CUBE_SKIP: 1
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           EXAMPLE_FRONTEND_SUBDIRECTORY: 'analytics-dashboard'
-  
+
   event-analytics:
     runs-on: ubuntu-20.04
     timeout-minutes: 30

@@ -253,6 +253,39 @@ service account with a different email address:
 
 <Screenshot src="https://ucarecdn.com/2e7ac466-73a5-4dd6-9c85-ed98d9df8979/"/>
 
+### <--{"id" : "Creating syncs"}--> Tableau
+
+Data model is synchronized via the [Tableau API][tableau-api] which uses either a
+`user` name and a `password`, or a personal access token and personal access token secret for authentication.
+
+You can learn more about creating personal access tokens in the [Tableau documentation][tableau-api-authentication].
+
+Example `cube.js` configuration file for Tableau:
+
+```javascript
+module.exports = {
+  semanticLayerSync: ({ securityContext }) => {
+    return [{
+      type: "tableau",
+      name: "Tableau Sync",
+      config: {
+        database: "My Database: production-deployment",
+        site: "mytableausite",
+        region: "10ax",
+        user: "john@example.com",
+        password: "******************",
+        // Uncomment the following lines to use a personal access token instead of a username and password
+        // personalAccessToken: "test",
+        // personalAccessTokenSecret: "",
+      }
+    }];
+  }
+};
+```
+
+[tableau-api]: https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api.htm
+[tableau-api-authentication]: https://help.tableau.com/current/server/en-us/security_personal_access_tokens.htm#create-personal-access-tokens
+
 ## Running syncs
 
 When the data model is updated, all configured syncs will automatically run.

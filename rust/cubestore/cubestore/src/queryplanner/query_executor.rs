@@ -9,6 +9,7 @@ use crate::queryplanner::optimizations::CubeQueryPlanner;
 use crate::queryplanner::planning::{get_worker_plan, Snapshot, Snapshots};
 use crate::queryplanner::pretty_printers::{pp_phys_plan, pp_plan};
 use crate::queryplanner::serialized_plan::{IndexSnapshot, RowFilter, RowRange, SerializedPlan};
+use crate::queryplanner::trace_data_loaded::DataLoadedSize;
 use crate::store::DataFrame;
 use crate::table::data::rows_to_columns;
 use crate::table::parquet::CubestoreParquetMetadataCache;
@@ -73,7 +74,7 @@ pub trait QueryExecutor: DIService + Send + Sync {
         plan: SerializedPlan,
         remote_to_local_names: HashMap<String, String>,
         chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
-    ) -> Result<(SchemaRef, Vec<RecordBatch>), CubeError>;
+    ) -> Result<(SchemaRef, Vec<RecordBatch>, usize), CubeError>;
 
     async fn router_plan(
         &self,
@@ -86,6 +87,7 @@ pub trait QueryExecutor: DIService + Send + Sync {
         plan: SerializedPlan,
         remote_to_local_names: HashMap<String, String>,
         chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
+        data_loaded_size: Option<Arc<DataLoadedSize>>,
     ) -> Result<(Arc<dyn ExecutionPlan>, LogicalPlan), CubeError>;
 
     async fn pp_worker_plan(
@@ -161,9 +163,15 @@ impl QueryExecutor for QueryExecutorImpl {
         plan: SerializedPlan,
         remote_to_local_names: HashMap<String, String>,
         chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
-    ) -> Result<(SchemaRef, Vec<RecordBatch>), CubeError> {
+    ) -> Result<(SchemaRef, Vec<RecordBatch>, usize), CubeError> {
+        let data_loaded_size = DataLoadedSize::new();
         let (physical_plan, logical_plan) = self
-            .worker_plan(plan, remote_to_local_names, chunk_id_to_record_batches)
+            .worker_plan(
+                plan,
+                remote_to_local_names,
+                chunk_id_to_record_batches,
+                Some(data_loaded_size.clone()),
+            )
             .await?;
         let worker_plan;
         let max_batch_rows;
@@ -219,7 +227,7 @@ impl QueryExecutor for QueryExecutorImpl {
         }
         // TODO: stream results as they become available.
         let results = regroup_batches(results?, max_batch_rows)?;
-        Ok((worker_plan.schema(), results))
+        Ok((worker_plan.schema(), results, data_loaded_size.get()))
     }
 
     async fn router_plan(
@@ -245,6 +253,7 @@ impl QueryExecutor for QueryExecutorImpl {
         plan: SerializedPlan,
         remote_to_local_names: HashMap<String, String>,
         chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
+        data_loaded_size: Option<Arc<DataLoadedSize>>,
     ) -> Result<(Arc<dyn ExecutionPlan>, LogicalPlan), CubeError> {
         let plan_to_move = plan.logical_plan(
             remote_to_local_names,
@@ -252,7 +261,7 @@ impl QueryExecutor for QueryExecutorImpl {
             self.parquet_metadata_cache.cache().clone(),
         )?;
         let plan = Arc::new(plan);
-        let ctx = self.worker_context(plan.clone())?;
+        let ctx = self.worker_context(plan.clone(), data_loaded_size)?;
         let plan_ctx = ctx.clone();
         Ok((
             plan_ctx.create_physical_plan(&plan_to_move.clone())?,
@@ -267,7 +276,12 @@ impl QueryExecutor for QueryExecutorImpl {
         chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
     ) -> Result<String, CubeError> {
         let (physical_plan, _) = self
-            .worker_plan(plan, remote_to_local_names, chunk_id_to_record_batches)
+            .worker_plan(
+                plan,
+                remote_to_local_names,
+                chunk_id_to_record_batches,
+                None,
+            )
             .await?;
 
         let worker_plan;
@@ -315,6 +329,7 @@ impl QueryExecutorImpl {
     fn worker_context(
         &self,
         serialized_plan: Arc<SerializedPlan>,
+        data_loaded_size: Option<Arc<DataLoadedSize>>,
     ) -> Result<Arc<ExecutionContext>, CubeError> {
         Ok(Arc::new(ExecutionContext::with_config(
             ExecutionConfig::new()
@@ -323,6 +338,7 @@ impl QueryExecutorImpl {
                 .with_query_planner(Arc::new(CubeQueryPlanner::new_on_worker(
                     serialized_plan,
                     self.memory_handler.clone(),
+                    data_loaded_size,
                 ))),
         )))
     }
