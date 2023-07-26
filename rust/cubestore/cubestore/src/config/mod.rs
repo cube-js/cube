@@ -1,10 +1,11 @@
-#![allow(deprecated)] // 'vtable' and 'TraitObject' are deprecated.
+#![allow(deprecated)] // 'vtable' and 'TraitObject' are deprecated.confi
 pub mod injection;
 pub mod processing_loop;
 
 use crate::cachestore::{
     CacheStore, CacheStoreSchedulerImpl, ClusterCacheStoreClient, LazyRocksCacheStore,
 };
+use crate::cluster::rate_limiter::{BasicProcessRateLimiter, ProcessRateLimiter};
 use crate::cluster::transport::{
     ClusterTransport, ClusterTransportImpl, MetaStoreTransport, MetaStoreTransportImpl,
 };
@@ -1755,6 +1756,12 @@ impl Config {
             })
             .await;
 
+        self.injector
+            .register_typed::<dyn ProcessRateLimiter, _, _, _>(async move |_| {
+                BasicProcessRateLimiter::new()
+            })
+            .await;
+
         let cluster_meta_store_sender = metastore_event_sender_to_move.clone();
 
         self.injector
@@ -1772,6 +1779,7 @@ impl Config {
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     cluster_meta_store_sender,
+                    i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                 )
