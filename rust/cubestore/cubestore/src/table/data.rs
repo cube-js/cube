@@ -1,6 +1,7 @@
 use crate::metastore::{Column, ColumnType};
 use crate::table::{Row, TableValue, TimestampValue};
-use crate::util::decimal::Decimal;
+use crate::util::decimal::{Decimal, Decimal96};
+use crate::util::int96::Int96;
 use arrow::array::{Array, ArrayBuilder, ArrayRef, StringArray};
 use arrow::record_batch::RecordBatch;
 use itertools::Itertools;
@@ -16,7 +17,9 @@ pub enum TableValueR<'a> {
     Null,
     String(&'a str),
     Int(i64),
+    Int96(Int96),
     Decimal(Decimal),
+    Decimal96(Decimal96),
     Float(OrdF64),
     Bytes(&'a [u8]),
     Timestamp(TimestampValue),
@@ -29,7 +32,9 @@ impl TableValueR<'_> {
             TableValue::Null => TableValueR::Null,
             TableValue::String(s) => TableValueR::String(&s),
             TableValue::Int(i) => TableValueR::Int(*i),
+            TableValue::Int96(i) => TableValueR::Int96(*i),
             TableValue::Decimal(d) => TableValueR::Decimal(*d),
+            TableValue::Decimal96(d) => TableValueR::Decimal96(*d),
             TableValue::Float(f) => TableValueR::Float(*f),
             TableValue::Bytes(b) => TableValueR::Bytes(&b),
             TableValue::Timestamp(v) => TableValueR::Timestamp(v.clone()),
@@ -117,7 +122,9 @@ pub fn cmp_same_types(l: &TableValueR, r: &TableValueR) -> Ordering {
         (_, TableValueR::Null) => Ordering::Greater,
         (TableValueR::String(a), TableValueR::String(b)) => a.cmp(b),
         (TableValueR::Int(a), TableValueR::Int(b)) => a.cmp(b),
+        (TableValueR::Int96(a), TableValueR::Int96(b)) => a.cmp(b),
         (TableValueR::Decimal(a), TableValueR::Decimal(b)) => a.cmp(b),
+        (TableValueR::Decimal96(a), TableValueR::Decimal96(b)) => a.cmp(b),
         (TableValueR::Float(a), TableValueR::Float(b)) => a.cmp(b),
         (TableValueR::Bytes(a), TableValueR::Bytes(b)) => a.cmp(b),
         (TableValueR::Timestamp(a), TableValueR::Timestamp(b)) => a.cmp(b),
@@ -134,6 +141,7 @@ macro_rules! match_column_type {
         match t {
             ColumnType::String => $matcher!(String, StringBuilder, String),
             ColumnType::Int => $matcher!(Int, Int64Builder, Int),
+            ColumnType::Int96 => $matcher!(Int96, Int96Builder, Int96),
             ColumnType::Bytes => $matcher!(Bytes, BinaryBuilder, Bytes),
             ColumnType::HyperLogLog(_) => $matcher!(HyperLogLog, BinaryBuilder, Bytes),
             ColumnType::Timestamp => $matcher!(Timestamp, TimestampMicrosecondBuilder, Timestamp),
@@ -146,6 +154,16 @@ macro_rules! match_column_type {
                 4 => $matcher!(Decimal, Int64Decimal4Builder, Decimal, 4),
                 5 => $matcher!(Decimal, Int64Decimal5Builder, Decimal, 5),
                 10 => $matcher!(Decimal, Int64Decimal10Builder, Decimal, 10),
+                n => panic!("unhandled target scale: {}", n),
+            },
+            ColumnType::Decimal96 { .. } => match t.target_scale() {
+                0 => $matcher!(Decimal96, Int96Decimal0Builder, Decimal96, 0),
+                1 => $matcher!(Decimal96, Int96Decimal1Builder, Decimal96, 1),
+                2 => $matcher!(Decimal96, Int96Decimal2Builder, Decimal96, 2),
+                3 => $matcher!(Decimal96, Int96Decimal3Builder, Decimal96, 3),
+                4 => $matcher!(Decimal96, Int96Decimal4Builder, Decimal96, 4),
+                5 => $matcher!(Decimal96, Int96Decimal5Builder, Decimal96, 5),
+                10 => $matcher!(Decimal96, Int96Decimal10Builder, Decimal96, 10),
                 n => panic!("unhandled target scale: {}", n),
             },
             ColumnType::Float => $matcher!(Float, Float64Builder, Float),
@@ -180,6 +198,12 @@ pub fn append_value(b: &mut dyn ArrayBuilder, c: &ColumnType, v: &TableValue) {
     let is_null = matches!(v, TableValue::Null);
     macro_rules! convert_value {
         (Decimal, $v: expr) => {{
+            $v.raw_value()
+        }};
+        (Decimal96, $v: expr) => {{
+            $v.raw_value()
+        }};
+        (Int96, $v: expr) => {{
             $v.raw_value()
         }};
         (Float, $v: expr) => {{

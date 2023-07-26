@@ -559,6 +559,9 @@ pub fn parse_json_value(column: &Column, value: &JsonValue) -> Result<TableValue
                 x
             ))),
         },
+        ColumnType::Int96 => Err(CubeError::user(
+            "int96 unsupported for streaming data".to_string(),
+        )),
         ColumnType::Bytes => match value {
             _ => Err(CubeError::internal(format!(
                 "ksql source bytes import isn't supported"
@@ -595,6 +598,9 @@ pub fn parse_json_value(column: &Column, value: &JsonValue) -> Result<TableValue
                 x
             ))),
         },
+        ColumnType::Decimal96 { .. } => Err(CubeError::user(
+            "decimal96 unsupported for streaming data".to_string(),
+        )),
         ColumnType::Float => match value {
             JsonValue::Number(v) => Ok(TableValue::Float(OrdF64(v.clone().into()))),
             JsonValue::Null => Ok(TableValue::Null),

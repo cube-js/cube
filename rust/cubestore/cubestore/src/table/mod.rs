@@ -1,9 +1,12 @@
-use crate::util::decimal::Decimal;
+use crate::util::decimal::{Decimal, Decimal96};
+use crate::util::int96::Int96;
 
 use arrow::array::{
     Array, ArrayRef, BinaryArray, BooleanArray, Float64Array, Int64Array, Int64Decimal0Array,
     Int64Decimal10Array, Int64Decimal1Array, Int64Decimal2Array, Int64Decimal3Array,
-    Int64Decimal4Array, Int64Decimal5Array, StringArray, TimestampMicrosecondArray,
+    Int64Decimal4Array, Int64Decimal5Array, Int96Array, Int96Decimal0Array, Int96Decimal10Array,
+    Int96Decimal1Array, Int96Decimal2Array, Int96Decimal3Array, Int96Decimal4Array,
+    Int96Decimal5Array, StringArray, TimestampMicrosecondArray,
 };
 use arrow::datatypes::{DataType, TimeUnit};
 
@@ -25,7 +28,9 @@ pub enum TableValue {
     Null,
     String(String),
     Int(i64),
+    Int96(Int96),
     Decimal(Decimal),
+    Decimal96(Decimal96),
     Float(OrdF64),
     Bytes(Vec<u8>),
     Timestamp(TimestampValue),
@@ -38,7 +43,9 @@ impl DeepSizeOf for TableValue {
             TableValue::Null => 0,
             TableValue::String(v) => v.deep_size_of_children(context),
             TableValue::Int(_) => 0,
+            TableValue::Int96(_) => 0,
             TableValue::Decimal(_) => 0,
+            TableValue::Decimal96(_) => 0,
             TableValue::Float(_) => 0,
             TableValue::Bytes(v) => v.deep_size_of_children(context),
             TableValue::Timestamp(_) => 0,
@@ -62,6 +69,9 @@ impl TableValue {
             DataType::Int64 => {
                 TableValue::Int(a.as_any().downcast_ref::<Int64Array>().unwrap().value(row))
             }
+            DataType::Int96 => TableValue::Int96(Int96::new(
+                a.as_any().downcast_ref::<Int96Array>().unwrap().value(row),
+            )),
             DataType::Utf8 => TableValue::String(
                 a.as_any()
                     .downcast_ref::<StringArray>()
@@ -115,6 +125,48 @@ impl TableValue {
             DataType::Int64Decimal(10) => TableValue::Decimal(Decimal::new(
                 a.as_any()
                     .downcast_ref::<Int64Decimal10Array>()
+                    .unwrap()
+                    .value(row),
+            )),
+            DataType::Int96Decimal(0) => TableValue::Decimal96(Decimal96::new(
+                a.as_any()
+                    .downcast_ref::<Int96Decimal0Array>()
+                    .unwrap()
+                    .value(row),
+            )),
+            DataType::Int96Decimal(1) => TableValue::Decimal96(Decimal96::new(
+                a.as_any()
+                    .downcast_ref::<Int96Decimal1Array>()
+                    .unwrap()
+                    .value(row),
+            )),
+            DataType::Int96Decimal(2) => TableValue::Decimal96(Decimal96::new(
+                a.as_any()
+                    .downcast_ref::<Int96Decimal2Array>()
+                    .unwrap()
+                    .value(row),
+            )),
+            DataType::Int96Decimal(3) => TableValue::Decimal96(Decimal96::new(
+                a.as_any()
+                    .downcast_ref::<Int96Decimal3Array>()
+                    .unwrap()
+                    .value(row),
+            )),
+            DataType::Int96Decimal(4) => TableValue::Decimal96(Decimal96::new(
+                a.as_any()
+                    .downcast_ref::<Int96Decimal4Array>()
+                    .unwrap()
+                    .value(row),
+            )),
+            DataType::Int96Decimal(5) => TableValue::Decimal96(Decimal96::new(
+                a.as_any()
+                    .downcast_ref::<Int96Decimal5Array>()
+                    .unwrap()
+                    .value(row),
+            )),
+            DataType::Int96Decimal(10) => TableValue::Decimal96(Decimal96::new(
+                a.as_any()
+                    .downcast_ref::<Int96Decimal10Array>()
                     .unwrap()
                     .value(row),
             )),

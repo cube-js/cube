@@ -19,7 +19,9 @@ use crate::{app_metrics, CubeError};
 use arrow::array::{
     make_array, Array, ArrayRef, BinaryArray, BooleanArray, Float64Array, Int16Array, Int32Array,
     Int64Array, Int64Decimal0Array, Int64Decimal10Array, Int64Decimal1Array, Int64Decimal2Array,
-    Int64Decimal3Array, Int64Decimal4Array, Int64Decimal5Array, MutableArrayData, StringArray,
+    Int64Decimal3Array, Int64Decimal4Array, Int64Decimal5Array, Int96Array, Int96Decimal0Array,
+    Int96Decimal10Array, Int96Decimal1Array, Int96Decimal2Array, Int96Decimal3Array,
+    Int96Decimal4Array, Int96Decimal5Array, MutableArrayData, StringArray,
     TimestampMicrosecondArray, TimestampNanosecondArray, UInt16Array, UInt32Array, UInt64Array,
 };
 use arrow::datatypes::{DataType, Schema, SchemaRef, TimeUnit};
@@ -1373,6 +1375,12 @@ macro_rules! convert_array_cast_native {
     ($V: expr, (Decimal)) => {{
         crate::util::decimal::Decimal::new($V)
     }};
+    ($V: expr, (Decimal96)) => {{
+        crate::util::decimal::Decimal96::new($V)
+    }};
+    ($V: expr, (Int96)) => {{
+        crate::util::int96::Int96::new($V)
+    }};
     ($V: expr, $T: ty) => {{
         $V as $T
     }};
@@ -1425,6 +1433,9 @@ pub fn batch_to_dataframe(batches: &Vec<RecordBatch>) -> Result<DataFrame, CubeE
                 DataType::Int16 => convert_array!(array, num_rows, rows, Int16Array, Int, i64),
                 DataType::Int32 => convert_array!(array, num_rows, rows, Int32Array, Int, i64),
                 DataType::Int64 => convert_array!(array, num_rows, rows, Int64Array, Int, i64),
+                DataType::Int96 => {
+                    convert_array!(array, num_rows, rows, Int96Array, Int96, (Int96))
+                }
                 DataType::Float64 => {
                     let a = array.as_any().downcast_ref::<Float64Array>().unwrap();
                     for i in 0..num_rows {
@@ -1491,6 +1502,62 @@ pub fn batch_to_dataframe(batches: &Vec<RecordBatch>) -> Result<DataFrame, CubeE
                     Int64Decimal10Array,
                     Decimal,
                     (Decimal)
+                ),
+                DataType::Int96Decimal(0) => convert_array!(
+                    array,
+                    num_rows,
+                    rows,
+                    Int96Decimal0Array,
+                    Decimal96,
+                    (Decimal96)
+                ),
+                DataType::Int96Decimal(1) => convert_array!(
+                    array,
+                    num_rows,
+                    rows,
+                    Int96Decimal1Array,
+                    Decimal96,
+                    (Decimal96)
+                ),
+                DataType::Int96Decimal(2) => convert_array!(
+                    array,
+                    num_rows,
+                    rows,
+                    Int96Decimal2Array,
+                    Decimal96,
+                    (Decimal96)
+                ),
+                DataType::Int96Decimal(3) => convert_array!(
+                    array,
+                    num_rows,
+                    rows,
+                    Int96Decimal3Array,
+                    Decimal96,
+                    (Decimal96)
+                ),
+                DataType::Int96Decimal(4) => convert_array!(
+                    array,
+                    num_rows,
+                    rows,
+                    Int96Decimal4Array,
+                    Decimal96,
+                    (Decimal96)
+                ),
+                DataType::Int96Decimal(5) => convert_array!(
+                    array,
+                    num_rows,
+                    rows,
+                    Int96Decimal5Array,
+                    Decimal96,
+                    (Decimal96)
+                ),
+                DataType::Int96Decimal(10) => convert_array!(
+                    array,
+                    num_rows,
+                    rows,
+                    Int96Decimal10Array,
+                    Decimal96,
+                    (Decimal96)
                 ),
                 DataType::Timestamp(TimeUnit::Microsecond, None) => {
                     let a = array
@@ -1559,11 +1626,16 @@ pub fn arrow_to_column_type(arrow_type: DataType) -> Result<ColumnType, CubeErro
             scale: scale as i32,
             precision: 18,
         }),
+        DataType::Int96Decimal(scale) => Ok(ColumnType::Decimal {
+            scale: scale as i32,
+            precision: 27,
+        }),
         DataType::Boolean => Ok(ColumnType::Boolean),
         DataType::Int8
         | DataType::Int16
         | DataType::Int32
         | DataType::Int64
+        | DataType::Int96
         | DataType::UInt8
         | DataType::UInt16
         | DataType::UInt32

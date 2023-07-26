@@ -25,6 +25,13 @@ pub static SUPPORTED_COALESCE_TYPES: &[DataType] = &[
     DataType::Int64Decimal(4),
     DataType::Int64Decimal(5),
     DataType::Int64Decimal(10),
+    DataType::Int96Decimal(0),
+    DataType::Int96Decimal(1),
+    DataType::Int96Decimal(2),
+    DataType::Int96Decimal(3),
+    DataType::Int96Decimal(4),
+    DataType::Int96Decimal(5),
+    DataType::Int96Decimal(10),
     DataType::Timestamp(TimeUnit::Second, None),
     DataType::Timestamp(TimeUnit::Millisecond, None),
     DataType::Timestamp(TimeUnit::Microsecond, None),
@@ -75,6 +82,9 @@ fn do_coalesce(start: &ArrayRef, rest: &[ColumnarValue]) -> Result<ArrayRef, Dat
     macro_rules! match_scalar {
         ($v: pat, Int64Decimal) => {
             ScalarValue::Int64Decimal($v, _)
+        };
+        ($v: pat, Int96Decimal) => {
+            ScalarValue::Int96Decimal($v, _)
         };
         ($v: pat, $variant: ident) => {
             ScalarValue::$variant($v)
