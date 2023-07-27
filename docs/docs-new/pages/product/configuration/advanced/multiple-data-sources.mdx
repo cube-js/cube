@@ -34,7 +34,7 @@ CUBEJS_DS_DATASOURCE1_DB_HOST=remotehost
 
 Cube expects that the `default` data source is **always** defined. Ensure that
 `CUBEJS_DB_*` environment variables are set **or** that the `default` data
-source is defined using [`driverFactory`] [ref-config-ref-driverfactory] in your
+source is defined using [`driverFactory`][ref-config-ref-driverfactory] in your
 `cube.js` file.
 
 </InfoBox>
@@ -61,8 +61,7 @@ pages][ref-config-db].
 
 ## Data model
 
-Use the
-[`data_source`](/product/data-modeling/reference/cube#parameters-data-source)
+Use the [`data_source`](/product/data-modeling/reference/cube#data_source)
 property to set a data source for each cube:
 
 <CodeTabs>
@@ -97,8 +96,7 @@ cube(`orders_from_other_data_source`, {
 </CodeTabs>
 
 [ref-config-ref-env]: /reference/configuration/environment-variables
-[ref-config-ref-driverfactory]:
-  /reference/configuration/config#options-reference-driver-factory
+[ref-config-ref-driverfactory]: /reference/configuration/config#driverfactory
 [ref-config-db]: /product/configuration/data-sources
 [ref-config-multitenancy]:
   /product/configuration/advanced/multitenancy#multitenancy-multitenancy-vs-multiple-data-sources
