@@ -8,10 +8,7 @@ use async_trait::async_trait;
 use datafusion::{
     error::{DataFusionError, Result},
     execution::context::TaskContext,
-    logical_plan::{
-        plan::{Aggregate, Extension},
-        Column, DFSchemaRef, Expr, LogicalPlan, UserDefinedLogicalNode,
-    },
+    logical_plan::{plan::Extension, DFSchemaRef, Expr, LogicalPlan, UserDefinedLogicalNode},
     physical_plan::{
         aggregates::AggregateFunction, DisplayFormatType, ExecutionPlan, Partitioning,
         SendableRecordBatchStream, Statistics,
@@ -189,10 +186,10 @@ impl CubeScanWrapperNode {
                                 load_request_meta.as_ref().clone(),
                             )
                             .await?;
-                        // TODO
+                        // TODO Add wrapper for reprojection and literal members handling
                         return Ok((
                             Some(data_sources[0].clone()),
-                            // TODO
+                            // TODO Implement more straightforward way to get alias name
                             node.schema
                                 .fields()
                                 .iter()

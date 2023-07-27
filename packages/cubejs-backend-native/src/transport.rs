@@ -6,6 +6,7 @@ use std::fmt::Display;
 use async_trait::async_trait;
 use cubeclient::models::{V1Error, V1LoadRequestQuery, V1LoadResponse, V1MetaResponse};
 use cubesql::compile::engine::df::scan::{MemberField, SchemaRef};
+use cubesql::compile::engine::df::wrapper::SqlQuery;
 use cubesql::transport::{SqlGenerator, SqlResponse};
 use cubesql::{
     di_service,
@@ -13,6 +14,7 @@ use cubesql::{
     transport::{CubeStreamReceiver, LoadRequestMeta, MetaContext, TransportService},
     CubeError,
 };
+use serde_derive::Deserialize;
 use serde_derive::Serialize;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -28,6 +30,7 @@ use crate::{
 pub struct NodeBridgeTransport {
     channel: Arc<Channel>,
     on_load: Arc<Root<JsFunction>>,
+    on_sql_api_load: Arc<Root<JsFunction>>,
     on_sql: Arc<Root<JsFunction>>,
     on_meta: Arc<Root<JsFunction>>,
     on_load_stream: Arc<Root<JsFunction>>,
@@ -38,6 +41,7 @@ impl NodeBridgeTransport {
     pub fn new(
         channel: Channel,
         on_load: Root<JsFunction>,
+        on_sql_api_load: Root<JsFunction>,
         on_sql: Root<JsFunction>,
         on_meta: Root<JsFunction>,
         on_load_stream: Root<JsFunction>,
@@ -46,6 +50,7 @@ impl NodeBridgeTransport {
         Self {
             channel: Arc::new(channel),
             on_load: Arc::new(on_load),
+            on_sql_api_load: Arc::new(on_sql_api_load),
             on_sql: Arc::new(on_sql),
             on_meta: Arc::new(on_meta),
             on_load_stream: Arc::new(on_load_stream),
@@ -64,6 +69,8 @@ struct SessionContext {
 struct LoadRequest {
     request: TransportRequest,
     query: V1LoadRequestQuery,
+    #[serde(rename = "sqlQuery", skip_serializing_if = "Option::is_none")]
+    sql_query: Option<(String, Vec<String>)>,
     session: SessionContext,
 }
 
@@ -71,6 +78,11 @@ struct LoadRequest {
 struct MetaRequest {
     request: TransportRequest,
     session: SessionContext,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct SqlResponseSerialized {
+    sql: (String, Vec<String>),
 }
 
 #[async_trait]
@@ -165,14 +177,83 @@ impl TransportService for NodeBridgeTransport {
         &self,
         query: V1LoadRequestQuery,
         ctx: AuthContextRef,
-        meta_fields: LoadRequestMeta,
+        meta: LoadRequestMeta,
     ) -> Result<SqlResponse, CubeError> {
-        todo!()
+        let native_auth = ctx
+            .as_any()
+            .downcast_ref::<NativeAuthContext>()
+            .expect("Unable to cast AuthContext to NativeAuthContext");
+
+        let request_id = Uuid::new_v4().to_string();
+
+        let extra = serde_json::to_string(&LoadRequest {
+            request: TransportRequest {
+                id: format!("{}-span-{}", request_id, 1),
+                meta: Some(meta.clone()),
+            },
+            query: query.clone(),
+            session: SessionContext {
+                user: native_auth.user.clone(),
+                superuser: native_auth.superuser,
+            },
+            sql_query: None,
+        })?;
+
+        let response: serde_json::Value = call_js_with_channel_as_callback(
+            self.channel.clone(),
+            self.on_sql.clone(),
+            Some(extra),
+        )
+        .await?;
+
+        let sql = response
+            .get("sql")
+            .ok_or(CubeError::user(format!("No sql in response: {}", response)))?
+            .get("sql")
+            .ok_or(CubeError::user(format!("No sql in response: {}", response)))?;
+        Ok(SqlResponse {
+            sql: SqlQuery {
+                sql: sql
+                    .get(0)
+                    .ok_or(CubeError::user(format!(
+                        "No sql array in response: {}",
+                        response
+                    )))?
+                    .as_str()
+                    .ok_or(CubeError::user(format!(
+                        "SQL not a string in response: {}",
+                        response
+                    )))?
+                    .to_string(),
+                values: sql
+                    .get(1)
+                    .ok_or(CubeError::user(format!(
+                        "No sql array in response: {}",
+                        response
+                    )))?
+                    .as_array()
+                    .ok_or(CubeError::user(format!(
+                        "No sql array in response: {}",
+                        response
+                    )))?
+                    .into_iter()
+                    .map(|v| -> Result<_, CubeError> {
+                        Ok(v.as_str()
+                            .ok_or(CubeError::user(format!(
+                                "Params not a string in response: {}",
+                                response
+                            )))?
+                            .to_string())
+                    })
+                    .collect::<Result<Vec<_>, _>>()?,
+            },
+        })
     }
 
     async fn load(
         &self,
         query: V1LoadRequestQuery,
+        sql_query: Option<SqlQuery>,
         ctx: AuthContextRef,
         meta: LoadRequestMeta,
     ) -> Result<V1LoadResponse, CubeError> {
@@ -197,11 +278,12 @@ impl TransportService for NodeBridgeTransport {
                     user: native_auth.user.clone(),
                     superuser: native_auth.superuser,
                 },
+                sql_query: sql_query.clone().map(|q| (q.sql, q.values)),
             })?;
 
             let response: serde_json::Value = call_js_with_channel_as_callback(
                 self.channel.clone(),
-                self.on_load.clone(),
+                self.on_sql_api_load.clone(),
                 Some(extra),
             )
             .await?;
@@ -244,6 +326,7 @@ impl TransportService for NodeBridgeTransport {
     async fn load_stream(
         &self,
         query: V1LoadRequestQuery,
+        sql_query: Option<SqlQuery>,
         ctx: AuthContextRef,
         meta: LoadRequestMeta,
         schema: SchemaRef,
@@ -265,6 +348,7 @@ impl TransportService for NodeBridgeTransport {
                     meta: Some(meta.clone()),
                 },
                 query: query.clone(),
+                sql_query: sql_query.clone().map(|q| (q.sql, q.values)),
                 session: SessionContext {
                     user: native_auth.user.clone(),
                     superuser: native_auth.superuser,

@@ -115,6 +115,26 @@ export class SQLServer {
           }
         });
       },
+      sqlApiLoad: async ({ request, session, query, sqlQuery }) => {
+        const context = await contextByRequest(request, session);
+
+        // eslint-disable-next-line no-async-promise-executor
+        return new Promise(async (resolve, reject) => {
+          try {
+            await this.apiGateway.sqlApiLoad({
+              query,
+              sqlQuery,
+              context,
+              res: (message) => {
+                resolve(message);
+              },
+              apiType: 'sql',
+            });
+          } catch (e) {
+            reject(e);
+          }
+        });
+      },
       sql: async ({ request, session, query }) => {
         const context = await contextByRequest(request, session);
 

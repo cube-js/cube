@@ -39,6 +39,24 @@ describe('SQLInterface', () => {
       };
     });
 
+    const sqlApiLoad = jest.fn(async ({ request, session, query }) => {
+      console.log('[js] load', {
+        request,
+        session,
+        query
+      });
+
+      expect(session).toEqual({
+        user: expect.toBeTypeOrNull(String),
+        superuser: expect.any(Boolean),
+      });
+
+      // It's just an emulation that ApiGateway returns error
+      return {
+        error: 'This error should be passed back to MySQL client'
+      };
+    });
+
     const sql = jest.fn(async ({ request, session, query }) => {
       console.log('[js] sql', {
         request,
@@ -118,6 +136,7 @@ describe('SQLInterface', () => {
       port: 4545,
       checkAuth,
       load,
+      sqlApiLoad,
       sql,
       meta,
       stream,

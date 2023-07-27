@@ -43,6 +43,13 @@ export interface LoadPayload {
     query: any,
 }
 
+export interface SqlApiLoadPayload {
+    request: Request<LoadRequestMeta>,
+    session: SessionContext,
+    query: any,
+    sqlQuery: any,
+}
+
 export interface MetaPayload {
     request: Request<undefined>,
     session: SessionContext,
@@ -57,6 +64,7 @@ export type SQLInterfaceOptions = {
     sql: (payload: LoadPayload) => unknown | Promise<unknown>,
     meta: (payload: MetaPayload) => unknown | Promise<unknown>,
     stream: (payload: LoadPayload) => unknown | Promise<unknown>,
+    sqlApiLoad: (payload: SqlApiLoadPayload) => unknown | Promise<unknown>,
     sqlGenerators: (paramsJson: string) => unknown | Promise<unknown>,
 };
 
@@ -153,24 +161,24 @@ function wrapRawNativeFunctionWithChannelCallback(
 }
 
 const errorString = (err: any) => err.error ||
-    err.message ||
-    err.stack?.toString() ||
-    (typeof err === 'string' ? err.toString() : JSON.stringify(err));
+  err.message ||
+  err.stack?.toString() ||
+  (typeof err === 'string' ? err.toString() : JSON.stringify(err));
 
 // TODO: Refactor - define classes
 function wrapNativeFunctionWithStream(
-  fn: (extra: any) => unknown | Promise<unknown>
+  fn: (extra: any) => unknown | Promise<unknown>,
 ) {
   const chunkLength = parseInt(
     process.env.CUBEJS_DB_QUERY_STREAM_HIGH_WATER_MARK || '8192',
-    10
+    10,
   );
-  return async (extra: any, writer: any) => {
-    let streamResponse: any;
+  return async (extra: any, writerOrChannel: any) => {
+    let response: any;
     try {
-      streamResponse = await fn(JSON.parse(extra));
-      if (streamResponse && streamResponse.stream) {
-        writer.start();
+      response = await fn(JSON.parse(extra));
+      if (response && response.stream) {
+        writerOrChannel.start();
 
         let chunkBuffer: any[] = [];
         const writable = new Writable({
@@ -183,47 +191,49 @@ function wrapNativeFunctionWithStream(
             } else {
               const toSend = chunkBuffer;
               chunkBuffer = [];
-              writer.chunk(toSend, callback);
+              writerOrChannel.chunk(toSend, callback);
             }
+
           },
           final(callback: (error?: (Error | null)) => void) {
             const end = (err: any) => {
               if (err) {
                 callback(err);
               } else {
-                writer.end(callback);
+                writerOrChannel.end(callback);
               }
             };
             if (chunkBuffer.length > 0) {
               const toSend = chunkBuffer;
               chunkBuffer = [];
-              writer.chunk(toSend, end);
+              writerOrChannel.chunk(toSend, end);
             } else {
               end(null);
             }
           },
           destroy(error: Error | null, callback: (error: (Error | null)) => void) {
             if (error) {
-              writer.reject(errorString(error));
+              writerOrChannel.reject(errorString(error));
             }
             callback(null);
-          }
+          },
         });
-        streamResponse.stream.pipe(writable);
-        streamResponse.stream.on('error', (err: any) => {
+        response.stream.pipe(writable);
+        response.stream.on('error', (err: any) => {
           writable.destroy(err);
         });
       } else {
-        throw new Error('Expected stream but nothing returned');
+        // TODO remove JSON.stringify()
+        writerOrChannel.resolve(JSON.stringify(response));
       }
     } catch (e: any) {
-      if (!!streamResponse && !!streamResponse.stream) {
-        streamResponse.stream.destroy(e);
+      if (!!response && !!response.stream) {
+        response.stream.destroy(e);
       }
-      writer.reject(errorString(e));
+      writerOrChannel.reject(errorString(e));
     }
   };
-}
+};
 
 type LogLevel = 'error' | 'warn' | 'info' | 'debug' | 'trace';
 
@@ -260,7 +270,11 @@ export const registerInterface = async (options: SQLInterfaceOptions): Promise<S
     throw new Error('options.stream must be a function');
   }
 
-  if (typeof options.sqlGenerators != 'function') {
+  if (typeof options.sqlApiLoad != 'function') {
+        throw new Error('options.sqlApiLoad must be a function');
+    }
+
+    if (typeof options.sqlGenerators != 'function') {
         throw new Error('options.sqlGenerators must be a function');
     }
 
@@ -276,6 +290,7 @@ export const registerInterface = async (options: SQLInterfaceOptions): Promise<S
         sql: wrapNativeFunctionWithChannelCallback(options.sql),
         meta: wrapNativeFunctionWithChannelCallback(options.meta),
         stream: wrapNativeFunctionWithStream(options.stream),
+        sqlApiLoad: wrapNativeFunctionWithStream(options.sqlApiLoad),
         sqlGenerators: wrapRawNativeFunctionWithChannelCallback(options.sqlGenerators),
     });
 };

@@ -264,8 +264,31 @@ fn get_sql_templates(
         );
     }
 
-    // TODO
-    Ok(SqlTemplates::new(functions_map, HashMap::new())?)
+    let stataments = templates
+        .downcast_or_throw::<JsObject, _>(cx)
+        .map_cube_err("Can't downcast template to object")?
+        .get::<JsObject, _, _>(cx, "statements")
+        .map_cube_err("Can't get statements")?;
+
+    let statement_names = stataments
+        .get_own_property_names(cx)
+        .map_cube_err("Can't get statements property names")?;
+
+    let mut statements_map = HashMap::new();
+    for i in 0..statement_names.len(cx) {
+        let statement_name = statement_names
+            .get::<JsString, _, _>(cx, i)
+            .map_cube_err("Can't get statement names")?;
+        statements_map.insert(
+            statement_name.value(cx),
+            stataments
+                .get::<JsString, _, _>(cx, statement_name)
+                .map_cube_err("Can't get statement value")?
+                .value(cx),
+        );
+    }
+
+    Ok(SqlTemplates::new(functions_map, statements_map)?)
 }
 
 // TODO impl drop for SqlGenerator

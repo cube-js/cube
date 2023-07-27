@@ -323,6 +323,7 @@ pub fn get_test_transport() -> Arc<dyn TransportService> {
         async fn load(
             &self,
             _query: V1LoadRequestQuery,
+            _sql_query: Option<SqlQuery>,
             _ctx: AuthContextRef,
             _meta_fields: LoadRequestMeta,
         ) -> Result<V1LoadResponse, CubeError> {
@@ -332,6 +333,7 @@ pub fn get_test_transport() -> Arc<dyn TransportService> {
         async fn load_stream(
             &self,
             _query: V1LoadRequestQuery,
+            _sql_query: Option<SqlQuery>,
             _ctx: AuthContextRef,
             _meta_fields: LoadRequestMeta,
             _schema: SchemaRef,

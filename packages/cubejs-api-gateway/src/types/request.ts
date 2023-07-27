@@ -119,6 +119,12 @@ type QueryRequest = BaseRequest & {
   resType?: ResultType
 };
 
+type SqlApiRequest = BaseRequest & {
+  query: Record<string, any>;
+  sqlQuery?: [string, string[]];
+  apiType?: ApiType;
+};
+
 /**
  * Pre-aggregations selector object.
  */
@@ -182,6 +188,7 @@ export {
   RequestExtension,
   ExtendedRequestContext,
   Request,
+  SqlApiRequest,
   QueryRewriteFn,
   SecurityContextExtractorFn,
   ExtendContextFn,

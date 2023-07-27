@@ -79,6 +79,7 @@ pub trait TransportService: Send + Sync + Debug {
     async fn load(
         &self,
         query: V1LoadRequestQuery,
+        sql_query: Option<SqlQuery>,
         ctx: AuthContextRef,
         meta_fields: LoadRequestMeta,
     ) -> Result<V1LoadResponse, CubeError>;
@@ -86,6 +87,7 @@ pub trait TransportService: Send + Sync + Debug {
     async fn load_stream(
         &self,
         query: V1LoadRequestQuery,
+        sql_query: Option<SqlQuery>,
         ctx: AuthContextRef,
         meta_fields: LoadRequestMeta,
         schema: SchemaRef,
@@ -194,6 +196,7 @@ impl TransportService for HttpTransport {
     async fn load(
         &self,
         query: V1LoadRequestQuery,
+        _sql_query: Option<SqlQuery>,
         ctx: AuthContextRef,
         meta: LoadRequestMeta,
     ) -> Result<V1LoadResponse, CubeError> {
@@ -218,6 +221,7 @@ impl TransportService for HttpTransport {
     async fn load_stream(
         &self,
         _query: V1LoadRequestQuery,
+        _sql_query: Option<SqlQuery>,
         _ctx: AuthContextRef,
         _meta_fields: LoadRequestMeta,
         _schema: SchemaRef,

@@ -38,7 +38,7 @@ import {
   PreAggJob,
   PreAggJobStatusItem,
   PreAggJobStatusObject,
-  PreAggJobStatusResponse,
+  PreAggJobStatusResponse, SqlApiRequest,
 } from './types/request';
 import {
   CheckAuthInternalOptions,
@@ -1626,6 +1626,137 @@ class ApiGateway {
       } else {
         res(results[0]);
       }
+    } catch (e) {
+      this.handleError({
+        e, context, query, res, requestStarted
+      });
+    }
+  }
+
+  public async sqlApiLoad(request: SqlApiRequest) {
+    let query: Query | Query[] | null = null;
+    const {
+      context,
+      res,
+      apiType = 'sql',
+    } = request;
+    const requestStarted = new Date();
+
+    try {
+      await this.assertApiScope('data', context.securityContext);
+
+      query = this.parseQueryParam(request.query);
+      let resType: ResultType = ResultType.DEFAULT;
+
+      if (!Array.isArray(query) && query.responseFormat) {
+        resType = query.responseFormat;
+      }
+
+      this.log({
+        type: 'Load Request',
+        query
+      }, context);
+
+      const [queryType, normalizedQueries] =
+        await this.getNormalizedQueries(query, context);
+
+      let metaConfigResult = await this
+        .getCompilerApi(context).metaConfig({
+          requestId: context.requestId
+        });
+
+      metaConfigResult = this.filterVisibleItemsInMeta(context, metaConfigResult);
+
+      const sqlQueries = await this
+        .getSqlQueriesInternal(context, normalizedQueries);
+
+      let results;
+
+      let slowQuery = false;
+
+      if (request.sqlQuery) {
+        const finalQuery = {
+          query: request.sqlQuery[0],
+          values: request.sqlQuery[1],
+          continueWait: true,
+          renewQuery: normalizedQueries[0].renewQuery,
+          requestId: context.requestId,
+          context,
+          ...sqlQueries[0],
+        };
+
+        const response = await this
+          .getAdapterApi(context)
+          .executeQuery(finalQuery);
+
+        const annotation = prepareAnnotation(
+          metaConfigResult, normalizedQueries[0]
+        );
+
+        results = [this.getResultInternal(
+          context,
+          queryType,
+          normalizedQueries[0],
+          sqlQueries[0],
+          annotation,
+          response,
+          resType,
+        )];
+      } else {
+        results = await Promise.all(
+          normalizedQueries.map(async (normalizedQuery, index) => {
+            slowQuery = slowQuery ||
+              Boolean(sqlQueries[index].slowQuery);
+
+            const annotation = prepareAnnotation(
+              metaConfigResult, normalizedQuery
+            );
+
+            const response = await this.getSqlResponseInternal(
+              context,
+              normalizedQuery,
+              sqlQueries[index],
+            );
+
+            return this.getResultInternal(
+              context,
+              queryType,
+              normalizedQuery,
+              sqlQueries[index],
+              annotation,
+              response,
+              resType,
+            );
+          })
+        );
+      }
+
+      this.log(
+        {
+          type: 'Load Request Success',
+          query,
+          duration: this.duration(requestStarted),
+          apiType,
+          isPlayground: Boolean(
+            context.signedWithPlaygroundAuthSecret
+          ),
+          queries: results.length,
+          queriesWithPreAggregations:
+          results.filter(
+            (r: any) => Object.keys(
+              r.usedPreAggregations || {}
+            ).length
+          ).length,
+          queriesWithData:
+          results.filter((r: any) => r.data?.length).length,
+          dbType: results.map(r => r.dbType),
+        },
+        context,
+      );
+
+      res({
+        results,
+      });
     } catch (e) {
       this.handleError({
         e, context, query, res, requestStarted

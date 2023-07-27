@@ -2383,7 +2383,17 @@ class BaseQuery {
   sqlTemplates() {
     return {
       functions: {
-        sum: 'SUM({{ argument }})',
+        SUM: 'SUM({{ args | join(sep=", ") }})',
+        MIN: 'MIN({{ args | join(sep=", ") }})',
+        MAX: 'MAX({{ args | join(sep=", ") }})',
+        COUNT: 'COUNT({{ args | join(sep=", ") }})',
+        COUNT_DISTINCT: 'COUNT(DISTINCT {{ args | join(sep=", ") }})',
+        AVG: 'AVG({{ args | join(sep=", ") }})',
+      },
+      statements: {
+        select: 'SELECT {% for col in group_by %}{{col.expr}} "{{col.alias}}",{% endfor %}{% for col in aggregate %}{{col.expr}} "{{col.alias}}"{% if loop.last %}{% else %},{% endif %}{% endfor %} \n' +
+          '                    FROM ({{ from }}) AS {{ from_alias }} \n' +
+          '                    {% if group_by %} GROUP BY {% for col in group_by %}{{ loop.index }}{% if loop.last %}{% else %},{% endif %}{% endfor %}{% endif %}'
       }
     };
   }

@@ -14,6 +14,16 @@ const meta_fixture = require('./meta');
     throw new Error('load is not implemented');
   };
 
+  const sqlApiLoad = async ({ request, session, query }) => {
+    console.log('[js] load', {
+      request,
+      session,
+      query,
+    });
+
+    throw new Error('load is not implemented');
+  };
+
   const meta = async ({ request, session }) => {
     console.log('[js] meta', {
       request,
@@ -85,6 +95,7 @@ const meta_fixture = require('./meta');
       // nonce: '12345678910111213141516'.substring(0, 20),
       checkAuth,
       load,
+      sqlApiLoad,
       meta,
       stream,
       sqlGenerators,
