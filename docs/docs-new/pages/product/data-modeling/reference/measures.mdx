@@ -186,7 +186,7 @@ cube(`orders`, {
   measures: {
     total: {
       sql: `amount`,
-      type: `running_total`,
+      type: `sum`,
       format: `currency`,
     },
   },
@@ -201,7 +201,7 @@ cubes:
     measures:
       - name: total
         sql: amount
-        type: running_total
+        type: sum
         format: currency
 ```
 
