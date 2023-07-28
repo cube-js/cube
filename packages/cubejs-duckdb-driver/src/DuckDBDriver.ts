@@ -4,7 +4,7 @@ import {
   StreamOptions,
   QueryOptions, StreamTableData,
 } from '@cubejs-backend/base-driver';
-import { assertDataSource, getEnv } from '@cubejs-backend/shared';
+import { getEnv } from '@cubejs-backend/shared';
 import { promisify } from 'util';
 import * as stream from 'stream';
 // eslint-disable-next-line import/no-extraneous-dependencies
@@ -15,28 +15,16 @@ import { HydrationStream, transformRow } from './HydrationStream';
 
 export type DuckDBDriverConfiguration = {
   dataSource?: string,
-  enableHttpFs?: boolean,
   initSql?: string,
 };
 
 export class DuckDBDriver extends BaseDriver implements DriverInterface {
-  protected readonly config: DuckDBDriverConfiguration;
-
   protected initPromise: Promise<Database> | null = null;
 
   public constructor(
-    config: DuckDBDriverConfiguration = {},
+    protected readonly config: DuckDBDriverConfiguration = {},
   ) {
     super();
-
-    const dataSource =
-      config.dataSource ||
-      assertDataSource('default');
-
-    this.config = {
-      enableHttpFs: getEnv('duckdbHttpFs', { dataSource }) || true,
-      ...config,
-    };
   }
 
   protected async initDatabase(): Promise<Database> {
@@ -45,15 +33,46 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
     const db = new Database(token ? `md:?motherduck_token=${token}` : ':memory:');
     const conn = db.connect();
 
-    if (this.config.enableHttpFs) {
-      try {
-        await this.handleQuery(conn, 'INSTALL httpfs', []);
-      } catch (e) {
-        if (this.logger) {
-          console.error('DuckDB - error on httpfs installation', {
-            e
-          });
+    const s3InitQuries = [
+      {
+        key: 's3_region',
+        value: getEnv('duckdbS3Region', this.config),
+      },
+      {
+        key: 's3_endpoint',
+        value: getEnv('duckdbS3Endpoint', this.config),
+      },
+      {
+        key: 's3_access_key_id',
+        value: getEnv('duckdbS3AccessKeyId', this.config),
+      },
+      {
+        key: 's3_secret_access_key',
+        value: getEnv('duckdbS3SecretAccessKeyId', this.config),
+      },
+    ];
+    
+    try {
+      await this.handleQuery(conn, 'INSTALL httpfs', []);
+    } catch (e) {
+      if (this.logger) {
+        console.error('DuckDB - error on httpfs installation', {
+          e
+        });
+      }
+    }
+    
+    try {
+      for (const { key, value } of s3InitQuries) {
+        if (value) {
+          await this.handleQuery(conn, `SET ${key}='${value}'`, []);
         }
+      }
+    } catch (e) {
+      if (this.logger) {
+        console.error('DuckDB - error on s3 configuration', {
+          e
+        });
       }
     }
 
