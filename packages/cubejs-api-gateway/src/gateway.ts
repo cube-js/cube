@@ -1169,7 +1169,7 @@ class ApiGateway {
     return [queryType, normalizedQueries];
   }
 
-  public async sql({ query, context, res }: QueryRequest) {
+  public async sql({ query, context, res, memberToAlias }: QueryRequest) {
     const requestStarted = new Date();
 
     try {
@@ -1180,7 +1180,7 @@ class ApiGateway {
 
       const sqlQueries = await Promise.all<any>(
         normalizedQueries.map((normalizedQuery) => this.getCompilerApi(context).getSql(
-          this.coerceForSqlQuery(normalizedQuery, context),
+          this.coerceForSqlQuery({ ...normalizedQuery, memberToAlias }, context),
           { includeDebugInfo: getEnv('devMode') || context.signedWithPlaygroundAuthSecret }
         ))
       );
@@ -1693,15 +1693,11 @@ class ApiGateway {
           metaConfigResult, normalizedQueries[0]
         );
 
-        results = [this.getResultInternal(
-          context,
-          queryType,
-          normalizedQueries[0],
-          sqlQueries[0],
-          annotation,
-          response,
-          resType,
-        )];
+        // TODO Can we just pass through data? Ensure hidden members can't be queried
+        results = [{
+          data: response.data,
+          annotation
+        }];
       } else {
         results = await Promise.all(
           normalizedQueries.map(async (normalizedQuery, index) => {

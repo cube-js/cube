@@ -43,6 +43,13 @@ export interface LoadPayload {
     query: any,
 }
 
+export interface SqlPayload {
+    request: Request<LoadRequestMeta>,
+    session: SessionContext,
+    query: any,
+    memberToAlias: Record<string, string>,
+}
+
 export interface SqlApiLoadPayload {
     request: Request<LoadRequestMeta>,
     session: SessionContext,
@@ -61,7 +68,7 @@ export type SQLInterfaceOptions = {
     nonce?: string,
     checkAuth: (payload: CheckAuthPayload) => CheckAuthResponse | Promise<CheckAuthResponse>,
     load: (payload: LoadPayload) => unknown | Promise<unknown>,
-    sql: (payload: LoadPayload) => unknown | Promise<unknown>,
+    sql: (payload: SqlPayload) => unknown | Promise<unknown>,
     meta: (payload: MetaPayload) => unknown | Promise<unknown>,
     stream: (payload: LoadPayload) => unknown | Promise<unknown>,
     sqlApiLoad: (payload: SqlApiLoadPayload) => unknown | Promise<unknown>,

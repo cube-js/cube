@@ -2158,6 +2158,9 @@ class BaseQuery {
    * @returns {string}
    */
   aliasName(name, isPreAggregationName) {
+    if (this.options.memberToAlias && this.options.memberToAlias[name]) {
+      return this.options.memberToAlias[name];
+    }
     const path = name.split('.');
     if (path[0] && this.cubeEvaluator.cubeExists(path[0]) && this.cubeEvaluator.cubeFromPath(path[0]).sqlAlias) {
       const cubeName = path[0];

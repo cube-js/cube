@@ -117,6 +117,7 @@ type QueryRequest = BaseRequest & {
   queryType?: RequestType;
   apiType?: ApiType;
   resType?: ResultType
+  memberToAlias?: Record<string, string>;
 };
 
 type SqlApiRequest = BaseRequest & {

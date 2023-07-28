@@ -1,5 +1,7 @@
 use crate::{
-    compile::engine::df::scan::{CubeScanNode, PhysicalSortExpr, SchemaRef, WrappedSelectNode},
+    compile::engine::df::scan::{
+        CubeScanNode, MemberField, PhysicalSortExpr, SchemaRef, WrappedSelectNode,
+    },
     sql::AuthContextRef,
     transport::{AliasedColumn, LoadRequestMeta, MetaContext, SqlGenerator, TransportService},
     CubeError,
@@ -184,6 +186,18 @@ impl CubeScanWrapperNode {
                                 node.request,
                                 node.auth_context,
                                 load_request_meta.as_ref().clone(),
+                                Some(
+                                    node.member_fields
+                                        .iter()
+                                        .zip(node.schema.fields().iter())
+                                        .filter_map(|(m, field)| match m {
+                                            MemberField::Member(f) => {
+                                                Some((f.to_string(), field.name().to_string()))
+                                            }
+                                            _ => None,
+                                        })
+                                        .collect(),
+                                ),
                             )
                             .await?;
                         // TODO Add wrapper for reprojection and literal members handling

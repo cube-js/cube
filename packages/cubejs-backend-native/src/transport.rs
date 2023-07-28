@@ -72,6 +72,8 @@ struct LoadRequest {
     #[serde(rename = "sqlQuery", skip_serializing_if = "Option::is_none")]
     sql_query: Option<(String, Vec<String>)>,
     session: SessionContext,
+    #[serde(rename = "memberToAlias", skip_serializing_if = "Option::is_none")]
+    member_to_alias: Option<HashMap<String, String>>,
 }
 
 #[derive(Debug, Serialize)]
@@ -178,6 +180,7 @@ impl TransportService for NodeBridgeTransport {
         query: V1LoadRequestQuery,
         ctx: AuthContextRef,
         meta: LoadRequestMeta,
+        member_to_alias: Option<HashMap<String, String>>,
     ) -> Result<SqlResponse, CubeError> {
         let native_auth = ctx
             .as_any()
@@ -197,6 +200,7 @@ impl TransportService for NodeBridgeTransport {
                 superuser: native_auth.superuser,
             },
             sql_query: None,
+            member_to_alias,
         })?;
 
         let response: serde_json::Value = call_js_with_channel_as_callback(
@@ -279,6 +283,7 @@ impl TransportService for NodeBridgeTransport {
                     superuser: native_auth.superuser,
                 },
                 sql_query: sql_query.clone().map(|q| (q.sql, q.values)),
+                member_to_alias: None,
             })?;
 
             let response: serde_json::Value = call_js_with_channel_as_callback(
@@ -353,6 +358,7 @@ impl TransportService for NodeBridgeTransport {
                     user: native_auth.user.clone(),
                     superuser: native_auth.superuser,
                 },
+                member_to_alias: None,
             })?;
 
             let res = call_js_with_stream_as_callback(

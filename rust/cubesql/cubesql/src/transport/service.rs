@@ -73,6 +73,7 @@ pub trait TransportService: Send + Sync + Debug {
         query: V1LoadRequestQuery,
         ctx: AuthContextRef,
         meta_fields: LoadRequestMeta,
+        member_to_alias: Option<HashMap<String, String>>,
     ) -> Result<SqlResponse, CubeError>;
 
     // Execute load query
@@ -189,6 +190,7 @@ impl TransportService for HttpTransport {
         query: V1LoadRequestQuery,
         ctx: AuthContextRef,
         meta_fields: LoadRequestMeta,
+        member_to_alias: Option<HashMap<String, String>>,
     ) -> Result<SqlResponse, CubeError> {
         todo!()
     }

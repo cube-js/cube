@@ -313,6 +313,7 @@ pub fn get_test_transport() -> Arc<dyn TransportService> {
             query: V1LoadRequestQuery,
             ctx: AuthContextRef,
             meta_fields: LoadRequestMeta,
+            member_to_alias: Option<HashMap<String, String>>,
         ) -> Result<SqlResponse, CubeError> {
             Ok(SqlResponse {
                 sql: SqlQuery::new("SELECT 1".to_string(), vec![]),
