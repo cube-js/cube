@@ -132,7 +132,8 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
 
   public async release(): Promise<void> {
     if (this.initPromise) {
-      const close = promisify((await this.initPromise).close).bind(this);
+      const db = await this.initPromise;
+      const close = promisify(db.close).bind(db);
       this.initPromise = null;
 
       await close();
