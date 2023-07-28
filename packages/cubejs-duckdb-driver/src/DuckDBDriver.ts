@@ -33,7 +33,7 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
     const db = new Database(token ? `md:?motherduck_token=${token}` : ':memory:');
     const conn = db.connect();
 
-    const s3InitQuries = [
+    const s3InitQueries = [
       {
         key: 's3_region',
         value: getEnv('duckdbS3Region', this.config),
@@ -63,7 +63,7 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
     }
     
     try {
-      for (const { key, value } of s3InitQuries) {
+      for (const { key, value } of s3InitQueries) {
         if (value) {
           await this.handleQuery(conn, `SET ${key}='${value}'`, []);
         }
