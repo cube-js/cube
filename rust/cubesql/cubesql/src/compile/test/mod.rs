@@ -198,23 +198,21 @@ pub fn get_test_tenant_ctx() -> Arc<MetaContext> {
         sql_templates: Arc::new(
             SqlTemplates::new(
                 vec![
-                    ("SUM".to_string(), "SUM({{ args | join(sep=\", \") }})".to_string()),
-                    ("MIN".to_string(), "MIN({{ args | join(sep=\", \") }})".to_string()),
-                    ("MAX".to_string(), "MAX({{ args | join(sep=\", \") }})".to_string()),
-                    ("COUNT".to_string(), "COUNT({{ args | join(sep=\", \") }})".to_string()),
+                    ("functions/SUM".to_string(), "SUM({{ args | join(sep=\", \") }})".to_string()),
+                    ("functions/MIN".to_string(), "MIN({{ args | join(sep=\", \") }})".to_string()),
+                    ("functions/MAX".to_string(), "MAX({{ args | join(sep=\", \") }})".to_string()),
+                    ("functions/COUNT".to_string(), "COUNT({{ args | join(sep=\", \") }})".to_string()),
                     (
-                        "COUNT_DISTINCT".to_string(),
+                        "functions/COUNT_DISTINCT".to_string(),
                         "COUNT(DISTINCT {{ args | join(sep=\", \") }})".to_string(),
                     ),
-                ]
-                .into_iter()
-                .collect(),
-                vec![(
-                    "select".to_string(),
-                    r#"SELECT {% for col in group_by %}{{col.expr}} "{{col.alias}}",{% endfor %}{% for col in aggregate %}{{col.expr}} "{{col.alias}}"{% if loop.last %}{% else %},{% endif %}{% endfor %} 
+                    (
+                        "statements/select".to_string(),
+                        r#"SELECT {% for col in group_by %}{{col.expr}} "{{col.alias}}",{% endfor %}{% for col in aggregate %}{{col.expr}} "{{col.alias}}"{% if loop.last %}{% else %},{% endif %}{% endfor %} 
                     FROM ({{ from }}) AS {{ from_alias }} 
                     {% if group_by %} GROUP BY {% for col in group_by %}{{ loop.index }}{% if loop.last %}{% else %},{% endif %}{% endfor %}{% endif %}"#.to_string(),
-                )]
+                    ),
+                ]
                 .into_iter()
                 .collect(),
             )

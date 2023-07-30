@@ -58,6 +58,7 @@ futures-core = "0.3.23"
 futures-util = "0.3.23"
 sha1_smol = "1.0.0"
 tera = { version = "1", default-features = false }
+minijinja = { version = "1", features = ["json", "loader"] }
 
 
 [dev-dependencies]

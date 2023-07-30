@@ -1096,6 +1096,7 @@ mod tests {
                 query: V1LoadRequestQuery,
                 ctx: AuthContextRef,
                 meta_fields: LoadRequestMeta,
+                member_to_alias: Option<HashMap<String, String>>,
             ) -> Result<SqlResponse, CubeError> {
                 todo!()
             }

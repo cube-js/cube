@@ -257,8 +257,8 @@ impl WrapperRules {
 
                             if sql_generator
                                 .get_sql_templates()
-                                .functions
-                                .contains_key(fun.as_str())
+                                .templates
+                                .contains_key(&format!("functions/{}", fun.as_str()))
                             {
                                 return true;
                             }

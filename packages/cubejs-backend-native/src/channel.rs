@@ -240,55 +240,43 @@ fn get_sql_templates(
         .map_cube_err("Can't get sqlTemplates")?;
     let templates = sql_templates
         .call(cx, sql_generator, Vec::new())
-        .map_cube_err("Can't call sqlTemplates function")?;
-    let functions = templates
+        .map_cube_err("Can't call sqlTemplates function")?
         .downcast_or_throw::<JsObject, _>(cx)
-        .map_cube_err("Can't downcast template to object")?
-        .get::<JsObject, _, _>(cx, "functions")
-        .map_cube_err("Can't get functions")?;
+        .map_cube_err("Can't cast sqlTemplates to object")?;
 
-    let function_names = functions
+    let template_types = templates
         .get_own_property_names(cx)
-        .map_cube_err("Can't get functions property names")?;
-    let mut functions_map = HashMap::new();
-    for i in 0..function_names.len(cx) {
-        let function_name = function_names
+        .map_cube_err("Can't get template types")?;
+
+    let mut templates_map = HashMap::new();
+
+    for i in 0..template_types.len(cx) {
+        let template_type = template_types
             .get::<JsString, _, _>(cx, i)
-            .map_cube_err("Can't get function names")?;
-        functions_map.insert(
-            function_name.value(cx),
-            functions
-                .get::<JsString, _, _>(cx, function_name)
-                .map_cube_err("Can't get function value")?
-                .value(cx),
-        );
+            .map_cube_err("Can't get template type")?;
+        let template = templates
+            .get::<JsObject, _, _>(cx, template_type)
+            .map_cube_err("Can't get template")?;
+
+        let template_names = template
+            .get_own_property_names(cx)
+            .map_cube_err("Can't get template names")?;
+
+        for i in 0..template_names.len(cx) {
+            let template_name = template_names
+                .get::<JsString, _, _>(cx, i)
+                .map_cube_err("Can't get function names")?;
+            templates_map.insert(
+                format!("{}/{}", template_type.value(cx), template_name.value(cx)),
+                template
+                    .get::<JsString, _, _>(cx, template_name)
+                    .map_cube_err("Can't get function value")?
+                    .value(cx),
+            );
+        }
     }
 
-    let stataments = templates
-        .downcast_or_throw::<JsObject, _>(cx)
-        .map_cube_err("Can't downcast template to object")?
-        .get::<JsObject, _, _>(cx, "statements")
-        .map_cube_err("Can't get statements")?;
-
-    let statement_names = stataments
-        .get_own_property_names(cx)
-        .map_cube_err("Can't get statements property names")?;
-
-    let mut statements_map = HashMap::new();
-    for i in 0..statement_names.len(cx) {
-        let statement_name = statement_names
-            .get::<JsString, _, _>(cx, i)
-            .map_cube_err("Can't get statement names")?;
-        statements_map.insert(
-            statement_name.value(cx),
-            stataments
-                .get::<JsString, _, _>(cx, statement_name)
-                .map_cube_err("Can't get statement value")?
-                .value(cx),
-        );
-    }
-
-    Ok(SqlTemplates::new(functions_map, statements_map)?)
+    Ok(SqlTemplates::new(templates_map)?)
 }
 
 // TODO impl drop for SqlGenerator

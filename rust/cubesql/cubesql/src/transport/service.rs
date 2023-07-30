@@ -8,6 +8,7 @@ use datafusion::{
     arrow::{datatypes::SchemaRef, record_batch::RecordBatch},
     physical_plan::aggregates::AggregateFunction,
 };
+use minijinja::{context, value::Value, Environment};
 use serde_derive::*;
 use std::{collections::HashMap, fmt::Debug, sync::Arc, time::Duration};
 use tera::{Context, Tera};
@@ -235,9 +236,8 @@ impl TransportService for HttpTransport {
 
 #[derive(Debug)]
 pub struct SqlTemplates {
-    pub functions: HashMap<String, String>,
-    pub statements: HashMap<String, String>,
-    tera: Tera,
+    pub templates: HashMap<String, String>,
+    jinja: Environment<'static>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -247,13 +247,11 @@ pub struct AliasedColumn {
 }
 
 impl SqlTemplates {
-    pub fn new(
-        functions: HashMap<String, String>,
-        statements: HashMap<String, String>,
-    ) -> Result<Self, CubeError> {
-        let mut tera = Tera::default();
-        for (name, template) in functions.iter() {
-            tera.add_raw_template(&format!("functions/{}", name), template)
+    pub fn new(templates: HashMap<String, String>) -> Result<Self, CubeError> {
+        let mut jinja = Environment::new();
+        for (name, template) in templates.iter() {
+            jinja
+                .add_template_owned(name.to_string(), template.to_string())
                 .map_err(|e| {
                     CubeError::internal(format!(
                         "Error parsing template {} '{}': {}",
@@ -262,21 +260,7 @@ impl SqlTemplates {
                 })?;
         }
 
-        for (name, template) in statements.iter() {
-            tera.add_raw_template(&format!("statements/{}", name), template)
-                .map_err(|e| {
-                    CubeError::internal(format!(
-                        "Error parsing template {} '{}': {}",
-                        name, template, e
-                    ))
-                })?;
-        }
-
-        Ok(Self {
-            functions,
-            statements,
-            tera,
-        })
+        Ok(Self { templates, jinja })
     }
 
     pub fn aggregate_function_name(
@@ -300,14 +284,18 @@ impl SqlTemplates {
         having: Option<String>,
         order_by: Vec<AliasedColumn>,
     ) -> Result<String, CubeError> {
-        let mut context = Context::new();
-        context.insert("from", &from);
-        context.insert("group_by", &group_by);
-        context.insert("aggregate", &aggregate);
-        context.insert("from_alias", &alias);
-        self.tera
-            .render("statements/select", &context)
-            .map_err(|e| CubeError::internal(format!("Error rendering select template: {}", e)))
+        self.render_template("statements/select", context! { from => from, group_by => group_by, aggregate => aggregate, from_alias => alias })
+    }
+
+    fn render_template(&self, name: &str, ctx: Value) -> Result<String, CubeError> {
+        Ok(self
+            .jinja
+            .get_template(name)
+            .map_err(|e| CubeError::internal(format!("Error getting {} template: {}", name, e)))?
+            .render(ctx)
+            .map_err(|e| {
+                CubeError::internal(format!("Error rendering {} template: {}", name, e))
+            })?)
     }
 
     pub fn aggregate_function(
@@ -316,17 +304,10 @@ impl SqlTemplates {
         args: Vec<String>,
         distinct: bool,
     ) -> Result<String, CubeError> {
-        let mut context = Context::new();
-        context.insert("args", &args);
-        context.insert("distinct", &distinct);
         let function = self.aggregate_function_name(aggregate_function, distinct);
-        self.tera
-            .render(&format!("functions/{}", function), &context)
-            .map_err(|e| {
-                CubeError::internal(format!(
-                    "Error rendering aggregate template '{}': {}",
-                    function, e
-                ))
-            })
+        self.render_template(
+            &format!("functions/{}", function),
+            context! { args => args, distinct => distinct },
+        )
     }
 }
