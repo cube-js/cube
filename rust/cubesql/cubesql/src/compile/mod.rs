@@ -13682,7 +13682,7 @@ ORDER BY \"COUNT(count)\" DESC"
         .await
         .as_logical_plan();
 
-        let end_date = chrono::Utc::now().date().naive_utc() - chrono::Duration::days(5);
+        let end_date = chrono::Utc::now().date_naive() - chrono::Duration::days(5);
         assert_eq!(
             logical_plan.find_cube_scan().request,
             V1LoadRequestQuery {
@@ -13739,7 +13739,7 @@ ORDER BY \"COUNT(count)\" DESC"
         let duration_sub_weeks = chrono::Duration::weeks(4);
         let duration_sub_days =
             chrono::Duration::days(now.weekday().num_days_from_sunday() as i64 + 1);
-        let end_date = now.date().naive_utc() - duration_sub_weeks - duration_sub_days;
+        let end_date = now.date_naive() - duration_sub_weeks - duration_sub_days;
         assert_eq!(
             logical_plan.find_cube_scan().request,
             V1LoadRequestQuery {
@@ -17809,7 +17809,7 @@ ORDER BY \"COUNT(count)\" DESC"
         .await
         .as_logical_plan();
 
-        let end_date = chrono::Utc::now().date().naive_utc() - chrono::Duration::days(1);
+        let end_date = chrono::Utc::now().date_naive() - chrono::Duration::days(1);
         let start_date = end_date - chrono::Duration::days(29);
         assert_eq!(
             logical_plan.find_cube_scan().request,
