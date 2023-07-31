@@ -263,12 +263,15 @@ function whereArgToQueryFilters(
   const queryFilters: any[] = [];
   
   Object.keys(whereArg).forEach((key) => {
+    const cubeExists = metaConfig.find((cube) => cube.config.name === key);
+    const normalizedKey = cubeExists ? key : capitalize(key);
+    
     if (['OR', 'AND'].includes(key)) {
       queryFilters.push({
         [key.toLowerCase()]: whereArg[key].reduce(
           (filters, whereBooleanArg) => [
             ...filters,
-            ...whereArgToQueryFilters(whereBooleanArg, prefix),
+            ...whereArgToQueryFilters(whereBooleanArg, prefix, metaConfig),
           ],
           []
         ),
@@ -282,8 +285,6 @@ function whereArgToQueryFilters(
       //   age: { equals: 28 } # <-- will require AND
       // }
       if (Object.keys(whereArg[key]).length > 1) {
-        const cubeExists = metaConfig.find((cube) => cube.config.name === key);
-        
         queryFilters.push(
           ...whereArgToQueryFilters(
             {
@@ -292,11 +293,12 @@ function whereArgToQueryFilters(
                 []
               ),
             },
-            cubeExists ? key : capitalize(key)
+            normalizedKey,
+            metaConfig
           )
         );
       } else {
-        const res = whereArgToQueryFilters(whereArg[key], capitalize(key));
+        const res = whereArgToQueryFilters(whereArg[key], normalizedKey, metaConfig);
 
         queryFilters.push(...res);
       }
@@ -315,12 +317,10 @@ function whereArgToQueryFilters(
     } else {
       Object.entries<any>(whereArg[key]).forEach(([member, filters]) => {
         Object.entries(filters).forEach(([operator, value]) => {
-          const cubeExists = metaConfig.find((cube) => cube.config.name === key);
-          
           queryFilters.push({
             member: prefix
               ? `${prefix}.${key}`
-              : `${cubeExists ? key : capitalize(key)}.${member}`,
+              : `${normalizedKey}.${member}`,
             operator: mapWhereOperator(operator, value),
             ...(mapWhereValue(operator, value) && {
               values: mapWhereValue(operator, value),

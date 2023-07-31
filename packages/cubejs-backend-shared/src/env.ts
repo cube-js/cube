@@ -1398,16 +1398,6 @@ const variables: Record<string, (...args: any) => any> = {
    * duckdb                                                         *
    ***************************************************************** */
 
-  duckdbHttpFs: ({
-    dataSource
-  }: {
-    dataSource: string,
-  }) => (
-    process.env[
-      keyByDataSource('CUBEJS_DB_DUCKDB_HTTP_FS', dataSource)
-    ]
-  ),
-
   duckdbMotherDuckToken: ({
     dataSource
   }: {
@@ -1415,6 +1405,46 @@ const variables: Record<string, (...args: any) => any> = {
   }) => (
     process.env[
       keyByDataSource('CUBEJS_DB_DUCKDB_MOTHERDUCK_TOKEN', dataSource)
+    ]
+  ),
+  
+  duckdbS3Region: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_DUCKDB_S3_REGION', dataSource)
+    ]
+  ),
+  
+  duckdbS3AccessKeyId: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_DUCKDB_S3_ACCESS_KEY_ID', dataSource)
+    ]
+  ),
+  
+  duckdbS3SecretAccessKeyId: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_DUCKDB_S3_SECRET_ACCESS_KEY', dataSource)
+    ]
+  ),
+  
+  duckdbS3Endpoint: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_DUCKDB_S3_ENDPOINT', dataSource)
     ]
   ),
 
