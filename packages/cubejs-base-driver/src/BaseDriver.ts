@@ -34,7 +34,8 @@ import {
   TableColumnQueryResult,
   TableQueryResult,
   TableStructure,
-  DriverCapabilities
+  DriverCapabilities,
+  SchemaQueryResult
 } from './driver.interface';
 
 const sortByKeys = (unordered: any) => {
@@ -313,7 +314,7 @@ export abstract class BaseDriver implements DriverInterface {
   }
 
   public getSchemasQuery() {
-    return this.query<{ schemaName: string }>(
+    return this.query<SchemaQueryResult>(
       `SELECT schema_name FROM information_schema.schemata WHERE schema_name NOT IN (${this.getIgnoredSchemas()})`,
     );
   }
