@@ -370,7 +370,8 @@ export abstract class BaseDriver implements DriverInterface {
              columns.table_schema as ${this.quoteIdentifier('table_schema')},
              columns.data_type  as ${this.quoteIdentifier('data_type')}
       FROM information_schema.columns
-      WHERE table_name = ${this.param(0)} AND table_schema = ${this.param(1)}`,
+      WHERE table_name = ${this.param(0)} AND table_schema = ${this.param(1)}
+      ORDER BY columns.ordinal_position`,
       [name, schema]
     );
 
