@@ -758,5 +758,60 @@ describe('ScaffoldingTemplate', () => {
         },
       ]);
     });
+    
+    it('generates schema with a catalog', () => {
+      const template = new ScaffoldingTemplate(
+        {
+          public: {
+            accounts: dbSchema.public.accounts,
+          },
+        },
+        driver,
+        {
+          format: SchemaFormat.Yaml,
+          snakeCase: true,
+          catalog: 'hello_catalog'
+        }
+      );
+
+      expect(template.generateFilesByTableNames(['public.accounts'])).toEqual([
+        {
+          fileName: 'accounts.yml',
+          content: `cubes:
+  - name: accounts
+    sql_table: hello_catalog.public.accounts
+
+    joins: []
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: username
+        sql: username
+        type: string
+
+      - name: password
+        sql: password
+        type: string
+
+    measures:
+      - name: count
+        type: count
+
+      - name: failurecount
+        sql: failureCount
+        type: sum
+
+    pre_aggregations:
+      # Pre-aggregation definitions go here.
+      # Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started
+
+`,
+        },
+      ]);
+    });
   });
 });

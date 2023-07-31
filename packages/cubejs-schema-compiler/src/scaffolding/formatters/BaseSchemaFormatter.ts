@@ -24,6 +24,7 @@ export type SchemaFile = {
 
 export type SchemaFormatterOptions = {
   snakeCase: boolean;
+  catalog?: string | null;
 };
 
 export abstract class BaseSchemaFormatter {
@@ -103,9 +104,13 @@ export abstract class BaseSchemaFormatter {
   }
 
   public schemaDescriptorForTable(tableSchema: TableSchema, schemaContext: SchemaContext = {}) {
-    const table = `${
+    let table = `${
       tableSchema.schema?.length ? `${this.escapeName(tableSchema.schema)}.` : ''
     }${this.escapeName(tableSchema.table)}`;
+    
+    if (this.options.catalog) {
+      table = `${this.escapeName(this.options.catalog)}.${table}`;
+    }
 
     const { dataSource, ...contextProps } = schemaContext;
 
