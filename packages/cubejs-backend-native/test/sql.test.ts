@@ -97,7 +97,7 @@ describe('SQLInterface', () => {
     });
 
     const sqlGenerators = jest.fn(async ({ request, session }) => {
-      console.log('[js] sqlGenerators',  {
+      console.log('[js] sqlGenerators', {
         request,
         session,
       });
