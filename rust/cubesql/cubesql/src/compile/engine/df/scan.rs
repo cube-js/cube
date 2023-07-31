@@ -29,7 +29,7 @@ use log::warn;
 
 use crate::{
     compile::{
-        engine::df::wrapper::{CubeScanWrapperExecutionPlan, CubeScanWrapperNode, SqlQuery},
+        engine::df::wrapper::{CubeScanWrapperNode, SqlQuery},
         find_cube_scans_deep_search,
         rewrite::WrappedSelectType,
     },
@@ -341,7 +341,6 @@ impl ExtensionPlanner for CubeScanExtensionPlanner {
                     member_fields: scan_node.member_fields.clone(),
                     transport: self.transport.clone(),
                     request: scan_node.request.clone(),
-                    wrapped_plan: None,
                     wrapped_sql: None,
                     auth_context: scan_node.auth_context.clone(),
                     options: scan_node.options.clone(),
@@ -371,7 +370,6 @@ impl ExtensionPlanner for CubeScanExtensionPlanner {
                     member_fields,
                     transport: self.transport.clone(),
                     request: scan_node.request.clone(),
-                    wrapped_plan: Some(wrapper_node.wrapped_plan.clone()),
                     wrapped_sql: Some(wrapper_node.wrapped_sql.as_ref().ok_or_else(|| {
                         DataFusionError::Internal(format!(
                             "Wrapped SQL is not set for wrapper node. Optimization wasn't performed: {:?}",
@@ -395,7 +393,6 @@ struct CubeScanExecutionPlan {
     schema: SchemaRef,
     member_fields: Vec<MemberField>,
     request: V1LoadRequestQuery,
-    wrapped_plan: Option<Arc<LogicalPlan>>,
     wrapped_sql: Option<SqlQuery>,
     auth_context: AuthContextRef,
     options: CubeScanOptions,
@@ -647,7 +644,7 @@ impl ExecutionPlan for CubeScanExecutionPlan {
                     write!(
                         f,
                         "CubeScanExecutionPlan, Request:\n{}",
-                        serde_json::to_string(&self.request).map_err(|e| fmt::Error)?
+                        serde_json::to_string(&self.request).map_err(|_| fmt::Error)?
                     )
                 }
             }
@@ -1093,10 +1090,10 @@ mod tests {
 
             async fn sql(
                 &self,
-                query: V1LoadRequestQuery,
-                ctx: AuthContextRef,
-                meta_fields: LoadRequestMeta,
-                member_to_alias: Option<HashMap<String, String>>,
+                _query: V1LoadRequestQuery,
+                _ctx: AuthContextRef,
+                _meta_fields: LoadRequestMeta,
+                _member_to_alias: Option<HashMap<String, String>>,
             ) -> Result<SqlResponse, CubeError> {
                 todo!()
             }
@@ -1205,7 +1202,6 @@ mod tests {
                 offset: None,
                 filters: None,
             },
-            wrapped_plan: None,
             wrapped_sql: None,
             auth_context: Arc::new(HttpAuthContext {
                 access_token: "access_token".to_string(),

@@ -29,7 +29,6 @@ use crate::{
 #[derive(Debug)]
 pub struct NodeBridgeTransport {
     channel: Arc<Channel>,
-    on_load: Arc<Root<JsFunction>>,
     on_sql_api_load: Arc<Root<JsFunction>>,
     on_sql: Arc<Root<JsFunction>>,
     on_meta: Arc<Root<JsFunction>>,
@@ -40,7 +39,6 @@ pub struct NodeBridgeTransport {
 impl NodeBridgeTransport {
     pub fn new(
         channel: Channel,
-        on_load: Root<JsFunction>,
         on_sql_api_load: Root<JsFunction>,
         on_sql: Root<JsFunction>,
         on_meta: Root<JsFunction>,
@@ -49,7 +47,6 @@ impl NodeBridgeTransport {
     ) -> Self {
         Self {
             channel: Arc::new(channel),
-            on_load: Arc::new(on_load),
             on_sql_api_load: Arc::new(on_sql_api_load),
             on_sql: Arc::new(on_sql),
             on_meta: Arc::new(on_meta),
@@ -212,41 +209,39 @@ impl TransportService for NodeBridgeTransport {
 
         let sql = response
             .get("sql")
-            .ok_or(CubeError::user(format!("No sql in response: {}", response)))?
+            .ok_or_else(|| CubeError::user(format!("No sql in response: {}", response)))?
             .get("sql")
-            .ok_or(CubeError::user(format!("No sql in response: {}", response)))?;
+            .ok_or_else(|| CubeError::user(format!("No sql in response: {}", response)))?;
         Ok(SqlResponse {
             sql: SqlQuery {
                 sql: sql
                     .get(0)
-                    .ok_or(CubeError::user(format!(
-                        "No sql array in response: {}",
-                        response
-                    )))?
+                    .ok_or_else(|| {
+                        CubeError::user(format!("No sql array in response: {}", response))
+                    })?
                     .as_str()
-                    .ok_or(CubeError::user(format!(
-                        "SQL not a string in response: {}",
-                        response
-                    )))?
+                    .ok_or_else(|| {
+                        CubeError::user(format!("SQL not a string in response: {}", response))
+                    })?
                     .to_string(),
                 values: sql
                     .get(1)
-                    .ok_or(CubeError::user(format!(
-                        "No sql array in response: {}",
-                        response
-                    )))?
+                    .ok_or_else(|| {
+                        CubeError::user(format!("No sql array in response: {}", response))
+                    })?
                     .as_array()
-                    .ok_or(CubeError::user(format!(
-                        "No sql array in response: {}",
-                        response
-                    )))?
-                    .into_iter()
+                    .ok_or_else(|| {
+                        CubeError::user(format!("No sql array in response: {}", response))
+                    })?
+                    .iter()
                     .map(|v| -> Result<_, CubeError> {
                         Ok(v.as_str()
-                            .ok_or(CubeError::user(format!(
-                                "Params not a string in response: {}",
-                                response
-                            )))?
+                            .ok_or_else(|| {
+                                CubeError::user(format!(
+                                    "Params not a string in response: {}",
+                                    response
+                                ))
+                            })?
                             .to_string())
                     })
                     .collect::<Result<Vec<_>, _>>()?,

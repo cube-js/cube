@@ -1,57 +1,17 @@
 use crate::{
-    compile::engine::df::scan::{
-        CubeScanNode, MemberField, PhysicalSortExpr, SchemaRef, WrappedSelectNode,
-    },
+    compile::engine::df::scan::{CubeScanNode, MemberField, WrappedSelectNode},
     sql::AuthContextRef,
     transport::{AliasedColumn, LoadRequestMeta, MetaContext, SqlGenerator, TransportService},
     CubeError,
 };
-use async_trait::async_trait;
 use datafusion::{
     error::{DataFusionError, Result},
-    execution::context::TaskContext,
     logical_plan::{plan::Extension, DFSchemaRef, Expr, LogicalPlan, UserDefinedLogicalNode},
-    physical_plan::{
-        aggregates::AggregateFunction, DisplayFormatType, ExecutionPlan, Partitioning,
-        SendableRecordBatchStream, Statistics,
-    },
+    physical_plan::aggregates::AggregateFunction,
 };
 use itertools::Itertools;
 use serde_derive::*;
 use std::{any::Any, fmt, future::Future, pin::Pin, result, sync::Arc};
-
-#[derive(Debug, Clone)]
-pub struct CubeScanWrapperExecutionPlan {
-    schema: SchemaRef,
-    wrapped_plan: Arc<LogicalPlan>,
-    wrapped_sql: SqlQuery,
-    transport: Arc<dyn TransportService>,
-    request_meta: LoadRequestMeta,
-    meta: Arc<MetaContext>,
-    auth_context: AuthContextRef,
-}
-
-impl CubeScanWrapperExecutionPlan {
-    pub fn new(
-        schema: SchemaRef,
-        wrapped_plan: Arc<LogicalPlan>,
-        wrapped_sql: SqlQuery,
-        transport: Arc<dyn TransportService>,
-        request_meta: LoadRequestMeta,
-        meta: Arc<MetaContext>,
-        auth_context: AuthContextRef,
-    ) -> Self {
-        Self {
-            schema,
-            wrapped_plan,
-            wrapped_sql,
-            transport,
-            request_meta,
-            meta,
-            auth_context,
-        }
-    }
-}
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct SqlQuery {
@@ -213,17 +173,17 @@ impl CubeScanWrapperNode {
                         ));
                     } else if let Some(WrappedSelectNode {
                         schema,
-                        select_type,
-                        projection_expr,
+                        select_type: _select_type,
+                        projection_expr: _projection_expr,
                         group_expr,
                         aggr_expr,
                         from,
-                        joins,
-                        filter_expr,
-                        having_expr,
-                        limit,
-                        offset,
-                        order_expr,
+                        joins: _joins,
+                        filter_expr: _filter_expr,
+                        having_expr: _having_expr,
+                        limit: _limit,
+                        offset: _offset,
+                        order_expr: _order_expr,
                         alias,
                     }) = wrapped_select_node
                     {
@@ -430,70 +390,5 @@ impl UserDefinedLogicalNode for CubeScanWrapperNode {
             auth_context: self.auth_context.clone(),
             wrapped_sql: self.wrapped_sql.clone(),
         })
-    }
-}
-
-#[async_trait]
-impl ExecutionPlan for CubeScanWrapperExecutionPlan {
-    /// Return a reference to Any that can be used for downcasting
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn schema(&self) -> SchemaRef {
-        self.schema.clone()
-    }
-
-    fn output_partitioning(&self) -> Partitioning {
-        Partitioning::UnknownPartitioning(1)
-    }
-
-    fn output_ordering(&self) -> Option<&[PhysicalSortExpr]> {
-        None
-    }
-
-    fn children(&self) -> Vec<Arc<dyn ExecutionPlan>> {
-        vec![]
-    }
-
-    fn with_new_children(
-        self: Arc<Self>,
-        _children: Vec<Arc<dyn ExecutionPlan>>,
-    ) -> Result<Arc<dyn ExecutionPlan>> {
-        Err(DataFusionError::Internal(format!(
-            "Children cannot be replaced in {:?}",
-            self
-        )))
-    }
-
-    async fn execute(
-        &self,
-        _partition: usize,
-        _context: Arc<TaskContext>,
-    ) -> Result<SendableRecordBatchStream> {
-        Err(DataFusionError::Internal(format!(
-            "CubeScanWrapperExecutionPlan should not be executed"
-        )))
-    }
-
-    fn fmt_as(&self, t: DisplayFormatType, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match t {
-            DisplayFormatType::Default => {
-                write!(
-                    f,
-                    "CubeScanWrapperExecutionPlan, SQL: {}",
-                    self.wrapped_sql.sql
-                )
-            }
-        }
-    }
-
-    fn statistics(&self) -> Statistics {
-        Statistics {
-            num_rows: None,
-            total_byte_size: None,
-            column_statistics: None,
-            is_exact: false,
-        }
     }
 }

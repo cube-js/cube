@@ -11,7 +11,6 @@ use datafusion::{
 use minijinja::{context, value::Value, Environment};
 use serde_derive::*;
 use std::{collections::HashMap, fmt::Debug, sync::Arc, time::Duration};
-use tera::{Context, Tera};
 use tokio::{
     sync::{mpsc::Receiver, RwLock as RwLockAsync},
     time::Instant,
@@ -188,10 +187,10 @@ impl TransportService for HttpTransport {
 
     async fn sql(
         &self,
-        query: V1LoadRequestQuery,
-        ctx: AuthContextRef,
-        meta_fields: LoadRequestMeta,
-        member_to_alias: Option<HashMap<String, String>>,
+        _query: V1LoadRequestQuery,
+        _ctx: AuthContextRef,
+        _meta_fields: LoadRequestMeta,
+        _member_to_alias: Option<HashMap<String, String>>,
     ) -> Result<SqlResponse, CubeError> {
         todo!()
     }
@@ -280,9 +279,9 @@ impl SqlTemplates {
         group_by: Vec<AliasedColumn>,
         aggregate: Vec<AliasedColumn>,
         alias: String,
-        filter: Option<String>,
-        having: Option<String>,
-        order_by: Vec<AliasedColumn>,
+        _filter: Option<String>,
+        _having: Option<String>,
+        _order_by: Vec<AliasedColumn>,
     ) -> Result<String, CubeError> {
         self.render_template("statements/select", context! { from => from, group_by => group_by, aggregate => aggregate, from_alias => alias })
     }

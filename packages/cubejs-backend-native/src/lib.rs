@@ -99,9 +99,6 @@ fn register_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let check_auth = options
         .get::<JsFunction, _, _>(&mut cx, "checkAuth")?
         .root(&mut cx);
-    let transport_load = options
-        .get::<JsFunction, _, _>(&mut cx, "load")?
-        .root(&mut cx);
     let transport_sql_api_load = options
         .get::<JsFunction, _, _>(&mut cx, "sqlApiLoad")?
         .root(&mut cx);
@@ -150,7 +147,6 @@ fn register_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let runtime = tokio_runtime_node(&mut cx)?;
     let transport_service = NodeBridgeTransport::new(
         cx.channel(),
-        transport_load,
         transport_sql_api_load,
         transport_sql,
         transport_meta,

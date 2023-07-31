@@ -729,6 +729,7 @@ fn wrapped_select(
     )
 }
 
+#[allow(dead_code)]
 fn wrapped_select_projection_expr(left: impl Display, right: impl Display) -> String {
     format!("(WrappedSelectProjectionExpr {} {})", left, right)
 }
@@ -737,38 +738,47 @@ fn wrapped_select_projection_expr_empty_tail() -> String {
     "WrappedSelectProjectionExpr".to_string()
 }
 
+#[allow(dead_code)]
 fn wrapped_select_group_expr(left: impl Display, right: impl Display) -> String {
     format!("(WrappedSelectGroupExpr {} {})", left, right)
 }
 
+#[allow(dead_code)]
 fn wrapped_select_group_expr_empty_tail() -> String {
     "WrappedSelectGroupExpr".to_string()
 }
 
+#[allow(dead_code)]
 fn wrapped_select_aggr_expr(left: impl Display, right: impl Display) -> String {
     format!("(WrappedSelectAggrExpr {} {})", left, right)
 }
 
+#[allow(dead_code)]
 fn wrapped_select_aggr_expr_empty_tail() -> String {
     "WrappedSelectAggrExpr".to_string()
 }
 
+#[allow(dead_code)]
 fn wrapped_select_joins(left: impl Display, right: impl Display) -> String {
     format!("(WrappedSelectJoins {} {})", left, right)
 }
 
+#[allow(dead_code)]
 fn wrapped_select_joins_empty_tail() -> String {
     "WrappedSelectJoins".to_string()
 }
 
+#[allow(dead_code)]
 fn wrapped_select_filter_expr(left: impl Display, right: impl Display) -> String {
     format!("(WrappedSelectFilterExpr {} {})", left, right)
 }
 
+#[allow(dead_code)]
 fn wrapped_select_filter_expr_empty_tail() -> String {
     "WrappedSelectFilterExpr".to_string()
 }
 
+#[allow(dead_code)]
 fn wrapped_select_having_expr(left: impl Display, right: impl Display) -> String {
     format!("(WrappedSelectHavingExpr {} {})", left, right)
 }
@@ -777,6 +787,7 @@ fn wrapped_select_having_expr_empty_tail() -> String {
     "WrappedSelectHavingExpr".to_string()
 }
 
+#[allow(dead_code)]
 fn wrapped_select_order_expr(left: impl Display, right: impl Display) -> String {
     format!("(WrappedSelectOrderExpr {} {})", left, right)
 }

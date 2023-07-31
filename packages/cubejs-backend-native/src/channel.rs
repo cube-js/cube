@@ -276,7 +276,7 @@ fn get_sql_templates(
         }
     }
 
-    Ok(SqlTemplates::new(templates_map)?)
+    SqlTemplates::new(templates_map)
 }
 
 // TODO impl drop for SqlGenerator
