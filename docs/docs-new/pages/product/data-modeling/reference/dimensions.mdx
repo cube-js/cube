@@ -194,10 +194,10 @@ formats.
 cube(`orders`, {
   // ...
 
-  measures: {
+  dimensions: {
     total: {
       sql: `amount`,
-      type: `running_total`,
+      type: `number`,
       format: `currency`,
     },
   },
@@ -209,10 +209,10 @@ cubes:
   - name: orders
     # ...
 
-    measures:
+    dimensions:
       - name: total
         sql: amount
-        type: running_total
+        type: number
         format: currency
 ```
 
