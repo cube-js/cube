@@ -198,20 +198,25 @@ pub fn get_test_tenant_ctx() -> Arc<MetaContext> {
         sql_templates: Arc::new(
             SqlTemplates::new(
                 vec![
-                    ("functions/SUM".to_string(), "SUM({{ args | join(sep=\", \") }})".to_string()),
-                    ("functions/MIN".to_string(), "MIN({{ args | join(sep=\", \") }})".to_string()),
-                    ("functions/MAX".to_string(), "MAX({{ args | join(sep=\", \") }})".to_string()),
-                    ("functions/COUNT".to_string(), "COUNT({{ args | join(sep=\", \") }})".to_string()),
+                    ("functions/SUM".to_string(), "SUM({{ args_concat }})".to_string()),
+                    ("functions/MIN".to_string(), "MIN({{ args_concat }})".to_string()),
+                    ("functions/MAX".to_string(), "MAX({{ args_concat }})".to_string()),
+                    ("functions/COUNT".to_string(), "COUNT({{ args_concat }})".to_string()),
                     (
                         "functions/COUNT_DISTINCT".to_string(),
-                        "COUNT(DISTINCT {{ args | join(sep=\", \") }})".to_string(),
+                        "COUNT(DISTINCT {{ args_concat }})".to_string(),
                     ),
                     (
                         "statements/select".to_string(),
-                        r#"SELECT {% for col in group_by %}{{col.expr}} "{{col.alias}}",{% endfor %}{% for col in aggregate %}{{col.expr}} "{{col.alias}}"{% if loop.last %}{% else %},{% endif %}{% endfor %} 
+                        r#"SELECT {{ group_by_aggregate_concat | map(attribute='aliased') | join(', ') }} 
                     FROM ({{ from }}) AS {{ from_alias }} 
-                    {% if group_by %} GROUP BY {% for col in group_by %}{{ loop.index }}{% if loop.last %}{% else %},{% endif %}{% endfor %}{% endif %}"#.to_string(),
+                    {% if group_by %} GROUP BY {{ group_by | map(attribute='index') | join(', ') }}{% endif %}"#.to_string(),
                     ),
+                    (
+                        "statements/column_aliased".to_string(),
+                        "{{expr}} {{quoted_alias}}".to_string(),
+                    ),
+                    ("quotes/identifiers".to_string(), "\"".to_string())
                 ]
                 .into_iter()
                 .collect(),

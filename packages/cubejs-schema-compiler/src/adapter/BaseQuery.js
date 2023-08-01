@@ -207,7 +207,8 @@ class BaseQuery {
       useOriginalSqlPreAggregationsInPreAggregation: this.options.useOriginalSqlPreAggregationsInPreAggregation,
       cubeLatticeCache: this.options.cubeLatticeCache, // TODO too heavy for key
       historyQueries: this.options.historyQueries, // TODO too heavy for key
-      ungrouped: this.options.ungrouped
+      ungrouped: this.options.ungrouped,
+      memberToAlias: this.options.memberToAlias,
     });
     this.timezone = this.options.timezone;
     this.rowLimit = this.options.rowLimit;
@@ -2386,17 +2387,21 @@ class BaseQuery {
   sqlTemplates() {
     return {
       functions: {
-        SUM: 'SUM({{ args | join(sep=", ") }})',
-        MIN: 'MIN({{ args | join(sep=", ") }})',
-        MAX: 'MAX({{ args | join(sep=", ") }})',
-        COUNT: 'COUNT({{ args | join(sep=", ") }})',
-        COUNT_DISTINCT: 'COUNT(DISTINCT {{ args | join(sep=", ") }})',
-        AVG: 'AVG({{ args | join(sep=", ") }})',
+        SUM: 'SUM({{ args_concat }})',
+        MIN: 'MIN({{ args_concat }})',
+        MAX: 'MAX({{ args_concat }})',
+        COUNT: 'COUNT({{ args_concat }})',
+        COUNT_DISTINCT: 'COUNT(DISTINCT {{ args_concat }})',
+        AVG: 'AVG({{ args_concat }})',
       },
       statements: {
-        select: 'SELECT {% for col in group_by %}{{col.expr}} "{{col.alias}}",{% endfor %}{% for col in aggregate %}{{col.expr}} "{{col.alias}}"{% if loop.last %}{% else %},{% endif %}{% endfor %} \n' +
-          '                    FROM ({{ from }}) AS {{ from_alias }} \n' +
-          '                    {% if group_by %} GROUP BY {% for col in group_by %}{{ loop.index }}{% if loop.last %}{% else %},{% endif %}{% endfor %}{% endif %}'
+        select: 'SELECT {{ group_by_aggregate_concat | map(attribute=\'aliased\') | join(\', \') }} \n' +
+          'FROM ({{ from }}) AS {{ from_alias }} \n' +
+          '{% if group_by %} GROUP BY {{ group_by | map(attribute=\'index\') | join(\', \') }}{% endif %}',
+        column_aliased: '{{expr}} {{quoted_alias}}',
+      },
+      quotes: {
+        identifiers: '"'
       }
     };
   }

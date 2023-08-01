@@ -6,7 +6,9 @@ use crate::{
 };
 use datafusion::{
     error::{DataFusionError, Result},
-    logical_plan::{plan::Extension, DFSchemaRef, Expr, LogicalPlan, UserDefinedLogicalNode},
+    logical_plan::{
+        plan::Extension, DFSchema, DFSchemaRef, Expr, LogicalPlan, UserDefinedLogicalNode,
+    },
     physical_plan::aggregates::AggregateFunction,
 };
 use itertools::Itertools;
@@ -63,6 +65,13 @@ impl CubeScanWrapperNode {
             auth_context: self.auth_context.clone(),
             wrapped_sql: Some(sql),
         }
+    }
+}
+
+fn expr_name(e: &Expr, schema: &Arc<DFSchema>) -> Result<String> {
+    match e {
+        Expr::Column(col) => Ok(col.name.clone()),
+        _ => e.name(schema),
     }
 }
 
@@ -217,8 +226,7 @@ impl CubeScanWrapperNode {
                                         expr.clone(),
                                     )
                                     .await?,
-                                    // TODO escape
-                                    alias: expr.name(&schema)?, // TODO use from schema instead?
+                                    alias: expr_name(&expr, &schema)?,
                                 });
                             }
                             let mut aggregate = Vec::new();
@@ -230,8 +238,7 @@ impl CubeScanWrapperNode {
                                         expr.clone(),
                                     )
                                     .await?,
-                                    // TODO escape
-                                    alias: expr.name(&schema)?, // TODO use from schema instead?
+                                    alias: expr_name(&expr, &schema)?,
                                 });
                             }
                             let resulting_sql = generator

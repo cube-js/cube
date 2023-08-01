@@ -245,6 +245,14 @@ pub struct AliasedColumn {
     pub alias: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TemplateColumn {
+    pub expr: String,
+    pub alias: String,
+    pub aliased: String,
+    pub index: usize,
+}
+
 impl SqlTemplates {
     pub fn new(templates: HashMap<String, String>) -> Result<Self, CubeError> {
         let mut jinja = Environment::new();
@@ -283,7 +291,59 @@ impl SqlTemplates {
         _having: Option<String>,
         _order_by: Vec<AliasedColumn>,
     ) -> Result<String, CubeError> {
-        self.render_template("statements/select", context! { from => from, group_by => group_by, aggregate => aggregate, from_alias => alias })
+        let group_by = group_by
+            .into_iter()
+            .enumerate()
+            .map(|(i, c)| -> Result<_, CubeError> {
+                let quoted_alias = self.quote_identifier(&c.alias)?;
+                Ok(TemplateColumn {
+                    expr: c.expr.to_string(),
+                    alias: c.alias.to_string(),
+                    aliased: self.render_template(
+                        "statements/column_aliased",
+                        context! { alias => c.alias, expr => c.expr, quoted_alias => quoted_alias },
+                    )?,
+                    index: i + 1,
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let aggregate = aggregate
+            .into_iter()
+            .enumerate()
+            .map(|(i, c)| -> Result<_, CubeError> {
+                let quoted_alias = self.quote_identifier(&c.alias)?;
+                Ok(TemplateColumn {
+                    expr: c.expr.to_string(),
+                    alias: c.alias.to_string(),
+                    aliased: self.render_template(
+                        "statements/column_aliased",
+                        context! { alias => c.alias, expr => c.expr, quoted_alias => quoted_alias },
+                    )?,
+                    index: i + 1,
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let group_by_aggregate_concat = group_by
+            .iter()
+            .chain(aggregate.iter())
+            .map(|c| c.clone())
+            .collect::<Vec<_>>();
+        self.render_template("statements/select", context! { from => from, group_by_aggregate_concat => group_by_aggregate_concat, group_by => group_by, aggregate => aggregate, from_alias => alias })
+    }
+
+    fn quote_identifier(&self, column_name: &str) -> Result<String, CubeError> {
+        let quote = self
+            .templates
+            .get("quotes/identifiers")
+            .ok_or_else(|| CubeError::user("quotes/identifiers template not found".to_string()))?;
+        // TODO escape column names
+        if column_name.contains(quote) {
+            return Err(CubeError::user(format!(
+                "Column name {} contains quote {} and escaping is not supported",
+                column_name, quote
+            )));
+        }
+        Ok(format!("{}{}{}", quote, column_name, quote))
     }
 
     fn render_template(&self, name: &str, ctx: Value) -> Result<String, CubeError> {
@@ -304,9 +364,10 @@ impl SqlTemplates {
         distinct: bool,
     ) -> Result<String, CubeError> {
         let function = self.aggregate_function_name(aggregate_function, distinct);
+        let args_concat = args.join(", ");
         self.render_template(
             &format!("functions/{}", function),
-            context! { args => args, distinct => distinct },
+            context! { args_concat => args_concat, args => args, distinct => distinct },
         )
     }
 }
