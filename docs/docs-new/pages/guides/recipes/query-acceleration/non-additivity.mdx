@@ -8,15 +8,15 @@ redirect_from:
 ## Use case
 
 We want to run queries against
-[pre-aggregations](https://cube.dev/docs/caching#pre-aggregations) only to
-ensure our application's superior performance. Usually, accelerating a query is
-as simple as including its measures and dimensions to the pre-aggregation
-[definition](https://cube.dev/docs/schema/reference/pre-aggregations#parameters-measures).
+[pre-aggregations](/product/caching#pre-aggregations) only to ensure our
+application's superior performance. Usually, accelerating a query is as simple
+as including its measures and dimensions to the pre-aggregation
+[definition](/product/data-modeling/reference/pre-aggregations#measures).
 
-[Non-additive](https://cube.dev/docs/caching/pre-aggregations/getting-started#ensuring-pre-aggregations-are-targeted-by-queries-non-additivity)
+[Non-additive](/product/caching/getting-started-pre-aggregations#ensuring-pre-aggregations-are-targeted-by-queries-non-additivity)
 measures (e.g., average values or distinct counts) are a special case.
 Pre-aggregations with such measures are less likely to be
-[selected](https://cube.dev/docs/caching/pre-aggregations/getting-started#ensuring-pre-aggregations-are-targeted-by-queries-selecting-the-pre-aggregation)
+[selected](/product/caching/getting-started-pre-aggregations#ensuring-pre-aggregations-are-targeted-by-queries-selecting-the-pre-aggregation)
 to accelerate a query. However, there are a few ways to work around that.
 
 ## Data modeling
@@ -26,7 +26,7 @@ age:
 
 - count of unique age values (`distinct_ages`)
 - average age (`avg_age`)
-- 90th [percentile](https://cube.dev/docs/recipes/percentiles) of age
+- 90th [percentile](/guides/recipes/data-modeling/percentiles) of age
   (`p90_age`)
 
 <CodeTabs>
@@ -131,7 +131,7 @@ Let's explore some possible workarounds.
 ### Replacing with approximate additive measures
 
 Often, non-additive `count_distinct` measures can be changed to have the
-[`count_distinct_approx` type](https://cube.dev/docs/schema/reference/types-and-formats#measures-types-count-distinct-approx)
+[`count_distinct_approx` type](/product/data-modeling/reference/types-and-formats#count_distinct_approx)
 which will make them additive and orders of magnitude more performant. This
 `count_distinct_approx` measures can be used in pre-aggregations. However, there
 are two drawbacks:
@@ -172,7 +172,7 @@ cube(`users`, {
 ### Decomposing into a formula with additive measures
 
 Non-additive `avg` measures can be rewritten as
-[calculated measures](https://cube.dev/docs/schema/reference/measures#calculated-measures)
+[calculated measures](/product/data-modeling/reference/measures#calculated-measures)
 that reference additive measures only. Then, this additive measures can be used
 in pre-aggregations. Please note, however, that you shouldn't include `avg_age`
 measure in your pre-aggregation as it renders it non-additive.

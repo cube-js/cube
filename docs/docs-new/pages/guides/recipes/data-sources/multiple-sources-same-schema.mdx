@@ -19,12 +19,12 @@ the local database (bootstrapped in the `docker-compose.yml` file) which has the
 same data model.
 
 To enable multitenancy, use the
-[`contextToAppId`](https://cube.dev/docs/config#options-reference-context-to-app-id)
-function to provide distinct identifiers for each tenant. Also, implement the
-[`driverFactory`](https://cube.dev/docs/config#options-reference-driver-factory)
-function where you can select a data source based on the tenant name.
-[JSON Web Token](https://cube.dev/docs/security) includes information about the
-tenant name in the `tenant` property of the `securityContext`.
+[`contextToAppId`](/reference/configuration/config#contexttoappid) function to
+provide distinct identifiers for each tenant. Also, implement the
+[`driverFactory`](/reference/configuration/config#driverfactory) function where
+you can select a data source based on the tenant name.
+[JSON Web Token](/product/auth) includes information about the tenant name in
+the `tenant` property of the `securityContext`.
 
 ```javascript
 module.exports = {

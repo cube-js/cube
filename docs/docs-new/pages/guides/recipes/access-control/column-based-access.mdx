@@ -14,9 +14,9 @@ products. A supplier can't see other supplier's products.
 ## Data modeling
 
 To implement column-based access, we will use supplier's email from a
-[JSON Web Token](https://cube.dev/docs/security), and the
-[`queryRewrite`](https://cube.dev/docs/security/context#using-query-rewrite)
-extension point to manage data access.
+[JSON Web Token](/product/auth), and the
+[`queryRewrite`](/product/auth/context#using-queryrewrite) extension point to
+manage data access.
 
 We have `products` and `suppliers` cubes with a `many_to_one` relationship from
 products to suppliers:

@@ -8,7 +8,7 @@ redirect_from:
 [Retool](https://retool.com/) is the fast way to build internal tools. It lets
 you visually design apps that interface with any database or API. You can
 connect a Cube deployment to Retool using Cube’s
-[REST API](https://cube.dev/docs/rest-api).
+[REST API](/reference/rest-api).
 
 Here's a short video guide on how to connect Retool to Cube.
 
@@ -17,7 +17,7 @@ Here's a short video guide on how to connect Retool to Cube.
 ## Use REST API in Cube
 
 > Don't have a Cube project yet?
-> [Learn how to get started here](https://cube.dev/docs/getting-started/cloud/overview).
+> [Learn how to get started here](/product/getting-started/cloud).
 
 ### Cube Cloud
 
@@ -31,13 +31,12 @@ authorization token:
 
 For a Cube instance publicly available at a specific `HOST`, the REST API URL
 would be `HOST/cubejs-api/v1`. Please refer to the
-[REST API page](https://cube.dev/docs/rest-api) for details.
+[REST API page](/reference/rest-api) for details.
 
 You will also need to generate a JSON Web Token that would be used to
 authenticate requests to Cube.
 
-Please check the
-[Security page](https://cube.dev/docs/security#generating-json-web-tokens-jwt)
+Please check the [Security page](/product/auth#generating-json-web-tokens-jwt)
 to learn how to generate a token. We suggest generating a long-lived JWT that
 won't expire soon.
 
@@ -54,8 +53,8 @@ Next, copy and paste Cube's REST API URL and the Authorization token.
 ## Create a POST request in Retool
 
 Get your Cube query in the JSON
-[query format](https://cube.dev/docs/query-format) ready. You can copy it from
-Cube’s Playground or compose manually.
+[query format](/product/apis-integrations/rest-api/query-format) ready. You can
+copy it from Cube’s Playground or compose manually.
 
 Create a POST request, paste the JSON query in the **Body**. Make sure to add a
 `query` parameter for your JSON query.
