@@ -3728,7 +3728,7 @@ mod tests {
             let result = service.exec_query("SELECT count(*) as cnt from Foo.Persons").await.unwrap();
             assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(5)])]);
 
-            let result = service.exec_query("SELECT count(*) as cnt from Foo.Persons WHERE arr = '[\"Foo\",\"Bar\",\"FooBar\"]' or arr = '[\"\"]' or arr is null").await.unwrap();
+            let result = service.exec_query("SELECT count(*) as cnt from Foo.Persons WHERE arr = '[\"Foo21\",\"Bar2\",\"FooBar7\"]' or arr = '[\"Foo2\",\"Bar1\",\"FooBar4\"]' or arr = '[\"Foo\",\"Bar\",\"FooBar\"]' or arr = '[\"\"]' or arr is null").await.unwrap();
             assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(5)])]);
         }).await;
     }
