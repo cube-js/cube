@@ -1,0 +1,178 @@
+# Dynamic data models with Jinja and Python
+
+Cube supports authoring data models using the [Jinja templating
+language][jinja]. This allows de-duplicating common patterns in your data models
+as well as dynamically generating data models from a remote data source.
+
+<InfoBox>
+
+This feature is in Public Preview and is subject to change. We'd love to hear
+your feedback on this feature, please post an issue on GitHub.
+
+</InfoBox>
+
+To use a Jinja template, create a file in your data model folder with the
+`.jinja` extension. In the following example, we'll create a file named
+`orders.yml.jinja` under the `models/` directory.
+
+## Loops
+
+Jinja supports [looping][jinja-docs-for-loop] over lists and dictionaries. In
+the following example, we loop over a list of columns and generate a dimension
+for each one:
+
+```twig
+{%- set columns = [
+  "id",
+  "status",
+  "created_at",
+  "completed_at"
+] -%}
+
+cubes:
+  - name: orders
+    sql: >
+      SELECT
+        {%- for column in columns %}
+        {{column}},
+        {%- endfor %}
+        SUM(number) AS total_amount
+      FROM public.orders
+      GROUP BY 1
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: status
+        sql: status
+        type: string
+
+      - name: created_at
+        sql: created_at
+        type: time
+
+      - name: completed_at
+        sql: completed_at
+        type: time
+```
+
+## Macros
+
+Cube data models also support Jinja macros, which allow you to define reusable
+snippets of code. You can read more about macros in the [Jinja
+documentation][jinja-docs-macros].
+
+In the following example, we define a macro called `dimension()` which generates
+a dimension definition in Cube. This macro is then invoked multiple times to
+generate multiple dimensions:
+
+```twig
+{# Declare the macro before using it, otherwise Jinja will throw an error. #}
+{%- macro dimension(column_name, type='string', primary_key=False) -%}
+      - name: {{ column_name }}
+        sql: {{ column_name }}
+        type: {{ type }}
+        {% if primary_key -%}
+        primary_key: true
+        {% endif -%}
+{% endmacro -%}
+
+cubes:
+  - name: orders
+    sql_table: public.orders
+
+    dimensions:
+      {{ dimension('id', 'number', primary_key=True) }}
+      {{ dimension('status') }}
+      {{ dimension('created_at', 'time') }}
+      {{ dimension('completed_at', 'time') }}
+```
+
+## Calling Python functions
+
+You can declare and invoke Python functions from within a Jinja template. This
+allows the reuse of existing code to generate data models.
+
+In the following example, we'll create a new file called `utils.py`, and within
+it, declare a function called `load_data()` which will load data from a remote
+API endpoint. We will then use the function to generate a data model in Cube.
+
+```python
+# Note that we decorate this function with the `context_func` decorator.
+# This is required in order for data models to be able to call this function.
+@context_func
+def load_data():
+   client = MyApiClient("example.com")
+   return client.load_data()
+
+
+class MyApiClient:
+  def __init__(self, api_url):
+    self.api_url = api_url
+
+  # mock API call
+  def load_data(self):
+    api_response = {
+      "cubes": [
+        {
+          "name": "cube_from_api",
+          "measures": [
+            { "name": "count", "type": "count" },
+            { "name": "total", "type": "sum", "sql": "amount" }
+          ],
+          "dimensions": []
+        },
+        {
+          "name": "cube_from_api_with_dimensions",
+          "measures": [
+            { "name": "active_users", "type": "count_distinct", "sql": "user_id" }
+          ],
+          "dimensions": [
+            { "name": "city", "sql": "city_column", "type": "string" }
+          ]
+        }
+      ]
+    }
+    return api_response
+```
+
+Now that we've decorated our function with the `@context_func` decorator, we can
+call it from within a Jinja template. In the following example, we'll call the
+`load_data()` function and use the result to generate a data model.
+
+```twig
+cubes:
+  {# Here we use the decorated function from earlier #}
+  {%- for cube in load_data()["cubes"] %}
+
+  - name: {{ cube.name }}
+
+  {%- if cube.measures is not none and cube.measures|length > 0 %}
+    measures:
+      {%- for measure in cube.measures %}
+      - name: {{ measure.name }}
+        type: {{ measure.type }}
+      {%- if measure.sql %}
+        sql: {{ measure.sql }}
+      {%- endif %}
+      {%- endfor %}
+  {%- endif %}
+
+  {%- if cube.dimensions is not none and cube.dimensions|length > 0 %}
+    dimensions:
+      {%- for dimension in cube.dimensions %}
+      - name: {{ dimension.name }}
+        type: {{ dimension.type }}
+        sql: {{ dimension.sql }}
+      {%- endfor %}
+  {%- endif %}
+  {%- endfor %}
+```
+
+[jinja]: https://jinja.palletsprojects.com/
+[jinja-docs-for-loop]: https://jinja.palletsprojects.com/en/3.1.x/templates/#for
+[jinja-docs-macros]:
+  https://jinja.palletsprojects.com/en/3.1.x/templates/#macros
