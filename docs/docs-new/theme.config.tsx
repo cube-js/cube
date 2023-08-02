@@ -17,9 +17,22 @@ const config: DocsThemeConfig = {
   project: {
     link: repo,
   },
-  useNextSeoProps() {
+  head: (
+    <>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    </>
+  ),
+  useNextSeoProps: () => {
     return {
+      description: "Documentation for Cube, the Semantic Layer for building data apps",
       titleTemplate: "%s | Cube Docs",
+      openGraph: {
+        description: "Documentation for Cube, the Semantic Layer for building data apps",
+      },
+      twitter: {
+        handle: 'the_cube_dev',
+        site: 'the_cube_dev',
+      },
     };
   },
   primaryHue: {
