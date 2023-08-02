@@ -1,0 +1,23 @@
+module.exports = {
+  "aws-athena": "AWS Athena",
+  "aws-redshift": "AWS Redshift",
+  "clickhouse": "ClickHouse",
+  "databricks-jdbc": "Databricks (JDBC)",
+  "druid": "Druid",
+  "elasticsearch": "Elasticsearch",
+  "firebolt": "Firebolt",
+  "google-bigquery": "Google BigQuery",
+  "hive": "Hive",
+  "ksqldb": "ksqlDB",
+  "materialize": "Materialize",
+  "mongodb": "MongoDB",
+  "ms-sql": "MS-SQL",
+  "mysql": "MySQL",
+  "oracle": "Oracle",
+  "postgres": "Postgres",
+  "presto": "Presto",
+  "questdb": "QuestDB",
+  "snowflake": "Snowflake",
+  "sqlite": "SQLite",
+  "trino": "Trino"
+}

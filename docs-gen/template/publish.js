@@ -101,13 +101,7 @@ const tagValue = (doclet, tagOriginalTitle) => {
   return tag && tag.value;
 };
 
-const generateModuleSection = (doclet) => `---
-title: '${doclet.name}'
-permalink: ${tagValue(doclet, 'permalink')}
-category: Reference
-subCategory: ${tagValue(doclet, 'subCategory')}
-menuOrder: ${tagValue(doclet, 'menuOrder')}
----
+const generateModuleSection = (doclet) => `# ${doclet.name}
 
 ${doclet.description}\n\n`;
 

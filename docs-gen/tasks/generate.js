@@ -2,7 +2,7 @@ const TypeDoc = require('typedoc');
 const path = require('path');
 const fs = require('fs-extra');
 
-const outputDir = '../docs/content/Reference/Frontend';
+const outputDir = '../docs/docs-new/pages/reference/frontend';
 
 const app = new TypeDoc.Application();
 
@@ -50,7 +50,7 @@ projects.forEach(({ name, docsPath, outputDir }) => {
       const pathArr = tmpDir.split('/');
       pathArr.splice(-1, 1);
       const out = path.join(...pathArr);
-      const currentPath = path.join(out, `${name}.md`);
+      const currentPath = path.join(out, `${name.replace('@', '')}.mdx`);
 
       fs.copyFileSync(path.join(tmpDir, tmpFileName), currentPath);
       fs.removeSync(tmpDir);

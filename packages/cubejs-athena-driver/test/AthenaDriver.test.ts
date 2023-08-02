@@ -44,10 +44,6 @@ describe('AthenaDriver', () => {
     await tests.testStream();
   });
 
-  test('unload', async () => {
-    await tests.testUnload();
-  });
-
   test('unload CSV escape symbol', async () => {
     await tests.testUnloadEscapeSymbolOp1(AthenaDriver);
     await tests.testUnloadEscapeSymbolOp2(AthenaDriver);

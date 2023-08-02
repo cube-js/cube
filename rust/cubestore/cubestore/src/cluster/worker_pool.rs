@@ -299,13 +299,17 @@ impl<
         }
         ctx += &self.name;
 
+        let title = std::env::var("CUBESTORE_SELECT_WORKER_TITLE")
+            .ok()
+            .unwrap_or("--sel-worker".to_string());
+
         let handle = respawn(
             WorkerProcessArgs {
                 args: args_rx,
                 results: res_tx,
                 processor: PhantomData::<P>::default(),
             },
-            &["--sel-worker".to_string()],
+            &[title],
             &[("CUBESTORE_LOG_CONTEXT".to_string(), ctx)],
         )?;
         Ok((args_tx, res_rx, handle))

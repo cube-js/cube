@@ -8,12 +8,14 @@ use crate::metastore::{
     deactivate_table_on_corrupt_data, table::Table, Chunk, IdRow, Index, IndexType, MetaStore,
     Partition, PartitionData,
 };
+use crate::queryplanner::trace_data_loaded::{DataLoadedSize, TraceDataLoadedExec};
 use crate::remotefs::{ensure_temp_file_is_dropped, RemoteFs};
 use crate::store::{min_max_values_from_data, ChunkDataStore, ChunkStore, ROW_GROUP_SIZE};
 use crate::table::data::{cmp_min_rows, cmp_partition_key};
 use crate::table::parquet::{arrow_schema, ParquetTableStore};
 use crate::table::redistribute::redistribute;
 use crate::table::{Row, TableValue};
+use crate::util::batch_memory::record_batch_buffer_size;
 use crate::CubeError;
 use arrow::array::{ArrayRef, UInt64Array};
 use arrow::compute::{lexsort_to_indices, SortColumn, SortOptions};
@@ -50,7 +52,11 @@ use tokio::task::JoinHandle;
 
 #[async_trait]
 pub trait CompactionService: DIService + Send + Sync {
-    async fn compact(&self, partition_id: u64) -> Result<(), CubeError>;
+    async fn compact(
+        &self,
+        partition_id: u64,
+        data_loaded_size: Arc<DataLoadedSize>,
+    ) -> Result<(), CubeError>;
     async fn compact_in_memory_chunks(&self, partition_id: u64) -> Result<(), CubeError>;
     async fn compact_node_in_memory_chunks(&self, node: String) -> Result<(), CubeError>;
     /// Split multi-partition that has too many rows. Figures out the keys based on stored data.
@@ -415,7 +421,11 @@ impl CompactionServiceImpl {
 }
 #[async_trait]
 impl CompactionService for CompactionServiceImpl {
-    async fn compact(&self, partition_id: u64) -> Result<(), CubeError> {
+    async fn compact(
+        &self,
+        partition_id: u64,
+        data_loaded_size: Arc<DataLoadedSize>,
+    ) -> Result<(), CubeError> {
         let (partition, index, table, multi_part) = self
             .meta_store
             .get_partition_for_compaction(partition_id)
@@ -466,7 +476,7 @@ impl CompactionService for CompactionServiceImpl {
 
         let mut data = Vec::new();
         let mut chunks_to_use = Vec::new();
-        let mut total_size = 0;
+        let mut chunks_total_size = 0;
         let num_columns = index.get_row().columns().len();
 
         for chunk in chunks.iter() {
@@ -486,16 +496,17 @@ impl CompactionService for CompactionServiceImpl {
                     index,
                     chunk
                 );
-                for col in b.columns() {
-                    total_size += col.get_array_memory_size();
-                }
+                chunks_total_size += record_batch_buffer_size(&b);
                 data.push(b);
             }
             chunks_to_use.push(chunk.clone());
-            if total_size > self.config.compaction_chunks_in_memory_size_threshold() as usize {
+            if chunks_total_size > self.config.compaction_chunks_in_memory_size_threshold() as usize
+            {
                 break;
             }
         }
+
+        data_loaded_size.add(chunks_total_size);
 
         let chunks = chunks_to_use;
 
@@ -629,14 +640,21 @@ impl CompactionService for CompactionServiceImpl {
         // Merge and write rows.
         let schema = Arc::new(arrow_schema(index.get_row()));
         let main_table: Arc<dyn ExecutionPlan> = match old_partition_local {
-            Some(file) => Arc::new(ParquetExec::try_from_path(
-                file.as_str(),
-                None,
-                None,
-                ROW_GROUP_SIZE,
-                1,
-                None,
-            )?),
+            Some(file) => {
+                let parquet_exec = Arc::new(ParquetExec::try_from_path(
+                    file.as_str(),
+                    None,
+                    None,
+                    ROW_GROUP_SIZE,
+                    1,
+                    None,
+                )?);
+
+                Arc::new(TraceDataLoadedExec::new(
+                    parquet_exec,
+                    data_loaded_size.clone(),
+                ))
+            }
             None => Arc::new(EmptyExec::new(false, schema.clone())),
         };
 
@@ -1496,7 +1514,10 @@ mod tests {
             remote_fs,
             Arc::new(config),
         );
-        compaction_service.compact(1).await.unwrap();
+        compaction_service
+            .compact(1, DataLoadedSize::new())
+            .await
+            .unwrap();
 
         fn sort_fn(
             a: &(u64, Option<Row>, Option<Row>),
@@ -1566,7 +1587,10 @@ mod tests {
             .unwrap();
         metastore.chunk_uploaded(4).await.unwrap();
 
-        compaction_service.compact(next_partition_id).await.unwrap();
+        compaction_service
+            .compact(next_partition_id, DataLoadedSize::new())
+            .await
+            .unwrap();
 
         let active_partitions = metastore
             .get_active_partitions_by_index_id(1)
@@ -1896,7 +1920,7 @@ mod tests {
             config.config_obj(),
         );
         compaction_service
-            .compact(partition.get_id())
+            .compact(partition.get_id(), DataLoadedSize::new())
             .await
             .unwrap();
 
@@ -1967,7 +1991,10 @@ mod tests {
                     .join(", ");
                 let query = format!("insert into test.a (a, b) values {}", values);
                 service.exec_query(&query).await.unwrap();
-                compaction_service.compact(1).await.unwrap();
+                compaction_service
+                    .compact(1, DataLoadedSize::new())
+                    .await
+                    .unwrap();
                 let partitions = services
                     .meta_store
                     .get_active_partitions_by_index_id(1)
@@ -1982,7 +2009,7 @@ mod tests {
 
                 service.exec_query(&query).await.unwrap();
                 compaction_service
-                    .compact(partitions[0].get_id())
+                    .compact(partitions[0].get_id(), DataLoadedSize::new())
                     .await
                     .unwrap();
                 let partitions = services

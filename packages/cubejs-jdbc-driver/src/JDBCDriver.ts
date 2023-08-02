@@ -21,10 +21,10 @@ import { DriverOptionsInterface, SupportedDrivers } from './supported-drivers';
 import { JDBCDriverConfiguration } from './types';
 import { QueryStream, nextFn, Row } from './QueryStream';
 
-const DriverManager = require('jdbc/lib/drivermanager');
-const Connection = require('jdbc/lib/connection');
-const DatabaseMetaData = require('jdbc/lib/databasemetadata');
-const jinst = require('jdbc/lib/jinst');
+const DriverManager = require('@cubejs-backend/jdbc/lib/drivermanager');
+const Connection = require('@cubejs-backend/jdbc/lib/connection');
+const DatabaseMetaData = require('@cubejs-backend/jdbc/lib/databasemetadata');
+const jinst = require('@cubejs-backend/jdbc/lib/jinst');
 const mvn = require('node-java-maven');
 
 let mvnPromise: Promise<void> | null = null;

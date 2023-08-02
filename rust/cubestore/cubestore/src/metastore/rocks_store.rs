@@ -12,7 +12,7 @@ use datafusion::cube_ext;
 use log::{info, trace};
 use rocksdb::backup::{BackupEngine, BackupEngineOptions, RestoreOptions};
 use rocksdb::checkpoint::Checkpoint;
-use rocksdb::{Env, Snapshot, WriteBatch, WriteBatchIterator, DB};
+use rocksdb::{DBCompressionType, Env, Snapshot, WriteBatch, WriteBatchIterator, DB};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -520,6 +520,7 @@ impl RocksStoreChecksumType {
 pub struct RocksStoreConfig {
     pub checksum_type: RocksStoreChecksumType,
     pub cache_capacity: usize,
+    pub compression_type: DBCompressionType,
 }
 
 impl RocksStoreConfig {
@@ -528,6 +529,7 @@ impl RocksStoreConfig {
             // Supported since RocksDB 6.27
             checksum_type: RocksStoreChecksumType::XXH3,
             cache_capacity: 8 * 1024 * 1024,
+            compression_type: DBCompressionType::None,
         }
     }
 
@@ -536,6 +538,7 @@ impl RocksStoreConfig {
             // Supported since RocksDB 6.27
             checksum_type: RocksStoreChecksumType::XXH3,
             cache_capacity: 8 * 1024 * 1024,
+            compression_type: DBCompressionType::None,
         }
     }
 }

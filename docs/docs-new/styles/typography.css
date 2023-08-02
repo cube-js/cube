@@ -9,6 +9,7 @@
   --h1_font-size: 42px;
   --h1_line-height: 54px;
   --h1_font: bold var(--h1_font-size) / var(--h1_line-height) var(--font);
+  --h1_color: var(--dark_01);
 
   --h2_font-size: 32px;
   --h2_line-height: 44px;
@@ -67,4 +68,33 @@
     --p1_font-size: var(--p2_font-size);
     --p1_line-height: var(--p2_line-height);
   }
+}
+
+body {
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-title);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p {
+  color: var(--dark_01);
+}
+
+code,
+kbd,
+samp,
+pre {
+  font-family: var(--font-code);
 }

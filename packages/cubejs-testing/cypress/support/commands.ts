@@ -26,9 +26,12 @@
 // -- This will overwrite an existing command --
 // Cypress.Commands.overwrite("visit", (originalFn, url, options) => { ... })
 
-Cypress.Commands.add('getByTestId', (selector, ...args) => {
-  return cy.get(`[data-testid='${selector}']`, ...args);
-});
+Cypress.on(
+  'uncaught:exception',
+  (err) => !err.message.includes('ResizeObserver')
+);
+
+Cypress.Commands.add('getByTestId', (selector, ...args) => cy.get(`[data-testid='${selector}']`, ...args));
 
 Cypress.Commands.add('setQuery', (query, ...args) => {
   cy.clearLocalStorage(/queryTabs/);

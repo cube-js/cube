@@ -1,0 +1,25 @@
+cubes:
+  {%- for cube in load_data()["cubes"] %}
+
+  - name: {{ cube.name }}
+
+  {%- if cube.measures is not none and cube.measures|length > 0 %}
+    measures:
+      {%- for measure in cube.measures %}
+      - name: {{ measure.name }}
+        type: {{ measure.type }}
+      {%- if measure.sql %}
+        sql: {{ measure.sql }}
+      {%- endif %}
+      {%- endfor %}
+  {%- endif %}
+
+  {%- if cube.dimensions is not none and cube.dimensions|length > 0 %}
+    dimensions:
+      {%- for dimension in cube.dimensions %}
+      - name: {{ dimension.name }}
+        type: {{ dimension.type }}
+        sql: {{ dimension.sql }}
+      {%- endfor %}
+  {%- endif %}
+  {%- endfor %}

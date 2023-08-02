@@ -28,7 +28,7 @@ libc = "0.2"
 findshlibs = "0.10.2"
 convert_case = "0.6.0"
 # python
-minijinja = { git = "https://github.com/mitsuhiko/minijinja.git", rev = "efdb9bee8b893b423157035631cfe3ae694c45cd", features = ["json", "loader"], optional = true }
+minijinja = { version = "1", features = ["json", "loader"], optional = true }
 pyo3 = { version = "0.18.3", features = [], optional = true }
 pyo3-asyncio = { version = "0.18.0", features = ["tokio-runtime", "attributes"], optional = true }
 

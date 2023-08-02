@@ -20,6 +20,7 @@ pub use rocks_store::*;
 pub use rocks_table::*;
 
 use crate::cluster::node_name_by_partition;
+use crate::metastore::partition::partition_file_name;
 use async_trait::async_trait;
 use log::info;
 use rocksdb::{BlockBasedOptions, Cache, Env, MergeOperands, Options, DB};
@@ -968,6 +969,8 @@ pub trait MetaStore: DIService + Send + Sync {
     async fn get_warmup_partitions(
         &self,
     ) -> Result<Vec<(IdRow<Partition>, Vec<IdRow<Chunk>>)>, CubeError>;
+
+    async fn get_all_filenames(&self) -> Result<Vec<String>, CubeError>;
 
     fn chunks_table(&self) -> ChunkMetaStoreTable;
     async fn create_chunk(
@@ -3310,6 +3313,27 @@ impl MetaStore for RocksMetaStore {
                 }
             }
             Ok(partitions)
+        })
+        .await
+    }
+    async fn get_all_filenames(&self) -> Result<Vec<String>, CubeError> {
+        self.read_operation_out_of_queue(|db| {
+            let mut filenames = Vec::new();
+            for c in ChunkRocksTable::new(db.clone()).table_scan(db.snapshot)? {
+                let c = c?;
+                if !c.row.in_memory {
+                    filenames.push(c.row.get_full_name(c.id));
+                }
+            }
+
+            for p in PartitionRocksTable::new(db.clone()).table_scan(db.snapshot)? {
+                let p = p?;
+                if p.row.active || p.row.main_table_row_count == 0 {
+                    //maint_table_row_count == 0 means that partition is just created
+                    filenames.push(partition_file_name(p.id, p.row.suffix()));
+                }
+            }
+            Ok(filenames)
         })
         .await
     }

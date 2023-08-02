@@ -1,4 +1,8 @@
-import React from 'react';
+import classnames from 'classnames/bind';
+
+import * as styles from './LoomVideo.module.scss';
+
+const cn = classnames.bind(styles);
 
 export type LoomVideoProps = {
   url: string;
@@ -7,7 +11,7 @@ export type LoomVideoProps = {
 export const LoomVideo = ({ url }: LoomVideoProps) => {
   return (
     <div
-      className="block-video"
+      className={cn('LoomVideo__Wrapper')}
       style={{ position: 'relative', paddingBottom: '56.25%', height: 0 }}
     >
       <iframe

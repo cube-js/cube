@@ -15,6 +15,10 @@ describe('oracle', () => {
 
   beforeAll(async () => {
     db = await OracleDBRunner.startContainer({});
+
+    const stream = await db.logs();
+    stream.pipe(process.stdout);
+
     birdbox = await getBirdbox(
       'oracle',
       {

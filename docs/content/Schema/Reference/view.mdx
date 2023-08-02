@@ -85,7 +85,7 @@ views:
 
       - join_path: base_orders.users
         prefix: true
-        includes: *
+        includes: "*"
         excludes:
           - company
 
@@ -214,7 +214,7 @@ views:
 
       - join_path: base_orders.users
         prefix: true
-        includes: *
+        includes: "*"
         excludes:
           - company
 
@@ -226,7 +226,7 @@ For the root cube of the view, just put the cube name as in the example above fo
 
 The other required parameter inside the `cubes` block is `includes`. You can simply list measures, dimensions, or segments you'd like to include.
 In case you need to rename some of them, you can provide `name` and `alias` parameters.
-Alternatively, you can use the `excludes` parameter in conjunction with the includes all definition `includes: *`.
+Alternatively, you can use the `excludes` parameter in conjunction with the includes all definition `includes: "*"`.
 
 Optionally, if you'd like to prefix exposed measures, dimensions, or segments with the cube name, you can use the `prefix: true` parameter.
 It will prefix them with the cube name, e.g. `users_city`. You can use the `alias` parameter to rename the cube for the prefixing purpose.
@@ -335,6 +335,12 @@ views:
 To learn more about using `public` to control visibility based on security
 context, read the [Controlling access to cubes and views
 recipe][ref-recipe-control-access-cubes-views].
+
+## Using views with pre-aggregations
+
+Pre-aggregations defined for original Cube members would still work when used in view queries.
+Please note that pre-aggregations use the same leaf members matching algorithm used for Cubes.
+As a consequence, all measures and dimensions included in pre-aggregation should be leaf members in order to be matched by view query.
 
 [ref-recipe-control-access-cubes-views]:
   /recipes/controlling-access-to-cubes-and-views

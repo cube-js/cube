@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import styles from './styles.module.scss';
-// import Button from '../Button'
+import styles from './FeedbackForm.module.css';
+import { Button, ButtonGroup } from '../Button/Button';
 
-const Button = (props) => <button {...props} />;
+// const Button = (props) => <button {...props} />;
 
 const FeedbackForm = (props: propsType) => {
   const { setFeedbackMessage, clearFeedback, feedback } = props;
@@ -14,7 +14,7 @@ const FeedbackForm = (props: propsType) => {
   };
 
   const handleSubmit = (
-    event: Event,
+    event: React.MouseEvent<HTMLButtonElement>,
     message: string,
   ) => {
     event.preventDefault();
@@ -22,7 +22,7 @@ const FeedbackForm = (props: propsType) => {
   };
 
   return (
-    <form className={styles.feedbackForm}>
+    <form className={styles.FeedbackForm}>
       <textarea
         value={message}
         onChange={(e) => {
@@ -30,21 +30,20 @@ const FeedbackForm = (props: propsType) => {
         }}
         placeholder={feedbackMessage[feedback] || ''}
       ></textarea>
-      <div className={styles.feedbackForm__buttons}>
+      <ButtonGroup className={styles.FeedbackForm__buttons}>
         <Button
-          view="primary"
-          className={styles.feedbackForm__sendButton}
-          onClick={(e: Event) => {
+          className={styles.FeedbackForm__sendButton}
+          onClick={(e) => {
             handleSubmit(e, message);
           }}
           type="submit"
         >
           Send
         </Button>
-        <Button view="outline" onClick={clearFeedback}>
+        <Button variant="secondary" onClick={clearFeedback}>
           Cancel
         </Button>
-      </div>
+      </ButtonGroup>
     </form>
   );
 };

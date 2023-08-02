@@ -43,4 +43,10 @@
 
   --cherry: var(--pink);
   --cherry_dark: var(--pink_bright);
+
+  --light-green: 	hsl(135, 29%, 49%);
+  --red: 	hsl(357, 85%, 59%);
+
+  --success: var(--light-green);
+  --danger: var(--red);
 }

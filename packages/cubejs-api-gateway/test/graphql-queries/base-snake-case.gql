@@ -1,0 +1,132 @@
+query CubeQuery {
+  cube {
+    orders {
+      count
+      created_at {
+        day
+      }
+    }
+  }
+}
+
+query CubeQuery {
+  cube(where: { orders: { status: { equals: "shipped" } } }) {
+    orders {
+      count
+      created_at {
+        day
+      }
+    }
+  }
+}
+
+query CubeQuery {
+  cube(
+    where: {
+      orders: { created_at: { inDateRange: ["2022-01-01", "2022-02-01"] } }
+    }
+  ) {
+    orders(orderBy: { created_at: asc }) {
+      count
+      created_at {
+        value
+      }
+    }
+  }
+}
+
+query CubeQuery {
+  cube(
+    where: {
+      orders: { created_at: { inDateRange: ["2022-01-01", "2022-02-01"] } }
+    }
+  ) {
+    orders(orderBy: { created_at: asc }) {
+      count
+      created_at {
+        day
+      }
+    }
+  }
+}
+
+query CubeQuery {
+  cube(where: { orders: { created_at: { inDateRange: "This month" } } }) {
+    orders {
+      count
+      created_at {
+        value
+      }
+    }
+  }
+}
+
+query CubeQuery {
+  cube(where: { orders: { created_at: { inDateRange: "This month" } } }) {
+    orders {
+      count
+      created_at {
+        day
+      }
+    }
+  }
+}
+
+query CubeQuery {
+  cube(where: { orders: { created_at: { inDateRange: "2 weeks ago to now" } } }) {
+    orders {
+      count
+      created_at {
+        day
+      }
+    }
+  }
+}
+
+query CubeQuery {
+  cube(
+    where: {
+      orders: { created_at: { notInDateRange: ["2022-01-01", "2022-02-01"] } }
+    }
+  ) {
+    orders {
+      count
+      created_at {
+        day
+      }
+    }
+  }
+}
+
+query CubeQuery {
+  cube {
+    orders(orderBy: { count: desc, status: asc }) {
+      count
+      status
+      created_at {
+        value
+      }
+    }
+    users(orderBy: { city: desc }) {
+      city
+    }
+  }
+}
+
+query CubeQuery {
+  cube(
+    where: {
+      orders: { status: { in: ["canceled", "active"] } }
+      OR: [
+        {
+          users: { OR: [{ city: { set: false } }, { city: { equals: "US" } }] }
+        }
+      ]
+    }
+  ) {
+    orders {
+      count
+      status
+    }
+  }
+}

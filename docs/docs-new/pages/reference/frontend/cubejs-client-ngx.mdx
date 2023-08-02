@@ -4,6 +4,7 @@ redirect_from:
 ---
 
 # @cubejs-client/ngx
+
 `@cubejs-client/ngx` provides Angular Module for easy integration Cube into an
 Angular app.
 
@@ -43,13 +44,13 @@ export class AppModule { }
 ```
 
 The `options` object is passed directly to
-[@cubejs-client/core](/@cubejs-client-core).
+[@cubejs-client/core](/reference/frontend/cubejs-client-core).
 
 `CubejsClientModule` provides `CubejsClient`, which you can inject into your
 components or services:
 
 ```typescript
-import { CubejsClient } from '@cubejs-client/ngx';
+import { CubejsClient } from "@cubejs-client/ngx";
 
 export class AppComponent {
   constructor(private cubejs: CubejsClient) {}
@@ -57,13 +58,13 @@ export class AppComponent {
   ngOnInit() {
     this.cubejs
       .load({
-        measures: ['some_measure'],
+        measures: ["some_measure"],
       })
       .subscribe(
         (resultSet) => {
           this.data = resultSet.chartPivot();
         },
-        (err) => console.log('HTTP Error', err)
+        (err) => console.log("HTTP Error", err)
       );
   }
 }
@@ -72,11 +73,11 @@ export class AppComponent {
 ## API
 
 `CubejsClient` provides the same API methods as
-[@cubejs-client/core](/@cubejs-client-core#cubejs-api). The difference is that
-instead of Promise it returns an
+[@cubejs-client/core](/reference/frontend/cubejs-client-core#cubejsapi). The
+difference is that instead of Promise it returns an
 [Observable](http://reactivex.io/rxjs/class/es6/Observable.js~Observable.html),
-which passes [resultSet](/@cubejs-client-core#result-set) into callback
-function.
+which passes [resultSet](/reference/frontend/cubejs-client-core#resultset) into
+callback function.
 
 Also you can use [RxJS Subject](https://rxjs-dev.firebaseapp.com/guide/subject)
 with a query using `watch` method:

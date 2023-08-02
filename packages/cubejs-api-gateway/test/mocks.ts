@@ -28,7 +28,7 @@ export const preAggregationsResultFactory = () => ([
 
 export const preAggregationPartitionsResultFactory = () => ([
   {
-    timezone: 'UTC',
+    timezones: ['UTC'],
     preAggregation: preAggregationsResultFactory()[0],
     partitions: [{
       tableName: 'dev_pre_aggregations.usage_usages20210430'

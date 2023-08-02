@@ -1,0 +1,60 @@
+---
+redirect_from:
+  - /monitoring/datadog
+---
+
+# Integration with Datadog
+
+[Datadog][datadog] is a popular fully managed observability service. This guide
+demonstrates how to set up Cube Cloud to export logs to Datadog.
+
+## Configuration
+
+First, enable [monitoring integrations][ref-monitoring-integrations] in Cube
+Cloud.
+
+### Exporting logs
+
+To export logs to Datadog, go to <Btn>Organization Settings → API Keys</Btn>
+obtain an API key:
+
+<Screenshot src="https://ucarecdn.com/d4703748-aea9-4d74-bac2-febe13c604c6/" />
+
+Then, configure the [`datadog_logs`][vector-datadog-logs] sink in your
+[`vector.toml` configuration file][ref-monitoring-integrations-conf].
+
+Example configuration:
+
+```toml
+[sinks.datadog_logs]
+type = "datadog_logs"
+inputs = [
+  "cubejs-server",
+  "refresh-scheduler",
+  "ext-db",
+  "warmup-job",
+  "cubestore"
+]
+default_api_key = "0746ad78335ac7c0219ee38b47ada6a6"
+site = "datadoghq.eu"
+compression = "gzip"
+healthcheck = false
+```
+
+Note that Datadog accounts belong to specific [sites][datadog-docs-sites]
+throughout the world. Use the `site` option to configure the sink appropriately.
+When miscofigured, Vector agent outputs the following error:
+`Client request was forbidden`.
+
+Commit the configuration for Vector, it should take effect in a minute. Then,
+navigate to <Btn>Logs</Btn> in Datadog and watch the logs coming:
+
+<Screenshot src="https://ucarecdn.com/5e66f3d6-85a7-498c-89e8-41632d1b184c/" />
+
+[datadog]: https://www.datadoghq.com
+[datadog-docs-sites]: https://docs.datadoghq.com/getting_started/site/
+[vector-datadog-logs]:
+  https://vector.dev/docs/reference/configuration/sinks/datadog_logs/
+[ref-monitoring-integrations]: /product/monitoring/integrations
+[ref-monitoring-integrations-conf]:
+  /product/monitoring/integrations#configuration

@@ -5,7 +5,7 @@
 }
 
 .Footer * {
-  font-family: var(--font-creapro) !important;
+  font-family: var(--font-title) !important;
 }
 
 .Footer--borderTop {

@@ -10,6 +10,7 @@ pub mod query_executor;
 pub mod serialized_plan;
 mod tail_limit;
 mod topk;
+pub mod trace_data_loaded;
 pub use topk::MIN_TOPK_STREAM_ROWS;
 mod coalesce;
 mod filter_by_key_range;

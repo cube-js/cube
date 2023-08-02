@@ -34,7 +34,7 @@ features:
   should not rely on this feature.
 
 | Status     | Feature                                                                                                                           | Deprecated | Remove    |
-|------------|-----------------------------------------------------------------------------------------------------------------------------------|------------|-----------|
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------- | ---------- | --------- |
 | Removed    | [Node.js 8](#nodejs-8)                                                                                                            | v0.22.4    | v0.26.0   |
 | Deprecated | [`hearBeatInterval`](#hearbeatinterval)                                                                                           | v0.23.8    | June 2021 |
 | Removed    | [`CUBEJS_ENABLE_TLS`](#cubejs_enable_tls)                                                                                         | v0.23.11   | v0.26.0   |
@@ -55,6 +55,7 @@ features:
 | Deprecated | [`dbType`](#dbtype)                                                                                                               | v0.30.30   |           |
 | Deprecated | [Serverless Deployments](#serverless-deployments)                                                                                 | v0.31.64   |           |
 | Deprecated | [Node.js 14](#nodejs-14)                                                                                                          | v0.32.0    |           |
+| Deprecated | [`running_total` measure type](#running_total-measure-type)                                                                       | v0.33.39   |           |
 
 ### Node.js 8
 
@@ -110,13 +111,13 @@ now provide a public API from the package directly.
 Deprecated:
 
 ```javascript
-const BaseDriver = require('@cubejs-backend/query-orchestrator/driver/BaseDriver');
+const BaseDriver = require("@cubejs-backend/query-orchestrator/driver/BaseDriver");
 ```
 
 You should use:
 
 ```javascript
-const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
+const { BaseDriver } = require("@cubejs-backend/query-orchestrator");
 ```
 
 ### `contextToDataSourceId`
@@ -143,13 +144,13 @@ now provide a public API from the package directly.
 Deprecated:
 
 ```javascript
-const CubejsServerCore = require('@cubejs-backend/server-core');
+const CubejsServerCore = require("@cubejs-backend/server-core");
 ```
 
 You should use:
 
 ```javascript
-const { CubejsServerCore } = require('@cubejs-backend/server-core');
+const { CubejsServerCore } = require("@cubejs-backend/server-core");
 ```
 
 ### Absolute import for `@cubejs-backend/schema-compiler`
@@ -162,13 +163,13 @@ now provide a public API from the package directly.
 Deprecated:
 
 ```javascript
-const BaseQuery = require('@cubejs-backend/schema-compiler/adapter/BaseQuery');
+const BaseQuery = require("@cubejs-backend/schema-compiler/adapter/BaseQuery");
 ```
 
 You should use:
 
 ```javascript
-const { BaseQuery } = require('@cubejs-backend/schema-compiler');
+const { BaseQuery } = require("@cubejs-backend/schema-compiler");
 ```
 
 ### `checkAuthMiddleware`
@@ -206,7 +207,7 @@ Deprecated:
 
 ```js
 cube(`visitors`, {
-  sql: `select * from visitors WHERE ${USER_CONTEXT.source.filter('source')}`,
+  sql: `select * from visitors WHERE ${USER_CONTEXT.source.filter("source")}`,
 });
 ```
 
@@ -215,7 +216,7 @@ You should use:
 ```js
 cube(`visitors`, {
   sql: `select * from visitors WHERE ${SECURITY_CONTEXT.source.filter(
-    'source'
+    "source"
   )}`,
 });
 ```
@@ -347,7 +348,15 @@ instead.
 
 **Deprecated in Release: v0.32.0**
 
-Node.js 14 reached [End of Life on April 30, 2023][link-nodejs-eol]. This means no
-more updates. Please upgrade to Node.js 16 or higher.
+Node.js 14 reached [End of Life on April 30, 2023][link-nodejs-eol]. This means
+no more updates. Please upgrade to Node.js 16 or higher.
 
 [link-nodejs-eol]: https://github.com/nodejs/Release#end-of-life-releases
+
+### `running_total` measure type
+
+**Deprecated in Release: v0.33.39**
+
+The `running_total` measure type is now deprecated, and we recommend using
+[`rolling_window`](https://cube.dev/docs/product/data-modeling/reference/measures#rolling_window)
+to calculate running totals instead.

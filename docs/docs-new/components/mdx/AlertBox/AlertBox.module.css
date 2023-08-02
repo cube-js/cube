@@ -1,45 +1,49 @@
 .AlertBox__header {
-    font-weight: 700;
-    font: var(--h5_font);
+  font-weight: 700;
+  font: var(--h5_font);
+}
+
+.AlertBox__HeaderIcon {
+  margin-right: 0.5rem;
 }
 
 .AlertBox__content {
-    font-weight: 400;
-    font-size: 16px;
-    line-height: 28px;
+  font-weight: 400;
+  font-size: 16px;
+  line-height: 28px;
 }
 
 .AlertBox__Wrapper {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: flex-start;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
 
-    padding: 12px 16px;
-    border-left: 3px solid;
-    margin: 24px 0;
+  padding: 12px 16px;
+  border-left: 3px solid;
+  margin: 24px 0;
 }
 
 .AlertBox__Wrapper--error {
-    background-color: #FCEBEB;
-    border-left-color: #EF3F2C;
-    color: #831414;
+  background-color: #FCEBEB;
+  border-left-color: #EF3F2C;
+  color: #831414;
 }
 
 .AlertBox__Wrapper--info {
-    background-color: #EBF4FC;
-    border-left-color: #3C94E5;
-    color: #2A4475;
+  background-color: #EBF4FC;
+  border-left-color: #3C94E5;
+  color: #2A4475;
 }
 
 .AlertBox__Wrapper--warning {
-    background-color: #FEF6EF;
-    border-left-color: #F0A45E;
-    color: #7A442A;
+  background-color: #FEF6EF;
+  border-left-color: #F0A45E;
+  color: #7A442A;
 }
 
 .AlertBox__Wrapper--default {
-    background-color: #E9F9F2;
-    border-left-color: #27C27C;
-    color: #26534B;
+  background-color: #E9F9F2;
+  border-left-color: #27C27C;
+  color: #26534B;
 }

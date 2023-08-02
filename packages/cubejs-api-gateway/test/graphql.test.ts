@@ -69,6 +69,65 @@ const metaConfig = [
   },
 ];
 
+const metaConfigSnakeCase = [
+  {
+    config: {
+      name: 'orders',
+      measures: [
+        {
+          name: 'orders.count',
+          isVisible: true,
+        },
+      ],
+      dimensions: [
+        {
+          name: 'orders.id',
+          isVisible: true,
+        },
+        {
+          name: 'orders.status',
+          type: 'string',
+          isVisible: true,
+        },
+        {
+          name: 'orders.created_at',
+          type: 'time',
+          isVisible: true,
+        },
+      ],
+    },
+  },
+  {
+    config: {
+      name: 'users',
+      measures: [
+        {
+          name: 'users.count',
+          isVisible: true,
+        },
+      ],
+      dimensions: [
+        {
+          name: 'users.id',
+          isVisible: true,
+        },
+        {
+          name: 'users.city',
+          type: 'string',
+          isVisible: true,
+        },
+        {
+          name: 'users.created_at',
+          type: 'time',
+          isVisible: true,
+        },
+      ],
+    },
+  },
+];
+
+const jsonParser = bodyParser.json({ limit: '1mb' });
+
 function gqlQuery(query: string, variables?: Record<string, string | number>) {
   return JSON.stringify({
     operationName: 'CubeQuery',
@@ -86,58 +145,121 @@ function expectValidSchema(schema) {
   expect(ordersFields).toHaveProperty('createdAt');
 }
 
-const app = express();
-
-const jsonParser = bodyParser.json({ limit: '1mb' });
-
-app.use('/graphql', jsonParser, (req, res) => {
-  const schema = makeSchema(metaConfig);
-
-  return graphqlHTTP({
-    schema,
-    context: {
-      req,
-      apiGateway: {
-        async load({ query, res: response }) {
-          expect(query).toMatchSnapshot(req.body.query);
-
-          response({
-            query,
-            annotation: {},
-            data: [],
-          });
-        },
-      },
-    },
-  })(req, res);
-});
-
-const GRAPHQL_QUERIES_PATH = `${process.cwd()}/test/graphql-queries/base.gql`;
-
 describe('GraphQL Schema', () => {
-  test('should make valid schema', () => {
-    const schema = makeSchema(metaConfig);
-    expectValidSchema(schema);
+  describe('with camelCase', () => {
+    const app = express();
+
+    app.use('/graphql', jsonParser, (req, res) => {
+      const schema = makeSchema(metaConfig);
+  
+      return graphqlHTTP({
+        schema,
+        context: {
+          req,
+          apiGateway: {
+            async load({ query, res: response }) {
+              expect(query).toMatchSnapshot(req.body.query);
+  
+              response({
+                query,
+                annotation: {},
+                data: [],
+              });
+            },
+          },
+        },
+      })(req, res);
+    });
+
+    const GRAPHQL_QUERIES_PATH = `${process.cwd()}/test/graphql-queries/base.gql`;
+    
+    app.use('/graphql', jsonParser, (req, res) => {
+      const schema = makeSchema(metaConfig);
+    
+      return graphqlHTTP({
+        schema,
+        context: {
+          req,
+          apiGateway: {
+            async load({ query, res: response }) {
+              expect(query).toMatchSnapshot(req.body.query);
+    
+              response({
+                query,
+                annotation: {},
+                data: [],
+              });
+            },
+          },
+        },
+      })(req, res);
+    });
+    
+    test('should make valid schema', () => {
+      const schema = makeSchema(metaConfig);
+      expectValidSchema(schema);
+    });
+
+    test('should make valid schema when name is not capitalized', async () => {
+      const schema = makeSchema(JSON.parse(
+        JSON.stringify(metaConfig)
+          .replace(/Orders/g, 'orders')
+      ));
+      expectValidSchema(schema);
+    });
+
+    const queries = fs.readFileSync(GRAPHQL_QUERIES_PATH, 'utf-8').split('\n\n');
+
+    queries.forEach((query, index) => {
+      test(`GraphQL query ${index}`, async () => {
+        const { error } = await request(app)
+          .post('/graphql')
+          .set('Content-Type', 'application/json')
+          .send(gqlQuery(query));
+
+        expect((<any>error)?.text).toBeUndefined();
+      });
+    });
   });
+    
+  describe('with snake_case', () => {
+    const app = express();
 
-  test('should make valid schema when name is not capitalized', async () => {
-    const schema = makeSchema(JSON.parse(
-      JSON.stringify(metaConfig)
-        .replace(/Orders/g, 'orders')
-    ));
-    expectValidSchema(schema);
-  });
+    app.use('/graphql', jsonParser, (req, res) => {
+      const schema = makeSchema(metaConfigSnakeCase);
+      
+      return graphqlHTTP({
+        schema,
+        context: {
+          req,
+          apiGateway: {
+            async load({ query, res: response }) {
+              expect(query).toMatchSnapshot(req.body.query);
+      
+              response({
+                query,
+                annotation: {},
+                data: [],
+              });
+            },
+          },
+        },
+      })(req, res);
+    });
 
-  const queries = fs.readFileSync(GRAPHQL_QUERIES_PATH, 'utf-8').split('\n\n');
+    const GRAPHQL_QUERIES_PATH = `${process.cwd()}/test/graphql-queries/base-snake-case.gql`;
 
-  queries.forEach((query, index) => {
-    test(`GraphQL query ${index}`, async () => {
-      const { error } = await request(app)
-        .post('/graphql')
-        .set('Content-Type', 'application/json')
-        .send(gqlQuery(query));
+    const queries = fs.readFileSync(GRAPHQL_QUERIES_PATH, 'utf-8').split('\n\n');
 
-      expect((<any>error)?.text).toBeUndefined();
+    queries.forEach((query, index) => {
+      test(`GraphQL query ${index}`, async () => {
+        const { error } = await request(app)
+          .post('/graphql')
+          .set('Content-Type', 'application/json')
+          .send(gqlQuery(query));
+
+        expect((<any>error)?.text).toBeUndefined();
+      });
     });
   });
 });

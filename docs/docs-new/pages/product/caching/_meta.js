@@ -1,5 +1,4 @@
 module.exports = {
-  "overview": "Overview",
   "getting-started-pre-aggregations": "Getting started with pre-aggregations",
   "using-pre-aggregations": "Using pre-aggregations",
   "lambda-pre-aggregations": "Lambda pre-aggregations",

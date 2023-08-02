@@ -31,12 +31,12 @@ jobs:
           toolchain: nightly-2022-03-22
           override: true
           components: rustfmt, clippy
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
         with:
-          working-directory: ./rust/cubesql
+          workspaces: ./rust/cubesql -> target
           # default key
           key: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu-16
-          sharedKey: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu-16
+          shared-key: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu-16
       - name: Lint CubeSQL
         run: cd rust/cubesql/cubesql && cargo fmt --all -- --check
       - name: Lint Native
@@ -64,12 +64,12 @@ jobs:
           toolchain: nightly-2022-03-22
           override: true
           components: rustfmt
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
         with:
-          working-directory: ./rust/cubesql
+          workspaces: ./rust/cubesql -> target
           # default key
           key: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu-16
-          sharedKey: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu-16
+          shared-key: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu-16
       - name: Install tarpaulin@0.20.1
         uses: baptiste0928/cargo-install@v1
         with:
@@ -107,12 +107,12 @@ jobs:
           toolchain: nightly-2022-03-22
           override: true
           components: rustfmt
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
         with:
-          working-directory: ./rust/cubesql
+          workspaces: ./rust/cubesql -> target
           # default key
           key: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu-16
-          sharedKey: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu-16
+          shared-key: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu-16
       - name: Unit tests (Legacy Engine)
         env:
           CUBESQL_TESTING_CUBE_TOKEN: ${{ secrets.CUBESQL_TESTING_CUBE_TOKEN }}
@@ -151,11 +151,11 @@ jobs:
           override: true
           components: rustfmt
           target: ${{ matrix.target }}
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
         with:
-          working-directory: ./rust/cubesql
+          workspaces: ./rust/cubesql -> target
           key: cubesql-${{ runner.OS }}-${{ matrix.target }}-${{ matrix.node-version }}
-          sharedKey: cubesql-${{ runner.OS }}-${{ matrix.target }}-${{ matrix.node-version }}
+          shared-key: cubesql-${{ runner.OS }}-${{ matrix.target }}-${{ matrix.node-version }}
       - name: Install Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v3
         with:
@@ -190,24 +190,28 @@ jobs:
         if: (matrix.python-version == 'fallback')
         env:
           CARGO_BUILD_TARGET: ${{ matrix.target }}
-        run: cd packages/cubejs-backend-native && yarn run native:build-debug
+        working-directory: ./packages/cubejs-backend-native
+        run: yarn run native:build-debug
       - name: Build native (with Python)
         if: (matrix.python-version != 'fallback')
         env:
           PYO3_PYTHON: python${{ matrix.python-version }}
           CARGO_BUILD_TARGET: ${{ matrix.target }}
-        run: cd packages/cubejs-backend-native && yarn run native:build-debug-python
+        working-directory: ./packages/cubejs-backend-native
+        run: yarn run native:build-debug-python
       - name: Test native (GNU only)
         if: (matrix.target == 'x86_64-unknown-linux-gnu')
         env:
           CUBESQL_STREAM_MODE: true
           CUBEJS_NATIVE_INTERNAL_DEBUG: true
-        run: cd packages/cubejs-backend-native && yarn run test:unit
+        working-directory: ./packages/cubejs-backend-native
+        run: yarn run test:unit
       - name: Run E2E Smoke testing over whole Cube (GNU only)
         if: (matrix.target == 'x86_64-unknown-linux-gnu')
         env:
           CUBEJS_NATIVE_INTERNAL_DEBUG: true
-        run: cd packages/cubejs-testing && yarn smoke:cubesql
+        working-directory: ./packages/cubejs-testing
+        run: yarn smoke:cubesql
 
   native_macos:
     needs: [lint]

@@ -3,7 +3,8 @@ redirect_from:
   - /recipes/using-different-schemas-for-tenants
 ---
 
-# /Access-control/using-different-schemas-for-tenants
+# Using different data models for tenants
+
 ## Use case
 
 We want to provide different data models to different tenants. In the recipe
@@ -25,22 +26,23 @@ model/
 ```
 
 Let's configure Cube to use a specific data model path for each tenant. We'll
-pass the tenant name as a part of
-[`securityContext`](https://cube.dev/docs/security/context#top) into the
-[`repositoryFactory`](https://cube.dev/docs/config#repository-factory) function.
+pass the tenant name as a part of [`securityContext`](/product/auth/context#top)
+into the
+[`repositoryFactory`](/reference/configuration/config#repositoryfactory)
+function.
 
 We'll also need to override the
-[`contextToAppId`](https://cube.dev/docs/config#context-to-app-id) function to
+[`contextToAppId`](/reference/configuration/config#contexttoappid) function to
 control how the data model compilation result is cached and provide the tenant
 names via the
-[`scheduledRefreshContexts`](https://cube.dev/docs/config#scheduled-refresh-contexts)
+[`scheduledRefreshContexts`](/reference/configuration/config#scheduledrefreshcontexts)
 function so a refresh worker can find all existing data models and build
 pre-aggregations for them, if needed.
 
 Our `cube.js` file will look like this:
 
 ```javascript
-const { FileRepository } = require('@cubejs-backend/server-core');
+const { FileRepository } = require("@cubejs-backend/server-core");
 
 module.exports = {
   contextToAppId: ({ securityContext }) =>
@@ -50,8 +52,8 @@ module.exports = {
     new FileRepository(`model/${securityContext.tenant}`),
 
   scheduledRefreshContexts: () => [
-    { securityContext: { tenant: 'avocado' } },
-    { securityContext: { tenant: 'mango' } },
+    { securityContext: { tenant: "avocado" } },
+    { securityContext: { tenant: "mango" } },
   ],
 };
 ```
@@ -69,13 +71,10 @@ This is the `products` cube for the `avocado` tenant:
 cubes:
   - name: products
     sql: >
-      SELECT *
-      FROM public.Products
-      WHERE MOD (id, 2) = 1
+      SELECT * FROM public.Products WHERE MOD (id, 2) = 1
 ```
 
 ```javascript
-
 cube(`products`, {
   sql: `SELECT *
     FROM public.Products
@@ -95,9 +94,7 @@ This is the `products` cube for the `mango` tenant:
 cubes:
   - name: products
     sql: >
-      SELECT *
-      FROM public.Products
-      WHERE MOD (id, 2) = 0
+      SELECT * FROM public.Products WHERE MOD (id, 2) = 0
 ```
 
 ```javascript
@@ -127,10 +124,10 @@ To fetch the products, we will send two identical queries with different JWTs:
 
 ```json5
 {
-  "sub": "1234567890",
-  "tenant": "Mango",
-  "iat": 1000000000,
-  "exp": 5000000000
+  sub: "1234567890",
+  tenant: "Mango",
+  iat: 1000000000,
+  exp: 5000000000,
 }
 ```
 
@@ -152,7 +149,7 @@ We will receive different data for each tenant, as expected:
   {
     "products.id": 5,
     "products.name": "Handcrafted Rubber Chicken",
-  }
+  },
 ]
 ```
 
@@ -170,7 +167,7 @@ We will receive different data for each tenant, as expected:
   {
     "products.id": 6,
     "products.name": "Handcrafted Plastic Chair",
-  }
+  },
 ]
 ```
 

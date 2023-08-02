@@ -1,0 +1,18 @@
+.Td {
+  border-bottom: 1px solid var(--dark_05);
+  border-right: 1px solid var(--dark_05);
+  padding: 0.5rem 1rem;
+  //border-collapse: collapse;
+  //border-bottom: none;
+
+  &:last-child {
+    border-right: none;
+  }
+  //+ td {
+  //  border-left: none;
+  //}
+  //&:first-of-type {
+  //  border-top-left-radius: 0.5rem;
+  //}
+  //
+}

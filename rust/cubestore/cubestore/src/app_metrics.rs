@@ -56,3 +56,6 @@ pub static METASTORE_READ_OUT_QUEUE_OPERATION: Histogram =
 
 /// RemoteFs metrics
 pub static REMOTE_FS_OPERATION_CORE: Counter = metrics::counter("cs.remote_fs.operations.core");
+pub static REMOTE_FS_FILES_TO_REMOVE: Gauge = metrics::gauge("cs.remote_fs.files_to_remove.count");
+pub static REMOTE_FS_FILES_SIZE_TO_REMOVE: Gauge =
+    metrics::gauge("cs.remote_fs.files_to_remove.size");

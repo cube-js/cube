@@ -97,6 +97,7 @@ impl RocksStoreDetails for RocksCacheStoreDetails {
         };
 
         opts.set_block_based_table_factory(&block_opts);
+        opts.set_compression_type(rocksdb_config.compression_type);
 
         DB::open(&opts, path)
             .map_err(|err| CubeError::internal(format!("DB::open error for cachestore: {}", err)))

@@ -1,6 +1,6 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
-exports[`GraphQL Schema GraphQL query 0: query CubeQuery {
+exports[`GraphQL Schema with camelCase GraphQL query 0: query CubeQuery {
   cube {
     orders {
       count
@@ -23,7 +23,7 @@ Object {
 }
 `;
 
-exports[`GraphQL Schema GraphQL query 1: query CubeQuery {
+exports[`GraphQL Schema with camelCase GraphQL query 1: query CubeQuery {
   cube(where: { orders: { status: { equals: "shipped" } } }) {
     orders {
       count
@@ -55,7 +55,7 @@ Object {
 }
 `;
 
-exports[`GraphQL Schema GraphQL query 2: query CubeQuery {
+exports[`GraphQL Schema with camelCase GraphQL query 2: query CubeQuery {
   cube(
     where: {
       orders: { createdAt: { inDateRange: ["2022-01-01", "2022-02-01"] } }
@@ -94,7 +94,7 @@ Object {
 }
 `;
 
-exports[`GraphQL Schema GraphQL query 3: query CubeQuery {
+exports[`GraphQL Schema with camelCase GraphQL query 3: query CubeQuery {
   cube(
     where: {
       orders: { createdAt: { inDateRange: ["2022-01-01", "2022-02-01"] } }
@@ -131,7 +131,7 @@ Object {
 }
 `;
 
-exports[`GraphQL Schema GraphQL query 4: query CubeQuery {
+exports[`GraphQL Schema with camelCase GraphQL query 4: query CubeQuery {
   cube(where: { orders: { createdAt: { inDateRange: "This month" } } }) {
     orders {
       count
@@ -157,7 +157,7 @@ Object {
 }
 `;
 
-exports[`GraphQL Schema GraphQL query 5: query CubeQuery {
+exports[`GraphQL Schema with camelCase GraphQL query 5: query CubeQuery {
   cube(where: { orders: { createdAt: { inDateRange: "This month" } } }) {
     orders {
       count
@@ -181,7 +181,7 @@ Object {
 }
 `;
 
-exports[`GraphQL Schema GraphQL query 6: query CubeQuery {
+exports[`GraphQL Schema with camelCase GraphQL query 6: query CubeQuery {
   cube(where: { orders: { createdAt: { inDateRange: "2 weeks ago to now" } } }) {
     orders {
       count
@@ -205,7 +205,7 @@ Object {
 }
 `;
 
-exports[`GraphQL Schema GraphQL query 7: query CubeQuery {
+exports[`GraphQL Schema with camelCase GraphQL query 7: query CubeQuery {
   cube(
     where: {
       orders: { createdAt: { notInDateRange: ["2022-01-01", "2022-02-01"] } }
@@ -242,7 +242,7 @@ Object {
 }
 `;
 
-exports[`GraphQL Schema GraphQL query 8: query CubeQuery {
+exports[`GraphQL Schema with camelCase GraphQL query 8: query CubeQuery {
   cube {
     orders(orderBy: { count: desc, status: asc }) {
       count
@@ -282,7 +282,7 @@ Object {
 }
 `;
 
-exports[`GraphQL Schema GraphQL query 9: query CubeQuery {
+exports[`GraphQL Schema with camelCase GraphQL query 9: query CubeQuery {
   cube(
     where: {
       orders: { status: { in: ["canceled", "active"] } }
@@ -335,6 +335,345 @@ Object {
   ],
   "measures": Array [
     "Orders.count",
+  ],
+}
+`;
+
+exports[`GraphQL Schema with snake_case GraphQL query 0: query CubeQuery {
+  cube {
+    orders {
+      count
+      created_at {
+        day
+      }
+    }
+  }
+} 1`] = `
+Object {
+  "measures": Array [
+    "orders.count",
+  ],
+  "timeDimensions": Array [
+    Object {
+      "dimension": "orders.created_at",
+      "granularity": "day",
+    },
+  ],
+}
+`;
+
+exports[`GraphQL Schema with snake_case GraphQL query 1: query CubeQuery {
+  cube(where: { orders: { status: { equals: "shipped" } } }) {
+    orders {
+      count
+      created_at {
+        day
+      }
+    }
+  }
+} 1`] = `
+Object {
+  "filters": Array [
+    Object {
+      "member": "orders.status",
+      "operator": "equals",
+      "values": Array [
+        "shipped",
+      ],
+    },
+  ],
+  "measures": Array [
+    "orders.count",
+  ],
+  "timeDimensions": Array [
+    Object {
+      "dimension": "orders.created_at",
+      "granularity": "day",
+    },
+  ],
+}
+`;
+
+exports[`GraphQL Schema with snake_case GraphQL query 2: query CubeQuery {
+  cube(
+    where: {
+      orders: { created_at: { inDateRange: ["2022-01-01", "2022-02-01"] } }
+    }
+  ) {
+    orders(orderBy: { created_at: asc }) {
+      count
+      created_at {
+        value
+      }
+    }
+  }
+} 1`] = `
+Object {
+  "dimensions": Array [
+    "orders.created_at",
+  ],
+  "measures": Array [
+    "orders.count",
+  ],
+  "order": Array [
+    Array [
+      "orders.created_at",
+      "asc",
+    ],
+  ],
+  "timeDimensions": Array [
+    Object {
+      "dateRange": Array [
+        "2022-01-01",
+        "2022-02-01",
+      ],
+      "dimension": "orders.created_at",
+    },
+  ],
+}
+`;
+
+exports[`GraphQL Schema with snake_case GraphQL query 3: query CubeQuery {
+  cube(
+    where: {
+      orders: { created_at: { inDateRange: ["2022-01-01", "2022-02-01"] } }
+    }
+  ) {
+    orders(orderBy: { created_at: asc }) {
+      count
+      created_at {
+        day
+      }
+    }
+  }
+} 1`] = `
+Object {
+  "measures": Array [
+    "orders.count",
+  ],
+  "order": Array [
+    Array [
+      "orders.created_at",
+      "asc",
+    ],
+  ],
+  "timeDimensions": Array [
+    Object {
+      "dateRange": Array [
+        "2022-01-01",
+        "2022-02-01",
+      ],
+      "dimension": "orders.created_at",
+      "granularity": "day",
+    },
+  ],
+}
+`;
+
+exports[`GraphQL Schema with snake_case GraphQL query 4: query CubeQuery {
+  cube(where: { orders: { created_at: { inDateRange: "This month" } } }) {
+    orders {
+      count
+      created_at {
+        value
+      }
+    }
+  }
+} 1`] = `
+Object {
+  "dimensions": Array [
+    "orders.created_at",
+  ],
+  "measures": Array [
+    "orders.count",
+  ],
+  "timeDimensions": Array [
+    Object {
+      "dateRange": "This month",
+      "dimension": "orders.created_at",
+    },
+  ],
+}
+`;
+
+exports[`GraphQL Schema with snake_case GraphQL query 5: query CubeQuery {
+  cube(where: { orders: { created_at: { inDateRange: "This month" } } }) {
+    orders {
+      count
+      created_at {
+        day
+      }
+    }
+  }
+} 1`] = `
+Object {
+  "measures": Array [
+    "orders.count",
+  ],
+  "timeDimensions": Array [
+    Object {
+      "dateRange": "This month",
+      "dimension": "orders.created_at",
+      "granularity": "day",
+    },
+  ],
+}
+`;
+
+exports[`GraphQL Schema with snake_case GraphQL query 6: query CubeQuery {
+  cube(where: { orders: { created_at: { inDateRange: "2 weeks ago to now" } } }) {
+    orders {
+      count
+      created_at {
+        day
+      }
+    }
+  }
+} 1`] = `
+Object {
+  "measures": Array [
+    "orders.count",
+  ],
+  "timeDimensions": Array [
+    Object {
+      "dateRange": "2 weeks ago to now",
+      "dimension": "orders.created_at",
+      "granularity": "day",
+    },
+  ],
+}
+`;
+
+exports[`GraphQL Schema with snake_case GraphQL query 7: query CubeQuery {
+  cube(
+    where: {
+      orders: { created_at: { notInDateRange: ["2022-01-01", "2022-02-01"] } }
+    }
+  ) {
+    orders {
+      count
+      created_at {
+        day
+      }
+    }
+  }
+} 1`] = `
+Object {
+  "filters": Array [
+    Object {
+      "member": "orders.created_at",
+      "operator": "notInDateRange",
+      "values": Array [
+        "2022-01-01",
+        "2022-02-01",
+      ],
+    },
+  ],
+  "measures": Array [
+    "orders.count",
+  ],
+  "timeDimensions": Array [
+    Object {
+      "dimension": "orders.created_at",
+      "granularity": "day",
+    },
+  ],
+}
+`;
+
+exports[`GraphQL Schema with snake_case GraphQL query 8: query CubeQuery {
+  cube {
+    orders(orderBy: { count: desc, status: asc }) {
+      count
+      status
+      created_at {
+        value
+      }
+    }
+    users(orderBy: { city: desc }) {
+      city
+    }
+  }
+} 1`] = `
+Object {
+  "dimensions": Array [
+    "orders.status",
+    "orders.created_at",
+    "users.city",
+  ],
+  "measures": Array [
+    "orders.count",
+  ],
+  "order": Array [
+    Array [
+      "orders.count",
+      "desc",
+    ],
+    Array [
+      "orders.status",
+      "asc",
+    ],
+    Array [
+      "users.city",
+      "desc",
+    ],
+  ],
+}
+`;
+
+exports[`GraphQL Schema with snake_case GraphQL query 9: query CubeQuery {
+  cube(
+    where: {
+      orders: { status: { in: ["canceled", "active"] } }
+      OR: [
+        {
+          users: { OR: [{ city: { set: false } }, { city: { equals: "US" } }] }
+        }
+      ]
+    }
+  ) {
+    orders {
+      count
+      status
+    }
+  }
+}
+ 1`] = `
+Object {
+  "dimensions": Array [
+    "orders.status",
+  ],
+  "filters": Array [
+    Object {
+      "or": Array [
+        Object {
+          "or": Array [
+            Object {
+              "member": "users.city",
+              "operator": "notSet",
+            },
+            Object {
+              "member": "users.city",
+              "operator": "equals",
+              "values": Array [
+                "US",
+              ],
+            },
+          ],
+        },
+      ],
+    },
+    Object {
+      "member": "orders.status",
+      "operator": "equals",
+      "values": Array [
+        "canceled",
+        "active",
+      ],
+    },
+  ],
+  "measures": Array [
+    "orders.count",
   ],
 }
 `;

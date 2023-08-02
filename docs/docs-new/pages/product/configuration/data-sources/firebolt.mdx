@@ -4,13 +4,21 @@ redirect_from:
 ---
 
 # Firebolt
+
+<WarningBox>
+
+The driver for Firebolt is supported by its vendor. Please report any issues to
+their [Help Center][firebolt-help].
+
+</WarningBox>
+
 ## Prerequisites
 
 - The username/password for your [Firebolt][firebolt] account
 
 ## Setup
 
-###  Manual
+### Manual
 
 Add the following to a `.env` file in your Cube project:
 
@@ -36,5 +44,6 @@ CUBEJS_FIREBOLT_ENGINE_NAME=engine_name
 | `CUBEJS_DB_MAX_POOL`           | The maximum number of concurrent database connections to pool. Default is `20`      | A valid number                                                          |    ❌    |                                    ✅                                    |
 
 [firebolt]: https://www.firebolt.io/
+[firebolt-help]: https://help.firebolt.io/
 [ref-config-multiple-ds-decorating-env]:
-  /config/multiple-data-sources#configuring-data-sources-with-environment-variables-decorated-environment-variables
+  /product/configuration/advanced/multiple-data-sources#configuring-data-sources-with-environment-variables-decorated-environment-variables
