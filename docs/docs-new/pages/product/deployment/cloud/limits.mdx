@@ -67,6 +67,18 @@ for all deployments within an account.
 When a threshold is hit, query processing will be stopped. Please [contact
 support][cube-contact-us] for further assistance.
 
+## Quotas
+
+The [REST][ref-rest-api] and [GraphQL][ref-gql-api] APIs both have a standard
+quota of 100 requests per second per deployment; this can go up to 1000 requests
+per second for short bursts of traffic. These limits can be raised on request,
+[contact support][cube-contact-us] for more details.
+
+When the quota is exceeded, the API will return a `429 Too Many Requests`
+response.
+
+[ref-rest-api]: /product/apis-integrations/rest-api
+[ref-gql-api]: /product/apis-integrations/graphql-api
 [ref-deployment-types]: /product/deployment/cloud/deployment-types
 [ref-pricing]: /product/deployment/cloud/pricing
 [ref-query-history]: /product/workspace/query-history
