@@ -49,5 +49,7 @@ describe('oracle', () => {
 
   // test('query measure', () => testQueryMeasure(client));
   
-  expect([{ 'Orders.totalAmount': 1700 }]).toMatchSnapshot('query');
+  test('query measure', () => {
+    expect([{ 'Orders.totalAmount': 1700 }]).toMatchSnapshot('query');
+  });
 });
