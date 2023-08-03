@@ -45,7 +45,8 @@ CUBEJS_DB_PASS=**********
 
 Measures of type
 [`count_distinct_approx`][ref-schema-ref-types-formats-countdistinctapprox] can
-not be used in pre-aggregations when using Postgres as a source database.
+only be used in pre-aggregations when using the [Postgres HLL
+extension][gh-postgres-hll] with Postgres as a source database.
 
 ## Pre-Aggregation Build Strategies
 
@@ -121,6 +122,7 @@ module.exports = {
 [aws-rds-pem]: https://s3.amazonaws.com/rds-downloads/rds-ca-2019-root.pem
 [gcp-docs-sql-connect]:
   https://cloud.google.com/sql/docs/postgres/connect-functions#connecting_to
+[gh-postgres-hll]: https://github.com/citusdata/postgresql-hll
 [heroku-postgres-issue]:
   https://help.heroku.com/3DELT3RK/why-can-t-my-third-party-utility-connect-to-heroku-postgres-with-ssl
 [postgres]: https://www.postgresql.org/
