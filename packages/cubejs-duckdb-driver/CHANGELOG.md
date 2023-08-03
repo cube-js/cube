@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.42](https://github.com/cube-js/cube/compare/v0.33.41...v0.33.42) (2023-08-03)
+
+
+### Bug Fixes
+
+* **duckdb:** load httpfs ([#6976](https://github.com/cube-js/cube/issues/6976)) ([423e824](https://github.com/cube-js/cube/commit/423e824d2ffe9f920d9775ffb851c05ab66c8d5d))
+
+
+
+
+
 ## [0.33.41](https://github.com/cube-js/cube/compare/v0.33.40...v0.33.41) (2023-07-28)
 
 
