@@ -54,6 +54,7 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
     
     try {
       await this.handleQuery(conn, 'INSTALL httpfs', []);
+      await this.handleQuery(conn, 'LOAD httpfs', []);
     } catch (e) {
       if (this.logger) {
         console.error('DuckDB - error on httpfs installation', {
