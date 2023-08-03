@@ -48,5 +48,6 @@ describe('oracle', () => {
   //   });
 
   // test('query measure', () => testQueryMeasure(client));
-  test('todo', () => expect(true).toBe(true));
+  
+  expect([{ 'Orders.totalAmount': 1700 }]).toMatchSnapshot('query');
 });
