@@ -13,56 +13,57 @@ pub struct SystemCacheTableDef;
 impl InfoSchemaTableDef for SystemCacheTableDef {
     type T = IdRow<CacheItem>;
 
-    async fn rows(&self, ctx: InfoSchemaTableDefContext) -> Result<Arc<Vec<Self::T>>, CubeError> {
-        Ok(Arc::new(ctx.cache_store.cache_all().await?))
+    async fn rows(
+        &self,
+        ctx: InfoSchemaTableDefContext,
+        limit: Option<usize>,
+    ) -> Result<Arc<Vec<Self::T>>, CubeError> {
+        Ok(Arc::new(ctx.cache_store.cache_all(limit).await?))
     }
 
-    fn columns(&self) -> Vec<(Field, Box<dyn Fn(Arc<Vec<Self::T>>) -> ArrayRef>)> {
+    fn schema(&self) -> Vec<Field> {
         vec![
-            (
-                Field::new("id", DataType::Utf8, false),
-                Box::new(|items| {
-                    Arc::new(StringArray::from_iter(
-                        items.iter().map(|row| Some(row.get_row().get_key())),
-                    ))
-                }),
+            Field::new("id", DataType::Utf8, false),
+            Field::new("prefix", DataType::Utf8, false),
+            Field::new(
+                "expire",
+                DataType::Timestamp(TimeUnit::Nanosecond, None),
+                false,
             ),
-            (
-                Field::new("prefix", DataType::Utf8, false),
-                Box::new(|items| {
-                    Arc::new(StringArray::from_iter(
-                        items.iter().map(|row| row.get_row().get_prefix().clone()),
-                    ))
-                }),
-            ),
-            (
-                Field::new(
-                    "expire",
-                    DataType::Timestamp(TimeUnit::Nanosecond, None),
-                    false,
-                ),
-                Box::new(|items| {
-                    Arc::new(TimestampNanosecondArray::from(
-                        items
-                            .iter()
-                            .map(|row| {
-                                row.get_row()
-                                    .get_expire()
-                                    .as_ref()
-                                    .map(|t| t.timestamp_nanos())
-                            })
-                            .collect::<Vec<_>>(),
-                    ))
-                }),
-            ),
-            (
-                Field::new("value", DataType::Utf8, false),
-                Box::new(|items| {
-                    Arc::new(StringArray::from_iter(
-                        items.iter().map(|row| Some(row.get_row().get_value())),
-                    ))
-                }),
-            ),
+            Field::new("value", DataType::Utf8, false),
+        ]
+    }
+
+    fn columns(&self) -> Vec<Box<dyn Fn(Arc<Vec<Self::T>>) -> ArrayRef>> {
+        vec![
+            Box::new(|items| {
+                Arc::new(StringArray::from_iter(
+                    items.iter().map(|row| Some(row.get_row().get_key())),
+                ))
+            }),
+            Box::new(|items| {
+                Arc::new(StringArray::from_iter(
+                    items.iter().map(|row| row.get_row().get_prefix().clone()),
+                ))
+            }),
+            Box::new(|items| {
+                Arc::new(TimestampNanosecondArray::from(
+                    items
+                        .iter()
+                        .map(|row| {
+                            row.get_row()
+                                .get_expire()
+                                .as_ref()
+                                .map(|t| t.timestamp_nanos())
+                        })
+                        .collect::<Vec<_>>(),
+                ))
+            }),
+            Box::new(|items| {
+                Arc::new(StringArray::from_iter(
+                    items.iter().map(|row| Some(row.get_row().get_value())),
+                ))
+            }),
         ]
     }
 }

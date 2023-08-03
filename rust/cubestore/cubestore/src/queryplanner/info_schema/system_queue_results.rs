@@ -13,64 +13,63 @@ pub struct SystemQueueResultsTableDef;
 impl InfoSchemaTableDef for SystemQueueResultsTableDef {
     type T = IdRow<QueueResult>;
 
-    async fn rows(&self, ctx: InfoSchemaTableDefContext) -> Result<Arc<Vec<Self::T>>, CubeError> {
-        Ok(Arc::new(ctx.cache_store.queue_results_all().await?))
+    async fn rows(
+        &self,
+        ctx: InfoSchemaTableDefContext,
+        limit: Option<usize>,
+    ) -> Result<Arc<Vec<Self::T>>, CubeError> {
+        Ok(Arc::new(ctx.cache_store.queue_results_all(limit).await?))
     }
 
-    fn columns(&self) -> Vec<(Field, Box<dyn Fn(Arc<Vec<Self::T>>) -> ArrayRef>)> {
+    fn schema(&self) -> Vec<Field> {
         vec![
-            (
-                Field::new("id", DataType::UInt64, false),
-                Box::new(|items| {
-                    Arc::new(UInt64Array::from_iter(
-                        items.iter().map(|row| Some(row.get_id())),
-                    ))
-                }),
+            Field::new("id", DataType::UInt64, false),
+            Field::new("path", DataType::Utf8, false),
+            Field::new(
+                "expire",
+                DataType::Timestamp(TimeUnit::Nanosecond, None),
+                false,
             ),
-            (
-                Field::new("path", DataType::Utf8, false),
-                Box::new(|items| {
-                    Arc::new(StringArray::from_iter(
-                        items
-                            .iter()
-                            .map(|row| Some(row.get_row().get_path().clone())),
-                    ))
-                }),
-            ),
-            (
-                Field::new(
-                    "expire",
-                    DataType::Timestamp(TimeUnit::Nanosecond, None),
-                    false,
-                ),
-                Box::new(|items| {
-                    Arc::new(TimestampNanosecondArray::from(
-                        items
-                            .iter()
-                            .map(|row| row.get_row().get_expire().timestamp_nanos())
-                            .collect::<Vec<_>>(),
-                    ))
-                }),
-            ),
-            (
-                Field::new("deleted", DataType::Boolean, false),
-                Box::new(|items| {
-                    Arc::new(BooleanArray::from_iter(
-                        items.iter().map(|row| Some(row.get_row().is_deleted())),
-                    ))
-                }),
-            ),
-            (
-                Field::new("value", DataType::Utf8, false),
-                Box::new(|items| {
-                    Arc::new(StringArray::from(
-                        items
-                            .iter()
-                            .map(|row| format!("{:?}", row.get_row().get_value()))
-                            .collect::<Vec<_>>(),
-                    ))
-                }),
-            ),
+            Field::new("deleted", DataType::Boolean, false),
+            Field::new("value", DataType::Utf8, false),
+        ]
+    }
+
+    fn columns(&self) -> Vec<Box<dyn Fn(Arc<Vec<Self::T>>) -> ArrayRef>> {
+        vec![
+            Box::new(|items| {
+                Arc::new(UInt64Array::from_iter(
+                    items.iter().map(|row| Some(row.get_id())),
+                ))
+            }),
+            Box::new(|items| {
+                Arc::new(StringArray::from_iter(
+                    items
+                        .iter()
+                        .map(|row| Some(row.get_row().get_path().clone())),
+                ))
+            }),
+            Box::new(|items| {
+                Arc::new(TimestampNanosecondArray::from(
+                    items
+                        .iter()
+                        .map(|row| row.get_row().get_expire().timestamp_nanos())
+                        .collect::<Vec<_>>(),
+                ))
+            }),
+            Box::new(|items| {
+                Arc::new(BooleanArray::from_iter(
+                    items.iter().map(|row| Some(row.get_row().is_deleted())),
+                ))
+            }),
+            Box::new(|items| {
+                Arc::new(StringArray::from(
+                    items
+                        .iter()
+                        .map(|row| format!("{:?}", row.get_row().get_value()))
+                        .collect::<Vec<_>>(),
+                ))
+            }),
         ]
     }
 }

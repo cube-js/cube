@@ -115,6 +115,10 @@ impl MetaStore for MetaStoreMock {
         panic!("MetaStore mock!")
     }
 
+    async fn get_trace_obj_by_table_id(&self, _table_id: u64) -> Result<Option<String>, CubeError> {
+        panic!("MetaStore mock!")
+    }
+
     async fn update_location_download_size(
         &self,
         _id: u64,
@@ -167,6 +171,13 @@ impl MetaStore for MetaStoreMock {
     }
 
     async fn get_partition(&self, _partition_id: u64) -> Result<IdRow<Partition>, CubeError> {
+        panic!("MetaStore mock!")
+    }
+
+    async fn get_partition_out_of_queue(
+        &self,
+        _partition_id: u64,
+    ) -> Result<IdRow<Partition>, CubeError> {
         panic!("MetaStore mock!")
     }
 
@@ -252,6 +263,35 @@ impl MetaStore for MetaStoreMock {
         panic!("MetaStore mock!")
     }
 
+    async fn get_partitions_for_in_memory_compaction(
+        &self,
+        _node: String,
+    ) -> Result<
+        Vec<(
+            IdRow<Partition>,
+            IdRow<Index>,
+            IdRow<Table>,
+            Vec<IdRow<Chunk>>,
+        )>,
+        CubeError,
+    > {
+        panic!("MetaStore mock!")
+    }
+
+    async fn get_all_node_in_memory_chunks(
+        &self,
+        _node: String,
+    ) -> Result<Vec<IdRow<Chunk>>, CubeError> {
+        panic!("MetaStore mock!")
+    }
+
+    async fn get_chunks_without_partition_created_seconds_ago(
+        &self,
+        _seconds_ago: i64,
+    ) -> Result<Vec<IdRow<Chunk>>, CubeError> {
+        panic!("MetaStore mock!")
+    }
+
     fn index_table(&self) -> IndexMetaStoreTable {
         panic!("MetaStore mock!")
     }
@@ -273,6 +313,13 @@ impl MetaStore for MetaStoreMock {
         panic!("MetaStore mock!")
     }
 
+    async fn get_table_indexes_out_of_queue(
+        &self,
+        _table_id: u64,
+    ) -> Result<Vec<IdRow<Index>>, CubeError> {
+        panic!("MetaStore mock!")
+    }
+
     async fn get_active_partitions_by_index_id(
         &self,
         _index_id: u64,
@@ -281,6 +328,13 @@ impl MetaStore for MetaStoreMock {
     }
 
     async fn get_index(&self, _index_id: u64) -> Result<IdRow<Index>, CubeError> {
+        panic!("MetaStore mock!")
+    }
+
+    async fn get_index_with_active_partitions_out_of_queue(
+        &self,
+        _index_id: u64,
+    ) -> Result<(IdRow<Index>, Vec<IdRow<Partition>>), CubeError> {
         panic!("MetaStore mock!")
     }
 
@@ -375,6 +429,10 @@ impl MetaStore for MetaStoreMock {
         panic!("MetaStore mock!")
     }
 
+    async fn get_all_filenames(&self) -> Result<Vec<String>, CubeError> {
+        panic!("MetaStore mock!")
+    }
+
     fn chunks_table(&self) -> ChunkMetaStoreTable {
         panic!("MetaStore mock!")
     }
@@ -390,7 +448,25 @@ impl MetaStore for MetaStoreMock {
         panic!("MetaStore mock!")
     }
 
+    async fn insert_chunks(&self, _chunks: Vec<Chunk>) -> Result<Vec<IdRow<Chunk>>, CubeError> {
+        panic!("MetaStore mock!")
+    }
+
     async fn get_chunk(&self, _chunk_id: u64) -> Result<IdRow<Chunk>, CubeError> {
+        panic!("MetaStore mock!")
+    }
+
+    async fn get_chunks_out_of_queue(
+        &self,
+        _ids: Vec<u64>,
+    ) -> Result<Vec<IdRow<Chunk>>, CubeError> {
+        panic!("MetaStore mock!")
+    }
+
+    async fn get_partitions_out_of_queue(
+        &self,
+        _ids: Vec<u64>,
+    ) -> Result<Vec<IdRow<Partition>>, CubeError> {
         panic!("MetaStore mock!")
     }
 
@@ -481,6 +557,10 @@ impl MetaStore for MetaStoreMock {
         panic!("MetaStore mock!")
     }
 
+    async fn delete_chunks_without_checks(&self, _chunk_ids: Vec<u64>) -> Result<(), CubeError> {
+        panic!("MetaStore mock!")
+    }
+
     async fn all_inactive_chunks(&self) -> Result<Vec<IdRow<Chunk>>, CubeError> {
         panic!("MetaStore mock!")
     }
@@ -533,6 +613,10 @@ impl MetaStore for MetaStoreMock {
         &self,
         _orphaned_timeout: Duration,
     ) -> Result<Vec<IdRow<Job>>, CubeError> {
+        panic!("MetaStore mock!")
+    }
+
+    async fn get_jobs_on_non_exists_nodes(&self) -> Result<Vec<IdRow<Job>>, CubeError> {
         panic!("MetaStore mock!")
     }
 
@@ -592,7 +676,6 @@ impl MetaStore for MetaStoreMock {
     ) -> Result<IdRow<ReplayHandle>, CubeError> {
         panic!("MetaStore mock!")
     }
-
     async fn create_replay_handle_from_seq_pointers(
         &self,
         _table_id: u64,
@@ -600,31 +683,26 @@ impl MetaStore for MetaStoreMock {
     ) -> Result<IdRow<ReplayHandle>, CubeError> {
         panic!("MetaStore mock!")
     }
-
     async fn get_replay_handles_by_table(
         &self,
         _table_id: u64,
     ) -> Result<Vec<IdRow<ReplayHandle>>, CubeError> {
         panic!("MetaStore mock!")
     }
-
     async fn get_replay_handles_by_ids(
         &self,
         _ids: Vec<u64>,
     ) -> Result<Vec<IdRow<ReplayHandle>>, CubeError> {
         panic!("MetaStore mock!")
     }
-
     async fn all_replay_handles(&self) -> Result<Vec<IdRow<ReplayHandle>>, CubeError> {
         panic!("MetaStore mock!")
     }
-
     async fn all_replay_handles_to_merge(
         &self,
     ) -> Result<Vec<(IdRow<ReplayHandle>, bool)>, CubeError> {
         panic!("MetaStore mock!")
     }
-
     async fn update_replay_handle_failed_if_exists(
         &self,
         _id: u64,
@@ -632,7 +710,6 @@ impl MetaStore for MetaStoreMock {
     ) -> Result<(), CubeError> {
         panic!("MetaStore mock!")
     }
-
     async fn replace_replay_handles(
         &self,
         _old_ids: Vec<u64>,
@@ -640,103 +717,26 @@ impl MetaStore for MetaStoreMock {
     ) -> Result<Option<IdRow<ReplayHandle>>, CubeError> {
         panic!("MetaStore mock!")
     }
-
     async fn get_tables_with_indexes(
         &self,
         _table_name: Vec<(String, String)>,
     ) -> Result<Vec<(IdRow<Schema>, IdRow<Table>, Vec<IdRow<Index>>)>, CubeError> {
         panic!("MetaStore mock!")
     }
-
     async fn debug_dump(&self, _out_path: String) -> Result<(), CubeError> {
         panic!("MetaStore mock!")
     }
-
     async fn compaction(&self) -> Result<(), CubeError> {
         panic!("MetaStore mock!")
     }
-
     async fn healthcheck(&self) -> Result<(), CubeError> {
         panic!("MetaStore mock!")
     }
-
     async fn get_snapshots_list(&self) -> Result<Vec<SnapshotInfo>, CubeError> {
         panic!("MetaStore mock!")
     }
 
     async fn set_current_snapshot(&self, _snapshot_id: u128) -> Result<(), CubeError> {
-        panic!("MetaStore mock!")
-    }
-    async fn get_chunks_out_of_queue(
-        &self,
-        _ids: Vec<u64>,
-    ) -> Result<Vec<IdRow<Chunk>>, CubeError> {
-        panic!("MetaStore mock!")
-    }
-    async fn get_partitions_out_of_queue(
-        &self,
-        _ids: Vec<u64>,
-    ) -> Result<Vec<IdRow<Partition>>, CubeError> {
-        panic!("MetaStore mock!")
-    }
-    async fn delete_chunks_without_checks(&self, _chunk_ids: Vec<u64>) -> Result<(), CubeError> {
-        panic!("MetaStore mock!")
-    }
-    async fn get_chunks_without_partition_created_seconds_ago(
-        &self,
-        _seconds_ago: i64,
-    ) -> Result<Vec<IdRow<Chunk>>, CubeError> {
-        panic!("MetaStore mock!")
-    }
-    async fn get_index_with_active_partitions_out_of_queue(
-        &self,
-        _index_id: u64,
-    ) -> Result<(IdRow<Index>, Vec<IdRow<Partition>>), CubeError> {
-        panic!("MetaStore mock!")
-    }
-    async fn insert_chunks(&self, _chunks: Vec<Chunk>) -> Result<Vec<IdRow<Chunk>>, CubeError> {
-        panic!("MetaStore mock!")
-    }
-    async fn get_jobs_on_non_exists_nodes(&self) -> Result<Vec<IdRow<Job>>, CubeError> {
-        panic!("MetaStore mock!")
-    }
-    async fn get_trace_obj_by_table_id(&self, _table_id: u64) -> Result<Option<String>, CubeError> {
-        panic!("MetaStore mock!")
-    }
-    async fn get_partition_out_of_queue(
-        &self,
-        _partition_id: u64,
-    ) -> Result<IdRow<Partition>, CubeError> {
-        panic!("MetaStore mock!")
-    }
-    async fn get_partitions_for_in_memory_compaction(
-        &self,
-        _node: String,
-    ) -> Result<
-        Vec<(
-            IdRow<Partition>,
-            IdRow<Index>,
-            IdRow<Table>,
-            Vec<IdRow<Chunk>>,
-        )>,
-        CubeError,
-    > {
-        panic!("MetaStore mock!")
-    }
-    async fn get_all_node_in_memory_chunks(
-        &self,
-        _node: String,
-    ) -> Result<Vec<IdRow<Chunk>>, CubeError> {
-        panic!("MetaStore mock!")
-    }
-    async fn get_table_indexes_out_of_queue(
-        &self,
-        _table_id: u64,
-    ) -> Result<Vec<IdRow<Index>>, CubeError> {
-        panic!("MetaStore mock!")
-    }
-
-    async fn get_all_filenames(&self) -> Result<Vec<String>, CubeError> {
         panic!("MetaStore mock!")
     }
 }
@@ -747,7 +747,7 @@ pub struct CacheStoreMock;
 
 #[async_trait]
 impl CacheStore for CacheStoreMock {
-    async fn cache_all(&self) -> Result<Vec<IdRow<CacheItem>>, CubeError> {
+    async fn cache_all(&self, _limit: Option<usize>) -> Result<Vec<IdRow<CacheItem>>, CubeError> {
         panic!("CacheStore mock!")
     }
 
@@ -779,11 +779,14 @@ impl CacheStore for CacheStoreMock {
         panic!("CacheStore mock!")
     }
 
-    async fn queue_all(&self) -> Result<Vec<IdRow<QueueItem>>, CubeError> {
+    async fn queue_all(&self, _limit: Option<usize>) -> Result<Vec<IdRow<QueueItem>>, CubeError> {
         panic!("CacheStore mock!")
     }
 
-    async fn queue_results_all(&self) -> Result<Vec<IdRow<QueueResult>>, CubeError> {
+    async fn queue_results_all(
+        &self,
+        _limit: Option<usize>,
+    ) -> Result<Vec<IdRow<QueueResult>>, CubeError> {
         panic!("CacheStore mock!")
     }
 
