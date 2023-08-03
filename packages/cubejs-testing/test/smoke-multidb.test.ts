@@ -15,7 +15,9 @@ describe('multidb', () => {
 
   beforeAll(async () => {
     db = await PostgresDBRunner.startContainer({});
-    db2 = await MysqlDBRunner.startContainer({});
+    db2 = await MysqlDBRunner.startContainer({
+      version: '8'
+    });
 
     birdbox = await getBirdbox(
       'multidb',
