@@ -1409,6 +1409,16 @@ const variables: Record<string, (...args: any) => any> = {
     ]
   ),
 
+  duckdbMemoryLimit: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_DUCKDB_MEMORY_LIMIT', dataSource)
+    ]
+  ),
+
   /**
    * Presto catalog.
    */

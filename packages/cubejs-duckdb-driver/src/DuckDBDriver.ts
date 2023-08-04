@@ -32,25 +32,6 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
     
     const db = new Database(token ? `md:?motherduck_token=${token}` : ':memory:');
     const conn = db.connect();
-
-    const s3InitQuries = [
-      {
-        key: 's3_region',
-        value: getEnv('duckdbS3Region', this.config),
-      },
-      {
-        key: 's3_endpoint',
-        value: getEnv('duckdbS3Endpoint', this.config),
-      },
-      {
-        key: 's3_access_key_id',
-        value: getEnv('duckdbS3AccessKeyId', this.config),
-      },
-      {
-        key: 's3_secret_access_key',
-        value: getEnv('duckdbS3SecretAccessKeyId', this.config),
-      },
-    ];
     
     try {
       await this.handleQuery(conn, 'INSTALL httpfs', []);
@@ -77,18 +58,41 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
       // DuckDB will lose connection_ref on connection on error, this will lead to broken conn object
       throw e;
     }
-    
-    try {
-      for (const { key, value } of s3InitQuries) {
-        if (value) {
+
+    const configuration = [
+      {
+        key: 's3_region',
+        value: getEnv('duckdbS3Region', this.config),
+      },
+      {
+        key: 's3_endpoint',
+        value: getEnv('duckdbS3Endpoint', this.config),
+      },
+      {
+        key: 's3_access_key_id',
+        value: getEnv('duckdbS3AccessKeyId', this.config),
+      },
+      {
+        key: 's3_secret_access_key',
+        value: getEnv('duckdbS3SecretAccessKeyId', this.config),
+      },
+      {
+        key: 'memory_limit',
+        value: getEnv('duckdbMemoryLimit', this.config),
+      },
+    ];
+
+    for (const { key, value } of configuration) {
+      if (value) {
+        try {
           await this.handleQuery(conn, `SET ${key}='${value}'`, []);
+        } catch (e) {
+          if (this.logger) {
+            console.error(`DuckDB - error on configuration, key: ${key}`, {
+              e
+            });
+          }
         }
-      }
-    } catch (e) {
-      if (this.logger) {
-        console.error('DuckDB - error on s3 configuration', {
-          e
-        });
       }
     }
 
