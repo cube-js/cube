@@ -66,7 +66,7 @@ impl InfoSchemaTableDef for SystemQueueResultsTableDef {
                 Arc::new(StringArray::from(
                     items
                         .iter()
-                        .map(|row| format!("{:?}", row.get_row().get_value()))
+                        .map(|row| row.get_row().get_value().clone())
                         .collect::<Vec<_>>(),
                 ))
             }),

@@ -24,7 +24,7 @@ impl InfoSchemaTableDef for SystemQueueTableDef {
     fn schema(&self) -> Vec<Field> {
         vec![
             Field::new("id", DataType::Utf8, false),
-            Field::new("prefix", DataType::Utf8, false),
+            Field::new("prefix", DataType::Utf8, true),
             Field::new(
                 "created",
                 DataType::Timestamp(TimeUnit::Nanosecond, None),

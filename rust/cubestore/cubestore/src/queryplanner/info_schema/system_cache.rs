@@ -24,11 +24,11 @@ impl InfoSchemaTableDef for SystemCacheTableDef {
     fn schema(&self) -> Vec<Field> {
         vec![
             Field::new("id", DataType::Utf8, false),
-            Field::new("prefix", DataType::Utf8, false),
+            Field::new("prefix", DataType::Utf8, true),
             Field::new(
                 "expire",
                 DataType::Timestamp(TimeUnit::Nanosecond, None),
-                false,
+                true,
             ),
             Field::new("value", DataType::Utf8, false),
         ]
