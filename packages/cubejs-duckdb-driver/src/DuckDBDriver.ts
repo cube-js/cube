@@ -18,8 +18,13 @@ export type DuckDBDriverConfiguration = {
   initSql?: string,
 };
 
+type InitPromise = {
+  connection: Connection,
+  db: Database;
+};
+
 export class DuckDBDriver extends BaseDriver implements DriverInterface {
-  protected initPromise: Promise<Database> | null = null;
+  protected initPromise: Promise<InitPromise> | null = null;
 
   public constructor(
     protected readonly config: DuckDBDriverConfiguration = {},
@@ -27,14 +32,14 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
     super();
   }
 
-  protected async initDatabase(): Promise<Database> {
+  protected async init(): Promise<InitPromise> {
     const token = getEnv('duckdbMotherDuckToken', this.config);
     
     const db = new Database(token ? `md:?motherduck_token=${token}` : ':memory:');
-    const conn = db.connect();
+    const connection = db.connect();
     
     try {
-      await this.handleQuery(conn, 'INSTALL httpfs', []);
+      await this.handleQuery(connection, 'INSTALL httpfs', []);
     } catch (e) {
       if (this.logger) {
         console.error('DuckDB - error on httpfs installation', {
@@ -42,12 +47,12 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
         });
       }
 
-      // DuckDB will lose connection_ref on connection on error, this will lead to broken conn object
+      // DuckDB will lose connection_ref on connection on error, this will lead to broken connection object
       throw e;
     }
 
     try {
-      await this.handleQuery(conn, 'LOAD httpfs', []);
+      await this.handleQuery(connection, 'LOAD httpfs', []);
     } catch (e) {
       if (this.logger) {
         console.error('DuckDB - error on loading httpfs', {
@@ -55,7 +60,7 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
         });
       }
 
-      // DuckDB will lose connection_ref on connection on error, this will lead to broken conn object
+      // DuckDB will lose connection_ref on connection on error, this will lead to broken connection object
       throw e;
     }
 
@@ -81,11 +86,11 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
         value: getEnv('duckdbMemoryLimit', this.config),
       },
     ];
-
+    
     for (const { key, value } of configuration) {
       if (value) {
         try {
-          await this.handleQuery(conn, `SET ${key}='${value}'`, []);
+          await this.handleQuery(connection, `SET ${key}='${value}'`, []);
         } catch (e) {
           if (this.logger) {
             console.error(`DuckDB - error on configuration, key: ${key}`, {
@@ -98,7 +103,7 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
 
     if (this.config.initSql) {
       try {
-        await this.handleQuery(conn, this.config.initSql, []);
+        await this.handleQuery(connection, this.config.initSql, []);
       } catch (e) {
         if (this.logger) {
           console.error('DuckDB - error on init sql (skipping)', {
@@ -107,18 +112,21 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
         }
       }
     }
-
-    return db;
+    
+    return {
+      connection,
+      db
+    };
   }
 
-  protected async getConnection() {
+  protected async getConnection(): Promise<Connection> {
     if (!this.initPromise) {
-      this.initPromise = this.initDatabase();
+      this.initPromise = this.init();
     }
 
     try {
-      const db = (await this.initPromise);
-      return db.connect();
+      const { connection } = await this.initPromise;
+      return connection;
     } catch (e) {
       this.initPromise = null;
 
@@ -171,7 +179,7 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
 
   public async release(): Promise<void> {
     if (this.initPromise) {
-      const db = await this.initPromise;
+      const { db } = await this.initPromise;
       const close = promisify(db.close).bind(db);
       this.initPromise = null;
 
