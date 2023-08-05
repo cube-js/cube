@@ -374,11 +374,19 @@ impl Rewriter {
             Box::new(OrderRules::new(cube_context.clone())),
             Box::new(SplitRules::new(cube_context.clone())),
             Box::new(CaseRules::new(cube_context.clone())),
-            Box::new(WrapperRules::new(cube_context.clone())),
         ];
         let mut rewrites = Vec::new();
         for r in rules {
             rewrites.extend(r.rewrite_rules());
+        }
+        if let Ok(true) = env::var("CUBESQL_SQL_PUSH_DOWN")
+            .map_err(|e| CubeError::internal(e.to_string()))
+            .and_then(|s| {
+                s.parse::<bool>()
+                    .map_err(|e| CubeError::internal(e.to_string()))
+            })
+        {
+            rewrites.extend(WrapperRules::new(cube_context.clone()).rewrite_rules());
         }
         if let Ok(disabled_rule_names) = env::var("CUBESQL_DISABLE_REWRITES") {
             let disabled_rule_names = disabled_rule_names
