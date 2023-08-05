@@ -1381,7 +1381,7 @@ impl ClusterImpl {
     ) -> Result<(SchemaRef, Vec<SerializedRecordBatchStream>), CubeError> {
         self.process_rate_limiter
             .wait_for_allow(
-                TaskType::Job,
+                TaskType::Select,
                 Some(Duration::from_secs(self.config_obj.query_timeout())),
             )
             .await?;
