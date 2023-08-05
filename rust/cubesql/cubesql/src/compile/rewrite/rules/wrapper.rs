@@ -2,17 +2,18 @@ use crate::{
     compile::{
         engine::provider::CubeContext,
         rewrite::{
-            agg_fun_expr, aggregate,
+            agg_fun_expr, aggregate, alias_expr,
             analysis::LogicalPlanAnalysis,
-            column_expr, cube_scan, cube_scan_wrapper, literal_expr, rewrite,
+            column_expr, cube_scan, cube_scan_wrapper, literal_expr, projection, rewrite,
             rewriter::RewriteRules,
             rules::{replacer_pull_up_node, replacer_push_down_node},
-            transforming_rewrite, wrapped_select, wrapped_select_filter_expr_empty_tail,
+            transforming_rewrite, wrapped_select, wrapped_select_aggr_expr_empty_tail,
+            wrapped_select_filter_expr_empty_tail, wrapped_select_group_expr_empty_tail,
             wrapped_select_having_expr_empty_tail, wrapped_select_joins_empty_tail,
             wrapped_select_order_expr_empty_tail, wrapped_select_projection_expr_empty_tail,
             wrapper_pullup_replacer, wrapper_pushdown_replacer, AggregateFunctionExprDistinct,
-            AggregateFunctionExprFun, CubeScanAliasToCube, LogicalPlanLanguage,
-            WrapperPullupReplacerAliasToCube,
+            AggregateFunctionExprFun, CubeScanAliasToCube, LogicalPlanLanguage, ProjectionAlias,
+            WrappedSelectAlias, WrapperPullupReplacerAliasToCube,
         },
     },
     var, var_iter,
@@ -37,7 +38,6 @@ impl RewriteRules for WrapperRules {
                     "?order",
                     "?limit",
                     "?offset",
-                    "?aliases",
                     "CubeScanSplit:false",
                     "?can_pushdown_join",
                     "CubeScanWrapped:false",
@@ -51,7 +51,6 @@ impl RewriteRules for WrapperRules {
                             "?order",
                             "?limit",
                             "?offset",
-                            "?aliases",
                             "CubeScanSplit:false",
                             "?can_pushdown_join",
                             "CubeScanWrapped:true",
@@ -70,6 +69,46 @@ impl RewriteRules for WrapperRules {
                 ),
                 cube_scan_wrapper("?cube_scan_input", "CubeScanWrapperFinalized:true"),
             ),
+            rewrite(
+                "wrapper-pull-up-to-cube-scan",
+                cube_scan_wrapper(
+                    wrapped_select(
+                        "WrappedSelectSelectType:Aggregate",
+                        wrapper_pullup_replacer("?projection_expr", "?alias_to_cube"),
+                        wrapper_pullup_replacer("?group_expr", "?alias_to_cube"),
+                        wrapper_pullup_replacer("?aggr_expr", "?alias_to_cube"),
+                        wrapper_pullup_replacer("?cube_scan_input", "?alias_to_cube"),
+                        wrapped_select_joins_empty_tail(),
+                        wrapped_select_filter_expr_empty_tail(),
+                        wrapped_select_having_expr_empty_tail(),
+                        "WrappedSelectLimit:None",
+                        "WrappedSelectOffset:None",
+                        wrapped_select_order_expr_empty_tail(),
+                        "?select_alias",
+                    ),
+                    "CubeScanWrapperFinalized:false",
+                ),
+                cube_scan_wrapper(
+                    wrapper_pullup_replacer(
+                        wrapped_select(
+                            "WrappedSelectSelectType:Aggregate",
+                            "?projection_expr",
+                            "?group_expr",
+                            "?aggr_expr",
+                            "?cube_scan_input",
+                            wrapped_select_joins_empty_tail(),
+                            wrapped_select_filter_expr_empty_tail(),
+                            wrapped_select_having_expr_empty_tail(),
+                            "WrappedSelectLimit:None",
+                            "WrappedSelectOffset:None",
+                            wrapped_select_order_expr_empty_tail(),
+                            "?select_alias",
+                        ),
+                        "?alias_to_cube",
+                    ),
+                    "CubeScanWrapperFinalized:false",
+                ),
+            ),
             // Aggregate
             rewrite(
                 "wrapper-push-down-aggregate-to-cube-scan",
@@ -85,7 +124,10 @@ impl RewriteRules for WrapperRules {
                 cube_scan_wrapper(
                     wrapped_select(
                         "WrappedSelectSelectType:Aggregate",
-                        wrapped_select_projection_expr_empty_tail(),
+                        wrapper_pullup_replacer(
+                            wrapped_select_projection_expr_empty_tail(),
+                            "?alias_to_cube",
+                        ),
                         wrapper_pushdown_replacer("?group_expr", "?alias_to_cube"),
                         wrapper_pushdown_replacer("?aggr_expr", "?alias_to_cube"),
                         wrapper_pullup_replacer("?cube_scan_input", "?alias_to_cube"),
@@ -100,14 +142,30 @@ impl RewriteRules for WrapperRules {
                     "CubeScanWrapperFinalized:false",
                 ),
             ),
-            rewrite(
-                "wrapper-pull-up-aggregate-to-cube-scan",
+            // Projection
+            transforming_rewrite(
+                "wrapper-push-down-projection-to-cube-scan",
+                projection(
+                    "?expr",
+                    cube_scan_wrapper(
+                        wrapper_pullup_replacer("?cube_scan_input", "?alias_to_cube"),
+                        "CubeScanWrapperFinalized:false",
+                    ),
+                    "?projection_alias",
+                    "ProjectionSplit:false",
+                ),
                 cube_scan_wrapper(
                     wrapped_select(
-                        "WrappedSelectSelectType:Aggregate",
-                        wrapped_select_projection_expr_empty_tail(),
-                        wrapper_pullup_replacer("?group_expr", "?alias_to_cube"),
-                        wrapper_pullup_replacer("?aggr_expr", "?alias_to_cube"),
+                        "WrappedSelectSelectType:Projection",
+                        wrapper_pushdown_replacer("?expr", "?alias_to_cube"),
+                        wrapper_pullup_replacer(
+                            wrapped_select_group_expr_empty_tail(),
+                            "?alias_to_cube",
+                        ),
+                        wrapper_pullup_replacer(
+                            wrapped_select_aggr_expr_empty_tail(),
+                            "?alias_to_cube",
+                        ),
                         wrapper_pullup_replacer("?cube_scan_input", "?alias_to_cube"),
                         wrapped_select_joins_empty_tail(),
                         wrapped_select_filter_expr_empty_tail(),
@@ -115,30 +173,11 @@ impl RewriteRules for WrapperRules {
                         "WrappedSelectLimit:None",
                         "WrappedSelectOffset:None",
                         wrapped_select_order_expr_empty_tail(),
-                        "WrappedSelectAlias:None",
+                        "?select_alias",
                     ),
                     "CubeScanWrapperFinalized:false",
                 ),
-                cube_scan_wrapper(
-                    wrapper_pullup_replacer(
-                        wrapped_select(
-                            "WrappedSelectSelectType:Aggregate",
-                            wrapped_select_projection_expr_empty_tail(),
-                            "?group_expr",
-                            "?aggr_expr",
-                            "?cube_scan_input",
-                            wrapped_select_joins_empty_tail(),
-                            wrapped_select_filter_expr_empty_tail(),
-                            wrapped_select_having_expr_empty_tail(),
-                            "WrappedSelectLimit:None",
-                            "WrappedSelectOffset:None",
-                            wrapped_select_order_expr_empty_tail(),
-                            "WrappedSelectAlias:None",
-                        ),
-                        "?alias_to_cube",
-                    ),
-                    "CubeScanWrapperFinalized:false",
-                ),
+                self.transform_projection("?projection_alias", "?select_alias"),
             ),
             // Aggregate function
             rewrite(
@@ -165,6 +204,20 @@ impl RewriteRules for WrapperRules {
                     "?alias_to_cube",
                 ),
                 self.transform_agg_fun_expr("?fun", "?distinct", "?alias_to_cube"),
+            ),
+            // Alias
+            rewrite(
+                "wrapper-push-down-alias",
+                wrapper_pushdown_replacer(alias_expr("?expr", "?alias"), "?alias_to_cube"),
+                alias_expr(
+                    wrapper_pushdown_replacer("?expr", "?alias_to_cube"),
+                    "?alias",
+                ),
+            ),
+            rewrite(
+                "wrapper-pull-up-alias",
+                alias_expr(wrapper_pullup_replacer("?expr", "?alias_to_cube"), "?alias"),
+                wrapper_pullup_replacer(alias_expr("?expr", "?alias"), "?alias_to_cube"),
             ),
             // Column
             rewrite(
@@ -194,6 +247,13 @@ impl RewriteRules for WrapperRules {
             "WrappedSelectGroupExpr",
         );
 
+        Self::list_pushdown_pullup_rules(
+            &mut rules,
+            "wrapper-projection-expr",
+            "ProjectionExpr",
+            "WrappedSelectProjectionExpr",
+        );
+
         rules
     }
 }
@@ -219,6 +279,29 @@ impl WrapperRules {
                     egraph.add(LogicalPlanLanguage::WrapperPullupReplacerAliasToCube(
                         WrapperPullupReplacerAliasToCube(alias_to_cube),
                     )),
+                );
+                return true;
+            }
+            false
+        }
+    }
+
+    fn transform_projection(
+        &self,
+        projection_alias_var: &'static str,
+        select_alias_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let projection_alias_var = var!(projection_alias_var);
+        let select_alias_var = var!(select_alias_var);
+        move |egraph, subst| {
+            for projection_alias in
+                var_iter!(egraph[subst[projection_alias_var]], ProjectionAlias).cloned()
+            {
+                subst.insert(
+                    select_alias_var,
+                    egraph.add(LogicalPlanLanguage::WrappedSelectAlias(WrappedSelectAlias(
+                        projection_alias,
+                    ))),
                 );
                 return true;
             }

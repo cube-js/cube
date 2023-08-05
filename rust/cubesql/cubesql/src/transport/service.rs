@@ -284,6 +284,7 @@ impl SqlTemplates {
     pub fn select(
         &self,
         from: String,
+        projection: Vec<AliasedColumn>,
         group_by: Vec<AliasedColumn>,
         aggregate: Vec<AliasedColumn>,
         alias: String,
@@ -291,47 +292,55 @@ impl SqlTemplates {
         _having: Option<String>,
         _order_by: Vec<AliasedColumn>,
     ) -> Result<String, CubeError> {
-        let group_by = group_by
-            .into_iter()
-            .enumerate()
-            .map(|(i, c)| -> Result<_, CubeError> {
-                let quoted_alias = self.quote_identifier(&c.alias)?;
-                Ok(TemplateColumn {
-                    expr: c.expr.to_string(),
-                    alias: c.alias.to_string(),
-                    aliased: self.render_template(
-                        "statements/column_aliased",
-                        context! { alias => c.alias, expr => c.expr, quoted_alias => quoted_alias },
-                    )?,
-                    index: i + 1,
-                })
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        let aggregate = aggregate
-            .into_iter()
-            .enumerate()
-            .map(|(i, c)| -> Result<_, CubeError> {
-                let quoted_alias = self.quote_identifier(&c.alias)?;
-                Ok(TemplateColumn {
-                    expr: c.expr.to_string(),
-                    alias: c.alias.to_string(),
-                    aliased: self.render_template(
-                        "statements/column_aliased",
-                        context! { alias => c.alias, expr => c.expr, quoted_alias => quoted_alias },
-                    )?,
-                    index: i + 1,
-                })
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        let group_by_aggregate_concat = group_by
+        let group_by = self.to_template_columns(group_by)?;
+        let aggregate = self.to_template_columns(aggregate)?;
+        let projection = self.to_template_columns(projection)?;
+        let select_concat = group_by
             .iter()
             .chain(aggregate.iter())
+            .chain(projection.iter())
             .map(|c| c.clone())
             .collect::<Vec<_>>();
-        self.render_template("statements/select", context! { from => from, group_by_aggregate_concat => group_by_aggregate_concat, group_by => group_by, aggregate => aggregate, from_alias => alias })
+        self.render_template(
+            "statements/select",
+            context! {
+                from => from,
+                select_concat => select_concat,
+                group_by => group_by,
+                aggregate => aggregate,
+                projection => projection,
+                from_alias => alias
+            },
+        )
     }
 
-    fn quote_identifier(&self, column_name: &str) -> Result<String, CubeError> {
+    fn to_template_columns(
+        &self,
+        aliased_columns: Vec<AliasedColumn>,
+    ) -> Result<Vec<TemplateColumn>, CubeError> {
+        aliased_columns
+            .into_iter()
+            .enumerate()
+            .map(|(i, c)| -> Result<_, CubeError> {
+                Ok(TemplateColumn {
+                    expr: c.expr.to_string(),
+                    alias: c.alias.to_string(),
+                    aliased: self.alias_expr(&c.expr, &c.alias)?,
+                    index: i + 1,
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()
+    }
+
+    pub fn alias_expr(&self, expr: &str, alias: &str) -> Result<String, CubeError> {
+        let quoted_alias = self.quote_identifier(alias)?;
+        self.render_template(
+            "statements/column_aliased",
+            context! { alias => alias, expr => expr, quoted_alias => quoted_alias },
+        )
+    }
+
+    pub fn quote_identifier(&self, column_name: &str) -> Result<String, CubeError> {
         let quote = self
             .templates
             .get("quotes/identifiers")

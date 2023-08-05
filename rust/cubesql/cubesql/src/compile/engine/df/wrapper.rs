@@ -183,7 +183,7 @@ impl CubeScanWrapperNode {
                     } else if let Some(WrappedSelectNode {
                         schema,
                         select_type: _select_type,
-                        projection_expr: _projection_expr,
+                        projection_expr,
                         group_expr,
                         aggr_expr,
                         from,
@@ -218,6 +218,18 @@ impl CubeScanWrapperNode {
                                 })?
                                 .clone();
                             let mut group_by = Vec::new();
+                            let mut projection = Vec::new();
+                            for expr in projection_expr {
+                                projection.push(AliasedColumn {
+                                    expr: Self::generate_sql_for_expr(
+                                        plan.clone(),
+                                        generator.clone(),
+                                        expr.clone(),
+                                    )
+                                    .await?,
+                                    alias: expr_name(&expr, &schema)?,
+                                });
+                            }
                             for expr in group_expr {
                                 group_by.push(AliasedColumn {
                                     expr: Self::generate_sql_for_expr(
@@ -245,6 +257,7 @@ impl CubeScanWrapperNode {
                                 .get_sql_templates()
                                 .select(
                                     sql.sql.to_string(),
+                                    projection,
                                     group_by,
                                     aggregate,
                                     // TODO
@@ -292,9 +305,40 @@ impl CubeScanWrapperNode {
     ) -> Pin<Box<dyn Future<Output = Result<String>> + Send>> {
         Box::pin(async move {
             match expr {
-                // Expr::Alias(_, _) => {}
+                Expr::Alias(expr, _) => {
+                    let expr = Self::generate_sql_for_expr(
+                        plan.clone(),
+                        sql_generator.clone(),
+                        (*expr).clone(),
+                    )
+                    .await?;
+                    Ok(expr)
+                }
                 // Expr::OuterColumn(_, _) => {}
-                Expr::Column(c) => Ok(c.flat_name()),
+                Expr::Column(c) => Ok(match c.relation.as_ref() {
+                    Some(r) => format!(
+                        "{}.{}",
+                        r,
+                        sql_generator
+                            .get_sql_templates()
+                            .quote_identifier(&c.name)
+                            .map_err(|e| {
+                                DataFusionError::Internal(format!(
+                                    "Can't generate SQL for column: {}",
+                                    e
+                                ))
+                            })?
+                    ),
+                    None => sql_generator
+                        .get_sql_templates()
+                        .quote_identifier(&c.name)
+                        .map_err(|e| {
+                            DataFusionError::Internal(format!(
+                                "Can't generate SQL for column: {}",
+                                e
+                            ))
+                        })?,
+                }),
                 // Expr::ScalarVariable(_, _) => {}
                 // Expr::Literal(_) => {}
                 // Expr::BinaryExpr { .. } => {}

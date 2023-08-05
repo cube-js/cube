@@ -1666,15 +1666,20 @@ impl LanguageToLogicalPlanConverter {
                         group_expr.iter().chain(aggr_expr.iter()).cloned().collect()
                     }
                 };
-                let schema = Arc::new(DFSchema::new_with_metadata(
+                let schema = DFSchema::new_with_metadata(
                     // TODO support joins schema
                     exprlist_to_fields(all_expr.iter(), from.schema())?,
                     HashMap::new(),
-                )?);
+                )?;
+
+                let schema = match alias {
+                    Some(ref alias) => schema.replace_qualifier(alias.as_str()),
+                    None => schema,
+                };
 
                 LogicalPlan::Extension(Extension {
                     node: Arc::new(WrappedSelectNode::new(
-                        schema,
+                        Arc::new(schema),
                         select_type,
                         projection_expr,
                         group_expr,

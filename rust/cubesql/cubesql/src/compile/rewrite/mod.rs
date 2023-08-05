@@ -271,7 +271,6 @@ crate::plan_to_language! {
             order: Vec<LogicalPlan>,
             limit: Option<usize>,
             offset: Option<usize>,
-            aliases: Option<Vec<(String, String)>>,
             split: bool,
             can_pushdown_join: bool,
             wrapped: bool,
@@ -743,7 +742,6 @@ fn wrapped_select_group_expr(left: impl Display, right: impl Display) -> String 
     format!("(WrappedSelectGroupExpr {} {})", left, right)
 }
 
-#[allow(dead_code)]
 fn wrapped_select_group_expr_empty_tail() -> String {
     "WrappedSelectGroupExpr".to_string()
 }
@@ -753,7 +751,6 @@ fn wrapped_select_aggr_expr(left: impl Display, right: impl Display) -> String {
     format!("(WrappedSelectAggrExpr {} {})", left, right)
 }
 
-#[allow(dead_code)]
 fn wrapped_select_aggr_expr_empty_tail() -> String {
     "WrappedSelectAggrExpr".to_string()
 }
@@ -1261,23 +1258,13 @@ fn cube_scan(
     orders: impl Display,
     limit: impl Display,
     offset: impl Display,
-    aliases: impl Display,
     split: impl Display,
     can_pushdown_join: impl Display,
     wrapped: impl Display,
 ) -> String {
     format!(
-        "(Extension (CubeScan {} {} {} {} {} {} {} {} {} {}))",
-        alias_to_cube,
-        members,
-        filters,
-        orders,
-        limit,
-        offset,
-        aliases,
-        split,
-        can_pushdown_join,
-        wrapped
+        "(Extension (CubeScan {} {} {} {} {} {} {} {} {}))",
+        alias_to_cube, members, filters, orders, limit, offset, split, can_pushdown_join, wrapped
     )
 }
 

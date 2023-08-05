@@ -2395,8 +2395,8 @@ class BaseQuery {
         AVG: 'AVG({{ args_concat }})',
       },
       statements: {
-        select: 'SELECT {{ group_by_aggregate_concat | map(attribute=\'aliased\') | join(\', \') }} \n' +
-          'FROM ({{ from }}) AS {{ from_alias }} \n' +
+        select: 'SELECT {{ select_concat | map(attribute=\'aliased\') | join(\', \') }} \n' +
+          'FROM (\n  {{ from }}\n) AS {{ from_alias }} \n' +
           '{% if group_by %} GROUP BY {{ group_by | map(attribute=\'index\') | join(\', \') }}{% endif %}',
         column_aliased: '{{expr}} {{quoted_alias}}',
       },

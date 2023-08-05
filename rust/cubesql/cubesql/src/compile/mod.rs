@@ -3134,6 +3134,7 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    #[cfg(debug_assertions)]
     async fn non_cube_filters_cast_kept() {
         init_logger();
 
@@ -7665,6 +7666,7 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    #[cfg(debug_assertions)]
     async fn test_pg_get_userbyid_postgres() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "pg_get_userbyid",
@@ -14712,6 +14714,7 @@ ORDER BY \"COUNT(count)\" DESC"
 
     #[tokio::test]
     async fn test_date_granularity_skyvia() {
+        init_logger();
         let supported_granularities = vec![
             // Day
             ["CAST(DATE_TRUNC('day', t.\"order_date\")::date AS varchar)", "day"],
@@ -17920,7 +17923,7 @@ ORDER BY \"COUNT(count)\" DESC"
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
-            "SELECT MIN(avgPrice) FROM (SELECT avgPrice FROM KibanaSampleDataEcommerce) a"
+            "SELECT MIN(avgPrice) mp FROM (SELECT avgPrice FROM KibanaSampleDataEcommerce LIMIT 1) a"
                 .to_string(),
             DatabaseProtocol::PostgreSQL,
         )
