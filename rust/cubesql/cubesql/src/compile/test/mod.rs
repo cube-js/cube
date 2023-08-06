@@ -198,6 +198,7 @@ pub fn get_test_tenant_ctx() -> Arc<MetaContext> {
         sql_templates: Arc::new(
             SqlTemplates::new(
                 vec![
+                    ("functions/COALESCE".to_string(), "COALESCE({{ args_concat }})".to_string()),
                     ("functions/SUM".to_string(), "SUM({{ args_concat }})".to_string()),
                     ("functions/MIN".to_string(), "MIN({{ args_concat }})".to_string()),
                     ("functions/MAX".to_string(), "MAX({{ args_concat }})".to_string()),
@@ -216,7 +217,8 @@ pub fn get_test_tenant_ctx() -> Arc<MetaContext> {
                         "statements/column_aliased".to_string(),
                         "{{expr}} {{quoted_alias}}".to_string(),
                     ),
-                    ("quotes/identifiers".to_string(), "\"".to_string())
+                    ("quotes/identifiers".to_string(), "\"".to_string()),
+                    ("quotes/escape".to_string(), "\"\"".to_string())
                 ]
                 .into_iter()
                 .collect(),

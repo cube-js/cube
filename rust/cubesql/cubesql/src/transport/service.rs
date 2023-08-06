@@ -6,7 +6,7 @@ use cubeclient::{
 
 use datafusion::{
     arrow::{datatypes::SchemaRef, record_batch::RecordBatch},
-    physical_plan::aggregates::AggregateFunction,
+    physical_plan::{aggregates::AggregateFunction, functions::BuiltinScalarFunction},
 };
 use minijinja::{context, value::Value, Environment};
 use serde_derive::*;
@@ -345,14 +345,16 @@ impl SqlTemplates {
             .templates
             .get("quotes/identifiers")
             .ok_or_else(|| CubeError::user("quotes/identifiers template not found".to_string()))?;
-        // TODO escape column names
-        if column_name.contains(quote) {
-            return Err(CubeError::user(format!(
-                "Column name {} contains quote {} and escaping is not supported",
-                column_name, quote
-            )));
-        }
-        Ok(format!("{}{}{}", quote, column_name, quote))
+        let escape = self
+            .templates
+            .get("quotes/escape")
+            .ok_or_else(|| CubeError::user("quotes/escape template not found".to_string()))?;
+        Ok(format!(
+            "{}{}{}",
+            quote,
+            column_name.replace(quote, escape),
+            quote
+        ))
     }
 
     fn render_template(&self, name: &str, ctx: Value) -> Result<String, CubeError> {
@@ -377,6 +379,19 @@ impl SqlTemplates {
         self.render_template(
             &format!("functions/{}", function),
             context! { args_concat => args_concat, args => args, distinct => distinct },
+        )
+    }
+
+    pub fn scalar_function(
+        &self,
+        scalar_function: BuiltinScalarFunction,
+        args: Vec<String>,
+    ) -> Result<String, CubeError> {
+        let function = scalar_function.to_string().to_uppercase();
+        let args_concat = args.join(", ");
+        self.render_template(
+            &format!("functions/{}", function),
+            context! { args_concat => args_concat, args => args },
         )
     }
 }

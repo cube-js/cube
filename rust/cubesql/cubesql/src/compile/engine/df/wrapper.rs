@@ -10,6 +10,7 @@ use datafusion::{
         plan::Extension, DFSchema, DFSchemaRef, Expr, LogicalPlan, UserDefinedLogicalNode,
     },
     physical_plan::aggregates::AggregateFunction,
+    scalar::ScalarValue,
 };
 use itertools::Itertools;
 use serde_derive::*;
@@ -340,7 +341,6 @@ impl CubeScanWrapperNode {
                         })?,
                 }),
                 // Expr::ScalarVariable(_, _) => {}
-                // Expr::Literal(_) => {}
                 // Expr::BinaryExpr { .. } => {}
                 // Expr::AnyExpr { .. } => {}
                 // Expr::Like(_) => {}-=
@@ -356,9 +356,86 @@ impl CubeScanWrapperNode {
                 // Expr::Cast { .. } => {}
                 // Expr::TryCast { .. } => {}
                 // Expr::Sort { .. } => {}
-                // Expr::ScalarFunction { .. } => {}
                 // Expr::ScalarUDF { .. } => {}
                 // Expr::TableUDF { .. } => {}
+                Expr::Literal(literal) => {
+                    Ok(match literal {
+                        // ScalarValue::Boolean(b) => {}
+                        ScalarValue::Float32(f) => {
+                            f.map(|f| format!("{}", f)).unwrap_or("NULL".to_string())
+                        }
+                        ScalarValue::Float64(f) => {
+                            f.map(|f| format!("{}", f)).unwrap_or("NULL".to_string())
+                        }
+                        // ScalarValue::Decimal128(_, _, _) => {}
+                        ScalarValue::Int8(x) => {
+                            x.map(|x| format!("{}", x)).unwrap_or("NULL".to_string())
+                        }
+                        ScalarValue::Int16(x) => {
+                            x.map(|x| format!("{}", x)).unwrap_or("NULL".to_string())
+                        }
+                        ScalarValue::Int32(x) => {
+                            x.map(|x| format!("{}", x)).unwrap_or("NULL".to_string())
+                        }
+                        ScalarValue::Int64(x) => {
+                            x.map(|x| format!("{}", x)).unwrap_or("NULL".to_string())
+                        }
+                        ScalarValue::UInt8(x) => {
+                            x.map(|x| format!("{}", x)).unwrap_or("NULL".to_string())
+                        }
+                        ScalarValue::UInt16(x) => {
+                            x.map(|x| format!("{}", x)).unwrap_or("NULL".to_string())
+                        }
+                        ScalarValue::UInt32(x) => {
+                            x.map(|x| format!("{}", x)).unwrap_or("NULL".to_string())
+                        }
+                        ScalarValue::UInt64(x) => {
+                            x.map(|x| format!("{}", x)).unwrap_or("NULL".to_string())
+                        }
+                        ScalarValue::Utf8(x) => {
+                            // TODO introduce parameter
+                            x.map(|x| format!("'{}'", x)).unwrap_or("NULL".to_string())
+                        }
+                        // ScalarValue::LargeUtf8(_) => {}
+                        // ScalarValue::Binary(_) => {}
+                        // ScalarValue::LargeBinary(_) => {}
+                        // ScalarValue::List(_, _) => {}
+                        // ScalarValue::Date32(_) => {}
+                        // ScalarValue::Date64(_) => {}
+                        // ScalarValue::TimestampSecond(_, _) => {}
+                        // ScalarValue::TimestampMillisecond(_, _) => {}
+                        // ScalarValue::TimestampMicrosecond(_, _) => {}
+                        // ScalarValue::TimestampNanosecond(_, _) => {}
+                        // ScalarValue::IntervalYearMonth(_) => {}
+                        // ScalarValue::IntervalDayTime(_) => {}
+                        // ScalarValue::IntervalMonthDayNano(_) => {}
+                        // ScalarValue::Struct(_, _) => {}
+                        x => {
+                            return Err(DataFusionError::Internal(format!(
+                                "Can't generate SQL for literal: {:?}",
+                                x
+                            )));
+                        }
+                    })
+                }
+                Expr::ScalarFunction { fun, args } => {
+                    let mut sql_args = Vec::new();
+                    for arg in args {
+                        sql_args.push(
+                            Self::generate_sql_for_expr(plan.clone(), sql_generator.clone(), arg)
+                                .await?,
+                        );
+                    }
+                    Ok(sql_generator
+                        .get_sql_templates()
+                        .scalar_function(fun, sql_args)
+                        .map_err(|e| {
+                            DataFusionError::Internal(format!(
+                                "Can't generate SQL for scalar function: {}",
+                                e
+                            ))
+                        })?)
+                }
                 Expr::AggregateFunction {
                     fun,
                     args,

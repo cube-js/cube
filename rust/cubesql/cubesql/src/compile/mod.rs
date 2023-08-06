@@ -17923,7 +17923,7 @@ ORDER BY \"COUNT(count)\" DESC"
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
-            "SELECT MIN(avgPrice) mp FROM (SELECT avgPrice FROM KibanaSampleDataEcommerce LIMIT 1) a"
+            "SELECT COALESCE(customer_gender, 'N/A'), MIN(avgPrice) mp FROM (SELECT avgPrice, customer_gender FROM KibanaSampleDataEcommerce LIMIT 1) a GROUP BY 1"
                 .to_string(),
             DatabaseProtocol::PostgreSQL,
         )
