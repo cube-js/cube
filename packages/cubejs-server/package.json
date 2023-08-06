@@ -1,5 +1,5 @@
 {
-  "name": "@cubejs-backend/server",
+  "name": "@heora/cubejs-server",
   "description": "Cube.js all-in-one server",
   "author": "Cube Dev, Inc.",
   "version": "0.33.43",
@@ -28,7 +28,7 @@
   "cubejsCliVersion": ">=0.22",
   "scripts": {
     "postpack": "rm -f oclif.manifest.json",
-    "prepack": "OCLIF_TS_NODE=0 oclif-dev manifest",
+    "prepack": "cross-env OCLIF_TS_NODE=0 oclif-dev manifest",
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
@@ -43,7 +43,7 @@
     "@cubejs-backend/cubestore-driver": "^0.33.43",
     "@cubejs-backend/dotenv": "^9.0.2",
     "@cubejs-backend/native": "^0.33.43",
-    "@cubejs-backend/server-core": "^0.33.43",
+    "@heora/cubejs-server-core": "^0.33.43",
     "@cubejs-backend/shared": "^0.33.43",
     "@oclif/color": "^1.0.0",
     "@oclif/command": "^1.8.13",

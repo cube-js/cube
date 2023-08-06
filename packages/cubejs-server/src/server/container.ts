@@ -13,7 +13,7 @@ import {
   PackageManifest,
   resolveBuiltInPackageVersion,
 } from '@cubejs-backend/shared';
-import { SystemOptions } from '@cubejs-backend/server-core';
+import { SystemOptions } from '@heora/cubejs-server-core';
 import { isFallbackBuild, pythonLoadConfig } from '@cubejs-backend/native';
 
 import {

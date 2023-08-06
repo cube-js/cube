@@ -131,6 +131,48 @@ export class DevServer {
       });
     }));
 
+    app.get('/playground/file', catchErrors(async (req, res) => {
+      this.cubejsServer.event('Dev Server file Load');
+
+      const { fileName } = req.body;
+
+      const localPath = this.cubejsServer.repository.localPath();
+      const absPath = path.join(localPath, fileName);
+      const data = fs.readFileSync(absPath, 'utf-8')
+
+      res.json({
+        fileName,
+        source: data
+      })
+    }))
+
+    app.post('/playground/file', catchErrors(async (req, res) => {
+      this.cubejsServer.event('Dev Server file Load');
+
+      if (!req.body) {
+        throw new Error('Your express app config is missing body-parser middleware. Typical config can look like: `app.use(bodyParser.json({ limit: \'50mb\' }));`');
+      }
+      if (!req.body.fileName) {
+        throw new Error('You have to select at least one source');
+      }
+      if (!req.body.source) {
+        throw new Error('You have to select at least one source');
+      }
+
+      const { fileName, source } = req.body;
+      const localPath = this.cubejsServer.repository.localPath();
+      const absPath = path.join(localPath, fileName);
+
+      fs.writeFileSync(absPath, source, {
+        encoding: 'utf-8'
+      });
+
+      res.json({
+        fileName,
+        absPath
+      });
+    }));
+
     app.post('/playground/generate-schema', catchErrors(async (req, res) => {
       this.cubejsServer.event('Dev Server Generate Schema');
       if (!req.body) {
