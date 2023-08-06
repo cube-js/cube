@@ -50,7 +50,7 @@
   },
   "devDependencies": {
     "@cubejs-backend/linter": "^0.33.0",
-    "@heora/cubejs-server": "^0.33.43",
+    "@cubejs-backend/server": "^0.33.43",
     "@oclif/command": "^1.8.0",
     "@types/cli-progress": "^3.8.0",
     "@types/cross-spawn": "^6.0.2",
