@@ -63,10 +63,10 @@ const create = async (projectName, options) => {
   });
 
   logStage('Installing server dependencies');
-  await npmInstall(['@cubejs-backend/server'], options.template === 'docker');
+  await npmInstall(['@heora/cubejs-server'], options.template === 'docker');
 
   if (!options.dbType) {
-    const Drivers = requireFromPackage<any>('@cubejs-backend/server-core/dist/src/core/DriverDependencies.js');
+    const Drivers = requireFromPackage<any>('@heora/server-core/dist/src/core/DriverDependencies.js');
     const prompt = await inquirer.prompt([{
       type: 'list',
       name: 'dbType',
@@ -78,7 +78,7 @@ const create = async (projectName, options) => {
   }
 
   logStage('Installing DB driver dependencies');
-  const CubejsServer = requireFromPackage<any>('@cubejs-backend/server');
+  const CubejsServer = requireFromPackage<any>('@heora/cubejs-server');
 
   const driverPackageName = CubejsServer.driverDependencies(options.dbType);
   if (!driverPackageName) {
@@ -125,8 +125,8 @@ const create = async (projectName, options) => {
   const driverClass = requireFromPackage<any>(driverPackageName);
 
   const driverPackageManifest = await requirePackageManifest(driverPackageName);
-  const serverCorePackageManifest = await requirePackageManifest('@cubejs-backend/server-core');
-  const serverPackageManifest = await requirePackageManifest('@cubejs-backend/server');
+  const serverCorePackageManifest = await requirePackageManifest('@heora/cubejs-server-core');
+  const serverPackageManifest = await requirePackageManifest('@heora/cubejs-server');
 
   const dockerVersion = findMaxVersion([
     serverPackageManifest.version,

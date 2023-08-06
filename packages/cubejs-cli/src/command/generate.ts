@@ -2,7 +2,7 @@ import fs from 'fs-extra';
 import path from 'path';
 import { CommanderStatic } from 'commander';
 import { isDockerImage, requireFromPackage, packageExists, getEnv } from '@cubejs-backend/shared';
-import type { ServerContainer as ServerContainerType } from '@cubejs-backend/server';
+import type { ServerContainer as ServerContainerType } from '@heora/cubejs-server';
 
 import { displayError, event } from '../utils';
 
@@ -30,16 +30,16 @@ const generate = async (options) => {
 
   const relative = isDockerImage();
 
-  if (!packageExists('@cubejs-backend/server', relative)) {
+  if (!packageExists('@heora/cubejs-server', relative)) {
     await displayError(
-      '@cubejs-backend/server dependency not found. Please run generate command from project directory.',
+      '@heora/cubejs-server dependency not found. Please run generate command from project directory.',
       generateSchemaOptions
     );
   }
 
   logStage('Fetching DB schema');
   const serverPackage = requireFromPackage<{ ServerContainer: any }>(
-    '@cubejs-backend/server',
+    '@heora/cubejs-server',
     {
       relative,
     }
@@ -47,7 +47,7 @@ const generate = async (options) => {
 
   if (!serverPackage.ServerContainer) {
     await displayError(
-      '@cubejs-backend/server is too old. Please use @cubejs-backend/server >= v0.26.11',
+      '@heora/cubejs-server is too old. Please use @heora/cubejs-server >= v0.26.11',
       generateSchemaOptions
     );
   }

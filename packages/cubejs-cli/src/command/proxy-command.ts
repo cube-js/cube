@@ -12,20 +12,20 @@ import { displayError, loadCliManifest, } from '../utils';
 
 export async function proxyCommand(program: CommanderStatic, command: string) {
   const relative = isDockerImage();
-  const serverPackageExists = packageExists('@cubejs-backend/server', relative);
+  const serverPackageExists = packageExists('@heora/cubejs-server', relative);
 
   const commandInfo = program
     .command(command);
 
   if (serverPackageExists) {
-    const packageManifest = await requirePackageManifest<any>('@cubejs-backend/server', {
+    const packageManifest = await requirePackageManifest<any>('@heora/cubejs-server', {
       relative,
     });
     if (packageManifest.cubejsCliVersion) {
       const cliManifest = loadCliManifest();
       if (semver.satisfies(cliManifest.version, packageManifest.cubejsCliVersion)) {
         const OriginalCommandPackage = requireFromPackage<any>(
-          `@cubejs-backend/server/dist/command/${command}.js`,
+          `@heora/cubejs-server/dist/command/${command}.js`,
           {
             relative,
           }
@@ -57,7 +57,7 @@ export async function proxyCommand(program: CommanderStatic, command: string) {
         return;
       }
 
-      const message = `${chalk.red('Unavailable.')} @cubejs-backend/server inside current directory requires ` +
+      const message = `${chalk.red('Unavailable.')} @heora/cubejs-server inside current directory requires ` +
         `cubejs-cli (${packageManifest.cubejsCliVersion}).`;
 
       commandInfo
@@ -71,7 +71,7 @@ export async function proxyCommand(program: CommanderStatic, command: string) {
       return;
     }
 
-    const message = `${chalk.red('Unavailable.')} Please upgrade @cubejs-backend/server.`;
+    const message = `${chalk.red('Unavailable.')} Please upgrade @heora/cubejs-server.`;
 
     commandInfo
       .description(

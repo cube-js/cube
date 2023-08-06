@@ -137,6 +137,7 @@ export class DevServer {
       const { fileName } = req.body;
 
       const localPath = this.cubejsServer.repository.localPath();
+
       const absPath = path.join(localPath, fileName);
       const data = fs.readFileSync(absPath, 'utf-8')
 

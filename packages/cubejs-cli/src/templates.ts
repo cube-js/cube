@@ -16,7 +16,7 @@ export type Template = {
 /**
  * @deprecated
  */
-const indexJs = `const CubejsServer = require('@cubejs-backend/server');
+const indexJs = `const CubejsServer = require('@heora/cubejs-server');
 
 const server = new CubejsServer();
 

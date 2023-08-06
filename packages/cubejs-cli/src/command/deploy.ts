@@ -8,9 +8,9 @@ import { logStage, displayError, event } from '../utils';
 import { Config } from '../config';
 
 const deploy = async ({ directory, auth, uploadEnv, token }: any) => {
-  if (!(await fs.pathExists(path.join(process.cwd(), 'node_modules', '@cubejs-backend/server-core')))) {
+  if (!(await fs.pathExists(path.join(process.cwd(), 'node_modules', '@heora/server-core')))) {
     await displayError(
-      '@cubejs-backend/server-core dependency not found. Please run deploy command from project root directory and ensure npm install has been run.'
+      '@heora/server-core dependency not found. Please run deploy command from project root directory and ensure npm install has been run.'
     );
   }
 

@@ -1,8 +1,8 @@
 {
-  "name": "cubejs-cli",
+  "name": "@heora/cubejs-cli",
   "description": "Cube.js Command Line Interface",
   "author": "Cube Dev, Inc.",
-  "version": "0.33.43",
+  "version": "0.33.46",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
@@ -15,6 +15,7 @@
     "cubejs": "dist/src/index.js"
   },
   "scripts": {
+    "dev": "node ./dist/src/index.js create hello-world -d postgres",
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
@@ -50,7 +51,7 @@
   },
   "devDependencies": {
     "@cubejs-backend/linter": "^0.33.0",
-    "@cubejs-backend/server": "^0.33.43",
+    "@heora/cubejs-server": "^0.33.46",
     "@oclif/command": "^1.8.0",
     "@types/cli-progress": "^3.8.0",
     "@types/cross-spawn": "^6.0.2",

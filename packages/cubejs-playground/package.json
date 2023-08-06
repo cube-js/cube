@@ -1,5 +1,5 @@
 {
-  "name": "@cubejs-client/playground",
+  "name": "@heora/cubejs-client-playground",
   "author": "Cube Dev, Inc.",
   "version": "0.33.26",
   "engines": {},
@@ -16,7 +16,7 @@
     "watch": "tsc --noEmit false --watch",
     "build": "tsc && yarn build:playground && yarn build:lib",
     "build:lib": "tsc --noEmit false && node postbuild.js && cp -R src/img/ lib/img/",
-    "build:playground": "SKIP_PREFLIGHT_CHECK=true vite build && rm -Rf ../cubejs-server-core/playground/** && cp -R build/ ../cubejs-server-core/playground/"
+    "build:playground": "cross-env SKIP_PREFLIGHT_CHECK=true vite build && rm -Rf ../cubejs-server-core/playground/** && cp -R build/ ../cubejs-server-core/playground/"
   },
   "browserslist": [
     ">0.2% and supports es6-module"
