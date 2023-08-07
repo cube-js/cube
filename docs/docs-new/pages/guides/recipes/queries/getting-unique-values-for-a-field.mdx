@@ -10,7 +10,7 @@ redirect_from:
 We have a dashboard with information about the users, and we'd like to filter
 them by city. To do so, we need to display all unique values for cities in the
 dropdown. In the recipe below, we'll learn how to get unique values for
-[dimensions](https://cube.dev/docs/schema/reference/dimensions).
+[dimensions](/product/data-modeling/reference/dimensions).
 
 ## Data modeling
 
@@ -90,7 +90,7 @@ dropdown on the dashboard:
 
 In case we need to choose a dimension or render dropdowns for all dimensions, we
 can fetch the list of dimensions for all cubes from the
-[`/meta` endpoint](https://cube.dev/docs/rest-api#api-reference-v-1-meta):
+[`/meta` endpoint](/reference/rest-api#v1meta):
 
 ```bash{promptUser: user}
 curl http://localhost:4000/cubejs-api/v1/meta

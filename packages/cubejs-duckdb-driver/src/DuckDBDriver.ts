@@ -18,8 +18,13 @@ export type DuckDBDriverConfiguration = {
   initSql?: string,
 };
 
+type InitPromise = {
+  connection: Connection,
+  db: Database;
+};
+
 export class DuckDBDriver extends BaseDriver implements DriverInterface {
-  protected initPromise: Promise<Database> | null = null;
+  protected initPromise: Promise<InitPromise> | null = null;
 
   public constructor(
     protected readonly config: DuckDBDriverConfiguration = {},
@@ -27,13 +32,39 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
     super();
   }
 
-  protected async initDatabase(): Promise<Database> {
+  protected async init(): Promise<InitPromise> {
     const token = getEnv('duckdbMotherDuckToken', this.config);
     
     const db = new Database(token ? `md:?motherduck_token=${token}` : ':memory:');
-    const conn = db.connect();
+    const connection = db.connect();
+    
+    try {
+      await this.handleQuery(connection, 'INSTALL httpfs', []);
+    } catch (e) {
+      if (this.logger) {
+        console.error('DuckDB - error on httpfs installation', {
+          e
+        });
+      }
 
-    const s3InitQuries = [
+      // DuckDB will lose connection_ref on connection on error, this will lead to broken connection object
+      throw e;
+    }
+
+    try {
+      await this.handleQuery(connection, 'LOAD httpfs', []);
+    } catch (e) {
+      if (this.logger) {
+        console.error('DuckDB - error on loading httpfs', {
+          e
+        });
+      }
+
+      // DuckDB will lose connection_ref on connection on error, this will lead to broken connection object
+      throw e;
+    }
+
+    const configuration = [
       {
         key: 's3_region',
         value: getEnv('duckdbS3Region', this.config),
@@ -50,35 +81,29 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
         key: 's3_secret_access_key',
         value: getEnv('duckdbS3SecretAccessKeyId', this.config),
       },
+      {
+        key: 'memory_limit',
+        value: getEnv('duckdbMemoryLimit', this.config),
+      },
     ];
     
-    try {
-      await this.handleQuery(conn, 'INSTALL httpfs', []);
-    } catch (e) {
-      if (this.logger) {
-        console.error('DuckDB - error on httpfs installation', {
-          e
-        });
-      }
-    }
-    
-    try {
-      for (const { key, value } of s3InitQuries) {
-        if (value) {
-          await this.handleQuery(conn, `SET ${key}='${value}'`, []);
+    for (const { key, value } of configuration) {
+      if (value) {
+        try {
+          await this.handleQuery(connection, `SET ${key}='${value}'`, []);
+        } catch (e) {
+          if (this.logger) {
+            console.error(`DuckDB - error on configuration, key: ${key}`, {
+              e
+            });
+          }
         }
-      }
-    } catch (e) {
-      if (this.logger) {
-        console.error('DuckDB - error on s3 configuration', {
-          e
-        });
       }
     }
 
     if (this.config.initSql) {
       try {
-        await this.handleQuery(conn, this.config.initSql, []);
+        await this.handleQuery(connection, this.config.initSql, []);
       } catch (e) {
         if (this.logger) {
           console.error('DuckDB - error on init sql (skipping)', {
@@ -87,18 +112,21 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
         }
       }
     }
-
-    return db;
+    
+    return {
+      connection,
+      db
+    };
   }
 
-  protected async getConnection() {
+  protected async getConnection(): Promise<Connection> {
     if (!this.initPromise) {
-      this.initPromise = this.initDatabase();
+      this.initPromise = this.init();
     }
 
     try {
-      const db = (await this.initPromise);
-      return db.connect();
+      const { connection } = await this.initPromise;
+      return connection;
     } catch (e) {
       this.initPromise = null;
 
@@ -151,7 +179,7 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
 
   public async release(): Promise<void> {
     if (this.initPromise) {
-      const db = await this.initPromise;
+      const { db } = await this.initPromise;
       const close = promisify(db.close).bind(db);
       this.initPromise = null;
 

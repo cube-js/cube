@@ -21,14 +21,10 @@ deployments. Auto-suspension will hibernate the deployment when **no** API
 requests are received after a period of time, and automatically resume the
 deployment when API requests start coming in again:
 
-<div style={{ textAlign: "center" }}>
-  <img
-    alt="Cube Cloud auto-suspend flowchart"
-    src="https://ucarecdn.com/e9a22d59-e0af-40c5-b590-02f2566663d1/"
-    style={{ border: "none" }}
-    width="100%"
-  />
-</div>
+<Diagram
+  alt="Cube Cloud auto-suspend flowchart"
+  src="https://ucarecdn.com/e9a22d59-e0af-40c5-b590-02f2566663d1/"
+/>
 
 [Development Instances][ref-deployment-dev-instance] are auto-suspended
 automatically when not in use for 10 minutes, whereas [Production
@@ -37,6 +33,10 @@ Multi-Clusters][ref-deployment-prod-multi-cluster] can auto-suspend after no API
 requests were received within a configurable time period. While suspended,
 [pre-aggregation][ref-caching-preaggs-gs] builds will also be paused to prevent
 unnecessary resource consumption.
+
+During auto-suspension, resources are monitored in 5 minute intervals. This
+means that if a deployment was suspended 4 minutes ago, and a request comes in,
+the deployment will resume immediately and 5 minute of CCU usage will be billed.
 
 ## Configuration
 

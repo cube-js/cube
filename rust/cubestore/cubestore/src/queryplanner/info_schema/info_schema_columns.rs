@@ -16,6 +16,7 @@ impl InfoSchemaTableDef for ColumnsInfoSchemaTableDef {
     async fn rows(
         &self,
         ctx: InfoSchemaTableDefContext,
+        _limit: Option<usize>,
     ) -> Result<Arc<Vec<(Column, TablePath)>>, CubeError> {
         let rows = ctx.meta_store.get_tables_with_path(false).await?;
         let mut res = Vec::new();
@@ -30,57 +31,49 @@ impl InfoSchemaTableDef for ColumnsInfoSchemaTableDef {
         Ok(Arc::new(res))
     }
 
-    fn columns(
-        &self,
-    ) -> Vec<(
-        Field,
-        Box<dyn Fn(Arc<Vec<(Column, TablePath)>>) -> ArrayRef>,
-    )> {
+    fn schema(&self) -> Vec<Field> {
         vec![
-            (
-                Field::new("table_schema", DataType::Utf8, false),
-                Box::new(|tables| {
-                    Arc::new(StringArray::from(
-                        tables
-                            .iter()
-                            .map(|(_, row)| row.schema.get_row().get_name().as_str())
-                            .collect::<Vec<_>>(),
-                    ))
-                }),
-            ),
-            (
-                Field::new("table_name", DataType::Utf8, false),
-                Box::new(|tables| {
-                    Arc::new(StringArray::from(
-                        tables
-                            .iter()
-                            .map(|(_, row)| row.table.get_row().get_table_name().as_str())
-                            .collect::<Vec<_>>(),
-                    ))
-                }),
-            ),
-            (
-                Field::new("column_name", DataType::Utf8, false),
-                Box::new(|tables| {
-                    Arc::new(StringArray::from(
-                        tables
-                            .iter()
-                            .map(|(column, _)| column.get_name().as_str())
-                            .collect::<Vec<_>>(),
-                    ))
-                }),
-            ),
-            (
-                Field::new("data_type", DataType::Utf8, false),
-                Box::new(|tables| {
-                    Arc::new(StringArray::from(
-                        tables
-                            .iter()
-                            .map(|(column, _)| column.get_column_type().to_string())
-                            .collect::<Vec<_>>(),
-                    ))
-                }),
-            ),
+            Field::new("table_schema", DataType::Utf8, false),
+            Field::new("table_name", DataType::Utf8, false),
+            Field::new("column_name", DataType::Utf8, false),
+            Field::new("data_type", DataType::Utf8, false),
+        ]
+    }
+
+    fn columns(&self) -> Vec<Box<dyn Fn(Arc<Vec<(Column, TablePath)>>) -> ArrayRef>> {
+        vec![
+            Box::new(|tables| {
+                Arc::new(StringArray::from(
+                    tables
+                        .iter()
+                        .map(|(_, row)| row.schema.get_row().get_name().as_str())
+                        .collect::<Vec<_>>(),
+                ))
+            }),
+            Box::new(|tables| {
+                Arc::new(StringArray::from(
+                    tables
+                        .iter()
+                        .map(|(_, row)| row.table.get_row().get_table_name().as_str())
+                        .collect::<Vec<_>>(),
+                ))
+            }),
+            Box::new(|tables| {
+                Arc::new(StringArray::from(
+                    tables
+                        .iter()
+                        .map(|(column, _)| column.get_name().as_str())
+                        .collect::<Vec<_>>(),
+                ))
+            }),
+            Box::new(|tables| {
+                Arc::new(StringArray::from(
+                    tables
+                        .iter()
+                        .map(|(column, _)| column.get_column_type().to_string())
+                        .collect::<Vec<_>>(),
+                ))
+            }),
         ]
     }
 }

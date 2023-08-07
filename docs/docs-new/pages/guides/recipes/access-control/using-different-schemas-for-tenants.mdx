@@ -26,15 +26,16 @@ model/
 ```
 
 Let's configure Cube to use a specific data model path for each tenant. We'll
-pass the tenant name as a part of
-[`securityContext`](https://cube.dev/docs/security/context#top) into the
-[`repositoryFactory`](https://cube.dev/docs/config#repository-factory) function.
+pass the tenant name as a part of [`securityContext`](/product/auth/context#top)
+into the
+[`repositoryFactory`](/reference/configuration/config#repositoryfactory)
+function.
 
 We'll also need to override the
-[`contextToAppId`](https://cube.dev/docs/config#context-to-app-id) function to
+[`contextToAppId`](/reference/configuration/config#contexttoappid) function to
 control how the data model compilation result is cached and provide the tenant
 names via the
-[`scheduledRefreshContexts`](https://cube.dev/docs/config#scheduled-refresh-contexts)
+[`scheduledRefreshContexts`](/reference/configuration/config#scheduledrefreshcontexts)
 function so a refresh worker can find all existing data models and build
 pre-aggregations for them, if needed.
 

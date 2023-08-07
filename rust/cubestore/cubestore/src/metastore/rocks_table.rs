@@ -1108,6 +1108,24 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         Ok(())
     }
 
+    fn scan_rows(&self, limit: Option<usize>) -> Result<Vec<IdRow<Self::T>>, CubeError> {
+        let iter = self.table_scan(self.snapshot())?;
+
+        let mut res = Vec::new();
+
+        if let Some(limit) = limit {
+            for row in iter.take(limit) {
+                res.push(row?);
+            }
+        } else {
+            for row in iter {
+                res.push(row?);
+            }
+        };
+
+        Ok(res)
+    }
+
     fn all_rows(&self) -> Result<Vec<IdRow<Self::T>>, CubeError> {
         let mut res = Vec::new();
         for row in self.table_scan(self.snapshot())? {

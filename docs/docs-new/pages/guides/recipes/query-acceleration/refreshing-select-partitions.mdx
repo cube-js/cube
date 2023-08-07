@@ -9,16 +9,15 @@ redirect_from:
 
 We have a dataset with orders and we want to aggregate data while having decent
 performance. Orders have a creation time, so we can use
-[partitioning](https://cube.dev/docs/caching/using-pre-aggregations#partitioning)
-by time to optimize pre-aggregations build and refresh time. The problem is that
-the order's status can change after a long period. In this case, we want to
-rebuild only partitions associated with this order.
+[partitioning](/product/caching/using-pre-aggregations#partitioning) by time to
+optimize pre-aggregations build and refresh time. The problem is that the
+order's status can change after a long period. In this case, we want to rebuild
+only partitions associated with this order.
 
 In the recipe below, we'll learn how to use the
-[`refresh_key`](https://cube.dev/docs/schema/reference/pre-aggregations#parameters-refresh-key-sql)
-together with the
-[`FITER_PARAMS`](https://cube.dev/docs/schema/reference/cube#filter-params) for
-partition separately.
+[`refresh_key`](/product/data-modeling/reference/pre-aggregations#sql) together
+with the [`FITER_PARAMS`](/product/data-modeling/reference/cube#filter-params)
+for partition separately.
 
 ## Data modeling
 
@@ -35,7 +34,7 @@ orders, including number and status:
 In our case, each order has `created_at` and `updated_at` properties. The
 `updated_at` property is the last order update timestamp. To create a
 pre-aggregation with partitions, we need to specify the
-[`partition_granularity` property](https://cube.dev/docs/schema/reference/pre-aggregations#partition-granularity).
+[`partition_granularity` property](/product/data-modeling/reference/pre-aggregations#partition_granularity).
 Partitions will be split monthly by the `created_at` dimension.
 
 <CodeTabs>
@@ -80,11 +79,11 @@ cube(`orders`, {
 </CodeTabs>
 
 As you can see, we defined custom a
-[`refresh_key`](https://cube.dev/docs/schema/reference/pre-aggregations#parameters-refresh-key-sql)
-that will check for new values of the `updated_at` property. The refresh key is
-evaluated for each partition separately. For example, if we update orders from
-August and update their `updated_at` property, the current refresh key will
-update for **all** partitions. There is how it looks in the Cube logs:
+[`refresh_key`](/product/data-modeling/reference/pre-aggregations#sql) that will
+check for new values of the `updated_at` property. The refresh key is evaluated
+for each partition separately. For example, if we update orders from August and
+update their `updated_at` property, the current refresh key will update for
+**all** partitions. There is how it looks in the Cube logs:
 
 ```bash
 Executing SQL: 5b4c517f-b496-4c69-9503-f8cd2b4c73b6
@@ -108,8 +107,7 @@ Note that the query for two partitions is the same. It's the reason why **all
 partitions** will be updated.
 
 How do we fix this and update only the partition for August? We can use the
-[`FILTER_PARAMS`](https://cube.dev/docs/schema/reference/cube#filter-params) for
-that!
+[`FILTER_PARAMS`](/product/data-modeling/reference/cube#filter-params) for that!
 
 Let's update our pre-aggregation definition:
 

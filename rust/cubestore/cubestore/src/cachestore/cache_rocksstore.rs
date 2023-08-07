@@ -433,7 +433,7 @@ impl QueueResultResponse {
 #[cuberpc::service]
 pub trait CacheStore: DIService + Send + Sync {
     // cache
-    async fn cache_all(&self) -> Result<Vec<IdRow<CacheItem>>, CubeError>;
+    async fn cache_all(&self, limit: Option<usize>) -> Result<Vec<IdRow<CacheItem>>, CubeError>;
     async fn cache_set(
         &self,
         item: CacheItem,
@@ -446,8 +446,11 @@ pub trait CacheStore: DIService + Send + Sync {
     async fn cache_incr(&self, key: String) -> Result<IdRow<CacheItem>, CubeError>;
 
     // queue
-    async fn queue_all(&self) -> Result<Vec<IdRow<QueueItem>>, CubeError>;
-    async fn queue_results_all(&self) -> Result<Vec<IdRow<QueueResult>>, CubeError>;
+    async fn queue_all(&self, limit: Option<usize>) -> Result<Vec<IdRow<QueueItem>>, CubeError>;
+    async fn queue_results_all(
+        &self,
+        limit: Option<usize>,
+    ) -> Result<Vec<IdRow<QueueResult>>, CubeError>;
     async fn queue_results_multi_delete(&self, ids: Vec<u64>) -> Result<(), CubeError>;
     async fn queue_add(&self, item: QueueItem) -> Result<QueueAddResponse, CubeError>;
     async fn queue_truncate(&self) -> Result<(), CubeError>;
@@ -491,10 +494,10 @@ pub trait CacheStore: DIService + Send + Sync {
 
 #[async_trait]
 impl CacheStore for RocksCacheStore {
-    async fn cache_all(&self) -> Result<Vec<IdRow<CacheItem>>, CubeError> {
+    async fn cache_all(&self, limit: Option<usize>) -> Result<Vec<IdRow<CacheItem>>, CubeError> {
         self.store
             .read_operation_out_of_queue(move |db_ref| {
-                Ok(CacheItemRocksTable::new(db_ref).all_rows()?)
+                Ok(CacheItemRocksTable::new(db_ref).scan_rows(limit)?)
             })
             .await
     }
@@ -616,15 +619,18 @@ impl CacheStore for RocksCacheStore {
             .await
     }
 
-    async fn queue_all(&self) -> Result<Vec<IdRow<QueueItem>>, CubeError> {
+    async fn queue_all(&self, limit: Option<usize>) -> Result<Vec<IdRow<QueueItem>>, CubeError> {
         self.store
-            .read_operation(move |db_ref| Ok(QueueItemRocksTable::new(db_ref).all_rows()?))
+            .read_operation(move |db_ref| Ok(QueueItemRocksTable::new(db_ref).scan_rows(limit)?))
             .await
     }
 
-    async fn queue_results_all(&self) -> Result<Vec<IdRow<QueueResult>>, CubeError> {
+    async fn queue_results_all(
+        &self,
+        limit: Option<usize>,
+    ) -> Result<Vec<IdRow<QueueResult>>, CubeError> {
         self.store
-            .read_operation(move |db_ref| Ok(QueueResultRocksTable::new(db_ref).all_rows()?))
+            .read_operation(move |db_ref| Ok(QueueResultRocksTable::new(db_ref).scan_rows(limit)?))
             .await
     }
 
@@ -1009,7 +1015,7 @@ pub struct ClusterCacheStoreClient {}
 
 #[async_trait]
 impl CacheStore for ClusterCacheStoreClient {
-    async fn cache_all(&self) -> Result<Vec<IdRow<CacheItem>>, CubeError> {
+    async fn cache_all(&self, _limit: Option<usize>) -> Result<Vec<IdRow<CacheItem>>, CubeError> {
         panic!("CacheStore cannot be used on the worker node! cache_all was used.")
     }
 
@@ -1041,11 +1047,14 @@ impl CacheStore for ClusterCacheStoreClient {
         panic!("CacheStore cannot be used on the worker node! cache_incr was used.")
     }
 
-    async fn queue_all(&self) -> Result<Vec<IdRow<QueueItem>>, CubeError> {
+    async fn queue_all(&self, _limit: Option<usize>) -> Result<Vec<IdRow<QueueItem>>, CubeError> {
         panic!("CacheStore cannot be used on the worker node! queue_all was used.")
     }
 
-    async fn queue_results_all(&self) -> Result<Vec<IdRow<QueueResult>>, CubeError> {
+    async fn queue_results_all(
+        &self,
+        _limit: Option<usize>,
+    ) -> Result<Vec<IdRow<QueueResult>>, CubeError> {
         panic!("CacheStore cannot be used on the worker node! queue_results_all was used.")
     }
 

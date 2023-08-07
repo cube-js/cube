@@ -3,6 +3,30 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.43](https://github.com/cube-js/cube/compare/v0.33.42...v0.33.43) (2023-08-04)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.33.42](https://github.com/cube-js/cube/compare/v0.33.41...v0.33.42) (2023-08-03)
+
+
+### Bug Fixes
+
+* **mssql-driver:** Fix group by clause for queries with dimensions and cumulative measures in MS SQL ([#6526](https://github.com/cube-js/cube/issues/6526)) Thanks [@mfclarke-cnx](https://github.com/mfclarke-cnx)! ([e0ed3a2](https://github.com/cube-js/cube/commit/e0ed3a27c9decf00c00568ebb01b6689f410a44d))
+
+
+### Features
+
+* **schema-compiler:** allow passing a catalog ([#6964](https://github.com/cube-js/cube/issues/6964)) ([680f545](https://github.com/cube-js/cube/commit/680f54561a53d4c8b2108204f191ae9a3c22156e))
+
+
+
+
+
 ## [0.33.41](https://github.com/cube-js/cube/compare/v0.33.40...v0.33.41) (2023-07-28)
 
 **Note:** Version bump only for package @cubejs-backend/schema-compiler

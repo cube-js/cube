@@ -78,7 +78,7 @@ Cube supports the following types of pre-aggregations:
 
 The default type is `rollup`.
 
-<h4 id="parameters-type-rollup">rollup</h4>
+#### rollup
 
 Rollup pre-aggregations are the most effective way to boost performance of any
 analytical application. The blazing fast performance of tools like Google
@@ -144,7 +144,7 @@ cubes:
 
 </CodeTabs>
 
-<h4 id="parameters-type-originalsql">original_sql</h4>
+#### original_sql
 
 As the name suggests, it persists the results of the `sql` property of the cube.
 Pre-aggregations of type `original_sql` should **only** be used when the cube's
@@ -202,7 +202,7 @@ cubes:
 
 </CodeTabs>
 
-<h4 id="parameters-type-rollupjoin">rollup_join</h4>
+#### rollup_join
 
 <WarningBox heading={`🐣  Preview`}>
 
@@ -461,7 +461,7 @@ cubes:
 
 </CodeTabs>
 
-<h4 id="parameters-type-rolluplambda">rollup_lambda</h4>
+#### rollup_lambda
 
 <WarningBox>
 
@@ -817,7 +817,7 @@ key is evaluated for each partition separately.
 
 </InfoBox>
 
-<h4 id="parameters-refresh-key-sql">sql</h4>
+#### sql
 
 You can set up a custom refresh check strategy by using the `sql` property:
 
@@ -862,7 +862,7 @@ In the above example, the refresh key SQL will be executed every 10 seconds, as
 refresh key differ from the last execution, then the pre-aggregation will be
 refreshed.
 
-<h4 id="parameters-refresh-key-every">every</h4>
+#### every
 
 The `refresh_key` can define an `every` property which can be used to refresh
 pre-aggregations based on a time interval. By default, it is set to `1 hour`
@@ -948,7 +948,7 @@ In the above example, the refresh key SQL will be executed every hour. If the
 results of the SQL refresh key differ from the last execution, then the
 pre-aggregation will be refreshed.
 
-<h4 id="parameters-refresh-key-incremental">incremental</h4>
+#### incremental
 
 You can incrementally refresh partitioned rollups by setting
 `incremental: true`. This option defaults to `false`.
@@ -1006,7 +1006,7 @@ cubes:
 
 </CodeTabs>
 
-<h4 id="parameters-refresh-key-updatewindow">update_window</h4>
+#### update_window
 
 <WarningBox>
 
@@ -1629,7 +1629,8 @@ cubes:
 
 </CodeTabs>
 
-[ref-api-ref-query-ref]: https://cube.dev/docs/query-format#query-properties
+[ref-api-ref-query-ref]:
+  /product/apis-integrations/rest-api/query-format#query-properties
 [ref-caching-lambda-preaggs]: /product/caching/lambda-pre-aggregations
 [ref-caching-partitioning]: /product/caching/using-pre-aggregations#partitioning
 [ref-caching-preaggs-target]:
@@ -1641,31 +1642,31 @@ cubes:
 [ref-config-downstream-superset]:
   /product/configuration/visualization-tools/superset
 [ref-config-driverfactory]: /config/#driver-factory
-[ref-cube-refreshkey]: /product/data-modeling/reference/cube#refresh-key
+[ref-cube-refreshkey]: /product/data-modeling/reference/cube#refresh_key
 [ref-production-checklist-refresh]:
   /product/deployment/production-checklist#set-up-refresh-worker
 [ref-recipe-funnels]: /guides/recipes/analytics/funnels
-[ref-sqlalias]: /product/data-modeling/reference/cube#sql-alias
+[ref-sqlalias]: /product/data-modeling/reference/cube#sql_alias
 [ref-schema-ref-cube-datasource]:
-  /product/data-modeling/reference/cube#parameters-data-source
+  /product/data-modeling/reference/cube#data_source
 [ref-schema-dimensions]: /product/data-modeling/reference/dimensions
 [ref-schema-measures]: /product/data-modeling/reference/measures
 [ref-schema-segments]: /product/data-modeling/reference/segments
 [ref-schema-types-dim-time]:
-  /product/data-modeling/reference/types-and-formats#types-time
+  /product/data-modeling/reference/types-and-formats#time-1
 [ref-naming]: /product/data-modeling/fundamentals/syntax#naming
 [self-granularity]: #granularity
-[self-incremental]: #refresh-key-incremental
-[self-origsql-preaggs]: #use-original-sql-pre-aggregations
-[self-originalsql]: #parameters-type-originalsql
-[self-refreshkey]: #refresh-key
-[self-refreshkey-every]: #refresh-key-every
-[self-refreshkey-sql]: #refresh-key-sql
-[self-rollup]: #parameters-type-rollup
-[self-rollupjoin]: #parameters-type-rollupjoin
-[self-rolluplambda]: #parameters-type-rolluplambda
-[self-timedimension]: #time-dimension
-[self-buildrange]: #parameters-build-range-start-and-build-range-end
+[self-incremental]: #incremental
+[self-origsql-preaggs]: #use_original_sql_pre_aggregations
+[self-originalsql]: #original_sql
+[self-refreshkey]: #refresh_key
+[self-refreshkey-every]: #every
+[self-refreshkey-sql]: #sql
+[self-rollup]: #rollup
+[self-rollupjoin]: #rollup_join
+[self-rolluplambda]: #rollup_lambda
+[self-timedimension]: #time_dimension
+[self-buildrange]: #build_range_start-and-build_range_end
 [wiki-olap-ops]: https://en.wikipedia.org/wiki/OLAP_cube#Operations
 [wiki-composable-agg-fn]:
   https://en.wikipedia.org/wiki/Aggregate_function#Decomposable_aggregate_functions

@@ -472,39 +472,6 @@ cubes:
 
 </CodeTabs>
 
-### running_total
-
-Type of measure `running_total` is calculated as summation of values defined in
-`sql`. Use it to calculate cumulative measures.
-
-<CodeTabs>
-
-```javascript
-cube(`orders`, {
-  // ...
-
-  measures: {
-    total_subscriptions: {
-      sql: `subscription_amount`,
-      type: `running_total`,
-    },
-  },
-});
-```
-
-```yaml
-cubes:
-  - name: orders
-    # ...
-
-    measures:
-      - name: total_subscriptions
-        sql: subscription_amount
-        type: running_total
-```
-
-</CodeTabs>
-
 ## Measure Formats
 
 When creating a **measure** you can explicitly define the format you’d like to
@@ -557,7 +524,7 @@ cube(`orders`, {
   measures: {
     total_amount: {
       sql: `amount`,
-      type: `running_total`,
+      type: `sum`,
       format: `currency`,
     },
   },
@@ -572,7 +539,7 @@ cubes:
     measures:
       - name: total_amount
         sql: amount
-        type: running_total
+        type: sum
         format: currency
 ```
 
@@ -963,7 +930,7 @@ cubes:
 [ref-string-time-dims]:
   /product/data-modeling/fundamentals/additional-concepts#string-time-dimensions
 [ref-schema-ref-preaggs-rollup]:
-  /product/data-modeling/reference/pre-aggregations#type-rollup
+  /product/data-modeling/reference/pre-aggregations#rollup
 [ref-schema-ref-calc-measures]:
   /product/data-modeling/reference/measures#calculated-measures
 [ref-drilldowns]:

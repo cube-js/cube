@@ -167,8 +167,8 @@ impl LazyRocksCacheStore {
 
 #[async_trait]
 impl CacheStore for LazyRocksCacheStore {
-    async fn cache_all(&self) -> Result<Vec<IdRow<CacheItem>>, CubeError> {
-        self.init().await?.cache_all().await
+    async fn cache_all(&self, limit: Option<usize>) -> Result<Vec<IdRow<CacheItem>>, CubeError> {
+        self.init().await?.cache_all(limit).await
     }
 
     async fn cache_set(
@@ -202,12 +202,15 @@ impl CacheStore for LazyRocksCacheStore {
         self.init().await?.cache_incr(path).await
     }
 
-    async fn queue_all(&self) -> Result<Vec<IdRow<QueueItem>>, CubeError> {
-        self.init().await?.queue_all().await
+    async fn queue_all(&self, limit: Option<usize>) -> Result<Vec<IdRow<QueueItem>>, CubeError> {
+        self.init().await?.queue_all(limit).await
     }
 
-    async fn queue_results_all(&self) -> Result<Vec<IdRow<QueueResult>>, CubeError> {
-        self.init().await?.queue_results_all().await
+    async fn queue_results_all(
+        &self,
+        limit: Option<usize>,
+    ) -> Result<Vec<IdRow<QueueResult>>, CubeError> {
+        self.init().await?.queue_results_all(limit).await
     }
 
     async fn queue_results_multi_delete(&self, ids: Vec<u64>) -> Result<(), CubeError> {
