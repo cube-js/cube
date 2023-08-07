@@ -7,7 +7,7 @@ import {
 } from 'antd';
 import { RouterProps } from 'react-router-dom';
 
-import PrismCode from '../../PrismCode';
+import { EditCode } from '../components/EditCode'
 import { playgroundAction } from '../../events';
 import { Menu, Tabs, Tree } from '../../components';
 import { Alert, CubeLoader } from '../../atoms';
@@ -97,10 +97,23 @@ export class SchemaPage extends Component<SchemaPageProps, any> {
   async loadFiles() {
     const res = await playgroundFetch('/playground/files');
     const result = await res.json();
+
+    let files = []
+
+    if (result.files && result.files.length) {
+      files = result.files.map(file => ({ ...file, type: 'save' }))
+    }
+
     this.setState({
-      files: result.files,
-      activeTab: (result.files && result.files.length > 0) ? "files" : "schema"
+      files,
+      activeTab: files.length > 0 ? "files" : "schema"
     });
+  }
+
+  clear(callback?: () => void) {
+    this.setState({
+      selectedFile: ''
+    }, () => callback && callback())
   }
 
   async generateSchema(format: SchemaFormat = SchemaFormat.js) {
@@ -146,11 +159,6 @@ export class SchemaPage extends Component<SchemaPageProps, any> {
     }
   }
 
-  selectedFileContent() {
-    const file = this.selectedFile();
-    return file && file.content;
-  }
-
   selectedFile() {
     const { files, selectedFile } = this.state;
     return files.find((f) => f.fileName === selectedFile);
@@ -158,12 +166,15 @@ export class SchemaPage extends Component<SchemaPageProps, any> {
 
   renderFilesMenu() {
     const { selectedFile, files } = this.state;
+
     return (
       <Menu
         mode="inline"
         onClick={({ key }) => {
           playgroundAction('Select File');
-          this.setState({ selectedFile: key });
+          this.clear(() => {
+            this.setState({ selectedFile: key });
+          })
         }}
         selectedKeys={selectedFile ? [selectedFile] : []}
       >
@@ -319,11 +330,15 @@ export class SchemaPage extends Component<SchemaPageProps, any> {
             />
           )}
           {selectedFile ? (
-            <PrismCode
-              code={this.selectedFileContent()}
+            <EditCode
+              file={this.selectedFile()}
               style={{
                 padding: 0,
                 marginTop: 24,
+              }}
+              onChange={(reset) => {
+                this.loadFiles()
+                if (reset) this.clear()
               }}
             />
           ) : (
