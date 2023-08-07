@@ -1,8 +1,8 @@
 # Cube and Langchain demo app
 
-This is an example of chatbot built with Cube, Langchaing and Streamlit. 
+This is an example of a chatbot built with Cube, Langchain, and Streamlit. 
 
-[Why to use semantic layer with LLM for chatbots?](https://cube.dev/blog/semantic-layer-the-backbone-of-ai-powered-data-experiences)
+[Why use a semantic layer with LLM for chatbots?](https://cube.dev/blog/semantic-layer-the-backbone-of-ai-powered-data-experiences)
 
 ## Pre-requisites
 
