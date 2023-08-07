@@ -4042,8 +4042,14 @@ mod tests {
         }).await;
     }
 
-    #[tokio::test]
-    async fn create_table_with_temp_file() {
+    #[test]
+    fn create_table_with_temp_file() {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .thread_stack_size(4 * 1024 * 1024)
+            .build()
+            .unwrap()
+            .block_on( async {
         Config::run_test("create_table_with_temp_file", async move |services| {
             let service = services.sql_service;
 
@@ -4083,6 +4089,9 @@ mod tests {
             let result = service.exec_query("SELECT count(*) as cnt from Foo.Persons WHERE arr = '[\"Foo\",\"Bar\",\"FooBar\"]' or arr = '[\"\"]' or arr is null").await.unwrap();
             assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(5)])]);
         }).await;
+
+            }
+            )
     }
 
     #[tokio::test]

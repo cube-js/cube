@@ -59,11 +59,6 @@ jobs:
         with:
           command: fmt
           args: --manifest-path rust/cubestore/cubehll/Cargo.toml -- --check
-      - name: Run cargo build
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --manifest-path rust/cubestore/Cargo.toml -j 4
       - name: Run cargo test
         uses: actions-rs/cargo@v1
         env:
