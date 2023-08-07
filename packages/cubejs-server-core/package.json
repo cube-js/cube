@@ -2,7 +2,7 @@
   "name": "@heora/cubejs-server-core",
   "description": "Cube.js base component to wire all backend components together",
   "author": "Cube Dev, Inc.",
-  "version": "0.33.46",
+  "version": "0.33.51",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
@@ -59,7 +59,7 @@
   "devDependencies": {
     "@cubejs-backend/cubestore-driver": "^0.33.43",
     "@cubejs-backend/linter": "^0.33.0",
-    "@heora/cubejs-client-playground": "^0.33.26",
+    "@heora/cubejs-client-playground": "^0.33.30",
     "@types/cross-spawn": "^6.0.2",
     "@types/express": "^4.17.9",
     "@types/fs-extra": "^9.0.8",

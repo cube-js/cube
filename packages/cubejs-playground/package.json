@@ -1,7 +1,7 @@
 {
   "name": "@heora/cubejs-client-playground",
   "author": "Cube Dev, Inc.",
-  "version": "0.33.26",
+  "version": "0.33.30",
   "engines": {},
   "repository": {
     "type": "git",
@@ -16,7 +16,7 @@
     "watch": "tsc --noEmit false --watch",
     "build": "tsc && yarn build:playground && yarn build:lib",
     "build:lib": "tsc --noEmit false && node postbuild.js && cp -R src/img/ lib/img/",
-    "build:playground": "cross-env SKIP_PREFLIGHT_CHECK=true vite build && rm -Rf ../cubejs-server-core/playground/** && cp -R build/ ../cubejs-server-core/playground/"
+    "build:playground": "cross-env SKIP_PREFLIGHT_CHECK=true vite build && rm -Rf ../cubejs-server-core/playground/** && cp -R build/** ../cubejs-server-core/playground/"
   },
   "browserslist": [
     ">0.2% and supports es6-module"
@@ -32,6 +32,7 @@
     "@graphiql/toolkit": "^0.4.3",
     "anser": "^2.1.1",
     "camel-case": "^4.1.2",
+    "codemirror": "^5.65.14",
     "codesandbox-import-utils": "^2.1.1",
     "cron-validator": "^1.2.1",
     "customize-cra": "^1.0.0",
@@ -49,6 +50,7 @@
     "mitt": "^2.1.0",
     "moment": "^2.25.3",
     "react-beautiful-dnd": "^13.0.0",
+    "react-codemirror2": "^7.2.1",
     "react-hotkeys-hook": "^3.3.0",
     "react-is": "^16.8.4",
     "react-responsive": "^8.0.1",

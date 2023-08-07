@@ -174,6 +174,21 @@ export class DevServer {
       });
     }));
 
+    app.post('/playground/file/delete', catchErrors(async (req, res) => {
+      this.cubejsServer.event('Dev Server file delete');
+
+      const { fileName } = req.body;
+
+      const localPath = this.cubejsServer.repository.localPath();
+      const absPath = path.join(localPath, fileName);
+
+      fs.unlinkSync(absPath)
+
+      res.json({
+        fileName
+      })
+    }))
+
     app.post('/playground/generate-schema', catchErrors(async (req, res) => {
       this.cubejsServer.event('Dev Server Generate Schema');
       if (!req.body) {

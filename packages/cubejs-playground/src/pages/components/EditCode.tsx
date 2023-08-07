@@ -157,7 +157,7 @@ export const EditCode = (props: EditCodeProps) => {
         value={ymlContent}
         onBeforeChange={handleYMLChange}
         editorDidMount={(editor) => {
-          editor.setSize(null, "600px"); // 设置编辑器高度
+          editor.setSize(null, "500px");
         }}
       />
 
