@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/docker",
-  "version": "0.33.43",
+  "version": "0.33.53",
   "description": "Cube.js In Docker (virtual package)",
   "author": "Cube Dev, Inc.",
   "license": "Apache-2.0",
@@ -34,8 +34,8 @@
     "@cubejs-backend/snowflake-driver": "^0.33.43",
     "@cubejs-backend/sqlite-driver": "^0.33.43",
     "@cubejs-backend/trino-driver": "^0.33.43",
-    "@heora/cubejs-cli": "^0.33.51",
-    "@heora/cubejs-server": "^0.33.51",
+    "@heora/cubejs-cli": "^0.33.53",
+    "@heora/cubejs-server": "^0.33.53",
     "typescript": "~4.9.5"
   },
   "resolutions": {
