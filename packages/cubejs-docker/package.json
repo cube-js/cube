@@ -35,7 +35,7 @@
     "@cubejs-backend/sqlite-driver": "^0.33.43",
     "@cubejs-backend/trino-driver": "^0.33.43",
     "@heora/cubejs-cli": "^0.33.51",
-    "@heora/cubejs-server": "^0.33.43",
+    "@heora/cubejs-server": "^0.33.51",
     "typescript": "~4.9.5"
   },
   "resolutions": {
