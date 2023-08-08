@@ -2,7 +2,7 @@
   "name": "@heora/cubejs-server-core",
   "description": "Cube.js base component to wire all backend components together",
   "author": "Cube Dev, Inc.",
-  "version": "0.33.51",
+  "version": "0.33.52",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",

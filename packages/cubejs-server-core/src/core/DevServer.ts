@@ -223,6 +223,14 @@ export class DevServer {
 
       // await fs.emptyDir(path.join(schemaPath, 'cubes'));
       // await fs.emptyDir(path.join(schemaPath, 'views'));
+
+      const cubes_dir = path.join(schemaPath, 'cubes');
+      const views_dir = path.join(schemaPath, 'views')
+
+      if (!fs.existsSync(cubes_dir)) {
+        fs.mkdirSync(cubes_dir, { recursive: true })
+        fs.mkdirSync(views_dir, { recursive: true })
+      }
       
       await fs.writeFile(path.join(schemaPath, 'views', 'example_view.yml'), `# In Cube, views are used to expose slices of your data graph and act as data marts.
 # You can control which measures and dimensions are exposed to BIs or data apps, 
