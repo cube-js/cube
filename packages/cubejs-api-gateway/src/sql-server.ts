@@ -144,6 +144,7 @@ export class SQLServer {
             await this.apiGateway.sql({
               query,
               memberToAlias,
+              exportAnnotatedSql: true,
               queryType: 'multi',
               context,
               res: (message) => {

@@ -1,7 +1,9 @@
 use crate::{
     compile::engine::df::scan::{CubeScanNode, MemberField, WrappedSelectNode},
     sql::AuthContextRef,
-    transport::{AliasedColumn, LoadRequestMeta, MetaContext, SqlGenerator, TransportService},
+    transport::{
+        AliasedColumn, LoadRequestMeta, MetaContext, SqlGenerator, SqlTemplates, TransportService,
+    },
     CubeError,
 };
 use datafusion::{
@@ -13,27 +15,76 @@ use datafusion::{
     scalar::ScalarValue,
 };
 use itertools::Itertools;
+use regex::{Captures, Regex};
 use serde_derive::*;
 use std::{any::Any, fmt, future::Future, pin::Pin, result, sync::Arc};
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct SqlQuery {
     pub sql: String,
-    pub values: Vec<String>,
+    pub values: Vec<Option<String>>,
 }
 
 impl SqlQuery {
-    pub fn new(sql: String, values: Vec<String>) -> Self {
+    pub fn new(sql: String, values: Vec<Option<String>>) -> Self {
         Self { sql, values }
     }
 
-    pub fn add_value(&mut self, value: String) -> usize {
+    pub fn add_value(&mut self, value: Option<String>) -> usize {
+        let index = self.values.len();
         self.values.push(value);
-        self.values.len()
+        index
     }
 
     pub fn replace_sql(&mut self, sql: String) {
         self.sql = sql;
+    }
+
+    fn render_param(
+        &self,
+        sql_templates: Arc<SqlTemplates>,
+        param_index: Option<&str>,
+        new_param_index: usize,
+    ) -> Result<(usize, String)> {
+        let param = param_index
+            .ok_or_else(|| DataFusionError::Execution("Missing param match".to_string()))?
+            .parse::<usize>()
+            .map_err(|e| DataFusionError::Execution(format!("Can't parse param index: {}", e)))?;
+        Ok((
+            param,
+            sql_templates
+                .param(new_param_index)
+                .map_err(|e| DataFusionError::Execution(format!("Can't render param: {}", e)))?,
+        ))
+    }
+
+    pub fn finalize_query(&mut self, sql_templates: Arc<SqlTemplates>) -> Result<()> {
+        let mut params = Vec::new();
+        let regex = Regex::new(r"\$(\d+)\$")
+            .map_err(|e| DataFusionError::Execution(format!("Can't parse regex: {}", e)))?;
+        let mut res = Ok(());
+        let replaced_sql = regex.replace_all(self.sql.as_str(), |c: &Captures<'_>| {
+            let param = c.get(1).map(|x| x.as_str());
+            match self.render_param(sql_templates.clone(), param, params.len()) {
+                Ok((param_index, param)) => {
+                    params.push(self.values[param_index].clone());
+                    param
+                }
+                Err(e) => {
+                    res = Err(e);
+                    "".to_string()
+                }
+            }
+        });
+
+        match res {
+            Ok(()) => {
+                self.sql = replaced_sql.to_string();
+                self.values = params;
+                Ok(())
+            }
+            Err(e) => Err(e),
+        }
     }
 }
 
@@ -89,7 +140,24 @@ impl CubeScanWrapperNode {
             self.wrapped_plan.clone(),
         )
         .await
-        .map(|(_, _, sql)| sql)?;
+        .and_then(|(data_source, _, mut sql): (Option<String>, _, SqlQuery)| -> result::Result<_, CubeError> {
+            let data_source = data_source.ok_or_else(|| CubeError::internal(format!(
+                "Can't generate SQL for wrapped select: no data source returned"
+            )))?;
+            let sql_templates = self
+                .meta
+                .data_source_to_sql_generator
+                .get(&data_source)
+                .ok_or_else(|| {
+                    CubeError::internal(format!(
+                        "Can't generate SQL for wrapped select: no sql generator for '{:?}' data source",
+                        data_source
+                    ))
+                })?
+                .get_sql_templates();
+            sql.finalize_query(sql_templates).map_err(|e| CubeError::internal(e.to_string()))?;
+            Ok(sql)
+        })?;
         Ok(self.with_sql(sql))
     }
 
@@ -221,36 +289,45 @@ impl CubeScanWrapperNode {
                             let mut group_by = Vec::new();
                             let mut projection = Vec::new();
                             for expr in projection_expr {
+                                let (expr_sql, new_sql_query) = Self::generate_sql_for_expr(
+                                    plan.clone(),
+                                    sql,
+                                    generator.clone(),
+                                    expr.clone(),
+                                )
+                                .await?;
+                                sql = new_sql_query;
                                 projection.push(AliasedColumn {
-                                    expr: Self::generate_sql_for_expr(
-                                        plan.clone(),
-                                        generator.clone(),
-                                        expr.clone(),
-                                    )
-                                    .await?,
+                                    expr: expr_sql,
                                     alias: expr_name(&expr, &schema)?,
                                 });
                             }
                             for expr in group_expr {
+                                let (expr_sql, new_sql_query) = Self::generate_sql_for_expr(
+                                    plan.clone(),
+                                    sql,
+                                    generator.clone(),
+                                    expr.clone(),
+                                )
+                                .await?;
+                                sql = new_sql_query;
                                 group_by.push(AliasedColumn {
-                                    expr: Self::generate_sql_for_expr(
-                                        plan.clone(),
-                                        generator.clone(),
-                                        expr.clone(),
-                                    )
-                                    .await?,
+                                    expr: expr_sql,
                                     alias: expr_name(&expr, &schema)?,
                                 });
                             }
                             let mut aggregate = Vec::new();
                             for expr in aggr_expr {
+                                let (expr_sql, new_sql_query) = Self::generate_sql_for_expr(
+                                    plan.clone(),
+                                    sql,
+                                    generator.clone(),
+                                    expr.clone(),
+                                )
+                                .await?;
+                                sql = new_sql_query;
                                 aggregate.push(AliasedColumn {
-                                    expr: Self::generate_sql_for_expr(
-                                        plan.clone(),
-                                        generator.clone(),
-                                        expr.clone(),
-                                    )
-                                    .await?,
+                                    expr: expr_sql,
                                     alias: expr_name(&expr, &schema)?,
                                 });
                             }
@@ -301,26 +378,39 @@ impl CubeScanWrapperNode {
 
     pub fn generate_sql_for_expr(
         plan: Arc<Self>,
+        mut sql_query: SqlQuery,
         sql_generator: Arc<dyn SqlGenerator>,
         expr: Expr,
-    ) -> Pin<Box<dyn Future<Output = Result<String>> + Send>> {
+    ) -> Pin<Box<dyn Future<Output = Result<(String, SqlQuery)>> + Send>> {
         Box::pin(async move {
             match expr {
                 Expr::Alias(expr, _) => {
-                    let expr = Self::generate_sql_for_expr(
+                    let (expr, sql_query) = Self::generate_sql_for_expr(
                         plan.clone(),
+                        sql_query,
                         sql_generator.clone(),
                         (*expr).clone(),
                     )
                     .await?;
-                    Ok(expr)
+                    Ok((expr, sql_query))
                 }
                 // Expr::OuterColumn(_, _) => {}
-                Expr::Column(c) => Ok(match c.relation.as_ref() {
-                    Some(r) => format!(
-                        "{}.{}",
-                        r,
-                        sql_generator
+                Expr::Column(c) => Ok((
+                    match c.relation.as_ref() {
+                        Some(r) => format!(
+                            "{}.{}",
+                            r,
+                            sql_generator
+                                .get_sql_templates()
+                                .quote_identifier(&c.name)
+                                .map_err(|e| {
+                                    DataFusionError::Internal(format!(
+                                        "Can't generate SQL for column: {}",
+                                        e
+                                    ))
+                                })?
+                        ),
+                        None => sql_generator
                             .get_sql_templates()
                             .quote_identifier(&c.name)
                             .map_err(|e| {
@@ -328,18 +418,10 @@ impl CubeScanWrapperNode {
                                     "Can't generate SQL for column: {}",
                                     e
                                 ))
-                            })?
-                    ),
-                    None => sql_generator
-                        .get_sql_templates()
-                        .quote_identifier(&c.name)
-                        .map_err(|e| {
-                            DataFusionError::Internal(format!(
-                                "Can't generate SQL for column: {}",
-                                e
-                            ))
-                        })?,
-                }),
+                            })?,
+                    },
+                    sql_query,
+                )),
                 // Expr::ScalarVariable(_, _) => {}
                 // Expr::BinaryExpr { .. } => {}
                 // Expr::AnyExpr { .. } => {}
@@ -361,40 +443,50 @@ impl CubeScanWrapperNode {
                 Expr::Literal(literal) => {
                     Ok(match literal {
                         // ScalarValue::Boolean(b) => {}
-                        ScalarValue::Float32(f) => {
-                            f.map(|f| format!("{}", f)).unwrap_or("NULL".to_string())
-                        }
-                        ScalarValue::Float64(f) => {
-                            f.map(|f| format!("{}", f)).unwrap_or("NULL".to_string())
-                        }
+                        ScalarValue::Float32(f) => (
+                            f.map(|f| format!("{}", f)).unwrap_or("NULL".to_string()),
+                            sql_query,
+                        ),
+                        ScalarValue::Float64(f) => (
+                            f.map(|f| format!("{}", f)).unwrap_or("NULL".to_string()),
+                            sql_query,
+                        ),
                         // ScalarValue::Decimal128(_, _, _) => {}
-                        ScalarValue::Int8(x) => {
-                            x.map(|x| format!("{}", x)).unwrap_or("NULL".to_string())
-                        }
-                        ScalarValue::Int16(x) => {
-                            x.map(|x| format!("{}", x)).unwrap_or("NULL".to_string())
-                        }
-                        ScalarValue::Int32(x) => {
-                            x.map(|x| format!("{}", x)).unwrap_or("NULL".to_string())
-                        }
-                        ScalarValue::Int64(x) => {
-                            x.map(|x| format!("{}", x)).unwrap_or("NULL".to_string())
-                        }
-                        ScalarValue::UInt8(x) => {
-                            x.map(|x| format!("{}", x)).unwrap_or("NULL".to_string())
-                        }
-                        ScalarValue::UInt16(x) => {
-                            x.map(|x| format!("{}", x)).unwrap_or("NULL".to_string())
-                        }
-                        ScalarValue::UInt32(x) => {
-                            x.map(|x| format!("{}", x)).unwrap_or("NULL".to_string())
-                        }
-                        ScalarValue::UInt64(x) => {
-                            x.map(|x| format!("{}", x)).unwrap_or("NULL".to_string())
-                        }
+                        ScalarValue::Int8(x) => (
+                            x.map(|x| format!("{}", x)).unwrap_or("NULL".to_string()),
+                            sql_query,
+                        ),
+                        ScalarValue::Int16(x) => (
+                            x.map(|x| format!("{}", x)).unwrap_or("NULL".to_string()),
+                            sql_query,
+                        ),
+                        ScalarValue::Int32(x) => (
+                            x.map(|x| format!("{}", x)).unwrap_or("NULL".to_string()),
+                            sql_query,
+                        ),
+                        ScalarValue::Int64(x) => (
+                            x.map(|x| format!("{}", x)).unwrap_or("NULL".to_string()),
+                            sql_query,
+                        ),
+                        ScalarValue::UInt8(x) => (
+                            x.map(|x| format!("{}", x)).unwrap_or("NULL".to_string()),
+                            sql_query,
+                        ),
+                        ScalarValue::UInt16(x) => (
+                            x.map(|x| format!("{}", x)).unwrap_or("NULL".to_string()),
+                            sql_query,
+                        ),
+                        ScalarValue::UInt32(x) => (
+                            x.map(|x| format!("{}", x)).unwrap_or("NULL".to_string()),
+                            sql_query,
+                        ),
+                        ScalarValue::UInt64(x) => (
+                            x.map(|x| format!("{}", x)).unwrap_or("NULL".to_string()),
+                            sql_query,
+                        ),
                         ScalarValue::Utf8(x) => {
-                            // TODO introduce parameter
-                            x.map(|x| format!("'{}'", x)).unwrap_or("NULL".to_string())
+                            let param_index = sql_query.add_value(x);
+                            (format!("${}$", param_index), sql_query)
                         }
                         // ScalarValue::LargeUtf8(_) => {}
                         // ScalarValue::Binary(_) => {}
@@ -421,20 +513,28 @@ impl CubeScanWrapperNode {
                 Expr::ScalarFunction { fun, args } => {
                     let mut sql_args = Vec::new();
                     for arg in args {
-                        sql_args.push(
-                            Self::generate_sql_for_expr(plan.clone(), sql_generator.clone(), arg)
-                                .await?,
-                        );
+                        let (sql, query) = Self::generate_sql_for_expr(
+                            plan.clone(),
+                            sql_query,
+                            sql_generator.clone(),
+                            arg,
+                        )
+                        .await?;
+                        sql_query = query;
+                        sql_args.push(sql);
                     }
-                    Ok(sql_generator
-                        .get_sql_templates()
-                        .scalar_function(fun, sql_args)
-                        .map_err(|e| {
-                            DataFusionError::Internal(format!(
-                                "Can't generate SQL for scalar function: {}",
-                                e
-                            ))
-                        })?)
+                    Ok((
+                        sql_generator
+                            .get_sql_templates()
+                            .scalar_function(fun, sql_args)
+                            .map_err(|e| {
+                                DataFusionError::Internal(format!(
+                                    "Can't generate SQL for scalar function: {}",
+                                    e
+                                ))
+                            })?,
+                        sql_query,
+                    ))
                 }
                 Expr::AggregateFunction {
                     fun,
@@ -451,20 +551,28 @@ impl CubeScanWrapperNode {
                                 }
                             }
                         }
-                        sql_args.push(
-                            Self::generate_sql_for_expr(plan.clone(), sql_generator.clone(), arg)
-                                .await?,
-                        );
+                        let (sql, query) = Self::generate_sql_for_expr(
+                            plan.clone(),
+                            sql_query,
+                            sql_generator.clone(),
+                            arg,
+                        )
+                        .await?;
+                        sql_query = query;
+                        sql_args.push(sql);
                     }
-                    Ok(sql_generator
-                        .get_sql_templates()
-                        .aggregate_function(fun, sql_args, distinct)
-                        .map_err(|e| {
-                            DataFusionError::Internal(format!(
-                                "Can't generate SQL for aggregate function: {}",
-                                e
-                            ))
-                        })?)
+                    Ok((
+                        sql_generator
+                            .get_sql_templates()
+                            .aggregate_function(fun, sql_args, distinct)
+                            .map_err(|e| {
+                                DataFusionError::Internal(format!(
+                                    "Can't generate SQL for aggregate function: {}",
+                                    e
+                                ))
+                            })?,
+                        sql_query,
+                    ))
                 }
                 // Expr::WindowFunction { .. } => {}
                 // Expr::AggregateUDF { .. } => {}

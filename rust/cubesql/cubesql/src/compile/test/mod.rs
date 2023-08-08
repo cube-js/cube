@@ -218,7 +218,8 @@ pub fn get_test_tenant_ctx() -> Arc<MetaContext> {
                         "{{expr}} {{quoted_alias}}".to_string(),
                     ),
                     ("quotes/identifiers".to_string(), "\"".to_string()),
-                    ("quotes/escape".to_string(), "\"\"".to_string())
+                    ("quotes/escape".to_string(), "\"\"".to_string()),
+                    ("params/param".to_string(), "${{ param_index + 1 }}".to_string())
                 ]
                 .into_iter()
                 .collect(),

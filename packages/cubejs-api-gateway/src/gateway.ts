@@ -1169,7 +1169,7 @@ class ApiGateway {
     return [queryType, normalizedQueries];
   }
 
-  public async sql({ query, context, res, memberToAlias }: QueryRequest) {
+  public async sql({ query, context, res, memberToAlias, exportAnnotatedSql }: QueryRequest) {
     const requestStarted = new Date();
 
     try {
@@ -1181,7 +1181,10 @@ class ApiGateway {
       const sqlQueries = await Promise.all<any>(
         normalizedQueries.map((normalizedQuery) => this.getCompilerApi(context).getSql(
           this.coerceForSqlQuery({ ...normalizedQuery, memberToAlias }, context),
-          { includeDebugInfo: getEnv('devMode') || context.signedWithPlaygroundAuthSecret }
+          {
+            includeDebugInfo: getEnv('devMode') || context.signedWithPlaygroundAuthSecret,
+            exportAnnotatedSql,
+          }
         ))
       );
 

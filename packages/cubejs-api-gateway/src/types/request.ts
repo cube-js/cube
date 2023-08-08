@@ -118,6 +118,7 @@ type QueryRequest = BaseRequest & {
   apiType?: ApiType;
   resType?: ResultType
   memberToAlias?: Record<string, string>;
+  exportAnnotatedSql?: boolean;
 };
 
 type SqlApiRequest = BaseRequest & {

@@ -547,19 +547,20 @@ class BaseQuery {
    * Returns an array of SQL query strings for the query.
    * @returns {Array<string>}
    */
-  buildSqlAndParams() {
+  buildSqlAndParams(exportAnnotatedSql) {
     if (!this.options.preAggregationQuery && this.externalQueryClass) {
       if (this.externalPreAggregationQuery()) { // TODO performance
-        return this.externalQuery().buildSqlAndParams();
+        return this.externalQuery().buildSqlAndParams(exportAnnotatedSql);
       }
     }
 
     return this.compilers.compiler.withQuery(
       this,
       () => this.cacheValue(
-        ['buildSqlAndParams'],
+        ['buildSqlAndParams', exportAnnotatedSql],
         () => this.paramAllocator.buildSqlAndParams(
-          this.buildParamAnnotatedSql()
+          this.buildParamAnnotatedSql(),
+          exportAnnotatedSql
         ),
         { cache: this.queryCache }
       )
@@ -2393,6 +2394,8 @@ class BaseQuery {
         COUNT: 'COUNT({{ args_concat }})',
         COUNT_DISTINCT: 'COUNT(DISTINCT {{ args_concat }})',
         AVG: 'AVG({{ args_concat }})',
+
+        COALESCE: 'COALESCE({{ args_concat }})',
       },
       statements: {
         select: 'SELECT {{ select_concat | map(attribute=\'aliased\') | join(\', \') }} \n' +
@@ -2401,7 +2404,11 @@ class BaseQuery {
         column_aliased: '{{expr}} {{quoted_alias}}',
       },
       quotes: {
-        identifiers: '"'
+        identifiers: '"',
+        escape: '""'
+      },
+      params: {
+        param: '?'
       }
     };
   }

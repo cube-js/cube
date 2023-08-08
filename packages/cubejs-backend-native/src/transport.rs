@@ -67,7 +67,7 @@ struct LoadRequest {
     request: TransportRequest,
     query: V1LoadRequestQuery,
     #[serde(rename = "sqlQuery", skip_serializing_if = "Option::is_none")]
-    sql_query: Option<(String, Vec<String>)>,
+    sql_query: Option<(String, Vec<Option<String>>)>,
     session: SessionContext,
     #[serde(rename = "memberToAlias", skip_serializing_if = "Option::is_none")]
     member_to_alias: Option<HashMap<String, String>>,
@@ -234,16 +234,7 @@ impl TransportService for NodeBridgeTransport {
                         CubeError::user(format!("No sql array in response: {}", response))
                     })?
                     .iter()
-                    .map(|v| -> Result<_, CubeError> {
-                        Ok(v.as_str()
-                            .ok_or_else(|| {
-                                CubeError::user(format!(
-                                    "Params not a string in response: {}",
-                                    response
-                                ))
-                            })?
-                            .to_string())
-                    })
+                    .map(|v| -> Result<_, CubeError> { Ok(v.as_str().map(|s| s.to_string())) })
                     .collect::<Result<Vec<_>, _>>()?,
             },
         })

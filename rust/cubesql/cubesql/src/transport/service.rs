@@ -394,4 +394,8 @@ impl SqlTemplates {
             context! { args_concat => args_concat, args => args },
         )
     }
+
+    pub fn param(&self, param_index: usize) -> Result<String, CubeError> {
+        self.render_template("params/param", context! { param_index => param_index })
+    }
 }

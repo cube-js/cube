@@ -141,12 +141,12 @@ export class CompilerApi {
   }
 
   async getSql(query, options = {}) {
-    const { includeDebugInfo } = options;
+    const { includeDebugInfo, exportAnnotatedSql } = options;
     const { sqlGenerator, compilers } = await this.getSqlGenerator(query);
 
     const getSqlFn = () => compilers.compiler.withQuery(sqlGenerator, () => ({
       external: sqlGenerator.externalPreAggregationQuery(),
-      sql: sqlGenerator.buildSqlAndParams(),
+      sql: sqlGenerator.buildSqlAndParams(exportAnnotatedSql),
       lambdaQueries: sqlGenerator.buildLambdaQuery(),
       timeDimensionAlias: sqlGenerator.timeDimensions[0] && sqlGenerator.timeDimensions[0].unescapedAliasName(),
       timeDimensionField: sqlGenerator.timeDimensions[0] && sqlGenerator.timeDimensions[0].dimension,
