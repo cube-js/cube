@@ -26,6 +26,7 @@ import { Table } from '@/components/overrides/Table/Table';
 import { Td } from '@/components/overrides/Table/Td';
 import { Th } from '@/components/overrides/Table/Th';
 import { Tr } from '@/components/overrides/Table/Tr';
+import { EmbeddedVideo } from './EmbeddedVideo/EmbeddedVideo';
 
 export const components = {
   ...Buttons,
@@ -37,6 +38,7 @@ export const components = {
   SuccessBox,
   WarningBox,
   LoomVideo,
+  EmbeddedVideo,
   Grid,
   GridItem,
   GitHubCodeBlock,
