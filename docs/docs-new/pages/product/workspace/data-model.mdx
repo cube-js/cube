@@ -59,16 +59,16 @@ there are any unsaved changes:
 ## Data Graph
 
 In addition to exploring the code of data model files, you can view the visual
-representation of the data model, including relations between cubes.
+representation of the data model, including relations between cubes and views.
 Click <Btn>Show Graph</Btn> in the top right part of the data model editor to
 open Data Graph:
 
 <Screenshot src="https://ucarecdn.com/30b7fa8c-fb9f-43fb-af1d-4ef98aae2829/" />
 
-Data Graph visualizes [cubes][ref-cubes] and [joins][ref-joins] between them as
-an [entity-relationship diagram][wiki-erd] (ERD). It allows to have a bird's-eye
-view of the data model and visually detect connected parts, i.e., groups of
-cubes that don't have any relationships with other groups.
+Data Graph visualizes [cubes][ref-cubes] and [views][ref-views] as an
+[entity-relationship diagram][wiki-erd] (ERD). It provides a bird's-eye view of
+the data model and visually detect connected parts, i.e., groups of cubes that
+don't have any relationships with other groups.
 
 For clarity, only dimensions and custom SQL expressions used in joins are shown.
 Join [relationship types][ref-join-types] are depicted with the crow's foot
@@ -77,16 +77,14 @@ notation:
 - Dash represents `one` in `one_to_one` and `one_to_many` types
 - Crow's foot represents `many` in `one_to_many` and `many_to_one` types
 
-You can pan and zoom the visualization, search cubes using the input box, hover
-over cubes to highlight their relationships, and click <Btn>Show Code</Btn> to
-view their code.
+You can pan and zoom the visualization, search for cubes or views using the
+input box, hover over entities or their properties to highlight their
+relationships, and click <Btn>Show Code</Btn> to view their code.
 
-<video width="100%" controls>
-  <source
-    src="https://ucarecdn.com/2cc26fee-f94e-4328-bc46-297bfdd6e726/video.mp4"
-    type="video/mp4"
-  />
-</video>
+<EmbeddedVideo
+  src="https://ucarecdn.com/2cc26fee-f94e-4328-bc46-297bfdd6e726/video.mp4"
+  type="video/mp4"
+/>
 
 ## Git integration
 
@@ -134,6 +132,7 @@ alternatively add rollups to existing data models:
 
 [ref-data-modeling]: /product/data-modeling/overview
 [ref-cubes]: /product/data-modeling/reference/cube
+[ref-views]: /product/data-modeling/reference/views
 [ref-joins]: /product/data-modeling/reference/joins
 [ref-join-types]: /product/data-modeling/reference/joins#relationship
 [wiki-erd]: https://en.wikipedia.org/wiki/Entity–relationship_model
