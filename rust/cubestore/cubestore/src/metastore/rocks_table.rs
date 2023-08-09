@@ -1,7 +1,8 @@
 use crate::metastore::rocks_store::TableId;
 use crate::metastore::{
     get_fixed_prefix, BatchPipe, DbTableRef, IdRow, IndexId, KeyVal, MemorySequence,
-    MetaStoreEvent, RocksSecondaryIndexValue, RowKey, SecondaryIndexInfo, TableInfo,
+    MetaStoreEvent, RocksSecondaryIndexValue, RocksSecondaryIndexValueTTLExtended,
+    RocksSecondaryIndexValueVersion, RowKey, SecondaryIndexInfo, TableInfo,
 };
 use crate::CubeError;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
@@ -138,15 +139,21 @@ pub trait BaseRocksSecondaryIndex<T>: Debug {
 
     fn is_ttl(&self) -> bool;
 
+    fn store_ttl_extended_info(&self) -> bool;
+
     fn get_expire(&self, _row: &T) -> Option<DateTime<Utc>>;
 
     fn version(&self) -> u32;
 
-    fn value_version(&self) -> u32;
+    fn value_version(&self) -> RocksSecondaryIndexValueVersion;
 }
 
 pub trait RocksSecondaryIndex<T, K: Hash>: BaseRocksSecondaryIndex<T> {
     fn typed_key_by(&self, row: &T) -> K;
+
+    fn raw_value_size(&self, _row: &T) -> u32 {
+        0
+    }
 
     fn key_to_bytes(&self, key: &K) -> Vec<u8>;
 
@@ -161,10 +168,27 @@ pub trait RocksSecondaryIndex<T, K: Hash>: BaseRocksSecondaryIndex<T> {
         if RocksSecondaryIndex::is_ttl(self) {
             let expire = RocksSecondaryIndex::get_expire(self, row);
 
-            RocksSecondaryIndexValue::HashAndTTL(&hash, expire)
+            if RocksSecondaryIndex::store_ttl_extended_info(self) {
+                RocksSecondaryIndexValue::HashAndTTLExtended(
+                    &hash,
+                    expire,
+                    RocksSecondaryIndexValueTTLExtended {
+                        lfu: 0,
+                        lru: None,
+                        raw_size: self.raw_value_size(row),
+                    },
+                )
                 .to_bytes(RocksSecondaryIndex::value_version(self))
+                .unwrap()
+            } else {
+                RocksSecondaryIndexValue::HashAndTTL(&hash, expire)
+                    .to_bytes(RocksSecondaryIndex::value_version(self))
+                    .unwrap()
+            }
         } else {
-            RocksSecondaryIndexValue::Hash(&hash).to_bytes(RocksSecondaryIndex::value_version(self))
+            RocksSecondaryIndexValue::Hash(&hash)
+                .to_bytes(RocksSecondaryIndex::value_version(self))
+                .unwrap()
         }
     }
 
@@ -178,15 +202,19 @@ pub trait RocksSecondaryIndex<T, K: Hash>: BaseRocksSecondaryIndex<T> {
 
     fn version(&self) -> u32;
 
-    fn value_version(&self) -> u32 {
+    fn value_version(&self) -> RocksSecondaryIndexValueVersion {
         if RocksSecondaryIndex::is_ttl(self) {
-            2
+            RocksSecondaryIndexValueVersion::WithTTLSupport
         } else {
-            1
+            RocksSecondaryIndexValueVersion::OnlyHash
         }
     }
 
     fn is_ttl(&self) -> bool {
+        false
+    }
+
+    fn store_ttl_extended_info(&self) -> bool {
         false
     }
 
@@ -219,6 +247,10 @@ where
         RocksSecondaryIndex::is_ttl(self)
     }
 
+    fn store_ttl_extended_info(&self) -> bool {
+        RocksSecondaryIndex::store_ttl_extended_info(self)
+    }
+
     fn get_expire(&self, row: &T) -> Option<DateTime<Utc>> {
         RocksSecondaryIndex::get_expire(self, row)
     }
@@ -227,7 +259,7 @@ where
         RocksSecondaryIndex::version(self)
     }
 
-    fn value_version(&self) -> u32 {
+    fn value_version(&self) -> RocksSecondaryIndexValueVersion {
         RocksSecondaryIndex::value_version(self)
     }
 }
@@ -531,7 +563,7 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
                     || index_info.value_version != index.value_version()
                 {
                     log::trace!(
-                        "Migrating index {:?} from [{}, {}] to [{}, {}]",
+                        "Migrating index {:?} from [{}, {:?}] to [{}, {:?}]",
                         index,
                         index_info.version,
                         index_info.value_version,
@@ -1032,6 +1064,7 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
                     match RocksSecondaryIndexValue::from_bytes(&*value, index.value_version())? {
                         RocksSecondaryIndexValue::Hash(h) => (h, None),
                         RocksSecondaryIndexValue::HashAndTTL(h, expire) => (h, expire),
+                        RocksSecondaryIndexValue::HashAndTTLExtended(h, expire, _) => (h, expire),
                     };
 
                 if secondary_key_val.len() != hash.len()

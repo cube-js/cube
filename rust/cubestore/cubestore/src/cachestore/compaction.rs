@@ -1,4 +1,6 @@
-use crate::metastore::{IndexId, RocksSecondaryIndexValue, RowKey, SecondaryIndexInfo};
+use crate::metastore::{
+    IndexId, RocksSecondaryIndexValue, RocksSecondaryIndexValueVersion, RowKey, SecondaryIndexInfo,
+};
 use crate::TableId;
 
 use chrono::{DateTime, Utc};
@@ -123,8 +125,12 @@ impl MetaStoreCacheCompactionFilter {
         match RocksSecondaryIndexValue::from_bytes(value, index_info.value_version) {
             Err(err) => {
                 // Index was migrated from old format to the new version, but compaction didnt remove it
-                if index_info.value_version == 2
-                    && RocksSecondaryIndexValue::from_bytes(value, 1).is_ok()
+                if index_info.value_version == RocksSecondaryIndexValueVersion::WithTTLSupport
+                    && RocksSecondaryIndexValue::from_bytes(
+                        value,
+                        RocksSecondaryIndexValueVersion::OnlyHash,
+                    )
+                    .is_ok()
                 {
                     CompactionDecision::Remove
                 } else {
@@ -137,7 +143,10 @@ impl MetaStoreCacheCompactionFilter {
                 }
             }
             Ok(RocksSecondaryIndexValue::Hash(_)) => CompactionDecision::Keep,
-            Ok(RocksSecondaryIndexValue::HashAndTTL(_, expire)) => {
+            Ok(
+                RocksSecondaryIndexValue::HashAndTTL(_, expire)
+                | RocksSecondaryIndexValue::HashAndTTLExtended(_, expire, _),
+            ) => {
                 if let Some(expire) = expire {
                     if expire <= self.current {
                         self.removed += 1;
@@ -386,7 +395,9 @@ mod tests {
 
         // Indexes with TTL use new format (v2) for indexes, but index migration doesnt skip
         // compaction for old rows
-        let index_value = RocksSecondaryIndexValue::Hash("kek".as_bytes()).to_bytes(1);
+        let index_value = RocksSecondaryIndexValue::Hash("kek".as_bytes())
+            .to_bytes(RocksSecondaryIndexValueVersion::OnlyHash)
+            .unwrap();
 
         match filter.filter(1, &key.to_bytes(), &index_value) {
             Decision::Remove => (),
