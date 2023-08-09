@@ -286,15 +286,25 @@ impl RocksCacheStore {
                         continue;
                     }
 
-                    items_to_evict.push(item.row_id);
+                    let extended = if let Some(ex) = item.extended {
+                        ex
+                    } else {
+                        continue
+                    };
 
-                    if items_to_evict.len() == compare_elements_size {}
+                    items_to_evict.push(item.row_id);
+                    ready_to_evict_size += extended.raw_size as u64;
+
+                    if items_to_evict.len() == compare_elements_size {
+
+                    }
                 }
 
                 trace!(
-                    "Eviction scanned: {}, to_delete: {}",
+                    "Eviction scanned: {}, to_delete: {}, evicted: {}",
                     stats_total_keys_scanned,
-                    items_to_evict.len()
+                    items_to_evict.len(),
+                    ready_to_evict_size
                 );
 
                 Ok(())
