@@ -299,6 +299,10 @@ impl CacheStore for LazyRocksCacheStore {
         self.init().await?.compaction().await
     }
 
+    async fn eviction(&self) -> Result<(), CubeError> {
+        self.init().await?.eviction().await
+    }
+
     async fn healthcheck(&self) -> Result<(), CubeError> {
         self.init().await?.healthcheck().await
     }

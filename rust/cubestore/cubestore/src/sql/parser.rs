@@ -169,6 +169,7 @@ pub enum MetaStoreCommand {
 pub enum CacheStoreCommand {
     Compaction,
     Healthcheck,
+    Eviction,
 }
 
 pub struct CubeStoreParser<'a> {
@@ -385,6 +386,8 @@ impl<'a> CubeStoreParser<'a> {
     pub fn parse_cachestore(&mut self) -> Result<Statement, ParserError> {
         let command = if self.parse_custom_token("compaction") {
             CacheStoreCommand::Compaction
+        } else if self.parse_custom_token("eviction") {
+            CacheStoreCommand::Eviction
         } else if self.parse_custom_token("healthcheck") {
             CacheStoreCommand::Healthcheck
         } else {

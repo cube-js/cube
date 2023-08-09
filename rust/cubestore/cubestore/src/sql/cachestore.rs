@@ -43,6 +43,10 @@ impl CacheStoreSqlService {
                 self.cachestore.compaction().await?;
                 Ok(Arc::new(DataFrame::new(vec![], vec![])))
             }
+            CacheStoreCommand::Eviction => {
+                self.cachestore.eviction().await?;
+                Ok(Arc::new(DataFrame::new(vec![], vec![])))
+            }
             CacheStoreCommand::Healthcheck => {
                 self.cachestore.healthcheck().await?;
                 Ok(Arc::new(DataFrame::new(vec![], vec![])))
