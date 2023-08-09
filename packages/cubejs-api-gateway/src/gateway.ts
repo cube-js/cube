@@ -491,7 +491,7 @@ class ApiGateway {
 
   private filterVisibleItemsInMeta(context: RequestContext, metaConfig: any) {
     function visibilityFilter(item) {
-      return getEnv('devMode') || context.signedWithPlaygroundAuthSecret || item.isVisible;
+      return getEnv('devMode') || context.signedWithPlaygroundAuthSecret || item.isVisible || item.config?.isVisible;
     }
 
     return metaConfig
