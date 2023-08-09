@@ -587,14 +587,6 @@ pre-aggregations in Cube Store.
 
 ## Joins between pre-aggregations
 
-<WarningBox>
-
-This feature is in Preview and the API may change in a future release. Joining
-pre-aggregations **only** works with databases of the same type, support for
-joining pre-aggregations from different databases is coming soon.
-
-</WarningBox>
-
 When making a query that joins data from two different cubes, Cube can use
 pre-aggregations instead of running the base SQL queries. To get started, first
 ensure both cubes have valid pre-aggregations:
