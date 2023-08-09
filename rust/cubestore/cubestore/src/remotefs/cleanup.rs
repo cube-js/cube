@@ -1,4 +1,4 @@
-use crate::config::{ConfigObj, env_parse};
+use crate::config::{env_parse, ConfigObj};
 use crate::metastore::MetaStore;
 use crate::remotefs::RemoteFs;
 use crate::{app_metrics, CubeError};
@@ -65,10 +65,7 @@ impl RemoteFsCleanup {
             //
             //We delete files on the next iteration after building the file list in order to give time for requests that may use these files to complete
             if cleanup_enabled && !files_to_remove.is_empty() {
-                log::debug!(
-                    "Cleaning up {} files in remote fs",
-                    files_to_remove.len()
-                );
+                log::debug!("Cleaning up {} files in remote fs", files_to_remove.len());
                 log::trace!("The files being removed are {:?}", files_to_remove);
                 //Double check that files don't exists in metastore
                 let files_from_metastore = match self.metastore.get_all_filenames().await {
@@ -85,7 +82,6 @@ impl RemoteFsCleanup {
                         log::error!("Error while deleting {} in remote fs: {}", f, e);
                     }
                 }
-
             }
 
             files_to_remove.clear();
