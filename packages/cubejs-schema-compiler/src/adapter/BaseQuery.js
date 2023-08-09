@@ -545,6 +545,7 @@ class BaseQuery {
 
   /**
    * Returns an array of SQL query strings for the query.
+   * @param {boolean} [exportAnnotatedSql] - returns annotated sql with not rendered params if true
    * @returns {Array<string>}
    */
   buildSqlAndParams(exportAnnotatedSql) {
