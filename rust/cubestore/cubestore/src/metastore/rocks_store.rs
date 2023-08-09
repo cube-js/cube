@@ -158,26 +158,27 @@ pub enum RocksSecondaryIndexValueVersion {
 
 /// RocksSecondaryIndexValue represent a value for secondary index keys
 ///
-/// | hash - 8 | - 8 - bytes
-/// | hash - 8 | ttl - 8 | - 16 bytes
-/// | hash - 8 | ttl - 8 | raw_size - 4 | lru - 4 | lfu - 1 | - 23 bytes
+/// | hash | - hash only
+/// | hash | ttl - 8 | - with ttl
+/// | hash | ttl - 4 | raw_size - 4 | lru - 4 | lfu - 1 | - extended ttl
 ///
-/// Where LRU is encoded as u32 with our epoch,
-/// u32 = 4294967295 / (60 * 60 * 24 * 365) = 136 years from 2022.
+/// Where:
+///
+/// Hash is a set of character data of indeterminate length.
+///
+/// LRU/TTl (HashAndTTLExtended) is encoded as u32 (seconds since our epoch),
+/// u32 = 4294967295 / (60 * 60 * 24 * 365) = 136 years from 2022/1/1.
 impl<'a> RocksSecondaryIndexValue<'a> {
     fn base_date_epoch() -> NaiveDateTime {
         NaiveDate::from_ymd(2022, 1, 1).and_hms(0, 0, 0)
     }
 
-    fn encode_optional_datetime_as_u32(date: Option<DateTime<Utc>>) -> Result<u32, CubeError> {
+    fn encode_optional_datetime_as_u32(date: &Option<DateTime<Utc>>) -> Result<u32, CubeError> {
         if let Some(d) = date {
             let seconds = d
                 .naive_local()
                 .signed_duration_since(Self::base_date_epoch())
-                .num_microseconds()
-                .ok_or(CubeError::internal(
-                    "Unable to extract number of seconds from timestamp".to_string(),
-                ))?;
+                .num_seconds();
 
             u32::try_from(seconds).map_err(|err| {
                 CubeError::internal(format!("Unable to represent datetime as u32: {}", err))
@@ -206,64 +207,50 @@ impl<'a> RocksSecondaryIndexValue<'a> {
             RocksSecondaryIndexValueVersion::OnlyHash => Ok(RocksSecondaryIndexValue::Hash(bytes)),
             RocksSecondaryIndexValueVersion::WithTTLSupport => match bytes[0] {
                 0 => Ok(RocksSecondaryIndexValue::Hash(bytes)),
-                1 => match bytes.len() {
-                    14 => {
-                        let hash_size = bytes.len() - 8;
-                        let (hash, mut expire_buf) = (&bytes[1..hash_size], &bytes[hash_size..]);
-                        let expire_timestamp = expire_buf.read_i64::<BigEndian>()?;
+                1 => {
+                    let hash_size = bytes.len() - 8;
+                    let (hash, mut expire_buf) = (&bytes[1..hash_size], &bytes[hash_size..]);
+                    let expire_timestamp = expire_buf.read_i64::<BigEndian>()?;
 
-                        let expire = if expire_timestamp == 0 {
-                            None
-                        } else {
-                            Some(DateTime::<Utc>::from_utc(
-                                NaiveDateTime::from_timestamp(expire_timestamp, 0),
-                                Utc,
-                            ))
-                        };
-
-                        Ok(RocksSecondaryIndexValue::HashAndTTL(&hash, expire))
-                    }
-                    27 => {
-                        let hash_size = bytes.len() - (8 + 4 + 8 + 1);
-                        let (hash, mut expire_buf, extended_buf) = (
-                            &bytes[1..hash_size],
-                            &bytes[hash_size..hash_size + 8],
-                            &bytes[hash_size + 8..],
-                        );
-
-                        let expire_timestamp = expire_buf.read_i64::<BigEndian>()?;
-                        let expire = if expire_timestamp == 0 {
-                            None
-                        } else {
-                            Some(DateTime::<Utc>::from_utc(
-                                NaiveDateTime::from_timestamp(expire_timestamp, 0),
-                                Utc,
-                            ))
-                        };
-
-                        let (mut size_buf, mut lru_buf, mut lfu_buf) = (
-                            &extended_buf[0..4],
-                            &extended_buf[4..8],
-                            &extended_buf[8..9],
-                        );
-
-                        let raw_size = size_buf.read_u32::<BigEndian>()?;
-                        let lru = Self::decode_optional_datetime_as_u32(
-                            lru_buf.read_u32::<BigEndian>()?,
-                        )?;
-                        let lfu = lfu_buf.read_u8()?;
-
-                        Ok(RocksSecondaryIndexValue::HashAndTTLExtended(
-                            &hash,
-                            expire,
-                            RocksSecondaryIndexValueTTLExtended { raw_size, lru, lfu },
+                    let expire = if expire_timestamp == 0 {
+                        None
+                    } else {
+                        Some(DateTime::<Utc>::from_utc(
+                            NaiveDateTime::from_timestamp(expire_timestamp, 0),
+                            Utc,
                         ))
-                    }
-                    size => Err(CubeError::internal(format!(
-                        "Unsupported type \"{}\" of value for index, unexpected size: {}",
-                        bytes[0], size
-                    ))),
-                },
+                    };
+
+                    Ok(RocksSecondaryIndexValue::HashAndTTL(&hash, expire))
+                }
+                2 => {
+                    let hash_size = bytes.len() - (4 + 4 + 4 + 1);
+                    let (hash, mut expire_buf, extended_buf) = (
+                        &bytes[1..hash_size],
+                        &bytes[hash_size..hash_size + 4],
+                        &bytes[hash_size + 4..],
+                    );
+
+                    let expire =
+                        Self::decode_optional_datetime_as_u32(expire_buf.read_u32::<BigEndian>()?)?;
+
+                    let (mut size_buf, mut lru_buf, mut lfu_buf) = (
+                        &extended_buf[0..4],
+                        &extended_buf[4..8],
+                        &extended_buf[8..9],
+                    );
+
+                    let raw_size = size_buf.read_u32::<BigEndian>()?;
+                    let lru =
+                        Self::decode_optional_datetime_as_u32(lru_buf.read_u32::<BigEndian>()?)?;
+                    let lfu = lfu_buf.read_u8()?;
+
+                    Ok(RocksSecondaryIndexValue::HashAndTTLExtended(
+                        &hash,
+                        expire,
+                        RocksSecondaryIndexValueTTLExtended { raw_size, lru, lfu },
+                    ))
+                }
                 tid => Err(CubeError::internal(format!(
                     "Unsupported type \"{}\" of value for index",
                     tid
@@ -315,19 +302,14 @@ impl<'a> RocksSecondaryIndexValue<'a> {
                     Ok(buf.into_inner())
                 },
                 RocksSecondaryIndexValue::HashAndTTLExtended(hash, expire, info) => {
-                    let mut buf = Cursor::new(Vec::with_capacity(hash.len() + 1 + 8 + 4 + 8 + 1));
+                    let mut buf = Cursor::new(Vec::with_capacity(hash.len() + 1 + 4 + 4 + 8 + 1));
 
-                    buf.write_u8(1)?;
+                    buf.write_u8(2)?;
                     buf.write_all(&hash)?;
-
-                    if let Some(ex) = expire {
-                        buf.write_i64::<BigEndian>(ex.timestamp())?;
-                    } else {
-                        buf.write_i64::<BigEndian>(0)?;
-                    }
+                    buf.write_u32::<BigEndian>(Self::encode_optional_datetime_as_u32(expire)?)?;
 
                     buf.write_u32::<BigEndian>(info.raw_size)?;
-                    buf.write_u32::<BigEndian>(Self::encode_optional_datetime_as_u32(info.lru)?)?;
+                    buf.write_u32::<BigEndian>(Self::encode_optional_datetime_as_u32(&info.lru)?)?;
                     buf.write_u8(info.lfu)?;
 
                     Ok(buf.into_inner())
@@ -1295,6 +1277,7 @@ mod tests {
         Ok(())
     }
 
+    #[tokio::test]
     async fn test_loop_panic() -> Result<(), CubeError> {
         let config = Config::test("test_loop_panic");
         let store_path = env::current_dir().unwrap().join("test_loop_panic-local");
