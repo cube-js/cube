@@ -491,11 +491,10 @@ class ApiGateway {
 
   private filterVisibleItemsInMeta(context: RequestContext, metaConfig: any) {
     function visibilityFilter(item) {
-      return getEnv('devMode') || context.signedWithPlaygroundAuthSecret || item.isVisible || item.config?.isVisible;
+      return getEnv('devMode') || context.signedWithPlaygroundAuthSecret || item.isVisible;
     }
 
     return metaConfig
-      .filter(visibilityFilter)
       .map((cube) => ({
         config: {
           public: cube.isVisible,
@@ -504,7 +503,9 @@ class ApiGateway {
           dimensions: cube.config.dimensions?.filter(visibilityFilter),
           segments: cube.config.segments?.filter(visibilityFilter),
         },
-      })).filter(cube => cube.config.measures?.length || cube.config.dimensions?.length || cube.config.segments?.length);
+      }))
+      .filter(cube => visibilityFilter(cube.config))
+      .filter(cube => cube.config.measures?.length || cube.config.dimensions?.length || cube.config.segments?.length);
   }
 
   public async meta({ context, res }: { context: RequestContext, res: ResponseResultFn }) {
