@@ -1170,9 +1170,7 @@ impl ClusterImpl {
             }));
         }
         let process_rate_limiter = self.process_rate_limiter.clone();
-        futures.push(cube_ext::spawn(async move {
-            process_rate_limiter.wait_processing_loop().await;
-        }));
+        futures.extend(process_rate_limiter.spawn_processing_loop().await);
 
         let stop_token = self.stop_token.clone();
         let long_running_job_notify = self.long_running_job_notify.clone();

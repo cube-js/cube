@@ -5,8 +5,9 @@ use std::cmp::PartialEq;
 use std::hash::Hash;
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::task::JoinHandle;
 
-#[derive(Eq, PartialEq, Hash)]
+#[derive(Eq, PartialEq, Hash, Clone)]
 pub enum TaskType {
     Select,
     Job,
@@ -26,7 +27,7 @@ pub trait ProcessRateLimiter: DIService + Send + Sync {
         timeout: Option<Duration>,
     ) -> Result<(), CubeError>;
 
-    async fn wait_processing_loop(self: Arc<Self>);
+    async fn spawn_processing_loop(self: Arc<Self>) -> Vec<JoinHandle<()>>;
 
     async fn pending_size(&self, task_type: TaskType) -> Option<usize>;
 
@@ -63,7 +64,9 @@ impl ProcessRateLimiter for BasicProcessRateLimiter {
         Ok(())
     }
 
-    async fn wait_processing_loop(self: Arc<Self>) {}
+    async fn spawn_processing_loop(self: Arc<Self>) -> Vec<JoinHandle<()>> {
+        vec![]
+    }
 
     async fn pending_size(&self, _task_type: TaskType) -> Option<usize> {
         None
