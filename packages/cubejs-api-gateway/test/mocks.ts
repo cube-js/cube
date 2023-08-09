@@ -80,7 +80,6 @@ export const compilerApi = jest.fn().mockImplementation(() => ({
       {
         config: {
           name: 'Foo',
-          isVisible: true,
           measures: [
             {
               name: 'Foo.bar',
@@ -98,6 +97,7 @@ export const compilerApi = jest.fn().mockImplementation(() => ({
             },
           ],
         },
+        isVisible: true,
       },
     ];
   },
@@ -107,7 +107,6 @@ export const compilerApi = jest.fn().mockImplementation(() => ({
       {
         config: {
           name: 'Foo',
-          isVisible: true,
           measures: [
             {
               name: 'Foo.bar',
@@ -126,6 +125,7 @@ export const compilerApi = jest.fn().mockImplementation(() => ({
             },
           ],
         },
+        isVisible: true,
       },
     ];
 

@@ -495,7 +495,7 @@ class ApiGateway {
     }
 
     return metaConfig
-      .filter(cube => visibilityFilter(cube.config))
+      .filter(visibilityFilter)
       .map((cube) => ({
         config: {
           public: cube.isVisible,
