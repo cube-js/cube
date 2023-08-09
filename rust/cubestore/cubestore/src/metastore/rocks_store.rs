@@ -208,19 +208,21 @@ impl<'a> RocksSecondaryIndexValue<'a> {
             RocksSecondaryIndexValueVersion::OnlyHash => Ok(RocksSecondaryIndexValue::Hash(bytes)),
             RocksSecondaryIndexValueVersion::WithTTLSupport => match bytes[0] {
                 0 => Ok(RocksSecondaryIndexValue::Hash(bytes)),
-                1 => {
-                    let hash_size = bytes.len() - 8;
+                1 => match bytes.len() {
+                    14 => {
+                        let hash_size = bytes.len() - 8;
+                        let hash_size = bytes.len() - 8;
                     let (hash, mut expire_buf) = (&bytes[1..hash_size], &bytes[hash_size..]);
-                    let expire_timestamp = expire_buf.read_i64::<BigEndian>()?;
+                        let expire_timestamp = expire_buf.read_i64::<BigEndian>()?;
 
-                    let expire = if expire_timestamp == 0 {
-                        None
-                    } else {
-                        Some(DateTime::<Utc>::from_utc(
-                            NaiveDateTime::from_timestamp(expire_timestamp, 0),
-                            Utc,
-                        ))
-                    };
+                        let expire = if expire_timestamp == 0 {
+                            None
+                        } else {
+                            Some(DateTime::<Utc>::from_utc(
+                                NaiveDateTime::from_timestamp(expire_timestamp, 0),
+                                Utc,
+                            ))
+                        };
 
                     Ok(RocksSecondaryIndexValue::HashAndTTL(&hash, expire))
                 }
