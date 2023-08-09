@@ -495,6 +495,7 @@ class ApiGateway {
     }
 
     return metaConfig
+      .filter(cube => visibilityFilter(cube.config))
       .map((cube) => ({
         config: {
           public: cube.isVisible,
@@ -503,9 +504,7 @@ class ApiGateway {
           dimensions: cube.config.dimensions?.filter(visibilityFilter),
           segments: cube.config.segments?.filter(visibilityFilter),
         },
-      }))
-      .filter(cube => visibilityFilter(cube.config))
-      .filter(cube => cube.config.measures?.length || cube.config.dimensions?.length || cube.config.segments?.length);
+      })).filter(cube => cube.config.measures?.length || cube.config.dimensions?.length || cube.config.segments?.length);
   }
 
   public async meta({ context, res }: { context: RequestContext, res: ResponseResultFn }) {
