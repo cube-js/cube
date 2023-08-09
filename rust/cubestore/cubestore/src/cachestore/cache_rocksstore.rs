@@ -213,6 +213,7 @@ impl RocksCacheStore {
             ttl_tx,
             _ttl_tl_loop_join_handle: Arc::new(AbortingJoinHandle::new(join_handle)),
             upload_loop: Arc::new(WorkerLoop::new("Cachestore upload")),
+            eviction_loop: Arc::new(WorkerLoop::new("Cachestore eviction")),
         })
     }
 

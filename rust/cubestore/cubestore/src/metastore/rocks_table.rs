@@ -358,16 +358,15 @@ where
 
 #[derive(Debug)]
 pub struct SecondaryIndexValueScanIterItem {
-    pub ttl: Option<DateTime<Utc>>,
-    pub lru: Option<DateTime<Utc>>,
-    pub lfu: u8,
     pub row_id: u64,
-    pub row_size: u64,
+    pub extended: Option<RocksSecondaryIndexValueTTLExtended>,
+    pub ttl: Option<DateTime<Utc>>,
 }
 
 pub struct SecondaryIndexValueScanIter<'a, RT: RocksTable + ?Sized> {
     table: &'a RT,
     index_id: u32,
+    index_version: RocksSecondaryIndexValueVersion,
     iter: DBIterator<'a>,
 }
 
@@ -389,22 +388,23 @@ where
                     }
 
                     let secondary_index_value =
-                        match RocksSecondaryIndexValue::from_bytes(&value, 2) {
+                        match RocksSecondaryIndexValue::from_bytes(&value, self.index_version) {
                             Ok(r) => r,
                             Err(err) => return Some(Err(err)),
                         };
 
-                    let ttl = match secondary_index_value {
-                        RocksSecondaryIndexValue::Hash(_) => None,
-                        RocksSecondaryIndexValue::HashAndTTL(_, ttl) => ttl,
+                    let (ttl, extended) = match secondary_index_value {
+                        RocksSecondaryIndexValue::Hash(_) => (None, None),
+                        RocksSecondaryIndexValue::HashAndTTL(_, ttl) => (ttl, None),
+                        RocksSecondaryIndexValue::HashAndTTLExtended(_, ttl, extended) => {
+                            (ttl, Some(extended))
+                        }
                     };
 
                     return Some(Ok(SecondaryIndexValueScanIterItem {
-                        ttl,
                         row_id,
-                        row_size: 1,
-                        lru: None,
-                        lfu: 0,
+                        ttl,
+                        extended,
                     }));
                 };
             } else {
@@ -1269,6 +1269,7 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         Ok(SecondaryIndexValueScanIter {
             table: self,
             index_id: Self::index_id(index_id),
+            index_version: RocksSecondaryIndex::value_version(secondary_index),
             iter,
         })
     }
