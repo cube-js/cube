@@ -15,7 +15,8 @@ on:
 jobs:
   debian:
     name: Debian Rust ${{ matrix.rust }}
-    runs-on: ubuntu-20.04
+    # 22.04 has gcc 11
+    runs-on: ubuntu-22.04
     timeout-minutes: 60
     strategy:
       fail-fast: false
@@ -43,7 +44,7 @@ jobs:
           workspaces: ./rust/cubestore -> target
           # We should use a separate key for testing to pass disk space limitations
           shared-key: cubestore-testing
-          key: ubuntu-20.04
+          key: ubuntu-22.04
       - name: Run cargo fmt cubestore
         uses: actions-rs/cargo@v1
         with:
