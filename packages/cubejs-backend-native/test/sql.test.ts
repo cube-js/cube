@@ -39,12 +39,19 @@ describe('SQLInterface', () => {
       };
     });
 
-    const sqlApiLoad = jest.fn(async ({ request, session, query }) => {
+    const sqlApiLoad = jest.fn(async ({ request, session, query, streaming }) => {
       console.log('[js] load', {
         request,
         session,
-        query
+        query,
+        streaming
       });
+
+      if (streaming) {
+        return {
+          stream: new FakeRowStream(query),
+        };
+      }
 
       expect(session).toEqual({
         user: expect.toBeTypeOrNull(String),
