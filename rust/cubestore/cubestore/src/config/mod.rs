@@ -443,6 +443,8 @@ pub trait ConfigObj: DIService {
 
     fn enable_topk(&self) -> bool;
 
+    fn enable_remove_orphaned_remote_files(&self) -> bool;
+
     fn enable_startup_warmup(&self) -> bool;
 
     fn malloc_trim_every_secs(&self) -> u64;
@@ -544,6 +546,7 @@ pub struct ConfigObjImpl {
     pub max_ingestion_data_frames: usize,
     pub upload_to_remote: bool,
     pub enable_topk: bool,
+    pub enable_remove_orphaned_remote_files: bool,
     pub enable_startup_warmup: bool,
     pub malloc_trim_every_secs: u64,
     pub query_cache_max_capacity_bytes: u64,
@@ -753,6 +756,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn enable_topk(&self) -> bool {
         self.enable_topk
+    }
+
+    fn enable_remove_orphaned_remote_files(&self) -> bool {
+        self.enable_remove_orphaned_remote_files
     }
 
     fn enable_startup_warmup(&self) -> bool {
@@ -1149,6 +1156,10 @@ impl Config {
                     .unwrap_or("localhost".to_string()),
                 upload_to_remote: !env::var("CUBESTORE_NO_UPLOAD").ok().is_some(),
                 enable_topk: env_bool("CUBESTORE_ENABLE_TOPK", true),
+                enable_remove_orphaned_remote_files: env_bool(
+                    "ENABLE_REMOVE_ORPHANED_REMOTE_FILES",
+                    false,
+                ),
                 enable_startup_warmup: env_bool("CUBESTORE_STARTUP_WARMUP", true),
                 malloc_trim_every_secs: env_parse("CUBESTORE_MALLOC_TRIM_EVERY_SECS", 30),
                 query_cache_max_capacity_bytes: env_parse_size(
@@ -1304,6 +1315,7 @@ impl Config {
                 server_name: "localhost".to_string(),
                 upload_to_remote: true,
                 enable_topk: true,
+                enable_remove_orphaned_remote_files: false,
                 enable_startup_warmup: true,
                 malloc_trim_every_secs: 0,
                 query_cache_max_capacity_bytes: 512 << 20,

@@ -1,4 +1,4 @@
-use crate::config::{env_parse, ConfigObj};
+use crate::config::ConfigObj;
 use crate::metastore::MetaStore;
 use crate::remotefs::RemoteFs;
 use crate::{app_metrics, CubeError};
@@ -53,7 +53,7 @@ impl RemoteFsCleanup {
         let cleanup_files_delay = self.config.remote_files_cleanup_delay_secs() as i64;
         let remote_fs = self.remote_fs.clone();
         let mut files_to_remove: HashSet<String> = HashSet::new();
-        let cleanup_enabled = env_parse("CUBESTORE_REMOVE_REMOTE_ORPHANED_FILES", 0) == 1;
+        let cleanup_enabled = self.config.enable_remove_orphaned_remote_files();
         loop {
             // Do the cleanup every now and then.
             tokio::select! {
