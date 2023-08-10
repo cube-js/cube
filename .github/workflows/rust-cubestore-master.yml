@@ -26,6 +26,7 @@ jobs:
           swap-size-mb: 8192
           remove-dotnet: 'true'
           remove-android: 'true'
+          remove-docker-images: 'true'
       - name: Checkout
         uses: actions/checkout@v3
       - name: Install Rust
