@@ -38,9 +38,11 @@ jobs:
           toolchain: ${{ matrix.rust }}
           override: true
           components: rustfmt
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
         with:
-          working-directory: ./rust/cubestore
+          workspaces: ./rust/cubestore -> target
+          # We should use a separate key for testing to pass disk space limitations
+          shared-key: cubestore-testing
           key: ubuntu-20.04
       - name: Run cargo fmt cubestore
         uses: actions-rs/cargo@v1
