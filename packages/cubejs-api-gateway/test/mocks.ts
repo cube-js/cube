@@ -97,7 +97,6 @@ export const compilerApi = jest.fn().mockImplementation(() => ({
             },
           ],
         },
-        isVisible: true,
       },
     ];
   },
@@ -125,7 +124,6 @@ export const compilerApi = jest.fn().mockImplementation(() => ({
             },
           ],
         },
-        isVisible: true,
       },
     ];
 
