@@ -31,7 +31,7 @@ use chrono::{DateTime, Utc};
 use itertools::Itertools;
 use log::{trace, warn};
 use serde_derive::{Deserialize, Serialize};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::sync::broadcast::Sender;
@@ -214,15 +214,59 @@ impl RocksCacheStore {
     }
 
     pub fn prepare_test_cachestore(test_name: &str) -> (Arc<LocalDirRemoteFs>, Arc<Self>) {
-        let config = Config::test(test_name);
         let store_path = env::current_dir()
             .unwrap()
             .join(format!("test-{}-local", test_name));
+        let _ = std::fs::remove_dir_all(store_path.clone());
+
+        Self::prepare_test_cachestore_impl(test_name, store_path)
+    }
+
+    pub fn prepare_test_cachestore_from_fixtures(
+        test_name: &str,
+        remote_fixtures: &str,
+    ) -> (Arc<LocalDirRemoteFs>, Arc<Self>) {
+        let store_path = env::current_dir()
+            .unwrap()
+            .join(format!("test-{}-local", test_name));
+        let _ = std::fs::remove_dir_all(store_path.clone());
+
+        let fixtures_path = env::current_dir()
+            .unwrap()
+            .join("testing-fixtures")
+            .join(remote_fixtures);
+
+        fn copy_dir_all(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> std::io::Result<()> {
+            std::fs::create_dir_all(&dst)?;
+
+            for entry in std::fs::read_dir(src)? {
+                let entry = entry?;
+                let ty = entry.file_type()?;
+                if ty.is_dir() {
+                    copy_dir_all(entry.path(), dst.as_ref().join(entry.file_name()))?;
+                } else {
+                    std::fs::copy(entry.path(), dst.as_ref().join(entry.file_name()))?;
+                }
+            }
+
+            Ok(())
+        }
+
+        copy_dir_all(&fixtures_path, store_path.join("cachestore")).unwrap();
+
+        Self::prepare_test_cachestore_impl(test_name, store_path)
+    }
+
+    fn prepare_test_cachestore_impl(
+        test_name: &str,
+        store_path: PathBuf,
+    ) -> (Arc<LocalDirRemoteFs>, Arc<Self>) {
+        let config = Config::test(test_name);
+
         let remote_store_path = env::current_dir()
             .unwrap()
             .join(format!("test-{}-remote", test_name));
 
-        let _ = std::fs::remove_dir_all(store_path.clone());
         let _ = std::fs::remove_dir_all(remote_store_path.clone());
 
         let details = Arc::new(RocksCacheStoreDetails {});
@@ -1145,11 +1189,30 @@ crate::di_service!(ClusterCacheStoreClient, [CacheStore]);
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::init_test_logger;
     use crate::CubeError;
 
     #[tokio::test]
+    async fn test_cachestore_migration() -> Result<(), CubeError> {
+        init_test_logger().await;
+
+        let (_, cachestore) = RocksCacheStore::prepare_test_cachestore_from_fixtures(
+            "cachestore-migration",
+            "cachestore-migration",
+        );
+        // Right now, this test is not complete, because there is a problem with error tracking on migration
+        // TODO(ovr): fix me
+        cachestore.check_all_indexes().await?;
+
+        RocksCacheStore::cleanup_test_cachestore("cachestore-migration");
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_cache_incr() -> Result<(), CubeError> {
-        // arrange
+        init_test_logger().await;
+
         let (_, cachestore) = RocksCacheStore::prepare_test_cachestore("cache_incr");
 
         let key = "prefix:key".to_string();
