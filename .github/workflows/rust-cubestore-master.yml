@@ -19,6 +19,12 @@ jobs:
     env:
       RUST: ${{ matrix.rust }}
     steps:
+      - name: Maximize build space (disk space limitations)
+        uses: easimon/maximize-build-space@master
+        with:
+          swap-size-mb: 8192
+          remove-dotnet: 'true'
+          remove-android: 'true'
       - name: Checkout
         uses: actions/checkout@v3
       - name: Install Rust
