@@ -10,9 +10,9 @@ on:
 jobs:
   debian:
     name: Debian Rust ${{ matrix.rust }}
-    # 22.04 has gcc 11
+    # 22.04 has gcc 11, new binutils (ld)
     runs-on: ubuntu-22.04
-    timeout-minutes: 60
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
