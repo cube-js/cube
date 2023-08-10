@@ -11,7 +11,7 @@ module.exports = {
   "ksqldb": "ksqlDB",
   "materialize": "Materialize",
   "mongodb": "MongoDB",
-  "ms-sql": "MS-SQL",
+  "ms-sql": "Microsoft SQL Server",
   "mysql": "MySQL",
   "oracle": "Oracle",
   "postgres": "Postgres",
