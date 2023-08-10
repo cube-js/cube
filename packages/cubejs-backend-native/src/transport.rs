@@ -32,7 +32,6 @@ pub struct NodeBridgeTransport {
     on_sql_api_load: Arc<Root<JsFunction>>,
     on_sql: Arc<Root<JsFunction>>,
     on_meta: Arc<Root<JsFunction>>,
-    on_load_stream: Arc<Root<JsFunction>>,
     sql_generators: Arc<Root<JsFunction>>,
 }
 
@@ -42,7 +41,6 @@ impl NodeBridgeTransport {
         on_sql_api_load: Root<JsFunction>,
         on_sql: Root<JsFunction>,
         on_meta: Root<JsFunction>,
-        on_load_stream: Root<JsFunction>,
         sql_generators: Root<JsFunction>,
     ) -> Self {
         Self {
@@ -50,7 +48,6 @@ impl NodeBridgeTransport {
             on_sql_api_load: Arc::new(on_sql_api_load),
             on_sql: Arc::new(on_sql),
             on_meta: Arc::new(on_meta),
-            on_load_stream: Arc::new(on_load_stream),
             sql_generators: Arc::new(sql_generators),
         }
     }
@@ -71,6 +68,7 @@ struct LoadRequest {
     session: SessionContext,
     #[serde(rename = "memberToAlias", skip_serializing_if = "Option::is_none")]
     member_to_alias: Option<HashMap<String, String>>,
+    streaming: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -198,6 +196,7 @@ impl TransportService for NodeBridgeTransport {
             },
             sql_query: None,
             member_to_alias,
+            streaming: false,
         })?;
 
         let response: serde_json::Value = call_js_with_channel_as_callback(
@@ -270,6 +269,7 @@ impl TransportService for NodeBridgeTransport {
                 },
                 sql_query: sql_query.clone().map(|q| (q.sql, q.values)),
                 member_to_alias: None,
+                streaming: false,
             })?;
 
             let response: serde_json::Value = call_js_with_channel_as_callback(
@@ -345,11 +345,12 @@ impl TransportService for NodeBridgeTransport {
                     superuser: native_auth.superuser,
                 },
                 member_to_alias: None,
+                streaming: true,
             })?;
 
             let res = call_js_with_stream_as_callback(
                 self.channel.clone(),
-                self.on_load_stream.clone(),
+                self.on_sql_api_load.clone(),
                 Some(extra),
                 schema.clone(),
                 member_fields.clone(),

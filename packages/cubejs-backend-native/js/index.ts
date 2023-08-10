@@ -55,6 +55,7 @@ export interface SqlApiLoadPayload {
     session: SessionContext,
     query: any,
     sqlQuery: any,
+    streaming: boolean,
 }
 
 export interface MetaPayload {

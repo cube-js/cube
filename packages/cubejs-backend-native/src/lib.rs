@@ -108,9 +108,6 @@ fn register_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let transport_meta = options
         .get::<JsFunction, _, _>(&mut cx, "meta")?
         .root(&mut cx);
-    let transport_load_stream = options
-        .get::<JsFunction, _, _>(&mut cx, "stream")?
-        .root(&mut cx);
     let transport_sql_generator = options
         .get::<JsFunction, _, _>(&mut cx, "sqlGenerators")?
         .root(&mut cx);
@@ -150,7 +147,6 @@ fn register_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
         transport_sql_api_load,
         transport_sql,
         transport_meta,
-        transport_load_stream,
         transport_sql_generator,
     );
     let auth_service = NodeBridgeAuthService::new(cx.channel(), check_auth);

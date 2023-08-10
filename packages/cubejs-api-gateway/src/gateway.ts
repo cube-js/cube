@@ -1657,7 +1657,8 @@ class ApiGateway {
 
       this.log({
         type: 'Load Request',
-        query
+        query,
+        streaming: request.streaming,
       }, context);
 
       const [queryType, normalizedQueries] =
@@ -1677,6 +1678,23 @@ class ApiGateway {
 
       let slowQuery = false;
 
+      const streamResponse = async (sqlQuery) => {
+        const q = {
+          ...sqlQuery,
+          query: sqlQuery.query || sqlQuery.sql[0],
+          values: sqlQuery.values || sqlQuery.sql[1],
+          continueWait: true,
+          renewQuery: false,
+          requestId: context.requestId,
+          context,
+          persistent: true,
+          forceNoCache: true,
+        };
+        return {
+          stream: await this.getAdapterApi(context).streamQuery(q),
+        };
+      };
+
       if (request.sqlQuery) {
         const finalQuery = {
           query: request.sqlQuery[0],
@@ -1686,21 +1704,27 @@ class ApiGateway {
           requestId: context.requestId,
           context,
           ...sqlQueries[0],
+          // TODO Can we just pass through data? Ensure hidden members can't be queried
+          aliasNameToMember: null,
         };
 
-        const response = await this
-          .getAdapterApi(context)
-          .executeQuery(finalQuery);
+        if (request.streaming) {
+          results = [await streamResponse(finalQuery)];
+        } else {
+          const response = await this
+            .getAdapterApi(context)
+            .executeQuery(finalQuery);
 
-        const annotation = prepareAnnotation(
-          metaConfigResult, normalizedQueries[0]
-        );
+          const annotation = prepareAnnotation(
+            metaConfigResult, normalizedQueries[0]
+          );
 
-        // TODO Can we just pass through data? Ensure hidden members can't be queried
-        results = [{
-          data: response.data,
-          annotation
-        }];
+          // TODO Can we just pass through data? Ensure hidden members can't be queried
+          results = [{
+            data: response.data,
+            annotation
+          }];
+        }
       } else {
         results = await Promise.all(
           normalizedQueries.map(async (normalizedQuery, index) => {
@@ -1710,6 +1734,10 @@ class ApiGateway {
             const annotation = prepareAnnotation(
               metaConfigResult, normalizedQuery
             );
+
+            if (request.streaming) {
+              return streamResponse(sqlQueries[index]);
+            }
 
             const response = await this.getSqlResponseInternal(
               context,
@@ -1753,7 +1781,7 @@ class ApiGateway {
         context,
       );
 
-      res({
+      res(request.streaming ? results[0] : {
         results,
       });
     } catch (e) {

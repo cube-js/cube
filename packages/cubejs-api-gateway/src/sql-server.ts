@@ -115,7 +115,7 @@ export class SQLServer {
           }
         });
       },
-      sqlApiLoad: async ({ request, session, query, sqlQuery }) => {
+      sqlApiLoad: async ({ request, session, query, sqlQuery, streaming }) => {
         const context = await contextByRequest(request, session);
 
         // eslint-disable-next-line no-async-promise-executor
@@ -124,6 +124,7 @@ export class SQLServer {
             await this.apiGateway.sqlApiLoad({
               query,
               sqlQuery,
+              streaming,
               context,
               res: (message) => {
                 resolve(message);

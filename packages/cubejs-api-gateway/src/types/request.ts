@@ -125,6 +125,7 @@ type SqlApiRequest = BaseRequest & {
   query: Record<string, any>;
   sqlQuery?: [string, string[]];
   apiType?: ApiType;
+  streaming?: boolean;
 };
 
 /**
