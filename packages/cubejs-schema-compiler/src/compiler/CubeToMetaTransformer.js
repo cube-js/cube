@@ -32,9 +32,11 @@ export class CubeToMetaTransformer {
    */
   transform(cube) {
     const cubeTitle = cube.title || this.titleize(cube.name);
+    
+    const cubeVisibility = this.isVisible(cube, true);
 
     return {
-      isVisible: this.isVisible(cube, true),
+      isVisible: cubeVisibility,
       config: {
         name: cube.name,
         type: cube.isView ? 'view' : 'cube',
@@ -44,7 +46,7 @@ export class CubeToMetaTransformer {
         measures: R.compose(
           R.map((nameToMetric) => ({
             ...this.measureConfig(cube.name, cubeTitle, nameToMetric),
-            isVisible: this.isVisible(nameToMetric[1], this.isVisible(cube, true))
+            isVisible: cubeVisibility ? this.isVisible(nameToMetric[1], true) : false
           })),
           R.toPairs
         )(cube.measures || {}),
@@ -59,7 +61,7 @@ export class CubeToMetaTransformer {
               nameToDimension[1].suggestFilterValues == null ? true : nameToDimension[1].suggestFilterValues,
             format: nameToDimension[1].format,
             meta: nameToDimension[1].meta,
-            isVisible: this.isVisible(nameToDimension[1], this.isVisible(cube, !nameToDimension[1].primaryKey))
+            isVisible: cubeVisibility ? this.isVisible(nameToDimension[1], !nameToDimension[1].primaryKey) : false
           })),
           R.toPairs
         )(cube.dimensions || {}),
@@ -70,7 +72,7 @@ export class CubeToMetaTransformer {
             shortTitle: this.title(cubeTitle, nameToSegment, true),
             description: nameToSegment[1].description,
             meta: nameToSegment[1].meta,
-            isVisible: this.isVisible(nameToSegment[1], this.isVisible(cube, true))
+            isVisible: cubeVisibility ? this.isVisible(nameToSegment[1], true) : false
           })),
           R.toPairs
         )(cube.segments || {})
