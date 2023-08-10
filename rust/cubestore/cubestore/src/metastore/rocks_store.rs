@@ -19,7 +19,7 @@ use std::fmt::Debug;
 use std::io::{Cursor, Write};
 
 use crate::metastore::snapshot_info::SnapshotInfo;
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime};
@@ -128,24 +128,89 @@ impl MemorySequence {
     }
 }
 
+#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
+pub struct RocksSecondaryIndexValueTTLExtended {
+    // Approximate counter of usage
+    pub lfu: u8,
+    // Last access time
+    pub lru: Option<DateTime<Utc>>,
+    // Raw size of table's value without compression
+    pub raw_size: u32,
+}
+
+#[derive(Debug)]
 pub enum RocksSecondaryIndexValue<'a> {
     Hash(&'a [u8]),
     HashAndTTL(&'a [u8], Option<DateTime<Utc>>),
+    HashAndTTLExtended(
+        &'a [u8],
+        Option<DateTime<Utc>>,
+        RocksSecondaryIndexValueTTLExtended,
+    ),
 }
 
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[repr(u32)]
+pub enum RocksSecondaryIndexValueVersion {
+    OnlyHash = 1,
+    WithTTLSupport = 2,
+}
+
+/// RocksSecondaryIndexValue represent a value for secondary index keys
+///
+/// | hash | - hash only
+/// | hash | ttl - 8 | - with ttl
+/// | hash | ttl - 4 | raw_size - 4 | lru - 4 | lfu - 1 | - extended ttl
+///
+/// Where:
+///
+/// Hash is a set of character data of indeterminate length.
+///
+/// LRU/TTl (HashAndTTLExtended) is encoded as u32 (seconds since our epoch),
+/// u32 = 4294967295 / (60 * 60 * 24 * 365) = 136 years from 2022/1/1.
 impl<'a> RocksSecondaryIndexValue<'a> {
+    fn base_date_epoch() -> NaiveDateTime {
+        NaiveDate::from_ymd(2022, 1, 1).and_hms(0, 0, 0)
+    }
+
+    fn encode_optional_datetime_as_u32(date: &Option<DateTime<Utc>>) -> Result<u32, CubeError> {
+        if let Some(d) = date {
+            let seconds = d
+                .naive_local()
+                .signed_duration_since(Self::base_date_epoch())
+                .num_seconds();
+
+            u32::try_from(seconds).map_err(|err| {
+                CubeError::internal(format!("Unable to represent datetime as u32: {}", err))
+            })
+        } else {
+            Ok(0)
+        }
+    }
+
+    fn decode_optional_datetime_as_u32(timestamp: u32) -> Result<Option<DateTime<Utc>>, CubeError> {
+        if timestamp == 0 {
+            return Ok(None);
+        }
+
+        let timestamp = DateTime::<Utc>::from_utc(Self::base_date_epoch(), Utc)
+            + chrono::Duration::seconds(timestamp as i64);
+
+        Ok(Some(timestamp))
+    }
+
     pub fn from_bytes(
         bytes: &'a [u8],
-        value_version: u32,
+        value_version: RocksSecondaryIndexValueVersion,
     ) -> Result<RocksSecondaryIndexValue<'a>, CubeError> {
         match value_version {
-            1 => Ok(RocksSecondaryIndexValue::Hash(bytes)),
-            2 => match bytes[0] {
+            RocksSecondaryIndexValueVersion::OnlyHash => Ok(RocksSecondaryIndexValue::Hash(bytes)),
+            RocksSecondaryIndexValueVersion::WithTTLSupport => match bytes[0] {
                 0 => Ok(RocksSecondaryIndexValue::Hash(bytes)),
                 1 => {
-                    let (hash, mut expire_buf) =
-                        (&bytes[1..bytes.len() - 8], &bytes[bytes.len() - 8..]);
-                    let expire_timestamp = expire_buf.read_i64::<BigEndian>().unwrap();
+                    let hash_size = bytes.len() - 8;
+                    let (hash, mut expire_buf) = (&bytes[1..hash_size], &bytes[hash_size..]);
+                    let expire_timestamp = expire_buf.read_i64::<BigEndian>()?;
 
                     let expire = if expire_timestamp == 0 {
                         None
@@ -158,51 +223,98 @@ impl<'a> RocksSecondaryIndexValue<'a> {
 
                     Ok(RocksSecondaryIndexValue::HashAndTTL(&hash, expire))
                 }
+                2 => {
+                    let hash_size = bytes.len() - (4 + 4 + 4 + 1);
+                    let (hash, mut expire_buf, extended_buf) = (
+                        &bytes[1..hash_size],
+                        &bytes[hash_size..hash_size + 4],
+                        &bytes[hash_size + 4..],
+                    );
+
+                    let expire =
+                        Self::decode_optional_datetime_as_u32(expire_buf.read_u32::<BigEndian>()?)?;
+
+                    let (mut size_buf, mut lru_buf, mut lfu_buf) = (
+                        &extended_buf[0..4],
+                        &extended_buf[4..8],
+                        &extended_buf[8..9],
+                    );
+
+                    let raw_size = size_buf.read_u32::<BigEndian>()?;
+                    let lru =
+                        Self::decode_optional_datetime_as_u32(lru_buf.read_u32::<BigEndian>()?)?;
+                    let lfu = lfu_buf.read_u8()?;
+
+                    Ok(RocksSecondaryIndexValue::HashAndTTLExtended(
+                        &hash,
+                        expire,
+                        RocksSecondaryIndexValueTTLExtended { raw_size, lru, lfu },
+                    ))
+                }
                 tid => Err(CubeError::internal(format!(
                     "Unsupported type \"{}\" of value for index",
                     tid
                 ))),
             },
+            #[allow(unreachable_patterns)]
             version => Err(CubeError::internal(format!(
-                "Unsupported value_version {}",
+                "Unsupported value_version {:?}",
                 version
             ))),
         }
     }
 
-    pub fn to_bytes(&self, value_version: u32) -> Vec<u8> {
+    pub fn to_bytes(
+        &self,
+        value_version: RocksSecondaryIndexValueVersion,
+    ) -> Result<Vec<u8>, CubeError> {
         match value_version {
-            1 => match *self {
-                RocksSecondaryIndexValue::Hash(hash) => hash.to_vec(),
+            RocksSecondaryIndexValueVersion::OnlyHash => match *self {
+                RocksSecondaryIndexValue::Hash(hash) => Ok(hash.to_vec()),
                 RocksSecondaryIndexValue::HashAndTTL(_, _) => panic!(
                     "RocksSecondaryIndexValue::HashAndTTL is not supported for value_version = 1"
                 ),
+                RocksSecondaryIndexValue::HashAndTTLExtended(_, _, _) => panic!(
+                    "RocksSecondaryIndexValue::HashAndTTLWithUsageInfo is not supported for value_version = 1"
+                ),
             },
-            2 => match self {
+            RocksSecondaryIndexValueVersion::WithTTLSupport => match self {
                 RocksSecondaryIndexValue::Hash(hash) => {
                     let mut buf = Cursor::new(Vec::with_capacity(hash.len() + 1));
 
-                    buf.write_u8(0).unwrap();
-                    buf.write_all(&hash).unwrap();
+                    buf.write_u8(0)?;
+                    buf.write_all(&hash)?;
 
-                    buf.into_inner()
+                    Ok(buf.into_inner())
                 }
                 RocksSecondaryIndexValue::HashAndTTL(hash, expire) => {
                     let mut buf = Cursor::new(Vec::with_capacity(hash.len() + 1 + 8));
 
-                    buf.write_u8(1).unwrap();
-                    buf.write_all(&hash).unwrap();
+                    buf.write_u8(1)?;
+                    buf.write_all(&hash)?;
 
                     if let Some(ex) = expire {
-                        buf.write_i64::<BigEndian>(ex.timestamp()).unwrap()
+                        buf.write_i64::<BigEndian>(ex.timestamp())?
                     } else {
-                        buf.write_i64::<BigEndian>(0).unwrap()
+                        buf.write_i64::<BigEndian>(0)?
                     }
 
-                    buf.into_inner()
+                    Ok(buf.into_inner())
+                },
+                RocksSecondaryIndexValue::HashAndTTLExtended(hash, expire, info) => {
+                    let mut buf = Cursor::new(Vec::with_capacity(hash.len() + 1 + 4 + 4 + 8 + 1));
+
+                    buf.write_u8(2)?;
+                    buf.write_all(&hash)?;
+                    buf.write_u32::<BigEndian>(Self::encode_optional_datetime_as_u32(expire)?)?;
+
+                    buf.write_u32::<BigEndian>(info.raw_size)?;
+                    buf.write_u32::<BigEndian>(Self::encode_optional_datetime_as_u32(&info.lru)?)?;
+                    buf.write_u8(info.lfu)?;
+
+                    Ok(buf.into_inner())
                 }
             },
-            version => panic!("Unsupported value_version {}", version),
         }
     }
 }
@@ -222,11 +334,11 @@ pub struct SecondaryIndexInfo {
     pub version: u32,
     #[serde(default = "secondary_index_info_default_value_version")]
     // serialization/deserialization version
-    pub value_version: u32,
+    pub value_version: RocksSecondaryIndexValueVersion,
 }
 
-fn secondary_index_info_default_value_version() -> u32 {
-    1
+fn secondary_index_info_default_value_version() -> RocksSecondaryIndexValueVersion {
+    RocksSecondaryIndexValueVersion::OnlyHash
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
@@ -1098,7 +1210,72 @@ mod tests {
     use crate::config::Config;
     use crate::metastore::{BaseRocksStoreFs, RocksMetaStoreDetails};
     use crate::remotefs::LocalDirRemoteFs;
+    use chrono::Timelike;
     use std::{env, fs};
+
+    #[test]
+    fn test_rocks_secondary_index_encoding_with_ttl() -> Result<(), CubeError> {
+        let hash = &[1, 2, 3, 4, 5];
+        let expire = Some(
+            Utc::now()
+                .with_nanosecond(0)
+                .expect("Should truncate nanos, because we dont truncate it"),
+        );
+
+        let index_v = RocksSecondaryIndexValue::HashAndTTL(hash, expire);
+        let index_v_as_bytes = index_v.to_bytes(RocksSecondaryIndexValueVersion::WithTTLSupport)?;
+
+        let index_v_decoded = RocksSecondaryIndexValue::from_bytes(
+            &index_v_as_bytes,
+            RocksSecondaryIndexValueVersion::WithTTLSupport,
+        )?;
+        match index_v_decoded {
+            RocksSecondaryIndexValue::HashAndTTL(h, ex) => {
+                assert_eq!(h, hash, "decoded hash should match encoded");
+                assert_eq!(ex, expire, "decoded expire should match encoded");
+            }
+            other => panic!("Wrong decoded value: {:?}", other),
+        };
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_rocks_secondary_index_encoding_with_ttl_and_info() -> Result<(), CubeError> {
+        let hash = &[1, 2, 3, 4, 5];
+        let expire = Some(
+            Utc::now()
+                .with_nanosecond(0)
+                .expect("Should truncate nanos, because we dont truncate it"),
+        );
+        let info = RocksSecondaryIndexValueTTLExtended {
+            lfu: 1,
+            lru: Some(
+                Utc::now()
+                    .with_nanosecond(0)
+                    .expect("Should truncate nanos, because we dont truncate it"),
+            ),
+            raw_size: 1024,
+        };
+
+        let index_v = RocksSecondaryIndexValue::HashAndTTLExtended(hash, expire, info.clone());
+        let index_v_as_bytes = index_v.to_bytes(RocksSecondaryIndexValueVersion::WithTTLSupport)?;
+
+        let index_v_decoded = RocksSecondaryIndexValue::from_bytes(
+            &index_v_as_bytes,
+            RocksSecondaryIndexValueVersion::WithTTLSupport,
+        )?;
+        match index_v_decoded {
+            RocksSecondaryIndexValue::HashAndTTLExtended(h, ex, inf) => {
+                assert_eq!(h, hash, "decoded hash should match encoded");
+                assert_eq!(ex, expire, "decoded expire should match encoded");
+                assert_eq!(inf, info, "decoded expire should match encoded");
+            }
+            other => panic!("Wrong decoded value: {:?}", other),
+        };
+
+        Ok(())
+    }
 
     #[tokio::test]
     async fn test_loop_panic() -> Result<(), CubeError> {

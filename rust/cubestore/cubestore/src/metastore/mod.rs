@@ -152,7 +152,7 @@ macro_rules! base_rocks_secondary_index {
                 crate::metastore::RocksSecondaryIndex::get_id(self)
             }
 
-            fn value_version(&self) -> u32 {
+            fn value_version(&self) -> crate::metastore::RocksSecondaryIndexValueVersion {
                 crate::metastore::RocksSecondaryIndex::value_version(self)
             }
 
@@ -166,6 +166,10 @@ macro_rules! base_rocks_secondary_index {
 
             fn is_ttl(&self) -> bool {
                 RocksSecondaryIndex::is_ttl(self)
+            }
+
+            fn store_ttl_extended_info(&self) -> bool {
+                RocksSecondaryIndex::store_ttl_extended_info(self)
             }
 
             fn get_expire(&self, row: &$table) -> Option<chrono::DateTime<chrono::Utc>> {
