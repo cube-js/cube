@@ -19,3 +19,4 @@ yarn-error.log
 lerna-debug.log
 tsconfig.tsbuildinfo
 .tool-versions
+testings/
