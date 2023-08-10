@@ -141,8 +141,8 @@ impl RocksSecondaryIndex<CacheItem, CacheItemIndexKey> for CacheItemRocksIndex {
     }
 
     fn raw_value_size(&self, row: &CacheItem) -> u32 {
-        if u32::try_from(row.value.len()).is_ok() {
-            row.value.len() as u32
+        if let Ok(size) = u32::try_from(row.value.len()) {
+            size
         } else {
             u32::MAX
         }
