@@ -21,6 +21,7 @@ warp = { version = "0.3.3" }
 sqlparser = { git = 'https://github.com/cube-js/sqlparser-rs.git', rev = "4388f6712dae5073c2d71d74f64cae2edd418066" }
 serde_derive = "1.0.115"
 serde = "1.0.115"
+serde_repr = "0.1"
 serde_bytes = "0.11.5"
 cubehll = { path = "../cubehll" }
 cubezetasketch = { path = "../cubezetasketch" }

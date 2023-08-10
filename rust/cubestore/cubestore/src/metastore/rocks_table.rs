@@ -482,8 +482,20 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
     }
 
     fn migrate(&self) -> Result<(), CubeError> {
-        self.migration_check_table()?;
-        self.migration_check_indexes()?;
+        self.migration_check_table().map_err(|err| {
+            CubeError::internal(format!(
+                "Error during table (table_id: {:?}) migration: {}",
+                Self::table_id(),
+                err
+            ))
+        })?;
+        self.migration_check_indexes().map_err(|err| {
+            CubeError::internal(format!(
+                "Error during indexes (table_id: {:?}) migration: {}",
+                Self::table_id(),
+                err
+            ))
+        })?;
 
         Ok(())
     }
@@ -582,8 +594,10 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
 
     fn deserialize_table_info(&self, buffer: &[u8]) -> Result<TableInfo, CubeError> {
         let r = flexbuffers::Reader::get_root(&buffer).unwrap();
-        let row = TableInfo::deserialize(r)?;
-        Ok(row)
+
+        TableInfo::deserialize(r).map_err(|err| {
+            CubeError::internal(format!("Deserialization error for TableInfo: {}", err))
+        })
     }
 
     fn serialize_table_info(&self, index_info: TableInfo) -> Result<Vec<u8>, CubeError> {
@@ -595,8 +609,13 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
 
     fn deserialize_index_info(&self, buffer: &[u8]) -> Result<SecondaryIndexInfo, CubeError> {
         let r = flexbuffers::Reader::get_root(&buffer).unwrap();
-        let row = SecondaryIndexInfo::deserialize(r)?;
-        Ok(row)
+
+        SecondaryIndexInfo::deserialize(r).map_err(|err| {
+            CubeError::internal(format!(
+                "Deserialization error for SecondaryIndexInfo: {}",
+                err
+            ))
+        })
     }
 
     fn serialize_index_info(&self, index_info: SecondaryIndexInfo) -> Result<Vec<u8>, CubeError> {
