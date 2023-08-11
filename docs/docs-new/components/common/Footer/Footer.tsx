@@ -20,27 +20,27 @@ const CURRENT_YEAR = new Date().getFullYear();
 const COMPANY_LINKS = [
   {
     label: "About",
-    link: "/about",
+    link: "https://cube.dev/about",
   },
   {
     label: "Careers",
-    link: "/careers",
+    link: "https://cube.dev/careers",
   },
   {
     label: "Terms of Use",
-    link: "/terms-of-use",
+    link: "https://cube.dev/terms-of-use",
   },
   {
     label: "Privacy Policy",
-    link: "/privacy-policy",
+    link: "https://cube.dev/privacy-policy",
   },
   {
     label: "Security Statement",
-    link: "/security",
+    link: "https://cube.dev/security",
   },
   {
     label: "List of Subprocessors",
-    link: "/subprocessors",
+    link: "https://cube.dev/subprocessors",
   },
 ];
 
@@ -55,23 +55,23 @@ const RESOURCES_LINKS = [
   },
   {
     label: "Examples",
-    link: "/examples",
+    link: "https://cube.dev/examples",
   },
   {
     label: "Community",
-    link: "/community",
+    link: "https://cube.dev/community",
   },
   {
     label: "Events",
-    link: "/events",
+    link: "https://cube.dev/events",
   },
   {
     label: "Customer Stories",
-    link: "/case-studies",
+    link: "https://cube.dev/case-studies",
   },
   {
     label: "Cube Partner Network",
-    link: "/consulting/cube-partner-network",
+    link: "https://cube.dev/consulting/cube-partner-network",
   },
 ];
 
