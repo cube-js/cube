@@ -11,6 +11,8 @@ import "@cube-dev/marketing-ui/dist/index.css";
 import localFont from "next/font/local";
 import { Inter } from "next/font/google";
 import { SearchProvider } from "@cube-dev/marketing-ui";
+import { useRouter } from 'next/router';
+import { useEffect } from 'react';
 
 export const SourceCodePro = localFont({
   src: "../fonts/SourceCodePro-Regular.woff2",
@@ -59,7 +61,29 @@ export const CeraPro = localFont({
   ],
 });
 
-export default function MyApp({ Component, pageProps }: AppProps) {
+type Props = { origin: string | null };
+
+export default function MyApp({ origin, Component, pageProps }: AppProps & Props) {
+  const router = useRouter()
+
+  // Track page views
+  useEffect(() => {
+    const handleRouteChange = async (url) => {
+      if (typeof window !== 'undefined') {
+        const { page } = await import('cubedev-tracking');
+        page();
+      }
+    }
+
+    router.events.on('routeChangeStart', handleRouteChange)
+
+    // If the component is unmounted, unsubscribe
+    // from the event with the `off` method:
+    return () => {
+      router.events.off('routeChangeStart', handleRouteChange)
+    }
+  }, [router])
+
   return (
     <SearchProvider
       algoliaAppId={process.env.NEXT_PUBLIC_ALGOLIA_APP_ID}
