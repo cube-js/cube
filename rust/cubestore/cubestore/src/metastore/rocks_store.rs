@@ -14,6 +14,7 @@ use rocksdb::backup::{BackupEngine, BackupEngineOptions, RestoreOptions};
 use rocksdb::checkpoint::Checkpoint;
 use rocksdb::{DBCompressionType, Env, Snapshot, WriteBatch, WriteBatchIterator, DB};
 use serde::{Deserialize, Serialize};
+use serde_repr::*;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::io::{Cursor, Write};
@@ -149,7 +150,7 @@ pub enum RocksSecondaryIndexValue<'a> {
     ),
 }
 
-#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize_repr, Deserialize_repr)]
 #[repr(u32)]
 pub enum RocksSecondaryIndexValueVersion {
     OnlyHash = 1,
@@ -811,7 +812,7 @@ impl RocksStore {
             };
 
             if let Err(e) = meta_store_to_move.details.migrate(table_ref) {
-                log::error!("Error during checking indexes: {}", e);
+                log::error!("Error during migrating storage: {}", e);
             }
         })
         .await?;
