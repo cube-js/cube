@@ -7,7 +7,7 @@ module.exports = {
   "elasticsearch": "Elasticsearch",
   "firebolt": "Firebolt",
   "google-bigquery": "Google BigQuery",
-  "hive": "Hive",
+  "hive": "Hive / SparkSQL",
   "ksqldb": "ksqlDB",
   "materialize": "Materialize",
   "mongodb": "MongoDB",
