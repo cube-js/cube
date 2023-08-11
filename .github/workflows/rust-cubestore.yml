@@ -29,6 +29,12 @@ jobs:
         run: |
           echo "Before"
           df -h
+          sudo apt-get remove -y 'php.*'
+          sudo apt-get remove -y '^mongodb-.*'
+          sudo apt-get remove -y '^mysql-.*'
+          sudo apt-get autoremove -y
+          sudo apt-get clean
+
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf /usr/local/lib/android
           sudo rm -rf /opt/ghc
