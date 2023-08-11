@@ -39,6 +39,44 @@ describe('SQLInterface', () => {
       };
     });
 
+    const sqlApiLoad = jest.fn(async ({ request, session, query, streaming }) => {
+      console.log('[js] load', {
+        request,
+        session,
+        query,
+        streaming
+      });
+
+      if (streaming) {
+        return {
+          stream: new FakeRowStream(query),
+        };
+      }
+
+      expect(session).toEqual({
+        user: expect.toBeTypeOrNull(String),
+        superuser: expect.any(Boolean),
+      });
+
+      // It's just an emulation that ApiGateway returns error
+      return {
+        error: 'This error should be passed back to MySQL client'
+      };
+    });
+
+    const sql = jest.fn(async ({ request, session, query }) => {
+      console.log('[js] sql', {
+        request,
+        session,
+        query
+      });
+
+      // It's just an emulation that ApiGateway returns error
+      return {
+        error: 'This error should be passed back to MySQL client'
+      };
+    });
+
     const stream = jest.fn(async ({ request, session, query }) => {
       console.log('[js] stream', {
         request,
@@ -63,6 +101,18 @@ describe('SQLInterface', () => {
       });
 
       return metaFixture;
+    });
+
+    const sqlGenerators = jest.fn(async ({ request, session }) => {
+      console.log('[js] sqlGenerators', {
+        request,
+        session,
+      });
+
+      return {
+        cubeNameToDataSource: {},
+        dataSourceToSqlGenerator: {},
+      };
     });
 
     const checkAuth = jest.fn(async ({ request, user }) => {
@@ -93,8 +143,11 @@ describe('SQLInterface', () => {
       port: 4545,
       checkAuth,
       load,
+      sqlApiLoad,
+      sql,
       meta,
       stream,
+      sqlGenerators,
     });
     console.log(instance);
 

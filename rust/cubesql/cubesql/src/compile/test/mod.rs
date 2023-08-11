@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
 use cubeclient::models::{
@@ -8,12 +8,15 @@ use cubeclient::models::{
 use datafusion::arrow::datatypes::SchemaRef;
 
 use crate::{
-    compile::engine::df::scan::MemberField,
+    compile::engine::df::{scan::MemberField, wrapper::SqlQuery},
     sql::{
         session::DatabaseProtocol, AuthContextRef, AuthenticateResponse, HttpAuthContext,
         ServerManager, Session, SessionManager, SqlAuthService,
     },
-    transport::{CubeStreamReceiver, LoadRequestMeta, TransportService},
+    transport::{
+        CubeStreamReceiver, LoadRequestMeta, SqlGenerator, SqlResponse, SqlTemplates,
+        TransportService,
+    },
     CubeError,
 };
 
@@ -170,12 +173,81 @@ pub fn get_string_cube_meta() -> Vec<V1CubeMeta> {
     }]
 }
 
+#[derive(Debug)]
+pub struct SqlGeneratorMock {
+    pub sql_templates: Arc<SqlTemplates>,
+}
+
+#[async_trait]
+impl SqlGenerator for SqlGeneratorMock {
+    fn get_sql_templates(&self) -> Arc<SqlTemplates> {
+        self.sql_templates.clone()
+    }
+
+    async fn call_template(
+        &self,
+        _name: String,
+        _params: HashMap<String, String>,
+    ) -> Result<String, CubeError> {
+        todo!()
+    }
+}
+
 pub fn get_test_tenant_ctx() -> Arc<MetaContext> {
-    Arc::new(MetaContext::new(get_test_meta()))
+    let sql_generator: Arc<dyn SqlGenerator + Send + Sync> = Arc::new(SqlGeneratorMock {
+        sql_templates: Arc::new(
+            SqlTemplates::new(
+                vec![
+                    ("functions/COALESCE".to_string(), "COALESCE({{ args_concat }})".to_string()),
+                    ("functions/SUM".to_string(), "SUM({{ args_concat }})".to_string()),
+                    ("functions/MIN".to_string(), "MIN({{ args_concat }})".to_string()),
+                    ("functions/MAX".to_string(), "MAX({{ args_concat }})".to_string()),
+                    ("functions/COUNT".to_string(), "COUNT({{ args_concat }})".to_string()),
+                    (
+                        "functions/COUNT_DISTINCT".to_string(),
+                        "COUNT(DISTINCT {{ args_concat }})".to_string(),
+                    ),
+                    (
+                        "statements/select".to_string(),
+                        r#"SELECT {{ select_concat | map(attribute='aliased') | join(', ') }} 
+                    FROM ({{ from }}) AS {{ from_alias }} 
+                    {% if group_by %} GROUP BY {{ group_by | map(attribute='index') | join(', ') }}{% endif %}"#.to_string(),
+                    ),
+                    (
+                        "statements/column_aliased".to_string(),
+                        "{{expr}} {{quoted_alias}}".to_string(),
+                    ),
+                    ("quotes/identifiers".to_string(), "\"".to_string()),
+                    ("quotes/escape".to_string(), "\"\"".to_string()),
+                    ("params/param".to_string(), "${{ param_index + 1 }}".to_string())
+                ]
+                .into_iter()
+                .collect(),
+            )
+            .unwrap(),
+        ),
+    });
+    Arc::new(MetaContext::new(
+        get_test_meta(),
+        vec![
+            (
+                "KibanaSampleDataEcommerce".to_string(),
+                "default".to_string(),
+            ),
+            ("Logs".to_string(), "default".to_string()),
+            ("NumberCube".to_string(), "default".to_string()),
+        ]
+        .into_iter()
+        .collect(),
+        vec![("default".to_string(), sql_generator)]
+            .into_iter()
+            .collect(),
+    ))
 }
 
 pub fn get_test_tenant_ctx_with_meta(meta: Vec<V1CubeMeta>) -> Arc<MetaContext> {
-    Arc::new(MetaContext::new(meta))
+    // TODO
+    Arc::new(MetaContext::new(meta, HashMap::new(), HashMap::new()))
 }
 
 pub async fn get_test_session(protocol: DatabaseProtocol) -> Arc<Session> {
@@ -242,10 +314,23 @@ pub fn get_test_transport() -> Arc<dyn TransportService> {
             panic!("It's a fake transport");
         }
 
+        async fn sql(
+            &self,
+            _query: V1LoadRequestQuery,
+            _ctx: AuthContextRef,
+            _meta_fields: LoadRequestMeta,
+            _member_to_alias: Option<HashMap<String, String>>,
+        ) -> Result<SqlResponse, CubeError> {
+            Ok(SqlResponse {
+                sql: SqlQuery::new("SELECT 1".to_string(), vec![]),
+            })
+        }
+
         // Execute load query
         async fn load(
             &self,
             _query: V1LoadRequestQuery,
+            _sql_query: Option<SqlQuery>,
             _ctx: AuthContextRef,
             _meta_fields: LoadRequestMeta,
         ) -> Result<V1LoadResponse, CubeError> {
@@ -255,6 +340,7 @@ pub fn get_test_transport() -> Arc<dyn TransportService> {
         async fn load_stream(
             &self,
             _query: V1LoadRequestQuery,
+            _sql_query: Option<SqlQuery>,
             _ctx: AuthContextRef,
             _meta_fields: LoadRequestMeta,
             _schema: SchemaRef,

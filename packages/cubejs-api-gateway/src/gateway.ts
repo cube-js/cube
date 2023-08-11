@@ -38,7 +38,7 @@ import {
   PreAggJob,
   PreAggJobStatusItem,
   PreAggJobStatusObject,
-  PreAggJobStatusResponse,
+  PreAggJobStatusResponse, SqlApiRequest,
 } from './types/request';
 import {
   CheckAuthInternalOptions,
@@ -1169,7 +1169,7 @@ class ApiGateway {
     return [queryType, normalizedQueries];
   }
 
-  public async sql({ query, context, res }: QueryRequest) {
+  public async sql({ query, context, res, memberToAlias, exportAnnotatedSql }: QueryRequest) {
     const requestStarted = new Date();
 
     try {
@@ -1180,8 +1180,11 @@ class ApiGateway {
 
       const sqlQueries = await Promise.all<any>(
         normalizedQueries.map((normalizedQuery) => this.getCompilerApi(context).getSql(
-          this.coerceForSqlQuery(normalizedQuery, context),
-          { includeDebugInfo: getEnv('devMode') || context.signedWithPlaygroundAuthSecret }
+          this.coerceForSqlQuery({ ...normalizedQuery, memberToAlias }, context),
+          {
+            includeDebugInfo: getEnv('devMode') || context.signedWithPlaygroundAuthSecret,
+            exportAnnotatedSql,
+          }
         ))
       );
 
@@ -1196,6 +1199,30 @@ class ApiGateway {
     } catch (e) {
       this.handleError({
         e, context, query, res, requestStarted
+      });
+    }
+  }
+
+  public async sqlGenerators({ context, res }: { context: RequestContext, res: ResponseResultFn }) {
+    const requestStarted = new Date();
+
+    try {
+      const compilerApi = this.getCompilerApi(context);
+      const query = {
+        requestId: context.requestId,
+      };
+      const cubeNameToDataSource = await compilerApi.cubeNameToDataSource(query);
+
+      let dataSources = Object.keys(cubeNameToDataSource).map(c => cubeNameToDataSource[c]);
+      dataSources = [...new Set(dataSources)];
+      const dataSourceToSqlGenerator = (await Promise.all(
+        dataSources.map(async dataSource => ({ [dataSource]: (await compilerApi.getSqlGenerator(query, dataSource)).sqlGenerator }))
+      )).reduce((a, b) => ({ ...a, ...b }), {});
+
+      res({ cubeNameToDataSource, dataSourceToSqlGenerator });
+    } catch (e) {
+      this.handleError({
+        e, context, res, requestStarted
       });
     }
   }
@@ -1602,6 +1629,161 @@ class ApiGateway {
       } else {
         res(results[0]);
       }
+    } catch (e) {
+      this.handleError({
+        e, context, query, res, requestStarted
+      });
+    }
+  }
+
+  public async sqlApiLoad(request: SqlApiRequest) {
+    let query: Query | Query[] | null = null;
+    const {
+      context,
+      res,
+      apiType = 'sql',
+    } = request;
+    const requestStarted = new Date();
+
+    try {
+      await this.assertApiScope('data', context.securityContext);
+
+      query = this.parseQueryParam(request.query);
+      let resType: ResultType = ResultType.DEFAULT;
+
+      if (!Array.isArray(query) && query.responseFormat) {
+        resType = query.responseFormat;
+      }
+
+      this.log({
+        type: 'Load Request',
+        query,
+        streaming: request.streaming,
+      }, context);
+
+      const [queryType, normalizedQueries] =
+        await this.getNormalizedQueries(query, context);
+
+      let metaConfigResult = await this
+        .getCompilerApi(context).metaConfig({
+          requestId: context.requestId
+        });
+
+      metaConfigResult = this.filterVisibleItemsInMeta(context, metaConfigResult);
+
+      const sqlQueries = await this
+        .getSqlQueriesInternal(context, normalizedQueries);
+
+      let results;
+
+      let slowQuery = false;
+
+      const streamResponse = async (sqlQuery) => {
+        const q = {
+          ...sqlQuery,
+          query: sqlQuery.query || sqlQuery.sql[0],
+          values: sqlQuery.values || sqlQuery.sql[1],
+          continueWait: true,
+          renewQuery: false,
+          requestId: context.requestId,
+          context,
+          persistent: true,
+          forceNoCache: true,
+        };
+        return {
+          stream: await this.getAdapterApi(context).streamQuery(q),
+        };
+      };
+
+      if (request.sqlQuery) {
+        const finalQuery = {
+          query: request.sqlQuery[0],
+          values: request.sqlQuery[1],
+          continueWait: true,
+          renewQuery: normalizedQueries[0].renewQuery,
+          requestId: context.requestId,
+          context,
+          ...sqlQueries[0],
+          // TODO Can we just pass through data? Ensure hidden members can't be queried
+          aliasNameToMember: null,
+        };
+
+        if (request.streaming) {
+          results = [await streamResponse(finalQuery)];
+        } else {
+          const response = await this
+            .getAdapterApi(context)
+            .executeQuery(finalQuery);
+
+          const annotation = prepareAnnotation(
+            metaConfigResult, normalizedQueries[0]
+          );
+
+          // TODO Can we just pass through data? Ensure hidden members can't be queried
+          results = [{
+            data: response.data,
+            annotation
+          }];
+        }
+      } else {
+        results = await Promise.all(
+          normalizedQueries.map(async (normalizedQuery, index) => {
+            slowQuery = slowQuery ||
+              Boolean(sqlQueries[index].slowQuery);
+
+            const annotation = prepareAnnotation(
+              metaConfigResult, normalizedQuery
+            );
+
+            if (request.streaming) {
+              return streamResponse(sqlQueries[index]);
+            }
+
+            const response = await this.getSqlResponseInternal(
+              context,
+              normalizedQuery,
+              sqlQueries[index],
+            );
+
+            return this.getResultInternal(
+              context,
+              queryType,
+              normalizedQuery,
+              sqlQueries[index],
+              annotation,
+              response,
+              resType,
+            );
+          })
+        );
+      }
+
+      this.log(
+        {
+          type: 'Load Request Success',
+          query,
+          duration: this.duration(requestStarted),
+          apiType,
+          isPlayground: Boolean(
+            context.signedWithPlaygroundAuthSecret
+          ),
+          queries: results.length,
+          queriesWithPreAggregations:
+          results.filter(
+            (r: any) => Object.keys(
+              r.usedPreAggregations || {}
+            ).length
+          ).length,
+          queriesWithData:
+          results.filter((r: any) => r.data?.length).length,
+          dbType: results.map(r => r.dbType),
+        },
+        context,
+      );
+
+      res(request.streaming ? results[0] : {
+        results,
+      });
     } catch (e) {
       this.handleError({
         e, context, query, res, requestStarted

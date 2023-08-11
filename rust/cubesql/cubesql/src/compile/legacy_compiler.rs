@@ -132,8 +132,8 @@ impl CompiledExpression {
 
                 if let Ok(ref date) = NaiveDate::parse_from_str(s.as_str(), "%Y-%m-%d") {
                     return Some(
-                        Utc.ymd(date.year(), date.month(), date.day())
-                            .and_hms_nano(0, 0, 0, 0),
+                        Utc.with_ymd_and_hms(date.year(), date.month(), date.day(), 0, 0, 0)
+                            .unwrap(),
                     );
                 }
 

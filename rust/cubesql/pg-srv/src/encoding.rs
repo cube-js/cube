@@ -110,7 +110,10 @@ impl_primitive!(f64);
 // POSTGRES_EPOCH_JDATE
 #[cfg(feature = "with-chrono")]
 fn pg_base_date_epoch() -> NaiveDateTime {
-    NaiveDate::from_ymd(2000, 1, 1).and_hms(0, 0, 0)
+    NaiveDate::from_ymd_opt(2000, 1, 1)
+        .unwrap()
+        .and_hms_opt(0, 0, 0)
+        .unwrap()
 }
 
 #[cfg(feature = "with-chrono")]

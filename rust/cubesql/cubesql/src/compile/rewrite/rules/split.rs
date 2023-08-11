@@ -49,9 +49,9 @@ impl RewriteRules for SplitRules {
                         "?orders",
                         "?limit",
                         "?offset",
-                        "?aliases",
                         "CubeScanSplit:false",
                         "?can_pushdown_join",
+                        "CubeScanWrapped:false",
                     ),
                     "?group_expr",
                     "?aggr_expr",
@@ -70,9 +70,9 @@ impl RewriteRules for SplitRules {
                             "?orders",
                             "?limit",
                             "?offset",
-                            "?aliases",
                             "CubeScanSplit:true",
                             "?can_pushdown_join",
+                            "CubeScanWrapped:false",
                         ),
                         inner_aggregate_split_replacer("?group_expr", "?inner_aggregate_cube"),
                         inner_aggregate_split_replacer("?aggr_expr", "?inner_aggregate_cube"),
@@ -99,9 +99,9 @@ impl RewriteRules for SplitRules {
                         "?orders",
                         "?limit",
                         "?offset",
-                        "?aliases",
                         "CubeScanSplit:false",
                         "?can_pushdown_join",
+                        "CubeScanWrapped:false",
                     ),
                     "?alias",
                     "ProjectionSplit:false",
@@ -117,9 +117,9 @@ impl RewriteRules for SplitRules {
                             "?orders",
                             "?limit",
                             "?offset",
-                            "?aliases",
                             "CubeScanSplit:true",
                             "?can_pushdown_join",
+                            "CubeScanWrapped:false",
                         ),
                         "?projection_alias",
                         "ProjectionSplit:true",
@@ -145,9 +145,9 @@ impl RewriteRules for SplitRules {
                         "?orders",
                         "?limit",
                         "?offset",
-                        "?aliases",
                         "CubeScanSplit:false",
                         "?can_pushdown_join",
+                        "CubeScanWrapped:false",
                     ),
                     "?alias",
                     "ProjectionSplit:false",
@@ -164,9 +164,9 @@ impl RewriteRules for SplitRules {
                                 "?orders",
                                 "?limit",
                                 "?offset",
-                                "?aliases",
                                 "CubeScanSplit:true",
                                 "?can_pushdown_join",
+                                "CubeScanWrapped:false",
                             ),
                             "?inner_projection_alias",
                             "ProjectionSplit:true",
@@ -198,9 +198,9 @@ impl RewriteRules for SplitRules {
                         "?orders",
                         "?limit",
                         "?offset",
-                        "?aliases",
                         "CubeScanSplit:false",
                         "?can_pushdown_join",
+                        "CubeScanWrapped:false",
                     ),
                     "?group_expr",
                     "?aggr_expr",
@@ -215,9 +215,9 @@ impl RewriteRules for SplitRules {
                             "?orders",
                             "?limit",
                             "?offset",
-                            "?aliases",
                             "CubeScanSplit:true",
                             "?can_pushdown_join",
+                            "CubeScanWrapped:false",
                         ),
                         inner_aggregate_split_replacer("?group_expr", "?inner_aggregate_cube"),
                         inner_aggregate_split_replacer("?aggr_expr", "?inner_aggregate_cube"),
@@ -1070,90 +1070,6 @@ impl RewriteRules for SplitRules {
                 self.transform_original_expr_to_alias_and_column(
                     "?expr",
                     "?outer_alias",
-                    Some("?outer_column"),
-                ),
-            ),
-            // Skyvia Day (Date) to DateTrunc
-            transforming_chain_rewrite(
-                "split-push-down-skyvia-day-to-date-trunc-inner-replacer",
-                inner_aggregate_split_replacer("?expr", "?alias_to_cube"),
-                vec![(
-                    "?expr",
-                    cast_expr_explicit(
-                        cast_expr_explicit(
-                            fun_expr(
-                                "DateTrunc",
-                                vec![literal_string("day"), column_expr("?column")],
-                            ),
-                            ArrowDataType::Date32,
-                        ),
-                        ArrowDataType::Utf8,
-                    ),
-                )],
-                alias_expr(
-                    fun_expr(
-                        "DateTrunc",
-                        vec![literal_string("day"), column_expr("?column")],
-                    ),
-                    "?alias",
-                ),
-                self.transform_original_expr_to_alias_and_column("?expr", "?alias", None),
-            ),
-            transforming_chain_rewrite(
-                "split-push-down-skyvia-day-to-date-trunc-outer-aggr-replacer",
-                outer_aggregate_split_replacer("?expr", "?alias_to_cube"),
-                vec![(
-                    "?expr",
-                    cast_expr_explicit(
-                        cast_expr_explicit(
-                            fun_expr(
-                                "DateTrunc",
-                                vec![literal_string("day"), column_expr("?column")],
-                            ),
-                            ArrowDataType::Date32,
-                        ),
-                        ArrowDataType::Utf8,
-                    ),
-                )],
-                alias_expr(
-                    cast_expr_explicit(
-                        cast_expr_explicit(column_expr("?outer_column"), ArrowDataType::Date32),
-                        ArrowDataType::Utf8,
-                    ),
-                    "?alias",
-                ),
-                self.transform_original_expr_to_alias_and_column(
-                    "?expr",
-                    "?alias",
-                    Some("?outer_column"),
-                ),
-            ),
-            transforming_chain_rewrite(
-                "split-push-down-skyvia-day-to-date-trunc-outer-replacer",
-                outer_projection_split_replacer("?expr", "?alias_to_cube"),
-                vec![(
-                    "?expr",
-                    cast_expr_explicit(
-                        cast_expr_explicit(
-                            fun_expr(
-                                "DateTrunc",
-                                vec![literal_string("day"), column_expr("?column")],
-                            ),
-                            ArrowDataType::Date32,
-                        ),
-                        ArrowDataType::Utf8,
-                    ),
-                )],
-                alias_expr(
-                    cast_expr_explicit(
-                        cast_expr_explicit(column_expr("?outer_column"), ArrowDataType::Date32),
-                        ArrowDataType::Utf8,
-                    ),
-                    "?alias",
-                ),
-                self.transform_original_expr_to_alias_and_column(
-                    "?expr",
-                    "?alias",
                     Some("?outer_column"),
                 ),
             ),
@@ -2187,12 +2103,14 @@ impl RewriteRules for SplitRules {
             rewrite(
                 "split-push-down-alias-aggr-group-tail-replacer",
                 alias_expr(aggr_group_expr_empty_tail(), "?alias"),
-                aggr_group_expr_empty_tail(),
+                // TODO implement Ignore node. There's still risk for equivalence ambiguity.
+                aggr_group_expr(aggr_group_expr_empty_tail(), aggr_group_expr_empty_tail()),
             ),
             rewrite(
                 "split-push-down-alias-aggr-aggr-tail-replacer",
                 alias_expr(aggr_aggr_expr_empty_tail(), "?alias"),
-                aggr_aggr_expr_empty_tail(),
+                // TODO implement Ignore node. There's still risk for equivalence ambiguity.
+                aggr_aggr_expr(aggr_aggr_expr_empty_tail(), aggr_aggr_expr_empty_tail()),
             ),
             // Trunc
             rewrite(

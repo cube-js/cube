@@ -8,7 +8,7 @@ use crate::{
             cost::BestCubePlan,
             rules::{
                 case::CaseRules, dates::DateRules, filters::FilterRules, members::MemberRules,
-                order::OrderRules, split::SplitRules,
+                order::OrderRules, split::SplitRules, wrapper::WrapperRules,
             },
             LogicalPlanLanguage,
         },
@@ -378,6 +378,15 @@ impl Rewriter {
         let mut rewrites = Vec::new();
         for r in rules {
             rewrites.extend(r.rewrite_rules());
+        }
+        if let Ok(true) = env::var("CUBESQL_SQL_PUSH_DOWN")
+            .map_err(|e| CubeError::internal(e.to_string()))
+            .and_then(|s| {
+                s.parse::<bool>()
+                    .map_err(|e| CubeError::internal(e.to_string()))
+            })
+        {
+            rewrites.extend(WrapperRules::new(cube_context.clone()).rewrite_rules());
         }
         if let Ok(disabled_rule_names) = env::var("CUBESQL_DISABLE_REWRITES") {
             let disabled_rule_names = disabled_rule_names

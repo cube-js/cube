@@ -61,7 +61,7 @@ jobs:
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2022-03-22
+          toolchain: nightly-2022-06-22
           override: true
           components: rustfmt
       - uses: Swatinem/rust-cache@v2
@@ -80,6 +80,7 @@ jobs:
           CUBESQL_TESTING_CUBE_TOKEN: ${{ secrets.CUBESQL_TESTING_CUBE_TOKEN }}
           CUBESQL_TESTING_CUBE_URL: ${{ secrets.CUBESQL_TESTING_CUBE_URL }}
           CUBESQL_REWRITE_ENGINE: true
+          CUBESQL_SQL_PUSH_DOWN: true
           CUBESQL_REWRITE_TIMEOUT: 60
         run: cd rust/cubesql && cargo tarpaulin --workspace --no-fail-fast --avoid-cfg-tarpaulin --out Xml
       - name: Upload code coverage

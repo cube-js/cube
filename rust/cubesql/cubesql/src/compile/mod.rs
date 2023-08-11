@@ -13,6 +13,7 @@ use datafusion::{
     optimizer::{
         optimizer::{OptimizerConfig, OptimizerRule},
         projection_drop_out::ProjectionDropOut,
+        utils::from_plan,
     },
     physical_plan::ExecutionPlan,
     prelude::*,
@@ -103,6 +104,10 @@ pub mod service;
 pub mod test;
 
 pub use crate::transport::ctx::*;
+use crate::{
+    compile::engine::df::wrapper::CubeScanWrapperNode,
+    transport::{LoadRequestMeta, TransportService},
+};
 pub use error::{CompilationError, CompilationResult};
 
 #[derive(Clone)]
@@ -341,6 +346,8 @@ impl QueryPlanner {
                         change_user: None,
                         max_records: None,
                     },
+                    // Empty as it's not used in the legacy compiler
+                    Vec::new(),
                 )),
             });
             let logical_plan = LogicalPlan::Projection(Projection {
@@ -866,7 +873,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         statement: &Box<ast::Statement>,
         verbose: bool,
         analyze: bool,
-    ) -> Pin<Box<dyn Future<Output = Result<QueryPlan, CompilationError>> + Send + Sync>> {
+    ) -> Pin<Box<dyn Future<Output = Result<QueryPlan, CompilationError>> + Send>> {
         let self_cloned = self.clone();
 
         let statement = statement.clone();
@@ -1328,6 +1335,12 @@ WHERE `TABLE_SCHEMA` = '{}'",
         };
 
         log::debug!("Rewrite: {:#?}", rewrite_plan);
+        let rewrite_plan = Self::evaluate_wrapped_sql(
+            self.session_manager.server.transport.clone(),
+            Arc::new(self.state.get_load_request_meta()),
+            rewrite_plan,
+        )
+        .await?;
         if let Some(qtrace) = qtrace {
             qtrace.set_best_plan_and_cube_scans(&rewrite_plan);
         }
@@ -1337,6 +1350,43 @@ WHERE `TABLE_SCHEMA` = '{}'",
             rewrite_plan,
             ctx,
         ))
+    }
+
+    fn evaluate_wrapped_sql(
+        transport_service: Arc<dyn TransportService>,
+        load_request_meta: Arc<LoadRequestMeta>,
+        plan: LogicalPlan,
+    ) -> Pin<Box<dyn Future<Output = CompilationResult<LogicalPlan>> + Send>> {
+        Box::pin(async move {
+            if let LogicalPlan::Extension(Extension { node }) = &plan {
+                // .cloned() is to avoid borrowing Any to comply with Send + Sync
+                let wrapper_option = node.as_any().downcast_ref::<CubeScanWrapperNode>().cloned();
+                if let Some(wrapper) = wrapper_option {
+                    // TODO evaluate sql
+                    return Ok(LogicalPlan::Extension(Extension {
+                        node: Arc::new(
+                            wrapper
+                                .generate_sql(transport_service.clone(), load_request_meta.clone())
+                                .await
+                                .map_err(|e| CompilationError::internal(e.to_string()))?,
+                        ),
+                    }));
+                }
+            }
+            let mut children = Vec::new();
+            for input in plan.inputs() {
+                children.push(
+                    Self::evaluate_wrapped_sql(
+                        transport_service.clone(),
+                        load_request_meta.clone(),
+                        input.clone(),
+                    )
+                    .await?,
+                );
+            }
+            from_plan(&plan, plan.expressions().as_slice(), children.as_slice())
+                .map_err(|e| CompilationError::internal(e.to_string()))
+        })
     }
 }
 
@@ -1549,6 +1599,10 @@ pub fn find_cube_scans_deep_search(
             if let LogicalPlan::Extension(ext) = plan {
                 if let Some(scan_node) = ext.node.as_any().downcast_ref::<CubeScanNode>() {
                     self.0.push(scan_node.clone());
+                } else if let Some(wrapper_node) =
+                    ext.node.as_any().downcast_ref::<CubeScanWrapperNode>()
+                {
+                    wrapper_node.wrapped_plan.accept(self)?;
                 }
             }
             Ok(true)
@@ -1583,7 +1637,7 @@ mod tests {
         compile::test::{get_string_cube_meta, get_test_tenant_ctx_with_meta},
         sql::{dataframe::batch_to_dataframe, types::StatusFlags},
     };
-    use datafusion::logical_plan::PlanVisitor;
+    use datafusion::{logical_plan::PlanVisitor, physical_plan::displayable};
     use log::Level;
     use serde_json::json;
     use simple_logger::SimpleLogger;
@@ -3080,6 +3134,7 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    #[cfg(debug_assertions)]
     async fn non_cube_filters_cast_kept() {
         init_logger();
 
@@ -7611,6 +7666,7 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    #[cfg(debug_assertions)]
     async fn test_pg_get_userbyid_postgres() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "pg_get_userbyid",
@@ -9518,6 +9574,8 @@ ORDER BY \"COUNT(count)\" DESC"
 
     #[tokio::test]
     async fn test_metabase_table_exists() -> Result<(), CubeError> {
+        init_logger();
+
         insta::assert_snapshot!(
             "metabase_table_exists",
             execute_query(
@@ -13626,7 +13684,7 @@ ORDER BY \"COUNT(count)\" DESC"
         .await
         .as_logical_plan();
 
-        let end_date = chrono::Utc::now().date().naive_utc() - chrono::Duration::days(5);
+        let end_date = chrono::Utc::now().date_naive() - chrono::Duration::days(5);
         assert_eq!(
             logical_plan.find_cube_scan().request,
             V1LoadRequestQuery {
@@ -13683,7 +13741,7 @@ ORDER BY \"COUNT(count)\" DESC"
         let duration_sub_weeks = chrono::Duration::weeks(4);
         let duration_sub_days =
             chrono::Duration::days(now.weekday().num_days_from_sunday() as i64 + 1);
-        let end_date = now.date().naive_utc() - duration_sub_weeks - duration_sub_days;
+        let end_date = now.date_naive() - duration_sub_weeks - duration_sub_days;
         assert_eq!(
             logical_plan.find_cube_scan().request,
             V1LoadRequestQuery {
@@ -14656,6 +14714,7 @@ ORDER BY \"COUNT(count)\" DESC"
 
     #[tokio::test]
     async fn test_date_granularity_skyvia() {
+        init_logger();
         let supported_granularities = vec![
             // Day
             ["CAST(DATE_TRUNC('day', t.\"order_date\")::date AS varchar)", "day"],
@@ -17753,7 +17812,7 @@ ORDER BY \"COUNT(count)\" DESC"
         .await
         .as_logical_plan();
 
-        let end_date = chrono::Utc::now().date().naive_utc() - chrono::Duration::days(1);
+        let end_date = chrono::Utc::now().date_naive() - chrono::Duration::days(1);
         let start_date = end_date - chrono::Duration::days(29);
         assert_eq!(
             logical_plan.find_cube_scan().request,
@@ -17857,6 +17916,39 @@ ORDER BY \"COUNT(count)\" DESC"
         );
 
         Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_simple_wrapper() {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT COALESCE(customer_gender, 'N/A'), MIN(avgPrice) mp FROM (SELECT avgPrice, customer_gender FROM KibanaSampleDataEcommerce LIMIT 1) a GROUP BY 1"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        // let logical_plan = query_plan.as_logical_plan();
+        // assert_eq!(
+        //     logical_plan.find_cube_scan().request,
+        //     V1LoadRequestQuery {
+        //         measures: Some(vec!["KibanaSampleDataEcommerce.avgPrice".to_string(),]),
+        //         segments: Some(vec![]),
+        //         dimensions: Some(vec![]),
+        //         time_dimensions: None,
+        //         order: None,
+        //         limit: None,
+        //         offset: None,
+        //         filters: None
+        //     }
+        // );
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
     }
 
     #[tokio::test]

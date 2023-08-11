@@ -99,14 +99,17 @@ fn register_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let check_auth = options
         .get::<JsFunction, _, _>(&mut cx, "checkAuth")?
         .root(&mut cx);
-    let transport_load = options
-        .get::<JsFunction, _, _>(&mut cx, "load")?
+    let transport_sql_api_load = options
+        .get::<JsFunction, _, _>(&mut cx, "sqlApiLoad")?
+        .root(&mut cx);
+    let transport_sql = options
+        .get::<JsFunction, _, _>(&mut cx, "sql")?
         .root(&mut cx);
     let transport_meta = options
         .get::<JsFunction, _, _>(&mut cx, "meta")?
         .root(&mut cx);
-    let transport_load_stream = options
-        .get::<JsFunction, _, _>(&mut cx, "stream")?
+    let transport_sql_generator = options
+        .get::<JsFunction, _, _>(&mut cx, "sqlGenerators")?
         .root(&mut cx);
 
     let nonce_handle = options.get_value(&mut cx, "nonce")?;
@@ -141,9 +144,10 @@ fn register_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let runtime = tokio_runtime_node(&mut cx)?;
     let transport_service = NodeBridgeTransport::new(
         cx.channel(),
-        transport_load,
+        transport_sql_api_load,
+        transport_sql,
         transport_meta,
-        transport_load_stream,
+        transport_sql_generator,
     );
     let auth_service = NodeBridgeAuthService::new(cx.channel(), check_auth);
 

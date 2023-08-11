@@ -207,7 +207,8 @@ class BaseQuery {
       useOriginalSqlPreAggregationsInPreAggregation: this.options.useOriginalSqlPreAggregationsInPreAggregation,
       cubeLatticeCache: this.options.cubeLatticeCache, // TODO too heavy for key
       historyQueries: this.options.historyQueries, // TODO too heavy for key
-      ungrouped: this.options.ungrouped
+      ungrouped: this.options.ungrouped,
+      memberToAlias: this.options.memberToAlias,
     });
     this.timezone = this.options.timezone;
     this.rowLimit = this.options.rowLimit;
@@ -544,21 +545,23 @@ class BaseQuery {
 
   /**
    * Returns an array of SQL query strings for the query.
+   * @param {boolean} [exportAnnotatedSql] - returns annotated sql with not rendered params if true
    * @returns {Array<string>}
    */
-  buildSqlAndParams() {
+  buildSqlAndParams(exportAnnotatedSql) {
     if (!this.options.preAggregationQuery && this.externalQueryClass) {
       if (this.externalPreAggregationQuery()) { // TODO performance
-        return this.externalQuery().buildSqlAndParams();
+        return this.externalQuery().buildSqlAndParams(exportAnnotatedSql);
       }
     }
 
     return this.compilers.compiler.withQuery(
       this,
       () => this.cacheValue(
-        ['buildSqlAndParams'],
+        ['buildSqlAndParams', exportAnnotatedSql],
         () => this.paramAllocator.buildSqlAndParams(
-          this.buildParamAnnotatedSql()
+          this.buildParamAnnotatedSql(),
+          exportAnnotatedSql
         ),
         { cache: this.queryCache }
       )
@@ -2158,6 +2161,9 @@ class BaseQuery {
    * @returns {string}
    */
   aliasName(name, isPreAggregationName) {
+    if (this.options.memberToAlias && this.options.memberToAlias[name]) {
+      return this.options.memberToAlias[name];
+    }
     const path = name.split('.');
     if (path[0] && this.cubeEvaluator.cubeExists(path[0]) && this.cubeEvaluator.cubeFromPath(path[0]).sqlAlias) {
       const cubeName = path[0];
@@ -2378,6 +2384,34 @@ class BaseQuery {
 
   preAggregationAllowUngroupingWithPrimaryKey(_cube, _preAggregation) {
     return false;
+  }
+
+  sqlTemplates() {
+    return {
+      functions: {
+        SUM: 'SUM({{ args_concat }})',
+        MIN: 'MIN({{ args_concat }})',
+        MAX: 'MAX({{ args_concat }})',
+        COUNT: 'COUNT({{ args_concat }})',
+        COUNT_DISTINCT: 'COUNT(DISTINCT {{ args_concat }})',
+        AVG: 'AVG({{ args_concat }})',
+
+        COALESCE: 'COALESCE({{ args_concat }})',
+      },
+      statements: {
+        select: 'SELECT {{ select_concat | map(attribute=\'aliased\') | join(\', \') }} \n' +
+          'FROM (\n  {{ from }}\n) AS {{ from_alias }} \n' +
+          '{% if group_by %} GROUP BY {{ group_by | map(attribute=\'index\') | join(\', \') }}{% endif %}',
+        column_aliased: '{{expr}} {{quoted_alias}}',
+      },
+      quotes: {
+        identifiers: '"',
+        escape: '""'
+      },
+      params: {
+        param: '?'
+      }
+    };
   }
 
   // eslint-disable-next-line consistent-return

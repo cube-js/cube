@@ -14,6 +14,16 @@ const meta_fixture = require('./meta');
     throw new Error('load is not implemented');
   };
 
+  const sqlApiLoad = async ({ request, session, query }) => {
+    console.log('[js] load', {
+      request,
+      session,
+      query,
+    });
+
+    throw new Error('load is not implemented');
+  };
+
   const meta = async ({ request, session }) => {
     console.log('[js] meta', {
       request,
@@ -66,21 +76,33 @@ const meta_fixture = require('./meta');
     throw new Error('Please specify password');
   };
 
-  native.setupLogger(
-    ({ event }) => console.log(event),
-    'trace',
-  );
+  const sqlGenerators = async ({ request, session, query }) => {
+        console.log('[js] sqlGenerators',  {
+            request,
+            session,
+            query ,
+        });
 
-  const server = await native.registerInterface({
-    // nonce: '12345678910111213141516'.substring(0, 20),
-    checkAuth,
-    load,
-    meta,
-    stream,
-  });
-  console.log({
-    server
-  });
+        return {};
+    }
+
+    native.setupLogger(
+      ({ event }) => console.log(event),
+      'trace',
+    );
+
+    const server = await native.registerInterface({
+      // nonce: '12345678910111213141516'.substring(0, 20),
+      checkAuth,
+      load,
+      sqlApiLoad,
+      meta,
+      stream,
+      sqlGenerators,
+    });
+    console.log({
+      server
+    });
 
   process.on('SIGINT', async () => {
     console.log('SIGINT signal');
