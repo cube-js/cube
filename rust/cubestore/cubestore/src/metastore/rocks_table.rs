@@ -851,14 +851,11 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         old_row: &Self::T,
         batch_pipe: &mut BatchPipe,
     ) -> Result<IdRow<Self::T>, CubeError> {
-        let deleted_row = self.delete_index_row(&old_row, row_id)?;
-        for row in deleted_row {
-            batch_pipe.batch().delete(row.key);
-        }
-
         let mut ser = flexbuffers::FlexbufferSerializer::new();
         new_row.serialize(&mut ser).unwrap();
         let serialized_row = ser.take_buffer();
+
+        self.sync_indexes_on_update(row_id, &new_row, &old_row, batch_pipe)?;
 
         let updated_row = self.update_row(row_id, serialized_row)?;
         batch_pipe.add_event(MetaStoreEvent::Update(Self::table_id(), row_id));
@@ -872,11 +869,54 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
 
         batch_pipe.batch().put(updated_row.key, updated_row.val);
 
-        let index_row = self.insert_index_row(&new_row, row_id)?;
-        for row in index_row {
-            batch_pipe.batch().put(row.key, row.val);
-        }
         Ok(IdRow::new(row_id, new_row))
+    }
+
+    fn sync_indexes_on_update(
+        &self,
+        row_id: u64,
+        new_row: &Self::T,
+        old_row: &Self::T,
+        batch_pipe: &mut BatchPipe,
+    ) -> Result<(), CubeError> {
+        for index in Self::indexes().iter() {
+            let old_hash = index.key_hash(&old_row);
+            let new_hash = index.key_hash(&new_row);
+
+            if old_hash == new_hash {
+                let old_index_value = index.index_value(old_row);
+                let new_index_value = index.index_value(new_row);
+
+                if old_index_value != new_index_value {
+                    let key = RowKey::SecondaryIndex(
+                        Self::index_id(index.get_id()),
+                        new_hash.to_be_bytes().to_vec(),
+                        row_id,
+                    );
+
+                    batch_pipe.batch().put(key.to_bytes(), new_index_value);
+                }
+            } else {
+                let old_key = RowKey::SecondaryIndex(
+                    Self::index_id(index.get_id()),
+                    old_hash.to_be_bytes().to_vec(),
+                    row_id,
+                );
+
+                batch_pipe.batch().delete(old_key.to_bytes());
+
+                let new_index_value = index.index_value(new_row);
+                let new_key = RowKey::SecondaryIndex(
+                    Self::index_id(index.get_id()),
+                    new_hash.to_be_bytes().to_vec(),
+                    row_id,
+                );
+
+                batch_pipe.batch().put(new_key.to_bytes(), new_index_value);
+            }
+        }
+
+        Ok(())
     }
 
     fn delete(&self, row_id: u64, batch_pipe: &mut BatchPipe) -> Result<IdRow<Self::T>, CubeError> {
