@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.45](https://github.com/cube-js/cube.js/compare/v0.33.44...v0.33.45) (2023-08-13)
+
+
+### Features
+
+* **cubesql:** Whole SQL query push down to data sources ([#6629](https://github.com/cube-js/cube.js/issues/6629)) ([0e8a76a](https://github.com/cube-js/cube.js/commit/0e8a76a20cb37e675997f384785dd06e09175113))
+
+
+
+
+
 ## [0.33.44](https://github.com/cube-js/cube/compare/v0.33.43...v0.33.44) (2023-08-11)
 
 **Note:** Version bump only for package @cubejs-backend/testing-drivers
