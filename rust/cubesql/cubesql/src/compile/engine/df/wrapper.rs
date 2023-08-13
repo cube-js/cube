@@ -146,6 +146,7 @@ impl CubeScanWrapperNode {
             transport,
             load_request_meta,
             self.wrapped_plan.clone(),
+            false,
         )
         .await
         .and_then(|SqlGenerationResult { data_source, mut sql, .. }| -> result::Result<_, CubeError> {
@@ -174,6 +175,7 @@ impl CubeScanWrapperNode {
         transport: Arc<dyn TransportService>,
         load_request_meta: Arc<LoadRequestMeta>,
         node: Arc<LogicalPlan>,
+        can_rename_columns: bool,
     ) -> Pin<Box<dyn Future<Output = result::Result<SqlGenerationResult, CubeError>> + Send>> {
         Box::pin(async move {
             match node.as_ref() {
@@ -279,6 +281,7 @@ impl CubeScanWrapperNode {
                             transport.clone(),
                             load_request_meta.clone(),
                             from.clone(),
+                            true,
                         )
                         .await?;
                         let mut next_remapping = HashMap::new();
@@ -303,6 +306,7 @@ impl CubeScanWrapperNode {
                                 generator.clone(),
                                 &column_remapping,
                                 &mut next_remapping,
+                                can_rename_columns,
                             )
                             .await?;
                             let (group_by, sql) = Self::generate_column_expr(
@@ -313,6 +317,7 @@ impl CubeScanWrapperNode {
                                 generator.clone(),
                                 &column_remapping,
                                 &mut next_remapping,
+                                can_rename_columns,
                             )
                             .await?;
                             let (aggregate, mut sql) = Self::generate_column_expr(
@@ -323,6 +328,7 @@ impl CubeScanWrapperNode {
                                 generator.clone(),
                                 &column_remapping,
                                 &mut next_remapping,
+                                can_rename_columns,
                             )
                             .await?;
                             let resulting_sql = generator
@@ -387,19 +393,31 @@ impl CubeScanWrapperNode {
         generator: Arc<dyn SqlGenerator>,
         column_remapping: &Option<HashMap<Column, Column>>,
         next_remapping: &mut HashMap<Column, Column>,
+        can_rename_columns: bool,
     ) -> result::Result<(Vec<AliasedColumn>, SqlQuery), CubeError> {
         let non_id_regex = Regex::new(r"[^a-zA-Z0-9_]")
             .map_err(|e| CubeError::internal(format!("Can't parse regex: {}", e)))?;
         let mut aliased_columns = Vec::new();
         for expr in exprs {
             let expr = if let Some(column_remapping) = column_remapping.as_ref() {
-                replace_col(
-                    expr.clone(),
+                let original_expr = expr;
+                let mut expr = replace_col(
+                    original_expr.clone(),
                     &column_remapping.iter().map(|(k, v)| (k, v)).collect(),
                 )
                 .map_err(|_| {
-                    CubeError::internal(format!("Can't rename columns for expr: {:?}", expr))
-                })?
+                    CubeError::internal(format!(
+                        "Can't rename columns for expr: {:?}",
+                        original_expr
+                    ))
+                })?;
+                if !can_rename_columns {
+                    let original_alias = expr_name(&original_expr, &schema)?;
+                    if original_alias != expr_name(&expr, &schema)? {
+                        expr = Expr::Alias(Box::new(expr), original_alias.clone());
+                    }
+                }
+                expr
             } else {
                 expr
             };
@@ -409,15 +427,21 @@ impl CubeScanWrapperNode {
             sql = new_sql_query;
 
             let original_alias = expr_name(&expr, &schema)?;
-            let mut truncated_alias = non_id_regex.replace_all(&original_alias, "_").to_string();
-            truncated_alias.truncate(16);
-            let mut alias = truncated_alias.clone();
-            for i in 1..10000 {
-                if !next_remapping.contains_key(&Column::from_name(&alias)) {
-                    break;
+            let alias = if can_rename_columns {
+                let mut truncated_alias =
+                    non_id_regex.replace_all(&original_alias, "_").to_string();
+                truncated_alias.truncate(16);
+                let mut alias = truncated_alias.clone();
+                for i in 1..10000 {
+                    if !next_remapping.contains_key(&Column::from_name(&alias)) {
+                        break;
+                    }
+                    alias = format!("{}_{}", truncated_alias, i);
                 }
-                alias = format!("{}_{}", truncated_alias, i);
-            }
+                alias
+            } else {
+                original_alias.clone()
+            };
             if original_alias != alias {
                 if !next_remapping.contains_key(&Column::from_name(&alias)) {
                     next_remapping.insert(
