@@ -335,7 +335,7 @@ impl SqlTemplates {
     pub fn alias_expr(&self, expr: &str, alias: &str) -> Result<String, CubeError> {
         let quoted_alias = self.quote_identifier(alias)?;
         self.render_template(
-            "statements/column_aliased",
+            "expressions/column_aliased",
             context! { alias => alias, expr => expr, quoted_alias => quoted_alias },
         )
     }
@@ -392,6 +392,30 @@ impl SqlTemplates {
         self.render_template(
             &format!("functions/{}", function),
             context! { args_concat => args_concat, args => args },
+        )
+    }
+
+    pub fn case(
+        &self,
+        expr: Option<String>,
+        when_then: Vec<(String, String)>,
+        else_expr: Option<String>,
+    ) -> Result<String, CubeError> {
+        self.render_template(
+            "expressions/case",
+            context! { expr => expr, when_then => when_then, else_expr => else_expr },
+        )
+    }
+
+    pub fn binary_expr(
+        &self,
+        left: String,
+        op: String,
+        right: String,
+    ) -> Result<String, CubeError> {
+        self.render_template(
+            "expressions/binary",
+            context! { left => left, op => op, right => right },
         )
     }
 

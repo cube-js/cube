@@ -389,7 +389,7 @@ impl CubeScanWrapperNode {
                         plan.clone(),
                         sql_query,
                         sql_generator.clone(),
-                        (*expr).clone(),
+                        *expr,
                     )
                     .await?;
                     Ok((expr, sql_query))
@@ -423,7 +423,32 @@ impl CubeScanWrapperNode {
                     sql_query,
                 )),
                 // Expr::ScalarVariable(_, _) => {}
-                // Expr::BinaryExpr { .. } => {}
+                Expr::BinaryExpr { left, op, right } => {
+                    let (left, sql_query) = Self::generate_sql_for_expr(
+                        plan.clone(),
+                        sql_query,
+                        sql_generator.clone(),
+                        *left,
+                    )
+                    .await?;
+                    let (right, sql_query) = Self::generate_sql_for_expr(
+                        plan.clone(),
+                        sql_query,
+                        sql_generator.clone(),
+                        *right,
+                    )
+                    .await?;
+                    let resulting_sql = sql_generator
+                        .get_sql_templates()
+                        .binary_expr(left, op.to_string(), right)
+                        .map_err(|e| {
+                            DataFusionError::Internal(format!(
+                                "Can't generate SQL for binary expr: {}",
+                                e
+                            ))
+                        })?;
+                    Ok((resulting_sql, sql_query))
+                }
                 // Expr::AnyExpr { .. } => {}
                 // Expr::Like(_) => {}-=
                 // Expr::ILike(_) => {}
@@ -434,7 +459,64 @@ impl CubeScanWrapperNode {
                 // Expr::Negative(_) => {}
                 // Expr::GetIndexedField { .. } => {}
                 // Expr::Between { .. } => {}
-                // Expr::Case { .. } => {}
+                Expr::Case {
+                    expr,
+                    when_then_expr,
+                    else_expr,
+                } => {
+                    let expr = if let Some(expr) = expr {
+                        let (expr, sql_query_next) = Self::generate_sql_for_expr(
+                            plan.clone(),
+                            sql_query,
+                            sql_generator.clone(),
+                            *expr,
+                        )
+                        .await?;
+                        sql_query = sql_query_next;
+                        Some(expr)
+                    } else {
+                        None
+                    };
+                    let mut when_then_expr_sql = Vec::new();
+                    for (when, then) in when_then_expr {
+                        let (when, sql_query_next) = Self::generate_sql_for_expr(
+                            plan.clone(),
+                            sql_query,
+                            sql_generator.clone(),
+                            *when,
+                        )
+                        .await?;
+                        let (then, sql_query_next) = Self::generate_sql_for_expr(
+                            plan.clone(),
+                            sql_query_next,
+                            sql_generator.clone(),
+                            *then,
+                        )
+                        .await?;
+                        sql_query = sql_query_next;
+                        when_then_expr_sql.push((when, then));
+                    }
+                    let else_expr = if let Some(else_expr) = else_expr {
+                        let (else_expr, sql_query_next) = Self::generate_sql_for_expr(
+                            plan.clone(),
+                            sql_query,
+                            sql_generator.clone(),
+                            *else_expr,
+                        )
+                        .await?;
+                        sql_query = sql_query_next;
+                        Some(else_expr)
+                    } else {
+                        None
+                    };
+                    let resulting_sql = sql_generator
+                        .get_sql_templates()
+                        .case(expr, when_then_expr_sql, else_expr)
+                        .map_err(|e| {
+                            DataFusionError::Internal(format!("Can't generate SQL for case: {}", e))
+                        })?;
+                    Ok((resulting_sql, sql_query))
+                }
                 // Expr::Cast { .. } => {}
                 // Expr::TryCast { .. } => {}
                 // Expr::Sort { .. } => {}

@@ -2402,7 +2402,11 @@ class BaseQuery {
         select: 'SELECT {{ select_concat | map(attribute=\'aliased\') | join(\', \') }} \n' +
           'FROM (\n  {{ from }}\n) AS {{ from_alias }} \n' +
           '{% if group_by %} GROUP BY {{ group_by | map(attribute=\'index\') | join(\', \') }}{% endif %}',
+      },
+      expressions: {
         column_aliased: '{{expr}} {{quoted_alias}}',
+        case: 'CASE {% if expr %}{{ expr }} {% endif %}{% for when, then in when_then %}WHEN {{ when }} THEN {{ then }}{% endfor %}{% if else_expr %} ELSE {{ else_expr }}{% endif %} END',
+        binary: '{{ left }} {{ op }} {{ right }}'
       },
       quotes: {
         identifiers: '"',

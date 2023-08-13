@@ -1695,6 +1695,8 @@ mod tests {
 
         fn find_cube_scan(&self) -> CubeScanNode;
 
+        fn find_cube_scan_wrapper(&self) -> CubeScanWrapperNode;
+
         fn find_cube_scans(&self) -> Vec<CubeScanNode>;
 
         fn find_filter(&self) -> Option<Filter>;
@@ -1734,6 +1736,20 @@ mod tests {
             }
 
             cube_scans[0].clone()
+        }
+
+        fn find_cube_scan_wrapper(&self) -> CubeScanWrapperNode {
+            match self {
+                LogicalPlan::Extension(Extension { node }) => {
+                    if let Some(wrapper_node) = node.as_any().downcast_ref::<CubeScanWrapperNode>()
+                    {
+                        wrapper_node.clone()
+                    } else {
+                        panic!("Root plan node is not cube_scan_wrapper!");
+                    }
+                }
+                _ => panic!("Root plan node is not extension!"),
+            }
         }
 
         fn find_cube_scans(&self) -> Vec<CubeScanNode> {
@@ -17929,20 +17945,39 @@ ORDER BY \"COUNT(count)\" DESC"
         )
         .await;
 
-        // let logical_plan = query_plan.as_logical_plan();
-        // assert_eq!(
-        //     logical_plan.find_cube_scan().request,
-        //     V1LoadRequestQuery {
-        //         measures: Some(vec!["KibanaSampleDataEcommerce.avgPrice".to_string(),]),
-        //         segments: Some(vec![]),
-        //         dimensions: Some(vec![]),
-        //         time_dimensions: None,
-        //         order: None,
-        //         limit: None,
-        //         offset: None,
-        //         filters: None
-        //     }
-        // );
+        let logical_plan = query_plan.as_logical_plan();
+        assert!(logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql
+            .contains("COALESCE"));
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_case_wrapper() {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT CASE WHEN customer_gender = 'female' THEN 'f' ELSE 'm' END, MIN(avgPrice) mp FROM (SELECT avgPrice, customer_gender FROM KibanaSampleDataEcommerce LIMIT 1) a GROUP BY 1"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+            .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert!(logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql
+            .contains("CASE WHEN"));
 
         let physical_plan = query_plan.as_physical_plan().await.unwrap();
         println!(

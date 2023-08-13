@@ -118,6 +118,7 @@ jobs:
         env:
           CUBESQL_TESTING_CUBE_TOKEN: ${{ secrets.CUBESQL_TESTING_CUBE_TOKEN }}
           CUBESQL_TESTING_CUBE_URL: ${{ secrets.CUBESQL_TESTING_CUBE_URL }}
+          CUBESQL_SQL_PUSH_DOWN: true
         run: cd rust/cubesql && cargo test
 
   native_linux:
