@@ -84,6 +84,7 @@ pub trait QueryPlanner: DIService + Send + Sync {
         &self,
         statement: Statement,
         inline_tables: &InlineTables,
+        trace_obj: Option<String>,
     ) -> Result<QueryPlan, CubeError>;
     async fn execute_meta_plan(&self, plan: LogicalPlan) -> Result<DataFrame, CubeError>;
 }
@@ -110,6 +111,7 @@ impl QueryPlanner for QueryPlannerImpl {
         &self,
         statement: Statement,
         inline_tables: &InlineTables,
+        trace_obj: Option<String>,
     ) -> Result<QueryPlan, CubeError> {
         let ctx = self.execution_context().await?;
 
@@ -139,7 +141,10 @@ impl QueryPlanner for QueryPlannerImpl {
                 &logical_plan,
                 &meta.multi_part_subtree,
             )?;
-            QueryPlan::Select(SerializedPlan::try_new(logical_plan, meta).await?, workers)
+            QueryPlan::Select(
+                SerializedPlan::try_new(logical_plan, meta, trace_obj).await?,
+                workers,
+            )
         } else {
             QueryPlan::Meta(logical_plan)
         };

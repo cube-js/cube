@@ -13,9 +13,24 @@ pub enum TaskType {
     Job,
 }
 
+impl TaskType {
+    pub fn name(&self) -> String {
+        match self {
+            Self::Select => "select".to_string(),
+            Self::Job => "job".to_string(),
+        }
+    }
+}
+
+#[derive(Clone, Default)]
+pub struct TraceIndex {
+    pub table_id: Option<u64>,
+    pub trace_obj: Option<String>,
+}
+
 #[async_trait]
 pub trait ProcessRateLimiter: DIService + Send + Sync {
-    async fn commit_task_usage(&self, task_type: TaskType, size: i64);
+    async fn commit_task_usage(&self, task_type: TaskType, size: i64, trace_index: TraceIndex);
 
     async fn current_budget(&self, task_type: TaskType) -> Option<i64>;
 
@@ -46,7 +61,7 @@ impl BasicProcessRateLimiter {
 
 #[async_trait]
 impl ProcessRateLimiter for BasicProcessRateLimiter {
-    async fn commit_task_usage(&self, _task_type: TaskType, _size: i64) {}
+    async fn commit_task_usage(&self, _task_type: TaskType, _size: i64, _trace_index: TraceIndex) {}
 
     async fn current_budget(&self, _task_type: TaskType) -> Option<i64> {
         None
