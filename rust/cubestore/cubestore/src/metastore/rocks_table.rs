@@ -284,6 +284,7 @@ where
                 if table_id != self.table_id {
                     return None;
                 }
+
                 Some(self.table.deserialize_id_row(row_id, &value))
             } else {
                 None
@@ -877,6 +878,18 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
             batch_pipe.batch().put(row.key, row.val);
         }
         Ok(IdRow::new(row_id, new_row))
+    }
+
+    fn truncate(&self, batch_pipe: &mut BatchPipe) -> Result<(), CubeError> {
+        let iter = self.table_scan(self.snapshot())?;
+
+        for item in iter {
+            let item = item?;
+
+            self.delete_impl(item, batch_pipe)?;
+        }
+
+        Ok(())
     }
 
     fn delete(&self, row_id: u64, batch_pipe: &mut BatchPipe) -> Result<IdRow<Self::T>, CubeError> {

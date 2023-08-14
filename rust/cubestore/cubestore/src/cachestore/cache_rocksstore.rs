@@ -581,10 +581,7 @@ impl CacheStore for RocksCacheStore {
         self.store
             .write_operation(move |db_ref, batch_pipe| {
                 let cache_schema = CacheItemRocksTable::new(db_ref);
-                let rows = cache_schema.all_rows()?;
-                for row in rows.iter() {
-                    cache_schema.delete(row.get_id(), batch_pipe)?;
-                }
+                cache_schema.truncate(batch_pipe)?;
 
                 Ok(())
             })
@@ -728,16 +725,10 @@ impl CacheStore for RocksCacheStore {
         self.store
             .write_operation(move |db_ref, batch_pipe| {
                 let queue_item_schema = QueueItemRocksTable::new(db_ref.clone());
-                let rows = queue_item_schema.all_rows()?;
-                for row in rows.iter() {
-                    queue_item_schema.delete(row.get_id(), batch_pipe)?;
-                }
+                queue_item_schema.truncate(batch_pipe)?;
 
                 let queue_result_schema = QueueResultRocksTable::new(db_ref);
-                let rows = queue_result_schema.all_rows()?;
-                for row in rows.iter() {
-                    queue_result_schema.delete(row.get_id(), batch_pipe)?;
-                }
+                queue_result_schema.truncate(batch_pipe)?;
 
                 Ok(())
             })
