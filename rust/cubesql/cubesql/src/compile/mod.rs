@@ -36,7 +36,7 @@ use self::{
     engine::{
         context::VariablesProvider,
         df::{
-            optimizers::{FilterPushDown, LimitPushDown, SortPushDown},
+            optimizers::{FilterPushDown, LimitPushDown, SortPushDown, WindowAggrPutProjection},
             planner::CubeQueryPlanner,
             scan::{CubeScanNode, MemberField},
         },
@@ -1269,6 +1269,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
             Arc::new(FilterPushDown::new()),
             Arc::new(SortPushDown::new()),
             Arc::new(LimitPushDown::new()),
+            Arc::new(WindowAggrPutProjection::new()),
         ];
         for optimizer in optimizers {
             // TODO: report an error when the plan can't be optimized
@@ -18433,5 +18434,72 @@ ORDER BY \"COUNT(count)\" DESC"
         );
 
         Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_window_aggr_cube() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                "customer_gender" AS "col1",
+                date_trunc('day', "order_date") AS "col2",
+                COUNT(*) AS "count",
+                COUNT(DISTINCT "countDistinct") AS "col3",
+                DENSE_RANK() OVER (ORDER BY "customer_gender" NULLS FIRST) AS "$RANK_1",
+                DENSE_RANK() OVER (ORDER BY date_trunc('day', "order_date") DESC NULLS LAST) AS "$RANK_2"
+            FROM "public"."KibanaSampleDataEcommerce"
+            WHERE
+                "customer_gender" IN ('test')
+                AND "order_date" >= date_trunc(
+                    'day',
+                    TO_TIMESTAMP('2023-03-12 00:00:00', 'yyyy-MM-dd HH24:mi:ss')
+                )
+            GROUP BY
+                "customer_gender",
+                date_trunc('day', "order_date")
+            ;"#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![
+                    "KibanaSampleDataEcommerce.count".to_string(),
+                    "KibanaSampleDataEcommerce.countDistinct".to_string()
+                ]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("day".to_string()),
+                    date_range: None,
+                }]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem {
+                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                        operator: Some("equals".to_string()),
+                        values: Some(vec!["test".to_string()]),
+                        or: None,
+                        and: None
+                    },
+                    V1LoadRequestQueryFilterItem {
+                        member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
+                        operator: Some("afterDate".to_string()),
+                        values: Some(vec!["2023-03-12T00:00:00.000Z".to_string()]),
+                        or: None,
+                        and: None
+                    },
+                ])
+            }
+        )
     }
 }
