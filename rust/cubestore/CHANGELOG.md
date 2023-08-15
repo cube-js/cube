@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.47](https://github.com/cube-js/cube.js/compare/v0.33.46...v0.33.47) (2023-08-15)
+
+
+### Bug Fixes
+
+* **cubestore:** Reduce memory usage while truncating ([#7031](https://github.com/cube-js/cube.js/issues/7031)) ([29080d7](https://github.com/cube-js/cube.js/commit/29080d72661bb23529d35343a7b1f4f20cda9ec6))
+
+
+
+
+
 ## [0.33.46](https://github.com/cube-js/cube.js/compare/v0.33.45...v0.33.46) (2023-08-14)
 
 
