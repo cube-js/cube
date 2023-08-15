@@ -5,10 +5,14 @@ support for querying data in CSV, JSON and Parquet formats from an AWS
 S3-compatible blob storage. This means you can [query data stored in AWS S3,
 Google Cloud Storage, or CloudFlare R2][duckdb-docs-s3-import].
 
+<Diagram src="https://ucarecdn.com/8a703f95-3341-40f0-8132-602186ef90c5/" />
+
 Cube can also connect to [MotherDuck][motherduck], a cloud-based serverless
 analytics platform built on DuckDB. When connected to MotherDuck, DuckDB uses
 [hybrid execution][motherduck-docs-architecture] and routes queries to S3
 through MotherDuck for better performance.
+
+<Diagram src="https://ucarecdn.com/12aae105-661f-40b3-83d0-ae1f3ba16a80/" />
 
 ## Prerequisites
 
