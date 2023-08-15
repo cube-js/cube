@@ -1,0 +1,814 @@
+use crate::cachestore::cache_item::{CacheItemRocksIndex, CacheItemRocksTable};
+use crate::cachestore::CacheItem;
+use crate::config::ConfigObj;
+use crate::metastore::{
+    BaseRocksSecondaryIndex, IdRow, PackedDateTime, RocksSecondaryIndexValueTTLExtended,
+    RocksSecondaryIndexValueVersionDecoder, RocksSecondaryIndexValueVersionEncoder, RocksStore,
+    RocksTable,
+};
+use crate::util::aborting_join_handle::AbortingJoinHandle;
+use crate::util::WorkerLoop;
+use crate::{app_metrics, CubeError};
+use chrono::Utc;
+use datafusion::cube_ext;
+use itertools::Itertools;
+use log::trace;
+use serde_derive::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::str::FromStr;
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+use std::sync::Arc;
+use tokio::sync::RwLockWriteGuard;
+
+#[derive(Debug)]
+struct CacheLookupEvent {
+    row_id: u64,
+    raw_size: u32,
+    key_hash: [u8; 8],
+}
+
+#[derive(Debug, Clone)]
+pub struct CachePolicyData {
+    pub key_hash: [u8; 8],
+    pub raw_size: u32,
+    pub lru: PackedDateTime,
+    pub lfu: u8,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum CacheEvictionPolicy {
+    // Keeps most recently used keys, iterating over all keys without sampling
+    ALLKEYS_LRU = 0,
+    // Keeps most least frequently used, iterating over all keys without sampling
+    ALLKEYS_LFU = 1,
+    // Removes shortest remaining time-to-live (TTL) values, iterating over all keys without sampling
+    ALLKEYS_TTL = 2,
+    // Keeps most recently used keys, iterating over all keys by sampling & exit earlier when it's possible
+    SAMPLED_LRU = 3,
+    // Keeps most recently used keys, iterating over all keys by sampling & exit earlier when it's possible
+    SAMPLED_LFU = 4,
+    // Removes shortest remaining time-to-live (TTL) values, iterating over all keys by sampling & exit earlier when it's possible
+    SAMPLED_TTL = 5,
+}
+
+impl CacheEvictionPolicy {
+    pub fn to_weight(&self) -> CacheEvictionWeightCriteria {
+        match self {
+            CacheEvictionPolicy::ALLKEYS_LRU => CacheEvictionWeightCriteria::ByLRU,
+            CacheEvictionPolicy::ALLKEYS_LFU => CacheEvictionWeightCriteria::ByLFU,
+            CacheEvictionPolicy::ALLKEYS_TTL => CacheEvictionWeightCriteria::ByTTL,
+            CacheEvictionPolicy::SAMPLED_LRU => CacheEvictionWeightCriteria::ByLRU,
+            CacheEvictionPolicy::SAMPLED_LFU => CacheEvictionWeightCriteria::ByLFU,
+            CacheEvictionPolicy::SAMPLED_TTL => CacheEvictionWeightCriteria::ByTTL,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum CacheEvictionWeightCriteria {
+    ByLRU,
+    ByTTL,
+    ByLFU,
+}
+
+#[derive(Debug)]
+enum EvictionState {
+    Unknown,
+    Loading,
+    Ready,
+}
+
+impl FromStr for CacheEvictionPolicy {
+    type Err = CubeError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match &s {
+            &"allkeys-lru" => Ok(CacheEvictionPolicy::ALLKEYS_LRU),
+            &"allkeys-lfu" => Ok(CacheEvictionPolicy::ALLKEYS_LFU),
+            &"allkeys-ttl" => Ok(CacheEvictionPolicy::ALLKEYS_TTL),
+            &"sampled-lru" => Ok(CacheEvictionPolicy::SAMPLED_LRU),
+            &"sampled-lfu" => Ok(CacheEvictionPolicy::SAMPLED_LRU),
+            &"sampled-ttl" => Ok(CacheEvictionPolicy::SAMPLED_TTL),
+            other => Err(CubeError::user(format!(
+                "Unsupported cache eviction type: {}",
+                other
+            ))),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct CacheEvictionManager {
+    ttl_buffer: Arc<tokio::sync::RwLock<HashMap<u64, CachePolicyData>>>,
+    ttl_lookup_tx: tokio::sync::mpsc::Sender<CacheLookupEvent>,
+    pub persist_loop: Arc<WorkerLoop>,
+    pub eviction_loop: Arc<WorkerLoop>,
+    // eviction state
+    eviction_state: tokio::sync::RwLock<EvictionState>,
+    // Some stats
+    stats_total_keys: AtomicU32,
+    stats_total_raw_size: AtomicU64,
+    // Limits from configuration
+    limit_max_keys: u32,
+    limit_max_size_hard: u64,
+    limit_max_size_soft: u64,
+    eviction_policy: CacheEvictionPolicy,
+    // Configuration
+    persist_batch_size: usize,
+    eviction_batch_size: usize,
+    // if ttl of a key is less then this value, key will be evicted
+    // this help to delete upcoming keys for deleting
+    eviction_min_ttl_threshold: u32,
+    // background listener to track events
+    _ttl_tl_loop_join_handle: Arc<AbortingJoinHandle<()>>,
+}
+
+#[derive(Debug)]
+struct DeleteBatchResult {
+    deleted_count: u32,
+    deleted_size: u64,
+    skipped: u32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct EvictionResult {
+    pub total_keys_removed: u32,
+    pub total_size_removed: u64,
+    pub total_delete_skipped: u32,
+    pub stats_total_keys: u32,
+    pub stats_total_raw_size: u64,
+}
+
+impl CacheEvictionManager {
+    pub fn get_stats_total_keys(&self) -> u32 {
+        self.stats_total_keys.load(Ordering::SeqCst)
+    }
+
+    pub fn get_stats_total_raw_size(&self) -> u64 {
+        self.stats_total_raw_size.load(Ordering::SeqCst)
+    }
+
+    pub fn new(config: &Arc<dyn ConfigObj>) -> Self {
+        let ttl_buffer: HashMap<u64, CachePolicyData> = HashMap::new();
+        let ttl_buffer = Arc::new(tokio::sync::RwLock::new(ttl_buffer));
+        let (ttl_lookup_tx, mut ttl_lookup_rx) =
+            tokio::sync::mpsc::channel::<CacheLookupEvent>(32_768);
+
+        let ttl_buffer_to_move = ttl_buffer.clone();
+
+        let join_handle = cube_ext::spawn_blocking(move || loop {
+            if let Some(event) = ttl_lookup_rx.blocking_recv() {
+                {
+                    let mut ttl_buffer = ttl_buffer_to_move.blocking_write();
+                    if let Some(mut cache_data) = ttl_buffer.get_mut(&event.row_id) {
+                        let expired_lfu = if let Some(previous_lru) =
+                            cache_data.lru.decode_value_as_opt_datetime().unwrap()
+                        {
+                            previous_lru < Utc::now() - chrono::Duration::seconds(60 * 2)
+                        } else {
+                            true
+                        };
+
+                        cache_data.lru = Utc::now().encode_value_as_u32().unwrap();
+
+                        if expired_lfu {
+                            cache_data.lfu = 1;
+                        } else {
+                            if cache_data.lfu < u8::MAX {
+                                cache_data.lfu += 1;
+                            }
+                        }
+                    } else {
+                        ttl_buffer.insert(
+                            event.row_id,
+                            CachePolicyData {
+                                key_hash: event.key_hash,
+                                raw_size: event.raw_size,
+                                lru: Utc::now().encode_value_as_u32().unwrap(),
+                                lfu: 1,
+                            },
+                        );
+                    };
+                }
+            }
+        });
+
+        Self {
+            ttl_buffer,
+            ttl_lookup_tx,
+            persist_loop: Arc::new(WorkerLoop::new("Cachestore ttl persist")),
+            eviction_loop: Arc::new(WorkerLoop::new("Cachestore eviction")),
+            eviction_state: tokio::sync::RwLock::new(EvictionState::Unknown),
+            stats_total_keys: AtomicU32::new(0),
+            stats_total_raw_size: AtomicU64::new(0),
+            // Limits & Evict
+            limit_max_size_soft: config.cachestore_cache_max_size_soft(),
+            limit_max_size_hard: config.cachestore_cache_max_size_hard(),
+            limit_max_keys: config.cachestore_cache_max_keys(),
+            eviction_policy: config.cachestore_cache_eviction_policy().clone(),
+            //
+            persist_batch_size: config.cachestore_cache_persist_batch_size(),
+            eviction_batch_size: config.cachestore_cache_eviction_batch_size(),
+            eviction_min_ttl_threshold: config.cachestore_cache_eviction_min_ttl_threshold(),
+            //
+            _ttl_tl_loop_join_handle: Arc::new(AbortingJoinHandle::new(join_handle)),
+        }
+    }
+
+    pub fn stop_processing_loops(&self) {
+        self.persist_loop.stop();
+        self.eviction_loop.stop();
+    }
+
+    async fn delete_batch(
+        &self,
+        batch: Vec<(u64, u32)>,
+        store: &Arc<RocksStore>,
+    ) -> Result<DeleteBatchResult, CubeError> {
+        let ttl_buffer_to_move = self.ttl_buffer.clone();
+
+        let (deleted_count, deleted_size, skipped) = store
+            .write_operation(move |db_ref, pipe| {
+                let guard = ttl_buffer_to_move.blocking_read();
+                let cache_schema = CacheItemRocksTable::new(db_ref.clone());
+
+                let mut deleted_count: u32 = 0;
+                let mut deleted_size: u64 = 0;
+                let mut skipped: u32 = 0;
+
+                for (id, raw_size) in batch {
+                    if !guard.contains_key(&id) {
+                        if let Some(_) = cache_schema.try_delete(id, pipe)? {
+                            deleted_count += 1;
+                            deleted_size += raw_size as u64;
+                        } else {
+                            skipped += 1;
+                        };
+                    }
+                }
+
+                Ok((deleted_count, deleted_size, skipped))
+            })
+            .await?;
+
+        self.stats_total_keys
+            .fetch_sub(deleted_count, Ordering::Relaxed);
+        self.stats_total_raw_size
+            .fetch_sub(deleted_size, Ordering::Relaxed);
+
+        app_metrics::CACHESTORE_EVICTION_REMOVED_KEYS.add(deleted_count as i64);
+        app_metrics::CACHESTORE_EVICTION_REMOVED_SIZE.add(deleted_size as i64);
+
+        Ok(DeleteBatchResult {
+            deleted_count,
+            deleted_size,
+            skipped,
+        })
+    }
+
+    pub async fn run_eviction(&self, store: &Arc<RocksStore>) -> Result<EvictionResult, CubeError> {
+        trace!(
+            "Eviction started, total_keys: {}, total_size: {}",
+            self.get_stats_total_keys(),
+            self.get_stats_total_raw_size()
+        );
+
+        let mut state = self.eviction_state.write().await;
+        if let EvictionState::Unknown = *state {
+            *state = EvictionState::Loading;
+
+            let absolute_items = self.collect_stats_and_candidates_to_evict(&store).await?;
+            let absolute_items_len = absolute_items.len();
+
+            let mut total_keys_removed = 0;
+            let mut total_size_removed = 0;
+            let mut total_delete_skipped = 0;
+
+            if absolute_items_len > 0 {
+                let batch_result = self.delete_batch(absolute_items, &store).await?;
+                total_keys_removed += batch_result.deleted_count;
+                total_size_removed += batch_result.deleted_size;
+                total_delete_skipped += batch_result.skipped;
+            }
+
+            trace!(
+                "Eviction loaded stats, total_keys: {}, total_size: {}, absolute: {}",
+                self.get_stats_total_keys(),
+                self.get_stats_total_raw_size(),
+                absolute_items_len
+            );
+
+            *state = EvictionState::Ready;
+
+            return Ok(EvictionResult {
+                stats_total_keys: self.get_stats_total_keys(),
+                stats_total_raw_size: self.get_stats_total_raw_size(),
+                total_keys_removed,
+                total_size_removed,
+                total_delete_skipped,
+            });
+        }
+
+        let eviction_fut = if self.get_stats_total_keys() > self.limit_max_keys {
+            let need_to_evict = (self.get_stats_total_keys() - self.limit_max_keys) as u64;
+            trace!(
+                "Max keys limit eviction: {} > {}, need to evict: {}",
+                self.get_stats_total_keys(),
+                self.limit_max_keys,
+                need_to_evict
+            );
+
+            self.do_eviction(&store, need_to_evict, false)
+        } else if self.get_stats_total_raw_size() > self.limit_max_size_soft {
+            let need_to_evict = (self.get_stats_total_raw_size() - self.limit_max_size_soft) as u64;
+            trace!(
+                "Max size limit eviction: {} > {}, need to evict: {}",
+                self.get_stats_total_raw_size(),
+                self.limit_max_size_soft,
+                need_to_evict
+            );
+
+            self.do_eviction(&store, need_to_evict, true)
+        } else {
+            trace!("Nothing to evict");
+
+            return Ok(EvictionResult {
+                total_keys_removed: 0,
+                total_size_removed: 0,
+                total_delete_skipped: 0,
+                stats_total_keys: self.get_stats_total_keys(),
+                stats_total_raw_size: self.get_stats_total_raw_size(),
+            });
+        };
+
+        let result = eviction_fut.await?;
+
+        trace!(
+            "Eviction finished, total_keys: {}, total_size: {}",
+            self.get_stats_total_keys(),
+            self.get_stats_total_raw_size()
+        );
+
+        Ok(result)
+    }
+
+    async fn collect_stats_and_candidates_to_evict(
+        &self,
+        store: &Arc<RocksStore>,
+    ) -> Result<Vec<(u64, u32)>, CubeError> {
+        let eviction_min_ttl_threshold = self.eviction_min_ttl_threshold as i64;
+
+        let (to_delete, stats_total_keys, stats_total_raw_size) = store
+            .read_operation_out_of_queue(move |db_ref| {
+                let mut stats_total_keys: u32 = 0;
+                let mut stats_total_raw_size: u64 = 0;
+
+                let mut result = Vec::with_capacity(16);
+                let started_date =
+                    Utc::now() + chrono::Duration::seconds(eviction_min_ttl_threshold);
+                let cache_schema = CacheItemRocksTable::new(db_ref.clone());
+
+                for item in cache_schema.scan_index_values(&CacheItemRocksIndex::ByPath)? {
+                    let item = item?;
+
+                    stats_total_keys += 1;
+
+                    let row_size = if let Some(extended) = item.extended {
+                        stats_total_raw_size += extended.raw_size as u64;
+                        extended.raw_size
+                    } else {
+                        0
+                    };
+
+                    if let Some(ttl) = item.ttl {
+                        if ttl < started_date {
+                            result.push((item.row_id, row_size));
+                        }
+                    }
+                }
+
+                Ok((result, stats_total_keys, stats_total_raw_size))
+            })
+            .await?;
+
+        self.stats_total_keys
+            .store(stats_total_keys, Ordering::Release);
+        self.stats_total_raw_size
+            .store(stats_total_raw_size, Ordering::Release);
+
+        Ok(to_delete)
+    }
+
+    async fn collect_candidates_to_evict(
+        &self,
+        criteria: CacheEvictionWeightCriteria,
+        store: &Arc<RocksStore>,
+    ) -> Result<Vec<(u64, u32)>, CubeError> {
+        let eviction_min_ttl_threshold = self.eviction_min_ttl_threshold as i64;
+
+        let batch_to_delete = store
+            .read_operation_out_of_queue(move |db_ref| {
+                let mut stats_total_raw_size: u64 = 0;
+                let started_date =
+                    Utc::now() + chrono::Duration::seconds(eviction_min_ttl_threshold);
+
+                let cache_schema = CacheItemRocksTable::new(db_ref.clone());
+                let mut result = Vec::new();
+
+                for item in cache_schema.scan_index_values(&CacheItemRocksIndex::ByPath)? {
+                    let item = item?;
+
+                    let (weight, raw_size) = if let Some(extended) = item.extended {
+                        stats_total_raw_size += extended.raw_size as u64;
+
+                        let weight = match criteria {
+                            CacheEvictionWeightCriteria::ByLRU => {
+                                extended.lru.encode_value_as_u32()?
+                            }
+                            CacheEvictionWeightCriteria::ByTTL => item.ttl.encode_value_as_u32()?,
+                            CacheEvictionWeightCriteria::ByLFU => extended.lfu as u32,
+                        };
+
+                        (weight, extended.raw_size)
+                    } else {
+                        (/* height priority to delete */ 0, 0)
+                    };
+
+                    if let Some(ttl) = item.ttl {
+                        if ttl < started_date {
+                            result.push((item.row_id, weight, raw_size));
+                            continue;
+                        }
+                    }
+
+                    result.push((item.row_id, weight, raw_size))
+                }
+
+                Ok(result)
+            })
+            .await?;
+
+        let ttl_sorted: Vec<(u64, /* weight */ u32, /* raw_size */ u32)> = batch_to_delete
+            .into_iter()
+            .sorted_by(|(_, a, _), (_, b, _)| a.cmp(b))
+            .collect();
+
+        let mapped = ttl_sorted
+            .into_iter()
+            .map(|(id, weight, raw_size)| (id, raw_size))
+            .collect();
+
+        Ok(mapped)
+    }
+
+    async fn do_eviction_by_allkeys(
+        &self,
+        store: &Arc<RocksStore>,
+        target: u64,
+        target_is_size: bool,
+        criteria: CacheEvictionWeightCriteria,
+    ) -> Result<EvictionResult, CubeError> {
+        let to_evict = self.collect_candidates_to_evict(criteria, &store).await?;
+
+        let stats_total_keys = self.get_stats_total_keys();
+        let stats_total_raw_size = self.get_stats_total_raw_size();
+
+        let mut total_size_removed = 0_u64;
+        let mut total_keys_removed = 0_u32;
+        let mut total_delete_skipped = 0_u32;
+
+        let mut batch = Vec::with_capacity(self.eviction_batch_size);
+
+        for (id, raw_size) in to_evict {
+            batch.push((id, raw_size));
+
+            if batch.len() >= self.eviction_batch_size {
+                let current_batch =
+                    std::mem::replace(&mut batch, Vec::with_capacity(self.eviction_batch_size));
+                let batch_result = self.delete_batch(current_batch, &store).await?;
+
+                total_size_removed += batch_result.deleted_size;
+                total_keys_removed += batch_result.deleted_count;
+                total_delete_skipped += batch_result.skipped;
+
+                if target_is_size {
+                    if total_size_removed >= target {
+                        return Ok(EvictionResult {
+                            total_keys_removed,
+                            total_size_removed,
+                            total_delete_skipped,
+                            stats_total_keys,
+                            stats_total_raw_size,
+                        });
+                    }
+                } else {
+                    if total_keys_removed >= target as u32 {
+                        return Ok(EvictionResult {
+                            total_keys_removed,
+                            total_size_removed,
+                            total_delete_skipped,
+                            stats_total_keys,
+                            stats_total_raw_size,
+                        });
+                    }
+                }
+            }
+        }
+
+        return Ok(EvictionResult {
+            total_keys_removed,
+            total_size_removed,
+            total_delete_skipped,
+            stats_total_keys,
+            stats_total_raw_size,
+        });
+    }
+
+    async fn do_eviction_by_sampling(
+        &self,
+        store: &Arc<RocksStore>,
+        target: u64,
+        target_is_size: bool,
+        criteria: CacheEvictionWeightCriteria,
+    ) -> Result<EvictionResult, CubeError> {
+        // move
+        let eviction_batch_size = self.eviction_batch_size;
+
+        let to_delete: Vec<(u64, u32)> = store
+            .read_operation_out_of_queue(move |db_ref| {
+                let mut pending_volume_remove: u64 = 0;
+
+                let mut to_delete = Vec::with_capacity(eviction_batch_size);
+                let cache_schema = CacheItemRocksTable::new(db_ref.clone());
+
+                let mut sampling_count = 0;
+                let mut sampling_min: Option<(
+                    /* row_id */ u64,
+                    /* lru */ u32,
+                    /* raw_size */ u32,
+                )> = None;
+
+                for item in cache_schema.scan_index_values(&CacheItemRocksIndex::ByPath)? {
+                    let item = item?;
+
+                    let (weight, raw_size) = if let Some(extended) = item.extended {
+                        let weight = match criteria {
+                            CacheEvictionWeightCriteria::ByLRU => {
+                                extended.lru.encode_value_as_u32()?
+                            }
+                            CacheEvictionWeightCriteria::ByTTL => item.ttl.encode_value_as_u32()?,
+                            CacheEvictionWeightCriteria::ByLFU => extended.lfu as u32,
+                        };
+
+                        (weight, extended.raw_size)
+                    } else {
+                        (/* height priority to delete */ 0, 0)
+                    };
+
+                    if let Some((_, min_weight, _)) = sampling_min {
+                        if min_weight > weight {
+                            sampling_min = Some((item.row_id, weight, raw_size));
+                        }
+                    } else {
+                        sampling_min = Some((item.row_id, weight, raw_size));
+                    }
+
+                    sampling_count += 1;
+
+                    if sampling_count == 6 {
+                        let (min_id, _, min_raw_size) =
+                            sampling_min.take().expect("must contain sample");
+                        sampling_count = 0;
+
+                        if target_is_size {
+                            pending_volume_remove += min_raw_size as u64;
+                        } else {
+                            pending_volume_remove += 1;
+                        }
+
+                        to_delete.push((min_id, min_raw_size));
+
+                        if pending_volume_remove >= target {
+                            return Ok(to_delete);
+                        }
+                    }
+                }
+
+                Ok(to_delete)
+            })
+            .await?;
+
+        let mut batch = Vec::with_capacity(self.eviction_batch_size);
+
+        let mut total_keys_removed = 0;
+        let mut total_size_removed = 0;
+        let mut total_delete_skipped = 0;
+
+        for (row_id, raw_size) in to_delete {
+            batch.push((row_id, raw_size));
+
+            if batch.len() == self.eviction_batch_size {
+                let current_batch =
+                    std::mem::replace(&mut batch, Vec::with_capacity(self.eviction_batch_size));
+                let batch_result = self.delete_batch(current_batch, &store).await?;
+
+                total_size_removed += batch_result.deleted_size;
+                total_keys_removed += batch_result.deleted_count;
+                total_delete_skipped += batch_result.skipped;
+            }
+        }
+
+        return Ok(EvictionResult {
+            total_keys_removed,
+            total_size_removed,
+            total_delete_skipped,
+            stats_total_keys: self.get_stats_total_keys(),
+            stats_total_raw_size: self.get_stats_total_raw_size(),
+        });
+    }
+
+    async fn do_eviction(
+        &self,
+        store: &Arc<RocksStore>,
+        target: u64,
+        target_is_size: bool,
+    ) -> Result<EvictionResult, CubeError> {
+        return match self.eviction_policy {
+            CacheEvictionPolicy::ALLKEYS_LRU => {
+                self.do_eviction_by_allkeys(
+                    store,
+                    target,
+                    target_is_size,
+                    self.eviction_policy.to_weight(),
+                )
+                .await
+            }
+            CacheEvictionPolicy::ALLKEYS_LFU => {
+                self.do_eviction_by_allkeys(
+                    store,
+                    target,
+                    target_is_size,
+                    self.eviction_policy.to_weight(),
+                )
+                .await
+            }
+            CacheEvictionPolicy::ALLKEYS_TTL => {
+                self.do_eviction_by_allkeys(
+                    store,
+                    target,
+                    target_is_size,
+                    self.eviction_policy.to_weight(),
+                )
+                .await
+            }
+            CacheEvictionPolicy::SAMPLED_LRU => {
+                self.do_eviction_by_sampling(
+                    store,
+                    target,
+                    target_is_size,
+                    self.eviction_policy.to_weight(),
+                )
+                .await
+            }
+            CacheEvictionPolicy::SAMPLED_LFU => {
+                self.do_eviction_by_sampling(
+                    store,
+                    target,
+                    target_is_size,
+                    self.eviction_policy.to_weight(),
+                )
+                .await
+            }
+            CacheEvictionPolicy::SAMPLED_TTL => {
+                self.do_eviction_by_sampling(
+                    store,
+                    target,
+                    target_is_size,
+                    self.eviction_policy.to_weight(),
+                )
+                .await
+            }
+        };
+    }
+
+    pub async fn run_persist(&self, store: &Arc<RocksStore>) -> Result<(), CubeError> {
+        let (to_persist, buffer_len) = {
+            let mut ttl_buffer = self.ttl_buffer.write().await;
+            trace!("TTL persisting, buffer len: {}", ttl_buffer.len());
+
+            if ttl_buffer.len() >= self.persist_batch_size {
+                let mut to_persist = HashMap::with_capacity(self.persist_batch_size);
+                let all_keys: Vec<u64> = ttl_buffer
+                    .keys()
+                    .into_iter()
+                    .take(self.persist_batch_size)
+                    .map(|k| k.clone())
+                    .collect();
+
+                for key in all_keys.into_iter() {
+                    if let Some(item) = ttl_buffer.remove(&key) {
+                        to_persist.insert(key, item);
+                    }
+                }
+
+                (to_persist.into_iter(), ttl_buffer.len())
+            } else {
+                let old_state = std::mem::replace(&mut *ttl_buffer, HashMap::new());
+                (old_state.into_iter(), 0)
+            }
+        };
+
+        app_metrics::CACHESTORE_TTL_PERSIST.add(to_persist.len() as i64);
+        app_metrics::CACHESTORE_TTL_BUFFER.report(buffer_len as i64);
+
+        store
+            .write_operation(move |db_ref, pipe| {
+                let cache_schema = CacheItemRocksTable::new(db_ref.clone());
+
+                for (row_id, item) in to_persist.into_iter() {
+                    cache_schema.update_extended_ttl_secondary_index(
+                        row_id,
+                        &CacheItemRocksIndex::ByPath,
+                        item.key_hash.to_vec(),
+                        RocksSecondaryIndexValueTTLExtended {
+                            lfu: item.lfu,
+                            lru: item.lru.decode_value_as_opt_datetime()?,
+                            raw_size: item.raw_size,
+                        },
+                        pipe,
+                    )?;
+                }
+
+                Ok(())
+            })
+            .await?;
+
+        Ok(())
+    }
+
+    pub async fn notify_lookup(&self, id_row: &IdRow<CacheItem>) -> Result<(), CubeError> {
+        let event = CacheLookupEvent {
+            row_id: id_row.get_id(),
+            raw_size: id_row.get_row().get_value().len() as u32,
+            key_hash: CacheItemRocksIndex::ByPath
+                .key_hash(id_row.get_row())
+                .to_be_bytes(),
+        };
+        self.ttl_lookup_tx.send(event).await?;
+
+        Ok(())
+    }
+
+    pub async fn before_insert(&self, row_size: u64) -> Result<(), CubeError> {
+        if self.get_stats_total_raw_size() + row_size > self.limit_max_size_hard {
+            self.eviction_loop.trigger_process();
+        }
+
+        Ok(())
+    }
+
+    pub fn notify_insert(&self, raw_size: u64) -> Result<(), CubeError> {
+        self.stats_total_keys.fetch_add(1, Ordering::Relaxed);
+        self.stats_total_raw_size
+            .fetch_add(raw_size, Ordering::Relaxed);
+
+        Ok(())
+    }
+
+    pub async fn notify_delete(&self, row_id: u64, row_size: u64) -> Result<(), CubeError> {
+        let mut guard = self.ttl_buffer.write().await;
+        guard.remove(&row_id);
+
+        self.stats_total_keys.fetch_sub(1, Ordering::Relaxed);
+        self.stats_total_raw_size
+            .fetch_sub(row_size, Ordering::Relaxed);
+
+        Ok(())
+    }
+
+    pub async fn truncation_block<'a>(&'a self) -> Result<TruncationBlockGuard<'a>, CubeError> {
+        let mut ttl_buffer_guard = self.ttl_buffer.write().await;
+        *ttl_buffer_guard = HashMap::new();
+
+        let mut eviction_state_guard = self.eviction_state.write().await;
+        *eviction_state_guard = EvictionState::Ready;
+
+        self.stats_total_keys.store(0, Ordering::Relaxed);
+        self.stats_total_raw_size.store(0, Ordering::Relaxed);
+
+        Ok(TruncationBlockGuard {
+            _ttl_buffer_guard: ttl_buffer_guard,
+            _eviction_state_guard: eviction_state_guard,
+        })
+    }
+
+    pub async fn notify_truncate_end(&self) -> Result<(), CubeError> {
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
+pub struct TruncationBlockGuard<'a> {
+    _ttl_buffer_guard: RwLockWriteGuard<'a, HashMap<u64, CachePolicyData>>,
+    _eviction_state_guard: RwLockWriteGuard<'a, EvictionState>,
+}

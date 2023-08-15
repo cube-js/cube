@@ -13,8 +13,10 @@ use std::collections::HashMap;
 use std::env;
 
 use crate::metastore::{
-    BaseRocksStoreFs, BatchPipe, DbTableRef, IdRow, MetaStoreEvent, MetaStoreFs, RocksPropertyRow,
-    RocksStore, RocksStoreDetails, RocksTable,
+    BaseRocksSecondaryIndex, BaseRocksStoreFs, BatchPipe, DbTableRef, IdRow, MetaStoreEvent,
+    MetaStoreFs, RocksSecondaryIndex, RocksSecondaryIndexValueTTLExtended,
+    RocksSecondaryIndexValueVersionEncoder, RocksStore, RocksStoreDetails, RocksTable, RowKey,
+    SecondaryIndexValueScanIterItem, SecondaryKey,
 };
 use crate::remotefs::LocalDirRemoteFs;
 use crate::util::WorkerLoop;
@@ -22,8 +24,13 @@ use crate::{app_metrics, CubeError};
 use async_trait::async_trait;
 
 use futures_timer::Delay;
-use rocksdb::{BlockBasedOptions, Cache, Options, DB};
+use rocksdb::{
+    BlockBasedOptions, Cache, Direction, IteratorMode, MergeOperands, Options, ReadOptions, DB,
+};
 
+use crate::cachestore::cache_eviction_manager::{
+    CacheEvictionManager, CachePolicyData, EvictionResult,
+};
 use crate::cachestore::compaction::CompactionPreloadedState;
 use crate::cachestore::listener::RocksCacheStoreListener;
 use crate::table::{Row, TableValue};
@@ -33,8 +40,8 @@ use itertools::Itertools;
 use log::{trace, warn};
 use serde_derive::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::sync::{Arc, Mutex, RwLock};
+use std::time::{Duration, Instant};
 use tokio::sync::broadcast::Sender;
 use tokio::task::JoinHandle;
 
@@ -126,8 +133,11 @@ impl RocksStoreDetails for RocksCacheStoreDetails {
 
 pub struct RocksCacheStore {
     store: Arc<RocksStore>,
+    cache_eviction_manager: CacheEvictionManager,
     upload_loop: Arc<WorkerLoop>,
     metrics_loop: Arc<WorkerLoop>,
+    persist_loop: Arc<WorkerLoop>,
+    eviction_loop: Arc<WorkerLoop>,
 }
 
 impl RocksCacheStore {
@@ -143,26 +153,32 @@ impl RocksCacheStore {
         RocksCacheStoreListener::new(sender.subscribe())
     }
 
-    pub fn new(
+    pub async fn new(
         path: &Path,
         metastore_fs: Arc<dyn MetaStoreFs>,
         config: Arc<dyn ConfigObj>,
     ) -> Result<Arc<Self>, CubeError> {
-        Ok(Self::new_from_store(RocksStore::with_listener(
+        Self::new_from_store(RocksStore::with_listener(
             path,
             vec![],
             metastore_fs,
             config,
             Arc::new(RocksCacheStoreDetails {}),
-        )?))
+        )?)
+        .await
     }
 
-    fn new_from_store(store: Arc<RocksStore>) -> Arc<Self> {
-        Arc::new(Self {
+    async fn new_from_store(store: Arc<RocksStore>) -> Result<Arc<Self>, CubeError> {
+        let cache_eviction_manager = CacheEvictionManager::new(&store.config);
+
+        Ok(Arc::new(Self {
             store,
+            cache_eviction_manager,
             upload_loop: Arc::new(WorkerLoop::new("Cachestore upload")),
             metrics_loop: Arc::new(WorkerLoop::new("Cachestore metrics")),
-        })
+            persist_loop: Arc::new(WorkerLoop::new("Cachestore ttl persist")),
+            eviction_loop: Arc::new(WorkerLoop::new("Cachestore eviction")),
+        }))
     }
 
     pub async fn load_from_dump(
@@ -180,7 +196,7 @@ impl RocksCacheStore {
         )
         .await?;
 
-        Ok(Self::new_from_store(store))
+        Self::new_from_store(store).await
     }
 
     pub async fn load_from_remote(
@@ -192,7 +208,15 @@ impl RocksCacheStore {
             .load_from_remote(&path, config, Arc::new(RocksCacheStoreDetails {}))
             .await?;
 
-        Ok(Self::new_from_store(store))
+        Self::new_from_store(store).await
+    }
+
+    async fn run_ttl_persist(&self) -> Result<(), CubeError> {
+        self.cache_eviction_manager.run_persist(&self.store).await
+    }
+
+    async fn run_eviction(&self) -> Result<EvictionResult, CubeError> {
+        self.cache_eviction_manager.run_eviction(&self.store).await
     }
 
     pub fn spawn_processing_loops(self: Arc<Self>) -> Vec<JoinHandle<Result<(), CubeError>>> {
@@ -268,6 +292,7 @@ impl RocksCacheStore {
     }
 
     pub async fn stop_processing_loops(&self) {
+        self.cache_eviction_manager.stop_processing_loops();
         self.upload_loop.stop();
         self.metrics_loop.stop();
     }
@@ -276,16 +301,16 @@ impl RocksCacheStore {
         self.store.add_listener(listener).await;
     }
 
-    pub fn prepare_test_cachestore(test_name: &str) -> (Arc<LocalDirRemoteFs>, Arc<Self>) {
+    pub async fn prepare_test_cachestore(test_name: &str) -> (Arc<LocalDirRemoteFs>, Arc<Self>) {
         let store_path = env::current_dir()
             .unwrap()
             .join(format!("test-{}-local", test_name));
         let _ = std::fs::remove_dir_all(store_path.clone());
 
-        Self::prepare_test_cachestore_impl(test_name, store_path)
+        Self::prepare_test_cachestore_impl(test_name, store_path).await
     }
 
-    pub fn prepare_test_cachestore_from_fixtures(
+    pub async fn prepare_test_cachestore_from_fixtures(
         test_name: &str,
         remote_fixtures: &str,
     ) -> (Arc<LocalDirRemoteFs>, Arc<Self>) {
@@ -317,10 +342,10 @@ impl RocksCacheStore {
 
         copy_dir_all(&fixtures_path, store_path.join("cachestore")).unwrap();
 
-        Self::prepare_test_cachestore_impl(test_name, store_path)
+        Self::prepare_test_cachestore_impl(test_name, store_path).await
     }
 
-    fn prepare_test_cachestore_impl(
+    async fn prepare_test_cachestore_impl(
         test_name: &str,
         store_path: PathBuf,
     ) -> (Arc<LocalDirRemoteFs>, Arc<Self>) {
@@ -342,7 +367,7 @@ impl RocksCacheStore {
         )
         .unwrap();
 
-        (remote_fs, Self::new_from_store(store))
+        (remote_fs, Self::new_from_store(store).await.unwrap())
     }
 
     pub fn cleanup_test_cachestore(test_name: &str) {
@@ -596,6 +621,10 @@ pub trait CacheStore: DIService + Send + Sync {
 
     // Force compaction for the whole RocksDB
     async fn compaction(&self) -> Result<(), CubeError>;
+    // Force run for eviction
+    async fn eviction(&self) -> Result<EvictionResult, CubeError>;
+    // Force run for persist of lru/lfu stats
+    async fn persist(&self) -> Result<(), CubeError>;
     async fn healthcheck(&self) -> Result<(), CubeError>;
     async fn rocksdb_properties(&self) -> Result<Vec<RocksPropertyRow>, CubeError>;
 }
@@ -615,7 +644,12 @@ impl CacheStore for RocksCacheStore {
         item: CacheItem,
         update_if_not_exists: bool,
     ) -> Result<bool, CubeError> {
-        self.store
+        self.cache_eviction_manager
+            .before_insert(item.get_value().len() as u64)
+            .await?;
+
+        let (result, inserted) = self
+            .store
             .write_operation(move |db_ref, batch_pipe| {
                 let cache_schema = CacheItemRocksTable::new(db_ref.clone());
                 let index_key = CacheItemIndexKey::ByPath(item.get_path());
@@ -624,20 +658,30 @@ impl CacheStore for RocksCacheStore {
 
                 if let Some(id_row) = id_row_opt {
                     if update_if_not_exists {
-                        return Ok(false);
+                        return Ok((false, None));
                     };
 
                     cache_schema.update(id_row.id, item, &id_row.row, batch_pipe)?;
+                    Ok((true, None))
                 } else {
-                    cache_schema.insert(item, batch_pipe)?;
-                }
+                    let raw_size = item.get_value().len();
 
-                Ok(true)
+                    cache_schema.insert(item, batch_pipe)?;
+                    Ok((true, Some(raw_size)))
+                }
             })
-            .await
+            .await?;
+
+        if let Some(raw_size) = inserted {
+            self.cache_eviction_manager.notify_insert(raw_size as u64)?;
+        }
+
+        Ok(result)
     }
 
     async fn cache_truncate(&self) -> Result<(), CubeError> {
+        let block = self.cache_eviction_manager.truncation_block().await;
+
         self.store
             .write_operation(move |db_ref, batch_pipe| {
                 let cache_schema = CacheItemRocksTable::new(db_ref);
@@ -647,11 +691,14 @@ impl CacheStore for RocksCacheStore {
             })
             .await?;
 
+        drop(block);
+
         Ok(())
     }
 
     async fn cache_delete(&self, key: String) -> Result<(), CubeError> {
-        self.store
+        let result = self
+            .store
             .write_operation(move |db_ref, batch_pipe| {
                 let cache_schema = CacheItemRocksTable::new(db_ref.clone());
                 let index_key = CacheItemIndexKey::ByPath(key);
@@ -659,18 +706,30 @@ impl CacheStore for RocksCacheStore {
                     .get_single_opt_row_by_index(&index_key, &CacheItemRocksIndex::ByPath)?;
 
                 if let Some(row) = row_opt {
-                    cache_schema.delete_row(row, batch_pipe)?;
-                }
+                    let row_id = row.id;
+                    let raw_size = row.get_row().get_value().len();
 
-                Ok(())
+                    cache_schema.delete_row(row, batch_pipe)?;
+
+                    Ok(Some((row_id, raw_size)))
+                } else {
+                    Ok(None)
+                }
             })
             .await?;
+
+        if let Some((row_id, raw_size)) = result {
+            self.cache_eviction_manager
+                .notify_delete(row_id, raw_size as u64)
+                .await?;
+        }
 
         Ok(())
     }
 
     async fn cache_get(&self, key: String) -> Result<Option<IdRow<CacheItem>>, CubeError> {
-        self.store
+        let res = self
+            .store
             .read_operation(move |db_ref| {
                 let cache_schema = CacheItemRocksTable::new(db_ref.clone());
                 let index_key = CacheItemIndexKey::ByPath(key);
@@ -679,7 +738,13 @@ impl CacheStore for RocksCacheStore {
 
                 Ok(id_row_opt)
             })
-            .await
+            .await?;
+
+        if let Some(item) = &res {
+            self.cache_eviction_manager.notify_lookup(item).await?;
+        };
+
+        Ok(res)
     }
 
     async fn cache_keys(&self, prefix: String) -> Result<Vec<IdRow<CacheItem>>, CubeError> {
@@ -1095,6 +1160,14 @@ impl CacheStore for RocksCacheStore {
         Ok(())
     }
 
+    async fn eviction(&self) -> Result<EvictionResult, CubeError> {
+        self.run_eviction().await
+    }
+
+    async fn persist(&self) -> Result<(), CubeError> {
+        self.run_ttl_persist().await
+    }
+
     async fn healthcheck(&self) -> Result<(), CubeError> {
         self.store.healthcheck().await?;
 
@@ -1231,6 +1304,14 @@ impl CacheStore for ClusterCacheStoreClient {
 
     async fn compaction(&self) -> Result<(), CubeError> {
         panic!("CacheStore cannot be used on the worker node! compaction was used.")
+    }
+
+    async fn eviction(&self) -> Result<EvictionResult, CubeError> {
+        panic!("CacheStore cannot be used on the worker node! eviction was used.")
+    }
+
+    async fn persist(&self) -> Result<(), CubeError> {
+        panic!("CacheStore cannot be used on the worker node! persist was used.")
     }
 
     async fn healthcheck(&self) -> Result<(), CubeError> {

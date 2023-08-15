@@ -1929,6 +1929,7 @@ mod tests {
                 BaseRocksStoreFs::new_for_cachestore(remote_fs.clone(), config.config_obj()),
                 config.config_obj(),
             )
+            .await
             .unwrap();
             let rows_per_chunk = 10;
             let query_timeout = Duration::from_secs(30);
@@ -2004,6 +2005,7 @@ mod tests {
                 BaseRocksStoreFs::new_for_cachestore(remote_fs.clone(), config.config_obj()),
                 config.config_obj(),
             )
+            .await
             .unwrap();
             let rows_per_chunk = 10;
             let query_timeout = Duration::from_secs(30);
@@ -2109,6 +2111,7 @@ mod tests {
                 BaseRocksStoreFs::new_for_cachestore(remote_fs.clone(), config.config_obj()),
                 config.config_obj(),
             )
+            .await
             .unwrap();
             let rows_per_chunk = 10;
             let query_timeout = Duration::from_secs(30);

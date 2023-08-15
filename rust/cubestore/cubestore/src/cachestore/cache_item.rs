@@ -167,9 +167,7 @@ impl RocksSecondaryIndex<CacheItem, CacheItemIndexKey> for CacheItemRocksIndex {
 
     fn store_ttl_extended_info(&self) -> bool {
         match self {
-            // Right now, it's disabled due to compatibility reasons
-            // TODO(ovr): Enable after migration
-            CacheItemRocksIndex::ByPath => false,
+            CacheItemRocksIndex::ByPath => true,
             CacheItemRocksIndex::ByPrefix => false,
         }
     }

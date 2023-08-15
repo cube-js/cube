@@ -43,6 +43,48 @@ impl CacheStoreSqlService {
                 self.cachestore.compaction().await?;
                 Ok(Arc::new(DataFrame::new(vec![], vec![])))
             }
+            CacheStoreCommand::Eviction => {
+                let result = self.cachestore.eviction().await?;
+
+                Ok(Arc::new(DataFrame::new(
+                    vec![
+                        Column::new("name".to_string(), ColumnType::String, 0),
+                        Column::new("value".to_string(), ColumnType::String, 1),
+                        Column::new("description".to_string(), ColumnType::String, 2),
+                    ],
+                    vec![
+                        Row::new(vec![
+                            TableValue::String("stats_total_keys".to_string()),
+                            TableValue::String(result.stats_total_keys.to_string()),
+                            TableValue::Null,
+                        ]),
+                        Row::new(vec![
+                            TableValue::String("stats_total_raw_size".to_string()),
+                            TableValue::String(humansize::format_size(result.stats_total_raw_size, humansize::DECIMAL)),
+                            TableValue::Null,
+                        ]),
+                        Row::new(vec![
+                            TableValue::String("total_keys_removed".to_string()),
+                            TableValue::String(result.total_keys_removed.to_string()),
+                            TableValue::Null,
+                        ]),
+                        Row::new(vec![
+                            TableValue::String("total_size_removed".to_string()),
+                            TableValue::String(humansize::format_size(result.total_size_removed, humansize::DECIMAL)),
+                            TableValue::Null,
+                        ]),
+                        Row::new(vec![
+                            TableValue::String("total_delete_skipped".to_string()),
+                            TableValue::String(result.total_delete_skipped.to_string()),
+                            TableValue::String("Number of rows which was scheduled for deletion (from eviction), but were deleted by another process (compaction / delete)".to_string()),
+                        ]),
+                    ],
+                )))
+            }
+            CacheStoreCommand::Persist => {
+                self.cachestore.persist().await?;
+                Ok(Arc::new(DataFrame::new(vec![], vec![])))
+            }
             CacheStoreCommand::Healthcheck => {
                 self.cachestore.healthcheck().await?;
                 Ok(Arc::new(DataFrame::new(vec![], vec![])))

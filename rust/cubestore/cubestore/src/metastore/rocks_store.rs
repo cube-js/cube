@@ -163,6 +163,55 @@ pub enum RocksSecondaryIndexValueVersion {
     WithTTLSupport = 2,
 }
 
+pub type PackedDateTime = u32;
+
+fn base_date_epoch() -> NaiveDateTime {
+    NaiveDate::from_ymd(2022, 1, 1).and_hms(0, 0, 0)
+}
+
+pub trait RocksSecondaryIndexValueVersionEncoder {
+    fn encode_value_as_u32(&self) -> Result<u32, CubeError>;
+}
+
+pub trait RocksSecondaryIndexValueVersionDecoder {
+    fn decode_value_as_opt_datetime(self) -> Result<Option<DateTime<Utc>>, CubeError>;
+}
+
+impl RocksSecondaryIndexValueVersionDecoder for u32 {
+    fn decode_value_as_opt_datetime(self) -> Result<Option<DateTime<Utc>>, CubeError> {
+        if self == 0 {
+            return Ok(None);
+        }
+
+        let timestamp = DateTime::<Utc>::from_utc(base_date_epoch(), Utc)
+            + chrono::Duration::seconds(self as i64);
+
+        Ok(Some(timestamp))
+    }
+}
+
+impl RocksSecondaryIndexValueVersionEncoder for DateTime<Utc> {
+    fn encode_value_as_u32(&self) -> Result<u32, CubeError> {
+        let seconds = self
+            .naive_local()
+            .signed_duration_since(base_date_epoch())
+            .num_seconds();
+
+        u32::try_from(seconds).map_err(|err| {
+            CubeError::internal(format!("Unable to represent datetime as u32: {}", err))
+        })
+    }
+}
+
+impl RocksSecondaryIndexValueVersionEncoder for Option<DateTime<Utc>> {
+    fn encode_value_as_u32(&self) -> Result<u32, CubeError> {
+        match self {
+            None => Ok(0),
+            Some(v) => v.encode_value_as_u32(),
+        }
+    }
+}
+
 /// RocksSecondaryIndexValue represent a value for secondary index keys
 ///
 /// | hash | - hash only
@@ -176,36 +225,6 @@ pub enum RocksSecondaryIndexValueVersion {
 /// LRU/TTl (HashAndTTLExtended) is encoded as u32 (seconds since our epoch),
 /// u32 = 4294967295 / (60 * 60 * 24 * 365) = 136 years from 2022/1/1.
 impl<'a> RocksSecondaryIndexValue<'a> {
-    fn base_date_epoch() -> NaiveDateTime {
-        NaiveDate::from_ymd(2022, 1, 1).and_hms(0, 0, 0)
-    }
-
-    fn encode_optional_datetime_as_u32(date: &Option<DateTime<Utc>>) -> Result<u32, CubeError> {
-        if let Some(d) = date {
-            let seconds = d
-                .naive_local()
-                .signed_duration_since(Self::base_date_epoch())
-                .num_seconds();
-
-            u32::try_from(seconds).map_err(|err| {
-                CubeError::internal(format!("Unable to represent datetime as u32: {}", err))
-            })
-        } else {
-            Ok(0)
-        }
-    }
-
-    fn decode_optional_datetime_as_u32(timestamp: u32) -> Result<Option<DateTime<Utc>>, CubeError> {
-        if timestamp == 0 {
-            return Ok(None);
-        }
-
-        let timestamp = DateTime::<Utc>::from_utc(Self::base_date_epoch(), Utc)
-            + chrono::Duration::seconds(timestamp as i64);
-
-        Ok(Some(timestamp))
-    }
-
     pub fn from_bytes(
         bytes: &'a [u8],
         value_version: RocksSecondaryIndexValueVersion,
@@ -215,6 +234,7 @@ impl<'a> RocksSecondaryIndexValue<'a> {
             RocksSecondaryIndexValueVersion::WithTTLSupport => match bytes[0] {
                 0 => Ok(RocksSecondaryIndexValue::Hash(bytes)),
                 1 => {
+                    let hash_size = bytes.len() - 8;
                     let hash_size = bytes.len() - 8;
                     let (hash, mut expire_buf) = (&bytes[1..hash_size], &bytes[hash_size..]);
                     let expire_timestamp = expire_buf.read_i64::<BigEndian>()?;
@@ -238,8 +258,9 @@ impl<'a> RocksSecondaryIndexValue<'a> {
                         &bytes[hash_size + 4..],
                     );
 
-                    let expire =
-                        Self::decode_optional_datetime_as_u32(expire_buf.read_u32::<BigEndian>()?)?;
+                    let expire = expire_buf
+                        .read_u32::<BigEndian>()?
+                        .decode_value_as_opt_datetime()?;
 
                     let (mut size_buf, mut lru_buf, mut lfu_buf) = (
                         &extended_buf[0..4],
@@ -248,8 +269,9 @@ impl<'a> RocksSecondaryIndexValue<'a> {
                     );
 
                     let raw_size = size_buf.read_u32::<BigEndian>()?;
-                    let lru =
-                        Self::decode_optional_datetime_as_u32(lru_buf.read_u32::<BigEndian>()?)?;
+                    let lru = lru_buf
+                        .read_u32::<BigEndian>()?
+                        .decode_value_as_opt_datetime()?;
                     let lfu = lfu_buf.read_u8()?;
 
                     Ok(RocksSecondaryIndexValue::HashAndTTLExtended(
@@ -313,10 +335,10 @@ impl<'a> RocksSecondaryIndexValue<'a> {
 
                     buf.write_u8(2)?;
                     buf.write_all(&hash)?;
-                    buf.write_u32::<BigEndian>(Self::encode_optional_datetime_as_u32(expire)?)?;
+                    buf.write_u32::<BigEndian>(expire.encode_value_as_u32()?)?;
 
                     buf.write_u32::<BigEndian>(info.raw_size)?;
-                    buf.write_u32::<BigEndian>(Self::encode_optional_datetime_as_u32(&info.lru)?)?;
+                    buf.write_u32::<BigEndian>(info.lru.encode_value_as_u32()?)?;
                     buf.write_u8(info.lfu)?;
 
                     Ok(buf.into_inner())
@@ -398,6 +420,35 @@ impl RowKey {
 
     pub fn from_bytes(bytes: &[u8]) -> RowKey {
         RowKey::try_from_bytes(bytes).unwrap()
+    }
+
+    pub fn to_prefix_bytes(&self) -> Vec<u8> {
+        let mut wtr = Vec::with_capacity(5);
+
+        match self {
+            RowKey::Table(table_id, row_id) => {
+                wtr.write_u8(1).unwrap();
+                wtr.write_u32::<BigEndian>(*table_id as u32).unwrap();
+            }
+            RowKey::Sequence(table_id) => {
+                wtr.write_u8(2).unwrap();
+                wtr.write_u32::<BigEndian>(*table_id as u32).unwrap();
+            }
+            RowKey::SecondaryIndex(index_id, secondary_key, row_id) => {
+                wtr.write_u8(3).unwrap();
+                wtr.write_u32::<BigEndian>(*index_id as IndexId).unwrap();
+            }
+            RowKey::SecondaryIndexInfo { index_id } => {
+                wtr.write_u8(4).unwrap();
+                wtr.write_u32::<BigEndian>(*index_id as IndexId).unwrap();
+            }
+            RowKey::TableInfo { table_id } => {
+                wtr.write_u8(5).unwrap();
+                wtr.write_u32::<BigEndian>(*table_id as u32).unwrap();
+            }
+        }
+
+        wtr
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {
