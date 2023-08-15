@@ -11,6 +11,11 @@
   transition: all .2s ease;
   cursor: pointer;
 }
+@media screen and (min-width: 992px) {
+  .GridItem__Wrapper {
+    height: 5.375rem;
+  }
+}
 
 .GridItem__Wrapper:hover {
   background: #F6F6F8;
@@ -24,7 +29,9 @@
 }
 
 .GridItem__Image {
+  display: flex;
   height: 2.5rem;
+  align-self: center;
 }
 
 .GridItem__Title {
@@ -36,5 +43,4 @@
   line-height: 32px;
   letter-spacing: 0.02em;
   color: var(--dark);
-  text-align: center;
 }

@@ -210,6 +210,61 @@ A domain name within an MS SQL database to connect to.
 | -------------------------------------------- | ---------------------- | --------------------- |
 | A valid domain name within a MS SQL database | N/A                    | N/A                   |
 
+## `CUBEJS_DB_DUCKDB_MEMORY_LIMIT`
+
+The [maximum memory limit][duckdb-docs-config] for DuckDB. Equivalent to
+`SET memory_limit=<MEMORY_LIMIT>`.
+
+| Possible Values                  | Default in Development | Default in Production |
+| -------------------------------- | ---------------------- | --------------------- |
+| A valid MotherDuck service token | 75% of available RAM   | 75% of available RAM  |
+
+[duckdb-docs-config]: https://duckdb.org/docs/sql/configuration.html
+
+## `CUBEJS_DB_DUCKDB_MOTHER_DUCK_TOKEN`
+
+The [service token][motherduck-docs-svc-token] to use for connections to
+MotherDuck.
+
+| Possible Values                  | Default in Development | Default in Production |
+| -------------------------------- | ---------------------- | --------------------- |
+| A valid MotherDuck service token | N/A                    | N/A                   |
+
+## `CUBEJS_DB_DUCKDB_S3_ACCESS_KEY_ID`
+
+The AWS Access Key ID to use for S3 connections.
+
+| Possible Values           | Default in Development | Default in Production |
+| ------------------------- | ---------------------- | --------------------- |
+| A valid AWS Access Key ID | N/A                    | N/A                   |
+
+## `CUBEJS_DB_DUCKDB_S3_SECRET_ACCESS_KEY_ID`
+
+The AWS Secret Access Key to use for S3 connections.
+
+| Possible Values               | Default in Development | Default in Production |
+| ----------------------------- | ---------------------- | --------------------- |
+| A valid AWS Secret Access Key | N/A                    | N/A                   |
+
+## `CUBEJS_DB_DUCKDB_S3_ENDPOINT`
+
+The AWS endpoint to use for S3 connections.
+
+| Possible Values                                   | Default in Development | Default in Production |
+| ------------------------------------------------- | ---------------------- | --------------------- |
+| [A valid AWS S3 endpoint][aws-docs-vpc-endpoints] | N/A                    | N/A                   |
+
+[aws-docs-vpc-endpoints]:
+  https://docs.aws.amazon.com/vpc/latest/privatelink/vpc-endpoints-s3.html
+
+## `CUBEJS_DB_DUCKDB_S3_REGION`
+
+The AWS region to use for S3 connections.
+
+| Possible Values                        | Default in Development | Default in Production |
+| -------------------------------------- | ---------------------- | --------------------- |
+| [A valid AWS region][aws-docs-regions] | N/A                    | N/A                   |
+
 ## `CUBEJS_DB_ELASTIC_APIKEY_ID`
 
 The [ID of the API key from elastic.co][elastic-docs-api-keys]. Required when
@@ -1257,6 +1312,8 @@ The port for a Cube deployment to listen to API connections on.
   https://docs.aws.amazon.com/general/latest/gr/aws-sec-cred-types.html#access-keys-and-secret-access-keys
 [aws-docs-regions]:
   https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-regions-availability-zones.html#concepts-available-regions
+[aws-docs-vpc-endpoints]:
+  https://docs.aws.amazon.com/vpc/latest/privatelink/vpc-endpoints-s3.html
 [bq-docs-regional-locations]:
   https://cloud.google.com/bigquery/docs/locations#regional-locations
 [databricks-docs-dbfs]:
@@ -1281,6 +1338,8 @@ The port for a Cube deployment to listen to API connections on.
 [ietf-jwt-ref-iss]: https://tools.ietf.org/html/rfc7519#section-4.1.1
 [ietf-jwt-ref-sub]: https://tools.ietf.org/html/rfc7519#section-4.1.2
 [ietf-jwt-ref-aud]: https://tools.ietf.org/html/rfc7519#section-4.1.3
+[motherduck-docs-svc-token]:
+  https://motherduck.com/docs/authenticating-to-motherduck/#authentication-using-a-service-token
 [ref-config]: /reference/configuration/config
 [ref-config-conf-ctx-to-appid]: /reference/configuration/config#contexttoappid
 [ref-config-db]: /product/configuration/data-sources

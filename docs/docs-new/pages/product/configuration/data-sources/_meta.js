@@ -4,6 +4,7 @@ module.exports = {
   "clickhouse": "ClickHouse",
   "databricks-jdbc": "Databricks (JDBC)",
   "druid": "Druid",
+  "duckdb": "DuckDB / MotherDuck",
   "elasticsearch": "Elasticsearch",
   "firebolt": "Firebolt",
   "google-bigquery": "Google BigQuery",
