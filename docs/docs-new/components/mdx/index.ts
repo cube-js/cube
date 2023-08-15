@@ -27,6 +27,7 @@ import { Td } from '@/components/overrides/Table/Td';
 import { Th } from '@/components/overrides/Table/Th';
 import { Tr } from '@/components/overrides/Table/Tr';
 import { CommunitySupportedDriver } from '@/components/mdx/Banners/CommunitySupportedDriver';
+import { Code } from '../overrides/Code/Code';
 
 export const components = {
   ...Buttons,
@@ -61,6 +62,7 @@ export const components = {
   h1: H1,
   a: Link,
   table: Table,
+  code: Code,
   td: Td,
   th: Th,
   tr: Tr,
