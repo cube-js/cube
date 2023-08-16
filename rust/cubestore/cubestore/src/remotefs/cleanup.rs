@@ -62,7 +62,6 @@ impl RemoteFsCleanup {
                     return;
                 }
             }
-            //
             //We delete files on the next iteration after building the file list in order to give time for requests that may use these files to complete
             if cleanup_enabled && !files_to_remove.is_empty() {
                 log::debug!("Cleaning up {} files in remote fs", files_to_remove.len());
@@ -78,6 +77,9 @@ impl RemoteFsCleanup {
 
                 // Only keep the files we want to remove in `local_files`.
                 for f in files_from_metastore {
+                    files_to_remove.remove(&f);
+                }
+                for f in files_to_remove.iter() {
                     if let Err(e) = self.remote_fs.delete_file(&f).await {
                         log::error!("Error while deleting {} in remote fs: {}", f, e);
                     }
@@ -103,7 +105,6 @@ impl RemoteFsCleanup {
                 Ok(f) => f.into_iter().collect::<HashSet<_>>(),
             };
 
-            let mut files_to_remove = Vec::new();
             let mut files_to_remove_size = 0;
 
             for f in remote_files {
@@ -121,7 +122,7 @@ impl RemoteFsCleanup {
                 {
                     continue;
                 }
-                files_to_remove.push(file_name.to_string());
+                files_to_remove.insert(file_name.to_string());
                 files_to_remove_size += f.file_size;
             }
             if !files_to_remove.is_empty() {

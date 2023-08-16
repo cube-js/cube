@@ -1157,7 +1157,7 @@ impl Config {
                 upload_to_remote: !env::var("CUBESTORE_NO_UPLOAD").ok().is_some(),
                 enable_topk: env_bool("CUBESTORE_ENABLE_TOPK", true),
                 enable_remove_orphaned_remote_files: env_bool(
-                    "ENABLE_REMOVE_ORPHANED_REMOTE_FILES",
+                    "CUBESTORE_ENABLE_REMOVE_ORPHANED_REMOTE_FILES",
                     false,
                 ),
                 enable_startup_warmup: env_bool("CUBESTORE_STARTUP_WARMUP", true),
