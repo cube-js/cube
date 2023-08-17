@@ -3,8 +3,8 @@ import moment from 'moment-timezone';
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
 import { UserError } from '../compiler';
-import { BaseMeasure } from './BaseMeasure';
-import { BaseDimension } from './BaseDimension';
+import { BaseMeasure } from "./BaseMeasure";
+import { BaseDimension } from "./BaseDimension";
 
 const GRANULARITY_TO_INTERVAL = {
   second: 'Second',
