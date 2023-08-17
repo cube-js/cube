@@ -75,7 +75,9 @@ type FilterOperator =
  'notInDateRange' |
  'onTheDate' |
  'beforeDate' |
+ 'beforeOrOnDate' |
  'afterDate' |
+ 'afterOrOnDate' |
  'measureFilter';
 
 /**

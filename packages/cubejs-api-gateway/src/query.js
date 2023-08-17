@@ -62,7 +62,9 @@ const operators = [
   'notInDateRange',
   'onTheDate',
   'beforeDate',
+  'beforeOrOnDate',
   'afterDate',
+  'afterOrOnDate',
   'measureFilter',
 ];
 

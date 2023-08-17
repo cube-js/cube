@@ -2602,9 +2602,9 @@ impl FilterRules {
                                         MemberType::Boolean => op,
                                         MemberType::Time => match expr_op {
                                             Operator::Lt => "beforeDate",
-                                            Operator::LtEq => "beforeDate",
+                                            Operator::LtEq => "beforeOrOnDate",
                                             Operator::Gt => "afterDate",
-                                            Operator::GtEq => "afterDate",
+                                            Operator::GtEq => "afterOrOnDate",
                                             _ => op,
                                         },
                                     };
