@@ -2245,6 +2245,35 @@ impl RewriteRules for FilterRules {
                     "FilterOpOp:and",
                 ),
             ),
+            transforming_rewrite(
+                "filter-replacer-in-date-range-inclusive",
+                filter_op(
+                    filter_op_filters(
+                        filter_member("?member", "FilterMemberOp:afterOrOnDate", "?date_range_start"),
+                        filter_member("?member", "FilterMemberOp:beforeOrOnDate", "?date_range_end"),
+                    ),
+                    "FilterOpOp:and",
+                ),
+                filter_member("?member", "FilterMemberOp:inDateRange", "?date_range"),
+                self.merge_date_range("?date_range_start", "?date_range_end", "?date_range"),
+            ),
+            rewrite(
+                "filter-replacer-in-date-range-inverse-inclusive",
+                filter_op(
+                    filter_op_filters(
+                        filter_member("?member", "FilterMemberOp:beforeOrOnDate", "?date_range_end"),
+                        filter_member("?member", "FilterMemberOp:afterOrOnDate", "?date_range_start"),
+                    ),
+                    "FilterOpOp:and",
+                ),
+                filter_op(
+                    filter_op_filters(
+                        filter_member("?member", "FilterMemberOp:afterOrOnDate", "?date_range_start"),
+                        filter_member("?member", "FilterMemberOp:beforeOrOnDate", "?date_range_end"),
+                    ),
+                    "FilterOpOp:and",
+                ),
+            ),
             rewrite(
                 "in-date-range-to-time-dimension-pull-up-left",
                 cube_scan_filters(
@@ -3696,8 +3725,10 @@ impl FilterRules {
         move |egraph, subst| {
             for op in var_iter!(egraph[subst[op_var]], BinaryExprOp) {
                 let new_op = match op {
-                    Operator::GtEq | Operator::Gt => Operator::GtEq,
-                    Operator::LtEq | Operator::Lt => Operator::Lt,
+                    Operator::GtEq => Operator::GtEq,
+                    Operator::Gt => Operator::Gt,
+                    Operator::LtEq => Operator::LtEq,
+                    Operator::Lt => Operator::Lt,
                     _ => continue,
                 };
 
