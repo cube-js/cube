@@ -16,14 +16,10 @@ features.
 
 </SuccessBox>
 
-<div style={{ textAlign: "center" }}>
-  <img
-    alt="High-level architecture diagram of a Cube Cloud Development Instance"
-    src="https://ucarecdn.com/adaa000a-c562-4eb4-9687-6f57f0f4c22b/"
-    style={{ border: "none" }}
-    width="100%"
-  />
-</div>
+<Diagram
+  alt="High-level architecture diagram of a Cube Cloud Development Instance"
+  src="https://ucarecdn.com/adaa000a-c562-4eb4-9687-6f57f0f4c22b/"
+/>
 
 Development Instances are designed for development use-cases only. This makes it
 easy to get started with Cube Cloud quickly, and also allows you to build and
@@ -51,14 +47,10 @@ Production cluster is available in Cube Cloud on
 
 </SuccessBox>
 
-<div style={{ textAlign: "center" }}>
-  <img
-    alt="High-level architecture diagram of a Cube Cloud Production Cluster"
-    src="https://ucarecdn.com/fcb57d7a-09ee-4854-9282-db443a5ee61d/"
-    style={{ border: "none" }}
-    width="100%"
-  />
-</div>
+<Diagram
+  alt="High-level architecture diagram of a Cube Cloud Production Cluster"
+  src="https://ucarecdn.com/fcb57d7a-09ee-4854-9282-db443a5ee61d/"
+/>
 
 Production Clusters are designed to support high-availability production
 workloads. It consists of several key components, including starting with 2 Cube
@@ -66,6 +58,11 @@ API instances, 1 Cube Refresh Worker and 2 Cube Store Routers - all of which run
 on dedicated infrastructure. The cluster can automatically scale to meet the
 needs of your workload by adding more components as necessary; check the
 [Scalability section](#scalability) below.
+
+Please note that any Git branches other than `main`/`master` will **not** use a
+Production Cluster, and will instead use a
+[Development Instance](#development-instance), which will [incur additional
+charges][ref-deploy-cloud-pricing].
 
 ## Production multi-cluster
 
@@ -81,14 +78,10 @@ Production multi-cluster is available in Cube Cloud on
 
 </SuccessBox>
 
-<div style={{ textAlign: "center" }}>
-  <img
-    alt="High-level architecture diagram of a Cube Cloud Production Multi-Cluster"
-    src="https://ucarecdn.com/0ab1eb5c-7aba-4e9c-8951-1998d4b714f0/"
-    style={{ border: "none" }}
-    width="100%"
-  />
-</div>
+<Diagram
+  alt="High-level architecture diagram of a Cube Cloud Production Multi-Cluster"
+  src="https://ucarecdn.com/0ab1eb5c-7aba-4e9c-8951-1998d4b714f0/"
+/>
 
 Cube Cloud routes traffic between clusters based on
 [`contextToAppId()`][ref-conf-ref-ctx-to-app-id].
@@ -161,3 +154,4 @@ and select from the available options:
 
 [ref-conf-ref-ctx-to-app-id]: /reference/configuration/config#contexttoappid
 [ref-limits]: /product/deployment/cloud/limits#resources
+[ref-deploy-cloud-pricing]: /product/deployment/cloud/pricing
