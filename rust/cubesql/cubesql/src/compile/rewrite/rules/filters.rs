@@ -2249,8 +2249,16 @@ impl RewriteRules for FilterRules {
                 "filter-replacer-in-date-range-inclusive",
                 filter_op(
                     filter_op_filters(
-                        filter_member("?member", "FilterMemberOp:afterOrOnDate", "?date_range_start"),
-                        filter_member("?member", "FilterMemberOp:beforeOrOnDate", "?date_range_end"),
+                        filter_member(
+                            "?member",
+                            "FilterMemberOp:afterOrOnDate",
+                            "?date_range_start",
+                        ),
+                        filter_member(
+                            "?member",
+                            "FilterMemberOp:beforeOrOnDate",
+                            "?date_range_end",
+                        ),
                     ),
                     "FilterOpOp:and",
                 ),
@@ -2261,15 +2269,31 @@ impl RewriteRules for FilterRules {
                 "filter-replacer-in-date-range-inverse-inclusive",
                 filter_op(
                     filter_op_filters(
-                        filter_member("?member", "FilterMemberOp:beforeOrOnDate", "?date_range_end"),
-                        filter_member("?member", "FilterMemberOp:afterOrOnDate", "?date_range_start"),
+                        filter_member(
+                            "?member",
+                            "FilterMemberOp:beforeOrOnDate",
+                            "?date_range_end",
+                        ),
+                        filter_member(
+                            "?member",
+                            "FilterMemberOp:afterOrOnDate",
+                            "?date_range_start",
+                        ),
                     ),
                     "FilterOpOp:and",
                 ),
                 filter_op(
                     filter_op_filters(
-                        filter_member("?member", "FilterMemberOp:afterOrOnDate", "?date_range_start"),
-                        filter_member("?member", "FilterMemberOp:beforeOrOnDate", "?date_range_end"),
+                        filter_member(
+                            "?member",
+                            "FilterMemberOp:afterOrOnDate",
+                            "?date_range_start",
+                        ),
+                        filter_member(
+                            "?member",
+                            "FilterMemberOp:beforeOrOnDate",
+                            "?date_range_end",
+                        ),
                     ),
                     "FilterOpOp:and",
                 ),
