@@ -54,6 +54,7 @@ impl RemoteFsCleanup {
         let remote_fs = self.remote_fs.clone();
         let mut files_to_remove: HashSet<String> = HashSet::new();
         let cleanup_enabled = self.config.enable_remove_orphaned_remote_files();
+        let batch_size = self.config.remote_files_cleanup_batch_size();
         loop {
             // Do the cleanup every now and then.
             tokio::select! {
@@ -106,6 +107,7 @@ impl RemoteFsCleanup {
             };
 
             let mut files_to_remove_size = 0;
+            let mut files_to_remove_count = 0;
 
             for f in remote_files {
                 let file_name = f.remote_path();
@@ -122,16 +124,17 @@ impl RemoteFsCleanup {
                 {
                     continue;
                 }
-                files_to_remove.insert(file_name.to_string());
                 files_to_remove_size += f.file_size;
+                files_to_remove_count += 1;
+                if (files_to_remove.len() as u64) < batch_size {
+                    files_to_remove.insert(file_name.to_string());
+                }
             }
-            if !files_to_remove.is_empty() {
-                app_metrics::REMOTE_FS_FILES_TO_REMOVE
-                    .report_with_tags(files_to_remove.len() as i64, Some(&stat_tags));
+            app_metrics::REMOTE_FS_FILES_TO_REMOVE
+                .report_with_tags(files_to_remove_count as i64, Some(&stat_tags));
 
-                app_metrics::REMOTE_FS_FILES_SIZE_TO_REMOVE
-                    .report_with_tags(files_to_remove_size as i64, Some(&stat_tags));
-            }
+            app_metrics::REMOTE_FS_FILES_SIZE_TO_REMOVE
+                .report_with_tags(files_to_remove_size as i64, Some(&stat_tags));
         }
     }
 

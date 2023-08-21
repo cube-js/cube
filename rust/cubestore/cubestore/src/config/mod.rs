@@ -494,6 +494,8 @@ pub trait ConfigObj: DIService {
     fn local_files_cleanup_delay_secs(&self) -> u64;
 
     fn remote_files_cleanup_delay_secs(&self) -> u64;
+
+    fn remote_files_cleanup_batch_size(&self) -> u64;
 }
 
 #[derive(Debug, Clone)]
@@ -572,6 +574,7 @@ pub struct ConfigObjImpl {
     pub local_files_cleanup_size_threshold: u64,
     pub local_files_cleanup_delay_secs: u64,
     pub remote_files_cleanup_delay_secs: u64,
+    pub remote_files_cleanup_batch_size: u64,
 }
 
 crate::di_service!(ConfigObjImpl, [ConfigObj]);
@@ -857,6 +860,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn remote_files_cleanup_delay_secs(&self) -> u64 {
         self.remote_files_cleanup_delay_secs
+    }
+
+    fn remote_files_cleanup_batch_size(&self) -> u64 {
+        self.remote_files_cleanup_batch_size
     }
 }
 
@@ -1254,6 +1261,10 @@ impl Config {
                     "CUBESTORE_REMOTE_FILES_CLEANUP_DELAY_SECS",
                     3600,
                 ),
+                remote_files_cleanup_batch_size: env_parse(
+                    "CUBESTORE_REMOTE_FILES_CLEANUP_BATCH_SIZE",
+                    50000,
+                ),
             }),
         }
     }
@@ -1344,6 +1355,7 @@ impl Config {
                 local_files_cleanup_size_threshold: 0,
                 local_files_cleanup_delay_secs: 600,
                 remote_files_cleanup_delay_secs: 3600,
+                remote_files_cleanup_batch_size: 50000,
             }),
         }
     }
