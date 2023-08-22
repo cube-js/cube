@@ -595,7 +595,7 @@ impl CacheStore for RocksCacheStore {
                     .get_single_opt_row_by_index(&index_key, &CacheItemRocksIndex::ByPath)?;
 
                 if let Some(row) = row_opt {
-                    cache_schema.delete(row.id, batch_pipe)?;
+                    cache_schema.delete_row(row, batch_pipe)?;
                 }
 
                 Ok(())
@@ -803,7 +803,7 @@ impl CacheStore for RocksCacheStore {
                 let id_row_opt = queue_schema.get_row_by_key(key)?;
 
                 if let Some(id_row) = id_row_opt {
-                    Ok(Some(queue_schema.delete(id_row.get_id(), batch_pipe)?))
+                    Ok(Some(queue_schema.delete_row(id_row, batch_pipe)?))
                 } else {
                     Ok(None)
                 }
@@ -905,20 +905,19 @@ impl CacheStore for RocksCacheStore {
                 let item_row = queue_schema.get_row_by_key(key.clone())?;
                 if let Some(item_row) = item_row {
                     let path = item_row.get_row().get_path();
-                    queue_schema.delete(item_row.get_id(), batch_pipe)?;
+                    let id = item_row.get_id();
+
+                    queue_schema.delete_row(item_row, batch_pipe)?;
 
                     if let Some(result) = result {
                         let queue_result = QueueResult::new(path.clone(), result);
                         let result_schema = QueueResultRocksTable::new(db_ref.clone());
                         // QueueResult is a result of QueueItem, it's why we can use row_id of QueueItem
-                        let result_row = result_schema.insert_with_pk(
-                            item_row.get_id(),
-                            queue_result,
-                            batch_pipe,
-                        )?;
+                        let result_row =
+                            result_schema.insert_with_pk(id, queue_result, batch_pipe)?;
 
                         batch_pipe.add_event(MetaStoreEvent::AckQueueItem(QueueResultAckEvent {
-                            id: item_row.get_id(),
+                            id,
                             path,
                             result: QueueResultAckEventResult::WithResult {
                                 result: result_row.into_row().value,
@@ -926,7 +925,7 @@ impl CacheStore for RocksCacheStore {
                         }));
                     } else {
                         batch_pipe.add_event(MetaStoreEvent::AckQueueItem(QueueResultAckEvent {
-                            id: item_row.get_id(),
+                            id,
                             path,
                             result: QueueResultAckEventResult::Empty {},
                         }));
