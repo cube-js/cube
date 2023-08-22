@@ -446,7 +446,7 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         } else {
             self.next_table_seq()?
         };
-        let inserted_row = self.insert_row(row_id, serialized_row)?;
+        let inserted_row = self.insert_row_kv(row_id, serialized_row)?;
 
         batch_pipe.add_event(MetaStoreEvent::Insert(Self::table_id(), row_id));
         if self.snapshot().get(&inserted_row.key)?.is_some() {
@@ -861,7 +861,7 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         new_row.serialize(&mut ser).unwrap();
         let serialized_row = ser.take_buffer();
 
-        let updated_row = self.update_row(row_id, serialized_row)?;
+        let updated_row = self.update_row_kv(row_id, serialized_row)?;
         batch_pipe.add_event(MetaStoreEvent::Update(Self::table_id(), row_id));
 
         if self.enable_update_event() {
@@ -886,7 +886,7 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         for item in iter {
             let item = item?;
 
-            self.delete_impl(item, batch_pipe)?;
+            self.delete_row(item, batch_pipe)?;
         }
 
         Ok(())
@@ -894,7 +894,7 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
 
     fn delete(&self, row_id: u64, batch_pipe: &mut BatchPipe) -> Result<IdRow<Self::T>, CubeError> {
         let row = self.get_row_or_not_found(row_id)?;
-        self.delete_impl(row, batch_pipe)
+        self.delete_row(row, batch_pipe)
     }
 
     fn try_delete(
@@ -903,13 +903,13 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         batch_pipe: &mut BatchPipe,
     ) -> Result<Option<IdRow<Self::T>>, CubeError> {
         if let Some(row) = self.get_row(row_id)? {
-            Ok(Some(self.delete_impl(row, batch_pipe)?))
+            Ok(Some(self.delete_row(row, batch_pipe)?))
         } else {
             Ok(None)
         }
     }
 
-    fn delete_impl(
+    fn delete_row(
         &self,
         row: IdRow<Self::T>,
         batch_pipe: &mut BatchPipe,
@@ -927,7 +927,7 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
 
         batch_pipe
             .batch()
-            .delete(self.delete_row(row.get_id())?.key);
+            .delete(self.delete_row_kv(row.get_id())?.key);
 
         Ok(row)
     }
@@ -952,7 +952,7 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         Ok(next_seq)
     }
 
-    fn insert_row(&self, row_id: u64, row: Vec<u8>) -> Result<KeyVal, CubeError> {
+    fn insert_row_kv(&self, row_id: u64, row: Vec<u8>) -> Result<KeyVal, CubeError> {
         let t = RowKey::Table(Self::table_id(), row_id);
         let res = KeyVal {
             key: t.to_bytes(),
@@ -962,7 +962,7 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         Ok(res)
     }
 
-    fn update_row(&self, row_id: u64, row: Vec<u8>) -> Result<KeyVal, CubeError> {
+    fn update_row_kv(&self, row_id: u64, row: Vec<u8>) -> Result<KeyVal, CubeError> {
         let t = RowKey::Table(Self::table_id(), row_id);
         let res = KeyVal {
             key: t.to_bytes(),
@@ -971,7 +971,7 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         Ok(res)
     }
 
-    fn delete_row(&self, row_id: u64) -> Result<KeyVal, CubeError> {
+    fn delete_row_kv(&self, row_id: u64) -> Result<KeyVal, CubeError> {
         let t = RowKey::Table(Self::table_id(), row_id);
         let res = KeyVal {
             key: t.to_bytes(),
