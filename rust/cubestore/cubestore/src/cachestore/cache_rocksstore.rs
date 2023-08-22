@@ -13,8 +13,8 @@ use std::collections::HashMap;
 use std::env;
 
 use crate::metastore::{
-    BaseRocksStoreFs, BatchPipe, DbTableRef, IdRow, MetaStoreEvent, MetaStoreFs, RocksStore,
-    RocksStoreDetails, RocksTable,
+    BaseRocksStoreFs, BatchPipe, DbTableRef, IdRow, MetaStoreEvent, MetaStoreFs, RocksPropertyRow,
+    RocksStore, RocksStoreDetails, RocksTable,
 };
 use crate::remotefs::LocalDirRemoteFs;
 use crate::util::WorkerLoop;
@@ -534,6 +534,7 @@ pub trait CacheStore: DIService + Send + Sync {
     // Force compaction for the whole RocksDB
     async fn compaction(&self) -> Result<(), CubeError>;
     async fn healthcheck(&self) -> Result<(), CubeError>;
+    async fn rocksdb_properties(&self) -> Result<Vec<RocksPropertyRow>, CubeError>;
 }
 
 #[async_trait]
@@ -1036,6 +1037,10 @@ impl CacheStore for RocksCacheStore {
 
         Ok(())
     }
+
+    async fn rocksdb_properties(&self) -> Result<Vec<RocksPropertyRow>, CubeError> {
+        self.store.rocksdb_properties()
+    }
 }
 
 crate::di_service!(RocksCacheStore, [CacheStore]);
@@ -1167,6 +1172,10 @@ impl CacheStore for ClusterCacheStoreClient {
 
     async fn healthcheck(&self) -> Result<(), CubeError> {
         panic!("CacheStore cannot be used on the worker node! healthcheck was used.")
+    }
+
+    async fn rocksdb_properties(&self) -> Result<Vec<RocksPropertyRow>, CubeError> {
+        panic!("CacheStore cannot be used on the worker node! rocksdb_properties was used.")
     }
 }
 

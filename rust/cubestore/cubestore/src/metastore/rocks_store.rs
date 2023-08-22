@@ -139,6 +139,12 @@ pub struct RocksSecondaryIndexValueTTLExtended {
     pub raw_size: u32,
 }
 
+#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
+pub struct RocksPropertyRow {
+    pub key: String,
+    pub value: Option<String>,
+}
+
 #[derive(Debug)]
 pub enum RocksSecondaryIndexValue<'a> {
     Hash(&'a [u8]),
@@ -976,6 +982,55 @@ impl RocksStore {
         );
 
         Ok(())
+    }
+
+    pub fn rocksdb_properties(&self) -> Result<Vec<RocksPropertyRow>, CubeError> {
+        let to_collect = [
+            rocksdb::properties::BLOCK_CACHE_CAPACITY,
+            rocksdb::properties::BLOCK_CACHE_USAGE,
+            rocksdb::properties::BLOCK_CACHE_PINNED_USAGE,
+            rocksdb::properties::LEVELSTATS,
+            &rocksdb::properties::compression_ratio_at_level(0),
+            &rocksdb::properties::compression_ratio_at_level(1),
+            &rocksdb::properties::compression_ratio_at_level(2),
+            &rocksdb::properties::compression_ratio_at_level(3),
+            &rocksdb::properties::compression_ratio_at_level(4),
+            &rocksdb::properties::compression_ratio_at_level(6),
+            rocksdb::properties::DBSTATS,
+            // rocksdb::properties::SSTABLES,
+            rocksdb::properties::NUM_RUNNING_FLUSHES,
+            rocksdb::properties::COMPACTION_PENDING,
+            rocksdb::properties::NUM_RUNNING_COMPACTIONS,
+            rocksdb::properties::BACKGROUND_ERRORS,
+            rocksdb::properties::CUR_SIZE_ACTIVE_MEM_TABLE,
+            rocksdb::properties::CUR_SIZE_ALL_MEM_TABLES,
+            rocksdb::properties::SIZE_ALL_MEM_TABLES,
+            rocksdb::properties::NUM_ENTRIES_ACTIVE_MEM_TABLE,
+            rocksdb::properties::NUM_ENTRIES_IMM_MEM_TABLES,
+            rocksdb::properties::NUM_DELETES_ACTIVE_MEM_TABLE,
+            rocksdb::properties::NUM_DELETES_IMM_MEM_TABLES,
+            rocksdb::properties::ESTIMATE_NUM_KEYS,
+            rocksdb::properties::NUM_SNAPSHOTS,
+            rocksdb::properties::OLDEST_SNAPSHOT_TIME,
+            rocksdb::properties::NUM_LIVE_VERSIONS,
+            rocksdb::properties::ESTIMATE_LIVE_DATA_SIZE,
+            rocksdb::properties::LIVE_SST_FILES_SIZE,
+            rocksdb::properties::ESTIMATE_PENDING_COMPACTION_BYTES,
+            rocksdb::properties::ESTIMATE_TABLE_READERS_MEM,
+            rocksdb::properties::BASE_LEVEL,
+            rocksdb::properties::AGGREGATED_TABLE_PROPERTIES,
+        ];
+
+        let mut result = Vec::with_capacity(to_collect.len());
+
+        for property_name in to_collect {
+            result.push(RocksPropertyRow {
+                key: property_name.to_string_lossy().to_string(),
+                value: self.db.property_value(property_name)?,
+            })
+        }
+
+        Ok(result)
     }
 
     pub async fn healthcheck(&self) -> Result<(), CubeError> {

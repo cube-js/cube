@@ -65,6 +65,8 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("column_escaping", column_escaping),
         t("information_schema", information_schema),
         t("system_query_cache", system_query_cache),
+        t("metastore_rocksdb_tables", metastore_rocksdb_tables),
+        t("cachestore_rocksdb_tables", cachestore_rocksdb_tables),
         t("case_column_escaping", case_column_escaping),
         t("inner_column_escaping", inner_column_escaping),
         t("convert_tz", convert_tz),
@@ -1395,9 +1397,18 @@ async fn system_query_cache(service: Box<dyn SqlClient>) {
         .exec_query("SELECT * FROM system.query_cache")
         .await
         .unwrap();
+}
 
+async fn metastore_rocksdb_tables(service: Box<dyn SqlClient>) {
     service
-        .exec_query("SELECT sql FROM system.query_cache;")
+        .exec_query("SELECT * FROM metastore.rocksdb_properties")
+        .await
+        .unwrap();
+}
+
+async fn cachestore_rocksdb_tables(service: Box<dyn SqlClient>) {
+    service
+        .exec_query("SELECT * FROM cachestore.rocksdb_properties")
         .await
         .unwrap();
 }
