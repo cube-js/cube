@@ -1,6 +1,6 @@
 import { CompileError } from '../../../src/compiler/CompileError';
 import { ClickHouseQuery } from '../../../src/adapter/ClickHouseQuery';
-import { prepareCompiler } from '../../../src/compiler/PrepareCompiler';
+import { prepareCompiler } from '../../../src';
 
 import { prepareCompiler as testPrepareCompiler } from '../../unit/PrepareCompiler';
 import { ClickHouseDbRunner } from './ClickHouseDbRunner';
@@ -445,6 +445,291 @@ describe('ClickHouse DataSchemaCompiler', () => {
       expect(contextEvaluator.contextList).toEqual(
         ['Marketing']
       );
+    });
+  });
+
+  describe('WITH FILL', () => {
+    beforeEach(() => {
+      process.env.CUBEJS_DB_CLICKHOUSE_WITHFILL = 'true';
+    });
+
+    afterEach(() => {
+      delete process.env.CUBEJS_DB_CLICKHOUSE_WITHFILL;
+    });
+
+    it('returns results as-is when a date range is not used', async () => {
+      const { compiler, cubeEvaluator, joinGraph } = testPrepareCompiler(`
+    cube('visitors', {
+        sql: \`
+        select * from visitors
+        \`,
+        measures: {
+          count: {
+            type: 'count'
+          },
+        },
+        dimensions: {
+          source: {
+            type: 'string',
+            sql: 'source'
+          },
+          created_at: {
+            type: 'time',
+            sql: 'created_at'
+          },
+          updated_at: {
+            type: 'time',
+            sql: 'updated_at'
+          }
+        }
+      })
+    `);
+      await compiler.compile();
+
+      const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['visitors.count'],
+        timeDimensions: [{
+          dimension: 'visitors.created_at',
+          granularity: 'week',
+        }],
+        order: [{
+          id: 'visitors.created_at',
+          desc: false,
+        }],
+        timezone: 'America/Los_Angeles',
+      });
+      logSqlAndParams(query);
+
+      const res = await dbRunner.testQuery(query.buildSqlAndParams());
+
+      expect(res).toEqual([
+        {
+          visitors__created_at_week: '2016-09-05T00:00:00.000',
+          visitors__count: '1',
+        },
+        {
+          visitors__created_at_week: '2016-09-12T00:00:00.000',
+          visitors__count: '0',
+        },
+        {
+          visitors__created_at_week: '2016-09-19T00:00:00.000',
+          visitors__count: '0',
+        },
+        {
+          visitors__created_at_week: '2016-09-26T00:00:00.000',
+          visitors__count: '0',
+        },
+        {
+          visitors__created_at_week: '2016-10-03T00:00:00.000',
+          visitors__count: '0',
+        },
+        {
+          visitors__created_at_week: '2016-10-10T00:00:00.000',
+          visitors__count: '0',
+        },
+        {
+          visitors__created_at_week: '2016-10-17T00:00:00.000',
+          visitors__count: '0',
+        },
+        {
+          visitors__created_at_week: '2016-10-24T00:00:00.000',
+          visitors__count: '0',
+        },
+        {
+          visitors__created_at_week: '2016-10-31T00:00:00.000',
+          visitors__count: '0',
+        },
+        {
+          visitors__created_at_week: '2016-11-07T00:00:00.000',
+          visitors__count: '0',
+        },
+        {
+          visitors__created_at_week: '2016-11-14T00:00:00.000',
+          visitors__count: '0',
+        },
+        {
+          visitors__created_at_week: '2016-11-21T00:00:00.000',
+          visitors__count: '0',
+        },
+        {
+          visitors__created_at_week: '2016-11-28T00:00:00.000',
+          visitors__count: '0',
+        },
+        {
+          visitors__created_at_week: '2016-12-05T00:00:00.000',
+          visitors__count: '0',
+        },
+        {
+          visitors__created_at_week: '2016-12-12T00:00:00.000',
+          visitors__count: '0',
+        },
+        {
+          visitors__created_at_week: '2016-12-19T00:00:00.000',
+          visitors__count: '0',
+        },
+        {
+          visitors__created_at_week: '2016-12-26T00:00:00.000',
+          visitors__count: '0',
+        },
+        {
+          visitors__created_at_week: '2017-01-02T00:00:00.000',
+          visitors__count: '5',
+        },
+      ]);
+    });
+
+    it('returns results for each point in the date range', async () => {
+      const { compiler, cubeEvaluator, joinGraph } = testPrepareCompiler(`
+    cube('visitors', {
+        sql: \`
+        select * from visitors
+        \`,
+        measures: {
+          count: {
+            type: 'count'
+          },
+        },
+        dimensions: {
+          source: {
+            type: 'string',
+            sql: 'source'
+          },
+          created_at: {
+            type: 'time',
+            sql: 'created_at'
+          },
+          updated_at: {
+            type: 'time',
+            sql: 'updated_at'
+          }
+        }
+      })
+    `);
+      await compiler.compile();
+
+      const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['visitors.count'],
+        timeDimensions: [{
+          dimension: 'visitors.created_at',
+          granularity: 'week',
+          dateRange: ['2017-01-01', '2017-01-30'],
+        }],
+        order: [{
+          id: 'visitors.created_at',
+          desc: false,
+        }],
+        timezone: 'America/Los_Angeles',
+      });
+      logSqlAndParams(query);
+
+      const res = await dbRunner.testQuery(query.buildSqlAndParams());
+
+      expect(res).toEqual([
+        {
+          visitors__created_at_week: '2016-12-31T16:00:00.000',
+          visitors__count: '0',
+        },
+        {
+          visitors__created_at_week: '2017-01-02T00:00:00.000',
+          visitors__count: '5',
+        },
+        {
+          visitors__created_at_week: '2017-01-07T16:00:00.000',
+          visitors__count: '0',
+        },
+        {
+          visitors__created_at_week: '2017-01-14T16:00:00.000',
+          visitors__count: '0',
+        },
+        {
+          visitors__created_at_week: '2017-01-21T16:00:00.000',
+          visitors__count: '0',
+        },
+        {
+          visitors__created_at_week: '2017-01-28T16:00:00.000',
+          visitors__count: '0',
+        },
+      ]);
+    });
+
+    it('returns results for the range when using filters instead', async () => {
+      const { compiler, cubeEvaluator, joinGraph } = testPrepareCompiler(`
+    cube('visitors', {
+        sql: \`
+        select * from visitors
+        \`,
+        measures: {
+          count: {
+            type: 'count'
+          },
+        },
+        dimensions: {
+          source: {
+            type: 'string',
+            sql: 'source'
+          },
+          created_at: {
+            type: 'time',
+            sql: 'created_at'
+          },
+          updated_at: {
+            type: 'time',
+            sql: 'updated_at'
+          }
+        }
+      })
+    `);
+      await compiler.compile();
+
+      const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['visitors.count'],
+        timeDimensions: [
+          {
+            dimension: 'visitors.created_at',
+            granularity: 'week',
+          },
+        ],
+        filters: [{
+          member: 'visitors.created_at',
+          operator: 'inDateRange',
+          values: ['2017-01-01', '2017-01-30'],
+        }],
+        order: [{
+          id: 'visitors.created_at',
+          desc: false,
+        }],
+        timezone: 'America/Los_Angeles',
+      });
+      logSqlAndParams(query);
+
+      const res = await dbRunner.testQuery(query.buildSqlAndParams());
+
+      expect(res).toEqual([
+        {
+          visitors__created_at_week: '2016-12-31T16:00:00.000',
+          visitors__count: '0',
+        },
+        {
+          visitors__created_at_week: '2017-01-02T00:00:00.000',
+          visitors__count: '5',
+        },
+        {
+          visitors__created_at_week: '2017-01-07T16:00:00.000',
+          visitors__count: '0',
+        },
+        {
+          visitors__created_at_week: '2017-01-14T16:00:00.000',
+          visitors__count: '0',
+        },
+        {
+          visitors__created_at_week: '2017-01-21T16:00:00.000',
+          visitors__count: '0',
+        },
+        {
+          visitors__created_at_week: '2017-01-28T16:00:00.000',
+          visitors__count: '0',
+        },
+      ]);
     });
   });
 });
