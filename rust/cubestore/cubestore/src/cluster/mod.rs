@@ -11,7 +11,7 @@ use crate::cluster::worker_pool::{worker_main, MessageProcessor, WorkerPool};
 
 use crate::ack_error;
 use crate::cluster::message::NetworkMessage;
-use crate::cluster::rate_limiter::{ProcessRateLimiter, TaskType};
+use crate::cluster::rate_limiter::{ProcessRateLimiter, TaskType, TraceIndex};
 use crate::cluster::transport::{ClusterTransport, MetaStoreTransport, WorkerConnection};
 use crate::config::injection::{DIService, Injector};
 use crate::config::{is_router, WorkerServices};
@@ -915,16 +915,31 @@ impl JobRunner {
                     let partition_id = *partition_id;
                     let process_rate_limiter = self.process_rate_limiter.clone();
                     let timeout = Some(Duration::from_secs(self.config_obj.import_job_timeout()));
+                    let metastore = self.meta_store.clone();
                     Ok(cube_ext::spawn(async move {
                         process_rate_limiter
                             .wait_for_allow(TaskType::Job, timeout)
                             .await?; //TODO config, may be same ad orphaned timeout
+
+                        let (_, _, table, _) =
+                            metastore.get_partition_for_compaction(partition_id).await?;
+                        let table_id = table.get_id();
+                        let trace_obj = metastore.get_trace_obj_by_table_id(table_id).await?;
+                        let trace_index = TraceIndex {
+                            table_id: Some(table_id),
+                            trace_obj,
+                        };
+
                         let data_loaded_size = DataLoadedSize::new();
                         let res = compaction_service
                             .compact(partition_id, data_loaded_size.clone())
                             .await;
                         process_rate_limiter
-                            .commit_task_usage(TaskType::Job, data_loaded_size.get() as i64)
+                            .commit_task_usage(
+                                TaskType::Job,
+                                data_loaded_size.get() as i64,
+                                trace_index,
+                            )
                             .await;
                         res
                     }))
@@ -1008,6 +1023,7 @@ impl JobRunner {
                     let location = location.to_string();
                     let process_rate_limiter = self.process_rate_limiter.clone();
                     let timeout = Some(Duration::from_secs(self.config_obj.import_job_timeout()));
+                    let metastore = self.meta_store.clone();
                     Ok(cube_ext::spawn(async move {
                         let is_streaming = Table::is_stream_location(&location);
                         let data_loaded_size = if is_streaming {
@@ -1025,8 +1041,17 @@ impl JobRunner {
                             .import_table_part(table_id, &location, data_loaded_size.clone())
                             .await;
                         if let Some(data_loaded) = &data_loaded_size {
+                            let trace_obj = metastore.get_trace_obj_by_table_id(table_id).await?;
+                            let trace_index = TraceIndex {
+                                table_id: Some(table_id),
+                                trace_obj,
+                            };
                             process_rate_limiter
-                                .commit_task_usage(TaskType::Job, data_loaded.get() as i64)
+                                .commit_task_usage(
+                                    TaskType::Job,
+                                    data_loaded.get() as i64,
+                                    trace_index,
+                                )
                                 .await;
                         }
                         res
@@ -1041,16 +1066,31 @@ impl JobRunner {
                     let chunk_id = *chunk_id;
                     let process_rate_limiter = self.process_rate_limiter.clone();
                     let timeout = Some(Duration::from_secs(self.config_obj.import_job_timeout()));
+                    let metastore = self.meta_store.clone();
                     Ok(cube_ext::spawn(async move {
                         process_rate_limiter
                             .wait_for_allow(TaskType::Job, timeout)
                             .await?; //TODO config, may be same ad orphaned timeout
+                        let chunk = metastore.get_chunk(chunk_id).await?;
+                        let (_, _, table, _) = metastore
+                            .get_partition_for_compaction(chunk.get_row().get_partition_id())
+                            .await?;
+                        let table_id = table.get_id();
+                        let trace_obj = metastore.get_trace_obj_by_table_id(table_id).await?;
+                        let trace_index = TraceIndex {
+                            table_id: Some(table_id),
+                            trace_obj,
+                        };
                         let data_loaded_size = DataLoadedSize::new();
                         let res = chunk_store
                             .repartition_chunk(chunk_id, data_loaded_size.clone())
                             .await;
                         process_rate_limiter
-                            .commit_task_usage(TaskType::Job, data_loaded_size.get() as i64)
+                            .commit_task_usage(
+                                TaskType::Job,
+                                data_loaded_size.get() as i64,
+                                trace_index,
+                            )
                             .await;
                         res
                     }))
@@ -1170,9 +1210,7 @@ impl ClusterImpl {
             }));
         }
         let process_rate_limiter = self.process_rate_limiter.clone();
-        futures.push(cube_ext::spawn(async move {
-            process_rate_limiter.wait_processing_loop().await;
-        }));
+        futures.extend(process_rate_limiter.spawn_processing_loop().await);
 
         let stop_token = self.stop_token.clone();
         let long_running_job_notify = self.long_running_job_notify.clone();
@@ -1385,17 +1423,21 @@ impl ClusterImpl {
                 Some(Duration::from_secs(self.config_obj.query_timeout())),
             )
             .await?;
+        let trace_index = TraceIndex {
+            table_id: None,
+            trace_obj: plan_node.trace_obj(),
+        };
         let res = self.run_local_select_worker_impl(plan_node).await;
         match res {
             Ok((schema, records, data_loaded_size)) => {
                 self.process_rate_limiter
-                    .commit_task_usage(TaskType::Select, data_loaded_size as i64)
+                    .commit_task_usage(TaskType::Select, data_loaded_size as i64, trace_index)
                     .await;
                 Ok((schema, records))
             }
             Err(e) => {
                 self.process_rate_limiter
-                    .commit_task_usage(TaskType::Select, 0)
+                    .commit_task_usage(TaskType::Select, 0, trace_index)
                     .await;
                 Err(e)
             }
