@@ -264,8 +264,8 @@ impl CubeScanWrapperNode {
                         joins: _joins,
                         filter_expr: _filter_expr,
                         having_expr: _having_expr,
-                        limit: _limit,
-                        offset: _offset,
+                        limit,
+                        offset,
                         order_expr: _order_expr,
                         alias,
                     }) = wrapped_select_node
@@ -306,6 +306,7 @@ impl CubeScanWrapperNode {
                                 generator.clone(),
                                 &column_remapping,
                                 &mut next_remapping,
+                                alias.clone(),
                                 can_rename_columns,
                             )
                             .await?;
@@ -317,6 +318,7 @@ impl CubeScanWrapperNode {
                                 generator.clone(),
                                 &column_remapping,
                                 &mut next_remapping,
+                                alias.clone(),
                                 can_rename_columns,
                             )
                             .await?;
@@ -328,6 +330,7 @@ impl CubeScanWrapperNode {
                                 generator.clone(),
                                 &column_remapping,
                                 &mut next_remapping,
+                                alias.clone(),
                                 can_rename_columns,
                             )
                             .await?;
@@ -343,6 +346,8 @@ impl CubeScanWrapperNode {
                                     None,
                                     None,
                                     Vec::new(),
+                                    limit,
+                                    offset,
                                 )
                                 .map_err(|e| {
                                     DataFusionError::Internal(format!(
@@ -393,14 +398,14 @@ impl CubeScanWrapperNode {
         generator: Arc<dyn SqlGenerator>,
         column_remapping: &Option<HashMap<Column, Column>>,
         next_remapping: &mut HashMap<Column, Column>,
+        from_alias: Option<String>,
         can_rename_columns: bool,
     ) -> result::Result<(Vec<AliasedColumn>, SqlQuery), CubeError> {
         let non_id_regex = Regex::new(r"[^a-zA-Z0-9_]")
             .map_err(|e| CubeError::internal(format!("Can't parse regex: {}", e)))?;
         let mut aliased_columns = Vec::new();
-        for expr in exprs {
+        for original_expr in exprs {
             let expr = if let Some(column_remapping) = column_remapping.as_ref() {
-                let original_expr = expr;
                 let mut expr = replace_col(
                     original_expr.clone(),
                     &column_remapping.iter().map(|(k, v)| (k, v)).collect(),
@@ -419,17 +424,17 @@ impl CubeScanWrapperNode {
                 }
                 expr
             } else {
-                expr
+                original_expr.clone()
             };
             let (expr_sql, new_sql_query) =
                 Self::generate_sql_for_expr(plan.clone(), sql, generator.clone(), expr.clone())
                     .await?;
             sql = new_sql_query;
 
-            let original_alias = expr_name(&expr, &schema)?;
+            let original_alias = expr_name(&original_expr, &schema)?;
             let alias = if can_rename_columns {
-                let mut truncated_alias =
-                    non_id_regex.replace_all(&original_alias, "_").to_string();
+                let alias = expr_name(&expr, &schema)?;
+                let mut truncated_alias = non_id_regex.replace_all(&alias, "_").to_string();
                 truncated_alias.truncate(16);
                 let mut alias = truncated_alias.clone();
                 for i in 1..10000 {
@@ -447,6 +452,16 @@ impl CubeScanWrapperNode {
                     next_remapping.insert(
                         Column::from_name(&original_alias),
                         Column::from_name(&alias),
+                    );
+                    next_remapping.insert(
+                        Column {
+                            name: original_alias.clone(),
+                            relation: from_alias.clone(),
+                        },
+                        Column {
+                            name: alias.clone(),
+                            relation: from_alias.clone(),
+                        },
                     );
                 } else {
                     return Err(CubeError::internal(format!(

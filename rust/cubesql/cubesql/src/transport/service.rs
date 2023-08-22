@@ -291,6 +291,8 @@ impl SqlTemplates {
         _filter: Option<String>,
         _having: Option<String>,
         _order_by: Vec<AliasedColumn>,
+        limit: Option<usize>,
+        offset: Option<usize>,
     ) -> Result<String, CubeError> {
         let group_by = self.to_template_columns(group_by)?;
         let aggregate = self.to_template_columns(aggregate)?;
@@ -309,7 +311,9 @@ impl SqlTemplates {
                 group_by => group_by,
                 aggregate => aggregate,
                 projection => projection,
-                from_alias => alias
+                from_alias => alias,
+                limit => limit,
+                offset => offset,
             },
         )
     }

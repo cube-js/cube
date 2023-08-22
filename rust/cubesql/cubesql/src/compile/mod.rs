@@ -17987,6 +17987,39 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_case_wrapper_with_limit() {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT * FROM (SELECT CASE WHEN customer_gender = 'female' THEN 'f' ELSE 'm' END, MIN(avgPrice) mp FROM (SELECT avgPrice, customer_gender FROM KibanaSampleDataEcommerce LIMIT 1) a GROUP BY 1) q LIMIT 1123"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+            .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert!(logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql
+            .contains("CASE WHEN"));
+
+        assert!(logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql
+            .contains("LIMIT 1123"));
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+    }
+
+    #[tokio::test]
     async fn test_thoughtspot_pg_date_trunc_year() {
         init_logger();
 

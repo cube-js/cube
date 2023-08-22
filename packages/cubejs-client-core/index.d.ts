@@ -1068,7 +1068,7 @@ declare module '@cubejs-client/core' {
      * const context = document.getElementById('myChart');
      * new Chart(context, chartjsConfig(resultSet));
      * ```
-     * @param query - [Query object](query-format)
+     * @param query - [Query object](/product/apis-integrations/rest-api/query-format)
      */
     load<QueryType extends DeeplyReadonly<Query | Query[]>>(
       query: QueryType,
@@ -1084,7 +1084,7 @@ declare module '@cubejs-client/core' {
     ): Promise<ResultSet<QueryRecordType<QueryType>>>;
 
     /**
-     * Allows you to fetch data and receive updates over time. See [Real-Time Data Fetch](real-time-data-fetch)
+     * Allows you to fetch data and receive updates over time. See [Real-Time Data Fetch](/product/apis-integrations/rest-api/real-time-data-fetch)
      *
      * ```js
      * // Subscribe to a query's updates
@@ -1158,7 +1158,7 @@ declare module '@cubejs-client/core' {
    * );
    * ```
    *
-   * @param apiToken - [API token](security) is used to authorize requests and determine SQL database you're accessing. In the development mode, Cube.js Backend will print the API token to the console on startup. In case of async function `authorization` is updated for `options.transport` on each request.
+   * @param apiToken - [API token](/product/auth) is used to authorize requests and determine SQL database you're accessing. In the development mode, Cube.js Backend will print the API token to the console on startup. In case of async function `authorization` is updated for `options.transport` on each request.
    * @order 1
    */
   export default function cubejs(apiToken: string | (() => Promise<string>), options: CubeJSApiOptions): CubejsApi;

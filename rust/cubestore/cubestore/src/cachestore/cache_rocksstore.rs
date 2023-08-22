@@ -563,11 +563,7 @@ impl CacheStore for RocksCacheStore {
                         return Ok(false);
                     };
 
-                    let mut new = id_row.row.clone();
-                    new.value = item.value;
-                    new.expire = item.expire;
-
-                    cache_schema.update(id_row.id, new, &id_row.row, batch_pipe)?;
+                    cache_schema.update(id_row.id, item, &id_row.row, batch_pipe)?;
                 } else {
                     cache_schema.insert(item, batch_pipe)?;
                 }
@@ -581,10 +577,7 @@ impl CacheStore for RocksCacheStore {
         self.store
             .write_operation(move |db_ref, batch_pipe| {
                 let cache_schema = CacheItemRocksTable::new(db_ref);
-                let rows = cache_schema.all_rows()?;
-                for row in rows.iter() {
-                    cache_schema.delete(row.get_id(), batch_pipe)?;
-                }
+                cache_schema.truncate(batch_pipe)?;
 
                 Ok(())
             })
@@ -728,16 +721,10 @@ impl CacheStore for RocksCacheStore {
         self.store
             .write_operation(move |db_ref, batch_pipe| {
                 let queue_item_schema = QueueItemRocksTable::new(db_ref.clone());
-                let rows = queue_item_schema.all_rows()?;
-                for row in rows.iter() {
-                    queue_item_schema.delete(row.get_id(), batch_pipe)?;
-                }
+                queue_item_schema.truncate(batch_pipe)?;
 
                 let queue_result_schema = QueueResultRocksTable::new(db_ref);
-                let rows = queue_result_schema.all_rows()?;
-                for row in rows.iter() {
-                    queue_result_schema.delete(row.get_id(), batch_pipe)?;
-                }
+                queue_result_schema.truncate(batch_pipe)?;
 
                 Ok(())
             })
@@ -1223,6 +1210,47 @@ mod tests {
         assert_eq!(cachestore.cache_incr(key).await?.get_row().value, "2");
 
         RocksCacheStore::cleanup_test_cachestore("cache_incr");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_cache_set() -> Result<(), CubeError> {
+        init_test_logger().await;
+
+        let (_, cachestore) = RocksCacheStore::prepare_test_cachestore("cache_set");
+
+        let path = "prefix:key-to-test-update".to_string();
+        assert_eq!(
+            cachestore
+                .cache_set(
+                    CacheItem::new(path.clone(), Some(60), "value1".to_string()),
+                    false
+                )
+                .await?,
+            true
+        );
+
+        assert_eq!(
+            cachestore
+                .cache_set(
+                    CacheItem::new(path.clone(), Some(60), "value2".to_string()),
+                    false
+                )
+                .await?,
+            true
+        );
+
+        let row = cachestore
+            .cache_get(path.clone())
+            .await?
+            .expect("must return row")
+            .into_row();
+        assert_eq!(row.get_path(), path);
+        assert_eq!(row.value, "value2".to_string());
+        assert_eq!(row.expire.is_some(), true);
+
+        RocksCacheStore::cleanup_test_cachestore("cache_set");
 
         Ok(())
     }
