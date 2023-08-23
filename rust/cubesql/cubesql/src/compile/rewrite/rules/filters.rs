@@ -924,7 +924,7 @@ impl RewriteRules for FilterRules {
                         "AND",
                         binary_expr(
                             column_expr("?column"),
-                            "<",
+                            "<=",
                             binary_expr(
                                 fun_expr(
                                     "DateTrunc",
@@ -1901,7 +1901,7 @@ impl RewriteRules for FilterRules {
                         "AND",
                         binary_expr(
                             column_expr("?column"),
-                            "<",
+                            "<=",
                             fun_expr(
                                 "DateTrunc",
                                 vec![
