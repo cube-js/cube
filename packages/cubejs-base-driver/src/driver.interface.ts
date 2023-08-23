@@ -166,7 +166,9 @@ export type DownloadQueryResultsResult = DownloadQueryResultsBase & (DownloadTab
 // eslint-disable-next-line camelcase
 export type TableQueryResult = { table_name?: string, TABLE_NAME?: string };
 
-export type SchemaQueryResult = { schemaName: string };
+export type QuerySchemasResult = { schemaName: string };
+
+export type QueryTablesResult = { schemaName: string, tableName: string };
 
 export interface DriverInterface {
   createSchemaIfNotExists(schemaName: string): Promise<void>;
@@ -180,7 +182,9 @@ export interface DriverInterface {
   tableColumnTypes: (table: string) => Promise<TableStructure>;
   queryColumnTypes: (sql: string, params?: unknown[]) => Promise<{ name: any; type: string; }[]>;
   // Returns all schemas for current database
-  getSchemasQuery: () => Promise<SchemaQueryResult[]>;
+  getSchemas: () => Promise<QuerySchemasResult[]>;
+  // Returns all tables for defined schemas
+  getTables: (schemaNames: string[]) => Promise<QueryTablesResult[]>;
   // eslint-disable-next-line camelcase
   getTablesQuery: (schemaName: string) => Promise<TableQueryResult[]>;
   // Remove table from database

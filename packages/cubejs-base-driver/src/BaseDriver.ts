@@ -35,7 +35,8 @@ import {
   TableQueryResult,
   TableStructure,
   DriverCapabilities,
-  SchemaQueryResult
+  QuerySchemasResult,
+  QueryTablesResult
 } from './driver.interface';
 
 const sortByKeys = (unordered: any) => {
@@ -169,6 +170,17 @@ export abstract class BaseDriver implements DriverInterface {
       WHERE table_schema NOT IN (${this.getIgnoredSchemas()})
       GROUP BY table_schema
       ORDER BY table_schema
+    `;
+  }
+
+  protected informationSchemaGetTablesQuery(schemaNames: string[]) {
+    const schemas = schemaNames.map(s => this.singleQuoteIdentifier(s)).join(', ');
+    return `
+      SELECT table_schema as ${this.quoteIdentifier('schema_name')},
+             table_name as ${this.quoteIdentifier('table_name')}
+      FROM information_schema.tables
+      WHERE table_schema IN (${schemas})
+      ORDER BY table_schema, table_name
     `;
   }
 
@@ -320,9 +332,18 @@ export abstract class BaseDriver implements DriverInterface {
     }
   }
 
-  public getSchemasQuery() {
+  public getSchemas() {
     const query = this.informationSchemaGetSchemasQuery();
-    return this.query<SchemaQueryResult>(query);
+    return this.query<QuerySchemasResult>(query);
+  }
+
+  public getTables(schemaNames?: string[]) {
+    if (!schemaNames) {
+      throw new Error('getTables without schemaNames is not supported');
+    }
+
+    const query = this.informationSchemaGetTablesQuery(schemaNames);
+    return this.query<QueryTablesResult>(query);
   }
 
   public getTablesQuery(schemaName: string) {
