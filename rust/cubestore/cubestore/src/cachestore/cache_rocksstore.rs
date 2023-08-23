@@ -563,11 +563,7 @@ impl CacheStore for RocksCacheStore {
                         return Ok(false);
                     };
 
-                    let mut new = id_row.row.clone();
-                    new.value = item.value;
-                    new.expire = item.expire;
-
-                    cache_schema.update(id_row.id, new, &id_row.row, batch_pipe)?;
+                    cache_schema.update(id_row.id, item, &id_row.row, batch_pipe)?;
                 } else {
                     cache_schema.insert(item, batch_pipe)?;
                 }
@@ -581,10 +577,7 @@ impl CacheStore for RocksCacheStore {
         self.store
             .write_operation(move |db_ref, batch_pipe| {
                 let cache_schema = CacheItemRocksTable::new(db_ref);
-                let rows = cache_schema.all_rows()?;
-                for row in rows.iter() {
-                    cache_schema.delete(row.get_id(), batch_pipe)?;
-                }
+                cache_schema.truncate(batch_pipe)?;
 
                 Ok(())
             })
@@ -602,7 +595,7 @@ impl CacheStore for RocksCacheStore {
                     .get_single_opt_row_by_index(&index_key, &CacheItemRocksIndex::ByPath)?;
 
                 if let Some(row) = row_opt {
-                    cache_schema.delete(row.id, batch_pipe)?;
+                    cache_schema.delete_row(row, batch_pipe)?;
                 }
 
                 Ok(())
@@ -728,16 +721,10 @@ impl CacheStore for RocksCacheStore {
         self.store
             .write_operation(move |db_ref, batch_pipe| {
                 let queue_item_schema = QueueItemRocksTable::new(db_ref.clone());
-                let rows = queue_item_schema.all_rows()?;
-                for row in rows.iter() {
-                    queue_item_schema.delete(row.get_id(), batch_pipe)?;
-                }
+                queue_item_schema.truncate(batch_pipe)?;
 
                 let queue_result_schema = QueueResultRocksTable::new(db_ref);
-                let rows = queue_result_schema.all_rows()?;
-                for row in rows.iter() {
-                    queue_result_schema.delete(row.get_id(), batch_pipe)?;
-                }
+                queue_result_schema.truncate(batch_pipe)?;
 
                 Ok(())
             })
@@ -816,7 +803,7 @@ impl CacheStore for RocksCacheStore {
                 let id_row_opt = queue_schema.get_row_by_key(key)?;
 
                 if let Some(id_row) = id_row_opt {
-                    Ok(Some(queue_schema.delete(id_row.get_id(), batch_pipe)?))
+                    Ok(Some(queue_schema.delete_row(id_row, batch_pipe)?))
                 } else {
                     Ok(None)
                 }
@@ -918,20 +905,19 @@ impl CacheStore for RocksCacheStore {
                 let item_row = queue_schema.get_row_by_key(key.clone())?;
                 if let Some(item_row) = item_row {
                     let path = item_row.get_row().get_path();
-                    queue_schema.delete(item_row.get_id(), batch_pipe)?;
+                    let id = item_row.get_id();
+
+                    queue_schema.delete_row(item_row, batch_pipe)?;
 
                     if let Some(result) = result {
                         let queue_result = QueueResult::new(path.clone(), result);
                         let result_schema = QueueResultRocksTable::new(db_ref.clone());
                         // QueueResult is a result of QueueItem, it's why we can use row_id of QueueItem
-                        let result_row = result_schema.insert_with_pk(
-                            item_row.get_id(),
-                            queue_result,
-                            batch_pipe,
-                        )?;
+                        let result_row =
+                            result_schema.insert_with_pk(id, queue_result, batch_pipe)?;
 
                         batch_pipe.add_event(MetaStoreEvent::AckQueueItem(QueueResultAckEvent {
-                            id: item_row.get_id(),
+                            id,
                             path,
                             result: QueueResultAckEventResult::WithResult {
                                 result: result_row.into_row().value,
@@ -939,7 +925,7 @@ impl CacheStore for RocksCacheStore {
                         }));
                     } else {
                         batch_pipe.add_event(MetaStoreEvent::AckQueueItem(QueueResultAckEvent {
-                            id: item_row.get_id(),
+                            id,
                             path,
                             result: QueueResultAckEventResult::Empty {},
                         }));
@@ -1223,6 +1209,47 @@ mod tests {
         assert_eq!(cachestore.cache_incr(key).await?.get_row().value, "2");
 
         RocksCacheStore::cleanup_test_cachestore("cache_incr");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_cache_set() -> Result<(), CubeError> {
+        init_test_logger().await;
+
+        let (_, cachestore) = RocksCacheStore::prepare_test_cachestore("cache_set");
+
+        let path = "prefix:key-to-test-update".to_string();
+        assert_eq!(
+            cachestore
+                .cache_set(
+                    CacheItem::new(path.clone(), Some(60), "value1".to_string()),
+                    false
+                )
+                .await?,
+            true
+        );
+
+        assert_eq!(
+            cachestore
+                .cache_set(
+                    CacheItem::new(path.clone(), Some(60), "value2".to_string()),
+                    false
+                )
+                .await?,
+            true
+        );
+
+        let row = cachestore
+            .cache_get(path.clone())
+            .await?
+            .expect("must return row")
+            .into_row();
+        assert_eq!(row.get_path(), path);
+        assert_eq!(row.value, "value2".to_string());
+        assert_eq!(row.expire.is_some(), true);
+
+        RocksCacheStore::cleanup_test_cachestore("cache_set");
 
         Ok(())
     }

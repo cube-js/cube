@@ -9,7 +9,8 @@ use crate::{
 use datafusion::{
     error::{DataFusionError, Result},
     logical_plan::{
-        plan::Extension, DFSchema, DFSchemaRef, Expr, LogicalPlan, UserDefinedLogicalNode,
+        plan::Extension, replace_col, Column, DFSchema, DFSchemaRef, Expr, LogicalPlan,
+        UserDefinedLogicalNode,
     },
     physical_plan::aggregates::AggregateFunction,
     scalar::ScalarValue,
@@ -17,7 +18,7 @@ use datafusion::{
 use itertools::Itertools;
 use regex::{Captures, Regex};
 use serde_derive::*;
-use std::{any::Any, fmt, future::Future, pin::Pin, result, sync::Arc};
+use std::{any::Any, collections::HashMap, fmt, future::Future, pin::Pin, result, sync::Arc};
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct SqlQuery {
@@ -127,6 +128,13 @@ fn expr_name(e: &Expr, schema: &Arc<DFSchema>) -> Result<String> {
     }
 }
 
+pub struct SqlGenerationResult {
+    pub data_source: Option<String>,
+    pub from_alias: Option<String>,
+    pub column_remapping: Option<HashMap<Column, Column>>,
+    pub sql: SqlQuery,
+}
+
 impl CubeScanWrapperNode {
     pub async fn generate_sql(
         &self,
@@ -138,9 +146,10 @@ impl CubeScanWrapperNode {
             transport,
             load_request_meta,
             self.wrapped_plan.clone(),
+            false,
         )
         .await
-        .and_then(|(data_source, _, mut sql): (Option<String>, _, SqlQuery)| -> result::Result<_, CubeError> {
+        .and_then(|SqlGenerationResult { data_source, mut sql, .. }| -> result::Result<_, CubeError> {
             let data_source = data_source.ok_or_else(|| CubeError::internal(format!(
                 "Can't generate SQL for wrapped select: no data source returned"
             )))?;
@@ -166,13 +175,8 @@ impl CubeScanWrapperNode {
         transport: Arc<dyn TransportService>,
         load_request_meta: Arc<LoadRequestMeta>,
         node: Arc<LogicalPlan>,
-    ) -> Pin<
-        Box<
-            dyn Future<
-                    Output = result::Result<(Option<String>, Option<String>, SqlQuery), CubeError>,
-                > + Send,
-        >,
-    > {
+        can_rename_columns: bool,
+    ) -> Pin<Box<dyn Future<Output = result::Result<SqlGenerationResult, CubeError>> + Send>> {
         Box::pin(async move {
             match node.as_ref() {
                 // LogicalPlan::Projection(_) => {}
@@ -239,16 +243,17 @@ impl CubeScanWrapperNode {
                             )
                             .await?;
                         // TODO Add wrapper for reprojection and literal members handling
-                        return Ok((
-                            Some(data_sources[0].clone()),
-                            // TODO Implement more straightforward way to get alias name
-                            node.schema
+                        return Ok(SqlGenerationResult {
+                            data_source: Some(data_sources[0].clone()),
+                            from_alias: node
+                                .schema
                                 .fields()
                                 .iter()
                                 .next()
                                 .and_then(|f| f.qualifier().cloned()),
-                            sql.sql,
-                        ));
+                            sql: sql.sql,
+                            column_remapping: None,
+                        });
                     } else if let Some(WrappedSelectNode {
                         schema,
                         select_type: _select_type,
@@ -259,20 +264,27 @@ impl CubeScanWrapperNode {
                         joins: _joins,
                         filter_expr: _filter_expr,
                         having_expr: _having_expr,
-                        limit: _limit,
-                        offset: _offset,
+                        limit,
+                        offset,
                         order_expr: _order_expr,
                         alias,
                     }) = wrapped_select_node
                     {
                         // TODO support joins
-                        let (data_source, from_alias, mut sql) = Self::generate_sql_for_node(
+                        let SqlGenerationResult {
+                            data_source,
+                            from_alias,
+                            column_remapping,
+                            sql,
+                        } = Self::generate_sql_for_node(
                             plan.clone(),
                             transport.clone(),
                             load_request_meta.clone(),
                             from.clone(),
+                            true,
                         )
                         .await?;
+                        let mut next_remapping = HashMap::new();
                         let alias = alias.or(from_alias.clone());
                         if let Some(data_source) = data_source {
                             let generator = plan
@@ -286,51 +298,42 @@ impl CubeScanWrapperNode {
                                     ))
                                 })?
                                 .clone();
-                            let mut group_by = Vec::new();
-                            let mut projection = Vec::new();
-                            for expr in projection_expr {
-                                let (expr_sql, new_sql_query) = Self::generate_sql_for_expr(
-                                    plan.clone(),
-                                    sql,
-                                    generator.clone(),
-                                    expr.clone(),
-                                )
-                                .await?;
-                                sql = new_sql_query;
-                                projection.push(AliasedColumn {
-                                    expr: expr_sql,
-                                    alias: expr_name(&expr, &schema)?,
-                                });
-                            }
-                            for expr in group_expr {
-                                let (expr_sql, new_sql_query) = Self::generate_sql_for_expr(
-                                    plan.clone(),
-                                    sql,
-                                    generator.clone(),
-                                    expr.clone(),
-                                )
-                                .await?;
-                                sql = new_sql_query;
-                                group_by.push(AliasedColumn {
-                                    expr: expr_sql,
-                                    alias: expr_name(&expr, &schema)?,
-                                });
-                            }
-                            let mut aggregate = Vec::new();
-                            for expr in aggr_expr {
-                                let (expr_sql, new_sql_query) = Self::generate_sql_for_expr(
-                                    plan.clone(),
-                                    sql,
-                                    generator.clone(),
-                                    expr.clone(),
-                                )
-                                .await?;
-                                sql = new_sql_query;
-                                aggregate.push(AliasedColumn {
-                                    expr: expr_sql,
-                                    alias: expr_name(&expr, &schema)?,
-                                });
-                            }
+                            let (projection, sql) = Self::generate_column_expr(
+                                plan.clone(),
+                                schema.clone(),
+                                projection_expr,
+                                sql,
+                                generator.clone(),
+                                &column_remapping,
+                                &mut next_remapping,
+                                alias.clone(),
+                                can_rename_columns,
+                            )
+                            .await?;
+                            let (group_by, sql) = Self::generate_column_expr(
+                                plan.clone(),
+                                schema.clone(),
+                                group_expr,
+                                sql,
+                                generator.clone(),
+                                &column_remapping,
+                                &mut next_remapping,
+                                alias.clone(),
+                                can_rename_columns,
+                            )
+                            .await?;
+                            let (aggregate, mut sql) = Self::generate_column_expr(
+                                plan.clone(),
+                                schema.clone(),
+                                aggr_expr,
+                                sql,
+                                generator.clone(),
+                                &column_remapping,
+                                &mut next_remapping,
+                                alias.clone(),
+                                can_rename_columns,
+                            )
+                            .await?;
                             let resulting_sql = generator
                                 .get_sql_templates()
                                 .select(
@@ -343,6 +346,8 @@ impl CubeScanWrapperNode {
                                     None,
                                     None,
                                     Vec::new(),
+                                    limit,
+                                    offset,
                                 )
                                 .map_err(|e| {
                                     DataFusionError::Internal(format!(
@@ -351,7 +356,16 @@ impl CubeScanWrapperNode {
                                     ))
                                 })?;
                             sql.replace_sql(resulting_sql.clone());
-                            Ok((Some(data_source), alias, sql))
+                            Ok(SqlGenerationResult {
+                                data_source: Some(data_source),
+                                from_alias: alias,
+                                sql,
+                                column_remapping: if next_remapping.len() > 0 {
+                                    Some(next_remapping)
+                                } else {
+                                    None
+                                },
+                            })
                         } else {
                             Err(CubeError::internal(format!(
                                 "Can't generate SQL for wrapped select: no data source for {:?}",
@@ -376,6 +390,95 @@ impl CubeScanWrapperNode {
         })
     }
 
+    async fn generate_column_expr(
+        plan: Arc<Self>,
+        schema: DFSchemaRef,
+        exprs: Vec<Expr>,
+        mut sql: SqlQuery,
+        generator: Arc<dyn SqlGenerator>,
+        column_remapping: &Option<HashMap<Column, Column>>,
+        next_remapping: &mut HashMap<Column, Column>,
+        from_alias: Option<String>,
+        can_rename_columns: bool,
+    ) -> result::Result<(Vec<AliasedColumn>, SqlQuery), CubeError> {
+        let non_id_regex = Regex::new(r"[^a-zA-Z0-9_]")
+            .map_err(|e| CubeError::internal(format!("Can't parse regex: {}", e)))?;
+        let mut aliased_columns = Vec::new();
+        for original_expr in exprs {
+            let expr = if let Some(column_remapping) = column_remapping.as_ref() {
+                let mut expr = replace_col(
+                    original_expr.clone(),
+                    &column_remapping.iter().map(|(k, v)| (k, v)).collect(),
+                )
+                .map_err(|_| {
+                    CubeError::internal(format!(
+                        "Can't rename columns for expr: {:?}",
+                        original_expr
+                    ))
+                })?;
+                if !can_rename_columns {
+                    let original_alias = expr_name(&original_expr, &schema)?;
+                    if original_alias != expr_name(&expr, &schema)? {
+                        expr = Expr::Alias(Box::new(expr), original_alias.clone());
+                    }
+                }
+                expr
+            } else {
+                original_expr.clone()
+            };
+            let (expr_sql, new_sql_query) =
+                Self::generate_sql_for_expr(plan.clone(), sql, generator.clone(), expr.clone())
+                    .await?;
+            sql = new_sql_query;
+
+            let original_alias = expr_name(&original_expr, &schema)?;
+            let alias = if can_rename_columns {
+                let alias = expr_name(&expr, &schema)?;
+                let mut truncated_alias = non_id_regex.replace_all(&alias, "_").to_string();
+                truncated_alias.truncate(16);
+                let mut alias = truncated_alias.clone();
+                for i in 1..10000 {
+                    if !next_remapping.contains_key(&Column::from_name(&alias)) {
+                        break;
+                    }
+                    alias = format!("{}_{}", truncated_alias, i);
+                }
+                alias
+            } else {
+                original_alias.clone()
+            };
+            if original_alias != alias {
+                if !next_remapping.contains_key(&Column::from_name(&alias)) {
+                    next_remapping.insert(
+                        Column::from_name(&original_alias),
+                        Column::from_name(&alias),
+                    );
+                    next_remapping.insert(
+                        Column {
+                            name: original_alias.clone(),
+                            relation: from_alias.clone(),
+                        },
+                        Column {
+                            name: alias.clone(),
+                            relation: from_alias.clone(),
+                        },
+                    );
+                } else {
+                    return Err(CubeError::internal(format!(
+                        "Can't generate SQL for column expr: duplicate alias {}",
+                        alias
+                    )));
+                }
+            }
+
+            aliased_columns.push(AliasedColumn {
+                expr: expr_sql,
+                alias,
+            });
+        }
+        Ok((aliased_columns, sql))
+    }
+
     pub fn generate_sql_for_expr(
         plan: Arc<Self>,
         mut sql_query: SqlQuery,
@@ -389,7 +492,7 @@ impl CubeScanWrapperNode {
                         plan.clone(),
                         sql_query,
                         sql_generator.clone(),
-                        (*expr).clone(),
+                        *expr,
                     )
                     .await?;
                     Ok((expr, sql_query))
@@ -423,7 +526,32 @@ impl CubeScanWrapperNode {
                     sql_query,
                 )),
                 // Expr::ScalarVariable(_, _) => {}
-                // Expr::BinaryExpr { .. } => {}
+                Expr::BinaryExpr { left, op, right } => {
+                    let (left, sql_query) = Self::generate_sql_for_expr(
+                        plan.clone(),
+                        sql_query,
+                        sql_generator.clone(),
+                        *left,
+                    )
+                    .await?;
+                    let (right, sql_query) = Self::generate_sql_for_expr(
+                        plan.clone(),
+                        sql_query,
+                        sql_generator.clone(),
+                        *right,
+                    )
+                    .await?;
+                    let resulting_sql = sql_generator
+                        .get_sql_templates()
+                        .binary_expr(left, op.to_string(), right)
+                        .map_err(|e| {
+                            DataFusionError::Internal(format!(
+                                "Can't generate SQL for binary expr: {}",
+                                e
+                            ))
+                        })?;
+                    Ok((resulting_sql, sql_query))
+                }
                 // Expr::AnyExpr { .. } => {}
                 // Expr::Like(_) => {}-=
                 // Expr::ILike(_) => {}
@@ -434,7 +562,64 @@ impl CubeScanWrapperNode {
                 // Expr::Negative(_) => {}
                 // Expr::GetIndexedField { .. } => {}
                 // Expr::Between { .. } => {}
-                // Expr::Case { .. } => {}
+                Expr::Case {
+                    expr,
+                    when_then_expr,
+                    else_expr,
+                } => {
+                    let expr = if let Some(expr) = expr {
+                        let (expr, sql_query_next) = Self::generate_sql_for_expr(
+                            plan.clone(),
+                            sql_query,
+                            sql_generator.clone(),
+                            *expr,
+                        )
+                        .await?;
+                        sql_query = sql_query_next;
+                        Some(expr)
+                    } else {
+                        None
+                    };
+                    let mut when_then_expr_sql = Vec::new();
+                    for (when, then) in when_then_expr {
+                        let (when, sql_query_next) = Self::generate_sql_for_expr(
+                            plan.clone(),
+                            sql_query,
+                            sql_generator.clone(),
+                            *when,
+                        )
+                        .await?;
+                        let (then, sql_query_next) = Self::generate_sql_for_expr(
+                            plan.clone(),
+                            sql_query_next,
+                            sql_generator.clone(),
+                            *then,
+                        )
+                        .await?;
+                        sql_query = sql_query_next;
+                        when_then_expr_sql.push((when, then));
+                    }
+                    let else_expr = if let Some(else_expr) = else_expr {
+                        let (else_expr, sql_query_next) = Self::generate_sql_for_expr(
+                            plan.clone(),
+                            sql_query,
+                            sql_generator.clone(),
+                            *else_expr,
+                        )
+                        .await?;
+                        sql_query = sql_query_next;
+                        Some(else_expr)
+                    } else {
+                        None
+                    };
+                    let resulting_sql = sql_generator
+                        .get_sql_templates()
+                        .case(expr, when_then_expr_sql, else_expr)
+                        .map_err(|e| {
+                            DataFusionError::Internal(format!("Can't generate SQL for case: {}", e))
+                        })?;
+                    Ok((resulting_sql, sql_query))
+                }
                 // Expr::Cast { .. } => {}
                 // Expr::TryCast { .. } => {}
                 // Expr::Sort { .. } => {}

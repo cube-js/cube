@@ -223,6 +223,7 @@ export class QueryQueue {
     }
 
     const queueConnection = await this.queueDriver.createConnection();
+    let waitingContext;
     try {
       if (priority == null) {
         priority = 0;
@@ -283,18 +284,22 @@ export class QueryQueue {
       const [active, toProcess] = await queueConnection.getQueryStageState(true);
 
       if (queryDef) {
-        this.logger('Waiting for query', {
+        waitingContext = {
           queueId,
           spanId: options.spanId,
-          queueSize,
           queryKey: queryDef.queryKey,
           queuePrefix: this.redisQueuePrefix,
           requestId: options.requestId,
+          waitingForRequestId: queryDef.requestId
+        };
+
+        this.logger('Waiting for query', {
+          ...waitingContext,
+          queueSize,
           activeQueryKeys: active,
           toProcessQueryKeys: toProcess,
           active: active.indexOf(queryKeyHash) !== -1,
           queueIndex: toProcess.indexOf(queryKeyHash),
-          waitingForRequestId: queryDef.requestId
         });
       }
 
@@ -333,6 +338,11 @@ export class QueryQueue {
       }
 
       return this.parseResult(result);
+    } catch (error) {
+      if (waitingContext) {
+        this.logger('Cancelled waiting for query', waitingContext);
+      }
+      throw error;
     } finally {
       this.queueDriver.release(queueConnection);
     }

@@ -3,6 +3,40 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.47](https://github.com/cube-js/cube/compare/v0.33.46...v0.33.47) (2023-08-15)
+
+
+### Features
+
+* **cubesql:** Support LIMIT for SQL push down ([1b5c19f](https://github.com/cube-js/cube/commit/1b5c19f03331ca4174b37614b8b41cdafc211ad7))
+
+
+
+
+
+## [0.33.46](https://github.com/cube-js/cube/compare/v0.33.45...v0.33.46) (2023-08-14)
+
+
+### Features
+
+* **cubesql:** Initial SQL push down support for BigQuery, Clickhouse and MySQL ([38467ab](https://github.com/cube-js/cube/commit/38467ab7de64803cd51acf4d5fc696938e52f778))
+
+
+
+
+
+## [0.33.45](https://github.com/cube-js/cube/compare/v0.33.44...v0.33.45) (2023-08-13)
+
+
+### Features
+
+* **cubesql:** CASE WHEN SQL push down ([#7029](https://github.com/cube-js/cube/issues/7029)) ([80e4a60](https://github.com/cube-js/cube/commit/80e4a609cdb983db0a600d0fff0fd5bfe31652ed))
+* **cubesql:** Whole SQL query push down to data sources ([#6629](https://github.com/cube-js/cube/issues/6629)) ([0e8a76a](https://github.com/cube-js/cube/commit/0e8a76a20cb37e675997f384785dd06e09175113))
+
+
+
+
+
 ## [0.33.44](https://github.com/cube-js/cube/compare/v0.33.43...v0.33.44) (2023-08-11)
 
 

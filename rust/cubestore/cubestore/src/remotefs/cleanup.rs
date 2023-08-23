@@ -50,8 +50,11 @@ impl RemoteFsCleanup {
         let token = self.stopped_token.child_token();
         let cleanup_interval =
             Duration::from_secs(self.config.remote_files_cleanup_interval_secs());
-        let cleanup_local_files_delay = self.config.remote_files_cleanup_delay_secs() as i64;
+        let cleanup_files_delay = self.config.remote_files_cleanup_delay_secs() as i64;
         let remote_fs = self.remote_fs.clone();
+        let mut files_to_remove: HashSet<String> = HashSet::new();
+        let cleanup_enabled = self.config.enable_remove_orphaned_remote_files();
+        let batch_size = self.config.remote_files_cleanup_batch_size();
         loop {
             // Do the cleanup every now and then.
             tokio::select! {
@@ -60,6 +63,31 @@ impl RemoteFsCleanup {
                     return;
                 }
             }
+            //We delete files on the next iteration after building the file list in order to give time for requests that may use these files to complete
+            if cleanup_enabled && !files_to_remove.is_empty() {
+                log::debug!("Cleaning up {} files in remote fs", files_to_remove.len());
+                log::trace!("The files being removed are {:?}", files_to_remove);
+                //Double check that files don't exists in metastore
+                let files_from_metastore = match self.metastore.get_all_filenames().await {
+                    Err(e) => {
+                        log::error!("could not get the list of files from metastore: {}", e);
+                        continue;
+                    }
+                    Ok(f) => f,
+                };
+
+                // Only keep the files we want to remove in `local_files`.
+                for f in files_from_metastore {
+                    files_to_remove.remove(&f);
+                }
+                for f in files_to_remove.iter() {
+                    if let Err(e) = self.remote_fs.delete_file(&f).await {
+                        log::error!("Error while deleting {} in remote fs: {}", f, e);
+                    }
+                }
+            }
+
+            files_to_remove.clear();
 
             let res_remote_files = remote_fs.list_with_metadata("").await;
             let remote_files = match res_remote_files {
@@ -78,30 +106,35 @@ impl RemoteFsCleanup {
                 Ok(f) => f.into_iter().collect::<HashSet<_>>(),
             };
 
-            let mut files_to_remove = Vec::new();
             let mut files_to_remove_size = 0;
+            let mut files_to_remove_count = 0;
 
             for f in remote_files {
-                if files_from_metastore.get(f.remote_path()).is_some() {
+                let file_name = f.remote_path();
+                if !file_name.ends_with(".parquet") {
+                    continue;
+                }
+                if files_from_metastore.get(file_name).is_some() {
                     continue;
                 }
                 if Utc::now()
                     .signed_duration_since(f.updated().clone())
                     .num_seconds()
-                    < cleanup_local_files_delay
+                    < cleanup_files_delay
                 {
                     continue;
                 }
-                files_to_remove.push(f.remote_path().to_string());
                 files_to_remove_size += f.file_size;
+                files_to_remove_count += 1;
+                if (files_to_remove.len() as u64) < batch_size {
+                    files_to_remove.insert(file_name.to_string());
+                }
             }
-            if !files_to_remove.is_empty() {
-                app_metrics::REMOTE_FS_FILES_TO_REMOVE
-                    .report_with_tags(files_to_remove.len() as i64, Some(&stat_tags));
+            app_metrics::REMOTE_FS_FILES_TO_REMOVE
+                .report_with_tags(files_to_remove_count as i64, Some(&stat_tags));
 
-                app_metrics::REMOTE_FS_FILES_SIZE_TO_REMOVE
-                    .report_with_tags(files_to_remove_size as i64, Some(&stat_tags));
-            }
+            app_metrics::REMOTE_FS_FILES_SIZE_TO_REMOVE
+                .report_with_tags(files_to_remove_size as i64, Some(&stat_tags));
         }
     }
 

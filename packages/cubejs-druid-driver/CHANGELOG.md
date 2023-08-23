@@ -3,6 +3,30 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.47](https://github.com/cube-js/cube/compare/v0.33.46...v0.33.47) (2023-08-15)
+
+**Note:** Version bump only for package @cubejs-backend/druid-driver
+
+
+
+
+
+## [0.33.46](https://github.com/cube-js/cube/compare/v0.33.45...v0.33.46) (2023-08-14)
+
+**Note:** Version bump only for package @cubejs-backend/druid-driver
+
+
+
+
+
+## [0.33.45](https://github.com/cube-js/cube/compare/v0.33.44...v0.33.45) (2023-08-13)
+
+**Note:** Version bump only for package @cubejs-backend/druid-driver
+
+
+
+
+
 ## [0.33.44](https://github.com/cube-js/cube/compare/v0.33.43...v0.33.44) (2023-08-11)
 
 **Note:** Version bump only for package @cubejs-backend/druid-driver

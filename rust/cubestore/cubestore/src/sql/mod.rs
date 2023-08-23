@@ -396,15 +396,7 @@ impl SqlServiceImpl {
             None
         };
 
-        let has_streaming_locations = locations.as_ref().map_or(false, |locations| {
-            locations.iter().any(|l| Table::is_stream_location(l))
-        });
-
-        let trace_obj_to_save = if has_streaming_locations {
-            trace_obj.clone()
-        } else {
-            None
-        };
+        let trace_obj_to_save = trace_obj.clone();
 
         let source_columns = if let Some(source_table) = source_table {
             let mut parser = CubeStoreParser::new(&source_table)?;
@@ -622,6 +614,7 @@ impl SqlServiceImpl {
             .logical_plan(
                 DFStatement::Statement(Statement::Query(q)),
                 &InlineTables::new(),
+                None,
             )
             .await?;
 
@@ -691,7 +684,11 @@ impl SqlServiceImpl {
 
         let query_plan = self
             .query_planner
-            .logical_plan(DFStatement::Statement(statement), &InlineTables::new())
+            .logical_plan(
+                DFStatement::Statement(statement),
+                &InlineTables::new(),
+                None,
+            )
             .await?;
         let res = match query_plan {
             QueryPlan::Select(serialized, _) => {
@@ -884,6 +881,7 @@ impl SqlService for SqlServiceImpl {
                             indices: Vec::new(),
                             multi_part_subtree: HashMap::new(),
                         },
+                        None,
                     )
                     .await?;
                     if workers.len() == 0 {
@@ -1289,6 +1287,7 @@ impl SqlService for SqlServiceImpl {
                     .logical_plan(
                         DFStatement::Statement(Statement::Query(q)),
                         &context.inline_tables,
+                        context.trace_obj.clone(),
                     )
                     .await?;
                 // TODO distribute and combine
@@ -1373,6 +1372,7 @@ impl SqlService for SqlServiceImpl {
                     .logical_plan(
                         DFStatement::Statement(Statement::Query(q)),
                         &context.inline_tables,
+                        None,
                     )
                     .await?;
                 match logical_plan {

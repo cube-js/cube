@@ -210,13 +210,17 @@ pub fn get_test_tenant_ctx() -> Arc<MetaContext> {
                     (
                         "statements/select".to_string(),
                         r#"SELECT {{ select_concat | map(attribute='aliased') | join(', ') }} 
-                    FROM ({{ from }}) AS {{ from_alias }} 
-                    {% if group_by %} GROUP BY {{ group_by | map(attribute='index') | join(', ') }}{% endif %}"#.to_string(),
+  FROM ({{ from }}) AS {{ from_alias }} 
+  {% if group_by %} GROUP BY {{ group_by | map(attribute='index') | join(', ') }}{% endif %}{% if limit %}
+  LIMIT {{ limit }}{% endif %}{% if offset %}
+  OFFSET {{ offset }}{% endif %}"#.to_string(),
                     ),
                     (
-                        "statements/column_aliased".to_string(),
+                        "expressions/column_aliased".to_string(),
                         "{{expr}} {{quoted_alias}}".to_string(),
                     ),
+                    ("expressions/binary".to_string(), "{{ left }} {{ op }} {{ right }}".to_string()),
+                    ("expressions/case".to_string(), "CASE {% if expr %}{{ expr }} {% endif %}{% for when, then in when_then %}WHEN {{ when }} THEN {{ then }}{% endfor %}{% if else_expr %} ELSE {{ else_expr }}{% endif %} END".to_string()),
                     ("quotes/identifiers".to_string(), "\"".to_string()),
                     ("quotes/escape".to_string(), "\"\"".to_string()),
                     ("params/param".to_string(), "${{ param_index + 1 }}".to_string())

@@ -25,7 +25,7 @@ llm = OpenAI(
     temperature=0, openai_api_key=os.environ.get("OPENAI_API_KEY"), verbose=True
 )
 
-st.title("Using `CubeSemanticLoader` with LLM")
+st.title("CubeSemanticLoader on LangChain")
 
 question = st.text_input(
     "Your question: ", placeholder="Ask me anything ...", key="input"
@@ -35,7 +35,7 @@ if st.button("Submit", type="primary"):
     check_input(question)
     vectorstore = init_vectorstore()
 
-    log("Quering vectorstore and building the prompt...")
+    # log("Quering vectorstore and building the prompt...")
 
     docs = vectorstore.similarity_search(question)
     # take the first document as the best guess
@@ -67,21 +67,22 @@ if st.button("Submit", type="primary"):
         no_answer_text=_NO_ANSWER_TEXT,
     )
 
-    log("Prepared prompt")
+    # log("Prepared prompt")
 
     # Call LLM API to get the SQL query
     log("Calling LLM API to generate SQL query...")
     llm_answer = llm(prompt + PROMPT_POSTFIX)
+    bare_llm_answer = re.sub(r"(?i)Answer:\s*", "", llm_answer)
     print(prompt + PROMPT_POSTFIX)
 
-    log("Got response from LLM:")
-    st.info(llm_answer)
+    # log("Got response from LLM:")
+    # st.info(bare_llm_answer)
 
     if llm_answer.strip() == _NO_ANSWER_TEXT:
         st.stop()
 
     # Parse the response
-    parsed_data = json.loads(re.sub(r"(?i)Answer:\s*", "", llm_answer))
+    parsed_data = json.loads(bare_llm_answer)
 
     # Access the objects
     sql_query = parsed_data["query"]
@@ -91,11 +92,11 @@ if st.button("Submit", type="primary"):
     st.info(sql_query)
 
     if len(filters) > 0:
-        log("Query has filters:")
-        st.info(filters)
+        # log("Query has filters:")
+        # st.info(filters)
 
         # Handling filters for better accuracy
-        log("Processing filters for better accuracy...")
+        # log("Processing filters for better accuracy...")
         for filter in filters:
             print(filter)
             column_name = filter["column"]
@@ -104,31 +105,32 @@ if st.button("Submit", type="primary"):
             doc = vectorstore.similarity_search(
                 filter["column"], filter=dict(column_name=filter_value), k=1
             )
-
-            print("Creating docs from values...")
-            value_docs = create_docs_from_values(
-                doc[0].metadata["column_values"], table_name, column_name
-            )
-
-            # Create vectorstore for values search
-            print(f"{column_name}: Creating vectorstore for values search...")
-            value_vectorstore = create_vectorstore(value_docs)
-
-            # Search for the value
-            print("Searching for the value...")
-            value_doc = value_vectorstore.similarity_search(filter["value"], k=1)
-            cleaned_value = value_doc[0].page_content
-
-            if cleaned_value and cleaned_value != filter["value"]:
-                log("Replacing filter value with the closest match...")
-                old_filter_sql = (
-                    f"{filter['column']} {filter['operator']} '{filter['value']}'"
+            
+            if doc:
+                print("Creating docs from values...")
+                value_docs = create_docs_from_values(
+                    doc[0].metadata["column_values"], table_name, column_name
                 )
-                new_filter_sql = (
-                    f"{filter['column']} {filter['operator']} '{cleaned_value}'"
-                )
-                sql_query = sql_query.replace(old_filter_sql, new_filter_sql)
-                st.info(sql_query)
+
+                # Create vectorstore for values search
+                print(f"{column_name}: Creating vectorstore for values search...")
+                value_vectorstore = create_vectorstore(value_docs)
+
+                # Search for the value
+                print("Searching for the value...")
+                value_doc = value_vectorstore.similarity_search(filter["value"], k=1)
+                cleaned_value = value_doc[0].page_content
+
+                if cleaned_value and cleaned_value != filter["value"]:
+                    log("Replacing filter value with the closest match...")
+                    old_filter_sql = (
+                        f"{filter['column']} {filter['operator']} '{filter['value']}'"
+                    )
+                    new_filter_sql = (
+                        f"{filter['column']} {filter['operator']} '{cleaned_value}'"
+                    )
+                    sql_query = sql_query.replace(old_filter_sql, new_filter_sql)
+                    st.info(sql_query)
 
     # Call Cube SQL API
     columns, rows = call_sql_api(sql_query)
