@@ -128,7 +128,10 @@ impl CubeServices {
 
             let rocks_cache_store = self.rocks_cache_store.clone().unwrap();
             futures.push(cube_ext::spawn(async move {
-                rocks_cache_store.wait_upload_loop().await;
+                let loops = rocks_cache_store.spawn_processing_loops().await;
+
+                Self::wait_loops(loops).await?;
+
                 Ok(())
             }));
 
@@ -427,6 +430,8 @@ pub trait ConfigObj: DIService {
 
     fn cachestore_queue_results_expire(&self) -> u64;
 
+    fn cachestore_metrics_interval(&self) -> u64;
+
     fn download_concurrency(&self) -> u64;
 
     fn upload_concurrency(&self) -> u64;
@@ -541,6 +546,7 @@ pub struct ConfigObjImpl {
     pub cachestore_rocks_store_config: RocksStoreConfig,
     pub cachestore_gc_loop_interval: u64,
     pub cachestore_queue_results_expire: u64,
+    pub cachestore_metrics_interval: u64,
     pub upload_concurrency: u64,
     pub download_concurrency: u64,
     pub connection_timeout: u64,
@@ -605,16 +611,16 @@ impl ConfigObj for ConfigObjImpl {
         self.compaction_chunks_in_memory_size_threshold
     }
 
-    fn compaction_in_memory_chunks_size_limit(&self) -> u64 {
-        self.compaction_in_memory_chunks_size_limit
-    }
-
     fn compaction_chunks_max_lifetime_threshold(&self) -> u64 {
         self.compaction_chunks_max_lifetime_threshold
     }
 
     fn compaction_in_memory_chunks_max_lifetime_threshold(&self) -> u64 {
         self.compaction_in_memory_chunks_max_lifetime_threshold
+    }
+
+    fn compaction_in_memory_chunks_size_limit(&self) -> u64 {
+        self.compaction_in_memory_chunks_size_limit
     }
 
     fn compaction_in_memory_chunks_total_size_limit(&self) -> u64 {
@@ -709,12 +715,12 @@ impl ConfigObj for ConfigObjImpl {
         &self.metastore_bind_address
     }
 
-    fn metastore_remote_address(&self) -> &Option<String> {
-        &self.metastore_remote_address
-    }
-
     fn metastore_rocksdb_config(&self) -> &RocksStoreConfig {
         &self.metastore_rocks_store_config
+    }
+
+    fn metastore_remote_address(&self) -> &Option<String> {
+        &self.metastore_remote_address
     }
 
     fn cachestore_rocksdb_config(&self) -> &RocksStoreConfig {
@@ -727,6 +733,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn cachestore_queue_results_expire(&self) -> u64 {
         self.cachestore_queue_results_expire
+    }
+
+    fn cachestore_metrics_interval(&self) -> u64 {
+        self.cachestore_metrics_interval
     }
 
     fn download_concurrency(&self) -> u64 {
@@ -786,10 +796,6 @@ impl ConfigObj for ConfigObjImpl {
     fn stream_replay_check_interval_secs(&self) -> u64 {
         self.stream_replay_check_interval_secs
     }
-    fn skip_kafka_parsing_errors(&self) -> bool {
-        self.skip_kafka_parsing_errors
-    }
-
     fn check_ws_orphaned_messages_interval_secs(&self) -> u64 {
         self.check_ws_orphaned_messages_interval_secs
     }
@@ -800,6 +806,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn drop_ws_complete_messages_after_secs(&self) -> u64 {
         self.drop_ws_complete_messages_after_secs
+    }
+
+    fn skip_kafka_parsing_errors(&self) -> bool {
+        self.skip_kafka_parsing_errors
     }
 
     fn dump_dir(&self) -> &Option<PathBuf> {
@@ -1151,6 +1161,12 @@ impl Config {
                     Some(60 * 5),
                     Some(1),
                 ),
+                cachestore_metrics_interval: env_parse_duration(
+                    "CUBESTORE_CACHESTORE_METRICS_LOOP",
+                    15,
+                    Some(60 * 10),
+                    Some(0),
+                ),
                 upload_concurrency: env_parse("CUBESTORE_MAX_ACTIVE_UPLOADS", 4),
                 download_concurrency: env_parse("CUBESTORE_MAX_ACTIVE_DOWNLOADS", 8),
                 max_ingestion_data_frames: env_parse("CUBESTORE_MAX_DATA_FRAMES", 4),
@@ -1318,6 +1334,7 @@ impl Config {
                 cachestore_rocks_store_config: RocksStoreConfig::cachestore_default(),
                 cachestore_gc_loop_interval: 30,
                 cachestore_queue_results_expire: 90,
+                cachestore_metrics_interval: 15,
                 upload_concurrency: 4,
                 download_concurrency: 8,
                 max_ingestion_data_frames: 4,
