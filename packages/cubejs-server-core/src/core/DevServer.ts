@@ -103,6 +103,20 @@ export class DevServer {
       });
     }));
 
+    /** WIP */
+    app.get('/playground/list-schemas', catchErrors(async (req, res) => {
+      // this.cubejsServer.event('Dev Server List Schemas');
+      const driver = await this.cubejsServer.getDriver({
+        dataSource: req.body.dataSource || 'default',
+        authInfo: null,
+        securityContext: null,
+        requestId: getRequestIdFromRequest(req),
+      });
+
+      const schemas = await driver.getSchemasQuery();
+      res.json({ schemas });
+    }));
+
     app.get('/playground/db-schema', catchErrors(async (req, res) => {
       this.cubejsServer.event('Dev Server DB Schema Load');
       const driver = await this.cubejsServer.getDriver({

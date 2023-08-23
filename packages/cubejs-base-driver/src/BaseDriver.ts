@@ -34,7 +34,8 @@ import {
   TableColumnQueryResult,
   TableQueryResult,
   TableStructure,
-  DriverCapabilities
+  DriverCapabilities,
+  SchemaQueryResult
 } from './driver.interface';
 
 const sortByKeys = (unordered: any) => {
@@ -76,6 +77,8 @@ const DB_BIG_INT_MIN = BigInt('-9223372036854775808');
 
 const DB_INT_MAX = 2147483647;
 const DB_INT_MIN = -2147483648;
+
+const IGNORED_DB_SCHEMAS = ['information_schema', 'mysql', 'performance_schema', 'sys', 'INFORMATION_SCHEMA'];
 
 // Order of keys is important here: from more specific to less specific
 const DbTypeValueMatcher: Record<string, ((v: any) => boolean)> = {
@@ -140,6 +143,14 @@ export abstract class BaseDriver implements DriverInterface {
     this.testConnectionTimeoutValue = _options.testConnectionTimeout || 10000;
   }
 
+  protected singleQuoteIdentifier(identifier: string): string {
+    return `'${identifier}'`;
+  }
+
+  protected getIgnoredSchemas() {
+    return IGNORED_DB_SCHEMAS.map(schema => this.singleQuoteIdentifier(schema)).join(', ');
+  }
+
   protected informationSchemaQuery() {
     return `
       SELECT columns.column_name as ${this.quoteIdentifier('column_name')},
@@ -147,8 +158,18 @@ export abstract class BaseDriver implements DriverInterface {
              columns.table_schema as ${this.quoteIdentifier('table_schema')},
              columns.data_type as ${this.quoteIdentifier('data_type')}
       FROM information_schema.columns
-      WHERE columns.table_schema NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys', 'INFORMATION_SCHEMA')
+      WHERE columns.table_schema NOT IN (${this.getIgnoredSchemas()})
    `;
+  }
+
+  protected informationSchemaGetSchemasQuery() {
+    return `
+      SELECT table_schema as ${this.quoteIdentifier('schema_name')}
+      FROM information_schema.tables
+      WHERE table_schema NOT IN (${this.getIgnoredSchemas()})
+      GROUP BY table_schema
+      ORDER BY table_schema
+    `;
   }
 
   protected getSslOptions(dataSource: string): TLSConnectionOptions | undefined {
@@ -297,6 +318,11 @@ export abstract class BaseDriver implements DriverInterface {
     if (schemas.length === 0) {
       await this.query(`CREATE SCHEMA IF NOT EXISTS ${schemaName}`);
     }
+  }
+
+  public getSchemasQuery() {
+    const query = this.informationSchemaGetSchemasQuery();
+    return this.query<SchemaQueryResult>(query);
   }
 
   public getTablesQuery(schemaName: string) {
