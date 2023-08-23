@@ -166,9 +166,14 @@ export type DownloadQueryResultsResult = DownloadQueryResultsBase & (DownloadTab
 // eslint-disable-next-line camelcase
 export type TableQueryResult = { table_name?: string, TABLE_NAME?: string };
 
-export type QuerySchemasResult = { schemaName: string };
+// eslint-disable-next-line camelcase
+export type QuerySchemasResult = { schema_name: string };
 
-export type QueryTablesResult = { schemaName: string, tableName: string };
+// eslint-disable-next-line camelcase
+export type QueryTablesResult = { schema_name: string, table_name: string };
+
+// eslint-disable-next-line camelcase
+export type QueryColumnsResult = { schema_name: string, table_name: string } & TableColumnQueryResult;
 
 export interface DriverInterface {
   createSchemaIfNotExists(schemaName: string): Promise<void>;

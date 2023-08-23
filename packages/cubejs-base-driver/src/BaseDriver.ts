@@ -36,7 +36,8 @@ import {
   TableStructure,
   DriverCapabilities,
   QuerySchemasResult,
-  QueryTablesResult
+  QueryTablesResult,
+  QueryColumnsResult
 } from './driver.interface';
 
 const sortByKeys = (unordered: any) => {
@@ -344,6 +345,21 @@ export abstract class BaseDriver implements DriverInterface {
 
     const query = this.informationSchemaGetTablesQuery(schemaNames);
     return this.query<QueryTablesResult>(query);
+  }
+
+  public getColumns(tables: QueryTablesResult[]) {
+    const conditions = tables.map(t => `(table_schema='${t.schema_name}' AND table_name='${t.table_name}')`).join(' OR ');
+
+    const query = `
+      SELECT columns.column_name as ${this.quoteIdentifier('column_name')},
+             columns.table_name as ${this.quoteIdentifier('table_name')},
+             columns.table_schema as ${this.quoteIdentifier('table_schema')},
+             columns.data_type as ${this.quoteIdentifier('data_type')}
+      FROM information_schema.columns
+      WHERE ${conditions}
+    `;
+
+    return this.query<QueryColumnsResult>(query);
   }
 
   public getTablesQuery(schemaName: string) {

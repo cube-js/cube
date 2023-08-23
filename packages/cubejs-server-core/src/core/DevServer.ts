@@ -135,6 +135,24 @@ export class DevServer {
       res.json({ tables });
     }));
 
+    /** WIP */
+    app.post('/playground/list-columns', catchErrors(async (req, res) => {
+      if (!req.body.tables) {
+        throw new Error('tables parameter is required');
+      }
+
+      // this.cubejsServer.event('Dev Server List Columns');
+      const driver = await this.cubejsServer.getDriver({
+        dataSource: req.body.dataSource || 'default',
+        authInfo: null,
+        securityContext: null,
+        requestId: getRequestIdFromRequest(req),
+      });
+
+      const columns = await driver.getColumns(req.body.tables);
+      res.json({ columns });
+    }));
+
     app.get('/playground/db-schema', catchErrors(async (req, res) => {
       this.cubejsServer.event('Dev Server DB Schema Load');
       const driver = await this.cubejsServer.getDriver({
