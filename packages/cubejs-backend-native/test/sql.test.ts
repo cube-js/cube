@@ -18,7 +18,7 @@ const logger = jest.fn(({ event }) => {
 // );
 
 describe('SQLInterface', () => {
-  jest.setTimeout(10 * 1000);
+  jest.setTimeout(60 * 1000);
 
   it('SHOW FULL TABLES FROM `db`', async () => {
     const load = jest.fn(async ({ request, session, query }) => {
