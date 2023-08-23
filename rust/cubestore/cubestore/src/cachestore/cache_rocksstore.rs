@@ -96,6 +96,8 @@ impl RocksStoreDetails for RocksCacheStoreDetails {
             block_opts
         };
 
+        opts.set_max_background_jobs(rocksdb_config.max_background_jobs as i32);
+        opts.set_max_subcompactions(rocksdb_config.max_subcompactions);
         opts.set_block_based_table_factory(&block_opts);
         opts.set_compression_type(rocksdb_config.compression_type);
 
