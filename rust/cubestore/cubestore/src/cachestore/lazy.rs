@@ -5,7 +5,7 @@ use crate::cachestore::{
     RocksCacheStore,
 };
 use crate::config::ConfigObj;
-use crate::metastore::{IdRow, MetaStoreEvent, MetaStoreFs};
+use crate::metastore::{IdRow, MetaStoreEvent, MetaStoreFs, RocksPropertyRow};
 use crate::CubeError;
 use async_trait::async_trait;
 use log::trace;
@@ -301,6 +301,10 @@ impl CacheStore for LazyRocksCacheStore {
 
     async fn healthcheck(&self) -> Result<(), CubeError> {
         self.init().await?.healthcheck().await
+    }
+
+    async fn rocksdb_properties(&self) -> Result<Vec<RocksPropertyRow>, CubeError> {
+        self.init().await?.rocksdb_properties().await
     }
 }
 

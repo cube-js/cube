@@ -1,6 +1,7 @@
 mod info_schema_columns;
 mod info_schema_schemata;
 mod info_schema_tables;
+mod rocksdb_properties;
 mod system_cache;
 mod system_chunks;
 mod system_indexes;
@@ -15,6 +16,7 @@ mod system_tables;
 pub use info_schema_columns::*;
 pub use info_schema_schemata::*;
 pub use info_schema_tables::*;
+pub use rocksdb_properties::*;
 pub use system_cache::*;
 pub use system_chunks::*;
 pub use system_indexes::*;
