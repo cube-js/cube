@@ -257,6 +257,14 @@ impl<'a> RocksSecondaryIndexValue<'a> {
                         expire,
                         RocksSecondaryIndexValueTTLExtended { raw_size, lru, lfu },
                     ))
+                },
+                // it's a new format for HashAndTTL where expire is packed as u32
+                3 => {
+                    let hash_size = bytes.len() - 4;
+                    let (hash, mut expire_buf) = (&bytes[1..hash_size], &bytes[hash_size..]);
+                    let expire = Self::decode_optional_datetime_as_u32(expire_buf.read_u32::<BigEndian>()?)?;
+
+                    Ok(RocksSecondaryIndexValue::HashAndTTL(&hash, expire))
                 }
                 tid => Err(CubeError::internal(format!(
                     "Unsupported type \"{}\" of value for index",
@@ -297,6 +305,7 @@ impl<'a> RocksSecondaryIndexValue<'a> {
                 RocksSecondaryIndexValue::HashAndTTL(hash, expire) => {
                     let mut buf = Cursor::new(Vec::with_capacity(hash.len() + 1 + 8));
 
+                    // TODO(ovr): Migrate to 3, pack expire as u32 instead of u64
                     buf.write_u8(1)?;
                     buf.write_all(&hash)?;
 
