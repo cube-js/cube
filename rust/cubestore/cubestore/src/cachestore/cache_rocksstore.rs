@@ -18,7 +18,7 @@ use crate::metastore::{
 };
 use crate::remotefs::LocalDirRemoteFs;
 use crate::util::WorkerLoop;
-use crate::CubeError;
+use crate::{app_metrics, CubeError};
 use async_trait::async_trait;
 
 use futures_timer::Delay;
@@ -28,6 +28,7 @@ use crate::cachestore::compaction::CompactionPreloadedState;
 use crate::cachestore::listener::RocksCacheStoreListener;
 use crate::table::{Row, TableValue};
 use chrono::{DateTime, Utc};
+use datafusion::cube_ext;
 use itertools::Itertools;
 use log::{trace, warn};
 use serde_derive::{Deserialize, Serialize};
@@ -35,6 +36,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::sync::broadcast::Sender;
+use tokio::task::JoinHandle;
 
 pub(crate) struct RocksCacheStoreDetails {}
 
@@ -125,6 +127,7 @@ impl RocksStoreDetails for RocksCacheStoreDetails {
 pub struct RocksCacheStore {
     store: Arc<RocksStore>,
     upload_loop: Arc<WorkerLoop>,
+    metrics_loop: Arc<WorkerLoop>,
 }
 
 impl RocksCacheStore {
@@ -158,6 +161,7 @@ impl RocksCacheStore {
         Arc::new(Self {
             store,
             upload_loop: Arc::new(WorkerLoop::new("Cachestore upload")),
+            metrics_loop: Arc::new(WorkerLoop::new("Cachestore metrics")),
         })
     }
 
@@ -191,24 +195,77 @@ impl RocksCacheStore {
         Ok(Self::new_from_store(store))
     }
 
-    pub async fn wait_upload_loop(self: Arc<Self>) {
-        if !self.store.config.upload_to_remote() {
+    pub fn spawn_processing_loops(self: Arc<Self>) -> Vec<JoinHandle<Result<(), CubeError>>> {
+        let mut loops = vec![];
+
+        if self.store.config.upload_to_remote() {
+            let upload_interval = self.store.config.meta_store_log_upload_interval();
+            let cachestore = self.clone();
+            loops.push(cube_ext::spawn(async move {
+                cachestore
+                    .upload_loop
+                    .process(
+                        cachestore.clone(),
+                        async move |_| Ok(Delay::new(Duration::from_secs(upload_interval)).await),
+                        async move |m, _| m.store.run_upload().await,
+                    )
+                    .await;
+
+                Ok(())
+            }))
+        } else {
             log::info!("Not running cachestore upload loop");
-            return;
         }
 
-        let upload_interval = self.store.config.meta_store_log_upload_interval();
-        self.upload_loop
-            .process(
-                self.clone(),
-                async move |_| Ok(Delay::new(Duration::from_secs(upload_interval)).await),
-                async move |m, _| m.store.run_upload().await,
-            )
-            .await;
+        let metrics_interval = self.store.config.cachestore_metrics_interval();
+        if metrics_interval > 0 {
+            let cachestore = self.clone();
+            loops.push(cube_ext::spawn(async move {
+                cachestore
+                    .metrics_loop
+                    .process(
+                        cachestore.clone(),
+                        async move |_| Ok(Delay::new(Duration::from_secs(metrics_interval)).await),
+                        async move |m, _| {
+                            if let Err(err) = m.submit_metrics().await {
+                                log::error!("Error while submitting cachestore metrics: {}", err)
+                            };
+
+                            Ok(())
+                        },
+                    )
+                    .await;
+
+                Ok(())
+            }))
+        } else {
+            log::info!("Not running cachestore metrics loop");
+        }
+
+        loops
+    }
+
+    pub async fn submit_metrics(&self) -> Result<(), CubeError> {
+        app_metrics::CACHESTORE_ROCKSDB_ESTIMATE_LIVE_DATA_SIZE.report(
+            self.store
+                .db
+                .property_int_value(rocksdb::properties::ESTIMATE_LIVE_DATA_SIZE)?
+                .unwrap_or(0) as i64,
+        );
+
+        app_metrics::CACHESTORE_ROCKSDB_LIVE_SST_FILES_SIZE.report(
+            self.store
+                .db
+                .property_int_value(rocksdb::properties::LIVE_SST_FILES_SIZE)?
+                .unwrap_or(0) as i64,
+        );
+
+        Ok(())
     }
 
     pub async fn stop_processing_loops(&self) {
         self.upload_loop.stop();
+        self.metrics_loop.stop();
     }
 
     pub async fn add_listener(&self, listener: Sender<MetaStoreEvent>) {
