@@ -274,6 +274,7 @@ crate::plan_to_language! {
             split: bool,
             can_pushdown_join: bool,
             wrapped: bool,
+            ungrouped: bool,
         },
         CubeScanWrapper {
             input: Arc<LogicalPlan>,
@@ -1261,10 +1262,20 @@ fn cube_scan(
     split: impl Display,
     can_pushdown_join: impl Display,
     wrapped: impl Display,
+    ungrouped: impl Display,
 ) -> String {
     format!(
-        "(Extension (CubeScan {} {} {} {} {} {} {} {} {}))",
-        alias_to_cube, members, filters, orders, limit, offset, split, can_pushdown_join, wrapped
+        "(Extension (CubeScan {} {} {} {} {} {} {} {} {} {}))",
+        alias_to_cube,
+        members,
+        filters,
+        orders,
+        limit,
+        offset,
+        split,
+        can_pushdown_join,
+        wrapped,
+        ungrouped
     )
 }
 

@@ -11,17 +11,18 @@ use crate::{
             analysis::LogicalPlanAnalysis, rewriter::Rewriter, AggregateFunctionExprDistinct,
             AggregateFunctionExprFun, AggregateSplit, AggregateUDFExprFun, AliasExprAlias,
             AnyExprOp, BetweenExprNegated, BinaryExprOp, CastExprDataType, ChangeUserMemberValue,
-            ColumnExprColumn, CubeScanAliasToCube, CubeScanLimit, CubeScanOffset, DimensionName,
-            EmptyRelationProduceOneRow, FilterMemberMember, FilterMemberOp, FilterMemberValues,
-            FilterOpOp, InListExprNegated, JoinJoinConstraint, JoinJoinType, JoinLeftOn,
-            JoinRightOn, LikeExprEscapeChar, LikeExprLikeType, LikeExprNegated, LikeType,
-            LimitFetch, LimitSkip, LiteralExprValue, LiteralMemberRelation, LiteralMemberValue,
-            LogicalPlanLanguage, MeasureName, MemberErrorError, OrderAsc, OrderMember,
-            OuterColumnExprColumn, OuterColumnExprDataType, ProjectionAlias, ProjectionSplit,
-            ScalarFunctionExprFun, ScalarUDFExprFun, ScalarVariableExprDataType,
-            ScalarVariableExprVariable, SegmentMemberMember, SortExprAsc, SortExprNullsFirst,
-            TableScanFetch, TableScanProjection, TableScanSourceTableName, TableScanTableName,
-            TableUDFExprFun, TimeDimensionDateRange, TimeDimensionGranularity, TimeDimensionName,
+            ColumnExprColumn, CubeScanAliasToCube, CubeScanLimit, CubeScanOffset,
+            CubeScanUngrouped, DimensionName, EmptyRelationProduceOneRow, FilterMemberMember,
+            FilterMemberOp, FilterMemberValues, FilterOpOp, InListExprNegated, JoinJoinConstraint,
+            JoinJoinType, JoinLeftOn, JoinRightOn, LikeExprEscapeChar, LikeExprLikeType,
+            LikeExprNegated, LikeType, LimitFetch, LimitSkip, LiteralExprValue,
+            LiteralMemberRelation, LiteralMemberValue, LogicalPlanLanguage, MeasureName,
+            MemberErrorError, OrderAsc, OrderMember, OuterColumnExprColumn,
+            OuterColumnExprDataType, ProjectionAlias, ProjectionSplit, ScalarFunctionExprFun,
+            ScalarUDFExprFun, ScalarVariableExprDataType, ScalarVariableExprVariable,
+            SegmentMemberMember, SortExprAsc, SortExprNullsFirst, TableScanFetch,
+            TableScanProjection, TableScanSourceTableName, TableScanTableName, TableUDFExprFun,
+            TimeDimensionDateRange, TimeDimensionGranularity, TimeDimensionName,
             TryCastExprDataType, UnionAlias, WindowFunctionExprFun, WindowFunctionExprWindowFrame,
             WrappedSelectAlias, WrappedSelectJoinJoinType, WrappedSelectLimit, WrappedSelectOffset,
             WrappedSelectSelectType, WrappedSelectType,
@@ -1586,6 +1587,13 @@ impl LanguageToLogicalPlanConverter {
                             .into_iter()
                             .unique_by(|(f, _)| f.qualified_name())
                             .collect();
+
+                        let ungrouped =
+                            match_data_node!(node_by_id, cube_scan_params[9], CubeScanUngrouped);
+
+                        if ungrouped {
+                            query.ungrouped = Some(true);
+                        }
 
                         let member_fields = fields.iter().map(|(_, m)| m.clone()).collect();
 

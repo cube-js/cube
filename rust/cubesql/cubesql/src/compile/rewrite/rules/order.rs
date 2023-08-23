@@ -35,6 +35,7 @@ impl RewriteRules for OrderRules {
                         "?split",
                         "?can_pushdown_join",
                         "CubeScanWrapped:false",
+                        "?ungrouped",
                     ),
                 ),
                 cube_scan(
@@ -47,6 +48,7 @@ impl RewriteRules for OrderRules {
                     "?split",
                     "?can_pushdown_join",
                     "CubeScanWrapped:false",
+                    "?ungrouped",
                 ),
                 self.push_down_sort("?expr", "?members", "?aliases"),
             ),

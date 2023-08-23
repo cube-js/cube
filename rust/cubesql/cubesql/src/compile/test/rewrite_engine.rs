@@ -65,7 +65,7 @@ pub fn rewrite_rules(
     cube_context: Arc<CubeContext>,
 ) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
     let rules: Vec<Box<dyn RewriteRules>> = vec![
-        Box::new(MemberRules::new(cube_context.clone())),
+        Box::new(MemberRules::new(cube_context.clone(), false)),
         Box::new(FilterRules::new(cube_context.clone())),
         Box::new(DateRules::new(cube_context.clone())),
         Box::new(OrderRules::new(cube_context.clone())),
