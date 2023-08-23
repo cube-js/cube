@@ -1201,6 +1201,7 @@ mod tests {
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             },
             wrapped_sql: None,
             auth_context: Arc::new(HttpAuthContext {

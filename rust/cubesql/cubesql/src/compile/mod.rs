@@ -143,7 +143,7 @@ impl QueryPlanner {
         let rewrite_engine = env::var("CUBESQL_REWRITE_ENGINE")
             .ok()
             .map(|v| v.parse::<bool>().unwrap())
-            .unwrap_or(self.state.protocol == DatabaseProtocol::PostgreSQL);
+            .unwrap_or(true);
         if rewrite_engine {
             return self.create_df_logical_plan(stmt.clone(), qtrace).await;
         }
@@ -1634,7 +1634,10 @@ mod tests {
         *,
     };
     use crate::{
-        compile::test::{get_string_cube_meta, get_test_tenant_ctx_with_meta},
+        compile::{
+            rewrite::rewriter::Rewriter,
+            test::{get_string_cube_meta, get_test_tenant_ctx_with_meta},
+        },
         sql::{dataframe::batch_to_dataframe, types::StatusFlags},
     };
     use datafusion::{logical_plan::PlanVisitor, physical_plan::displayable};
@@ -1782,7 +1785,8 @@ mod tests {
                 order: None,
                 limit: None,
                 offset: None,
-                filters: None
+                filters: None,
+                ungrouped: None,
             }
         );
     }
@@ -1804,7 +1808,8 @@ mod tests {
                 order: None,
                 limit: None,
                 offset: None,
-                filters: None
+                filters: None,
+                ungrouped: None,
             }
         );
     }
@@ -1826,7 +1831,8 @@ mod tests {
                 order: None,
                 limit: None,
                 offset: None,
-                filters: None
+                filters: None,
+                ungrouped: None,
             }
         );
     }
@@ -1853,7 +1859,8 @@ mod tests {
                 order: None,
                 limit: None,
                 offset: None,
-                filters: None
+                filters: None,
+                ungrouped: None,
             }
         );
     }
@@ -1884,7 +1891,8 @@ mod tests {
                 order: None,
                 limit: None,
                 offset: None,
-                filters: None
+                filters: None,
+                ungrouped: None,
             }
         );
 
@@ -1924,7 +1932,8 @@ mod tests {
                 order: None,
                 limit: None,
                 offset: None,
-                filters: None
+                filters: None,
+                ungrouped: None,
             }
         )
     }
@@ -1954,7 +1963,8 @@ mod tests {
                 order: None,
                 limit: None,
                 offset: None,
-                filters: None
+                filters: None,
+                ungrouped: None,
             }
         )
     }
@@ -1988,7 +1998,8 @@ mod tests {
                     values: Some(vec!["fe".to_string()]),
                     or: None,
                     and: None
-                }])
+                }]),
+                ungrouped: None,
             }
         )
     }
@@ -2022,7 +2033,8 @@ mod tests {
                     values: Some(vec!["emale".to_string()]),
                     or: None,
                     and: None
-                }])
+                }]),
+                ungrouped: None,
             }
         )
     }
@@ -2065,7 +2077,8 @@ mod tests {
                         or: None,
                         and: None
                     }
-                ])
+                ]),
+                ungrouped: None,
             }
         );
 
@@ -2147,6 +2160,7 @@ mod tests {
                     ]),
                     and: None,
                 }]),
+                ungrouped: None,
             }
         );
     }
@@ -2190,7 +2204,8 @@ mod tests {
                         or: None,
                         and: None
                     }
-                ])
+                ]),
+                ungrouped: None,
             }
         )
     }
@@ -2214,6 +2229,7 @@ mod tests {
             limit: None,
             offset: None,
             filters: None,
+            ungrouped: None,
         };
 
         let cube_scan = query_plan.as_logical_plan().find_cube_scan();
@@ -2260,6 +2276,7 @@ mod tests {
                     or: None,
                     and: None,
                 }]),
+                ungrouped: None,
             }
         )
     }
@@ -2299,13 +2316,17 @@ mod tests {
                 ]]),
                 limit: None,
                 offset: None,
-                filters: None
+                filters: None,
+                ungrouped: None,
             }
         )
     }
 
     #[tokio::test]
     async fn test_order_by() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         init_logger();
 
         let supported_orders = vec![
@@ -2325,7 +2346,8 @@ mod tests {
                     ]]),
                     limit: None,
                     offset: None,
-                    filters: None
+                    filters: None,
+                    ungrouped: Some(true),
                 }
             ),
             (
@@ -2344,7 +2366,8 @@ mod tests {
                     ]]),
                     limit: None,
                     offset: None,
-                    filters: None
+                    filters: None,
+                    ungrouped: None,
                 }
             ),
             // test_order_indentifier_default
@@ -2363,7 +2386,8 @@ mod tests {
                     ]]),
                     limit: None,
                     offset: None,
-                    filters: None
+                    filters: None,
+                    ungrouped: Some(true),
                 }
             ),
             // test_order_compound_identifier_default
@@ -2382,7 +2406,8 @@ mod tests {
                     ]]),
                     limit: None,
                     offset: None,
-                    filters: None
+                    filters: None,
+                    ungrouped: Some(true),
                 }
             ),
             // test_order_indentifier_asc
@@ -2401,7 +2426,8 @@ mod tests {
                     ]]),
                     limit: None,
                     offset: None,
-                    filters: None
+                    filters: None,
+                    ungrouped: Some(true),
                 }
             ),
             // test_order_indentifier_desc
@@ -2420,7 +2446,8 @@ mod tests {
                     ]]),
                     limit: None,
                     offset: None,
-                    filters: None
+                    filters: None,
+                    ungrouped: Some(true),
                 }
             ),
             // test_order_identifer_alias_ident_no_escape
@@ -2439,7 +2466,8 @@ mod tests {
                     ]]),
                     limit: None,
                     offset: None,
-                    filters: None
+                    filters: None,
+                    ungrouped: Some(true),
                 }
             ),
             // test_order_identifer_alias_ident_escape
@@ -2458,7 +2486,8 @@ mod tests {
                     ]]),
                     limit: None,
                     offset: None,
-                    filters: None
+                    filters: None,
+                    ungrouped: Some(true),
                 }
             ),
         ];
@@ -2476,6 +2505,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_order_function_date() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
@@ -2502,7 +2534,8 @@ mod tests {
                 ]]),
                 limit: None,
                 offset: None,
-                filters: None
+                filters: None,
+                ungrouped: Some(true),
             }
         );
 
@@ -2529,7 +2562,8 @@ mod tests {
                 ]]),
                 limit: None,
                 offset: None,
-                filters: None
+                filters: None,
+                ungrouped: None,
             }
         );
     }
@@ -2586,6 +2620,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_select_two_fields() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         let query_plan = convert_select_to_query_plan(
             "SELECT order_date, customer_gender FROM KibanaSampleDataEcommerce".to_string(),
             DatabaseProtocol::MySQL,
@@ -2606,12 +2643,16 @@ mod tests {
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: Some(true),
             }
         )
     }
 
     #[tokio::test]
     async fn test_select_fields_alias() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         let query_plan = convert_select_to_query_plan(
             "SELECT order_date as order_date, customer_gender as customer_gender FROM KibanaSampleDataEcommerce"
                 .to_string(), DatabaseProtocol::MySQL
@@ -2632,6 +2673,7 @@ mod tests {
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: Some(true),
             }
         );
 
@@ -2652,6 +2694,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_select_where_false() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
@@ -2685,12 +2730,16 @@ mod tests {
                 limit: Some(1),
                 offset: None,
                 filters: None,
+                ungrouped: Some(true),
             }
         );
     }
 
     #[tokio::test]
     async fn tableau_projection_with_casts() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
@@ -2739,6 +2788,7 @@ mod tests {
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: Some(true),
             }
         );
     }
@@ -2768,6 +2818,7 @@ mod tests {
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         );
     }
@@ -2795,6 +2846,7 @@ mod tests {
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         );
     }
@@ -2828,6 +2880,7 @@ mod tests {
                     or: None,
                     and: None,
                 }]),
+                ungrouped: None,
             }
         );
     }
@@ -2884,6 +2937,7 @@ mod tests {
                     or: None,
                     and: None,
                 }]),
+                ungrouped: None,
             }
         );
 
@@ -2919,6 +2973,7 @@ mod tests {
                         and: None,
                     }
                 ]),
+                ungrouped: None,
             }
         );
     }
@@ -2952,6 +3007,7 @@ mod tests {
                     or: None,
                     and: None,
                 }]),
+                ungrouped: None,
             }
         );
     }
@@ -3009,6 +3065,7 @@ mod tests {
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         );
     }
@@ -3052,6 +3109,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         );
     }
@@ -3080,6 +3138,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: Some(1001),
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         );
     }
@@ -3145,6 +3204,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     ]),
                     and: None,
                 },]),
+                ungrouped: None,
             }
         );
     }
@@ -3197,6 +3257,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     or: None,
                     and: None,
                 }]),
+                ungrouped: None,
             }
         );
 
@@ -3242,6 +3303,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         );
     }
@@ -3267,6 +3329,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         );
     }
@@ -3296,6 +3359,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         );
 
@@ -3320,6 +3384,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         );
     }
@@ -3349,6 +3414,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         );
     }
@@ -3380,6 +3446,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     or: None,
                     and: None,
                 }]),
+                ungrouped: None,
             }
         );
     }
@@ -3411,6 +3478,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     or: None,
                     and: None,
                 }]),
+                ungrouped: None,
             }
         );
     }
@@ -3474,6 +3542,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     or: None,
                     and: None,
                 }]),
+                ungrouped: None,
             }
         );
     }
@@ -3523,6 +3592,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     or: None,
                     and: None,
                 }]),
+                ungrouped: None,
             }
         );
     }
@@ -3576,6 +3646,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: Some(1000001),
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         );
     }
@@ -3608,6 +3679,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     or: None,
                     and: None,
                 }]),
+                ungrouped: None,
             }
         );
     }
@@ -3652,6 +3724,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     or: None,
                     and: None,
                 }]),
+                ungrouped: None,
             }
         );
     }
@@ -3705,6 +3778,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     or: None,
                     and: None,
                 }]),
+                ungrouped: None,
             }
         );
     }
@@ -3723,6 +3797,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     limit: None,
                     offset: None,
                     filters: None,
+                    ungrouped: None,
                 },
             ),
             (
@@ -3736,6 +3811,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     limit: None,
                     offset: None,
                     filters: None,
+                    ungrouped: None,
                 },
             ),
             (
@@ -3749,6 +3825,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     limit: None,
                     offset: None,
                     filters: None,
+                    ungrouped: None,
                 },
             ),
             (
@@ -3762,6 +3839,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     limit: None,
                     offset: None,
                     filters: None,
+                    ungrouped: None,
                 },
             ),
             (
@@ -3775,6 +3853,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     limit: None,
                     offset: None,
                     filters: None,
+                    ungrouped: None,
                 },
             ),
             (
@@ -3788,6 +3867,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     limit: None,
                     offset: None,
                     filters: None,
+                    ungrouped: None,
                 },
             ),
             (
@@ -3801,6 +3881,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     limit: None,
                     offset: None,
                     filters: None,
+                    ungrouped: None,
                 },
             ),
         ];
@@ -3839,7 +3920,8 @@ ORDER BY \"COUNT(count)\" DESC"
                 order: None,
                 limit: None,
                 offset: None,
-                filters: None
+                filters: None,
+                ungrouped: None,
             }
         )
     }
@@ -3930,7 +4012,8 @@ ORDER BY \"COUNT(count)\" DESC"
                     order: None,
                     limit: None,
                     offset: None,
-                    filters: None
+                    filters: None,
+                    ungrouped: None,
                 }
             );
 
@@ -4003,7 +4086,8 @@ ORDER BY \"COUNT(count)\" DESC"
                     order: None,
                     limit: None,
                     offset: None,
-                    filters: None
+                    filters: None,
+                    ungrouped: None,
                 }
             )
         }
@@ -4034,7 +4118,8 @@ ORDER BY \"COUNT(count)\" DESC"
                 order: None,
                 limit: None,
                 offset: None,
-                filters: None
+                filters: None,
+                ungrouped: None,
             }
         )
     }
@@ -5269,6 +5354,9 @@ ORDER BY \"COUNT(count)\" DESC"
 
     #[tokio::test]
     async fn test_literal_filter_simplify() -> Result<(), CubeError> {
+        if !Rewriter::sql_push_down_enabled() {
+            return Ok(());
+        }
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
@@ -5295,6 +5383,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: Some(1000),
                 offset: None,
                 filters: None,
+                ungrouped: Some(true),
             }
         );
         assert_eq!(
@@ -5333,6 +5422,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     or: None,
                     and: None,
                 }]),
+                ungrouped: Some(true),
             }
         );
 
@@ -5341,6 +5431,9 @@ ORDER BY \"COUNT(count)\" DESC"
 
     #[tokio::test]
     async fn test_limit_push_down() -> Result<(), CubeError> {
+        if !Rewriter::sql_push_down_enabled() {
+            return Ok(());
+        }
         // 1 level push down
         let query_plan = convert_select_to_query_plan(
             "SELECT l1.*, 1 as projection_should_exist_l1 FROM (\
@@ -5366,6 +5459,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: Some(1000),
                 offset: None,
                 filters: None,
+                ungrouped: Some(true),
             }
         );
 
@@ -5396,6 +5490,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: Some(1000),
                 offset: None,
                 filters: None,
+                ungrouped: Some(true),
             }
         );
 
@@ -5441,6 +5536,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: Some(1000),
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         );
 
@@ -5479,6 +5575,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         );
 
@@ -5515,6 +5612,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         );
 
@@ -5563,6 +5661,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         );
 
@@ -5603,6 +5702,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         );
 
@@ -5649,6 +5749,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: Some(1000),
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         );
 
@@ -9712,6 +9813,9 @@ ORDER BY \"COUNT(count)\" DESC"
 
     #[tokio::test]
     async fn test_metabase_substring() -> Result<(), CubeError> {
+        if !Rewriter::sql_push_down_enabled() {
+            return Ok(());
+        }
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
@@ -9740,6 +9844,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: Some(true),
             }
         );
 
@@ -9748,6 +9853,9 @@ ORDER BY \"COUNT(count)\" DESC"
 
     #[tokio::test]
     async fn test_skyvia_reaggregate_date_part() -> Result<(), CubeError> {
+        if !Rewriter::sql_push_down_enabled() {
+            return Ok(());
+        }
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
@@ -9777,6 +9885,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: Some(true),
             }
         );
 
@@ -9846,6 +9955,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         );
 
@@ -9854,6 +9964,9 @@ ORDER BY \"COUNT(count)\" DESC"
 
     #[tokio::test]
     async fn test_binary_expr_projection_split() -> Result<(), CubeError> {
+        if !Rewriter::sql_push_down_enabled() {
+            return Ok(());
+        }
         let operators = ["+", "-", "*", "/"];
 
         for operator in operators {
@@ -9884,6 +9997,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     limit: None,
                     offset: None,
                     filters: None,
+                    ungrouped: Some(true),
                 }
             );
         }
@@ -9958,6 +10072,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         );
 
@@ -11237,6 +11352,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: Some(2500),
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         );
 
@@ -11283,6 +11399,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         );
 
@@ -11365,6 +11482,9 @@ ORDER BY \"COUNT(count)\" DESC"
 
     #[tokio::test]
     async fn test_cast_decimal_default_precision() -> Result<(), CubeError> {
+        if !Rewriter::sql_push_down_enabled() {
+            return Ok(());
+        }
         insta::assert_snapshot!(
             "cast_decimal_default_precision",
             execute_query(
@@ -11404,6 +11524,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     or: None,
                     and: None,
                 }]),
+                ungrouped: Some(true),
             }
         );
 
@@ -11412,6 +11533,9 @@ ORDER BY \"COUNT(count)\" DESC"
 
     #[tokio::test]
     async fn test_triple_ident() -> Result<(), CubeError> {
+        if !Rewriter::sql_push_down_enabled() {
+            return Ok(());
+        }
         let query_plan = convert_select_to_query_plan(
             "select count
             from \"public\".\"KibanaSampleDataEcommerce\"
@@ -11448,6 +11572,7 @@ ORDER BY \"COUNT(count)\" DESC"
                         and: None,
                     }
                 ]),
+                ungrouped: Some(true),
             }
         );
 
@@ -11492,13 +11617,17 @@ ORDER BY \"COUNT(count)\" DESC"
                     values: filter_vals,
                     or: None,
                     and: None,
-                },])
+                },]),
+                ungrouped: None,
             }
         )
     }
 
     #[tokio::test]
     async fn superset_timeout_reached() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         init_logger();
 
         let logical_plan = convert_select_to_query_plan(
@@ -11540,7 +11669,8 @@ ORDER BY \"COUNT(count)\" DESC"
                 ]]),
                 limit: Some(10000),
                 offset: None,
-                filters: None
+                filters: None,
+                ungrouped: Some(true),
             }
         )
     }
@@ -11572,12 +11702,16 @@ ORDER BY \"COUNT(count)\" DESC"
                     or: None,
                     and: None,
                 }]),
+                ungrouped: None,
             }
         )
     }
 
     #[tokio::test]
     async fn metabase_limit_0() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         init_logger();
 
         let logical_plan = convert_select_to_query_plan(
@@ -11595,7 +11729,8 @@ ORDER BY \"COUNT(count)\" DESC"
                 order: None,
                 limit: Some(1),
                 offset: None,
-                filters: None
+                filters: None,
+                ungrouped: Some(true),
             }
         )
     }
@@ -11624,12 +11759,16 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         )
     }
 
     #[tokio::test]
     async fn metabase_date_filters() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         init_logger();
 
         let now = "str_to_date('2022-01-01 00:00:00.000000', 'YYYY-MM-DD HH24:MI:SS.US')";
@@ -11696,7 +11835,8 @@ ORDER BY \"COUNT(count)\" DESC"
                     order: None,
                     limit: None,
                     offset: None,
-                    filters: None
+                    filters: None,
+                    ungrouped: Some(true),
                 }
             );
         }
@@ -11733,7 +11873,8 @@ ORDER BY \"COUNT(count)\" DESC"
                 order: None,
                 limit: None,
                 offset: None,
-                filters: None
+                filters: None,
+                ungrouped: Some(true),
             }
         );
 
@@ -11794,7 +11935,8 @@ ORDER BY \"COUNT(count)\" DESC"
                     order: None,
                     limit: None,
                     offset: None,
-                    filters: None
+                    filters: None,
+                    ungrouped: Some(true),
                 }
             );
         }
@@ -11831,7 +11973,8 @@ ORDER BY \"COUNT(count)\" DESC"
                 ]]),
                 limit: None,
                 offset: None,
-                filters: None
+                filters: None,
+                ungrouped: None,
             }
         );
     }
@@ -11861,12 +12004,16 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         )
     }
 
     #[tokio::test]
     async fn metabase_contains_str_filters() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         init_logger();
 
         let logical_plan = convert_select_to_query_plan(
@@ -11897,6 +12044,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     or: None,
                     and: None,
                 },]),
+                ungrouped: Some(true),
             }
         );
 
@@ -11943,12 +12091,16 @@ ORDER BY \"COUNT(count)\" DESC"
                     ]),
                     and: None,
                 },]),
+                ungrouped: Some(true),
             }
         );
     }
 
     #[tokio::test]
     async fn metabase_between_numbers_filters() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         init_logger();
 
         let logical_plan = convert_select_to_query_plan(
@@ -11988,6 +12140,7 @@ ORDER BY \"COUNT(count)\" DESC"
                         and: None,
                     }
                 ]),
+                ungrouped: Some(true),
             }
         );
 
@@ -12038,6 +12191,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     ]),
                     and: None,
                 },]),
+                ungrouped: Some(true),
             }
         );
     }
@@ -12073,6 +12227,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         );
     }
@@ -12168,7 +12323,8 @@ ORDER BY \"COUNT(count)\" DESC"
                     order: None,
                     limit: None,
                     offset: None,
-                    filters: None
+                    filters: None,
+                    ungrouped: None,
                 }
             )
         }
@@ -12210,6 +12366,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     limit: None,
                     offset: None,
                     filters: None,
+                    ungrouped: None,
                 }
             )
         }
@@ -12255,6 +12412,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         )
     }
@@ -12300,6 +12458,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     or: None,
                     and: None,
                 }]),
+                ungrouped: None,
             }
         )
     }
@@ -12344,7 +12503,8 @@ ORDER BY \"COUNT(count)\" DESC"
                     order: None,
                     limit: None,
                     offset: None,
-                    filters: None
+                    filters: None,
+                    ungrouped: None,
                 }
             )
         }
@@ -12374,12 +12534,16 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         )
     }
 
     #[tokio::test]
     async fn test_metabase_substring_user() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         init_logger();
 
         let logical_plan = convert_select_to_query_plan(
@@ -12405,12 +12569,16 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: Some(10000),
                 offset: None,
                 filters: None,
+                ungrouped: Some(true),
             }
         )
     }
 
     #[tokio::test]
     async fn test_select_asterisk_cross_join() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         init_logger();
 
         let logical_plan = convert_select_to_query_plan(
@@ -12449,12 +12617,16 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: Some(true),
             }
         )
     }
 
     #[tokio::test]
     async fn test_user_with_join() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         init_logger();
 
         let logical_plan = convert_select_to_query_plan(
@@ -12476,6 +12648,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: Some(true),
             }
         );
 
@@ -12636,6 +12809,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: Some(50000),
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         );
 
@@ -12656,6 +12830,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: Some(200),
                 offset: Some(200),
                 filters: None,
+                ungrouped: None,
             }
         );
     }
@@ -12773,6 +12948,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     limit: None,
                     offset: None,
                     filters: None,
+                    ungrouped: None,
                 }
             );
         }
@@ -12818,6 +12994,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         );
 
@@ -12855,6 +13032,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         );
     }
@@ -12897,6 +13075,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     or: None,
                     and: None,
                 }]),
+                ungrouped: None,
             }
         );
     }
@@ -12961,6 +13140,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }),
             true
         );
@@ -12979,6 +13159,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }),
             true
         );
@@ -13041,6 +13222,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }),
             true
         );
@@ -13062,6 +13244,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }),
             true
         );
@@ -13107,6 +13290,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     or: None,
                     and: None,
                 }]),
+                ungrouped: None,
             }
         );
     }
@@ -13171,6 +13355,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: Some(2500),
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         )
     }
@@ -13257,6 +13442,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     limit: Some(2500),
                     offset: None,
                     filters: None,
+                    ungrouped: None,
                 }
             )
         }
@@ -13299,6 +13485,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     or: None,
                     and: None,
                 }]),
+                ungrouped: None,
             }
         )
     }
@@ -13340,6 +13527,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     or: None,
                     and: None,
                 }]),
+                ungrouped: None,
             }
         )
     }
@@ -13385,6 +13573,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     or: None,
                     and: None,
                 }]),
+                ungrouped: None,
             }
         )
     }
@@ -13440,6 +13629,7 @@ ORDER BY \"COUNT(count)\" DESC"
                         and: None,
                     },
                 ]),
+                ungrouped: None,
             }
         )
     }
@@ -13484,6 +13674,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     or: None,
                     and: None,
                 }]),
+                ungrouped: None,
             }
         )
     }
@@ -13528,6 +13719,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     or: None,
                     and: None,
                 }]),
+                ungrouped: None,
             }
         )
     }
@@ -13576,6 +13768,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     or: None,
                     and: None,
                 }]),
+                ungrouped: None,
             }
         )
     }
@@ -13634,6 +13827,7 @@ ORDER BY \"COUNT(count)\" DESC"
                         and: None,
                     },
                 ]),
+                ungrouped: None,
             }
         )
     }
@@ -13675,6 +13869,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         )
     }
@@ -13722,6 +13917,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: Some(2500),
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         )
     }
@@ -13779,12 +13975,16 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: Some(2500),
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         )
     }
 
     #[tokio::test]
     async fn test_thoughtspot_char_length() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         init_logger();
 
         let logical_plan = convert_select_to_query_plan(
@@ -13811,6 +14011,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: Some(true),
             }
         )
     }
@@ -13844,6 +14045,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     or: None,
                     and: None,
                 }]),
+                ungrouped: None,
             }
         );
     }
@@ -13877,12 +14079,16 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         )
     }
 
     #[tokio::test]
     async fn test_thoughtspot_derived_dot_column() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         init_logger();
 
         let logical_plan = convert_select_to_query_plan(
@@ -13937,6 +14143,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: Some(true),
             },
         );
     }
@@ -13983,7 +14190,8 @@ ORDER BY \"COUNT(count)\" DESC"
                 order: None,
                 limit: None,
                 offset: None,
-                filters: None
+                filters: None,
+                ungrouped: None,
             }
         );
 
@@ -14036,7 +14244,8 @@ ORDER BY \"COUNT(count)\" DESC"
                 order: None,
                 limit: None,
                 offset: None,
-                filters: None
+                filters: None,
+                ungrouped: None,
             }
         );
 
@@ -14159,6 +14368,9 @@ ORDER BY \"COUNT(count)\" DESC"
 
     #[tokio::test]
     async fn test_select_is_null_is_not_null() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         init_logger();
 
         let logical_plan = convert_select_to_query_plan(
@@ -14187,12 +14399,16 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: Some(true),
             }
         )
     }
 
     #[tokio::test]
     async fn test_cast_split_aliasing() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         init_logger();
 
         let logical_plan = convert_select_to_query_plan(
@@ -14230,12 +14446,16 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: Some(true),
             }
         )
     }
 
     #[tokio::test]
     async fn test_sigma_str_contains() -> Result<(), CubeError> {
+        if !Rewriter::sql_push_down_enabled() {
+            return Ok(());
+        }
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
@@ -14284,6 +14504,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     ]),
                     and: None,
                 }]),
+                ungrouped: Some(true),
             }
         );
 
@@ -14292,6 +14513,9 @@ ORDER BY \"COUNT(count)\" DESC"
 
     #[tokio::test]
     async fn test_sigma_str_not_contains() -> Result<(), CubeError> {
+        if !Rewriter::sql_push_down_enabled() {
+            return Ok(());
+        }
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
@@ -14340,6 +14564,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     ]),
                     and: None,
                 }]),
+                ungrouped: Some(true),
             }
         );
 
@@ -14348,6 +14573,9 @@ ORDER BY \"COUNT(count)\" DESC"
 
     #[tokio::test]
     async fn test_sigma_str_starts_with() -> Result<(), CubeError> {
+        if !Rewriter::sql_push_down_enabled() {
+            return Ok(());
+        }
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
@@ -14396,6 +14624,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     ]),
                     and: None,
                 }]),
+                ungrouped: Some(true),
             }
         );
 
@@ -14404,6 +14633,9 @@ ORDER BY \"COUNT(count)\" DESC"
 
     #[tokio::test]
     async fn test_sigma_str_not_starts_with() -> Result<(), CubeError> {
+        if !Rewriter::sql_push_down_enabled() {
+            return Ok(());
+        }
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
@@ -14452,6 +14684,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     ]),
                     and: None,
                 }]),
+                ungrouped: Some(true),
             }
         );
 
@@ -14460,6 +14693,9 @@ ORDER BY \"COUNT(count)\" DESC"
 
     #[tokio::test]
     async fn test_sigma_str_ends_with() -> Result<(), CubeError> {
+        if !Rewriter::sql_push_down_enabled() {
+            return Ok(());
+        }
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
@@ -14508,6 +14744,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     ]),
                     and: None,
                 }]),
+                ungrouped: Some(true),
             }
         );
 
@@ -14516,6 +14753,9 @@ ORDER BY \"COUNT(count)\" DESC"
 
     #[tokio::test]
     async fn test_sigma_str_not_ends_with() -> Result<(), CubeError> {
+        if !Rewriter::sql_push_down_enabled() {
+            return Ok(());
+        }
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
@@ -14564,6 +14804,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     ]),
                     and: None,
                 }]),
+                ungrouped: Some(true),
             }
         );
 
@@ -14588,6 +14829,9 @@ ORDER BY \"COUNT(count)\" DESC"
 
     #[tokio::test]
     async fn test_sigma_num_range() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         init_logger();
 
         let logical_plan = convert_select_to_query_plan(
@@ -14663,12 +14907,16 @@ ORDER BY \"COUNT(count)\" DESC"
                     ]),
                     and: None,
                 }]),
+                ungrouped: Some(true),
             }
         )
     }
 
     #[tokio::test]
     async fn test_sigma_num_not_in() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         init_logger();
 
         let logical_plan = convert_select_to_query_plan(
@@ -14724,12 +14972,16 @@ ORDER BY \"COUNT(count)\" DESC"
                     ]),
                     and: None,
                 }]),
+                ungrouped: Some(true),
             }
         )
     }
 
     #[tokio::test]
     async fn test_date_granularity_skyvia() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         init_logger();
         let supported_granularities = vec![
             // Day
@@ -14773,7 +15025,8 @@ ORDER BY \"COUNT(count)\" DESC"
                     order: None,
                     limit: None,
                     offset: None,
-                    filters: None
+                    filters: None,
+                    ungrouped: Some(true),
                 }
             )
         }
@@ -14809,7 +15062,8 @@ ORDER BY \"COUNT(count)\" DESC"
                     order: None,
                     limit: None,
                     offset: None,
-                    filters: None
+                    filters: None,
+                    ungrouped: None,
                 }
             )
         }
@@ -14817,6 +15071,9 @@ ORDER BY \"COUNT(count)\" DESC"
 
     #[tokio::test]
     async fn test_sigma_literal_relation() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         init_logger();
 
         let logical_plan = convert_select_to_query_plan(
@@ -14846,12 +15103,16 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: Some(true),
             }
         )
     }
 
     #[tokio::test]
     async fn test_join_three_cubes() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         init_logger();
 
         let logical_plan = convert_select_to_query_plan(
@@ -14897,6 +15158,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: Some(true),
             }
         )
     }
@@ -14943,7 +15205,8 @@ ORDER BY \"COUNT(count)\" DESC"
                     values: Some(vec!["true".to_string()]),
                     or: None,
                     and: None
-                }])
+                }]),
+                ungrouped: None,
             }
         )
     }
@@ -14994,7 +15257,8 @@ ORDER BY \"COUNT(count)\" DESC"
                         or: None,
                         and: None
                     }
-                ])
+                ]),
+                ungrouped: None,
             }
         )
     }
@@ -15050,7 +15314,8 @@ ORDER BY \"COUNT(count)\" DESC"
                         or: None,
                         and: None
                     }
-                ])
+                ]),
+                ungrouped: None,
             }
         )
     }
@@ -15101,7 +15366,8 @@ ORDER BY \"COUNT(count)\" DESC"
                         or: None,
                         and: None
                     }
-                ])
+                ]),
+                ungrouped: None,
             }
         )
     }
@@ -15157,7 +15423,8 @@ ORDER BY \"COUNT(count)\" DESC"
                         or: None,
                         and: None
                     }
-                ])
+                ]),
+                ungrouped: None,
             }
         )
     }
@@ -15219,7 +15486,8 @@ ORDER BY \"COUNT(count)\" DESC"
                         or: None,
                         and: None
                     }
-                ])
+                ]),
+                ungrouped: None,
             }
         )
     }
@@ -15301,6 +15569,9 @@ ORDER BY \"COUNT(count)\" DESC"
 
     #[tokio::test]
     async fn test_join_cubes_with_postprocessing() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         init_logger();
 
         let logical_plan = convert_select_to_query_plan(
@@ -15335,6 +15606,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }),
             true
         );
@@ -15349,6 +15621,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: Some(true),
             }),
             true
         )
@@ -15356,6 +15629,9 @@ ORDER BY \"COUNT(count)\" DESC"
 
     #[tokio::test]
     async fn test_join_cubes_with_postprocessing_and_no_cubejoinfield() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         init_logger();
 
         let logical_plan = convert_select_to_query_plan(
@@ -15392,6 +15668,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }),
             true
         );
@@ -15406,6 +15683,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: Some(true),
             }),
             true
         )
@@ -15413,6 +15691,9 @@ ORDER BY \"COUNT(count)\" DESC"
 
     #[tokio::test]
     async fn test_limit_push_down_recursion() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         init_logger();
 
         let logical_plan = convert_select_to_query_plan(
@@ -15445,12 +15726,16 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: Some(10001),
                 offset: None,
                 filters: None,
+                ungrouped: Some(true),
             }
         )
     }
 
     #[tokio::test]
     async fn test_push_down_projection_literal() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         init_logger();
 
         let logical_plan = convert_select_to_query_plan(
@@ -15493,6 +15778,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: Some(true),
             }
         )
     }
@@ -15554,7 +15840,8 @@ ORDER BY \"COUNT(count)\" DESC"
                     values: None,
                     or: None,
                     and: None
-                },])
+                },]),
+                ungrouped: None,
             }
         )
     }
@@ -15611,7 +15898,8 @@ ORDER BY \"COUNT(count)\" DESC"
                     values: None,
                     or: None,
                     and: None
-                },])
+                },]),
+                ungrouped: None,
             }
         )
     }
@@ -15660,7 +15948,8 @@ ORDER BY \"COUNT(count)\" DESC"
                     ]),
                     or: None,
                     and: None
-                },])
+                },]),
+                ungrouped: None,
             }
         )
     }
@@ -15691,6 +15980,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         )
     }
@@ -15721,6 +16011,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         )
     }
@@ -15775,7 +16066,8 @@ ORDER BY \"COUNT(count)\" DESC"
                     values: Some(vec!["male".to_string()]),
                     or: None,
                     and: None
-                }])
+                }]),
+                ungrouped: None,
             }
         );
 
@@ -15825,7 +16117,8 @@ ORDER BY \"COUNT(count)\" DESC"
                     values: Some(vec!["test".to_string()]),
                     or: None,
                     and: None
-                }])
+                }]),
+                ungrouped: None,
             }
         );
 
@@ -15875,7 +16168,8 @@ ORDER BY \"COUNT(count)\" DESC"
                     values: Some(vec!["known".to_string()]),
                     or: None,
                     and: None
-                }])
+                }]),
+                ungrouped: None,
             }
         )
     }
@@ -15952,6 +16246,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     ]),
                     and: None,
                 }]),
+                ungrouped: None,
             }
         )
     }
@@ -16011,12 +16306,16 @@ ORDER BY \"COUNT(count)\" DESC"
                     ]),
                     and: None,
                 }]),
+                ungrouped: None,
             }
         )
     }
 
     #[tokio::test]
     async fn test_segment_post_aggr() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         init_logger();
 
         let logical_plan = convert_select_to_query_plan(
@@ -16041,12 +16340,16 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: Some(true),
             }
         )
     }
 
     #[tokio::test]
     async fn test_select_from_cube_case() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         init_logger();
 
         let logical_plan = convert_select_to_query_plan(
@@ -16078,6 +16381,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: Some(true),
             }
         )
     }
@@ -16117,12 +16421,16 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         )
     }
 
     #[tokio::test]
     async fn test_select_from_cube_case_with_expr() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         init_logger();
 
         let logical_plan = convert_select_to_query_plan(
@@ -16158,6 +16466,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: Some(true),
             }
         )
     }
@@ -16201,6 +16510,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         )
     }
@@ -16240,6 +16550,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         )
     }
@@ -16280,6 +16591,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         )
     }
@@ -16341,7 +16653,8 @@ ORDER BY \"COUNT(count)\" DESC"
                         }),
                     ]),
                     and: None
-                }])
+                }]),
+                ungrouped: None,
             }
         )
     }
@@ -16383,7 +16696,8 @@ ORDER BY \"COUNT(count)\" DESC"
                     values: Some(vec!["10".to_string()]),
                     or: None,
                     and: None
-                }])
+                }]),
+                ungrouped: None,
             }
         )
     }
@@ -16421,6 +16735,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         )
     }
@@ -16457,6 +16772,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         )
     }
@@ -16493,6 +16809,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         )
     }
@@ -16536,6 +16853,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         )
     }
@@ -16579,6 +16897,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         )
     }
@@ -16614,6 +16933,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         );
 
@@ -16647,6 +16967,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         );
 
@@ -16695,6 +17016,7 @@ ORDER BY \"COUNT(count)\" DESC"
                         and: None
                     }
                 ]),
+                ungrouped: None,
             }
         )
     }
@@ -16729,6 +17051,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         )
     }
@@ -16768,6 +17091,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         );
 
@@ -16802,6 +17126,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         )
     }
@@ -16845,6 +17170,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         )
     }
@@ -16888,6 +17214,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         );
 
@@ -16928,6 +17255,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         )
     }
@@ -16981,6 +17309,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     or: None,
                     and: None
                 }]),
+                ungrouped: None,
             }
         )
     }
@@ -17016,6 +17345,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         )
     }
@@ -17059,6 +17389,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         )
     }
@@ -17104,6 +17435,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         )
     }
@@ -17153,6 +17485,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         )
     }
@@ -17192,6 +17525,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         )
     }
@@ -17236,6 +17570,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         )
     }
@@ -17289,7 +17624,8 @@ ORDER BY \"COUNT(count)\" DESC"
                         or: None,
                         and: None,
                     },
-                ])
+                ]),
+                ungrouped: None,
             }
         )
     }
@@ -17405,7 +17741,8 @@ ORDER BY \"COUNT(count)\" DESC"
                         or: None,
                         and: None,
                     },
-                ])
+                ]),
+                ungrouped: None,
             }
         )
     }
@@ -17447,6 +17784,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         )
     }
@@ -17487,6 +17825,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         )
     }
@@ -17528,12 +17867,16 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         )
     }
 
     #[tokio::test]
     async fn test_thoughtspot_filter_date_trunc_column_with_literal() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         init_logger();
 
         let test_data = vec![
@@ -17585,6 +17928,7 @@ ORDER BY \"COUNT(count)\" DESC"
                         or: None,
                         and: None
                     }]),
+                    ungrouped: Some(true),
                 }
             );
         }
@@ -17622,12 +17966,16 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         )
     }
 
     #[tokio::test]
     async fn test_metabase_substring_postaggr() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         init_logger();
 
         let logical_plan = convert_select_to_query_plan(
@@ -17659,12 +18007,16 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: Some(true),
             }
         )
     }
 
     #[tokio::test]
     async fn test_reaggregate_without_aliases() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         init_logger();
 
         let logical_plan = convert_select_to_query_plan(
@@ -17696,6 +18048,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: Some(true),
             }
         )
     }
@@ -17733,12 +18086,16 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         )
     }
 
     #[tokio::test]
     async fn test_sigma_row_count_cross_join() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         init_logger();
 
         let logical_plan = convert_select_to_query_plan(
@@ -17797,6 +18154,7 @@ ORDER BY \"COUNT(count)\" DESC"
             limit: None,
             offset: None,
             filters: None,
+            ungrouped: Some(true),
         }))
     }
 
@@ -17875,7 +18233,8 @@ ORDER BY \"COUNT(count)\" DESC"
                         }),
                     ]),
                     and: None
-                }])
+                }]),
+                ungrouped: None,
             }
         )
     }
@@ -17916,6 +18275,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         )
     }
@@ -17936,6 +18296,9 @@ ORDER BY \"COUNT(count)\" DESC"
 
     #[tokio::test]
     async fn test_simple_wrapper() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
@@ -17962,6 +18325,9 @@ ORDER BY \"COUNT(count)\" DESC"
 
     #[tokio::test]
     async fn test_case_wrapper() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
@@ -17988,6 +18354,9 @@ ORDER BY \"COUNT(count)\" DESC"
 
     #[tokio::test]
     async fn test_case_wrapper_with_limit() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
@@ -18088,6 +18457,7 @@ ORDER BY \"COUNT(count)\" DESC"
                         and: None,
                     },
                 ]),
+                ungrouped: None,
             }
         )
     }
@@ -18134,6 +18504,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: Some(1000),
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         )
     }
@@ -18171,6 +18542,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         )
     }
@@ -18211,6 +18583,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         )
     }
@@ -18251,6 +18624,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         )
     }
@@ -18291,6 +18665,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         )
     }
@@ -18331,6 +18706,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             }
         )
     }
