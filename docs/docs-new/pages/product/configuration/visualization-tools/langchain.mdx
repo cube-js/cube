@@ -1,0 +1,28 @@
+# Langchain
+
+[LangChain][langchain] is a framework designed to simplify the creation of
+applications using large language models.
+
+To get started with Langchain, follow the [instructions
+here][langchain-docs-getting-started].
+
+## Configuring the connection to Cube
+
+LangChain connects to Cube using the [REST API][ref-rest-api], and will need a
+[JWT][ref-jwt] to authenticate.
+
+If you're using Cube Cloud, you can retrieve these details from a deployment's
+<Btn>Overview</Btn> page.
+
+## Querying Cube
+
+Please refer to the [Cube loader documentation on
+LangChain][langchain-docs-cube] for more information on how to query Cube.
+
+[langchain]: https://python.langchain.com/
+[langchain-docs-getting-started]:
+  https://python.langchain.com/docs/get_started/installation.html
+[langchain-docs-cube]:
+  https://python.langchain.com/docs/integrations/document_loaders/cube_semantic#example
+[ref-rest-api]: /product/apis-integrations/rest-api
+[ref-jwt]: /product/auth#generating-json-web-tokens-jwt
