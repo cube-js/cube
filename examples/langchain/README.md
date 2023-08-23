@@ -13,6 +13,6 @@ This is an example of a chatbot built with Cube, Langchain, and Streamlit.
 ## How to run
 
 - Install dependencies: `pip install -r requirements.txt`
-- Run `python ingest.py`. It will use `CubeSemanticLoader` Langchain library to load metadata and save it in vectorstore
 - Copy `.env.example` as `.env` and fill it in with your credentials
+- Run `python ingest.py`. It will use `CubeSemanticLoader` Langchain library to load metadata and save it in vectorstore
 - Run `streamlit run main.py`

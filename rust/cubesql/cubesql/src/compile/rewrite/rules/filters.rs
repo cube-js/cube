@@ -69,6 +69,7 @@ impl RewriteRules for FilterRules {
                         "?split",
                         "?can_pushdown_join",
                         "?wrapped",
+                        "?ungrouped",
                     ),
                 ),
                 cube_scan(
@@ -89,6 +90,7 @@ impl RewriteRules for FilterRules {
                     "?split",
                     "?can_pushdown_join",
                     "?wrapped",
+                    "?ungrouped",
                 ),
                 self.push_down_filter(
                     "?alias_to_cube",
@@ -112,6 +114,7 @@ impl RewriteRules for FilterRules {
                         "?split",
                         "?can_pushdown_join",
                         "?wrapped",
+                        "?ungrouped",
                     ),
                 ),
                 limit(
@@ -127,6 +130,7 @@ impl RewriteRules for FilterRules {
                         "?split",
                         "?can_pushdown_join",
                         "?wrapped",
+                        "?ungrouped",
                     ),
                 ),
                 self.push_down_limit_filter(
@@ -169,6 +173,7 @@ impl RewriteRules for FilterRules {
                             "?split",
                             "?can_pushdown_join",
                             "?wrapped",
+                            "?ungrouped",
                         ),
                     ),
                 ),
@@ -187,6 +192,7 @@ impl RewriteRules for FilterRules {
                             "?split",
                             "?can_pushdown_join",
                             "?wrapped",
+                            "?ungrouped",
                         ),
                     ),
                 ),
@@ -224,6 +230,7 @@ impl RewriteRules for FilterRules {
                             "?split",
                             "?can_pushdown_join",
                             "?wrapped",
+                            "?ungrouped",
                         ),
                     ),
                     "?alias",
@@ -244,6 +251,7 @@ impl RewriteRules for FilterRules {
                             "?split",
                             "?can_pushdown_join",
                             "?wrapped",
+                            "?ungrouped",
                         ),
                         "?alias",
                         "?projection_split",
@@ -2346,6 +2354,7 @@ impl RewriteRules for FilterRules {
                     "CubeScanSplit:false",
                     "?can_pushdown_join",
                     "?wrapped",
+                    "?ungrouped",
                 ),
                 cube_scan(
                     "?source_table_name",
@@ -2361,6 +2370,7 @@ impl RewriteRules for FilterRules {
                     "CubeScanSplit:false",
                     "?can_pushdown_join",
                     "?wrapped",
+                    "?ungrouped",
                 ),
             ),
             transforming_rewrite(

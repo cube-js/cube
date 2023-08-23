@@ -45,6 +45,7 @@ impl RewriteRules for WrapperRules {
                     "CubeScanSplit:false",
                     "?can_pushdown_join",
                     "CubeScanWrapped:false",
+                    "?ungrouped",
                 ),
                 cube_scan_wrapper(
                     wrapper_pullup_replacer(
@@ -58,11 +59,13 @@ impl RewriteRules for WrapperRules {
                             "CubeScanSplit:false",
                             "?can_pushdown_join",
                             "CubeScanWrapped:true",
+                            "?ungrouped",
                         ),
                         "?alias_to_cube_out",
                     ),
                     "CubeScanWrapperFinalized:false",
                 ),
+                // TODO push ungrouped to pullup replacer
                 self.transform_wrap_cube_scan("?alias_to_cube", "?alias_to_cube_out"),
             ),
             rewrite(

@@ -761,6 +761,7 @@ export class QueryCache {
               useCsvQuery: options.useCsvQuery,
               lambdaTypes: options.lambdaTypes,
               persistent: options.persistent,
+              primaryQuery: true,
             }
           ),
           refreshKeyValues: cacheKeyQueryResults,
@@ -793,7 +794,6 @@ export class QueryCache {
   ) {
     return cacheKeyQueries.map((q) => {
       const [query, values, queryOptions]: QueryTuple = Array.isArray(q) ? q : [q, [], {}];
-
       return this.cacheQueryResult(
         query,
         <string[]>values,
@@ -836,11 +836,12 @@ export class QueryCache {
       useCsvQuery?: boolean,
       lambdaTypes?: TableStructure,
       persistent?: boolean,
+      primaryQuery?: boolean,
     }
   ) {
     const spanId = crypto.randomBytes(16).toString('hex');
     options = options || { dataSource: 'default' };
-    const { renewalThreshold } = options;
+    const { renewalThreshold, primaryQuery } = options;
     const renewalKey = options.renewalKey && this.queryRedisKey(options.renewalKey);
     const redisKey = this.queryRedisKey(cacheKey);
     const fetchNew = () => (
@@ -864,7 +865,7 @@ export class QueryCache {
           .cacheDriver
           .set(redisKey, result, expiration)
           .then(({ bytes }) => {
-            this.logger('Renewed', { cacheKey, requestId: options.requestId, spanId });
+            this.logger('Renewed', { cacheKey, requestId: options.requestId, spanId, primaryQuery });
             this.logger('Outgoing network usage', {
               service: 'cache',
               requestId: options.requestId,
@@ -876,7 +877,7 @@ export class QueryCache {
           });
       }).catch(e => {
         if (!(e instanceof ContinueWaitError)) {
-          this.logger('Dropping Cache', { cacheKey, error: e.stack || e, requestId: options.requestId, spanId });
+          this.logger('Dropping Cache', { cacheKey, error: e.stack || e, requestId: options.requestId, spanId, primaryQuery });
           this.cacheDriver.remove(redisKey)
             .catch(err => this.logger('Error removing key', {
               cacheKey,
@@ -890,7 +891,7 @@ export class QueryCache {
     );
 
     if (options.forceNoCache) {
-      this.logger('Force no cache for', { cacheKey, requestId: options.requestId, spanId });
+      this.logger('Force no cache for', { cacheKey, requestId: options.requestId, spanId, primaryQuery });
       return fetchNew();
     }
 
@@ -924,6 +925,7 @@ export class QueryCache {
             renewalThreshold,
             requestId: options.requestId,
             spanId,
+            primaryQuery,
           });
           res = inMemoryValue;
         }
@@ -946,6 +948,7 @@ export class QueryCache {
         renewalThreshold,
         requestId: options.requestId,
         spanId,
+        primaryQuery,
       });
       if (
         renewalKey && (
@@ -956,24 +959,24 @@ export class QueryCache {
         )
       ) {
         if (options.waitForRenew) {
-          this.logger('Waiting for renew', { cacheKey, renewalThreshold, requestId: options.requestId, spanId });
+          this.logger('Waiting for renew', { cacheKey, renewalThreshold, requestId: options.requestId, spanId, primaryQuery });
           return fetchNew();
         } else {
-          this.logger('Renewing existing key', { cacheKey, renewalThreshold, requestId: options.requestId, spanId });
+          this.logger('Renewing existing key', { cacheKey, renewalThreshold, requestId: options.requestId, spanId, primaryQuery });
           fetchNew().catch(e => {
             if (!(e instanceof ContinueWaitError)) {
-              this.logger('Error renewing', { cacheKey, error: e.stack || e, requestId: options.requestId, spanId });
+              this.logger('Error renewing', { cacheKey, error: e.stack || e, requestId: options.requestId, spanId, primaryQuery });
             }
           });
         }
       }
-      this.logger('Using cache for', { cacheKey, requestId: options.requestId, spanId });
+      this.logger('Using cache for', { cacheKey, requestId: options.requestId, spanId, primaryQuery });
       if (options.useInMemory && renewedAgo + inMemoryCacheDisablePeriod <= renewalThreshold * 1000) {
         this.memoryCache.set(redisKey, parsedResult);
       }
       return parsedResult.result;
     } else {
-      this.logger('Missing cache for', { cacheKey, requestId: options.requestId, spanId });
+      this.logger('Missing cache for', { cacheKey, requestId: options.requestId, spanId, primaryQuery });
       return fetchNew();
     }
   }

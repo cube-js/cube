@@ -364,11 +364,18 @@ impl Rewriter {
         plan
     }
 
+    pub fn sql_push_down_enabled() -> bool {
+        env::var("CUBESQL_SQL_PUSH_DOWN")
+            .map(|v| v.to_lowercase() == "true")
+            .unwrap_or(false)
+    }
+
     pub fn rewrite_rules(
         cube_context: Arc<CubeContext>,
     ) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
+        let sql_push_down = Self::sql_push_down_enabled();
         let rules: Vec<Box<dyn RewriteRules>> = vec![
-            Box::new(MemberRules::new(cube_context.clone())),
+            Box::new(MemberRules::new(cube_context.clone(), sql_push_down)),
             Box::new(FilterRules::new(cube_context.clone())),
             Box::new(DateRules::new(cube_context.clone())),
             Box::new(OrderRules::new(cube_context.clone())),
@@ -379,13 +386,7 @@ impl Rewriter {
         for r in rules {
             rewrites.extend(r.rewrite_rules());
         }
-        if let Ok(true) = env::var("CUBESQL_SQL_PUSH_DOWN")
-            .map_err(|e| CubeError::internal(e.to_string()))
-            .and_then(|s| {
-                s.parse::<bool>()
-                    .map_err(|e| CubeError::internal(e.to_string()))
-            })
-        {
+        if sql_push_down {
             rewrites.extend(WrapperRules::new(cube_context.clone()).rewrite_rules());
         }
         if let Ok(disabled_rule_names) = env::var("CUBESQL_DISABLE_REWRITES") {

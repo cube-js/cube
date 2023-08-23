@@ -5,13 +5,14 @@ use crate::cachestore::{
     RocksCacheStore,
 };
 use crate::config::ConfigObj;
-use crate::metastore::{IdRow, MetaStoreEvent, MetaStoreFs};
+use crate::metastore::{IdRow, MetaStoreEvent, MetaStoreFs, RocksPropertyRow};
 use crate::CubeError;
 use async_trait::async_trait;
 use log::trace;
 use std::path::Path;
 use std::sync::Arc;
 use tokio::sync::watch::{Receiver, Sender};
+use tokio::task::JoinHandle;
 
 pub enum LazyRocksCacheStoreState {
     FromRemote {
@@ -118,7 +119,7 @@ impl LazyRocksCacheStore {
         }
     }
 
-    pub async fn wait_upload_loop(&self) {
+    pub async fn spawn_processing_loops(self: Arc<Self>) -> Vec<JoinHandle<Result<(), CubeError>>> {
         if let Some(init_signal) = &self.init_signal {
             let _ = init_signal.clone().changed().await;
         }
@@ -128,13 +129,13 @@ impl LazyRocksCacheStore {
             if let LazyRocksCacheStoreState::Initialized { store } = &*guard {
                 store.clone()
             } else {
-                return ();
+                return vec![];
             }
         };
 
         trace!("wait_upload_loop unblocked, Cache Store was initialized");
 
-        store.wait_upload_loop().await
+        store.spawn_processing_loops()
     }
 
     pub async fn stop_processing_loops(&self) {
@@ -301,6 +302,10 @@ impl CacheStore for LazyRocksCacheStore {
 
     async fn healthcheck(&self) -> Result<(), CubeError> {
         self.init().await?.healthcheck().await
+    }
+
+    async fn rocksdb_properties(&self) -> Result<Vec<RocksPropertyRow>, CubeError> {
+        self.init().await?.rocksdb_properties().await
     }
 }
 

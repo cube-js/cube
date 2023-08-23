@@ -13,12 +13,12 @@ use std::collections::HashMap;
 use std::env;
 
 use crate::metastore::{
-    BaseRocksStoreFs, BatchPipe, DbTableRef, IdRow, MetaStoreEvent, MetaStoreFs, RocksStore,
-    RocksStoreDetails, RocksTable,
+    BaseRocksStoreFs, BatchPipe, DbTableRef, IdRow, MetaStoreEvent, MetaStoreFs, RocksPropertyRow,
+    RocksStore, RocksStoreDetails, RocksTable,
 };
 use crate::remotefs::LocalDirRemoteFs;
 use crate::util::WorkerLoop;
-use crate::CubeError;
+use crate::{app_metrics, CubeError};
 use async_trait::async_trait;
 
 use futures_timer::Delay;
@@ -28,6 +28,7 @@ use crate::cachestore::compaction::CompactionPreloadedState;
 use crate::cachestore::listener::RocksCacheStoreListener;
 use crate::table::{Row, TableValue};
 use chrono::{DateTime, Utc};
+use datafusion::cube_ext;
 use itertools::Itertools;
 use log::{trace, warn};
 use serde_derive::{Deserialize, Serialize};
@@ -35,6 +36,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::sync::broadcast::Sender;
+use tokio::task::JoinHandle;
 
 pub(crate) struct RocksCacheStoreDetails {}
 
@@ -96,6 +98,8 @@ impl RocksStoreDetails for RocksCacheStoreDetails {
             block_opts
         };
 
+        opts.set_max_background_jobs(rocksdb_config.max_background_jobs as i32);
+        opts.set_max_subcompactions(rocksdb_config.max_subcompactions);
         opts.set_block_based_table_factory(&block_opts);
         opts.set_compression_type(rocksdb_config.compression_type);
 
@@ -123,6 +127,7 @@ impl RocksStoreDetails for RocksCacheStoreDetails {
 pub struct RocksCacheStore {
     store: Arc<RocksStore>,
     upload_loop: Arc<WorkerLoop>,
+    metrics_loop: Arc<WorkerLoop>,
 }
 
 impl RocksCacheStore {
@@ -156,6 +161,7 @@ impl RocksCacheStore {
         Arc::new(Self {
             store,
             upload_loop: Arc::new(WorkerLoop::new("Cachestore upload")),
+            metrics_loop: Arc::new(WorkerLoop::new("Cachestore metrics")),
         })
     }
 
@@ -189,24 +195,77 @@ impl RocksCacheStore {
         Ok(Self::new_from_store(store))
     }
 
-    pub async fn wait_upload_loop(self: Arc<Self>) {
-        if !self.store.config.upload_to_remote() {
+    pub fn spawn_processing_loops(self: Arc<Self>) -> Vec<JoinHandle<Result<(), CubeError>>> {
+        let mut loops = vec![];
+
+        if self.store.config.upload_to_remote() {
+            let upload_interval = self.store.config.meta_store_log_upload_interval();
+            let cachestore = self.clone();
+            loops.push(cube_ext::spawn(async move {
+                cachestore
+                    .upload_loop
+                    .process(
+                        cachestore.clone(),
+                        async move |_| Ok(Delay::new(Duration::from_secs(upload_interval)).await),
+                        async move |m, _| m.store.run_upload().await,
+                    )
+                    .await;
+
+                Ok(())
+            }))
+        } else {
             log::info!("Not running cachestore upload loop");
-            return;
         }
 
-        let upload_interval = self.store.config.meta_store_log_upload_interval();
-        self.upload_loop
-            .process(
-                self.clone(),
-                async move |_| Ok(Delay::new(Duration::from_secs(upload_interval)).await),
-                async move |m, _| m.store.run_upload().await,
-            )
-            .await;
+        let metrics_interval = self.store.config.cachestore_metrics_interval();
+        if metrics_interval > 0 {
+            let cachestore = self.clone();
+            loops.push(cube_ext::spawn(async move {
+                cachestore
+                    .metrics_loop
+                    .process(
+                        cachestore.clone(),
+                        async move |_| Ok(Delay::new(Duration::from_secs(metrics_interval)).await),
+                        async move |m, _| {
+                            if let Err(err) = m.submit_metrics().await {
+                                log::error!("Error while submitting cachestore metrics: {}", err)
+                            };
+
+                            Ok(())
+                        },
+                    )
+                    .await;
+
+                Ok(())
+            }))
+        } else {
+            log::info!("Not running cachestore metrics loop");
+        }
+
+        loops
+    }
+
+    pub async fn submit_metrics(&self) -> Result<(), CubeError> {
+        app_metrics::CACHESTORE_ROCKSDB_ESTIMATE_LIVE_DATA_SIZE.report(
+            self.store
+                .db
+                .property_int_value(rocksdb::properties::ESTIMATE_LIVE_DATA_SIZE)?
+                .unwrap_or(0) as i64,
+        );
+
+        app_metrics::CACHESTORE_ROCKSDB_LIVE_SST_FILES_SIZE.report(
+            self.store
+                .db
+                .property_int_value(rocksdb::properties::LIVE_SST_FILES_SIZE)?
+                .unwrap_or(0) as i64,
+        );
+
+        Ok(())
     }
 
     pub async fn stop_processing_loops(&self) {
         self.upload_loop.stop();
+        self.metrics_loop.stop();
     }
 
     pub async fn add_listener(&self, listener: Sender<MetaStoreEvent>) {
@@ -534,6 +593,7 @@ pub trait CacheStore: DIService + Send + Sync {
     // Force compaction for the whole RocksDB
     async fn compaction(&self) -> Result<(), CubeError>;
     async fn healthcheck(&self) -> Result<(), CubeError>;
+    async fn rocksdb_properties(&self) -> Result<Vec<RocksPropertyRow>, CubeError>;
 }
 
 #[async_trait]
@@ -595,7 +655,7 @@ impl CacheStore for RocksCacheStore {
                     .get_single_opt_row_by_index(&index_key, &CacheItemRocksIndex::ByPath)?;
 
                 if let Some(row) = row_opt {
-                    cache_schema.delete(row.id, batch_pipe)?;
+                    cache_schema.delete_row(row, batch_pipe)?;
                 }
 
                 Ok(())
@@ -803,7 +863,7 @@ impl CacheStore for RocksCacheStore {
                 let id_row_opt = queue_schema.get_row_by_key(key)?;
 
                 if let Some(id_row) = id_row_opt {
-                    Ok(Some(queue_schema.delete(id_row.get_id(), batch_pipe)?))
+                    Ok(Some(queue_schema.delete_row(id_row, batch_pipe)?))
                 } else {
                     Ok(None)
                 }
@@ -905,20 +965,19 @@ impl CacheStore for RocksCacheStore {
                 let item_row = queue_schema.get_row_by_key(key.clone())?;
                 if let Some(item_row) = item_row {
                     let path = item_row.get_row().get_path();
-                    queue_schema.delete(item_row.get_id(), batch_pipe)?;
+                    let id = item_row.get_id();
+
+                    queue_schema.delete_row(item_row, batch_pipe)?;
 
                     if let Some(result) = result {
                         let queue_result = QueueResult::new(path.clone(), result);
                         let result_schema = QueueResultRocksTable::new(db_ref.clone());
                         // QueueResult is a result of QueueItem, it's why we can use row_id of QueueItem
-                        let result_row = result_schema.insert_with_pk(
-                            item_row.get_id(),
-                            queue_result,
-                            batch_pipe,
-                        )?;
+                        let result_row =
+                            result_schema.insert_with_pk(id, queue_result, batch_pipe)?;
 
                         batch_pipe.add_event(MetaStoreEvent::AckQueueItem(QueueResultAckEvent {
-                            id: item_row.get_id(),
+                            id,
                             path,
                             result: QueueResultAckEventResult::WithResult {
                                 result: result_row.into_row().value,
@@ -926,7 +985,7 @@ impl CacheStore for RocksCacheStore {
                         }));
                     } else {
                         batch_pipe.add_event(MetaStoreEvent::AckQueueItem(QueueResultAckEvent {
-                            id: item_row.get_id(),
+                            id,
                             path,
                             result: QueueResultAckEventResult::Empty {},
                         }));
@@ -1036,6 +1095,10 @@ impl CacheStore for RocksCacheStore {
         self.store.healthcheck().await?;
 
         Ok(())
+    }
+
+    async fn rocksdb_properties(&self) -> Result<Vec<RocksPropertyRow>, CubeError> {
+        self.store.rocksdb_properties()
     }
 }
 
@@ -1168,6 +1231,10 @@ impl CacheStore for ClusterCacheStoreClient {
 
     async fn healthcheck(&self) -> Result<(), CubeError> {
         panic!("CacheStore cannot be used on the worker node! healthcheck was used.")
+    }
+
+    async fn rocksdb_properties(&self) -> Result<Vec<RocksPropertyRow>, CubeError> {
+        panic!("CacheStore cannot be used on the worker node! rocksdb_properties was used.")
     }
 }
 

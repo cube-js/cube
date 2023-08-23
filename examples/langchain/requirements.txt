@@ -4,5 +4,7 @@ python-dotenv
 langchain
 psycopg2
 pathlib
-jwt
-faiss
+PyJWT
+faiss-cpu
+openai
+tiktoken

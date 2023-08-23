@@ -402,6 +402,7 @@ impl SqlService for CacheStoreSqlService {
                     .logical_plan(
                         DFStatement::Statement(Statement::Query(q)),
                         &ctx.inline_tables,
+                        None,
                     )
                     .await?;
 

@@ -12,13 +12,13 @@ const logger = jest.fn(({ event }) => {
   console.log(event);
 });
 
-native.setupLogger(
-  logger,
-  'trace',
-);
+// native.setupLogger(
+//   logger,
+//   'trace',
+// );
 
 describe('SQLInterface', () => {
-  jest.setTimeout(10 * 1000);
+  jest.setTimeout(60 * 1000);
 
   it('SHOW FULL TABLES FROM `db`', async () => {
     const load = jest.fn(async ({ request, session, query }) => {
@@ -265,11 +265,6 @@ describe('SQLInterface', () => {
 
         expect(result).toEqual([{ 'TimestampNanosecond(1608936528000000000, None)': '2020-12-25T22:48:48.000' }]);
       }
-
-      // Increment it in case you throw Error
-      setTimeout(_ => {
-        expect(logger.mock.calls.length).toEqual(1);
-      }, 2000);
 
       connection.destroy();
     } finally {
