@@ -12,10 +12,10 @@ const logger = jest.fn(({ event }) => {
   console.log(event);
 });
 
-native.setupLogger(
-  logger,
-  'trace',
-);
+// native.setupLogger(
+//   logger,
+//   'trace',
+// );
 
 describe('SQLInterface', () => {
   jest.setTimeout(10 * 1000);
