@@ -58,6 +58,8 @@ pub static CACHESTORE_ROCKSDB_ESTIMATE_LIVE_DATA_SIZE: Gauge =
     metrics::gauge("cs.cachestore.rocksdb.estimate_live_data_size");
 pub static CACHESTORE_ROCKSDB_LIVE_SST_FILES_SIZE: Gauge =
     metrics::gauge("cs.cachestore.rocksdb.live_sst_files_size");
+pub static CACHESTORE_ROCKSDB_CF_DEFAULT_SIZE: Gauge =
+    metrics::gauge("cs.cachestore.rocksdb.cf.default.size");
 pub static CACHESTORE_SCHEDULER_GC_QUEUE: Gauge =
     metrics::gauge("cs.cachestore.scheduler.gc_queue");
 
