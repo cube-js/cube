@@ -260,6 +260,10 @@ impl RocksCacheStore {
                 .unwrap_or(0) as i64,
         );
 
+        let cf_metadata = self.store.db.get_column_family_metadata();
+
+        app_metrics::CACHESTORE_ROCKSDB_CF_DEFAULT_SIZE.report(cf_metadata.size as i64);
+
         Ok(())
     }
 
