@@ -433,9 +433,9 @@ pub trait ConfigObj: DIService {
 
     fn cachestore_cache_ttl_persist_loop_interval(&self) -> u64;
 
-    fn cachestore_cache_max_size_soft(&self) -> u64;
+    fn cachestore_cache_threshold_to_force_eviction(&self) -> u32;
 
-    fn cachestore_cache_max_size_hard(&self) -> u64;
+    fn cachestore_cache_max_size(&self) -> u64;
 
     fn cachestore_cache_max_keys(&self) -> u32;
 
@@ -764,12 +764,12 @@ impl ConfigObj for ConfigObjImpl {
         self.cachestore_cache_ttl_persist_loop_interval
     }
 
-    fn cachestore_cache_max_size_soft(&self) -> u64 {
+    fn cachestore_cache_max_size(&self) -> u64 {
         4096 << 20
     }
 
-    fn cachestore_cache_max_size_hard(&self) -> u64 {
-        (4096 + 1024) << 20
+    fn cachestore_cache_threshold_to_force_eviction(&self) -> u32 {
+        20
     }
 
     fn cachestore_cache_max_keys(&self) -> u32 {

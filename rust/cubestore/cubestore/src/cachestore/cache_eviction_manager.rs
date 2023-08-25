@@ -109,7 +109,8 @@ pub struct CacheEvictionManager {
     stats_total_keys: AtomicU32,
     stats_total_raw_size: AtomicU64,
     // Limits from configuration
-    limit_max_keys: u32,
+    limit_max_keys_soft: u32,
+    limit_max_keys_hard: u32,
     limit_max_size_hard: u64,
     limit_max_size_soft: u64,
     eviction_policy: CacheEvictionPolicy,
@@ -193,6 +194,8 @@ impl CacheEvictionManager {
             }
         });
 
+        let threshold_to_force_eviction = config.cachestore_cache_threshold_to_force_eviction();
+
         Self {
             ttl_buffer,
             ttl_lookup_tx,
@@ -202,11 +205,13 @@ impl CacheEvictionManager {
             stats_total_keys: AtomicU32::new(0),
             stats_total_raw_size: AtomicU64::new(0),
             // Limits & Evict
-            limit_max_size_soft: config.cachestore_cache_max_size_soft(),
-            limit_max_size_hard: config.cachestore_cache_max_size_hard(),
-            limit_max_keys: config.cachestore_cache_max_keys(),
+            limit_max_size_soft: config.cachestore_cache_max_size(),
+            limit_max_size_hard: config.cachestore_cache_max_size()
+                + (config.cachestore_cache_max_size() * (threshold_to_force_eviction as u64)),
+            limit_max_keys_soft: config.cachestore_cache_max_keys(),
+            limit_max_keys_hard: config.cachestore_cache_max_keys()
+                + (config.cachestore_cache_max_keys() * config.cachestore_cache_max_keys()),
             eviction_policy: config.cachestore_cache_eviction_policy().clone(),
-            //
             persist_batch_size: config.cachestore_cache_persist_batch_size(),
             eviction_batch_size: config.cachestore_cache_eviction_batch_size(),
             eviction_min_ttl_threshold: config.cachestore_cache_eviction_min_ttl_threshold(),
@@ -309,12 +314,12 @@ impl CacheEvictionManager {
             });
         }
 
-        let eviction_fut = if self.get_stats_total_keys() > self.limit_max_keys {
-            let need_to_evict = (self.get_stats_total_keys() - self.limit_max_keys) as u64;
+        let eviction_fut = if self.get_stats_total_keys() > self.limit_max_keys_soft {
+            let need_to_evict = (self.get_stats_total_keys() - self.limit_max_keys_soft) as u64;
             trace!(
                 "Max keys limit eviction: {} > {}, need to evict: {}",
                 self.get_stats_total_keys(),
-                self.limit_max_keys,
+                self.limit_max_keys_soft,
                 need_to_evict
             );
 
@@ -759,8 +764,20 @@ impl CacheEvictionManager {
         Ok(())
     }
 
-    pub async fn before_insert(&self, row_size: u64) -> Result<(), CubeError> {
+    pub async fn need_to_evict(&self, row_size: u64) -> bool {
+        if self.get_stats_total_keys() + 1 > self.limit_max_keys_hard {
+            return true;
+        }
+
         if self.get_stats_total_raw_size() + row_size > self.limit_max_size_hard {
+            return true;
+        }
+
+        false
+    }
+
+    pub async fn before_insert(&self, row_size: u64) -> Result<(), CubeError> {
+        if self.need_to_evict(row_size) {
             self.eviction_loop.trigger_process();
         }
 
