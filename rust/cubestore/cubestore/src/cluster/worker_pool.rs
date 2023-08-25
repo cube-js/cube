@@ -53,7 +53,7 @@ pub trait MessageProcessor<
     R: Serialize + DeserializeOwned + Sync + Send + 'static,
 >
 {
-    async fn process(services: &WorkerServices, args: T) -> Result<R, CubeError>;
+    async fn process(config: &Config, args: T) -> Result<R, CubeError>;
 }
 
 impl<
@@ -87,6 +87,7 @@ impl<
     }
 
     pub async fn wait_processing_loops(&self) {
+        println!("FFFFFFFF");
         let futures = self
             .workers
             .iter()
@@ -342,7 +343,6 @@ where
     worker_setup(&runtime);
     runtime.block_on(async move {
         let config = get_worker_config().await;
-        let services = config.worker_services().await;
 
         spawn_background_processes(config.clone());
 
@@ -351,7 +351,7 @@ where
             match res {
                 Ok(args) => {
                     let result =
-                        match async_try_with_catch_unwind(P::process(&services, args)).await {
+                        match async_try_with_catch_unwind(P::process(&config, args)).await {
                             Ok(result) => result,
                             Err(panic) => Err(CubeError::from(panic)),
                         };
@@ -452,6 +452,7 @@ mod tests {
     use crate::util::respawn;
     use crate::CubeError;
     use datafusion::cube_ext;
+    use crate::config::Config;
 
     #[ctor::ctor]
     fn test_support_init() {
@@ -474,7 +475,7 @@ mod tests {
 
     #[async_trait]
     impl MessageProcessor<Message, Response> for Processor {
-        async fn process(_services: &WorkerServices, args: Message) -> Result<Response, CubeError> {
+        async fn process(_config: &Config, args: Message) -> Result<Response, CubeError> {
             match args {
                 Message::Delay(x) => {
                     Delay::new(Duration::from_millis(x)).await;
