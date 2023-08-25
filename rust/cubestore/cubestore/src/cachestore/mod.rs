@@ -8,7 +8,7 @@ mod queue_item;
 mod queue_result;
 mod scheduler;
 
-pub use cache_eviction_manager::{CacheEvictionManager, CacheEvictionPolicy};
+pub use cache_eviction_manager::{CacheEvictionManager, CacheEvictionPolicy, EvictionResult};
 pub use cache_item::CacheItem;
 pub use cache_rocksstore::{
     CacheStore, CacheStoreRpcClient, ClusterCacheStoreClient, QueueAddResponse, QueueKey,
