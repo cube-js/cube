@@ -976,10 +976,10 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
                     RocksSecondaryIndexValue::HashAndTTLExtended(hash, None, extended)
                 }
                 RocksSecondaryIndexValue::HashAndTTL(hash, ttl) => {
-                    RocksSecondaryIndexValue::HashAndTTLExtended(hash, None, extended)
+                    RocksSecondaryIndexValue::HashAndTTLExtended(hash, ttl, extended)
                 }
                 RocksSecondaryIndexValue::HashAndTTLExtended(hash, ttl, _) => {
-                    RocksSecondaryIndexValue::HashAndTTLExtended(hash, None, extended)
+                    RocksSecondaryIndexValue::HashAndTTLExtended(hash, ttl, extended)
                 }
             };
 

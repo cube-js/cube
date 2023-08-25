@@ -426,7 +426,7 @@ impl RowKey {
         let mut wtr = Vec::with_capacity(5);
 
         match self {
-            RowKey::Table(table_id, row_id) => {
+            RowKey::Table(table_id, _) => {
                 wtr.write_u8(1).unwrap();
                 wtr.write_u32::<BigEndian>(*table_id as u32).unwrap();
             }
@@ -434,7 +434,7 @@ impl RowKey {
                 wtr.write_u8(2).unwrap();
                 wtr.write_u32::<BigEndian>(*table_id as u32).unwrap();
             }
-            RowKey::SecondaryIndex(index_id, secondary_key, row_id) => {
+            RowKey::SecondaryIndex(index_id, secondary_key, _) => {
                 wtr.write_u8(3).unwrap();
                 wtr.write_u32::<BigEndian>(*index_id as IndexId).unwrap();
             }

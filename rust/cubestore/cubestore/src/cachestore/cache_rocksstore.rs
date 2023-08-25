@@ -14,7 +14,7 @@ use std::env;
 
 use crate::metastore::{
     BaseRocksSecondaryIndex, BaseRocksStoreFs, BatchPipe, DbTableRef, IdRow, MetaStoreEvent,
-    MetaStoreFs, RocksSecondaryIndex, RocksSecondaryIndexValueTTLExtended,
+    MetaStoreFs, RocksPropertyRow, RocksSecondaryIndex, RocksSecondaryIndexValueTTLExtended,
     RocksSecondaryIndexValueVersionEncoder, RocksStore, RocksStoreDetails, RocksTable, RowKey,
     SecondaryIndexValueScanIterItem, SecondaryKey,
 };
@@ -136,8 +136,6 @@ pub struct RocksCacheStore {
     cache_eviction_manager: CacheEvictionManager,
     upload_loop: Arc<WorkerLoop>,
     metrics_loop: Arc<WorkerLoop>,
-    persist_loop: Arc<WorkerLoop>,
-    eviction_loop: Arc<WorkerLoop>,
 }
 
 impl RocksCacheStore {
@@ -176,8 +174,6 @@ impl RocksCacheStore {
             cache_eviction_manager,
             upload_loop: Arc::new(WorkerLoop::new("Cachestore upload")),
             metrics_loop: Arc::new(WorkerLoop::new("Cachestore metrics")),
-            persist_loop: Arc::new(WorkerLoop::new("Cachestore ttl persist")),
-            eviction_loop: Arc::new(WorkerLoop::new("Cachestore eviction")),
         }))
     }
 
@@ -264,6 +260,53 @@ impl RocksCacheStore {
             }))
         } else {
             log::info!("Not running cachestore metrics loop");
+        }
+
+        let persist_interval = self
+            .store
+            .config
+            .cachestore_cache_ttl_persist_loop_interval();
+        if persist_interval > 0 {
+            let cachestore = self.clone();
+            loops.push(cube_ext::spawn(async move {
+                cachestore
+                    .cache_eviction_manager
+                    .persist_loop
+                    .process(
+                        cachestore.clone(),
+                        async move |_| Ok(Delay::new(Duration::from_secs(persist_interval)).await),
+                        async move |m, _| m.run_ttl_persist().await,
+                    )
+                    .await;
+
+                Ok(())
+            }))
+        } else {
+            log::info!("Not running cachestore persist loop");
+        }
+
+        let eviction_interval = self.store.config.cachestore_cache_eviction_loop_interval();
+        if eviction_interval > 0 {
+            let cachestore = self.clone();
+            loops.push(cube_ext::spawn(async move {
+                cachestore
+                    .cache_eviction_manager
+                    .eviction_loop
+                    .process(
+                        cachestore.clone(),
+                        async move |_| Ok(Delay::new(Duration::from_secs(eviction_interval)).await),
+                        async move |m, _| {
+                            let _ = m.run_eviction().await?;
+
+                            Ok(())
+                        },
+                    )
+                    .await;
+
+                Ok(())
+            }))
+        } else {
+            log::info!("Not running cachestore eviction loop");
         }
 
         loops

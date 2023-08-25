@@ -429,6 +429,10 @@ pub trait ConfigObj: DIService {
 
     fn cachestore_gc_loop_interval(&self) -> u64;
 
+    fn cachestore_cache_eviction_loop_interval(&self) -> u64;
+
+    fn cachestore_cache_ttl_persist_loop_interval(&self) -> u64;
+
     fn cachestore_cache_max_size_soft(&self) -> u64;
 
     fn cachestore_cache_max_size_hard(&self) -> u64;
@@ -560,6 +564,8 @@ pub struct ConfigObjImpl {
     pub metastore_rocks_store_config: RocksStoreConfig,
     pub cachestore_rocks_store_config: RocksStoreConfig,
     pub cachestore_gc_loop_interval: u64,
+    pub cachestore_cache_eviction_loop_interval: u64,
+    pub cachestore_cache_ttl_persist_loop_interval: u64,
     pub cachestore_queue_results_expire: u64,
     pub cachestore_metrics_interval: u64,
     pub cachestore_cache_policy: CacheEvictionPolicy,
@@ -750,6 +756,26 @@ impl ConfigObj for ConfigObjImpl {
         self.cachestore_gc_loop_interval
     }
 
+    fn cachestore_cache_eviction_loop_interval(&self) -> u64 {
+        self.cachestore_cache_eviction_loop_interval
+    }
+
+    fn cachestore_cache_ttl_persist_loop_interval(&self) -> u64 {
+        self.cachestore_cache_ttl_persist_loop_interval
+    }
+
+    fn cachestore_cache_max_size_soft(&self) -> u64 {
+        4096 << 20
+    }
+
+    fn cachestore_cache_max_size_hard(&self) -> u64 {
+        (4096 + 1024) << 20
+    }
+
+    fn cachestore_cache_max_keys(&self) -> u32 {
+        100_000
+    }
+
     fn cachestore_cache_eviction_policy(&self) -> CacheEvictionPolicy {
         self.cachestore_cache_policy.clone()
     }
@@ -910,22 +936,6 @@ impl ConfigObj for ConfigObjImpl {
 
     fn remote_files_cleanup_batch_size(&self) -> u64 {
         self.remote_files_cleanup_batch_size
-    }
-
-    fn cachestore_cache_max_size_soft(&self) -> u64 {
-        4096 << 20
-    }
-
-    fn cachestore_cache_max_size_hard(&self) -> u64 {
-        5120 << 20
-    }
-
-    fn cachestore_cache_max_keys(&self) -> u32 {
-        100_000
-    }
-
-    fn cachestore_cache_policy(&self) -> CacheEvictionPolicy {
-        self.cachestore_cache_policy.clone()
     }
 }
 
@@ -1206,6 +1216,22 @@ impl Config {
                     Some(60 * 1),
                     Some(1),
                 ),
+                cachestore_cache_eviction_loop_interval: env_parse_duration(
+                    "CUBESTORE_CACHE_EVICTION_LOOP",
+                    60,
+                    // 2 h
+                    Some(2 * 60 * 60),
+                    // 0 to disable
+                    Some(1),
+                ),
+                cachestore_cache_ttl_persist_loop_interval: env_parse_duration(
+                    "CUBESTORE_CACHE_TTL_PERSIST_LOOP",
+                    15,
+                    // 5m
+                    Some(5 * 60),
+                    // 0 to disable
+                    Some(0),
+                ),
                 cachestore_queue_results_expire: env_parse_duration(
                     "CUBESTORE_QUEUE_RESULTS_EXPIRE",
                     60,
@@ -1403,6 +1429,8 @@ impl Config {
                 metastore_rocks_store_config: RocksStoreConfig::metastore_default(),
                 cachestore_rocks_store_config: RocksStoreConfig::cachestore_default(),
                 cachestore_gc_loop_interval: 30,
+                cachestore_cache_eviction_loop_interval: 60,
+                cachestore_cache_ttl_persist_loop_interval: 15,
                 cachestore_queue_results_expire: 90,
                 cachestore_metrics_interval: 15,
                 cachestore_cache_policy: CacheEvictionPolicy::SAMPLED_LRU,
