@@ -434,7 +434,7 @@ impl RowKey {
                 wtr.write_u8(2).unwrap();
                 wtr.write_u32::<BigEndian>(*table_id as u32).unwrap();
             }
-            RowKey::SecondaryIndex(index_id, secondary_key, _) => {
+            RowKey::SecondaryIndex(index_id, _, _) => {
                 wtr.write_u8(3).unwrap();
                 wtr.write_u32::<BigEndian>(*index_id as IndexId).unwrap();
             }

@@ -117,6 +117,7 @@ pub struct CacheEvictionManager {
     // Configuration
     persist_batch_size: usize,
     eviction_batch_size: usize,
+    eviction_below_threshold: u8,
     // if ttl of a key is less then this value, key will be evicted
     // this help to delete upcoming keys for deleting
     eviction_min_ttl_threshold: u32,
@@ -138,6 +139,14 @@ pub struct EvictionResult {
     pub total_delete_skipped: u32,
     pub stats_total_keys: u32,
     pub stats_total_raw_size: u64,
+}
+
+fn calc_percentage(v: u64, percentage: u8) -> u64 {
+    if percentage == 0 {
+        return v;
+    }
+
+    (percentage as u64 * v) / 100_u64
 }
 
 impl CacheEvictionManager {
@@ -194,8 +203,6 @@ impl CacheEvictionManager {
             }
         });
 
-        let threshold_to_force_eviction = config.cachestore_cache_threshold_to_force_eviction();
-
         Self {
             ttl_buffer,
             ttl_lookup_tx,
@@ -207,13 +214,20 @@ impl CacheEvictionManager {
             // Limits & Evict
             limit_max_size_soft: config.cachestore_cache_max_size(),
             limit_max_size_hard: config.cachestore_cache_max_size()
-                + (config.cachestore_cache_max_size() * (threshold_to_force_eviction as u64)),
+                + calc_percentage(
+                    config.cachestore_cache_max_size(),
+                    config.cachestore_cache_threshold_to_force_eviction(),
+                ),
             limit_max_keys_soft: config.cachestore_cache_max_keys(),
             limit_max_keys_hard: config.cachestore_cache_max_keys()
-                + (config.cachestore_cache_max_keys() * config.cachestore_cache_max_keys()),
+                + calc_percentage(
+                    config.cachestore_cache_max_keys() as u64,
+                    config.cachestore_cache_threshold_to_force_eviction(),
+                ) as u32,
             eviction_policy: config.cachestore_cache_eviction_policy().clone(),
             persist_batch_size: config.cachestore_cache_persist_batch_size(),
             eviction_batch_size: config.cachestore_cache_eviction_batch_size(),
+            eviction_below_threshold: config.cachestore_cache_eviction_below_threshold(),
             eviction_min_ttl_threshold: config.cachestore_cache_eviction_min_ttl_threshold(),
             //
             _ttl_tl_loop_join_handle: Arc::new(AbortingJoinHandle::new(join_handle)),
@@ -316,24 +330,34 @@ impl CacheEvictionManager {
 
         let eviction_fut = if self.get_stats_total_keys() > self.limit_max_keys_soft {
             let need_to_evict = (self.get_stats_total_keys() - self.limit_max_keys_soft) as u64;
+            let target =
+                need_to_evict + calc_percentage(need_to_evict, self.eviction_below_threshold);
+
             trace!(
-                "Max keys limit eviction: {} > {}, need to evict: {}",
+                "Max keys limit eviction: {} > {}, need to evict: {}, threshold: {}, target: {}",
                 self.get_stats_total_keys(),
                 self.limit_max_keys_soft,
-                need_to_evict
+                need_to_evict,
+                self.eviction_below_threshold,
+                target
             );
 
-            self.do_eviction(&store, need_to_evict, false)
+            self.do_eviction(&store, target, false)
         } else if self.get_stats_total_raw_size() > self.limit_max_size_soft {
             let need_to_evict = (self.get_stats_total_raw_size() - self.limit_max_size_soft) as u64;
+            let target =
+                need_to_evict + calc_percentage(need_to_evict, self.eviction_below_threshold);
+
             trace!(
-                "Max size limit eviction: {} > {}, need to evict: {}",
+                "Max size limit eviction: {} > {}, need to evict: {}, threshold: {}, target: {}",
                 self.get_stats_total_raw_size(),
                 self.limit_max_size_soft,
-                need_to_evict
+                need_to_evict,
+                self.eviction_below_threshold,
+                target
             );
 
-            self.do_eviction(&store, need_to_evict, true)
+            self.do_eviction(&store, target, true)
         } else {
             trace!("Nothing to evict");
 
@@ -764,7 +788,7 @@ impl CacheEvictionManager {
         Ok(())
     }
 
-    pub async fn need_to_evict(&self, row_size: u64) -> bool {
+    pub fn need_to_evict(&self, row_size: u64) -> bool {
         if self.get_stats_total_keys() + 1 > self.limit_max_keys_hard {
             return true;
         }

@@ -433,7 +433,7 @@ pub trait ConfigObj: DIService {
 
     fn cachestore_cache_ttl_persist_loop_interval(&self) -> u64;
 
-    fn cachestore_cache_threshold_to_force_eviction(&self) -> u32;
+    fn cachestore_cache_threshold_to_force_eviction(&self) -> u8;
 
     fn cachestore_cache_max_size(&self) -> u64;
 
@@ -442,6 +442,8 @@ pub trait ConfigObj: DIService {
     fn cachestore_cache_eviction_policy(&self) -> CacheEvictionPolicy;
 
     fn cachestore_cache_eviction_batch_size(&self) -> usize;
+
+    fn cachestore_cache_eviction_below_threshold(&self) -> u8;
 
     fn cachestore_cache_persist_batch_size(&self) -> usize;
 
@@ -566,10 +568,12 @@ pub struct ConfigObjImpl {
     pub cachestore_gc_loop_interval: u64,
     pub cachestore_cache_eviction_loop_interval: u64,
     pub cachestore_cache_ttl_persist_loop_interval: u64,
+    pub cachestore_cache_max_size: u64,
     pub cachestore_queue_results_expire: u64,
     pub cachestore_metrics_interval: u64,
     pub cachestore_cache_policy: CacheEvictionPolicy,
     pub cachestore_cache_eviction_batch_size: usize,
+    pub cachestore_cache_eviction_below_threshold: u8,
     pub cachestore_cache_persist_batch_size: usize,
     pub cachestore_cache_eviction_min_ttl_threshold: u32,
     pub upload_concurrency: u64,
@@ -765,11 +769,11 @@ impl ConfigObj for ConfigObjImpl {
     }
 
     fn cachestore_cache_max_size(&self) -> u64 {
-        4096 << 20
+        self.cachestore_cache_max_size
     }
 
-    fn cachestore_cache_threshold_to_force_eviction(&self) -> u32 {
-        20
+    fn cachestore_cache_threshold_to_force_eviction(&self) -> u8 {
+        15
     }
 
     fn cachestore_cache_max_keys(&self) -> u32 {
@@ -936,6 +940,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn remote_files_cleanup_batch_size(&self) -> u64 {
         self.remote_files_cleanup_batch_size
+    }
+
+    fn cachestore_cache_eviction_below_threshold(&self) -> u8 {
+        self.cachestore_cache_eviction_below_threshold
     }
 }
 
@@ -1232,6 +1240,14 @@ impl Config {
                     // 0 to disable
                     Some(0),
                 ),
+                cachestore_cache_max_size: env_parse_size(
+                    "CUBESTORE_CACHE_MAX_SIZE",
+                    4096 << 20,
+                    // 16384 mb
+                    Some(16384 << 20),
+                    // 32 mb
+                    Some(32 << 20),
+                ) as u64,
                 cachestore_queue_results_expire: env_parse_duration(
                     "CUBESTORE_QUEUE_RESULTS_EXPIRE",
                     60,
@@ -1253,6 +1269,7 @@ impl Config {
                     "CUBESTORE_CACHE_EVICTION_BATCH_SIZE",
                     150,
                 ),
+                cachestore_cache_eviction_below_threshold: 15,
                 cachestore_cache_persist_batch_size: env_parse(
                     "CUBESTORE_CACHE_PERSIST_BATCH_SIZE",
                     150,
@@ -1431,10 +1448,12 @@ impl Config {
                 cachestore_gc_loop_interval: 30,
                 cachestore_cache_eviction_loop_interval: 60,
                 cachestore_cache_ttl_persist_loop_interval: 15,
+                cachestore_cache_max_size: 4096 << 32,
                 cachestore_queue_results_expire: 90,
                 cachestore_metrics_interval: 15,
                 cachestore_cache_policy: CacheEvictionPolicy::SAMPLED_LRU,
                 cachestore_cache_eviction_batch_size: 150,
+                cachestore_cache_eviction_below_threshold: 15,
                 cachestore_cache_persist_batch_size: 200,
                 cachestore_cache_eviction_min_ttl_threshold: 5,
                 upload_concurrency: 4,
