@@ -44,6 +44,7 @@ pub struct SchedulerImpl {
     reconcile_loop: WorkerLoop,
     chunk_processing_loop: WorkerLoop,
     chunk_events_queue: Mutex<Vec<(SystemTime, u64)>>,
+    in_memory_chunks_to_delete: Mutex<Vec<(String, u64)>>, //(node, chunk_is)
     node_last_actions: Mutex<HashMap<String, LastNodeActionTimes>>,
 }
 
@@ -97,6 +98,7 @@ impl SchedulerImpl {
             gc_queue,
             reconcile_loop: WorkerLoop::new("Reconcile"),
             chunk_events_queue: Mutex::new(Vec::with_capacity(1000)),
+            in_memory_chunks_to_delete: Mutex::new(Vec::with_capacity(1000)),
             node_last_actions: Mutex::new(workers),
             chunk_processing_loop: WorkerLoop::new("ChunkProcessing"),
         }
@@ -756,9 +758,8 @@ impl SchedulerImpl {
                     .get_partition(chunk.get_row().get_partition_id())
                     .await?;
                 let node_name = self.cluster.node_name_by_partition(&partition);
-                self.cluster
-                    .free_memory_chunk(&node_name, chunk.get_id())
-                    .await?;
+                let mut to_delete = self.in_memory_chunks_to_delete.lock().await;
+                to_delete.push((node_name, chunk.get_id()))
             } else if chunk.get_row().uploaded() {
                 let file_name =
                     ChunkStore::chunk_remote_path(chunk.get_id(), chunk.get_row().suffix());
@@ -898,6 +899,39 @@ impl SchedulerImpl {
 
             self.process_active_chunks(active_chunks).await?;
             self.process_inactive_chunks(inactive_chunks).await?;
+        }
+        {
+            let chunks_to_delete = {
+                let mut chunks = self.in_memory_chunks_to_delete.lock().await;
+                if chunks.is_empty() {
+                    Vec::new()
+                } else {
+                    let mut result = Vec::new();
+                    std::mem::swap(&mut *chunks, &mut result);
+                    result
+                }
+            };
+            if !chunks_to_delete.is_empty() {
+                let chunks_to_delete = chunks_to_delete.into_iter().into_group_map();
+                for (node, ids) in chunks_to_delete {
+                    if !ids.is_empty() {
+                        if let Err(e) = self
+                            .cluster
+                            .free_deleted_memory_chunks(&node, ids.clone())
+                            .await
+                        {
+                            log::error!(
+                                "Error while trying release in memory chunks in node {}: {}",
+                                node,
+                                e
+                            );
+
+                            let mut chunks = self.in_memory_chunks_to_delete.lock().await;
+                            chunks.extend(ids.iter().map(|v| (node.clone(), *v)));
+                        }
+                    }
+                }
+            }
         }
 
         Ok(())
