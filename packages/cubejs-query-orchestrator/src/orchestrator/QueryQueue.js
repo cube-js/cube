@@ -340,7 +340,7 @@ export class QueryQueue {
       return this.parseResult(result);
     } catch (error) {
       if (waitingContext) {
-        this.logger('Cancelled waiting for query', waitingContext);
+        this.logger('Finished waiting for query', waitingContext);
       }
       throw error;
     } finally {
