@@ -91,7 +91,7 @@ impl CubeServices {
         Self::wait_loops(self.spawn_processing_loops().await?).await
     }
 
-    async fn wait_loops(loops: Vec<LoopHandle>) -> Result<(), CubeError> {
+    pub async fn wait_loops(loops: Vec<LoopHandle>) -> Result<(), CubeError> {
         join_all(loops)
             .await
             .into_iter()
@@ -571,6 +571,7 @@ pub struct ConfigObjImpl {
     pub cachestore_cache_max_size: u64,
     pub cachestore_queue_results_expire: u64,
     pub cachestore_metrics_interval: u64,
+    pub cachestore_cache_max_keys: u32,
     pub cachestore_cache_policy: CacheEvictionPolicy,
     pub cachestore_cache_eviction_batch_size: usize,
     pub cachestore_cache_eviction_below_threshold: u8,
@@ -777,7 +778,7 @@ impl ConfigObj for ConfigObjImpl {
     }
 
     fn cachestore_cache_max_keys(&self) -> u32 {
-        100_000
+        self.cachestore_cache_max_keys
     }
 
     fn cachestore_cache_eviction_policy(&self) -> CacheEvictionPolicy {
@@ -1261,9 +1262,10 @@ impl Config {
                     Some(60 * 10),
                     Some(0),
                 ),
+                cachestore_cache_max_keys: env_parse("CUBESTORE_CACHE_MAX_KEYS", 100_000),
                 cachestore_cache_policy: env_parse(
                     "CUBESTORE_CACHE_POLICY",
-                    CacheEvictionPolicy::SAMPLED_LRU,
+                    CacheEvictionPolicy::SampledLru,
                 ),
                 cachestore_cache_eviction_batch_size: env_parse(
                     "CUBESTORE_CACHE_EVICTION_BATCH_SIZE",
@@ -1451,7 +1453,8 @@ impl Config {
                 cachestore_cache_max_size: 4096 << 32,
                 cachestore_queue_results_expire: 90,
                 cachestore_metrics_interval: 15,
-                cachestore_cache_policy: CacheEvictionPolicy::SAMPLED_LRU,
+                cachestore_cache_max_keys: 100_000,
+                cachestore_cache_policy: CacheEvictionPolicy::SampledLru,
                 cachestore_cache_eviction_batch_size: 150,
                 cachestore_cache_eviction_below_threshold: 15,
                 cachestore_cache_persist_batch_size: 200,

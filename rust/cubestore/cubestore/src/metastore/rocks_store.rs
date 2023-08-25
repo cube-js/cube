@@ -235,7 +235,6 @@ impl<'a> RocksSecondaryIndexValue<'a> {
                 0 => Ok(RocksSecondaryIndexValue::Hash(bytes)),
                 1 => {
                     let hash_size = bytes.len() - 8;
-                    let hash_size = bytes.len() - 8;
                     let (hash, mut expire_buf) = (&bytes[1..hash_size], &bytes[hash_size..]);
                     let expire_timestamp = expire_buf.read_i64::<BigEndian>()?;
 

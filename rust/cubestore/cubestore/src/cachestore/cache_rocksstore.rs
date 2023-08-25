@@ -151,7 +151,7 @@ impl RocksCacheStore {
         RocksCacheStoreListener::new(sender.subscribe())
     }
 
-    pub async fn new(
+    pub fn new(
         path: &Path,
         metastore_fs: Arc<dyn MetaStoreFs>,
         config: Arc<dyn ConfigObj>,
@@ -163,10 +163,9 @@ impl RocksCacheStore {
             config,
             Arc::new(RocksCacheStoreDetails {}),
         )?)
-        .await
     }
 
-    async fn new_from_store(store: Arc<RocksStore>) -> Result<Arc<Self>, CubeError> {
+    fn new_from_store(store: Arc<RocksStore>) -> Result<Arc<Self>, CubeError> {
         let cache_eviction_manager = CacheEvictionManager::new(&store.config);
 
         Ok(Arc::new(Self {
@@ -192,7 +191,7 @@ impl RocksCacheStore {
         )
         .await?;
 
-        Self::new_from_store(store).await
+        Self::new_from_store(store)
     }
 
     pub async fn load_from_remote(
@@ -204,7 +203,7 @@ impl RocksCacheStore {
             .load_from_remote(&path, config, Arc::new(RocksCacheStoreDetails {}))
             .await?;
 
-        Self::new_from_store(store).await
+        Self::new_from_store(store)
     }
 
     async fn run_ttl_persist(&self) -> Result<(), CubeError> {
@@ -344,18 +343,22 @@ impl RocksCacheStore {
         self.store.add_listener(listener).await;
     }
 
-    pub async fn prepare_test_cachestore(test_name: &str) -> (Arc<LocalDirRemoteFs>, Arc<Self>) {
+    pub fn prepare_test_cachestore(
+        test_name: &str,
+        config: Config,
+    ) -> (Arc<LocalDirRemoteFs>, Arc<Self>) {
         let store_path = env::current_dir()
             .unwrap()
             .join(format!("test-{}-local", test_name));
         let _ = std::fs::remove_dir_all(store_path.clone());
 
-        Self::prepare_test_cachestore_impl(test_name, store_path).await
+        Self::prepare_test_cachestore_impl(test_name, store_path, config)
     }
 
-    pub async fn prepare_test_cachestore_from_fixtures(
+    pub fn prepare_test_cachestore_from_fixtures(
         test_name: &str,
         remote_fixtures: &str,
+        config: Config,
     ) -> (Arc<LocalDirRemoteFs>, Arc<Self>) {
         let store_path = env::current_dir()
             .unwrap()
@@ -385,15 +388,14 @@ impl RocksCacheStore {
 
         copy_dir_all(&fixtures_path, store_path.join("cachestore")).unwrap();
 
-        Self::prepare_test_cachestore_impl(test_name, store_path).await
+        Self::prepare_test_cachestore_impl(test_name, store_path, config)
     }
 
-    async fn prepare_test_cachestore_impl(
+    fn prepare_test_cachestore_impl(
         test_name: &str,
         store_path: PathBuf,
+        config: Config,
     ) -> (Arc<LocalDirRemoteFs>, Arc<Self>) {
-        let config = Config::test(test_name);
-
         let remote_store_path = env::current_dir()
             .unwrap()
             .join(format!("test-{}-remote", test_name));
@@ -410,7 +412,7 @@ impl RocksCacheStore {
         )
         .unwrap();
 
-        (remote_fs, Self::new_from_store(store).await.unwrap())
+        (remote_fs, Self::new_from_store(store).unwrap())
     }
 
     pub fn cleanup_test_cachestore(test_name: &str) {
@@ -1371,7 +1373,7 @@ crate::di_service!(ClusterCacheStoreClient, [CacheStore]);
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::init_test_logger;
+    use crate::config::{CubeServices, init_test_logger};
     use crate::CubeError;
 
     #[tokio::test]
@@ -1381,6 +1383,7 @@ mod tests {
         let (_, cachestore) = RocksCacheStore::prepare_test_cachestore_from_fixtures(
             "cachestore-migration",
             "cachestore-migration",
+            Config::test("cachestore-migration"),
         );
         // Right now, this test is not complete, because there is a problem with error tracking on migration
         // TODO(ovr): fix me
@@ -1395,7 +1398,8 @@ mod tests {
     async fn test_cache_incr() -> Result<(), CubeError> {
         init_test_logger().await;
 
-        let (_, cachestore) = RocksCacheStore::prepare_test_cachestore("cache_incr");
+        let (_, cachestore) =
+            RocksCacheStore::prepare_test_cachestore("cache_incr", Config::test("cachestore_incr"));
 
         let key = "prefix:key".to_string();
         assert_eq!(
@@ -1413,7 +1417,8 @@ mod tests {
     async fn test_cache_set() -> Result<(), CubeError> {
         init_test_logger().await;
 
-        let (_, cachestore) = RocksCacheStore::prepare_test_cachestore("cache_set");
+        let (_, cachestore) =
+            RocksCacheStore::prepare_test_cachestore("cache_set", Config::test("cachestore_set"));
 
         let path = "prefix:key-to-test-update".to_string();
         assert_eq!(
@@ -1446,6 +1451,46 @@ mod tests {
         assert_eq!(row.expire.is_some(), true);
 
         RocksCacheStore::cleanup_test_cachestore("cache_set");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_cachestore_eviction_by_size() -> Result<(), CubeError> {
+        init_test_logger().await;
+
+        let config = Config::test("cachestore_eviction");
+        config.update_config(|mut config| {
+            // config.cachestore_cache_max_size = 32 << 20;
+            // config.cachestore_cache_max_keys = 10_000;
+
+            config
+        });
+
+        let (_, cachestore) =
+            RocksCacheStore::prepare_test_cachestore("cachestore_eviction", config);
+
+        // let cachestore_to_move = cachestore.clone();
+        // let future = tokio::task::spawn(async move {
+        //     let loops = cachestore_to_move.spawn_processing_loops();
+        //     CubeServices::wait_loops(loops).await
+        // });
+
+        for i in 0..512 {
+            panic!("insert {}", i);
+
+            cachestore
+                .cache_set(
+                    CacheItem::new(format!("test:{}", i), Some(3600), "a".repeat(1 << 20)),
+                    false,
+                )
+                .await?;
+        }
+
+        // let eviction_results = cachestore.run_eviction().await?;
+        // println!("eviction_results {:?}", eviction_results);
+
+        RocksCacheStore::cleanup_test_cachestore("cachestore_eviction");
 
         Ok(())
     }

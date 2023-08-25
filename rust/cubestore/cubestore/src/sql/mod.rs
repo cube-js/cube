@@ -1928,9 +1928,7 @@ mod tests {
                 &Path::new(path).join("cachestore"),
                 BaseRocksStoreFs::new_for_cachestore(remote_fs.clone(), config.config_obj()),
                 config.config_obj(),
-            )
-            .await
-            .unwrap();
+            ).unwrap();
             let rows_per_chunk = 10;
             let query_timeout = Duration::from_secs(30);
             let store = ChunkStore::new(
@@ -2004,9 +2002,7 @@ mod tests {
                 &Path::new(path).join("cachestore"),
                 BaseRocksStoreFs::new_for_cachestore(remote_fs.clone(), config.config_obj()),
                 config.config_obj(),
-            )
-            .await
-            .unwrap();
+            ).unwrap();
             let rows_per_chunk = 10;
             let query_timeout = Duration::from_secs(30);
             let chunk_store = ChunkStore::new(
@@ -2110,9 +2106,7 @@ mod tests {
                 &Path::new(path).join("cachestore"),
                 BaseRocksStoreFs::new_for_cachestore(remote_fs.clone(), config.config_obj()),
                 config.config_obj(),
-            )
-            .await
-            .unwrap();
+            ).unwrap();
             let rows_per_chunk = 10;
             let query_timeout = Duration::from_secs(30);
             let chunk_store = ChunkStore::new(

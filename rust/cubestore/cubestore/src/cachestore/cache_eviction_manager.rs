@@ -38,28 +38,28 @@ pub struct CachePolicyData {
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum CacheEvictionPolicy {
     // Keeps most recently used keys, iterating over all keys without sampling
-    ALLKEYS_LRU = 0,
+    AllKeysLru = 0,
     // Keeps most least frequently used, iterating over all keys without sampling
-    ALLKEYS_LFU = 1,
+    AllKeysLfu = 1,
     // Removes shortest remaining time-to-live (TTL) values, iterating over all keys without sampling
-    ALLKEYS_TTL = 2,
+    AllKeysTtl = 2,
     // Keeps most recently used keys, iterating over all keys by sampling & exit earlier when it's possible
-    SAMPLED_LRU = 3,
+    SampledLru = 3,
     // Keeps most recently used keys, iterating over all keys by sampling & exit earlier when it's possible
-    SAMPLED_LFU = 4,
+    SampledLfu = 4,
     // Removes shortest remaining time-to-live (TTL) values, iterating over all keys by sampling & exit earlier when it's possible
-    SAMPLED_TTL = 5,
+    SampledTtl = 5,
 }
 
 impl CacheEvictionPolicy {
     pub fn to_weight(&self) -> CacheEvictionWeightCriteria {
         match self {
-            CacheEvictionPolicy::ALLKEYS_LRU => CacheEvictionWeightCriteria::ByLRU,
-            CacheEvictionPolicy::ALLKEYS_LFU => CacheEvictionWeightCriteria::ByLFU,
-            CacheEvictionPolicy::ALLKEYS_TTL => CacheEvictionWeightCriteria::ByTTL,
-            CacheEvictionPolicy::SAMPLED_LRU => CacheEvictionWeightCriteria::ByLRU,
-            CacheEvictionPolicy::SAMPLED_LFU => CacheEvictionWeightCriteria::ByLFU,
-            CacheEvictionPolicy::SAMPLED_TTL => CacheEvictionWeightCriteria::ByTTL,
+            CacheEvictionPolicy::AllKeysLru => CacheEvictionWeightCriteria::ByLRU,
+            CacheEvictionPolicy::AllKeysLfu => CacheEvictionWeightCriteria::ByLFU,
+            CacheEvictionPolicy::AllKeysTtl => CacheEvictionWeightCriteria::ByTTL,
+            CacheEvictionPolicy::SampledLru => CacheEvictionWeightCriteria::ByLRU,
+            CacheEvictionPolicy::SampledLfu => CacheEvictionWeightCriteria::ByLFU,
+            CacheEvictionPolicy::SampledTtl => CacheEvictionWeightCriteria::ByTTL,
         }
     }
 }
@@ -83,12 +83,12 @@ impl FromStr for CacheEvictionPolicy {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match &s {
-            &"allkeys-lru" => Ok(CacheEvictionPolicy::ALLKEYS_LRU),
-            &"allkeys-lfu" => Ok(CacheEvictionPolicy::ALLKEYS_LFU),
-            &"allkeys-ttl" => Ok(CacheEvictionPolicy::ALLKEYS_TTL),
-            &"sampled-lru" => Ok(CacheEvictionPolicy::SAMPLED_LRU),
-            &"sampled-lfu" => Ok(CacheEvictionPolicy::SAMPLED_LRU),
-            &"sampled-ttl" => Ok(CacheEvictionPolicy::SAMPLED_TTL),
+            &"allkeys-lru" => Ok(CacheEvictionPolicy::AllKeysLru),
+            &"allkeys-lfu" => Ok(CacheEvictionPolicy::AllKeysLfu),
+            &"allkeys-ttl" => Ok(CacheEvictionPolicy::AllKeysTtl),
+            &"sampled-lru" => Ok(CacheEvictionPolicy::SampledLru),
+            &"sampled-lfu" => Ok(CacheEvictionPolicy::SampledLru),
+            &"sampled-ttl" => Ok(CacheEvictionPolicy::SampledTtl),
             other => Err(CubeError::user(format!(
                 "Unsupported cache eviction type: {}",
                 other
@@ -318,14 +318,6 @@ impl CacheEvictionManager {
             );
 
             *state = EvictionState::Ready;
-
-            return Ok(EvictionResult {
-                stats_total_keys: self.get_stats_total_keys(),
-                stats_total_raw_size: self.get_stats_total_raw_size(),
-                total_keys_removed,
-                total_size_removed,
-                total_delete_skipped,
-            });
         }
 
         let eviction_fut = if self.get_stats_total_keys() > self.limit_max_keys_soft {
@@ -663,7 +655,7 @@ impl CacheEvictionManager {
         target_is_size: bool,
     ) -> Result<EvictionResult, CubeError> {
         return match self.eviction_policy {
-            CacheEvictionPolicy::ALLKEYS_LRU => {
+            CacheEvictionPolicy::AllKeysLru => {
                 self.do_eviction_by_allkeys(
                     store,
                     target,
@@ -672,7 +664,7 @@ impl CacheEvictionManager {
                 )
                 .await
             }
-            CacheEvictionPolicy::ALLKEYS_LFU => {
+            CacheEvictionPolicy::AllKeysLfu => {
                 self.do_eviction_by_allkeys(
                     store,
                     target,
@@ -681,7 +673,7 @@ impl CacheEvictionManager {
                 )
                 .await
             }
-            CacheEvictionPolicy::ALLKEYS_TTL => {
+            CacheEvictionPolicy::AllKeysTtl => {
                 self.do_eviction_by_allkeys(
                     store,
                     target,
@@ -690,7 +682,7 @@ impl CacheEvictionManager {
                 )
                 .await
             }
-            CacheEvictionPolicy::SAMPLED_LRU => {
+            CacheEvictionPolicy::SampledLru => {
                 self.do_eviction_by_sampling(
                     store,
                     target,
@@ -699,7 +691,7 @@ impl CacheEvictionManager {
                 )
                 .await
             }
-            CacheEvictionPolicy::SAMPLED_LFU => {
+            CacheEvictionPolicy::SampledLfu => {
                 self.do_eviction_by_sampling(
                     store,
                     target,
@@ -708,7 +700,7 @@ impl CacheEvictionManager {
                 )
                 .await
             }
-            CacheEvictionPolicy::SAMPLED_TTL => {
+            CacheEvictionPolicy::SampledTtl => {
                 self.do_eviction_by_sampling(
                     store,
                     target,
