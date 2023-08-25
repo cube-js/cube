@@ -1373,7 +1373,7 @@ crate::di_service!(ClusterCacheStoreClient, [CacheStore]);
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::{CubeServices, init_test_logger};
+    use crate::config::{init_test_logger, CubeServices};
     use crate::CubeError;
 
     #[tokio::test]
