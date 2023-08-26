@@ -1,3 +1,3 @@
 #!/bin/bash
 # ci
-cd ../../docs-gen && yarn && yarn generate
+cd ../../docs-gen && NODE_ENV=development yarn install && yarn generate

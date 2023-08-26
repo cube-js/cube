@@ -43,7 +43,7 @@ pub enum NetworkMessage {
     },
     FreeMemoryChunkResult(Result<(), CubeError>),
 
-    FreeDeletedMemoryChunks,
+    FreeDeletedMemoryChunks(Vec<u64>),
     FreeDeletedMemoryChunksResult(Result<(), CubeError>),
 
     MetaStoreCall(MetaStoreRpcMethodCall),

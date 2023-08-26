@@ -295,6 +295,8 @@ components:
           type: "array"
           items:
             $ref: "#/components/schemas/V1LoadRequestQueryFilterItem"
+        ungrouped:
+          type: "boolean"
     V1LoadRequest:
       type: "object"
       properties:

@@ -24,7 +24,7 @@ export class QueryStream extends stream.Transform {
   }: {
     key: string;
     streams: Map<string, QueryStream>;
-    aliasNameToMember: { [alias: string]: string };
+    aliasNameToMember: { [alias: string]: string } | null;
   }) {
     super({
       objectMode: true,
@@ -33,9 +33,6 @@ export class QueryStream extends stream.Transform {
     this.queryKey = key;
     this.streams = streams;
     this.aliasNameToMember = aliasNameToMember;
-    if (!this.aliasNameToMember) {
-      this.emit('error', 'The QueryStream `aliasNameToMember` property is missed.');
-    }
     this.debounce();
   }
 
@@ -46,10 +43,14 @@ export class QueryStream extends stream.Transform {
     if (this.streams.has(this.queryKey)) {
       this.streams.delete(this.queryKey);
     }
-    const row = {};
-    Object.keys(chunk).forEach((alias) => {
-      row[this.aliasNameToMember[alias]] = chunk[alias];
-    });
+    let row = {};
+    if (this.aliasNameToMember) {
+      Object.keys(chunk).forEach((alias) => {
+        row[this.aliasNameToMember[alias]] = chunk[alias];
+      });
+    } else {
+      row = chunk;
+    }
     if (this.counter < this.readableHighWaterMark) {
       this.counter++;
     } else {

@@ -144,4 +144,11 @@ export class BigqueryQuery extends BaseQuery {
       every: '2 minutes'
     };
   }
+
+  sqlTemplates() {
+    const templates = super.sqlTemplates();
+    templates.quotes.identifiers = '`';
+    templates.quotes.escape = '\\`';
+    return templates;
+  }
 }

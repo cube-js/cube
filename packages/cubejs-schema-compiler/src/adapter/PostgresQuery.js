@@ -43,4 +43,11 @@ export class PostgresQuery extends BaseQuery {
   countDistinctApprox(sql) {
     return `round(hll_cardinality(hll_add_agg(hll_hash_any(${sql}))))`;
   }
+
+  sqlTemplates() {
+    const templates = super.sqlTemplates();
+    // eslint-disable-next-line no-template-curly-in-string
+    templates.params.param = '${{ param_index + 1 }}';
+    return templates;
+  }
 }

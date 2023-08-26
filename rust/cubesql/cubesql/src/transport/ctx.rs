@@ -1,9 +1,10 @@
 use datafusion::{arrow::datatypes::DataType, logical_plan::Column};
-use std::ops::RangeFrom;
+use itertools::Itertools;
+use std::{collections::HashMap, ops::RangeFrom, sync::Arc};
 
 use cubeclient::models::{V1CubeMeta, V1CubeMetaDimension, V1CubeMetaMeasure};
 
-use crate::sql::ColumnType;
+use crate::{sql::ColumnType, transport::SqlGenerator};
 
 use super::V1CubeMetaExt;
 
@@ -11,6 +12,8 @@ use super::V1CubeMetaExt;
 pub struct MetaContext {
     pub cubes: Vec<V1CubeMeta>,
     pub tables: Vec<CubeMetaTable>,
+    pub cube_to_data_source: HashMap<String, String>,
+    pub data_source_to_sql_generator: HashMap<String, Arc<dyn SqlGenerator + Send + Sync>>,
 }
 
 #[derive(Debug, Clone)]
@@ -31,7 +34,11 @@ pub struct CubeMetaColumn {
 }
 
 impl MetaContext {
-    pub fn new(cubes: Vec<V1CubeMeta>) -> Self {
+    pub fn new(
+        cubes: Vec<V1CubeMeta>,
+        cube_to_data_source: HashMap<String, String>,
+        data_source_to_sql_generator: HashMap<String, Arc<dyn SqlGenerator + Send + Sync>>,
+    ) -> Self {
         // 18000 - max system table oid
         let mut oid_iter: RangeFrom<u32> = 18000..;
         let tables: Vec<CubeMetaTable> = cubes
@@ -54,7 +61,29 @@ impl MetaContext {
             })
             .collect();
 
-        Self { cubes, tables }
+        Self {
+            cubes,
+            tables,
+            cube_to_data_source,
+            data_source_to_sql_generator,
+        }
+    }
+
+    pub fn sql_generator_by_alias_to_cube(
+        &self,
+        alias_to_cube: &Vec<(String, String)>,
+    ) -> Option<Arc<dyn SqlGenerator + Send + Sync>> {
+        let data_sources = alias_to_cube
+            .iter()
+            .map(|(_, c)| self.cube_to_data_source.get(c))
+            .unique()
+            .collect::<Option<Vec<_>>>()?;
+        if data_sources.len() != 1 {
+            return None;
+        }
+        self.data_source_to_sql_generator
+            .get(data_sources[0].as_str())
+            .cloned()
     }
 
     pub fn find_cube_with_name(&self, name: &str) -> Option<V1CubeMeta> {
@@ -189,7 +218,8 @@ mod tests {
             },
         ];
 
-        let test_context = MetaContext::new(test_cubes);
+        // TODO
+        let test_context = MetaContext::new(test_cubes, HashMap::new(), HashMap::new());
 
         match test_context.find_cube_table_with_oid(18000) {
             Some(table) => assert_eq!(18000, table.oid),

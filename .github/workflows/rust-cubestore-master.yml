@@ -10,8 +10,9 @@ on:
 jobs:
   debian:
     name: Debian Rust ${{ matrix.rust }}
-    runs-on: ubuntu-20.04
-    timeout-minutes: 60
+    # 22.04 has gcc 11, new binutils (ld)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
@@ -19,6 +20,22 @@ jobs:
     env:
       RUST: ${{ matrix.rust }}
     steps:
+      - name: Maximize build space (disk space limitations)
+        run: |
+          echo "Before"
+          df -h
+          sudo apt-get remove -y 'php.*'
+          sudo apt-get remove -y '^mongodb-.*'
+          sudo apt-get remove -y '^mysql-.*'
+          sudo apt-get autoremove -y
+          sudo apt-get clean
+
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          echo "After"
+          df -h
       - name: Checkout
         uses: actions/checkout@v3
       - name: Install Rust
@@ -27,10 +44,11 @@ jobs:
           toolchain: ${{ matrix.rust }}
           override: true
           components: rustfmt
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
         with:
-          working-directory: ./rust/cubestore
-          key: ubuntu-20.04
+          workspaces: ./rust/cubestore -> target
+          shared-key: cubestore
+          key: ubuntu-22.04
       - name: Run cargo fmt cubestore
         uses: actions-rs/cargo@v1
         with:
@@ -223,11 +241,12 @@ jobs:
           target: ${{ matrix.target }}
           override: true
           components: rustfmt
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
         with:
-          working-directory: rust/cubestore
-          key: cross-${{ runner.OS }}-${{ matrix.target }}
-          sharedKey:  cross-${{ runner.OS }}-${{ matrix.target }}
+          workspaces: ./rust/cubestore -> target
+          # We should use a separate key for testing to pass disk space limitations
+          shared-key: cubestore-testing
+          key: ubuntu-20.04
       - run: source .github/actions/${{ matrix.before_script }}.sh
         if: ${{ matrix.before_script }}
         shell: bash

@@ -240,4 +240,11 @@ export class ClickHouseQuery extends BaseQuery {
   createIndexSql(indexName, tableName, escapedColumns) {
     return `ALTER TABLE ${tableName} ADD INDEX ${indexName} (${escapedColumns.join(', ')}) TYPE minmax GRANULARITY 1`;
   }
+
+  sqlTemplates() {
+    const templates = super.sqlTemplates();
+    templates.quotes.identifiers = '`';
+    templates.quotes.escape = '\\`';
+    return templates;
+  }
 }

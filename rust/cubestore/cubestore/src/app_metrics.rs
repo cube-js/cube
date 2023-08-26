@@ -54,6 +54,15 @@ pub static METASTORE_INNER_WRITE_OPERATION: Histogram =
 pub static METASTORE_READ_OUT_QUEUE_OPERATION: Histogram =
     metrics::histogram("cs.metastore.read_out_queue_operation.ms");
 
+pub static CACHESTORE_ROCKSDB_ESTIMATE_LIVE_DATA_SIZE: Gauge =
+    metrics::gauge("cs.cachestore.rocksdb.estimate_live_data_size");
+pub static CACHESTORE_ROCKSDB_LIVE_SST_FILES_SIZE: Gauge =
+    metrics::gauge("cs.cachestore.rocksdb.live_sst_files_size");
+pub static CACHESTORE_ROCKSDB_CF_DEFAULT_SIZE: Gauge =
+    metrics::gauge("cs.cachestore.rocksdb.cf.default.size");
+pub static CACHESTORE_SCHEDULER_GC_QUEUE: Gauge =
+    metrics::gauge("cs.cachestore.scheduler.gc_queue");
+
 /// RemoteFs metrics
 pub static REMOTE_FS_OPERATION_CORE: Counter = metrics::counter("cs.remote_fs.operations.core");
 pub static REMOTE_FS_FILES_TO_REMOVE: Gauge = metrics::gauge("cs.remote_fs.files_to_remove.count");

@@ -14,6 +14,7 @@ use rocksdb::backup::{BackupEngine, BackupEngineOptions, RestoreOptions};
 use rocksdb::checkpoint::Checkpoint;
 use rocksdb::{DBCompressionType, Env, Snapshot, WriteBatch, WriteBatchIterator, DB};
 use serde::{Deserialize, Serialize};
+use serde_repr::*;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::io::{Cursor, Write};
@@ -138,6 +139,12 @@ pub struct RocksSecondaryIndexValueTTLExtended {
     pub raw_size: u32,
 }
 
+#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
+pub struct RocksPropertyRow {
+    pub key: String,
+    pub value: Option<String>,
+}
+
 #[derive(Debug)]
 pub enum RocksSecondaryIndexValue<'a> {
     Hash(&'a [u8]),
@@ -149,7 +156,7 @@ pub enum RocksSecondaryIndexValue<'a> {
     ),
 }
 
-#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize_repr, Deserialize_repr)]
 #[repr(u32)]
 pub enum RocksSecondaryIndexValueVersion {
     OnlyHash = 1,
@@ -628,11 +635,18 @@ impl RocksStoreChecksumType {
     }
 }
 
+pub type RocksStoreCompressionType = DBCompressionType;
+
 #[derive(Debug, Clone)]
 pub struct RocksStoreConfig {
     pub checksum_type: RocksStoreChecksumType,
     pub cache_capacity: usize,
-    pub compression_type: DBCompressionType,
+    pub compression_type: RocksStoreCompressionType,
+    // Sets maximum number of concurrent background jobs (compactions and flushes).
+    pub max_background_jobs: u32,
+    // Sets maximum number of threads that will concurrently perform a compaction job by breaking
+    // it into multiple, smaller ones that are run simultaneously.
+    pub max_subcompactions: u32,
 }
 
 impl RocksStoreConfig {
@@ -641,7 +655,10 @@ impl RocksStoreConfig {
             // Supported since RocksDB 6.27
             checksum_type: RocksStoreChecksumType::XXH3,
             cache_capacity: 8 * 1024 * 1024,
-            compression_type: DBCompressionType::None,
+            compression_type: RocksStoreCompressionType::None,
+            max_background_jobs: 2,
+            // Default: 1 (i.e. no subcompactions)
+            max_subcompactions: 1,
         }
     }
 
@@ -650,7 +667,10 @@ impl RocksStoreConfig {
             // Supported since RocksDB 6.27
             checksum_type: RocksStoreChecksumType::XXH3,
             cache_capacity: 8 * 1024 * 1024,
-            compression_type: DBCompressionType::None,
+            compression_type: RocksStoreCompressionType::None,
+            max_background_jobs: 2,
+            // Default: 1 (i.e. no subcompactions)
+            max_subcompactions: 1,
         }
     }
 }
@@ -811,7 +831,7 @@ impl RocksStore {
             };
 
             if let Err(e) = meta_store_to_move.details.migrate(table_ref) {
-                log::error!("Error during checking indexes: {}", e);
+                log::error!("Error during migrating storage: {}", e);
             }
         })
         .await?;
@@ -975,6 +995,55 @@ impl RocksStore {
         );
 
         Ok(())
+    }
+
+    pub fn rocksdb_properties(&self) -> Result<Vec<RocksPropertyRow>, CubeError> {
+        let to_collect = [
+            rocksdb::properties::BLOCK_CACHE_CAPACITY,
+            rocksdb::properties::BLOCK_CACHE_USAGE,
+            rocksdb::properties::BLOCK_CACHE_PINNED_USAGE,
+            rocksdb::properties::LEVELSTATS,
+            &rocksdb::properties::compression_ratio_at_level(0),
+            &rocksdb::properties::compression_ratio_at_level(1),
+            &rocksdb::properties::compression_ratio_at_level(2),
+            &rocksdb::properties::compression_ratio_at_level(3),
+            &rocksdb::properties::compression_ratio_at_level(4),
+            &rocksdb::properties::compression_ratio_at_level(6),
+            rocksdb::properties::DBSTATS,
+            // rocksdb::properties::SSTABLES,
+            rocksdb::properties::NUM_RUNNING_FLUSHES,
+            rocksdb::properties::COMPACTION_PENDING,
+            rocksdb::properties::NUM_RUNNING_COMPACTIONS,
+            rocksdb::properties::BACKGROUND_ERRORS,
+            rocksdb::properties::CUR_SIZE_ACTIVE_MEM_TABLE,
+            rocksdb::properties::CUR_SIZE_ALL_MEM_TABLES,
+            rocksdb::properties::SIZE_ALL_MEM_TABLES,
+            rocksdb::properties::NUM_ENTRIES_ACTIVE_MEM_TABLE,
+            rocksdb::properties::NUM_ENTRIES_IMM_MEM_TABLES,
+            rocksdb::properties::NUM_DELETES_ACTIVE_MEM_TABLE,
+            rocksdb::properties::NUM_DELETES_IMM_MEM_TABLES,
+            rocksdb::properties::ESTIMATE_NUM_KEYS,
+            rocksdb::properties::NUM_SNAPSHOTS,
+            rocksdb::properties::OLDEST_SNAPSHOT_TIME,
+            rocksdb::properties::NUM_LIVE_VERSIONS,
+            rocksdb::properties::ESTIMATE_LIVE_DATA_SIZE,
+            rocksdb::properties::LIVE_SST_FILES_SIZE,
+            rocksdb::properties::ESTIMATE_PENDING_COMPACTION_BYTES,
+            rocksdb::properties::ESTIMATE_TABLE_READERS_MEM,
+            rocksdb::properties::BASE_LEVEL,
+            rocksdb::properties::AGGREGATED_TABLE_PROPERTIES,
+        ];
+
+        let mut result = Vec::with_capacity(to_collect.len());
+
+        for property_name in to_collect {
+            result.push(RocksPropertyRow {
+                key: property_name.to_string_lossy().to_string(),
+                value: self.db.property_value(property_name)?,
+            })
+        }
+
+        Ok(result)
     }
 
     pub async fn healthcheck(&self) -> Result<(), CubeError> {

@@ -30,10 +30,11 @@ use crate::metastore::table::{Table, TablePath};
 use crate::metastore::{IdRow, MetaStore};
 use crate::queryplanner::flatten_union::FlattenUnion;
 use crate::queryplanner::info_schema::{
-    ColumnsInfoSchemaTableDef, SchemataInfoSchemaTableDef, SystemCacheTableDef,
-    SystemChunksTableDef, SystemIndexesTableDef, SystemJobsTableDef, SystemPartitionsTableDef,
-    SystemQueueResultsTableDef, SystemQueueTableDef, SystemReplayHandlesTableDef,
-    SystemSnapshotsTableDef, SystemTablesTableDef, TablesInfoSchemaTableDef,
+    ColumnsInfoSchemaTableDef, RocksDBPropertiesTableDef, SchemataInfoSchemaTableDef,
+    SystemCacheTableDef, SystemChunksTableDef, SystemIndexesTableDef, SystemJobsTableDef,
+    SystemPartitionsTableDef, SystemQueueResultsTableDef, SystemQueueTableDef,
+    SystemReplayHandlesTableDef, SystemSnapshotsTableDef, SystemTablesTableDef,
+    TablesInfoSchemaTableDef,
 };
 use crate::queryplanner::now::MaterializeNow;
 use crate::queryplanner::planning::{choose_index_ext, ClusterSendNode};
@@ -84,6 +85,7 @@ pub trait QueryPlanner: DIService + Send + Sync {
         &self,
         statement: Statement,
         inline_tables: &InlineTables,
+        trace_obj: Option<String>,
     ) -> Result<QueryPlan, CubeError>;
     async fn execute_meta_plan(&self, plan: LogicalPlan) -> Result<DataFrame, CubeError>;
 }
@@ -110,6 +112,7 @@ impl QueryPlanner for QueryPlannerImpl {
         &self,
         statement: Statement,
         inline_tables: &InlineTables,
+        trace_obj: Option<String>,
     ) -> Result<QueryPlan, CubeError> {
         let ctx = self.execution_context().await?;
 
@@ -139,7 +142,10 @@ impl QueryPlanner for QueryPlannerImpl {
                 &logical_plan,
                 &meta.multi_part_subtree,
             )?;
-            QueryPlan::Select(SerializedPlan::try_new(logical_plan, meta).await?, workers)
+            QueryPlan::Select(
+                SerializedPlan::try_new(logical_plan, meta, trace_obj).await?,
+                workers,
+            )
         } else {
             QueryPlan::Meta(logical_plan)
         };
@@ -380,6 +386,16 @@ impl ContextProvider for MetaStoreSchemaProvider {
                 self.cache_store.clone(),
                 InfoSchemaTable::SystemSnapshots,
             ))),
+            ("metastore", "rocksdb_properties") => Some(Arc::new(InfoSchemaTableProvider::new(
+                self.meta_store.clone(),
+                self.cache_store.clone(),
+                InfoSchemaTable::MetastoreRocksDBProperties,
+            ))),
+            ("cachestore", "rocksdb_properties") => Some(Arc::new(InfoSchemaTableProvider::new(
+                self.meta_store.clone(),
+                self.cache_store.clone(),
+                InfoSchemaTable::CachestoreRocksDBProperties,
+            ))),
             _ => None,
         })
     }
@@ -423,6 +439,8 @@ pub enum InfoSchemaTable {
     SystemReplayHandles,
     SystemCache,
     SystemSnapshots,
+    CachestoreRocksDBProperties,
+    MetastoreRocksDBProperties,
 }
 
 pub struct InfoSchemaTableDefContext {
@@ -499,6 +517,12 @@ impl InfoSchemaTable {
             InfoSchemaTable::SystemJobs => Box::new(SystemJobsTableDef),
             InfoSchemaTable::SystemCache => Box::new(SystemCacheTableDef),
             InfoSchemaTable::SystemSnapshots => Box::new(SystemSnapshotsTableDef),
+            InfoSchemaTable::CachestoreRocksDBProperties => {
+                Box::new(RocksDBPropertiesTableDef::new_cachestore())
+            }
+            InfoSchemaTable::MetastoreRocksDBProperties => {
+                Box::new(RocksDBPropertiesTableDef::new_metastore())
+            }
         }
     }
 

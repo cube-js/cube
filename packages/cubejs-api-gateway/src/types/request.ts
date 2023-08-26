@@ -117,6 +117,15 @@ type QueryRequest = BaseRequest & {
   queryType?: RequestType;
   apiType?: ApiType;
   resType?: ResultType
+  memberToAlias?: Record<string, string>;
+  exportAnnotatedSql?: boolean;
+};
+
+type SqlApiRequest = BaseRequest & {
+  query: Record<string, any>;
+  sqlQuery?: [string, string[]];
+  apiType?: ApiType;
+  streaming?: boolean;
 };
 
 /**
@@ -182,6 +191,7 @@ export {
   RequestExtension,
   ExtendedRequestContext,
   Request,
+  SqlApiRequest,
   QueryRewriteFn,
   SecurityContextExtractorFn,
   ExtendContextFn,

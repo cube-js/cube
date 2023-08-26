@@ -1337,7 +1337,11 @@ fn last_day_of_month(y: i32, m: u32) -> u32 {
     if m == 12 {
         return 31;
     }
-    NaiveDate::from_ymd(y, m + 1, 1).pred().day()
+    NaiveDate::from_ymd_opt(y, m + 1, 1)
+        .expect(&format!("Invalid year month: {}-{}", y, m))
+        .pred_opt()
+        .expect(&format!("Invalid year month: {}-{}", y, m))
+        .day()
 }
 
 pub fn create_interval_mul_udf() -> ScalarUDF {
@@ -1583,7 +1587,8 @@ pub fn create_to_char_udf() -> ScalarUDF {
 
                 let secs = duration.num_seconds();
                 let nanosecs = duration.num_nanoseconds().unwrap_or(0) - secs * 1_000_000_000;
-                let timestamp = NaiveDateTime::from_timestamp(secs, nanosecs as u32);
+                let timestamp = NaiveDateTime::from_timestamp_opt(secs, nanosecs as u32)
+                    .expect(format!("Invalid secs {} nanosecs {}", secs, nanosecs).as_str());
 
                 // chrono's strftime is missing quarter format, as such a workaround is required
                 let quarter = &format!("{}", timestamp.date().month0() / 3 + 1);
