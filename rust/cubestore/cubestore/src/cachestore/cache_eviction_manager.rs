@@ -200,6 +200,8 @@ impl CacheEvictionManager {
                         );
                     };
                 }
+            } else {
+                return;
             }
         });
 
