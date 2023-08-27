@@ -18,6 +18,7 @@ use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::sync::Arc;
+use tokio::sync::mpsc::error::TrySendError;
 use tokio::sync::RwLockWriteGuard;
 
 #[derive(Debug)]
@@ -161,8 +162,9 @@ impl CacheEvictionManager {
     pub fn new(config: &Arc<dyn ConfigObj>) -> Self {
         let ttl_buffer: HashMap<u64, CachePolicyData> = HashMap::new();
         let ttl_buffer = Arc::new(tokio::sync::RwLock::new(ttl_buffer));
-        let (ttl_lookup_tx, mut ttl_lookup_rx) =
-            tokio::sync::mpsc::channel::<CacheLookupEvent>(32_768);
+        let (ttl_lookup_tx, mut ttl_lookup_rx) = tokio::sync::mpsc::channel::<CacheLookupEvent>(
+            config.cachestore_cache_ttl_notify_channel(),
+        );
 
         let ttl_buffer_to_move = ttl_buffer.clone();
 
@@ -797,9 +799,23 @@ impl CacheEvictionManager {
                 .key_hash(id_row.get_row())
                 .to_be_bytes(),
         };
-        self.ttl_lookup_tx.send(event).await?;
 
-        Ok(())
+        if let Err(ref err) = self.ttl_lookup_tx.try_send(event) {
+            match &err {
+                TrySendError::Full(_) => {
+                    log::error!(
+                        "Unable to track lookup event for eviction manager: no available capacity"
+                    );
+
+                    Ok(())
+                }
+                TrySendError::Closed(_) => Err(CubeError::internal(
+                    "Unable to track lookup event for eviction manager: channel closed".to_string(),
+                )),
+            }
+        } else {
+            Ok(())
+        }
     }
 
     pub fn need_to_evict(&self, row_size: u64) -> bool {
