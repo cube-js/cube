@@ -241,16 +241,64 @@ impl CacheEvictionManager {
         self.eviction_loop.stop();
     }
 
+    async fn delete_items(
+        &self,
+        to_delete: Vec<(u64, u32)>,
+        store: &Arc<RocksStore>,
+    ) -> Result<EvictionResult, CubeError> {
+        let stats_total_keys = self.get_stats_total_keys();
+        let stats_total_raw_size = self.get_stats_total_raw_size();
+
+        let mut total_keys_removed = 0;
+        let mut total_size_removed = 0;
+        let mut total_delete_skipped = 0;
+
+        let last_batch = if to_delete.len() > self.eviction_batch_size {
+            let mut batch = Vec::with_capacity(self.eviction_batch_size);
+
+            for (row_id, raw_size) in to_delete {
+                batch.push((row_id, raw_size));
+
+                if batch.len() == self.eviction_batch_size {
+                    let current_batch =
+                        std::mem::replace(&mut batch, Vec::with_capacity(self.eviction_batch_size));
+                    let batch_result = self.delete_batch(current_batch, &store).await?;
+
+                    total_size_removed += batch_result.deleted_size;
+                    total_keys_removed += batch_result.deleted_count;
+                    total_delete_skipped += batch_result.skipped;
+                }
+            }
+
+            batch
+        } else {
+            to_delete
+        };
+
+        if last_batch.len() > 0 {
+            let batch_result = self.delete_batch(last_batch, &store).await?;
+
+            total_size_removed += batch_result.deleted_size;
+            total_keys_removed += batch_result.deleted_count;
+            total_delete_skipped += batch_result.skipped;
+        }
+
+        return Ok(EvictionResult {
+            total_keys_removed,
+            total_size_removed,
+            total_delete_skipped,
+            stats_total_keys,
+            stats_total_raw_size,
+        });
+    }
+
     async fn delete_batch(
         &self,
         batch: Vec<(u64, u32)>,
         store: &Arc<RocksStore>,
     ) -> Result<DeleteBatchResult, CubeError> {
-        let ttl_buffer_to_move = self.ttl_buffer.clone();
-
         let (deleted_count, deleted_size, skipped) = store
             .write_operation(move |db_ref, pipe| {
-                let guard = ttl_buffer_to_move.blocking_read();
                 let cache_schema = CacheItemRocksTable::new(db_ref.clone());
 
                 let mut deleted_count: u32 = 0;
@@ -258,14 +306,12 @@ impl CacheEvictionManager {
                 let mut skipped: u32 = 0;
 
                 for (id, raw_size) in batch {
-                    if !guard.contains_key(&id) {
-                        if let Some(_) = cache_schema.try_delete(id, pipe)? {
-                            deleted_count += 1;
-                            deleted_size += raw_size as u64;
-                        } else {
-                            skipped += 1;
-                        };
-                    }
+                    if let Some(_) = cache_schema.try_delete(id, pipe)? {
+                        deleted_count += 1;
+                        deleted_size += raw_size as u64;
+                    } else {
+                        skipped += 1;
+                    };
                 }
 
                 Ok((deleted_count, deleted_size, skipped))
@@ -294,6 +340,10 @@ impl CacheEvictionManager {
             self.get_stats_total_raw_size()
         );
 
+        let mut total_keys_removed = 0;
+        let mut total_size_removed = 0;
+        let mut total_delete_skipped = 0;
+
         let mut state = self.eviction_state.write().await;
         if let EvictionState::Unknown = *state {
             *state = EvictionState::Loading;
@@ -301,15 +351,11 @@ impl CacheEvictionManager {
             let absolute_items = self.collect_stats_and_candidates_to_evict(&store).await?;
             let absolute_items_len = absolute_items.len();
 
-            let mut total_keys_removed = 0;
-            let mut total_size_removed = 0;
-            let mut total_delete_skipped = 0;
-
             if absolute_items_len > 0 {
-                let batch_result = self.delete_batch(absolute_items, &store).await?;
-                total_keys_removed += batch_result.deleted_count;
-                total_size_removed += batch_result.deleted_size;
-                total_delete_skipped += batch_result.skipped;
+                let batch_result = self.delete_items(absolute_items, &store).await?;
+                total_keys_removed = batch_result.total_delete_skipped;
+                total_size_removed = batch_result.total_size_removed;
+                total_delete_skipped = batch_result.total_delete_skipped;
             }
 
             trace!(
@@ -356,9 +402,9 @@ impl CacheEvictionManager {
             trace!("Nothing to evict");
 
             return Ok(EvictionResult {
-                total_keys_removed: 0,
-                total_size_removed: 0,
-                total_delete_skipped: 0,
+                total_keys_removed,
+                total_size_removed,
+                total_delete_skipped,
                 stats_total_keys: self.get_stats_total_keys(),
                 stats_total_raw_size: self.get_stats_total_raw_size(),
             });
@@ -621,33 +667,7 @@ impl CacheEvictionManager {
             })
             .await?;
 
-        let mut batch = Vec::with_capacity(self.eviction_batch_size);
-
-        let mut total_keys_removed = 0;
-        let mut total_size_removed = 0;
-        let mut total_delete_skipped = 0;
-
-        for (row_id, raw_size) in to_delete {
-            batch.push((row_id, raw_size));
-
-            if batch.len() == self.eviction_batch_size {
-                let current_batch =
-                    std::mem::replace(&mut batch, Vec::with_capacity(self.eviction_batch_size));
-                let batch_result = self.delete_batch(current_batch, &store).await?;
-
-                total_size_removed += batch_result.deleted_size;
-                total_keys_removed += batch_result.deleted_count;
-                total_delete_skipped += batch_result.skipped;
-            }
-        }
-
-        return Ok(EvictionResult {
-            total_keys_removed,
-            total_size_removed,
-            total_delete_skipped,
-            stats_total_keys: self.get_stats_total_keys(),
-            stats_total_raw_size: self.get_stats_total_raw_size(),
-        });
+        self.delete_items(to_delete, &store).await
     }
 
     async fn do_eviction(
