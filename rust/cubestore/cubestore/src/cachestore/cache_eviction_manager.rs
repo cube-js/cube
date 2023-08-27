@@ -524,7 +524,7 @@ impl CacheEvictionManager {
 
         let mapped = ttl_sorted
             .into_iter()
-            .map(|(id, weight, raw_size)| (id, raw_size))
+            .map(|(id, _weight, raw_size)| (id, raw_size))
             .collect();
 
         Ok(mapped)

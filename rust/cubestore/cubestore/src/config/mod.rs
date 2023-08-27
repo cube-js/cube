@@ -569,6 +569,7 @@ pub struct ConfigObjImpl {
     pub cachestore_cache_eviction_loop_interval: u64,
     pub cachestore_cache_ttl_persist_loop_interval: u64,
     pub cachestore_cache_max_size: u64,
+    pub cachestore_cache_threshold_to_force_eviction: u8,
     pub cachestore_queue_results_expire: u64,
     pub cachestore_metrics_interval: u64,
     pub cachestore_cache_max_keys: u32,
@@ -774,7 +775,7 @@ impl ConfigObj for ConfigObjImpl {
     }
 
     fn cachestore_cache_threshold_to_force_eviction(&self) -> u8 {
-        15
+        self.cachestore_cache_threshold_to_force_eviction
     }
 
     fn cachestore_cache_max_keys(&self) -> u32 {
@@ -1249,6 +1250,7 @@ impl Config {
                     // 32 mb
                     Some(32 << 20),
                 ) as u64,
+                cachestore_cache_threshold_to_force_eviction: 25,
                 cachestore_queue_results_expire: env_parse_duration(
                     "CUBESTORE_QUEUE_RESULTS_EXPIRE",
                     60,
@@ -1451,6 +1453,7 @@ impl Config {
                 cachestore_cache_eviction_loop_interval: 60,
                 cachestore_cache_ttl_persist_loop_interval: 15,
                 cachestore_cache_max_size: 4096 << 32,
+                cachestore_cache_threshold_to_force_eviction: 25,
                 cachestore_queue_results_expire: 90,
                 cachestore_metrics_interval: 15,
                 cachestore_cache_max_keys: 100_000,

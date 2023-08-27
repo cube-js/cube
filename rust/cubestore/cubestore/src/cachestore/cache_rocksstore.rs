@@ -1373,7 +1373,8 @@ crate::di_service!(ClusterCacheStoreClient, [CacheStore]);
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::{init_test_logger, CubeServices};
+    use crate::cachestore::CacheEvictionPolicy;
+    use crate::config::{init_test_logger, ConfigObjImpl, CubeServices};
     use crate::CubeError;
 
     #[tokio::test]
@@ -1455,42 +1456,118 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
-    async fn test_cachestore_eviction_by_size() -> Result<(), CubeError> {
+    async fn test_cachestore_force_eviction(
+        name: &str,
+        update_config: impl FnOnce(ConfigObjImpl) -> ConfigObjImpl,
+        keys_to_insert: usize,
+        key_size: usize,
+    ) -> Result<EvictionResult, CubeError> {
         init_test_logger().await;
 
-        let config = Config::test("cachestore_eviction");
-        config.update_config(|mut config| {
-            // config.cachestore_cache_max_size = 32 << 20;
-            // config.cachestore_cache_max_keys = 10_000;
+        let config = Config::test(name).update_config(update_config);
 
-            config
+        let (_, cachestore) = RocksCacheStore::prepare_test_cachestore(name, config);
+
+        let cachestore_to_move = cachestore.clone();
+        let future = tokio::task::spawn(async move {
+            let loops = cachestore_to_move.spawn_processing_loops();
+            CubeServices::wait_loops(loops).await
         });
 
-        let (_, cachestore) =
-            RocksCacheStore::prepare_test_cachestore("cachestore_eviction", config);
-
-        // let cachestore_to_move = cachestore.clone();
-        // let future = tokio::task::spawn(async move {
-        //     let loops = cachestore_to_move.spawn_processing_loops();
-        //     CubeServices::wait_loops(loops).await
-        // });
-
-        for i in 0..512 {
-            panic!("insert {}", i);
-
+        for i in 0..keys_to_insert {
             cachestore
                 .cache_set(
-                    CacheItem::new(format!("test:{}", i), Some(3600), "a".repeat(1 << 20)),
+                    CacheItem::new(format!("test:{}", i), Some(3600), "a".repeat(key_size)),
                     false,
                 )
                 .await?;
         }
 
-        // let eviction_results = cachestore.run_eviction().await?;
-        // println!("eviction_results {:?}", eviction_results);
+        let mut result = EvictionResult {
+            total_keys_removed: 0,
+            total_size_removed: 0,
+            total_delete_skipped: 0,
+            stats_total_keys: 0,
+            stats_total_raw_size: 0,
+        };
 
-        RocksCacheStore::cleanup_test_cachestore("cachestore_eviction");
+        // 1 load state
+        // check limits 3 (3 rounds for sampling)
+        for _ in 0..4 {
+            let eviction_results = cachestore.run_eviction().await?;
+            // println!("eviction_results 2 {:?}", eviction_results);
+
+            result.total_keys_removed += eviction_results.total_keys_removed;
+            result.total_size_removed += eviction_results.total_size_removed;
+            result.total_delete_skipped += eviction_results.total_delete_skipped;
+        }
+
+        // should do anything
+        {
+            let eviction_results = cachestore.run_eviction().await?;
+            assert_eq!(eviction_results.total_keys_removed, 0);
+            assert_eq!(eviction_results.total_size_removed, 0);
+            assert_eq!(eviction_results.total_delete_skipped, 0);
+
+            result.stats_total_keys = eviction_results.stats_total_keys;
+            result.stats_total_raw_size = eviction_results.stats_total_raw_size;
+        }
+
+        RocksCacheStore::cleanup_test_cachestore(name);
+
+        Ok(result)
+    }
+
+    #[tokio::test]
+    async fn test_cachestore_force_eviction_with_max_keys_limit_by_sampled_lru(
+    ) -> Result<(), CubeError> {
+        let result = test_cachestore_force_eviction(
+            "cachestore_force_eviction_with_max_keys_limit_by_sampled_lru",
+            |mut config| {
+                // 512 as soft
+                config.cachestore_cache_max_keys = 512;
+                // 512 * 1.5 = 768
+                config.cachestore_cache_threshold_to_force_eviction = 50;
+                config.cachestore_cache_max_size = 16384 << 20;
+                config.cachestore_cache_policy = CacheEvictionPolicy::SampledLru;
+
+                config
+            },
+            512 + 128,
+            128 << 12,
+        )
+        .await?;
+
+        assert_eq!(result.stats_total_keys < 512, true);
+        assert_eq!(result.total_keys_removed > 100, true);
+        assert_eq!(result.total_keys_removed < 256, true);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_cachestore_force_eviction_with_max_keys_limit_by_allkeys_lru(
+    ) -> Result<(), CubeError> {
+        let result = test_cachestore_force_eviction(
+            "cachestore_force_eviction_with_max_keys_limit_by_allkeys_lru",
+            |mut config| {
+                // 512 as soft
+                config.cachestore_cache_max_keys = 512;
+                // 512 * 1.5 = 768
+                config.cachestore_cache_threshold_to_force_eviction = 50;
+                config.cachestore_cache_max_size = 16384 << 20;
+                config.cachestore_cache_policy = CacheEvictionPolicy::AllKeysLru;
+
+                config
+            },
+            512 + 128,
+            128 << 12,
+        )
+        .await?;
+
+        assert_eq!(result.stats_total_keys < 512, true);
+        assert_eq!(result.total_keys_removed > 100, true);
+        assert_eq!(result.total_keys_removed < 256, true);
 
         Ok(())
     }
