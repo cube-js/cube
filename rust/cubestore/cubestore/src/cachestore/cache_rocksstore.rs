@@ -14,9 +14,8 @@ use std::env;
 
 use crate::metastore::{
     BaseRocksSecondaryIndex, BaseRocksStoreFs, BatchPipe, DbTableRef, IdRow, MetaStoreEvent,
-    MetaStoreFs, RocksPropertyRow, RocksSecondaryIndex, RocksSecondaryIndexValueTTLExtended,
-    RocksSecondaryIndexValueVersionEncoder, RocksStore, RocksStoreDetails, RocksTable, RowKey,
-    SecondaryIndexValueScanIterItem, SecondaryKey,
+    MetaStoreFs, RocksPropertyRow, RocksSecondaryIndex, RocksSecondaryIndexValueVersionEncoder,
+    RocksStore, RocksStoreDetails, RocksTable,
 };
 use crate::remotefs::LocalDirRemoteFs;
 use crate::util::WorkerLoop;
@@ -24,13 +23,9 @@ use crate::{app_metrics, CubeError};
 use async_trait::async_trait;
 
 use futures_timer::Delay;
-use rocksdb::{
-    BlockBasedOptions, Cache, Direction, IteratorMode, MergeOperands, Options, ReadOptions, DB,
-};
+use rocksdb::{BlockBasedOptions, Cache, Options, DB};
 
-use crate::cachestore::cache_eviction_manager::{
-    CacheEvictionManager, CachePolicyData, EvictionResult,
-};
+use crate::cachestore::cache_eviction_manager::{CacheEvictionManager, EvictionResult};
 use crate::cachestore::compaction::CompactionPreloadedState;
 use crate::cachestore::listener::RocksCacheStoreListener;
 use crate::table::{Row, TableValue};
@@ -40,8 +35,8 @@ use itertools::Itertools;
 use log::{trace, warn};
 use serde_derive::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, RwLock};
-use std::time::{Duration, Instant};
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
 use tokio::sync::broadcast::Sender;
 use tokio::task::JoinHandle;
 
@@ -271,11 +266,7 @@ impl RocksCacheStore {
                 cachestore
                     .cache_eviction_manager
                     .persist_loop
-                    .process(
-                        cachestore.clone(),
-                        async move |_| Ok(Delay::new(Duration::from_secs(persist_interval)).await),
-                        async move |m, _| m.run_ttl_persist().await,
-                    )
+                    .process(cachestore.clone(), async move |m| m.run_ttl_persist().await)
                     .await;
 
                 Ok(())
@@ -291,15 +282,11 @@ impl RocksCacheStore {
                 cachestore
                     .cache_eviction_manager
                     .eviction_loop
-                    .process(
-                        cachestore.clone(),
-                        async move |_| Ok(Delay::new(Duration::from_secs(eviction_interval)).await),
-                        async move |m, _| {
-                            let _ = m.run_eviction().await?;
+                    .process(cachestore.clone(), async move |m| {
+                        let _ = m.run_eviction().await?;
 
-                            Ok(())
-                        },
-                    )
+                        Ok(())
+                    })
                     .await;
 
                 Ok(())
@@ -1469,7 +1456,8 @@ mod tests {
         let (_, cachestore) = RocksCacheStore::prepare_test_cachestore(name, config);
 
         let cachestore_to_move = cachestore.clone();
-        let future = tokio::task::spawn(async move {
+
+        tokio::task::spawn(async move {
             let loops = cachestore_to_move.spawn_processing_loops();
             CubeServices::wait_loops(loops).await
         });
@@ -1568,6 +1556,106 @@ mod tests {
         assert_eq!(result.stats_total_keys < 512, true);
         assert_eq!(result.total_keys_removed > 100, true);
         assert_eq!(result.total_keys_removed < 256, true);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_cachestore_auto_eviction_with_max_keys_limit_by_allkeys_lru(
+    ) -> Result<(), CubeError> {
+        init_test_logger().await;
+
+        let config =
+            Config::test("test_cachestore_auto_eviction_with_max_keys_limit_by_allkeys_lru")
+                .update_config(|mut config| {
+                    // 512 as soft
+                    config.cachestore_cache_max_keys = 512;
+                    // 512 * 1.5 = 768
+                    config.cachestore_cache_threshold_to_force_eviction = 50;
+                    config.cachestore_cache_max_size = 16384 << 20;
+                    config.cachestore_cache_policy = CacheEvictionPolicy::AllKeysLru;
+                    // disable periodic eviction, this test should force eviction
+                    config.cachestore_cache_eviction_loop_interval = 100000;
+
+                    config
+                });
+
+        let (_, cachestore) = RocksCacheStore::prepare_test_cachestore(
+            "test_cachestore_auto_eviction_with_max_keys_limit_by_allkeys_lru",
+            config,
+        );
+
+        let cachestore_to_move = cachestore.clone();
+
+        tokio::task::spawn(async move {
+            let loops = cachestore_to_move.spawn_processing_loops();
+            CubeServices::wait_loops(loops).await
+        });
+
+        for interval in 0..8 {
+            for i in (0..200).step_by(4) {
+                let (r1, r2, r3, r4) = tokio::join!(
+                    cachestore.cache_set(
+                        CacheItem::new(
+                            format!("test:{}", (interval * 1000) + i),
+                            Some(3600),
+                            "a".repeat(1 << 12)
+                        ),
+                        false,
+                    ),
+                    cachestore.cache_set(
+                        CacheItem::new(
+                            format!("test:{}", (interval * 1000) + i + 1),
+                            Some(3600),
+                            "a".repeat(1 << 12)
+                        ),
+                        false,
+                    ),
+                    cachestore.cache_set(
+                        CacheItem::new(
+                            format!("test:{}", (interval * 1000) + i + 2),
+                            Some(3600),
+                            "a".repeat(1 << 12)
+                        ),
+                        false,
+                    ),
+                    cachestore.cache_set(
+                        CacheItem::new(
+                            format!("test:{}", (interval * 1000) + i + 3),
+                            Some(3600),
+                            "a".repeat(1 << 12)
+                        ),
+                        false,
+                    )
+                );
+
+                r1?;
+                r2?;
+                r3?;
+                r4?;
+            }
+
+            tokio::time::sleep(Duration::from_millis(500)).await;
+        }
+
+        tokio::time::sleep(Duration::from_millis(1000)).await;
+        trace!(
+            "total keys: {}",
+            cachestore.cache_eviction_manager.get_stats_total_keys()
+        );
+
+        assert_eq!(
+            cachestore.cache_eviction_manager.get_stats_total_keys() < 512,
+            true
+        );
+        assert_eq!(
+            cachestore.cache_eviction_manager.get_stats_total_keys() > 300,
+            true
+        );
+
+        RocksCacheStore::cleanup_test_cachestore(
+            "test_cachestore_auto_eviction_with_max_keys_limit_by_allkeys_lru",
+        );
 
         Ok(())
     }

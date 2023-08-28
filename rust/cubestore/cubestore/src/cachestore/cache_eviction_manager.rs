@@ -7,7 +7,7 @@ use crate::metastore::{
     RocksTable,
 };
 use crate::util::aborting_join_handle::AbortingJoinHandle;
-use crate::util::WorkerLoop;
+use crate::util::IntervalLoop;
 use crate::{app_metrics, CubeError};
 use chrono::Utc;
 use datafusion::cube_ext;
@@ -102,8 +102,8 @@ impl FromStr for CacheEvictionPolicy {
 pub struct CacheEvictionManager {
     ttl_buffer: Arc<tokio::sync::RwLock<HashMap<u64, CachePolicyData>>>,
     ttl_lookup_tx: tokio::sync::mpsc::Sender<CacheLookupEvent>,
-    pub persist_loop: Arc<WorkerLoop>,
-    pub eviction_loop: Arc<WorkerLoop>,
+    pub persist_loop: Arc<IntervalLoop>,
+    pub eviction_loop: Arc<IntervalLoop>,
     // eviction state
     eviction_state: tokio::sync::RwLock<EvictionState>,
     // Some stats
@@ -210,8 +210,16 @@ impl CacheEvictionManager {
         Self {
             ttl_buffer,
             ttl_lookup_tx,
-            persist_loop: Arc::new(WorkerLoop::new("Cachestore ttl persist")),
-            eviction_loop: Arc::new(WorkerLoop::new("Cachestore eviction")),
+            persist_loop: Arc::new(IntervalLoop::new(
+                "Cachestore ttl persist",
+                tokio::time::Duration::from_secs(
+                    config.cachestore_cache_ttl_persist_loop_interval(),
+                ),
+            )),
+            eviction_loop: Arc::new(IntervalLoop::new(
+                "Cachestore eviction",
+                tokio::time::Duration::from_secs(config.cachestore_cache_eviction_loop_interval()),
+            )),
             eviction_state: tokio::sync::RwLock::new(EvictionState::Unknown),
             stats_total_keys: AtomicU32::new(0),
             stats_total_raw_size: AtomicU64::new(0),
