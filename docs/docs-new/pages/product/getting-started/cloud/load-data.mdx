@@ -44,9 +44,11 @@ CREATE TABLE cube_demo.ecom.line_items
 Clear all the content in the Editor and run the following command to load data
 into the `line_items` table.
 
-    COPY INTO cube_demo.ecom.line_items (id, order_id, product_id, price, created_at)
-    FROM 's3://cube-tutorial/line_items.csv'
-    FILE_FORMAT = (TYPE = 'CSV' FIELD_DELIMITER = ',' SKIP_HEADER = 1);
+```sql
+COPY INTO cube_demo.ecom.line_items (id, order_id, product_id, price, created_at)
+FROM 's3://cube-tutorial/line_items.csv'
+FILE_FORMAT = (TYPE = 'CSV' FIELD_DELIMITER = ',' SKIP_HEADER = 1);
+```
 
 Now, we’re going to repeat these steps for three other tables.
 
@@ -68,7 +70,6 @@ Run the following command to load data into the `orders` table from S3.
 COPY INTO cube_demo.ecom.orders (id, user_id, status, completed_at, created_at)
 FROM 's3://cube-tutorial/orders.csv'
 FILE_FORMAT = (TYPE = 'CSV' FIELD_DELIMITER = ',' SKIP_HEADER = 1);
-
 ```
 
 Run the following command to create the `users` table.
@@ -85,7 +86,6 @@ CREATE TABLE cube_demo.ecom.users
   last_name VARCHAR,
   created_at TIMESTAMP
 );
-
 ```
 
 Run the following command to load data into the `users` table.
@@ -94,7 +94,6 @@ Run the following command to load data into the `users` table.
 COPY INTO cube_demo.ecom.users (id, city, age, gender, state, first_name, last_name, created_at)
 FROM 's3://cube-tutorial/users.csv'
 FILE_FORMAT = (TYPE = 'CSV' FIELD_DELIMITER = ',' SKIP_HEADER = 1);
-
 ```
 
 Run the following command to create the `products` table.
@@ -106,7 +105,6 @@ CREATE TABLE cube_demo.ecom.products
   product_category VARCHAR,
   created_at TIMESTAMP
 );
-
 ```
 
 Run the following command to load data into the `products` table.
