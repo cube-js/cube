@@ -22,6 +22,7 @@ import {
   DownloadQueryResultsResult,
   DownloadQueryResultsOptions,
   DriverCapabilities,
+  QueryTablesResult,
 } from '@cubejs-backend/base-driver';
 import { formatToTimeZone } from 'date-fns-timezone';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';

@@ -327,7 +327,7 @@ export abstract class BaseDriver implements DriverInterface {
       throw new Error('getTables without schemaNames is not supported');
     }
 
-    const schemas = schemaNames.map((_, idx) => `$${idx + 1}`).join(', ');
+    const schemas = schemaNames.map((_, idx) => this.param(idx)).join(', ');
 
     const query = `
       SELECT table_schema as ${this.quoteIdentifier('schema_name')},
@@ -343,8 +343,10 @@ export abstract class BaseDriver implements DriverInterface {
     const parameters: string[] = [];
 
     tables.forEach((t, idx) => {
-      const schemaPlaceholder = `$${2 * idx + 1}`;
-      const tablePlaceholder = `$${2 * idx + 2}`;
+      const schemaParamIdx = 2 * idx + 1;
+      const tableParamIdx = 2 * idx + 2;
+      const schemaPlaceholder = this.param(schemaParamIdx - 1);
+      const tablePlaceholder = this.param(tableParamIdx - 1);
       conditions.push(`(table_schema=${schemaPlaceholder} AND table_name=${tablePlaceholder})`);
       parameters.push(t.schema_name, t.table_name);
     });
