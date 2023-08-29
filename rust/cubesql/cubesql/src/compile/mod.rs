@@ -13311,6 +13311,44 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_holistics_to_char_with_cast() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            "SELECT * FROM (
+            SELECT DISTINCT
+              TO_CHAR((CAST ( \"public_kibana\".\"order_date\" AS timestamptz )) AT TIME ZONE 'Etc/UTC', 'YYYY-MM-DD HH24:MI:SS.US') AS \"po_ca_6bbc97\"
+            FROM
+              \"public\".\"KibanaSampleDataEcommerce\" \"public_kibana\"
+            LIMIT 100000
+            ) holistics_awesome_table LIMIT 1000000".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        let cube_scan = logical_plan.find_cube_scan();
+
+        assert_eq!(
+            cube_scan.request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+                ungrouped: Some(true),
+            }
+        );
+    }
+
+    #[tokio::test]
     async fn test_select_column_with_same_name_as_table() -> Result<(), CubeError> {
         init_logger();
 

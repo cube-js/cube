@@ -2080,26 +2080,6 @@ impl RewriteRules for SplitRules {
                 "?new_expr".to_string(),
                 self.transform_cast_inner("?expr", "?alias_to_cube", "?inner_expr", "?data_type", "?new_expr"),
             ),
-            transforming_chain_rewrite(
-                "split-push-down-cast-outer-replacer",
-                outer_projection_split_replacer("?expr", "?alias_to_cube"),
-                vec![(
-                    "?expr",
-                    cast_expr("?inner_expr", "?data_type"),
-                )],
-                "?new_expr".to_string(),
-                self.transform_cast_outer("?expr", "?alias_to_cube", "?inner_expr", "?data_type", "?new_expr", true),
-            ),
-            transforming_chain_rewrite(
-                "split-push-down-cast-outer-aggr-replacer",
-                outer_aggregate_split_replacer("?expr", "?alias_to_cube"),
-                vec![(
-                    "?expr",
-                    cast_expr("?inner_expr", "?data_type"),
-                )],
-                "?new_expr".to_string(),
-                self.transform_cast_outer("?expr", "?alias_to_cube", "?inner_expr", "?data_type", "?new_expr", false),
-            ),
             // Substring
             rewrite(
                 "split-push-down-substr-inner-replacer",
@@ -4977,6 +4957,45 @@ impl RewriteRules for SplitRules {
             )
             .into_iter(),
         );
+        // Cast
+        rules.extend(
+            self.outer_aggr_group_expr_aggr_combinator_rewrite(
+                "split-push-down-cast-replacer",
+                |split_replacer| split_replacer("?expr", "?cube"),
+                |_| vec![("?expr", cast_expr("?inner_expr", "?data_type"))],
+                |split_replacer| cast_expr(split_replacer("?inner_expr", "?cube"), "?data_type"),
+                self.transform_cast_outer_unaliased("?expr", "?inner_expr", "?data_type"),
+                true,
+                true,
+                true,
+                Some(vec![("?expr", column_expr("?column"))]),
+            )
+            .into_iter(),
+        );
+        rules.extend(
+            self.outer_aggr_group_expr_aggr_combinator_rewrite(
+                "split-push-down-cast-aliased-replacer",
+                |split_replacer| split_replacer("?expr", "?cube"),
+                |_| {
+                    vec![(
+                        "?expr",
+                        cast_expr_explicit(column_expr("?column"), ArrowDataType::Date32),
+                    )]
+                },
+                |_| {
+                    alias_expr(
+                        cast_expr_explicit(column_expr("?new_column"), ArrowDataType::Date32),
+                        "?new_alias",
+                    )
+                },
+                self.transform_cast_outer_aliased("?expr", "?new_column", "?new_alias"),
+                true,
+                false,
+                true,
+                None,
+            )
+            .into_iter(),
+        );
 
         rules
     }
@@ -6728,20 +6747,16 @@ impl SplitRules {
         }
     }
 
-    fn transform_cast_outer(
+    fn transform_cast_outer_unaliased(
         &self,
         expr_var: &'static str,
-        alias_to_cube_var: &'static str,
         inner_expr_var: &'static str,
         data_type_var: &'static str,
-        new_expr_var: &'static str,
-        is_outer_projection: bool,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool + Clone
+    {
         let expr_var = var!(expr_var);
-        let alias_to_cube_var = var!(alias_to_cube_var);
         let inner_expr_var = var!(inner_expr_var);
         let data_type_var = var!(data_type_var);
-        let new_expr_var = var!(new_expr_var);
         move |egraph, subst| {
             let expr_id = subst[expr_var];
             let res = egraph[expr_id]
@@ -6753,7 +6768,7 @@ impl SplitRules {
                     expr_id
                 )));
 
-            if let Ok(expr) = res {
+            if let Ok(_) = res {
                 let inner_expr_id = subst[inner_expr_var];
                 let res =
                     egraph[inner_expr_id]
@@ -6772,31 +6787,7 @@ impl SplitRules {
                                 var_iter!(egraph[subst[data_type_var]], CastExprDataType).cloned()
                             {
                                 if data_type == ArrowDataType::Date32 {
-                                    // TODO unwrap
-                                    let name = expr.name(&DFSchema::empty()).unwrap();
-                                    let column = Column::from_name(name.to_string());
-
-                                    let column_id =
-                                        egraph.add(LogicalPlanLanguage::ColumnExprColumn(
-                                            ColumnExprColumn(column),
-                                        ));
-                                    let column_expr_id =
-                                        egraph.add(LogicalPlanLanguage::ColumnExpr([column_id]));
-                                    let cast_expr_id = egraph.add(LogicalPlanLanguage::CastExpr([
-                                        column_expr_id,
-                                        subst[data_type_var],
-                                    ]));
-                                    let alias_id = egraph.add(LogicalPlanLanguage::AliasExprAlias(
-                                        AliasExprAlias(name),
-                                    ));
-                                    let alias_expr_id =
-                                        egraph.add(LogicalPlanLanguage::AliasExpr([
-                                            cast_expr_id,
-                                            alias_id,
-                                        ]));
-
-                                    subst.insert(new_expr_var, alias_expr_id);
-                                    return true;
+                                    return false;
                                 }
                             }
                         }
@@ -6804,27 +6795,49 @@ impl SplitRules {
                     }
                 }
             }
-
-            let split_replacer_id = if is_outer_projection {
-                egraph.add(LogicalPlanLanguage::OuterProjectionSplitReplacer([
-                    subst[inner_expr_var],
-                    subst[alias_to_cube_var],
-                ]))
-            } else {
-                egraph.add(LogicalPlanLanguage::OuterAggregateSplitReplacer([
-                    subst[inner_expr_var],
-                    subst[alias_to_cube_var],
-                ]))
-            };
-
-            subst.insert(
-                new_expr_var,
-                egraph.add(LogicalPlanLanguage::CastExpr([
-                    split_replacer_id,
-                    subst[data_type_var],
-                ])),
-            );
             true
+        }
+    }
+
+    fn transform_cast_outer_aliased(
+        &self,
+        expr_var: &'static str,
+        new_column_var: &'static str,
+        new_alias_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool + Clone
+    {
+        let expr_var = var!(expr_var);
+        let new_column_var = var!(new_column_var);
+        let new_alias_var = var!(new_alias_var);
+        move |egraph, subst| {
+            let expr_id = subst[expr_var];
+            let res = egraph[expr_id]
+                .data
+                .original_expr
+                .as_ref()
+                .ok_or(CubeError::internal(format!(
+                    "Original expr wasn't prepared for {:?}",
+                    expr_id
+                )));
+
+            if let Ok(expr) = res {
+                // TODO unwrap
+                let name = expr.name(&DFSchema::empty()).unwrap();
+                let column = Column::from_name(name.to_string());
+
+                subst.insert(
+                    new_column_var,
+                    egraph.add(LogicalPlanLanguage::ColumnExprColumn(ColumnExprColumn(
+                        column,
+                    ))),
+                );
+                subst.insert(
+                    new_alias_var,
+                    egraph.add(LogicalPlanLanguage::AliasExprAlias(AliasExprAlias(name))),
+                );
+                return true;
+            }
+            false
         }
     }
 
