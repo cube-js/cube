@@ -1551,6 +1551,56 @@ const variables: Record<string, (...args: any) => any> = {
     ]
   ),
 
+  prestoAwsRegion: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_PRESTO_AWS_REGION', dataSource)
+    ]
+  ),
+
+  prestoUnloadBucket: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_PRESTO_UNLOAD_BUCKET', dataSource)
+    ]
+  ),
+
+  prestoUnloadPrefix: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_PRESTO_UNLOAD_PREFIX', dataSource)
+    ]
+  ),
+
+  prestoUnloadCatalog: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_PRESTO_UNLOAD_CATALOG', dataSource)
+    ]
+  ),
+
+  prestoUnloadSchema: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_PRESTO_UNLOAD_SCHEMA', dataSource)
+    ]
+  ),
+
   /** ****************************************************************
    * Cube Store Driver                                               *
    ***************************************************************** */
