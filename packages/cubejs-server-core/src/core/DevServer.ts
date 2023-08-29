@@ -103,7 +103,7 @@ export class DevServer {
       });
     }));
 
-    /** WIP */
+    /** WIP - new methods for step-by-step schema loading */
     app.get('/playground/list-schemas', catchErrors(async (req, res) => {
       // this.cubejsServer.event('Dev Server List Schemas');
       const driver = await this.cubejsServer.getDriver({
@@ -117,7 +117,7 @@ export class DevServer {
       res.json({ schemas });
     }));
 
-    /** WIP */
+    /** WIP - new methods for step-by-step schema loading */
     app.post('/playground/list-tables', catchErrors(async (req, res) => {
       if (!req.body.schemaNames) {
         throw new Error('schemaNames parameter is required');
@@ -135,7 +135,7 @@ export class DevServer {
       res.json({ tables });
     }));
 
-    /** WIP */
+    /** WIP - new methods for step-by-step schema loading */
     app.post('/playground/list-columns', catchErrors(async (req, res) => {
       if (!req.body.tables) {
         throw new Error('tables parameter is required');
@@ -151,6 +151,20 @@ export class DevServer {
 
       const columns = await driver.getColumnsForSpecificTables(req.body.tables);
       res.json({ columns });
+    }));
+
+    /** WIP - new methods for step-by-step schema loading */
+    app.get('/playground/driver-capabilities', catchErrors(async (req, res) => {
+      // this.cubejsServer.event('Dev Server Driver Capabilities');
+      const driver = await this.cubejsServer.getDriver({
+        dataSource: req.body.dataSource || 'default',
+        authInfo: null,
+        securityContext: null,
+        requestId: getRequestIdFromRequest(req),
+      });
+
+      const capabilities = await driver.capabilities();
+      res.json({ capabilities });
     }));
 
     app.get('/playground/db-schema', catchErrors(async (req, res) => {

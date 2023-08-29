@@ -501,7 +501,9 @@ export abstract class BaseDriver implements DriverInterface {
   }
 
   public capabilities(): DriverCapabilities {
-    return {};
+    return {
+      incrementalSchemaLoading: false,
+    };
   }
 
   public nowTimestamp() {
