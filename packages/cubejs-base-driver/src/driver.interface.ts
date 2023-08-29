@@ -186,10 +186,10 @@ export interface DriverInterface {
   //
   tableColumnTypes: (table: string) => Promise<TableStructure>;
   queryColumnTypes: (sql: string, params?: unknown[]) => Promise<{ name: any; type: string; }[]>;
-  // Returns all schemas for current database
+  //
   getSchemas: () => Promise<QuerySchemasResult[]>;
-  // Returns all tables for defined schemas
-  getTables: (schemaNames: string[]) => Promise<QueryTablesResult[]>;
+  getTablesForSpecificSchemas: (schemaNames: string[]) => Promise<QueryTablesResult[]>;
+  getColumnsForSpecificTables: (tables: QueryTablesResult[]) => Promise<QueryColumnsResult[]>;
   // eslint-disable-next-line camelcase
   getTablesQuery: (schemaName: string) => Promise<TableQueryResult[]>;
   // Remove table from database

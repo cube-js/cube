@@ -164,27 +164,6 @@ export abstract class BaseDriver implements DriverInterface {
    `;
   }
 
-  protected informationSchemaGetSchemasQuery() {
-    return `
-      SELECT table_schema as ${this.quoteIdentifier('schema_name')}
-      FROM information_schema.tables
-      WHERE table_schema NOT IN (${this.getIgnoredSchemas()})
-      GROUP BY table_schema
-      ORDER BY table_schema
-    `;
-  }
-
-  protected informationSchemaGetTablesQuery(schemaNames: string[]) {
-    const schemas = schemaNames.map(s => this.singleQuoteIdentifier(s)).join(', ');
-    return `
-      SELECT table_schema as ${this.quoteIdentifier('schema_name')},
-             table_name as ${this.quoteIdentifier('table_name')}
-      FROM information_schema.tables
-      WHERE table_schema IN (${schemas})
-      ORDER BY table_schema, table_name
-    `;
-  }
-
   protected getSslOptions(dataSource: string): TLSConnectionOptions | undefined {
     if (
       getEnv('dbSsl', { dataSource }) ||
@@ -334,21 +313,43 @@ export abstract class BaseDriver implements DriverInterface {
   }
 
   public getSchemas() {
-    const query = this.informationSchemaGetSchemasQuery();
+    const query = `
+      SELECT table_schema as ${this.quoteIdentifier('schema_name')}
+      FROM information_schema.tables
+      WHERE table_schema NOT IN (${this.getIgnoredSchemas()})
+      GROUP BY table_schema
+    `;
     return this.query<QuerySchemasResult>(query);
   }
 
-  public getTables(schemaNames?: string[]) {
+  public getTablesForSpecificSchemas(schemaNames?: string[]) {
     if (!schemaNames) {
       throw new Error('getTables without schemaNames is not supported');
     }
 
-    const query = this.informationSchemaGetTablesQuery(schemaNames);
-    return this.query<QueryTablesResult>(query);
+    const schemas = schemaNames.map((_, idx) => `$${idx + 1}`).join(', ');
+
+    const query = `
+      SELECT table_schema as ${this.quoteIdentifier('schema_name')},
+            table_name as ${this.quoteIdentifier('table_name')}
+      FROM information_schema.tables
+      WHERE table_schema IN (${schemas})
+    `;
+    return this.query<QueryTablesResult>(query, schemaNames);
   }
 
-  public getColumns(tables: QueryTablesResult[]) {
-    const conditions = tables.map(t => `(table_schema='${t.schema_name}' AND table_name='${t.table_name}')`).join(' OR ');
+  public getColumnsForSpecificTables(tables: QueryTablesResult[]) {
+    const conditions: string[] = [];
+    const parameters: string[] = [];
+
+    tables.forEach((t, idx) => {
+      const schemaPlaceholder = `$${2 * idx + 1}`;
+      const tablePlaceholder = `$${2 * idx + 2}`;
+      conditions.push(`(table_schema=${schemaPlaceholder} AND table_name=${tablePlaceholder})`);
+      parameters.push(t.schema_name, t.table_name);
+    });
+
+    const conditionString = conditions.join(' OR ');
 
     const query = `
       SELECT columns.column_name as ${this.quoteIdentifier('column_name')},
@@ -356,10 +357,10 @@ export abstract class BaseDriver implements DriverInterface {
              columns.table_schema as ${this.quoteIdentifier('table_schema')},
              columns.data_type as ${this.quoteIdentifier('data_type')}
       FROM information_schema.columns
-      WHERE ${conditions}
+      WHERE ${conditionString}
     `;
 
-    return this.query<QueryColumnsResult>(query);
+    return this.query<QueryColumnsResult>(query, parameters);
   }
 
   public getTablesQuery(schemaName: string) {

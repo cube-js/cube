@@ -131,7 +131,7 @@ export class DevServer {
         requestId: getRequestIdFromRequest(req),
       });
 
-      const tables = await driver.getTables(req.body.schemaNames);
+      const tables = await driver.getTablesForSpecificSchemas(req.body.schemaNames);
       res.json({ tables });
     }));
 
@@ -149,7 +149,7 @@ export class DevServer {
         requestId: getRequestIdFromRequest(req),
       });
 
-      const columns = await driver.getColumns(req.body.tables);
+      const columns = await driver.getColumnsForSpecificTables(req.body.tables);
       res.json({ columns });
     }));
 
