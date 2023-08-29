@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"\n                SELECT to_char(c, 'YYYY-MM-DD HH24:MI:SS.US') c2\n                FROM (\n                    SELECT str_to_date('2021-08-31 11:05', '%Y-%m-%d %H:%i') c\n                ) t\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++----------------------------+
+| c2                         |
++----------------------------+
+| 2021-08-31 11:05:00.000000 |
++----------------------------+

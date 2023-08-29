@@ -9633,6 +9633,21 @@ ORDER BY \"COUNT(count)\" DESC"
             .await?
         );
 
+        insta::assert_snapshot!(
+            "to_char_3",
+            execute_query(
+                "
+                SELECT to_char(c, 'YYYY-MM-DD HH24:MI:SS.US') c2
+                FROM (
+                    SELECT str_to_date('2021-08-31 11:05', '%Y-%m-%d %H:%i') c
+                ) t
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
         Ok(())
     }
 
