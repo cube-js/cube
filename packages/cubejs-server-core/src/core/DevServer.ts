@@ -103,9 +103,8 @@ export class DevServer {
       });
     }));
 
-    /** WIP - new methods for step-by-step schema loading */
     app.get('/playground/list-schemas', catchErrors(async (req, res) => {
-      // this.cubejsServer.event('Dev Server List Schemas');
+      this.cubejsServer.event('Dev Server List Schemas');
       const driver = await this.cubejsServer.getDriver({
         dataSource: req.body.dataSource || 'default',
         authInfo: null,
@@ -117,13 +116,12 @@ export class DevServer {
       res.json({ schemas });
     }));
 
-    /** WIP - new methods for step-by-step schema loading */
     app.post('/playground/list-tables', catchErrors(async (req, res) => {
       if (!req.body.schemaNames) {
         throw new Error('schemaNames parameter is required');
       }
 
-      // this.cubejsServer.event('Dev Server List Tables');
+      this.cubejsServer.event('Dev Server List Tables');
       const driver = await this.cubejsServer.getDriver({
         dataSource: req.body.dataSource || 'default',
         authInfo: null,
@@ -135,13 +133,12 @@ export class DevServer {
       res.json({ tables });
     }));
 
-    /** WIP - new methods for step-by-step schema loading */
     app.post('/playground/list-columns', catchErrors(async (req, res) => {
       if (!req.body.tables) {
         throw new Error('tables parameter is required');
       }
 
-      // this.cubejsServer.event('Dev Server List Columns');
+      this.cubejsServer.event('Dev Server List Columns');
       const driver = await this.cubejsServer.getDriver({
         dataSource: req.body.dataSource || 'default',
         authInfo: null,
@@ -153,9 +150,8 @@ export class DevServer {
       res.json({ columns });
     }));
 
-    /** WIP - new methods for step-by-step schema loading */
     app.get('/playground/driver-capabilities', catchErrors(async (req, res) => {
-      // this.cubejsServer.event('Dev Server Driver Capabilities');
+      this.cubejsServer.event('Dev Server Driver Capabilities');
       const driver = await this.cubejsServer.getDriver({
         dataSource: req.body.dataSource || 'default',
         authInfo: null,
