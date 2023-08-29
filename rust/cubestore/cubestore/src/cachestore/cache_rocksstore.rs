@@ -13,8 +13,7 @@ use std::collections::HashMap;
 use std::env;
 
 use crate::metastore::{
-    BaseRocksSecondaryIndex, BaseRocksStoreFs, BatchPipe, DbTableRef, IdRow, MetaStoreEvent,
-    MetaStoreFs, RocksPropertyRow, RocksSecondaryIndex, RocksSecondaryIndexValueVersionEncoder,
+    BaseRocksStoreFs, BatchPipe, DbTableRef, IdRow, MetaStoreEvent, MetaStoreFs, RocksPropertyRow,
     RocksStore, RocksStoreDetails, RocksTable,
 };
 use crate::remotefs::LocalDirRemoteFs;
@@ -714,18 +713,20 @@ impl CacheStore for RocksCacheStore {
     async fn cache_truncate(&self) -> Result<(), CubeError> {
         let block = self.cache_eviction_manager.truncation_block().await;
 
-        self.store
+        let result = self
+            .store
             .write_operation(move |db_ref, batch_pipe| {
                 let cache_schema = CacheItemRocksTable::new(db_ref);
                 cache_schema.truncate(batch_pipe)?;
 
                 Ok(())
             })
-            .await?;
+            .await;
 
+        self.cache_eviction_manager.notify_truncate_end().await;
         drop(block);
 
-        Ok(())
+        result
     }
 
     async fn cache_delete(&self, key: String) -> Result<(), CubeError> {
@@ -1360,7 +1361,7 @@ crate::di_service!(ClusterCacheStoreClient, [CacheStore]);
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cachestore::CacheEvictionPolicy;
+    use crate::cachestore::{CacheEvictionPolicy, EvictionFinishedResult};
     use crate::config::{init_test_logger, ConfigObjImpl, CubeServices};
     use crate::CubeError;
 
@@ -1448,7 +1449,7 @@ mod tests {
         update_config: impl FnOnce(ConfigObjImpl) -> ConfigObjImpl,
         keys_to_insert: usize,
         key_size: usize,
-    ) -> Result<EvictionResult, CubeError> {
+    ) -> Result<EvictionFinishedResult, CubeError> {
         init_test_logger().await;
 
         let config = Config::test(name).update_config(update_config);
@@ -1471,7 +1472,7 @@ mod tests {
                 .await?;
         }
 
-        let mut result = EvictionResult {
+        let mut result = EvictionFinishedResult {
             total_keys_removed: 0,
             total_size_removed: 0,
             total_delete_skipped: 0,
@@ -1482,17 +1483,22 @@ mod tests {
         // 1 load state
         // check limits 3 (3 rounds for sampling)
         for _ in 0..4 {
-            let eviction_results = cachestore.run_eviction().await?;
-            // println!("eviction_results 2 {:?}", eviction_results);
-
-            result.total_keys_removed += eviction_results.total_keys_removed;
-            result.total_size_removed += eviction_results.total_size_removed;
-            result.total_delete_skipped += eviction_results.total_delete_skipped;
+            let eviction_results = match cachestore.run_eviction().await? {
+                EvictionResult::InProgress(status) => panic!("unexpected status: {}", status),
+                EvictionResult::Finished(stats) => {
+                    result.total_keys_removed += stats.total_keys_removed;
+                    result.total_size_removed += stats.total_size_removed;
+                    result.total_delete_skipped += stats.total_delete_skipped;
+                }
+            };
         }
 
         // should do anything
         {
-            let eviction_results = cachestore.run_eviction().await?;
+            let eviction_results = match cachestore.run_eviction().await? {
+                EvictionResult::InProgress(status) => panic!("unexpected status: {}", status),
+                EvictionResult::Finished(stats) => stats,
+            };
             assert_eq!(eviction_results.total_keys_removed, 0);
             assert_eq!(eviction_results.total_size_removed, 0);
             assert_eq!(eviction_results.total_delete_skipped, 0);

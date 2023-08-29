@@ -74,9 +74,12 @@ pub enum CacheEvictionWeightCriteria {
 
 #[derive(Debug)]
 enum EvictionState {
-    Unknown,
-    Loading,
+    Initial,
+    LoadingFailed,
     Ready,
+    Loading(/* finalizer */ tokio::sync::oneshot::Receiver<()>),
+    EvictionStarted(/* finalizer */ tokio::sync::oneshot::Receiver<()>),
+    TruncationStarted,
 }
 
 impl FromStr for CacheEvictionPolicy {
@@ -134,7 +137,13 @@ struct DeleteBatchResult {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct EvictionResult {
+pub enum EvictionResult {
+    InProgress(String),
+    Finished(EvictionFinishedResult),
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct EvictionFinishedResult {
     pub total_keys_removed: u32,
     pub total_size_removed: u64,
     pub total_delete_skipped: u32,
@@ -220,7 +229,7 @@ impl CacheEvictionManager {
                 "Cachestore eviction",
                 tokio::time::Duration::from_secs(config.cachestore_cache_eviction_loop_interval()),
             )),
-            eviction_state: tokio::sync::RwLock::new(EvictionState::Unknown),
+            eviction_state: tokio::sync::RwLock::new(EvictionState::Initial),
             stats_total_keys: AtomicU32::new(0),
             stats_total_raw_size: AtomicU64::new(0),
             // Limits & Evict
@@ -255,7 +264,7 @@ impl CacheEvictionManager {
         &self,
         to_delete: Vec<(u64, u32)>,
         store: &Arc<RocksStore>,
-    ) -> Result<EvictionResult, CubeError> {
+    ) -> Result<EvictionFinishedResult, CubeError> {
         let stats_total_keys = self.get_stats_total_keys();
         let stats_total_raw_size = self.get_stats_total_raw_size();
 
@@ -293,7 +302,7 @@ impl CacheEvictionManager {
             total_delete_skipped += batch_result.skipped;
         }
 
-        return Ok(EvictionResult {
+        return Ok(EvictionFinishedResult {
             total_keys_removed,
             total_size_removed,
             total_delete_skipped,
@@ -350,34 +359,57 @@ impl CacheEvictionManager {
             self.get_stats_total_raw_size()
         );
 
-        let mut total_keys_removed = 0;
-        let mut total_size_removed = 0;
-        let mut total_delete_skipped = 0;
-
         let mut state = self.eviction_state.write().await;
-        if let EvictionState::Unknown = *state {
-            *state = EvictionState::Loading;
+        match *state {
+            EvictionState::Initial | EvictionState::LoadingFailed => {
+                let (state_tx, state_rx) = tokio::sync::oneshot::channel::<()>();
 
-            let absolute_items = self.collect_stats_and_candidates_to_evict(&store).await?;
-            let absolute_items_len = absolute_items.len();
+                *state = EvictionState::Loading(state_rx);
+                drop(state);
 
-            if absolute_items_len > 0 {
-                let batch_result = self.delete_items(absolute_items, &store).await?;
-                total_keys_removed = batch_result.total_delete_skipped;
-                total_size_removed = batch_result.total_size_removed;
-                total_delete_skipped = batch_result.total_delete_skipped;
+                let load_result = self.do_load(&store).await;
+
+                let mut state = self.eviction_state.write().await;
+                *state = if load_result.is_ok() {
+                    EvictionState::Ready
+                } else {
+                    EvictionState::LoadingFailed
+                };
+                drop(state);
+
+                let _ = state_tx.send(());
+
+                load_result
             }
+            EvictionState::Ready => {
+                let (state_tx, state_rx) = tokio::sync::oneshot::channel::<()>();
 
-            trace!(
-                "Eviction loaded stats, total_keys: {}, total_size: {}, absolute: {}",
-                self.get_stats_total_keys(),
-                self.get_stats_total_raw_size(),
-                absolute_items_len
-            );
+                *state = EvictionState::EvictionStarted(state_rx);
+                drop(state);
 
-            *state = EvictionState::Ready;
+                let eviction_result = self.do_eviction(&store).await;
+
+                let mut state = self.eviction_state.write().await;
+                *state = EvictionState::Ready;
+                drop(state);
+
+                let _ = state_tx.send(());
+
+                eviction_result
+            }
+            EvictionState::Loading(_) => Ok(EvictionResult::InProgress(
+                "loading is in progress".to_string(),
+            )),
+            EvictionState::EvictionStarted(_) => Ok(EvictionResult::InProgress(
+                "eviction is in progress".to_string(),
+            )),
+            EvictionState::TruncationStarted => Ok(EvictionResult::InProgress(
+                "truncation is in progress".to_string(),
+            )),
         }
+    }
 
+    async fn do_eviction(&self, store: &Arc<RocksStore>) -> Result<EvictionResult, CubeError> {
         let eviction_fut = if self.get_stats_total_keys() > self.limit_max_keys_soft {
             let need_to_evict = (self.get_stats_total_keys() - self.limit_max_keys_soft) as u64;
             let target =
@@ -392,7 +424,7 @@ impl CacheEvictionManager {
                 target
             );
 
-            self.do_eviction(&store, target, false)
+            self.do_eviction_by(&store, target, false)
         } else if self.get_stats_total_raw_size() > self.limit_max_size_soft {
             let need_to_evict = (self.get_stats_total_raw_size() - self.limit_max_size_soft) as u64;
             let target =
@@ -407,17 +439,17 @@ impl CacheEvictionManager {
                 target
             );
 
-            self.do_eviction(&store, target, true)
+            self.do_eviction_by(&store, target, true)
         } else {
             trace!("Nothing to evict");
 
-            return Ok(EvictionResult {
-                total_keys_removed,
-                total_size_removed,
-                total_delete_skipped,
+            return Ok(EvictionResult::Finished(EvictionFinishedResult {
+                total_keys_removed: 0,
+                total_size_removed: 0,
+                total_delete_skipped: 0,
                 stats_total_keys: self.get_stats_total_keys(),
                 stats_total_raw_size: self.get_stats_total_raw_size(),
-            });
+            }));
         };
 
         let result = eviction_fut.await?;
@@ -429,6 +461,37 @@ impl CacheEvictionManager {
         );
 
         Ok(result)
+    }
+
+    async fn do_load(&self, store: &Arc<RocksStore>) -> Result<EvictionResult, CubeError> {
+        let mut total_keys_removed = 0;
+        let mut total_size_removed = 0;
+        let mut total_delete_skipped = 0;
+
+        let absolute_items = self.collect_stats_and_candidates_to_evict(&store).await?;
+        let absolute_items_len = absolute_items.len();
+
+        if absolute_items_len > 0 {
+            let batch_result = self.delete_items(absolute_items, &store).await?;
+            total_keys_removed = batch_result.total_delete_skipped;
+            total_size_removed = batch_result.total_size_removed;
+            total_delete_skipped = batch_result.total_delete_skipped;
+        }
+
+        trace!(
+            "Eviction loaded stats, total_keys: {}, total_size: {}, absolute: {}",
+            self.get_stats_total_keys(),
+            self.get_stats_total_raw_size(),
+            absolute_items_len
+        );
+
+        Ok(EvictionResult::Finished(EvictionFinishedResult {
+            total_keys_removed,
+            total_size_removed,
+            total_delete_skipped,
+            stats_total_keys: self.get_stats_total_keys(),
+            stats_total_raw_size: self.get_stats_total_raw_size(),
+        }))
     }
 
     async fn collect_stats_and_candidates_to_evict(
@@ -478,7 +541,7 @@ impl CacheEvictionManager {
         Ok(to_delete)
     }
 
-    async fn collect_candidates_to_evict(
+    async fn collect_allkeys_to_evict(
         &self,
         criteria: CacheEvictionWeightCriteria,
         store: &Arc<RocksStore>,
@@ -487,7 +550,6 @@ impl CacheEvictionManager {
 
         let batch_to_delete = store
             .read_operation_out_of_queue(move |db_ref| {
-                let mut stats_total_raw_size: u64 = 0;
                 let started_date =
                     Utc::now() + chrono::Duration::seconds(eviction_min_ttl_threshold);
 
@@ -498,8 +560,6 @@ impl CacheEvictionManager {
                     let item = item?;
 
                     let (weight, raw_size) = if let Some(extended) = item.extended {
-                        stats_total_raw_size += extended.raw_size as u64;
-
                         let weight = match criteria {
                             CacheEvictionWeightCriteria::ByLRU => {
                                 extended.lru.encode_value_as_u32()?
@@ -547,7 +607,7 @@ impl CacheEvictionManager {
         target_is_size: bool,
         criteria: CacheEvictionWeightCriteria,
     ) -> Result<EvictionResult, CubeError> {
-        let to_evict = self.collect_candidates_to_evict(criteria, &store).await?;
+        let to_evict = self.collect_allkeys_to_evict(criteria, &store).await?;
 
         let stats_total_keys = self.get_stats_total_keys();
         let stats_total_raw_size = self.get_stats_total_raw_size();
@@ -572,35 +632,35 @@ impl CacheEvictionManager {
 
                 if target_is_size {
                     if total_size_removed >= target {
-                        return Ok(EvictionResult {
+                        return Ok(EvictionResult::Finished(EvictionFinishedResult {
                             total_keys_removed,
                             total_size_removed,
                             total_delete_skipped,
                             stats_total_keys,
                             stats_total_raw_size,
-                        });
+                        }));
                     }
                 } else {
                     if total_keys_removed >= target as u32 {
-                        return Ok(EvictionResult {
+                        return Ok(EvictionResult::Finished(EvictionFinishedResult {
                             total_keys_removed,
                             total_size_removed,
                             total_delete_skipped,
                             stats_total_keys,
                             stats_total_raw_size,
-                        });
+                        }));
                     }
                 }
             }
         }
 
-        return Ok(EvictionResult {
+        return Ok(EvictionResult::Finished(EvictionFinishedResult {
             total_keys_removed,
             total_size_removed,
             total_delete_skipped,
             stats_total_keys,
             stats_total_raw_size,
-        });
+        }));
     }
 
     async fn do_eviction_by_sampling(
@@ -677,10 +737,12 @@ impl CacheEvictionManager {
             })
             .await?;
 
-        self.delete_items(to_delete, &store).await
+        Ok(EvictionResult::Finished(
+            self.delete_items(to_delete, &store).await?,
+        ))
     }
 
-    async fn do_eviction(
+    async fn do_eviction_by(
         &self,
         store: &Arc<RocksStore>,
         target: u64,
@@ -866,28 +928,28 @@ impl CacheEvictionManager {
     }
 
     pub async fn truncation_block<'a>(&'a self) -> Result<TruncationBlockGuard<'a>, CubeError> {
+        let mut eviction_state_guard = self.eviction_state.write().await;
+        *eviction_state_guard = EvictionState::TruncationStarted;
+        drop(eviction_state_guard);
+
         let mut ttl_buffer_guard = self.ttl_buffer.write().await;
         *ttl_buffer_guard = HashMap::new();
 
-        let mut eviction_state_guard = self.eviction_state.write().await;
-        *eviction_state_guard = EvictionState::Ready;
-
-        self.stats_total_keys.store(0, Ordering::Relaxed);
-        self.stats_total_raw_size.store(0, Ordering::Relaxed);
-
         Ok(TruncationBlockGuard {
             _ttl_buffer_guard: ttl_buffer_guard,
-            _eviction_state_guard: eviction_state_guard,
         })
     }
 
-    pub async fn notify_truncate_end(&self) -> Result<(), CubeError> {
-        Ok(())
+    pub async fn notify_truncate_end(&self) {
+        self.stats_total_keys.store(0, Ordering::Relaxed);
+        self.stats_total_raw_size.store(0, Ordering::Relaxed);
+
+        let mut eviction_state_guard = self.eviction_state.write().await;
+        *eviction_state_guard = EvictionState::Ready;
     }
 }
 
 #[derive(Debug)]
 pub struct TruncationBlockGuard<'a> {
     _ttl_buffer_guard: RwLockWriteGuard<'a, HashMap<u64, CachePolicyData>>,
-    _eviction_state_guard: RwLockWriteGuard<'a, EvictionState>,
 }
