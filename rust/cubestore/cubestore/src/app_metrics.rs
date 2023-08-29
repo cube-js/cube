@@ -68,7 +68,7 @@ pub static REMOTE_FS_FILES_TO_REMOVE: Gauge = metrics::gauge("cs.remote_fs.files
 pub static REMOTE_FS_FILES_SIZE_TO_REMOVE: Gauge =
     metrics::gauge("cs.remote_fs.files_to_remove.size");
 
-// Cache Store TTL Buffer
+/// Cache Store Cache
 pub static CACHESTORE_TTL_PERSIST: Counter = metrics::counter("cs.cachestore.ttl.persist");
 pub static CACHESTORE_TTL_BUFFER: Gauge = metrics::gauge("cs.cachestore.ttl.buffer");
 // Cache Store Eviction
@@ -76,5 +76,3 @@ pub static CACHESTORE_EVICTION_REMOVED_KEYS: Counter =
     metrics::counter("cs.cachestore.eviction.removed.keys");
 pub static CACHESTORE_EVICTION_REMOVED_SIZE: Counter =
     metrics::counter("cs.cachestore.eviction.removed.size");
-pub static CACHESTORE_EVICTION: Counter = metrics::counter("cachestore.eviction");
-pub static CACHESTORE_EVICTION_MS: Histogram = metrics::histogram("cachestore.eviction.ms");
