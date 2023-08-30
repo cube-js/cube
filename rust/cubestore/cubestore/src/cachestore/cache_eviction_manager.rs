@@ -7,6 +7,7 @@ use crate::metastore::{
     RocksTable,
 };
 use crate::util::aborting_join_handle::AbortingJoinHandle;
+use crate::util::lock::acquire_lock;
 use crate::util::IntervalLoop;
 use crate::{app_metrics, CubeError};
 use chrono::Utc;
@@ -15,6 +16,7 @@ use deepsize::DeepSizeOf;
 use itertools::Itertools;
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fmt;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::sync::Arc;
@@ -77,9 +79,22 @@ enum EvictionState {
     Initial,
     LoadingFailed,
     Ready,
-    Loading(/* finalizer */ tokio::sync::oneshot::Receiver<()>),
-    EvictionStarted(/* finalizer */ tokio::sync::oneshot::Receiver<()>),
+    Loading,
+    EvictionStarted,
     TruncationStarted,
+}
+
+impl fmt::Display for EvictionState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            EvictionState::Initial => "initial",
+            EvictionState::LoadingFailed => "loading failed",
+            EvictionState::Ready => "ready",
+            EvictionState::Loading => "loading",
+            EvictionState::EvictionStarted => "eviction started",
+            EvictionState::TruncationStarted => "truncation started",
+        })
+    }
 }
 
 impl FromStr for CacheEvictionPolicy {
@@ -109,6 +124,7 @@ pub struct CacheEvictionManager {
     pub eviction_loop: Arc<IntervalLoop>,
     // eviction state
     eviction_state: tokio::sync::RwLock<EvictionState>,
+    eviction_state_notify: tokio::sync::Notify,
     // Some stats
     stats_total_keys: AtomicU32,
     stats_total_raw_size: AtomicU64,
@@ -235,6 +251,7 @@ impl CacheEvictionManager {
                 tokio::time::Duration::from_secs(config.cachestore_cache_eviction_loop_interval()),
             )),
             eviction_state: tokio::sync::RwLock::new(EvictionState::Initial),
+            eviction_state_notify: tokio::sync::Notify::new(),
             stats_total_keys: AtomicU32::new(0),
             stats_total_raw_size: AtomicU64::new(0),
             // Limits & Evict
@@ -367,9 +384,7 @@ impl CacheEvictionManager {
         let mut state = self.eviction_state.write().await;
         match *state {
             EvictionState::Initial | EvictionState::LoadingFailed => {
-                let (state_tx, state_rx) = tokio::sync::oneshot::channel::<()>();
-
-                *state = EvictionState::Loading(state_rx);
+                *state = EvictionState::Loading;
                 drop(state);
 
                 let load_result = self.do_load(&store).await;
@@ -382,14 +397,12 @@ impl CacheEvictionManager {
                 };
                 drop(state);
 
-                let _ = state_tx.send(());
+                self.eviction_state_notify.notify_waiters();
 
                 load_result
             }
             EvictionState::Ready => {
-                let (state_tx, state_rx) = tokio::sync::oneshot::channel::<()>();
-
-                *state = EvictionState::EvictionStarted(state_rx);
+                *state = EvictionState::EvictionStarted;
                 drop(state);
 
                 let eviction_result = self.do_eviction(&store).await;
@@ -398,14 +411,14 @@ impl CacheEvictionManager {
                 *state = EvictionState::Ready;
                 drop(state);
 
-                let _ = state_tx.send(());
+                self.eviction_state_notify.notify_waiters();
 
                 eviction_result
             }
-            EvictionState::Loading(_) => Ok(EvictionResult::InProgress(
+            EvictionState::Loading => Ok(EvictionResult::InProgress(
                 "loading is in progress".to_string(),
             )),
-            EvictionState::EvictionStarted(_) => Ok(EvictionResult::InProgress(
+            EvictionState::EvictionStarted => Ok(EvictionResult::InProgress(
                 "eviction is in progress".to_string(),
             )),
             EvictionState::TruncationStarted => Ok(EvictionResult::InProgress(
@@ -951,12 +964,49 @@ impl CacheEvictionManager {
         Ok(())
     }
 
-    pub async fn truncation_block<'a>(&'a self) -> Result<TruncationBlockGuard<'a>, CubeError> {
-        let mut eviction_state_guard = self.eviction_state.write().await;
-        *eviction_state_guard = EvictionState::TruncationStarted;
-        drop(eviction_state_guard);
+    async fn start_eviction_state(&self, next_state: EvictionState) -> Result<(), CubeError> {
+        for _ in 0..5 {
+            let mut eviction_state_guard =
+                acquire_lock("eviction state", self.eviction_state.write()).await?;
+            match &*eviction_state_guard {
+                EvictionState::Initial | EvictionState::LoadingFailed | EvictionState::Ready => {
+                    *eviction_state_guard = next_state;
+                    drop(eviction_state_guard);
 
-        let mut ttl_buffer_guard = self.ttl_buffer.write().await;
+                    return Ok(());
+                }
+                _ => {
+                    drop(eviction_state_guard);
+                    self.eviction_state_notify.notified().await;
+                }
+            }
+        }
+
+        Err(CubeError::internal(format!(
+            "Can't start {} state",
+            next_state
+        )))
+    }
+
+    async fn end_eviction_state(&self, next_state: EvictionState) -> Result<(), CubeError> {
+        let mut eviction_state_guard =
+            acquire_lock("eviction state", self.eviction_state.write()).await?;
+        *eviction_state_guard = next_state;
+
+        Ok(())
+    }
+
+    pub async fn truncation_block<'a>(&'a self) -> Result<TruncationBlockGuard<'a>, CubeError> {
+        self.start_eviction_state(EvictionState::TruncationStarted)
+            .await?;
+
+        let mut ttl_buffer_guard = match acquire_lock("ttl buffer", self.ttl_buffer.write()).await {
+            Ok(r) => r,
+            Err(err) => {
+                self.end_eviction_state(EvictionState::Ready).await?;
+                return Err(err);
+            }
+        };
         *ttl_buffer_guard = HashMap::new();
 
         Ok(TruncationBlockGuard {
@@ -964,12 +1014,11 @@ impl CacheEvictionManager {
         })
     }
 
-    pub async fn notify_truncate_end(&self) {
+    pub async fn notify_truncate_end(&self) -> Result<(), CubeError> {
         self.stats_total_keys.store(0, Ordering::Relaxed);
         self.stats_total_raw_size.store(0, Ordering::Relaxed);
 
-        let mut eviction_state_guard = self.eviction_state.write().await;
-        *eviction_state_guard = EvictionState::Ready;
+        self.end_eviction_state(EvictionState::Ready).await
     }
 }
 

@@ -723,7 +723,7 @@ impl CacheStore for RocksCacheStore {
             })
             .await;
 
-        self.cache_eviction_manager.notify_truncate_end().await;
+        self.cache_eviction_manager.notify_truncate_end().await?;
         drop(block);
 
         result
