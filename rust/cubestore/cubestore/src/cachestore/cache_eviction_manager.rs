@@ -659,6 +659,14 @@ impl CacheEvictionManager {
             }
         }
 
+        if batch.len() > 0 {
+            let batch_result = self.delete_batch(batch, &store).await?;
+
+            total_size_removed += batch_result.deleted_size;
+            total_keys_removed += batch_result.deleted_count;
+            total_delete_skipped += batch_result.skipped;
+        }
+
         return Ok(EvictionResult::Finished(EvictionFinishedResult {
             total_keys_removed,
             total_size_removed,
