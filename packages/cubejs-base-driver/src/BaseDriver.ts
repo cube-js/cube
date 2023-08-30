@@ -145,12 +145,8 @@ export abstract class BaseDriver implements DriverInterface {
     this.testConnectionTimeoutValue = _options.testConnectionTimeout || 10000;
   }
 
-  protected singleQuoteIdentifier(identifier: string): string {
-    return `'${identifier}'`;
-  }
-
   protected getIgnoredSchemas() {
-    return IGNORED_DB_SCHEMAS.map(schema => this.singleQuoteIdentifier(schema)).join(', ');
+    return IGNORED_DB_SCHEMAS.map(schema => `'${schema}'`).join(', ');
   }
 
   protected informationSchemaQuery() {
