@@ -337,12 +337,11 @@ export abstract class BaseDriver implements DriverInterface {
   public getColumnsForSpecificTables(tables: QueryTablesResult[]) {
     const conditions: string[] = [];
     const parameters: string[] = [];
+    let paramIndex = 0;
 
-    tables.forEach((t, idx) => {
-      const schemaParamIdx = 2 * idx + 1;
-      const tableParamIdx = 2 * idx + 2;
-      const schemaPlaceholder = this.param(schemaParamIdx - 1);
-      const tablePlaceholder = this.param(tableParamIdx - 1);
+    tables.forEach((t) => {
+      const schemaPlaceholder = this.param(paramIndex++);
+      const tablePlaceholder = this.param(paramIndex++);
       conditions.push(`(table_schema=${schemaPlaceholder} AND table_name=${tablePlaceholder})`);
       parameters.push(t.schema_name, t.table_name);
     });
