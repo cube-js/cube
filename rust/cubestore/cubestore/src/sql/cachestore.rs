@@ -12,7 +12,6 @@ use crate::table::{Row, TableValue};
 use crate::{app_metrics, CubeError};
 use async_trait::async_trait;
 use datafusion::sql::parser::Statement as DFStatement;
-use log::debug;
 use sqlparser::ast::Statement;
 use std::path::Path;
 use std::sync::Arc;
@@ -192,7 +191,7 @@ impl CacheStoreSqlService {
             app_metrics::CACHE_QUERY_TIME_MS.report(execution_time.as_millis() as i64);
         }
 
-        debug!("Cache command processing time: {:?}", execution_time,);
+        log::trace!("Cache command processing time: {:?}", execution_time,);
 
         Ok(result)
     }
@@ -425,7 +424,7 @@ impl CacheStoreSqlService {
             app_metrics::QUEUE_QUERY_TIME_MS.report(execution_time.as_millis() as i64);
         }
 
-        debug!("Queue command processing time: {:?}", execution_time,);
+        log::debug!("Queue command processing time: {:?}", execution_time,);
 
         Ok(result)
     }

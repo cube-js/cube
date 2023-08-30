@@ -12,7 +12,6 @@ use crate::{app_metrics, CubeError};
 use chrono::Utc;
 use datafusion::cube_ext;
 use itertools::Itertools;
-use log::trace;
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str::FromStr;
@@ -358,10 +357,10 @@ impl CacheEvictionManager {
     }
 
     pub async fn run_eviction(&self, store: &Arc<RocksStore>) -> Result<EvictionResult, CubeError> {
-        trace!(
+        log::debug!(
             "Eviction started, total_keys: {}, total_size: {}",
             self.get_stats_total_keys(),
-            self.get_stats_total_raw_size()
+            humansize::format_size(self.get_stats_total_raw_size(), humansize::DECIMAL)
         );
 
         let mut state = self.eviction_state.write().await;
@@ -421,7 +420,7 @@ impl CacheEvictionManager {
             let target =
                 need_to_evict + calc_percentage(need_to_evict, self.eviction_below_threshold);
 
-            trace!(
+            log::debug!(
                 "Max keys limit eviction: {} > {}, need to evict: {}, threshold: {}, target: {}",
                 stats_total_keys,
                 self.limit_max_keys_soft,
@@ -438,18 +437,18 @@ impl CacheEvictionManager {
                 let target =
                     need_to_evict + calc_percentage(need_to_evict, self.eviction_below_threshold);
 
-                trace!(
-                "Max size limit eviction: {} > {}, need to evict: {}, threshold: {}, target: {}",
-                stats_total_raw_siz,
-                self.limit_max_size_soft,
-                need_to_evict,
-                self.eviction_below_threshold,
-                target
-            );
+                log::debug!(
+                    "Max size limit eviction: {} > {}, need to evict: {}, threshold: {}, target: {}",
+                    humansize::format_size(stats_total_raw_siz, humansize::DECIMAL),
+                    humansize::format_size(self.limit_max_size_soft, humansize::DECIMAL),
+                    humansize::format_size(need_to_evict, humansize::DECIMAL),
+                    self.eviction_below_threshold,
+                    humansize::format_size(target, humansize::DECIMAL)
+                );
 
                 self.do_eviction_by(&store, target, true)
             } else {
-                trace!("Nothing to evict");
+                log::trace!("Nothing to evict");
 
                 return Ok(EvictionResult::Finished(EvictionFinishedResult {
                     total_keys_removed: 0,
@@ -463,10 +462,10 @@ impl CacheEvictionManager {
 
         let result = eviction_fut.await?;
 
-        trace!(
+        log::debug!(
             "Eviction finished, total_keys: {}, total_size: {}",
             self.get_stats_total_keys(),
-            self.get_stats_total_raw_size()
+            humansize::format_size(self.get_stats_total_raw_size(), humansize::DECIMAL)
         );
 
         Ok(result)
@@ -487,7 +486,7 @@ impl CacheEvictionManager {
             total_delete_skipped = batch_result.total_delete_skipped;
         }
 
-        trace!(
+        log::trace!(
             "Eviction loaded stats, total_keys: {}, total_size: {}, absolute: {}",
             self.get_stats_total_keys(),
             self.get_stats_total_raw_size(),
@@ -528,6 +527,9 @@ impl CacheEvictionManager {
                         stats_total_raw_size += extended.raw_size as u64;
                         extended.raw_size
                     } else {
+                        // count keys without size as 1
+                        stats_total_raw_size += 1_u64;
+
                         0
                     };
 
@@ -557,7 +559,11 @@ impl CacheEvictionManager {
     ) -> Result<Vec<(u64, u32)>, CubeError> {
         let eviction_min_ttl_threshold = self.eviction_min_ttl_threshold as i64;
 
-        let batch_to_delete = store
+        let batch_to_delete: Vec<(
+            /* id */ u64,
+            /* weight */ u32,
+            /* raw_size */ u32,
+        )> = store
             .read_operation_out_of_queue(move |db_ref| {
                 let started_date =
                     Utc::now() + chrono::Duration::seconds(eviction_min_ttl_threshold);
@@ -579,7 +585,21 @@ impl CacheEvictionManager {
 
                         (weight, extended.raw_size)
                     } else {
-                        (/* height priority to delete */ 0, 0)
+                        let weight = match criteria {
+                            CacheEvictionWeightCriteria::ByLRU =>
+                            /* height priority to delete */
+                            {
+                                0
+                            }
+                            CacheEvictionWeightCriteria::ByTTL => item.ttl.encode_value_as_u32()?,
+                            CacheEvictionWeightCriteria::ByLFU =>
+                            /* height priority to delete */
+                            {
+                                0
+                            }
+                        };
+
+                        (weight, /* count keys without size as 1 */ 1)
                     };
 
                     if let Some(ttl) = item.ttl {
@@ -596,17 +616,13 @@ impl CacheEvictionManager {
             })
             .await?;
 
-        let ttl_sorted: Vec<(u64, /* weight */ u32, /* raw_size */ u32)> = batch_to_delete
+        let sorted = batch_to_delete
             .into_iter()
             .sorted_by(|(_, a, _), (_, b, _)| a.cmp(b))
-            .collect();
-
-        let mapped = ttl_sorted
-            .into_iter()
             .map(|(id, _weight, raw_size)| (id, raw_size))
             .collect();
 
-        Ok(mapped)
+        Ok(sorted)
     }
 
     async fn do_eviction_by_allkeys(
@@ -718,7 +734,21 @@ impl CacheEvictionManager {
 
                         (weight, extended.raw_size)
                     } else {
-                        (/* height priority to delete */ 0, 0)
+                        let weight = match criteria {
+                            CacheEvictionWeightCriteria::ByLRU =>
+                            /* height priority to delete */
+                            {
+                                0
+                            }
+                            CacheEvictionWeightCriteria::ByTTL => item.ttl.encode_value_as_u32()?,
+                            CacheEvictionWeightCriteria::ByLFU =>
+                            /* height priority to delete */
+                            {
+                                0
+                            }
+                        };
+
+                        (weight, /* count keys without size as 1 */ 1)
                     };
 
                     if let Some((_, min_weight, _)) = sampling_min {
@@ -826,7 +856,7 @@ impl CacheEvictionManager {
     pub async fn run_persist(&self, store: &Arc<RocksStore>) -> Result<(), CubeError> {
         let (to_persist, buffer_len) = {
             let mut ttl_buffer = self.ttl_buffer.write().await;
-            trace!("TTL persisting, buffer len: {}", ttl_buffer.len());
+            log::trace!("TTL persisting, buffer len: {}", ttl_buffer.len());
 
             if ttl_buffer.len() >= self.persist_batch_size {
                 let mut to_persist = HashMap::with_capacity(self.persist_batch_size);
