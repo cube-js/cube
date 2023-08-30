@@ -421,33 +421,51 @@ impl RowKey {
         RowKey::try_from_bytes(bytes).unwrap()
     }
 
-    pub fn to_prefix_bytes(&self) -> Vec<u8> {
-        let mut wtr = Vec::with_capacity(5);
+    pub fn to_iterate_range(&self) -> impl rocksdb::IterateBounds {
+        let mut min = Vec::with_capacity(5);
+        let mut max = Vec::with_capacity(5);
 
         match self {
             RowKey::Table(table_id, _) => {
-                wtr.write_u8(1).unwrap();
-                wtr.write_u32::<BigEndian>(*table_id as u32).unwrap();
+                min.write_u8(1).unwrap();
+                max.write_u8(1).unwrap();
+
+                min.write_u32::<BigEndian>(*table_id as u32).unwrap();
+                max.write_u32::<BigEndian>((*table_id as u32) + 1).unwrap();
             }
             RowKey::Sequence(table_id) => {
-                wtr.write_u8(2).unwrap();
-                wtr.write_u32::<BigEndian>(*table_id as u32).unwrap();
+                min.write_u8(2).unwrap();
+                max.write_u8(2).unwrap();
+
+                min.write_u32::<BigEndian>(*table_id as u32).unwrap();
+                max.write_u32::<BigEndian>((*table_id as u32) + 1).unwrap();
             }
             RowKey::SecondaryIndex(index_id, _, _) => {
-                wtr.write_u8(3).unwrap();
-                wtr.write_u32::<BigEndian>(*index_id as IndexId).unwrap();
+                min.write_u8(3).unwrap();
+                max.write_u8(3).unwrap();
+
+                min.write_u32::<BigEndian>(*index_id as IndexId).unwrap();
+                max.write_u32::<BigEndian>((*index_id as IndexId) + 1)
+                    .unwrap();
             }
             RowKey::SecondaryIndexInfo { index_id } => {
-                wtr.write_u8(4).unwrap();
-                wtr.write_u32::<BigEndian>(*index_id as IndexId).unwrap();
+                min.write_u8(4).unwrap();
+                max.write_u8(4).unwrap();
+
+                min.write_u32::<BigEndian>(*index_id as IndexId).unwrap();
+                max.write_u32::<BigEndian>((*index_id as IndexId) + 1)
+                    .unwrap();
             }
             RowKey::TableInfo { table_id } => {
-                wtr.write_u8(5).unwrap();
-                wtr.write_u32::<BigEndian>(*table_id as u32).unwrap();
+                min.write_u8(5).unwrap();
+                max.write_u8(5).unwrap();
+
+                min.write_u32::<BigEndian>(*table_id as u32).unwrap();
+                max.write_u32::<BigEndian>((*table_id as u32) + 1).unwrap();
             }
         }
 
-        wtr
+        min..max
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {

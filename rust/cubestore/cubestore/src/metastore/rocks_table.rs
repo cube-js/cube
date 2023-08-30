@@ -1318,11 +1318,11 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         let ref db = self.snapshot();
 
         let index_id = RocksSecondaryIndex::get_id(secondary_index);
-        let _key_min = RowKey::SecondaryIndex(Self::index_id(index_id), vec![], 0);
+        let row_key = RowKey::SecondaryIndex(Self::index_id(index_id), vec![], 0);
 
         let mut opts = ReadOptions::default();
         opts.set_prefix_same_as_start(false);
-        opts.set_iterate_range([3, 0, 0, 12, 1]..[3, 0, 0, 12, 2]);
+        opts.set_iterate_range(row_key.to_iterate_range());
 
         let iter = db.iterator_opt(IteratorMode::Start, opts);
 
