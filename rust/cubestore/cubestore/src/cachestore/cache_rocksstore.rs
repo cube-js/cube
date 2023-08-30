@@ -1522,6 +1522,7 @@ mod tests {
                 config.cachestore_cache_max_keys = 512;
                 // 512 * 1.5 = 768
                 config.cachestore_cache_threshold_to_force_eviction = 50;
+                config.cachestore_cache_eviction_below_threshold = 15;
                 config.cachestore_cache_max_size = 16384 << 20;
                 config.cachestore_cache_policy = CacheEvictionPolicy::SampledLru;
 
@@ -1532,7 +1533,10 @@ mod tests {
         )
         .await?;
 
+        // 640 -> 640 - (128 * 1.15 = 147.5) -> 492
         assert_eq!(result.stats_total_keys < 512, true);
+        assert_eq!(result.stats_total_keys > 456, true);
+
         assert_eq!(result.total_keys_removed > 100, true);
         assert_eq!(result.total_keys_removed < 256, true);
 
@@ -1549,6 +1553,7 @@ mod tests {
                 config.cachestore_cache_max_keys = 512;
                 // 512 * 1.5 = 768
                 config.cachestore_cache_threshold_to_force_eviction = 50;
+                config.cachestore_cache_eviction_below_threshold = 15;
                 config.cachestore_cache_max_size = 16384 << 20;
                 config.cachestore_cache_policy = CacheEvictionPolicy::AllKeysLru;
 
@@ -1559,7 +1564,10 @@ mod tests {
         )
         .await?;
 
+        // 640 -> 640 - (128 * 1.15 = 147.5) -> 492
         assert_eq!(result.stats_total_keys < 512, true);
+        assert_eq!(result.stats_total_keys > 456, true);
+
         assert_eq!(result.total_keys_removed > 100, true);
         assert_eq!(result.total_keys_removed < 256, true);
 

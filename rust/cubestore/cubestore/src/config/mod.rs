@@ -1281,7 +1281,7 @@ impl Config {
                 cachestore_cache_max_keys: env_parse("CUBESTORE_CACHE_MAX_KEYS", 100_000),
                 cachestore_cache_policy: env_parse(
                     "CUBESTORE_CACHE_POLICY",
-                    CacheEvictionPolicy::SampledLru,
+                    CacheEvictionPolicy::AllKeysLru,
                 ),
                 cachestore_cache_eviction_batch_size: env_parse(
                     "CUBESTORE_CACHE_EVICTION_BATCH_SIZE",

@@ -358,7 +358,7 @@ impl CacheEvictionManager {
 
     pub async fn run_eviction(&self, store: &Arc<RocksStore>) -> Result<EvictionResult, CubeError> {
         log::debug!(
-            "Eviction started, total_keys: {}, total_size: {}",
+            "Eviction loop, total_keys: {}, total_size: {}",
             self.get_stats_total_keys(),
             humansize::format_size(self.get_stats_total_raw_size(), humansize::DECIMAL)
         );
@@ -634,66 +634,38 @@ impl CacheEvictionManager {
     ) -> Result<EvictionResult, CubeError> {
         let to_evict = self.collect_allkeys_to_evict(criteria, &store).await?;
 
-        let stats_total_keys = self.get_stats_total_keys();
-        let stats_total_raw_size = self.get_stats_total_raw_size();
+        let mut pending_size_removed = 0_u64;
+        let mut pending_keys_removed = 0_u32;
 
-        let mut total_size_removed = 0_u64;
-        let mut total_keys_removed = 0_u32;
-        let mut total_delete_skipped = 0_u32;
-
-        let mut batch = Vec::with_capacity(self.eviction_batch_size);
+        let mut pending = Vec::with_capacity(self.eviction_batch_size);
 
         for (id, raw_size) in to_evict {
-            batch.push((id, raw_size));
+            pending_size_removed += raw_size as u64;
+            pending_keys_removed += 1;
 
-            if batch.len() >= self.eviction_batch_size {
-                let current_batch =
-                    std::mem::replace(&mut batch, Vec::with_capacity(self.eviction_batch_size));
-                let batch_result = self.delete_batch(current_batch, &store).await?;
+            pending.push((id, raw_size));
 
-                total_size_removed += batch_result.deleted_size;
-                total_keys_removed += batch_result.deleted_count;
-                total_delete_skipped += batch_result.skipped;
+            let target_reached = if target_is_size {
+                pending_size_removed >= target
+            } else {
+                pending_keys_removed >= (target as u32)
+            };
 
-                if target_is_size {
-                    if total_size_removed >= target {
-                        return Ok(EvictionResult::Finished(EvictionFinishedResult {
-                            total_keys_removed,
-                            total_size_removed,
-                            total_delete_skipped,
-                            stats_total_keys,
-                            stats_total_raw_size,
-                        }));
-                    }
-                } else {
-                    if total_keys_removed >= target as u32 {
-                        return Ok(EvictionResult::Finished(EvictionFinishedResult {
-                            total_keys_removed,
-                            total_size_removed,
-                            total_delete_skipped,
-                            stats_total_keys,
-                            stats_total_raw_size,
-                        }));
-                    }
-                }
+            if target_reached {
+                let stats = self.delete_items(pending, &store).await?;
+
+                return Ok(EvictionResult::Finished(stats));
             }
         }
 
-        if batch.len() > 0 {
-            let batch_result = self.delete_batch(batch, &store).await?;
+        log::error!("Inconsistency eviction. Unable to reach target on eviction with all keys policy, target: {}", if target_is_size {
+            humansize::format_size(target, humansize::DECIMAL)
+        } else {
+            target.to_string()
+        });
 
-            total_size_removed += batch_result.deleted_size;
-            total_keys_removed += batch_result.deleted_count;
-            total_delete_skipped += batch_result.skipped;
-        }
-
-        return Ok(EvictionResult::Finished(EvictionFinishedResult {
-            total_keys_removed,
-            total_size_removed,
-            total_delete_skipped,
-            stats_total_keys,
-            stats_total_raw_size,
-        }));
+        let stats = self.delete_items(pending, &store).await?;
+        return Ok(EvictionResult::Finished(stats));
     }
 
     async fn do_eviction_by_sampling(
@@ -856,7 +828,7 @@ impl CacheEvictionManager {
     pub async fn run_persist(&self, store: &Arc<RocksStore>) -> Result<(), CubeError> {
         let (to_persist, buffer_len) = {
             let mut ttl_buffer = self.ttl_buffer.write().await;
-            log::trace!("TTL persisting, buffer len: {}", ttl_buffer.len());
+            log::debug!("TTL persisting, len: {}", ttl_buffer.len());
 
             if ttl_buffer.len() >= self.persist_batch_size {
                 let mut to_persist = HashMap::with_capacity(self.persist_batch_size);
