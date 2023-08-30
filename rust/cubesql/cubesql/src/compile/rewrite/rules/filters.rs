@@ -9,9 +9,9 @@ use crate::{
             cube_scan_members, dimension_expr, expr_column_name, filter,
             filter_cast_unwrap_replacer, filter_member, filter_op, filter_op_filters,
             filter_op_filters_empty_tail, filter_replacer, fun_expr, fun_expr_var_arg, inlist_expr,
-            is_not_null_expr, is_null_expr, like_expr, limit, list_expr, literal_bool,
-            literal_expr, literal_int, literal_string, measure_expr, member_name_by_alias,
-            negative_expr, not_expr, projection, rewrite,
+            inlist_expr_list, inlist_expr_list_empty_tail, is_not_null_expr, is_null_expr,
+            like_expr, limit, list_expr, literal_bool, literal_expr, literal_int, literal_string,
+            measure_expr, member_name_by_alias, negative_expr, not_expr, projection, rewrite,
             rewriter::RewriteRules,
             scalar_fun_expr_args, scalar_fun_expr_args_empty_tail, segment_member,
             time_dimension_date_range_replacer, time_dimension_expr, transforming_chain_rewrite,
@@ -2020,6 +2020,11 @@ impl RewriteRules for FilterRules {
                 self.transform_filter_cast_unwrap("?expr", "?data_type"),
             ),
             rewrite(
+                "filter-cast-unwrap-literal",
+                filter_cast_unwrap_replacer(literal_expr("?literal")),
+                literal_expr("?literal"),
+            ),
+            rewrite(
                 "filter-cast-unwrap-binary-push-down",
                 filter_cast_unwrap_replacer(binary_expr("?left", "?op", "?right")),
                 binary_expr(
@@ -2053,8 +2058,24 @@ impl RewriteRules for FilterRules {
             rewrite(
                 "filter-cast-unwrap-inlist-push-down",
                 filter_cast_unwrap_replacer(inlist_expr("?expr", "?list", "?negated")),
-                // TODO unwrap list as well
-                inlist_expr(filter_cast_unwrap_replacer("?expr"), "?list", "?negated"),
+                inlist_expr(
+                    filter_cast_unwrap_replacer("?expr"),
+                    filter_cast_unwrap_replacer("?list"),
+                    "?negated",
+                ),
+            ),
+            rewrite(
+                "filter-cast-unwrap-inlist-expr-push-down",
+                filter_cast_unwrap_replacer(inlist_expr_list("?left", "?right")),
+                inlist_expr_list(
+                    filter_cast_unwrap_replacer("?left"),
+                    filter_cast_unwrap_replacer("?right"),
+                ),
+            ),
+            rewrite(
+                "filter-cast-unwrap-inlist-expr-tail-push-down",
+                filter_cast_unwrap_replacer(inlist_expr_list_empty_tail()),
+                inlist_expr_list_empty_tail(),
             ),
             rewrite(
                 "filter-cast-unwrap-is-null-push-down",

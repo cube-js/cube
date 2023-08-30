@@ -13296,6 +13296,52 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_holistics_where_in_list_cast() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            "SELECT * FROM (
+            SELECT DISTINCT
+              \"public_kibana\".\"customer_gender\" AS \"po_s_cd8bc4\"
+            FROM
+              \"public\".\"KibanaSampleDataEcommerce\" \"public_kibana\"
+            WHERE
+              \"public_kibana\".\"customer_gender\" IN (CAST ( 'male' AS text ), CAST ( 'female' AS text ))
+            LIMIT 100000
+            ) holistics_awesome_table LIMIT 1000000".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        let cube_scan = logical_plan.find_cube_scan();
+
+        assert_eq!(
+            cube_scan.request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                    operator: Some("equals".to_string()),
+                    values: Some(vec!["male".to_string(), "female".to_string()]),
+                    or: None,
+                    and: None,
+                }]),
+                ungrouped: Some(true),
+            }
+        );
+    }
+
+    #[tokio::test]
     async fn test_select_column_with_same_name_as_table() -> Result<(), CubeError> {
         init_logger();
 
