@@ -11,6 +11,7 @@ use crate::util::IntervalLoop;
 use crate::{app_metrics, CubeError};
 use chrono::Utc;
 use datafusion::cube_ext;
+use deepsize::DeepSizeOf;
 use itertools::Itertools;
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -27,7 +28,7 @@ struct CacheLookupEvent {
     key_hash: [u8; 8],
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, DeepSizeOf)]
 pub struct CachePolicyData {
     pub key_hash: [u8; 8],
     pub raw_size: u32,
@@ -828,7 +829,11 @@ impl CacheEvictionManager {
     pub async fn run_persist(&self, store: &Arc<RocksStore>) -> Result<(), CubeError> {
         let (to_persist, buffer_len) = {
             let mut ttl_buffer = self.ttl_buffer.write().await;
-            log::debug!("TTL persisting, len: {}", ttl_buffer.len());
+            log::debug!(
+                "TTL persisting, len: {}, size: {}",
+                ttl_buffer.len(),
+                humansize::format_size(ttl_buffer.deep_size_of(), humansize::DECIMAL)
+            );
 
             if ttl_buffer.len() >= self.persist_batch_size {
                 let mut to_persist = HashMap::with_capacity(self.persist_batch_size);
