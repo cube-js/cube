@@ -899,7 +899,11 @@ impl RocksStore {
             };
 
             if let Err(e) = meta_store_to_move.details.migrate(table_ref) {
-                log::error!("Error during migrating storage: {}", e);
+                log::error!(
+                    "Error during {} migration: {}",
+                    meta_store_to_move.details.get_name(),
+                    e
+                );
             }
         })
         .await?;
