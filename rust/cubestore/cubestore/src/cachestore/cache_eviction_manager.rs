@@ -24,10 +24,15 @@ use tokio::sync::mpsc::error::TrySendError;
 use tokio::sync::RwLockWriteGuard;
 
 #[derive(Debug)]
-struct CacheLookupEvent {
-    row_id: u64,
-    raw_size: u32,
-    key_hash: [u8; 8],
+enum CacheEvent {
+    Lookup {
+        row_id: u64,
+        raw_size: u32,
+        key_hash: [u8; 8],
+    },
+    Delete {
+        row_id: u64,
+    },
 }
 
 #[derive(Debug, Clone, DeepSizeOf)]
@@ -119,7 +124,7 @@ impl FromStr for CacheEvictionPolicy {
 #[derive(Debug)]
 pub struct CacheEvictionManager {
     ttl_buffer: Arc<tokio::sync::RwLock<HashMap<u64, CachePolicyData>>>,
-    ttl_lookup_tx: tokio::sync::mpsc::Sender<CacheLookupEvent>,
+    ttl_event_tx: tokio::sync::mpsc::Sender<CacheEvent>,
     pub persist_loop: Arc<IntervalLoop>,
     pub eviction_loop: Arc<IntervalLoop>,
     // eviction state
@@ -187,18 +192,25 @@ impl CacheEvictionManager {
     pub fn new(config: &Arc<dyn ConfigObj>) -> Self {
         let ttl_buffer: HashMap<u64, CachePolicyData> = HashMap::new();
         let ttl_buffer = Arc::new(tokio::sync::RwLock::new(ttl_buffer));
-        let (ttl_lookup_tx, mut ttl_lookup_rx) = tokio::sync::mpsc::channel::<CacheLookupEvent>(
-            config.cachestore_cache_ttl_notify_channel(),
-        );
+        let (ttl_event_tx, mut ttl_event_rx) =
+            tokio::sync::mpsc::channel::<CacheEvent>(config.cachestore_cache_ttl_notify_channel());
 
         let ttl_buffer_to_move = ttl_buffer.clone();
         let ttl_buffer_max_size = config.cachestore_cache_ttl_buffer_max_size();
 
         let join_handle = cube_ext::spawn_blocking(move || loop {
-            if let Some(event) = ttl_lookup_rx.blocking_recv() {
-                {
+            match ttl_event_rx.blocking_recv() {
+                Some(CacheEvent::Delete { row_id }) => {
                     let mut ttl_buffer = ttl_buffer_to_move.blocking_write();
-                    if let Some(mut cache_data) = ttl_buffer.get_mut(&event.row_id) {
+                    ttl_buffer.remove(&row_id);
+                }
+                Some(CacheEvent::Lookup {
+                    row_id,
+                    key_hash,
+                    raw_size,
+                }) => {
+                    let mut ttl_buffer = ttl_buffer_to_move.blocking_write();
+                    if let Some(mut cache_data) = ttl_buffer.get_mut(&row_id) {
                         let expired_lfu = if let Some(previous_lru) =
                             cache_data.lru.decode_value_as_opt_datetime().unwrap()
                         {
@@ -222,24 +234,25 @@ impl CacheEvictionManager {
                         }
 
                         ttl_buffer.insert(
-                            event.row_id,
+                            row_id,
                             CachePolicyData {
-                                key_hash: event.key_hash,
-                                raw_size: event.raw_size,
+                                key_hash,
+                                raw_size,
                                 lru: Utc::now().encode_value_as_u32().unwrap(),
                                 lfu: 1,
                             },
                         );
                     };
                 }
-            } else {
-                return;
+                None => {
+                    return;
+                }
             }
         });
 
         Self {
             ttl_buffer,
-            ttl_lookup_tx,
+            ttl_event_tx,
             persist_loop: Arc::new(IntervalLoop::new(
                 "Cachestore ttl persist",
                 tokio::time::Duration::from_secs(
@@ -913,31 +926,33 @@ impl CacheEvictionManager {
         Ok(())
     }
 
-    pub fn notify_lookup(&self, id_row: &IdRow<CacheItem>) -> Result<(), CubeError> {
-        let event = CacheLookupEvent {
-            row_id: id_row.get_id(),
-            raw_size: id_row.get_row().get_value().len() as u32,
-            key_hash: CacheItemRocksIndex::ByPath
-                .key_hash(id_row.get_row())
-                .to_be_bytes(),
-        };
-
-        if let Err(ref err) = self.ttl_lookup_tx.try_send(event) {
+    fn send_ttl_event(&self, event: CacheEvent) -> Result<(), CubeError> {
+        if let Err(ref err) = self.ttl_event_tx.try_send(event) {
             match &err {
                 TrySendError::Full(_) => {
                     log::error!(
-                        "Unable to track lookup event for eviction manager: no available capacity"
+                        "Unable to track event for eviction manager: no available capacity"
                     );
 
                     Ok(())
                 }
                 TrySendError::Closed(_) => Err(CubeError::internal(
-                    "Unable to track lookup event for eviction manager: channel closed".to_string(),
+                    "Unable to track event for eviction manager: channel closed".to_string(),
                 )),
             }
         } else {
             Ok(())
         }
+    }
+
+    pub fn notify_lookup(&self, id_row: &IdRow<CacheItem>) -> Result<(), CubeError> {
+        self.send_ttl_event(CacheEvent::Lookup {
+            row_id: id_row.get_id(),
+            raw_size: id_row.get_row().get_value().len() as u32,
+            key_hash: CacheItemRocksIndex::ByPath
+                .key_hash(id_row.get_row())
+                .to_be_bytes(),
+        })
     }
 
     pub fn need_to_evict(&self, row_size: u64) -> bool {
@@ -968,15 +983,12 @@ impl CacheEvictionManager {
         Ok(())
     }
 
-    pub async fn notify_delete(&self, row_id: u64, row_size: u64) -> Result<(), CubeError> {
-        let mut guard = self.ttl_buffer.write().await;
-        guard.remove(&row_id);
-
+    pub fn notify_delete(&self, row_id: u64, row_size: u64) -> Result<(), CubeError> {
         self.stats_total_keys.fetch_sub(1, Ordering::Relaxed);
         self.stats_total_raw_size
             .fetch_sub(row_size, Ordering::Relaxed);
 
-        Ok(())
+        self.send_ttl_event(CacheEvent::Delete { row_id })
     }
 
     async fn start_eviction_state(&self, next_state: EvictionState) -> Result<(), CubeError> {

@@ -753,8 +753,7 @@ impl CacheStore for RocksCacheStore {
 
         if let Some((row_id, raw_size)) = result {
             self.cache_eviction_manager
-                .notify_delete(row_id, raw_size as u64)
-                .await?;
+                .notify_delete(row_id, raw_size as u64)?;
         }
 
         Ok(())
