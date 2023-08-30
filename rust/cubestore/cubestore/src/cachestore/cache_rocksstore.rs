@@ -1483,7 +1483,7 @@ mod tests {
         // 1 load state
         // check limits 3 (3 rounds for sampling)
         for _ in 0..4 {
-            let eviction_results = match cachestore.run_eviction().await? {
+            match cachestore.run_eviction().await? {
                 EvictionResult::InProgress(status) => panic!("unexpected status: {}", status),
                 EvictionResult::Finished(stats) => {
                     result.total_keys_removed += stats.total_keys_removed;
@@ -1576,8 +1576,9 @@ mod tests {
                 .update_config(|mut config| {
                     // 512 as soft
                     config.cachestore_cache_max_keys = 512;
-                    // 512 * 1.5 = 768
-                    config.cachestore_cache_threshold_to_force_eviction = 50;
+                    // 512 * 1.25 = 640
+                    config.cachestore_cache_threshold_to_force_eviction = 25;
+                    config.cachestore_cache_eviction_below_threshold = 15;
                     config.cachestore_cache_max_size = 16384 << 20;
                     config.cachestore_cache_policy = CacheEvictionPolicy::AllKeysLru;
                     // disable periodic eviction, this test should force eviction
@@ -1598,8 +1599,8 @@ mod tests {
             CubeServices::wait_loops(loops).await
         });
 
-        for interval in 0..8 {
-            for i in (0..200).step_by(4) {
+        for interval in 0..10 {
+            for i in (0..300).step_by(4) {
                 let (r1, r2, r3, r4) = tokio::join!(
                     cachestore.cache_set(
                         CacheItem::new(
@@ -1642,20 +1643,22 @@ mod tests {
             }
 
             tokio::time::sleep(Duration::from_millis(500)).await;
+            trace!(
+                "after loop, total keys: {}",
+                cachestore.cache_eviction_manager.get_stats_total_keys()
+            );
+            assert_eq!(
+                cachestore.cache_eviction_manager.get_stats_total_keys() < 640,
+                true
+            );
+            assert_eq!(
+                cachestore.cache_eviction_manager.get_stats_total_keys() >= 300,
+                true
+            );
         }
 
-        tokio::time::sleep(Duration::from_millis(1000)).await;
-        trace!(
-            "total keys: {}",
-            cachestore.cache_eviction_manager.get_stats_total_keys()
-        );
-
         assert_eq!(
-            cachestore.cache_eviction_manager.get_stats_total_keys() < 512,
-            true
-        );
-        assert_eq!(
-            cachestore.cache_eviction_manager.get_stats_total_keys() > 300,
+            cachestore.cache_eviction_manager.get_stats_total_keys() > 400,
             true
         );
 
