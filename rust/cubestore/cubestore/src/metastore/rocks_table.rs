@@ -174,7 +174,8 @@ pub trait RocksSecondaryIndex<T, K: Hash>: BaseRocksSecondaryIndex<T> {
                     expire,
                     RocksSecondaryIndexValueTTLExtended {
                         lfu: 0,
-                        lru: None,
+                        // Setup currect time as a protection for LRU eviction
+                        lru: Some(Utc::now()),
                         raw_size: self.raw_value_size(row),
                     },
                 )
