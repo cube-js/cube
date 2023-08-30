@@ -176,6 +176,7 @@ impl CacheEvictionManager {
         );
 
         let ttl_buffer_to_move = ttl_buffer.clone();
+        let ttl_buffer_max_size = config.cachestore_cache_ttl_buffer_max_size();
 
         let join_handle = cube_ext::spawn_blocking(move || loop {
             if let Some(event) = ttl_lookup_rx.blocking_recv() {
@@ -200,6 +201,10 @@ impl CacheEvictionManager {
                             }
                         }
                     } else {
+                        if ttl_buffer.len() >= ttl_buffer_max_size {
+                            continue;
+                        }
+
                         ttl_buffer.insert(
                             event.row_id,
                             CachePolicyData {

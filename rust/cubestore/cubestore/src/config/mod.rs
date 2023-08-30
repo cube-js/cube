@@ -451,6 +451,8 @@ pub trait ConfigObj: DIService {
 
     fn cachestore_cache_ttl_notify_channel(&self) -> usize;
 
+    fn cachestore_cache_ttl_buffer_max_size(&self) -> usize;
+
     fn cachestore_queue_results_expire(&self) -> u64;
 
     fn cachestore_metrics_interval(&self) -> u64;
@@ -581,6 +583,7 @@ pub struct ConfigObjImpl {
     pub cachestore_cache_persist_batch_size: usize,
     pub cachestore_cache_eviction_min_ttl_threshold: u32,
     pub cachestore_cache_ttl_notify_channel: usize,
+    pub cachestore_cache_ttl_buffer_max_size: usize,
     pub upload_concurrency: u64,
     pub download_concurrency: u64,
     pub connection_timeout: u64,
@@ -803,6 +806,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn cachestore_cache_ttl_notify_channel(&self) -> usize {
         self.cachestore_cache_ttl_notify_channel
+    }
+
+    fn cachestore_cache_ttl_buffer_max_size(&self) -> usize {
+        self.cachestore_cache_ttl_buffer_max_size
     }
 
     fn cachestore_queue_results_expire(&self) -> u64 {
@@ -1295,6 +1302,10 @@ impl Config {
                     "CUBESTORE_CACHE_TTL_NOTIFY_CHANNEL",
                     4_096,
                 ),
+                cachestore_cache_ttl_buffer_max_size: env_parse(
+                    "CUBESTORE_CACHE_TTL_BUFFER_MAX_SIZE",
+                    16_384,
+                ),
                 upload_concurrency: env_parse("CUBESTORE_MAX_ACTIVE_UPLOADS", 4),
                 download_concurrency: env_parse("CUBESTORE_MAX_ACTIVE_DOWNLOADS", 8),
                 max_ingestion_data_frames: env_parse("CUBESTORE_MAX_DATA_FRAMES", 4),
@@ -1474,6 +1485,7 @@ impl Config {
                 cachestore_cache_persist_batch_size: 200,
                 cachestore_cache_eviction_min_ttl_threshold: 5,
                 cachestore_cache_ttl_notify_channel: 4_096,
+                cachestore_cache_ttl_buffer_max_size: 16_384,
                 upload_concurrency: 4,
                 download_concurrency: 8,
                 max_ingestion_data_frames: 4,
