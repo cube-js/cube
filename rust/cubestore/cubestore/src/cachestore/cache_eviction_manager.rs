@@ -573,22 +573,29 @@ impl CacheEvictionManager {
     ) -> Result<Vec<(u64, u32)>, CubeError> {
         let eviction_min_ttl_threshold = self.eviction_min_ttl_threshold as i64;
 
-        let batch_to_delete: Vec<(
-            /* id */ u64,
-            /* weight */ u32,
-            /* raw_size */ u32,
-        )> = store
+        let (all_keys, stats_total_keys, stats_total_raw_size) = store
             .read_operation_out_of_queue(move |db_ref| {
-                let started_date =
-                    Utc::now() + chrono::Duration::seconds(eviction_min_ttl_threshold);
+                let mut stats_total_keys: u32 = 0;
+                let mut stats_total_raw_size: u64 = 0;
 
                 let cache_schema = CacheItemRocksTable::new(db_ref.clone());
-                let mut result = Vec::new();
+
+                let started_date =
+                    Utc::now() + chrono::Duration::seconds(eviction_min_ttl_threshold);
+                let mut result: Vec<(
+                    /* id */ u64,
+                    /* weight */ u32,
+                    /* raw_size */ u32,
+                )> = Vec::new();
 
                 for item in cache_schema.scan_index_values(&CacheItemRocksIndex::ByPath)? {
                     let item = item?;
 
+                    stats_total_keys += 1;
+
                     let (weight, raw_size) = if let Some(extended) = item.extended {
+                        stats_total_raw_size += extended.raw_size as u64;
+
                         let weight = match criteria {
                             CacheEvictionWeightCriteria::ByLRU => {
                                 extended.lru.encode_value_as_u32()?
@@ -599,6 +606,9 @@ impl CacheEvictionManager {
 
                         (weight, extended.raw_size)
                     } else {
+                        // count keys without size as 1
+                        stats_total_raw_size += 1_u64;
+
                         let weight = match criteria {
                             CacheEvictionWeightCriteria::ByLRU =>
                             /* height priority to delete */
@@ -626,11 +636,16 @@ impl CacheEvictionManager {
                     result.push((item.row_id, weight, raw_size))
                 }
 
-                Ok(result)
+                Ok((result, stats_total_keys, stats_total_raw_size))
             })
             .await?;
 
-        let sorted = batch_to_delete
+        self.stats_total_keys
+            .store(stats_total_keys, Ordering::Release);
+        self.stats_total_raw_size
+            .store(stats_total_raw_size, Ordering::Release);
+
+        let sorted = all_keys
             .into_iter()
             .sorted_by(|(_, a, _), (_, b, _)| a.cmp(b))
             .map(|(id, _weight, raw_size)| (id, raw_size))
