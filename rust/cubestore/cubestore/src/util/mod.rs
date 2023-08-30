@@ -176,6 +176,7 @@ impl IntervalLoop {
 mod tests {
     use super::*;
     use crate::CubeError;
+    use tokio::time::Duration;
 
     #[tokio::test]
     async fn test_interval_loop_trigger_process() -> Result<(), CubeError> {
@@ -214,12 +215,12 @@ mod tests {
         });
 
         wl.trigger_process();
-        tokio::time::sleep(Duration::from_millis(500)).await;
+        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
         assert_eq!(service.get_counter().await, 1);
 
         wl.trigger_process();
-        tokio::time::sleep(Duration::from_millis(500)).await;
+        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
         assert_eq!(service.get_counter().await, 2);
 
