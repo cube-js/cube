@@ -415,14 +415,15 @@ impl CacheEvictionManager {
     }
 
     async fn do_eviction(&self, store: &Arc<RocksStore>) -> Result<EvictionResult, CubeError> {
-        let eviction_fut = if self.get_stats_total_keys() > self.limit_max_keys_soft {
-            let need_to_evict = (self.get_stats_total_keys() - self.limit_max_keys_soft) as u64;
+        let stats_total_keys = self.get_stats_total_keys();
+        let eviction_fut = if stats_total_keys > self.limit_max_keys_soft {
+            let need_to_evict = (stats_total_keys - self.limit_max_keys_soft) as u64;
             let target =
                 need_to_evict + calc_percentage(need_to_evict, self.eviction_below_threshold);
 
             trace!(
                 "Max keys limit eviction: {} > {}, need to evict: {}, threshold: {}, target: {}",
-                self.get_stats_total_keys(),
+                stats_total_keys,
                 self.limit_max_keys_soft,
                 need_to_evict,
                 self.eviction_below_threshold,
@@ -430,31 +431,34 @@ impl CacheEvictionManager {
             );
 
             self.do_eviction_by(&store, target, false)
-        } else if self.get_stats_total_raw_size() > self.limit_max_size_soft {
-            let need_to_evict = (self.get_stats_total_raw_size() - self.limit_max_size_soft) as u64;
-            let target =
-                need_to_evict + calc_percentage(need_to_evict, self.eviction_below_threshold);
+        } else {
+            let stats_total_raw_siz = self.get_stats_total_raw_size();
+            if stats_total_raw_siz > self.limit_max_size_soft {
+                let need_to_evict = (stats_total_raw_siz - self.limit_max_size_soft) as u64;
+                let target =
+                    need_to_evict + calc_percentage(need_to_evict, self.eviction_below_threshold);
 
-            trace!(
+                trace!(
                 "Max size limit eviction: {} > {}, need to evict: {}, threshold: {}, target: {}",
-                self.get_stats_total_raw_size(),
+                stats_total_raw_siz,
                 self.limit_max_size_soft,
                 need_to_evict,
                 self.eviction_below_threshold,
                 target
             );
 
-            self.do_eviction_by(&store, target, true)
-        } else {
-            trace!("Nothing to evict");
+                self.do_eviction_by(&store, target, true)
+            } else {
+                trace!("Nothing to evict");
 
-            return Ok(EvictionResult::Finished(EvictionFinishedResult {
-                total_keys_removed: 0,
-                total_size_removed: 0,
-                total_delete_skipped: 0,
-                stats_total_keys: self.get_stats_total_keys(),
-                stats_total_raw_size: self.get_stats_total_raw_size(),
-            }));
+                return Ok(EvictionResult::Finished(EvictionFinishedResult {
+                    total_keys_removed: 0,
+                    total_size_removed: 0,
+                    total_delete_skipped: 0,
+                    stats_total_keys: self.get_stats_total_keys(),
+                    stats_total_raw_size: self.get_stats_total_raw_size(),
+                }));
+            }
         };
 
         let result = eviction_fut.await?;
