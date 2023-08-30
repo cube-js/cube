@@ -885,7 +885,7 @@ impl CacheEvictionManager {
         Ok(())
     }
 
-    pub async fn notify_lookup(&self, id_row: &IdRow<CacheItem>) -> Result<(), CubeError> {
+    pub fn notify_lookup(&self, id_row: &IdRow<CacheItem>) -> Result<(), CubeError> {
         let event = CacheLookupEvent {
             row_id: id_row.get_id(),
             raw_size: id_row.get_row().get_value().len() as u32,

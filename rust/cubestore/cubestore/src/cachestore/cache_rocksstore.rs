@@ -774,7 +774,7 @@ impl CacheStore for RocksCacheStore {
             .await?;
 
         if let Some(item) = &res {
-            self.cache_eviction_manager.notify_lookup(item).await?;
+            self.cache_eviction_manager.notify_lookup(item)?;
         };
 
         Ok(res)
@@ -795,7 +795,8 @@ impl CacheStore for RocksCacheStore {
     }
 
     async fn cache_incr(&self, path: String) -> Result<IdRow<CacheItem>, CubeError> {
-        self.store
+        let item = self
+            .store
             .write_operation(move |db_ref, batch_pipe| {
                 let cache_schema = CacheItemRocksTable::new(db_ref.clone());
                 let index_key = CacheItemIndexKey::ByPath(path.clone());
@@ -815,7 +816,11 @@ impl CacheStore for RocksCacheStore {
                     cache_schema.insert(item, batch_pipe)
                 }
             })
-            .await
+            .await?;
+
+        self.cache_eviction_manager.notify_lookup(&item)?;
+
+        Ok(item)
     }
 
     async fn queue_all(&self, limit: Option<usize>) -> Result<Vec<IdRow<QueueItem>>, CubeError> {
