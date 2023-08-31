@@ -1,3 +1,4 @@
+use regex::Regex;
 use std::collections::HashMap;
 
 use sqlparser::{
@@ -61,6 +62,10 @@ pub fn parse_sql_to_statements(
     let query = query.replace("SIGNED INTEGER", "bigint");
     let query = query.replace("unsigned integer", "bigint");
     let query = query.replace("UNSIGNED INTEGER", "bigint");
+
+    // Tableau
+    let re = Regex::new(r"CAST\((\S+) AS TEXT\)").unwrap();
+    let query = re.replace_all(&*query, "$1").to_string();
 
     // DBEver
     let query = query.replace(
