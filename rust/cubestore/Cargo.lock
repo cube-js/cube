@@ -1252,7 +1252,7 @@ dependencies = [
  "humansize",
  "indoc",
  "ipc-channel",
- "itertools 0.9.0",
+ "itertools 0.11.0",
  "json",
  "lazy_static",
  "libc",
@@ -1285,7 +1285,7 @@ dependencies = [
  "serde_json",
  "serde_repr",
  "simple_logger",
- "smallvec 1.8.0",
+ "smallvec 1.11.0",
  "sqlparser",
  "tarpc",
  "tempfile",
@@ -1363,7 +1363,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "sha2 0.9.5",
- "smallvec 1.8.0",
+ "smallvec 1.11.0",
  "sqlparser",
  "tokio 1.18.1",
  "tokio-stream",
@@ -1633,7 +1633,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ef4c5738bcd7fad10315029c50026f83c9da5e4a21f8ed66826f43e0e2bde5f6"
 dependencies = [
  "bitflags",
- "smallvec 1.8.0",
+ "smallvec 1.11.0",
  "thiserror",
 ]
 
@@ -2320,6 +2320,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "itertools"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b1c173a5686ce8bfa551b3563d0c2170bf24ca44da99c7ca4bfdab5418c3fe57"
+dependencies = [
+ "either",
+]
+
+[[package]]
 name = "itoa"
 version = "0.4.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2736,7 +2745,7 @@ dependencies = [
  "quanta",
  "scheduled-thread-pool",
  "skeptic",
- "smallvec 1.8.0",
+ "smallvec 1.11.0",
  "tagptr",
  "thiserror",
  "triomphe",
@@ -2762,7 +2771,7 @@ dependencies = [
  "rustc_version 0.4.0",
  "scheduled-thread-pool",
  "skeptic",
- "smallvec 1.8.0",
+ "smallvec 1.11.0",
  "tagptr",
  "thiserror",
  "triomphe",
@@ -3317,7 +3326,7 @@ dependencies = [
  "cfg-if 1.0.0",
  "libc",
  "redox_syscall 0.2.10",
- "smallvec 1.8.0",
+ "smallvec 1.11.0",
  "windows-sys 0.36.1",
 ]
 
@@ -4619,9 +4628,9 @@ dependencies = [
 
 [[package]]
 name = "smallvec"
-version = "1.8.0"
+version = "1.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f2dd574626839106c320a323308629dcb1acfc96e32a8cba364ddc61ac23ee83"
+checksum = "62bb4feee49fdd9f707ef802e22365a35de4b7b299de4763d44bfea899442ff9"
 
 [[package]]
 name = "snap"

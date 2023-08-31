@@ -3,7 +3,8 @@ pub mod injection;
 pub mod processing_loop;
 
 use crate::cachestore::{
-    CacheStore, CacheStoreSchedulerImpl, ClusterCacheStoreClient, LazyRocksCacheStore,
+    CacheEvictionPolicy, CacheStore, CacheStoreSchedulerImpl, ClusterCacheStoreClient,
+    LazyRocksCacheStore,
 };
 use crate::cluster::rate_limiter::{BasicProcessRateLimiter, ProcessRateLimiter};
 use crate::cluster::transport::{
@@ -90,7 +91,7 @@ impl CubeServices {
         Self::wait_loops(self.spawn_processing_loops().await?).await
     }
 
-    async fn wait_loops(loops: Vec<LoopHandle>) -> Result<(), CubeError> {
+    pub async fn wait_loops(loops: Vec<LoopHandle>) -> Result<(), CubeError> {
         join_all(loops)
             .await
             .into_iter()
@@ -428,6 +429,30 @@ pub trait ConfigObj: DIService {
 
     fn cachestore_gc_loop_interval(&self) -> u64;
 
+    fn cachestore_cache_eviction_loop_interval(&self) -> u64;
+
+    fn cachestore_cache_ttl_persist_loop_interval(&self) -> u64;
+
+    fn cachestore_cache_threshold_to_force_eviction(&self) -> u8;
+
+    fn cachestore_cache_max_size(&self) -> u64;
+
+    fn cachestore_cache_max_keys(&self) -> u32;
+
+    fn cachestore_cache_eviction_policy(&self) -> CacheEvictionPolicy;
+
+    fn cachestore_cache_eviction_batch_size(&self) -> usize;
+
+    fn cachestore_cache_eviction_below_threshold(&self) -> u8;
+
+    fn cachestore_cache_persist_batch_size(&self) -> usize;
+
+    fn cachestore_cache_eviction_min_ttl_threshold(&self) -> u32;
+
+    fn cachestore_cache_ttl_notify_channel(&self) -> usize;
+
+    fn cachestore_cache_ttl_buffer_max_size(&self) -> usize;
+
     fn cachestore_queue_results_expire(&self) -> u64;
 
     fn cachestore_metrics_interval(&self) -> u64;
@@ -545,8 +570,20 @@ pub struct ConfigObjImpl {
     pub metastore_rocks_store_config: RocksStoreConfig,
     pub cachestore_rocks_store_config: RocksStoreConfig,
     pub cachestore_gc_loop_interval: u64,
+    pub cachestore_cache_eviction_loop_interval: u64,
+    pub cachestore_cache_ttl_persist_loop_interval: u64,
+    pub cachestore_cache_max_size: u64,
+    pub cachestore_cache_threshold_to_force_eviction: u8,
     pub cachestore_queue_results_expire: u64,
     pub cachestore_metrics_interval: u64,
+    pub cachestore_cache_max_keys: u32,
+    pub cachestore_cache_policy: CacheEvictionPolicy,
+    pub cachestore_cache_eviction_batch_size: usize,
+    pub cachestore_cache_eviction_below_threshold: u8,
+    pub cachestore_cache_persist_batch_size: usize,
+    pub cachestore_cache_eviction_min_ttl_threshold: u32,
+    pub cachestore_cache_ttl_notify_channel: usize,
+    pub cachestore_cache_ttl_buffer_max_size: usize,
     pub upload_concurrency: u64,
     pub download_concurrency: u64,
     pub connection_timeout: u64,
@@ -731,6 +768,50 @@ impl ConfigObj for ConfigObjImpl {
         self.cachestore_gc_loop_interval
     }
 
+    fn cachestore_cache_eviction_loop_interval(&self) -> u64 {
+        self.cachestore_cache_eviction_loop_interval
+    }
+
+    fn cachestore_cache_ttl_persist_loop_interval(&self) -> u64 {
+        self.cachestore_cache_ttl_persist_loop_interval
+    }
+
+    fn cachestore_cache_max_size(&self) -> u64 {
+        self.cachestore_cache_max_size
+    }
+
+    fn cachestore_cache_threshold_to_force_eviction(&self) -> u8 {
+        self.cachestore_cache_threshold_to_force_eviction
+    }
+
+    fn cachestore_cache_max_keys(&self) -> u32 {
+        self.cachestore_cache_max_keys
+    }
+
+    fn cachestore_cache_eviction_policy(&self) -> CacheEvictionPolicy {
+        self.cachestore_cache_policy.clone()
+    }
+
+    fn cachestore_cache_eviction_batch_size(&self) -> usize {
+        self.cachestore_cache_eviction_batch_size
+    }
+
+    fn cachestore_cache_persist_batch_size(&self) -> usize {
+        self.cachestore_cache_persist_batch_size
+    }
+
+    fn cachestore_cache_eviction_min_ttl_threshold(&self) -> u32 {
+        self.cachestore_cache_eviction_min_ttl_threshold
+    }
+
+    fn cachestore_cache_ttl_notify_channel(&self) -> usize {
+        self.cachestore_cache_ttl_notify_channel
+    }
+
+    fn cachestore_cache_ttl_buffer_max_size(&self) -> usize {
+        self.cachestore_cache_ttl_buffer_max_size
+    }
+
     fn cachestore_queue_results_expire(&self) -> u64 {
         self.cachestore_queue_results_expire
     }
@@ -758,15 +839,12 @@ impl ConfigObj for ConfigObjImpl {
     fn server_name(&self) -> &String {
         &self.server_name
     }
-
     fn max_ingestion_data_frames(&self) -> usize {
         self.max_ingestion_data_frames
     }
-
     fn upload_to_remote(&self) -> bool {
         self.upload_to_remote
     }
-
     fn enable_topk(&self) -> bool {
         self.enable_topk
     }
@@ -787,15 +865,19 @@ impl ConfigObj for ConfigObjImpl {
     fn query_cache_time_to_idle_secs(&self) -> Option<u64> {
         self.query_cache_time_to_idle_secs
     }
+
     fn metadata_cache_max_capacity_bytes(&self) -> u64 {
         self.metadata_cache_max_capacity_bytes
     }
+
     fn metadata_cache_time_to_idle_secs(&self) -> u64 {
         self.metadata_cache_time_to_idle_secs
     }
+
     fn stream_replay_check_interval_secs(&self) -> u64 {
         self.stream_replay_check_interval_secs
     }
+
     fn check_ws_orphaned_messages_interval_secs(&self) -> u64 {
         self.check_ws_orphaned_messages_interval_secs
     }
@@ -874,6 +956,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn remote_files_cleanup_batch_size(&self) -> u64 {
         self.remote_files_cleanup_batch_size
+    }
+
+    fn cachestore_cache_eviction_below_threshold(&self) -> u8 {
+        self.cachestore_cache_eviction_below_threshold
     }
 }
 
@@ -1154,6 +1240,31 @@ impl Config {
                     Some(60 * 1),
                     Some(1),
                 ),
+                cachestore_cache_eviction_loop_interval: env_parse_duration(
+                    "CUBESTORE_CACHE_EVICTION_LOOP",
+                    60,
+                    // 2 h
+                    Some(2 * 60 * 60),
+                    // 0 to disable
+                    Some(1),
+                ),
+                cachestore_cache_ttl_persist_loop_interval: env_parse_duration(
+                    "CUBESTORE_CACHE_TTL_PERSIST_LOOP",
+                    15,
+                    // 5m
+                    Some(5 * 60),
+                    // 0 to disable
+                    Some(0),
+                ),
+                cachestore_cache_max_size: env_parse_size(
+                    "CUBESTORE_CACHE_MAX_SIZE",
+                    4096 << 20,
+                    // 16384 mb
+                    Some(16384 << 20),
+                    // 32 mb
+                    Some(32 << 20),
+                ) as u64,
+                cachestore_cache_threshold_to_force_eviction: 25,
                 cachestore_queue_results_expire: env_parse_duration(
                     "CUBESTORE_QUEUE_RESULTS_EXPIRE",
                     60,
@@ -1166,6 +1277,34 @@ impl Config {
                     15,
                     Some(60 * 10),
                     Some(0),
+                ),
+                cachestore_cache_max_keys: env_parse("CUBESTORE_CACHE_MAX_KEYS", 100_000),
+                cachestore_cache_policy: env_parse(
+                    "CUBESTORE_CACHE_POLICY",
+                    CacheEvictionPolicy::AllKeysLru,
+                ),
+                cachestore_cache_eviction_batch_size: env_parse(
+                    "CUBESTORE_CACHE_EVICTION_BATCH_SIZE",
+                    150,
+                ),
+                cachestore_cache_eviction_below_threshold: 15,
+                cachestore_cache_persist_batch_size: env_parse(
+                    "CUBESTORE_CACHE_PERSIST_BATCH_SIZE",
+                    150,
+                ),
+                cachestore_cache_eviction_min_ttl_threshold: env_parse_duration(
+                    "CUBESTORE_CACHE_EVICTION_TTL_THRESHOLD",
+                    5,
+                    Some(5 * 60),
+                    Some(0),
+                ),
+                cachestore_cache_ttl_notify_channel: env_parse(
+                    "CUBESTORE_CACHE_TTL_NOTIFY_CHANNEL",
+                    4_096,
+                ),
+                cachestore_cache_ttl_buffer_max_size: env_parse(
+                    "CUBESTORE_CACHE_TTL_BUFFER_MAX_SIZE",
+                    16_384,
                 ),
                 upload_concurrency: env_parse("CUBESTORE_MAX_ACTIVE_UPLOADS", 4),
                 download_concurrency: env_parse("CUBESTORE_MAX_ACTIVE_DOWNLOADS", 8),
@@ -1333,8 +1472,20 @@ impl Config {
                 metastore_rocks_store_config: RocksStoreConfig::metastore_default(),
                 cachestore_rocks_store_config: RocksStoreConfig::cachestore_default(),
                 cachestore_gc_loop_interval: 30,
+                cachestore_cache_eviction_loop_interval: 60,
+                cachestore_cache_ttl_persist_loop_interval: 15,
+                cachestore_cache_max_size: 4096 << 32,
+                cachestore_cache_threshold_to_force_eviction: 25,
                 cachestore_queue_results_expire: 90,
                 cachestore_metrics_interval: 15,
+                cachestore_cache_max_keys: 100_000,
+                cachestore_cache_policy: CacheEvictionPolicy::SampledLru,
+                cachestore_cache_eviction_batch_size: 150,
+                cachestore_cache_eviction_below_threshold: 15,
+                cachestore_cache_persist_batch_size: 200,
+                cachestore_cache_eviction_min_ttl_threshold: 5,
+                cachestore_cache_ttl_notify_channel: 4_096,
+                cachestore_cache_ttl_buffer_max_size: 16_384,
                 upload_concurrency: 4,
                 download_concurrency: 8,
                 max_ingestion_data_frames: 4,

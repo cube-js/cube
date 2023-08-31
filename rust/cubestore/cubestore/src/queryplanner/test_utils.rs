@@ -875,6 +875,14 @@ impl CacheStore for CacheStoreMock {
         panic!("CacheStore mock!")
     }
 
+    async fn eviction(&self) -> Result<crate::cachestore::EvictionResult, CubeError> {
+        panic!("CacheStore mock!")
+    }
+
+    async fn persist(&self) -> Result<(), CubeError> {
+        panic!("CacheStore mock!")
+    }
+
     async fn healthcheck(&self) -> Result<(), CubeError> {
         panic!("CacheStore mock!")
     }

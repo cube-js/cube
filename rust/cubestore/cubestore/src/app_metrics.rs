@@ -24,7 +24,6 @@ pub static CACHE_QUERY_TIME_MS: Histogram = metrics::histogram("cs.sql.query.cac
 /// Incoming queue queries.
 pub static QUEUE_QUERIES: Counter = metrics::counter("cs.sql.query.queue");
 pub static QUEUE_QUERY_TIME_MS: Histogram = metrics::histogram("cs.sql.query.queue.ms");
-
 pub static STREAMING_ROWS_READ: Counter = metrics::counter("cs.streaming.rows");
 pub static STREAMING_CHUNKS_READ: Counter = metrics::counter("cs.streaming.chunks");
 pub static STREAMING_LASTOFFSET: Gauge = metrics::gauge("cs.streaming.lastoffset");
@@ -68,3 +67,12 @@ pub static REMOTE_FS_OPERATION_CORE: Counter = metrics::counter("cs.remote_fs.op
 pub static REMOTE_FS_FILES_TO_REMOVE: Gauge = metrics::gauge("cs.remote_fs.files_to_remove.count");
 pub static REMOTE_FS_FILES_SIZE_TO_REMOVE: Gauge =
     metrics::gauge("cs.remote_fs.files_to_remove.size");
+
+/// Cache Store Cache
+pub static CACHESTORE_TTL_PERSIST: Counter = metrics::counter("cs.cachestore.ttl.persist");
+pub static CACHESTORE_TTL_BUFFER: Gauge = metrics::gauge("cs.cachestore.ttl.buffer");
+// Cache Store Eviction
+pub static CACHESTORE_EVICTION_REMOVED_KEYS: Counter =
+    metrics::counter("cs.cachestore.eviction.removed.keys");
+pub static CACHESTORE_EVICTION_REMOVED_SIZE: Counter =
+    metrics::counter("cs.cachestore.eviction.removed.size");
