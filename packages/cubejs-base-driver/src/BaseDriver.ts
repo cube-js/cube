@@ -318,18 +318,19 @@ export abstract class BaseDriver implements DriverInterface {
     return this.query<QuerySchemasResult>(query);
   }
 
-  public getTablesForSpecificSchemas(schemaNames?: string[]) {
-    if (!schemaNames) {
-      throw new Error('getTables without schemaNames is not supported');
+  public getTablesForSpecificSchemas(schemas?: QuerySchemasResult[]) {
+    if (!schemas) {
+      throw new Error('getTables without schemas is not supported');
     }
 
-    const schemas = schemaNames.map((_, idx) => this.param(idx)).join(', ');
+    const schemasPlaceholders = schemas.map((_, idx) => this.param(idx)).join(', ');
+    const schemaNames = schemas.map(s => s.schema_name);
 
     const query = `
       SELECT table_schema as ${this.quoteIdentifier('schema_name')},
             table_name as ${this.quoteIdentifier('table_name')}
       FROM information_schema.tables
-      WHERE table_schema IN (${schemas})
+      WHERE table_schema IN (${schemasPlaceholders})
     `;
     return this.query<QueryTablesResult>(query, schemaNames);
   }

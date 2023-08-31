@@ -117,8 +117,8 @@ export class DevServer {
     }));
 
     app.post('/playground/list-tables', catchErrors(async (req, res) => {
-      if (!req.body.schemaNames) {
-        throw new Error('schemaNames parameter is required');
+      if (!req.body.schemas) {
+        throw new Error('schemas parameter is required');
       }
 
       this.cubejsServer.event('Dev Server List Tables');
@@ -129,7 +129,7 @@ export class DevServer {
         requestId: getRequestIdFromRequest(req),
       });
 
-      const tables = await driver.getTablesForSpecificSchemas(req.body.schemaNames);
+      const tables = await driver.getTablesForSpecificSchemas(req.body.schemas);
       res.json({ tables });
     }));
 

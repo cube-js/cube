@@ -189,7 +189,7 @@ export interface DriverInterface {
   queryColumnTypes: (sql: string, params?: unknown[]) => Promise<{ name: any; type: string; }[]>;
   //
   getSchemas: () => Promise<QuerySchemasResult[]>;
-  getTablesForSpecificSchemas: (schemaNames: string[]) => Promise<QueryTablesResult[]>;
+  getTablesForSpecificSchemas: (schemas: QuerySchemasResult[]) => Promise<QueryTablesResult[]>;
   getColumnsForSpecificTables: (tables: QueryTablesResult[]) => Promise<QueryColumnsResult[]>;
   // eslint-disable-next-line camelcase
   getTablesQuery: (schemaName: string) => Promise<TableQueryResult[]>;
