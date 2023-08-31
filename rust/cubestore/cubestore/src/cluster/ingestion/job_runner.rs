@@ -1,7 +1,6 @@
-use crate::config::{Config, ConfigObj};
+use crate::config::ConfigObj;
 use crate::metastore::{
-    deactivate_table_on_corrupt_data, Chunk, IdRow, MetaStore, MetaStoreEvent, Partition, RowKey,
-    TableId,
+    IdRow, MetaStore, RowKey, TableId,
 };
 use crate::metastore::job::{Job, JobStatus, JobType};
 use crate::import::ImportService;
@@ -19,8 +18,8 @@ use futures_timer::Delay;
 use std::time::Duration;
 use crate::CubeError;
 use std::sync::Arc;
-use log::{debug, error, info, warn};
-use tokio::sync::{oneshot, watch, Notify, RwLock};
+use log::{debug, error, info};
+use tokio::sync::{oneshot, Notify};
 use core::mem;
 use datafusion::cube_ext;
 use crate::cluster::ingestion::job_processor::JobProcessor;
@@ -36,7 +35,7 @@ pub struct JobRunner {
     pub notify: Arc<Notify>,
     pub stop_token: CancellationToken,
     pub is_long_term: bool,
-    pub job_processor: Arc<JobProcessor>,
+    pub job_processor: Arc<dyn JobProcessor>,
 }
 
 impl JobRunner {
@@ -199,7 +198,6 @@ impl JobRunner {
             }
             JobType::PartitionCompaction => {
                 if let RowKey::Table(TableId::Partitions, partition_id) = job.row_reference() {
-                    let compaction_service = self.compaction_service.clone();
                     let partition_id = *partition_id;
                     let process_rate_limiter = self.process_rate_limiter.clone();
                     let timeout = Some(Duration::from_secs(self.config_obj.import_job_timeout()));
@@ -220,7 +218,6 @@ impl JobRunner {
                             trace_obj,
                         };
 
-                        let data_loaded_size = DataLoadedSize::new();
                         let res = job_processor.process_job(job_to_move).await;
                         if let Ok(job_res) = res {
                             process_rate_limiter

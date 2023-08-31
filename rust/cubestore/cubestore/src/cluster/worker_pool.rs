@@ -54,6 +54,7 @@ pub trait MessageProcessor<
 >
 {
     async fn process(config: &Config, args: T) -> Result<R, CubeError>;
+    fn process_titile() -> String;
 }
 
 impl<
@@ -62,7 +63,7 @@ impl<
         P: MessageProcessor<T, R> + Sync + Send + 'static,
     > WorkerPool<T, R, P>
 {
-    pub fn new(num: usize, timeout: Duration) -> WorkerPool<T, R, P> {
+    pub fn new(num: usize, timeout: Duration, name_prefix: &str, envs: Vec<(String, String)>) -> WorkerPool<T, R, P> {
         let queue = Arc::new(unlimited::Queue::new());
         let (stopped_tx, stopped_rx) = watch::channel(false);
 
@@ -70,7 +71,8 @@ impl<
 
         for i in 1..=num {
             let process = Arc::new(WorkerProcess::<T, R, P>::new(
-                format!("sel{}", i),
+                format!("{}{}", name_prefix,  i),
+                envs.clone(),
                 queue.clone(),
                 timeout.clone(),
                 stopped_rx.clone(),
@@ -87,7 +89,6 @@ impl<
     }
 
     pub async fn wait_processing_loops(&self) {
-        println!("FFFFFFFF");
         let futures = self
             .workers
             .iter()
@@ -148,6 +149,7 @@ pub struct WorkerProcess<
     P: MessageProcessor<T, R> + Sync + Send + 'static,
 > {
     name: String,
+    envs: Vec<(String, String)>,
     queue: Arc<unlimited::Queue<Message<T, R>>>,
     timeout: Duration,
     processor: PhantomData<P>,
@@ -163,12 +165,14 @@ impl<
 {
     fn new(
         name: String,
+        envs: Vec<(String, String)>,
         queue: Arc<unlimited::Queue<Message<T, R>>>,
         timeout: Duration,
         stopped_rx: watch::Receiver<bool>,
     ) -> Self {
         WorkerProcess {
             name,
+            envs,
             queue,
             timeout,
             stopped_rx: RwLock::new(stopped_rx),
@@ -300,9 +304,9 @@ impl<
         }
         ctx += &self.name;
 
-        let title = std::env::var("CUBESTORE_SELECT_WORKER_TITLE")
-            .ok()
-            .unwrap_or("--sel-worker".to_string());
+        let title = P::process_titile();
+        let mut envs = vec![("CUBESTORE_LOG_CONTEXT".to_string(), ctx)];
+        envs.extend(self.envs.iter().cloned());
 
         let handle = respawn(
             WorkerProcessArgs {
@@ -311,7 +315,7 @@ impl<
                 processor: PhantomData::<P>::default(),
             },
             &[title],
-            &[("CUBESTORE_LOG_CONTEXT".to_string(), ctx)],
+            &envs,
         )?;
         Ok((args_tx, res_rx, handle))
     }
@@ -330,6 +334,10 @@ where
     R: Serialize + DeserializeOwned + Sync + Send + 'static,
     P: MessageProcessor<T, R>,
 {
+    if std::env::var("_CUBESTORE_SUBPROCESS_TYPE") == Ok("INGESTION_WORKER".to_string()) {
+        println!("!!! ingestion started");
+
+    }
     let (rx, tx) = (a.args, a.results);
     let mut tokio_builder = Builder::new_multi_thread();
     tokio_builder.enable_all();
@@ -485,6 +493,10 @@ mod tests {
                     panic!("oops")
                 }
             }
+        }
+
+        fn process_titile() -> String {
+            "--sel-worker".to_string()
         }
     }
 

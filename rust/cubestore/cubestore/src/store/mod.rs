@@ -566,7 +566,9 @@ impl ChunkDataStore for ChunkStore {
         partition: IdRow<Partition>,
         index: IdRow<Index>,
     ) -> Result<Vec<RecordBatch>, CubeError> {
+        println!("f1111");
         if chunk.get_row().in_memory() {
+            println!("f2222");
             let node_name = self.cluster.node_name_by_partition(&partition);
             let server_name = self.cluster.server_name();
             if node_name != server_name {
@@ -580,9 +582,12 @@ impl ChunkDataStore for ChunkStore {
                     arrow_schema(&index.get_row()),
                 )))])
         } else {
+            println!("f33333");
             let (local_file, index) = self.download_chunk(chunk, partition, index).await?;
+            println!("f4444");
             Ok(cube_ext::spawn_blocking(move || -> Result<_, CubeError> {
                 let parquet = ParquetTableStore::new(index, ROW_GROUP_SIZE);
+                println!("f5555");
                 Ok(parquet.read_columns(&local_file)?)
             })
             .await??)
@@ -726,16 +731,20 @@ impl ChunkStore {
         partition: IdRow<Partition>,
         index: IdRow<Index>,
     ) -> Result<(String, Index), CubeError> {
+        println!("d11111");
         if !chunk.get_row().uploaded() {
             return Err(CubeError::internal(format!(
                 "Trying to get not uploaded chunk: {:?}",
                 chunk
             )));
         }
+        println!("d22222");
         let file_size = chunk.get_row().file_size();
         let chunk_id = chunk.get_id();
         let remote_path = ChunkStore::chunk_file_name(chunk);
+        println!("d22233");
         let result = self.remote_fs.download_file(&remote_path, file_size).await;
+        println!("d33333");
 
         deactivate_table_on_corrupt_data(
             self.meta_store.clone(),
@@ -744,6 +753,8 @@ impl ChunkStore {
             Some(chunk_id),
         )
         .await;
+
+        println!("d4444");
 
         Ok((
             self.remote_fs.local_file(&remote_path).await?,

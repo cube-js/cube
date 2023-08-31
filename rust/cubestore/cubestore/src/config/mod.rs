@@ -6,6 +6,7 @@ use crate::cachestore::{
     CacheEvictionPolicy, CacheStore, CacheStoreSchedulerImpl, ClusterCacheStoreClient,
     LazyRocksCacheStore,
 };
+use crate::cluster::ingestion::job_processor::{JobProcessor, JobProcessorImpl};
 use crate::cluster::rate_limiter::{BasicProcessRateLimiter, ProcessRateLimiter};
 use crate::cluster::transport::{
     ClusterTransport, ClusterTransportImpl, MetaStoreTransport, MetaStoreTransportImpl,
@@ -2133,6 +2134,17 @@ impl Config {
                     Duration::from_secs(c.query_timeout()),
                     Duration::from_secs(c.import_job_timeout() * 2),
                     query_cache_to_move,
+                )
+            })
+            .await;
+
+        self.injector
+            .register_typed::<dyn JobProcessor, _, _, _>(async move |i| {
+                JobProcessorImpl::new(
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
                 )
             })
             .await;

@@ -1,18 +1,15 @@
-#[cfg(not(target_os = "windows"))]
-use crate::cluster::ingestion::worker::{IngestionWorkerMessage, IngestionWorkerProcessor};
-#[cfg(not(target_os = "windows"))]
-use crate::cluster::worker_pool::{worker_main, MessageProcessor, WorkerPool};
+use crate::config::injection::DIService;
 use crate::config::{Config, ConfigObj};
 use crate::import::ImportService;
-use crate::metastore::job::{Job, JobStatus, JobType};
+use crate::metastore::job::{Job, JobType};
 use crate::metastore::table::Table;
 use crate::metastore::{MetaStore, RowKey, TableId};
 use crate::queryplanner::trace_data_loaded::DataLoadedSize;
 use crate::store::compaction::CompactionService;
 use crate::CubeError;
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use std::time::Duration;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct JobProcessResult {
@@ -37,30 +34,51 @@ impl Default for JobProcessResult {
     }
 }
 
-#[cfg(not(target_os = "windows"))]
-pub struct JobProcessor {
-    process_pool:
-        Arc<WorkerPool<IngestionWorkerMessage, JobProcessResult, IngestionWorkerProcessor>>,
+#[async_trait]
+pub trait JobProcessor: DIService + Send + Sync {
+    async fn wait_processing_loops(&self);
+    async fn stop_processing_loops(&self) -> Result<(), CubeError>;
+    async fn process_job(&self, job: Job) -> Result<JobProcessResult, CubeError>;
 }
 
-#[cfg(not(target_os = "windows"))]
-impl JobProcessor {
-    pub fn new(pool_size: usize, timeout: Duration) -> Arc<Self> {
+pub struct JobProcessorImpl {
+    processor: Arc<JobIsolatedProcessor>,
+}
+
+impl JobProcessorImpl {
+    pub fn new(
+        config_obj: Arc<dyn ConfigObj>,
+        meta_store: Arc<dyn MetaStore>,
+        compaction_service: Arc<dyn CompactionService>,
+        import_service: Arc<dyn ImportService>,
+    ) -> Arc<Self> {
         Arc::new(Self {
-            process_pool: Arc::new(WorkerPool::new(pool_size, timeout)),
+            processor: JobIsolatedProcessor::new(
+                config_obj,
+                meta_store,
+                compaction_service,
+                import_service,
+            ),
         })
     }
-    pub async fn wait_processing_loops(&self) {
-        self.process_pool.wait_processing_loops().await
+}
+
+#[async_trait]
+impl JobProcessor for JobProcessorImpl {
+    async fn wait_processing_loops(&self) {}
+
+    async fn stop_processing_loops(&self) -> Result<(), CubeError> {
+        Ok(())
     }
-    pub async fn stop_processing_loops(&self) -> Result<(), CubeError> {
-        self.process_pool.stop_workers().await
-    }
-    pub async fn process_job(&self, job: Job) -> Result<JobProcessResult, CubeError> {
-        println!("^^^^^^^ ");
-        self.process_pool.process(IngestionWorkerMessage::Job(job)).await
+
+    async fn process_job(&self, job: Job) -> Result<JobProcessResult, CubeError> {
+        self.processor
+            .process_separate_job(&job)
+            .await
     }
 }
+
+crate::di_service!(JobProcessorImpl, [JobProcessor]);
 
 //TODO
 #[cfg(target_os = "windows")]
@@ -83,7 +101,9 @@ impl JobProcessor {
         self.process_pool.stop_workers().await
     }
     pub async fn process_job(&self, job: Job) -> Result<JobProcessResult, CubeError> {
-        self.process_pool.process(IngestionWorkerMessage::Job(job)).await
+        self.process_pool
+            .process(IngestionWorkerMessage::Job(job))
+            .await
     }
 }
 
@@ -125,9 +145,12 @@ impl JobIsolatedProcessor {
                     let compaction_service = self.compaction_service.clone();
                     let partition_id = *partition_id;
                     let data_loaded_size = DataLoadedSize::new();
-                    compaction_service
+                    println!("!!!! CCCCCCCC");
+                    let r = compaction_service
                         .compact(partition_id, data_loaded_size.clone())
-                        .await?;
+                        .await;
+                    println!("!!!! FFFFFF");
+                    r?;
                     Ok(JobProcessResult::new(data_loaded_size.get()))
                 } else {
                     Self::fail_job_row_key(job)

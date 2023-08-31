@@ -6,7 +6,7 @@ pub mod worker_pool;
 
 pub mod rate_limiter;
 
-mod ingestion;
+pub mod ingestion;
 
 #[cfg(not(target_os = "windows"))]
 use crate::cluster::worker_pool::{worker_main, MessageProcessor, WorkerPool};
@@ -16,13 +16,11 @@ use crate::cluster::message::NetworkMessage;
 use crate::cluster::rate_limiter::{ProcessRateLimiter, TaskType, TraceIndex};
 use crate::cluster::transport::{ClusterTransport, MetaStoreTransport, WorkerConnection};
 use crate::config::injection::{DIService, Injector};
-use crate::config::{is_router, WorkerServices};
+use crate::config::is_router;
 #[allow(unused_imports)]
 use crate::config::{Config, ConfigObj};
-use crate::import::ImportService;
 use crate::metastore::chunks::chunk_file_name;
 use crate::metastore::job::{Job, JobStatus, JobType};
-use crate::metastore::table::Table;
 use crate::metastore::{
     deactivate_table_on_corrupt_data, Chunk, IdRow, MetaStore, MetaStoreEvent, Partition, RowKey,
     TableId,
@@ -33,18 +31,14 @@ use crate::metastore::{
 };
 use crate::queryplanner::query_executor::{QueryExecutor, SerializedRecordBatchStream};
 use crate::queryplanner::serialized_plan::SerializedPlan;
-use crate::queryplanner::trace_data_loaded::DataLoadedSize;
 use crate::remotefs::RemoteFs;
-use crate::store::compaction::CompactionService;
 use crate::store::ChunkDataStore;
 use crate::telemetry::tracing::TracingHelper;
-use crate::util::aborting_join_handle::AbortingJoinHandle;
 use crate::CubeError;
 use arrow::datatypes::SchemaRef;
 use arrow::error::ArrowError;
 use arrow::record_batch::RecordBatch;
 use async_trait::async_trait;
-use core::mem;
 use datafusion::cube_ext;
 use datafusion::physical_plan::{RecordBatchStream, SendableRecordBatchStream};
 use flatbuffers::bitflags::_core::pin::Pin;
@@ -67,7 +61,6 @@ use std::time::SystemTime;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::broadcast::{Receiver, Sender};
 use tokio::sync::{oneshot, watch, Notify, RwLock};
-use tokio::task::JoinHandle;
 use tokio::time::timeout;
 use tokio_util::sync::CancellationToken;
 use tracing::{instrument, Instrument};
@@ -288,6 +281,12 @@ impl MessageProcessor<WorkerMessage, (SchemaRef, Vec<SerializedRecordBatchStream
                 }
             }
         }
+    }
+
+    fn process_titile() -> String {
+        std::env::var("CUBESTORE_SELECT_WORKER_TITLE")
+            .ok()
+            .unwrap_or("--sel-worker".to_string())
     }
 }
 
@@ -822,20 +821,20 @@ impl ClusterImpl {
             let arc = Arc::new(WorkerPool::new(
                 self.config_obj.select_worker_pool_size(),
                 Duration::from_secs(self.config_obj.query_timeout()),
+                "sel",
+                vec![("_CUBESTORE_SUBPROCESS_TYPE".to_string(), "SELECT_WORKER".to_string())]
             ));
             *pool = Some(arc.clone());
             futures.push(cube_ext::spawn(
                 async move { arc.wait_processing_loops().await },
             ));
         }
-        #[cfg(not(target_os = "windows"))]
         let job_processor = {
-            let job_processor = JobProcessor::new(self.config_obj.job_runners_count(), Duration::from_secs(600)); //TODO - timeout
+            let job_processor = self.injector.upgrade().unwrap().get_service_typed::<dyn JobProcessor>().await; //TODO - timeout
             let job_processor_to_move = job_processor.clone();
             futures.push(cube_ext::spawn(
                 async move { job_processor_to_move.wait_processing_loops().await },
             ));
-            println!("!!!!! ---- !!!!!!");
             job_processor
 
         };
