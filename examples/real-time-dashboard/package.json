@@ -4,7 +4,7 @@
     "dev": "./node_modules/.bin/cubejs-server server"
   },
   "dependencies": {
-    "mongodb": "^4.6.0"
+    "mongodb": "^4.17.0"
   },
   "devDependencies": {
     "@cubejs-backend/mongobi-driver": "^0.30.7",
