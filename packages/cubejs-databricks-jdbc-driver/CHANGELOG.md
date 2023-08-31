@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.49](https://github.com/cube-js/cube/compare/v0.33.48...v0.33.49) (2023-08-31)
+
+
+### Bug Fixes
+
+* **databricks-driver:** Uppercase filter values doesn't match in contains filter ([#7067](https://github.com/cube-js/cube/issues/7067)) ([1e29bb3](https://github.com/cube-js/cube/commit/1e29bb396434730fb705c5406c7a7f3df91b7edf))
+
+
+
+
+
 ## [0.33.48](https://github.com/cube-js/cube/compare/v0.33.47...v0.33.48) (2023-08-23)
 
 **Note:** Version bump only for package @cubejs-backend/databricks-jdbc-driver
