@@ -12913,6 +12913,33 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_holistics_date_trunc_date32() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "holistics_date_trunc_date32",
+            execute_query(
+                "
+                with \"h__dates\" AS (
+                    SELECT
+                        CAST ('2023-02-01' AS date) as \"start_range\",
+                        CAST ( '2023-02-28' AS date ) as \"end_range\",
+                        28 as \"length\"
+                )
+                SELECT
+                    DATE_TRUNC( 'month', \"start_range\") AS \"dm_ddt_d_6e2110\",
+                    MAX(\"length\") AS \"h_dates_length\"
+                FROM \"h__dates\"
+                GROUP BY 1
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_holistics_group_by_date() {
         init_logger();
 
