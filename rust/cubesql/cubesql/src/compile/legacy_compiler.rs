@@ -742,7 +742,6 @@ fn binary_op_create_node_and(
                     operator: r_op,
                     values: r_v,
                 }] => {
-                    print!("test");
                     if l_member.eq(r_member)
                         && ((l_op.eq(&"beforeDate".to_string())
                             && r_op.eq(&"afterDate".to_string()))

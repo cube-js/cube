@@ -34,7 +34,7 @@ use chrono::{
         Numeric::{Day, Hour, Minute, Month, Second, Year},
         Pad::Zero,
     },
-    Duration, NaiveDateTime,
+    NaiveDateTime,
 };
 use cubeclient::models::V1CubeMeta;
 use datafusion::{
@@ -932,7 +932,7 @@ impl RewriteRules for FilterRules {
                         "AND",
                         binary_expr(
                             column_expr("?column"),
-                            "<=",
+                            "<",
                             binary_expr(
                                 fun_expr(
                                     "DateTrunc",
@@ -1909,7 +1909,7 @@ impl RewriteRules for FilterRules {
                         "AND",
                         binary_expr(
                             column_expr("?column"),
-                            "<=",
+                            "<",
                             fun_expr(
                                 "DateTrunc",
                                 vec![
@@ -2703,18 +2703,11 @@ impl FilterRules {
                                             if let Some(timestamp) =
                                                 Self::scalar_to_native_datetime(&literal)
                                             {
-                                                let minus_one = format_iso_timestamp(
-                                                    timestamp
-                                                        .checked_sub_signed(Duration::milliseconds(
-                                                            1,
-                                                        ))
-                                                        .unwrap(),
-                                                );
                                                 let value = format_iso_timestamp(timestamp);
 
                                                 match expr_op {
-                                                    Operator::Lt => minus_one,
-                                                    Operator::LtEq => minus_one,
+                                                    Operator::Lt => value,
+                                                    Operator::LtEq => value,
                                                     Operator::Gt => value,
                                                     Operator::GtEq => value,
                                                     _ => {
