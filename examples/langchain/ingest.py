@@ -10,14 +10,11 @@ from langchain.document_loaders import CubeSemanticLoader
 
 load_dotenv()
 
-
 def ingest_cube_meta():
-    api_url = os.environ["CUBE_API_URL"]
-    cubejs_api_secret = os.environ["CUBE_API_SECRET"]
     security_context = {}
-    api_token = jwt.encode(security_context, cubejs_api_secret, algorithm="HS256")
+    token = jwt.encode(security_context, os.environ["CUBE_API_SECRET"], algorithm="HS256")
 
-    loader = CubeSemanticLoader(api_url, api_token)
+    loader = CubeSemanticLoader(os.environ["CUBE_API_URL"], token)
     documents = loader.load()
 
     embeddings = OpenAIEmbeddings()

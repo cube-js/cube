@@ -2,7 +2,8 @@ streamlit
 pandas
 python-dotenv
 langchain
-psycopg2
 pathlib
-jwt
-faiss
+PyJWT
+openai
+tiktoken
+faiss-cpu
