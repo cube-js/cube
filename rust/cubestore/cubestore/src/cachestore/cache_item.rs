@@ -16,9 +16,11 @@ pub struct CacheItem {
     pub(crate) expire: Option<DateTime<Utc>>,
 }
 
-const CACHE_ITEM_VALUE_SIZE: u32 = 58;
-const CACHE_ITEM_KEY_SIZE: u32 = 15;
-pub const CACHE_ITEM_SIZE_WITHOUT_VALUE: u32 = CACHE_ITEM_KEY_SIZE + CACHE_ITEM_VALUE_SIZE;
+// Every RowKey uses 15 bytes
+// Table 58 (flex format)
+// SecondaryIndex::ByPrefix 8 + hash (let's take 18)
+// SecondaryIndex::ByPath 13 + hash (let's take 18)
+pub const CACHE_ITEM_SIZE_WITHOUT_VALUE: u32 = (15 * 3) + 58 + (8 + 18) + (13 + 18);
 
 impl RocksEntity for CacheItem {}
 
