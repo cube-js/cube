@@ -287,6 +287,8 @@ pub fn parse_sql_to_statements(
         "select NULL, NULL AS NULL2, NULL AS NULL3",
     );
 
+    log::debug!("Parsed SQL: {}", query);
+
     if let Some(qtrace) = qtrace {
         qtrace.set_replaced_query(&query)
     }
