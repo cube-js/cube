@@ -619,7 +619,8 @@ impl CacheEvictionManager {
                 for item in cache_schema.scan_index_values(&CacheItemRocksIndex::ByPath)? {
                     let item = item?;
 
-                    let (weight, raw_size) = self.get_weight_and_size_by_criteria(&item, &criteria);
+                    let (weight, raw_size) =
+                        Self::get_weight_and_size_by_criteria(&item, &criteria)?;
 
                     // We need to count expired keys too!
                     stats_total_keys += 1;
@@ -667,11 +668,19 @@ impl CacheEvictionManager {
     ) -> Result<EvictionResult, CubeError> {
         let (to_evict, expired) = self.collect_allkeys_to_evict(criteria, &store).await?;
 
+        let stats_total_keys = self.get_stats_total_keys();
+        let stats_total_raw_size = self.get_stats_total_raw_size();
+
         let mut pending_size_removed = 0_u64;
         let mut pending_keys_removed = 0_u32;
+        let mut pending_delete_skipped = 0_u32;
 
         if expired.len() > 0 {
-            let stats = self.delete_items(expired, &store, true).await?;
+            let deletion_result = self.delete_items(expired, &store, true).await?;
+
+            pending_keys_removed += deletion_result.total_keys_removed;
+            pending_size_removed += deletion_result.total_size_removed;
+            pending_delete_skipped += deletion_result.total_delete_skipped;
         }
 
         let mut pending = Vec::with_capacity(self.eviction_batch_size);
@@ -689,9 +698,19 @@ impl CacheEvictionManager {
             };
 
             if target_reached {
-                let stats = self.delete_items(pending, &store, false).await?;
+                let deletion_result = self.delete_items(pending, &store, false).await?;
 
-                return Ok(EvictionResult::Finished(stats));
+                pending_keys_removed += deletion_result.total_keys_removed;
+                pending_size_removed += deletion_result.total_size_removed;
+                pending_delete_skipped += deletion_result.total_delete_skipped;
+
+                return Ok(EvictionResult::Finished(EvictionFinishedResult {
+                    total_keys_removed: pending_keys_removed,
+                    total_size_removed: pending_size_removed,
+                    total_delete_skipped: pending_delete_skipped,
+                    stats_total_keys,
+                    stats_total_raw_size,
+                }));
             }
         }
 
@@ -701,8 +720,19 @@ impl CacheEvictionManager {
             target.to_string()
         });
 
-        let stats = self.delete_items(pending, &store, false).await?;
-        return Ok(EvictionResult::Finished(stats));
+        let deletion_result = self.delete_items(pending, &store, false).await?;
+
+        pending_keys_removed += deletion_result.total_keys_removed;
+        pending_size_removed += deletion_result.total_size_removed;
+        pending_delete_skipped += deletion_result.total_delete_skipped;
+
+        return Ok(EvictionResult::Finished(EvictionFinishedResult {
+            total_keys_removed: pending_keys_removed,
+            total_size_removed: pending_size_removed,
+            total_delete_skipped: pending_delete_skipped,
+            stats_total_keys,
+            stats_total_raw_size,
+        }));
     }
 
     async fn do_eviction_by_sampling(
@@ -736,7 +766,8 @@ impl CacheEvictionManager {
                 for item in cache_schema.scan_index_values(&CacheItemRocksIndex::ByPath)? {
                     let item = item?;
 
-                    let (weight, raw_size) = self.get_weight_and_size_by_criteria(&item, &criteria);
+                    let (weight, raw_size) =
+                        Self::get_weight_and_size_by_criteria(&item, &criteria)?;
 
                     if let Some(ttl) = item.ttl {
                         if ttl < now_with_threshold {
@@ -1037,10 +1068,9 @@ impl CacheEvictionManager {
 
     #[inline]
     fn get_weight_and_size_by_criteria(
-        &self,
         item: &SecondaryIndexValueScanIterItem,
         criteria: &CacheEvictionWeightCriteria,
-    ) -> _ {
+    ) -> Result<(u32, u32), CubeError> {
         if let Some(extended) = &item.extended {
             let weight = match criteria {
                 CacheEvictionWeightCriteria::ByLRU => extended.lru.encode_value_as_u32()?,
@@ -1048,7 +1078,7 @@ impl CacheEvictionManager {
                 CacheEvictionWeightCriteria::ByLFU => extended.lfu as u32,
             };
 
-            (weight, extended.raw_size)
+            Ok((weight, extended.raw_size))
         } else {
             let weight = match criteria {
                 CacheEvictionWeightCriteria::ByLRU =>
@@ -1064,7 +1094,7 @@ impl CacheEvictionManager {
                 }
             };
 
-            (weight, CACHE_ITEM_SIZE_WITHOUT_VALUE)
+            Ok((weight, CACHE_ITEM_SIZE_WITHOUT_VALUE))
         }
     }
 }
