@@ -339,9 +339,8 @@ impl CacheEvictionManager {
                 if batch.len() == self.eviction_batch_size {
                     let current_batch =
                         std::mem::replace(&mut batch, Vec::with_capacity(self.eviction_batch_size));
-                    let batch_result = self
-                        .delete_batch(current_batch, &store, keys_are_expired)
-                        .await?;
+
+                    let batch_result = self.delete_batch(current_batch, &store).await?;
 
                     total_size_removed += batch_result.deleted_size;
                     total_keys_removed += batch_result.deleted_count;
@@ -355,13 +354,19 @@ impl CacheEvictionManager {
         };
 
         if last_batch.len() > 0 {
-            let batch_result = self
-                .delete_batch(last_batch, &store, keys_are_expired)
-                .await?;
+            let batch_result = self.delete_batch(last_batch, &store).await?;
 
             total_size_removed += batch_result.deleted_size;
             total_keys_removed += batch_result.deleted_count;
             total_delete_skipped += batch_result.skipped;
+        }
+
+        if keys_are_expired {
+            app_metrics::CACHESTORE_EVICTION_REMOVED_EXPIRED_KEYS.add(total_keys_removed as i64);
+            app_metrics::CACHESTORE_EVICTION_REMOVED_EXPIRED_SIZE.add(total_size_removed as i64);
+        } else {
+            app_metrics::CACHESTORE_EVICTION_REMOVED_KEYS.add(total_keys_removed as i64);
+            app_metrics::CACHESTORE_EVICTION_REMOVED_SIZE.add(total_size_removed as i64);
         }
 
         return Ok(EvictionFinishedResult {
@@ -377,7 +382,6 @@ impl CacheEvictionManager {
         &self,
         batch: Vec<(u64, u32)>,
         store: &Arc<RocksStore>,
-        keys_are_expired: bool,
     ) -> Result<DeleteBatchResult, CubeError> {
         let (deleted_count, deleted_size, skipped) = store
             .write_operation(move |db_ref, pipe| {
@@ -404,14 +408,6 @@ impl CacheEvictionManager {
             .fetch_sub(deleted_count, Ordering::Relaxed);
         self.stats_total_raw_size
             .fetch_sub(deleted_size, Ordering::Relaxed);
-
-        if keys_are_expired {
-            app_metrics::CACHESTORE_EVICTION_REMOVED_EXPIRED_KEYS.add(deleted_count as i64);
-            app_metrics::CACHESTORE_EVICTION_REMOVED_EXPIRED_SIZE.add(deleted_size as i64);
-        } else {
-            app_metrics::CACHESTORE_EVICTION_REMOVED_KEYS.add(deleted_count as i64);
-            app_metrics::CACHESTORE_EVICTION_REMOVED_SIZE.add(deleted_size as i64);
-        }
 
         Ok(DeleteBatchResult {
             deleted_count,
