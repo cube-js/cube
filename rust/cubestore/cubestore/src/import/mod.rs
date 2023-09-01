@@ -324,51 +324,16 @@ impl<'a> CsvLineParser<'a> {
     }
 
     fn next_value(&mut self) -> Result<MaybeOwnedStr, CubeError> {
-        Ok(
-            if let Some(b'"') = self.remaining.as_bytes().iter().nth(0) {
-                let mut closing_index = None;
-                let mut seen_escapes = false;
-                self.remaining = &self.remaining[1..];
-                let mut first_quote_index = None;
-                for (i, c) in self.remaining.char_indices() {
-                    if c == '"' && first_quote_index.is_some() {
-                        seen_escapes = true;
-                        first_quote_index = None;
-                    } else if c == '"' {
-                        first_quote_index = Some(i);
-                    } else if first_quote_index.is_some() {
-                        closing_index = first_quote_index.take();
-                        break;
-                    }
-                }
-                if first_quote_index.is_some() {
-                    closing_index = first_quote_index.take();
-                }
-                let closing_index = closing_index.ok_or(CubeError::user(format!(
-                    "Malformed CSV string: {}",
-                    self.line
-                )))?;
-                let res;
-                if seen_escapes {
-                    let unescaped = self.remaining[0..closing_index].replace("\"\"", "\"");
-                    res = MaybeOwnedStr::Owned(unescaped)
-                } else {
-                    res = MaybeOwnedStr::Borrowed(&self.remaining[0..closing_index])
-                }
-                self.remaining = self.remaining[(closing_index + 1)..].as_ref();
-                res
-            } else {
-                let next_comma = self
-                    .remaining
-                    .as_bytes()
-                    .iter()
-                    .position(|c| *c == self.delimiter)
-                    .unwrap_or(self.remaining.len());
-                let res = &self.remaining[0..next_comma];
-                self.remaining = self.remaining[next_comma..].as_ref();
-                MaybeOwnedStr::Borrowed(res)
-            },
-        )
+        let next_comma = self
+            .remaining
+            .as_bytes()
+            .iter()
+            .position(|c| *c == self.delimiter)
+            .unwrap_or(self.remaining.len());
+        let res = &self.remaining[0..next_comma];
+        self.remaining = self.remaining[next_comma..].as_ref();
+
+        return Ok(MaybeOwnedStr::Borrowed(res));
     }
 
     fn advance(&mut self) -> Result<(), CubeError> {
@@ -432,9 +397,7 @@ impl<R: AsyncBufRead> Stream for CsvLineStream<R> {
                         } else {
                             let new_line_pos = memchr::memchr(b'\n', available);
                             let quote_pos = memchr::memchr(b'"', available);
-                            let in_quotes = quote_pos.is_some()
-                                && (new_line_pos.is_some() && quote_pos < new_line_pos
-                                    || new_line_pos.is_none());
+                            let in_quotes = false;
                             if in_quotes {
                                 if let Some(i) = quote_pos {
                                     projected.buf.extend_from_slice(&available[..=i]);
