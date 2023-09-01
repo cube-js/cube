@@ -1467,22 +1467,33 @@ mod tests {
             CubeServices::wait_loops(loops).await
         });
 
-        for i in 0..keys_to_insert {
-            cachestore
-                .cache_set(
+        for i in (0..keys_to_insert).step_by(4) {
+            let (r1, r2, r3, r4) = tokio::join!(
+                cachestore.cache_set(
                     CacheItem::new(format!("test:{}", i), Some(3600), "a".repeat(key_size)),
                     false,
+                ),
+                cachestore.cache_set(
+                    CacheItem::new(format!("test:{}", i + 1), Some(3600), "a".repeat(key_size)),
+                    false,
+                ),
+                cachestore.cache_set(
+                    CacheItem::new(format!("test:{}", i + 2), Some(3600), "a".repeat(key_size)),
+                    false,
+                ),
+                cachestore.cache_set(
+                    CacheItem::new(format!("test:{}", i + 3), Some(3600), "a".repeat(key_size)),
+                    false,
                 )
-                .await?;
+            );
+
+            r1?;
+            r2?;
+            r3?;
+            r4?;
         }
 
-        let mut result = EvictionFinishedResult {
-            total_keys_removed: 0,
-            total_size_removed: 0,
-            total_delete_skipped: 0,
-            stats_total_keys: 0,
-            stats_total_raw_size: 0,
-        };
+        let mut result = EvictionFinishedResult::empty();
 
         // 1 load state
         // check limits 3 (3 rounds for sampling)
@@ -1490,14 +1501,14 @@ mod tests {
             match cachestore.run_eviction().await? {
                 EvictionResult::InProgress(status) => panic!("unexpected status: {}", status),
                 EvictionResult::Finished(stats) => {
-                    result.total_keys_removed += stats.total_keys_removed;
-                    result.total_size_removed += stats.total_size_removed;
-                    result.total_delete_skipped += stats.total_delete_skipped;
+                    println!("eviction stats {:?}", stats);
+
+                    result.add_eviction_result(stats);
                 }
             };
         }
 
-        // should do anything
+        // should not do anything
         {
             let eviction_results = match cachestore.run_eviction().await? {
                 EvictionResult::InProgress(status) => panic!("unexpected status: {}", status),
@@ -1568,10 +1579,11 @@ mod tests {
         )
         .await?;
 
-        // 640 -> 640 - (128 * 1.15 = 147.5) -> 492
+        // 640 - (128 * 1.15 = 147.5) -> 492
         assert_eq!(result.stats_total_keys < 512, true);
         assert_eq!(result.stats_total_keys > 456, true);
 
+        println!("result {:?}", result);
         assert_eq!(result.total_keys_removed > 100, true);
         assert_eq!(result.total_keys_removed < 256, true);
 

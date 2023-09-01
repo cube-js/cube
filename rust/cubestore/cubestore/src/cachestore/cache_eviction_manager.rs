@@ -176,6 +176,24 @@ pub struct EvictionFinishedResult {
     pub stats_total_raw_size: u64,
 }
 
+impl EvictionFinishedResult {
+    pub fn empty() -> Self {
+        Self {
+            total_keys_removed: 0,
+            total_size_removed: 0,
+            total_delete_skipped: 0,
+            stats_total_keys: 0,
+            stats_total_raw_size: 0,
+        }
+    }
+
+    pub fn add_eviction_result(&mut self, results: EvictionFinishedResult) {
+        self.total_keys_removed += results.total_keys_removed;
+        self.total_size_removed += results.total_size_removed;
+        self.total_delete_skipped += results.total_delete_skipped;
+    }
+}
+
 fn calc_percentage(v: u64, percentage: u8) -> u64 {
     if percentage == 0 {
         return v;
@@ -622,7 +640,7 @@ impl CacheEvictionManager {
                     let (weight, raw_size) =
                         Self::get_weight_and_size_by_criteria(&item, &criteria)?;
 
-                    // We need to count expired keys too!
+                    // We need to count expired keys too for correct stats!
                     stats_total_keys += 1;
                     stats_total_raw_size += raw_size as u64;
 
@@ -666,26 +684,29 @@ impl CacheEvictionManager {
         target_is_size: bool,
         criteria: CacheEvictionWeightCriteria,
     ) -> Result<EvictionResult, CubeError> {
-        let (to_evict, expired) = self.collect_allkeys_to_evict(criteria, &store).await?;
+        let (all_keys, expired) = self.collect_allkeys_to_evict(criteria, &store).await?;
+
+        let mut pending_keys_removed = 0_u32;
+        let mut pending_size_removed = 0_u64;
 
         let stats_total_keys = self.get_stats_total_keys();
         let stats_total_raw_size = self.get_stats_total_raw_size();
-
-        let mut pending_size_removed = 0_u64;
-        let mut pending_keys_removed = 0_u32;
-        let mut pending_delete_skipped = 0_u32;
+        let mut result = EvictionFinishedResult {
+            total_keys_removed: 0,
+            total_size_removed: 0,
+            total_delete_skipped: 0,
+            stats_total_keys,
+            stats_total_raw_size,
+        };
 
         if expired.len() > 0 {
             let deletion_result = self.delete_items(expired, &store, true).await?;
-
-            pending_keys_removed += deletion_result.total_keys_removed;
-            pending_size_removed += deletion_result.total_size_removed;
-            pending_delete_skipped += deletion_result.total_delete_skipped;
+            result.add_eviction_result(deletion_result);
         }
 
         let mut pending = Vec::with_capacity(self.eviction_batch_size);
 
-        for (id, raw_size) in to_evict {
+        for (id, raw_size) in all_keys {
             pending_size_removed += raw_size as u64;
             pending_keys_removed += 1;
 
@@ -699,18 +720,9 @@ impl CacheEvictionManager {
 
             if target_reached {
                 let deletion_result = self.delete_items(pending, &store, false).await?;
+                result.add_eviction_result(deletion_result);
 
-                pending_keys_removed += deletion_result.total_keys_removed;
-                pending_size_removed += deletion_result.total_size_removed;
-                pending_delete_skipped += deletion_result.total_delete_skipped;
-
-                return Ok(EvictionResult::Finished(EvictionFinishedResult {
-                    total_keys_removed: pending_keys_removed,
-                    total_size_removed: pending_size_removed,
-                    total_delete_skipped: pending_delete_skipped,
-                    stats_total_keys,
-                    stats_total_raw_size,
-                }));
+                return Ok(EvictionResult::Finished(result));
             }
         }
 
@@ -721,18 +733,9 @@ impl CacheEvictionManager {
         });
 
         let deletion_result = self.delete_items(pending, &store, false).await?;
+        result.add_eviction_result(deletion_result);
 
-        pending_keys_removed += deletion_result.total_keys_removed;
-        pending_size_removed += deletion_result.total_size_removed;
-        pending_delete_skipped += deletion_result.total_delete_skipped;
-
-        return Ok(EvictionResult::Finished(EvictionFinishedResult {
-            total_keys_removed: pending_keys_removed,
-            total_size_removed: pending_size_removed,
-            total_delete_skipped: pending_delete_skipped,
-            stats_total_keys,
-            stats_total_raw_size,
-        }));
+        return Ok(EvictionResult::Finished(result));
     }
 
     async fn do_eviction_by_sampling(
