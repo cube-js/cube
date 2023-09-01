@@ -1,4 +1,6 @@
-use crate::cachestore::cache_item::{CacheItemRocksIndex, CacheItemRocksTable};
+use crate::cachestore::cache_item::{
+    CacheItemRocksIndex, CacheItemRocksTable, CACHE_ITEM_SIZE_WITHOUT_VALUE,
+};
 use crate::cachestore::CacheItem;
 use crate::config::ConfigObj;
 use crate::metastore::{
@@ -302,6 +304,7 @@ impl CacheEvictionManager {
         &self,
         to_delete: KeysVector,
         store: &Arc<RocksStore>,
+        keys_are_expired: bool,
     ) -> Result<EvictionFinishedResult, CubeError> {
         let stats_total_keys = self.get_stats_total_keys();
         let stats_total_raw_size = self.get_stats_total_raw_size();
@@ -319,7 +322,9 @@ impl CacheEvictionManager {
                 if batch.len() == self.eviction_batch_size {
                     let current_batch =
                         std::mem::replace(&mut batch, Vec::with_capacity(self.eviction_batch_size));
-                    let batch_result = self.delete_batch(current_batch, &store).await?;
+                    let batch_result = self
+                        .delete_batch(current_batch, &store, keys_are_expired)
+                        .await?;
 
                     total_size_removed += batch_result.deleted_size;
                     total_keys_removed += batch_result.deleted_count;
@@ -333,7 +338,9 @@ impl CacheEvictionManager {
         };
 
         if last_batch.len() > 0 {
-            let batch_result = self.delete_batch(last_batch, &store).await?;
+            let batch_result = self
+                .delete_batch(last_batch, &store, keys_are_expired)
+                .await?;
 
             total_size_removed += batch_result.deleted_size;
             total_keys_removed += batch_result.deleted_count;
@@ -353,6 +360,7 @@ impl CacheEvictionManager {
         &self,
         batch: Vec<(u64, u32)>,
         store: &Arc<RocksStore>,
+        keys_are_expired: bool,
     ) -> Result<DeleteBatchResult, CubeError> {
         let (deleted_count, deleted_size, skipped) = store
             .write_operation(move |db_ref, pipe| {
@@ -380,8 +388,13 @@ impl CacheEvictionManager {
         self.stats_total_raw_size
             .fetch_sub(deleted_size, Ordering::Relaxed);
 
-        app_metrics::CACHESTORE_EVICTION_REMOVED_KEYS.add(deleted_count as i64);
-        app_metrics::CACHESTORE_EVICTION_REMOVED_SIZE.add(deleted_size as i64);
+        if keys_are_expired {
+            app_metrics::CACHESTORE_EVICTION_REMOVED_EXPIRED_KEYS.add(deleted_count as i64);
+            app_metrics::CACHESTORE_EVICTION_REMOVED_EXPIRED_SIZE.add(deleted_size as i64);
+        } else {
+            app_metrics::CACHESTORE_EVICTION_REMOVED_KEYS.add(deleted_count as i64);
+            app_metrics::CACHESTORE_EVICTION_REMOVED_SIZE.add(deleted_size as i64);
+        }
 
         Ok(DeleteBatchResult {
             deleted_count,
@@ -510,10 +523,11 @@ impl CacheEvictionManager {
         let expired_len = expired_items.len();
 
         if expired_len > 0 {
-            let batch_result = self.delete_items(expired_items, &store).await?;
-            total_keys_removed = batch_result.total_delete_skipped;
-            total_size_removed = batch_result.total_size_removed;
-            total_delete_skipped = batch_result.total_delete_skipped;
+            let deletion_result = self.delete_items(expired_items, &store, true).await?;
+
+            total_keys_removed = deletion_result.total_keys_removed;
+            total_size_removed = deletion_result.total_size_removed;
+            total_delete_skipped = deletion_result.total_delete_skipped;
         }
 
         log::trace!(
@@ -634,8 +648,12 @@ impl CacheEvictionManager {
                             }
                         };
 
-                        (weight, /* count keys without size as 1 */ 1)
+                        (weight, CACHE_ITEM_SIZE_WITHOUT_VALUE)
                     };
+
+                    // We need to count expired keys too!
+                    stats_total_keys += 1;
+                    stats_total_raw_size += raw_size as u64;
 
                     if let Some(ttl) = item.ttl {
                         if ttl < now_with_threshold {
@@ -643,9 +661,6 @@ impl CacheEvictionManager {
                             continue;
                         }
                     }
-
-                    stats_total_keys += 1;
-                    stats_total_raw_size += raw_size as u64;
 
                     all_keys.push((item.row_id, weight, raw_size))
                 }
@@ -686,7 +701,7 @@ impl CacheEvictionManager {
         let mut pending_keys_removed = 0_u32;
 
         if expired.len() > 0 {
-            let stats = self.delete_items(expired, &store).await?;
+            let stats = self.delete_items(expired, &store, true).await?;
         }
 
         let mut pending = Vec::with_capacity(self.eviction_batch_size);
@@ -704,7 +719,7 @@ impl CacheEvictionManager {
             };
 
             if target_reached {
-                let stats = self.delete_items(pending, &store).await?;
+                let stats = self.delete_items(pending, &store, false).await?;
 
                 return Ok(EvictionResult::Finished(stats));
             }
@@ -716,7 +731,7 @@ impl CacheEvictionManager {
             target.to_string()
         });
 
-        let stats = self.delete_items(pending, &store).await?;
+        let stats = self.delete_items(pending, &store, false).await?;
         return Ok(EvictionResult::Finished(stats));
     }
 
@@ -772,7 +787,7 @@ impl CacheEvictionManager {
                             }
                         };
 
-                        (weight, /* count keys without size as 1 */ 1)
+                        (weight, CACHE_ITEM_SIZE_WITHOUT_VALUE)
                     };
 
                     if let Some((_, min_weight, _)) = sampling_min {
@@ -809,7 +824,7 @@ impl CacheEvictionManager {
             .await?;
 
         Ok(EvictionResult::Finished(
-            self.delete_items(to_delete, &store).await?,
+            self.delete_items(to_delete, &store, false).await?,
         ))
     }
 

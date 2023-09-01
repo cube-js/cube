@@ -16,6 +16,10 @@ pub struct CacheItem {
     pub(crate) expire: Option<DateTime<Utc>>,
 }
 
+const CACHE_ITEM_VALUE_SIZE: u64 = 1;
+const CACHE_ITEM_KEY_SIZE: u64 = 15;
+pub const CACHE_ITEM_SIZE_WITHOUT_VALUE: u64 = CACHE_ITEM_KEY_SIZE + CACHE_ITEM_VALUE_SIZE;
+
 impl RocksEntity for CacheItem {}
 
 impl CacheItem {
@@ -141,7 +145,9 @@ impl RocksSecondaryIndex<CacheItem, CacheItemIndexKey> for CacheItemRocksIndex {
     }
 
     fn raw_value_size(&self, row: &CacheItem) -> u32 {
-        if let Ok(size) = u32::try_from(row.value.len()) {
+        let size = CACHE_ITEM_SIZE_WITHOUT_VALUE + row.value.len();
+
+        if let Ok(size) = u32::try_from(size) {
             size
         } else {
             u32::MAX
