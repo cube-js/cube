@@ -80,8 +80,6 @@ const DB_BIG_INT_MIN = BigInt('-9223372036854775808');
 const DB_INT_MAX = 2147483647;
 const DB_INT_MIN = -2147483648;
 
-const IGNORED_DB_SCHEMAS = ['information_schema', 'mysql', 'performance_schema', 'sys', 'INFORMATION_SCHEMA'];
-
 // Order of keys is important here: from more specific to less specific
 const DbTypeValueMatcher: Record<string, ((v: any) => boolean)> = {
   timestamp: (v) => v instanceof Date || v.toString().match(/^\d\d\d\d-\d\d-\d\dT\d\d:\d\d:\d\d/),
@@ -145,10 +143,6 @@ export abstract class BaseDriver implements DriverInterface {
     this.testConnectionTimeoutValue = _options.testConnectionTimeout || 10000;
   }
 
-  protected getIgnoredSchemas() {
-    return IGNORED_DB_SCHEMAS.map(schema => `'${schema}'`).join(', ');
-  }
-
   protected informationSchemaQuery() {
     return `
       SELECT columns.column_name as ${this.quoteIdentifier('column_name')},
@@ -156,7 +150,7 @@ export abstract class BaseDriver implements DriverInterface {
              columns.table_schema as ${this.quoteIdentifier('table_schema')},
              columns.data_type as ${this.quoteIdentifier('data_type')}
       FROM information_schema.columns
-      WHERE columns.table_schema NOT IN (${this.getIgnoredSchemas()})
+      WHERE columns.table_schema NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys', 'INFORMATION_SCHEMA')
    `;
   }
 
@@ -312,17 +306,13 @@ export abstract class BaseDriver implements DriverInterface {
     const query = `
       SELECT table_schema as ${this.quoteIdentifier('schema_name')}
       FROM information_schema.tables
-      WHERE table_schema NOT IN (${this.getIgnoredSchemas()})
+      WHERE table_schema NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys', 'INFORMATION_SCHEMA')
       GROUP BY table_schema
     `;
     return this.query<QuerySchemasResult>(query);
   }
 
-  public getTablesForSpecificSchemas(schemas?: QuerySchemasResult[]) {
-    if (!schemas) {
-      throw new Error('getTables without schemas is not supported');
-    }
-
+  public getTablesForSpecificSchemas(schemas: QuerySchemasResult[]) {
     const schemasPlaceholders = schemas.map((_, idx) => this.param(idx)).join(', ');
     const schemaNames = schemas.map(s => s.schema_name);
 
@@ -336,19 +326,36 @@ export abstract class BaseDriver implements DriverInterface {
   }
 
   public getColumnsForSpecificTables(tables: QueryTablesResult[]) {
-    const conditions: string[] = [];
-    const parameters: string[] = [];
-    let paramIndex = 0;
-
+    const groupedBySchema: Record<string, string[]> = {};
+  
     tables.forEach((t) => {
-      const schemaPlaceholder = this.param(paramIndex++);
-      const tablePlaceholder = this.param(paramIndex++);
-      conditions.push(`(table_schema=${schemaPlaceholder} AND table_name=${tablePlaceholder})`);
-      parameters.push(t.schema_name, t.table_name);
+      if (!groupedBySchema[t.schema_name]) {
+        groupedBySchema[t.schema_name] = [];
+      }
+      groupedBySchema[t.schema_name].push(t.table_name);
     });
-
+  
+    const conditions: string[] = [];
+    const parameters: any[] = [];
+    let paramIndex = 1;
+  
+    const createPlaceholders = (count: number): string[] => {
+      const placeholders: string[] = [];
+      for (let i = 0; i < count; i++) {
+        placeholders.push(`$${paramIndex++}`);
+      }
+      return placeholders;
+    };
+  
+    for (const [schema, tableNames] of Object.entries(groupedBySchema)) {
+      const schemaPlaceholder = `$${paramIndex++}`;
+      const tablePlaceholders = createPlaceholders(tableNames.length).join(', ');
+      conditions.push(`(table_schema = ${schemaPlaceholder} AND table_name IN (${tablePlaceholders}))`);
+      parameters.push(schema, ...tableNames);
+    }
+  
     const conditionString = conditions.join(' OR ');
-
+  
     const query = `
       SELECT columns.column_name as ${this.quoteIdentifier('column_name')},
              columns.table_name as ${this.quoteIdentifier('table_name')},
@@ -357,7 +364,7 @@ export abstract class BaseDriver implements DriverInterface {
       FROM information_schema.columns
       WHERE ${conditionString}
     `;
-
+  
     return this.query<QueryColumnsResult>(query, parameters);
   }
 
