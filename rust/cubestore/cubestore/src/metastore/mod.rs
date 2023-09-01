@@ -152,7 +152,7 @@ macro_rules! base_rocks_secondary_index {
                 crate::metastore::RocksSecondaryIndex::get_id(self)
             }
 
-            fn value_version(&self) -> u32 {
+            fn value_version(&self) -> crate::metastore::RocksSecondaryIndexValueVersion {
                 crate::metastore::RocksSecondaryIndex::value_version(self)
             }
 
@@ -166,6 +166,10 @@ macro_rules! base_rocks_secondary_index {
 
             fn is_ttl(&self) -> bool {
                 RocksSecondaryIndex::is_ttl(self)
+            }
+
+            fn store_ttl_extended_info(&self) -> bool {
+                RocksSecondaryIndex::store_ttl_extended_info(self)
             }
 
             fn get_expire(&self, row: &$table) -> Option<chrono::DateTime<chrono::Utc>> {
@@ -1122,6 +1126,7 @@ pub trait MetaStore: DIService + Send + Sync {
     // Force compaction for the whole RocksDB
     async fn compaction(&self) -> Result<(), CubeError>;
     async fn healthcheck(&self) -> Result<(), CubeError>;
+    async fn rocksdb_properties(&self) -> Result<Vec<RocksPropertyRow>, CubeError>;
 
     async fn get_snapshots_list(&self) -> Result<Vec<SnapshotInfo>, CubeError>;
     async fn set_current_snapshot(&self, snapshot_id: u128) -> Result<(), CubeError>;
@@ -1220,7 +1225,10 @@ impl RocksStoreDetails for RocksMetaStoreDetails {
             block_opts
         };
 
+        opts.set_max_background_jobs(rocksdb_config.max_background_jobs as i32);
+        opts.set_max_subcompactions(rocksdb_config.max_subcompactions);
         opts.set_block_based_table_factory(&block_opts);
+        opts.set_compression_type(rocksdb_config.compression_type);
 
         DB::open(&opts, path)
             .map_err(|err| CubeError::internal(format!("DB::open error for metastore: {}", err)))
@@ -4194,6 +4202,10 @@ impl MetaStore for RocksMetaStore {
         .await?;
 
         Ok(())
+    }
+
+    async fn rocksdb_properties(&self) -> Result<Vec<RocksPropertyRow>, CubeError> {
+        self.store.rocksdb_properties()
     }
 
     async fn healthcheck(&self) -> Result<(), CubeError> {

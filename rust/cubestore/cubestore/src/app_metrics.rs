@@ -24,7 +24,6 @@ pub static CACHE_QUERY_TIME_MS: Histogram = metrics::histogram("cs.sql.query.cac
 /// Incoming queue queries.
 pub static QUEUE_QUERIES: Counter = metrics::counter("cs.sql.query.queue");
 pub static QUEUE_QUERY_TIME_MS: Histogram = metrics::histogram("cs.sql.query.queue.ms");
-
 pub static STREAMING_ROWS_READ: Counter = metrics::counter("cs.streaming.rows");
 pub static STREAMING_CHUNKS_READ: Counter = metrics::counter("cs.streaming.chunks");
 pub static STREAMING_LASTOFFSET: Gauge = metrics::gauge("cs.streaming.lastoffset");
@@ -54,8 +53,26 @@ pub static METASTORE_INNER_WRITE_OPERATION: Histogram =
 pub static METASTORE_READ_OUT_QUEUE_OPERATION: Histogram =
     metrics::histogram("cs.metastore.read_out_queue_operation.ms");
 
+pub static CACHESTORE_ROCKSDB_ESTIMATE_LIVE_DATA_SIZE: Gauge =
+    metrics::gauge("cs.cachestore.rocksdb.estimate_live_data_size");
+pub static CACHESTORE_ROCKSDB_LIVE_SST_FILES_SIZE: Gauge =
+    metrics::gauge("cs.cachestore.rocksdb.live_sst_files_size");
+pub static CACHESTORE_ROCKSDB_CF_DEFAULT_SIZE: Gauge =
+    metrics::gauge("cs.cachestore.rocksdb.cf.default.size");
+pub static CACHESTORE_SCHEDULER_GC_QUEUE: Gauge =
+    metrics::gauge("cs.cachestore.scheduler.gc_queue");
+
 /// RemoteFs metrics
 pub static REMOTE_FS_OPERATION_CORE: Counter = metrics::counter("cs.remote_fs.operations.core");
 pub static REMOTE_FS_FILES_TO_REMOVE: Gauge = metrics::gauge("cs.remote_fs.files_to_remove.count");
 pub static REMOTE_FS_FILES_SIZE_TO_REMOVE: Gauge =
     metrics::gauge("cs.remote_fs.files_to_remove.size");
+
+/// Cache Store Cache
+pub static CACHESTORE_TTL_PERSIST: Counter = metrics::counter("cs.cachestore.ttl.persist");
+pub static CACHESTORE_TTL_BUFFER: Gauge = metrics::gauge("cs.cachestore.ttl.buffer");
+// Cache Store Eviction
+pub static CACHESTORE_EVICTION_REMOVED_KEYS: Counter =
+    metrics::counter("cs.cachestore.eviction.removed.keys");
+pub static CACHESTORE_EVICTION_REMOVED_SIZE: Counter =
+    metrics::counter("cs.cachestore.eviction.removed.size");

@@ -159,6 +159,7 @@ impl QueryBuilder {
                 } else {
                     None
                 },
+                ungrouped: None,
             },
             meta: self.meta,
         }

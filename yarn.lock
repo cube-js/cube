@@ -6776,6 +6776,14 @@
     "@types/docker-modem" "*"
     "@types/node" "*"
 
+"@types/dockerode@^3.3.16":
+  version "3.3.17"
+  resolved "https://registry.yarnpkg.com/@types/dockerode/-/dockerode-3.3.17.tgz#6070d12831a0518adf4755d831bb947bfec1255c"
+  integrity sha512-rhH719FBhfwFcL45AixUE5YWnXsdYEEnGhp/HWubOTowZMcsE4wDANvZi+EOrDLzYy2jI3EougA8par/ILi5Ww==
+  dependencies:
+    "@types/docker-modem" "*"
+    "@types/node" "*"
+
 "@types/dockerode@^3.3.8":
   version "3.3.9"
   resolved "https://registry.yarnpkg.com/@types/dockerode/-/dockerode-3.3.9.tgz#8c6e519fd4d0d86717b2c6a864904f4e6aa8af40"
@@ -27447,6 +27455,26 @@ testcontainers@^9.3.0:
     "@balena/dockerignore" "^1.0.2"
     "@types/archiver" "^5.3.2"
     "@types/dockerode" "^3.3.15"
+    archiver "^5.3.1"
+    async-lock "^1.4.0"
+    byline "^5.0.0"
+    debug "^4.3.4"
+    docker-compose "^0.23.19"
+    dockerode "^3.3.5"
+    get-port "^5.1.1"
+    node-fetch "^2.6.9"
+    properties-reader "^2.2.0"
+    ssh-remote-port-forward "^1.0.4"
+    tar-fs "^2.1.1"
+
+testcontainers@^9.8.0:
+  version "9.8.0"
+  resolved "https://registry.yarnpkg.com/testcontainers/-/testcontainers-9.8.0.tgz#03d8798ad047e7673e934934b5504bc0a2f14e4e"
+  integrity sha512-61IlJeVrUbS5JlAgM/N0koFnRxsID+vDap7CUmgaHXSGxmFofCiokB7kD96c1BtDWGOznrd7lTAPGSkd3RVkPA==
+  dependencies:
+    "@balena/dockerignore" "^1.0.2"
+    "@types/archiver" "^5.3.2"
+    "@types/dockerode" "^3.3.16"
     archiver "^5.3.1"
     async-lock "^1.4.0"
     byline "^5.0.0"

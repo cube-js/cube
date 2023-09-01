@@ -10,7 +10,7 @@ use crate::metastore::source::{Source, SourceCredentials};
 use crate::metastore::table::{StreamOffset, Table, TablePath};
 use crate::metastore::{
     Chunk, ChunkMetaStoreTable, Column, IdRow, ImportFormat, Index, IndexDef, IndexMetaStoreTable,
-    MetaStore, Partition, PartitionData, PartitionMetaStoreTable, RowKey, Schema,
+    MetaStore, Partition, PartitionData, PartitionMetaStoreTable, RocksPropertyRow, RowKey, Schema,
     SchemaMetaStoreTable, TableMetaStoreTable, WAL,
 };
 use crate::table::Row;
@@ -732,6 +732,11 @@ impl MetaStore for MetaStoreMock {
     async fn healthcheck(&self) -> Result<(), CubeError> {
         panic!("MetaStore mock!")
     }
+
+    async fn rocksdb_properties(&self) -> Result<Vec<RocksPropertyRow>, CubeError> {
+        panic!("MetaStore mock!")
+    }
+
     async fn get_snapshots_list(&self) -> Result<Vec<SnapshotInfo>, CubeError> {
         panic!("MetaStore mock!")
     }
@@ -870,7 +875,19 @@ impl CacheStore for CacheStoreMock {
         panic!("CacheStore mock!")
     }
 
+    async fn eviction(&self) -> Result<crate::cachestore::EvictionResult, CubeError> {
+        panic!("CacheStore mock!")
+    }
+
+    async fn persist(&self) -> Result<(), CubeError> {
+        panic!("CacheStore mock!")
+    }
+
     async fn healthcheck(&self) -> Result<(), CubeError> {
+        panic!("CacheStore mock!")
+    }
+
+    async fn rocksdb_properties(&self) -> Result<Vec<RocksPropertyRow>, CubeError> {
         panic!("CacheStore mock!")
     }
 }

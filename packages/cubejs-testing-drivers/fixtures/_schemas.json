@@ -214,7 +214,7 @@
         },
         {
           "name": "returning",
-          "sql": "returning",
+          "sql": "is_returning",
           "type": "boolean"
         }
       ],

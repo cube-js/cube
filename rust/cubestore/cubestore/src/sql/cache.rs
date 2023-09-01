@@ -240,6 +240,7 @@ mod tests {
                 indices: Vec::new(),
                 multi_part_subtree: HashMap::new(),
             },
+            None,
         )
         .await?;
         let counter = Arc::new(AtomicI64::new(1));

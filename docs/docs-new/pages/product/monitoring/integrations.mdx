@@ -38,12 +38,12 @@ following guides and configuration examples to get tool-specific instructions:
 
 <Grid imageSize={[56, 56]}>
   <GridItem
-    url="datadog"
+    url="integrations/datadog"
     imageUrl="https://static.cube.dev/icons/datadog.svg"
     title="Datadog"
   />
   <GridItem
-    url="grafana-cloud"
+    url="integrations/grafana-cloud"
     imageUrl="https://static.cube.dev/icons/grafana.svg"
     title="Grafana Cloud"
   />
@@ -61,8 +61,8 @@ Under <Btn>Metrics export</Btn>, you will see credentials for the
 `prometheus_exporter` sink, in case you'd like to setup [metrics
 export][self-sinks-for-metrics].
 
-Additionally, create a [`vector.toml` configration file][vector-docs-config]
-next to your `cube.js` file. This file is used to keep sinks configration. You
+Additionally, create a [`vector.toml` configuration file][vector-docs-config]
+next to your `cube.js` file. This file is used to keep sinks configuration. You
 have to commit this file for Vector configuration to take effect.
 
 ### Environment variables
@@ -243,6 +243,13 @@ You can also customize the user name and password for `prometheus_exporter` by
 setting `CUBE_CLOUD_MONITORING_METRICS_USER` and
 `CUBE_CLOUD_MONITORING_METRICS_PASSWORD` environment variables, respectively.
 
+## Auto-suspend behavior
+
+If [auto-suspension][ref-deploy-autosuspend] is enabled for a deployment with
+configured monitoring integrations, then the integrations will also be
+suspended, which prevents the export of metrics and logs.
+
+[ref-deploy-autosuspend]: /product/deployment/cloud/auto-suspension
 [self-sinks-for-metrics]: #configuration-sinks-for-metrics
 [ref-vpc]: /product/configuration/vpc
 [vector]: https://vector.dev/

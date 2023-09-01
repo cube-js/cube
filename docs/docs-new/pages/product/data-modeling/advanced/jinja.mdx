@@ -12,51 +12,60 @@ your feedback on this feature, please post an issue on GitHub.
 </InfoBox>
 
 To use a Jinja template, create a file in your data model folder with the
-`.jinja` extension. In the following example, we'll create a file named
-`orders.yml.jinja` under the `models/` directory.
+`.jinja` extension. For example, a file containing the `orders` cube could be
+named `orders.yml.jinja` under the `models/` directory.
 
 ## Loops
 
 Jinja supports [looping][jinja-docs-for-loop] over lists and dictionaries. In
-the following example, we loop over a list of columns and generate a dimension
-for each one:
+the following example, we loop over a list of nested properties and generate a
+`LEFT JOIN UNNEST` clause for each one: for each one:
 
 ```twig
-{%- set columns = [
-  "id",
-  "status",
-  "created_at",
-  "completed_at"
+{%- set nested_properties = [
+  "referrer",
+  "href",
+  "host",
+  "pathname",
+  "search"
 ] -%}
 
 cubes:
-  - name: orders
+  - name: analytics
     sql: >
       SELECT
-        {%- for column in columns %}
-        {{column}},
-        {%- endfor %}
-        SUM(number) AS total_amount
-      FROM public.orders
-      GROUP BY 1
+      {%- for prop in nested_properties %}
+        {{ prop }}_prop.value AS {{ prop }}
+      {%- endfor %}
+      FROM public.events
+      {%- for prop in nested_properties %}
+      LEFT JOIN UNNEST(properties) AS {{ prop }}_prop ON {{ prop }}_prop.key = '{{ prop }}'
+      {%- endfor %}
+```
 
-    dimensions:
-      - name: id
-        sql: id
-        type: number
-        primary_key: true
+Another useful pattern is to loop over a dictionary of values and generate a
+measure for each one, as in the following example:
 
-      - name: status
-        sql: status
-        type: string
+```twig
+{%- set metrics = {
+  "mau": 30,
+  "wau": 7,
+  "day": 1
+} %}
 
-      - name: created_at
-        sql: created_at
-        type: time
+cubes:
+  - name: orders
+    sql_table: public.orders
 
-      - name: completed_at
-        sql: completed_at
-        type: time
+    measures:
+      {%- for name, days in metrics.items() %}
+      - name: {{ name }}
+        type: count_distinct
+        sql: user_id
+        rolling_window:
+          trailing: {{ days }} day
+          offset: start
+      {% endfor %}
 ```
 
 ## Macros
@@ -89,6 +98,23 @@ cubes:
       {{ dimension('status') }}
       {{ dimension('created_at', 'time') }}
       {{ dimension('completed_at', 'time') }}
+```
+
+You could also use macros to generate SQL snippets for use in the `sql`
+property:
+
+```twig
+{%- macro cents_to_dollars(column_name, precision=2) -%}
+  ({{ column_name }} / 100)::NUMERIC(16, {{ precision }})
+{%- endmacro -%}
+
+cubes:
+  - name: payments
+    sql: >
+      SELECT
+        id AS payment_id,
+        {{ cents_to_dollars('amount') }} AS amount_usd
+      FROM app_data.payments
 ```
 
 ## Calling Python functions

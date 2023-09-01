@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import R from 'ramda';
 import { createQuery, compile, queryClass, PreAggregations, QueryFactory } from '@cubejs-backend/schema-compiler';
+import { v4 as uuidv4 } from 'uuid';
 import { NativeInstance } from '@cubejs-backend/native';
 
 export class CompilerApi {
@@ -105,26 +106,23 @@ export class CompilerApi {
   }
 
   async getDbType(dataSource = 'default') {
-    const res = await this.dbType({ dataSource, });
-    return res;
+    return this.dbType({ dataSource, });
   }
 
   getDialectClass(dataSource = 'default', dbType) {
     return this.dialectClass && this.dialectClass({ dataSource, dbType });
   }
 
-  async getSql(query, options = {}) {
-    const { includeDebugInfo } = options;
-
-    const dbType = await this.getDbType();
+  async getSqlGenerator(query, dataSource) {
+    const dbType = await this.getDbType(dataSource);
     const compilers = await this.getCompilers({ requestId: query.requestId });
-    let sqlGenerator = await this.createQueryByDataSource(compilers, query);
+    let sqlGenerator = await this.createQueryByDataSource(compilers, query, dataSource);
 
     if (!sqlGenerator) {
       throw new Error(`Unknown dbType: ${dbType}`);
     }
 
-    const dataSource = compilers.compiler.withQuery(sqlGenerator, () => sqlGenerator.dataSource);
+    dataSource = compilers.compiler.withQuery(sqlGenerator, () => sqlGenerator.dataSource);
     const _dbType = await this.getDbType(dataSource);
     if (dataSource !== 'default' && dbType !== _dbType) {
       // TODO consider more efficient way than instantiating query
@@ -139,9 +137,16 @@ export class CompilerApi {
       }
     }
 
+    return { sqlGenerator, compilers };
+  }
+
+  async getSql(query, options = {}) {
+    const { includeDebugInfo, exportAnnotatedSql } = options;
+    const { sqlGenerator, compilers } = await this.getSqlGenerator(query);
+
     const getSqlFn = () => compilers.compiler.withQuery(sqlGenerator, () => ({
       external: sqlGenerator.externalPreAggregationQuery(),
-      sql: sqlGenerator.buildSqlAndParams(),
+      sql: sqlGenerator.buildSqlAndParams(exportAnnotatedSql),
       lambdaQueries: sqlGenerator.buildLambdaQuery(),
       timeDimensionAlias: sqlGenerator.timeDimensions[0] && sqlGenerator.timeDimensions[0].unescapedAliasName(),
       timeDimensionField: sqlGenerator.timeDimensions[0] && sqlGenerator.timeDimensions[0].dimension,
@@ -218,36 +223,19 @@ export class CompilerApi {
     };
   }
 
-  async dataSources(orchestratorApi) {
-    let compilerVersion = (
-      this.schemaVersion && await this.schemaVersion() ||
-      'default_schema_version'
-    );
+  async cubeNameToDataSource(query) {
+    const { cubeEvaluator } = await this.getCompilers({ requestId: query.requestId });
+    return cubeEvaluator
+      .cubeNames()
+      .map(
+        (cube) => ({ [cube]: cubeEvaluator.cubeFromPath(cube).dataSource || 'default' })
+      ).reduce((a, b) => ({ ...a, ...b }), {});
+  }
 
-    if (typeof compilerVersion === 'object') {
-      compilerVersion = JSON.stringify(compilerVersion);
-    }
+  async dataSources(orchestratorApi, query) {
+    const cubeNameToDataSource = await this.cubeNameToDataSource(query || { requestId: `datasources-${uuidv4()}` });
 
-    let { compilers } = this;
-    if (!compilers || this.compilerVersion !== compilerVersion) {
-      compilers = await compile(this.repository, {
-        allowNodeRequire: this.allowNodeRequire,
-        compileContext: this.compileContext,
-        allowJsDuplicatePropsInSchema: this.allowJsDuplicatePropsInSchema,
-        standalone: this.standalone,
-        nativeInstance: this.nativeInstance,
-      });
-    }
-
-    const { cubeEvaluator } = await compilers;
-
-    let dataSources = await Promise.all(
-      cubeEvaluator
-        .cubeNames()
-        .map(
-          async (cube) => cubeEvaluator.cubeFromPath(cube).dataSource ?? 'default'
-        )
-    );
+    let dataSources = Object.keys(cubeNameToDataSource).map(c => cubeNameToDataSource[c]);
 
     dataSources = [...new Set(dataSources)];
 

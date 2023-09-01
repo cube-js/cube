@@ -140,6 +140,14 @@ impl RocksSecondaryIndex<CacheItem, CacheItemIndexKey> for CacheItemRocksIndex {
         }
     }
 
+    fn raw_value_size(&self, row: &CacheItem) -> u32 {
+        if let Ok(size) = u32::try_from(row.value.len()) {
+            size
+        } else {
+            u32::MAX
+        }
+    }
+
     fn key_to_bytes(&self, key: &CacheItemIndexKey) -> Vec<u8> {
         match key {
             CacheItemIndexKey::ByPrefix(s) | CacheItemIndexKey::ByPath(s) => s.as_bytes().to_vec(),
@@ -155,6 +163,13 @@ impl RocksSecondaryIndex<CacheItem, CacheItemIndexKey> for CacheItemRocksIndex {
 
     fn is_ttl(&self) -> bool {
         true
+    }
+
+    fn store_ttl_extended_info(&self) -> bool {
+        match self {
+            CacheItemRocksIndex::ByPath => true,
+            CacheItemRocksIndex::ByPrefix => false,
+        }
     }
 
     fn get_expire(&self, row: &CacheItem) -> Option<DateTime<Utc>> {

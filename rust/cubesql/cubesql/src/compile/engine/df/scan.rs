@@ -28,6 +28,11 @@ use futures::Stream;
 use log::warn;
 
 use crate::{
+    compile::{
+        engine::df::wrapper::{CubeScanWrapperNode, SqlQuery},
+        find_cube_scans_deep_search,
+        rewrite::WrappedSelectType,
+    },
     sql::AuthContextRef,
     transport::{CubeStreamReceiver, LoadRequestMeta, TransportService},
     CubeError,
@@ -36,6 +41,7 @@ use chrono::{Datelike, NaiveDate, NaiveDateTime};
 use datafusion::{
     arrow::{array::TimestampNanosecondBuilder, datatypes::TimeUnit},
     execution::context::TaskContext,
+    logical_plan::JoinType,
     scalar::ScalarValue,
 };
 use serde_json::{json, Value};
@@ -59,6 +65,7 @@ pub struct CubeScanNode {
     pub request: V1LoadRequestQuery,
     pub auth_context: AuthContextRef,
     pub options: CubeScanOptions,
+    pub used_cubes: Vec<String>,
 }
 
 impl CubeScanNode {
@@ -68,6 +75,7 @@ impl CubeScanNode {
         request: V1LoadRequestQuery,
         auth_context: AuthContextRef,
         options: CubeScanOptions,
+        used_cubes: Vec<String>,
     ) -> Self {
         Self {
             schema,
@@ -75,6 +83,7 @@ impl CubeScanNode {
             request,
             auth_context,
             options,
+            used_cubes,
         }
     }
 }
@@ -118,7 +127,189 @@ impl UserDefinedLogicalNode for CubeScanNode {
             request: self.request.clone(),
             auth_context: self.auth_context.clone(),
             options: self.options.clone(),
+            used_cubes: self.used_cubes.clone(),
         })
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct WrappedSelectNode {
+    pub schema: DFSchemaRef,
+    pub select_type: WrappedSelectType,
+    pub projection_expr: Vec<Expr>,
+    pub group_expr: Vec<Expr>,
+    pub aggr_expr: Vec<Expr>,
+    pub from: Arc<LogicalPlan>,
+    pub joins: Vec<(Arc<LogicalPlan>, Expr, JoinType)>,
+    pub filter_expr: Vec<Expr>,
+    pub having_expr: Vec<Expr>,
+    pub limit: Option<usize>,
+    pub offset: Option<usize>,
+    pub order_expr: Vec<Expr>,
+    pub alias: Option<String>,
+}
+
+impl WrappedSelectNode {
+    pub fn new(
+        schema: DFSchemaRef,
+        select_type: WrappedSelectType,
+        projection_expr: Vec<Expr>,
+        group_expr: Vec<Expr>,
+        aggr_expr: Vec<Expr>,
+        from: Arc<LogicalPlan>,
+        joins: Vec<(Arc<LogicalPlan>, Expr, JoinType)>,
+        filter_expr: Vec<Expr>,
+        having_expr: Vec<Expr>,
+        limit: Option<usize>,
+        offset: Option<usize>,
+        order_expr: Vec<Expr>,
+        alias: Option<String>,
+    ) -> Self {
+        Self {
+            schema,
+            select_type,
+            projection_expr,
+            group_expr,
+            aggr_expr,
+            from,
+            joins,
+            filter_expr,
+            having_expr,
+            limit,
+            offset,
+            order_expr,
+            alias,
+        }
+    }
+}
+
+impl UserDefinedLogicalNode for WrappedSelectNode {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn inputs(&self) -> Vec<&LogicalPlan> {
+        let mut inputs = vec![self.from.as_ref()];
+        inputs.extend(self.joins.iter().map(|(j, _, _)| j.as_ref()));
+        inputs
+    }
+
+    fn schema(&self) -> &DFSchemaRef {
+        &self.schema
+    }
+
+    fn expressions(&self) -> Vec<Expr> {
+        let mut exprs = vec![];
+        exprs.extend(self.projection_expr.clone());
+        exprs.extend(self.group_expr.clone());
+        exprs.extend(self.aggr_expr.clone());
+        exprs.extend(self.joins.iter().map(|(_, expr, _)| expr.clone()));
+        exprs.extend(self.filter_expr.clone());
+        exprs.extend(self.having_expr.clone());
+        exprs.extend(self.order_expr.clone());
+        exprs
+    }
+
+    fn fmt_for_explain(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "WrappedSelect: select_type={:?}, projection_expr={:?}, group_expr={:?}, aggregate_expr={:?}, from={:?}, joins={:?}, filter_expr={:?}, having_expr={:?}, limit={:?}, offset={:?}, order_expr={:?}, alias={:?}",
+            self.select_type,
+            self.projection_expr,
+            self.group_expr,
+            self.aggr_expr,
+            self.from,
+            self.joins,
+            self.filter_expr,
+            self.having_expr,
+            self.limit,
+            self.offset,
+            self.order_expr,
+            self.alias,
+        )
+    }
+
+    fn from_template(
+        &self,
+        exprs: &[datafusion::logical_plan::Expr],
+        inputs: &[datafusion::logical_plan::LogicalPlan],
+    ) -> std::sync::Arc<dyn UserDefinedLogicalNode + Send + Sync> {
+        assert_eq!(inputs.len(), self.inputs().len(), "input size inconsistent");
+        assert_eq!(
+            exprs.len(),
+            self.expressions().len(),
+            "expression size inconsistent"
+        );
+
+        let from = Arc::new(inputs[0].clone());
+        let joins = (1..self.joins.len() + 1)
+            .map(|i| Arc::new(inputs[i].clone()))
+            .collect::<Vec<_>>();
+        let mut joins_expr = vec![];
+        let join_types = self
+            .joins
+            .iter()
+            .map(|(_, _, t)| t.clone())
+            .collect::<Vec<_>>();
+        let mut filter_expr = vec![];
+        let mut having_expr = vec![];
+        let mut order_expr = vec![];
+        let mut projection_expr = vec![];
+        let mut group_expr = vec![];
+        let mut aggregate_expr = vec![];
+        let limit = None;
+        let offset = None;
+        let alias = None;
+
+        let mut exprs_iter = exprs.iter();
+        for _ in self.projection_expr.iter() {
+            projection_expr.push(exprs_iter.next().unwrap().clone());
+        }
+
+        for _ in self.group_expr.iter() {
+            group_expr.push(exprs_iter.next().unwrap().clone());
+        }
+
+        for _ in self.aggr_expr.iter() {
+            aggregate_expr.push(exprs_iter.next().unwrap().clone());
+        }
+
+        for _ in self.joins.iter() {
+            joins_expr.push(exprs_iter.next().unwrap().clone());
+        }
+
+        for _ in self.filter_expr.iter() {
+            filter_expr.push(exprs_iter.next().unwrap().clone());
+        }
+
+        for _ in self.having_expr.iter() {
+            having_expr.push(exprs_iter.next().unwrap().clone());
+        }
+
+        for _ in self.order_expr.iter() {
+            order_expr.push(exprs_iter.next().unwrap().clone());
+        }
+
+        Arc::new(WrappedSelectNode::new(
+            self.schema.clone(),
+            self.select_type.clone(),
+            projection_expr,
+            group_expr,
+            aggregate_expr,
+            from,
+            joins
+                .into_iter()
+                .zip(joins_expr)
+                .zip(join_types)
+                .map(|((plan, expr), join_type)| (plan, expr, join_type))
+                .collect(),
+            filter_expr,
+            having_expr,
+            limit,
+            offset,
+            order_expr,
+            alias,
+        ))
     }
 }
 
@@ -150,6 +341,41 @@ impl ExtensionPlanner for CubeScanExtensionPlanner {
                     member_fields: scan_node.member_fields.clone(),
                     transport: self.transport.clone(),
                     request: scan_node.request.clone(),
+                    wrapped_sql: None,
+                    auth_context: scan_node.auth_context.clone(),
+                    options: scan_node.options.clone(),
+                    meta: self.meta.clone(),
+                }))
+            } else if let Some(wrapper_node) = node.as_any().downcast_ref::<CubeScanWrapperNode>() {
+                // TODO
+                // assert_eq!(logical_inputs.len(), 0, "Inconsistent number of inputs");
+                // assert_eq!(physical_inputs.len(), 0, "Inconsistent number of inputs");
+                let scan_node =
+                    find_cube_scans_deep_search(wrapper_node.wrapped_plan.clone(), false)
+                        .into_iter()
+                        .next()
+                        .ok_or(DataFusionError::Internal(format!(
+                            "No cube scans found in wrapper node: {:?}",
+                            wrapper_node
+                        )))?;
+
+                let schema = SchemaRef::new(wrapper_node.schema().as_ref().into());
+                let member_fields = schema
+                    .fields()
+                    .iter()
+                    .map(|f| MemberField::Member(f.name().to_string()))
+                    .collect();
+                Some(Arc::new(CubeScanExecutionPlan {
+                    schema,
+                    member_fields,
+                    transport: self.transport.clone(),
+                    request: scan_node.request.clone(),
+                    wrapped_sql: Some(wrapper_node.wrapped_sql.as_ref().ok_or_else(|| {
+                        DataFusionError::Internal(format!(
+                            "Wrapped SQL is not set for wrapper node. Optimization wasn't performed: {:?}",
+                            wrapper_node
+                        ))
+                    })?.clone()),
                     auth_context: scan_node.auth_context.clone(),
                     options: scan_node.options.clone(),
                     meta: self.meta.clone(),
@@ -167,6 +393,7 @@ struct CubeScanExecutionPlan {
     schema: SchemaRef,
     member_fields: Vec<MemberField>,
     request: V1LoadRequestQuery,
+    wrapped_sql: Option<SqlQuery>,
     auth_context: AuthContextRef,
     options: CubeScanOptions,
     // Shared references which will be injected by extension planner
@@ -354,6 +581,7 @@ impl ExecutionPlan for CubeScanExecutionPlan {
             self.transport.clone(),
             meta.clone(),
             self.options.clone(),
+            self.wrapped_sql.clone(),
         );
 
         if stream_mode {
@@ -361,6 +589,7 @@ impl ExecutionPlan for CubeScanExecutionPlan {
                 .transport
                 .load_stream(
                     self.request.clone(),
+                    self.wrapped_sql.clone(),
                     self.auth_context.clone(),
                     meta,
                     self.schema.clone(),
@@ -384,6 +613,7 @@ impl ExecutionPlan for CubeScanExecutionPlan {
                 self.transport.clone(),
                 meta.clone(),
                 self.options.clone(),
+                self.wrapped_sql.clone(),
             )
             .await?
             .data,
@@ -407,7 +637,16 @@ impl ExecutionPlan for CubeScanExecutionPlan {
     fn fmt_as(&self, t: DisplayFormatType, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match t {
             DisplayFormatType::Default => {
-                write!(f, "CubeScanExecutionPlan")
+                // TODO padding
+                if let Some(sql) = self.wrapped_sql.as_ref() {
+                    write!(f, "CubeScanExecutionPlan, SQL:\n{}", sql.sql)
+                } else {
+                    write!(
+                        f,
+                        "CubeScanExecutionPlan, Request:\n{}",
+                        serde_json::to_string(&self.request).map_err(|_| fmt::Error)?
+                    )
+                }
             }
         }
     }
@@ -431,6 +670,7 @@ struct CubeScanOneShotStream {
     transport: Arc<dyn TransportService>,
     meta: LoadRequestMeta,
     options: CubeScanOptions,
+    wrapped_sql: Option<SqlQuery>,
 }
 
 impl CubeScanOneShotStream {
@@ -442,6 +682,7 @@ impl CubeScanOneShotStream {
         transport: Arc<dyn TransportService>,
         meta: LoadRequestMeta,
         options: CubeScanOptions,
+        wrapped_sql: Option<SqlQuery>,
     ) -> Self {
         Self {
             data: None,
@@ -452,6 +693,7 @@ impl CubeScanOneShotStream {
             transport,
             meta,
             options,
+            wrapped_sql,
         }
     }
 
@@ -549,6 +791,7 @@ async fn load_data(
     transport: Arc<dyn TransportService>,
     meta: LoadRequestMeta,
     options: CubeScanOptions,
+    sql_query: Option<SqlQuery>,
 ) -> ArrowResult<V1LoadResult> {
     let no_members_query = request.measures.as_ref().map(|v| v.len()).unwrap_or(0) == 0
         && request.dimensions.as_ref().map(|v| v.len()).unwrap_or(0) == 0
@@ -574,7 +817,7 @@ async fn load_data(
             data,
         )
     } else {
-        let result = transport.load(request, auth_context, meta).await;
+        let result = transport.load(request, sql_query, auth_context, meta).await;
         let mut response = result.map_err(|err| ArrowError::ComputeError(err.to_string()))?;
         if let Some(data) = response.results.pop() {
             match (options.max_records, data.data.len()) {
@@ -601,12 +844,14 @@ fn load_to_stream_sync(one_shot_stream: &mut CubeScanOneShotStream) -> Result<()
     let transport = one_shot_stream.transport.clone();
     let meta = one_shot_stream.meta.clone();
     let options = one_shot_stream.options.clone();
+    let wrapped_sql = one_shot_stream.wrapped_sql.clone();
 
     let handle = tokio::runtime::Handle::current();
-    let res =
-        std::thread::spawn(move || handle.block_on(load_data(req, auth, transport, meta, options)))
-            .join()
-            .map_err(|_| DataFusionError::Execution(format!("Can't load to stream")))?;
+    let res = std::thread::spawn(move || {
+        handle.block_on(load_data(req, auth, transport, meta, options, wrapped_sql))
+    })
+    .join()
+    .map_err(|_| DataFusionError::Execution(format!("Can't load to stream")))?;
 
     let mut response = JsonValueObject::new(res.unwrap().data);
     one_shot_stream.data = Some(
@@ -804,8 +1049,9 @@ pub fn transform_response<V: ValueObject>(
 mod tests {
     use super::*;
     use crate::{
-        compile::MetaContext,
+        compile::{engine::df::wrapper::SqlQuery, MetaContext},
         sql::{session::DatabaseProtocol, HttpAuthContext},
+        transport::SqlResponse,
         CubeError,
     };
     use cubeclient::models::V1LoadResponse;
@@ -842,10 +1088,21 @@ mod tests {
                 panic!("It's a fake transport");
             }
 
+            async fn sql(
+                &self,
+                _query: V1LoadRequestQuery,
+                _ctx: AuthContextRef,
+                _meta_fields: LoadRequestMeta,
+                _member_to_alias: Option<HashMap<String, String>>,
+            ) -> Result<SqlResponse, CubeError> {
+                todo!()
+            }
+
             // Execute load query
             async fn load(
                 &self,
                 _query: V1LoadRequestQuery,
+                _sql_query: Option<SqlQuery>,
                 _ctx: AuthContextRef,
                 _meta_fields: LoadRequestMeta,
             ) -> Result<V1LoadResponse, CubeError> {
@@ -880,6 +1137,7 @@ mod tests {
             async fn load_stream(
                 &self,
                 _query: V1LoadRequestQuery,
+                _sql_query: Option<SqlQuery>,
                 _ctx: AuthContextRef,
                 _meta_fields: LoadRequestMeta,
                 _schema: SchemaRef,
@@ -943,7 +1201,9 @@ mod tests {
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
             },
+            wrapped_sql: None,
             auth_context: Arc::new(HttpAuthContext {
                 access_token: "access_token".to_string(),
                 base_path: "base_path".to_string(),

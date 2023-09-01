@@ -8,7 +8,7 @@ use crate::{
             cost::BestCubePlan,
             rules::{
                 case::CaseRules, dates::DateRules, filters::FilterRules, members::MemberRules,
-                order::OrderRules, split::SplitRules,
+                order::OrderRules, split::SplitRules, wrapper::WrapperRules,
             },
             LogicalPlanLanguage,
         },
@@ -364,11 +364,18 @@ impl Rewriter {
         plan
     }
 
+    pub fn sql_push_down_enabled() -> bool {
+        env::var("CUBESQL_SQL_PUSH_DOWN")
+            .map(|v| v.to_lowercase() == "true")
+            .unwrap_or(false)
+    }
+
     pub fn rewrite_rules(
         cube_context: Arc<CubeContext>,
     ) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
+        let sql_push_down = Self::sql_push_down_enabled();
         let rules: Vec<Box<dyn RewriteRules>> = vec![
-            Box::new(MemberRules::new(cube_context.clone())),
+            Box::new(MemberRules::new(cube_context.clone(), sql_push_down)),
             Box::new(FilterRules::new(cube_context.clone())),
             Box::new(DateRules::new(cube_context.clone())),
             Box::new(OrderRules::new(cube_context.clone())),
@@ -378,6 +385,9 @@ impl Rewriter {
         let mut rewrites = Vec::new();
         for r in rules {
             rewrites.extend(r.rewrite_rules());
+        }
+        if sql_push_down {
+            rewrites.extend(WrapperRules::new(cube_context.clone()).rewrite_rules());
         }
         if let Ok(disabled_rule_names) = env::var("CUBESQL_DISABLE_REWRITES") {
             let disabled_rule_names = disabled_rule_names

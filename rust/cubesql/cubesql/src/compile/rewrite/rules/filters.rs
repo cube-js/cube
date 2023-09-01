@@ -16,8 +16,8 @@ use crate::{
             scalar_fun_expr_args, scalar_fun_expr_args_empty_tail, segment_member,
             time_dimension_date_range_replacer, time_dimension_expr, transforming_chain_rewrite,
             transforming_rewrite, udf_expr, udf_expr_var_arg, udf_fun_expr_args,
-            udf_fun_expr_args_empty_tail, BetweenExprNegated, BinaryExprOp, ChangeUserMemberValue,
-            ColumnExprColumn, CubeScanAliasToCube, CubeScanAliases, CubeScanLimit,
+            udf_fun_expr_args_empty_tail, BetweenExprNegated, BinaryExprOp, CastExprDataType,
+            ChangeUserMemberValue, ColumnExprColumn, CubeScanAliasToCube, CubeScanLimit,
             FilterMemberMember, FilterMemberOp, FilterMemberValues, FilterReplacerAliasToCube,
             FilterReplacerAliases, InListExprNegated, LikeExprEscapeChar, LikeExprNegated,
             LimitFetch, LimitSkip, LiteralExprValue, LogicalPlanLanguage, SegmentMemberMember,
@@ -38,7 +38,10 @@ use chrono::{
 };
 use cubeclient::models::V1CubeMeta;
 use datafusion::{
-    arrow::array::{Date32Array, Date64Array, TimestampNanosecondArray},
+    arrow::{
+        array::{Date32Array, Date64Array, TimestampNanosecondArray},
+        datatypes::DataType,
+    },
     logical_plan::{Column, Expr, Operator},
     scalar::ScalarValue,
 };
@@ -63,9 +66,10 @@ impl RewriteRules for FilterRules {
                         "?order",
                         "?limit",
                         "?offset",
-                        "?aliases",
                         "?split",
                         "?can_pushdown_join",
+                        "?wrapped",
+                        "?ungrouped",
                     ),
                 ),
                 cube_scan(
@@ -83,15 +87,15 @@ impl RewriteRules for FilterRules {
                     "?order",
                     "?limit",
                     "?offset",
-                    "?aliases",
                     "?split",
                     "?can_pushdown_join",
+                    "?wrapped",
+                    "?ungrouped",
                 ),
                 self.push_down_filter(
                     "?alias_to_cube",
                     "?expr",
                     "?filter_alias_to_cube",
-                    "?aliases",
                     "?filter_aliases",
                 ),
             ),
@@ -107,9 +111,10 @@ impl RewriteRules for FilterRules {
                         "?order",
                         "?limit",
                         "?offset",
-                        "?aliases",
                         "?split",
                         "?can_pushdown_join",
+                        "?wrapped",
+                        "?ungrouped",
                     ),
                 ),
                 limit(
@@ -122,9 +127,10 @@ impl RewriteRules for FilterRules {
                         "?order",
                         "?new_limit",
                         "?offset",
-                        "?aliases",
                         "?split",
                         "?can_pushdown_join",
+                        "?wrapped",
+                        "?ungrouped",
                     ),
                 ),
                 self.push_down_limit_filter(
@@ -164,9 +170,10 @@ impl RewriteRules for FilterRules {
                             "?order",
                             "?limit",
                             "?offset",
-                            "?aliases",
                             "?split",
                             "?can_pushdown_join",
+                            "?wrapped",
+                            "?ungrouped",
                         ),
                     ),
                 ),
@@ -182,9 +189,10 @@ impl RewriteRules for FilterRules {
                             "?order",
                             "?limit",
                             "?offset",
-                            "?aliases",
                             "?split",
                             "?can_pushdown_join",
+                            "?wrapped",
+                            "?ungrouped",
                         ),
                     ),
                 ),
@@ -219,9 +227,10 @@ impl RewriteRules for FilterRules {
                             "?order",
                             "?limit",
                             "?offset",
-                            "?aliases",
                             "?split",
                             "?can_pushdown_join",
+                            "?wrapped",
+                            "?ungrouped",
                         ),
                     ),
                     "?alias",
@@ -239,9 +248,10 @@ impl RewriteRules for FilterRules {
                             "?order",
                             "?limit",
                             "?offset",
-                            "?aliases",
                             "?split",
                             "?can_pushdown_join",
+                            "?wrapped",
+                            "?ungrouped",
                         ),
                         "?alias",
                         "?projection_split",
@@ -2003,10 +2013,11 @@ impl RewriteRules for FilterRules {
                 "?expr".to_string(),
             ),
             // Every expression should be handled by filter cast unwrap replacer otherwise other rules just won't work
-            rewrite(
+            transforming_rewrite(
                 "filter-cast-unwrap",
                 filter_cast_unwrap_replacer(cast_expr("?expr", "?data_type")),
                 filter_cast_unwrap_replacer("?expr"),
+                self.transform_filter_cast_unwrap("?expr", "?data_type"),
             ),
             rewrite(
                 "filter-cast-unwrap-binary-push-down",
@@ -2274,7 +2285,7 @@ impl RewriteRules for FilterRules {
                     "?time_dimension_date_range",
                 ),
             ),
-            transforming_rewrite(
+            rewrite(
                 "in-date-range-to-time-dimension-swap-to-members",
                 cube_scan(
                     "?source_table_name",
@@ -2287,9 +2298,10 @@ impl RewriteRules for FilterRules {
                     "?order",
                     "?limit",
                     "?offset",
-                    "?aliases",
                     "CubeScanSplit:false",
                     "?can_pushdown_join",
+                    "?wrapped",
+                    "?ungrouped",
                 ),
                 cube_scan(
                     "?source_table_name",
@@ -2302,11 +2314,11 @@ impl RewriteRules for FilterRules {
                     "?order",
                     "?limit",
                     "?offset",
-                    "?aliases_none",
                     "CubeScanSplit:false",
                     "?can_pushdown_join",
+                    "?wrapped",
+                    "?ungrouped",
                 ),
-                self.transform_cube_scan_aliases_none("?aliases_none"),
             ),
             transforming_rewrite(
                 "time-dimension-date-range-replacer-push-down-left",
@@ -2431,44 +2443,31 @@ impl FilterRules {
         alias_to_cube_var: &'static str,
         exp_var: &'static str,
         filter_alias_to_cube_var: &'static str,
-        cube_aliases_var: &'static str,
         filter_aliases_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let exp_var = var!(exp_var);
-        let cube_aliases_var = var!(cube_aliases_var);
         let filter_aliases_var = var!(filter_aliases_var);
         let filter_alias_to_cube_var = var!(filter_alias_to_cube_var);
         move |egraph, subst| {
             for alias_to_cube in
                 var_iter!(egraph[subst[alias_to_cube_var]], CubeScanAliasToCube).cloned()
             {
-                for cube_aliases in
-                    var_iter!(egraph[subst[cube_aliases_var]], CubeScanAliases).cloned()
-                {
-                    if cube_aliases.is_none() {
-                        continue;
-                    }
+                if let Some(_referenced_expr) = &egraph.index(subst[exp_var]).data.referenced_expr {
+                    // TODO check referenced_expr
+                    subst.insert(
+                        filter_alias_to_cube_var,
+                        egraph.add(LogicalPlanLanguage::FilterReplacerAliasToCube(
+                            FilterReplacerAliasToCube(alias_to_cube),
+                        )),
+                    );
 
-                    if let Some(_referenced_expr) =
-                        &egraph.index(subst[exp_var]).data.referenced_expr
-                    {
-                        // TODO check referenced_expr
-                        subst.insert(
-                            filter_alias_to_cube_var,
-                            egraph.add(LogicalPlanLanguage::FilterReplacerAliasToCube(
-                                FilterReplacerAliasToCube(alias_to_cube),
-                            )),
-                        );
+                    let filter_replacer_aliases = egraph.add(
+                        LogicalPlanLanguage::FilterReplacerAliases(FilterReplacerAliases(vec![])),
+                    );
+                    subst.insert(filter_aliases_var, filter_replacer_aliases);
 
-                        let filter_replacer_aliases =
-                            egraph.add(LogicalPlanLanguage::FilterReplacerAliases(
-                                FilterReplacerAliases(cube_aliases.unwrap_or(vec![])),
-                            ));
-                        subst.insert(filter_aliases_var, filter_replacer_aliases);
-
-                        return true;
-                    }
+                    return true;
                 }
             }
 
@@ -4110,17 +4109,29 @@ impl FilterRules {
         }
     }
 
-    fn transform_cube_scan_aliases_none(
+    fn transform_filter_cast_unwrap(
         &self,
-        aliases_none_var: &'static str,
+        expr_var: &'static str,
+        data_type_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
-        let aliases_none_var = var!(aliases_none_var);
+        let expr_var = var!(expr_var);
+        let data_type_var = var!(data_type_var);
         move |egraph, subst| {
-            subst.insert(
-                aliases_none_var,
-                egraph.add(LogicalPlanLanguage::CubeScanAliases(CubeScanAliases(None))),
-            );
-            true
+            if let Some(expr) = egraph[subst[expr_var]].data.original_expr.clone() {
+                for data_type in var_iter!(egraph[subst[data_type_var]], CastExprDataType).cloned()
+                {
+                    return match data_type {
+                        // Exclude casts to string for timestamps
+                        DataType::Timestamp(_, _) => match expr {
+                            Expr::Literal(ScalarValue::Utf8(_)) => false,
+                            _ => true,
+                        },
+                        _ => true,
+                    };
+                }
+            }
+
+            false
         }
     }
 }

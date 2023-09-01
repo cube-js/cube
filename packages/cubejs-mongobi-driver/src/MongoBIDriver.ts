@@ -65,9 +65,9 @@ export class MongoBIDriver extends BaseDriver implements DriverInterface {
       testConnectionTimeout: config.testConnectionTimeout,
     });
 
-    const dataSource =
-      config.dataSource ||
-      assertDataSource('default');
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { dataSource: configDataSource, maxPoolSize, testConnectionTimeout, ...mongoBIDriverConfiguration } = config;
+    const dataSource = configDataSource || assertDataSource('default');
 
     this.config = {
       host: getEnv('dbHost', { dataSource }),
@@ -97,7 +97,7 @@ export class MongoBIDriver extends BaseDriver implements DriverInterface {
 
         return next();
       },
-      ...config
+      ...mongoBIDriverConfiguration
     };
     this.pool = genericPool.createPool({
       create: async () => {
