@@ -34,9 +34,9 @@ describe('DatabricksDriver', () => {
     process.env.CUBEJS_DB_EXPORT_BUCKET_TYPE='azure';
     process.env.CUBEJS_DB_EXPORT_BUCKET='wasbs://cube-export@mock.blob.core.windows.net';
     process.env.CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY='azure-key';
-    process.env.CUBEJS_DB_EXPORT_BUCKET_TENANT_ID='azure-tenant-id';
-    process.env.CUBEJS_DB_EXPORT_BUCKET_CLIENT_ID='azure-client-id';
-    process.env.CUBEJS_DB_EXPORT_BUCKET_CLIENT_SECRET='azure-client-sceret'
+    process.env.CUBEJS_DB_EXPORT_BUCKET_AZURE_TENANT_ID='azure-tenant-id';
+    process.env.CUBEJS_DB_EXPORT_BUCKET_AZURE_CLIENT_ID='azure-client-id';
+    process.env.CUBEJS_DB_EXPORT_BUCKET_AZURE_CLIENT_SECRET='azure-client-sceret'
     process.env.CUBEJS_DB_DATABRICKS_TOKEN='token';
   });
 

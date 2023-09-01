@@ -95,17 +95,17 @@ export type DatabricksDriverConfiguration = JDBCDriverConfiguration &
     /**
      * Azure tenant id
      */
-    tenantId?: string,
+    azureTenantId?: string,
 
     /**
      * Azure service principle client id
      */
-    clientId?: string,
+    azureClientId?: string,
 
     /**
      * Azure service principle client sceret
      */
-    clientSecret?: string,
+    azureClientSecret?: string,
   };
 
 async function fileExistsOr(
@@ -262,15 +262,15 @@ export class DatabricksDriver extends JDBCDriver {
       exportBucketCsvEscapeSymbol:
         getEnv('dbExportBucketCsvEscapeSymbol', { dataSource }),
       // Azure service principle
-      tenantId:
-        conf?.tenantId ||
-        getEnv('dbExportBucketTenantId', { dataSource }),
-      clientId:
-        conf?.clientId ||
-        getEnv('dbExportBucketClientId', { dataSource }),
-      clientSecret:
-        conf?.clientSecret ||
-        getEnv('dbExportBucketClientSecret', { dataSource }),
+      azureTenantId:
+        conf?.azureTenantId ||
+        getEnv('dbExportBucketAzureTenantId', { dataSource }),
+      azureClientId:
+        conf?.azureClientId ||
+        getEnv('dbExportBucketAzureClientId', { dataSource }),
+      azureClientSecret:
+        conf?.azureClientSecret ||
+        getEnv('dbExportBucketAzureClientSecret', { dataSource }),
     };
     super(config);
     this.config = config;
@@ -690,9 +690,9 @@ export class DatabricksDriver extends JDBCDriver {
         this.config.azureKey as string,
       )
       : new ClientSecretCredential(
-        this.config.tenantId as string,
-        this.config.clientId as string,
-        this.config.clientSecret as string,
+        this.config.azureTenantId as string,
+        this.config.azureClientId as string,
+        this.config.azureClientSecret as string,
       );
     const blobClient = new BlobServiceClient(
       `https://${account}.blob.core.windows.net`,
