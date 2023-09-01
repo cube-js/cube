@@ -744,12 +744,16 @@ impl CacheEvictionManager {
     ) -> Result<EvictionResult, CubeError> {
         // move
         let eviction_batch_size = self.eviction_batch_size;
+        let eviction_min_ttl_threshold = self.eviction_min_ttl_threshold as i64;
 
         let to_delete: Vec<(u64, u32)> = store
             .read_operation_out_of_queue(move |db_ref| {
                 let mut pending_volume_remove: u64 = 0;
 
+                let now_with_threshold =
+                    Utc::now() + chrono::Duration::seconds(eviction_min_ttl_threshold);
                 let mut to_delete = Vec::with_capacity(eviction_batch_size);
+
                 let cache_schema = CacheItemRocksTable::new(db_ref.clone());
 
                 let mut sampling_count = 0;
@@ -789,6 +793,20 @@ impl CacheEvictionManager {
 
                         (weight, CACHE_ITEM_SIZE_WITHOUT_VALUE)
                     };
+
+                    if let Some(ttl) = item.ttl {
+                        if ttl < now_with_threshold {
+                            if target_is_size {
+                                pending_volume_remove += raw_size as u64;
+                            } else {
+                                pending_volume_remove += 1;
+                            }
+
+                            to_delete.push((item.row_id, raw_size));
+
+                            continue;
+                        }
+                    }
 
                     if let Some((_, min_weight, _)) = sampling_min {
                         if min_weight > weight {
