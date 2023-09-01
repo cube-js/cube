@@ -6,7 +6,7 @@ use crate::config::ConfigObj;
 use crate::metastore::{
     BaseRocksSecondaryIndex, IdRow, PackedDateTime, RocksSecondaryIndexValueTTLExtended,
     RocksSecondaryIndexValueVersionDecoder, RocksSecondaryIndexValueVersionEncoder, RocksStore,
-    RocksTable,
+    RocksTable, SecondaryIndexValueScanIterItem,
 };
 use crate::util::aborting_join_handle::AbortingJoinHandle;
 use crate::util::lock::acquire_lock;
@@ -22,7 +22,6 @@ use std::fmt;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::sync::Arc;
-use std::vec::IntoIter;
 use tokio::sync::mpsc::error::TrySendError;
 use tokio::sync::RwLockWriteGuard;
 
@@ -620,36 +619,7 @@ impl CacheEvictionManager {
                 for item in cache_schema.scan_index_values(&CacheItemRocksIndex::ByPath)? {
                     let item = item?;
 
-                    let (weight, raw_size) = if let Some(extended) = item.extended {
-                        let weight = match criteria {
-                            CacheEvictionWeightCriteria::ByLRU => {
-                                extended.lru.encode_value_as_u32()?
-                            }
-                            CacheEvictionWeightCriteria::ByTTL => item.ttl.encode_value_as_u32()?,
-                            CacheEvictionWeightCriteria::ByLFU => extended.lfu as u32,
-                        };
-
-                        (weight, extended.raw_size)
-                    } else {
-                        // count keys without size as 1
-                        stats_total_raw_size += 1_u64;
-
-                        let weight = match criteria {
-                            CacheEvictionWeightCriteria::ByLRU =>
-                            /* height priority to delete */
-                            {
-                                0
-                            }
-                            CacheEvictionWeightCriteria::ByTTL => item.ttl.encode_value_as_u32()?,
-                            CacheEvictionWeightCriteria::ByLFU =>
-                            /* height priority to delete */
-                            {
-                                0
-                            }
-                        };
-
-                        (weight, CACHE_ITEM_SIZE_WITHOUT_VALUE)
-                    };
+                    let (weight, raw_size) = self.get_weight_and_size_by_criteria(&item, &criteria);
 
                     // We need to count expired keys too!
                     stats_total_keys += 1;
@@ -766,33 +736,7 @@ impl CacheEvictionManager {
                 for item in cache_schema.scan_index_values(&CacheItemRocksIndex::ByPath)? {
                     let item = item?;
 
-                    let (weight, raw_size) = if let Some(extended) = item.extended {
-                        let weight = match criteria {
-                            CacheEvictionWeightCriteria::ByLRU => {
-                                extended.lru.encode_value_as_u32()?
-                            }
-                            CacheEvictionWeightCriteria::ByTTL => item.ttl.encode_value_as_u32()?,
-                            CacheEvictionWeightCriteria::ByLFU => extended.lfu as u32,
-                        };
-
-                        (weight, extended.raw_size)
-                    } else {
-                        let weight = match criteria {
-                            CacheEvictionWeightCriteria::ByLRU =>
-                            /* height priority to delete */
-                            {
-                                0
-                            }
-                            CacheEvictionWeightCriteria::ByTTL => item.ttl.encode_value_as_u32()?,
-                            CacheEvictionWeightCriteria::ByLFU =>
-                            /* height priority to delete */
-                            {
-                                0
-                            }
-                        };
-
-                        (weight, CACHE_ITEM_SIZE_WITHOUT_VALUE)
-                    };
+                    let (weight, raw_size) = self.get_weight_and_size_by_criteria(&item, &criteria);
 
                     if let Some(ttl) = item.ttl {
                         if ttl < now_with_threshold {
@@ -1089,6 +1033,39 @@ impl CacheEvictionManager {
         self.stats_total_raw_size.store(0, Ordering::Relaxed);
 
         self.end_eviction_state(EvictionState::Ready).await
+    }
+
+    #[inline]
+    fn get_weight_and_size_by_criteria(
+        &self,
+        item: &SecondaryIndexValueScanIterItem,
+        criteria: &CacheEvictionWeightCriteria,
+    ) -> _ {
+        if let Some(extended) = &item.extended {
+            let weight = match criteria {
+                CacheEvictionWeightCriteria::ByLRU => extended.lru.encode_value_as_u32()?,
+                CacheEvictionWeightCriteria::ByTTL => item.ttl.encode_value_as_u32()?,
+                CacheEvictionWeightCriteria::ByLFU => extended.lfu as u32,
+            };
+
+            (weight, extended.raw_size)
+        } else {
+            let weight = match criteria {
+                CacheEvictionWeightCriteria::ByLRU =>
+                /* height priority to delete */
+                {
+                    0
+                }
+                CacheEvictionWeightCriteria::ByTTL => item.ttl.encode_value_as_u32()?,
+                CacheEvictionWeightCriteria::ByLFU =>
+                /* height priority to delete */
+                {
+                    0
+                }
+            };
+
+            (weight, CACHE_ITEM_SIZE_WITHOUT_VALUE)
+        }
     }
 }
 
