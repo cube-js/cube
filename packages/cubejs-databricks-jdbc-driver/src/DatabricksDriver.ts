@@ -684,16 +684,18 @@ export class DatabricksDriver extends JDBCDriver {
       pathname.split(`${this.config.exportBucket}/`)[1];
     const expr = new RegExp(`${foldername}\\/.*\\.csv$`, 'i');
 
-    const credential = this.config.azureKey
-      ? new StorageSharedKeyCredential(
-        account,
-        this.config.azureKey as string,
-      )
-      : new ClientSecretCredential(
+    let credential: StorageSharedKeyCredential | ClientSecretCredential;
+    credential = new StorageSharedKeyCredential(
+      account,
+      this.config.azureKey as string,
+    );
+    if (this.config.azureTenantId && this.config.azureClientId && this.config.azureClientSecret) {
+      credential = new ClientSecretCredential(
         this.config.azureTenantId as string,
         this.config.azureClientId as string,
         this.config.azureClientSecret as string,
       );
+    }
     const blobClient = new BlobServiceClient(
       `https://${account}.blob.core.windows.net`,
       credential,
