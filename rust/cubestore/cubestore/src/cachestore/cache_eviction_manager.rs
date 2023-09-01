@@ -20,6 +20,7 @@ use std::fmt;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::sync::Arc;
+use std::vec::IntoIter;
 use tokio::sync::mpsc::error::TrySendError;
 use tokio::sync::RwLockWriteGuard;
 
@@ -120,6 +121,8 @@ impl FromStr for CacheEvictionPolicy {
         }
     }
 }
+
+type KeysVector = Vec<(/* row_id */ u64, /* raw_size */ u32)>;
 
 #[derive(Debug)]
 pub struct CacheEvictionManager {
@@ -297,7 +300,7 @@ impl CacheEvictionManager {
 
     async fn delete_items(
         &self,
-        to_delete: Vec<(u64, u32)>,
+        to_delete: KeysVector,
         store: &Arc<RocksStore>,
     ) -> Result<EvictionFinishedResult, CubeError> {
         let stats_total_keys = self.get_stats_total_keys();
@@ -310,7 +313,7 @@ impl CacheEvictionManager {
         let last_batch = if to_delete.len() > self.eviction_batch_size {
             let mut batch = Vec::with_capacity(self.eviction_batch_size);
 
-            for (row_id, raw_size) in to_delete {
+            for (row_id, raw_size) in to_delete.into_iter() {
                 batch.push((row_id, raw_size));
 
                 if batch.len() == self.eviction_batch_size {
@@ -503,21 +506,21 @@ impl CacheEvictionManager {
         let mut total_size_removed = 0;
         let mut total_delete_skipped = 0;
 
-        let absolute_items = self.collect_stats_and_candidates_to_evict(&store).await?;
-        let absolute_items_len = absolute_items.len();
+        let expired_items = self.collect_stats_and_candidates_to_evict(&store).await?;
+        let expired_len = expired_items.len();
 
-        if absolute_items_len > 0 {
-            let batch_result = self.delete_items(absolute_items, &store).await?;
+        if expired_len > 0 {
+            let batch_result = self.delete_items(expired_items, &store).await?;
             total_keys_removed = batch_result.total_delete_skipped;
             total_size_removed = batch_result.total_size_removed;
             total_delete_skipped = batch_result.total_delete_skipped;
         }
 
         log::trace!(
-            "Eviction loaded stats, total_keys: {}, total_size: {}, absolute: {}",
+            "Eviction loaded stats, total_keys: {}, total_size: {}, expired: {}",
             self.get_stats_total_keys(),
             self.get_stats_total_raw_size(),
-            absolute_items_len
+            expired_len
         );
 
         Ok(EvictionResult::Finished(EvictionFinishedResult {
@@ -532,17 +535,14 @@ impl CacheEvictionManager {
     async fn collect_stats_and_candidates_to_evict(
         &self,
         store: &Arc<RocksStore>,
-    ) -> Result<Vec<(u64, u32)>, CubeError> {
-        let eviction_min_ttl_threshold = self.eviction_min_ttl_threshold as i64;
-
+    ) -> Result<KeysVector, CubeError> {
         let (to_delete, stats_total_keys, stats_total_raw_size) = store
             .read_operation_out_of_queue(move |db_ref| {
                 let mut stats_total_keys: u32 = 0;
                 let mut stats_total_raw_size: u64 = 0;
 
-                let mut result = Vec::with_capacity(16);
-                let started_date =
-                    Utc::now() + chrono::Duration::seconds(eviction_min_ttl_threshold);
+                let mut result = KeysVector::new();
+                let now = Utc::now();
                 let cache_schema = CacheItemRocksTable::new(db_ref.clone());
 
                 for item in cache_schema.scan_index_values(&CacheItemRocksIndex::ByPath)? {
@@ -561,7 +561,7 @@ impl CacheEvictionManager {
                     };
 
                     if let Some(ttl) = item.ttl {
-                        if ttl < started_date {
+                        if ttl < now {
                             result.push((item.row_id, row_size));
                         }
                     }
@@ -583,32 +583,30 @@ impl CacheEvictionManager {
         &self,
         criteria: CacheEvictionWeightCriteria,
         store: &Arc<RocksStore>,
-    ) -> Result<Vec<(u64, u32)>, CubeError> {
+    ) -> Result<(KeysVector, KeysVector), CubeError> {
         let eviction_min_ttl_threshold = self.eviction_min_ttl_threshold as i64;
 
-        let (all_keys, stats_total_keys, stats_total_raw_size) = store
+        let (all_keys, stats_total_keys, stats_total_raw_size, expired_keys) = store
             .read_operation_out_of_queue(move |db_ref| {
                 let mut stats_total_keys: u32 = 0;
                 let mut stats_total_raw_size: u64 = 0;
 
                 let cache_schema = CacheItemRocksTable::new(db_ref.clone());
 
-                let started_date =
+                let now_with_threshold =
                     Utc::now() + chrono::Duration::seconds(eviction_min_ttl_threshold);
-                let mut result: Vec<(
+
+                let mut expired_keys = KeysVector::with_capacity(64);
+                let mut all_keys: Vec<(
                     /* id */ u64,
                     /* weight */ u32,
                     /* raw_size */ u32,
-                )> = Vec::new();
+                )> = Vec::with_capacity(64);
 
                 for item in cache_schema.scan_index_values(&CacheItemRocksIndex::ByPath)? {
                     let item = item?;
 
-                    stats_total_keys += 1;
-
                     let (weight, raw_size) = if let Some(extended) = item.extended {
-                        stats_total_raw_size += extended.raw_size as u64;
-
                         let weight = match criteria {
                             CacheEvictionWeightCriteria::ByLRU => {
                                 extended.lru.encode_value_as_u32()?
@@ -640,16 +638,24 @@ impl CacheEvictionManager {
                     };
 
                     if let Some(ttl) = item.ttl {
-                        if ttl < started_date {
-                            result.push((item.row_id, weight, raw_size));
+                        if ttl < now_with_threshold {
+                            expired_keys.push((item.row_id, raw_size));
                             continue;
                         }
                     }
 
-                    result.push((item.row_id, weight, raw_size))
+                    stats_total_keys += 1;
+                    stats_total_raw_size += raw_size as u64;
+
+                    all_keys.push((item.row_id, weight, raw_size))
                 }
 
-                Ok((result, stats_total_keys, stats_total_raw_size))
+                Ok((
+                    all_keys,
+                    stats_total_keys,
+                    stats_total_raw_size,
+                    expired_keys,
+                ))
             })
             .await?;
 
@@ -658,13 +664,13 @@ impl CacheEvictionManager {
         self.stats_total_raw_size
             .store(stats_total_raw_size, Ordering::Release);
 
-        let sorted = all_keys
+        let sorted: KeysVector = all_keys
             .into_iter()
             .sorted_by(|(_, a, _), (_, b, _)| a.cmp(b))
             .map(|(id, _weight, raw_size)| (id, raw_size))
             .collect();
 
-        Ok(sorted)
+        Ok((sorted, expired_keys))
     }
 
     async fn do_eviction_by_allkeys(
@@ -674,10 +680,14 @@ impl CacheEvictionManager {
         target_is_size: bool,
         criteria: CacheEvictionWeightCriteria,
     ) -> Result<EvictionResult, CubeError> {
-        let to_evict = self.collect_allkeys_to_evict(criteria, &store).await?;
+        let (to_evict, expired) = self.collect_allkeys_to_evict(criteria, &store).await?;
 
         let mut pending_size_removed = 0_u64;
         let mut pending_keys_removed = 0_u32;
+
+        if expired.len() > 0 {
+            let stats = self.delete_items(expired, &store).await?;
+        }
 
         let mut pending = Vec::with_capacity(self.eviction_batch_size);
 
