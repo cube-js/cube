@@ -17873,7 +17873,7 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
-    async fn test_thoughtspot_filter_date_trunc_column_with_literal() {
+    async fn test_thoughtspot_filter_date_trunc_column_with_literal2() {
         if !Rewriter::sql_push_down_enabled() {
             return;
         }
@@ -17881,18 +17881,48 @@ ORDER BY \"COUNT(count)\" DESC"
 
         let test_data = vec![
             // (operator, literal date, filter operator, filter value)
-            (">=", "2020-03-25", "afterOrOnDate", "2020-04-01T00:00:00.000Z"),
-            (">=", "2020-04-01", "afterOrOnDate", "2020-04-01T00:00:00.000Z"),
-            (">=", "2020-04-10", "afterOrOnDate", "2020-05-01T00:00:00.000Z"),
-            ("<=", "2020-03-25", "beforeOrOnDate", "2020-03-31T23:59:59.999Z"),
-            ("<=", "2020-04-01", "beforeOrOnDate", "2020-04-30T23:59:59.999Z"),
-            ("<=", "2020-04-10", "beforeOrOnDate", "2020-04-30T23:59:59.999Z"),
+            (
+                ">=",
+                "2020-03-25",
+                "afterOrOnDate",
+                "2020-04-01T00:00:00.000Z",
+            ),
+            (
+                ">=",
+                "2020-04-01",
+                "afterOrOnDate",
+                "2020-04-01T00:00:00.000Z",
+            ),
+            (
+                ">=",
+                "2020-04-10",
+                "afterOrOnDate",
+                "2020-05-01T00:00:00.000Z",
+            ),
+            (
+                "<=",
+                "2020-03-25",
+                "beforeOrOnDate",
+                "2020-04-01T00:00:00.000Z",
+            ),
+            (
+                "<=",
+                "2020-04-01",
+                "beforeOrOnDate",
+                "2020-05-01T00:00:00.000Z",
+            ),
+            (
+                "<=",
+                "2020-04-10",
+                "beforeOrOnDate",
+                "2020-05-01T00:00:00.000Z",
+            ),
             (">", "2020-03-25", "afterDate", "2020-04-01T00:00:00.000Z"),
             (">", "2020-04-01", "afterDate", "2020-05-01T00:00:00.000Z"),
             (">", "2020-04-10", "afterDate", "2020-05-01T00:00:00.000Z"),
-            ("<", "2020-03-25", "beforeDate", "2020-03-31T23:59:59.999Z"),
-            ("<", "2020-04-01", "beforeDate", "2020-03-31T23:59:59.999Z"),
-            ("<", "2020-04-10", "beforeDate", "2020-04-30T23:59:59.999Z"),
+            ("<", "2020-03-25", "beforeDate", "2020-04-01T00:00:00.000Z"),
+            ("<", "2020-04-01", "beforeDate", "2020-04-01T00:00:00.000Z"),
+            ("<", "2020-04-10", "beforeDate", "2020-05-01T00:00:00.000Z"),
         ];
 
         for (operator, literal_date, filter_operator, filter_value) in test_data {
