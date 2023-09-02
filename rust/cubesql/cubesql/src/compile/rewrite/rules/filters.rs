@@ -2224,151 +2224,18 @@ impl RewriteRules for FilterRules {
                 "filter-replacer-in-date-range",
                 filter_op(
                     filter_op_filters(
-                        filter_member("?member", "FilterMemberOp:afterDate", "?date_range_start"),
-                        filter_member("?member", "FilterMemberOp:beforeDate", "?date_range_end"),
+                        filter_member("?member", "?date_range_start_op", "?date_range_start"),
+                        filter_member("?member", "?date_range_end_op", "?date_range_end"),
                     ),
                     "FilterOpOp:and",
                 ),
                 filter_member("?member", "FilterMemberOp:inDateRange", "?date_range"),
-                self.merge_date_range_exclusive(
+                self.merge_date_range(
                     "?date_range_start",
                     "?date_range_end",
                     "?date_range",
-                ),
-            ),
-            transforming_rewrite(
-                "filter-replacer-in-date-range-dec-end",
-                filter_op(
-                    filter_op_filters(
-                        filter_member(
-                            "?member",
-                            "FilterMemberOp:afterOrOnDate",
-                            "?date_range_start",
-                        ),
-                        filter_member("?member", "FilterMemberOp:beforeDate", "?date_range_end"),
-                    ),
-                    "FilterOpOp:and",
-                ),
-                filter_member("?member", "FilterMemberOp:inDateRange", "?date_range"),
-                self.merge_date_range_dec_end(
-                    "?date_range_start",
-                    "?date_range_end",
-                    "?date_range",
-                ),
-            ),
-            transforming_rewrite(
-                "filter-replacer-in-date-range-inc-start",
-                filter_op(
-                    filter_op_filters(
-                        filter_member("?member", "FilterMemberOp:afterDate", "?date_range_start"),
-                        filter_member(
-                            "?member",
-                            "FilterMemberOp:beforeOrOnDate",
-                            "?date_range_end",
-                        ),
-                    ),
-                    "FilterOpOp:and",
-                ),
-                filter_member("?member", "FilterMemberOp:inDateRange", "?date_range"),
-                self.merge_date_range_inc_start(
-                    "?date_range_start",
-                    "?date_range_end",
-                    "?date_range",
-                ),
-            ),
-            transforming_rewrite(
-                "filter-replacer-in-date-range-inclusive",
-                filter_op(
-                    filter_op_filters(
-                        filter_member(
-                            "?member",
-                            "FilterMemberOp:afterOrOnDate",
-                            "?date_range_start",
-                        ),
-                        filter_member(
-                            "?member",
-                            "FilterMemberOp:beforeOrOnDate",
-                            "?date_range_end",
-                        ),
-                    ),
-                    "FilterOpOp:and",
-                ),
-                filter_member("?member", "FilterMemberOp:inDateRange", "?date_range"),
-                self.merge_date_range("?date_range_start", "?date_range_end", "?date_range"),
-            ),
-            rewrite(
-                "filter-replacer-in-date-range-inverse",
-                filter_op(
-                    filter_op_filters(
-                        filter_member("?member", "FilterMemberOp:beforeDate", "?date_range_end"),
-                        filter_member("?member", "FilterMemberOp:afterDate", "?date_range_start"),
-                    ),
-                    "FilterOpOp:and",
-                ),
-                filter_op(
-                    filter_op_filters(
-                        filter_member("?member", "FilterMemberOp:afterDate", "?date_range_start"),
-                        filter_member("?member", "FilterMemberOp:beforeDate", "?date_range_end"),
-                    ),
-                    "FilterOpOp:and",
-                ),
-            ),
-            rewrite(
-                "filter-replacer-after-or-on-date-inverse",
-                filter_op(
-                    filter_op_filters(
-                        filter_member("?member", "FilterMemberOp:beforeDate", "?date_range_end"),
-                        filter_member(
-                            "?member",
-                            "FilterMemberOp:afterOrOnDate",
-                            "?date_range_start",
-                        ),
-                    ),
-                    "FilterOpOp:and",
-                ),
-                filter_op(
-                    filter_op_filters(
-                        filter_member(
-                            "?member",
-                            "FilterMemberOp:afterOrOnDate",
-                            "?date_range_start",
-                        ),
-                        filter_member("?member", "FilterMemberOp:beforeDate", "?date_range_end"),
-                    ),
-                    "FilterOpOp:and",
-                ),
-            ),
-            rewrite(
-                "filter-replacer-inclusive-dates-inverse",
-                filter_op(
-                    filter_op_filters(
-                        filter_member(
-                            "?member",
-                            "FilterMemberOp:beforeOrOnDate",
-                            "?date_range_end",
-                        ),
-                        filter_member(
-                            "?member",
-                            "FilterMemberOp:afterOrOnDate",
-                            "?date_range_start",
-                        ),
-                    ),
-                    "FilterOpOp:and",
-                ),
-                filter_op(
-                    filter_op_filters(
-                        filter_member(
-                            "?member",
-                            "FilterMemberOp:afterOrOnDate",
-                            "?date_range_start",
-                        ),
-                        filter_member(
-                            "?member",
-                            "FilterMemberOp:beforeOrOnDate",
-                            "?date_range_end",
-                        ),
-                    ),
-                    "FilterOpOp:and",
+                    "?date_range_start_op",
+                    "?date_range_end_op",
                 ),
             ),
             rewrite(
@@ -3923,169 +3790,92 @@ impl FilterRules {
         date_range_start_var: &'static str,
         date_range_end_var: &'static str,
         date_range_var: &'static str,
+        date_range_start_op_var: &'static str,
+        date_range_end_op_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
         let date_range_start_var = date_range_start_var.parse().unwrap();
         let date_range_end_var = date_range_end_var.parse().unwrap();
         let date_range_var = date_range_var.parse().unwrap();
+        let date_range_start_op_var = date_range_start_op_var.parse().unwrap();
+        let date_range_end_op_var = date_range_end_op_var.parse().unwrap();
         move |egraph, subst| {
-            for date_range_start in
-                var_iter!(egraph[subst[date_range_start_var]], FilterMemberValues)
-            {
-                for date_range_end in
-                    var_iter!(egraph[subst[date_range_end_var]], FilterMemberValues)
-                {
-                    let mut result = Vec::new();
-                    result.extend(date_range_start.clone().into_iter());
-                    result.extend(date_range_end.clone().into_iter());
-
-                    subst.insert(
-                        date_range_var,
-                        egraph.add(LogicalPlanLanguage::FilterMemberValues(FilterMemberValues(
-                            result,
-                        ))),
-                    );
-                    return true;
+            fn resolve_time_delta(date_var: &String, op: &String) -> String {
+                if op == "afterDate" {
+                    return increment_iso_timestamp_time(date_var);
+                } else if op == "beforeDate" {
+                    return decrement_iso_timestamp_time(date_var);
+                } else {
+                    return date_var.clone();
                 }
             }
 
-            false
-        }
-    }
-
-    fn merge_date_range_inc_start(
-        &self,
-        date_range_start_var: &'static str,
-        date_range_end_var: &'static str,
-        date_range_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
-        let date_range_start_var = date_range_start_var.parse().unwrap();
-        let date_range_end_var = date_range_end_var.parse().unwrap();
-        let date_range_var = date_range_var.parse().unwrap();
-        move |egraph, subst| {
-            for date_range_start in
-                var_iter!(egraph[subst[date_range_start_var]], FilterMemberValues)
-            {
-                for date_range_end in
-                    var_iter!(egraph[subst[date_range_end_var]], FilterMemberValues)
-                {
-                    let mut result = Vec::new();
-                    let timestamp = NaiveDateTime::parse_from_str(
-                        &date_range_start[0],
-                        "%Y-%m-%dT%H:%M:%S.%fZ",
-                    );
-
-                    let value = match timestamp {
-                        Ok(val) => format_iso_timestamp(
-                            val.checked_add_signed(Duration::milliseconds(1)).unwrap(),
-                        ),
-                        Err(_) => date_range_end[0].clone(),
-                    };
-                    result.extend(vec![value.to_string()]);
-                    result.extend(date_range_end.clone().into_iter());
-
-                    subst.insert(
-                        date_range_var,
-                        egraph.add(LogicalPlanLanguage::FilterMemberValues(FilterMemberValues(
-                            result,
-                        ))),
-                    );
-                    return true;
-                }
+            fn increment_iso_timestamp_time(date_var: &String) -> String {
+                let timestamp = NaiveDateTime::parse_from_str(date_var, "%Y-%m-%dT%H:%M:%S.%fZ");
+                let value = match timestamp {
+                    Ok(val) => format_iso_timestamp(
+                        val.checked_add_signed(Duration::milliseconds(1)).unwrap(),
+                    ),
+                    Err(_) => date_var.clone(),
+                };
+                return value;
             }
 
-            false
-        }
-    }
-
-    fn merge_date_range_dec_end(
-        &self,
-        date_range_start_var: &'static str,
-        date_range_end_var: &'static str,
-        date_range_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
-        let date_range_start_var = date_range_start_var.parse().unwrap();
-        let date_range_end_var = date_range_end_var.parse().unwrap();
-        let date_range_var = date_range_var.parse().unwrap();
-        move |egraph, subst| {
-            for date_range_start in
-                var_iter!(egraph[subst[date_range_start_var]], FilterMemberValues)
-            {
-                for date_range_end in
-                    var_iter!(egraph[subst[date_range_end_var]], FilterMemberValues)
-                {
-                    let mut result = Vec::new();
-                    let timestamp =
-                        NaiveDateTime::parse_from_str(&date_range_end[0], "%Y-%m-%dT%H:%M:%S.%fZ");
-
-                    let value = match timestamp {
-                        Ok(val) => format_iso_timestamp(
-                            val.checked_sub_signed(Duration::milliseconds(1)).unwrap(),
-                        ),
-                        Err(_) => date_range_end[0].clone(),
-                    };
-                    result.extend(date_range_start.clone().into_iter());
-                    result.extend(vec![value.to_string()]);
-
-                    subst.insert(
-                        date_range_var,
-                        egraph.add(LogicalPlanLanguage::FilterMemberValues(FilterMemberValues(
-                            result,
-                        ))),
-                    );
-                    return true;
-                }
+            fn decrement_iso_timestamp_time(date_var: &String) -> String {
+                let timestamp = NaiveDateTime::parse_from_str(date_var, "%Y-%m-%dT%H:%M:%S.%fZ");
+                let value = match timestamp {
+                    Ok(val) => format_iso_timestamp(
+                        val.checked_sub_signed(Duration::milliseconds(1)).unwrap(),
+                    ),
+                    Err(_) => date_var.clone(),
+                };
+                return value;
             }
 
-            false
-        }
-    }
-
-    fn merge_date_range_exclusive(
-        &self,
-        date_range_start_var: &'static str,
-        date_range_end_var: &'static str,
-        date_range_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
-        let date_range_start_var = date_range_start_var.parse().unwrap();
-        let date_range_end_var = date_range_end_var.parse().unwrap();
-        let date_range_var = date_range_var.parse().unwrap();
-        move |egraph, subst| {
             for date_range_start in
                 var_iter!(egraph[subst[date_range_start_var]], FilterMemberValues)
             {
                 for date_range_end in
                     var_iter!(egraph[subst[date_range_end_var]], FilterMemberValues)
                 {
-                    let mut result = Vec::new();
-                    let timestamp =
-                        NaiveDateTime::parse_from_str(&date_range_end[0], "%Y-%m-%dT%H:%M:%S.%fZ");
+                    for date_range_start_op in
+                        var_iter!(egraph[subst[date_range_start_op_var]], FilterMemberOp)
+                    {
+                        for date_range_end_op in
+                            var_iter!(egraph[subst[date_range_end_op_var]], FilterMemberOp)
+                        {
+                            let valid_filters = vec![
+                                "afterDate".to_string(),
+                                "beforeDate".to_string(),
+                                "afterOrOnDate".to_string(),
+                                "beforeOrOnDate".to_string(),
+                            ];
+                            if !valid_filters.contains(date_range_start_op)
+                                && !valid_filters.contains(date_range_end_op)
+                            {
+                                return false;
+                            }
+                            let mut result = Vec::new();
+                            let resolved_start_date =
+                                resolve_time_delta(&date_range_start[0], date_range_start_op);
+                            let resolved_end_date =
+                                resolve_time_delta(&date_range_end[0], date_range_end_op);
+                            if resolved_start_date <= resolved_end_date {
+                                result.extend(vec![resolved_start_date]);
+                                result.extend(vec![resolved_end_date]);
+                            } else {
+                                result.extend(vec![resolved_end_date]);
+                                result.extend(vec![resolved_start_date]);
+                            }
 
-                    let new_date_range_start = match timestamp {
-                        Ok(val) => format_iso_timestamp(
-                            val.checked_sub_signed(Duration::milliseconds(1)).unwrap(),
-                        ),
-                        Err(_) => date_range_start[0].clone(),
-                    };
-
-                    let timestamp =
-                        NaiveDateTime::parse_from_str(&date_range_end[0], "%Y-%m-%dT%H:%M:%S.%fZ");
-
-                    let new_date_range_end = match timestamp {
-                        Ok(val) => format_iso_timestamp(
-                            val.checked_sub_signed(Duration::milliseconds(1)).unwrap(),
-                        ),
-                        Err(_) => date_range_end[0].clone(),
-                    };
-                    result.extend(vec![new_date_range_start.to_string()]);
-                    result.extend(vec![new_date_range_end.to_string()]);
-
-                    subst.insert(
-                        date_range_var,
-                        egraph.add(LogicalPlanLanguage::FilterMemberValues(FilterMemberValues(
-                            result,
-                        ))),
-                    );
-                    return true;
+                            subst.insert(
+                                date_range_var,
+                                egraph.add(LogicalPlanLanguage::FilterMemberValues(
+                                    FilterMemberValues(result),
+                                )),
+                            );
+                            return true;
+                        }
+                    }
                 }
             }
 
