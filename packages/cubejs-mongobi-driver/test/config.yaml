@@ -1,0 +1,32 @@
+net:
+  bindIp: '0.0.0.0' # To bind to multiple IP addresses
+  port: 3307
+  ssl:
+    mode: 'disabled'
+
+mongodb:
+  net:
+    uri: 'mongodb://mongo:27017'
+    ssl:
+      enabled: false
+
+systemLog:
+  quiet: false
+  verbosity: 1
+  logRotate: 'rename' # "rename"|"reopen"
+
+schema:
+  refreshIntervalSecs: 60
+  stored:
+    mode: 'auto' # "auto"|"custom"
+    source: 'mongosqld_data' # the database where schemas are stored in stored-schema modes
+    name: 'mySchema' # the named schema to read/write to in stored-schema modes
+  sample:
+    size: 1000 # The amount of random documents we sample from each collection.
+    namespaces: ['*.*']
+
+processManagement:
+  service:
+    name: 'mongosql'
+    displayName: 'MongoSQL Service'
+    description: 'MongoSQL accesses MongoDB data with SQL'

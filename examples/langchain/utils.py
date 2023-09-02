@@ -82,7 +82,7 @@ Return the answer as a JSON object with the following format:
 
 {
     "query": "",
-    "filters": [{column: \"\", operator: \"\", value: "\"\"}]
+    "filters": [{"column": \"\", "operator": \"\", "value": "\"\"}]
 }
 """
 

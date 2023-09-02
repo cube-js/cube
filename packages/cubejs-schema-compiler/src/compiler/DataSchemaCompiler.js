@@ -233,7 +233,7 @@ export class DataSchemaCompiler {
 
     if (R.endsWith('.js', file.fileName)) {
       this.compileJsFile(file, errorsReport, cubes, contexts, exports, asyncModules, toCompile, compiledFiles);
-    } else if (R.endsWith('.yml.jinja', file.fileName)) {
+    } else if (R.endsWith('.yml.jinja', file.fileName) || R.endsWith('.yaml.jinja', file.fileName)) {
       this.yamlCompiler.compileYamlWithJinjaFile(
         file,
         errorsReport,

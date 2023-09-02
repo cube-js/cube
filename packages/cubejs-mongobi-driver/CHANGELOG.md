@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.49](https://github.com/cube-js/cube/compare/v0.33.48...v0.33.49) (2023-08-31)
+
+
+### Bug Fixes
+
+* **mongobi-driver:** Invalid configuration for mysql2 connection ([#6352](https://github.com/cube-js/cube/issues/6352)) Thanks [@loremaps](https://github.com/loremaps)! ([edaf326](https://github.com/cube-js/cube/commit/edaf32689a4252dfcafd70a10bc9292e17b2f2d7)), closes [#5527](https://github.com/cube-js/cube/issues/5527)
+
+
+
+
+
 ## [0.33.43](https://github.com/cube-js/cube/compare/v0.33.42...v0.33.43) (2023-08-04)
 
 **Note:** Version bump only for package @cubejs-backend/mongobi-driver

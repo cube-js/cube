@@ -76,6 +76,7 @@ pub struct SerializedPlan {
     schema_snapshot: Arc<SchemaSnapshot>,
     partition_ids_to_execute: Vec<(u64, RowFilter)>,
     inline_table_ids_to_execute: Vec<InlineTableId>,
+    trace_obj: Option<String>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -1042,6 +1043,7 @@ impl SerializedPlan {
     pub async fn try_new(
         plan: LogicalPlan,
         index_snapshots: PlanningMeta,
+        trace_obj: Option<String>,
     ) -> Result<Self, CubeError> {
         let serialized_logical_plan = Self::serialized_logical_plan(&plan);
         Ok(SerializedPlan {
@@ -1049,6 +1051,7 @@ impl SerializedPlan {
             schema_snapshot: Arc::new(SchemaSnapshot { index_snapshots }),
             partition_ids_to_execute: Vec::new(),
             inline_table_ids_to_execute: Vec::new(),
+            trace_obj,
         })
     }
 
@@ -1065,6 +1068,7 @@ impl SerializedPlan {
             schema_snapshot: self.schema_snapshot.clone(),
             partition_ids_to_execute,
             inline_table_ids_to_execute,
+            trace_obj: self.trace_obj.clone(),
         }
     }
 
@@ -1081,6 +1085,10 @@ impl SerializedPlan {
             chunk_id_to_record_batches,
             parquet_metadata_cache,
         })
+    }
+
+    pub fn trace_obj(&self) -> Option<String> {
+        self.trace_obj.clone()
     }
 
     pub fn index_snapshots(&self) -> &Vec<IndexSnapshot> {

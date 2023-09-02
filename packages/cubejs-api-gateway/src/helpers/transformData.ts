@@ -204,10 +204,6 @@ function getCompactRow(
       getDateRangeValue(timeDimensions)
     );
   } else if (queryType === QueryTypeEnum.BLENDING_QUERY) {
-    console.log(getBlendingResponseKey(timeDimensions));
-    console.log(dbRow[
-      getBlendingResponseKey(timeDimensions)
-    ]);
     row.push(
       dbRow[
         membersToAliasMap[

@@ -302,6 +302,22 @@ jobs:
       fail-fast: false
 
     steps:
+      - name: Maximize build space (disk space limitations)
+        run: |
+          echo "Before"
+          df -h
+          sudo apt-get remove -y 'php.*'
+          sudo apt-get remove -y '^mongodb-.*'
+          sudo apt-get remove -y '^mysql-.*'
+          sudo apt-get autoremove -y
+          sudo apt-get clean
+
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          echo "After"
+          df -h
       - name: Checkout
         uses: actions/checkout@v3
       - name: Install Rust
@@ -367,7 +383,7 @@ jobs:
         node-version: [16.x]
         db: [
             'clickhouse', 'druid', 'elasticsearch', 'mssql', 'mysql', 'postgres', 'prestodb',
-            'mysql-aurora-serverless', 'crate'
+            'mysql-aurora-serverless', 'crate', 'mongobi'
         ]
       fail-fast: false
 
@@ -425,6 +441,22 @@ jobs:
       fail-fast: false
 
     steps:
+      - name: Maximize build space (disk space limitations)
+        run: |
+          echo "Before"
+          df -h
+          sudo apt-get remove -y 'php.*'
+          sudo apt-get remove -y '^mongodb-.*'
+          sudo apt-get remove -y '^mysql-.*'
+          sudo apt-get autoremove -y
+          sudo apt-get clean
+
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          echo "After"
+          df -h
       - name: Checkout
         uses: actions/checkout@v3
       - name: Install Rust

@@ -6,7 +6,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "prebuild": "echo './scripts/docs-gen.sh'",
+    "prebuild": "./scripts/docs-gen.sh",
     "build": "next build",
     "postbuild": "next-sitemap",
     "start": "next start",

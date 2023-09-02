@@ -37,6 +37,8 @@ A Query has the following properties:
 - `limit`: A row limit for your query. The default value is `10000`. The maximum
   allowed limit is `50000`. If you'd like to request more rows than the maximum
   allowed limit, consider using [pagination][ref-recipe-pagination].
+- `total`: If set to `true`, Cube will return the total number of rows for a
+  query. The default value is `false`.
 - `offset`: The number of initial rows to be skipped for your query. The default
   value is `0`.
 - `order`: An object, where the keys are measures or dimensions to order by and

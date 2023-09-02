@@ -43,6 +43,21 @@ export interface LoadPayload {
     query: any,
 }
 
+export interface SqlPayload {
+    request: Request<LoadRequestMeta>,
+    session: SessionContext,
+    query: any,
+    memberToAlias: Record<string, string>,
+}
+
+export interface SqlApiLoadPayload {
+    request: Request<LoadRequestMeta>,
+    session: SessionContext,
+    query: any,
+    sqlQuery: any,
+    streaming: boolean,
+}
+
 export interface MetaPayload {
     request: Request<undefined>,
     session: SessionContext,
@@ -54,8 +69,11 @@ export type SQLInterfaceOptions = {
     nonce?: string,
     checkAuth: (payload: CheckAuthPayload) => CheckAuthResponse | Promise<CheckAuthResponse>,
     load: (payload: LoadPayload) => unknown | Promise<unknown>,
+    sql: (payload: SqlPayload) => unknown | Promise<unknown>,
     meta: (payload: MetaPayload) => unknown | Promise<unknown>,
     stream: (payload: LoadPayload) => unknown | Promise<unknown>,
+    sqlApiLoad: (payload: SqlApiLoadPayload) => unknown | Promise<unknown>,
+    sqlGenerators: (paramsJson: string) => unknown | Promise<unknown>,
 };
 
 function loadNative() {
@@ -116,25 +134,59 @@ function wrapNativeFunctionWithChannelCallback(
   };
 }
 
+function wrapRawNativeFunctionWithChannelCallback(
+  fn: (extra: any) => unknown | Promise<unknown>,
+) {
+  return async (extra: any, channel: any) => {
+    try {
+      const result = await fn(extra);
+
+      if (process.env.CUBEJS_NATIVE_INTERNAL_DEBUG) {
+        console.debug('[js] channel.resolve', {
+          result,
+        });
+      }
+      channel.resolve(result);
+    } catch (e: any) {
+      if (process.env.CUBEJS_NATIVE_INTERNAL_DEBUG) {
+        console.debug('[js] channel.reject', {
+          e,
+        });
+      }
+      try {
+        channel.reject(e.message || e.toString());
+      } catch (error) {
+        if (process.env.CUBEJS_NATIVE_INTERNAL_DEBUG) {
+          console.debug('[js] channel.reject exception', {
+            e: error,
+          });
+        }
+      }
+
+      // throw e;
+    }
+  };
+}
+
 const errorString = (err: any) => err.error ||
-    err.message ||
-    err.stack?.toString() ||
-    (typeof err === 'string' ? err.toString() : JSON.stringify(err));
+  err.message ||
+  err.stack?.toString() ||
+  (typeof err === 'string' ? err.toString() : JSON.stringify(err));
 
 // TODO: Refactor - define classes
 function wrapNativeFunctionWithStream(
-  fn: (extra: any) => unknown | Promise<unknown>
+  fn: (extra: any) => unknown | Promise<unknown>,
 ) {
   const chunkLength = parseInt(
     process.env.CUBEJS_DB_QUERY_STREAM_HIGH_WATER_MARK || '8192',
-    10
+    10,
   );
-  return async (extra: any, writer: any) => {
-    let streamResponse: any;
+  return async (extra: any, writerOrChannel: any) => {
+    let response: any;
     try {
-      streamResponse = await fn(JSON.parse(extra));
-      if (streamResponse && streamResponse.stream) {
-        writer.start();
+      response = await fn(JSON.parse(extra));
+      if (response && response.stream) {
+        writerOrChannel.start();
 
         let chunkBuffer: any[] = [];
         const writable = new Writable({
@@ -147,7 +199,7 @@ function wrapNativeFunctionWithStream(
             } else {
               const toSend = chunkBuffer;
               chunkBuffer = [];
-              writer.chunk(toSend, callback);
+              writerOrChannel.chunk(toSend, callback);
             }
           },
           final(callback: (error?: (Error | null)) => void) {
@@ -155,36 +207,37 @@ function wrapNativeFunctionWithStream(
               if (err) {
                 callback(err);
               } else {
-                writer.end(callback);
+                writerOrChannel.end(callback);
               }
             };
             if (chunkBuffer.length > 0) {
               const toSend = chunkBuffer;
               chunkBuffer = [];
-              writer.chunk(toSend, end);
+              writerOrChannel.chunk(toSend, end);
             } else {
               end(null);
             }
           },
           destroy(error: Error | null, callback: (error: (Error | null)) => void) {
             if (error) {
-              writer.reject(errorString(error));
+              writerOrChannel.reject(errorString(error));
             }
             callback(null);
-          }
+          },
         });
-        streamResponse.stream.pipe(writable);
-        streamResponse.stream.on('error', (err: any) => {
+        response.stream.pipe(writable);
+        response.stream.on('error', (err: any) => {
           writable.destroy(err);
         });
       } else {
-        throw new Error('Expected stream but nothing returned');
+        // TODO remove JSON.stringify()
+        writerOrChannel.resolve(JSON.stringify(response));
       }
     } catch (e: any) {
-      if (!!streamResponse && !!streamResponse.stream) {
-        streamResponse.stream.destroy(e);
+      if (!!response && !!response.stream) {
+        response.stream.destroy(e);
       }
-      writer.reject(errorString(e));
+      writerOrChannel.reject(errorString(e));
     }
   };
 }
@@ -224,13 +277,28 @@ export const registerInterface = async (options: SQLInterfaceOptions): Promise<S
     throw new Error('options.stream must be a function');
   }
 
+  if (typeof options.sqlApiLoad !== 'function') {
+    throw new Error('options.sqlApiLoad must be a function');
+  }
+
+  if (typeof options.sqlGenerators !== 'function') {
+    throw new Error('options.sqlGenerators must be a function');
+  }
+
+  if (typeof options.sql !== 'function') {
+    throw new Error('options.sql must be a function');
+  }
+
   const native = loadNative();
   return native.registerInterface({
     ...options,
     checkAuth: wrapNativeFunctionWithChannelCallback(options.checkAuth),
     load: wrapNativeFunctionWithChannelCallback(options.load),
+    sql: wrapNativeFunctionWithChannelCallback(options.sql),
     meta: wrapNativeFunctionWithChannelCallback(options.meta),
     stream: wrapNativeFunctionWithStream(options.stream),
+    sqlApiLoad: wrapNativeFunctionWithStream(options.sqlApiLoad),
+    sqlGenerators: wrapRawNativeFunctionWithChannelCallback(options.sqlGenerators),
   });
 };
 

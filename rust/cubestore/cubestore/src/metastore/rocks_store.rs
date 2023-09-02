@@ -14,12 +14,13 @@ use rocksdb::backup::{BackupEngine, BackupEngineOptions, RestoreOptions};
 use rocksdb::checkpoint::Checkpoint;
 use rocksdb::{DBCompressionType, Env, Snapshot, WriteBatch, WriteBatchIterator, DB};
 use serde::{Deserialize, Serialize};
+use serde_repr::*;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::io::{Cursor, Write};
 
 use crate::metastore::snapshot_info::SnapshotInfo;
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime};
@@ -128,24 +129,114 @@ impl MemorySequence {
     }
 }
 
+#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
+pub struct RocksSecondaryIndexValueTTLExtended {
+    // Approximate counter of usage
+    pub lfu: u8,
+    // Last access time
+    pub lru: Option<DateTime<Utc>>,
+    // Raw size of table's value without compression
+    pub raw_size: u32,
+}
+
+#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
+pub struct RocksPropertyRow {
+    pub key: String,
+    pub value: Option<String>,
+}
+
+#[derive(Debug)]
 pub enum RocksSecondaryIndexValue<'a> {
     Hash(&'a [u8]),
     HashAndTTL(&'a [u8], Option<DateTime<Utc>>),
+    HashAndTTLExtended(
+        &'a [u8],
+        Option<DateTime<Utc>>,
+        RocksSecondaryIndexValueTTLExtended,
+    ),
 }
 
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize_repr, Deserialize_repr)]
+#[repr(u32)]
+pub enum RocksSecondaryIndexValueVersion {
+    OnlyHash = 1,
+    WithTTLSupport = 2,
+}
+
+pub type PackedDateTime = u32;
+
+fn base_date_epoch() -> NaiveDateTime {
+    NaiveDate::from_ymd(2022, 1, 1).and_hms(0, 0, 0)
+}
+
+pub trait RocksSecondaryIndexValueVersionEncoder {
+    fn encode_value_as_u32(&self) -> Result<u32, CubeError>;
+}
+
+pub trait RocksSecondaryIndexValueVersionDecoder {
+    fn decode_value_as_opt_datetime(self) -> Result<Option<DateTime<Utc>>, CubeError>;
+}
+
+impl RocksSecondaryIndexValueVersionDecoder for u32 {
+    fn decode_value_as_opt_datetime(self) -> Result<Option<DateTime<Utc>>, CubeError> {
+        if self == 0 {
+            return Ok(None);
+        }
+
+        let timestamp = DateTime::<Utc>::from_utc(base_date_epoch(), Utc)
+            + chrono::Duration::seconds(self as i64);
+
+        Ok(Some(timestamp))
+    }
+}
+
+impl RocksSecondaryIndexValueVersionEncoder for DateTime<Utc> {
+    fn encode_value_as_u32(&self) -> Result<u32, CubeError> {
+        let seconds = self
+            .naive_local()
+            .signed_duration_since(base_date_epoch())
+            .num_seconds();
+
+        u32::try_from(seconds).map_err(|err| {
+            CubeError::internal(format!("Unable to represent datetime as u32: {}", err))
+        })
+    }
+}
+
+impl RocksSecondaryIndexValueVersionEncoder for Option<DateTime<Utc>> {
+    fn encode_value_as_u32(&self) -> Result<u32, CubeError> {
+        match self {
+            None => Ok(0),
+            Some(v) => v.encode_value_as_u32(),
+        }
+    }
+}
+
+/// RocksSecondaryIndexValue represent a value for secondary index keys
+///
+/// | hash | - hash only
+/// | hash | ttl - 8 | - with ttl
+/// | hash | ttl - 4 | raw_size - 4 | lru - 4 | lfu - 1 | - extended ttl
+///
+/// Where:
+///
+/// Hash is a set of character data of indeterminate length.
+///
+/// LRU/TTl (HashAndTTLExtended) is encoded as u32 (seconds since our epoch),
+/// u32 = 4294967295 / (60 * 60 * 24 * 365) = 136 years from 2022/1/1.
 impl<'a> RocksSecondaryIndexValue<'a> {
     pub fn from_bytes(
         bytes: &'a [u8],
-        value_version: u32,
+        value_version: RocksSecondaryIndexValueVersion,
     ) -> Result<RocksSecondaryIndexValue<'a>, CubeError> {
         match value_version {
-            1 => Ok(RocksSecondaryIndexValue::Hash(bytes)),
-            2 => match bytes[0] {
+            RocksSecondaryIndexValueVersion::OnlyHash => Ok(RocksSecondaryIndexValue::Hash(bytes)),
+            RocksSecondaryIndexValueVersion::WithTTLSupport => match bytes[0] {
                 0 => Ok(RocksSecondaryIndexValue::Hash(bytes)),
                 1 => {
-                    let (hash, mut expire_buf) =
-                        (&bytes[1..bytes.len() - 8], &bytes[bytes.len() - 8..]);
-                    let expire_timestamp = expire_buf.read_i64::<BigEndian>().unwrap();
+                    let hash_size = bytes.len() - 8;
+                    let (hash, mut expire_buf) = (&bytes[1..hash_size], &bytes[hash_size..]);
+                    let expire_timestamp = expire_buf.read_i64::<BigEndian>()?;
 
                     let expire = if expire_timestamp == 0 {
                         None
@@ -158,51 +249,100 @@ impl<'a> RocksSecondaryIndexValue<'a> {
 
                     Ok(RocksSecondaryIndexValue::HashAndTTL(&hash, expire))
                 }
+                2 => {
+                    let hash_size = bytes.len() - (4 + 4 + 4 + 1);
+                    let (hash, mut expire_buf, extended_buf) = (
+                        &bytes[1..hash_size],
+                        &bytes[hash_size..hash_size + 4],
+                        &bytes[hash_size + 4..],
+                    );
+
+                    let expire = expire_buf
+                        .read_u32::<BigEndian>()?
+                        .decode_value_as_opt_datetime()?;
+
+                    let (mut size_buf, mut lru_buf, mut lfu_buf) = (
+                        &extended_buf[0..4],
+                        &extended_buf[4..8],
+                        &extended_buf[8..9],
+                    );
+
+                    let raw_size = size_buf.read_u32::<BigEndian>()?;
+                    let lru = lru_buf
+                        .read_u32::<BigEndian>()?
+                        .decode_value_as_opt_datetime()?;
+                    let lfu = lfu_buf.read_u8()?;
+
+                    Ok(RocksSecondaryIndexValue::HashAndTTLExtended(
+                        &hash,
+                        expire,
+                        RocksSecondaryIndexValueTTLExtended { raw_size, lru, lfu },
+                    ))
+                }
                 tid => Err(CubeError::internal(format!(
                     "Unsupported type \"{}\" of value for index",
                     tid
                 ))),
             },
+            #[allow(unreachable_patterns)]
             version => Err(CubeError::internal(format!(
-                "Unsupported value_version {}",
+                "Unsupported value_version {:?}",
                 version
             ))),
         }
     }
 
-    pub fn to_bytes(&self, value_version: u32) -> Vec<u8> {
+    pub fn to_bytes(
+        &self,
+        value_version: RocksSecondaryIndexValueVersion,
+    ) -> Result<Vec<u8>, CubeError> {
         match value_version {
-            1 => match *self {
-                RocksSecondaryIndexValue::Hash(hash) => hash.to_vec(),
+            RocksSecondaryIndexValueVersion::OnlyHash => match *self {
+                RocksSecondaryIndexValue::Hash(hash) => Ok(hash.to_vec()),
                 RocksSecondaryIndexValue::HashAndTTL(_, _) => panic!(
                     "RocksSecondaryIndexValue::HashAndTTL is not supported for value_version = 1"
                 ),
+                RocksSecondaryIndexValue::HashAndTTLExtended(_, _, _) => panic!(
+                    "RocksSecondaryIndexValue::HashAndTTLWithUsageInfo is not supported for value_version = 1"
+                ),
             },
-            2 => match self {
+            RocksSecondaryIndexValueVersion::WithTTLSupport => match self {
                 RocksSecondaryIndexValue::Hash(hash) => {
                     let mut buf = Cursor::new(Vec::with_capacity(hash.len() + 1));
 
-                    buf.write_u8(0).unwrap();
-                    buf.write_all(&hash).unwrap();
+                    buf.write_u8(0)?;
+                    buf.write_all(&hash)?;
 
-                    buf.into_inner()
+                    Ok(buf.into_inner())
                 }
                 RocksSecondaryIndexValue::HashAndTTL(hash, expire) => {
                     let mut buf = Cursor::new(Vec::with_capacity(hash.len() + 1 + 8));
 
-                    buf.write_u8(1).unwrap();
-                    buf.write_all(&hash).unwrap();
+                    buf.write_u8(1)?;
+                    buf.write_all(&hash)?;
 
                     if let Some(ex) = expire {
-                        buf.write_i64::<BigEndian>(ex.timestamp()).unwrap()
+                        buf.write_i64::<BigEndian>(ex.timestamp())?
                     } else {
-                        buf.write_i64::<BigEndian>(0).unwrap()
+                        buf.write_i64::<BigEndian>(0)?
                     }
 
-                    buf.into_inner()
+                    Ok(buf.into_inner())
+                },
+                RocksSecondaryIndexValue::HashAndTTLExtended(hash, expire, info) => {
+                    let mut buf = Cursor::new(Vec::with_capacity(hash.len() + 1 + 4 + 4 + 8 + 1));
+
+                    buf.write_u8(2)?;
+                    buf.write_all(&hash)?;
+                    buf.write_u32::<BigEndian>(expire.encode_value_as_u32()?)?;
+
+                    buf.write_u32::<BigEndian>(info.raw_size)?;
+                    buf.write_u32::<BigEndian>(info.lru.encode_value_as_u32()?)?;
+                    buf.write_u8(info.lfu)?;
+
+                    Ok(buf.into_inner())
                 }
             },
-            version => panic!("Unsupported value_version {}", version),
         }
     }
 }
@@ -222,11 +362,11 @@ pub struct SecondaryIndexInfo {
     pub version: u32,
     #[serde(default = "secondary_index_info_default_value_version")]
     // serialization/deserialization version
-    pub value_version: u32,
+    pub value_version: RocksSecondaryIndexValueVersion,
 }
 
-fn secondary_index_info_default_value_version() -> u32 {
-    1
+fn secondary_index_info_default_value_version() -> RocksSecondaryIndexValueVersion {
+    RocksSecondaryIndexValueVersion::OnlyHash
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
@@ -279,6 +419,53 @@ impl RowKey {
 
     pub fn from_bytes(bytes: &[u8]) -> RowKey {
         RowKey::try_from_bytes(bytes).unwrap()
+    }
+
+    pub fn to_iterate_range(&self) -> impl rocksdb::IterateBounds {
+        let mut min = Vec::with_capacity(5);
+        let mut max = Vec::with_capacity(5);
+
+        match self {
+            RowKey::Table(table_id, _) => {
+                min.write_u8(1).unwrap();
+                max.write_u8(1).unwrap();
+
+                min.write_u32::<BigEndian>(*table_id as u32).unwrap();
+                max.write_u32::<BigEndian>((*table_id as u32) + 1).unwrap();
+            }
+            RowKey::Sequence(table_id) => {
+                min.write_u8(2).unwrap();
+                max.write_u8(2).unwrap();
+
+                min.write_u32::<BigEndian>(*table_id as u32).unwrap();
+                max.write_u32::<BigEndian>((*table_id as u32) + 1).unwrap();
+            }
+            RowKey::SecondaryIndex(index_id, _, _) => {
+                min.write_u8(3).unwrap();
+                max.write_u8(3).unwrap();
+
+                min.write_u32::<BigEndian>(*index_id as IndexId).unwrap();
+                max.write_u32::<BigEndian>((*index_id as IndexId) + 1)
+                    .unwrap();
+            }
+            RowKey::SecondaryIndexInfo { index_id } => {
+                min.write_u8(4).unwrap();
+                max.write_u8(4).unwrap();
+
+                min.write_u32::<BigEndian>(*index_id as IndexId).unwrap();
+                max.write_u32::<BigEndian>((*index_id as IndexId) + 1)
+                    .unwrap();
+            }
+            RowKey::TableInfo { table_id } => {
+                min.write_u8(5).unwrap();
+                max.write_u8(5).unwrap();
+
+                min.write_u32::<BigEndian>(*table_id as u32).unwrap();
+                max.write_u32::<BigEndian>((*table_id as u32) + 1).unwrap();
+            }
+        }
+
+        min..max
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {
@@ -516,11 +703,18 @@ impl RocksStoreChecksumType {
     }
 }
 
+pub type RocksStoreCompressionType = DBCompressionType;
+
 #[derive(Debug, Clone)]
 pub struct RocksStoreConfig {
     pub checksum_type: RocksStoreChecksumType,
     pub cache_capacity: usize,
-    pub compression_type: DBCompressionType,
+    pub compression_type: RocksStoreCompressionType,
+    // Sets maximum number of concurrent background jobs (compactions and flushes).
+    pub max_background_jobs: u32,
+    // Sets maximum number of threads that will concurrently perform a compaction job by breaking
+    // it into multiple, smaller ones that are run simultaneously.
+    pub max_subcompactions: u32,
 }
 
 impl RocksStoreConfig {
@@ -529,7 +723,10 @@ impl RocksStoreConfig {
             // Supported since RocksDB 6.27
             checksum_type: RocksStoreChecksumType::XXH3,
             cache_capacity: 8 * 1024 * 1024,
-            compression_type: DBCompressionType::None,
+            compression_type: RocksStoreCompressionType::None,
+            max_background_jobs: 2,
+            // Default: 1 (i.e. no subcompactions)
+            max_subcompactions: 1,
         }
     }
 
@@ -538,7 +735,10 @@ impl RocksStoreConfig {
             // Supported since RocksDB 6.27
             checksum_type: RocksStoreChecksumType::XXH3,
             cache_capacity: 8 * 1024 * 1024,
-            compression_type: DBCompressionType::None,
+            compression_type: RocksStoreCompressionType::None,
+            max_background_jobs: 2,
+            // Default: 1 (i.e. no subcompactions)
+            max_subcompactions: 1,
         }
     }
 }
@@ -699,7 +899,11 @@ impl RocksStore {
             };
 
             if let Err(e) = meta_store_to_move.details.migrate(table_ref) {
-                log::error!("Error during checking indexes: {}", e);
+                log::error!(
+                    "Error during {} migration: {}",
+                    meta_store_to_move.details.get_name(),
+                    e
+                );
             }
         })
         .await?;
@@ -863,6 +1067,55 @@ impl RocksStore {
         );
 
         Ok(())
+    }
+
+    pub fn rocksdb_properties(&self) -> Result<Vec<RocksPropertyRow>, CubeError> {
+        let to_collect = [
+            rocksdb::properties::BLOCK_CACHE_CAPACITY,
+            rocksdb::properties::BLOCK_CACHE_USAGE,
+            rocksdb::properties::BLOCK_CACHE_PINNED_USAGE,
+            rocksdb::properties::LEVELSTATS,
+            &rocksdb::properties::compression_ratio_at_level(0),
+            &rocksdb::properties::compression_ratio_at_level(1),
+            &rocksdb::properties::compression_ratio_at_level(2),
+            &rocksdb::properties::compression_ratio_at_level(3),
+            &rocksdb::properties::compression_ratio_at_level(4),
+            &rocksdb::properties::compression_ratio_at_level(6),
+            rocksdb::properties::DBSTATS,
+            // rocksdb::properties::SSTABLES,
+            rocksdb::properties::NUM_RUNNING_FLUSHES,
+            rocksdb::properties::COMPACTION_PENDING,
+            rocksdb::properties::NUM_RUNNING_COMPACTIONS,
+            rocksdb::properties::BACKGROUND_ERRORS,
+            rocksdb::properties::CUR_SIZE_ACTIVE_MEM_TABLE,
+            rocksdb::properties::CUR_SIZE_ALL_MEM_TABLES,
+            rocksdb::properties::SIZE_ALL_MEM_TABLES,
+            rocksdb::properties::NUM_ENTRIES_ACTIVE_MEM_TABLE,
+            rocksdb::properties::NUM_ENTRIES_IMM_MEM_TABLES,
+            rocksdb::properties::NUM_DELETES_ACTIVE_MEM_TABLE,
+            rocksdb::properties::NUM_DELETES_IMM_MEM_TABLES,
+            rocksdb::properties::ESTIMATE_NUM_KEYS,
+            rocksdb::properties::NUM_SNAPSHOTS,
+            rocksdb::properties::OLDEST_SNAPSHOT_TIME,
+            rocksdb::properties::NUM_LIVE_VERSIONS,
+            rocksdb::properties::ESTIMATE_LIVE_DATA_SIZE,
+            rocksdb::properties::LIVE_SST_FILES_SIZE,
+            rocksdb::properties::ESTIMATE_PENDING_COMPACTION_BYTES,
+            rocksdb::properties::ESTIMATE_TABLE_READERS_MEM,
+            rocksdb::properties::BASE_LEVEL,
+            rocksdb::properties::AGGREGATED_TABLE_PROPERTIES,
+        ];
+
+        let mut result = Vec::with_capacity(to_collect.len());
+
+        for property_name in to_collect {
+            result.push(RocksPropertyRow {
+                key: property_name.to_string_lossy().to_string(),
+                value: self.db.property_value(property_name)?,
+            })
+        }
+
+        Ok(result)
     }
 
     pub async fn healthcheck(&self) -> Result<(), CubeError> {
@@ -1098,7 +1351,72 @@ mod tests {
     use crate::config::Config;
     use crate::metastore::{BaseRocksStoreFs, RocksMetaStoreDetails};
     use crate::remotefs::LocalDirRemoteFs;
+    use chrono::Timelike;
     use std::{env, fs};
+
+    #[test]
+    fn test_rocks_secondary_index_encoding_with_ttl() -> Result<(), CubeError> {
+        let hash = &[1, 2, 3, 4, 5];
+        let expire = Some(
+            Utc::now()
+                .with_nanosecond(0)
+                .expect("Should truncate nanos, because we dont truncate it"),
+        );
+
+        let index_v = RocksSecondaryIndexValue::HashAndTTL(hash, expire);
+        let index_v_as_bytes = index_v.to_bytes(RocksSecondaryIndexValueVersion::WithTTLSupport)?;
+
+        let index_v_decoded = RocksSecondaryIndexValue::from_bytes(
+            &index_v_as_bytes,
+            RocksSecondaryIndexValueVersion::WithTTLSupport,
+        )?;
+        match index_v_decoded {
+            RocksSecondaryIndexValue::HashAndTTL(h, ex) => {
+                assert_eq!(h, hash, "decoded hash should match encoded");
+                assert_eq!(ex, expire, "decoded expire should match encoded");
+            }
+            other => panic!("Wrong decoded value: {:?}", other),
+        };
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_rocks_secondary_index_encoding_with_ttl_and_info() -> Result<(), CubeError> {
+        let hash = &[1, 2, 3, 4, 5];
+        let expire = Some(
+            Utc::now()
+                .with_nanosecond(0)
+                .expect("Should truncate nanos, because we dont truncate it"),
+        );
+        let info = RocksSecondaryIndexValueTTLExtended {
+            lfu: 1,
+            lru: Some(
+                Utc::now()
+                    .with_nanosecond(0)
+                    .expect("Should truncate nanos, because we dont truncate it"),
+            ),
+            raw_size: 1024,
+        };
+
+        let index_v = RocksSecondaryIndexValue::HashAndTTLExtended(hash, expire, info.clone());
+        let index_v_as_bytes = index_v.to_bytes(RocksSecondaryIndexValueVersion::WithTTLSupport)?;
+
+        let index_v_decoded = RocksSecondaryIndexValue::from_bytes(
+            &index_v_as_bytes,
+            RocksSecondaryIndexValueVersion::WithTTLSupport,
+        )?;
+        match index_v_decoded {
+            RocksSecondaryIndexValue::HashAndTTLExtended(h, ex, inf) => {
+                assert_eq!(h, hash, "decoded hash should match encoded");
+                assert_eq!(ex, expire, "decoded expire should match encoded");
+                assert_eq!(inf, info, "decoded expire should match encoded");
+            }
+            other => panic!("Wrong decoded value: {:?}", other),
+        };
+
+        Ok(())
+    }
 
     #[tokio::test]
     async fn test_loop_panic() -> Result<(), CubeError> {

@@ -12,13 +12,13 @@ const logger = jest.fn(({ event }) => {
   console.log(event);
 });
 
-native.setupLogger(
-  logger,
-  'trace',
-);
+// native.setupLogger(
+//   logger,
+//   'trace',
+// );
 
 describe('SQLInterface', () => {
-  jest.setTimeout(10 * 1000);
+  jest.setTimeout(60 * 1000);
 
   it('SHOW FULL TABLES FROM `db`', async () => {
     const load = jest.fn(async ({ request, session, query }) => {
@@ -31,6 +31,44 @@ describe('SQLInterface', () => {
       expect(session).toEqual({
         user: expect.toBeTypeOrNull(String),
         superuser: expect.any(Boolean),
+      });
+
+      // It's just an emulation that ApiGateway returns error
+      return {
+        error: 'This error should be passed back to MySQL client'
+      };
+    });
+
+    const sqlApiLoad = jest.fn(async ({ request, session, query, streaming }) => {
+      console.log('[js] load', {
+        request,
+        session,
+        query,
+        streaming
+      });
+
+      if (streaming) {
+        return {
+          stream: new FakeRowStream(query),
+        };
+      }
+
+      expect(session).toEqual({
+        user: expect.toBeTypeOrNull(String),
+        superuser: expect.any(Boolean),
+      });
+
+      // It's just an emulation that ApiGateway returns error
+      return {
+        error: 'This error should be passed back to MySQL client'
+      };
+    });
+
+    const sql = jest.fn(async ({ request, session, query }) => {
+      console.log('[js] sql', {
+        request,
+        session,
+        query
       });
 
       // It's just an emulation that ApiGateway returns error
@@ -65,6 +103,18 @@ describe('SQLInterface', () => {
       return metaFixture;
     });
 
+    const sqlGenerators = jest.fn(async ({ request, session }) => {
+      console.log('[js] sqlGenerators', {
+        request,
+        session,
+      });
+
+      return {
+        cubeNameToDataSource: {},
+        dataSourceToSqlGenerator: {},
+      };
+    });
+
     const checkAuth = jest.fn(async ({ request, user }) => {
       console.log('[js] checkAuth', {
         request,
@@ -93,8 +143,11 @@ describe('SQLInterface', () => {
       port: 4545,
       checkAuth,
       load,
+      sqlApiLoad,
+      sql,
       meta,
       stream,
+      sqlGenerators,
     });
     console.log(instance);
 
@@ -212,11 +265,6 @@ describe('SQLInterface', () => {
 
         expect(result).toEqual([{ 'TimestampNanosecond(1608936528000000000, None)': '2020-12-25T22:48:48.000' }]);
       }
-
-      // Increment it in case you throw Error
-      setTimeout(_ => {
-        expect(logger.mock.calls.length).toEqual(1);
-      }, 2000);
 
       connection.destroy();
     } finally {

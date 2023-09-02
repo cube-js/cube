@@ -30,7 +30,9 @@
     "CREATE_TBL_SUFFIX": " FROM ",
     "CREATE_SUB_PREFIX": "(",
     "CREATE_SUB_SUFFIX": ") SUBQUERY;",
-    "GENERATE_BIG_SERIES": "GENERATE_SERIES(1, 10000)"
+    "GENERATE_BIG_SERIES": "GENERATE_SERIES(1, 10000)",
+    "TRUE_LITERAL": "CAST(1 AS BIT)",
+    "FALSE_LITERAL": "CAST(0 AS BIT)"
   },
   "tables": {
     "products": "products",

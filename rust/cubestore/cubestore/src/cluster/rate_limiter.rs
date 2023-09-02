@@ -5,16 +5,32 @@ use std::cmp::PartialEq;
 use std::hash::Hash;
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::task::JoinHandle;
 
-#[derive(Eq, PartialEq, Hash)]
+#[derive(Eq, PartialEq, Hash, Clone)]
 pub enum TaskType {
     Select,
     Job,
 }
 
+impl TaskType {
+    pub fn name(&self) -> String {
+        match self {
+            Self::Select => "select".to_string(),
+            Self::Job => "job".to_string(),
+        }
+    }
+}
+
+#[derive(Clone, Default)]
+pub struct TraceIndex {
+    pub table_id: Option<u64>,
+    pub trace_obj: Option<String>,
+}
+
 #[async_trait]
 pub trait ProcessRateLimiter: DIService + Send + Sync {
-    async fn commit_task_usage(&self, task_type: TaskType, size: i64);
+    async fn commit_task_usage(&self, task_type: TaskType, size: i64, trace_index: TraceIndex);
 
     async fn current_budget(&self, task_type: TaskType) -> Option<i64>;
 
@@ -26,7 +42,7 @@ pub trait ProcessRateLimiter: DIService + Send + Sync {
         timeout: Option<Duration>,
     ) -> Result<(), CubeError>;
 
-    async fn wait_processing_loop(self: Arc<Self>);
+    async fn spawn_processing_loop(self: Arc<Self>) -> Vec<JoinHandle<()>>;
 
     async fn pending_size(&self, task_type: TaskType) -> Option<usize>;
 
@@ -45,7 +61,7 @@ impl BasicProcessRateLimiter {
 
 #[async_trait]
 impl ProcessRateLimiter for BasicProcessRateLimiter {
-    async fn commit_task_usage(&self, _task_type: TaskType, _size: i64) {}
+    async fn commit_task_usage(&self, _task_type: TaskType, _size: i64, _trace_index: TraceIndex) {}
 
     async fn current_budget(&self, _task_type: TaskType) -> Option<i64> {
         None
@@ -63,7 +79,9 @@ impl ProcessRateLimiter for BasicProcessRateLimiter {
         Ok(())
     }
 
-    async fn wait_processing_loop(self: Arc<Self>) {}
+    async fn spawn_processing_loop(self: Arc<Self>) -> Vec<JoinHandle<()>> {
+        vec![]
+    }
 
     async fn pending_size(&self, _task_type: TaskType) -> Option<usize> {
         None
