@@ -1,0 +1,83 @@
+# Using Cube with dbt
+
+It's not uncommon for [dbt](https://docs.getdbt.com/docs/introduction) to be
+used in data pipelines alongside Cube. In that case, dbt would usually take
+care of data transformation while Cube would keep metrics definitions in its
+data model, enforce access control rules, provide query acceleration and
+caching, and expose data to downstream tools.
+
+This guide contains best practices of using Cube with dbt.
+
+## Data modeling
+
+### Business logic
+
+It's totally fine to define [cubes](/product/data-modeling/reference/cube)
+on top of arbitrary [`sql` expressions](/product/data-modeling/reference/cube#sql)
+and have [dimensions](/product/data-modeling/reference/dimensions) that are
+[calculated on the fly](/product/data-modeling/reference/dimensions#sql)
+or defined as [case-when](/data-modeling/reference/dimensions#case) expressions. 
+
+However, it's usually best to move business logic upstream to dbt models and
+let dbt materialize tables to be used with Cube. Then, in compliance with the
+[style guide](/guides/style-guide), cubes can be defined on top of these tables
+using the [`sql_table` option](/product/data-modeling/reference/cube#sql_table).
+
+Typically, dbt models to be used with Cube would be
+[materialized](https://docs.getdbt.com/docs/build/materializations) as views
+or incremental tables.
+
+<WarningBox>
+
+TODO: Create a diagram:
+* raw tables →
+* dbt models (as tables) →
+* dbt models (as views) →
+* cubes →
+* views →
+* datasets in BIs
+
+</WarningBox>
+
+### Data types
+
+Cube provides a single [`time` type](/product/data-modeling/reference/types-and-formats#time-1)
+to model time dimensions. However, raw data can contain temporal columns in various
+formats, e.g., as `TIMESTAMP`, `DATETIME`, `DATE`, etc.
+
+It's a good practice to convert all temporal columns in dbt models into the
+`TIMESTAMP` format.
+
+## Data freshness
+
+### Refresh keys
+
+When [refresh keys](/product/data-modeling/reference/cube#refresh_key) of cubes
+are used to control data freshness, they can be set to refresh data periodically
+or when an arbitrary SQL expression evaluates to a new value, e.g.:
+
+```sql
+SELECT MAX(updated_at)
+FROM orders
+```
+
+For that purpose, it's usually convenient to have an `updated_at` column in every
+dbt model so that the refresh keys of cubes would be defined in the same manner.
+
+When the source data doesn't have a column that can be used to track updates
+reliably and dbt [snapshots](https://docs.getdbt.com/docs/build/snapshots) are used,
+`dbt_valid_from` and `dbt_valid_to` columns can be used to define refresh keys, e.g.:
+
+```sql
+SELECT CONCAT(COUNT(*), MAX(dbt_valid_from), MIN(dbt_valid_to))
+FROM orders_snapshot
+```
+
+### Pre-aggregations
+
+When [pre-aggregations](/product/caching/using-pre-aggregations) are implemented,
+they would be refreshed using their own [refresh keys](/docs/product/caching/using-pre-aggregations#refresh-strategy).
+
+Also, if a data orchestration tool like Airflow, Dagster, or Prefect is also used
+in the data pipeline, it can trigger pre-aggregation refresh when dbt models are updated
+via the [Orchestration API](/product/apis-integrations/orchestration-api).

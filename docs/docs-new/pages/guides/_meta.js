@@ -1,4 +1,5 @@
 module.exports = {
   "examples": "Examples",
-  "recipes": "Recipes"
+  "recipes": "Recipes",
+  "dbt": "Using Cube with dbt"
 }
