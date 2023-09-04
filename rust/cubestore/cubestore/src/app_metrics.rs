@@ -72,6 +72,10 @@ pub static REMOTE_FS_FILES_SIZE_TO_REMOVE: Gauge =
 pub static CACHESTORE_TTL_PERSIST: Counter = metrics::counter("cs.cachestore.ttl.persist");
 pub static CACHESTORE_TTL_BUFFER: Gauge = metrics::gauge("cs.cachestore.ttl.buffer");
 // Cache Store Eviction
+pub static CACHESTORE_EVICTION_REMOVED_EXPIRED_KEYS: Counter =
+    metrics::counter("cs.cachestore.eviction.expired.keys");
+pub static CACHESTORE_EVICTION_REMOVED_EXPIRED_SIZE: Counter =
+    metrics::counter("cs.cachestore.eviction.expired.size");
 pub static CACHESTORE_EVICTION_REMOVED_KEYS: Counter =
     metrics::counter("cs.cachestore.eviction.removed.keys");
 pub static CACHESTORE_EVICTION_REMOVED_SIZE: Counter =
