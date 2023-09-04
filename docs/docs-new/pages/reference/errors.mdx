@@ -23,3 +23,37 @@ on your cubes to hide them from end users.
 If you’re building a custom data application, you might use the [`meta` endpoint](/reference/rest-api#v1meta)
 of the REST API. It groups cubes into `connectedComponents` to help select those ones
 that can be joined together.
+
+## `Primary key is required when join is defined`
+
+```
+cube_a cube: primary key for 'cube_a' is required when join is defined
+in order to make aggregates work properly
+```
+
+Error message above indicates that you have a [cube](/product/data-modeling/reference/cube)
+with [joins](/product/data-modeling/reference/joins) and
+[pre-aggregations](/product/data-modeling/reference/pre-aggregations). However, that cube
+doesn't have a primary key.
+
+When generating SQL queries, Cube uses primary keys to avoid fanouts.
+A fanout happens when two tables are joined and a single value gets duplicated in the end result,
+meaning that some values can be double counted. 
+
+**Please define a [primary key](/product/data-modeling/reference/dimensions#primary_key) dimension in this cube to make joins and pre-aggregations work correctly.**
+
+If your data doesn't have a natural primary key, e.g., `id`, you can define a composite
+primary key by concatenating most or all of the columns in the table, e.g.:
+
+
+```yml
+cubes:
+  - name: cube_a
+    # ...
+
+    dimensions:
+      - name: composite_key
+        sql: CONCAT(column_a, '-', column_b, '-', column_c)
+        type: string
+        primary_key: true
+```
