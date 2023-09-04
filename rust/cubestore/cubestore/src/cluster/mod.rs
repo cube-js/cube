@@ -43,9 +43,12 @@ use datafusion::cube_ext;
 use datafusion::physical_plan::{RecordBatchStream, SendableRecordBatchStream};
 use flatbuffers::bitflags::_core::pin::Pin;
 use futures::future::join_all;
+use futures::future::BoxFuture;
 use futures::task::{Context, Poll};
 use futures::{Future, Stream};
 use futures_timer::Delay;
+use ingestion::job_processor::JobProcessor;
+use ingestion::job_runner::JobRunner;
 use itertools::Itertools;
 use log::{debug, error, info, warn};
 use mockall::automock;
@@ -64,8 +67,6 @@ use tokio::sync::{oneshot, watch, Notify, RwLock};
 use tokio::time::timeout;
 use tokio_util::sync::CancellationToken;
 use tracing::{instrument, Instrument};
-use ingestion::job_runner::JobRunner;
-use ingestion::job_processor::JobProcessor;
 
 #[automock]
 #[async_trait]
@@ -222,8 +223,30 @@ pub struct WorkerProcessor;
 impl MessageProcessor<WorkerMessage, (SchemaRef, Vec<SerializedRecordBatchStream>, usize)>
     for WorkerProcessor
 {
+    type Config = Config;
+
+    async fn configure() -> Result<Self::Config, CubeError> {
+        let custom_fn = SELECT_WORKER_CONFIGURE_FN.read().unwrap().clone();
+        let config = if let Some(func) = custom_fn.as_ref() {
+            func().await
+        } else {
+            let config = Config::default();
+            config.configure_injector().await;
+            config
+        };
+        Ok(config)
+    }
+
+    fn spawn_background_processes(config: Self::Config) -> Result<(), CubeError> {
+        let custom_fn = SELECT_WORKER_SPAWN_BACKGROUND_FN.read().unwrap();
+        if let Some(func) = custom_fn.as_ref() {
+            func(config);
+        }
+        Ok(())
+    }
+
     async fn process(
-        config: &Config,
+        config: &Self::Config,
         args: WorkerMessage,
     ) -> Result<(SchemaRef, Vec<SerializedRecordBatchStream>, usize), CubeError> {
         let services = config.worker_services().await;
@@ -300,6 +323,34 @@ fn proc_handler() {
             WorkerProcessor,
         >,
     );
+}
+
+lazy_static! {
+    static ref SELECT_WORKER_CONFIGURE_FN: std::sync::RwLock<Option<Arc<dyn Fn() -> BoxFuture<'static, Config> + Send + Sync>>> =
+        std::sync::RwLock::new(None);
+}
+
+lazy_static! {
+    static ref SELECT_WORKER_SPAWN_BACKGROUND_FN: std::sync::RwLock<Option<Box<dyn Fn(Config) + Send + Sync>>> =
+        std::sync::RwLock::new(None);
+}
+
+pub fn register_select_worker_configure_fn(f: fn() -> BoxFuture<'static, Config>) {
+    let mut func = SELECT_WORKER_CONFIGURE_FN.write().unwrap();
+    assert!(
+        func.is_none(),
+        "select worker configure function already registered"
+    );
+    *func = Some(Arc::new(f));
+}
+
+pub fn register_select_worker_spawn_background_fn(f: fn(Config)) {
+    let mut func = SELECT_WORKER_SPAWN_BACKGROUND_FN.write().unwrap();
+    assert!(
+        func.is_none(),
+        "select worker spawn background function already registered"
+    );
+    *func = Some(Box::new(f));
 }
 
 lazy_static! {
@@ -822,7 +873,10 @@ impl ClusterImpl {
                 self.config_obj.select_worker_pool_size(),
                 Duration::from_secs(self.config_obj.query_timeout()),
                 "sel",
-                vec![("_CUBESTORE_SUBPROCESS_TYPE".to_string(), "SELECT_WORKER".to_string())]
+                vec![(
+                    "_CUBESTORE_SUBPROCESS_TYPE".to_string(),
+                    "SELECT_WORKER".to_string(),
+                )],
             ));
             *pool = Some(arc.clone());
             futures.push(cube_ext::spawn(
@@ -830,15 +884,18 @@ impl ClusterImpl {
             ));
         }
         let job_processor = {
-            let job_processor = self.injector.upgrade().unwrap().get_service_typed::<dyn JobProcessor>().await; //TODO - timeout
+            let job_processor = self
+                .injector
+                .upgrade()
+                .unwrap()
+                .get_service_typed::<dyn JobProcessor>()
+                .await; //TODO - timeout
             let job_processor_to_move = job_processor.clone();
-            futures.push(cube_ext::spawn(
-                async move { job_processor_to_move.wait_processing_loops().await },
-            ));
+            futures.push(cube_ext::spawn(async move {
+                job_processor_to_move.wait_processing_loops().await
+            }));
             job_processor
-
         };
-
 
         for i in
             0..self.config_obj.job_runners_count() + self.config_obj.long_term_job_runners_count()

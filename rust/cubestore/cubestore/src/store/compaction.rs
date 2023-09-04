@@ -426,13 +426,11 @@ impl CompactionService for CompactionServiceImpl {
         partition_id: u64,
         data_loaded_size: Arc<DataLoadedSize>,
     ) -> Result<(), CubeError> {
-        println!("11111");
         let (partition, index, table, multi_part) = self
             .meta_store
             .get_partition_for_compaction(partition_id)
             .await?;
 
-        println!("2222");
         if !partition.get_row().is_active() && !multi_part.is_some() {
             log::trace!(
                 "Cannot compact inactive partition: {:?}",
@@ -440,7 +438,6 @@ impl CompactionService for CompactionServiceImpl {
             );
             return Ok(());
         }
-        println!("3333");
         if let Some(mp) = &multi_part {
             if mp.get_row().prepared_for_split() {
                 log::debug!(
@@ -450,7 +447,6 @@ impl CompactionService for CompactionServiceImpl {
                 return Ok(());
             }
         }
-        println!("44444");
         let mut all_pending_chunks = self
             .meta_store
             .get_chunks_by_partition(partition_id, false)
@@ -472,12 +468,10 @@ impl CompactionService for CompactionServiceImpl {
             .map(|c| c.clone())
             .collect::<Vec<_>>();
 
-        println!("5555");
         if chunks.is_empty() {
             return Ok(());
         }
 
-        println!("6666");
         let partition_id = partition.get_id();
 
         let mut data = Vec::new();
@@ -512,8 +506,6 @@ impl CompactionService for CompactionServiceImpl {
             }
         }
 
-        println!("7777777");
-
         data_loaded_size.add(chunks_total_size);
 
         let chunks = chunks_to_use;
@@ -540,7 +532,6 @@ impl CompactionService for CompactionServiceImpl {
             }
         };
 
-        println!("8888888");
         let mut total_rows = chunks_row_count;
         if new_chunk.is_none() {
             total_rows += partition.get_row().main_table_row_count();

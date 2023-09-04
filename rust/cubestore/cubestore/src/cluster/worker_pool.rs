@@ -8,7 +8,6 @@ use std::time::Duration;
 use async_trait::async_trait;
 use deadqueue::unlimited;
 use futures::future::join_all;
-use futures::future::BoxFuture;
 use ipc_channel::ipc;
 use ipc_channel::ipc::{IpcReceiver, IpcSender};
 use log::error;
@@ -53,7 +52,14 @@ pub trait MessageProcessor<
     R: Serialize + DeserializeOwned + Sync + Send + 'static,
 >
 {
-    async fn process(config: &Config, args: T) -> Result<R, CubeError>;
+    type Config: Sync + Send + Clone + 'static;
+
+    async fn configure() -> Result<Self::Config, CubeError>;
+
+    fn spawn_background_processes(config: Self::Config) -> Result<(), CubeError>;
+
+    async fn process(config: &Self::Config, args: T) -> Result<R, CubeError>;
+
     fn process_titile() -> String;
 }
 
@@ -63,7 +69,12 @@ impl<
         P: MessageProcessor<T, R> + Sync + Send + 'static,
     > WorkerPool<T, R, P>
 {
-    pub fn new(num: usize, timeout: Duration, name_prefix: &str, envs: Vec<(String, String)>) -> WorkerPool<T, R, P> {
+    pub fn new(
+        num: usize,
+        timeout: Duration,
+        name_prefix: &str,
+        envs: Vec<(String, String)>,
+    ) -> WorkerPool<T, R, P> {
         let queue = Arc::new(unlimited::Queue::new());
         let (stopped_tx, stopped_rx) = watch::channel(false);
 
@@ -71,7 +82,7 @@ impl<
 
         for i in 1..=num {
             let process = Arc::new(WorkerProcess::<T, R, P>::new(
-                format!("{}{}", name_prefix,  i),
+                format!("{}{}", name_prefix, i),
                 envs.clone(),
                 queue.clone(),
                 timeout.clone(),
@@ -334,10 +345,6 @@ where
     R: Serialize + DeserializeOwned + Sync + Send + 'static,
     P: MessageProcessor<T, R>,
 {
-    if std::env::var("_CUBESTORE_SUBPROCESS_TYPE") == Ok("INGESTION_WORKER".to_string()) {
-        println!("!!! ingestion started");
-
-    }
     let (rx, tx) = (a.args, a.results);
     let mut tokio_builder = Builder::new_multi_thread();
     tokio_builder.enable_all();
@@ -350,19 +357,35 @@ where
     let runtime = tokio_builder.build().unwrap();
     worker_setup(&runtime);
     runtime.block_on(async move {
-        let config = get_worker_config().await;
+        let config = match P::configure().await {
+            Err(e) => {
+                error!(
+                    "Error during {} worker configure: {}",
+                    P::process_titile(),
+                    e
+                );
+                return 1;
+            }
+            Ok(config) => config,
+        };
 
-        spawn_background_processes(config.clone());
+        if let Err(e) = P::spawn_background_processes(config.clone()) {
+            error!(
+                "Error during {} worker background processes spawn: {}",
+                P::process_titile(),
+                e
+            );
+        }
 
         loop {
             let res = rx.recv();
             match res {
                 Ok(args) => {
-                    let result =
-                        match async_try_with_catch_unwind(P::process(&config, args)).await {
-                            Ok(result) => result,
-                            Err(panic) => Err(CubeError::from(panic)),
-                        };
+                    let result = match async_try_with_catch_unwind(P::process(&config, args)).await
+                    {
+                        Ok(result) => result,
+                        Err(panic) => Err(CubeError::from(panic)),
+                    };
                     let send_res = tx.send(result);
                     if let Err(e) = send_res {
                         error!("Worker message send error: {:?}", e);
@@ -385,36 +408,8 @@ fn worker_setup(runtime: &Runtime) {
     }
 }
 
-async fn get_worker_config() -> Config {
-    let custom_fn = SELECT_WORKER_CONFIGURE_FN.read().unwrap();
-    if let Some(func) = custom_fn.as_ref() {
-        func().await
-    } else {
-        let config = Config::default();
-        config.configure_injector().await;
-        config
-    }
-}
-
-fn spawn_background_processes(config: Config) {
-    let custom_fn = SELECT_WORKER_SPAWN_BACKGROUND_FN.read().unwrap();
-    if let Some(func) = custom_fn.as_ref() {
-        func(config);
-    }
-}
-
 lazy_static! {
     static ref SELECT_WORKER_SETUP: std::sync::RwLock<Option<Box<dyn Fn(&Runtime) + Send + Sync>>> =
-        std::sync::RwLock::new(None);
-}
-
-lazy_static! {
-    static ref SELECT_WORKER_CONFIGURE_FN: std::sync::RwLock<Option<Box<dyn Fn() -> BoxFuture<'static, Config> + Send + Sync>>> =
-        std::sync::RwLock::new(None);
-}
-
-lazy_static! {
-    static ref SELECT_WORKER_SPAWN_BACKGROUND_FN: std::sync::RwLock<Option<Box<dyn Fn(Config) + Send + Sync>>> =
         std::sync::RwLock::new(None);
 }
 
@@ -422,24 +417,6 @@ pub fn register_select_worker_setup(f: fn(&Runtime)) {
     let mut setup = SELECT_WORKER_SETUP.write().unwrap();
     assert!(setup.is_none(), "select worker setup already registered");
     *setup = Some(Box::new(f));
-}
-
-pub fn register_select_worker_configure_fn(f: fn() -> BoxFuture<'static, Config>) {
-    let mut func = SELECT_WORKER_CONFIGURE_FN.write().unwrap();
-    assert!(
-        func.is_none(),
-        "select worker configure function already registered"
-    );
-    *func = Some(Box::new(f));
-}
-
-pub fn register_select_worker_spawn_background_fn(f: fn(Config)) {
-    let mut func = SELECT_WORKER_SPAWN_BACKGROUND_FN.write().unwrap();
-    assert!(
-        func.is_none(),
-        "select worker spawn background function already registered"
-    );
-    *func = Some(Box::new(f));
 }
 
 #[cfg(test)]
@@ -455,12 +432,11 @@ mod tests {
     use tokio::runtime::Builder;
 
     use crate::cluster::worker_pool::{worker_main, MessageProcessor, WorkerPool};
-    use crate::config::WorkerServices;
+    use crate::config::Config;
     use crate::queryplanner::serialized_plan::SerializedLogicalPlan;
     use crate::util::respawn;
     use crate::CubeError;
     use datafusion::cube_ext;
-    use crate::config::Config;
 
     #[ctor::ctor]
     fn test_support_init() {
@@ -483,6 +459,17 @@ mod tests {
 
     #[async_trait]
     impl MessageProcessor<Message, Response> for Processor {
+        type Config = Config;
+
+        async fn configure() -> Result<Self::Config, CubeError> {
+            let config = Config::default();
+            config.configure_injector().await;
+            Ok(config)
+        }
+
+        fn spawn_background_processes(_config: Self::Config) -> Result<(), CubeError> {
+            Ok(())
+        }
         async fn process(_config: &Config, args: Message) -> Result<Response, CubeError> {
             match args {
                 Message::Delay(x) => {
@@ -508,6 +495,8 @@ mod tests {
             let pool = Arc::new(WorkerPool::<Message, Response, Processor>::new(
                 4,
                 Duration::from_millis(1000),
+                "test",
+                Vec::new(),
             ));
             let pool_to_move = pool.clone();
             cube_ext::spawn(async move { pool_to_move.wait_processing_loops().await });
@@ -527,6 +516,8 @@ mod tests {
             let pool = Arc::new(WorkerPool::<Message, Response, Processor>::new(
                 4,
                 Duration::from_millis(1000),
+                "test",
+                Vec::new(),
             ));
             let pool_to_move = pool.clone();
             cube_ext::spawn(async move { pool_to_move.wait_processing_loops().await });
@@ -550,6 +541,8 @@ mod tests {
             let pool = Arc::new(WorkerPool::<Message, Response, Processor>::new(
                 4,
                 Duration::from_millis(450),
+                "test",
+                Vec::new(),
             ));
             let pool_to_move = pool.clone();
             cube_ext::spawn(async move { pool_to_move.wait_processing_loops().await });
@@ -577,6 +570,8 @@ mod tests {
             let pool = Arc::new(WorkerPool::<Message, Response, Processor>::new(
                 4,
                 Duration::from_millis(2000),
+                "test",
+                Vec::new(),
             ));
             let pool_to_move = pool.clone();
             cube_ext::spawn(async move { pool_to_move.wait_processing_loops().await });

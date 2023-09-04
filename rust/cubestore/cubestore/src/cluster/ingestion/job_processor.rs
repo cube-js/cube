@@ -1,11 +1,12 @@
 use crate::config::injection::DIService;
-use crate::config::{Config, ConfigObj};
+use crate::config::Config;
 use crate::import::ImportService;
 use crate::metastore::job::{Job, JobType};
 use crate::metastore::table::Table;
 use crate::metastore::{MetaStore, RowKey, TableId};
 use crate::queryplanner::trace_data_loaded::DataLoadedSize;
 use crate::store::compaction::CompactionService;
+use crate::store::ChunkDataStore;
 use crate::CubeError;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -47,15 +48,15 @@ pub struct JobProcessorImpl {
 
 impl JobProcessorImpl {
     pub fn new(
-        config_obj: Arc<dyn ConfigObj>,
         meta_store: Arc<dyn MetaStore>,
+        chunk_store: Arc<dyn ChunkDataStore>,
         compaction_service: Arc<dyn CompactionService>,
         import_service: Arc<dyn ImportService>,
     ) -> Arc<Self> {
         Arc::new(Self {
             processor: JobIsolatedProcessor::new(
-                config_obj,
                 meta_store,
+                chunk_store,
                 compaction_service,
                 import_service,
             ),
@@ -72,58 +73,29 @@ impl JobProcessor for JobProcessorImpl {
     }
 
     async fn process_job(&self, job: Job) -> Result<JobProcessResult, CubeError> {
-        self.processor
-            .process_separate_job(&job)
-            .await
+        self.processor.process_separate_job(&job).await
     }
 }
 
 crate::di_service!(JobProcessorImpl, [JobProcessor]);
 
-//TODO
-#[cfg(target_os = "windows")]
-pub struct JobProcessor {
-    process_pool:
-        Arc<WorkerPool<IngestionWorkerMessage, JobProcessResult, IngestionWorkerProcessor>>,
-}
-
-#[cfg(target_os = "windows")]
-impl JobProcessor {
-    pub fn new(pool_size: usize, timeout: Duration) -> Arc<Self> {
-        Arc::new(Self {
-            process_pool: Arc::new(WorkerPool::new(pool_size, timeout)),
-        })
-    }
-    pub async fn wait_processing_loops(&self) {
-        self.process_pool.wait_processing_loops().await
-    }
-    pub async fn stop_processing_loops(&self) -> Result<(), CubeError> {
-        self.process_pool.stop_workers().await
-    }
-    pub async fn process_job(&self, job: Job) -> Result<JobProcessResult, CubeError> {
-        self.process_pool
-            .process(IngestionWorkerMessage::Job(job))
-            .await
-    }
-}
-
 pub struct JobIsolatedProcessor {
-    config_obj: Arc<dyn ConfigObj>,
     meta_store: Arc<dyn MetaStore>,
+    chunk_store: Arc<dyn ChunkDataStore>,
     compaction_service: Arc<dyn CompactionService>,
     import_service: Arc<dyn ImportService>,
 }
 
 impl JobIsolatedProcessor {
     pub fn new(
-        config_obj: Arc<dyn ConfigObj>,
         meta_store: Arc<dyn MetaStore>,
+        chunk_store: Arc<dyn ChunkDataStore>,
         compaction_service: Arc<dyn CompactionService>,
         import_service: Arc<dyn ImportService>,
     ) -> Arc<Self> {
         Arc::new(Self {
-            config_obj,
             meta_store,
+            chunk_store,
             compaction_service,
             import_service,
         })
@@ -131,7 +103,7 @@ impl JobIsolatedProcessor {
 
     pub async fn new_from_config(config: &Config) -> Arc<Self> {
         Self::new(
-            config.config_obj(),
+            config.injector().get_service_typed().await,
             config.injector().get_service_typed().await,
             config.injector().get_service_typed().await,
             config.injector().get_service_typed().await,
@@ -145,11 +117,9 @@ impl JobIsolatedProcessor {
                     let compaction_service = self.compaction_service.clone();
                     let partition_id = *partition_id;
                     let data_loaded_size = DataLoadedSize::new();
-                    println!("!!!! CCCCCCCC");
                     let r = compaction_service
                         .compact(partition_id, data_loaded_size.clone())
                         .await;
-                    println!("!!!! FFFFFF");
                     r?;
                     Ok(JobProcessResult::new(data_loaded_size.get()))
                 } else {
@@ -211,6 +181,25 @@ impl JobIsolatedProcessor {
                     Ok(JobProcessResult::new(
                         data_loaded_size.map_or(0, |d| d.get()),
                     ))
+                } else {
+                    Self::fail_job_row_key(job)
+                }
+            }
+            JobType::RepartitionChunk => {
+                if let RowKey::Table(TableId::Chunks, chunk_id) = job.row_reference() {
+                    let chunk_id = *chunk_id;
+                    let chunk = self.meta_store.get_chunk(chunk_id).await?;
+                    if chunk.get_row().in_memory() {
+                        return Err(CubeError::internal(
+                            "In-memory chunk cannot be repartitioned in separate process"
+                                .to_string(),
+                        ));
+                    }
+                    let data_loaded_size = DataLoadedSize::new();
+                    self.chunk_store
+                        .repartition_chunk(chunk_id, data_loaded_size.clone())
+                        .await?;
+                    Ok(JobProcessResult::new(data_loaded_size.get()))
                 } else {
                     Self::fail_job_row_key(job)
                 }
