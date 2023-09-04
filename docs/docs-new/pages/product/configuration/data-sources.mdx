@@ -6,19 +6,10 @@ redirect_from:
 
 # Connecting to data sources
 
-Choose a data store to get started with below.
+Choose a data source to get started with below.
 
 Note that Cube also supports connecting to [multiple data
-stores][ref-config-multi-data-src] out of the box.
-
-<InfoBox>
-
-If you'd like to connect to a data store which is not yet listed on this page,
-please [file an issue](https://github.com/cube-js/cube/issues) on GitHub. You
-can also contribute a driver, see this
-[step-by-step guide](https://github.com/cube-js/cube/blob/master/CONTRIBUTING.md#implementing-driver).
-
-</InfoBox>
+sources][ref-config-multi-data-src] out of the box.
 
 ## Data Warehouses
 
@@ -183,6 +174,9 @@ highlighted as such in their respective pages.
 
 ## Third-party Drivers
 
+The following drivers were contributed by the Cube community. They are not part
+of the Cube distribution, however, they still be used with Cube:
+
 - [CosmosDB driver](https://www.npmjs.com/package/cosmosdb-cubejs-driver)
 - [SAP Hana driver](https://www.npmjs.com/package/cubejs-hana-driver)
 - [ArangoDB driver](https://www.npmjs.com/package/arangodb-cubejs-driver)
@@ -192,13 +186,27 @@ highlighted as such in their respective pages.
 - [Cratedb driver](https://www.npmjs.com/package/cratedb-cubejs-driver)
 - [Dremio ODBC driver](https://www.npmjs.com/package/dremio-odbc-cubejs-driver)
 
+## Currently Unsupported Data Sources
+
+If you'd like to connect to a data source which is not yet listed on this page,
+please see the list of [requested drivers](https://github.com/cube-js/cube/issues/7076)
+and [file an issue](https://github.com/cube-js/cube/issues) on GitHub.
+
 You're more than welcome to contribute new drivers as well as new features and
 patches to
 [existing drivers](https://github.com/cube-js/cube/tree/master/packages). Please
 check the
 [contribution guidelines](https://github.com/cube-js/cube/blob/master/CONTRIBUTING.md#contributing-database-drivers)
-and join the `#contributors` channel in our
+and join the `#contributing-to-cube` channel in our
 [Slack community](https://slack.cube.dev).
+
+<InfoBox>
+
+You can [contact us](https://cube.dev/contact) to discuss an integration
+with a currently unsupported data source. We might be able to assist Cube Cloud
+users on [select tiers](https://cube.dev/pricing).
+
+</InfoBox>
 
 [ref-config-multi-data-src]:
   /product/configuration/advanced/multiple-data-sources
