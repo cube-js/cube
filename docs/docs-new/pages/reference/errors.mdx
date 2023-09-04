@@ -57,3 +57,23 @@ cubes:
         type: string
         primary_key: true
 ```
+
+## `Refresh Scheduler Interval Error`
+
+```json
+{
+  "message": "Refresh Scheduler Interval Error",
+  "error": "Previous interval #2 was not finished with 60000 interval"
+}
+```
+
+Error message above indicates that your refresh worker is overloaded. You probably have
+a lot of [tenants](/product/configuration/advanced/multitenancy), a lot of
+[pre-aggregations](/product/caching/using-pre-aggregations) to refresh, or both.
+
+**If you're using [multitenancy](/product/configuration/advanced/multitenancy), you'd need
+to deploy several Cube clusters (each one per a reduced set of tenants) so there will be
+multiple refresh workers which will work only on a subset of your tenants.**
+
+If you're using Cube Cloud, you can use a [production multi-cluster](/product/deployment/cloud/deployment-types#production-multi-cluster)
+that would automatically do this for you.
