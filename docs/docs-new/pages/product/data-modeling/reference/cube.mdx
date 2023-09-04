@@ -541,32 +541,6 @@ SELECT FLOOR(EXTRACT(EPOCH FROM NOW()) / 5)
 └───────────────────────── second (0 - 59, optional)
 ```
 
-### rewrite_queries
-
-Set this flag to true if you want Cube to rewrite your queries after final SQL
-has been generated. This may be helpful to apply filter pushdown optimizations
-or reduce unnecessary query nesting. For example:
-
-<CodeTabs>
-
-```javascript
-cube(`tickets`, {
-  // ...
-
-  rewrite_queries: true,
-});
-```
-
-```yaml
-cubes:
-  - name: tickets
-    # ...
-
-    rewrite_queries: true
-```
-
-</CodeTabs>
-
 ### sql
 
 The `sql` parameter specifies the SQL that will be used to generate a table that
