@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/trino-driver",
   "description": "Cube.js Trino database driver",
   "author": "Cube Dev, Inc.",
-  "version": "0.33.49",
+  "version": "0.33.50",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
@@ -27,7 +27,7 @@
   "dependencies": {
     "@cubejs-backend/base-driver": "^0.33.43",
     "@cubejs-backend/prestodb-driver": "^0.33.43",
-    "@cubejs-backend/schema-compiler": "^0.33.49",
+    "@cubejs-backend/schema-compiler": "^0.33.50",
     "@cubejs-backend/shared": "^0.33.43",
     "presto-client": "^0.12.2",
     "ramda": "^0.27.0",
