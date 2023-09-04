@@ -13,7 +13,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
@@ -86,7 +86,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
@@ -189,7 +189,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
@@ -281,7 +281,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Disable rustup update (issue workaround for Windows)
         run: rustup set auto-self-update disable
         shell: bash
@@ -367,7 +367,7 @@ jobs:
     timeout-minutes: 90
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Repo metadata
         id: repo
         uses: actions/github-script@v3
@@ -441,7 +441,7 @@ jobs:
 
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Repo metadata
         id: repo
         uses: actions/github-script@v3
@@ -513,7 +513,7 @@ jobs:
 
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Repo metadata
         id: repo
         uses: actions/github-script@v3
@@ -606,7 +606,7 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Repo metadata
         id: repo
         uses: actions/github-script@v3
@@ -720,7 +720,7 @@ jobs:
             compress: false
       fail-fast: false
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Disable rustup update (issue workaround for Windows)
         run: rustup set auto-self-update disable
         if: contains(runner.os, 'windows')
@@ -807,7 +807,7 @@ jobs:
             tar_executable: gtar
       fail-fast: false
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Disable rustup update (issue workaround for Windows)
         run: rustup set auto-self-update disable
         if: contains(runner.os, 'windows')

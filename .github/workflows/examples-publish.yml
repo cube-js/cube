@@ -16,7 +16,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
@@ -42,7 +42,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
@@ -68,7 +68,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
@@ -93,7 +93,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
@@ -118,7 +118,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
@@ -143,7 +143,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
@@ -168,7 +168,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
@@ -192,7 +192,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
@@ -216,7 +216,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
@@ -240,7 +240,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
@@ -264,7 +264,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
@@ -288,7 +288,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
@@ -313,7 +313,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
@@ -337,7 +337,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
@@ -362,7 +362,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
@@ -386,7 +386,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
@@ -410,7 +410,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
@@ -434,7 +434,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
@@ -458,7 +458,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
@@ -482,7 +482,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
@@ -506,7 +506,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
@@ -530,7 +530,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
@@ -555,7 +555,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
@@ -581,7 +581,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
@@ -606,7 +606,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
@@ -630,7 +630,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
@@ -654,7 +654,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
@@ -679,7 +679,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
