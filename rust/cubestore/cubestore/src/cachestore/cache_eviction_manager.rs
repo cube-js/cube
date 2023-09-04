@@ -532,7 +532,7 @@ impl CacheEvictionManager {
         let mut total_size_removed = 0;
         let mut total_delete_skipped = 0;
 
-        let expired_items = self.collect_stats_and_candidates_to_evict(&store).await?;
+        let expired_items = self.collect_stats_and_expired_keys(&store).await?;
         let expired_len = expired_items.len();
 
         if expired_len > 0 {
@@ -559,42 +559,40 @@ impl CacheEvictionManager {
         }))
     }
 
-    async fn collect_stats_and_candidates_to_evict(
+    async fn collect_stats_and_expired_keys(
         &self,
         store: &Arc<RocksStore>,
     ) -> Result<KeysVector, CubeError> {
-        let (to_delete, stats_total_keys, stats_total_raw_size) = store
+        let (expired, stats_total_keys, stats_total_raw_size) = store
             .read_operation_out_of_queue(move |db_ref| {
                 let mut stats_total_keys: u32 = 0;
                 let mut stats_total_raw_size: u64 = 0;
 
-                let mut result = KeysVector::new();
                 let now = Utc::now();
                 let cache_schema = CacheItemRocksTable::new(db_ref.clone());
+
+                let mut expired = KeysVector::new();
 
                 for item in cache_schema.scan_index_values(&CacheItemRocksIndex::ByPath)? {
                     let item = item?;
 
-                    stats_total_keys += 1;
-
                     let row_size = if let Some(extended) = item.extended {
-                        stats_total_raw_size += extended.raw_size as u64;
                         extended.raw_size
                     } else {
-                        // count keys without size as 1
-                        stats_total_raw_size += 1_u64;
-
-                        0
+                        CACHE_ITEM_SIZE_WITHOUT_VALUE
                     };
+
+                    stats_total_keys += 1;
+                    stats_total_raw_size += row_size as u64;
 
                     if let Some(ttl) = item.ttl {
                         if ttl < now {
-                            result.push((item.row_id, row_size));
+                            expired.push((item.row_id, row_size));
                         }
                     }
                 }
 
-                Ok((result, stats_total_keys, stats_total_raw_size))
+                Ok((expired, stats_total_keys, stats_total_raw_size))
             })
             .await?;
 
@@ -603,7 +601,7 @@ impl CacheEvictionManager {
         self.stats_total_raw_size
             .store(stats_total_raw_size, Ordering::Release);
 
-        Ok(to_delete)
+        Ok(expired)
     }
 
     async fn collect_allkeys_to_evict(
