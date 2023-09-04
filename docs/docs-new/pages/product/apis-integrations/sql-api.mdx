@@ -57,19 +57,25 @@ suggest tools of your interest and vote for already proposed ones.
 
 ### Cube Core
 
-SQL API is disabled by default. To enable the SQL API, set the
-`CUBEJS_PG_SQL_PORT` to a port number you'd like to connect to with a
-Postgres-compatible tool.
+**SQL API is disabled by default.** To enable the SQL API, set `CUBEJS_PG_SQL_PORT`
+to a port number you'd like to connect to with a Postgres-compatible tool.
 
-Use `CUBEJS_SQL_USER` and `CUBEJS_SQL_PASSWORD` to configure credentials
-required to connect to the SQL API. You can also use
+| Credential | Environment variable, etc.     |
+|:---------- |:------------------------------ |
+| Host       | Host you're running Cube at    |
+| Port       | Set via `CUBEJS_PG_SQL_PORT`   |
+| User name  | Set via `CUBEJS_SQL_USER`      |
+| Password   | Set via `CUBEJS_SQL_PASSWORD`  |
+| Database   | Any valid string, e.g., `cube` |
+
+You can also use
 [`checkSqlAuth`][ref-config-checksqlauth],
 [`canSwitchSqlUser`][ref-config-canswitchsqluser], and `CUBEJS_SQL_SUPER_USER`
 to configure [custom authentication][ref-sql-api-auth].
 
 ### Cube Cloud
 
-SQL API is enabled by default. You can find credentials for the SQL API on
+**SQL API is enabled by default.** You can find credentials for the SQL API on
 the <Btn>Overview</Btn> page by clicking <Btn>Connect to SQL API</Btn>.
 
 You can also customize `CUBEJS_PG_SQL_PORT`, `CUBEJS_SQL_USER`, and
