@@ -13,8 +13,8 @@ pub use cache_eviction_manager::{
 };
 pub use cache_item::CacheItem;
 pub use cache_rocksstore::{
-    CacheStore, CacheStoreRpcClient, ClusterCacheStoreClient, QueueAddResponse, QueueKey,
-    QueueResultResponse, RocksCacheStore,
+    CacheStore, CacheStoreRpcClient, CachestoreInfo, ClusterCacheStoreClient, QueueAddResponse,
+    QueueKey, QueueResultResponse, RocksCacheStore,
 };
 pub use lazy::LazyRocksCacheStore;
 pub use queue_item::{QueueItem, QueueItemStatus, QueueResultAckEvent, QueueRetrieveResponse};
