@@ -268,6 +268,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         ),
         t("limit_pushdown_unique_key", limit_pushdown_unique_key),
         t("sys_drop_cache", sys_drop_cache),
+        t("sys_cachestore_info", sys_cachestore_info),
         t("sys_metastore_healthcheck", sys_metastore_healthcheck),
         t("sys_cachestore_healthcheck", sys_cachestore_healthcheck),
     ];
@@ -9286,6 +9287,10 @@ async fn queue_custom_orphaned(service: Box<dyn SqlClient>) {
         res.get_rows(),
         &vec![Row::new(vec![TableValue::String("1".to_string()),]),]
     );
+}
+
+async fn sys_cachestore_info(service: Box<dyn SqlClient>) {
+    service.exec_query("SYS CACHESTORE INFO").await.unwrap();
 }
 
 async fn sys_drop_cache(service: Box<dyn SqlClient>) {

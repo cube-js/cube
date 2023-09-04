@@ -28,7 +28,7 @@ jobs:
         node-version: [16.x]
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Disable rustup update (issue workaround for Windows)
         run: rustup set auto-self-update disable
         if: contains(runner.os, 'windows')
@@ -100,7 +100,7 @@ jobs:
         arch: ['', '-alpine']
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
@@ -169,7 +169,7 @@ jobs:
             container: cypress/browsers:node12.18.3-chrome89-ff86
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:

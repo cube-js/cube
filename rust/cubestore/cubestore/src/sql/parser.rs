@@ -170,6 +170,7 @@ pub enum CacheStoreCommand {
     Compaction,
     Healthcheck,
     Eviction,
+    Info,
     Persist,
 }
 
@@ -391,6 +392,8 @@ impl<'a> CubeStoreParser<'a> {
             CacheStoreCommand::Persist
         } else if self.parse_custom_token("eviction") {
             CacheStoreCommand::Eviction
+        } else if self.parse_custom_token("info") {
+            CacheStoreCommand::Info
         } else if self.parse_custom_token("healthcheck") {
             CacheStoreCommand::Healthcheck
         } else {

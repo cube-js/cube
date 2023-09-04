@@ -1,5 +1,5 @@
 use crate::cachestore::cache_eviction_manager::EvictionResult;
-use crate::cachestore::cache_rocksstore::QueueAddResponse;
+use crate::cachestore::cache_rocksstore::{CachestoreInfo, QueueAddResponse};
 use crate::cachestore::queue_item::QueueRetrieveResponse;
 use crate::cachestore::{
     CacheItem, CacheStore, QueueItem, QueueItemStatus, QueueKey, QueueResult, QueueResultResponse,
@@ -299,6 +299,10 @@ impl CacheStore for LazyRocksCacheStore {
 
     async fn compaction(&self) -> Result<(), CubeError> {
         self.init().await?.compaction().await
+    }
+
+    async fn info(&self) -> Result<CachestoreInfo, CubeError> {
+        self.init().await?.info().await
     }
 
     async fn eviction(&self) -> Result<EvictionResult, CubeError> {

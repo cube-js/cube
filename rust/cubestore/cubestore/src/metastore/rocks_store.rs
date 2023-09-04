@@ -140,6 +140,18 @@ pub struct RocksSecondaryIndexValueTTLExtended {
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
+pub struct RocksTableStats {
+    pub table_name: String,
+    pub keys_total: u32,
+    pub size_total: u64,
+    pub expired_keys_total: u32,
+    pub expired_size_total: u64,
+    pub min_row_size: u64,
+    pub avg_row_size: u64,
+    pub max_row_size: u64,
+}
+
+#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct RocksPropertyRow {
     pub key: String,
     pub value: Option<String>,

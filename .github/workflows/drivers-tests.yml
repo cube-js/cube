@@ -40,7 +40,7 @@ jobs:
     outputs:
       sha: ${{ steps.get-tag.outputs.sha }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - id: git-log
@@ -65,7 +65,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       # Building docker
       - name: Login to DockerHub
@@ -112,7 +112,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install Rust
         uses: actions-rs/toolchain@v1
