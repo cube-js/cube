@@ -1,11 +1,12 @@
 use crate::cachestore::cache_item::{
     CacheItem, CacheItemIndexKey, CacheItemRocksIndex, CacheItemRocksTable,
+    CACHE_ITEM_SIZE_WITHOUT_VALUE,
 };
 use crate::cachestore::queue_item::{
     QueueItem, QueueItemIndexKey, QueueItemRocksIndex, QueueItemRocksTable, QueueItemStatus,
     QueueResultAckEvent, QueueResultAckEventResult, QueueRetrieveResponse,
 };
-use crate::cachestore::queue_result::QueueResultRocksTable;
+use crate::cachestore::queue_result::{QueueResultRocksIndex, QueueResultRocksTable};
 use crate::cachestore::{compaction, QueueResult};
 use crate::config::injection::DIService;
 use crate::config::{Config, ConfigObj};
@@ -14,7 +15,7 @@ use std::env;
 
 use crate::metastore::{
     BaseRocksStoreFs, BatchPipe, DbTableRef, IdRow, MetaStoreEvent, MetaStoreFs, RocksPropertyRow,
-    RocksStore, RocksStoreDetails, RocksTable,
+    RocksStore, RocksStoreDetails, RocksTable, RocksTableStats,
 };
 use crate::remotefs::LocalDirRemoteFs;
 use crate::util::WorkerLoop;
@@ -566,14 +567,19 @@ impl QueueKey {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
+pub struct CachestoreInfo {
+    pub tables: Vec<RocksTableStats>,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
 pub struct QueueAddResponse {
     pub id: u64,
     pub added: bool,
     pub pending: u64,
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
 pub enum QueueResultResponse {
     Success { value: Option<String> },
 }
@@ -652,6 +658,8 @@ pub trait CacheStore: DIService + Send + Sync {
 
     // Force compaction for the whole RocksDB
     async fn compaction(&self) -> Result<(), CubeError>;
+    // DB stats + sizes
+    async fn info(&self) -> Result<CachestoreInfo, CubeError>;
     // Force run for eviction
     async fn eviction(&self) -> Result<EvictionResult, CubeError>;
     // Force run for persist of lru/lfu stats
@@ -1197,6 +1205,35 @@ impl CacheStore for RocksCacheStore {
         Ok(())
     }
 
+    async fn info(&self) -> Result<CachestoreInfo, CubeError> {
+        self.store
+            .read_operation_out_of_queue(move |db_ref| {
+                let cache_schema = CacheItemRocksTable::new(db_ref.clone());
+                let cache_schema_stats = cache_schema.collect_table_stats_by_extended_index(
+                    &CacheItemRocksIndex::ByPath,
+                    CACHE_ITEM_SIZE_WITHOUT_VALUE as u64,
+                )?;
+
+                let queue_schema = QueueItemRocksTable::new(db_ref.clone());
+                let queue_schema_stats = queue_schema.collect_table_stats_by_extended_index(
+                    &QueueItemRocksIndex::ByPath,
+                    0 as u64,
+                )?;
+
+                let queue_result_schema = QueueResultRocksTable::new(db_ref.clone());
+                let queue_result_stats = queue_result_schema
+                    .collect_table_stats_by_extended_index(
+                        &QueueResultRocksIndex::ByPath,
+                        0 as u64,
+                    )?;
+
+                Ok(CachestoreInfo {
+                    tables: vec![cache_schema_stats, queue_schema_stats, queue_result_stats],
+                })
+            })
+            .await
+    }
+
     async fn eviction(&self) -> Result<EvictionResult, CubeError> {
         self.run_eviction().await
     }
@@ -1341,6 +1378,10 @@ impl CacheStore for ClusterCacheStoreClient {
 
     async fn compaction(&self) -> Result<(), CubeError> {
         panic!("CacheStore cannot be used on the worker node! compaction was used.")
+    }
+
+    async fn info(&self) -> Result<CachestoreInfo, CubeError> {
+        panic!("CacheStore cannot be used on the worker node! info was used.")
     }
 
     async fn eviction(&self) -> Result<EvictionResult, CubeError> {
