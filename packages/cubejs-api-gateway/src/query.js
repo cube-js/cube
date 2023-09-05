@@ -40,6 +40,13 @@ const getPivotQuery = (queryType, queries) => {
 
 const id = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$/);
 const dimensionWithTime = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+(\.(second|minute|hour|day|week|month|year))?$/);
+const memberExpression = Joi.object().keys({
+  expression: Joi.func().required(),
+  cubeName: Joi.string().required(),
+  name: Joi.string().required(),
+  expressionName: Joi.string(),
+  definition: Joi.string(),
+});
 
 const operators = [
   'equals',
@@ -79,8 +86,9 @@ const oneCondition = Joi.object().keys({
 }).xor('or', 'and');
 
 const querySchema = Joi.object().keys({
-  measures: Joi.array().items(id),
-  dimensions: Joi.array().items(dimensionWithTime),
+  // TODO add member expression alternatives only for SQL API queries?
+  measures: Joi.array().items(Joi.alternatives(id, memberExpression)),
+  dimensions: Joi.array().items(Joi.alternatives(dimensionWithTime, memberExpression)),
   filters: Joi.array().items(oneFilter, oneCondition),
   timeDimensions: Joi.array().items(Joi.object().keys({
     dimension: id.required(),
@@ -176,7 +184,7 @@ const normalizeQuery = (query, persistent) => {
     );
   }
 
-  const regularToTimeDimension = (query.dimensions || []).filter(d => d.split('.').length === 3).map(d => ({
+  const regularToTimeDimension = (query.dimensions || []).filter(d => typeof d === 'string' && d.split('.').length === 3).map(d => ({
     dimension: d.split('.').slice(0, 2).join('.'),
     granularity: d.split('.')[2]
   }));
@@ -207,7 +215,7 @@ const normalizeQuery = (query, persistent) => {
     timezone,
     order: normalizeQueryOrder(query.order),
     filters: normalizeQueryFilters(query.filters || []),
-    dimensions: (query.dimensions || []).filter(d => d.split('.').length !== 3),
+    dimensions: (query.dimensions || []).filter(d => typeof d !== 'string' || d.split('.').length !== 3),
     timeDimensions: (query.timeDimensions || []).map(td => {
       let dateRange;
 

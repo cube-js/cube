@@ -20,8 +20,8 @@ class PostgresParamAllocator extends ParamAllocator {
 }
 
 export class PostgresQuery extends BaseQuery {
-  newParamAllocator() {
-    return new PostgresParamAllocator();
+  newParamAllocator(expressionParams) {
+    return new PostgresParamAllocator(expressionParams);
   }
 
   convertTz(field) {

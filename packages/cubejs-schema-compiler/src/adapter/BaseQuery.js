@@ -186,7 +186,7 @@ class BaseQuery {
      * @protected
      * @type {ParamAllocator}
      */
-    this.paramAllocator = this.options.paramAllocator || this.newParamAllocator();
+    this.paramAllocator = this.options.paramAllocator || this.newParamAllocator(this.options.expressionParams);
     this.compilerCache = this.compilers.compiler.compilerCache;
     this.queryCache = this.compilerCache.getQueryCache({
       measures: this.options.measures,
@@ -209,6 +209,7 @@ class BaseQuery {
       historyQueries: this.options.historyQueries, // TODO too heavy for key
       ungrouped: this.options.ungrouped,
       memberToAlias: this.options.memberToAlias,
+      expressionParams: this.options.expressionParams,
     });
     this.timezone = this.options.timezone;
     this.rowLimit = this.options.rowLimit;
@@ -433,8 +434,8 @@ class BaseQuery {
     return new BaseTimeDimension(this, timeDimension);
   }
 
-  newParamAllocator() {
-    return new ParamAllocator();
+  newParamAllocator(expressionParams) {
+    return new ParamAllocator(expressionParams);
   }
 
   newPreAggregations() {

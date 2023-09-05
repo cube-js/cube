@@ -68,6 +68,8 @@ struct LoadRequest {
     session: SessionContext,
     #[serde(rename = "memberToAlias", skip_serializing_if = "Option::is_none")]
     member_to_alias: Option<HashMap<String, String>>,
+    #[serde(rename = "expressionParams", skip_serializing_if = "Option::is_none")]
+    expression_params: Option<Vec<Option<String>>>,
     streaming: bool,
 }
 
@@ -176,6 +178,7 @@ impl TransportService for NodeBridgeTransport {
         ctx: AuthContextRef,
         meta: LoadRequestMeta,
         member_to_alias: Option<HashMap<String, String>>,
+        expression_params: Option<Vec<Option<String>>>,
     ) -> Result<SqlResponse, CubeError> {
         let native_auth = ctx
             .as_any()
@@ -196,6 +199,7 @@ impl TransportService for NodeBridgeTransport {
             },
             sql_query: None,
             member_to_alias,
+            expression_params,
             streaming: false,
         })?;
 
@@ -269,6 +273,7 @@ impl TransportService for NodeBridgeTransport {
                 },
                 sql_query: sql_query.clone().map(|q| (q.sql, q.values)),
                 member_to_alias: None,
+                expression_params: None,
                 streaming: false,
             })?;
 
@@ -345,6 +350,7 @@ impl TransportService for NodeBridgeTransport {
                     superuser: native_auth.superuser,
                 },
                 member_to_alias: None,
+                expression_params: None,
                 streaming: true,
             })?;
 

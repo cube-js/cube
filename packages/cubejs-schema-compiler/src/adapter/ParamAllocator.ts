@@ -1,7 +1,11 @@
 const PARAMS_MATCH_REGEXP = /\$(\d+)\$/g;
 
 export class ParamAllocator {
-  protected readonly params: unknown[] = [];
+  protected readonly params: unknown[];
+
+  public constructor(expressionParams?: unknown[]) {
+    this.params = expressionParams || [];
+  }
 
   public allocateParamsForQuestionString(sql: string, paramArray: unknown[]): string {
     let paramIndex = 0;

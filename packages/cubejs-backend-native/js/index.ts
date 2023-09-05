@@ -48,6 +48,7 @@ export interface SqlPayload {
     session: SessionContext,
     query: any,
     memberToAlias: Record<string, string>,
+    expressionParams: string[],
 }
 
 export interface SqlApiLoadPayload {

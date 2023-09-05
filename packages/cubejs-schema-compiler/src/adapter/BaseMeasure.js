@@ -6,7 +6,7 @@ export class BaseMeasure {
     if (measure.expression) {
       this.expression = measure.expression;
       this.expressionCubeName = measure.cubeName;
-      this.expressionName = `${measure.cubeName}.${measure.name}`;
+      this.expressionName = measure.expressionName || `${measure.cubeName}.${measure.name}`;
     }
     this.measure = measure;
   }

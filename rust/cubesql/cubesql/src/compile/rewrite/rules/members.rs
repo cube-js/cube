@@ -617,13 +617,15 @@ impl MemberRules {
                 "?original_alias",
             ),
         ));
-        let pushdown_measure_rewrite =
-            |name: &str,
+        Self::measure_rewrites(
+            &mut rules,
+            |name: &'static str,
              aggr_expr: String,
              measure_expr: String,
              fun_name: Option<&'static str>,
              distinct: Option<&'static str>,
-             cast_data_type: Option<&'static str>| {
+             cast_data_type: Option<&'static str>,
+             _column: Option<&'static str>| {
                 transforming_chain_rewrite(
                     name,
                     member_pushdown_replacer(
@@ -643,70 +645,8 @@ impl MemberRules {
                         "?measure",
                     ),
                 )
-            };
-        rules.push(pushdown_measure_rewrite(
-            "member-pushdown-replacer-agg-fun",
-            agg_fun_expr("?fun_name", vec![column_expr("?column")], "?distinct"),
-            measure_expr("?name", "?old_alias"),
-            Some("?fun_name"),
-            Some("?distinct"),
-            None,
-        ));
-        rules.push(pushdown_measure_rewrite(
-            "member-pushdown-replacer-agg-fun-cast",
-            agg_fun_expr(
-                "?fun_name",
-                vec![cast_expr(column_expr("?column"), "?data_type")],
-                "?distinct",
-            ),
-            measure_expr("?name", "?old_alias"),
-            Some("?fun_name"),
-            Some("?distinct"),
-            Some("?data_type"),
-        ));
-        rules.push(pushdown_measure_rewrite(
-            "member-pushdown-replacer-agg-fun-on-dimension",
-            agg_fun_expr("?fun_name", vec![column_expr("?column")], "?distinct"),
-            dimension_expr("?name", "?old_alias"),
-            Some("?fun_name"),
-            Some("?distinct"),
-            None,
-        ));
-        rules.push(pushdown_measure_rewrite(
-            "member-pushdown-replacer-udaf-fun",
-            udaf_expr("?fun_name", vec![column_expr("?column")]),
-            measure_expr("?name", "?old_alias"),
-            None,
-            None,
-            None,
-        ));
-        rules.push(pushdown_measure_rewrite(
-            "member-pushdown-replacer-udaf-fun-on-dimension",
-            udaf_expr("?fun_name", vec![column_expr("?column")]),
-            dimension_expr("?name", "?old_alias"),
-            None,
-            None,
-            None,
-        ));
-        rules.push(pushdown_measure_rewrite(
-            "member-pushdown-replacer-agg-fun-default-count",
-            agg_fun_expr("?fun_name", vec![literal_expr("?any")], "?distinct"),
-            measure_expr("?name", "?old_alias"),
-            Some("?fun_name"),
-            Some("?distinct"),
-            None,
-        ));
-        rules.push(pushdown_measure_rewrite(
-            "member-pushdown-replacer-agg-fun-default-count-alias",
-            alias_expr(
-                agg_fun_expr("?fun_name", vec![literal_expr("?any")], "?distinct"),
-                "?alias",
-            ),
-            measure_expr("?name", "?old_alias"),
-            Some("?fun_name"),
-            Some("?distinct"),
-            None,
-        ));
+            },
+        );
 
         rules.push(transforming_chain_rewrite(
             "member-pushdown-date-trunc",
@@ -1043,6 +983,90 @@ impl MemberRules {
         ));
 
         rules
+    }
+
+    pub fn measure_rewrites(
+        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
+        pushdown_measure_rewrite: impl Fn(
+            &'static str,
+            String,
+            String,
+            Option<&'static str>,
+            Option<&'static str>,
+            Option<&'static str>,
+            Option<&'static str>,
+        ) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>,
+    ) {
+        rules.push(pushdown_measure_rewrite(
+            "member-pushdown-replacer-agg-fun",
+            agg_fun_expr("?fun_name", vec![column_expr("?column")], "?distinct"),
+            measure_expr("?name", "?old_alias"),
+            Some("?fun_name"),
+            Some("?distinct"),
+            None,
+            Some("?column"),
+        ));
+        rules.push(pushdown_measure_rewrite(
+            "member-pushdown-replacer-agg-fun-cast",
+            agg_fun_expr(
+                "?fun_name",
+                vec![cast_expr(column_expr("?column"), "?data_type")],
+                "?distinct",
+            ),
+            measure_expr("?name", "?old_alias"),
+            Some("?fun_name"),
+            Some("?distinct"),
+            Some("?data_type"),
+            Some("?column"),
+        ));
+        rules.push(pushdown_measure_rewrite(
+            "member-pushdown-replacer-agg-fun-on-dimension",
+            agg_fun_expr("?fun_name", vec![column_expr("?column")], "?distinct"),
+            dimension_expr("?name", "?old_alias"),
+            Some("?fun_name"),
+            Some("?distinct"),
+            None,
+            Some("?column"),
+        ));
+        rules.push(pushdown_measure_rewrite(
+            "member-pushdown-replacer-udaf-fun",
+            udaf_expr("?fun_name", vec![column_expr("?column")]),
+            measure_expr("?name", "?old_alias"),
+            None,
+            None,
+            None,
+            Some("?column"),
+        ));
+        rules.push(pushdown_measure_rewrite(
+            "member-pushdown-replacer-udaf-fun-on-dimension",
+            udaf_expr("?fun_name", vec![column_expr("?column")]),
+            dimension_expr("?name", "?old_alias"),
+            None,
+            None,
+            None,
+            Some("?column"),
+        ));
+        rules.push(pushdown_measure_rewrite(
+            "member-pushdown-replacer-agg-fun-default-count",
+            agg_fun_expr("?fun_name", vec![literal_expr("?any")], "?distinct"),
+            measure_expr("?name", "?old_alias"),
+            Some("?fun_name"),
+            Some("?distinct"),
+            None,
+            None,
+        ));
+        rules.push(pushdown_measure_rewrite(
+            "member-pushdown-replacer-agg-fun-default-count-alias",
+            alias_expr(
+                agg_fun_expr("?fun_name", vec![literal_expr("?any")], "?distinct"),
+                "?alias",
+            ),
+            measure_expr("?name", "?old_alias"),
+            Some("?fun_name"),
+            Some("?distinct"),
+            None,
+            None,
+        ));
     }
 
     fn concat_cube_scan_members(

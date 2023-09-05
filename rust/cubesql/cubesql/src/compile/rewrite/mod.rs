@@ -257,6 +257,7 @@ crate::plan_to_language! {
             offset: Option<usize>,
             order_expr: Vec<Expr>,
             alias: Option<String>,
+            ungrouped: bool,
         },
         WrappedSelectJoin {
             input: Arc<LogicalPlan>,
@@ -407,10 +408,12 @@ crate::plan_to_language! {
         WrapperPushdownReplacer {
             member: Arc<LogicalPlan>,
             alias_to_cube: Vec<(String, String)>,
+            ungrouped: bool,
         },
         WrapperPullupReplacer {
             member: Arc<LogicalPlan>,
             alias_to_cube: Vec<(String, String)>,
+            ungrouped: bool,
         },
         // NOTE: converting this to a list might provide rewrite improvements
         CaseExprReplacer {
@@ -711,9 +714,10 @@ fn wrapped_select(
     offset: impl Display,
     order_expr: impl Display,
     alias: impl Display,
+    ungrouped: impl Display,
 ) -> String {
     format!(
-        "(WrappedSelect {} {} {} {} {} {} {} {} {} {} {} {})",
+        "(WrappedSelect {} {} {} {} {} {} {} {} {} {} {} {} {})",
         select_type,
         projection_expr,
         group_expr,
@@ -725,7 +729,8 @@ fn wrapped_select(
         limit,
         offset,
         order_expr,
-        alias
+        alias,
+        ungrouped,
     )
 }
 
@@ -1135,12 +1140,26 @@ fn case_expr_replacer(members: impl Display, alias_to_cube: impl Display) -> Str
     format!("(CaseExprReplacer {} {})", members, alias_to_cube)
 }
 
-fn wrapper_pushdown_replacer(members: impl Display, alias_to_cube: impl Display) -> String {
-    format!("(WrapperPushdownReplacer {} {})", members, alias_to_cube)
+fn wrapper_pushdown_replacer(
+    members: impl Display,
+    alias_to_cube: impl Display,
+    ungrouped: impl Display,
+) -> String {
+    format!(
+        "(WrapperPushdownReplacer {} {} {})",
+        members, alias_to_cube, ungrouped
+    )
 }
 
-fn wrapper_pullup_replacer(members: impl Display, alias_to_cube: impl Display) -> String {
-    format!("(WrapperPullupReplacer {} {})", members, alias_to_cube)
+fn wrapper_pullup_replacer(
+    members: impl Display,
+    alias_to_cube: impl Display,
+    ungrouped: impl Display,
+) -> String {
+    format!(
+        "(WrapperPullupReplacer {} {} {})",
+        members, alias_to_cube, ungrouped
+    )
 }
 
 fn event_notification(name: impl Display, members: impl Display, meta: impl Display) -> String {
