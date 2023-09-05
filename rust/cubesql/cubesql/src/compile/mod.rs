@@ -51,14 +51,14 @@ use self::{
             create_date_udf, create_dateadd_udf, create_datediff_udf, create_dayofmonth_udf,
             create_dayofweek_udf, create_dayofyear_udf, create_db_udf, create_ends_with_udf,
             create_format_type_udf, create_generate_series_udtf, create_generate_subscripts_udtf,
-            create_has_schema_privilege_udf, create_hour_udf, create_if_udf, create_instr_udf,
-            create_interval_mul_udf, create_isnull_udf, create_json_build_object_udf,
-            create_least_udf, create_locate_udf, create_makedate_udf, create_measure_udaf,
-            create_minute_udf, create_pg_backend_pid_udf, create_pg_datetime_precision_udf,
-            create_pg_encoding_to_char_udf, create_pg_expandarray_udtf,
-            create_pg_get_constraintdef_udf, create_pg_get_expr_udf, create_pg_get_indexdef_udf,
-            create_pg_get_serial_sequence_udf, create_pg_get_userbyid_udf,
-            create_pg_is_other_temp_schema, create_pg_my_temp_schema,
+            create_has_schema_privilege_udf, create_hour_udf, create_if_udf,
+            create_inet_server_addr_udf, create_instr_udf, create_interval_mul_udf,
+            create_isnull_udf, create_json_build_object_udf, create_least_udf, create_locate_udf,
+            create_makedate_udf, create_measure_udaf, create_minute_udf, create_pg_backend_pid_udf,
+            create_pg_datetime_precision_udf, create_pg_encoding_to_char_udf,
+            create_pg_expandarray_udtf, create_pg_get_constraintdef_udf, create_pg_get_expr_udf,
+            create_pg_get_indexdef_udf, create_pg_get_serial_sequence_udf,
+            create_pg_get_userbyid_udf, create_pg_is_other_temp_schema, create_pg_my_temp_schema,
             create_pg_numeric_precision_udf, create_pg_numeric_scale_udf,
             create_pg_table_is_visible_udf, create_pg_total_relation_size_udf,
             create_pg_truetypid_udf, create_pg_truetypmod_udf, create_pg_type_is_visible_udf,
@@ -1192,6 +1192,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_charindex_udf());
         ctx.register_udf(create_to_regtype_udf());
         ctx.register_udf(create_pg_get_indexdef_udf());
+        ctx.register_udf(create_inet_server_addr_udf());
 
         // udaf
         ctx.register_udaf(create_measure_udaf());
@@ -18863,6 +18864,26 @@ ORDER BY \"COUNT(count)\" DESC"
                     pg_catalog.pg_index.indrelid,
                     cls_idx.relname
                 ;".to_string(),
+                DatabaseProtocol::PostgreSQL,
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_zoho_inet_server_addr() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "zoho_inet_server_addr",
+            execute_query(
+                "
+                select
+                    pg_backend_pid(),
+                    coalesce(cast(inet_server_addr() as text ),'addr'),
+                    current_database()
+                ;"
+                .to_string(),
                 DatabaseProtocol::PostgreSQL,
             )
             .await?
