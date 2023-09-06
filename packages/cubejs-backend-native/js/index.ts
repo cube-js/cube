@@ -311,6 +311,7 @@ export const shutdownInterface = async (instance: SqlInterfaceInstance): Promise
 };
 
 export interface PyConfiguration {
+    repositoryFactory?: (ctx: unknown) => Promise<unknown>,
     checkAuth?: (req: unknown, authorization: string) => Promise<void>
     queryRewrite?: (query: unknown, ctx: unknown) => Promise<unknown>
     contextToApiScopes?: () => Promise<string[]>
@@ -335,6 +336,15 @@ export const pythonLoadConfig = async (content: string, options: { fileName: str
       },
       authorization
     );
+  }
+
+  if (config.repositoryFactory) {
+    const nativeRepositoryFactory = config.repositoryFactory;
+    config.repositoryFactory = (ctx: any) => ({
+      dataSchemaFiles: async () => nativeRepositoryFactory(
+        ctx
+      )
+    });
   }
 
   return config;

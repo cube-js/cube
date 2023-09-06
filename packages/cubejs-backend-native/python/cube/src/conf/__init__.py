@@ -1,4 +1,25 @@
+import os
 from typing import Union, Callable, Dict
+
+
+def file_repository(path):
+    files = []
+
+    for (dirpath, dirnames, filenames) in os.walk(path):
+        for fileName in filenames:
+            if fileName.endswith(".js") or fileName.endswith(".yml") or fileName.endswith(".yaml") or fileName.endswith(".jinja") or fileName.endswith(".py"):
+                path = os.path.join(dirpath, fileName)
+
+                f = open(path, 'r')
+                content = f.read()
+                f.close()
+
+                files.append({
+                    'fileName': fileName,
+                    'content': content
+                })
+
+    return files
 
 
 class RequestContext:
@@ -29,6 +50,7 @@ class Configuration:
     extend_context: Callable
     scheduled_refresh_contexts: Callable
     context_to_api_scopes: Callable
+    repository_factory: Callable
 
     def __init__(self):
         self.schema_path = None
@@ -53,6 +75,7 @@ class Configuration:
         self.extend_context = None
         self.scheduled_refresh_contexts = None
         self.context_to_api_scopes = None
+        self.repository_factory = None
 
     def set_schema_path(self, schema_path: str):
         self.schema_path = schema_path
@@ -113,6 +136,9 @@ class Configuration:
 
     def set_scheduled_refresh_contexts(self, scheduled_refresh_contexts: Callable):
         self.scheduled_refresh_contexts = scheduled_refresh_contexts
+
+    def set_repository_factory(self, repository_factory: Callable):
+        self.repository_factory = repository_factory
 
 
 settings = Configuration()
