@@ -715,12 +715,15 @@ export class DatabricksDriver extends JDBCDriver {
           protocol: SASProtocol.Https,
           version: '2020-08-04',
         };
-        const sas = credential instanceof StorageSharedKeyCredential
-          ? generateBlobSASQueryParameters(
+
+        let sas: string;
+        if (credential instanceof StorageSharedKeyCredential) {
+          sas = generateBlobSASQueryParameters(
             signatureValues,
             credential,
-          ).toString()
-          : generateBlobSASQueryParameters(
+          ).toString();
+        } else if (credential instanceof ClientSecretCredential) {
+          sas = generateBlobSASQueryParameters(
             signatureValues,
             await blobClient.getUserDelegationKey(
               startsOnDate,
@@ -728,6 +731,11 @@ export class DatabricksDriver extends JDBCDriver {
             ),
             account
           ).toString();
+        } else {
+          const credentialType = typeof credential;
+          throw new Error(`Unexpected credentials type: ${credentialType}`);
+        }
+
         csvFile.push(`https://${
           account
         }.blob.core.windows.net/${
