@@ -4,7 +4,7 @@ use neon::prelude::*;
 use neon::result::Throw;
 use neon::types::JsDate;
 use pyo3::exceptions::{PyNotImplementedError, PyTypeError};
-use pyo3::types::{PyBool, PyDict, PyFloat, PyFunction, PyInt, PyList, PyString};
+use pyo3::types::{PyBool, PyDict, PyFloat, PyFunction, PyInt, PyList, PySet, PyString};
 use pyo3::{Py, PyAny, PyErr, PyObject, Python, ToPyObject};
 use std::cell::RefCell;
 use std::collections::hash_map::{IntoIter, Iter, Keys};
@@ -258,6 +258,15 @@ impl CLRepr {
                 Self::Object(obj)
             } else if v.get_type().is_subclass_of::<PyList>()? {
                 let l = v.downcast::<PyList>()?;
+                let mut r = Vec::with_capacity(l.len());
+
+                for v in l.iter() {
+                    r.push(Self::from_python_ref(v)?);
+                }
+
+                Self::Array(r)
+            } else if v.get_type().is_subclass_of::<PySet>()? {
+                let l = v.downcast::<PySet>()?;
                 let mut r = Vec::with_capacity(l.len());
 
                 for v in l.iter() {

@@ -44,6 +44,7 @@ impl CubeConfigPy {
         self.function_attr(config_module, "extend_context")?;
         self.function_attr(config_module, "scheduled_refresh_contexts")?;
         self.function_attr(config_module, "context_to_api_scopes")?;
+        self.function_attr(config_module, "repository_factory")?;
 
         Ok(())
     }

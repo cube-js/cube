@@ -42,6 +42,7 @@ suite('Python Config', () => {
       contextToApiScopes: expect.any(Function),
       checkAuth: expect.any(Function),
       queryRewrite: expect.any(Function),
+      repositoryFactory: expect.any(Function),
     });
 
     if (!config.checkAuth) {
@@ -62,6 +63,31 @@ suite('Python Config', () => {
     expect(await config.contextToApiScopes()).toEqual(['meta', 'data', 'jobs']);
   });
 
+  test('repository factory', async () => {
+    if (!config.repositoryFactory) {
+      throw new Error('repositoryFactory was not defined in config.py');
+    }
+
+    const ctx = {
+      securityContext: { schemaPath: path.join(process.cwd(), 'test', 'fixtures', 'schema-tenant-1') }
+    };
+
+    const repository: any = await config.repositoryFactory(ctx);
+    expect(repository).toEqual({
+      dataSchemaFiles: expect.any(Function)
+    });
+
+    const files = await repository.dataSchemaFiles();
+    expect(files).toContainEqual({
+      fileName: 'test.yml',
+      content: expect.any(String),
+    });
+    expect(files).toContainEqual({
+      fileName: 'test.yml.jinja',
+      content: expect.any(String),
+    });
+  });
+
   test('cross language converting (js -> python -> js)', async () => {
     if (!config.queryRewrite) {
       throw new Error('queryRewrite was not defined in config.py');
@@ -80,6 +106,11 @@ suite('Python Config', () => {
       undefined_field: undefined,
       obj: {
         field_str: 'string',
+      },
+      obj_with_nested_object: {
+        sub_object: {
+          sub_field_str: 'string'
+        }
       },
       array_int: [1, 2, 3, 4, 5],
       array_obj: [{

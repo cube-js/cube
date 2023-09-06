@@ -1,4 +1,7 @@
-from cube.conf import settings
+from cube.conf import (
+    settings,
+    file_repository
+)
 
 settings.schema_path = "models"
 settings.pg_sql_port = 5555
@@ -15,6 +18,13 @@ async def check_auth(req, authorization):
 
 
 settings.check_auth = check_auth
+
+async def repository_factory(ctx):
+    print('[python] repository_factory ctx=', ctx)
+
+    return file_repository(ctx['securityContext']['schemaPath'])
+
+settings.repository_factory = repository_factory
 
 async def context_to_api_scopes():
     print('[python] context_to_api_scopes')
