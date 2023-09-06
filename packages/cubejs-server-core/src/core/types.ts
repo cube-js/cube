@@ -256,7 +256,7 @@ export type ContextAcceptanceResultWs = ContextAcceptanceResult & {
 };
 
 export interface ContextAcceptor {
-  shouldAccept(context: RequestContext | null): ContextAcceptanceResult;
-  shouldAcceptHttp(context: RequestContext | null): ContextAcceptanceResultHttp;
-  shouldAcceptWs(context: RequestContext | null): ContextAcceptanceResultWs;
+  shouldAccept(context: RequestContext | null): Promise<ContextAcceptanceResult> | ContextAcceptanceResult;
+  shouldAcceptHttp(context: RequestContext | null): Promise<ContextAcceptanceResultHttp> | ContextAcceptanceResultHttp;
+  shouldAcceptWs(context: RequestContext | null): Promise<ContextAcceptanceResultWs> | ContextAcceptanceResultWs;
 }
