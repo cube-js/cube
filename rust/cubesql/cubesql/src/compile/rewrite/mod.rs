@@ -409,11 +409,13 @@ crate::plan_to_language! {
             member: Arc<LogicalPlan>,
             alias_to_cube: Vec<(String, String)>,
             ungrouped: bool,
+            cube_members: Vec<LogicalPlan>,
         },
         WrapperPullupReplacer {
             member: Arc<LogicalPlan>,
             alias_to_cube: Vec<(String, String)>,
             ungrouped: bool,
+            cube_members: Vec<LogicalPlan>,
         },
         // NOTE: converting this to a list might provide rewrite improvements
         CaseExprReplacer {
@@ -475,7 +477,7 @@ impl ExprRewriter for WithColumnRelation {
     }
 }
 
-fn column_name_to_member_vec(
+pub fn column_name_to_member_vec(
     member_name_to_expr: Vec<(Option<String>, Expr)>,
 ) -> Vec<(String, Option<String>)> {
     let mut relation = WithColumnRelation(None);
@@ -1144,10 +1146,11 @@ fn wrapper_pushdown_replacer(
     members: impl Display,
     alias_to_cube: impl Display,
     ungrouped: impl Display,
+    cube_members: impl Display,
 ) -> String {
     format!(
-        "(WrapperPushdownReplacer {} {} {})",
-        members, alias_to_cube, ungrouped
+        "(WrapperPushdownReplacer {} {} {} {})",
+        members, alias_to_cube, ungrouped, cube_members
     )
 }
 
@@ -1155,10 +1158,11 @@ fn wrapper_pullup_replacer(
     members: impl Display,
     alias_to_cube: impl Display,
     ungrouped: impl Display,
+    cube_members: impl Display,
 ) -> String {
     format!(
-        "(WrapperPullupReplacer {} {} {})",
-        members, alias_to_cube, ungrouped
+        "(WrapperPullupReplacer {} {} {} {})",
+        members, alias_to_cube, ungrouped, cube_members
     )
 }
 

@@ -28,7 +28,7 @@ use crate::{
             WrappedSelectSelectType, WrappedSelectType, WrappedSelectUngrouped,
         },
     },
-    sql::{AuthContextRef, ColumnType},
+    sql::AuthContextRef,
     transport::V1CubeMetaExt,
     CubeError,
 };
