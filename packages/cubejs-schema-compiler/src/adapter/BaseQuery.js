@@ -1103,7 +1103,7 @@ class BaseQuery {
         'collectMultipliedMeasures',
         this.queryCache
       );
-      if (m.expressionName && !collectedMeasures.length) {
+      if (m.expressionName && !collectedMeasures.length && !m.isMemberExpression) {
         throw new UserError(`Subquery dimension ${m.expressionName} should reference at least one measure`);
       }
       return [m.measure, collectedMeasures];

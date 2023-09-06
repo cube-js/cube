@@ -444,7 +444,7 @@ impl RewriteRules for WrapperRules {
                 wrapper_pushdown_replacer(
                     agg_fun_expr("?fun", vec!["?expr"], "?distinct"),
                     "?alias_to_cube",
-                    "WrapperPullupReplacerUngrouped:false",
+                    "?ungrouped",
                     "?cube_members",
                 ),
                 agg_fun_expr(
@@ -452,7 +452,7 @@ impl RewriteRules for WrapperRules {
                     vec![wrapper_pushdown_replacer(
                         "?expr",
                         "?alias_to_cube",
-                        "WrapperPullupReplacerUngrouped:false",
+                        "?ungrouped",
                         "?cube_members",
                     )],
                     "?distinct",
@@ -465,7 +465,7 @@ impl RewriteRules for WrapperRules {
                     vec![wrapper_pullup_replacer(
                         "?expr",
                         "?alias_to_cube",
-                        "WrapperPullupReplacerUngrouped:false",
+                        "?ungrouped",
                         "?cube_members",
                     )],
                     "?distinct",
@@ -473,7 +473,7 @@ impl RewriteRules for WrapperRules {
                 wrapper_pullup_replacer(
                     agg_fun_expr("?fun", vec!["?expr"], "?distinct"),
                     "?alias_to_cube",
-                    "WrapperPullupReplacerUngrouped:false",
+                    "?ungrouped",
                     "?cube_members",
                 ),
                 self.transform_agg_fun_expr("?fun", "?distinct", "?alias_to_cube"),
@@ -730,15 +730,31 @@ impl RewriteRules for WrapperRules {
                 wrapper_pushdown_replacer(
                     column_expr("?name"),
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "WrapperPullupReplacerUngrouped:false",
                     "?cube_members",
                 ),
                 wrapper_pullup_replacer(
                     column_expr("?name"),
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "WrapperPullupReplacerUngrouped:false",
                     "?cube_members",
                 ),
+            ),
+            transforming_rewrite(
+                "wrapper-push-down-dimension",
+                wrapper_pushdown_replacer(
+                    column_expr("?name"),
+                    "?alias_to_cube",
+                    "WrapperPullupReplacerUngrouped:true",
+                    "?cube_members",
+                ),
+                wrapper_pullup_replacer(
+                    "?dimension",
+                    "?alias_to_cube",
+                    "WrapperPullupReplacerUngrouped:true",
+                    "?cube_members",
+                ),
+                self.pushdown_dimension("?name", "?cube_members", "?dimension"),
             ),
             // Literal
             rewrite(
@@ -758,6 +774,7 @@ impl RewriteRules for WrapperRules {
             ),
         ];
 
+        // TODO add flag to disable dimension rules
         MemberRules::measure_rewrites(
             &mut rules,
             |name: &'static str,
@@ -1091,6 +1108,47 @@ impl WrapperRules {
                 }
             }
 
+            false
+        }
+    }
+
+    fn pushdown_dimension(
+        &self,
+        column_name_var: &'static str,
+        members_var: &'static str,
+        dimension_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let column_name_var = var!(column_name_var);
+        let members_var = var!(members_var);
+        let dimension_var = var!(dimension_var);
+        let cube_context = self.cube_context.clone();
+        move |egraph, subst| {
+            for column in var_iter!(egraph[subst[column_name_var]], ColumnExprColumn).cloned() {
+                if let Some(member_name_to_expr) =
+                    egraph[subst[members_var]].data.member_name_to_expr.clone()
+                {
+                    let column_name_to_member_name = column_name_to_member_vec(member_name_to_expr);
+                    if let Some((_, Some(member))) = column_name_to_member_name
+                        .iter()
+                        .find(|(cn, _)| cn == &column.name)
+                    {
+                        if let Some(dimension) = cube_context
+                            .meta
+                            .find_dimension_with_name(member.to_string())
+                        {
+                            let column_expr_column =
+                                egraph.add(LogicalPlanLanguage::ColumnExprColumn(
+                                    ColumnExprColumn(column.clone()),
+                                ));
+
+                            let column_expr =
+                                egraph.add(LogicalPlanLanguage::ColumnExpr([column_expr_column]));
+                            subst.insert(dimension_var, column_expr);
+                            return true;
+                        }
+                    }
+                }
+            }
             false
         }
     }
