@@ -7,6 +7,7 @@ export class BaseMeasure {
       this.expression = measure.expression;
       this.expressionCubeName = measure.cubeName;
       this.expressionName = measure.expressionName || `${measure.cubeName}.${measure.name}`;
+      this.isMemberExpression = !!measure.definition;
     }
     this.measure = measure;
   }

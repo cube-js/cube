@@ -5,6 +5,7 @@ export class BaseDimension {
       this.expression = dimension.expression;
       this.expressionCubeName = dimension.cubeName;
       this.expressionName = dimension.expressionName || `${dimension.cubeName}.${dimension.name}`;
+      this.isMemberExpression = !!dimension.definition;
     }
     this.dimension = dimension;
   }
