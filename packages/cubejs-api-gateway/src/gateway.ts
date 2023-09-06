@@ -140,8 +140,8 @@ class ApiGateway {
 
   public constructor(
     protected readonly apiSecret: string,
-    protected readonly compilerApi: any,
-    protected readonly adapterApi: any,
+    protected readonly compilerApi: (ctx: RequestContext) => Promise<any>,
+    protected readonly adapterApi: (ctx: RequestContext) => Promise<any>,
     protected readonly logger: any,
     protected readonly options: ApiGatewayOptions,
   ) {
@@ -343,15 +343,13 @@ class ApiGateway {
           }
         },
       ],
-      (req: Request, res: Response) => {
+      async (req: Request, res: Response) => {
         const { transformedQuery, references } = req.body;
-        const canUsePreAggregationForTransformedQuery =
-          this
-            .compilerApi(req.context)
-            .canUsePreAggregationForTransformedQuery(
-              transformedQuery,
-              references,
-            );
+        const compilerApi = await this.getCompilerApi(req.context as RequestContext);
+        const canUsePreAggregationForTransformedQuery = compilerApi.canUsePreAggregationForTransformedQuery(
+          transformedQuery,
+          references,
+        );
         res.json({ canUsePreAggregationForTransformedQuery });
       }
     );
@@ -1871,19 +1869,11 @@ class ApiGateway {
   }
 
   protected async getCompilerApi(context: RequestContext) {
-    if (typeof this.compilerApi === 'function') {
-      return this.compilerApi(context);
-    }
-
-    return this.compilerApi;
+    return this.compilerApi(context);
   }
 
   protected async getAdapterApi(context: RequestContext) {
-    if (typeof this.adapterApi === 'function') {
-      return this.adapterApi(context);
-    }
-
-    return this.adapterApi;
+    return this.adapterApi(context);
   }
 
   public async contextByReq(req: Request, securityContext, requestId: string): Promise<ExtendedRequestContext> {
@@ -2390,7 +2380,7 @@ class ApiGateway {
     let health: 'HEALTH' | 'DOWN' = 'HEALTH';
 
     if (this.standalone) {
-      const orchestratorApi = await this.adapterApi({});
+      const orchestratorApi = await this.adapterApi({} as any);
 
       try {
         // todo: test other data sources
