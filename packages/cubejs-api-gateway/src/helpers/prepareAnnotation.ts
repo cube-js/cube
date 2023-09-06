@@ -40,7 +40,7 @@ const annotation = (
   if (!config) {
     return undefined;
   }
-  return [memberWithoutGranularity, {
+  return [typeof member === 'string' ? member : memberWithoutGranularity, {
     title: config.title,
     shortTitle: config.shortTitle,
     description: config.description,
