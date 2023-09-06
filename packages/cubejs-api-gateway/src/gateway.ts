@@ -1870,7 +1870,7 @@ class ApiGateway {
     return query as Query | Query[];
   }
 
-  protected async getCompilerApi(context) {
+  protected async getCompilerApi(context: RequestContext) {
     if (typeof this.compilerApi === 'function') {
       return this.compilerApi(context);
     }
@@ -1878,7 +1878,7 @@ class ApiGateway {
     return this.compilerApi;
   }
 
-  protected async getAdapterApi(context) {
+  protected async getAdapterApi(context: RequestContext) {
     if (typeof this.adapterApi === 'function') {
       return this.adapterApi(context);
     }
