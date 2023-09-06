@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.51](https://github.com/cube-js/cube/compare/v0.33.50...v0.33.51) (2023-09-06)
+
+
+### Features
+
+* **cubesql:** Support `inet_server_addr` stub ([9ecb180](https://github.com/cube-js/cube/commit/9ecb180add83a06f5689f530df561f79d441311f))
+
+
+
+
+
 ## [0.33.50](https://github.com/cube-js/cube/compare/v0.33.49...v0.33.50) (2023-09-04)
 
 

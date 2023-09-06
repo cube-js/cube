@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.51](https://github.com/cube-js/cube/compare/v0.33.50...v0.33.51) (2023-09-06)
+
+
+### Features
+
+* **native:** cube.py - support file_repository ([#7107](https://github.com/cube-js/cube/issues/7107)) ([806db35](https://github.com/cube-js/cube/commit/806db353e746f331b897aec8f61e8205ed299089))
+
+
+
+
+
 ## [0.33.50](https://github.com/cube-js/cube/compare/v0.33.49...v0.33.50) (2023-09-04)
 
 **Note:** Version bump only for package @cubejs-backend/native
