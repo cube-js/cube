@@ -98,12 +98,12 @@ export type DatabricksDriverConfiguration = JDBCDriverConfiguration &
     azureTenantId?: string,
 
     /**
-     * Azure service principle client id
+     * Azure service principal client id
      */
     azureClientId?: string,
 
     /**
-     * Azure service principle client sceret
+     * Azure service principal client sceret
      */
     azureClientSecret?: string,
   };
@@ -261,7 +261,7 @@ export class DatabricksDriver extends JDBCDriver {
         getEnv('dbExportBucketAzureKey', { dataSource }),
       exportBucketCsvEscapeSymbol:
         getEnv('dbExportBucketCsvEscapeSymbol', { dataSource }),
-      // Azure service principle
+      // Azure service principal
       azureTenantId:
         conf?.azureTenantId ||
         getEnv('dbExportBucketAzureTenantId', { dataSource }),
