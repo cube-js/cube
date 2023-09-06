@@ -510,6 +510,7 @@ export class QueryQueue {
         const [query] = await queueConnection.getQueryAndRemove(queryKey);
         if (query) {
           this.logger('Removing orphaned query', {
+            queueId: query.queueId,
             queryKey: query.queryKey,
             queuePrefix: this.redisQueuePrefix,
             requestId: query.requestId,

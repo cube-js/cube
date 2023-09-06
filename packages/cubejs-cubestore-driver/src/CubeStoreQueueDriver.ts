@@ -96,7 +96,9 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
       this.prefixKey(hash)
     ]);
     if (rows && rows.length) {
-      return this.decodeQueryDefFromRow(rows[0], 'cancelQuery');
+      return Object.assign({
+        queueId: rows[0].id,
+      }, this.decodeQueryDefFromRow(rows[0], 'cancelQuery'));
     }
 
     return null;
