@@ -106,8 +106,7 @@ def call_sql_api(sql_query: str):
 
     # Initializing Cube SQL API connection)
     connection = psycopg2.connect(CONN_STR)
-
-    log("Running query...")
+    
     cursor = connection.cursor()
     cursor.execute(sql_query)
 

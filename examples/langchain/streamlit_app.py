@@ -1,11 +1,16 @@
 import streamlit as st
 import pandas as pd
 import os
-import json
 import re
+import pickle
+import jwt
 
 from dotenv import load_dotenv
 from langchain import OpenAI
+from langchain.embeddings import OpenAIEmbeddings
+from langchain.vectorstores.faiss import FAISS
+from langchain.document_loaders import CubeSemanticLoader
+from pathlib import Path
 
 from utils import (
     create_docs_from_values,
@@ -21,19 +26,40 @@ from utils import (
 
 load_dotenv()
 
+def ingest_cube_meta():
+    security_context = {}
+    token = jwt.encode(security_context, os.environ["CUBE_API_SECRET"], algorithm="HS256")
+
+    loader = CubeSemanticLoader(os.environ["CUBE_API_URL"], token)
+    documents = loader.load()
+
+    embeddings = OpenAIEmbeddings()
+    vectorstore = FAISS.from_documents(documents, embeddings)
+
+    # Save vectorstore
+    with open("vectorstore.pkl", "wb") as f:
+        pickle.dump(vectorstore, f)
+        
+if not Path("vectorstore.pkl").exists():
+    with st.spinner('Loading context from Cube API...'):
+        ingest_cube_meta();
+
 llm = OpenAI(
     temperature=0, openai_api_key=os.environ.get("OPENAI_API_KEY"), verbose=True
 )
 
-st.title("Cube and Langchaing demo 🤖🚀")
+st.title("Cube and LangChain demo 🤖🚀")
 
-with st.expander("Running on test dataset from tutorial? Expand to see sample questions."):
-    st.write("""
-        * How many orders?
-        * How many completed orders?
-        * What are top selling product categories?
-        * What product category drives the highest average order value?
-    """)
+multi = '''
+Follow [this tutorial on Github](https://github.com/cube-js/cube/tree/master/examples/langchain) to clone this project and run it locally. 
+
+You can use these sample questions to quickly test the demo --
+* How many orders?
+* How many completed orders?
+* What are top selling product categories?
+* What product category drives the highest average order value?
+'''
+st.markdown(multi)
 
 question = st.text_input(
     "Your question: ", placeholder="Ask me anything ...", key="input"
@@ -89,6 +115,7 @@ if st.button("Submit", type="primary"):
     st.info(sql_query)
 
     # Call Cube SQL API
+    log("Sending the above query to Cube...")
     columns, rows = call_sql_api(sql_query)
 
     # Display the result
