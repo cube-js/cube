@@ -74,6 +74,7 @@ pub trait TransportService: Send + Sync + Debug {
         ctx: AuthContextRef,
         meta_fields: LoadRequestMeta,
         member_to_alias: Option<HashMap<String, String>>,
+        expression_params: Option<Vec<Option<String>>>,
     ) -> Result<SqlResponse, CubeError>;
 
     // Execute load query
@@ -191,6 +192,7 @@ impl TransportService for HttpTransport {
         _ctx: AuthContextRef,
         _meta_fields: LoadRequestMeta,
         _member_to_alias: Option<HashMap<String, String>>,
+        _expression_params: Option<Vec<Option<String>>>,
     ) -> Result<SqlResponse, CubeError> {
         todo!()
     }

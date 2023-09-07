@@ -1,6 +1,12 @@
 export class BaseDimension {
   constructor(query, dimension) {
     this.query = query;
+    if (dimension && dimension.expression) {
+      this.expression = dimension.expression;
+      this.expressionCubeName = dimension.cubeName;
+      this.expressionName = dimension.expressionName || `${dimension.cubeName}.${dimension.name}`;
+      this.isMemberExpression = !!dimension.definition;
+    }
     this.dimension = dimension;
   }
 
@@ -17,6 +23,9 @@ export class BaseDimension {
   }
 
   dimensionSql() {
+    if (this.expression) {
+      return this.query.evaluateSymbolSql(this.expressionCubeName, this.expressionName, this.definition(), 'dimension');
+    }
     if (this.query.cubeEvaluator.isSegment(this.dimension)) {
       return this.query.wrapSegmentForDimensionSelect(this.query.dimensionSql(this));
     }
@@ -32,6 +41,9 @@ export class BaseDimension {
   }
 
   cube() {
+    if (this.expression) {
+      return this.query.cubeEvaluator.cubeFromPath(this.expressionCubeName);
+    }
     return this.query.cubeEvaluator.cubeFromPath(this.dimension);
   }
 
@@ -43,6 +55,13 @@ export class BaseDimension {
   }
 
   definition() {
+    if (this.expression) {
+      return {
+        sql: this.expression,
+        // TODO use actual dimension type even though it isn't used right now
+        type: 'number'
+      };
+    }
     return this.dimensionDefinition();
   }
 
@@ -52,6 +71,9 @@ export class BaseDimension {
   }
 
   unescapedAliasName() {
+    if (this.expression) {
+      return this.query.aliasName(this.expressionName);
+    }
     return this.query.aliasName(this.dimension);
   }
 
@@ -60,6 +82,9 @@ export class BaseDimension {
   }
 
   path() {
+    if (this.expression) {
+      return null;
+    }
     if (this.query.cubeEvaluator.isSegment(this.dimension)) {
       return this.query.cubeEvaluator.parsePath('segments', this.dimension);
     }

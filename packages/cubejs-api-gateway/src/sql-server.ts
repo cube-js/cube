@@ -136,7 +136,7 @@ export class SQLServer {
           }
         });
       },
-      sql: async ({ request, session, query, memberToAlias }) => {
+      sql: async ({ request, session, query, memberToAlias, expressionParams }) => {
         const context = await contextByRequest(request, session);
 
         // eslint-disable-next-line no-async-promise-executor
@@ -145,7 +145,9 @@ export class SQLServer {
             await this.apiGateway.sql({
               query,
               memberToAlias,
+              expressionParams,
               exportAnnotatedSql: true,
+              memberExpressions: true,
               queryType: 'multi',
               context,
               res: (message) => {

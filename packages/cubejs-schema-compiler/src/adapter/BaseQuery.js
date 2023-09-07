@@ -186,7 +186,7 @@ class BaseQuery {
      * @protected
      * @type {ParamAllocator}
      */
-    this.paramAllocator = this.options.paramAllocator || this.newParamAllocator();
+    this.paramAllocator = this.options.paramAllocator || this.newParamAllocator(this.options.expressionParams);
     this.compilerCache = this.compilers.compiler.compilerCache;
     this.queryCache = this.compilerCache.getQueryCache({
       measures: this.options.measures,
@@ -209,6 +209,7 @@ class BaseQuery {
       historyQueries: this.options.historyQueries, // TODO too heavy for key
       ungrouped: this.options.ungrouped,
       memberToAlias: this.options.memberToAlias,
+      expressionParams: this.options.expressionParams,
     });
     this.timezone = this.options.timezone;
     this.rowLimit = this.options.rowLimit;
@@ -433,8 +434,8 @@ class BaseQuery {
     return new BaseTimeDimension(this, timeDimension);
   }
 
-  newParamAllocator() {
-    return new ParamAllocator();
+  newParamAllocator(expressionParams) {
+    return new ParamAllocator(expressionParams);
   }
 
   newPreAggregations() {
@@ -1102,7 +1103,7 @@ class BaseQuery {
         'collectMultipliedMeasures',
         this.queryCache
       );
-      if (m.expressionName && !collectedMeasures.length) {
+      if (m.expressionName && !collectedMeasures.length && !m.isMemberExpression) {
         throw new UserError(`Subquery dimension ${m.expressionName} should reference at least one measure`);
       }
       return [m.measure, collectedMeasures];
@@ -1710,17 +1711,29 @@ class BaseQuery {
     return this.evaluateSymbolContext || {};
   }
 
-  evaluateSymbolSql(cubeName, name, symbol) {
-    this.pushMemberNameForCollectionIfNecessary(cubeName, name);
+  evaluateSymbolSql(cubeName, name, symbol, memberExpressionType) {
+    if (!memberExpressionType) {
+      this.pushMemberNameForCollectionIfNecessary(cubeName, name);
+    }
     const memberPathArray = [cubeName, name];
     const memberPath = this.cubeEvaluator.pathFromArray(memberPathArray);
-    if (this.cubeEvaluator.isMeasure(memberPathArray)) {
+    let type = memberExpressionType;
+    if (!type && this.cubeEvaluator.isMeasure(memberPathArray)) {
+      type = 'measure';
+    }
+    if (!type && this.cubeEvaluator.isDimension(memberPathArray)) {
+      type = 'dimension';
+    }
+    if (!type && this.cubeEvaluator.isSegment(memberPathArray)) {
+      type = 'segment';
+    }
+    if (type === 'measure') {
       let parentMeasure;
       if (this.safeEvaluateSymbolContext().compositeCubeMeasures ||
         this.safeEvaluateSymbolContext().leafMeasures) {
         parentMeasure = this.safeEvaluateSymbolContext().currentMeasure;
         if (this.safeEvaluateSymbolContext().compositeCubeMeasures) {
-          if (parentMeasure &&
+          if (parentMeasure && !memberExpressionType &&
             (
               this.cubeEvaluator.cubeNameFromPath(parentMeasure) !== cubeName ||
               this.newMeasure(this.cubeEvaluator.pathFromArray(memberPathArray)).isCumulative()
@@ -1764,7 +1777,7 @@ class BaseQuery {
         this.safeEvaluateSymbolContext().currentMeasure = parentMeasure;
       }
       return result;
-    } else if (this.cubeEvaluator.isDimension(memberPathArray)) {
+    } else if (type === 'dimension') {
       if ((this.safeEvaluateSymbolContext().renderedReference || {})[memberPath]) {
         return this.evaluateSymbolContext.renderedReference[memberPath];
       }
@@ -1785,7 +1798,7 @@ class BaseQuery {
       } else {
         return this.autoPrefixAndEvaluateSql(cubeName, symbol.sql);
       }
-    } else if (this.cubeEvaluator.isSegment(memberPathArray)) {
+    } else if (type === 'segment') {
       if ((this.safeEvaluateSymbolContext().renderedReference || {})[memberPath]) {
         return this.evaluateSymbolContext.renderedReference[memberPath];
       }
