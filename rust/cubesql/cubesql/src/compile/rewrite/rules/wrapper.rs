@@ -740,6 +740,7 @@ impl RewriteRules for WrapperRules {
                     "?cube_members",
                 ),
             ),
+            // TODO time dimension support
             transforming_rewrite(
                 "wrapper-push-down-dimension",
                 wrapper_pushdown_replacer(
@@ -1017,7 +1018,8 @@ impl WrapperRules {
         column_var: Option<&'static str>,
         fun_name_var: Option<&'static str>,
         distinct_var: Option<&'static str>,
-        cast_data_type_var: Option<&'static str>,
+        // TODO support cast push downs
+        _cast_data_type_var: Option<&'static str>,
         cube_members_var: &'static str,
         measure_out_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
@@ -1132,7 +1134,7 @@ impl WrapperRules {
                         .iter()
                         .find(|(cn, _)| cn == &column.name)
                     {
-                        if let Some(dimension) = cube_context
+                        if let Some(_) = cube_context
                             .meta
                             .find_dimension_with_name(member.to_string())
                         {
