@@ -4093,6 +4093,113 @@ mod tests {
 
         }).await;
     }
+
+    #[tokio::test]
+    async fn total_count_over_groupping() {
+        Config::test("total_count_over_groupping")
+            .start_test(async move |services| {
+                let service = services.sql_service;
+                let metastore = services.meta_store;
+
+                let _ = service.exec_query("CREATE SCHEMA test").await.unwrap();
+
+                service
+                    .exec_query("CREATE TABLE test.test (id int, created timestamp, value int)")
+                    .await
+                    .unwrap();
+
+                service
+                    .exec_query(
+                        "INSERT INTO test.test (id, created, value) values \
+                            (1, '2022-01-01T00:00:00Z', 1),\
+                            (2, '2022-01-02T00:00:00Z', 1),\
+                            (1, '2022-02-03T00:00:00Z', 1),\
+                            (2, '2022-02-03T00:00:00Z', 2),\
+                            (2, '2022-01-02T00:00:00Z', 1)\
+                            ",
+                    )
+                    .await
+                    .unwrap();
+                let res = service
+                    .exec_query(
+                        "SELECT count(*) cnt FROM \
+                                (\
+                                 SELECT \
+                                 date_trunc('month', created) as month,
+                                 sum(value) as v
+                                 from test.test
+                                 group by 1
+                                 order by 2
+                                 ) tmp",
+                    )
+                    .await
+                    .unwrap();
+                assert_eq!(res.get_rows(), &vec![Row::new(vec![TableValue::Int(2)])]);
+
+                let res = service
+                    .exec_query(
+                        "SELECT count(*) cnt FROM \
+                                (\
+                                 SELECT \
+                                 created as month,
+                                 sum(value) as v
+                                 from test.test
+                                 group by 1
+                                 order by 2
+                                 ) tmp",
+                    )
+                    .await
+                    .unwrap();
+                assert_eq!(res.get_rows(), &vec![Row::new(vec![TableValue::Int(3)])]);
+            })
+            .await;
+    }
+
+    #[tokio::test]
+    async fn total_count_over2_groupping() {
+        Config::test("total_count_over_groupping")
+            .update_config(|mut c| c)
+            .start_test(async move |services| {
+                let service = services.sql_service;
+                let metastore = services.meta_store;
+
+                let _ = service.exec_query("CREATE SCHEMA test").await.unwrap();
+
+                service
+                    .exec_query("CREATE TABLE test.test (id int, created timestamp, value int)")
+                    .await
+                    .unwrap();
+
+                service
+                    .exec_query(
+                        "INSERT INTO test.test (id, created, value) values \
+                            (1, '2022-01-01T00:00:00Z', 1),\
+                            (2, '2022-01-01T00:00:00Z', 1),\
+                            (1, '2022-02-01T00:00:00Z', 1),\
+                            (2, '2022-02-01T00:00:00Z', 2),\
+                            (2, '2022-01-01T00:00:00Z', 1)\
+                            ",
+                    )
+                    .await
+                    .unwrap();
+                let res = service
+                    .exec_query(
+                        "SELECT count(*) cnt FROM \
+                                (\
+                                 SELECT \
+                                 created as month,
+                                 sum(id) as v
+                                 from test.test
+                                 group by 1
+                                 order by 2
+                                 ) tmp",
+                    )
+                    .await
+                    .unwrap();
+                println!("!! res: {:?}", res);
+            })
+            .await;
+    }
 }
 
 impl SqlServiceImpl {
