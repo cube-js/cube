@@ -70,7 +70,6 @@ interface Query {
   total?: boolean;
   totalQuery?: boolean;
   order?: any;
-
   timezone?: string;
   renewQuery?: boolean;
   ungrouped?: boolean;

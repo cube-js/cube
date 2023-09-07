@@ -59,6 +59,7 @@ export class BaseMeasure {
     if (this.expression) {
       return {
         sql: this.expression,
+        // TODO use actual measure type even though it isn't used right now
         type: 'number'
       };
     }

@@ -32,6 +32,7 @@ export class CubeSymbols {
       R.fromPairs
     )(cubes);
     this.cubeList = cubes.map(c => (c.name ? this.getCubeDefinition(c.name) : this.createCube(c)));
+    // TODO support actual dependency sorting to allow using views inside views
     const sortedByDependency = R.pipe(
       R.sortBy(c => !!c.isView),
     )(cubes);

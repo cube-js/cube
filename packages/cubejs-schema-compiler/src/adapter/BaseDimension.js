@@ -58,6 +58,7 @@ export class BaseDimension {
     if (this.expression) {
       return {
         sql: this.expression,
+        // TODO use actual dimension type even though it isn't used right now
         type: 'number'
       };
     }
