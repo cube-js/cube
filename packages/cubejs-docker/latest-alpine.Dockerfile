@@ -1,4 +1,4 @@
-FROM node:16.20.1-alpine3.17 as builder
+FROM node:16.20.2-alpine3.17 as builder
 
 WORKDIR /cube
 COPY . .
@@ -16,7 +16,7 @@ RUN apk update \
 # action. So, a process will use the root lock file here.
 RUN yarn install --prod && yarn cache clean
 
-FROM node:16.20.1-alpine3.17
+FROM node:16.20.2-alpine3.17
 
 ARG IMAGE_VERSION=unknown
 
