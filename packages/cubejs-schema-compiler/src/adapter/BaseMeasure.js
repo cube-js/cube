@@ -39,7 +39,7 @@ export class BaseMeasure {
 
   measureSql() {
     if (this.expression) {
-      return this.query.evaluateSql(this.expressionCubeName, this.expression);
+      return this.query.evaluateSymbolSql(this.expressionCubeName, this.expressionName, this.definition(), 'measure');
     }
     return this.query.measureSql(this);
   }

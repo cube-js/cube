@@ -1,7 +1,7 @@
 export class BaseDimension {
   constructor(query, dimension) {
     this.query = query;
-    if (dimension.expression) {
+    if (dimension && dimension.expression) {
       this.expression = dimension.expression;
       this.expressionCubeName = dimension.cubeName;
       this.expressionName = dimension.expressionName || `${dimension.cubeName}.${dimension.name}`;
@@ -24,7 +24,7 @@ export class BaseDimension {
 
   dimensionSql() {
     if (this.expression) {
-      return this.query.evaluateSql(this.expressionCubeName, this.expression);
+      return this.query.evaluateSymbolSql(this.expressionCubeName, this.expressionName, this.definition(), 'dimension');
     }
     if (this.query.cubeEvaluator.isSegment(this.dimension)) {
       return this.query.wrapSegmentForDimensionSelect(this.query.dimensionSql(this));
