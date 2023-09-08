@@ -154,7 +154,7 @@ export abstract class BaseDriver implements DriverInterface {
    `;
   }
 
-  private getSchemasQuery() {
+  protected getSchemasQuery() {
     return `
       SELECT table_schema as ${this.quoteIdentifier('schema_name')}
       FROM information_schema.tables
@@ -163,7 +163,7 @@ export abstract class BaseDriver implements DriverInterface {
     `;
   }
 
-  private getTablesForSpecificSchemasQuery(schemasPlaceholders: string) {
+  protected getTablesForSpecificSchemasQuery(schemasPlaceholders: string) {
     const query = `
       SELECT table_schema as ${this.quoteIdentifier('schema_name')},
             table_name as ${this.quoteIdentifier('table_name')}
@@ -173,7 +173,7 @@ export abstract class BaseDriver implements DriverInterface {
     return query;
   }
 
-  private getColumnsForSpecificTablesQuery(conditionString: string) {
+  protected getColumnsForSpecificTablesQuery(conditionString: string) {
     const query = `
       SELECT columns.column_name as ${this.quoteIdentifier('column_name')},
              columns.table_name as ${this.quoteIdentifier('table_name')},
