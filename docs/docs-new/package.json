@@ -8,7 +8,7 @@
     "dev": "next dev",
     "prebuild": "./scripts/docs-gen.sh",
     "build": "next build",
-    "postbuild": "next-sitemap",
+    "postbuild": "next-sitemap && rm -rf .next/cache",
     "start": "next start",
     "create-redirects": "ts-node --esm scripts/create-redirects.mjs",
     "migrate-content": "ts-node ./scripts/migrate-content.ts",
