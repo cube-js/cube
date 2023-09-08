@@ -727,6 +727,8 @@ pub struct RocksStoreConfig {
     // Sets maximum number of threads that will concurrently perform a compaction job by breaking
     // it into multiple, smaller ones that are run simultaneously.
     pub max_subcompactions: u32,
+    // By default, RocksDB uses only one background thread for flush and compaction.
+    pub parallelism: u32,
 }
 
 impl RocksStoreConfig {
@@ -739,6 +741,8 @@ impl RocksStoreConfig {
             max_background_jobs: 2,
             // Default: 1 (i.e. no subcompactions)
             max_subcompactions: 1,
+            // Default: 1
+            parallelism: 1,
         }
     }
 
@@ -751,6 +755,8 @@ impl RocksStoreConfig {
             max_background_jobs: 2,
             // Default: 1 (i.e. no subcompactions)
             max_subcompactions: 1,
+            // Default: 1
+            parallelism: 2,
         }
     }
 }
