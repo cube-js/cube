@@ -21,7 +21,7 @@ import {
 import { Bucket, Storage } from '@google-cloud/storage';
 import {
   BaseDriver, DownloadQueryResultsOptions, DownloadQueryResultsResult, DownloadTableCSVData,
-  DriverInterface, QueryOptions, StreamTableData,
+  DriverInterface, QueryOptions, QuerySchemasResult, StreamTableData,
 } from '@cubejs-backend/base-driver';
 import { Query } from '@google-cloud/bigquery/build/src/bigquery';
 import { HydrationStream } from './HydrationStream';
@@ -209,6 +209,13 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     );
 
     return dataSetsColumns.reduce((prev, current) => Object.assign(prev, current), {});
+  }
+
+  public async getSchemas(): Promise<QuerySchemasResult[]> {
+    const dataSets = await this.bigquery.getDatasets();
+    return dataSets[0].filter((dataSet) => dataSet.id).map((dataSet) => ({
+      schema_name: dataSet.id!,
+    }));
   }
 
   public async getTablesQuery(schemaName: string) {
