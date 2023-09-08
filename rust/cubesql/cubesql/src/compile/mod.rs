@@ -17873,7 +17873,7 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
-    async fn test_thoughtspot_filter_date_trunc_column_with_literal2() {
+    async fn test_thoughtspot_filter_date_trunc_column_with_literal() {
         if !Rewriter::sql_push_down_enabled() {
             return;
         }

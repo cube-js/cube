@@ -3843,28 +3843,37 @@ impl FilterRules {
                         for date_range_end_op in
                             var_iter!(egraph[subst[date_range_end_op_var]], FilterMemberOp)
                         {
-                            let valid_filters = vec![
-                                "afterDate".to_string(),
-                                "beforeDate".to_string(),
-                                "afterOrOnDate".to_string(),
-                                "beforeOrOnDate".to_string(),
-                            ];
-                            if !valid_filters.contains(date_range_start_op)
-                                && !valid_filters.contains(date_range_end_op)
+                            let valid_left_filters =
+                                vec!["afterDate".to_string(), "afterOrOnDate".to_string()];
+                            let valid_right_filters =
+                                vec!["beforeDate".to_string(), "beforeOrOnDate".to_string()];
+
+                            let swap_left_and_right;
+
+                            if valid_left_filters.contains(date_range_start_op)
+                                && valid_right_filters.contains(date_range_end_op)
                             {
+                                swap_left_and_right = false;
+                            } else if valid_left_filters.contains(date_range_end_op)
+                                || valid_right_filters.contains(date_range_start_op)
+                            {
+                                swap_left_and_right = true;
+                            } else {
                                 return false;
                             }
+
                             let mut result = Vec::new();
                             let resolved_start_date =
                                 resolve_time_delta(&date_range_start[0], date_range_start_op);
                             let resolved_end_date =
                                 resolve_time_delta(&date_range_end[0], date_range_end_op);
-                            if resolved_start_date <= resolved_end_date {
-                                result.extend(vec![resolved_start_date]);
+
+                            if swap_left_and_right {
                                 result.extend(vec![resolved_end_date]);
+                                result.extend(vec![resolved_start_date]);
                             } else {
-                                result.extend(vec![resolved_end_date]);
                                 result.extend(vec![resolved_start_date]);
+                                result.extend(vec![resolved_end_date]);
                             }
 
                             subst.insert(
