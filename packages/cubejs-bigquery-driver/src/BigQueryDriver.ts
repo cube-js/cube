@@ -21,7 +21,7 @@ import {
 import { Bucket, Storage } from '@google-cloud/storage';
 import {
   BaseDriver, DownloadQueryResultsOptions, DownloadQueryResultsResult, DownloadTableCSVData,
-  DriverInterface, QueryOptions, QuerySchemasResult, QueryTablesResult, StreamTableData,
+  DriverInterface, QueryColumnsResult, QueryOptions, QuerySchemasResult, QueryTablesResult, StreamTableData,
 } from '@cubejs-backend/base-driver';
 import { Query } from '@google-cloud/bigquery/build/src/bigquery';
 import { HydrationStream } from './HydrationStream';
@@ -232,6 +232,27 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
       return allTables.flat();
     } catch (e) {
       console.error('Error fetching tables for schemas:', e);
+      throw e;
+    }
+  }
+
+  public async getColumnsForSpecificTables(tables: QueryTablesResult[]): Promise<QueryColumnsResult[]> {
+    try {
+      const allColumnPromises = tables.map(async table => {
+        const tableName = `${table.schema_name}.${table.table_name}`;
+        const columns = await this.tableColumnTypes(tableName);
+        return columns.map((column: any) => ({
+          schema_name: table.schema_name,
+          table_name: table.table_name,
+          ...column
+        }));
+      });
+
+      const allColumns = await Promise.all(allColumnPromises);
+
+      return allColumns.flat();
+    } catch (e) {
+      console.error('Error fetching columns for tables:', e);
       throw e;
     }
   }
