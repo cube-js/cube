@@ -13,6 +13,7 @@ import {
   DownloadQueryResultsOptions,
   DownloadQueryResultsResult,
   DriverInterface,
+  QuerySchemasResult,
   StreamOptions,
   StreamTableDataWithTypes,
 } from '@cubejs-backend/base-driver';
@@ -266,6 +267,32 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
         FROM system.columns
        WHERE database = '${this.config.queryOptions.database}'
     `;
+  }
+
+  protected override getTablesForSpecificSchemasQuery(schemasPlaceholders: string) {
+    const query = `
+      SELECT database as schema_name,
+            name as table_name
+      FROM system.tables
+      WHERE database IN (${schemasPlaceholders})
+    `;
+    return query;
+  }
+
+  protected override getColumnsForSpecificTablesQuery(conditionString: string) {
+    const query = `
+      SELECT name as ${this.quoteIdentifier('column_name')},
+             table as ${this.quoteIdentifier('table_name')},
+             database as ${this.quoteIdentifier('table_schema')},
+             type as ${this.quoteIdentifier('data_type')}
+      FROM system.columns
+      WHERE ${conditionString}
+    `;
+    return query;
+  }
+
+  public getSchemas(): Promise<QuerySchemasResult[]> {
+    return Promise.resolve([{ schema_name: this.config.queryOptions.database }]);
   }
 
   public async stream(
