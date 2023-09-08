@@ -1257,6 +1257,14 @@ instance in cluster mode.
 | ------------------------- | ---------------------- | --------------------- |
 | A valid address/port pair | `localhost`            | `localhost`           |
 
+## `CUBESTORE_TELEMETRY`
+
+If `true`, then sends telemetry to Cube.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `true`                 | `true`                |
+
 ## `CUBESTORE_WAL_SPLIT_THRESHOLD`
 
 The maximum number of rows to keep in a single chunk of data right after
