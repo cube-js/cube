@@ -21,6 +21,7 @@ import {
 import { Bucket, Storage } from '@google-cloud/storage';
 import {
   BaseDriver, DownloadQueryResultsOptions, DownloadQueryResultsResult, DownloadTableCSVData,
+  DriverCapabilities,
   DriverInterface, QueryColumnsResult, QueryOptions, QuerySchemasResult, QueryTablesResult, StreamTableData,
 } from '@cubejs-backend/base-driver';
 import { Query } from '@google-cloud/bigquery/build/src/bigquery';
@@ -407,5 +408,11 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
       }
       return `\`${identifier}\``;
     }).join('.');
+  }
+
+  public capabilities(): DriverCapabilities {
+    return {
+      incrementalSchemaLoading: true,
+    };
   }
 }
