@@ -327,35 +327,28 @@ export abstract class BaseDriver implements DriverInterface {
 
   public getColumnsForSpecificTables(tables: QueryTablesResult[]) {
     const groupedBySchema: Record<string, string[]> = {};
-  
     tables.forEach((t) => {
       if (!groupedBySchema[t.schema_name]) {
         groupedBySchema[t.schema_name] = [];
       }
       groupedBySchema[t.schema_name].push(t.table_name);
     });
-  
+
     const conditions: string[] = [];
     const parameters: any[] = [];
-    let paramIndex = 1;
-  
-    const createPlaceholders = (count: number): string[] => {
-      const placeholders: string[] = [];
-      for (let i = 0; i < count; i++) {
-        placeholders.push(`$${paramIndex++}`);
-      }
-      return placeholders;
-    };
-  
+
     for (const [schema, tableNames] of Object.entries(groupedBySchema)) {
-      const schemaPlaceholder = `$${paramIndex++}`;
-      const tablePlaceholders = createPlaceholders(tableNames.length).join(', ');
+      const schemaPlaceholder = this.param(parameters.length);
+      parameters.push(schema);
+
+      const tablePlaceholders = tableNames.map((_, idx) => this.param(parameters.length + idx)).join(', ');
+      parameters.push(...tableNames);
+
       conditions.push(`(table_schema = ${schemaPlaceholder} AND table_name IN (${tablePlaceholders}))`);
-      parameters.push(schema, ...tableNames);
     }
-  
+
     const conditionString = conditions.join(' OR ');
-  
+
     const query = `
       SELECT columns.column_name as ${this.quoteIdentifier('column_name')},
              columns.table_name as ${this.quoteIdentifier('table_name')},
@@ -364,7 +357,7 @@ export abstract class BaseDriver implements DriverInterface {
       FROM information_schema.columns
       WHERE ${conditionString}
     `;
-  
+
     return this.query<QueryColumnsResult>(query, parameters);
   }
 
