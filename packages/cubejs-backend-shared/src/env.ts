@@ -588,6 +588,16 @@ const variables: Record<string, (...args: any) => any> = {
     .default('true')
     .asBoolStrict(),
 
+  /**
+   * Fetch Columns by Ordinal Position
+   *
+   * Currently defaults to 'false' as changing this in a live deployment could break existing pre-aggregations.
+   * This will eventually default to true.
+   */
+  fetchColumnsByOrdinalPosition: (): boolean => get('CUBEJS_DB_FETCH_COLUMNS_BY_ORDINAL_POSITION')
+    .default('false')
+    .asBoolStrict(),
+
   /** ****************************************************************
    * JDBC options                                                    *
    ***************************************************************** */
