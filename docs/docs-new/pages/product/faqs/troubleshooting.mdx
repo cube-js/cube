@@ -31,10 +31,15 @@ This usually means Cube can't create a pre-aggregation table, which could be due
 to a few different reasons. Further down the error log, you should see more
 details which will help narrow down the scope of the issue.
 
-| If you see…                                              | The issue is likely…                                                                                                                                                                     | Recommendation                                                                                            |
-| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `has a key that already exists in Name index`            | Multi-tenancy setup missing following configuration setting: <pre><code>{"preAggregationsSchema: ({ securityContext }) => `pre_aggregations_${securityContext.tenantId},`"}</code></pre> | Update configuration.                                                                                     |
-| `Error: Query execution timeout after 10 min of waiting` | Pre-aggregation is too large to be built.                                                                                                                                                | Try enabling [export bucket][ref-caching-using-preaggs-export-bucket] or reducing `partitionGranularity`. |
+If you see `has a key that already exists in Name index` message, it means multi-tenancy setup missing following configuration setting in your `cube.js` file: 
+
+```js
+module.exports = {
+  preAggregationsSchema: ({ securityContext }) => `pre_aggregations_${securityContext.tenantId}`
+}
+```
+
+If you see `Error: Query execution timeout after 10 min of waiting` message, it means pre-aggregation is too large to be built.
 
 For any other error types, feel free to reach out to us in our support chat.
 
