@@ -292,13 +292,14 @@ impl SqlTemplates {
         alias: String,
         _filter: Option<String>,
         _having: Option<String>,
-        _order_by: Vec<AliasedColumn>,
+        order_by: Vec<AliasedColumn>,
         limit: Option<usize>,
         offset: Option<usize>,
     ) -> Result<String, CubeError> {
         let group_by = self.to_template_columns(group_by)?;
         let aggregate = self.to_template_columns(aggregate)?;
         let projection = self.to_template_columns(projection)?;
+        let order_by = self.to_template_columns(order_by)?;
         let select_concat = group_by
             .iter()
             .chain(aggregate.iter())
@@ -313,6 +314,7 @@ impl SqlTemplates {
                 group_by => group_by,
                 aggregate => aggregate,
                 projection => projection,
+                order_by => order_by,
                 from_alias => alias,
                 limit => limit,
                 offset => offset,
@@ -422,6 +424,18 @@ impl SqlTemplates {
         self.render_template(
             "expressions/binary",
             context! { left => left, op => op, right => right },
+        )
+    }
+
+    pub fn sort_expr(
+        &self,
+        expr: String,
+        asc: bool,
+        nulls_first: bool,
+    ) -> Result<String, CubeError> {
+        self.render_template(
+            "expressions/sort",
+            context! { expr => expr, asc => asc, nulls_first => nulls_first },
         )
     }
 

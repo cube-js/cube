@@ -1542,7 +1542,7 @@ class BaseQuery {
     let index;
 
     index = this.dimensionsForSelect().findIndex(
-      d => equalIgnoreCase(d.dimension, id)
+      d => equalIgnoreCase(d.dimension, id) || equalIgnoreCase(d.expressionName, id)
     );
 
     if (index > -1) {
@@ -2415,13 +2415,15 @@ class BaseQuery {
         select: 'SELECT {{ select_concat | map(attribute=\'aliased\') | join(\', \') }} \n' +
           'FROM (\n  {{ from }}\n) AS {{ from_alias }} \n' +
           '{% if group_by %} GROUP BY {{ group_by | map(attribute=\'index\') | join(\', \') }}{% endif %}' +
+          '{% if order_by %} ORDER BY {{ order_by | map(attribute=\'expr\') | join(\', \') }}{% endif %}' +
           '{% if limit %}\nLIMIT {{ limit }}{% endif %}' +
           '{% if offset %}\nOFFSET {{ offset }}{% endif %}',
       },
       expressions: {
         column_aliased: '{{expr}} {{quoted_alias}}',
         case: 'CASE {% if expr %}{{ expr }} {% endif %}{% for when, then in when_then %}WHEN {{ when }} THEN {{ then }}{% endfor %}{% if else_expr %} ELSE {{ else_expr }}{% endif %} END',
-        binary: '{{ left }} {{ op }} {{ right }}'
+        binary: '{{ left }} {{ op }} {{ right }}',
+        sort: '{{ expr }} {% if asc %}ASC{% else %}DESC{% endif %}{% if nulls_first %} NULLS FIRST{% endif %}',
       },
       quotes: {
         identifiers: '"',
