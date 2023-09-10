@@ -188,7 +188,10 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
    * Returns driver's capabilities object.
    */
   public capabilities(): DriverCapabilities {
-    return { unloadWithoutTempTable: true };
+    return {
+      unloadWithoutTempTable: true,
+      incrementalSchemaLoading: true,
+    };
   }
 
   /**
