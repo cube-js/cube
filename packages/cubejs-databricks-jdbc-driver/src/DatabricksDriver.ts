@@ -261,7 +261,10 @@ export class DatabricksDriver extends JDBCDriver {
    * @override
    */
   public capabilities(): DriverCapabilities {
-    return { unloadWithoutTempTable: true };
+    return {
+      unloadWithoutTempTable: true,
+      incrementalSchemaLoading: true
+    };
   }
 
   /**
