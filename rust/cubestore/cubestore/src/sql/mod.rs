@@ -4182,7 +4182,7 @@ mod tests {
                             )
                         group by 1, 2
                         ) tmp",
-                        )
+                    )
                     .await
                     .unwrap();
                 assert_eq!(res.get_rows(), &vec![Row::new(vec![TableValue::Int(4)])]);
@@ -4207,7 +4207,7 @@ mod tests {
             })
             .await;
 
-            //assert_eq!(res.get_rows(), &vec![Row::new(vec![TableValue::Int(2)])]);
+        //assert_eq!(res.get_rows(), &vec![Row::new(vec![TableValue::Int(2)])]);
     }
 }
 
