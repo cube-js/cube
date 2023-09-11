@@ -1468,6 +1468,7 @@ class ApiGateway {
     },
     response: any,
     responseType?: ResultType,
+    castNumerics: boolean = false
   ) {
     return {
       query: normalizedQuery,
@@ -1482,6 +1483,7 @@ class ApiGateway {
         normalizedQuery,
         queryType,
         responseType,
+        castNumerics
       ),
       lastRefreshTime: response.lastRefreshTime?.toISOString(),
       ...(
@@ -1621,6 +1623,7 @@ class ApiGateway {
             annotation,
             response,
             resType,
+            normalizedQuery.castNumerics
           );
         })
       );
@@ -1690,11 +1693,13 @@ class ApiGateway {
 
       query = this.parseQueryParam(request.query);
       let resType: ResultType = ResultType.DEFAULT;
+      // let castNumerics = false;
 
       query = this.parseMemberExpressionsInQueries(query);
 
       if (!Array.isArray(query) && query.responseFormat) {
         resType = query.responseFormat;
+        // castNumerics = Boolean(query.castNumerics);
       }
 
       this.log({
@@ -1797,6 +1802,7 @@ class ApiGateway {
               annotation,
               response,
               resType,
+              // castNumerics
             );
           })
         );

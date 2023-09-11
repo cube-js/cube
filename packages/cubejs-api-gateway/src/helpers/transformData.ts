@@ -303,14 +303,36 @@ function transformData(
   data: { [sqlAlias: string]: unknown }[],
   query: NormalizedQuery,
   queryType: QueryType,
-  resType?: ResultType
+  resType?: ResultType,
+  castNumerics: boolean = false
 ): {
   members: string[],
   dataset: DBResponsePrimitive[][]
 } | {
   [member: string]: DBResponsePrimitive
 }[] {
-  const d = data as { [sqlAlias: string]: DBResponseValue }[];
+  const numericKeys = Object.entries(annotation).map(([k, v]) => {
+    if (v.type === 'number') {
+      return k.split('.').join('__');
+    }
+    
+    return null;
+  }).filter(Boolean) as string[];
+  
+  const d = (data as { [sqlAlias: string]: DBResponseValue }[]).map((row) => {
+    if (castNumerics) {
+      return Object.fromEntries(Object.entries(row).map(([k, v]) => {
+        if (numericKeys.includes(k)) {
+          return [k, v != null ? Number(v) : v];
+        }
+        
+        return [k, v];
+      }));
+    }
+
+    return row;
+  });
+  
   const membersToAliasMap = getMembers(
     queryType,
     query,

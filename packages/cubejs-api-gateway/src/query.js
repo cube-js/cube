@@ -111,6 +111,7 @@ const querySchema = Joi.object().keys({
   renewQuery: Joi.boolean(),
   ungrouped: Joi.boolean(),
   responseFormat: Joi.valid('default', 'compact'),
+  castNumerics: Joi.boolean(),
 });
 
 const normalizeQueryOrder = order => {

@@ -10,7 +10,6 @@ import {
   TimeMember,
   FilterOperator,
   QueryTimeDimensionGranularity,
-  QueryOrderType,
 } from './strings';
 import { ResultType } from './enums';
 
@@ -74,6 +73,7 @@ interface Query {
   renewQuery?: boolean;
   ungrouped?: boolean;
   responseFormat?: ResultType;
+  castNumerics?: boolean;
 }
 
 /**
