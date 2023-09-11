@@ -4106,10 +4106,26 @@ mod tests {
                     .exec_query("CREATE TABLE test.test (id int, created timestamp, value int)")
                     .await
                     .unwrap();
+                service
+                    .exec_query("CREATE TABLE test.test1 (id int, created timestamp, value int)")
+                    .await
+                    .unwrap();
 
                 service
                     .exec_query(
                         "INSERT INTO test.test (id, created, value) values \
+                            (1, '2022-01-01T00:00:00Z', 1),\
+                            (2, '2022-01-02T00:00:00Z', 1),\
+                            (1, '2022-02-03T00:00:00Z', 1),\
+                            (2, '2022-02-03T00:00:00Z', 2),\
+                            (2, '2022-01-02T00:00:00Z', 1)\
+                            ",
+                    )
+                    .await
+                    .unwrap();
+                service
+                    .exec_query(
+                        "INSERT INTO test.test1 (id, created, value) values \
                             (1, '2022-01-01T00:00:00Z', 1),\
                             (2, '2022-01-02T00:00:00Z', 1),\
                             (1, '2022-02-03T00:00:00Z', 1),\
@@ -4150,8 +4166,48 @@ mod tests {
                     .await
                     .unwrap();
                 assert_eq!(res.get_rows(), &vec![Row::new(vec![TableValue::Int(3)])]);
+
+                let res = service
+                    .exec_query(
+                        "SELECT count(*) cnt FROM \
+                        (\
+                        SELECT \
+                        id id,
+                        created created,
+                        sum(value) value
+                        from (
+                            select * from test.test
+                            union all 
+                            select * from test.test1
+                            )
+                        group by 1, 2
+                        ) tmp",
+                    )
+                    .await
+                    .unwrap();
+                assert_eq!(res.get_rows(), &vec![Row::new(vec![TableValue::Int(4)])]);
+
+                let res = service
+                    .exec_query(
+                        "SELECT count(*) cnt FROM \
+                                (\
+                                 SELECT \
+                                 id id,
+                                 date_trunc('month', created) as month,
+                                 sum(value) as v,
+                                 sum(id)
+                                 from test.test
+                                 group by 1, 2
+                                 order by 1, 2
+                                 ) tmp",
+                    )
+                    .await
+                    .unwrap();
+                assert_eq!(res.get_rows(), &vec![Row::new(vec![TableValue::Int(4)])]);
             })
             .await;
+
+        //assert_eq!(res.get_rows(), &vec![Row::new(vec![TableValue::Int(2)])]);
     }
 }
 
