@@ -33,7 +33,7 @@ export function testQueries(type: string): void {
     const suffix = new Date().getTime().toString(32);
     const tables = Object
       .keys(fixtures.tables)
-      .map((key: string) => `${fixtures.tables[key]}${suffix}`);
+      .map((key: string) => `${fixtures.tables[key]}_${suffix}`);
 
     beforeAll(async () => {
       env = await runEnvironment(type, suffix);
@@ -1396,7 +1396,6 @@ export function testQueries(type: string): void {
 
     // Incremental schema loading tests
     // TODO: Move to separate test
-    // TODO: Fix dropping fixture tables works for all drivers
     execute('should load and check driver capabilities', async () => {
       const capabilities = driver.capabilities();
       expect(capabilities).toMatchObject({
@@ -1421,11 +1420,11 @@ export function testQueries(type: string): void {
         table_name: expect.any(String),
       });
     
-      const inputTable = tablesForSchemas.find((t) => tables.includes(t.table_name));
-      const columnsForSchemas = await driver.getColumnsForSpecificTables([inputTable!]);
-      expect(columnsForSchemas).toBeInstanceOf(Array);
-      expect(columnsForSchemas.length).toBeGreaterThan(0);
-      expect(columnsForSchemas[0]).toMatchSnapshot({
+      const inputTables = tablesForSchemas.filter((t) => tables.includes(t.table_name));
+      const columnsForTables = await driver.getColumnsForSpecificTables(inputTables);
+      expect(columnsForTables).toBeInstanceOf(Array);
+      expect(columnsForTables.length).toBeGreaterThan(0);
+      expect(columnsForTables[0]).toMatchSnapshot({
         schema_name: expect.any(String),
         table_name: expect.any(String),
         column_name: expect.any(String),
