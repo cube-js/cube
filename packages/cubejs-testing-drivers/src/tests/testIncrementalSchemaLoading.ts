@@ -52,13 +52,6 @@ export function testIncrementalSchemaLoading(type: string): void {
     execute('should establish a connection', async () => {
       await driver.testConnection();
     });
-  
-    execute('should create a data source', async () => {
-      query = getCreateQueries(type, 'driver');
-      await Promise.all(query.map(async (q) => {
-        await driver.query(q);
-      }));
-    });
 
     execute('should load and check driver capabilities', async () => {
       const capabilities = driver.capabilities();
