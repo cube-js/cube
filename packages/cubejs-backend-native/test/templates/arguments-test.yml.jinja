@@ -1,5 +1,5 @@
 {%- set my_sequence = [1,2,3,4,5] -%}
-{%- set my_map = {'field_a' : 1, 'field_b' : 2} -%}
+{%- set my_map = {'field_a' : 5, 'field_b' : 15} -%}
 
 test:
   arg_sum_integers_int_int: {{ arg_sum_integers(1, 1) }}
@@ -9,4 +9,4 @@ test:
   arg_str: {{ arg_str("hello world") }}
   arg_null: {{ arg_null(null) }}
   arg_seq: {{ arg_seq(my_sequence) }}
-  arg_map: {{ arg_map(my_map) }}
+  arg_sum_map: {{ arg_sum_map(my_map) }}

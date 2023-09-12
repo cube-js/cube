@@ -17,8 +17,8 @@ def arg_null(a):
   return a
 
 @context_func
-def arg_map(a):
-  return a
+def arg_sum_map(obj):
+  return obj['field_a'] + obj['field_b']
 
 @context_func
 def arg_seq(a):
