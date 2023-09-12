@@ -31,6 +31,10 @@ export function testQueries(type: string): void {
     const apiToken = sign({}, 'mysupersecret');
 
     const suffix = new Date().getTime().toString(32);
+    const tables = Object
+      .keys(fixtures.tables)
+      .map((key: string) => `${fixtures.tables[key]}${suffix}`);
+
     beforeAll(async () => {
       env = await runEnvironment(type, suffix);
       process.env.CUBEJS_REFRESH_WORKER = 'true';
@@ -62,9 +66,6 @@ export function testQueries(type: string): void {
   
     afterAll(async () => {
       try {
-        const tables = Object
-          .keys(fixtures.tables)
-          .map((key: string) => `${fixtures.tables[key]}${suffix}`);
         console.log(`Dropping ${tables.length} fixture tables`);
         for (const t of tables) {
           await driver.dropTable(t);
@@ -1412,19 +1413,19 @@ export function testQueries(type: string): void {
       });
     
       const inputSchema = schemas.find((s) => !!s.schema_name);
-      const tables = await driver.getTablesForSpecificSchemas([inputSchema!]);
-      expect(tables).toBeInstanceOf(Array);
-      expect(tables.length).toBeGreaterThan(0);
-      expect(tables[0]).toMatchSnapshot({
+      const tablesForSchemas = await driver.getTablesForSpecificSchemas([inputSchema!]);
+      expect(tablesForSchemas).toBeInstanceOf(Array);
+      expect(tablesForSchemas.length).toBeGreaterThan(0);
+      expect(tablesForSchemas[0]).toMatchSnapshot({
         schema_name: expect.any(String),
         table_name: expect.any(String),
       });
     
-      const inputTable = tables.find((t) => !!t.table_name);
-      const columns = await driver.getColumnsForSpecificTables([inputTable!]);
-      expect(columns).toBeInstanceOf(Array);
-      expect(columns.length).toBeGreaterThan(0);
-      expect(columns[0]).toMatchSnapshot({
+      const inputTable = tablesForSchemas.find((t) => tables.includes(t.table_name));
+      const columnsForSchemas = await driver.getColumnsForSpecificTables([inputTable!]);
+      expect(columnsForSchemas).toBeInstanceOf(Array);
+      expect(columnsForSchemas.length).toBeGreaterThan(0);
+      expect(columnsForSchemas[0]).toMatchSnapshot({
         schema_name: expect.any(String),
         table_name: expect.any(String),
         column_name: expect.any(String),
