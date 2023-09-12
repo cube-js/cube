@@ -24,7 +24,7 @@ export function useCubeQuery(query, options = {}) {
     const cubejsApi = options.cubejsApi || context?.cubejsApi;
 
     if (!cubejsApi) {
-      throw new Error('Cube.js API client is not provided');
+      throw new Error('Cube API client is not provided');
     }
 
     if (resetResultSetOnChange) {
@@ -33,12 +33,13 @@ export function useCubeQuery(query, options = {}) {
 
     setError(null);
     setLoading(true);
-
+    
     try {
       const response = await cubejsApi.load(query, {
         mutexObj: mutexRef.current,
         mutexKey: 'query',
         progressCallback,
+        castNumerics: Boolean(typeof options.castNumerics === 'boolean' ? options.castNumerics : context?.options?.castNumerics)
       });
 
       if (isMounted()) {
@@ -64,7 +65,7 @@ export function useCubeQuery(query, options = {}) {
     const cubejsApi = options.cubejsApi || context?.cubejsApi;
 
     if (!cubejsApi) {
-      throw new Error('Cube.js API client is not provided');
+      throw new Error('Cube API client is not provided');
     }
 
     async function loadQuery() {
