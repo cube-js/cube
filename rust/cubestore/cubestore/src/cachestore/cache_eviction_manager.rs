@@ -506,25 +506,9 @@ impl CacheEvictionManager {
 
                 self.do_eviction_by(&store, target, true)
             } else {
-                let default_cf_metadata = store.db.get_column_family_metadata();
+                log::trace!("Nothing to evict");
 
-                log::trace!(
-                    "Nothing to evict, CF default size: {}",
-                    humansize::format_size(default_cf_metadata.size, humansize::DECIMAL)
-                );
-
-                if default_cf_metadata.size > self.compaction_trigger_size {
-                    let start: Option<&[u8]> = None;
-                    let end: Option<&[u8]> = None;
-
-                    log::debug!(
-                        "Triggering compaction, CF default size: {} > {}",
-                        humansize::format_size(default_cf_metadata.size, humansize::DECIMAL),
-                        humansize::format_size(self.compaction_trigger_size, humansize::DECIMAL)
-                    );
-
-                    store.db.compact_range(start, end)
-                }
+                self.check_compaction_trigger(&store);
 
                 return Ok(EvictionResult::Finished(EvictionFinishedResult {
                     total_keys_removed: 0,
@@ -537,6 +521,8 @@ impl CacheEvictionManager {
         };
 
         let result = eviction_fut.await?;
+
+        self.check_compaction_trigger(&store);
 
         log::debug!(
             "Eviction finished, total_keys: {}, total_size: {}",
@@ -1112,6 +1098,28 @@ impl CacheEvictionManager {
             };
 
             Ok((weight, CACHE_ITEM_SIZE_WITHOUT_VALUE))
+        }
+    }
+
+    fn check_compaction_trigger(&self, store: &Arc<RocksStore>) {
+        let default_cf_metadata = store.db.get_column_family_metadata();
+
+        log::trace!(
+            "Compaction auto trigger, CF default size: {}",
+            humansize::format_size(default_cf_metadata.size, humansize::DECIMAL)
+        );
+
+        if default_cf_metadata.size > self.compaction_trigger_size {
+            let start: Option<&[u8]> = None;
+            let end: Option<&[u8]> = None;
+
+            log::debug!(
+                "Triggering compaction, CF default size: {} > {}",
+                humansize::format_size(default_cf_metadata.size, humansize::DECIMAL),
+                humansize::format_size(self.compaction_trigger_size, humansize::DECIMAL)
+            );
+
+            store.db.compact_range(start, end)
         }
     }
 }
