@@ -185,6 +185,14 @@ export abstract class BaseDriver implements DriverInterface {
     return query;
   }
 
+  protected getColumnNameForSchemaName() {
+    return 'table_schema';
+  }
+
+  protected getColumnNameForTableName() {
+    return 'table_name';
+  }
+
   protected getSslOptions(dataSource: string): TLSConnectionOptions | undefined {
     if (
       getEnv('dbSsl', { dataSource }) ||
@@ -365,7 +373,7 @@ export abstract class BaseDriver implements DriverInterface {
       const tablePlaceholders = tableNames.map((_, idx) => this.param(parameters.length + idx)).join(', ');
       parameters.push(...tableNames);
 
-      conditions.push(`(table_schema = ${schemaPlaceholder} AND table_name IN (${tablePlaceholders}))`);
+      conditions.push(`(${this.getColumnNameForSchemaName()} = ${schemaPlaceholder} AND ${this.getColumnNameForTableName()} IN (${tablePlaceholders}))`);
     }
 
     const conditionString = conditions.join(' OR ');

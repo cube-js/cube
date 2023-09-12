@@ -291,6 +291,14 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     return query;
   }
 
+  protected override getColumnNameForSchemaName() {
+    return 'database';
+  }
+
+  protected override getColumnNameForTableName() {
+    return 'table';
+  }
+
   public getSchemas(): Promise<QuerySchemasResult[]> {
     return Promise.resolve([{ schema_name: this.config.queryOptions.database }]);
   }
