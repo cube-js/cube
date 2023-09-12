@@ -1107,10 +1107,11 @@ where
 impl Config {
     fn calculate_cache_compaction_trigger_size(cache_max_size: usize) -> usize {
         match cache_max_size >> 20 {
-            d if d < 32 => 32 * 9,
-            d if d < 64 => 64 * 8,
-            d if d < 128 => 128 * 7,
-            d if d < 256 => 256 * 6,
+            // TODO: Enable this limits after moving to separate CF for cache
+            // d if d < 32 => 32 * 9,
+            // d if d < 64 => 64 * 8,
+            // d if d < 128 => 128 * 7,
+            // d if d < 256 => 256 * 6,
             d if d < 512 => 512 * 5,
             d if d < 1024 => cache_max_size * 4,
             d if d < 4096 => cache_max_size * 3,
