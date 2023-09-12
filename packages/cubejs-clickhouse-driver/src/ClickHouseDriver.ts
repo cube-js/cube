@@ -283,7 +283,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     const query = `
       SELECT name as ${this.quoteIdentifier('column_name')},
              table as ${this.quoteIdentifier('table_name')},
-             database as ${this.quoteIdentifier('table_schema')},
+             database as ${this.quoteIdentifier('schema_name')},
              type as ${this.quoteIdentifier('data_type')}
       FROM system.columns
       WHERE ${conditionString}

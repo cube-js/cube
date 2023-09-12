@@ -177,7 +177,7 @@ export abstract class BaseDriver implements DriverInterface {
     const query = `
       SELECT columns.column_name as ${this.quoteIdentifier('column_name')},
              columns.table_name as ${this.quoteIdentifier('table_name')},
-             columns.table_schema as ${this.quoteIdentifier('table_schema')},
+             columns.table_schema as ${this.quoteIdentifier('schema_name')},
              columns.data_type as ${this.quoteIdentifier('data_type')}
       FROM information_schema.columns
       WHERE ${conditionString}
