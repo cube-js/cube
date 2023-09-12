@@ -1411,8 +1411,8 @@ export function testQueries(type: string): void {
         schema_name: expect.any(String),
       });
     
-      const inputSchema = schemas.find((s) => !!s.schema_name);
-      const tablesForSchemas = await driver.getTablesForSpecificSchemas([inputSchema!]);
+      const inputSchemas = schemas.filter((s) => !!s.schema_name);
+      const tablesForSchemas = await driver.getTablesForSpecificSchemas(inputSchemas);
       expect(tablesForSchemas).toBeInstanceOf(Array);
       expect(tablesForSchemas.length).toBeGreaterThan(0);
       expect(tablesForSchemas[0]).toMatchSnapshot({
