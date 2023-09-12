@@ -1,4 +1,5 @@
-{%- set my_sequence = [1,2,3,4,5] -%}
+{%- set my_sequence_1 = [1,2,3,4,5] -%}
+{%- set my_sequence_2 = [5,4,3,2,1] -%}
 {%- set my_map = {'field_a' : 5, 'field_b' : 15} -%}
 
 test:
@@ -8,5 +9,6 @@ test:
   arg_bool_false: {{ arg_bool(false) }}
   arg_str: {{ arg_str("hello world") }}
   arg_null: {{ arg_null(null) }}
-  arg_seq: {{ arg_seq(my_sequence) }}
+  arg_seq_1: {{ arg_seq(my_sequence_1) }}
+  arg_seq_2: {{ arg_seq(my_sequence_2) }}
   arg_sum_map: {{ arg_sum_map(my_map) }}
