@@ -17,6 +17,14 @@ def arg_null(a):
   return a
 
 @context_func
+def arg_sum_map(obj):
+  return obj['field_a'] + obj['field_b']
+
+@context_func
+def arg_seq(a):
+  return a
+
+@context_func
 def load_data_sync():
    client = MyApiClient("google.com")
    return client.load_data()
