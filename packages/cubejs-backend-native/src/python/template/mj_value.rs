@@ -229,16 +229,25 @@ pub fn from_minijinja_value(from: &mj::value::Value) -> Result<CLRepr, mj::Error
             let mut obj = CLReprObject::new();
 
             for key in from.try_iter()? {
-                let v = if let Ok(v) = from.get_item(&key) {
+                let value = if let Ok(v) = from.get_item(&key) {
                     from_minijinja_value(&v)?
                 } else {
                     CLRepr::Null
                 };
 
-                obj.insert(
-                    key.as_str().expect("must be a string").to_string(),
-                    v,
-                );
+                let key_str = if let Some(key) = key.as_str() {
+                    key.to_string()
+                } else {
+                    return Err(mj::Error::new(
+                        mj::ErrorKind::InvalidOperation,
+                        format!(
+                            "Unable to convert Map to Python object: key must be string, actual: {}",
+                            key.kind()
+                        ),
+                    ));
+                };
+
+                obj.insert(key_str, value);
             }
 
             Ok(CLRepr::Object(obj))
