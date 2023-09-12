@@ -6546,21 +6546,23 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/athena-driver should load columns for specific tables 1`] = `
+exports[`Queries with the @cubejs-backend/athena-driver should load schemas, tables for specific schemas, and columns for specific tables 1`] = `
 Object {
-  "column_name": Any<String>,
-  "data_type": Any<String>,
+  "schema_name": Any<String>,
+}
+`;
+
+exports[`Queries with the @cubejs-backend/athena-driver should load schemas, tables for specific schemas, and columns for specific tables 2`] = `
+Object {
   "schema_name": Any<String>,
   "table_name": Any<String>,
 }
 `;
-exports[`Queries with the @cubejs-backend/athena-driver should load schemas 1`] = `
+
+exports[`Queries with the @cubejs-backend/athena-driver should load schemas, tables for specific schemas, and columns for specific tables 3`] = `
 Object {
-  "schema_name": Any<String>,
-}
-`;
-exports[`Queries with the @cubejs-backend/athena-driver should load tables for specific schemas 1`] = `
-Object {
+  "column_name": Any<String>,
+  "data_type": Any<String>,
   "schema_name": Any<String>,
   "table_name": Any<String>,
 }
