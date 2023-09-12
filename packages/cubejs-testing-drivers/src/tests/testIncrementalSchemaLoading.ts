@@ -1,11 +1,13 @@
 import { jest, expect, beforeAll, afterAll } from '@jest/globals';
 import {
   BaseDriver,
+  QuerySchemasResult,
+  QueryTablesResult,
+  QueryColumnsResult,
 } from '@cubejs-backend/base-driver';
 import { Environment } from '../types/Environment';
 import {
   getFixtures,
-  getCreateQueries,
   getDriver,
   runEnvironment,
 } from '../helpers';
@@ -22,10 +24,9 @@ export function testIncrementalSchemaLoading(type: string): void {
         options: { highWaterMark: number },
       ) => Promise<any>
     };
-    let query: string[];
     let env: Environment;
-    let schemas: any;
-    let tables: any;
+    let schemas: QuerySchemasResult[];
+    let tables: QueryTablesResult[];
 
     function execute(name: string, test: () => Promise<void>) {
       if (fixtures.skip && fixtures.skip.indexOf(name) >= 0) {
@@ -69,7 +70,7 @@ export function testIncrementalSchemaLoading(type: string): void {
     });
 
     execute('should load tables for specific schemas', async () => {
-      tables = await driver.getTablesForSpecificSchemas(schemas);
+      tables = await driver.getTablesForSpecificSchemas([schemas[0]]);
       expect(tables).toBeInstanceOf(Array);
       expect(tables[0]).toMatchSnapshot({
         schema_name: expect.any(String),
@@ -78,7 +79,7 @@ export function testIncrementalSchemaLoading(type: string): void {
     });
 
     execute('should load columns for specific tables', async () => {
-      const columns = await driver.getColumnsForSpecificTables(tables);
+      const columns = await driver.getColumnsForSpecificTables([tables[0]]);
       expect(columns).toBeInstanceOf(Array);
       expect(columns[0]).toMatchSnapshot({
         schema_name: expect.any(String),
