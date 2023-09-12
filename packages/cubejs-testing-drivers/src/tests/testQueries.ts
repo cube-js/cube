@@ -1395,7 +1395,7 @@ export function testQueries(type: string): void {
 
     // Incremental schema loading tests
     // TODO: Move to separate test
-    // TODO: Cleanup created objects
+    // TODO: Fix dropping fixture tables works for all drivers
     execute('should load and check driver capabilities', async () => {
       const capabilities = driver.capabilities();
       expect(capabilities).toMatchObject({
