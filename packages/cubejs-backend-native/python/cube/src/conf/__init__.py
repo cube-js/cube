@@ -51,6 +51,8 @@ class Configuration:
     scheduled_refresh_contexts: Callable
     context_to_api_scopes: Callable
     repository_factory: Callable
+    schema_version: Callable[[RequestContext], str]
+    semantic_layer_sync: Callable
 
     def __init__(self):
         self.schema_path = None
@@ -76,6 +78,8 @@ class Configuration:
         self.scheduled_refresh_contexts = None
         self.context_to_api_scopes = None
         self.repository_factory = None
+        self.schema_version = None
+        self.semantic_layer_sync = None
 
     def set_schema_path(self, schema_path: str):
         self.schema_path = schema_path
@@ -139,6 +143,12 @@ class Configuration:
 
     def set_repository_factory(self, repository_factory: Callable):
         self.repository_factory = repository_factory
+
+    def set_schema_version(self, schema_version: Callable[[RequestContext], str]):
+        self.schema_version = schema_version
+
+    def set_semantic_layer_sync(self, semantic_layer_sync: Callable):
+        self.semantic_layer_sync = semantic_layer_sync
 
 
 settings = Configuration()
