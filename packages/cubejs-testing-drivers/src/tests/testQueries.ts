@@ -1,5 +1,5 @@
 import { jest, expect, beforeAll, afterAll } from '@jest/globals';
-import { BaseDriver } from '@cubejs-backend/base-driver';
+import { BaseDriver, QuerySchemasResult, QueryTablesResult } from '@cubejs-backend/base-driver';
 import cubejs, { CubejsApi } from '@cubejs-client/core';
 import { sign } from 'jsonwebtoken';
 import { Environment } from '../types/Environment';
@@ -20,6 +20,8 @@ export function testQueries(type: string): void {
     let driver: BaseDriver;
     let queries: string[];
     let env: Environment;
+    let schemas: QuerySchemasResult[];
+    let tables: QueryTablesResult[];
 
     function execute(name: string, test: () => Promise<void>) {
       if (fixtures.skip && fixtures.skip.indexOf(name) >= 0) {
@@ -1391,6 +1393,46 @@ export function testQueries(type: string): void {
         }]
       });
       expect(response.rawData()).toMatchSnapshot();
+    });
+
+    // Incremental schema loading tests
+    // TODO: Move to separate test
+    // TODO: Cleanup created objects
+    execute('should load and check driver capabilities', async () => {
+      const capabilities = driver.capabilities();
+      expect(capabilities).toMatchObject({
+        incrementalSchemaLoading: true,
+      });
+    });
+
+    execute('should load schemas', async () => {
+      schemas = await driver.getSchemas();
+      expect(schemas).toBeInstanceOf(Array);
+      expect(schemas[0]).toMatchSnapshot({
+        schema_name: expect.any(String),
+      });
+    });
+
+    execute('should load tables for specific schemas', async () => {
+      const inputSchema = schemas.find((s) => !!s.schema_name);
+      tables = await driver.getTablesForSpecificSchemas([inputSchema!]);
+      expect(tables).toBeInstanceOf(Array);
+      expect(tables[0]).toMatchSnapshot({
+        schema_name: expect.any(String),
+        table_name: expect.any(String),
+      });
+    });
+
+    execute('should load columns for specific tables', async () => {
+      const inputTable = tables.find((t) => !!t.table_name);
+      const columns = await driver.getColumnsForSpecificTables([inputTable!]);
+      expect(columns).toBeInstanceOf(Array);
+      expect(columns[0]).toMatchSnapshot({
+        schema_name: expect.any(String),
+        table_name: expect.any(String),
+        column_name: expect.any(String),
+        data_type: expect.any(String),
+      });
     });
   });
 }
