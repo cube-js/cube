@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.54](https://github.com/cube-js/cube/compare/v0.33.53...v0.33.54) (2023-09-12)
+
+
+### Bug Fixes
+
+* **cubestore:** COUNT(*) don't work on subquery with aggregation ([#7117](https://github.com/cube-js/cube/issues/7117)) ([fa48e92](https://github.com/cube-js/cube/commit/fa48e92128ce3695963371977d5475cfbe9b3eeb))
+* **cubestore:** Fix error in projection pushdown ([#7119](https://github.com/cube-js/cube/issues/7119)) ([88ef3d6](https://github.com/cube-js/cube/commit/88ef3d6d1bae235e47a9948aa0940a06bf2c2687))
+
+
+### Features
+
+* **cubesql:** `ORDER BY` SQL push down support ([#7115](https://github.com/cube-js/cube/issues/7115)) ([49ea3cf](https://github.com/cube-js/cube/commit/49ea3cf0721f30da142fb021f860cc56b0a85ab6))
+* **cubestore:** Increase parallelism for Cache Store ([#7114](https://github.com/cube-js/cube/issues/7114)) ([ad1b146](https://github.com/cube-js/cube/commit/ad1b146fcd63ff8eccfb719f79c82922a7b08b7e))
+
+
+
+
+
 ## [0.33.53](https://github.com/cube-js/cube/compare/v0.33.52...v0.33.53) (2023-09-08)
 
 
