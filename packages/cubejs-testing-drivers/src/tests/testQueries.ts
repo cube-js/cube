@@ -1398,9 +1398,8 @@ export function testQueries(type: string): void {
     // TODO: Move to separate test
     execute('should load and check driver capabilities', async () => {
       const capabilities = driver.capabilities();
-      expect(capabilities).toMatchObject({
-        incrementalSchemaLoading: true,
-      });
+      expect(capabilities).toHaveProperty('incrementalSchemaLoading');
+      expect(capabilities.incrementalSchemaLoading).toBe(true);
     });
 
     execute('should load schemas, tables for specific schemas, and columns for specific tables', async () => {
