@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.55](https://github.com/cube-js/cube/compare/v0.33.54...v0.33.55) (2023-09-12)
+
+
+### Features
+
+* **native:** Cube.py - support semanticLayerSync/schemaVersion ([#7124](https://github.com/cube-js/cube/issues/7124)) ([1df04da](https://github.com/cube-js/cube/commit/1df04da3bbbe205c72a4a645d6ddbf72b0eaf8f7))
+* **native:** Jinja - support passing Map/Seq to Python ([#7125](https://github.com/cube-js/cube/issues/7125)) ([b7762a1](https://github.com/cube-js/cube/commit/b7762a1700f35ac2b89eed061900a7fa01fd5866))
+
+
+
+
+
 ## [0.33.54](https://github.com/cube-js/cube/compare/v0.33.53...v0.33.54) (2023-09-12)
 
 **Note:** Version bump only for package @cubejs-backend/native
