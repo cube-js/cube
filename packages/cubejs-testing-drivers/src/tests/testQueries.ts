@@ -1404,6 +1404,7 @@ export function testQueries(type: string): void {
 
     execute('should load schemas, tables for specific schemas, and columns for specific tables', async () => {
       const schemas = await driver.getSchemas();
+      console.log('schemas', schemas);
       expect(schemas).toBeInstanceOf(Array);
       expect(schemas.length).toBeGreaterThan(0);
       expect(schemas[0]).toMatchSnapshot({
@@ -1411,7 +1412,9 @@ export function testQueries(type: string): void {
       });
     
       const inputSchemas = schemas.filter((s) => !!s.schema_name);
+      console.log('inputSchemas', inputSchemas);
       const tablesForSchemas = await driver.getTablesForSpecificSchemas(inputSchemas);
+      console.log('tablesForSchemas', tablesForSchemas);
       expect(tablesForSchemas).toBeInstanceOf(Array);
       expect(tablesForSchemas.length).toBeGreaterThan(0);
       expect(tablesForSchemas[0]).toMatchSnapshot({
@@ -1420,7 +1423,9 @@ export function testQueries(type: string): void {
       });
     
       const inputTables = tablesForSchemas.filter((t) => tables.includes(t.table_name));
+      console.log('inputTables', inputTables);
       const columnsForTables = await driver.getColumnsForSpecificTables(inputTables);
+      console.log('columnsForTables', columnsForTables);
       expect(columnsForTables).toBeInstanceOf(Array);
       expect(columnsForTables.length).toBeGreaterThan(0);
       expect(columnsForTables[0]).toMatchSnapshot({
