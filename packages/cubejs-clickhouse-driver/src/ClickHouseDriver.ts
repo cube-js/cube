@@ -12,6 +12,7 @@ import {
   BaseDriver,
   DownloadQueryResultsOptions,
   DownloadQueryResultsResult,
+  DriverCapabilities,
   DriverInterface,
   QuerySchemasResult,
   StreamOptions,
@@ -411,5 +412,11 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
 
   public getTablesQuery(schemaName: string) {
     return this.query('SELECT name as table_name FROM system.tables WHERE database = ?', [schemaName]);
+  }
+
+  public capabilities(): DriverCapabilities {
+    return {
+      incrementalSchemaLoading: true,
+    };
   }
 }
