@@ -53,6 +53,7 @@ class Configuration:
     repository_factory: Callable
     schema_version: Callable[[RequestContext], str]
     semantic_layer_sync: Callable
+    pre_aggregations_schema: Callable[[RequestContext], str]
 
     def __init__(self):
         self.schema_path = None
@@ -80,6 +81,7 @@ class Configuration:
         self.repository_factory = None
         self.schema_version = None
         self.semantic_layer_sync = None
+        self.pre_aggregations_schema = None
 
     def set_schema_path(self, schema_path: str):
         self.schema_path = schema_path
@@ -149,6 +151,9 @@ class Configuration:
 
     def set_semantic_layer_sync(self, semantic_layer_sync: Callable):
         self.semantic_layer_sync = semantic_layer_sync
+
+    def set_pre_aggregations_schema(self, pre_aggregations_schema: Callable[[RequestContext], str]):
+        self.pre_aggregations_schema = pre_aggregations_schema
 
 
 settings = Configuration()

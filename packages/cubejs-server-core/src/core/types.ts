@@ -127,7 +127,7 @@ export type ContextToOrchestratorIdFn = (context: RequestContext) => string | Pr
 
 export type OrchestratorOptionsFn = (context: RequestContext) => OrchestratorOptions;
 
-export type PreAggregationsSchemaFn = (context: RequestContext) => string;
+export type PreAggregationsSchemaFn = (context: RequestContext) => string | Promise<string>;
 
 // internal
 export type DriverOptions = {
