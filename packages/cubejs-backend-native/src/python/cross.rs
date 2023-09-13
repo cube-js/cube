@@ -4,7 +4,7 @@ use neon::prelude::*;
 use neon::result::Throw;
 use neon::types::JsDate;
 use pyo3::exceptions::{PyNotImplementedError, PyTypeError};
-use pyo3::types::{PyBool, PyDict, PyFloat, PyFunction, PyInt, PyList, PySet, PyString};
+use pyo3::types::{PyBool, PyDict, PyFloat, PyFunction, PyInt, PyList, PySet, PyString, PyTuple};
 use pyo3::{Py, PyAny, PyErr, PyObject, Python, ToPyObject};
 use std::cell::RefCell;
 use std::collections::hash_map::{IntoIter, Iter, Keys};
@@ -59,6 +59,7 @@ pub enum CLReprKind {
     Bool,
     Float,
     Int,
+    Tuple,
     Array,
     Object,
     JsFunction,
@@ -77,6 +78,7 @@ pub enum CLRepr {
     Bool(bool),
     Float(f64),
     Int(i64),
+    Tuple(Vec<CLRepr>),
     Array(Vec<CLRepr>),
     Object(CLReprObject),
     JsFunction(Arc<Root<JsFunction>>),
@@ -157,6 +159,7 @@ impl CLRepr {
             CLRepr::Bool(_) => CLReprKind::Bool,
             CLRepr::Float(_) => CLReprKind::Float,
             CLRepr::Int(_) => CLReprKind::Int,
+            CLRepr::Tuple(_) => CLReprKind::Tuple,
             CLRepr::Array(_) => CLReprKind::Array,
             CLRepr::Object(_) => CLReprKind::Object,
             CLRepr::JsFunction(_) => CLReprKind::JsFunction,
@@ -274,6 +277,15 @@ impl CLRepr {
                 }
 
                 Self::Array(r)
+            } else if v.get_type().is_subclass_of::<PyTuple>()? {
+                let l = v.downcast::<PyTuple>()?;
+                let mut r = Vec::with_capacity(l.len());
+
+                for v in l.iter() {
+                    r.push(Self::from_python_ref(v)?);
+                }
+
+                Self::Tuple(r)
             } else {
                 return Err(PyErr::new::<PyTypeError, _>(format!(
                     "Unable to represent {} type as CLR from Python",
@@ -295,7 +307,7 @@ impl CLRepr {
             CLRepr::Bool(v) => cx.boolean(v).upcast(),
             CLRepr::Float(v) => cx.number(v).upcast(),
             CLRepr::Int(v) => cx.number(v as f64).upcast(),
-            CLRepr::Array(arr) => {
+            CLRepr::Tuple(arr) | CLRepr::Array(arr) => {
                 let r = cx.empty_array();
 
                 for (k, v) in arr.into_iter().enumerate() {
@@ -388,6 +400,15 @@ impl CLRepr {
                 }
 
                 PyList::new(py, elements).to_object(py)
+            }
+            CLRepr::Tuple(arr) => {
+                let mut elements = Vec::with_capacity(arr.len());
+
+                for el in arr.into_iter() {
+                    elements.push(Self::into_py_impl(el, py)?);
+                }
+
+                PyTuple::new(py, elements).to_object(py)
             }
             CLRepr::Object(obj) => {
                 let r = PyDict::new(py);
