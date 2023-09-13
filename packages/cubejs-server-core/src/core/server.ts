@@ -507,7 +507,7 @@ export class CubejsServerCore {
           ),
           externalDialectClass: this.options.externalDialectFactory && this.options.externalDialectFactory(context),
           schemaVersion: currentSchemaVersion,
-          preAggregationsSchema: this.preAggregationsSchema(context),
+          preAggregationsSchema: await this.preAggregationsSchema(context),
           context,
           allowJsDuplicatePropsInSchema: this.options.allowJsDuplicatePropsInSchema,
           allowNodeRequire: this.options.allowNodeRequire,
