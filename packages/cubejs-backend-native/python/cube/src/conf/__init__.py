@@ -21,6 +21,8 @@ def file_repository(path):
 
     return files
 
+class ConfigurationException(Exception):
+    pass
 
 class RequestContext:
     url: str
@@ -157,3 +159,12 @@ class Configuration:
 
 
 settings = Configuration()
+
+def config(func):
+    if not callable(func):
+        raise ConfigurationException("@config decorator must be used with functions, actual: '%s'" % type(func).__name__)
+
+    if hasattr(settings, func.__name__):
+        setattr(settings, func.__name__, func)
+    else:
+        raise ConfigurationException("Unknown settings property: '%s'" % func.__name__)
