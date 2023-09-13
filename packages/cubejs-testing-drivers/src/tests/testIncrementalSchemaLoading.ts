@@ -94,8 +94,8 @@ export function testIncrementalSchemaLoading(type: string): void {
     });
 
     execute('should load columns for specific tables', async () => {
-      const createdTables = tables.map((t) => t.split('.').pop());
-      inputTables = inputTables.filter((t) => createdTables.includes(t.table_name));
+      const createdTables = tables.map((t) => t.split('.').pop()?.toUpperCase());
+      inputTables = inputTables.filter((t) => createdTables.includes(t.table_name.toUpperCase()));
       console.log('tables', tables);
       console.log('inputTables', inputTables);
       const columnsForTables = await driver.getColumnsForSpecificTables(inputTables);
