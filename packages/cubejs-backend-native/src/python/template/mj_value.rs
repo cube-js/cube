@@ -261,7 +261,9 @@ pub fn from_minijinja_value(from: &mj::value::Value) -> Result<CLRepr, mj::Error
 
 pub fn to_minijinja_value(from: CLRepr) -> Value {
     match from {
-        CLRepr::Array(inner) => Value::from_seq_object(JinjaSequenceObject { inner }),
+        CLRepr::Tuple(inner) | CLRepr::Array(inner) => {
+            Value::from_seq_object(JinjaSequenceObject { inner })
+        }
         CLRepr::Object(inner) => Value::from_object(JinjaDynamicObject { inner }),
         CLRepr::String(v) => Value::from(v),
         CLRepr::Float(v) => Value::from(v),

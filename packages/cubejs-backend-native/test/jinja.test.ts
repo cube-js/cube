@@ -63,8 +63,11 @@ suite('Python model', () => {
       arg_sum_integers: expect.any(Object),
       arg_str: expect.any(Object),
       arg_null: expect.any(Object),
+      arg_sum_tuple: expect.any(Object),
       arg_sum_map: expect.any(Object),
       arg_seq: expect.any(Object),
+      new_int_tuple: expect.any(Object),
+      new_str_tuple: expect.any(Object),
     });
   });
 });
@@ -80,8 +83,11 @@ darwinSuite('Scope Python model', () => {
       arg_sum_integers: expect.any(Object),
       arg_str: expect.any(Object),
       arg_null: expect.any(Object),
+      arg_sum_tuple: expect.any(Object),
       arg_sum_map: expect.any(Object),
       arg_seq: expect.any(Object),
+      new_int_tuple: expect.any(Object),
+      new_str_tuple: expect.any(Object),
     });
   });
 });
