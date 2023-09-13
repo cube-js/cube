@@ -78,7 +78,7 @@ fn python_load_model(mut cx: FunctionContext) -> JsResult<JsPromise> {
                 .downcast::<PyDict>()?;
 
             for (local_key, local_value) in execution_context_locals.iter() {
-                if local_value.is_instance_of::<PyFunction>()? {
+                if local_value.is_instance_of::<PyFunction>() {
                     let has_attr = local_value.hasattr("cube_context_func")?;
                     if has_attr {
                         let fun: Py<PyFunction> = local_value.downcast::<PyFunction>()?.into();
