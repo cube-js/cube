@@ -1,6 +1,6 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
-exports[`Incremental schema loading @cubejs-backend/snowflake-driver should load columns for specific tables 1`] = `
+exports[`Incremental schema loading @cubejs-backend/athena-driver should load columns for specific tables 1`] = `
 Object {
   "column_name": Any<String>,
   "data_type": Any<String>,
@@ -9,13 +9,13 @@ Object {
 }
 `;
 
-exports[`Incremental schema loading @cubejs-backend/snowflake-driver should load schemas 1`] = `
+exports[`Incremental schema loading @cubejs-backend/athena-driver should load schemas 1`] = `
 Object {
   "schema_name": Any<String>,
 }
 `;
 
-exports[`Incremental schema loading @cubejs-backend/snowflake-driver should load tables for specific schemas 1`] = `
+exports[`Incremental schema loading @cubejs-backend/athena-driver should load tables for specific schemas 1`] = `
 Object {
   "schema_name": Any<String>,
   "table_name": Any<String>,
