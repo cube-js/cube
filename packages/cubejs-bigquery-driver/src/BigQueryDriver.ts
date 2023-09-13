@@ -245,7 +245,8 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
         return columns.map((column: any) => ({
           schema_name: table.schema_name,
           table_name: table.table_name,
-          ...column
+          data_type: column.type,
+          column_name: column.name,
         }));
       });
 
