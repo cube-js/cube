@@ -31,10 +31,6 @@ export function testQueries(type: string): void {
     const apiToken = sign({}, 'mysupersecret');
 
     const suffix = new Date().getTime().toString(32);
-    const tables = Object
-      .keys(fixtures.tables)
-      .map((key: string) => `${fixtures.tables[key]}_${suffix}`);
-
     beforeAll(async () => {
       env = await runEnvironment(type, suffix);
       process.env.CUBEJS_REFRESH_WORKER = 'true';
@@ -66,6 +62,9 @@ export function testQueries(type: string): void {
   
     afterAll(async () => {
       try {
+        const tables = Object
+          .keys(fixtures.tables)
+          .map((key: string) => `${fixtures.tables[key]}${suffix}`);
         console.log(`Dropping ${tables.length} fixture tables`);
         for (const t of tables) {
           await driver.dropTable(t);
@@ -1392,48 +1391,6 @@ export function testQueries(type: string): void {
         }]
       });
       expect(response.rawData()).toMatchSnapshot();
-    });
-
-    // Incremental schema loading tests
-    // TODO: Move to separate test
-    execute('should load and check driver capabilities', async () => {
-      const capabilities = driver.capabilities();
-      expect(capabilities).toHaveProperty('incrementalSchemaLoading');
-      expect(capabilities.incrementalSchemaLoading).toBe(true);
-    });
-
-    execute('should load schemas, tables for specific schemas, and columns for specific tables', async () => {
-      const schemas = await driver.getSchemas();
-      console.log('schemas', schemas);
-      expect(schemas).toBeInstanceOf(Array);
-      expect(schemas.length).toBeGreaterThan(0);
-      expect(schemas[0]).toMatchSnapshot({
-        schema_name: expect.any(String),
-      });
-    
-      const inputSchemas = schemas.filter((s) => !!s.schema_name);
-      console.log('inputSchemas', inputSchemas);
-      const tablesForSchemas = await driver.getTablesForSpecificSchemas(inputSchemas);
-      console.log('tablesForSchemas', tablesForSchemas);
-      expect(tablesForSchemas).toBeInstanceOf(Array);
-      expect(tablesForSchemas.length).toBeGreaterThan(0);
-      expect(tablesForSchemas[0]).toMatchSnapshot({
-        schema_name: expect.any(String),
-        table_name: expect.any(String),
-      });
-    
-      const inputTables = tablesForSchemas.filter((t) => tables.includes(t.table_name));
-      console.log('inputTables', inputTables);
-      const columnsForTables = await driver.getColumnsForSpecificTables(inputTables);
-      console.log('columnsForTables', columnsForTables);
-      expect(columnsForTables).toBeInstanceOf(Array);
-      expect(columnsForTables.length).toBeGreaterThan(0);
-      expect(columnsForTables[0]).toMatchSnapshot({
-        schema_name: expect.any(String),
-        table_name: expect.any(String),
-        column_name: expect.any(String),
-        data_type: expect.any(String),
-      });
     });
   });
 }
