@@ -73,7 +73,6 @@ export function testIncrementalSchemaLoading(type: string): void {
 
     execute('should load schemas', async () => {
       inputSchemas = await driver.getSchemas();
-      console.log('schemas', inputSchemas);
       expect(inputSchemas).toBeInstanceOf(Array);
       expect(inputSchemas.length).toBeGreaterThan(0);
       expect(inputSchemas[0]).toMatchSnapshot({
@@ -83,9 +82,7 @@ export function testIncrementalSchemaLoading(type: string): void {
 
     execute('should load tables for specific schemas', async () => {
       inputSchemas = inputSchemas.filter((s) => !!s.schema_name);
-      console.log('inputSchemas', inputSchemas);
       inputTables = await driver.getTablesForSpecificSchemas(inputSchemas);
-      console.log('tablesForSchemas', inputTables);
       expect(inputTables).toBeInstanceOf(Array);
       expect(inputTables.length).toBeGreaterThan(0);
       expect(inputTables[0]).toMatchSnapshot({
@@ -97,10 +94,7 @@ export function testIncrementalSchemaLoading(type: string): void {
     execute('should load columns for specific tables', async () => {
       const createdTables = tables.map((t) => t.split('.').pop()?.toUpperCase());
       inputTables = inputTables.filter((t) => createdTables.includes(t.table_name.toUpperCase()));
-      console.log('tables', tables);
-      console.log('inputTables', inputTables);
       const columnsForTables = await driver.getColumnsForSpecificTables(inputTables);
-      console.log('columnsForTables', columnsForTables);
       expect(columnsForTables).toBeInstanceOf(Array);
       expect(columnsForTables.length).toBeGreaterThan(0);
       expect(columnsForTables[0]).toMatchSnapshot({
