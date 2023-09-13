@@ -27,9 +27,10 @@ export function testIncrementalSchemaLoading(type: string): void {
     let inputSchemas: QuerySchemasResult[];
     let inputTables: QueryTablesResult[];
 
+    const suffix = `driver_${new Date().getTime().toString(32)}`;
     const tables = Object
       .keys(fixtures.tables)
-      .map((key: string) => `${fixtures.tables[key]}_driver`);
+      .map((key: string) => `${fixtures.tables[key]}_${suffix}`);
 
     function execute(name: string, test: () => Promise<void>) {
       if (fixtures.skip && fixtures.skip.indexOf(name) >= 0) {
@@ -40,7 +41,7 @@ export function testIncrementalSchemaLoading(type: string): void {
     }
   
     beforeAll(async () => {
-      env = await runEnvironment(type, 'driver');
+      env = await runEnvironment(type, suffix);
       if (env.data) {
         process.env.CUBEJS_DB_HOST = '127.0.0.1';
         process.env.CUBEJS_DB_PORT = `${env.data.port}`;
@@ -58,7 +59,7 @@ export function testIncrementalSchemaLoading(type: string): void {
     });
   
     execute('should create the data source', async () => {
-      query = getCreateQueries(type, 'driver');
+      query = getCreateQueries(type, suffix);
       await Promise.all(query.map(async (q) => {
         await driver.query(q);
       }));
