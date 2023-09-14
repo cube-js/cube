@@ -114,4 +114,10 @@ export class DatabricksQuery extends BaseQuery {
   public defaultRefreshKeyRenewalThreshold() {
     return 120;
   }
+
+  public sqlTemplates() {
+    const templates = super.sqlTemplates();
+    templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
+    return templates;
+  }
 }

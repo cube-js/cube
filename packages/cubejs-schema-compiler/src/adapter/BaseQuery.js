@@ -210,6 +210,7 @@ class BaseQuery {
       ungrouped: this.options.ungrouped,
       memberToAlias: this.options.memberToAlias,
       expressionParams: this.options.expressionParams,
+      convertTzForRawTimeDimension: this.options.convertTzForRawTimeDimension,
     });
     this.timezone = this.options.timezone;
     this.rowLimit = this.options.rowLimit;
@@ -1796,7 +1797,15 @@ class BaseQuery {
           this.autoPrefixAndEvaluateSql(cubeName, symbol.longitude.sql)
         ]);
       } else {
-        return this.autoPrefixAndEvaluateSql(cubeName, symbol.sql);
+        let res = this.autoPrefixAndEvaluateSql(cubeName, symbol.sql);
+        if (this.safeEvaluateSymbolContext().convertTzForRawTimeDimension &&
+          !memberExpressionType &&
+          symbol.type === 'time' &&
+          this.cubeEvaluator.byPathAnyType(memberPathArray).ownedByCube
+        ) {
+          res = this.convertTz(res);
+        }
+        return res;
       }
     } else if (type === 'segment') {
       if ((this.safeEvaluateSymbolContext().renderedReference || {})[memberPath]) {
@@ -2399,6 +2408,10 @@ class BaseQuery {
     return false;
   }
 
+  /**
+   * @public
+   * @returns {any}
+   */
   sqlTemplates() {
     return {
       functions: {

@@ -77,6 +77,10 @@ export class BaseTimeDimension extends BaseFilter {
     return this.query.timeGroupedColumn(granularity, this.convertedToTz());
   }
 
+  convertTzForRawTimeDimensionIfNeeded(sql) {
+    return sql();
+  }
+
   convertedToTz() {
     return this.query.convertTz(this.query.dimensionSql(this));
   }
