@@ -76,7 +76,7 @@
 /* Only when top menu is visible */
 @media (min-width: 768px) {
   nav > :nth-child(1) {
-    margin-right: 97px !important;
+    margin-right: 98px !important;
   }
 
   nav > a + button {
