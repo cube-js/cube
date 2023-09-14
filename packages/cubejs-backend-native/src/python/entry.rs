@@ -37,7 +37,7 @@ fn python_load_config(mut cx: FunctionContext) -> JsResult<JsPromise> {
         let mut cube_conf = CubeConfigPy::new();
 
         for attr_name in cube_conf.get_static_attrs() {
-            cube_conf.static_attr(settings_py, attr_name)?;
+            cube_conf.attr(settings_py, attr_name)?;
         }
 
         cube_conf.apply_dynamic_functions(settings_py)?;

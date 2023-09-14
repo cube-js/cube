@@ -29,6 +29,17 @@ const jwtOptions = Joi.object().strict(true).keys({
   claimsNamespace: Joi.string(),
 });
 
+const corsOptions = Joi.object().strict(true).keys({
+  origin: Joi.any(),
+  methods: Joi.any(),
+  allowedHeaders: Joi.any(),
+  exposedHeaders: Joi.any(),
+  credentials: Joi.bool(),
+  maxAge: Joi.number(),
+  preflightContinue: Joi.bool(),
+  optionsSuccessStatus: Joi.bool(),
+});
+
 const dbTypes = Joi.alternatives().try(
   Joi.string().valid(...Object.keys(DriverDependencies)),
   Joi.func()
@@ -38,8 +49,8 @@ const schemaOptions = Joi.object().keys({
   // server CreateOptions
   initApp: Joi.func(),
   webSockets: Joi.boolean(),
-  http: Joi.object().keys({
-    cors: Joi.object(),
+  http: Joi.object().strict(true).keys({
+    cors: corsOptions,
   }),
   gracefulShutdown: Joi.number().min(0).integer(),
   // Additional from WebSocketServerOptions

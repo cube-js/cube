@@ -2123,7 +2123,7 @@ class ApiGateway {
         }
 
         const jwk = await jwks.getJWKbyKid(
-          typeof options.jwkUrl === 'function' ? options.jwkUrl(decoded) : <string>options.jwkUrl,
+          typeof options.jwkUrl === 'function' ? await options.jwkUrl(decoded) : <string>options.jwkUrl,
           decoded.header.kid
         );
         if (!jwk) {
