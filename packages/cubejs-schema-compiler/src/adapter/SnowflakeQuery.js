@@ -49,4 +49,10 @@ export class SnowflakeQuery extends BaseQuery {
   countDistinctApprox(sql) {
     return `APPROX_COUNT_DISTINCT(${sql})`;
   }
+
+  sqlTemplates() {
+    const templates = super.sqlTemplates();
+    templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
+    return templates;
+  }
 }

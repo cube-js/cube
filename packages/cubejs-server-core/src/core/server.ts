@@ -675,6 +675,7 @@ export class CubejsServerCore {
         allowUngroupedWithoutPrimaryKey:
             this.options.allowUngroupedWithoutPrimaryKey ||
             getEnv('allowUngroupedWithoutPrimaryKey'),
+        convertTzForRawTimeDimension: getEnv('convertTzForRawTimeDimension'),
         compileContext: options.context,
         dialectClass: options.dialectClass,
         externalDialectClass: options.externalDialectClass,

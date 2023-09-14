@@ -30,4 +30,10 @@ export class DuckDBQuery extends BaseQuery {
   public countDistinctApprox(sql: string) {
     return `approx_count_distinct(${sql})`;
   }
+
+  public sqlTemplates() {
+    const templates = super.sqlTemplates();
+    templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
+    return templates;
+  }
 }

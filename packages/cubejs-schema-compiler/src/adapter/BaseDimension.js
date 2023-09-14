@@ -24,12 +24,22 @@ export class BaseDimension {
 
   dimensionSql() {
     if (this.expression) {
-      return this.query.evaluateSymbolSql(this.expressionCubeName, this.expressionName, this.definition(), 'dimension');
+      return this.convertTzForRawTimeDimensionIfNeeded(() => this.query.evaluateSymbolSql(this.expressionCubeName, this.expressionName, this.definition(), 'dimension'));
     }
     if (this.query.cubeEvaluator.isSegment(this.dimension)) {
       return this.query.wrapSegmentForDimensionSelect(this.query.dimensionSql(this));
     }
-    return this.query.dimensionSql(this);
+    return this.convertTzForRawTimeDimensionIfNeeded(() => this.query.dimensionSql(this));
+  }
+
+  convertTzForRawTimeDimensionIfNeeded(sql) {
+    if (this.query.options.convertTzForRawTimeDimension) {
+      return this.query.evaluateSymbolSqlWithContext(sql, {
+        convertTzForRawTimeDimension: true
+      });
+    } else {
+      return sql();
+    }
   }
 
   sqlDefinition() {

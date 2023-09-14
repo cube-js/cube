@@ -20,6 +20,7 @@ export class CompilerApi {
     this.logger = this.options.logger;
     this.preAggregationsSchema = this.options.preAggregationsSchema;
     this.allowUngroupedWithoutPrimaryKey = this.options.allowUngroupedWithoutPrimaryKey;
+    this.convertTzForRawTimeDimension = this.options.convertTzForRawTimeDimension;
     this.schemaVersion = this.options.schemaVersion;
     this.compileContext = options.compileContext;
     this.allowJsDuplicatePropsInSchema = options.allowJsDuplicatePropsInSchema;
@@ -206,6 +207,7 @@ export class CompilerApi {
         externalDbType: this.options.externalDbType,
         preAggregationsSchema: this.preAggregationsSchema,
         allowUngroupedWithoutPrimaryKey: this.allowUngroupedWithoutPrimaryKey,
+        convertTzForRawTimeDimension: this.convertTzForRawTimeDimension,
         queryFactory: this.queryFactory,
       }
     );

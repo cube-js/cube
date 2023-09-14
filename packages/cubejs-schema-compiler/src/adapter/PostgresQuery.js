@@ -48,6 +48,7 @@ export class PostgresQuery extends BaseQuery {
     const templates = super.sqlTemplates();
     // eslint-disable-next-line no-template-curly-in-string
     templates.params.param = '${{ param_index + 1 }}';
+    templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
     return templates;
   }
 }

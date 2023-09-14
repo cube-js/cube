@@ -32,6 +32,10 @@ export class BaseFilter extends BaseDimension {
     return this.conditionSql(this.measure ? this.query.measureSql(this) : this.query.dimensionSql(this));
   }
 
+  convertTzForRawTimeDimensionIfNeeded(sql) {
+    return sql();
+  }
+
   // Evaluates filters on measures to whole where statement in query
   // It used in drill downs
   measureFilterToWhere() {
