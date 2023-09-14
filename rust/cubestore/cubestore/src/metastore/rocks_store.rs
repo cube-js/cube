@@ -1244,7 +1244,7 @@ impl RocksStore {
         let (tx, rx) = oneshot::channel::<Result<R, CubeError>>();
 
         let res = rw_loop_sender.send(Box::new(move || {
-            let db_span = warn_long("metastore read operation", Duration::from_millis(100));
+            let db_span = warn_long("store read operation", Duration::from_millis(100));
 
             let snapshot = db_to_send.snapshot();
             let res = f(DbTableRef {
@@ -1279,7 +1279,11 @@ impl RocksStore {
         })?
     }
 
-    pub async fn read_operation_out_of_queue<F, R>(&self, f: F) -> Result<R, CubeError>
+    pub async fn read_operation_out_of_queue_opt<F, R>(
+        &self,
+        f: F,
+        timeout: Duration,
+    ) -> Result<R, CubeError>
     where
         F: for<'a> FnOnce(DbTableRef<'a>) -> Result<R, CubeError> + Send + Sync + 'static,
         R: Send + Sync + 'static,
@@ -1288,11 +1292,8 @@ impl RocksStore {
         let db_to_send = self.db.clone();
 
         cube_ext::spawn_blocking(move || {
-            let db_span = warn_long(
-                "metastore read operation out of queue",
-                Duration::from_millis(100),
-            );
-            let span = tracing::trace_span!("metastore read operation out of queue");
+            let db_span = warn_long("store read operation out of queue", timeout);
+            let span = tracing::trace_span!("store read operation out of queue");
             let span_holder = span.enter();
 
             let snapshot = db_to_send.snapshot();
@@ -1309,6 +1310,15 @@ impl RocksStore {
             res
         })
         .await?
+    }
+
+    pub async fn read_operation_out_of_queue<F, R>(&self, f: F) -> Result<R, CubeError>
+    where
+        F: for<'a> FnOnce(DbTableRef<'a>) -> Result<R, CubeError> + Send + Sync + 'static,
+        R: Send + Sync + 'static,
+    {
+        self.read_operation_out_of_queue_opt::<F, R>(f, Duration::from_millis(100))
+            .await
     }
 
     pub fn cleanup_test_store(test_name: &str) {

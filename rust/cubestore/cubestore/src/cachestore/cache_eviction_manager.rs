@@ -22,6 +22,7 @@ use std::fmt;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::mpsc::error::TrySendError;
 use tokio::sync::RwLockWriteGuard;
 
@@ -508,7 +509,7 @@ impl CacheEvictionManager {
             } else {
                 log::trace!("Nothing to evict");
 
-                self.check_compaction_trigger(&store);
+                self.check_compaction_trigger(&store).await;
 
                 return Ok(EvictionResult::Finished(EvictionFinishedResult {
                     total_keys_removed: 0,
@@ -522,7 +523,7 @@ impl CacheEvictionManager {
 
         let result = eviction_fut.await?;
 
-        self.check_compaction_trigger(&store);
+        self.check_compaction_trigger(&store).await;
 
         log::debug!(
             "Eviction finished, total_keys: {}, total_size: {}",
@@ -1101,7 +1102,7 @@ impl CacheEvictionManager {
         }
     }
 
-    fn check_compaction_trigger(&self, store: &Arc<RocksStore>) {
+    async fn check_compaction_trigger(&self, store: &Arc<RocksStore>) {
         let default_cf_metadata = store.db.get_column_family_metadata();
 
         log::trace!(
@@ -1110,16 +1111,25 @@ impl CacheEvictionManager {
         );
 
         if default_cf_metadata.size > self.compaction_trigger_size {
-            let start: Option<&[u8]> = None;
-            let end: Option<&[u8]> = None;
-
             log::debug!(
                 "Triggering compaction, CF default size: {} > {}",
                 humansize::format_size(default_cf_metadata.size, humansize::DECIMAL),
                 humansize::format_size(self.compaction_trigger_size, humansize::DECIMAL)
             );
 
-            store.db.compact_range(start, end)
+            let _ = store
+                .read_operation_out_of_queue_opt(
+                    |db_ref| {
+                        let start: Option<&[u8]> = None;
+                        let end: Option<&[u8]> = None;
+
+                        db_ref.db.compact_range(start, end);
+
+                        Ok(())
+                    },
+                    Duration::from_secs(60),
+                )
+                .await;
         }
     }
 }
