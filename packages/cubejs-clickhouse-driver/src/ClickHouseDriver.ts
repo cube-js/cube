@@ -300,8 +300,8 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     return 'table';
   }
 
-  public getSchemas(): Promise<QuerySchemasResult[]> {
-    return Promise.resolve([{ schema_name: this.config.queryOptions.database }]);
+  public override async getSchemas(): Promise<QuerySchemasResult[]> {
+    return [{ schema_name: this.config.queryOptions.database }];
   }
 
   public async stream(
