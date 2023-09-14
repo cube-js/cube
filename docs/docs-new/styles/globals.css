@@ -79,8 +79,8 @@
     margin-right: 97px !important;
   }
 
-  nav > a:nth-child(4) {
-    margin-right: auto;
+  nav > a + button {
+    margin-left: auto;
   }
 }
 
