@@ -710,7 +710,17 @@ impl HttpMessage {
                         let string_value = Some(builder.create_string(&v.to_string()));
                         HttpColumnValue::create(builder, &HttpColumnValueArgs { string_value })
                     }
+                    TableValue::Int96(v) => {
+                        let string_value = Some(builder.create_string(&v.to_string()));
+                        HttpColumnValue::create(builder, &HttpColumnValueArgs { string_value })
+                    }
                     TableValue::Decimal(v) => {
+                        let scale =
+                            u8::try_from(columns[i].get_column_type().target_scale()).unwrap();
+                        let string_value = Some(builder.create_string(&v.to_string(scale)));
+                        HttpColumnValue::create(builder, &HttpColumnValueArgs { string_value })
+                    }
+                    TableValue::Decimal96(v) => {
                         let scale =
                             u8::try_from(columns[i].get_column_type().target_scale()).unwrap();
                         let string_value = Some(builder.create_string(&v.to_string(scale)));

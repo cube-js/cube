@@ -131,7 +131,7 @@ checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
 [[package]]
 name = "arrow"
 version = "5.0.0"
-source = "git+https://github.com/cube-js/arrow-rs?branch=cube#6bfc9fb4f038f09f72d41e0aa51929e8e40c4e6f"
+source = "git+https://github.com/cube-js/arrow-rs?branch=cube#77c45515c84ca6357a7b4d211e3b8b5bbdfa6b43"
 dependencies = [
  "bitflags",
  "chrono",
@@ -154,7 +154,7 @@ dependencies = [
 [[package]]
 name = "arrow-flight"
 version = "5.0.0"
-source = "git+https://github.com/cube-js/arrow-rs?branch=cube#6bfc9fb4f038f09f72d41e0aa51929e8e40c4e6f"
+source = "git+https://github.com/cube-js/arrow-rs?branch=cube#77c45515c84ca6357a7b4d211e3b8b5bbdfa6b43"
 dependencies = [
  "arrow",
  "base64 0.13.0",
@@ -1339,7 +1339,7 @@ dependencies = [
 [[package]]
 name = "datafusion"
 version = "4.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube#653a48386bc409459c8199505206c300e79118f8"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube#3e2df9eeddfe5472cd8cceb2546e5edc3cec3138"
 dependencies = [
  "ahash 0.7.4",
  "arrow",
@@ -3333,7 +3333,7 @@ dependencies = [
 [[package]]
 name = "parquet"
 version = "5.0.0"
-source = "git+https://github.com/cube-js/arrow-rs?branch=cube#6bfc9fb4f038f09f72d41e0aa51929e8e40c4e6f"
+source = "git+https://github.com/cube-js/arrow-rs?branch=cube#77c45515c84ca6357a7b4d211e3b8b5bbdfa6b43"
 dependencies = [
  "arrow",
  "base64 0.13.0",
