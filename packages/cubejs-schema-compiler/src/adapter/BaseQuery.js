@@ -2423,6 +2423,7 @@ class BaseQuery {
         AVG: 'AVG({{ args_concat }})',
 
         COALESCE: 'COALESCE({{ args_concat }})',
+        CONCAT: 'CONCAT({{ args_concat }})',
       },
       statements: {
         select: 'SELECT {{ select_concat | map(attribute=\'aliased\') | join(\', \') }} \n' +
