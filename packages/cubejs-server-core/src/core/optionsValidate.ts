@@ -1,7 +1,7 @@
 import Joi from 'joi';
 import DriverDependencies from './DriverDependencies';
 
-const schemaQueueOptions = Joi.object().keys({
+const schemaQueueOptions = Joi.object().strict(true).keys({
   concurrency: Joi.number().min(1).integer(),
   continueWaitTimeout: Joi.number().min(0).integer(),
   executionTimeout: Joi.number().min(0).integer(),
@@ -11,7 +11,7 @@ const schemaQueueOptions = Joi.object().keys({
   sendCancelMessageFn: Joi.func(),
 });
 
-const jwtOptions = Joi.object().keys({
+const jwtOptions = Joi.object().strict(true).keys({
   // JWK options
   jwkRetry: Joi.number().min(1).max(5).integer(),
   jwkDefaultExpire: Joi.number().min(0),
@@ -94,9 +94,9 @@ const schemaOptions = Joi.object().keys({
   allowUngroupedWithoutPrimaryKey: Joi.boolean(),
   orchestratorOptions: Joi.alternatives().try(
     Joi.func(),
-    Joi.object().keys({
+    Joi.object().strict(true).keys({
       redisPrefix: Joi.string().allow(''),
-      redisPoolOptions: Joi.object().keys({
+      redisPoolOptions: Joi.object().strict(true).keys({
         poolMin: Joi.number().min(0),
         poolMax: Joi.number().min(0),
         idleTimeoutSeconds: Joi.number().min(0),
