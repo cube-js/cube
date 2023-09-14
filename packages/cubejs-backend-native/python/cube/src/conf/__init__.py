@@ -1,5 +1,5 @@
 import os
-from typing import Union, Callable, Dict, Any
+from typing import Union, Callable, Dict
 
 
 def file_repository(path):
@@ -55,10 +55,10 @@ class Configuration:
     scheduled_refresh_contexts: Callable
     context_to_api_scopes: Callable
     repository_factory: Callable
-    schema_version: str | Callable[[RequestContext], str]
-    semantic_layer_sync: Dict | Callable[[], Dict]
-    pre_aggregations_schema: str | Callable[[RequestContext], str]
-    orchestrator_options: Dict | Callable[[RequestContext], Dict]
+    schema_version: Union[str, Callable[[RequestContext], str]]
+    semantic_layer_sync: Union[Dict, Callable[[], Dict]]
+    pre_aggregations_schema: Union[Callable[[RequestContext], str]]
+    orchestrator_options: Union[Dict, Callable[[RequestContext], Dict]]
 
     def __init__(self):
         self.schema_path = None
@@ -154,16 +154,16 @@ class Configuration:
     def set_repository_factory(self, repository_factory: Callable):
         self.repository_factory = repository_factory
 
-    def set_schema_version(self, schema_version: str | Callable[[RequestContext], str]):
+    def set_schema_version(self, schema_version: Union[str, Callable[[RequestContext], str]]):
         self.schema_version = schema_version
 
-    def set_semantic_layer_sync(self, semantic_layer_sync: Dict | Callable[[], Dict]):
+    def set_semantic_layer_sync(self, semantic_layer_sync: Union[Dict, Callable[[], Dict]]):
         self.semantic_layer_sync = semantic_layer_sync
 
-    def set_pre_aggregations_schema(self, pre_aggregations_schema: str | Callable[[RequestContext], str]):
+    def set_pre_aggregations_schema(self, pre_aggregations_schema: Union[str, Callable[[RequestContext], str]]):
         self.pre_aggregations_schema = pre_aggregations_schema
 
-    def set_orchestrator_options(self, orchestrator_options: Dict | Callable[[RequestContext], Dict]):
+    def set_orchestrator_options(self, orchestrator_options: Union[Dict, Callable[[RequestContext], Dict]]):
         self.orchestrator_options = orchestrator_options
 
 

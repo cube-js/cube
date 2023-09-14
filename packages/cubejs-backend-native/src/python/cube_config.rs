@@ -1,8 +1,6 @@
 use convert_case::{Case, Casing};
 use neon::prelude::*;
-use pyo3::exceptions::PyTypeError;
-use pyo3::types::PyFunction;
-use pyo3::{Py, PyAny, PyErr, PyResult};
+use pyo3::{PyAny, PyResult};
 
 use crate::python::cross::{CLRepr, CLReprObject};
 
