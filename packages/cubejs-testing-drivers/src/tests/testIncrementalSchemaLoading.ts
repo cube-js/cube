@@ -75,7 +75,7 @@ export function testIncrementalSchemaLoading(type: string): void {
       inputSchemas = await driver.getSchemas();
       expect(inputSchemas).toBeInstanceOf(Array);
       expect(inputSchemas.length).toBeGreaterThan(0);
-      expect(inputSchemas[0]).toMatchSnapshot({
+      expect(inputSchemas).toContain({
         schema_name: expect.any(String),
       });
     });
@@ -85,7 +85,7 @@ export function testIncrementalSchemaLoading(type: string): void {
       inputTables = await driver.getTablesForSpecificSchemas(inputSchemas);
       expect(inputTables).toBeInstanceOf(Array);
       expect(inputTables.length).toBeGreaterThan(0);
-      expect(inputTables[0]).toMatchSnapshot({
+      expect(inputTables).toContain({
         schema_name: expect.any(String),
         table_name: expect.any(String),
       });
@@ -97,7 +97,7 @@ export function testIncrementalSchemaLoading(type: string): void {
       const columnsForTables = await driver.getColumnsForSpecificTables(inputTables);
       expect(columnsForTables).toBeInstanceOf(Array);
       expect(columnsForTables.length).toBeGreaterThan(0);
-      expect(columnsForTables[0]).toMatchSnapshot({
+      expect(columnsForTables).toContain({
         schema_name: expect.any(String),
         table_name: expect.any(String),
         column_name: expect.any(String),

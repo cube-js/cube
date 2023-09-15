@@ -1,27 +1,5 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
-exports[`Incremental schema loading @cubejs-backend/clickhouse-driver should load columns for specific tables 1`] = `
-Object {
-  "column_name": Any<String>,
-  "data_type": Any<String>,
-  "schema_name": Any<String>,
-  "table_name": Any<String>,
-}
-`;
-
-exports[`Incremental schema loading @cubejs-backend/clickhouse-driver should load schemas 1`] = `
-Object {
-  "schema_name": Any<String>,
-}
-`;
-
-exports[`Incremental schema loading @cubejs-backend/clickhouse-driver should load tables for specific schemas 1`] = `
-Object {
-  "schema_name": Any<String>,
-  "table_name": Any<String>,
-}
-`;
-
 exports[`Queries with the @cubejs-backend/clickhouse-driver filtering Customers: contains + dimensions, first 1`] = `
 Array [
   Object {
