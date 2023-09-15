@@ -12,7 +12,9 @@ import {
   BaseDriver,
   DownloadQueryResultsOptions,
   DownloadQueryResultsResult,
+  DriverCapabilities,
   DriverInterface,
+  QuerySchemasResult,
   StreamOptions,
   StreamTableDataWithTypes,
 } from '@cubejs-backend/base-driver';
@@ -268,6 +270,40 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     `;
   }
 
+  protected override getTablesForSpecificSchemasQuery(schemasPlaceholders: string) {
+    const query = `
+      SELECT database as schema_name,
+            name as table_name
+      FROM system.tables
+      WHERE database IN (${schemasPlaceholders})
+    `;
+    return query;
+  }
+
+  protected override getColumnsForSpecificTablesQuery(conditionString: string) {
+    const query = `
+      SELECT name as ${this.quoteIdentifier('column_name')},
+             table as ${this.quoteIdentifier('table_name')},
+             database as ${this.quoteIdentifier('schema_name')},
+             type as ${this.quoteIdentifier('data_type')}
+      FROM system.columns
+      WHERE ${conditionString}
+    `;
+    return query;
+  }
+
+  protected override getColumnNameForSchemaName() {
+    return 'database';
+  }
+
+  protected override getColumnNameForTableName() {
+    return 'table';
+  }
+
+  public override async getSchemas(): Promise<QuerySchemasResult[]> {
+    return [{ schema_name: this.config.queryOptions.database }];
+  }
+
   public async stream(
     query: string,
     values: unknown[],
@@ -376,5 +412,11 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
 
   public getTablesQuery(schemaName: string) {
     return this.query('SELECT name as table_name FROM system.tables WHERE database = ?', [schemaName]);
+  }
+
+  public capabilities(): DriverCapabilities {
+    return {
+      incrementalSchemaLoading: true,
+    };
   }
 }

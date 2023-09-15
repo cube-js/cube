@@ -21,6 +21,7 @@ import {
   DownloadTableData,
   IndexesSQL,
   DownloadTableMemoryData,
+  DriverCapabilities,
 } from '@cubejs-backend/base-driver';
 
 const GenericTypeToMySql: Record<GenericDataBaseType, string> = {
@@ -406,5 +407,11 @@ export class MySqlDriver extends BaseDriver implements DriverInterface {
     return MySqlToGenericType[columnType.toLowerCase()] ||
       MySqlToGenericType[columnType.toLowerCase().split('(')[0]] ||
       super.toGenericType(columnType);
+  }
+
+  public capabilities(): DriverCapabilities {
+    return {
+      incrementalSchemaLoading: true,
+    };
   }
 }

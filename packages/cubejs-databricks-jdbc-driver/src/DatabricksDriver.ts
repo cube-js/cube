@@ -19,7 +19,7 @@ import {
   SASProtocol,
   generateBlobSASQueryParameters,
 } from '@azure/storage-blob';
-import { DriverCapabilities, QueryOptions, UnloadOptions } from '@cubejs-backend/base-driver';
+import { DriverCapabilities, QueryColumnsResult, QueryOptions, QuerySchemasResult, QueryTablesResult, UnloadOptions } from '@cubejs-backend/base-driver';
 import {
   JDBCDriver,
   JDBCDriverConfiguration,
@@ -261,7 +261,10 @@ export class DatabricksDriver extends JDBCDriver {
    * @override
    */
   public capabilities(): DriverCapabilities {
-    return { unloadWithoutTempTable: true };
+    return {
+      unloadWithoutTempTable: true,
+      incrementalSchemaLoading: true
+    };
   }
 
   /**
@@ -455,6 +458,59 @@ export class DatabricksDriver extends JDBCDriver {
     );
 
     return tables.flat();
+  }
+
+  public override async getSchemas(): Promise<QuerySchemasResult[]> {
+    const databases = await this.query<ShowDatabasesRow>(
+      `SHOW DATABASES${
+        this.config?.catalog
+          ? ` IN ${this.quoteIdentifier(this.config.catalog)}`
+          : ''
+      }`,
+      [],
+    );
+
+    return databases.map(({ databaseName }) => ({
+      schema_name: databaseName,
+    }));
+  }
+
+  public override async getTablesForSpecificSchemas(schemas: QuerySchemasResult[]): Promise<QueryTablesResult[]> {
+    const tables = await Promise.all(
+      // eslint-disable-next-line camelcase
+      schemas.map(async ({ schema_name }) => this.query<ShowTableRow>(
+        `SHOW TABLES IN ${this.getSchemaFullName(schema_name)}`,
+        []
+      ))
+    );
+
+    return tables.flat().map(({ database, tableName }) => ({
+      table_name: tableName,
+      schema_name: database,
+    }));
+  }
+
+  public override async getColumnsForSpecificTables(tables: QueryTablesResult[]): Promise<QueryColumnsResult[]> {
+    const columns = await Promise.all(
+      // eslint-disable-next-line camelcase
+      tables.map(async ({ schema_name, table_name }) => {
+        const tableFullName = `${
+          this.config?.catalog
+            ? `${this.config.catalog}.`
+            : ''
+        // eslint-disable-next-line camelcase
+        }${schema_name}.${table_name}`;
+        const columnTypes = await this.tableColumnTypes(tableFullName);
+        return columnTypes.map(({ name, type }) => ({
+          column_name: name,
+          data_type: type,
+          table_name,
+          schema_name,
+        }));
+      })
+    );
+
+    return columns.flat();
   }
 
   /**

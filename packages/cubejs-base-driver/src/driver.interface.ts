@@ -115,6 +115,7 @@ export interface ExternalDriverCompatibilities {
 export interface DriverCapabilities extends ExternalDriverCompatibilities {
   unloadWithoutTempTable?: boolean,
   streamingSource?: boolean,
+  incrementalSchemaLoading?: boolean,
 }
 
 export type StreamOptions = {
@@ -166,6 +167,15 @@ export type DownloadQueryResultsResult = DownloadQueryResultsBase & (DownloadTab
 // eslint-disable-next-line camelcase
 export type TableQueryResult = { table_name?: string, TABLE_NAME?: string };
 
+// eslint-disable-next-line camelcase
+export type QuerySchemasResult = { schema_name: string };
+
+// eslint-disable-next-line camelcase
+export type QueryTablesResult = { schema_name: string, table_name: string };
+
+// eslint-disable-next-line camelcase
+export type QueryColumnsResult = { schema_name: string, table_name: string } & TableColumnQueryResult;
+
 export interface DriverInterface {
   createSchemaIfNotExists(schemaName: string): Promise<void>;
   uploadTableWithIndexes(
@@ -177,6 +187,10 @@ export interface DriverInterface {
   //
   tableColumnTypes: (table: string) => Promise<TableStructure>;
   queryColumnTypes: (sql: string, params?: unknown[]) => Promise<{ name: any; type: string; }[]>;
+  //
+  getSchemas: () => Promise<QuerySchemasResult[]>;
+  getTablesForSpecificSchemas: (schemas: QuerySchemasResult[]) => Promise<QueryTablesResult[]>;
+  getColumnsForSpecificTables: (tables: QueryTablesResult[]) => Promise<QueryColumnsResult[]>;
   // eslint-disable-next-line camelcase
   getTablesQuery: (schemaName: string) => Promise<TableQueryResult[]>;
   // Remove table from database

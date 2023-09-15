@@ -64,7 +64,7 @@ export function testQueries(type: string): void {
       try {
         const tables = Object
           .keys(fixtures.tables)
-          .map((key: string) => `${fixtures.tables[key]}${suffix}`);
+          .map((key: string) => `${fixtures.tables[key]}_${suffix}`);
         console.log(`Dropping ${tables.length} fixture tables`);
         for (const t of tables) {
           await driver.dropTable(t);

@@ -321,6 +321,12 @@ class MSSqlDriver extends BaseDriver {
   wrapQueryWithLimit(query) {
     query.query = `SELECT TOP ${query.limit} * FROM (${query.query}) AS t`;
   }
+
+  capabilities() {
+    return {
+      incrementalSchemaLoading: true,
+    };
+  }
 }
 
 module.exports = MSSqlDriver;

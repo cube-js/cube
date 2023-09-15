@@ -16,7 +16,7 @@ import {
   BaseDriver,
   DownloadQueryResultsOptions, DownloadTableMemoryData, DriverInterface,
   GenericDataBaseType, IndexesSQL, TableStructure, StreamOptions,
-  StreamTableDataWithTypes, QueryOptions, DownloadQueryResultsResult,
+  StreamTableDataWithTypes, QueryOptions, DownloadQueryResultsResult, DriverCapabilities,
 } from '@cubejs-backend/base-driver';
 import { QueryStream } from './QueryStream';
 
@@ -406,5 +406,11 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
 
   public fromGenericType(columnType: string) {
     return GenericTypeToPostgres[columnType] || super.fromGenericType(columnType);
+  }
+
+  public capabilities(): DriverCapabilities {
+    return {
+      incrementalSchemaLoading: true,
+    };
   }
 }
