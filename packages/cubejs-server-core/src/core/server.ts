@@ -559,7 +559,7 @@ export class CubejsServerCore {
     const orchestratorOptions =
       this.optsHandler.getOrchestratorInitializedOptions(
         context,
-        this.orchestratorOptions(context) || {},
+        (await this.orchestratorOptions(context)) || {},
       );
 
     const orchestratorApi = this.createOrchestratorApi(

@@ -286,6 +286,10 @@ impl CLRepr {
                 }
 
                 Self::Tuple(r)
+            } else if v.get_type().is_subclass_of::<PyFunction>()? {
+                let fun: Py<PyFunction> = v.downcast::<PyFunction>()?.into();
+
+                Self::PyFunction(fun)
             } else {
                 return Err(PyErr::new::<PyTypeError, _>(format!(
                     "Unable to represent {} type as CLR from Python",

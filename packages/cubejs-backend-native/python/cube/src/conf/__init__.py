@@ -40,6 +40,8 @@ class Configuration:
     cache_and_queue_driver: str
     allow_js_duplicate_props_in_schema: bool
     process_subscriptions_interval: int
+    http: Dict
+    jwt: Dict
     # Functions
     logger: Callable
     context_to_app_id: Union[str, Callable[[RequestContext], str]]
@@ -53,9 +55,10 @@ class Configuration:
     scheduled_refresh_contexts: Callable
     context_to_api_scopes: Callable
     repository_factory: Callable
-    schema_version: Callable[[RequestContext], str]
-    semantic_layer_sync: Callable
-    pre_aggregations_schema: Callable[[RequestContext], str]
+    schema_version: Union[str, Callable[[RequestContext], str]]
+    semantic_layer_sync: Union[Dict, Callable[[], Dict]]
+    pre_aggregations_schema: Union[Callable[[RequestContext], str]]
+    orchestrator_options: Union[Dict, Callable[[RequestContext], Dict]]
 
     def __init__(self):
         self.schema_path = None
@@ -67,6 +70,8 @@ class Configuration:
         self.cache_and_queue_driver = None
         self.allow_js_duplicate_props_in_schema = None
         self.process_subscriptions_interval = None
+        self.http = None
+        self.jwt = None
         # Functions
         self.logger = None
         self.context_to_app_id = None
@@ -84,6 +89,7 @@ class Configuration:
         self.schema_version = None
         self.semantic_layer_sync = None
         self.pre_aggregations_schema = None
+        self.orchestrator_options = None
 
     def set_schema_path(self, schema_path: str):
         self.schema_path = schema_path
@@ -148,14 +154,17 @@ class Configuration:
     def set_repository_factory(self, repository_factory: Callable):
         self.repository_factory = repository_factory
 
-    def set_schema_version(self, schema_version: Callable[[RequestContext], str]):
+    def set_schema_version(self, schema_version: Union[str, Callable[[RequestContext], str]]):
         self.schema_version = schema_version
 
-    def set_semantic_layer_sync(self, semantic_layer_sync: Callable):
+    def set_semantic_layer_sync(self, semantic_layer_sync: Union[Dict, Callable[[], Dict]]):
         self.semantic_layer_sync = semantic_layer_sync
 
-    def set_pre_aggregations_schema(self, pre_aggregations_schema: Callable[[RequestContext], str]):
+    def set_pre_aggregations_schema(self, pre_aggregations_schema: Union[str, Callable[[RequestContext], str]]):
         self.pre_aggregations_schema = pre_aggregations_schema
+
+    def set_orchestrator_options(self, orchestrator_options: Union[Dict, Callable[[RequestContext], Dict]]):
+        self.orchestrator_options = orchestrator_options
 
 
 settings = Configuration()
