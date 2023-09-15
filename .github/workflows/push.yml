@@ -507,11 +507,11 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: build
-          args: --manifest-path rust/cubestore/Cargo.toml -j 4
+          args: --manifest-path rust/cubestore/Cargo.toml -j 4 --release
       - name: Copy Cube Store
         run: |
           mkdir -p rust/cubestore/downloaded/latest/bin
-          cp rust/cubestore/target/debug/cubestored rust/cubestore/downloaded/latest/bin/cubestored
+          cp rust/cubestore/target/release/cubestored rust/cubestore/downloaded/latest/bin/cubestored
       - name: Run Integration smoke tests
         timeout-minutes: 30
         run: ./.github/actions/smoke.sh
