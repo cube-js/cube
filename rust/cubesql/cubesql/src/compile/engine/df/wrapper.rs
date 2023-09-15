@@ -13,8 +13,8 @@ use cubeclient::models::V1LoadRequestQuery;
 use datafusion::{
     error::{DataFusionError, Result},
     logical_plan::{
-        plan::Extension, replace_col, Column, DFSchema, DFSchemaRef, Expr, LogicalPlan,
-        UserDefinedLogicalNode,
+        plan::Extension, replace_col, replace_col_to_expr, Column, DFSchema, DFSchemaRef, Expr,
+        LogicalPlan, UserDefinedLogicalNode,
     },
     physical_plan::aggregates::AggregateFunction,
     scalar::ScalarValue,
@@ -405,10 +405,37 @@ impl CubeScanWrapperNode {
                                 ungrouped_scan_node.clone(),
                             )
                             .await?;
+                            // Sort node always comes on top and pushed down to select so we need to replace columns here by appropriate column definitions
+                            let order_replace_map = projection_expr
+                                .iter()
+                                .chain(group_expr.iter())
+                                .chain(aggr_expr.iter())
+                                .map(|e| {
+                                    Ok((
+                                        Column {
+                                            relation: alias.clone(),
+                                            name: expr_name(&e, &schema)?,
+                                        },
+                                        e.clone(),
+                                    ))
+                                })
+                                .collect::<Result<HashMap<_, _>>>()?;
+
                             let (order, mut sql) = Self::generate_column_expr(
                                 plan.clone(),
                                 schema.clone(),
-                                order_expr.clone(),
+                                order_expr
+                                    .iter()
+                                    .map(|o| {
+                                        replace_col_to_expr(
+                                            o.clone(),
+                                            &order_replace_map
+                                                .iter()
+                                                .map(|(k, v)| (k, v))
+                                                .collect(),
+                                        )
+                                    })
+                                    .collect::<Result<Vec<_>>>()?,
                                 sql,
                                 generator.clone(),
                                 &column_remapping,
