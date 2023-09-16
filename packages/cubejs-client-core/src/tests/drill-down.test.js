@@ -241,6 +241,16 @@ describe('drill down query', () => {
       timeDimensions: [],
     })
   );
+  const resultSet5 = new ResultSet(
+    loadResponse({
+      timeDimensions: [
+        {
+          dimension: 'Orders.ts',
+          granularity: 'week',
+        }
+      ]
+    })
+  );
 
   it('handles a query with a time dimension', () => {
     expect(
@@ -364,6 +374,29 @@ describe('drill down query', () => {
         },
       ],
       timezone: 'UTC'
+    });
+  });
+
+  it('snap date range to granularity if the date range is not defined in the time dimension', () => {
+    expect(
+      resultSet5.drillDown({ xValues: ['2020-08-01T00:00:00.000'] })
+    ).toEqual({
+      measures: [],
+      segments: [],
+      dimensions: ['Orders.id', 'Orders.title'],
+      filters: [
+        {
+          member: 'Orders.count',
+          operator: 'measureFilter',
+        },
+      ],
+      timeDimensions: [
+        {
+          dimension: 'Orders.ts',
+          dateRange: ['2020-07-27T00:00:00.000', '2020-08-02T23:59:59.999'],
+        },
+      ],
+      timezone: 'UTC',
     });
   });
 });
