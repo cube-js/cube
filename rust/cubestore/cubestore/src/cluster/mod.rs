@@ -14,7 +14,7 @@ pub mod ingestion;
 #[cfg(not(target_os = "windows"))]
 use crate::cluster::worker_pool::{worker_main, MessageProcessor, WorkerPool};
 #[cfg(not(target_os = "windows"))]
-use crate::cluster::worker_services::{DefaultServicesServerDef, DefaultServicesServerProcessor};
+use crate::cluster::worker_services::{DefaultWorkerServicesDef, DefaultServicesServerProcessor};
 
 use crate::ack_error;
 use crate::cluster::message::NetworkMessage;
@@ -196,8 +196,7 @@ pub struct ClusterImpl {
                     WorkerMessage,
                     (SchemaRef, Vec<SerializedRecordBatchStream>, usize),
                     WorkerProcessor,
-                    DefaultServicesServerDef,
-                    DefaultServicesServerProcessor,
+                    DefaultWorkerServicesDef,
                 >,
             >,
         >,
@@ -328,7 +327,7 @@ fn proc_handler() {
             WorkerMessage,
             (SchemaRef, Vec<SerializedRecordBatchStream>, usize),
             WorkerProcessor,
-            DefaultServicesServerDef,
+            DefaultWorkerServicesDef,
         >,
     );
 }

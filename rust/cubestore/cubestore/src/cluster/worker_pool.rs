@@ -24,22 +24,20 @@ use crate::util::respawn::respawn;
 use crate::CubeError;
 use datafusion::cube_ext;
 use datafusion::cube_ext::catch_unwind::async_try_with_catch_unwind;
-use crate::cluster::worker_services::{ServicesServerDef, ServicesServerProcessor, ServicesServer};
+use crate::cluster::worker_services::{ServicesServerDef, ServicesServerProcessor, ServicesServer, WorkerServicesDef, WorkerProcessing};
 
 pub struct WorkerPool<
     T: Debug + Serialize + DeserializeOwned + Sync + Send + 'static,
     R: Serialize + DeserializeOwned + Sync + Send + 'static,
     P: MessageProcessor<T, R> + Sync + Send + 'static,
-    S: ServicesServerDef + Debug + Sync + Send + 'static,
-    SP: ServicesServerProcessor<S> + Sync + Send + 'static,
+    S: WorkerServicesDef + Sync + Send + 'static,
 
 > {
     queue: Arc<unlimited::Queue<Message<T, R>>>,
     stopped_tx: watch::Sender<bool>,
-    workers: Vec<Arc<WorkerProcess<T, R, P, S, SP>>>,
+    workers: Vec<Arc<WorkerProcess<T, R, P, S>>>,
     processor: PhantomData<P>,
-    services_def: PhantomData<S>,
-    services_processor: Arc<SP>
+    services_processor: Arc<S::Processor>
 }
 
 pub struct Message<
@@ -73,12 +71,11 @@ impl<
         T: Debug + Serialize + DeserializeOwned + Sync + Send + 'static,
         R: Serialize + DeserializeOwned + Sync + Send + 'static,
         P: MessageProcessor<T, R> + Sync + Send + 'static,
-        S: ServicesServerDef + Sync + Debug + Send + 'static,
-        SP: ServicesServerProcessor<S> + Sync + Send + 'static,
-    > WorkerPool<T, R, P, S, SP>
+        S: WorkerServicesDef + Sync + Send + 'static,
+    > WorkerPool<T, R, P, S>
 {
     pub fn new(
-        services_processor: Arc<SP>,
+        services_processor: Arc<S::Processor>,
         num: usize,
         timeout: Duration,
         name_prefix: &str,
@@ -90,7 +87,7 @@ impl<
         let mut workers = Vec::new();
 
         for i in 1..=num {
-            let process = Arc::new(WorkerProcess::<T, R, P, S, SP>::new(
+            let process = Arc::new(WorkerProcess::<T, R, P, S>::new(
                 services_processor.clone(),
                 format!("{}{}", name_prefix, i),
                 envs.clone(),
@@ -106,7 +103,6 @@ impl<
             queue,
             workers,
             processor: PhantomData,
-            services_def: PhantomData,
             services_processor,
         }
     }
@@ -170,8 +166,7 @@ pub struct WorkerProcess<
     T: Debug + Serialize + DeserializeOwned + Sync + Send + 'static,
     R: Serialize + DeserializeOwned + Sync + Send + 'static,
     P: MessageProcessor<T, R> + Sync + Send + 'static,
-    S: ServicesServerDef + Sync + Debug + Send + 'static,
-    SP: ServicesServerProcessor<S> + Sync + Send + 'static,
+    S: WorkerServicesDef + Sync + Send + 'static,
 > {
     name: String,
     envs: Vec<(String, String)>,
@@ -180,21 +175,19 @@ pub struct WorkerProcess<
     processor: PhantomData<P>,
     stopped_rx: RwLock<watch::Receiver<bool>>,
     finished_notify: Arc<Notify>,
-    services_def: PhantomData<S>,
-    services_processor: Arc<SP>,
-    services_server: Mutex<Option<ServicesServer<S, SP>>>,
+    services_processor: Arc<S::Processor>,
+    services_server: Mutex<Option<S::Server>>,
 }
 
 impl<
         T: Debug + Serialize + DeserializeOwned + Sync + Send + 'static,
         R: Serialize + DeserializeOwned + Sync + Send + 'static,
         P: MessageProcessor<T, R> + Sync + Send + 'static,
-        S: ServicesServerDef + Debug + Sync + Send + 'static,
-        SP: ServicesServerProcessor<S> + Sync + Send + 'static,
-    > WorkerProcess<T, R, P, S, SP>
+        S: WorkerServicesDef + Sync + Send + 'static,
+    > WorkerProcess<T, R, P, S>
 {
     fn new(
-        services_processor: Arc<SP>,
+        services_processor: Arc<S::Processor>,
         name: String,
         envs: Vec<(String, String)>,
         queue: Arc<unlimited::Queue<Message<T, R>>>,
@@ -211,7 +204,6 @@ impl<
             finished_notify: Arc::new(Notify::new()),
             services_server: Mutex::new(None),
             processor: PhantomData,
-            services_def: PhantomData,
         }
     }
 
@@ -356,7 +348,7 @@ impl<
                 args: args_rx,
                 results: res_tx,
                 processor: PhantomData::<P>::default(),
-                services_def: PhantomData::<S>::default(),
+                worker_services_def: PhantomData::<S>::default(),
                 services_sender: service_request_tx,
                 services_reciever: service_response_rx,
             },
@@ -364,19 +356,19 @@ impl<
             &envs,
         )?;
 
-        //*self.services_server.lock().await = Some(ServicesServer::start(service_request_rx, service_response_tx, self.services_processor.clone()));
+        *self.services_server.lock().await = Some(ServicesServer::start(service_request_rx, service_response_tx, self.services_processor.clone()));
         Ok((args_tx, res_rx, handle))
     }
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct WorkerProcessArgs<T, R, P: ?Sized, S: ServicesServerDef> {
+pub struct WorkerProcessArgs<T, R, P: ?Sized, S: WorkerServicesDef> {
     args: IpcReceiver<T>,
     results: IpcSender<Result<R, CubeError>>,
     processor: PhantomData<P>,
-    services_def: PhantomData<S>,
-    services_sender: IpcSender<S::Request>,
-    services_reciever: IpcReceiver<S::Response>,
+    worker_services_def: PhantomData<S>,
+    services_sender: IpcSender<<S::Server as ServicesServer<S::Processor>>::IpcRequest>,
+    services_reciever: IpcReceiver<<S::Server as ServicesServer<S::Processor>>::IpcResponse>,
 }
 
 pub fn worker_main<T, R, P, S>(a: WorkerProcessArgs<T, R, P, S>) -> i32
@@ -384,7 +376,7 @@ where
     T: Debug + Serialize + DeserializeOwned + Sync + Send + 'static,
     R: Serialize + DeserializeOwned + Sync + Send + 'static,
     P: MessageProcessor<T, R>,
-    S: ServicesServerDef
+    S: WorkerServicesDef + Sync + Send + 'static,
 {
     let (rx, tx) = (a.args, a.results);
     let mut tokio_builder = Builder::new_multi_thread();
@@ -397,6 +389,7 @@ where
     tokio_builder.thread_stack_size(stack_size);
     let runtime = tokio_builder.build().unwrap();
     worker_setup(&runtime);
+    println!("!!!!!");
     runtime.block_on(async move {
         let config = match P::configure().await {
             Err(e) => {
@@ -479,14 +472,14 @@ mod tests {
     use crate::CubeError;
     use datafusion::cube_ext;
 
-    use crate::cluster::worker_services::{ DefaultServicesServerDef, ServicesServerDef, DefaultServicesServerProcessor, ServicesServerProcessor};
+    use crate::cluster::worker_services::{ DefaultServicesServerProcessor, ServicesServerProcessor, DefaultWorkerServicesDef, WorkerServicesDef, ServicesServerImpl};
 
-    type TestPool = WorkerPool::<Message, Response, Processor, DefaultServicesServerDef, DefaultServicesServerProcessor>;
+    type TestPool = WorkerPool::<Message, Response, Processor, DefaultWorkerServicesDef>;
 
     #[ctor::ctor]
     fn test_support_init() {
         respawn::replace_cmd_args_in_tests();
-        respawn::register_handler(worker_main::<Message, Response, Processor>)
+        respawn::register_handler(worker_main::<Message, Response, Processor, DefaultWorkerServicesDef>)
     }
 
     #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
@@ -647,16 +640,9 @@ mod tests {
         Ok(())
     }
 
-    type TestServicePool = WorkerPool::<Message, Response, Processor, TestServicesServerDef, TestServicesServerProcessor>;
+    type TestServicePool = WorkerPool::<Message, Response, Processor, TestWorkerServicesDef>;
 
     #[derive(Debug)]
-    struct TestServicesServerDef;
-
-    impl ServicesServerDef for TestServicesServerDef {
-        type Request = i64;
-        type Response = bool;
-    }
-
     pub struct TestServicesServerProcessor;
 
     impl TestServicesServerProcessor {
@@ -665,8 +651,23 @@ mod tests {
         }
     }
 
+    pub struct TestWorkerServicesDef;
+
+    impl WorkerServicesDef for TestWorkerServicesDef {
+        type Processor = TestServicesServerProcessor;
+        type Server = ServicesServerImpl<Self::Processor>;
+    }
+
+    #[ctor::ctor]
+    fn test_services_support_init() {
+        respawn::replace_cmd_args_in_tests();
+        respawn::register_handler(worker_main::<Message, Response, Processor, TestWorkerServicesDef>)
+    }
+
     #[async_trait]
-    impl ServicesServerProcessor<TestServicesServerDef> for TestServicesServerProcessor {
+    impl ServicesServerProcessor for TestServicesServerProcessor {
+        type Request = i64;
+        type Response = bool;
         async fn process(&self, request: i64) -> bool {
             request % 2 == 0
         }
@@ -691,6 +692,7 @@ mod tests {
                 pool.process(Message::Delay(100)).await.unwrap(),
                 Response::Foo(100)
             );
+            println!("GGGGG");
             pool.stop_workers().await.unwrap();
         });
     }
