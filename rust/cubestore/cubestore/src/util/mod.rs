@@ -13,6 +13,7 @@ pub mod metrics;
 pub mod respawn;
 pub mod strings;
 pub mod time_span;
+pub mod cancellation_token_guard;
 
 pub use malloc_trim_loop::spawn_malloc_trim_loop;
 

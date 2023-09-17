@@ -4,12 +4,17 @@ pub mod transport;
 #[cfg(not(target_os = "windows"))]
 pub mod worker_pool;
 
+#[cfg(not(target_os = "windows"))]
+pub mod worker_services;
+
 pub mod rate_limiter;
 
 pub mod ingestion;
 
 #[cfg(not(target_os = "windows"))]
 use crate::cluster::worker_pool::{worker_main, MessageProcessor, WorkerPool};
+#[cfg(not(target_os = "windows"))]
+use crate::cluster::worker_services::{DefaultServicesServerDef, DefaultServicesServerProcessor};
 
 use crate::ack_error;
 use crate::cluster::message::NetworkMessage;
@@ -191,6 +196,8 @@ pub struct ClusterImpl {
                     WorkerMessage,
                     (SchemaRef, Vec<SerializedRecordBatchStream>, usize),
                     WorkerProcessor,
+                    DefaultServicesServerDef,
+                    DefaultServicesServerProcessor,
                 >,
             >,
         >,
@@ -321,6 +328,7 @@ fn proc_handler() {
             WorkerMessage,
             (SchemaRef, Vec<SerializedRecordBatchStream>, usize),
             WorkerProcessor,
+            DefaultServicesServerDef,
         >,
     );
 }
@@ -870,6 +878,7 @@ impl ClusterImpl {
         {
             let mut pool = self.select_process_pool.write().await;
             let arc = Arc::new(WorkerPool::new(
+                DefaultServicesServerProcessor::new(),
                 self.config_obj.select_worker_pool_size(),
                 Duration::from_secs(self.config_obj.query_timeout()),
                 "sel",
