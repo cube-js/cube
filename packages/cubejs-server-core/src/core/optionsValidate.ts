@@ -37,7 +37,7 @@ const corsOptions = Joi.object().strict(true).keys({
   credentials: Joi.bool(),
   maxAge: Joi.number(),
   preflightContinue: Joi.bool(),
-  optionsSuccessStatus: Joi.bool(),
+  optionsSuccessStatus: Joi.number(),
 });
 
 const dbTypes = Joi.alternatives().try(
