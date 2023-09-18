@@ -287,8 +287,9 @@ export class YamlCompiler {
       if (memberType === 'preAggregation' && indexes) {
         indexes = this.yamlArrayToObj(indexes || [], `${memberType}.index`, errorsReport);
       }
+
       if (!name) {
-        errorsReport.error(`name isn't defined for ${memberType}: ${YAML.stringify(rest)}`);
+        errorsReport.error(`name isn't defined for ${memberType}: ${JSON.stringify(rest)}`);
         return {};
       } else if (indexes) {
         return { [name]: { indexes, ...rest } };
