@@ -3,6 +3,26 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.58](https://github.com/cube-js/cube/compare/v0.33.57...v0.33.58) (2023-09-18)
+
+
+### Bug Fixes
+
+* **cubejs-client/core:** drillDown - check dateRange before destructuring ([#7138](https://github.com/cube-js/cube/issues/7138)) ([21a7cc2](https://github.com/cube-js/cube/commit/21a7cc2e852366ca224bf84e968c90c30e5e2332))
+* **docs:** layout styles ([f5e5372](https://github.com/cube-js/cube/commit/f5e537290b0367a3cd8acd0f4570766193592e93))
+* **schema-compiler:** YAML - crash on empty string/null, fix [#7126](https://github.com/cube-js/cube/issues/7126) ([#7141](https://github.com/cube-js/cube/issues/7141)) ([73f5ca7](https://github.com/cube-js/cube/commit/73f5ca74a6b6d7ae66b5576c6c4446fda6b1a5de))
+* **schema-compiler:** YAML - crash on unammed measure/dimension/join, refs [#7033](https://github.com/cube-js/cube/issues/7033) ([#7142](https://github.com/cube-js/cube/issues/7142)) ([5c6a065](https://github.com/cube-js/cube/commit/5c6a065b5755d9a991bc89beeb15243b119511cb))
+* **server-core:** Validation - cors.optionsSuccessStatus should be a number ([#7144](https://github.com/cube-js/cube/issues/7144)) ([1d58d4f](https://github.com/cube-js/cube/commit/1d58d4fe995299dfb2139a821538446ecb63eb2b))
+
+
+### Features
+
+* new methods for step-by-step db schema fetching ([#7058](https://github.com/cube-js/cube/issues/7058)) ([a362c20](https://github.com/cube-js/cube/commit/a362c2042d4158ae735e9afe0cfeae15c331dc9d))
+
+
+
+
+
 ## [0.33.57](https://github.com/cube-js/cube/compare/v0.33.56...v0.33.57) (2023-09-15)
 
 
