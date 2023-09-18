@@ -89,4 +89,25 @@ describe('Yaml Schema Testing', () => {
       expect(e.message).toContain('Unexpected input during yaml transpiling: null');
     }
   });
+
+  it('unammed measure', async () => {
+    const { compiler } = prepareYamlCompiler(
+      `cubes:
+  - name: Users
+    sql: SELECT * FROM e2e.users
+    dimensions:
+      - sql: id
+        type: number
+        primaryKey: true
+      `
+    );
+
+    try {
+      await compiler.compile();
+
+      throw new Error('compile must return an error');
+    } catch (e: any) {
+      expect(e.message).toContain('name isn\'t defined for dimension: ');
+    }
+  });
 });
