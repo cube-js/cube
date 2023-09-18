@@ -12,9 +12,11 @@ pub mod rate_limiter;
 pub mod ingestion;
 
 #[cfg(not(target_os = "windows"))]
-use crate::cluster::worker_pool::{worker_main, MessageProcessor, WorkerPool};
+use crate::cluster::worker_pool::{worker_main, WorkerPool};
 #[cfg(not(target_os = "windows"))]
-use crate::cluster::worker_services::{DefaultWorkerServicesDef, DefaultServicesServerProcessor};
+use crate::cluster::worker_services::{
+    DefaultServicesServerProcessor, DefaultWorkerServicesDef, WorkerProcessing,
+};
 
 use crate::ack_error;
 use crate::cluster::message::NetworkMessage;
@@ -72,6 +74,8 @@ use tokio::sync::{oneshot, watch, Notify, RwLock};
 use tokio::time::timeout;
 use tokio_util::sync::CancellationToken;
 use tracing::{instrument, Instrument};
+
+use self::worker_services::WorkerServicesDef;
 
 #[automock]
 #[async_trait]
@@ -189,18 +193,7 @@ pub struct ClusterImpl {
     long_running_job_notify: Arc<Notify>,
     meta_store_sender: Sender<MetaStoreEvent>,
     #[cfg(not(target_os = "windows"))]
-    select_process_pool: RwLock<
-        Option<
-            Arc<
-                WorkerPool<
-                    WorkerMessage,
-                    (SchemaRef, Vec<SerializedRecordBatchStream>, usize),
-                    WorkerProcessor,
-                    DefaultWorkerServicesDef,
-                >,
-            >,
-        >,
-    >,
+    select_process_pool: RwLock<Option<Arc<WorkerPool<WorkerProcessor>>>>,
     config_obj: Arc<dyn ConfigObj>,
     query_executor: Arc<dyn QueryExecutor>,
     stop_token: CancellationToken,
@@ -226,12 +219,15 @@ pub struct WorkerProcessor;
 
 #[cfg(not(target_os = "windows"))]
 #[async_trait]
-impl MessageProcessor<WorkerMessage, (SchemaRef, Vec<SerializedRecordBatchStream>, usize)>
-    for WorkerProcessor
-{
+impl WorkerProcessing for WorkerProcessor {
+    type Request = WorkerMessage;
+    type Response = (SchemaRef, Vec<SerializedRecordBatchStream>, usize);
     type Config = Config;
+    type Services = DefaultWorkerServicesDef;
 
-    async fn configure() -> Result<Self::Config, CubeError> {
+    async fn configure(
+        _services_client: Arc<<DefaultWorkerServicesDef as WorkerServicesDef>::Client>,
+    ) -> Result<Self::Config, CubeError> {
         let custom_fn = SELECT_WORKER_CONFIGURE_FN.read().unwrap().clone();
         let config = if let Some(func) = custom_fn.as_ref() {
             func().await
@@ -322,14 +318,7 @@ impl MessageProcessor<WorkerMessage, (SchemaRef, Vec<SerializedRecordBatchStream
 #[cfg(not(target_os = "windows"))]
 #[ctor::ctor]
 fn proc_handler() {
-    crate::util::respawn::register_handler(
-        worker_main::<
-            WorkerMessage,
-            (SchemaRef, Vec<SerializedRecordBatchStream>, usize),
-            WorkerProcessor,
-            DefaultWorkerServicesDef,
-        >,
-    );
+    crate::util::respawn::register_handler(worker_main::<WorkerProcessor>);
 }
 
 lazy_static! {

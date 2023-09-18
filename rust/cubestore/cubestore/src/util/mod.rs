@@ -1,5 +1,6 @@
 pub mod aborting_join_handle;
 pub mod batch_memory;
+pub mod cancellation_token_guard;
 pub mod decimal;
 pub mod error;
 pub mod int96;
@@ -13,7 +14,6 @@ pub mod metrics;
 pub mod respawn;
 pub mod strings;
 pub mod time_span;
-pub mod cancellation_token_guard;
 
 pub use malloc_trim_loop::spawn_malloc_trim_loop;
 
