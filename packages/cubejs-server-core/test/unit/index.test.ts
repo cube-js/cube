@@ -284,6 +284,16 @@ describe('index.test', () => {
         subject: 'http://localhost:4000',
         claimsNamespace: 'http://localhost:4000',
       },
+      http: {
+        cors: {
+          origin: '*',
+          methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+          preflightContinue: false,
+          optionsSuccessStatus: 204,
+          maxAge: 86400,
+          credentials: true,
+        }
+      },
       dashboardAppPath: 'string',
       dashboardAppPort: 4444,
       livePreview: true,
