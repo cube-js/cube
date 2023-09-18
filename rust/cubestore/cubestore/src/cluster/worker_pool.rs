@@ -5,7 +5,6 @@ use std::process::{Child, ExitStatus};
 use std::sync::Arc;
 use std::time::Duration;
 
-use async_trait::async_trait;
 use deadqueue::unlimited;
 use futures::future::join_all;
 use ipc_channel::ipc;
@@ -21,7 +20,7 @@ use tracing_futures::WithSubscriber;
 
 use crate::config::{env_parse, Config, WorkerServices};
 use crate::cluster::worker_services::{
-    ServicesClient, ServicesServer, ServicesServerProcessor, WorkerProcessing, WorkerServicesDef,
+    ServicesClient, ServicesServer, WorkerProcessing, WorkerServicesDef,
 };
 use crate::util::respawn::respawn;
 use crate::CubeError;

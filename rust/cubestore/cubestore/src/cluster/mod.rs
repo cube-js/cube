@@ -606,7 +606,7 @@ impl Cluster for ClusterImpl {
             NetworkMessage::WarmupDownload(remote_path, expected_file_size) => {
                 let res = self
                     .remote_fs
-                    .download_file(&remote_path, expected_file_size)
+                    .download_file(remote_path, expected_file_size)
                     .await;
                 NetworkMessage::WarmupDownloadResult(res.map(|_| ()))
             }
@@ -1300,7 +1300,7 @@ impl ClusterImpl {
                 async move {
                     let res = self
                         .remote_fs
-                        .download_file(remote, file_size.clone())
+                        .download_file(remote.clone(), file_size.clone())
                         .await;
                     deactivate_table_on_corrupt_data(
                         meta_store,
@@ -1562,7 +1562,7 @@ impl ClusterImpl {
                 //       so they are not errors most of the time.
                 ack_error!(
                     self.remote_fs
-                        .download_file(&file, p.get_row().file_size())
+                        .download_file(file, p.get_row().file_size())
                         .await
                 );
             }
@@ -1577,7 +1577,7 @@ impl ClusterImpl {
                 let result = self
                     .remote_fs
                     .download_file(
-                        &chunk_file_name(c.get_id(), c.get_row().suffix()),
+                        chunk_file_name(c.get_id(), c.get_row().suffix()),
                         c.get_row().file_size(),
                     )
                     .await;

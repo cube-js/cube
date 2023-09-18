@@ -292,7 +292,7 @@ impl WALDataStore for WALStore {
             .create_wal(table.get_id(), data.len())
             .await?;
         let remote_path = WALStore::wal_remote_path(wal.get_id()).clone();
-        let local_file = self.remote_fs.local_file(&remote_path).await?;
+        let local_file = self.remote_fs.local_file(remote_path).await?;
         cube_ext::spawn_blocking(move || -> Result<(), CubeError> {
             save(local_file, data)?;
             Ok(())
@@ -315,8 +315,8 @@ impl WALDataStore for WALStore {
             )));
         }
         let remote_path = WALStore::wal_remote_path(wal_id);
-        self.remote_fs.download_file(&remote_path, None).await?;
-        let local_file = self.remote_fs.local_file(&remote_path).await?;
+        self.remote_fs.download_file(remote_path.clone(), None).await?;
+        let local_file = self.remote_fs.local_file(remote_path.clone()).await?;
         Ok(
             cube_ext::spawn_blocking(move || -> Result<DataFrame, CubeError> {
                 Ok(load::<DataFrame>(local_file)?)
@@ -735,7 +735,7 @@ impl ChunkStore {
         let file_size = chunk.get_row().file_size();
         let chunk_id = chunk.get_id();
         let remote_path = ChunkStore::chunk_file_name(chunk);
-        let result = self.remote_fs.download_file(&remote_path, file_size).await;
+        let result = self.remote_fs.download_file(remote_path.clone(), file_size).await;
 
         deactivate_table_on_corrupt_data(
             self.meta_store.clone(),
@@ -746,7 +746,7 @@ impl ChunkStore {
         .await;
 
         Ok((
-            self.remote_fs.local_file(&remote_path).await?,
+            self.remote_fs.local_file(remote_path.clone()).await?,
             index.into_row(),
         ))
     }
@@ -1333,7 +1333,7 @@ impl ChunkStore {
         } else {
             trace!("New chunk allocated during partitioning: {:?}", chunk);
             let remote_path = ChunkStore::chunk_file_name(chunk.clone()).clone();
-            let local_file = self.remote_fs.temp_upload_path(&remote_path).await?;
+            let local_file = self.remote_fs.temp_upload_path(remote_path.clone()).await?;
             let local_file = scopeguard::guard(local_file, ensure_temp_file_is_dropped);
             let local_file_copy = local_file.clone();
             cube_ext::spawn_blocking(move || -> Result<(), CubeError> {
@@ -1345,7 +1345,7 @@ impl ChunkStore {
 
             let fs = self.remote_fs.clone();
             Ok(cube_ext::spawn(async move {
-                let file_size = fs.upload_file(&local_file, &remote_path).await?;
+                let file_size = fs.upload_file(local_file.to_string(), remote_path.clone()).await?;
                 Ok((chunk, Some(file_size)))
             }))
         }

@@ -646,7 +646,7 @@ impl ImportServiceImpl {
     async fn download_temp_file(&self, location: &str) -> Result<File, CubeError> {
         let to_download = LocationHelper::temp_uploads_path(location);
         // TODO check file size
-        let local_file = self.remote_fs.download_file(&to_download, None).await?;
+        let local_file = self.remote_fs.download_file(to_download, None).await?;
         Ok(File::open(local_file.clone())
             .await
             .map_err(|e| CubeError::internal(format!("Open temp_file {}: {}", local_file, e)))?)
@@ -656,7 +656,7 @@ impl ImportServiceImpl {
         // TODO There also should be a process which collects orphaned uploads due to failed imports
         if location.starts_with("temp://") {
             self.remote_fs
-                .delete_file(&LocationHelper::temp_uploads_path(location))
+                .delete_file(LocationHelper::temp_uploads_path(location))
                 .await?;
         }
         Ok(())

@@ -92,7 +92,7 @@ impl BaseRocksStoreFs {
     }
 
     pub async fn make_local_metastore_dir(&self) -> Result<String, CubeError> {
-        let meta_store_path = self.remote_fs.local_file(&self.name).await?;
+        let meta_store_path = self.remote_fs.local_file(self.name.to_string()).await?;
         fs::create_dir_all(meta_store_path.to_string()).await?;
         Ok(meta_store_path)
     }
@@ -119,9 +119,9 @@ impl BaseRocksStoreFs {
                 .map(|f| {
                     let remote_fs = self.remote_fs.clone();
                     return async move {
-                        let local = remote_fs.local_file(&f).await?;
+                        let local = remote_fs.local_file(f.clone()).await?;
                         // TODO persist file size
-                        Ok::<_, CubeError>((f.clone(), remote_fs.upload_file(&local, &f).await?))
+                        Ok::<_, CubeError>((f.clone(), remote_fs.upload_file(local, f.clone()).await?))
                     };
                 })
                 .collect::<Vec<_>>(),
@@ -133,7 +133,7 @@ impl BaseRocksStoreFs {
         Ok(upload_results)
     }
     pub async fn delete_old_snapshots(&self) -> Result<Vec<String>, CubeError> {
-        let existing_metastore_files = self.remote_fs.list(&format!("{}-", self.name)).await?;
+        let existing_metastore_files = self.remote_fs.list(format!("{}-", self.name)).await?;
         let candidates = existing_metastore_files
             .iter()
             .filter_map(|existing| {
@@ -190,7 +190,7 @@ impl BaseRocksStoreFs {
             for v in join_all(
                 to_delete
                     .iter()
-                    .map(|f| self.remote_fs.delete_file(&f))
+                    .map(|f| self.remote_fs.delete_file(f.to_string()))
                     .collect::<Vec<_>>(),
             )
             .await
@@ -208,7 +208,7 @@ impl BaseRocksStoreFs {
     pub async fn is_remote_metadata_exists(&self) -> Result<bool, CubeError> {
         let res = self
             .remote_fs
-            .list(&format!("{}-current", self.name))
+            .list(format!("{}-current", self.name))
             .await?
             .len()
             > 0;
@@ -218,7 +218,7 @@ impl BaseRocksStoreFs {
     pub async fn load_current_snapshot_id(&self) -> Result<Option<u128>, CubeError> {
         if self
             .remote_fs
-            .list(&format!("{}-current", self.name))
+            .list(format!("{}-current", self.name))
             .await?
             .len()
             == 0
@@ -230,13 +230,13 @@ impl BaseRocksStoreFs {
 
         let current_metastore_file = self
             .remote_fs
-            .local_file(&format!("{}-current", self.name))
+            .local_file(format!("{}-current", self.name))
             .await?;
         if fs::metadata(current_metastore_file.as_str()).await.is_ok() {
             fs::remove_file(current_metastore_file.as_str()).await?;
         }
         self.remote_fs
-            .download_file(&format!("{}-current", self.name), None)
+            .download_file(format!("{}-current", self.name), None)
             .await?;
         self.parse_local_current_snapshot_id().await
     }
@@ -244,7 +244,7 @@ impl BaseRocksStoreFs {
     pub async fn parse_local_current_snapshot_id(&self) -> Result<Option<u128>, CubeError> {
         let current_metastore_file = self
             .remote_fs
-            .local_file(&format!("{}-current", self.name))
+            .local_file(format!("{}-current", self.name))
             .await?;
 
         let re = Regex::new(&format!(r"^{}-(\d+)", &self.name)).unwrap();
@@ -268,7 +268,7 @@ impl BaseRocksStoreFs {
     pub async fn files_to_load(&self, snapshot: u128) -> Result<Vec<(String, u64)>, CubeError> {
         let res = self
             .remote_fs
-            .list_with_metadata(&format!("{}-{}", self.name, snapshot))
+            .list_with_metadata(format!("{}-{}", self.name, snapshot))
             .await?
             .into_iter()
             .map(|f| (f.remote_path, f.file_size))
@@ -307,8 +307,8 @@ impl MetaStoreFs for BaseRocksStoreFs {
                     let meta_store_path = self.make_local_metastore_dir().await?;
                     for (file, _) in to_load.iter() {
                         // TODO check file size
-                        self.remote_fs.download_file(file, None).await?;
-                        let local = self.remote_fs.local_file(file).await?;
+                        self.remote_fs.download_file(file.clone(), None).await?;
+                        let local = self.remote_fs.local_file(file.clone()).await?;
                         let path = Path::new(&local);
                         fs::copy(
                             path,
@@ -326,7 +326,7 @@ impl MetaStoreFs for BaseRocksStoreFs {
                         .await;
                 }
             } else {
-                trace!("Can't find {}-current in {:?}", self.name, self.remote_fs);
+                //TODO FIX IT (Debug for ext service) trace!("Can't find {}-current in {:?}", self.name, self.remote_fs);
             }
             info!("Creating {} from scratch in {}", self.name, path);
         } else {
@@ -348,10 +348,10 @@ impl MetaStoreFs for BaseRocksStoreFs {
         serializer: &WriteBatchContainer,
     ) -> Result<u64, CubeError> {
         let log_name = format!("{}/{}.flex", dir, seq_number);
-        let file_name = self.remote_fs.local_file(&log_name).await?;
+        let file_name = self.remote_fs.local_file(log_name.clone()).await?;
         serializer.write_to_file(&file_name).await?;
         // TODO persist file size
-        self.remote_fs.upload_file(&file_name, &log_name).await
+        self.remote_fs.upload_file(file_name, log_name).await
     }
 
     async fn upload_checkpoint(
@@ -375,7 +375,7 @@ impl MetaStoreFs for BaseRocksStoreFs {
     ) -> Result<(), CubeError> {
         let logs_to_batch = self
             .remote_fs
-            .list(&format!("{}-{}-logs", self.name, snapshot))
+            .list(format!("{}-{}-logs", self.name, snapshot))
             .await?;
         let mut logs_to_batch_to_seq = logs_to_batch
             .into_iter()
@@ -393,7 +393,7 @@ impl MetaStoreFs for BaseRocksStoreFs {
         logs_to_batch_to_seq.sort_unstable_by_key(|(_, seq)| *seq);
 
         for (log_file, _) in logs_to_batch_to_seq.iter() {
-            let path_to_log = self.remote_fs.local_file(log_file).await?;
+            let path_to_log = self.remote_fs.local_file(log_file.clone()).await?;
             let batch = WriteBatchContainer::read_from_file(&path_to_log).await;
             if let Ok(batch) = batch {
                 let db = rocks_store.db.clone();
@@ -413,7 +413,7 @@ impl MetaStoreFs for BaseRocksStoreFs {
         let remote_fs = self.remote_fs();
 
         let re = Regex::new(&*format!(r"^{}-(\d+)/", self.get_name())).unwrap();
-        let stores = remote_fs.list(&format!("{}-", self.get_name())).await?;
+        let stores = remote_fs.list(format!("{}-", self.get_name())).await?;
         let mut snapshots = BTreeSet::new();
         for store in stores.iter() {
             let parse_result = re
@@ -450,8 +450,8 @@ impl MetaStoreFs for BaseRocksStoreFs {
 
         self.remote_fs
             .upload_file(
-                file_path.keep()?.to_str().unwrap(),
-                &format!("{}-current", self.name),
+                file_path.keep()?.to_str().unwrap().to_string(),
+                format!("{}-current", self.name),
             )
             .await?;
         Ok(())

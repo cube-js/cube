@@ -1652,10 +1652,10 @@ impl Config {
         let remote_fs = self.remote_fs().await.unwrap();
         let _ = fs::remove_dir_all(store_path.clone());
         if clean_remote {
-            let remote_files = remote_fs.list("").await.unwrap();
+            let remote_files = remote_fs.list("".to_string()).await.unwrap();
             for file in remote_files {
                 debug!("Cleaning {}", file);
-                let _ = remote_fs.delete_file(file.as_str()).await.unwrap();
+                let _ = remote_fs.delete_file(file).await.unwrap();
             }
         }
         {
@@ -1679,9 +1679,9 @@ impl Config {
         let _ = DB::destroy(&Options::default(), self.cache_store_path());
         let _ = fs::remove_dir_all(store_path.clone());
         if clean_remote {
-            let remote_files = remote_fs.list("").await.unwrap();
+            let remote_files = remote_fs.list("".to_string()).await.unwrap();
             for file in remote_files {
-                let _ = remote_fs.delete_file(file.as_str()).await;
+                let _ = remote_fs.delete_file(file).await;
             }
         }
     }
