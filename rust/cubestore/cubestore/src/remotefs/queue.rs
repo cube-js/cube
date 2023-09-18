@@ -1,6 +1,6 @@
 use crate::config::ConfigObj;
 use crate::di_service;
-use crate::remotefs::{RemoteFile, RemoteFs, CommonRemoteFsUtils};
+use crate::remotefs::{CommonRemoteFsUtils, RemoteFile, RemoteFs};
 use crate::util::lock::acquire_lock;
 use crate::CubeError;
 use async_trait::async_trait;
@@ -33,9 +33,9 @@ pub struct QueueRemoteFs {
 impl Debug for QueueRemoteFs {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("QueueRemoteFs").finish()
-            //TODO FIX IT
-            /* .field("remote_fs", &self.remote_fs)
-            .finish() */
+        //TODO FIX IT
+        /* .field("remote_fs", &self.remote_fs)
+        .finish() */
     }
 }
 
@@ -187,7 +187,6 @@ impl QueueRemoteFs {
 
 #[async_trait]
 impl RemoteFs for QueueRemoteFs {
-
     async fn temp_upload_path(&self, remote_path: String) -> Result<String, CubeError> {
         CommonRemoteFsUtils::temp_upload_path(self, remote_path).await
     }
@@ -325,7 +324,10 @@ impl RemoteFs for QueueRemoteFs {
         self.remote_fs.list(remote_prefix).await
     }
 
-    async fn list_with_metadata(&self, remote_prefix: String) -> Result<Vec<RemoteFile>, CubeError> {
+    async fn list_with_metadata(
+        &self,
+        remote_prefix: String,
+    ) -> Result<Vec<RemoteFile>, CubeError> {
         self.remote_fs.list_with_metadata(remote_prefix).await
     }
 
@@ -388,7 +390,6 @@ mod test {
 
     #[async_trait]
     impl RemoteFs for MockFs {
-
         async fn temp_upload_path(&self, remote_path: String) -> Result<String, CubeError> {
             CommonRemoteFsUtils::temp_upload_path(self, remote_path).await
         }
@@ -513,7 +514,10 @@ mod test {
 
         let r = tokio::spawn(QueueRemoteFs::wait_processing_loops(queue_fs.clone()));
         let res = queue_fs
-            .upload_file(path.to_str().unwrap().to_string(), "temp-upload/foo.csv".to_string())
+            .upload_file(
+                path.to_str().unwrap().to_string(),
+                "temp-upload/foo.csv".to_string(),
+            )
             .await;
         queue_fs.stop_processing_loops().unwrap();
         r.await.unwrap().unwrap();
@@ -536,7 +540,10 @@ mod test {
 
         let r = tokio::spawn(QueueRemoteFs::wait_processing_loops(queue_fs.clone()));
         let res = queue_fs
-            .upload_file(path.to_str().unwrap().to_string(), "temp-upload/foo.csv".to_string())
+            .upload_file(
+                path.to_str().unwrap().to_string(),
+                "temp-upload/foo.csv".to_string(),
+            )
             .await;
         queue_fs.stop_processing_loops().unwrap();
         r.await.unwrap().unwrap();
@@ -559,7 +566,10 @@ mod test {
 
         let r = tokio::spawn(QueueRemoteFs::wait_processing_loops(queue_fs.clone()));
         let res = queue_fs
-            .upload_file(path.to_str().unwrap().to_string(), "temp-upload/foo.csv".to_string())
+            .upload_file(
+                path.to_str().unwrap().to_string(),
+                "temp-upload/foo.csv".to_string(),
+            )
             .await;
         queue_fs.stop_processing_loops().unwrap();
         r.await.unwrap().unwrap();
@@ -577,7 +587,9 @@ mod test {
             config.injector().get_service("original_remote_fs").await,
         );
         let r = tokio::spawn(QueueRemoteFs::wait_processing_loops(queue_fs.clone()));
-        let res = queue_fs.download_file("temp-upload/foo.csv".to_string(), None).await;
+        let res = queue_fs
+            .download_file("temp-upload/foo.csv".to_string(), None)
+            .await;
         match res {
             Ok(_) => assert!(false),
             Err(e) => assert!(e.is_corrupt_data()),
@@ -599,13 +611,24 @@ mod test {
         );
         let r = tokio::spawn(QueueRemoteFs::wait_processing_loops(queue_fs.clone()));
         queue_fs
-            .upload_file(path.to_str().unwrap().to_string(), "temp-upload/foo.csv".to_string())
+            .upload_file(
+                path.to_str().unwrap().to_string(),
+                "temp-upload/foo.csv".to_string(),
+            )
             .await
             .unwrap();
 
-        std::fs::remove_file(queue_fs.local_file("temp-upload/foo.csv".to_string()).await.unwrap()).unwrap();
+        std::fs::remove_file(
+            queue_fs
+                .local_file("temp-upload/foo.csv".to_string())
+                .await
+                .unwrap(),
+        )
+        .unwrap();
 
-        let res = queue_fs.download_file("temp-upload/foo.csv".to_string(), Some(1)).await;
+        let res = queue_fs
+            .download_file("temp-upload/foo.csv".to_string(), Some(1))
+            .await;
 
         match res {
             Ok(_) => assert!(false),
@@ -632,12 +655,23 @@ mod test {
         let r = tokio::spawn(QueueRemoteFs::wait_processing_loops(queue_fs.clone()));
 
         queue_fs
-            .upload_file(path.to_str().unwrap().to_string(), "temp-upload/foo.csv".to_string())
+            .upload_file(
+                path.to_str().unwrap().to_string(),
+                "temp-upload/foo.csv".to_string(),
+            )
             .await
             .unwrap();
-        std::fs::remove_file(queue_fs.local_file("temp-upload/foo.csv".to_string()).await.unwrap()).unwrap();
+        std::fs::remove_file(
+            queue_fs
+                .local_file("temp-upload/foo.csv".to_string())
+                .await
+                .unwrap(),
+        )
+        .unwrap();
 
-        let res = queue_fs.download_file("temp-upload/foo.csv".to_string(), None).await;
+        let res = queue_fs
+            .download_file("temp-upload/foo.csv".to_string(), None)
+            .await;
 
         match res {
             Ok(_) => assert!(false),

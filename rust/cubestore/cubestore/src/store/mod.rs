@@ -315,7 +315,9 @@ impl WALDataStore for WALStore {
             )));
         }
         let remote_path = WALStore::wal_remote_path(wal_id);
-        self.remote_fs.download_file(remote_path.clone(), None).await?;
+        self.remote_fs
+            .download_file(remote_path.clone(), None)
+            .await?;
         let local_file = self.remote_fs.local_file(remote_path.clone()).await?;
         Ok(
             cube_ext::spawn_blocking(move || -> Result<DataFrame, CubeError> {
@@ -735,7 +737,10 @@ impl ChunkStore {
         let file_size = chunk.get_row().file_size();
         let chunk_id = chunk.get_id();
         let remote_path = ChunkStore::chunk_file_name(chunk);
-        let result = self.remote_fs.download_file(remote_path.clone(), file_size).await;
+        let result = self
+            .remote_fs
+            .download_file(remote_path.clone(), file_size)
+            .await;
 
         deactivate_table_on_corrupt_data(
             self.meta_store.clone(),
@@ -1345,7 +1350,9 @@ impl ChunkStore {
 
             let fs = self.remote_fs.clone();
             Ok(cube_ext::spawn(async move {
-                let file_size = fs.upload_file(local_file.to_string(), remote_path.clone()).await?;
+                let file_size = fs
+                    .upload_file(local_file.to_string(), remote_path.clone())
+                    .await?;
                 Ok((chunk, Some(file_size)))
             }))
         }

@@ -1,3 +1,4 @@
+use crate::config::injection::Injector;
 use crate::util::cancellation_token_guard::CancellationGuard;
 use crate::CubeError;
 use async_trait::async_trait;
@@ -39,6 +40,7 @@ pub trait WorkerProcessing {
 pub trait ServicesServerProcessor {
     type Request: Debug + Serialize + DeserializeOwned + Sync + Send + 'static;
     type Response: Debug + Serialize + DeserializeOwned + Sync + Send + 'static;
+    async fn init(injector: Arc<Injector>) -> Arc<Self>;
     async fn process(&self, request: Self::Request) -> Self::Response;
 }
 
@@ -70,6 +72,9 @@ impl DefaultServicesServerProcessor {
 impl ServicesServerProcessor for DefaultServicesServerProcessor {
     type Request = ();
     type Response = ();
+    async fn init(_injector: Arc<Injector>) -> Arc<Self> {
+        Arc::new(Self {})
+    }
     async fn process(&self, _request: ()) -> () {
         ()
     }

@@ -448,6 +448,7 @@ mod tests {
     use tokio::runtime::Builder;
 
     use crate::cluster::worker_pool::{worker_main, WorkerPool};
+    use crate::config::injection::Injector;
     use crate::config::Config;
     use crate::queryplanner::serialized_plan::SerializedLogicalPlan;
     use crate::util::respawn;
@@ -640,6 +641,11 @@ mod tests {
     impl ServicesServerProcessor for TestServicesServerProcessor {
         type Request = i64;
         type Response = bool;
+
+        async fn init(_injector: Arc<Injector>) -> Arc<Self> {
+            Arc::new(Self {})
+        }
+
         async fn process(&self, request: i64) -> bool {
             request % 2 == 0
         }

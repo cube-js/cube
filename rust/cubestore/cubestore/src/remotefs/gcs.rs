@@ -1,6 +1,6 @@
 use crate::app_metrics;
 use crate::di_service;
-use crate::remotefs::{LocalDirRemoteFs, RemoteFile, RemoteFs, CommonRemoteFsUtils};
+use crate::remotefs::{CommonRemoteFsUtils, LocalDirRemoteFs, RemoteFile, RemoteFs};
 use crate::util::lock::acquire_lock;
 use crate::CubeError;
 use async_trait::async_trait;
@@ -119,7 +119,6 @@ di_service!(GCSRemoteFs, [RemoteFs]);
 
 #[async_trait]
 impl RemoteFs for GCSRemoteFs {
-
     async fn temp_upload_path(&self, remote_path: String) -> Result<String, CubeError> {
         CommonRemoteFsUtils::temp_upload_path(self, remote_path).await
     }
@@ -270,7 +269,10 @@ impl RemoteFs for GCSRemoteFs {
             .collect::<Vec<_>>())
     }
 
-    async fn list_with_metadata(&self, remote_prefix: String) -> Result<Vec<RemoteFile>, CubeError> {
+    async fn list_with_metadata(
+        &self,
+        remote_prefix: String,
+    ) -> Result<Vec<RemoteFile>, CubeError> {
         let prefix = self.gcs_path(&remote_prefix);
         let list = Object::list_prefix(self.bucket.as_str(), prefix.as_str()).await?;
         let leading_slash = Regex::new(format!("^{}", self.gcs_path("")).as_str()).unwrap();

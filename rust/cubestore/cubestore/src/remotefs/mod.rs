@@ -14,13 +14,13 @@ use datafusion::cube_ext;
 use futures::future::BoxFuture;
 use futures::FutureExt;
 use log::debug;
+use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tempfile::{NamedTempFile, PathPersistError};
 use tokio::fs;
 use tokio::sync::{Mutex, RwLock};
-use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RemoteFile {
@@ -54,7 +54,7 @@ pub trait RemoteFs: DIService + Send + Sync + Debug {
         &self,
         remote_path: String,
         expected_size: u64,
-    ) -> Result<(), CubeError>; 
+    ) -> Result<(), CubeError>;
 
     /// In addition to uploading this file to the remote filesystem, this function moves the file
     /// from `temp_upload_path` to `self.local_path(remote_path)` on the local file system.
@@ -74,7 +74,8 @@ pub trait RemoteFs: DIService + Send + Sync + Debug {
 
     async fn list(&self, remote_prefix: String) -> Result<Vec<String>, CubeError>;
 
-    async fn list_with_metadata(&self, remote_prefix: String) -> Result<Vec<RemoteFile>, CubeError>;
+    async fn list_with_metadata(&self, remote_prefix: String)
+        -> Result<Vec<RemoteFile>, CubeError>;
 
     async fn local_path(&self) -> Result<String, CubeError>;
 
@@ -87,9 +88,14 @@ impl CommonRemoteFsUtils {
     ///
     /// Use this path to prepare files for upload. Writing into `local_path()` directly can result
     /// in files being deleted by the background cleanup process, see `QueueRemoteFs::cleanup_loop`.
-    pub async fn temp_upload_path(remote_fs: &dyn RemoteFs, remote_path: String) -> Result<String, CubeError> {
+    pub async fn temp_upload_path(
+        remote_fs: &dyn RemoteFs,
+        remote_path: String,
+    ) -> Result<String, CubeError> {
         // Putting files into a subdirectory prevents cleanups from removing them.
-        remote_fs.local_file(format!("uploads/{}", remote_path)).await
+        remote_fs
+            .local_file(format!("uploads/{}", remote_path))
+            .await
     }
 
     /// Convention is to use this directory for creating files to be uploaded later.
@@ -183,7 +189,6 @@ di_service!(RemoteFsRpcClient, [RemoteFs]);
 
 #[async_trait]
 impl RemoteFs for LocalDirRemoteFs {
-
     async fn temp_upload_path(&self, remote_path: String) -> Result<String, CubeError> {
         CommonRemoteFsUtils::temp_upload_path(self, remote_path).await
     }
@@ -333,7 +338,10 @@ impl RemoteFs for LocalDirRemoteFs {
             .collect::<Vec<_>>())
     }
 
-    async fn list_with_metadata(&self, remote_prefix: String) -> Result<Vec<RemoteFile>, CubeError> {
+    async fn list_with_metadata(
+        &self,
+        remote_prefix: String,
+    ) -> Result<Vec<RemoteFile>, CubeError> {
         let remote_dir = self.remote_dir.read().await.as_ref().cloned();
         let result = Self::list_recursive(
             remote_dir.clone().unwrap_or(self.dir.clone()),
@@ -494,9 +502,16 @@ mod tests {
         name_maker: NameMaker,
         download_test: bool,
     ) {
-        assert_eq!(remote_fs.local_path().await.unwrap(), local_dir.to_str().unwrap());
+        assert_eq!(
+            remote_fs.local_path().await.unwrap(),
+            local_dir.to_str().unwrap()
+        );
 
-        let local_file = remote_fs.local_file("test.tst".to_string()).await.ok().unwrap();
+        let local_file = remote_fs
+            .local_file("test.tst".to_string())
+            .await
+            .ok()
+            .unwrap();
         assert_eq!(local_file, local_dir.join("test.tst").to_str().unwrap());
 
         let local_file_path = Path::new("test_dir")
@@ -569,14 +584,20 @@ mod tests {
 
             for filename in root_files.iter().chain(subdir_files.iter()) {
                 assert!(!local_dir.join(filename).is_file());
-                remote_fs.download_file(filename.clone(), None).await.unwrap();
+                remote_fs
+                    .download_file(filename.clone(), None)
+                    .await
+                    .unwrap();
                 assert!(local_dir.join(filename).is_file());
             }
         }
 
         for filename in root_files.iter().chain(subdir_files.iter()) {
             assert!(local_dir.join(&filename).is_file());
-            assert_eq!(&remote_fs.list(filename.clone()).await.unwrap()[0], filename);
+            assert_eq!(
+                &remote_fs.list(filename.clone()).await.unwrap()[0],
+                filename
+            );
 
             remote_fs.delete_file(filename.clone()).await.unwrap();
 

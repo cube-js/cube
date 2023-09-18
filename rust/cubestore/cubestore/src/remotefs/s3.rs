@@ -1,6 +1,6 @@
 use crate::app_metrics;
 use crate::di_service;
-use crate::remotefs::{LocalDirRemoteFs, RemoteFile, RemoteFs, CommonRemoteFsUtils};
+use crate::remotefs::{CommonRemoteFsUtils, LocalDirRemoteFs, RemoteFile, RemoteFs};
 use crate::util::lock::acquire_lock;
 use crate::CubeError;
 use async_trait::async_trait;
@@ -133,7 +133,6 @@ di_service!(S3RemoteFs, [RemoteFs]);
 
 #[async_trait]
 impl RemoteFs for S3RemoteFs {
-
     async fn temp_upload_path(&self, remote_path: String) -> Result<String, CubeError> {
         CommonRemoteFsUtils::temp_upload_path(self, remote_path).await
     }
@@ -290,7 +289,10 @@ impl RemoteFs for S3RemoteFs {
             .collect::<Vec<_>>())
     }
 
-    async fn list_with_metadata(&self, remote_prefix: String) -> Result<Vec<RemoteFile>, CubeError> {
+    async fn list_with_metadata(
+        &self,
+        remote_prefix: String,
+    ) -> Result<Vec<RemoteFile>, CubeError> {
         let path = self.s3_path(&remote_prefix);
         let bucket = self.bucket.read().unwrap().clone();
         let list = cube_ext::spawn_blocking(move || bucket.list_blocking(path, None)).await??;

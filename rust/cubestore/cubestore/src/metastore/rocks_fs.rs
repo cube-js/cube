@@ -121,7 +121,10 @@ impl BaseRocksStoreFs {
                     return async move {
                         let local = remote_fs.local_file(f.clone()).await?;
                         // TODO persist file size
-                        Ok::<_, CubeError>((f.clone(), remote_fs.upload_file(local, f.clone()).await?))
+                        Ok::<_, CubeError>((
+                            f.clone(),
+                            remote_fs.upload_file(local, f.clone()).await?,
+                        ))
                     };
                 })
                 .collect::<Vec<_>>(),

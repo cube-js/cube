@@ -2316,7 +2316,6 @@ mod tests {
 
     #[async_trait::async_trait]
     impl RemoteFs for FailingRemoteFs {
-
         async fn temp_upload_path(&self, remote_path: String) -> Result<String, CubeError> {
             CommonRemoteFsUtils::temp_upload_path(self, remote_path).await
         }
@@ -4291,7 +4290,10 @@ mod tests {
                         .injector
                         .get_service_typed::<dyn RemoteFs>()
                         .await
-                        .upload_file(path_2.to_str().unwrap().to_string(), "temp-uploads/orders.csv.gz".to_string())
+                        .upload_file(
+                            path_2.to_str().unwrap().to_string(),
+                            "temp-uploads/orders.csv.gz".to_string(),
+                        )
                         .await
                         .unwrap();
 

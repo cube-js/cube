@@ -15,7 +15,8 @@ pub mod ingestion;
 use crate::cluster::worker_pool::{worker_main, WorkerPool};
 #[cfg(not(target_os = "windows"))]
 use crate::cluster::worker_services::{
-    DefaultServicesServerProcessor, DefaultWorkerServicesDef, WorkerProcessing,
+    DefaultServicesServerProcessor, DefaultWorkerServicesDef, ServicesServerProcessor,
+    WorkerProcessing,
 };
 
 use crate::ack_error;
@@ -864,9 +865,10 @@ impl ClusterImpl {
             || self.config_obj.worker_bind_address().is_some())
             && self.config_obj.select_worker_pool_size() > 0
         {
+            let injector = self.injector.upgrade().unwrap();
             let mut pool = self.select_process_pool.write().await;
             let arc = Arc::new(WorkerPool::new(
-                DefaultServicesServerProcessor::new(),
+                ServicesServerProcessor::init(injector).await,
                 self.config_obj.select_worker_pool_size(),
                 Duration::from_secs(self.config_obj.query_timeout()),
                 "sel",
