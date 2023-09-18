@@ -122,12 +122,12 @@ export type DatabaseType =
   | 'questdb'
   | 'materialize';
 
-export type ContextToAppIdFn = (context: RequestContext) => string;
-export type ContextToOrchestratorIdFn = (context: RequestContext) => string;
+export type ContextToAppIdFn = (context: RequestContext) => string | Promise<string>;
+export type ContextToOrchestratorIdFn = (context: RequestContext) => string | Promise<string>;
 
-export type OrchestratorOptionsFn = (context: RequestContext) => OrchestratorOptions;
+export type OrchestratorOptionsFn = (context: RequestContext) => OrchestratorOptions | Promise<OrchestratorOptions>;
 
-export type PreAggregationsSchemaFn = (context: RequestContext) => string;
+export type PreAggregationsSchemaFn = (context: RequestContext) => string | Promise<string>;
 
 // internal
 export type DriverOptions = {
@@ -256,7 +256,7 @@ export type ContextAcceptanceResultWs = ContextAcceptanceResult & {
 };
 
 export interface ContextAcceptor {
-  shouldAccept(context: RequestContext | null): ContextAcceptanceResult;
-  shouldAcceptHttp(context: RequestContext | null): ContextAcceptanceResultHttp;
-  shouldAcceptWs(context: RequestContext | null): ContextAcceptanceResultWs;
+  shouldAccept(context: RequestContext | null): Promise<ContextAcceptanceResult> | ContextAcceptanceResult;
+  shouldAcceptHttp(context: RequestContext | null): Promise<ContextAcceptanceResultHttp> | ContextAcceptanceResultHttp;
+  shouldAcceptWs(context: RequestContext | null): Promise<ContextAcceptanceResultWs> | ContextAcceptanceResultWs;
 }

@@ -437,6 +437,8 @@ pub trait ConfigObj: DIService {
 
     fn cachestore_cache_max_size(&self) -> u64;
 
+    fn cachestore_cache_compaction_trigger_size(&self) -> u64;
+
     fn cachestore_cache_max_keys(&self) -> u32;
 
     fn cachestore_cache_eviction_policy(&self) -> CacheEvictionPolicy;
@@ -573,6 +575,7 @@ pub struct ConfigObjImpl {
     pub cachestore_cache_eviction_loop_interval: u64,
     pub cachestore_cache_ttl_persist_loop_interval: u64,
     pub cachestore_cache_max_size: u64,
+    pub cachestore_cache_compaction_trigger_size: u64,
     pub cachestore_cache_threshold_to_force_eviction: u8,
     pub cachestore_queue_results_expire: u64,
     pub cachestore_metrics_interval: u64,
@@ -778,6 +781,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn cachestore_cache_max_size(&self) -> u64 {
         self.cachestore_cache_max_size
+    }
+
+    fn cachestore_cache_compaction_trigger_size(&self) -> u64 {
+        self.cachestore_cache_compaction_trigger_size
     }
 
     fn cachestore_cache_threshold_to_force_eviction(&self) -> u8 {
@@ -1098,6 +1105,20 @@ where
 }
 
 impl Config {
+    fn calculate_cache_compaction_trigger_size(cache_max_size: usize) -> usize {
+        match cache_max_size >> 20 {
+            // TODO: Enable this limits after moving to separate CF for cache
+            // d if d < 32 => 32 * 9,
+            // d if d < 64 => 64 * 8,
+            // d if d < 128 => 128 * 7,
+            // d if d < 256 => 256 * 6,
+            d if d < 512 => 512 * 5,
+            d if d < 1024 => cache_max_size * 4,
+            d if d < 4096 => cache_max_size * 3,
+            _ => cache_max_size * 2,
+        }
+    }
+
     pub fn default() -> Config {
         let query_timeout = env_parse("CUBESTORE_QUERY_TIMEOUT", 120);
         let query_cache_time_to_idle_secs = env_parse(
@@ -1105,6 +1126,23 @@ impl Config {
             // 1 hour
             60 * 60,
         );
+
+        let cachestore_cache_max_size = env_parse_size(
+            "CUBESTORE_CACHE_MAX_SIZE",
+            4096 << 20,
+            // 16384 mb
+            Some(16_384 << 20),
+            // 32 mb
+            Some(32 << 20),
+        );
+
+        let cachestore_cache_compaction_trigger_size = env_parse_size(
+            "CUBESTORE_CACHE_COMPACTION_TRIGGER_SIZE",
+            Self::calculate_cache_compaction_trigger_size(cachestore_cache_max_size),
+            None,
+            // 256 mb
+            Some(256 << 20),
+        ) as u64;
 
         Config {
             injector: Injector::new(),
@@ -1256,14 +1294,8 @@ impl Config {
                     // 0 to disable
                     Some(0),
                 ),
-                cachestore_cache_max_size: env_parse_size(
-                    "CUBESTORE_CACHE_MAX_SIZE",
-                    4096 << 20,
-                    // 16384 mb
-                    Some(16384 << 20),
-                    // 32 mb
-                    Some(32 << 20),
-                ) as u64,
+                cachestore_cache_max_size: cachestore_cache_max_size as u64,
+                cachestore_cache_compaction_trigger_size,
                 cachestore_cache_threshold_to_force_eviction: 25,
                 cachestore_queue_results_expire: env_parse_duration(
                     "CUBESTORE_QUEUE_RESULTS_EXPIRE",
@@ -1474,7 +1506,8 @@ impl Config {
                 cachestore_gc_loop_interval: 30,
                 cachestore_cache_eviction_loop_interval: 60,
                 cachestore_cache_ttl_persist_loop_interval: 15,
-                cachestore_cache_max_size: 4096 << 32,
+                cachestore_cache_max_size: 4096 << 20,
+                cachestore_cache_compaction_trigger_size: 4096 * 2 << 20,
                 cachestore_cache_threshold_to_force_eviction: 25,
                 cachestore_queue_results_expire: 90,
                 cachestore_metrics_interval: 15,

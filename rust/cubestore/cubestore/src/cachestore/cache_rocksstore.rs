@@ -1,11 +1,12 @@
 use crate::cachestore::cache_item::{
     CacheItem, CacheItemIndexKey, CacheItemRocksIndex, CacheItemRocksTable,
+    CACHE_ITEM_SIZE_WITHOUT_VALUE,
 };
 use crate::cachestore::queue_item::{
     QueueItem, QueueItemIndexKey, QueueItemRocksIndex, QueueItemRocksTable, QueueItemStatus,
     QueueResultAckEvent, QueueResultAckEventResult, QueueRetrieveResponse,
 };
-use crate::cachestore::queue_result::QueueResultRocksTable;
+use crate::cachestore::queue_result::{QueueResultRocksIndex, QueueResultRocksTable};
 use crate::cachestore::{compaction, QueueResult};
 use crate::config::injection::DIService;
 use crate::config::{Config, ConfigObj};
@@ -14,7 +15,7 @@ use std::env;
 
 use crate::metastore::{
     BaseRocksStoreFs, BatchPipe, DbTableRef, IdRow, MetaStoreEvent, MetaStoreFs, RocksPropertyRow,
-    RocksStore, RocksStoreDetails, RocksTable,
+    RocksStore, RocksStoreDetails, RocksTable, RocksTableStats,
 };
 use crate::remotefs::LocalDirRemoteFs;
 use crate::util::WorkerLoop;
@@ -103,6 +104,7 @@ impl RocksStoreDetails for RocksCacheStoreDetails {
         opts.set_max_subcompactions(rocksdb_config.max_subcompactions);
         opts.set_block_based_table_factory(&block_opts);
         opts.set_compression_type(rocksdb_config.compression_type);
+        opts.increase_parallelism(rocksdb_config.parallelism as i32);
 
         DB::open(&opts, path)
             .map_err(|err| CubeError::internal(format!("DB::open error for cachestore: {}", err)))
@@ -566,14 +568,19 @@ impl QueueKey {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
+pub struct CachestoreInfo {
+    pub tables: Vec<RocksTableStats>,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
 pub struct QueueAddResponse {
     pub id: u64,
     pub added: bool,
     pub pending: u64,
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
 pub enum QueueResultResponse {
     Success { value: Option<String> },
 }
@@ -652,6 +659,8 @@ pub trait CacheStore: DIService + Send + Sync {
 
     // Force compaction for the whole RocksDB
     async fn compaction(&self) -> Result<(), CubeError>;
+    // DB stats + sizes
+    async fn info(&self) -> Result<CachestoreInfo, CubeError>;
     // Force run for eviction
     async fn eviction(&self) -> Result<EvictionResult, CubeError>;
     // Force run for persist of lru/lfu stats
@@ -1197,6 +1206,35 @@ impl CacheStore for RocksCacheStore {
         Ok(())
     }
 
+    async fn info(&self) -> Result<CachestoreInfo, CubeError> {
+        self.store
+            .read_operation_out_of_queue(move |db_ref| {
+                let cache_schema = CacheItemRocksTable::new(db_ref.clone());
+                let cache_schema_stats = cache_schema.collect_table_stats_by_extended_index(
+                    &CacheItemRocksIndex::ByPath,
+                    CACHE_ITEM_SIZE_WITHOUT_VALUE as u64,
+                )?;
+
+                let queue_schema = QueueItemRocksTable::new(db_ref.clone());
+                let queue_schema_stats = queue_schema.collect_table_stats_by_extended_index(
+                    &QueueItemRocksIndex::ByPath,
+                    0 as u64,
+                )?;
+
+                let queue_result_schema = QueueResultRocksTable::new(db_ref.clone());
+                let queue_result_stats = queue_result_schema
+                    .collect_table_stats_by_extended_index(
+                        &QueueResultRocksIndex::ByPath,
+                        0 as u64,
+                    )?;
+
+                Ok(CachestoreInfo {
+                    tables: vec![cache_schema_stats, queue_schema_stats, queue_result_stats],
+                })
+            })
+            .await
+    }
+
     async fn eviction(&self) -> Result<EvictionResult, CubeError> {
         self.run_eviction().await
     }
@@ -1343,6 +1381,10 @@ impl CacheStore for ClusterCacheStoreClient {
         panic!("CacheStore cannot be used on the worker node! compaction was used.")
     }
 
+    async fn info(&self) -> Result<CachestoreInfo, CubeError> {
+        panic!("CacheStore cannot be used on the worker node! info was used.")
+    }
+
     async fn eviction(&self) -> Result<EvictionResult, CubeError> {
         panic!("CacheStore cannot be used on the worker node! eviction was used.")
     }
@@ -1467,22 +1509,33 @@ mod tests {
             CubeServices::wait_loops(loops).await
         });
 
-        for i in 0..keys_to_insert {
-            cachestore
-                .cache_set(
+        for i in (0..keys_to_insert).step_by(4) {
+            let (r1, r2, r3, r4) = tokio::join!(
+                cachestore.cache_set(
                     CacheItem::new(format!("test:{}", i), Some(3600), "a".repeat(key_size)),
                     false,
+                ),
+                cachestore.cache_set(
+                    CacheItem::new(format!("test:{}", i + 1), Some(3600), "a".repeat(key_size)),
+                    false,
+                ),
+                cachestore.cache_set(
+                    CacheItem::new(format!("test:{}", i + 2), Some(3600), "a".repeat(key_size)),
+                    false,
+                ),
+                cachestore.cache_set(
+                    CacheItem::new(format!("test:{}", i + 3), Some(3600), "a".repeat(key_size)),
+                    false,
                 )
-                .await?;
+            );
+
+            r1?;
+            r2?;
+            r3?;
+            r4?;
         }
 
-        let mut result = EvictionFinishedResult {
-            total_keys_removed: 0,
-            total_size_removed: 0,
-            total_delete_skipped: 0,
-            stats_total_keys: 0,
-            stats_total_raw_size: 0,
-        };
+        let mut result = EvictionFinishedResult::empty();
 
         // 1 load state
         // check limits 3 (3 rounds for sampling)
@@ -1490,14 +1543,14 @@ mod tests {
             match cachestore.run_eviction().await? {
                 EvictionResult::InProgress(status) => panic!("unexpected status: {}", status),
                 EvictionResult::Finished(stats) => {
-                    result.total_keys_removed += stats.total_keys_removed;
-                    result.total_size_removed += stats.total_size_removed;
-                    result.total_delete_skipped += stats.total_delete_skipped;
+                    println!("eviction stats {:?}", stats);
+
+                    result.add_eviction_result(stats);
                 }
             };
         }
 
-        // should do anything
+        // should not do anything
         {
             let eviction_results = match cachestore.run_eviction().await? {
                 EvictionResult::InProgress(status) => panic!("unexpected status: {}", status),
@@ -1568,10 +1621,11 @@ mod tests {
         )
         .await?;
 
-        // 640 -> 640 - (128 * 1.15 = 147.5) -> 492
+        // 640 - (128 * 1.15 = 147.5) -> 492
         assert_eq!(result.stats_total_keys < 512, true);
         assert_eq!(result.stats_total_keys > 456, true);
 
+        println!("result {:?}", result);
         assert_eq!(result.total_keys_removed > 100, true);
         assert_eq!(result.total_keys_removed < 256, true);
 

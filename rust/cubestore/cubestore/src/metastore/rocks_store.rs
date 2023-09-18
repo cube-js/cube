@@ -140,6 +140,18 @@ pub struct RocksSecondaryIndexValueTTLExtended {
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
+pub struct RocksTableStats {
+    pub table_name: String,
+    pub keys_total: u32,
+    pub size_total: u64,
+    pub expired_keys_total: u32,
+    pub expired_size_total: u64,
+    pub min_row_size: u64,
+    pub avg_row_size: u64,
+    pub max_row_size: u64,
+}
+
+#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct RocksPropertyRow {
     pub key: String,
     pub value: Option<String>,
@@ -715,6 +727,8 @@ pub struct RocksStoreConfig {
     // Sets maximum number of threads that will concurrently perform a compaction job by breaking
     // it into multiple, smaller ones that are run simultaneously.
     pub max_subcompactions: u32,
+    // By default, RocksDB uses only one background thread for flush and compaction.
+    pub parallelism: u32,
 }
 
 impl RocksStoreConfig {
@@ -727,6 +741,8 @@ impl RocksStoreConfig {
             max_background_jobs: 2,
             // Default: 1 (i.e. no subcompactions)
             max_subcompactions: 1,
+            // Default: 1
+            parallelism: 1,
         }
     }
 
@@ -739,6 +755,8 @@ impl RocksStoreConfig {
             max_background_jobs: 2,
             // Default: 1 (i.e. no subcompactions)
             max_subcompactions: 1,
+            // Default: 1
+            parallelism: 2,
         }
     }
 }
@@ -1226,7 +1244,7 @@ impl RocksStore {
         let (tx, rx) = oneshot::channel::<Result<R, CubeError>>();
 
         let res = rw_loop_sender.send(Box::new(move || {
-            let db_span = warn_long("metastore read operation", Duration::from_millis(100));
+            let db_span = warn_long("store read operation", Duration::from_millis(100));
 
             let snapshot = db_to_send.snapshot();
             let res = f(DbTableRef {
@@ -1261,7 +1279,11 @@ impl RocksStore {
         })?
     }
 
-    pub async fn read_operation_out_of_queue<F, R>(&self, f: F) -> Result<R, CubeError>
+    pub async fn read_operation_out_of_queue_opt<F, R>(
+        &self,
+        f: F,
+        timeout: Duration,
+    ) -> Result<R, CubeError>
     where
         F: for<'a> FnOnce(DbTableRef<'a>) -> Result<R, CubeError> + Send + Sync + 'static,
         R: Send + Sync + 'static,
@@ -1270,11 +1292,8 @@ impl RocksStore {
         let db_to_send = self.db.clone();
 
         cube_ext::spawn_blocking(move || {
-            let db_span = warn_long(
-                "metastore read operation out of queue",
-                Duration::from_millis(100),
-            );
-            let span = tracing::trace_span!("metastore read operation out of queue");
+            let db_span = warn_long("store read operation out of queue", timeout);
+            let span = tracing::trace_span!("store read operation out of queue");
             let span_holder = span.enter();
 
             let snapshot = db_to_send.snapshot();
@@ -1291,6 +1310,15 @@ impl RocksStore {
             res
         })
         .await?
+    }
+
+    pub async fn read_operation_out_of_queue<F, R>(&self, f: F) -> Result<R, CubeError>
+    where
+        F: for<'a> FnOnce(DbTableRef<'a>) -> Result<R, CubeError> + Send + Sync + 'static,
+        R: Send + Sync + 'static,
+    {
+        self.read_operation_out_of_queue_opt::<F, R>(f, Duration::from_millis(100))
+            .await
     }
 
     pub fn cleanup_test_store(test_name: &str) {

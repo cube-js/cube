@@ -37,7 +37,7 @@ fn python_load_config(mut cx: FunctionContext) -> JsResult<JsPromise> {
         let mut cube_conf = CubeConfigPy::new();
 
         for attr_name in cube_conf.get_static_attrs() {
-            cube_conf.static_attr(settings_py, attr_name)?;
+            cube_conf.attr(settings_py, attr_name)?;
         }
 
         cube_conf.apply_dynamic_functions(settings_py)?;
@@ -78,7 +78,7 @@ fn python_load_model(mut cx: FunctionContext) -> JsResult<JsPromise> {
                 .downcast::<PyDict>()?;
 
             for (local_key, local_value) in execution_context_locals.iter() {
-                if local_value.is_instance_of::<PyFunction>()? {
+                if local_value.is_instance_of::<PyFunction>() {
                     let has_attr = local_value.hasattr("cube_context_func")?;
                     if has_attr {
                         let fun: Py<PyFunction> = local_value.downcast::<PyFunction>()?.into();

@@ -34,8 +34,13 @@ declare module '@cubejs-client/react' {
     QueryRecordType,
   } from '@cubejs-client/core';
 
+  type CubeProviderOptions = {
+    castNumerics?: boolean;
+  }
+  
   type CubeProviderProps = {
     cubejsApi: CubejsApi | null;
+    options?: CubeProviderOptions;
     children: React.ReactNode;
   };
 
@@ -69,6 +74,7 @@ declare module '@cubejs-client/react' {
 
   type CubeContextProps = {
     cubejsApi: CubejsApi;
+    options?: CubeProviderOptions;
   };
 
   /**
@@ -466,6 +472,10 @@ declare module '@cubejs-client/react' {
      * When `true` the resultSet will be reset to `null` first
      */
     resetResultSetOnChange?: boolean;
+    /**
+     * If enabled, all members of the 'number' type will be automatically converted to numerical values on the client side
+     */
+    castNumerics?: boolean;
   };
 
   type UseCubeQueryResult<TData> = {

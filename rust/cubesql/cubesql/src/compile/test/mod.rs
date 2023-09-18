@@ -211,7 +211,8 @@ pub fn get_test_tenant_ctx() -> Arc<MetaContext> {
                         "statements/select".to_string(),
                         r#"SELECT {{ select_concat | map(attribute='aliased') | join(', ') }} 
   FROM ({{ from }}) AS {{ from_alias }} 
-  {% if group_by %} GROUP BY {{ group_by | map(attribute='index') | join(', ') }}{% endif %}{% if limit %}
+  {% if group_by %} GROUP BY {{ group_by | map(attribute='index') | join(', ') }}{% endif %}
+  {% if order_by %} ORDER BY {{ order_by | map(attribute='expr') | join(', ') }}{% endif %}{% if limit %}
   LIMIT {{ limit }}{% endif %}{% if offset %}
   OFFSET {{ offset }}{% endif %}"#.to_string(),
                     ),
@@ -221,6 +222,7 @@ pub fn get_test_tenant_ctx() -> Arc<MetaContext> {
                     ),
                     ("expressions/binary".to_string(), "{{ left }} {{ op }} {{ right }}".to_string()),
                     ("expressions/case".to_string(), "CASE {% if expr %}{{ expr }} {% endif %}{% for when, then in when_then %}WHEN {{ when }} THEN {{ then }}{% endfor %}{% if else_expr %} ELSE {{ else_expr }}{% endif %} END".to_string()),
+                    ("expressions/sort".to_string(), "{{ expr }} {% if asc %}ASC{% else %}DESC{% endif %}{% if nulls_first %} NULLS FIRST {% endif %}".to_string()),
                     ("quotes/identifiers".to_string(), "\"".to_string()),
                     ("quotes/escape".to_string(), "\"\"".to_string()),
                     ("params/param".to_string(), "${{ param_index + 1 }}".to_string())
@@ -320,13 +322,17 @@ pub fn get_test_transport() -> Arc<dyn TransportService> {
 
         async fn sql(
             &self,
-            _query: V1LoadRequestQuery,
+            query: V1LoadRequestQuery,
             _ctx: AuthContextRef,
             _meta_fields: LoadRequestMeta,
             _member_to_alias: Option<HashMap<String, String>>,
+            expression_params: Option<Vec<Option<String>>>,
         ) -> Result<SqlResponse, CubeError> {
             Ok(SqlResponse {
-                sql: SqlQuery::new("SELECT 1".to_string(), vec![]),
+                sql: SqlQuery::new(
+                    format!("SELECT * FROM {}", serde_json::to_string(&query).unwrap()),
+                    expression_params.unwrap_or(Vec::new()),
+                ),
             })
         }
 

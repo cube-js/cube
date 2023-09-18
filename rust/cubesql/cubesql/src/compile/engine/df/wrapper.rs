@@ -1,16 +1,20 @@
 use crate::{
-    compile::engine::df::scan::{CubeScanNode, MemberField, WrappedSelectNode},
+    compile::{
+        engine::df::scan::{CubeScanNode, MemberField, WrappedSelectNode},
+        rewrite::WrappedSelectType,
+    },
     sql::AuthContextRef,
     transport::{
         AliasedColumn, LoadRequestMeta, MetaContext, SqlGenerator, SqlTemplates, TransportService,
     },
     CubeError,
 };
+use cubeclient::models::V1LoadRequestQuery;
 use datafusion::{
     error::{DataFusionError, Result},
     logical_plan::{
-        plan::Extension, replace_col, Column, DFSchema, DFSchemaRef, Expr, LogicalPlan,
-        UserDefinedLogicalNode,
+        plan::Extension, replace_col, replace_col_to_expr, Column, DFSchema, DFSchemaRef, Expr,
+        LogicalPlan, UserDefinedLogicalNode,
     },
     physical_plan::aggregates::AggregateFunction,
     scalar::ScalarValue,
@@ -95,6 +99,7 @@ pub struct CubeScanWrapperNode {
     pub meta: Arc<MetaContext>,
     pub auth_context: AuthContextRef,
     pub wrapped_sql: Option<SqlQuery>,
+    pub request: Option<V1LoadRequestQuery>,
 }
 
 impl CubeScanWrapperNode {
@@ -108,15 +113,17 @@ impl CubeScanWrapperNode {
             meta,
             auth_context,
             wrapped_sql: None,
+            request: None,
         }
     }
 
-    pub fn with_sql(&self, sql: SqlQuery) -> Self {
+    pub fn with_sql_and_request(&self, sql: SqlQuery, request: V1LoadRequestQuery) -> Self {
         Self {
             wrapped_plan: self.wrapped_plan.clone(),
             meta: self.meta.clone(),
             auth_context: self.auth_context.clone(),
             wrapped_sql: Some(sql),
+            request: Some(request),
         }
     }
 }
@@ -124,6 +131,7 @@ impl CubeScanWrapperNode {
 fn expr_name(e: &Expr, schema: &Arc<DFSchema>) -> Result<String> {
     match e {
         Expr::Column(col) => Ok(col.name.clone()),
+        Expr::Sort { expr, .. } => expr_name(expr, schema),
         _ => e.name(schema),
     }
 }
@@ -133,6 +141,7 @@ pub struct SqlGenerationResult {
     pub from_alias: Option<String>,
     pub column_remapping: Option<HashMap<Column, Column>>,
     pub sql: SqlQuery,
+    pub request: V1LoadRequestQuery,
 }
 
 impl CubeScanWrapperNode {
@@ -141,7 +150,7 @@ impl CubeScanWrapperNode {
         transport: Arc<dyn TransportService>,
         load_request_meta: Arc<LoadRequestMeta>,
     ) -> result::Result<Self, CubeError> {
-        let sql = Self::generate_sql_for_node(
+        let (sql, request) = Self::generate_sql_for_node(
             Arc::new(self.clone()),
             transport,
             load_request_meta,
@@ -149,7 +158,7 @@ impl CubeScanWrapperNode {
             false,
         )
         .await
-        .and_then(|SqlGenerationResult { data_source, mut sql, .. }| -> result::Result<_, CubeError> {
+        .and_then(|SqlGenerationResult { data_source, mut sql, request, .. }| -> result::Result<_, CubeError> {
             let data_source = data_source.ok_or_else(|| CubeError::internal(format!(
                 "Can't generate SQL for wrapped select: no data source returned"
             )))?;
@@ -165,9 +174,9 @@ impl CubeScanWrapperNode {
                 })?
                 .get_sql_templates();
             sql.finalize_query(sql_templates).map_err(|e| CubeError::internal(e.to_string()))?;
-            Ok(sql)
+            Ok((sql, request))
         })?;
-        Ok(self.with_sql(sql))
+        Ok(self.with_sql_and_request(sql, request))
     }
 
     pub fn generate_sql_for_node(
@@ -225,7 +234,7 @@ impl CubeScanWrapperNode {
                         }
                         let sql = transport
                             .sql(
-                                node.request,
+                                node.request.clone(),
                                 node.auth_context,
                                 load_request_meta.as_ref().clone(),
                                 Some(
@@ -240,6 +249,7 @@ impl CubeScanWrapperNode {
                                         })
                                         .collect(),
                                 ),
+                                None,
                             )
                             .await?;
                         // TODO Add wrapper for reprojection and literal members handling
@@ -253,10 +263,11 @@ impl CubeScanWrapperNode {
                                 .and_then(|f| f.qualifier().cloned()),
                             sql: sql.sql,
                             column_remapping: None,
+                            request: node.request.clone(),
                         });
                     } else if let Some(WrappedSelectNode {
                         schema,
-                        select_type: _select_type,
+                        select_type,
                         projection_expr,
                         group_expr,
                         aggr_expr,
@@ -266,24 +277,81 @@ impl CubeScanWrapperNode {
                         having_expr: _having_expr,
                         limit,
                         offset,
-                        order_expr: _order_expr,
+                        order_expr,
                         alias,
+                        ungrouped,
                     }) = wrapped_select_node
                     {
                         // TODO support joins
+                        let ungrouped_scan_node = if ungrouped {
+                            if let LogicalPlan::Extension(Extension { node }) = from.as_ref() {
+                                if let Some(cube_scan_node) =
+                                    node.as_any().downcast_ref::<CubeScanNode>()
+                                {
+                                    Some(Arc::new(cube_scan_node.clone()))
+                                } else {
+                                    return Err(CubeError::internal(format!(
+                                        "Expected CubeScan node but found: {:?}",
+                                        plan
+                                    )));
+                                }
+                            } else {
+                                return Err(CubeError::internal(format!(
+                                    "Expected CubeScan node but found: {:?}",
+                                    plan
+                                )));
+                            }
+                        } else {
+                            None
+                        };
                         let SqlGenerationResult {
                             data_source,
                             from_alias,
                             column_remapping,
                             sql,
-                        } = Self::generate_sql_for_node(
-                            plan.clone(),
-                            transport.clone(),
-                            load_request_meta.clone(),
-                            from.clone(),
-                            true,
-                        )
-                        .await?;
+                            request,
+                        } = if let Some(ungrouped_scan_node) = ungrouped_scan_node.clone() {
+                            let data_sources = ungrouped_scan_node
+                                .used_cubes
+                                .iter()
+                                .map(|c| plan.meta.cube_to_data_source.get(c).map(|c| c.to_string()))
+                                .unique()
+                                .collect::<Option<Vec<_>>>().ok_or_else(|| {
+                                CubeError::internal(format!(
+                                    "Can't generate SQL for node due to sql generator can't be found: {:?}",
+                                    ungrouped_scan_node
+                                ))
+                            })?;
+                            if data_sources.len() != 1 {
+                                return Err(CubeError::internal(format!(
+                                    "Can't generate SQL for node due to multiple data sources {}: {:?}",
+                                    data_sources.join(","),
+                                    ungrouped_scan_node
+                                )));
+                            }
+                            let sql = SqlQuery::new("".to_string(), Vec::new());
+                            SqlGenerationResult {
+                                data_source: Some(data_sources[0].clone()),
+                                from_alias: ungrouped_scan_node
+                                    .schema
+                                    .fields()
+                                    .iter()
+                                    .next()
+                                    .and_then(|f| f.qualifier().cloned()),
+                                column_remapping: None,
+                                sql,
+                                request: ungrouped_scan_node.request.clone(),
+                            }
+                        } else {
+                            Self::generate_sql_for_node(
+                                plan.clone(),
+                                transport.clone(),
+                                load_request_meta.clone(),
+                                from.clone(),
+                                true,
+                            )
+                            .await?
+                        };
                         let mut next_remapping = HashMap::new();
                         let alias = alias.or(from_alias.clone());
                         if let Some(data_source) = data_source {
@@ -301,71 +369,234 @@ impl CubeScanWrapperNode {
                             let (projection, sql) = Self::generate_column_expr(
                                 plan.clone(),
                                 schema.clone(),
-                                projection_expr,
+                                projection_expr.clone(),
                                 sql,
                                 generator.clone(),
                                 &column_remapping,
                                 &mut next_remapping,
                                 alias.clone(),
                                 can_rename_columns,
+                                ungrouped_scan_node.clone(),
                             )
                             .await?;
                             let (group_by, sql) = Self::generate_column_expr(
                                 plan.clone(),
                                 schema.clone(),
-                                group_expr,
+                                group_expr.clone(),
                                 sql,
                                 generator.clone(),
                                 &column_remapping,
                                 &mut next_remapping,
                                 alias.clone(),
                                 can_rename_columns,
+                                ungrouped_scan_node.clone(),
                             )
                             .await?;
-                            let (aggregate, mut sql) = Self::generate_column_expr(
+                            let (aggregate, sql) = Self::generate_column_expr(
                                 plan.clone(),
                                 schema.clone(),
-                                aggr_expr,
+                                aggr_expr.clone(),
                                 sql,
                                 generator.clone(),
                                 &column_remapping,
                                 &mut next_remapping,
                                 alias.clone(),
                                 can_rename_columns,
+                                ungrouped_scan_node.clone(),
                             )
                             .await?;
-                            let resulting_sql = generator
-                                .get_sql_templates()
-                                .select(
-                                    sql.sql.to_string(),
-                                    projection,
-                                    group_by,
-                                    aggregate,
-                                    // TODO
-                                    from_alias.unwrap_or("".to_string()),
-                                    None,
-                                    None,
-                                    Vec::new(),
-                                    limit,
-                                    offset,
-                                )
-                                .map_err(|e| {
-                                    DataFusionError::Internal(format!(
-                                        "Can't generate SQL for wrapped select: {}",
-                                        e
+                            // Sort node always comes on top and pushed down to select so we need to replace columns here by appropriate column definitions
+                            let order_replace_map = projection_expr
+                                .iter()
+                                .chain(group_expr.iter())
+                                .chain(aggr_expr.iter())
+                                .map(|e| {
+                                    Ok((
+                                        Column {
+                                            relation: alias.clone(),
+                                            name: expr_name(&e, &schema)?,
+                                        },
+                                        e.clone(),
                                     ))
-                                })?;
-                            sql.replace_sql(resulting_sql.clone());
-                            Ok(SqlGenerationResult {
-                                data_source: Some(data_source),
-                                from_alias: alias,
+                                })
+                                .collect::<Result<HashMap<_, _>>>()?;
+
+                            let (order, mut sql) = Self::generate_column_expr(
+                                plan.clone(),
+                                schema.clone(),
+                                order_expr
+                                    .iter()
+                                    .map(|o| {
+                                        replace_col_to_expr(
+                                            o.clone(),
+                                            &order_replace_map
+                                                .iter()
+                                                .map(|(k, v)| (k, v))
+                                                .collect(),
+                                        )
+                                    })
+                                    .collect::<Result<Vec<_>>>()?,
                                 sql,
-                                column_remapping: if next_remapping.len() > 0 {
-                                    Some(next_remapping)
-                                } else {
-                                    None
-                                },
-                            })
+                                generator.clone(),
+                                &column_remapping,
+                                &mut next_remapping,
+                                alias.clone(),
+                                can_rename_columns,
+                                ungrouped_scan_node.clone(),
+                            )
+                            .await?;
+                            if let Some(ungrouped_scan_node) = ungrouped_scan_node.clone() {
+                                let mut load_request = ungrouped_scan_node.request.clone();
+                                load_request.measures = Some(
+                                    aggregate
+                                        .iter()
+                                        .map(|m| {
+                                            Self::ungrouped_member_def(
+                                                m,
+                                                &ungrouped_scan_node.used_cubes,
+                                            )
+                                        })
+                                        .chain(
+                                            // TODO understand type of projections
+                                            projection.iter().map(|m| {
+                                                Self::ungrouped_member_def(
+                                                    m,
+                                                    &ungrouped_scan_node.used_cubes,
+                                                )
+                                            }),
+                                        )
+                                        .collect::<Result<_>>()?,
+                                );
+                                load_request.dimensions = Some(
+                                    group_by
+                                        .iter()
+                                        .map(|m| {
+                                            Self::ungrouped_member_def(
+                                                m,
+                                                &ungrouped_scan_node.used_cubes,
+                                            )
+                                        })
+                                        .collect::<Result<_>>()?,
+                                );
+                                if !order_expr.is_empty() {
+                                    load_request.order = Some(
+                                        order_expr
+                                            .iter()
+                                            .map(|o| -> Result<_> { match o {
+                                                Expr::Sort {
+                                                    expr,
+                                                    asc,
+                                                    ..
+                                                } => {
+                                                    let col_name = expr_name(&expr, &schema)?;
+                                                    let aliased_column = aggr_expr
+                                                        .iter()
+                                                        .find_position(|e| {
+                                                            expr_name(e, &schema).map(|n| &n == &col_name).unwrap_or(false)
+                                                        })
+                                                        .map(|(i, _)| aggregate[i].clone()).or_else(|| {
+                                                            projection_expr
+                                                                .iter()
+                                                                .find_position(|e| {
+                                                                    expr_name(e, &schema).map(|n| &n == &col_name).unwrap_or(false)
+                                                                })
+                                                                .map(|(i, _)| {
+                                                                    projection[i].clone()
+                                                                })
+                                                        }).or_else(|| {
+                                                            group_expr
+                                                                .iter()
+                                                                .find_position(|e| {
+                                                                    expr_name(e, &schema).map(|n| &n == &col_name).unwrap_or(false)
+                                                                })
+                                                                .map(|(i, _)| group_by[i].clone())
+                                                        }).ok_or_else(|| {
+                                                            DataFusionError::Execution(format!(
+                                                                "Can't find column {} in projection {:?} or aggregate {:?} or group {:?}",
+                                                                col_name,
+                                                                projection,
+                                                                aggregate,
+                                                                group_by
+                                                            ))
+                                                        })?;
+                                                    Ok(vec![
+                                                        aliased_column.alias.clone(),
+                                                        if *asc { "asc".to_string() } else { "desc".to_string() },
+                                                    ])
+                                                }
+                                                _ => Err(DataFusionError::Execution(format!(
+                                                    "Expected sort expression, found {:?}",
+                                                    o
+                                                ))),
+                                            }})
+                                            .collect::<Result<Vec<_>>>()?,
+                                    );
+                                }
+                                load_request.ungrouped =
+                                    if let WrappedSelectType::Projection = select_type {
+                                        load_request.ungrouped.clone()
+                                    } else {
+                                        None
+                                    };
+                                // TODO time dimensions, filters, segments, order, limit, offset
+
+                                let sql_response = transport
+                                    .sql(
+                                        load_request.clone(),
+                                        ungrouped_scan_node.auth_context.clone(),
+                                        load_request_meta.as_ref().clone(),
+                                        // TODO use aliases or push everything through names?
+                                        None,
+                                        Some(sql.values.clone()),
+                                    )
+                                    .await?;
+
+                                Ok(SqlGenerationResult {
+                                    data_source: Some(data_source),
+                                    from_alias: alias,
+                                    sql: sql_response.sql,
+                                    column_remapping: if next_remapping.len() > 0 {
+                                        Some(next_remapping)
+                                    } else {
+                                        None
+                                    },
+                                    request: load_request.clone(),
+                                })
+                            } else {
+                                let resulting_sql = generator
+                                    .get_sql_templates()
+                                    .select(
+                                        sql.sql.to_string(),
+                                        projection,
+                                        group_by,
+                                        aggregate,
+                                        // TODO
+                                        from_alias.unwrap_or("".to_string()),
+                                        None,
+                                        None,
+                                        order,
+                                        limit,
+                                        offset,
+                                    )
+                                    .map_err(|e| {
+                                        DataFusionError::Internal(format!(
+                                            "Can't generate SQL for wrapped select: {}",
+                                            e
+                                        ))
+                                    })?;
+                                sql.replace_sql(resulting_sql.clone());
+                                Ok(SqlGenerationResult {
+                                    data_source: Some(data_source),
+                                    from_alias: alias,
+                                    sql,
+                                    column_remapping: if next_remapping.len() > 0 {
+                                        Some(next_remapping)
+                                    } else {
+                                        None
+                                    },
+                                    request,
+                                })
+                            }
                         } else {
                             Err(CubeError::internal(format!(
                                 "Can't generate SQL for wrapped select: no data source for {:?}",
@@ -400,6 +631,7 @@ impl CubeScanWrapperNode {
         next_remapping: &mut HashMap<Column, Column>,
         from_alias: Option<String>,
         can_rename_columns: bool,
+        ungrouped_scan_node: Option<Arc<CubeScanNode>>,
     ) -> result::Result<(Vec<AliasedColumn>, SqlQuery), CubeError> {
         let non_id_regex = Regex::new(r"[^a-zA-Z0-9_]")
             .map_err(|e| CubeError::internal(format!("Can't parse regex: {}", e)))?;
@@ -426,15 +658,20 @@ impl CubeScanWrapperNode {
             } else {
                 original_expr.clone()
             };
-            let (expr_sql, new_sql_query) =
-                Self::generate_sql_for_expr(plan.clone(), sql, generator.clone(), expr.clone())
-                    .await?;
+            let (expr_sql, new_sql_query) = Self::generate_sql_for_expr(
+                plan.clone(),
+                sql,
+                generator.clone(),
+                expr.clone(),
+                ungrouped_scan_node.clone(),
+            )
+            .await?;
             sql = new_sql_query;
 
             let original_alias = expr_name(&original_expr, &schema)?;
             let alias = if can_rename_columns {
                 let alias = expr_name(&expr, &schema)?;
-                let mut truncated_alias = non_id_regex.replace_all(&alias, "_").to_string();
+                let mut truncated_alias = non_id_regex.replace_all(&alias, "_").to_lowercase();
                 truncated_alias.truncate(16);
                 let mut alias = truncated_alias.clone();
                 for i in 1..10000 {
@@ -479,11 +716,28 @@ impl CubeScanWrapperNode {
         Ok((aliased_columns, sql))
     }
 
+    fn ungrouped_member_def(column: &AliasedColumn, used_cubes: &Vec<String>) -> Result<String> {
+        let cube_params = used_cubes.iter().join(",");
+        Ok(format!(
+            "{}.{}:({}):{}",
+            used_cubes.iter().next().ok_or_else(|| {
+                DataFusionError::Internal(format!(
+                    "Can't generate SQL for column without cubes: {:?}",
+                    column
+                ))
+            })?,
+            column.alias,
+            cube_params,
+            column.expr
+        ))
+    }
+
     pub fn generate_sql_for_expr(
         plan: Arc<Self>,
         mut sql_query: SqlQuery,
         sql_generator: Arc<dyn SqlGenerator>,
         expr: Expr,
+        ungrouped_scan_node: Option<Arc<CubeScanNode>>,
     ) -> Pin<Box<dyn Future<Output = Result<(String, SqlQuery)>> + Send>> {
         Box::pin(async move {
             match expr {
@@ -493,38 +747,83 @@ impl CubeScanWrapperNode {
                         sql_query,
                         sql_generator.clone(),
                         *expr,
+                        ungrouped_scan_node,
                     )
                     .await?;
                     Ok((expr, sql_query))
                 }
                 // Expr::OuterColumn(_, _) => {}
-                Expr::Column(c) => Ok((
-                    match c.relation.as_ref() {
-                        Some(r) => format!(
-                            "{}.{}",
-                            r,
-                            sql_generator
-                                .get_sql_templates()
-                                .quote_identifier(&c.name)
-                                .map_err(|e| {
-                                    DataFusionError::Internal(format!(
-                                        "Can't generate SQL for column: {}",
-                                        e
-                                    ))
-                                })?
-                        ),
-                        None => sql_generator
-                            .get_sql_templates()
-                            .quote_identifier(&c.name)
-                            .map_err(|e| {
+                Expr::Column(c) => {
+                    if let Some(scan_node) = ungrouped_scan_node.as_ref() {
+                        let field_index = scan_node
+                            .schema
+                            .fields()
+                            .iter()
+                            .find_position(|f| {
+                                f.name() == &c.name
+                                    && match c.relation.as_ref() {
+                                        Some(r) => Some(r) == f.qualifier(),
+                                        None => true,
+                                    }
+                            })
+                            .ok_or_else(|| {
                                 DataFusionError::Internal(format!(
-                                    "Can't generate SQL for column: {}",
-                                    e
+                                    "Can't find column {} in ungrouped scan node",
+                                    c.name
                                 ))
-                            })?,
-                    },
-                    sql_query,
-                )),
+                            })?
+                            .0;
+                        let member = scan_node.member_fields.get(field_index).ok_or_else(|| {
+                            DataFusionError::Internal(format!(
+                                "Can't find member for column {} in ungrouped scan node",
+                                c.name
+                            ))
+                        })?;
+                        match member {
+                            MemberField::Member(member) => {
+                                Ok((format!("${{{}}}", member), sql_query))
+                            }
+                            MemberField::Literal(value) => {
+                                Self::generate_sql_for_expr(
+                                    plan.clone(),
+                                    sql_query,
+                                    sql_generator.clone(),
+                                    Expr::Literal(value.clone()),
+                                    ungrouped_scan_node.clone(),
+                                )
+                                .await
+                            }
+                        }
+                    } else {
+                        Ok((
+                            match c.relation.as_ref() {
+                                Some(r) => format!(
+                                    "{}.{}",
+                                    r,
+                                    sql_generator
+                                        .get_sql_templates()
+                                        .quote_identifier(&c.name)
+                                        .map_err(|e| {
+                                            DataFusionError::Internal(format!(
+                                                "Can't generate SQL for column: {}",
+                                                e
+                                            ))
+                                        })?
+                                ),
+                                None => sql_generator
+                                    .get_sql_templates()
+                                    .quote_identifier(&c.name)
+                                    .map_err(|e| {
+                                        DataFusionError::Internal(format!(
+                                            "Can't generate SQL for column: {}",
+                                            e
+                                        ))
+                                    })?,
+                            },
+                            sql_query,
+                        ))
+                    }
+                }
                 // Expr::ScalarVariable(_, _) => {}
                 Expr::BinaryExpr { left, op, right } => {
                     let (left, sql_query) = Self::generate_sql_for_expr(
@@ -532,6 +831,7 @@ impl CubeScanWrapperNode {
                         sql_query,
                         sql_generator.clone(),
                         *left,
+                        ungrouped_scan_node.clone(),
                     )
                     .await?;
                     let (right, sql_query) = Self::generate_sql_for_expr(
@@ -539,17 +839,21 @@ impl CubeScanWrapperNode {
                         sql_query,
                         sql_generator.clone(),
                         *right,
+                        ungrouped_scan_node.clone(),
                     )
                     .await?;
-                    let resulting_sql = sql_generator
-                        .get_sql_templates()
-                        .binary_expr(left, op.to_string(), right)
-                        .map_err(|e| {
-                            DataFusionError::Internal(format!(
-                                "Can't generate SQL for binary expr: {}",
-                                e
-                            ))
-                        })?;
+                    let resulting_sql = Self::escape_interpolation_quotes(
+                        sql_generator
+                            .get_sql_templates()
+                            .binary_expr(left, op.to_string(), right)
+                            .map_err(|e| {
+                                DataFusionError::Internal(format!(
+                                    "Can't generate SQL for binary expr: {}",
+                                    e
+                                ))
+                            })?,
+                        ungrouped_scan_node.is_some(),
+                    );
                     Ok((resulting_sql, sql_query))
                 }
                 // Expr::AnyExpr { .. } => {}
@@ -573,6 +877,7 @@ impl CubeScanWrapperNode {
                             sql_query,
                             sql_generator.clone(),
                             *expr,
+                            ungrouped_scan_node.clone(),
                         )
                         .await?;
                         sql_query = sql_query_next;
@@ -587,6 +892,7 @@ impl CubeScanWrapperNode {
                             sql_query,
                             sql_generator.clone(),
                             *when,
+                            ungrouped_scan_node.clone(),
                         )
                         .await?;
                         let (then, sql_query_next) = Self::generate_sql_for_expr(
@@ -594,6 +900,7 @@ impl CubeScanWrapperNode {
                             sql_query_next,
                             sql_generator.clone(),
                             *then,
+                            ungrouped_scan_node.clone(),
                         )
                         .await?;
                         sql_query = sql_query_next;
@@ -605,6 +912,7 @@ impl CubeScanWrapperNode {
                             sql_query,
                             sql_generator.clone(),
                             *else_expr,
+                            ungrouped_scan_node.clone(),
                         )
                         .await?;
                         sql_query = sql_query_next;
@@ -612,17 +920,49 @@ impl CubeScanWrapperNode {
                     } else {
                         None
                     };
-                    let resulting_sql = sql_generator
-                        .get_sql_templates()
-                        .case(expr, when_then_expr_sql, else_expr)
-                        .map_err(|e| {
-                            DataFusionError::Internal(format!("Can't generate SQL for case: {}", e))
-                        })?;
+                    let resulting_sql = Self::escape_interpolation_quotes(
+                        sql_generator
+                            .get_sql_templates()
+                            .case(expr, when_then_expr_sql, else_expr)
+                            .map_err(|e| {
+                                DataFusionError::Internal(format!(
+                                    "Can't generate SQL for case: {}",
+                                    e
+                                ))
+                            })?,
+                        ungrouped_scan_node.is_some(),
+                    );
                     Ok((resulting_sql, sql_query))
                 }
                 // Expr::Cast { .. } => {}
                 // Expr::TryCast { .. } => {}
-                // Expr::Sort { .. } => {}
+                Expr::Sort {
+                    expr,
+                    asc,
+                    nulls_first,
+                } => {
+                    let (expr, sql_query) = Self::generate_sql_for_expr(
+                        plan.clone(),
+                        sql_query,
+                        sql_generator.clone(),
+                        *expr,
+                        ungrouped_scan_node.clone(),
+                    )
+                    .await?;
+                    let resulting_sql = Self::escape_interpolation_quotes(
+                        sql_generator
+                            .get_sql_templates()
+                            .sort_expr(expr, asc, nulls_first)
+                            .map_err(|e| {
+                                DataFusionError::Internal(format!(
+                                    "Can't generate SQL for sort expr: {}",
+                                    e
+                                ))
+                            })?,
+                        ungrouped_scan_node.is_some(),
+                    );
+                    Ok((resulting_sql, sql_query))
+                }
                 // Expr::ScalarUDF { .. } => {}
                 // Expr::TableUDF { .. } => {}
                 Expr::Literal(literal) => {
@@ -703,21 +1043,25 @@ impl CubeScanWrapperNode {
                             sql_query,
                             sql_generator.clone(),
                             arg,
+                            ungrouped_scan_node.clone(),
                         )
                         .await?;
                         sql_query = query;
                         sql_args.push(sql);
                     }
                     Ok((
-                        sql_generator
-                            .get_sql_templates()
-                            .scalar_function(fun, sql_args)
-                            .map_err(|e| {
-                                DataFusionError::Internal(format!(
-                                    "Can't generate SQL for scalar function: {}",
-                                    e
-                                ))
-                            })?,
+                        Self::escape_interpolation_quotes(
+                            sql_generator
+                                .get_sql_templates()
+                                .scalar_function(fun, sql_args)
+                                .map_err(|e| {
+                                    DataFusionError::Internal(format!(
+                                        "Can't generate SQL for scalar function: {}",
+                                        e
+                                    ))
+                                })?,
+                            ungrouped_scan_node.is_some(),
+                        ),
                         sql_query,
                     ))
                 }
@@ -741,21 +1085,25 @@ impl CubeScanWrapperNode {
                             sql_query,
                             sql_generator.clone(),
                             arg,
+                            ungrouped_scan_node.clone(),
                         )
                         .await?;
                         sql_query = query;
                         sql_args.push(sql);
                     }
                     Ok((
-                        sql_generator
-                            .get_sql_templates()
-                            .aggregate_function(fun, sql_args, distinct)
-                            .map_err(|e| {
-                                DataFusionError::Internal(format!(
-                                    "Can't generate SQL for aggregate function: {}",
-                                    e
-                                ))
-                            })?,
+                        Self::escape_interpolation_quotes(
+                            sql_generator
+                                .get_sql_templates()
+                                .aggregate_function(fun, sql_args, distinct)
+                                .map_err(|e| {
+                                    DataFusionError::Internal(format!(
+                                        "Can't generate SQL for aggregate function: {}",
+                                        e
+                                    ))
+                                })?,
+                            ungrouped_scan_node.is_some(),
+                        ),
                         sql_query,
                     ))
                 }
@@ -772,6 +1120,14 @@ impl CubeScanWrapperNode {
                 }
             }
         })
+    }
+
+    fn escape_interpolation_quotes(s: String, ungrouped: bool) -> String {
+        if ungrouped {
+            s.replace("`", "\\`")
+        } else {
+            s
+        }
     }
 }
 
@@ -810,6 +1166,7 @@ impl UserDefinedLogicalNode for CubeScanWrapperNode {
             meta: self.meta.clone(),
             auth_context: self.auth_context.clone(),
             wrapped_sql: self.wrapped_sql.clone(),
+            request: self.request.clone(),
         })
     }
 }

@@ -147,6 +147,7 @@ pub struct WrappedSelectNode {
     pub offset: Option<usize>,
     pub order_expr: Vec<Expr>,
     pub alias: Option<String>,
+    pub ungrouped: bool,
 }
 
 impl WrappedSelectNode {
@@ -164,6 +165,7 @@ impl WrappedSelectNode {
         offset: Option<usize>,
         order_expr: Vec<Expr>,
         alias: Option<String>,
+        ungrouped: bool,
     ) -> Self {
         Self {
             schema,
@@ -179,6 +181,7 @@ impl WrappedSelectNode {
             offset,
             order_expr,
             alias,
+            ungrouped,
         }
     }
 }
@@ -309,6 +312,7 @@ impl UserDefinedLogicalNode for WrappedSelectNode {
             offset,
             order_expr,
             alias,
+            self.ungrouped,
         ))
     }
 }
@@ -369,7 +373,7 @@ impl ExtensionPlanner for CubeScanExtensionPlanner {
                     schema,
                     member_fields,
                     transport: self.transport.clone(),
-                    request: scan_node.request.clone(),
+                    request: wrapper_node.request.clone().unwrap_or(scan_node.request.clone()),
                     wrapped_sql: Some(wrapper_node.wrapped_sql.as_ref().ok_or_else(|| {
                         DataFusionError::Internal(format!(
                             "Wrapped SQL is not set for wrapper node. Optimization wasn't performed: {:?}",
@@ -1094,6 +1098,7 @@ mod tests {
                 _ctx: AuthContextRef,
                 _meta_fields: LoadRequestMeta,
                 _member_to_alias: Option<HashMap<String, String>>,
+                _expression_params: Option<Vec<Option<String>>>,
             ) -> Result<SqlResponse, CubeError> {
                 todo!()
             }

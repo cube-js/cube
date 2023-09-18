@@ -20,7 +20,7 @@ use tokio::sync::{oneshot, watch, Notify, RwLock};
 use tracing::{instrument, Instrument};
 use tracing_futures::WithSubscriber;
 
-use crate::config::{Config, WorkerServices};
+use crate::config::{env_parse, Config, WorkerServices};
 use crate::util::respawn::respawn;
 use crate::CubeError;
 use datafusion::cube_ext;
@@ -336,6 +336,8 @@ where
     if let Ok(var) = std::env::var("CUBESTORE_EVENT_LOOP_WORKER_THREADS") {
         tokio_builder.worker_threads(var.parse().unwrap());
     }
+    let stack_size = env_parse("CUBESTORE_SELECT_WORKER_STACK_SIZE", 4 * 1024 * 1024);
+    tokio_builder.thread_stack_size(stack_size);
     let runtime = tokio_builder.build().unwrap();
     worker_setup(&runtime);
     runtime.block_on(async move {

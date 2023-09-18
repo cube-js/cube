@@ -42,6 +42,73 @@ impl CacheStoreSqlService {
                 self.cachestore.compaction().await?;
                 Ok(Arc::new(DataFrame::new(vec![], vec![])))
             }
+            CacheStoreCommand::Info => {
+                let result = self.cachestore.info().await?;
+                let mut rows = vec![];
+
+                for table in result.tables {
+                    rows.push(Row::new(vec![
+                        TableValue::String(format!("{}.keys_total", table.table_name)),
+                        TableValue::String(table.keys_total.to_string()),
+                        TableValue::Null,
+                    ]));
+                    rows.push(Row::new(vec![
+                        TableValue::String(format!("{}.size_total", table.table_name)),
+                        TableValue::String(humansize::format_size(
+                            table.size_total,
+                            humansize::DECIMAL,
+                        )),
+                        TableValue::Null,
+                    ]));
+
+                    rows.push(Row::new(vec![
+                        TableValue::String(format!("{}.expired_keys_total", table.table_name)),
+                        TableValue::String(table.expired_keys_total.to_string()),
+                        TableValue::String("Total number of keys that expired but were not truncated via compaction.".to_string()),
+                    ]));
+                    rows.push(Row::new(vec![
+                        TableValue::String(format!("{}.expired_size_total", table.table_name)),
+                        TableValue::String(humansize::format_size(table.expired_size_total, humansize::DECIMAL)),
+                        TableValue::String("Total size of keys that expired but were not truncated via compaction.".to_string()),
+                    ]));
+
+                    rows.push(Row::new(vec![
+                        TableValue::String(format!("{}.min_row_size", table.table_name)),
+                        TableValue::String(humansize::format_size(
+                            table.min_row_size,
+                            humansize::DECIMAL,
+                        )),
+                        TableValue::Null,
+                    ]));
+
+                    rows.push(Row::new(vec![
+                        TableValue::String(format!("{}.max_row_size", table.table_name)),
+                        TableValue::String(humansize::format_size(
+                            table.max_row_size,
+                            humansize::DECIMAL,
+                        )),
+                        TableValue::Null,
+                    ]));
+
+                    rows.push(Row::new(vec![
+                        TableValue::String(format!("{}.avg_row_size", table.table_name)),
+                        TableValue::String(humansize::format_size(
+                            table.avg_row_size,
+                            humansize::DECIMAL,
+                        )),
+                        TableValue::Null,
+                    ]));
+                }
+
+                Ok(Arc::new(DataFrame::new(
+                    vec![
+                        Column::new("name".to_string(), ColumnType::String, 0),
+                        Column::new("value".to_string(), ColumnType::String, 1),
+                        Column::new("description".to_string(), ColumnType::String, 2),
+                    ],
+                    rows,
+                )))
+            }
             CacheStoreCommand::Eviction => {
                 let result = self.cachestore.eviction().await?;
 

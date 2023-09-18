@@ -29,7 +29,7 @@ module.exports = {
 
   product: {
     type: "page",
-    title: "Docs",
+    title: "Documentation",
   },
 
   reference: {

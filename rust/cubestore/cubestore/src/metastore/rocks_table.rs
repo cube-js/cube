@@ -2,7 +2,8 @@ use crate::metastore::rocks_store::TableId;
 use crate::metastore::{
     get_fixed_prefix, BatchPipe, DbTableRef, IdRow, IndexId, KeyVal, MemorySequence,
     MetaStoreEvent, RocksSecondaryIndexValue, RocksSecondaryIndexValueTTLExtended,
-    RocksSecondaryIndexValueVersion, RowKey, SecondaryIndexInfo, SecondaryKey, TableInfo,
+    RocksSecondaryIndexValueVersion, RocksTableStats, RowKey, SecondaryIndexInfo, SecondaryKey,
+    TableInfo,
 };
 use crate::CubeError;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
@@ -1162,6 +1163,71 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
             .into_iter()
             .find(|i| i.get_id() == secondary_index)
             .unwrap()
+    }
+
+    fn collect_table_stats_by_extended_index<'a, K: Debug>(
+        &'a self,
+        secondary_index: &'a impl RocksSecondaryIndex<Self::T, K>,
+        default_size: u64,
+    ) -> Result<RocksTableStats, CubeError>
+    where
+        K: Hash,
+    {
+        let mut keys_total: u32 = 0;
+        let mut expired_keys_total: u32 = 0;
+        let mut size_total: u64 = 0;
+        let mut expired_size_total: u64 = 0;
+        let mut min_row_size: u64 = u64::MAX;
+        let mut avg_row_size: u64 = 0;
+        let mut max_row_size: u64 = u64::MIN;
+
+        let now = Utc::now();
+
+        for item in self.scan_index_values(secondary_index)? {
+            let item = item?;
+
+            let raw_size = if let Some(extended) = item.extended {
+                extended.raw_size as u64
+            } else {
+                default_size
+            };
+
+            keys_total += 1;
+            size_total += raw_size;
+
+            if max_row_size < raw_size {
+                max_row_size = raw_size;
+            }
+
+            if min_row_size > raw_size {
+                min_row_size = raw_size;
+            }
+
+            avg_row_size = (avg_row_size + raw_size) / 2;
+
+            if let Some(ttl) = item.ttl {
+                if ttl < now {
+                    expired_keys_total += 1;
+                    expired_size_total += raw_size;
+                }
+            }
+        }
+
+        if keys_total == 0 {
+            max_row_size = 0;
+            min_row_size = 0;
+        }
+
+        Ok(RocksTableStats {
+            table_name: format!("{:?}", Self::table_id()),
+            keys_total,
+            size_total,
+            expired_keys_total,
+            expired_size_total,
+            min_row_size,
+            max_row_size,
+            avg_row_size,
+        })
     }
 
     fn get_row_ids_from_index(

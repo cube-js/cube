@@ -3393,6 +3393,24 @@ pub fn create_udtf_stub(
     )
 }
 
+pub fn create_inet_server_addr_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |_: &[ArrayRef]| {
+        let mut builder = StringBuilder::new(1);
+        builder.append_value("127.0.0.1/32").unwrap();
+
+        Ok(Arc::new(builder.finish()) as ArrayRef)
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Utf8)));
+
+    ScalarUDF::new(
+        "inet_server_addr",
+        &Signature::exact(vec![], Volatility::Immutable),
+        &return_type,
+        &fun,
+    )
+}
+
 pub fn register_fun_stubs(mut ctx: SessionContext) -> SessionContext {
     macro_rules! register_fun_stub {
         ($FTYP:ident, $NAME:expr, argc=$ARGC:expr $(, rettyp=$RETTYP:ident)? $(, vol=$VOL:ident)?) => {
@@ -3795,13 +3813,6 @@ pub fn register_fun_stubs(mut ctx: SessionContext) -> SessionContext {
         "inet_client_port",
         argc = 0,
         rettyp = Int32,
-        vol = Stable
-    );
-    register_fun_stub!(
-        udf,
-        "inet_server_addr",
-        argc = 0,
-        rettyp = Utf8,
         vol = Stable
     );
     register_fun_stub!(

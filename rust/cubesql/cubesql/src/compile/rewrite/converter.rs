@@ -12,10 +12,10 @@ use crate::{
             AggregateFunctionExprFun, AggregateSplit, AggregateUDFExprFun, AliasExprAlias,
             AnyExprOp, BetweenExprNegated, BinaryExprOp, CastExprDataType, ChangeUserMemberValue,
             ColumnExprColumn, CubeScanAliasToCube, CubeScanLimit, CubeScanOffset,
-            CubeScanUngrouped, DimensionName, EmptyRelationProduceOneRow, FilterMemberMember,
-            FilterMemberOp, FilterMemberValues, FilterOpOp, InListExprNegated, JoinJoinConstraint,
-            JoinJoinType, JoinLeftOn, JoinRightOn, LikeExprEscapeChar, LikeExprLikeType,
-            LikeExprNegated, LikeType, LimitFetch, LimitSkip, LiteralExprValue,
+            CubeScanUngrouped, CubeScanWrapped, DimensionName, EmptyRelationProduceOneRow,
+            FilterMemberMember, FilterMemberOp, FilterMemberValues, FilterOpOp, InListExprNegated,
+            JoinJoinConstraint, JoinJoinType, JoinLeftOn, JoinRightOn, LikeExprEscapeChar,
+            LikeExprLikeType, LikeExprNegated, LikeType, LimitFetch, LimitSkip, LiteralExprValue,
             LiteralMemberRelation, LiteralMemberValue, LogicalPlanLanguage, MeasureName,
             MemberErrorError, OrderAsc, OrderMember, OuterColumnExprColumn,
             OuterColumnExprDataType, ProjectionAlias, ProjectionSplit, ScalarFunctionExprFun,
@@ -25,10 +25,11 @@ use crate::{
             TimeDimensionDateRange, TimeDimensionGranularity, TimeDimensionName,
             TryCastExprDataType, UnionAlias, WindowFunctionExprFun, WindowFunctionExprWindowFrame,
             WrappedSelectAlias, WrappedSelectJoinJoinType, WrappedSelectLimit, WrappedSelectOffset,
-            WrappedSelectSelectType, WrappedSelectType,
+            WrappedSelectSelectType, WrappedSelectType, WrappedSelectUngrouped,
         },
     },
     sql::AuthContextRef,
+    transport::V1CubeMetaExt,
     CubeError,
 };
 use cubeclient::models::{
@@ -1155,6 +1156,8 @@ impl LanguageToLogicalPlanConverter {
                             match_list_node!(node_by_id, cube_scan_params[1], CubeScanMembers);
                         let order =
                             match_list_node!(node_by_id, cube_scan_params[3], CubeScanOrder);
+                        let wrapped =
+                            match_data_node!(node_by_id, cube_scan_params[8], CubeScanWrapped);
                         // TODO filters
                         // TODO
                         let mut query = V1LoadRequestQuery::new();
@@ -1322,10 +1325,39 @@ impl LanguageToLogicalPlanConverter {
                                     return Err(CubeError::user(error.to_string()));
                                 }
                                 LogicalPlanLanguage::AllMembers(_) => {
-                                    return Err(CubeError::internal(
-                                        "Can't detect Cube query and it may be not supported yet"
-                                            .to_string(),
-                                    ));
+                                    if !wrapped {
+                                        return Err(CubeError::internal(
+                                            "Can't detect Cube query and it may be not supported yet"
+                                                .to_string(),
+                                        ));
+                                    } else {
+                                        for (alias, cube) in alias_to_cube.iter() {
+                                            let cube = self
+                                                .cube_context
+                                                .meta
+                                                .find_cube_with_name(cube)
+                                                .ok_or_else(|| {
+                                                    CubeError::user(format!(
+                                                        "Can't find cube '{}'",
+                                                        cube
+                                                    ))
+                                                })?;
+                                            for column in cube.get_columns() {
+                                                // TODO literal members and cube members
+                                                fields.push((
+                                                    DFField::new(
+                                                        Some(&alias),
+                                                        column.get_name(),
+                                                        column.get_column_type().to_arrow(),
+                                                        true,
+                                                    ),
+                                                    MemberField::Member(
+                                                        column.member_name().to_string(),
+                                                    ),
+                                                ));
+                                            }
+                                        }
+                                    }
                                 }
                                 x => panic!("Expected dimension but found {:?}", x),
                             }
@@ -1515,7 +1547,7 @@ impl LanguageToLogicalPlanConverter {
                             ])
                         }
 
-                        if fields.len() == 0 {
+                        if !wrapped && fields.len() == 0 {
                             return Err(CubeError::internal(
                                 "Can't detect Cube query and it may be not supported yet"
                                     .to_string(),
@@ -1664,6 +1696,7 @@ impl LanguageToLogicalPlanConverter {
                 let order_expr =
                     match_expr_list_node!(node_by_id, to_expr, params[10], WrappedSelectOrderExpr);
                 let alias = match_data_node!(node_by_id, params[11], WrappedSelectAlias);
+                let ungrouped = match_data_node!(node_by_id, params[12], WrappedSelectUngrouped);
 
                 let group_expr = normalize_cols(group_expr, &from)?;
                 let aggr_expr = normalize_cols(aggr_expr, &from)?;
@@ -1700,6 +1733,7 @@ impl LanguageToLogicalPlanConverter {
                         offset,
                         order_expr,
                         alias,
+                        ungrouped,
                     )),
                 })
             }

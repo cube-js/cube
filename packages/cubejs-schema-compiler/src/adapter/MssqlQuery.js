@@ -73,8 +73,8 @@ export class MssqlQuery extends BaseQuery {
     return GRANULARITY_TO_INTERVAL[granularity](dimension);
   }
 
-  newParamAllocator() {
-    return new MssqlParamAllocator();
+  newParamAllocator(expressionParams) {
+    return new MssqlParamAllocator(expressionParams);
   }
 
   groupByDimensionLimit() {

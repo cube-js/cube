@@ -189,7 +189,7 @@ pub fn from_minijinja_value(from: &mj::value::Value) -> Result<CLRepr, mj::Error
             } else {
                 Err(mj::Error::new(
                     mj::ErrorKind::InvalidOperation,
-                    format!("Converting from {:?} to python is not supported", from),
+                    format!("Converting from {:?} to Python is not supported", from),
                 ))
             }
         }
@@ -201,16 +201,69 @@ pub fn from_minijinja_value(from: &mj::value::Value) -> Result<CLRepr, mj::Error
                 Ok(CLRepr::String(from.as_str().unwrap().to_string()))
             }
         }
+        ValueKind::Seq => {
+            let seq = if let Some(seq) = from.as_seq() {
+                seq
+            } else {
+                return Err(mj::Error::new(
+                    mj::ErrorKind::InvalidOperation,
+                    format!("Unable to convert Seq to Python"),
+                ));
+            };
+
+            let mut arr = Vec::with_capacity(seq.item_count());
+
+            for idx in 0..seq.item_count() {
+                let v = if let Some(value) = seq.get_item(idx) {
+                    from_minijinja_value(&value)?
+                } else {
+                    CLRepr::Null
+                };
+
+                arr.push(v)
+            }
+
+            Ok(CLRepr::Array(arr))
+        }
+        ValueKind::Map => {
+            let mut obj = CLReprObject::new();
+
+            for key in from.try_iter()? {
+                let value = if let Ok(v) = from.get_item(&key) {
+                    from_minijinja_value(&v)?
+                } else {
+                    CLRepr::Null
+                };
+
+                let key_str = if let Some(key) = key.as_str() {
+                    key.to_string()
+                } else {
+                    return Err(mj::Error::new(
+                        mj::ErrorKind::InvalidOperation,
+                        format!(
+                            "Unable to convert Map to Python object: key must be string, actual: {}",
+                            key.kind()
+                        ),
+                    ));
+                };
+
+                obj.insert(key_str, value);
+            }
+
+            Ok(CLRepr::Object(obj))
+        }
         other => Err(mj::Error::new(
             mj::ErrorKind::InvalidOperation,
-            format!("Converting from {:?} to python is not supported", other),
+            format!("Converting from {:?} to Python is not supported", other),
         )),
     }
 }
 
 pub fn to_minijinja_value(from: CLRepr) -> Value {
     match from {
-        CLRepr::Array(inner) => Value::from_seq_object(JinjaSequenceObject { inner }),
+        CLRepr::Tuple(inner) | CLRepr::Array(inner) => {
+            Value::from_seq_object(JinjaSequenceObject { inner })
+        }
         CLRepr::Object(inner) => Value::from_object(JinjaDynamicObject { inner }),
         CLRepr::String(v) => Value::from(v),
         CLRepr::Float(v) => Value::from(v),

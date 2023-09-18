@@ -59,16 +59,16 @@ function wrapToFnIfNeeded<T, R>(possibleFn: T | ((a: R) => T)): (a: R) => T {
   return () => possibleFn;
 }
 
-class AcceptAllAcceptor {
-  public shouldAccept(): ContextAcceptanceResult {
+class AcceptAllAcceptor implements ContextAcceptor {
+  public async shouldAccept(): Promise<ContextAcceptanceResult> {
     return { accepted: true };
   }
 
-  public shouldAcceptHttp(): ContextAcceptanceResultHttp {
+  public async shouldAcceptHttp(): Promise<ContextAcceptanceResultHttp> {
     return { accepted: true };
   }
 
-  public shouldAcceptWs(): ContextAcceptanceResultWs {
+  public async shouldAcceptWs(): Promise<ContextAcceptanceResultWs> {
     return { accepted: true };
   }
 }
@@ -465,8 +465,8 @@ export class CubejsServerCore {
 
   protected createApiGatewayInstance(
     apiSecret: string,
-    getCompilerApi: (context: RequestContext) => CompilerApi,
-    getOrchestratorApi: (context: RequestContext) => OrchestratorApi,
+    getCompilerApi: (context: RequestContext) => Promise<CompilerApi>,
+    getOrchestratorApi: (context: RequestContext) => Promise<OrchestratorApi>,
     logger: LoggerFn,
     options: ApiGatewayOptions
   ): ApiGateway {
@@ -475,7 +475,7 @@ export class CubejsServerCore {
 
   protected async contextRejectionMiddleware(req, res, next) {
     if (!this.standalone) {
-      const result = this.contextAcceptor.shouldAcceptHttp(req.context);
+      const result = await this.contextAcceptor.shouldAcceptHttp(req.context);
       if (!result.accepted) {
         res.writeHead(result.rejectStatusCode!, result.rejectHeaders!);
         res.send();
@@ -487,8 +487,8 @@ export class CubejsServerCore {
     }
   }
 
-  public getCompilerApi(context: RequestContext) {
-    const appId = this.contextToAppId(context);
+  public async getCompilerApi(context: RequestContext) {
+    const appId = await this.contextToAppId(context);
     let compilerApi = this.compilerCache.get(appId);
     const currentSchemaVersion = this.options.schemaVersion && (() => this.options.schemaVersion(context));
 
@@ -507,7 +507,7 @@ export class CubejsServerCore {
           ),
           externalDialectClass: this.options.externalDialectFactory && this.options.externalDialectFactory(context),
           schemaVersion: currentSchemaVersion,
-          preAggregationsSchema: this.preAggregationsSchema(context),
+          preAggregationsSchema: await this.preAggregationsSchema(context),
           context,
           allowJsDuplicatePropsInSchema: this.options.allowJsDuplicatePropsInSchema,
           allowNodeRequire: this.options.allowNodeRequire,
@@ -535,8 +535,8 @@ export class CubejsServerCore {
     this.startScheduledRefreshTimer();
   }
 
-  public getOrchestratorApi(context: RequestContext): OrchestratorApi {
-    const orchestratorId = this.contextToOrchestratorId(context);
+  public async getOrchestratorApi(context: RequestContext): Promise<OrchestratorApi> {
+    const orchestratorId = await this.contextToOrchestratorId(context);
 
     if (this.orchestratorStorage.has(orchestratorId)) {
       return this.orchestratorStorage.get(orchestratorId);
@@ -559,7 +559,7 @@ export class CubejsServerCore {
     const orchestratorOptions =
       this.optsHandler.getOrchestratorInitializedOptions(
         context,
-        this.orchestratorOptions(context) || {},
+        (await this.orchestratorOptions(context)) || {},
       );
 
     const orchestratorApi = this.createOrchestratorApi(
@@ -675,6 +675,7 @@ export class CubejsServerCore {
         allowUngroupedWithoutPrimaryKey:
             this.options.allowUngroupedWithoutPrimaryKey ||
             getEnv('allowUngroupedWithoutPrimaryKey'),
+        convertTzForRawTimeDimension: getEnv('convertTzForRawTimeDimension'),
         compileContext: options.context,
         dialectClass: options.dialectClass,
         externalDialectClass: options.externalDialectClass,
@@ -707,9 +708,17 @@ export class CubejsServerCore {
         error: 'At least one context should be returned by scheduledRefreshContexts'
       });
     }
-    const contexts = allContexts.filter(
-      (context) => this.contextAcceptor.shouldAccept(this.migrateBackgroundContext(context)).accepted
-    );
+
+    const contexts = [];
+
+    for (const allContext of allContexts) {
+      const res = await this.contextAcceptor.shouldAccept(
+        this.migrateBackgroundContext(allContext)
+      );
+      if (res.accepted) {
+        contexts.push(allContext);
+      }
+    }
 
     const batchLimit = pLimit(this.options.scheduledRefreshBatchSize);
     return Promise.all(

@@ -73,6 +73,17 @@
   }
 }
 
+/* Only when top menu is visible */
+@media (min-width: 768px) {
+  nav > :nth-child(1) {
+    margin-right: 98px !important;
+  }
+
+  nav > a + button {
+    margin-left: auto;
+  }
+}
+
 /* Only Tablet */
 @media (min-width: 640px) and (max-width: 979px) {
 }

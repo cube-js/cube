@@ -72,3 +72,68 @@ impl<'de> Deserialize<'de> for Decimal {
         })
     }
 }
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, DeepSizeOf)]
+#[repr(transparent)]
+pub struct Decimal96 {
+    raw_value: i128,
+}
+
+impl Decimal96 {
+    pub fn new(raw_value: i128) -> Self {
+        Decimal96 { raw_value }
+    }
+
+    pub fn raw_value(&self) -> i128 {
+        self.raw_value
+    }
+
+    pub fn negate(&self) -> Self {
+        Decimal96::new(-self.raw_value())
+    }
+
+    pub fn to_string(&self, scale: u8) -> String {
+        let big_decimal = BigDecimal::new(BigInt::from(self.raw_value), scale as i64);
+        let mut res = big_decimal.to_string();
+        if res.contains(".") {
+            let mut truncate_len = res.len();
+            for (i, c) in res.char_indices().rev() {
+                if c == '0' {
+                    truncate_len = i;
+                } else if c == '.' {
+                    truncate_len = i;
+                    break;
+                } else {
+                    break;
+                }
+            }
+            res.truncate(truncate_len);
+        }
+        res
+    }
+}
+
+impl Serialize for Decimal96 {
+    fn serialize<S>(&self, serializer: S) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error>
+    where
+        S: Serializer,
+    {
+        // Flexbuffers do not support i128.
+        let v = self.raw_value as u128;
+        ((v >> 64) as u64, v as u64).serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for Decimal96 {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        type SerTuple = (u64, u64);
+        let (high, low) = SerTuple::deserialize(deserializer)?;
+        let v: u128 = (high as u128) << 64 | low as u128;
+        Ok(Decimal96 {
+            raw_value: v as i128,
+        })
+    }
+}

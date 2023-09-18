@@ -181,7 +181,11 @@ exports[`Jinja render arguments-test.yml.jinja: arguments-test.yml.jinja 1`] = `
   arg_bool_true: 1
   arg_bool_false: 0
   arg_str: hello world
-  arg_null: none"
+  arg_null: none
+  arg_seq_1: [1, 2, 3, 4, 5]
+  arg_seq_2: [5, 4, 3, 2, 1]
+  arg_sum_tuple: 3
+  arg_sum_map: 20"
 `;
 
 exports[`Jinja render data-model.yml.jinja: data-model.yml.jinja 1`] = `

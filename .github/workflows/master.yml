@@ -21,7 +21,7 @@ jobs:
     outputs:
       sha: ${{ steps.get-tag.outputs.sha }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - id: git-log
@@ -46,7 +46,7 @@ jobs:
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Login to DockerHub
         uses: docker/login-action@v1
         with:

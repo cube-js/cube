@@ -9,6 +9,7 @@ import R from 'ramda';
 import { MetaConfig, MetaConfigMap, toConfigMap } from './toConfigMap';
 import { MemberType } from '../types/strings';
 import { MemberType as MemberTypeEnum } from '../types/enums';
+import { MemberExpression } from '../types/query';
 
 /**
  * Annotation item for cube's member.
@@ -30,8 +31,8 @@ type ConfigItem = {
 const annotation = (
   configMap: MetaConfigMap,
   memberType: MemberType,
-) => (member: string): undefined | [string, ConfigItem] => {
-  const [cubeName, fieldName] = member.split('.');
+) => (member: string | MemberExpression): undefined | [string, ConfigItem] => {
+  const [cubeName, fieldName] = (<MemberExpression>member).expression ? [(<MemberExpression>member).cubeName, (<MemberExpression>member).name] : (<string>member).split('.');
   const memberWithoutGranularity = [cubeName, fieldName].join('.');
   const config: ConfigItem = configMap[cubeName][memberType]
     .find(m => m.name === memberWithoutGranularity);
@@ -39,7 +40,7 @@ const annotation = (
   if (!config) {
     return undefined;
   }
-  return [member, {
+  return [typeof member === 'string' ? member : memberWithoutGranularity, {
     title: config.title,
     shortTitle: config.shortTitle,
     description: config.description,

@@ -39,7 +39,8 @@ use crate::streaming::StreamingService;
 use crate::table::data::{append_row, create_array_builders};
 use crate::table::{Row, TableValue};
 use crate::util::batch_memory::columns_vec_buffer_size;
-use crate::util::decimal::Decimal;
+use crate::util::decimal::{Decimal, Decimal96};
+use crate::util::int96::Int96;
 use crate::util::maybe_owned::MaybeOwnedStr;
 use crate::CubeError;
 use datafusion::cube_ext::ordfloat::OrdF64;
@@ -182,7 +183,15 @@ impl ImportFormat {
                 .parse()
                 .map(|v| TableValue::Int(v))
                 .unwrap_or(TableValue::Null),
+            ColumnType::Int96 => value
+                .parse()
+                .map(|v| TableValue::Int96(Int96::new(v)))
+                .unwrap_or(TableValue::Null),
             t @ ColumnType::Decimal { .. } => TableValue::Decimal(parse_decimal(
+                value,
+                u8::try_from(t.target_scale()).unwrap(),
+            )?),
+            t @ ColumnType::Decimal96 { .. } => TableValue::Decimal96(parse_decimal_96(
                 value,
                 u8::try_from(t.target_scale()).unwrap(),
             )?),
@@ -228,6 +237,26 @@ pub(crate) fn parse_decimal(value: &str, scale: u8) -> Result<Decimal, CubeError
         }
     };
     Ok(Decimal::new(raw_value))
+}
+
+pub(crate) fn parse_decimal_96(value: &str, scale: u8) -> Result<Decimal96, CubeError> {
+    // TODO: parse into Decimal directly.
+    let bd = BigDecimal::from_str_radix(value, 10)?;
+    let raw_value = match bd
+        .with_scale(scale as i64)
+        .into_bigint_and_exponent()
+        .0
+        .to_i128()
+    {
+        Some(d) => d,
+        None => {
+            return Err(CubeError::user(format!(
+                "cannot represent '{}' with scale {} without loosing precision",
+                value, scale
+            )))
+        }
+    };
+    Ok(Decimal96::new(raw_value))
 }
 
 fn decode_byte(s: &str) -> Option<u8> {

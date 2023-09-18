@@ -1,13 +1,5 @@
 # Semantic Layer Sync
 
-<InfoBox heading="Introducing Cube's Semantic Layer Sync with Preset">
-
-Gain instant insights from your data. Join [our webinar on August 30 at 9:00am
-PST](https://cube.dev/events/cube-metabase-webinar) to explore how Cube & Metabase streamline data analysis, leveraging Cube's
-Semantic Layer Sync.
-
-</InfoBox>
-
 Semantic Layer Sync synchronizes the [data model][ref-data-model] of a semantic
 layer from Cube to BI tools. It's the easiest way to connect a BI tool to Cube.
 
@@ -27,11 +19,11 @@ dimensions.
 
 In general, here's how Cube entities match BI-specific ones:
 
-| Cube                        | BI tool                   |
-| --------------------------- | ------------------------- |
-| Deployment, branch          | Database                  |
-| Cube, view                  | Dataset, table            |
-| Measure, dimension, segment | Column, dimension, metric |
+| Cube                        | BI tool                     |
+| --------------------------- | --------------------------- |
+| Deployment, branch          | Database                    |
+| Cube, view                  | Dataset, table, data source |
+| Measure, dimension, segment | Column, dimension, metric   |
 
 ## Creating syncs
 
@@ -47,13 +39,14 @@ Follow the steps in the wizard to create a sync with any of supported BI tools.
 
 Semantic Layer Sync supports the following BI tools:
 
-- [Apache Superset](#creating-syncs-apache-superset) (self-hosted) and
-  [Preset](#creating-syncs-preset) (managed)
-- [Metabase](#creating-syncs-metabase) (self-hosted and managed)
+- [Apache Superset](#apache-superset) (self-hosted) and
+  [Preset](#preset) (managed)
+- [Metabase](#metabase) (self-hosted and managed)
+- [Tableau](#tableau) (Cloud and Desktop)
 
 <InfoBox>
 
-We're working on bringing support for more BI tools, e.g., Power BI and Tableau.
+We're working on bringing support for more BI tools, e.g., Power BI and MicroStrategy.
 Please [reach out to us](https://forms.gle/eEit9Pa7ZXSoFxb86) if you're
 interested in using Semantic Layer Sync with other BI tools.
 
@@ -223,8 +216,7 @@ module.exports = {
         name: "Preset Sync",
         config: {
           api_token: "07988f63-c200-499e-97c9-ba137d8918aa",
-          api_secret:
-            "c19fbab4fd4945899795d32898f2e1165bef8e5ee653499e92f083b3d088aecb",
+          api_secret: "c19fbab4fd4945899795d32898f2e1165bef8e5ee653499e92f083b3d088aecb",
           workspace_url: "12345678.us1a.app.preset.io",
           database: "Cube Cloud: production-deployment",
         },
@@ -270,12 +262,26 @@ sending them, or use a service account with a different email address:
 
 ### Tableau
 
-Data model is synchronized via the [Tableau API][tableau-api] which uses either
-a `user` name and a `password`, or a personal access token and personal access
-token secret for authentication.
+Data model is synchronized via the [Tableau API][tableau-api] which uses [personal
+access tokens][tableau-pat] for authentication. You can create a new [personal access
+token][tableau-api-authentication] on the&nbsp;<Btn>My Account Settings</Btn> page.
 
-You can learn more about creating personal access tokens in the [Tableau
-documentation][tableau-api-authentication].
+<InfoBox>
+
+Personal access tokens might be disabled in your Tableau site configuration.
+To enable them, navigate to the&nbsp;<Btn>Settings</Btn> page of your Tableau site
+and click&nbsp;<Btn>Enable personal access tokens</Btn>.
+
+By default, personal access tokens are configured with an expiry period of 180 days.
+Please check your Tableau site configuration for details. To customize the expiry
+period, navigate to the&nbsp;<Btn>Settings</Btn> page of your Tableau site. Please
+also make sure to renew your personal access token in time. 
+
+</InfoBox>
+
+You will also need to specify a `region` and a Tableau `site` name. Consider the
+following URL of a Tableau site: `https://10ax.online.tableau.com/#/site/cubedev/home`.
+In this case, the region would be `10ax` and the site name would be `cubedev`.
 
 Example `cube.js` configuration file for Tableau:
 
@@ -287,14 +293,11 @@ module.exports = {
         type: "tableau",
         name: "Tableau Sync",
         config: {
-          database: "My Database: production-deployment",
-          site: "mytableausite",
           region: "10ax",
-          user: "john@example.com",
-          password: "******************",
-          // Uncomment the following lines to use a personal access token instead of a username and password
-          // personalAccessToken: "test",
-          // personalAccessTokenSecret: "",
+          site: "mytableausite",
+          personalAccessToken: "cube-cloud",
+          personalAccessTokenSecret: "HW8TFrBfJyen+JQleh0/bw==:1BvJLIti9Fud04rN021EfHMnh4yYD3p4",
+          database: "Cube Cloud: production-deployment",
         },
       },
     ];
@@ -302,10 +305,15 @@ module.exports = {
 };
 ```
 
+When connecting a Cube Cloud data source to your Tableau workbook, you will be prompted
+to enter the user name and password for Cube Cloud. You can find them at the&nbsp;<Btn>SQL
+API Connection</Btn> tab of the&nbsp;<Btn>BI Integrations</Btn> page in Cube Cloud.
+
 [tableau-api]:
   https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api.htm
 [tableau-api-authentication]:
   https://help.tableau.com/current/server/en-us/security_personal_access_tokens.htm#create-personal-access-tokens
+[tableau-pat]: https://help.tableau.com/current/server/en-us/security_personal_access_tokens.htm
 
 ## Running syncs
 
