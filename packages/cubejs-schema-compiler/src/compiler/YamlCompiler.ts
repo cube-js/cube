@@ -164,15 +164,17 @@ export class YamlCompiler {
       return t.booleanLiteral(obj);
     }
 
-    if (typeof obj === 'object') {
+    if (typeof obj === 'object' && obj !== null) {
       if (Array.isArray(obj)) {
         return t.arrayExpression(obj.map((value, i) => this.transpileYaml(value, propertyPath.concat(i.toString()), cubeName, errorsReport)));
       } else {
         const properties: any[] = [];
+
         for (const propKey of Object.keys(obj)) {
           const ast = this.transpileYaml(obj[propKey], propertyPath.concat(propKey), cubeName, errorsReport);
           properties.push(t.objectProperty(t.stringLiteral(propKey), ast));
         }
+
         return t.objectExpression(properties);
       }
     } else {

@@ -73,4 +73,20 @@ describe('Yaml Schema Testing', () => {
       expect(e.message).toContain('Users cube: (title = null) must be a string');
     }
   });
+
+  it('null for string field', async () => {
+    const { compiler } = prepareYamlCompiler(
+      `cubes:
+  - name: Users
+    title: null`
+    );
+
+    try {
+      await compiler.compile();
+
+      throw new Error('compile must return an error');
+    } catch (e: any) {
+      expect(e.message).toContain('Unexpected input during yaml transpiling: null');
+    }
+  });
 });
