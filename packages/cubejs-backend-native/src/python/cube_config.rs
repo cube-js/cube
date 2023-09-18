@@ -17,17 +17,32 @@ impl CubeConfigPy {
 
     pub fn get_static_attrs(&self) -> Vec<&'static str> {
         vec![
+            "web_sockets",
+            "http",
+            "graceful_shutdown",
+            "process_subscriptions_interval",
+            "web_sockets_base_path",
             "schema_path",
             "base_path",
-            "web_sockets_base_path",
-            "compiler_cache_size",
-            "telemetry",
-            "pg_sql_port",
+            "dev_server",
+            "api_secret",
             "cache_and_queue_driver",
             "allow_js_duplicate_props_in_schema",
-            "process_subscriptions_interval",
-            "http",
             "jwt",
+            "scheduled_refresh_timer",
+            "scheduled_refresh_timezones",
+            "scheduled_refresh_concurrency",
+            "scheduled_refresh_batch_size",
+            "compiler_cache_size",
+            "update_compiler_cache_keep_alive",
+            "max_compiler_cache_keep_alive",
+            "telemetry",
+            "sql_cache",
+            "live_preview",
+            "pg_sql_port",
+            "sql_super_user",
+            "sql_user",
+            "sql_password",
         ]
     }
 
@@ -36,6 +51,7 @@ impl CubeConfigPy {
         self.attr(config_module, "context_to_app_id")?;
         self.attr(config_module, "context_to_orchestrator_id")?;
         self.attr(config_module, "driver_factory")?;
+        self.attr(config_module, "external_driver_factory")?;
         self.attr(config_module, "db_type")?;
         self.attr(config_module, "check_auth")?;
         self.attr(config_module, "check_sql_auth")?;
