@@ -62,8 +62,8 @@ class Configuration:
     logger: Callable
     context_to_app_id: Union[str, Callable[[RequestContext], str]]
     context_to_orchestrator_id: Union[str, Callable[[RequestContext], str]]
-    driver_factory: Callable
-    external_driver_factory: Callable
+    driver_factory: Callable[[RequestContext], Dict]
+    external_driver_factory: Callable[[RequestContext], Dict]
     db_type: Union[str, Callable[[RequestContext], str]]
     check_auth: Callable
     check_sql_auth: Callable
@@ -124,13 +124,15 @@ class Configuration:
         self.pre_aggregations_schema = None
         self.orchestrator_options = None
 
-settings = Configuration()
+    def __call__(self, func):
+        if not callable(func):
+            raise ConfigurationException("@config decorator must be used with functions, actual: '%s'" % type(func).__name__)
 
-def config(func):
-    if not callable(func):
-        raise ConfigurationException("@config decorator must be used with functions, actual: '%s'" % type(func).__name__)
+        if hasattr(self, func.__name__):
+            setattr(self, func.__name__, func)
+        else:
+            raise ConfigurationException("Unknown configuration property: '%s'" % func.__name__)
 
-    if hasattr(settings, func.__name__):
-        setattr(settings, func.__name__, func)
-    else:
-        raise ConfigurationException("Unknown settings property: '%s'" % func.__name__)
+config = Configuration()
+# backward compatibility
+settings = config

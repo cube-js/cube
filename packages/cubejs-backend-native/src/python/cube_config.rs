@@ -15,7 +15,7 @@ impl CubeConfigPy {
         }
     }
 
-    pub fn get_static_attrs(&self) -> Vec<&'static str> {
+    pub fn get_attrs(&self) -> Vec<&'static str> {
         vec![
             "web_sockets",
             "http",
@@ -43,30 +43,26 @@ impl CubeConfigPy {
             "sql_super_user",
             "sql_user",
             "sql_password",
+            // functions
+            "logger",
+            "context_to_app_id",
+            "context_to_orchestrator_id",
+            "driver_factory",
+            "external_driver_factory",
+            "db_type",
+            "check_auth",
+            "check_sql_auth",
+            "can_switch_sql_user",
+            "query_rewrite",
+            "extend_context",
+            "scheduled_refresh_contexts",
+            "context_to_api_scopes",
+            "repository_factory",
+            "semantic_layer_sync",
+            "schema_version",
+            "pre_aggregations_schema",
+            "orchestrator_options",
         ]
-    }
-
-    pub fn apply_dynamic_functions(&mut self, config_module: &PyAny) -> PyResult<()> {
-        self.attr(config_module, "logger")?;
-        self.attr(config_module, "context_to_app_id")?;
-        self.attr(config_module, "context_to_orchestrator_id")?;
-        self.attr(config_module, "driver_factory")?;
-        self.attr(config_module, "external_driver_factory")?;
-        self.attr(config_module, "db_type")?;
-        self.attr(config_module, "check_auth")?;
-        self.attr(config_module, "check_sql_auth")?;
-        self.attr(config_module, "can_switch_sql_user")?;
-        self.attr(config_module, "query_rewrite")?;
-        self.attr(config_module, "extend_context")?;
-        self.attr(config_module, "scheduled_refresh_contexts")?;
-        self.attr(config_module, "context_to_api_scopes")?;
-        self.attr(config_module, "repository_factory")?;
-        self.attr(config_module, "semantic_layer_sync")?;
-        self.attr(config_module, "schema_version")?;
-        self.attr(config_module, "pre_aggregations_schema")?;
-        self.attr(config_module, "orchestrator_options")?;
-
-        Ok(())
     }
 
     pub fn attr(&mut self, config_module: &PyAny, key: &str) -> PyResult<()> {
