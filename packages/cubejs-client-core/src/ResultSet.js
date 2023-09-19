@@ -169,7 +169,7 @@ class ResultSet {
             range.end
           ];
           
-          if (originalTimeDimension) {
+          if (originalTimeDimension?.dateRange) {
             const [originalStart, originalEnd] = originalTimeDimension.dateRange;
             
             dateRange = [
