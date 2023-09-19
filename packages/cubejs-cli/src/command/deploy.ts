@@ -14,7 +14,7 @@ const deploy = async ({ directory, auth, uploadEnv, token }: any) => {
     );
   }
 
-  token = token || process.env.CUBE_CLOUD_DEPLOY_AUTH;
+  token ??= process.env.CUBE_CLOUD_DEPLOY_AUTH;
 
   if (token) {
     const config = new Config();
