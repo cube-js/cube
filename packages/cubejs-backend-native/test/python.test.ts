@@ -37,12 +37,15 @@ suite('Python Config', () => {
   test('async checkAuth', async () => {
     expect(config).toEqual({
       schemaPath: 'models',
-      pgSqlPort: 5555,
       telemetry: false,
       contextToApiScopes: expect.any(Function),
+      logger: expect.any(Function),
+      pgSqlPort: 5555,
+      preAggregationsSchema: expect.any(Function),
       checkAuth: expect.any(Function),
       queryRewrite: expect.any(Function),
       repositoryFactory: expect.any(Function),
+      schemaVersion: expect.any(Function),
     });
 
     if (!config.checkAuth) {
