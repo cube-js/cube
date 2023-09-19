@@ -150,8 +150,8 @@ darwinSuite('Old Python Config', () => {
     }
 
     await config.checkAuth(
-        { requestId: 'test' },
-        'MY_SECRET_TOKEN'
+      { requestId: 'test' },
+      'MY_SECRET_TOKEN'
     );
   });
 });
