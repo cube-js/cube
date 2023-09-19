@@ -722,6 +722,7 @@ pub struct RocksStoreConfig {
     pub checksum_type: RocksStoreChecksumType,
     pub cache_capacity: usize,
     pub compression_type: RocksStoreCompressionType,
+    pub bottommost_compression_type: RocksStoreCompressionType,
     // Sets maximum number of concurrent background jobs (compactions and flushes).
     pub max_background_jobs: u32,
     // Sets maximum number of threads that will concurrently perform a compaction job by breaking
@@ -738,6 +739,7 @@ impl RocksStoreConfig {
             checksum_type: RocksStoreChecksumType::XXH3,
             cache_capacity: 8 * 1024 * 1024,
             compression_type: RocksStoreCompressionType::None,
+            bottommost_compression_type: RocksStoreCompressionType::None,
             max_background_jobs: 2,
             // Default: 1 (i.e. no subcompactions)
             max_subcompactions: 1,
@@ -752,6 +754,7 @@ impl RocksStoreConfig {
             checksum_type: RocksStoreChecksumType::XXH3,
             cache_capacity: 8 * 1024 * 1024,
             compression_type: RocksStoreCompressionType::None,
+            bottommost_compression_type: RocksStoreCompressionType::None,
             max_background_jobs: 2,
             // Default: 1 (i.e. no subcompactions)
             max_subcompactions: 1,
