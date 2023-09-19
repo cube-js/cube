@@ -37,12 +37,15 @@ suite('Python Config', () => {
   test('async checkAuth', async () => {
     expect(config).toEqual({
       schemaPath: 'models',
-      pgSqlPort: 5555,
       telemetry: false,
       contextToApiScopes: expect.any(Function),
+      logger: expect.any(Function),
+      pgSqlPort: 5555,
+      preAggregationsSchema: expect.any(Function),
       checkAuth: expect.any(Function),
       queryRewrite: expect.any(Function),
       repositoryFactory: expect.any(Function),
+      schemaVersion: expect.any(Function),
     });
 
     if (!config.checkAuth) {
@@ -122,6 +125,33 @@ suite('Python Config', () => {
 
     expect(await config.queryRewrite(input, {})).toEqual(
       input
+    );
+  });
+});
+
+darwinSuite('Old Python Config', () => {
+  test('test', async () => {
+    const config = await loadConfigurationFile('old-config.py');
+    expect(config).toEqual({
+      schemaPath: 'models',
+      telemetry: false,
+      contextToApiScopes: expect.any(Function),
+      logger: expect.any(Function),
+      pgSqlPort: 5555,
+      preAggregationsSchema: expect.any(Function),
+      checkAuth: expect.any(Function),
+      queryRewrite: expect.any(Function),
+      repositoryFactory: expect.any(Function),
+      schemaVersion: expect.any(Function),
+    });
+
+    if (!config.checkAuth) {
+      throw new Error('checkAuth was not defined in config.py');
+    }
+
+    await config.checkAuth(
+      { requestId: 'test' },
+      'MY_SECRET_TOKEN'
     );
   });
 });
