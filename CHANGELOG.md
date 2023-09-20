@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.59](https://github.com/cube-js/cube/compare/v0.33.58...v0.33.59) (2023-09-20)
+
+
+### Features
+
+* **cubesql:** `EXTRACT` SQL push down ([#7151](https://github.com/cube-js/cube/issues/7151)) ([e30c4da](https://github.com/cube-js/cube/commit/e30c4da555adfc1515fcc9e0253bc89ca8adc58b))
+* **cubesql:** Add ability to filter dates inclusive of date being passed in when using `<=` or `>=` ([#7041](https://github.com/cube-js/cube/issues/7041)) Thanks [@darapuk](https://github.com/darapuk) ! ([6b9ae70](https://github.com/cube-js/cube/commit/6b9ae703b113a01fa4e6de54b5597475aed0b85d))
+* **native:** Cube.py - support all options ([#7145](https://github.com/cube-js/cube/issues/7145)) ([5e5fb18](https://github.com/cube-js/cube/commit/5e5fb1800d2e97b870281b335bfca28ab00a9c10))
+
+
+
+
+
 ## [0.33.58](https://github.com/cube-js/cube/compare/v0.33.57...v0.33.58) (2023-09-18)
 
 
