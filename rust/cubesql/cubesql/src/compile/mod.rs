@@ -3059,7 +3059,7 @@ mod tests {
                     granularity: None,
                     date_range: Some(json!(vec![
                         "2020-12-25T22:48:48.000Z".to_string(),
-                        "2022-03-31T23:59:59.999Z".to_string()
+                        "2022-04-01T00:00:00.000Z".to_string()
                     ]))
                 }]),
                 order: None,
@@ -4281,7 +4281,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 or: Some(vec![
                     json!(V1LoadRequestQueryFilterItem {
                         member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
-                        operator: Some("afterDate".to_string()),
+                        operator: Some("afterOrOnDate".to_string()),
                         values: Some(vec!["2021-08-31T00:00:00.000Z".to_string()]),
                         or: None,
                         and: None,
@@ -4289,7 +4289,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     json!(V1LoadRequestQueryFilterItem {
                         member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
                         operator: Some("beforeDate".to_string()),
-                        values: Some(vec!["2021-09-06T23:59:59.999Z".to_string()]),
+                        values: Some(vec!["2021-09-07T00:00:00.000Z".to_string()]),
                         or: None,
                         and: None,
                     })
@@ -11614,7 +11614,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
-                    operator: Some("afterDate".to_string()),
+                    operator: Some("afterOrOnDate".to_string()),
                     values: filter_vals,
                     or: None,
                     and: None,
@@ -13935,7 +13935,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     granularity: Some("day".to_string()),
                     date_range: Some(json!(vec![
                         "2020-01-01T00:00:00.000Z".to_string(),
-                        format!("{}T23:59:59.999Z", end_date),
+                        format!("{}T00:00:00.000Z", end_date),
                     ]))
                 }]),
                 order: Some(vec![vec![
@@ -17333,7 +17333,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
                     operator: Some("beforeDate".to_string()),
-                    values: Some(vec!["2014-05-30T23:59:59.999Z".to_string()]),
+                    values: Some(vec!["2014-05-31T00:00:00.000Z".to_string()]),
                     or: None,
                     and: None
                 }]),
@@ -17909,18 +17909,48 @@ ORDER BY \"COUNT(count)\" DESC"
 
         let test_data = vec![
             // (operator, literal date, filter operator, filter value)
-            (">=", "2020-03-25", "afterDate", "2020-04-01T00:00:00.000Z"),
-            (">=", "2020-04-01", "afterDate", "2020-04-01T00:00:00.000Z"),
-            (">=", "2020-04-10", "afterDate", "2020-05-01T00:00:00.000Z"),
-            ("<=", "2020-03-25", "beforeDate", "2020-03-31T23:59:59.999Z"),
-            ("<=", "2020-04-01", "beforeDate", "2020-04-30T23:59:59.999Z"),
-            ("<=", "2020-04-10", "beforeDate", "2020-04-30T23:59:59.999Z"),
+            (
+                ">=",
+                "2020-03-25",
+                "afterOrOnDate",
+                "2020-04-01T00:00:00.000Z",
+            ),
+            (
+                ">=",
+                "2020-04-01",
+                "afterOrOnDate",
+                "2020-04-01T00:00:00.000Z",
+            ),
+            (
+                ">=",
+                "2020-04-10",
+                "afterOrOnDate",
+                "2020-05-01T00:00:00.000Z",
+            ),
+            (
+                "<=",
+                "2020-03-25",
+                "beforeOrOnDate",
+                "2020-04-01T00:00:00.000Z",
+            ),
+            (
+                "<=",
+                "2020-04-01",
+                "beforeOrOnDate",
+                "2020-05-01T00:00:00.000Z",
+            ),
+            (
+                "<=",
+                "2020-04-10",
+                "beforeOrOnDate",
+                "2020-05-01T00:00:00.000Z",
+            ),
             (">", "2020-03-25", "afterDate", "2020-04-01T00:00:00.000Z"),
             (">", "2020-04-01", "afterDate", "2020-05-01T00:00:00.000Z"),
             (">", "2020-04-10", "afterDate", "2020-05-01T00:00:00.000Z"),
-            ("<", "2020-03-25", "beforeDate", "2020-03-31T23:59:59.999Z"),
-            ("<", "2020-04-01", "beforeDate", "2020-03-31T23:59:59.999Z"),
-            ("<", "2020-04-10", "beforeDate", "2020-04-30T23:59:59.999Z"),
+            ("<", "2020-03-25", "beforeDate", "2020-04-01T00:00:00.000Z"),
+            ("<", "2020-04-01", "beforeDate", "2020-04-01T00:00:00.000Z"),
+            ("<", "2020-04-10", "beforeDate", "2020-05-01T00:00:00.000Z"),
         ];
 
         for (operator, literal_date, filter_operator, filter_value) in test_data {

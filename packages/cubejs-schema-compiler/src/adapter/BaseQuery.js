@@ -1074,8 +1074,16 @@ class BaseQuery {
     return `${dimensionSql} < ${timeStampParam}`;
   }
 
+  beforeOrOnDateFilter(dimensionSql, timeStampParam) {
+    return `${dimensionSql} <= ${timeStampParam}`;
+  }
+
   afterDateFilter(dimensionSql, timeStampParam) {
     return `${dimensionSql} > ${timeStampParam}`;
+  }
+
+  afterOrOnDateFilter(dimensionSql, timeStampParam) {
+    return `${dimensionSql} >= ${timeStampParam}`;
   }
 
   timeStampCast(value) {

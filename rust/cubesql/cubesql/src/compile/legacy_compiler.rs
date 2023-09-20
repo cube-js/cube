@@ -557,7 +557,9 @@ fn compiled_binary_op_expr(
                 ast::BinaryOperator::Eq => (filter_expr, "equals".to_string()),
                 ast::BinaryOperator::NotEq => (filter_expr, "notEquals".to_string()),
                 ast::BinaryOperator::GtEq => match filter_expr {
-                    CompiledExpression::DateLiteral(_) => (filter_expr, "afterDate".to_string()),
+                    CompiledExpression::DateLiteral(_) => {
+                        (filter_expr, "afterOrOnDate".to_string())
+                    }
                     _ => (filter_expr, "gte".to_string()),
                 },
                 ast::BinaryOperator::Gt => match filter_expr {
@@ -575,7 +577,9 @@ fn compiled_binary_op_expr(
                     _ => (filter_expr, "lt".to_string()),
                 },
                 ast::BinaryOperator::LtEq => match filter_expr {
-                    CompiledExpression::DateLiteral(_) => (filter_expr, "beforeDate".to_string()),
+                    CompiledExpression::DateLiteral(_) => {
+                        (filter_expr, "beforeOrOnDate".to_string())
+                    }
                     _ => (filter_expr, "lte".to_string()),
                 },
                 _ => {
@@ -742,7 +746,11 @@ fn binary_op_create_node_and(
                         && ((l_op.eq(&"beforeDate".to_string())
                             && r_op.eq(&"afterDate".to_string()))
                             || (l_op.eq(&"afterDate".to_string())
-                                && r_op.eq(&"beforeDate".to_string())))
+                                && r_op.eq(&"beforeDate".to_string()))
+                            || (l_op.eq(&"afterOrOnDate".to_string())
+                                && r_op.eq(&"beforeOrOnDate".to_string()))
+                            || (l_op.eq(&"beforeOrOnDate".to_string())
+                                && r_op.eq(&"afterOrOnDate".to_string())))
                     {
                         return Ok(CompiledFilterTree::Filter(CompiledFilter::Filter {
                             member: l_member.clone(),

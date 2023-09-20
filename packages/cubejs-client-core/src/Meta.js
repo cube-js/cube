@@ -35,7 +35,9 @@ const operators = {
     { name: 'inDateRange', title: 'in date range' },
     { name: 'notInDateRange', title: 'not in date range' },
     { name: 'afterDate', title: 'after date' },
+    { name: 'afterOrOnDate', title: 'after or on date' },
     { name: 'beforeDate', title: 'before date' },
+    { name: 'beforeOrOnDate', title: 'before or on date' },
   ],
 };
 
