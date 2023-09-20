@@ -1,5 +1,3 @@
-use crate::config::injection::Injector;
-use crate::util::cancellation_token_guard::CancellationGuard;
 use crate::CubeError;
 use async_trait::async_trait;
 use datafusion::cube_ext;
@@ -11,20 +9,34 @@ use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::{broadcast, oneshot, Notify, RwLock};
+use tokio::sync::{broadcast, oneshot, RwLock};
 use tokio::task::JoinHandle;
-use tokio_util::sync::CancellationToken;
 
 #[async_trait]
-pub trait WorkerProcessing {
+pub trait Callable: Send + Sync + 'static {
+    type Request: Debug + Serialize + DeserializeOwned + Sync + Send + 'static;
+    type Response: Debug + Serialize + DeserializeOwned + Sync + Send + 'static;
+    async fn call(&self, req: Self::Request) -> Result<Self::Response, CubeError>;
+}
+
+#[async_trait]
+pub trait Configurator: Send + Sync + 'static {
+    type Config: Sync + Send + Clone + 'static;
+    type ServicesRequest: Debug + Serialize + DeserializeOwned + Sync + Send + 'static;
+    type ServicesResponse: Debug + Serialize + DeserializeOwned + Sync + Send + 'static;
+
+    async fn configure(
+        services_client: Arc<
+            dyn Callable<Request = Self::ServicesRequest, Response = Self::ServicesResponse>,
+        >,
+    ) -> Result<Self::Config, CubeError>;
+}
+
+#[async_trait]
+pub trait WorkerProcessing: Send + Sync + 'static {
     type Config: Sync + Send + Clone + 'static;
     type Request: Debug + Serialize + DeserializeOwned + Sync + Send + 'static;
     type Response: Debug + Serialize + DeserializeOwned + Sync + Send + 'static;
-    type Services: WorkerServicesDef;
-
-    async fn configure(
-        services_client: Arc<<Self::Services as WorkerServicesDef>::Client>,
-    ) -> Result<Self::Config, CubeError>;
 
     fn spawn_background_processes(config: Self::Config) -> Result<(), CubeError>;
 
@@ -36,27 +48,39 @@ pub trait WorkerProcessing {
     fn process_titile() -> String;
 }
 
-#[async_trait]
-pub trait ServicesServerProcessor {
+pub trait ServicesTransport {
     type Request: Debug + Serialize + DeserializeOwned + Sync + Send + 'static;
     type Response: Debug + Serialize + DeserializeOwned + Sync + Send + 'static;
-    async fn init(injector: Arc<Injector>) -> Arc<Self>;
-    async fn process(&self, request: Self::Request) -> Self::Response;
-}
+    type TransportRequest: Debug + Serialize + DeserializeOwned + Sync + Send + 'static;
+    type TransportResponse: Debug + Serialize + DeserializeOwned + Sync + Send + 'static;
 
-pub trait WorkerServicesDef {
-    type Processor: ServicesServerProcessor + Send + Sync + 'static;
-    type Server: ServicesServer<Self::Processor> + Send + Sync + 'static;
-    type Client: ServicesClient<Self::Processor, Self::Server> + Send + Sync + 'static;
-}
+    type Server: ServicesServer<
+        Request = Self::Request,
+        Response = Self::Response,
+        TransportRequest = Self::TransportRequest,
+        TransportResponse = Self::TransportResponse,
+    >;
+    type Client: ServicesClient<
+        Request = Self::Request,
+        Response = Self::Response,
+        TransportRequest = Self::TransportRequest,
+        TransportResponse = Self::TransportResponse,
+    >;
 
-#[derive(Debug)]
-pub struct DefaultWorkerServicesDef;
+    fn start_server(
+        reciever: IpcReceiver<Self::TransportRequest>,
+        sender: IpcSender<Self::TransportResponse>,
+        processor: Arc<dyn Callable<Request = Self::Request, Response = Self::Response>>,
+    ) -> Self::Server {
+        Self::Server::start(reciever, sender, processor)
+    }
 
-impl WorkerServicesDef for DefaultWorkerServicesDef {
-    type Processor = DefaultServicesServerProcessor;
-    type Server = ServicesServerImpl<Self::Processor>;
-    type Client = ServicesClientImpl<Self::Processor>;
+    fn connect(
+        sender: IpcSender<Self::TransportRequest>,
+        reciever: IpcReceiver<Self::TransportResponse>,
+    ) -> Arc<Self::Client> {
+        Self::Client::connect(sender, reciever)
+    }
 }
 
 #[derive(Debug)]
@@ -69,150 +93,69 @@ impl DefaultServicesServerProcessor {
 }
 
 #[async_trait]
-impl ServicesServerProcessor for DefaultServicesServerProcessor {
+impl Callable for DefaultServicesServerProcessor {
     type Request = ();
     type Response = ();
-    async fn init(_injector: Arc<Injector>) -> Arc<Self> {
-        Arc::new(Self {})
-    }
-    async fn process(&self, _request: ()) -> () {
-        ()
+
+    async fn call(&self, _request: ()) -> Result<(), CubeError> {
+        Ok(())
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct RequestMessage<S: ServicesServerProcessor + Debug + ?Sized> {
-    pub message_id: u64,
-    pub payload: S::Request,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct ResponseMessage<S: ServicesServerProcessor + Debug + ?Sized> {
-    pub message_id: u64,
-    pub payload: S::Response,
-}
-
-pub trait ServicesServer<P: ServicesServerProcessor + Send + Sync + 'static> {
-    type IpcRequest: Debug + Serialize + DeserializeOwned + Sync + Send + 'static;
-    type IpcResponse: Debug + Serialize + DeserializeOwned + Sync + Send + 'static;
-
-    fn start(
-        reciever: IpcReceiver<Self::IpcRequest>,
-        sender: IpcSender<Self::IpcResponse>,
-        processor: Arc<P>,
-    ) -> Self;
-
-    fn stop(&self);
-}
-
-pub struct ServicesServerImpl<P: ServicesServerProcessor + Debug + Send + Sync + 'static> {
-    join_handle: JoinHandle<()>,
+pub struct DefaultServicesTransport<P: Callable> {
     processor: PhantomData<P>,
 }
 
-impl<P: ServicesServerProcessor + Debug + Send + Sync + 'static> ServicesServer<P>
-    for ServicesServerImpl<P>
-{
-    type IpcRequest = RequestMessage<P>;
-    type IpcResponse = ResponseMessage<P>;
+impl<P: Callable> ServicesTransport for DefaultServicesTransport<P> {
+    type Request = P::Request;
+    type Response = P::Response;
+    type TransportRequest = TransportMessage<P::Request>;
+    type TransportResponse = TransportMessage<Result<P::Response, CubeError>>;
 
-    fn start(
-        reciever: IpcReceiver<Self::IpcRequest>,
-        sender: IpcSender<Self::IpcResponse>,
-        processor: Arc<P>,
-    ) -> Self {
-        let join_handle = Self::processing_loop(reciever, sender, processor);
-        Self {
-            join_handle,
-            processor: PhantomData,
-        }
-    }
-
-    fn stop(&self) {
-        self.join_handle.abort();
-    }
+    type Server = ServicesServerImpl<P>;
+    type Client = ServicesClientImpl<P>;
 }
 
-impl<P: ServicesServerProcessor + Debug + Send + Sync + 'static> ServicesServerImpl<P> {
-    fn processing_loop(
-        reciever: IpcReceiver<RequestMessage<P>>,
-        sender: IpcSender<ResponseMessage<P>>,
-        processor: Arc<P>,
-    ) -> JoinHandle<()> {
-        cube_ext::spawn_blocking(move || loop {
-            let req = reciever.recv();
-
-            let RequestMessage {
-                message_id,
-                payload,
-            } = match req {
-                Ok(message) => message,
-                Err(e) => {
-                    log::error!("Error while reading ipc service request: {:?}", e);
-                    break;
-                }
-            };
-
-            let processor_to_move = processor.clone();
-            let sender_to_move = sender.clone();
-
-            cube_ext::spawn(async move {
-                let res = processor_to_move.process(payload).await;
-                match sender_to_move.send(ResponseMessage {
-                    message_id,
-                    payload: res,
-                }) {
-                    Ok(_) => {}
-                    Err(e) => {
-                        log::error!("Error while sending IPC response: {:?}", e);
-                    }
-                }
-            });
-        })
-    }
-}
-
-impl<P: ServicesServerProcessor + Debug + Send + Sync + 'static> Drop for ServicesServerImpl<P> {
-    fn drop(&mut self) {
-        self.stop();
-    }
+#[derive(Serialize, Deserialize, Debug)]
+pub struct TransportMessage<T: Debug + Sync + Send + 'static> {
+    pub message_id: u64,
+    pub payload: T,
 }
 
 #[async_trait]
-pub trait ServicesClient<
-    P: ServicesServerProcessor + Send + Sync + 'static,
-    S: ServicesServer<P> + Send + Sync + 'static,
->
-{
+pub trait ServicesClient: Callable {
+    type TransportRequest: Debug + Serialize + DeserializeOwned + Sync + Send + 'static;
+    type TransportResponse: Debug + Serialize + DeserializeOwned + Sync + Send + 'static;
     fn connect(
-        sender: IpcSender<S::IpcRequest>,
-        reciever: IpcReceiver<S::IpcResponse>,
+        sender: IpcSender<Self::TransportRequest>,
+        reciever: IpcReceiver<Self::TransportResponse>,
     ) -> Arc<Self>;
-    async fn send(&self, request: P::Request) -> Result<P::Response, CubeError>;
+
     fn stop(&self);
 }
 
 struct ServicesClientMessage<
     T: Debug + Serialize + DeserializeOwned + Sync + Send + 'static,
-    R: Serialize + DeserializeOwned + Sync + Send + 'static,
+    R: Debug + Serialize + DeserializeOwned + Sync + Send + 'static,
 > {
     message: T,
     result_sender: oneshot::Sender<Result<R, CubeError>>,
 }
 
-pub struct ServicesClientImpl<P: ServicesServerProcessor + Debug + Send + Sync + 'static> {
+pub struct ServicesClientImpl<P: Callable> {
     queue: Arc<unlimited::Queue<ServicesClientMessage<P::Request, P::Response>>>,
     handle: JoinHandle<()>,
     processor: PhantomData<P>,
 }
 
 #[async_trait]
-impl<P: ServicesServerProcessor + Debug + Send + Sync + 'static>
-    ServicesClient<P, ServicesServerImpl<P>> for ServicesClientImpl<P>
-{
+impl<P: Callable> ServicesClient for ServicesClientImpl<P> {
+    type TransportRequest = TransportMessage<Self::Request>;
+    type TransportResponse = TransportMessage<Result<Self::Response, CubeError>>;
+
     fn connect(
-        sender: IpcSender<RequestMessage<P>>,
-        reciever: IpcReceiver<ResponseMessage<P>>,
+        sender: IpcSender<Self::TransportRequest>,
+        reciever: IpcReceiver<Self::TransportResponse>,
     ) -> Arc<Self> {
         let queue = Arc::new(unlimited::Queue::new());
         let handle = Self::processing_loop(sender, reciever, queue.clone());
@@ -222,7 +165,18 @@ impl<P: ServicesServerProcessor + Debug + Send + Sync + 'static>
             queue,
         })
     }
-    async fn send(&self, request: P::Request) -> Result<P::Response, CubeError> {
+
+    fn stop(&self) {
+        self.handle.abort();
+    }
+}
+
+#[async_trait]
+impl<P: Callable> Callable for ServicesClientImpl<P> {
+    type Request = P::Request;
+    type Response = P::Response;
+
+    async fn call(&self, request: Self::Request) -> Result<Self::Response, CubeError> {
         let (tx, rx) = oneshot::channel();
         self.queue.push(ServicesClientMessage {
             message: request,
@@ -230,16 +184,17 @@ impl<P: ServicesServerProcessor + Debug + Send + Sync + 'static>
         });
         rx.await?
     }
-    fn stop(&self) {
-        self.handle.abort();
-    }
 }
 
-impl<P: ServicesServerProcessor + Debug + Send + Sync + 'static> ServicesClientImpl<P> {
+impl<P: Callable> ServicesClientImpl<P> {
     fn processing_loop(
-        sender: IpcSender<RequestMessage<P>>,
-        reciever: IpcReceiver<ResponseMessage<P>>,
-        queue: Arc<unlimited::Queue<ServicesClientMessage<P::Request, P::Response>>>,
+        sender: IpcSender<<Self as ServicesClient>::TransportRequest>,
+        reciever: IpcReceiver<<Self as ServicesClient>::TransportResponse>,
+        queue: Arc<
+            unlimited::Queue<
+                ServicesClientMessage<<Self as Callable>::Request, <Self as Callable>::Response>,
+            >,
+        >,
     ) -> JoinHandle<()> {
         let (message_broadcast_tx, _) = broadcast::channel(10000);
 
@@ -248,7 +203,7 @@ impl<P: ServicesServerProcessor + Debug + Send + Sync + 'static> ServicesClientI
         let recieve_loop = cube_ext::spawn_blocking(move || loop {
             let res = reciever.recv();
             match res {
-                Ok(ResponseMessage {
+                Ok(TransportMessage {
                     message_id,
                     payload,
                 }) => {
@@ -280,7 +235,7 @@ impl<P: ServicesServerProcessor + Debug + Send + Sync + 'static> ServicesClientI
                 let message_id = id_counter;
                 id_counter += 1;
 
-                let ipc_message = RequestMessage {
+                let ipc_message = TransportMessage {
                     message_id,
                     payload: message,
                 };
@@ -312,7 +267,7 @@ impl<P: ServicesServerProcessor + Debug + Send + Sync + 'static> ServicesClientI
                                     if id == message_id {
                                         let mut option = res.write().await;
                                         if let Some(res) = option.take() {
-                                            Some(Ok(res))
+                                            Some(res)
                                         } else {
                                             Some(Err(CubeError::internal(format!(
                                                 "Worker service result consumed by another listener for message id {}",
@@ -356,7 +311,100 @@ impl<P: ServicesServerProcessor + Debug + Send + Sync + 'static> ServicesClientI
     }
 }
 
-impl<P: ServicesServerProcessor + Debug + Send + Sync + 'static> Drop for ServicesClientImpl<P> {
+impl<P: Callable> Drop for ServicesClientImpl<P> {
+    fn drop(&mut self) {
+        self.stop();
+    }
+}
+
+pub trait ServicesServer {
+    type Request: Debug + Serialize + DeserializeOwned + Sync + Send + 'static;
+    type Response: Debug + Serialize + DeserializeOwned + Sync + Send + 'static;
+    type TransportRequest: Debug + Serialize + DeserializeOwned + Sync + Send + 'static;
+    type TransportResponse: Debug + Serialize + DeserializeOwned + Sync + Send + 'static;
+
+    fn start(
+        reciever: IpcReceiver<Self::TransportRequest>,
+        sender: IpcSender<Self::TransportResponse>,
+        processor: Arc<dyn Callable<Request = Self::Request, Response = Self::Response>>,
+    ) -> Self;
+
+    fn stop(&self);
+}
+
+pub struct ServicesServerImpl<P: Callable> {
+    join_handle: JoinHandle<()>,
+    processor: PhantomData<P>,
+}
+
+impl<P: Callable> ServicesServer for ServicesServerImpl<P> {
+    type Request = P::Request;
+    type Response = P::Response;
+    type TransportRequest = TransportMessage<Self::Request>;
+    type TransportResponse = TransportMessage<Result<Self::Response, CubeError>>;
+
+    fn start(
+        reciever: IpcReceiver<Self::TransportRequest>,
+        sender: IpcSender<Self::TransportResponse>,
+        processor: Arc<dyn Callable<Request = Self::Request, Response = Self::Response>>,
+    ) -> Self {
+        let join_handle = Self::processing_loop(reciever, sender, processor);
+        Self {
+            join_handle,
+            processor: PhantomData,
+        }
+    }
+
+    fn stop(&self) {
+        self.join_handle.abort();
+    }
+}
+
+impl<P: Callable> ServicesServerImpl<P> {
+    fn processing_loop(
+        reciever: IpcReceiver<<Self as ServicesServer>::TransportRequest>,
+        sender: IpcSender<<Self as ServicesServer>::TransportResponse>,
+        processor: Arc<
+            dyn Callable<
+                Request = <Self as ServicesServer>::Request,
+                Response = <Self as ServicesServer>::Response,
+            >,
+        >,
+    ) -> JoinHandle<()> {
+        cube_ext::spawn_blocking(move || loop {
+            let req = reciever.recv();
+
+            let TransportMessage {
+                message_id,
+                payload,
+            } = match req {
+                Ok(message) => message,
+                Err(e) => {
+                    log::error!("Error while reading ipc service request: {:?}", e);
+                    break;
+                }
+            };
+
+            let processor_to_move = processor.clone();
+            let sender_to_move = sender.clone();
+
+            cube_ext::spawn(async move {
+                let res = processor_to_move.call(payload).await;
+                match sender_to_move.send(TransportMessage {
+                    message_id,
+                    payload: res,
+                }) {
+                    Ok(_) => {}
+                    Err(e) => {
+                        log::error!("Error while sending IPC response: {:?}", e);
+                    }
+                }
+            });
+        })
+    }
+}
+
+impl<P: Callable> Drop for ServicesServerImpl<P> {
     fn drop(&mut self) {
         self.stop();
     }

@@ -18,20 +18,22 @@ use tokio::sync::{oneshot, watch, Mutex, Notify, RwLock};
 use tracing::{instrument, Instrument};
 use tracing_futures::WithSubscriber;
 
-use crate::config::{env_parse, Config, WorkerServices};
 use crate::cluster::worker_services::{
-    ServicesClient, ServicesServer, WorkerProcessing, WorkerServicesDef,
+    Callable, Configurator, ServicesServer, ServicesTransport, WorkerProcessing,
 };
+use crate::config::env_parse;
 use crate::util::respawn::respawn;
 use crate::CubeError;
 use datafusion::cube_ext;
 use datafusion::cube_ext::catch_unwind::async_try_with_catch_unwind;
 
-pub struct WorkerPool<T: WorkerProcessing + Sync + Send + 'static> {
-    queue: Arc<unlimited::Queue<Message<T::Request, T::Response>>>,
+pub struct WorkerPool<C: Configurator, P: WorkerProcessing, S: ServicesTransport> {
+    queue: Arc<unlimited::Queue<Message<P::Request, P::Response>>>,
     stopped_tx: watch::Sender<bool>,
-    workers: Vec<Arc<WorkerProcess<T>>>,
-    processor: PhantomData<T>,
+    workers: Vec<Arc<WorkerProcess<C, P, S>>>,
+    configurator: PhantomData<C>,
+    processor: PhantomData<P>,
+    services_transport: PhantomData<S>,
 }
 
 pub struct Message<
@@ -44,9 +46,14 @@ pub struct Message<
     dispatcher: tracing::dispatcher::Dispatch,
 }
 
-impl<T: WorkerProcessing + Sync + Send + 'static> WorkerPool<T> {
+impl<
+        C: Configurator,
+        P: WorkerProcessing<Config = C::Config>,
+        S: ServicesTransport<Request = C::ServicesRequest, Response = C::ServicesResponse>,
+    > WorkerPool<C, P, S>
+{
     pub fn new(
-        services_processor: Arc<<T::Services as WorkerServicesDef>::Processor>,
+        services_processor: Arc<dyn Callable<Request = S::Request, Response = S::Response>>,
         num: usize,
         timeout: Duration,
         name_prefix: &str,
@@ -58,7 +65,7 @@ impl<T: WorkerProcessing + Sync + Send + 'static> WorkerPool<T> {
         let mut workers = Vec::new();
 
         for i in 1..=num {
-            let process = Arc::new(WorkerProcess::<T>::new(
+            let process = Arc::new(WorkerProcess::<C, P, S>::new(
                 services_processor.clone(),
                 format!("{}{}", name_prefix, i),
                 envs.clone(),
@@ -74,6 +81,8 @@ impl<T: WorkerProcessing + Sync + Send + 'static> WorkerPool<T> {
             queue,
             workers,
             processor: PhantomData,
+            configurator: PhantomData,
+            services_transport: PhantomData,
         }
     }
 
@@ -86,7 +95,7 @@ impl<T: WorkerProcessing + Sync + Send + 'static> WorkerPool<T> {
         join_all(futures).await;
     }
 
-    pub async fn process(&self, message: T::Request) -> Result<T::Response, CubeError> {
+    pub async fn process(&self, message: P::Request) -> Result<P::Response, CubeError> {
         let (tx, rx) = oneshot::channel();
         self.queue.push(Message {
             message,
@@ -132,24 +141,24 @@ impl Drop for ProcessHandleGuard {
     }
 }
 
-pub struct WorkerProcess<T: WorkerProcessing + Sync + Send + 'static> {
+pub struct WorkerProcess<C: Configurator, P: WorkerProcessing, S: ServicesTransport> {
     name: String,
     envs: Vec<(String, String)>,
-    queue: Arc<unlimited::Queue<Message<T::Request, T::Response>>>,
+    queue: Arc<unlimited::Queue<Message<P::Request, P::Response>>>,
     timeout: Duration,
-    processor: PhantomData<T>,
+    processor: PhantomData<(C, P, S)>,
     stopped_rx: RwLock<watch::Receiver<bool>>,
     finished_notify: Arc<Notify>,
-    services_processor: Arc<<T::Services as WorkerServicesDef>::Processor>,
-    services_server: Mutex<Option<<T::Services as WorkerServicesDef>::Server>>,
+    services_processor: Arc<dyn Callable<Request = S::Request, Response = S::Response>>,
+    services_server: Mutex<Option<S::Server>>,
 }
 
-impl<T: WorkerProcessing + Sync + Send + 'static> WorkerProcess<T> {
+impl<C: Configurator, P: WorkerProcessing, S: ServicesTransport> WorkerProcess<C, P, S> {
     fn new(
-        services_processor: Arc<<T::Services as WorkerServicesDef>::Processor>,
+        services_processor: Arc<dyn Callable<Request = S::Request, Response = S::Response>>,
         name: String,
         envs: Vec<(String, String)>,
-        queue: Arc<unlimited::Queue<Message<T::Request, T::Response>>>,
+        queue: Arc<unlimited::Queue<Message<P::Request, P::Response>>>,
         timeout: Duration,
         stopped_rx: watch::Receiver<bool>,
     ) -> Self {
@@ -266,14 +275,14 @@ impl<T: WorkerProcessing + Sync + Send + 'static> WorkerProcess<T> {
     #[instrument(level = "trace", skip(self, message, args_tx, res_rx))]
     async fn process_message(
         &self,
-        message: T::Request,
-        args_tx: IpcSender<T::Request>,
-        res_rx: IpcReceiver<Result<T::Response, CubeError>>,
+        message: P::Request,
+        args_tx: IpcSender<P::Request>,
+        res_rx: IpcReceiver<Result<P::Response, CubeError>>,
     ) -> Result<
         (
-            T::Response,
-            IpcSender<T::Request>,
-            IpcReceiver<Result<T::Response, CubeError>>,
+            P::Response,
+            IpcSender<P::Request>,
+            IpcReceiver<Result<P::Response, CubeError>>,
         ),
         CubeError,
     > {
@@ -286,8 +295,8 @@ impl<T: WorkerProcessing + Sync + Send + 'static> WorkerProcess<T> {
         &self,
     ) -> Result<
         (
-            IpcSender<T::Request>,
-            IpcReceiver<Result<T::Response, CubeError>>,
+            IpcSender<P::Request>,
+            IpcReceiver<Result<P::Response, CubeError>>,
             Child,
         ),
         CubeError,
@@ -309,7 +318,7 @@ impl<T: WorkerProcessing + Sync + Send + 'static> WorkerProcess<T> {
         }
         ctx += &self.name;
 
-        let title = T::process_titile();
+        let title = P::process_titile();
         let mut envs = vec![("CUBESTORE_LOG_CONTEXT".to_string(), ctx)];
         envs.extend(self.envs.iter().cloned());
 
@@ -320,7 +329,7 @@ impl<T: WorkerProcessing + Sync + Send + 'static> WorkerProcess<T> {
             WorkerProcessArgs {
                 args: args_rx,
                 results: res_tx,
-                processor: PhantomData::<T>::default(),
+                processor: PhantomData::<(C, P, S)>::default(),
                 services_sender: service_request_tx,
                 services_reciever: service_response_rx,
             },
@@ -328,7 +337,7 @@ impl<T: WorkerProcessing + Sync + Send + 'static> WorkerProcess<T> {
             &envs,
         )?;
 
-        *self.services_server.lock().await = Some(ServicesServer::start(
+        *self.services_server.lock().await = Some(S::start_server(
             service_request_rx,
             service_response_tx,
             self.services_processor.clone(),
@@ -338,25 +347,19 @@ impl<T: WorkerProcessing + Sync + Send + 'static> WorkerProcess<T> {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct WorkerProcessArgs<T: WorkerProcessing> {
-    args: IpcReceiver<T::Request>,
-    results: IpcSender<Result<T::Response, CubeError>>,
-    processor: PhantomData<T>,
-    services_sender: IpcSender<
-        <<T::Services as WorkerServicesDef>::Server as ServicesServer<
-            <T::Services as WorkerServicesDef>::Processor,
-        >>::IpcRequest,
-    >,
-    services_reciever: IpcReceiver<
-        <<T::Services as WorkerServicesDef>::Server as ServicesServer<
-            <T::Services as WorkerServicesDef>::Processor,
-        >>::IpcResponse,
-    >,
+pub struct WorkerProcessArgs<C: Configurator, P: WorkerProcessing, S: ServicesTransport> {
+    args: IpcReceiver<P::Request>,
+    results: IpcSender<Result<P::Response, CubeError>>,
+    processor: PhantomData<(C, P, S)>,
+    services_sender: IpcSender<S::TransportRequest>,
+    services_reciever: IpcReceiver<S::TransportResponse>,
 }
 
-pub fn worker_main<T>(a: WorkerProcessArgs<T>) -> i32
+pub fn worker_main<C, P, S>(a: WorkerProcessArgs<C, P, S>) -> i32
 where
-    T: WorkerProcessing + Sync + Send + 'static,
+    C: Configurator,
+    P: WorkerProcessing<Config = C::Config>,
+    S: ServicesTransport<Request = C::ServicesRequest, Response = C::ServicesResponse>,
 {
     let (rx, tx, services_sender, services_reciever) =
         (a.args, a.results, a.services_sender, a.services_reciever);
@@ -371,13 +374,12 @@ where
     let runtime = tokio_builder.build().unwrap();
     worker_setup(&runtime);
     runtime.block_on(async move {
-        let services_client =
-            <T::Services as WorkerServicesDef>::Client::connect(services_sender, services_reciever);
-        let config = match T::configure(services_client).await {
+        let services_client = S::connect(services_sender, services_reciever);
+        let config = match C::configure(services_client).await {
             Err(e) => {
                 error!(
                     "Error during {} worker configure: {}",
-                    T::process_titile(),
+                    P::process_titile(),
                     e
                 );
                 return 1;
@@ -385,10 +387,10 @@ where
             Ok(config) => config,
         };
 
-        if let Err(e) = T::spawn_background_processes(config.clone()) {
+        if let Err(e) = P::spawn_background_processes(config.clone()) {
             error!(
                 "Error during {} worker background processes spawn: {}",
-                T::process_titile(),
+                P::process_titile(),
                 e
             );
         }
@@ -397,7 +399,7 @@ where
             let res = rx.recv();
             match res {
                 Ok(args) => {
-                    let result = match async_try_with_catch_unwind(T::process(&config, args)).await
+                    let result = match async_try_with_catch_unwind(P::process(&config, args)).await
                     {
                         Ok(result) => result,
                         Err(panic) => Err(CubeError::from(panic)),
@@ -456,17 +458,17 @@ mod tests {
     use datafusion::cube_ext;
 
     use crate::cluster::worker_services::{
-        DefaultServicesServerProcessor, DefaultWorkerServicesDef, ServicesClient,
-        ServicesClientImpl, ServicesServerImpl, ServicesServerProcessor, WorkerProcessing,
-        WorkerServicesDef,
+        Callable, Configurator, DefaultServicesServerProcessor, DefaultServicesTransport,
+        ServicesClient, ServicesClientImpl, ServicesServerImpl, ServicesTransport,
+        WorkerProcessing,
     };
 
-    type TestPool = WorkerPool<Processor>;
+    type TestPool = WorkerPool<TestConfigurator, Processor, Transport>;
 
     #[ctor::ctor]
     fn test_support_init() {
         respawn::replace_cmd_args_in_tests();
-        respawn::register_handler(worker_main::<Processor>)
+        respawn::register_handler(worker_main::<TestConfigurator, Processor, Transport>)
     }
 
     #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
@@ -480,6 +482,22 @@ mod tests {
         Foo(u64),
     }
 
+    pub struct TestConfigurator;
+
+    #[async_trait]
+    impl Configurator for TestConfigurator {
+        type Config = Config;
+        type ServicesRequest = ();
+        type ServicesResponse = ();
+        async fn configure(
+            _services_client: Arc<dyn Callable<Request = (), Response = ()>>,
+        ) -> Result<Self::Config, CubeError> {
+            let config = Config::default();
+            config.configure_injector().await;
+            Ok(config)
+        }
+    }
+
     pub struct Processor;
 
     #[async_trait]
@@ -487,15 +505,6 @@ mod tests {
         type Config = Config;
         type Request = Message;
         type Response = Response;
-        type Services = DefaultWorkerServicesDef;
-
-        async fn configure(
-            _services_client: Arc<<DefaultWorkerServicesDef as WorkerServicesDef>::Client>,
-        ) -> Result<Self::Config, CubeError> {
-            let config = Config::default();
-            config.configure_injector().await;
-            Ok(config)
-        }
 
         fn spawn_background_processes(_config: Self::Config) -> Result<(), CubeError> {
             Ok(())
@@ -516,6 +525,8 @@ mod tests {
             "--sel-worker".to_string()
         }
     }
+
+    type Transport = DefaultServicesTransport<DefaultServicesServerProcessor>;
 
     #[test]
     fn test_basic() {
@@ -632,22 +643,18 @@ mod tests {
         Ok(())
     }
 
-    type TestServicePool = WorkerPool<ServProcessor>;
+    type TestServicePool = WorkerPool<ServConfigurator, ServProcessor, ServTransport>;
 
     #[derive(Debug)]
     pub struct TestServicesServerProcessor;
 
     #[async_trait]
-    impl ServicesServerProcessor for TestServicesServerProcessor {
+    impl Callable for TestServicesServerProcessor {
         type Request = i64;
         type Response = bool;
 
-        async fn init(_injector: Arc<Injector>) -> Arc<Self> {
-            Arc::new(Self {})
-        }
-
-        async fn process(&self, request: i64) -> bool {
-            request % 2 == 0
+        async fn call(&self, request: i64) -> Result<bool, CubeError> {
+            Ok(request % 2 == 0)
         }
     }
 
@@ -657,17 +664,9 @@ mod tests {
         }
     }
 
-    pub struct TestWorkerServicesDef;
-
-    impl WorkerServicesDef for TestWorkerServicesDef {
-        type Processor = TestServicesServerProcessor;
-        type Server = ServicesServerImpl<Self::Processor>;
-        type Client = ServicesClientImpl<Self::Processor>;
-    }
-
     #[derive(Clone)]
     pub struct TestConfig {
-        pub services_client: Arc<<TestWorkerServicesDef as WorkerServicesDef>::Client>,
+        pub services_client: Arc<dyn Callable<Request = i64, Response = bool>>,
     }
 
     #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
@@ -681,6 +680,21 @@ mod tests {
         Odd(i64),
     }
 
+    pub struct ServConfigurator;
+
+    #[async_trait]
+    impl Configurator for ServConfigurator {
+        type Config = TestConfig;
+        type ServicesRequest = i64;
+        type ServicesResponse = bool;
+        async fn configure(
+            services_client: Arc<dyn Callable<Request = i64, Response = bool>>,
+        ) -> Result<Self::Config, CubeError> {
+            let config = TestConfig { services_client };
+            Ok(config)
+        }
+    }
+
     pub struct ServProcessor;
 
     #[async_trait]
@@ -688,14 +702,6 @@ mod tests {
         type Config = TestConfig;
         type Request = TestServReq;
         type Response = TestServRes;
-        type Services = TestWorkerServicesDef;
-
-        async fn configure(
-            services_client: Arc<<TestWorkerServicesDef as WorkerServicesDef>::Client>,
-        ) -> Result<Self::Config, CubeError> {
-            let config = TestConfig { services_client };
-            Ok(config)
-        }
 
         fn spawn_background_processes(_config: Self::Config) -> Result<(), CubeError> {
             Ok(())
@@ -704,7 +710,7 @@ mod tests {
             config: &Self::Config,
             args: TestServReq,
         ) -> Result<TestServRes, CubeError> {
-            let r = config.services_client.send(args.v.clone()).await.unwrap();
+            let r = config.services_client.call(args.v.clone()).await.unwrap();
 
             let res = if r {
                 TestServRes::Even(args.v)
@@ -719,10 +725,12 @@ mod tests {
         }
     }
 
+    type ServTransport = DefaultServicesTransport<TestServicesServerProcessor>;
+
     #[ctor::ctor]
     fn test_services_support_init() {
         respawn::replace_cmd_args_in_tests();
-        respawn::register_handler(worker_main::<ServProcessor>)
+        respawn::register_handler(worker_main::<ServConfigurator, ServProcessor, ServTransport>)
     }
 
     #[test]

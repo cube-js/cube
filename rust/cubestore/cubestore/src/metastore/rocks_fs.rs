@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use datafusion::cube_ext;
 use futures::future::join_all;
 use itertools::Itertools;
-use log::{error, info, trace};
+use log::{error, info};
 use regex::Regex;
 use std::collections::BTreeSet;
 use std::collections::HashSet;
