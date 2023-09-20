@@ -4,9 +4,9 @@ use crate::{
         rewrite::{
             agg_fun_expr, aggregate, alias_expr,
             analysis::LogicalPlanAnalysis,
-            binary_expr, case_expr_var_arg, column_expr, column_name_to_member_vec, cube_scan,
-            cube_scan_wrapper, fun_expr_var_arg, limit, literal_expr, original_expr_name,
-            projection, rewrite,
+            binary_expr, case_expr_var_arg, cast_expr, column_expr, column_name_to_member_vec,
+            cube_scan, cube_scan_wrapper, fun_expr, fun_expr_var_arg, limit, literal_expr,
+            original_expr_name, projection, rewrite,
             rewriter::RewriteRules,
             rules::{members::MemberRules, replacer_pull_up_node, replacer_push_down_node},
             scalar_fun_expr_args, scalar_fun_expr_args_empty_tail, sort, sort_expr,
@@ -610,6 +610,44 @@ impl RewriteRules for WrapperRules {
                 ),
                 self.transform_fun_expr("?fun", "?alias_to_cube"),
             ),
+            transforming_rewrite(
+                "wrapper-pull-up-date-part",
+                fun_expr_var_arg(
+                    "DatePart",
+                    scalar_fun_expr_args(
+                        wrapper_pullup_replacer(
+                            literal_expr("?date_part"),
+                            "?alias_to_cube",
+                            "?ungrouped",
+                            "?cube_members",
+                        ),
+                        scalar_fun_expr_args(
+                            wrapper_pullup_replacer(
+                                "?date",
+                                "?alias_to_cube",
+                                "?ungrouped",
+                                "?cube_members",
+                            ),
+                            wrapper_pullup_replacer(
+                                scalar_fun_expr_args_empty_tail(),
+                                "?alias_to_cube",
+                                "?ungrouped",
+                                "?cube_members",
+                            ),
+                        ),
+                    ),
+                ),
+                wrapper_pullup_replacer(
+                    fun_expr(
+                        "DatePart",
+                        vec![literal_expr("?date_part"), "?date".to_string()],
+                    ),
+                    "?alias_to_cube",
+                    "?ungrouped",
+                    "?cube_members",
+                ),
+                self.transform_date_part_expr("?alias_to_cube"),
+            ),
             rewrite(
                 "wrapper-push-down-scalar-function-args",
                 wrapper_pushdown_replacer(
@@ -852,6 +890,43 @@ impl RewriteRules for WrapperRules {
                 ),
                 wrapper_pullup_replacer(
                     sort_expr("?expr", "?asc", "?nulls_first"),
+                    "?alias_to_cube",
+                    "?ungrouped",
+                    "?cube_members",
+                ),
+            ),
+            // Cast
+            rewrite(
+                "wrapper-push-down-cast",
+                wrapper_pushdown_replacer(
+                    cast_expr("?expr", "?data_type"),
+                    "?alias_to_cube",
+                    "?ungrouped",
+                    "?cube_members",
+                ),
+                cast_expr(
+                    wrapper_pushdown_replacer(
+                        "?expr",
+                        "?alias_to_cube",
+                        "?ungrouped",
+                        "?cube_members",
+                    ),
+                    "?data_type",
+                ),
+            ),
+            rewrite(
+                "wrapper-pull-up-cast",
+                cast_expr(
+                    wrapper_pullup_replacer(
+                        "?expr",
+                        "?alias_to_cube",
+                        "?ungrouped",
+                        "?cube_members",
+                    ),
+                    "?data_type",
+                ),
+                wrapper_pullup_replacer(
+                    cast_expr("?expr", "?data_type"),
                     "?alias_to_cube",
                     "?ungrouped",
                     "?cube_members",
@@ -1397,6 +1472,33 @@ impl WrapperRules {
                         {
                             return true;
                         }
+                    }
+                }
+            }
+            false
+        }
+    }
+
+    fn transform_date_part_expr(
+        &self,
+        alias_to_cube_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let alias_to_cube_var = var!(alias_to_cube_var);
+        let meta = self.cube_context.meta.clone();
+        move |egraph, subst| {
+            for alias_to_cube in var_iter!(
+                egraph[subst[alias_to_cube_var]],
+                WrapperPullupReplacerAliasToCube
+            )
+            .cloned()
+            {
+                if let Some(sql_generator) = meta.sql_generator_by_alias_to_cube(&alias_to_cube) {
+                    if sql_generator
+                        .get_sql_templates()
+                        .templates
+                        .contains_key("expressions/extract")
+                    {
+                        return true;
                     }
                 }
             }

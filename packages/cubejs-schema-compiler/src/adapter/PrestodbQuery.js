@@ -112,6 +112,9 @@ export class PrestodbQuery extends BaseQuery {
   sqlTemplates() {
     const templates = super.sqlTemplates();
     templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
+    templates.functions.DATEPART = 'DATE_PART({{ args_concat }})';
+    templates.expressions.extract = 'EXTRACT({{ date_part }} FROM {{ expr }})';
+    templates.expressions.interval = 'INTERVAL \'{{ num }}\' {{ date_part }}';
     return templates;
   }
 }

@@ -394,12 +394,13 @@ impl SqlTemplates {
         &self,
         scalar_function: BuiltinScalarFunction,
         args: Vec<String>,
+        date_part: Option<String>,
     ) -> Result<String, CubeError> {
         let function = scalar_function.to_string().to_uppercase();
         let args_concat = args.join(", ");
         self.render_template(
             &format!("functions/{}", function),
-            context! { args_concat => args_concat, args => args },
+            context! { args_concat => args_concat, args => args, date_part => date_part },
         )
     }
 
@@ -436,6 +437,32 @@ impl SqlTemplates {
         self.render_template(
             "expressions/sort",
             context! { expr => expr, asc => asc, nulls_first => nulls_first },
+        )
+    }
+
+    pub fn extract_expr(&self, date_part: String, expr: String) -> Result<String, CubeError> {
+        self.render_template(
+            "expressions/extract",
+            context! { date_part => date_part, expr => expr },
+        )
+    }
+
+    pub fn interval_expr(
+        &self,
+        interval: String,
+        num: i64,
+        date_part: String,
+    ) -> Result<String, CubeError> {
+        self.render_template(
+            "expressions/interval",
+            context! { interval => interval, num => num, date_part => date_part },
+        )
+    }
+
+    pub fn cast_expr(&self, expr: String, data_type: String) -> Result<String, CubeError> {
+        self.render_template(
+            "expressions/cast",
+            context! { expr => expr, data_type => data_type },
         )
     }
 
