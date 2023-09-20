@@ -1,6 +1,6 @@
 use crate::{
     compile::{
-        engine::df::scan::{CubeScanNode, MemberField, WrappedSelectNode},
+        engine::df::scan::{CubeScanNode, DataType, MemberField, WrappedSelectNode},
         rewrite::WrappedSelectType,
     },
     sql::AuthContextRef,
@@ -16,7 +16,7 @@ use datafusion::{
         plan::Extension, replace_col, replace_col_to_expr, Column, DFSchema, DFSchemaRef, Expr,
         LogicalPlan, UserDefinedLogicalNode,
     },
-    physical_plan::aggregates::AggregateFunction,
+    physical_plan::{aggregates::AggregateFunction, functions::BuiltinScalarFunction},
     scalar::ScalarValue,
 };
 use itertools::Itertools;
@@ -142,6 +142,10 @@ pub struct SqlGenerationResult {
     pub column_remapping: Option<HashMap<Column, Column>>,
     pub sql: SqlQuery,
     pub request: V1LoadRequestQuery,
+}
+
+lazy_static! {
+    static ref DATE_PART_REGEX: Regex = Regex::new("^[A-Za-z_ ]+$").unwrap();
 }
 
 impl CubeScanWrapperNode {
@@ -934,7 +938,61 @@ impl CubeScanWrapperNode {
                     );
                     Ok((resulting_sql, sql_query))
                 }
-                // Expr::Cast { .. } => {}
+                Expr::Cast { expr, data_type } => {
+                    let (expr, sql_query) = Self::generate_sql_for_expr(
+                        plan.clone(),
+                        sql_query,
+                        sql_generator.clone(),
+                        *expr,
+                        ungrouped_scan_node.clone(),
+                    )
+                    .await?;
+                    let data_type = match data_type {
+                        DataType::Null => "NULL",
+                        DataType::Boolean => "BOOLEAN",
+                        DataType::Int8 => "INTEGER",
+                        DataType::Int16 => "INTEGER",
+                        DataType::Int32 => "INTEGER",
+                        DataType::Int64 => "INTEGER",
+                        DataType::UInt8 => "INTEGER",
+                        DataType::UInt16 => "INTEGER",
+                        DataType::UInt32 => "INTEGER",
+                        DataType::UInt64 => "INTEGER",
+                        DataType::Float16 => "FLOAT",
+                        DataType::Float32 => "FLOAT",
+                        DataType::Float64 => "DOUBLE",
+                        DataType::Timestamp(_, _) => "TIMESTAMP",
+                        DataType::Date32 => "DATE",
+                        DataType::Date64 => "DATE",
+                        DataType::Time32(_) => "TIME",
+                        DataType::Time64(_) => "TIME",
+                        DataType::Duration(_) => "INTERVAL",
+                        DataType::Interval(_) => "INTERVAL",
+                        DataType::Binary => "BYTEA",
+                        DataType::FixedSizeBinary(_) => "BYTEA",
+                        DataType::Utf8 => "TEXT",
+                        DataType::LargeUtf8 => "TEXT",
+                        x => {
+                            return Err(DataFusionError::Execution(format!(
+                                "Can't generate SQL for cast: type isn't supported: {:?}",
+                                x
+                            )));
+                        }
+                    };
+                    let resulting_sql = Self::escape_interpolation_quotes(
+                        sql_generator
+                            .get_sql_templates()
+                            .cast_expr(expr, data_type.to_string())
+                            .map_err(|e| {
+                                DataFusionError::Internal(format!(
+                                    "Can't generate SQL for cast: {}",
+                                    e
+                                ))
+                            })?,
+                        ungrouped_scan_node.is_some(),
+                    );
+                    Ok((resulting_sql, sql_query))
+                }
                 // Expr::TryCast { .. } => {}
                 Expr::Sort {
                     expr,
@@ -1024,7 +1082,41 @@ impl CubeScanWrapperNode {
                         // ScalarValue::TimestampMicrosecond(_, _) => {}
                         // ScalarValue::TimestampNanosecond(_, _) => {}
                         // ScalarValue::IntervalYearMonth(_) => {}
-                        // ScalarValue::IntervalDayTime(_) => {}
+                        ScalarValue::IntervalDayTime(x) => {
+                            if let Some(x) = x {
+                                let days = x >> 32;
+                                let millis = x & 0xFFFFFFFF;
+                                if days > 0 && millis > 0 {
+                                    return Err(DataFusionError::Internal(format!(
+                                        "Can't generate SQL for interval: mixed intervals aren't supported: {} days {} millis encoded as {}",
+                                        days, millis, x
+                                    )));
+                                }
+                                let (num, date_part) = if days > 0 {
+                                    (days, "DAY")
+                                } else {
+                                    (millis, "MILLISECOND")
+                                };
+                                let interval = format!("{} {}", num, date_part);
+                                (
+                                    Self::escape_interpolation_quotes(
+                                        sql_generator
+                                            .get_sql_templates()
+                                            .interval_expr(interval, num, date_part.to_string())
+                                            .map_err(|e| {
+                                                DataFusionError::Internal(format!(
+                                                    "Can't generate SQL for interval: {}",
+                                                    e
+                                                ))
+                                            })?,
+                                        ungrouped_scan_node.is_some(),
+                                    ),
+                                    sql_query,
+                                )
+                            } else {
+                                ("NULL".to_string(), sql_query)
+                            }
+                        }
                         // ScalarValue::IntervalMonthDayNano(_) => {}
                         // ScalarValue::Struct(_, _) => {}
                         x => {
@@ -1036,6 +1128,60 @@ impl CubeScanWrapperNode {
                     })
                 }
                 Expr::ScalarFunction { fun, args } => {
+                    if let BuiltinScalarFunction::DatePart = &fun {
+                        if args.len() >= 2 {
+                            match &args[0] {
+                                Expr::Literal(ScalarValue::Utf8(Some(date_part))) => {
+                                    // Security check to prevent SQL injection
+                                    if !DATE_PART_REGEX.is_match(date_part) {
+                                        return Err(DataFusionError::Internal(format!(
+                                            "Can't generate SQL for scalar function: date part '{}' is not supported",
+                                            date_part
+                                        )));
+                                    }
+                                    let (arg_sql, query) = Self::generate_sql_for_expr(
+                                        plan.clone(),
+                                        sql_query,
+                                        sql_generator.clone(),
+                                        args[1].clone(),
+                                        ungrouped_scan_node.clone(),
+                                    )
+                                    .await?;
+                                    return Ok((
+                                        Self::escape_interpolation_quotes(
+                                            sql_generator
+                                                .get_sql_templates()
+                                                .extract_expr(date_part.to_string(), arg_sql)
+                                                .map_err(|e| {
+                                                    DataFusionError::Internal(format!(
+                                                    "Can't generate SQL for scalar function: {}",
+                                                    e
+                                                ))
+                                                })?,
+                                            ungrouped_scan_node.is_some(),
+                                        ),
+                                        query,
+                                    ));
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                    let date_part = if let BuiltinScalarFunction::DateTrunc = &fun {
+                        match &args[0] {
+                            Expr::Literal(ScalarValue::Utf8(Some(date_part))) => {
+                                // Security check to prevent SQL injection
+                                if DATE_PART_REGEX.is_match(date_part) {
+                                    Some(date_part.to_string())
+                                } else {
+                                    None
+                                }
+                            }
+                            _ => None,
+                        }
+                    } else {
+                        None
+                    };
                     let mut sql_args = Vec::new();
                     for arg in args {
                         let (sql, query) = Self::generate_sql_for_expr(
@@ -1053,7 +1199,7 @@ impl CubeScanWrapperNode {
                         Self::escape_interpolation_quotes(
                             sql_generator
                                 .get_sql_templates()
-                                .scalar_function(fun, sql_args)
+                                .scalar_function(fun, sql_args, date_part)
                                 .map_err(|e| {
                                     DataFusionError::Internal(format!(
                                         "Can't generate SQL for scalar function: {}",
