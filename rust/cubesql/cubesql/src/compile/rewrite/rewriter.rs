@@ -352,7 +352,7 @@ impl Rewriter {
                         .iter()
                         .enumerate()
                         .map(|(i, n)| format!("{}: {:?}", i, n))
-                        .join(",")
+                        .join(", ")
                 );
                 let converter =
                     LanguageToLogicalPlanConverter::new(best, cube_context.clone(), auth_context);

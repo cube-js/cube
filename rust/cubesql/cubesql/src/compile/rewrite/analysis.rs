@@ -258,7 +258,8 @@ impl LogicalPlanAnalysis {
     ) -> Option<Vec<(String, String)>> {
         let filter_operators = |id| egraph.index(id).data.filter_operators.clone();
         match enode {
-            LogicalPlanLanguage::FilterOp(params) => {
+            LogicalPlanLanguage::FilterOp(params) => filter_operators(params[0]),
+            LogicalPlanLanguage::FilterOpFilters(params) => {
                 let mut map = Vec::new();
                 for id in params.iter() {
                     map.extend(filter_operators(*id)?.into_iter());
