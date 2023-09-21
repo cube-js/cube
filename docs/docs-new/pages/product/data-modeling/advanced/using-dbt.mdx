@@ -3,10 +3,14 @@ redirect_from:
   - /schema/advanced/using-dbt
 ---
 
-# Using dbt
+# dbt integration
 
-You can leverage Cube on top of dbt models by pointing cubes to dbt models in
-your database.
+It is a common pattern to perform data transformation in the data warehouse
+with dbt and use Cube to define the metrics and join relationships on top of
+dbt models.
+
+You can leverage Cube on top of dbt models by pointing cubes to materialized
+tables in your database:
 
 <CodeTabs>
 
@@ -24,16 +28,145 @@ cube(`orders`, {
 
 </CodeTabs>
 
-## Using dbt_metrics
+## `cube_dbt` package
+
+Cube provides the [`cube_dbt` Python package][cube-dbt-package] that is
+designed to work with [dynamic data models][dynamic-models] built with
+Python and Jinja. With this package, you can:
+
+- load the [`manifest.json` file][dbt-manifest] of your dbt Core project
+- from that manifest, load all models or cherry-pick relevant ones by their
+path prefix, tags, or names
+- render models as cubes with proper `name`, `description`, and `sql_table`
+([inferred](https://github.com/cube-js/cube_dbt/blob/main/src/cube_dbt/model.py#L17,L22))
+- render columns as dimensions with proper `name`, `description`, `sql`,
+`type` ([inferred](https://github.com/cube-js/cube_dbt/blob/main/src/cube_dbt/column.py#L18,L26)),
+`primary_key` (if a column is [tagged](https://github.com/cube-js/cube_dbt/blob/main/src/cube_dbt/column.py#L35,L40) with `primary_key`),
+and `meta`
+
+<InfoBox>
+
+Loading models from dbt Cloud is technically feasible as well and might be
+implemented in further releases of the `cube_dbt` library.
+
+</InfoBox>
 
 <WarningBox>
 
-Previously, Cube provided the `@cubejs-backend/dbt-schema-extension` package to
-read metric definitions from dbt. Due to the [change in
-direction][dbt-deprecation] at dbt, we have deprecated this package as well.
-When a new `dbt_metrics` package becomes available, we will update and
-reintroduce our integration.
+Previously, Cube provided the `@cubejs-backend/dbt-schema-extension` package
+to read metric definitions from dbt. Due to the [change in
+direction][dbt-deprecation] at dbt, we have deprecated that package.
+We recommend using the `cube_dbt` package instead.
 
 </WarningBox>
 
+### Example
+
+<InfoBox>
+
+Please make sure to run this example in Cube Cloud on the latest version of
+Cube.
+
+</InfoBox>
+
+Use the `requirements.txt` file with the following contents in the root
+folder of your Cube deployment to load the `cube_dbt` package:
+
+```
+cube_dbt==0.3.1
+```
+
+Put the `defaults.py` file with the following contents in the data model
+folder of your Cube deployment:
+
+```python
+from cube import context_func
+from cube_dbt import (
+  load_dbt_manifest_from_url,
+  dbt_models,
+  model_name,
+  model_as_cube,
+  model_as_dimensions
+)
+
+manifest_url = 'https://cube-dbt-integration.s3.amazonaws.com/manifest.json'
+manifest = load_dbt_manifest_from_url(manifest_url)
+# Use 'load_dbt_manifest_from_file' to load a local file.
+# Use the 'boto3' package to access a private file on AWS S3:
+# https://boto3.amazonaws.com/v1/documentation/api/latest/index.html
+
+models = dbt_models(manifest, path_prefix='marts/')
+# Use the 'path_prefix' parameter to filter dbt models by their path.
+# Use the 'tags' parameter to filter dbt models by tags.
+# Use the 'names' parameter to filter dbt models by their names
+
+excluded_models = ['users_copy']
+
+# Use the 'context_func' decorator to expose a Python function to Jinja
+@context_func
+def get_models():
+  return list(model for model in models if model_name(model) not in excluded_models)
+
+@context_func
+def get_model(name):
+  return next(model for model in models if model_name(model) == name)
+
+@context_func
+def as_cube(model):
+  return model_as_cube(model)
+
+@context_func
+def as_dimensions(model):
+  return model_as_dimensions(model)
+```
+
+Put the `dbt.yml.jinja` file with the following contents in the data model
+folder of your Cube deployment to iterate over all models and render them
+as cubes (except for `excluded_models`):
+
+```yml
+cubes:
+  {% for model in get_models() %}
+  - {{ as_cube(model) }}
+
+    dimensions:
+      {{ as_dimensions(model) }}
+
+    measures:
+      - name: count
+        type: count
+  {% endfor %}
+```
+
+Put the `users.yml.jinja` file with the following contents in the data
+model folder of your Cube deployment to render only the `users_copy` model
+as a cube:
+
+```yml
+{% set model = get_model('users_copy') %}
+
+cubes:
+  - {{ as_cube(model) }}
+
+    dimensions:
+      {{ as_dimensions(model) }}
+
+    # Define model-specific measures here
+    measures:
+      - name: count_x2
+        sql: "{count} * 2"
+        type: number
+
+    # Define model-specific joins here
+    joins: []
+```
+
+### Reference
+
+Please use the [tests](https://github.com/cube-js/cube_dbt/tree/main/tests)
+for the `cube_dbt` package as reference documentation.
+
+[cube-dbt-package]: https://pypi.org/project/cube_dbt/
+[dynamic-models]: /product/data-modeling/advanced/jinja
+[dbt-manifest]: https://docs.getdbt.com/reference/artifacts/manifest-json
 [dbt-deprecation]: https://docs.getdbt.com/blog/deprecating-dbt-metrics

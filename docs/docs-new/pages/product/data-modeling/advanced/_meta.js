@@ -6,5 +6,5 @@ module.exports = {
   "dynamic-schema-creation": "Dynamic data models with JavaScript",
   "jinja": "Dynamic data models with Jinja and Python",
   "polymorphic-cubes": "Polymorphic cubes",
-  "using-dbt": "Using dbt"
+  "using-dbt": "dbt integration"
 }
