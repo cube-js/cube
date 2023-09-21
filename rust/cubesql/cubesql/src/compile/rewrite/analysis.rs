@@ -4,9 +4,9 @@ use crate::{
         rewrite::{
             converter::{is_expr_node, node_to_expr},
             expr_column_name, AliasExprAlias, AllMembersAlias, AllMembersCube, ChangeUserCube,
-            ColumnExprColumn, DimensionName, LiteralExprValue, LiteralMemberRelation,
-            LogicalPlanLanguage, MeasureName, SegmentName, TableScanSourceTableName,
-            TimeDimensionName, VirtualFieldCube, VirtualFieldName,
+            ColumnExprColumn, DimensionName, FilterMemberMember, FilterMemberOp, LiteralExprValue,
+            LiteralMemberRelation, LogicalPlanLanguage, MeasureName, SegmentName,
+            TableScanSourceTableName, TimeDimensionName, VirtualFieldCube, VirtualFieldName,
         },
     },
     transport::V1CubeMetaExt,
@@ -37,6 +37,7 @@ pub struct LogicalPlanData {
     pub constant: Option<ConstantFolding>,
     pub constant_in_list: Option<Vec<ScalarValue>>,
     pub cube_reference: Option<String>,
+    pub filter_operators: Option<Vec<(String, String)>>,
     pub is_empty_list: Option<bool>,
 }
 
@@ -246,6 +247,34 @@ impl LogicalPlanAnalysis {
             LogicalPlanLanguage::CubeScan(params) => {
                 map.extend(id_to_column_name_to_expr(params[1])?.into_iter());
                 Some(map)
+            }
+            _ => None,
+        }
+    }
+
+    fn make_filter_operators(
+        egraph: &EGraph<LogicalPlanLanguage, Self>,
+        enode: &LogicalPlanLanguage,
+    ) -> Option<Vec<(String, String)>> {
+        let filter_operators = |id| egraph.index(id).data.filter_operators.clone();
+        match enode {
+            LogicalPlanLanguage::FilterOp(params) => {
+                let mut map = Vec::new();
+                for id in params.iter() {
+                    map.extend(filter_operators(*id)?.into_iter());
+                }
+                Some(map)
+            }
+            LogicalPlanLanguage::FilterMember(params) => {
+                let member = var_iter!(egraph[params[0]], FilterMemberMember)
+                    .next()
+                    .unwrap()
+                    .to_string();
+                let op = var_iter!(egraph[params[1]], FilterMemberOp)
+                    .next()
+                    .unwrap()
+                    .to_string();
+                Some(vec![(member, op)])
             }
             _ => None,
         }
@@ -745,6 +774,7 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
             constant_in_list: Self::make_constant_in_list(egraph, enode),
             cube_reference: Self::make_cube_reference(egraph, enode),
             is_empty_list: Self::make_is_empty_list(egraph, enode),
+            filter_operators: Self::make_filter_operators(egraph, enode),
         }
     }
 
@@ -758,6 +788,7 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
         let (constant, b) = self.merge_option_field(a, b, |d| &mut d.constant);
         let (cube_reference, b) = self.merge_option_field(a, b, |d| &mut d.cube_reference);
         let (is_empty_list, b) = self.merge_option_field(a, b, |d| &mut d.is_empty_list);
+        let (filter_operators, b) = self.merge_option_field(a, b, |d| &mut d.filter_operators);
         let (column_name, _) = self.merge_option_field(a, b, |d| &mut d.column);
         original_expr
             | member_name_to_expr
@@ -767,6 +798,7 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
             | constant
             | cube_reference
             | column_name
+            | filter_operators
             | is_empty_list
     }
 
