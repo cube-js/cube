@@ -10,7 +10,7 @@
     "@testing-library/user-event": "^14.2.1",
     "apollo-link-http": "^1.5.17",
     "chart.js": "^3.6.2",
-    "graphql": "^16.1.0",
+    "graphql": "^16.8.1",
     "graphql-tag": "^2.12.6",
     "react": "^18.2.0",
     "react-chartjs-2": "^4.0.0",
