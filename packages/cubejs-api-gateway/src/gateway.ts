@@ -2148,6 +2148,7 @@ class ApiGateway {
         } catch (e) {
           this.log({
             type: (e as Error).message,
+            url: req.url,
             token: auth,
             error: (e as Error).stack || (e as Error).toString()
           }, <any>req);
