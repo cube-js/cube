@@ -2145,9 +2145,9 @@ class ApiGateway {
         try {
           req.securityContext = await checkAuthFn(auth, secret);
           req.signedWithPlaygroundAuthSecret = Boolean(internalOptions?.isPlaygroundCheckAuth);
-        } catch (e) {
+        } catch (e: any) {
           if (this.enforceSecurityChecks) {
-            throw new CubejsHandlerError(403, 'Forbidden', 'Invalid token');
+            throw new CubejsHandlerError(403, 'Forbidden', 'Invalid token', e);
           }
         }
       } else if (this.enforceSecurityChecks) {
@@ -2267,11 +2267,12 @@ class ApiGateway {
       }
     } catch (e: unknown) {
       if (e instanceof CubejsHandlerError) {
+        const error = e.originalError || e;
         this.log({
-          type: (e as Error).message,
+          type: error.message,
           url: req.url,
           token,
-          error: (e as Error).stack || (e as Error).toString()
+          error: error.stack || error.toString()
         }, <any>req);
         
         res.status(e.status).json({ error: e.message });
