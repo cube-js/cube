@@ -61,7 +61,6 @@ export class CubejsServer {
   protected readonly status: ServerStatusHandler = new ServerStatusHandler();
 
   public constructor(config: CreateOptions = {}, systemOptions?: SystemOptions) {
-    console.log(config);
     this.config = {
       ...config,
       webSockets: config.webSockets || getEnv('webSockets'),

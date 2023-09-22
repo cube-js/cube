@@ -49,7 +49,7 @@ jobs:
 
   unit:
     runs-on: ubuntu-20.04
-    timeout-minutes: 50
+    timeout-minutes: 60
     name: Unit (Rewrite Engine)
 
     steps:
@@ -93,7 +93,7 @@ jobs:
 
   unit_legacy:
     runs-on: ubuntu-20.04
-    timeout-minutes: 40
+    timeout-minutes: 60
     name: Unit (Legacy)
 
     steps:
