@@ -4,8 +4,8 @@ use neon::prelude::*;
 use neon::result::Throw;
 use neon::types::JsDate;
 use pyo3::exceptions::{PyNotImplementedError, PyTypeError};
-use pyo3::types::{PyBool, PyDict, PyFloat, PyFunction, PyInt, PyList, PySet, PyString, PyTuple};
-use pyo3::{Py, PyAny, PyErr, PyObject, Python, ToPyObject};
+use pyo3::types::{PyBool, PyComplex, PyDate, PyDict, PyFloat, PyFrame, PyFunction, PyInt, PyList, PySequence, PySet, PyString, PyTraceback, PyTuple};
+use pyo3::{AsPyPointer, IntoPy, Py, PyAny, PyErr, PyObject, Python, ToPyObject};
 use std::cell::RefCell;
 use std::collections::hash_map::{IntoIter, Iter, Keys};
 use std::collections::HashMap;
@@ -63,6 +63,7 @@ pub enum CLReprKind {
     Array,
     Object,
     JsFunction,
+    PyObject,
     PyFunction,
     PyExternalFunction,
     Null,
@@ -82,6 +83,7 @@ pub enum CLRepr {
     Array(Vec<CLRepr>),
     Object(CLReprObject),
     JsFunction(Arc<Root<JsFunction>>),
+    PyObject(Py<PyAny>),
     PyFunction(Py<PyFunction>),
     /// Special type to transfer functions through JavaScript
     /// In JS it's an external object. It's not the same as Function.
@@ -163,6 +165,7 @@ impl CLRepr {
             CLRepr::Array(_) => CLReprKind::Array,
             CLRepr::Object(_) => CLReprKind::Object,
             CLRepr::JsFunction(_) => CLReprKind::JsFunction,
+            CLRepr::PyObject(_) => CLReprKind::PyObject,
             CLRepr::PyFunction(_) => CLReprKind::PyFunction,
             CLRepr::PyExternalFunction(_) => CLReprKind::PyExternalFunction,
             CLRepr::Null => CLReprKind::Null,
@@ -235,70 +238,90 @@ impl CLRepr {
 
     /// Convert python value to CLRepr
     pub fn from_python_ref(v: &PyAny) -> Result<Self, PyErr> {
-        if !v.is_none() {
-            return Ok(if v.get_type().is_subclass_of::<PyString>()? {
-                Self::String(v.to_string())
-            } else if v.get_type().is_subclass_of::<PyBool>()? {
-                Self::Bool(v.downcast::<PyBool>()?.is_true())
-            } else if v.get_type().is_subclass_of::<PyFloat>()? {
-                let f = v.downcast::<PyFloat>()?;
-                Self::Float(f.value())
-            } else if v.get_type().is_subclass_of::<PyInt>()? {
-                let i: i64 = v.downcast::<PyInt>()?.extract()?;
-                Self::Int(i)
-            } else if v.get_type().is_subclass_of::<PyDict>()? {
-                let d = v.downcast::<PyDict>()?;
-                let mut obj = CLReprObject::new();
-
-                for (k, v) in d.iter() {
-                    if k.get_type().is_subclass_of::<PyString>()? {
-                        let key_str = k.downcast::<PyString>()?;
-
-                        obj.insert(key_str.to_string(), Self::from_python_ref(v)?);
-                    }
-                }
-
-                Self::Object(obj)
-            } else if v.get_type().is_subclass_of::<PyList>()? {
-                let l = v.downcast::<PyList>()?;
-                let mut r = Vec::with_capacity(l.len());
-
-                for v in l.iter() {
-                    r.push(Self::from_python_ref(v)?);
-                }
-
-                Self::Array(r)
-            } else if v.get_type().is_subclass_of::<PySet>()? {
-                let l = v.downcast::<PySet>()?;
-                let mut r = Vec::with_capacity(l.len());
-
-                for v in l.iter() {
-                    r.push(Self::from_python_ref(v)?);
-                }
-
-                Self::Array(r)
-            } else if v.get_type().is_subclass_of::<PyTuple>()? {
-                let l = v.downcast::<PyTuple>()?;
-                let mut r = Vec::with_capacity(l.len());
-
-                for v in l.iter() {
-                    r.push(Self::from_python_ref(v)?);
-                }
-
-                Self::Tuple(r)
-            } else if v.get_type().is_subclass_of::<PyFunction>()? {
-                let fun: Py<PyFunction> = v.downcast::<PyFunction>()?.into();
-
-                Self::PyFunction(fun)
-            } else {
-                return Err(PyErr::new::<PyTypeError, _>(format!(
-                    "Unable to represent {} type as CLR from Python",
-                    v.get_type(),
-                )));
-            });
+        if v.is_none() {
+            return Ok(Self::Null);
         }
 
-        Ok(Self::Null)
+        return Ok(if v.get_type().is_subclass_of::<PyString>()? {
+            Self::String(v.to_string())
+        } else if v.get_type().is_subclass_of::<PyBool>()? {
+            Self::Bool(v.downcast::<PyBool>()?.is_true())
+        } else if v.get_type().is_subclass_of::<PyFloat>()? {
+            let f = v.downcast::<PyFloat>()?;
+            Self::Float(f.value())
+        } else if v.get_type().is_subclass_of::<PyInt>()? {
+            let i: i64 = v.downcast::<PyInt>()?.extract()?;
+            Self::Int(i)
+        } else if v.get_type().is_subclass_of::<PyDict>()? {
+            let d = v.downcast::<PyDict>()?;
+            let mut obj = CLReprObject::new();
+
+            for (k, v) in d.iter() {
+                if k.get_type().is_subclass_of::<PyString>()? {
+                    let key_str = k.downcast::<PyString>()?;
+
+                    obj.insert(key_str.to_string(), Self::from_python_ref(v)?);
+                }
+            }
+
+            Self::Object(obj)
+        } else if v.get_type().is_subclass_of::<PyList>()? {
+            let l = v.downcast::<PyList>()?;
+            let mut r = Vec::with_capacity(l.len());
+
+            for v in l.iter() {
+                r.push(Self::from_python_ref(v)?);
+            }
+
+            Self::Array(r)
+        } else if v.get_type().is_subclass_of::<PySet>()? {
+            let l = v.downcast::<PySet>()?;
+            let mut r = Vec::with_capacity(l.len());
+
+            for v in l.iter() {
+                r.push(Self::from_python_ref(v)?);
+            }
+
+            Self::Array(r)
+        } else if v.get_type().is_subclass_of::<PyTuple>()? {
+            let l = v.downcast::<PyTuple>()?;
+            let mut r = Vec::with_capacity(l.len());
+
+            for v in l.iter() {
+                r.push(Self::from_python_ref(v)?);
+            }
+
+            Self::Tuple(r)
+        } else if v.get_type().is_subclass_of::<PyFunction>()? {
+            let fun: Py<PyFunction> = v.downcast::<PyFunction>()?.into();
+
+            Self::PyFunction(fun)
+        } else if v.get_type().is_subclass_of::<PyComplex>()? {
+            return Err(PyErr::new::<PyTypeError, _>(format!(
+                "Unable to represent PyComplex type as CLR from Python"
+            )));
+        } else if v.get_type().is_subclass_of::<PyDate>()? {
+            return Err(PyErr::new::<PyTypeError, _>(format!(
+                "Unable to represent PyDate type as CLR from Python"
+            )));
+        } else if v.get_type().is_subclass_of::<PyFrame>()? {
+            return Err(PyErr::new::<PyTypeError, _>(format!(
+                "Unable to represent PyFrame type as CLR from Python"
+            )));
+        } else if v.get_type().is_subclass_of::<PyTraceback>()? {
+            return Err(PyErr::new::<PyTypeError, _>(format!(
+                "Unable to represent PyTraceback type as CLR from Python"
+            )));
+        } else {
+            let is_sequence = unsafe { pyo3::ffi::PySequence_Check(v.as_ptr()) == 1 };
+            if is_sequence {
+                return Err(PyErr::new::<PyTypeError, _>(format!(
+                    "Unable to represent PyTraceback type as CLR from Python"
+                )));
+            }
+
+            Self::PyObject(v.into())
+        });
     }
 
     fn into_js_impl<'a, C: Context<'a>>(
@@ -373,6 +396,9 @@ impl CLRepr {
 
                 unwrapper_fun.into_inner(cx).upcast()
             }
+            CLRepr::PyObject(_) => {
+                return cx.throw_error(format!("Unable to represent PyObject in JS"))
+            }
         })
     }
 
@@ -437,6 +463,11 @@ impl CLRepr {
             CLRepr::PyFunction(_) => {
                 return Err(PyErr::new::<PyNotImplementedError, _>(
                     "Unable to represent PyFunction in Python",
+                ))
+            }
+            CLRepr::PyObject(_) => {
+                return Err(PyErr::new::<PyNotImplementedError, _>(
+                    "Unable to represent PyObject in Python",
                 ))
             }
         })

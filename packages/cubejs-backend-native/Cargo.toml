@@ -38,5 +38,5 @@ default-features = false
 features = ["napi-1", "napi-4", "napi-6", "channel-api", "promise-api", "task-api", "proc-macros"]
 
 [features]
-default = []
+default = ["python"]
 python = ["pyo3", "pyo3-asyncio", "minijinja"]
