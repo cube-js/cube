@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.60](https://github.com/cube-js/cube/compare/v0.33.59...v0.33.60) (2023-09-22)
+
+
+### Bug Fixes
+
+* **cubesql:** `dataRange` filter isn't being push down to time dimension in case of other filters are used ([a4edfae](https://github.com/cube-js/cube/commit/a4edfae654f99b0d5a1227dfc569e8f2231e9697)), closes [#6312](https://github.com/cube-js/cube/issues/6312)
+
+
+### Features
+
+* **docker:** Python - disable buffering for STDOUT (PYTHONUNBUFFERED) ([#7153](https://github.com/cube-js/cube/issues/7153)) ([5cd0a17](https://github.com/cube-js/cube/commit/5cd0a175bf903d7118735f3526813aa9dd6f9953))
+
+
+
+
+
 ## [0.33.59](https://github.com/cube-js/cube/compare/v0.33.58...v0.33.59) (2023-09-20)
 
 
