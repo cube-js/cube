@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/native",
-  "version": "0.33.60",
+  "version": "0.33.61",
   "author": "Cube Dev, Inc.",
   "description": "Native module for Cube.js (binding to Rust codebase)",
   "main": "dist/js/index.js",
