@@ -17,7 +17,8 @@ Refresh strategy can be customized by setting the
 pre-aggregation.
 
 The default value of [`refresh_key`][ref-schema-ref-preaggs-refresh-key] is
-`every: 1 hour`. It can be redefined either by overriding the default value of
+`every: 1 hour`, if neither of the cubes overrides it's `refreshKey` parameter. 
+It can be redefined either by overriding the default value of
 the [`every` property][ref-schema-ref-preaggs-refresh-key-every]:
 
 <CodeTabs>

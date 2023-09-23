@@ -774,7 +774,9 @@ declare module '@cubejs-client/core' {
     | 'inDateRange'
     | 'notInDateRange'
     | 'beforeDate'
-    | 'afterDate';
+    | 'beforeOrOnDate'
+    | 'afterDate'
+    | 'afterOrOnDate';
 
   export type TimeDimensionGranularity = 'second' | 'minute' | 'hour' | 'day' | 'week' | 'month' | 'quarter' | 'year';
 

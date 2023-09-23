@@ -3,6 +3,46 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.61](https://github.com/cube-js/cube/compare/v0.33.60...v0.33.61) (2023-09-22)
+
+
+### Features
+
+* **native:** Python - new Jinja API ([#7160](https://github.com/cube-js/cube/issues/7160)) ([ea250ae](https://github.com/cube-js/cube/commit/ea250ae3a9c2c86b375f1ebeebb8304496a1dfc2))
+
+
+
+
+
+## [0.33.60](https://github.com/cube-js/cube/compare/v0.33.59...v0.33.60) (2023-09-22)
+
+
+### Bug Fixes
+
+* **cubesql:** `dataRange` filter isn't being push down to time dimension in case of other filters are used ([a4edfae](https://github.com/cube-js/cube/commit/a4edfae654f99b0d5a1227dfc569e8f2231e9697)), closes [#6312](https://github.com/cube-js/cube/issues/6312)
+
+
+### Features
+
+* **docker:** Python - disable buffering for STDOUT (PYTHONUNBUFFERED) ([#7153](https://github.com/cube-js/cube/issues/7153)) ([5cd0a17](https://github.com/cube-js/cube/commit/5cd0a175bf903d7118735f3526813aa9dd6f9953))
+
+
+
+
+
+## [0.33.59](https://github.com/cube-js/cube/compare/v0.33.58...v0.33.59) (2023-09-20)
+
+
+### Features
+
+* **cubesql:** `EXTRACT` SQL push down ([#7151](https://github.com/cube-js/cube/issues/7151)) ([e30c4da](https://github.com/cube-js/cube/commit/e30c4da555adfc1515fcc9e0253bc89ca8adc58b))
+* **cubesql:** Add ability to filter dates inclusive of date being passed in when using `<=` or `>=` ([#7041](https://github.com/cube-js/cube/issues/7041)) Thanks [@darapuk](https://github.com/darapuk) ! ([6b9ae70](https://github.com/cube-js/cube/commit/6b9ae703b113a01fa4e6de54b5597475aed0b85d))
+* **native:** Cube.py - support all options ([#7145](https://github.com/cube-js/cube/issues/7145)) ([5e5fb18](https://github.com/cube-js/cube/commit/5e5fb1800d2e97b870281b335bfca28ab00a9c10))
+
+
+
+
+
 ## [0.33.58](https://github.com/cube-js/cube/compare/v0.33.57...v0.33.58) (2023-09-18)
 
 

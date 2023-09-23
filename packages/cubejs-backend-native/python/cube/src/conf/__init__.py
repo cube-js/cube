@@ -1,5 +1,5 @@
 import os
-from typing import Union, Callable, Dict
+from typing import Union, Callable, Dict, Any
 
 
 def file_repository(path):
@@ -31,22 +31,39 @@ class RequestContext:
 
 
 class Configuration:
+    web_sockets: bool
+    http: Dict
+    graceful_shutdown: int
+    process_subscriptions_interval: int
+    web_sockets_base_path: str
     schema_path: str
     base_path: str
-    web_sockets_base_path: str
-    compiler_cache_size: int
-    telemetry: bool
-    pg_sql_port: int
+    dev_server: bool
+    api_secret: str
     cache_and_queue_driver: str
     allow_js_duplicate_props_in_schema: bool
-    process_subscriptions_interval: int
-    http: Dict
     jwt: Dict
+    scheduled_refresh_timer: Any
+    scheduled_refresh_timezones: list[str]
+    scheduled_refresh_concurrency: int
+    scheduled_refresh_batch_size: int
+    compiler_cache_size: int
+    update_compiler_cache_keep_alive: bool
+    max_compiler_cache_keep_alive: int
+    telemetry: bool
+    sql_cache: bool
+    live_preview: bool
+    # SQL API
+    pg_sql_port: int
+    sql_super_user: str
+    sql_user: str
+    sql_password: str
     # Functions
     logger: Callable
     context_to_app_id: Union[str, Callable[[RequestContext], str]]
     context_to_orchestrator_id: Union[str, Callable[[RequestContext], str]]
-    driver_factory: Callable
+    driver_factory: Callable[[RequestContext], Dict]
+    external_driver_factory: Callable[[RequestContext], Dict]
     db_type: Union[str, Callable[[RequestContext], str]]
     check_auth: Callable
     check_sql_auth: Callable
@@ -61,22 +78,38 @@ class Configuration:
     orchestrator_options: Union[Dict, Callable[[RequestContext], Dict]]
 
     def __init__(self):
+        self.web_sockets = None
+        self.http = None
+        self.graceful_shutdown = None
         self.schema_path = None
         self.base_path = None
+        self.dev_server = None
+        self.api_secret = None
         self.web_sockets_base_path = None
-        self.compiler_cache_size = None
-        self.telemetry = None
         self.pg_sql_port = None
         self.cache_and_queue_driver = None
         self.allow_js_duplicate_props_in_schema = None
         self.process_subscriptions_interval = None
-        self.http = None
         self.jwt = None
+        self.scheduled_refresh_timer = None
+        self.scheduled_refresh_timezones = None
+        self.scheduled_refresh_concurrency = None
+        self.scheduled_refresh_batch_size = None
+        self.compiler_cache_size = None
+        self.update_compiler_cache_keep_alive = None
+        self.max_compiler_cache_keep_alive = None
+        self.telemetry = None
+        self.sql_cache = None
+        self.live_preview = None
+        self.sql_super_user = None
+        self.sql_user = None
+        self.sql_password = None
         # Functions
         self.logger = None
         self.context_to_app_id = None
         self.context_to_orchestrator_id = None
         self.driver_factory = None
+        self.external_driver_factory = None
         self.db_type = None
         self.check_auth = None
         self.check_sql_auth = None
@@ -91,89 +124,15 @@ class Configuration:
         self.pre_aggregations_schema = None
         self.orchestrator_options = None
 
-    def set_schema_path(self, schema_path: str):
-        self.schema_path = schema_path
+    def __call__(self, func):
+        if not callable(func):
+            raise ConfigurationException("@config decorator must be used with functions, actual: '%s'" % type(func).__name__)
 
-    def set_base_path(self, base_path: str):
-        self.base_path = base_path
+        if hasattr(self, func.__name__):
+            setattr(self, func.__name__, func)
+        else:
+            raise ConfigurationException("Unknown configuration property: '%s'" % func.__name__)
 
-    def set_web_sockets_base_path(self, web_sockets_base_path: str):
-        self.web_sockets_base_path = web_sockets_base_path
-
-    def set_compiler_cache_size(self, compiler_cache_size: int):
-        self.compiler_cache_size = compiler_cache_size
-
-    def set_telemetry(self, telemetry: bool):
-        self.telemetry = telemetry
-
-    def set_pg_sql_port(self, pg_sql_port: int):
-        self.pg_sql_port = pg_sql_port
-
-    def set_cache_and_queue_driver(self, cache_and_queue_driver: str):
-        self.cache_and_queue_driver = cache_and_queue_driver
-
-    def set_allow_js_duplicate_props_in_schema(self, allow_js_duplicate_props_in_schema: bool):
-        self.allow_js_duplicate_props_in_schema = allow_js_duplicate_props_in_schema
-
-    def set_process_subscriptions_interval(self, process_subscriptions_interval: int):
-        self.process_subscriptions_interval = process_subscriptions_interval
-
-    def set_logger(self, logger: Callable):
-        self.logger = logger
-
-    def set_context_to_app_id(self, context_to_app_id: Union[str, Callable[[RequestContext], str]]):
-        self.context_to_app_id = context_to_app_id
-
-    def set_context_to_orchestrator_id(self, context_to_orchestrator_id: Union[str, Callable[[RequestContext], str]]):
-        self.context_to_orchestrator_id = context_to_orchestrator_id
-
-    def set_driver_factory(self, driver_factory: Callable):
-        self.driver_factory = driver_factory
-
-    def set_db_type(self, db_type: Union[str, Callable[[RequestContext], str]]):
-        self.db_type = db_type
-
-    def set_check_auth(self, check_auth: Callable):
-        self.check_auth = check_auth
-
-    def set_check_sql_auth(self, check_sql_auth: Callable):
-        self.check_sql_auth = check_sql_auth
-
-    def set_can_switch_sql_user(self, can_switch_sql_user: Callable):
-        self.can_switch_sql_user = can_switch_sql_user
-
-    def set_query_rewrite(self, query_rewrite: Callable):
-        self.query_rewrite = query_rewrite
-
-    def set_extend_context(self, extend_context: Callable[[RequestContext], Dict]):
-        self.extend_context = extend_context
-
-    def set_scheduled_refresh_contexts(self, scheduled_refresh_contexts: Callable):
-        self.scheduled_refresh_contexts = scheduled_refresh_contexts
-
-    def set_repository_factory(self, repository_factory: Callable):
-        self.repository_factory = repository_factory
-
-    def set_schema_version(self, schema_version: Union[str, Callable[[RequestContext], str]]):
-        self.schema_version = schema_version
-
-    def set_semantic_layer_sync(self, semantic_layer_sync: Union[Dict, Callable[[], Dict]]):
-        self.semantic_layer_sync = semantic_layer_sync
-
-    def set_pre_aggregations_schema(self, pre_aggregations_schema: Union[str, Callable[[RequestContext], str]]):
-        self.pre_aggregations_schema = pre_aggregations_schema
-
-    def set_orchestrator_options(self, orchestrator_options: Union[Dict, Callable[[RequestContext], Dict]]):
-        self.orchestrator_options = orchestrator_options
-
-
-settings = Configuration()
-
-def config(func):
-    if not callable(func):
-        raise ConfigurationException("@config decorator must be used with functions, actual: '%s'" % type(func).__name__)
-
-    if hasattr(settings, func.__name__):
-        setattr(settings, func.__name__, func)
-    else:
-        raise ConfigurationException("Unknown settings property: '%s'" % func.__name__)
+config = Configuration()
+# backward compatibility
+settings = config

@@ -313,6 +313,7 @@ export const shutdownInterface = async (instance: SqlInterfaceInstance): Promise
 
 export interface PyConfiguration {
     repositoryFactory?: (ctx: unknown) => Promise<unknown>,
+    logger?: (msg: string, params: Record<string, any>) => void,
     checkAuth?: (req: unknown, authorization: string) => Promise<void>
     queryRewrite?: (query: unknown, ctx: unknown) => Promise<unknown>
     contextToApiScopes?: () => Promise<string[]>
@@ -346,6 +347,15 @@ export const pythonLoadConfig = async (content: string, options: { fileName: str
         ctx
       )
     });
+  }
+
+  if (config.logger) {
+    const nativeLogger = config.logger;
+    config.logger = (msg: string, params: Record<string, any>) => {
+      nativeLogger(msg, params).catch((e: any) => {
+        console.error(e);
+      });
+    };
   }
 
   return config;

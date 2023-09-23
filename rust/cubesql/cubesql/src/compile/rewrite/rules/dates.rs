@@ -3,20 +3,21 @@ use crate::{
     compile::{
         engine::provider::CubeContext,
         rewrite::{
-            agg_fun_expr, analysis::LogicalPlanAnalysis, binary_expr, cast_expr,
+            agg_fun_expr, alias_expr, analysis::LogicalPlanAnalysis, binary_expr, cast_expr,
             cast_expr_explicit, column_expr, fun_expr, literal_expr, literal_int, literal_string,
             negative_expr, rewrite, rewriter::RewriteRules, to_day_interval_expr,
-            transforming_rewrite, udf_expr, CastExprDataType, LiteralExprValue,
-            LogicalPlanLanguage,
+            transforming_rewrite, transforming_rewrite_with_root, udf_expr, AliasExprAlias,
+            CastExprDataType, LiteralExprValue, LogicalPlanLanguage,
         },
     },
     var, var_iter,
 };
 use datafusion::{
     arrow::datatypes::{DataType, TimeUnit},
+    logical_plan::DFSchema,
     scalar::ScalarValue,
 };
-use egg::{EGraph, Rewrite, Subst};
+use egg::{EGraph, Id, Rewrite, Subst};
 use std::{convert::TryFrom, sync::Arc};
 
 pub struct DateRules {
@@ -221,7 +222,8 @@ impl RewriteRules for DateRules {
                     vec![literal_string("day"), column_expr("?column")],
                 ),
             ),
-            transforming_rewrite(
+            // TODO
+            transforming_rewrite_with_root(
                 "cast-in-date-trunc",
                 fun_expr(
                     "DateTrunc",
@@ -230,13 +232,16 @@ impl RewriteRules for DateRules {
                         cast_expr(column_expr("?column"), "?data_type"),
                     ],
                 ),
-                fun_expr(
-                    "DateTrunc",
-                    vec![literal_expr("?granularity"), column_expr("?column")],
+                alias_expr(
+                    fun_expr(
+                        "DateTrunc",
+                        vec![literal_expr("?granularity"), column_expr("?column")],
+                    ),
+                    "?alias",
                 ),
-                self.unwrap_cast_to_timestamp("?data_type", "?granularity"),
+                self.unwrap_cast_to_timestamp("?data_type", "?granularity", "?alias"),
             ),
-            transforming_rewrite(
+            transforming_rewrite_with_root(
                 "cast-in-date-trunc-double",
                 fun_expr(
                     "DateTrunc",
@@ -254,17 +259,20 @@ impl RewriteRules for DateRules {
                         ),
                     ],
                 ),
-                fun_expr(
-                    "DateTrunc",
-                    vec![
-                        literal_expr("?granularity"),
-                        fun_expr(
-                            "DateTrunc",
-                            vec![literal_expr("?granularity"), "?expr".to_string()],
-                        ),
-                    ],
+                alias_expr(
+                    fun_expr(
+                        "DateTrunc",
+                        vec![
+                            literal_expr("?granularity"),
+                            fun_expr(
+                                "DateTrunc",
+                                vec![literal_expr("?granularity"), "?expr".to_string()],
+                            ),
+                        ],
+                    ),
+                    "?alias",
                 ),
-                self.unwrap_cast_to_timestamp("?data_type", "?granularity"),
+                self.unwrap_cast_to_timestamp("?data_type", "?granularity", "?alias"),
             ),
             rewrite(
                 "current-timestamp-to-now",
@@ -276,12 +284,15 @@ impl RewriteRules for DateRules {
                 udf_expr("localtimestamp", Vec::<String>::new()),
                 fun_expr("UtcTimestamp", Vec::<String>::new()),
             ),
-            rewrite(
+            transforming_rewrite_with_root(
                 "tableau-week",
                 binary_expr(
-                    fun_expr(
-                        "DateTrunc",
-                        vec!["?granularity".to_string(), column_expr("?column")],
+                    alias_expr(
+                        fun_expr(
+                            "DateTrunc",
+                            vec!["?granularity".to_string(), column_expr("?column")],
+                        ),
+                        "?date_trunc_alias",
                     ),
                     "+",
                     negative_expr(binary_expr(
@@ -294,10 +305,14 @@ impl RewriteRules for DateRules {
                         literal_expr("?interval_one_day"),
                     )),
                 ),
-                fun_expr(
-                    "DateTrunc",
-                    vec![literal_string("week"), column_expr("?column")],
+                alias_expr(
+                    fun_expr(
+                        "DateTrunc",
+                        vec![literal_string("week"), column_expr("?column")],
+                    ),
+                    "?alias",
                 ),
+                self.transform_root_alias("?alias"),
             ),
             rewrite(
                 "metabase-interval-date-range",
@@ -603,31 +618,75 @@ impl DateRules {
         &self,
         data_type_var: &'static str,
         granularity_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        alias_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &mut Subst) -> bool
+    {
         let data_type_var = var!(data_type_var);
         let granularity_var = var!(granularity_var);
-        move |egraph, subst| {
+        let alias_var = var!(alias_var);
+        move |egraph, root, subst| {
             for data_type in var_iter!(egraph[subst[data_type_var]], CastExprDataType) {
-                match data_type {
-                    DataType::Timestamp(TimeUnit::Nanosecond, None) => return true,
-                    DataType::Date32 => {
-                        for granularity in
-                            var_iter!(egraph[subst[granularity_var]], LiteralExprValue)
-                        {
-                            if let ScalarValue::Utf8(Some(granularity)) = granularity {
-                                if let (Some(original_granularity), Some(day_granularity)) = (
-                                    utils::granularity_str_to_int_order(&granularity, Some(false)),
-                                    utils::granularity_str_to_int_order("day", Some(false)),
-                                ) {
-                                    if original_granularity >= day_granularity {
-                                        return true;
+                if let Some(original_expr) = egraph[root].data.original_expr.as_ref() {
+                    let alias = original_expr.name(&DFSchema::empty()).unwrap();
+                    match data_type {
+                        DataType::Timestamp(TimeUnit::Nanosecond, None) => {
+                            subst.insert(
+                                alias_var,
+                                egraph.add(LogicalPlanLanguage::AliasExprAlias(AliasExprAlias(
+                                    alias.to_string(),
+                                ))),
+                            );
+                            return true;
+                        }
+                        DataType::Date32 => {
+                            for granularity in
+                                var_iter!(egraph[subst[granularity_var]], LiteralExprValue)
+                            {
+                                if let ScalarValue::Utf8(Some(granularity)) = granularity {
+                                    if let (Some(original_granularity), Some(day_granularity)) = (
+                                        utils::granularity_str_to_int_order(
+                                            &granularity,
+                                            Some(false),
+                                        ),
+                                        utils::granularity_str_to_int_order("day", Some(false)),
+                                    ) {
+                                        if original_granularity >= day_granularity {
+                                            subst.insert(
+                                                alias_var,
+                                                egraph.add(LogicalPlanLanguage::AliasExprAlias(
+                                                    AliasExprAlias(alias.to_string()),
+                                                )),
+                                            );
+                                            return true;
+                                        }
                                     }
                                 }
                             }
                         }
+                        _ => (),
                     }
-                    _ => (),
                 }
+            }
+            false
+        }
+    }
+
+    pub fn transform_root_alias(
+        &self,
+        alias_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &mut Subst) -> bool
+    {
+        let alias_var = var!(alias_var);
+        move |egraph, root, subst| {
+            if let Some(original_expr) = egraph[root].data.original_expr.as_ref() {
+                let alias = original_expr.name(&DFSchema::empty()).unwrap();
+                subst.insert(
+                    alias_var,
+                    egraph.add(LogicalPlanLanguage::AliasExprAlias(AliasExprAlias(
+                        alias.to_string(),
+                    ))),
+                );
+                return true;
             }
             false
         }

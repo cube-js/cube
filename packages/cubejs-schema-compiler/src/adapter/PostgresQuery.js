@@ -50,6 +50,10 @@ export class PostgresQuery extends BaseQuery {
     templates.params.param = '${{ param_index + 1 }}';
     templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
     templates.functions.CONCAT = 'CONCAT({% for arg in args %}CAST({{arg}} AS TEXT){% if not loop.last %},{% endif %}{% endfor %})';
+    templates.functions.DATEPART = 'DATE_PART({{ args_concat }})';
+    templates.expressions.interval = 'INTERVAL \'{{ interval }}\'';
+    templates.expressions.extract = 'EXTRACT({{ date_part }} FROM {{ expr }})';
+
     return templates;
   }
 }

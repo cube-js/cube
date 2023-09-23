@@ -979,6 +979,7 @@ pub fn transform_response<V: ValueObject>(
                         (FieldValue::String(s), builder) => {
                             let timestamp = NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%dT%H:%M:%S.%f")
                                 .or_else(|_| NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%d %H:%M:%S.%f"))
+                                .or_else(|_| NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%dT%H:%M:%S"))
                                 .map_err(|e| {
                                     DataFusionError::Execution(format!(
                                         "Can't parse timestamp: '{}': {}",

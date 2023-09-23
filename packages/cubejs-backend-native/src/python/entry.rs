@@ -30,17 +30,18 @@ fn python_load_config(mut cx: FunctionContext) -> JsResult<JsPromise> {
         let settings_py = if config_module.hasattr("__execution_context_locals")? {
             let execution_context_locals = config_module.getattr("__execution_context_locals")?;
             execution_context_locals.get_item("settings")?
+        } else if config_module.hasattr("config")? {
+            config_module.getattr("config")?
         } else {
+            // backward compatibility
             config_module.getattr("settings")?
         };
 
         let mut cube_conf = CubeConfigPy::new();
 
-        for attr_name in cube_conf.get_static_attrs() {
+        for attr_name in cube_conf.get_attrs() {
             cube_conf.attr(settings_py, attr_name)?;
         }
-
-        cube_conf.apply_dynamic_functions(settings_py)?;
 
         Ok(cube_conf)
     });

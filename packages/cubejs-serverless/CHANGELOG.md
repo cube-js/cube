@@ -3,6 +3,30 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.61](https://github.com/cube-js/cube/compare/v0.33.60...v0.33.61) (2023-09-22)
+
+**Note:** Version bump only for package @cubejs-backend/serverless
+
+
+
+
+
+## [0.33.60](https://github.com/cube-js/cube/compare/v0.33.59...v0.33.60) (2023-09-22)
+
+**Note:** Version bump only for package @cubejs-backend/serverless
+
+
+
+
+
+## [0.33.59](https://github.com/cube-js/cube/compare/v0.33.58...v0.33.59) (2023-09-20)
+
+**Note:** Version bump only for package @cubejs-backend/serverless
+
+
+
+
+
 ## [0.33.58](https://github.com/cube-js/cube/compare/v0.33.57...v0.33.58) (2023-09-18)
 
 **Note:** Version bump only for package @cubejs-backend/serverless

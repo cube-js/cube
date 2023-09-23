@@ -3059,7 +3059,7 @@ mod tests {
                     granularity: None,
                     date_range: Some(json!(vec![
                         "2020-12-25T22:48:48.000Z".to_string(),
-                        "2022-03-31T23:59:59.999Z".to_string()
+                        "2022-04-01T00:00:00.000Z".to_string()
                     ]))
                 }]),
                 order: None,
@@ -3110,6 +3110,133 @@ ORDER BY \"COUNT(count)\" DESC"
                 limit: None,
                 offset: None,
                 filters: None,
+                ungrouped: None,
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn superset_pg_time_filter_with_filter() {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT DATE_TRUNC('week', \"order_date\") AS __timestamp,
+               count(count) AS \"COUNT(count)\"
+FROM public.\"KibanaSampleDataEcommerce\"
+WHERE \"customer_gender\" = 'female' AND \"order_date\" >= TO_TIMESTAMP('2021-05-15 00:00:00.000000', 'YYYY-MM-DD HH24:MI:SS.US')
+  AND \"order_date\" < TO_TIMESTAMP('2022-05-15 00:00:00.000000', 'YYYY-MM-DD HH24:MI:SS.US')
+GROUP BY DATE_TRUNC('week', \"order_date\")
+ORDER BY \"COUNT(count)\" DESC"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+            .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("week".to_string()),
+                    date_range: Some(json!(vec![
+                        "2021-05-15T00:00:00.000Z".to_string(),
+                        "2022-05-14T23:59:59.999Z".to_string()
+                    ]))
+                }]),
+                order: Some(vec![vec![
+                    "KibanaSampleDataEcommerce.count".to_string(),
+                    "desc".to_string()
+                ]]),
+                limit: None,
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                    operator: Some("equals".to_string()),
+                    values: Some(vec!["female".to_string()]),
+                    or: None,
+                    and: None
+                }]),
+                ungrouped: None,
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn superset_pg_time_filter_with_generalized_filters() {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT DATE_TRUNC('week', \"order_date\") AS __timestamp,
+               count(count) AS \"COUNT(count)\"
+FROM public.\"KibanaSampleDataEcommerce\"
+WHERE \"customer_gender\" = 'female'\
+ AND \"order_date\" >= TO_TIMESTAMP('2021-05-15 00:00:00.000000', 'YYYY-MM-DD HH24:MI:SS.US')
+ AND \"customer_gender\" LIKE '%fem%'
+ AND \"customer_gender\" LIKE '%fe%'
+ AND \"order_date\" < TO_TIMESTAMP('2022-05-15 00:00:00.000000', 'YYYY-MM-DD HH24:MI:SS.US')
+ AND \"customer_gender\" LIKE '%f%'
+GROUP BY DATE_TRUNC('week', \"order_date\")
+ORDER BY \"COUNT(count)\" DESC"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("week".to_string()),
+                    date_range: Some(json!(vec![
+                        "2021-05-15T00:00:00.000Z".to_string(),
+                        "2022-05-14T23:59:59.999Z".to_string()
+                    ]))
+                }]),
+                order: Some(vec![vec![
+                    "KibanaSampleDataEcommerce.count".to_string(),
+                    "desc".to_string()
+                ]]),
+                limit: None,
+                offset: None,
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem {
+                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                        operator: Some("equals".to_string()),
+                        values: Some(vec!["female".to_string()]),
+                        or: None,
+                        and: None
+                    },
+                    V1LoadRequestQueryFilterItem {
+                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                        operator: Some("contains".to_string()),
+                        values: Some(vec!["fem".to_string()]),
+                        or: None,
+                        and: None
+                    },
+                    V1LoadRequestQueryFilterItem {
+                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                        operator: Some("contains".to_string()),
+                        values: Some(vec!["fe".to_string()]),
+                        or: None,
+                        and: None
+                    },
+                    V1LoadRequestQueryFilterItem {
+                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                        operator: Some("contains".to_string()),
+                        values: Some(vec!["f".to_string()]),
+                        or: None,
+                        and: None
+                    }
+                ]),
                 ungrouped: None,
             }
         );
@@ -4281,7 +4408,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 or: Some(vec![
                     json!(V1LoadRequestQueryFilterItem {
                         member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
-                        operator: Some("afterDate".to_string()),
+                        operator: Some("afterOrOnDate".to_string()),
                         values: Some(vec!["2021-08-31T00:00:00.000Z".to_string()]),
                         or: None,
                         and: None,
@@ -4289,7 +4416,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     json!(V1LoadRequestQueryFilterItem {
                         member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
                         operator: Some("beforeDate".to_string()),
-                        values: Some(vec!["2021-09-06T23:59:59.999Z".to_string()]),
+                        values: Some(vec!["2021-09-07T00:00:00.000Z".to_string()]),
                         or: None,
                         and: None,
                     })
@@ -11614,7 +11741,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
-                    operator: Some("afterDate".to_string()),
+                    operator: Some("afterOrOnDate".to_string()),
                     values: filter_vals,
                     or: None,
                     and: None,
@@ -13935,7 +14062,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     granularity: Some("day".to_string()),
                     date_range: Some(json!(vec![
                         "2020-01-01T00:00:00.000Z".to_string(),
-                        format!("{}T23:59:59.999Z", end_date),
+                        format!("{}T00:00:00.000Z", end_date),
                     ]))
                 }]),
                 order: Some(vec![vec![
@@ -14292,7 +14419,7 @@ ORDER BY \"COUNT(count)\" DESC"
         )
         .await;
 
-        query.unwrap_err();
+        query.unwrap();
     }
 
     #[tokio::test]
@@ -17333,7 +17460,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
                     operator: Some("beforeDate".to_string()),
-                    values: Some(vec!["2014-05-30T23:59:59.999Z".to_string()]),
+                    values: Some(vec!["2014-05-31T00:00:00.000Z".to_string()]),
                     or: None,
                     and: None
                 }]),
@@ -17909,18 +18036,48 @@ ORDER BY \"COUNT(count)\" DESC"
 
         let test_data = vec![
             // (operator, literal date, filter operator, filter value)
-            (">=", "2020-03-25", "afterDate", "2020-04-01T00:00:00.000Z"),
-            (">=", "2020-04-01", "afterDate", "2020-04-01T00:00:00.000Z"),
-            (">=", "2020-04-10", "afterDate", "2020-05-01T00:00:00.000Z"),
-            ("<=", "2020-03-25", "beforeDate", "2020-03-31T23:59:59.999Z"),
-            ("<=", "2020-04-01", "beforeDate", "2020-04-30T23:59:59.999Z"),
-            ("<=", "2020-04-10", "beforeDate", "2020-04-30T23:59:59.999Z"),
+            (
+                ">=",
+                "2020-03-25",
+                "afterOrOnDate",
+                "2020-04-01T00:00:00.000Z",
+            ),
+            (
+                ">=",
+                "2020-04-01",
+                "afterOrOnDate",
+                "2020-04-01T00:00:00.000Z",
+            ),
+            (
+                ">=",
+                "2020-04-10",
+                "afterOrOnDate",
+                "2020-05-01T00:00:00.000Z",
+            ),
+            (
+                "<=",
+                "2020-03-25",
+                "beforeOrOnDate",
+                "2020-04-01T00:00:00.000Z",
+            ),
+            (
+                "<=",
+                "2020-04-01",
+                "beforeOrOnDate",
+                "2020-05-01T00:00:00.000Z",
+            ),
+            (
+                "<=",
+                "2020-04-10",
+                "beforeOrOnDate",
+                "2020-05-01T00:00:00.000Z",
+            ),
             (">", "2020-03-25", "afterDate", "2020-04-01T00:00:00.000Z"),
             (">", "2020-04-01", "afterDate", "2020-05-01T00:00:00.000Z"),
             (">", "2020-04-10", "afterDate", "2020-05-01T00:00:00.000Z"),
-            ("<", "2020-03-25", "beforeDate", "2020-03-31T23:59:59.999Z"),
-            ("<", "2020-04-01", "beforeDate", "2020-03-31T23:59:59.999Z"),
-            ("<", "2020-04-10", "beforeDate", "2020-04-30T23:59:59.999Z"),
+            ("<", "2020-03-25", "beforeDate", "2020-04-01T00:00:00.000Z"),
+            ("<", "2020-04-01", "beforeDate", "2020-04-01T00:00:00.000Z"),
+            ("<", "2020-04-10", "beforeDate", "2020-05-01T00:00:00.000Z"),
         ];
 
         for (operator, literal_date, filter_operator, filter_value) in test_data {
@@ -18502,6 +18659,35 @@ ORDER BY \"COUNT(count)\" DESC"
             "Physical plan: {}",
             displayable(physical_plan.as_ref()).indent()
         );
+    }
+
+    #[tokio::test]
+    async fn test_wrapper_tableau_sunday_week() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT (CAST(DATE_TRUNC('day', CAST(order_date AS TIMESTAMP)) AS DATE) - (((7 + CAST(EXTRACT(DOW FROM order_date) AS BIGINT) - 1) % 7) * INTERVAL '1 DAY')) AS \"twk:date:ok\", AVG(avgPrice) mp FROM KibanaSampleDataEcommerce a GROUP BY 1 ORDER BY 1 DESC"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+            .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert!(logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql
+            .contains("EXTRACT"));
     }
 
     #[tokio::test]

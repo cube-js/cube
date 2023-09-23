@@ -808,7 +808,8 @@ cause out of memory.
 ### refresh_key
 
 Cube can also take care of keeping pre-aggregations up to date with the
-`refresh_key` property. By default, it is set to `every: '1 hour'`.
+`refresh_key` property. By default, it is set to `every: '1 hour'`, 
+if neither of the cubes' pre-aggregation references don't override `refresh_key`.
 
 <InfoBox>
 
@@ -866,7 +867,7 @@ refreshed.
 
 The `refresh_key` can define an `every` property which can be used to refresh
 pre-aggregations based on a time interval. By default, it is set to `1 hour`
-unless the [`sql` property][self-refreshkey-sql] is also defined, in which case
+unless the [`sql` property][self-refreshkey-sql] is also defined in any of cubes pre-aggregation references, in which case
 it is set to `10 seconds`. For example:
 
 <CodeTabs>
