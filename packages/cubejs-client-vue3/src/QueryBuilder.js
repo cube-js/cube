@@ -270,7 +270,12 @@ export default {
         [
           ...this.measures,
           ...this.dimensions,
-          ...this.timeDimensions.map(({ dimension }) => toOrderMember(dimension)),
+          ...this.timeDimensions.reduce((acc, { dimension, granularity }) => {
+            if (granularity !== undefined) {
+              acc.push(toOrderMember(dimension));
+            }
+            return acc;
+          }, []),
         ]
           .map((member, index) => {
             const id = member.name || member.id;
