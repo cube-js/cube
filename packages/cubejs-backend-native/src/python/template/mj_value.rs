@@ -1,18 +1,18 @@
 use crate::python::cross::{CLRepr, CLReprKind, CLReprObject};
 use crate::python::runtime::py_runtime;
 use crate::tokio_runtime;
+use log::error;
 use minijinja as mj;
 use minijinja::value::{Object, ObjectKind, SeqObject, StructObject, Value, ValueKind};
+use pyo3::exceptions::PyNotImplementedError;
 use pyo3::types::{PyFunction, PyTuple};
 use pyo3::{AsPyPointer, Py, PyAny, PyErr, PyResult, Python};
 use std::convert::TryInto;
 use std::sync::Arc;
-use log::error;
-use pyo3::exceptions::PyNotImplementedError;
 
 struct JinjaPythonObject {
     pub(crate) inner: Py<PyAny>,
-    fields: Vec<Arc<str>>
+    fields: Vec<Arc<str>>,
 }
 
 impl std::fmt::Debug for JinjaPythonObject {
@@ -63,30 +63,56 @@ impl Object for JinjaPythonObject {
                     "Calling async methods are not supported",
                 ))
             } else {
-                CLRepr::from_python_ref(
-                    call_res.as_ref(py),
-                )
+                CLRepr::from_python_ref(call_res.as_ref(py))
             }
         });
 
         match python_call_res {
             Ok(r) => Ok(to_minijinja_value(r)),
-            Err(err) =>  Err(mj::Error::new(
+            Err(err) => Err(mj::Error::new(
                 minijinja::ErrorKind::InvalidOperation,
-                format!(
-                    "Error while calling method: {}",
-                    err
-                )
-            ))
+                format!("Error while calling method: {}", err),
+            )),
         }
     }
 
-    fn call(&self, _state: &mj::State, _args: &[Value]) -> Result<Value, mj::Error> {
-        // TODO(ovr): Implement it
-        Err(mj::Error::new(
-            minijinja::ErrorKind::InvalidOperation,
-            "Unable to call on Py<Object>",
-        ))
+    fn call(&self, _state: &mj::State, args: &[Value]) -> Result<Value, mj::Error> {
+        let obj_ref = &self.inner;
+
+        let mut arguments = Vec::with_capacity(args.len());
+
+        for arg in args {
+            arguments.push(from_minijinja_value(arg)?);
+        }
+
+        let python_call_res = Python::with_gil(move |py| -> PyResult<CLRepr> {
+            let mut args_tuple = Vec::with_capacity(args.len());
+
+            for arg in arguments {
+                args_tuple.push(arg.into_py(py)?);
+            }
+
+            let tuple = PyTuple::new(py, args_tuple);
+
+            let call_res = obj_ref.call1(py, tuple)?;
+
+            let is_coroutine = unsafe { pyo3::ffi::PyCoro_CheckExact(call_res.as_ptr()) == 1 };
+            if is_coroutine {
+                Err(PyErr::new::<PyNotImplementedError, _>(
+                    "Calling async is not supported",
+                ))
+            } else {
+                CLRepr::from_python_ref(call_res.as_ref(py))
+            }
+        });
+
+        match python_call_res {
+            Ok(r) => Ok(to_minijinja_value(r)),
+            Err(err) => Err(mj::Error::new(
+                minijinja::ErrorKind::InvalidOperation,
+                format!("Error while calling method: {}", err),
+            )),
+        }
     }
 }
 
@@ -384,9 +410,10 @@ pub fn to_minijinja_value(from: CLRepr) -> Value {
         CLRepr::PyExternalFunction(inner) | CLRepr::PyFunction(inner) => {
             Value::from_object(JinjaPythonFunction { inner })
         }
-        CLRepr::PyObject(inner) => {
-            Value::from_object(JinjaPythonObject { inner, fields: vec![] })
-        }
+        CLRepr::PyObject(inner) => Value::from_object(JinjaPythonObject {
+            inner,
+            fields: vec![],
+        }),
         CLRepr::JsFunction(_) => panic!(
             "Converting from {:?} to minijinja::Value is not supported",
             CLReprKind::JsFunction
