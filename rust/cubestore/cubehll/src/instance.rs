@@ -178,24 +178,24 @@ impl HllInstance {
                 // TODO For now we read hll-storage-spec only for postgress. For other realizations
                 // this algorithm can differ.
                 /*
-                    uint64_t mask = nregs - 1;
+                   uint64_t mask = nregs - 1;
 
-                    size_t maxregval = (1 << nbits) - 1;
+                   size_t maxregval = (1 << nbits) - 1;
 
-                    size_t ndx = elem & mask;
+                   size_t ndx = elem & mask;
 
-                    uint64_t ss_val = elem >> log2nregs;
+                   uint64_t ss_val = elem >> log2nregs;
 
-                    size_t p_w = ss_val == 0 ? 0 : __builtin_ctzll(ss_val) + 1;
+                   size_t p_w = ss_val == 0 ? 0 : __builtin_ctzll(ss_val) + 1;
 
-                    Assert(ndx < msc_regs_idx_limit());
+                   Assert(ndx < msc_regs_idx_limit());
 
-                    if (p_w > maxregval)
-                        p_w = maxregval;
+                   if (p_w > maxregval)
+                       p_w = maxregval;
 
-                    if (mscp->msc_regs[ndx] < p_w)
-                        mscp->msc_regs[ndx] = p_w;
-                 * */
+                   if (mscp->msc_regs[ndx] < p_w)
+                       mscp->msc_regs[ndx] = p_w;
+                * */
                 let mask = num_buckets as u64 - 1;
                 let mut indices = Vec::with_capacity(num_hashes);
                 let mut values = Vec::with_capacity(num_hashes);
@@ -211,15 +211,10 @@ impl HllInstance {
                         val.trailing_zeros() + 1
                     };
 
-                    let zeroes = if zeroes > maxval {
-                        maxval
-                    } else {
-                        zeroes
-                    };
+                    let zeroes = if zeroes > maxval { maxval } else { zeroes };
                     indices.push(ind as u32);
                     values.push(zeroes as u8);
                 }
-
 
                 return Ok(HllInstance::Sparse(SparseHll::new_from_indices_and_values(
                     log_num_buckets,
@@ -614,7 +609,6 @@ impl DenseHll {
             overflow_values: Vec::new(),
         };
     }
-
 
     pub fn new_from_entries(index_bit_len: u8, values: Vec<u8>) -> Result<DenseHll> {
         DenseHll::is_valid_bit_len(index_bit_len)?;
@@ -1443,8 +1437,6 @@ mod tests {
 
         #[test]
         fn test_hll_postgr_test() {
-
-
             let t1 = "Eot/HUOjtjMdhpk=";
             let t2 = "FIt/OVKSkKYhSlQQhClKcpXEIRBEEKZJCHKlRjGKQhSlMwx0HQVRUFIdJkEOc5iEKY6TnIZJCFMRBUESgyimIhSDIKUxzGIgyCmWYpikIYxjHKVRknOVJzGMUyzoKUqTmKcpSIWQpTGMQ5CmQcxkEIgqiISoxzmWgpylQUxirQUhzGQkxDGQhJkjOhRyHKZBDlQRRjMSUhCmIVBTFKQqDGOcxUFOQpTlKkxSnMgqkJOU5iIKYxSGOY5TIQVRTGIMpiHOkozFKVRSlKgiSFIUpjlIchilQcpylGYZkIMghzHOgpzGQkpylIYhklMYpSFMYxTFKcxzHKkhyGOkpTmSQpjLcYpkFKhaCFMY6BnKYpknKdBUEOUxilMdBioMVCCIOYpzmSkxkGIgxSmQYpyqOcxjIKUpEHMc5VGMopzmKgxjJKYpiEGghjGKZRUFQQyTEMc5zGQcx0GGYhCqKQ6UnKc5inOUhUFIcpzlMUyEHOQxkJWUxkJQlCTlYRCymKchVJOdBzFQY5TlMUhiHMVJSlKUpkGIopSnUUhjFQcpjKQQpjoMYxDKKkxDpSYqCHUZJToQcijrIchTjI0x0GMciCKUghUJKkxTIQhJjGOYylHMwxzlIlSCnOkqCJKcpllOQiVHKZAzpOYhkHMU6zFGYpylKhRznKQxCGIQ5DFMYxmkKQxTFKYxznQUxCJMZRiLKUpzHQUyCoKVCTKKYpSkKg6UHIlBSmQYxTlQYqDIIdJimKY5zIKYpiGMcxylOkqCFQVJylOcxSmKkpjIIZRWEKUpTGIY5xsMdB0HKk6BjGYxjFKQxjmQZBSlMYhEpMlRSHKU5TmKQhjIKYxyEMU6DmMcpkFOgxEEKQpToScxxkMVBCIKVCVGOY5UqQYxikKUxCKSY5CnWQ6TlIg6TFKURTGKZCUJSlRRqKZJ2EOgiSESMpDmQQpyISRCDmOopilIQpSIeUo0lMYiSGKcpynQUhDkKRBDoOVpTIIU5SGKUhjIKcxTHIYxGEQY5UkIUhjHQUxDoGUiTlOUhzmGg6imOY5ilKUpCFQZBjGKYhjEMUhRqMUyCnMQxTIQkyTGMkwzHQg5RmKQiTJKQ50FORpypMVBxlKRBTLMcpEGMZBjlMg5TpMUqkpQkxjHScqjlUgqSmOVJlHIYxhmIQyEGWkxyEOMpTEKY5SoQZhjHQUpzGWVChlKghymOZhDmQYpEnQcpDnOUpTGGY5jlMc5TkKUxzFOcxSmIkpToQU5DoMgyhmIhRimIYhykKU5jmQk6FHcUpjJIc5TFIU5UoIUwzGKUhjJScpilMhJDFKNBjHKkpUHMYhkHQNBUEQpSDHOghhkKYpRmKYpzGOYxjFIYpjleY53FGU5SmKYpiJMRDjlMpBiHKgyhoMU5iHUUqEKOg5CJOUg0GOcpiESghDkac6UESUyTHSUy0FOgqDGUU5TGMUyTHKUpkGMdBzpGlBCFMU5TmMY5UGQYyEmKQxCnMRZyGKYqDJKZBilOUx0HIZBTFKMxiJSg5TEYQxUJOkxDlOYZ0EKRCTHOUxknQQh1FKQpSIOdBUnMVQzHKQ5imWsxhlQpBSoKZCDMIk5zQMUpilOMxUGIUxiFMU6THOUplEIYxyFORR1mKZJTFKUoyrIYhTFKY6DmOkiEFKZJEKMYhitIgyyGKUxjkKgxTmMZBCjKQpDmScpjkQchyFQYhinQhIzKMQ=";
             let t3 = "FIt/OVKSkKYhSlQQhClKcpXEIRBEEKZJCHKlRjGKQhSlMwx0HQVRUFIdJkEOc5iEKY6TnIZJCFMRBUESgyimIhSDIKUxzGIgyCmWYpikIYxjHKVRknOVJzGMUyzoKUqTmKcpSIWQpTGMQ5CmQcxkEIgqiISoxzmWgpylQUxirQUhzGQkxDGQhJkjOhRyHKZBDlQRRjMSUhCmIVBTFKQqDGOcxUFOQpTlKkxSnMgqkJOU5iIKYxSGOY5TIQVRTGIMpiHOkozFKVRSlKgiSFIUpjlIchilQcpylGYZkIMghzHOgpzGQkpylIYhklMYpSFMYxTFKcxzHKkhyGOkpTmSQpjLcYpkFKhaCFMY6BnKYpknKdBUEOUxilMdBioMVCCIOYpzmSkxkGIgxSmQYpyqOcxjIKUpEHMc5VGMopzmKgxjJKYpiEGghjGKZRUFQQyTEMc5zGQcx0GGYhCqKQ6UnKc5inOUhUFIcpzlMUyEHOQxkJWUxkJQlCTlYRCymKchVJOdBzFQY5TlMUhiHMVJSlKUpkGIopSnUUhjFQcpjKQQpjoMYxDKKkxDpSYqCHUZJToQcijrIchTjI0x0GMciCKUghUJKkxTIQhJjGOYylHMwxzlIlSCnOkqCJKcpllOQiVHKZAzpOYhkHMU6zFGYpylKhRznKQxCGIQ5DFMYxmkKQxTFKYxznQUxCJMZRiLKUpzHQUyCoKVCTKKYpSkKg6UHIlBSmQYxTlQYqDIIdJimKY5zIKYpiGMcxylOkqCFQVJylOcxSmKkpjIIZRWEKUpTGIY5xsMdB0HKk6BjGYxjFKQxjmQZBSlMYhEpMlRSHKU5TmKQhjIKYxyEMU6DmMcpkFOgxEEKQpToScxxkMVBCIKVCVGOY5UqQYxikKUxCKSY5CnWQ6TlIg6TFKURTGKZCUJSlRRqKZJ2EOgiSESMpDmQQpyISRCDmOopilIQpSIeUo0lMYiSGKcpynQUhDkKRBDoOVpTIIU5SGKUhjIKcxTHIYxGEQY5UkIUhjHQUxDoGUiTlOUhzmGg6imOY5ilKUpCFQZBjGKYhjEMUhRqMUyCnMQxTIQkyTGMkwzHQg5RmKQiTJKQ50FORpypMVBxlKRBTLMcpEGMZBjlMg5TpMUqkpQkxjHScqjlUgqSmOVJlHIYxhmIQyEGWkxyEOMpTEKY5SoQZhjHQUpzGWVChlKghymOZhDmQYpEnQcpDnOUpTGGY5jlMc5TkKUxzFOcxSmIkpToQU5DoMgyhmIhRimIYhykKU5jmQk6FHcUpjJIc5TFIU5UoIUwzGKUhjJScpilMhJDFKNBjHKkpUHMYhkHQNBUEQpSDHOghhkKYpRmKYpzGOYxjFIYpjleY53FGU5SmKYpiJMRDjlMpBiHKgyhoMU5iHUUqEKOg5CJOUhUGOcpiESghDkac6UESUyTHSUy0FOgqDGUU5TGMUyTHKUpkGMdBzpGlBCFMU5TmMY5UGQYyEmKQxCnMRZyGKYqDJKZBilOUx0HIZBTFKMxiJSg5TEYQxUJOkxDlOYZ0EKRCTHOUxknQQh1FKQpSIOdBUnMVQzHKQ5imWsxhlQpBSoKZCDMIk5zQMUpilOMxUGIUxiFMU6THOUplEIYxyFORR1mKZJTFKUoyrIYhTFKY6DmOkiEFKZJEKMYhitIgyyGKUxjkKgxTmMZBCjKQpDmScpjkQchyFQYhinQhIzKMQ=";
