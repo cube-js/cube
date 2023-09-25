@@ -130,6 +130,8 @@ function createTestSuite(utilsFile: string) {
         userId: 1,
       }
     });
+
+    // todo(ovr): Fix issue with tests
     // testTemplateWithPythonCtxBySnapshot(jinjaEngine, 'class-model.yml.jinja', {}, utilsFile);
     testTemplateWithPythonCtxBySnapshot(jinjaEngine, 'data-model.yml.jinja', {}, utilsFile);
     testTemplateWithPythonCtxBySnapshot(jinjaEngine, 'arguments-test.yml.jinja', {}, utilsFile);

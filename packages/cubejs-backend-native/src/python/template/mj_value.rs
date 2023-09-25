@@ -12,7 +12,6 @@ use std::sync::Arc;
 
 struct JinjaPythonObject {
     pub(crate) inner: Py<PyAny>,
-    fields: Vec<Arc<str>>,
 }
 
 impl std::fmt::Debug for JinjaPythonObject {
@@ -137,11 +136,20 @@ impl StructObject for JinjaPythonObject {
     }
 
     fn fields(&self) -> Vec<Arc<str>> {
-        self.fields.clone()
-    }
+        // TODO(ovr): Should we enable it? dump fn?
+        // let obj_ref = &self.inner;
+        //
+        // Python::with_gil(|py| {
+        //     let mut fields = vec![];
+        //
+        //     for key in obj_ref.as_ref(py).keys() {
+        //         fields.push(key.to_string().into());
+        //     }
+        //
+        //     fields
+        // })
 
-    fn field_count(&self) -> usize {
-        self.fields.len()
+        vec![]
     }
 }
 
@@ -410,10 +418,7 @@ pub fn to_minijinja_value(from: CLRepr) -> Value {
         CLRepr::PyExternalFunction(inner) | CLRepr::PyFunction(inner) => {
             Value::from_object(JinjaPythonFunction { inner })
         }
-        CLRepr::PyObject(inner) => Value::from_object(JinjaPythonObject {
-            inner,
-            fields: vec![],
-        }),
+        CLRepr::PyObject(inner) => Value::from_object(JinjaPythonObject { inner }),
         CLRepr::JsFunction(_) => panic!(
             "Converting from {:?} to minijinja::Value is not supported",
             CLReprKind::JsFunction
