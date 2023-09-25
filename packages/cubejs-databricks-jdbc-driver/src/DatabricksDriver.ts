@@ -202,6 +202,7 @@ export class DatabricksDriver extends JDBCDriver {
       drivername: 'com.databricks.client.jdbc.Driver',
       customClassPath: undefined,
       properties: {
+        UID: 'token',
         // PWD-parameter passed to the connection string has higher priority,
         // so we can set this one to an empty string to avoid a Java error.
         PWD:
