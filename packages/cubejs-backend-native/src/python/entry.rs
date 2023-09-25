@@ -68,7 +68,7 @@ fn python_load_model(mut cx: FunctionContext) -> JsResult<JsPromise> {
             env!("CARGO_MANIFEST_DIR"),
             "/python/cube/src/__init__.py"
         ));
-        PyModule::from_code(py, &cube_code, "__init__.py", "cube")?;
+        PyModule::from_code(py, cube_code, "__init__.py", "cube")?;
 
         let model_module = PyModule::from_code(py, &model_content, &model_file_name, "")?;
         let mut collected_functions = CLReprObject::new();

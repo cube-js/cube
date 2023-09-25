@@ -67,3 +67,11 @@ async def load_data():
       ]
     }
     return api_response
+
+class ExampleClassModelA:
+  def get_name_method(self):
+    return "example"
+
+@context.function
+def load_class_model():
+  return ExampleClassModelA()

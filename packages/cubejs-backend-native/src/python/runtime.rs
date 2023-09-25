@@ -117,7 +117,7 @@ impl PyRuntime {
                 match callback {
                     PyScheduledCallback::NodeDeferred(deferred) => {
                         deferred.settle_with(
-                            &js_channel,
+                            js_channel,
                             move |mut cx| -> NeonResult<Handle<JsError>> {
                                 cx.throw_error(format!("Python error: {}", err))
                             },
@@ -175,7 +175,7 @@ impl PyRuntime {
             }
             PyScheduledFunResult::Ready(r) => match callback {
                 PyScheduledCallback::NodeDeferred(deferred) => {
-                    deferred.settle_with(&js_channel, |mut cx| r.into_js(&mut cx));
+                    deferred.settle_with(js_channel, |mut cx| r.into_js(&mut cx));
                 }
                 PyScheduledCallback::Channel(chan) => {
                     if chan.send(Ok(r)).is_err() {
@@ -237,8 +237,8 @@ pub fn py_runtime_init<'a, C: Context<'a>>(
     // it's safe to unwrap
     pyo3_asyncio::tokio::init_with_runtime(runtime).unwrap();
 
-    if let Err(_) = PY_RUNTIME.set(PyRuntime::new(channel)) {
-        cx.throw_error(format!("Error on setting PyRuntime"))
+    if PY_RUNTIME.set(PyRuntime::new(channel)).is_err() {
+        cx.throw_error("Error on setting PyRuntime")
     } else {
         Ok(())
     }
