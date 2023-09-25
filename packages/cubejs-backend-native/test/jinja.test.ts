@@ -23,7 +23,7 @@ async function loadPythonCtxFromUtils(fileName: string) {
     content
   );
 
-  console.debug(ctx);
+  // console.debug(ctx);
 
   return ctx;
 }
