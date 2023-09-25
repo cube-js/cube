@@ -339,12 +339,12 @@ pub fn from_minijinja_value(from: &mj::value::Value) -> Result<CLRepr, mj::Error
             }
         }
         ValueKind::String => {
-            if from.is_safe() {
-                // TODO: Danger?
-                Ok(CLRepr::String(from.as_str().unwrap().to_string()))
-            } else {
-                Ok(CLRepr::String(from.as_str().unwrap().to_string()))
-            }
+            // TODO: Danger strings? Should we check from.is_safe()?
+            Ok(CLRepr::String(
+                from.as_str()
+                    .expect("ValueKind::String must return string from as_str()")
+                    .to_string(),
+            ))
         }
         ValueKind::Seq => {
             let seq = if let Some(seq) = from.as_seq() {
