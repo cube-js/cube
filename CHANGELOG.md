@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.62](https://github.com/cube-js/cube/compare/v0.33.61...v0.33.62) (2023-09-25)
+
+
+### Features
+
+* **native:** Jinja - support dynamic Python objects (methods, __call__, fields)  ([#7162](https://github.com/cube-js/cube/issues/7162)) ([6a5f70c](https://github.com/cube-js/cube/commit/6a5f70c3d7b910590f5c8ed411363dc6d694e720))
+
+
+
+
+
 ## [0.33.61](https://github.com/cube-js/cube/compare/v0.33.60...v0.33.61) (2023-09-22)
 
 
