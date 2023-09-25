@@ -300,27 +300,27 @@ impl CLRepr {
 
             Self::PyFunction(fun)
         } else if v.get_type().is_subclass_of::<PyComplex>()? {
-            return Err(PyErr::new::<PyTypeError, _>(format!(
-                "Unable to represent PyComplex type as CLR from Python"
-            )));
+            return Err(PyErr::new::<PyTypeError, _>(
+                "Unable to represent PyComplex type as CLR from Python".to_string(),
+            ));
         } else if v.get_type().is_subclass_of::<PyDate>()? {
-            return Err(PyErr::new::<PyTypeError, _>(format!(
-                "Unable to represent PyDate type as CLR from Python"
-            )));
+            return Err(PyErr::new::<PyTypeError, _>(
+                "Unable to represent PyDate type as CLR from Python".to_string(),
+            ));
         } else if v.get_type().is_subclass_of::<PyFrame>()? {
-            return Err(PyErr::new::<PyTypeError, _>(format!(
-                "Unable to represent PyFrame type as CLR from Python"
-            )));
+            return Err(PyErr::new::<PyTypeError, _>(
+                "Unable to represent PyFrame type as CLR from Python".to_string(),
+            ));
         } else if v.get_type().is_subclass_of::<PyTraceback>()? {
-            return Err(PyErr::new::<PyTypeError, _>(format!(
-                "Unable to represent PyTraceback type as CLR from Python"
-            )));
+            return Err(PyErr::new::<PyTypeError, _>(
+                "Unable to represent PyTraceback type as CLR from Python".to_string(),
+            ));
         } else {
             let is_sequence = unsafe { pyo3::ffi::PySequence_Check(v.as_ptr()) == 1 };
             if is_sequence {
-                return Err(PyErr::new::<PyTypeError, _>(format!(
-                    "Unable to represent PyTraceback type as CLR from Python"
-                )));
+                return Err(PyErr::new::<PyTypeError, _>(
+                    "Unable to represent PyTraceback type as CLR from Python".to_string(),
+                ));
             }
 
             Self::PyObject(v.into())
@@ -399,9 +399,7 @@ impl CLRepr {
 
                 unwrapper_fun.into_inner(cx).upcast()
             }
-            CLRepr::PyObject(_) => {
-                return cx.throw_error(format!("Unable to represent PyObject in JS"))
-            }
+            CLRepr::PyObject(_) => return cx.throw_error("Unable to represent PyObject in JS"),
         })
     }
 

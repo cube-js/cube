@@ -352,7 +352,7 @@ pub fn from_minijinja_value(from: &mj::value::Value) -> Result<CLRepr, mj::Error
             } else {
                 return Err(mj::Error::new(
                     mj::ErrorKind::InvalidOperation,
-                    format!("Unable to convert Seq to Python"),
+                    "Unable to convert Seq to Python".to_string(),
                 ));
             };
 
