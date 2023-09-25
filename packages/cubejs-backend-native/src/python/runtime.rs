@@ -237,7 +237,7 @@ pub fn py_runtime_init<'a, C: Context<'a>>(
     // it's safe to unwrap
     pyo3_asyncio::tokio::init_with_runtime(runtime).unwrap();
 
-    if let Err(_) = PY_RUNTIME.set(PyRuntime::new(channel)) {
+    if PY_RUNTIME.set(PyRuntime::new(channel)).is_err() {
         cx.throw_error("Error on setting PyRuntime")
     } else {
         Ok(())

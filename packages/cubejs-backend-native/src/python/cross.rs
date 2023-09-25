@@ -144,10 +144,7 @@ struct IntoJsContext {
 
 impl CLRepr {
     pub fn is_null(&self) -> bool {
-        match self {
-            CLRepr::Null => true,
-            _ => false,
-        }
+        matches!(self, CLRepr::Null)
     }
 
     pub fn downcast_to_object(self) -> CLReprObject {
