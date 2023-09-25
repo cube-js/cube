@@ -4,7 +4,7 @@ use crate::tokio_runtime;
 use minijinja as mj;
 use minijinja::value::{Object, ObjectKind, SeqObject, StructObject, Value, ValueKind};
 use pyo3::types::{PyFunction, PyTuple};
-use pyo3::{AsPyPointer, Py, PyAny, PyErr, PyObject, PyResult, Python};
+use pyo3::{AsPyPointer, Py, PyAny, PyErr, PyResult, Python};
 use std::convert::TryInto;
 use std::sync::Arc;
 use log::error;
