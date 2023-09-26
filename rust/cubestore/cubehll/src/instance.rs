@@ -175,8 +175,8 @@ impl HllInstance {
                     )));
                 }
                 // Convert to sparse representation in Airlift. By analogy with the code from postgress hll:
-                // TODO For now we read hll-storage-spec only for postgress. For other realizations
-                // this algorithm can differ.
+                // TODO Algorithm of conversion from EXPLICIT to SPARSE is not part of the storage specification,
+                // so we use the algorithm from the PostgreSql as is.
                 /*
                    uint64_t mask = nregs - 1;
 
