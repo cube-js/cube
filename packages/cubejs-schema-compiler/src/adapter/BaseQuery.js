@@ -2432,6 +2432,14 @@ class BaseQuery {
 
         COALESCE: 'COALESCE({{ args_concat }})',
         CONCAT: 'CONCAT({{ args_concat }})',
+        FLOOR: 'FLOOR({{ args_concat }})',
+        CEIL: 'CEIL({{ args_concat }})',
+        TRUNC: 'TRUNC({{ args_concat }})',
+        LEAST: 'LEAST({{ args_concat }})',
+        LOWER: 'LOWER({{ args_concat }})',
+        UPPER: 'UPPER({{ args_concat }})',
+        LEFT: 'LEFT({{ args_concat }})',
+        RIGHT: 'RIGHT({{ args_concat }})',
       },
       statements: {
         select: 'SELECT {{ select_concat | map(attribute=\'aliased\') | join(\', \') }} \n' +
