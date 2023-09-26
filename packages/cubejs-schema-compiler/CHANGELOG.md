@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.63](https://github.com/cube-js/cube/compare/v0.33.62...v0.33.63) (2023-09-26)
+
+
+### Features
+
+* **cubesql:** Tableau Standard Gregorian missing date groupings support through SQL push down and some other functions([#7172](https://github.com/cube-js/cube/issues/7172)) ([1339f57](https://github.com/cube-js/cube/commit/1339f577badf94aab02483e3431f614b1fe61302))
+
+
+
+
+
 ## [0.33.62](https://github.com/cube-js/cube/compare/v0.33.61...v0.33.62) (2023-09-25)
 
 **Note:** Version bump only for package @cubejs-backend/schema-compiler

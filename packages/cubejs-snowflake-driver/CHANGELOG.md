@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.63](https://github.com/cube-js/cube/compare/v0.33.62...v0.33.63) (2023-09-26)
+
+
+### Features
+
+* **snowflake-driver:** Upgrade snowflake driver to 1.8.0 ([#7171](https://github.com/cube-js/cube/issues/7171)) ([06a66c6](https://github.com/cube-js/cube/commit/06a66c662e93354e2d1a22e1bf406ea9d1c2825b))
+
+
+
+
+
 ## [0.33.58](https://github.com/cube-js/cube/compare/v0.33.57...v0.33.58) (2023-09-18)
 
 
