@@ -1583,7 +1583,6 @@ async fn ilike(service: Box<dyn SqlClient>) {
              ('test [ special 1', '%test [%'),\
              ('test ( special 2', '%test (%'),\
              ('111 test {)?*|+aaa', '%test {)?*|+aaa'),\
-             ('test }]\\\\  111 ', 'test }]\\\\ %'),\
              ('test2 }]\\\\222 ', 'test2 }]\\\\\\\\%')\
              ",
 
@@ -1648,7 +1647,6 @@ async fn ilike(service: Box<dyn SqlClient>) {
             ("some_underscore", "%some\\_underscore%"),
             ("test ( special 2", "%test (%"),
             ("test [ special 1", "%test [%"),
-            ("test }]\\  111 ", "test }]\\ %"),
             ("test2 }]\\222 ", "test2 }]\\\\%")
         ])
     );

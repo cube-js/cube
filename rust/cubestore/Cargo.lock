@@ -131,7 +131,7 @@ checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
 [[package]]
 name = "arrow"
 version = "5.0.0"
-source = "git+https://github.com/cube-js/arrow-rs?branch=cube#93c26ef581ba7fc7466902bc5eaa83bed5308c46"
+source = "git+https://github.com/cube-js/arrow-rs?branch=cube#c296882197dea4d1c38732c1db63c0e505e55436"
 dependencies = [
  "bitflags",
  "chrono",
@@ -154,7 +154,7 @@ dependencies = [
 [[package]]
 name = "arrow-flight"
 version = "5.0.0"
-source = "git+https://github.com/cube-js/arrow-rs?branch=cube#93c26ef581ba7fc7466902bc5eaa83bed5308c46"
+source = "git+https://github.com/cube-js/arrow-rs?branch=cube#c296882197dea4d1c38732c1db63c0e505e55436"
 dependencies = [
  "arrow",
  "base64 0.13.0",
@@ -3334,7 +3334,7 @@ dependencies = [
 [[package]]
 name = "parquet"
 version = "5.0.0"
-source = "git+https://github.com/cube-js/arrow-rs?branch=cube#93c26ef581ba7fc7466902bc5eaa83bed5308c46"
+source = "git+https://github.com/cube-js/arrow-rs?branch=cube#c296882197dea4d1c38732c1db63c0e505e55436"
 dependencies = [
  "arrow",
  "base64 0.13.0",
@@ -5473,7 +5473,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "97fee6b57c6a41524a810daee9286c02d7752c4253064d0b05472833a438f675"
 dependencies = [
  "cfg-if 1.0.0",
- "rand 0.8.4",
+ "rand 0.6.5",
  "static_assertions",
 ]
 
