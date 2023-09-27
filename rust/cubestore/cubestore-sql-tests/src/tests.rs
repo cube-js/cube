@@ -1621,6 +1621,14 @@ async fn ilike(service: Box<dyn SqlClient>) {
         .unwrap();
     assert_eq!(to_rows(&r), rows(&["some_underscore"]));
 
+    let r = service
+        .exec_query(
+            "SELECT t FROM s.strings WHERE t ILIKE CONCAT('%', '(', '%') ORDER BY t",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&["some_underscore"]));
+
     // Compare constant string with a bunch of patterns.
     // Inputs are: ('aba', '%ABA'), ('ABa', '%aba%'), ('CABA', 'aba%'), ('ZABA', '%a%b%a%'),
     //             ('ZZZ', 'zzz'), ('TTT', 'TTT').
