@@ -73,51 +73,39 @@ Use the `requirements.txt` file with the following contents in the root
 folder of your Cube deployment to load the `cube_dbt` package:
 
 ```
-cube_dbt==0.3.1
+cube_dbt==0.4.0
 ```
 
 Put the `defaults.py` file with the following contents in the data model
 folder of your Cube deployment:
 
 ```python
-from cube import context_func
-from cube_dbt import (
-  load_dbt_manifest_from_url,
-  dbt_models,
-  model_name,
-  model_as_cube,
-  model_as_dimensions
-)
+from cube import template
+from cube_dbt import Dbt
+
+context = template.JinjaContext()
 
 manifest_url = 'https://cube-dbt-integration.s3.amazonaws.com/manifest.json'
-manifest = load_dbt_manifest_from_url(manifest_url)
-# Use 'load_dbt_manifest_from_file' to load a local file.
-# Use the 'boto3' package to access a private file on AWS S3:
-# https://boto3.amazonaws.com/v1/documentation/api/latest/index.html
-
-models = dbt_models(manifest, path_prefix='marts/')
-# Use the 'path_prefix' parameter to filter dbt models by their path.
-# Use the 'tags' parameter to filter dbt models by tags.
-# Use the 'names' parameter to filter dbt models by their names
+dbt = Dbt
+  .from_url(manifest_url)
+  # Use 'from_file' to load a local file.
+  # Use the 'boto3' package to access a private file on AWS S3:
+  # https://boto3.amazonaws.com/v1/documentation/api/latest/index.html
+  .filter(path_prefix='marts/')
+  # Use the 'path_prefix' parameter to filter dbt models by their path.
+  # Use the 'tags' parameter to filter dbt models by tags.
+  # Use the 'names' parameter to filter dbt models by their names
 
 excluded_models = ['users_copy']
 
-# Use the 'context_func' decorator to expose a Python function to Jinja
-@context_func
-def get_models():
-  return list(model for model in models if model_name(model) not in excluded_models)
+# Use the 'context.function' decorator to expose a Python function to Jinja
+@context.function
+def dbt_models():
+  return list(model for model in dbt.models if model.name not in excluded_models)
 
-@context_func
-def get_model(name):
-  return next(model for model in models if model_name(model) == name)
-
-@context_func
-def as_cube(model):
-  return model_as_cube(model)
-
-@context_func
-def as_dimensions(model):
-  return model_as_dimensions(model)
+@context.function
+def dbt_model(name):
+  return dbt.models(name)
 ```
 
 Put the `dbt.yml.jinja` file with the following contents in the data model
@@ -126,11 +114,11 @@ as cubes (except for `excluded_models`):
 
 ```yml
 cubes:
-  {% for model in get_models() %}
-  - {{ as_cube(model) }}
+  {% for model in dbt_models() %}
+  - {{ model.as_cube() }}
 
     dimensions:
-      {{ as_dimensions(model) }}
+      {{ model.as_dimensions() }}
 
     measures:
       - name: count
@@ -143,13 +131,13 @@ model folder of your Cube deployment to render only the `users_copy` model
 as a cube:
 
 ```yml
-{% set model = get_model('users_copy') %}
+{% set model = dbt_model('users_copy') %}
 
 cubes:
-  - {{ as_cube(model) }}
+  - {{ model.as_cube() }}
 
     dimensions:
-      {{ as_dimensions(model) }}
+      {{ model.as_dimensions() }}
 
     # Define model-specific measures here
     measures:
