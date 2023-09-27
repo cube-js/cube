@@ -51,6 +51,5 @@ export function extractUidFromJdbcUrl(url: string): string {
     }
   });
 
-  // Return the value of UID if present, otherwise return 'token'
   return params.UID || 'token';
 }
