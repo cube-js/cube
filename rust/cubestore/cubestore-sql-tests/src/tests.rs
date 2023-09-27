@@ -1622,13 +1622,16 @@ async fn ilike(service: Box<dyn SqlClient>) {
     assert_eq!(to_rows(&r), rows(&["some_underscore"]));
 
     let r = service
-        .exec_query(
-            "SELECT t FROM s.strings WHERE t ILIKE CONCAT('%', '(', '%') ORDER BY t",
-        )
+        .exec_query("SELECT t FROM s.strings WHERE t ILIKE CONCAT('%', '(', '%') ORDER BY t")
         .await
         .unwrap();
-    assert_eq!(to_rows(&r), rows(&["some_underscore"]));
+    assert_eq!(to_rows(&r), rows(&["test ( special 2"]));
 
+    let r = service
+        .exec_query("SELECT t FROM s.strings WHERE t ILIKE CONCAT('%', '?*|+', '%') ORDER BY t")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&["111 test {)?*|+aaa"]));
     // Compare constant string with a bunch of patterns.
     // Inputs are: ('aba', '%ABA'), ('ABa', '%aba%'), ('CABA', 'aba%'), ('ZABA', '%a%b%a%'),
     //             ('ZZZ', 'zzz'), ('TTT', 'TTT').
@@ -1637,6 +1640,12 @@ async fn ilike(service: Box<dyn SqlClient>) {
         .await
         .unwrap();
     assert_eq!(to_rows(&r), rows(&["%ABA", "%a%b%a%", "%aba%", "aba%"]));
+
+    let r = service
+        .exec_query("SELECT pat FROM s.strings WHERE 'ggggtest (fjfj)' ILIKE pat ORDER BY pat")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&["%test (%"]));
 
     // Compare array against array.
     let r = service
