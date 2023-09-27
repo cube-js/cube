@@ -76,5 +76,5 @@
     "@types/ramda": "0.27.40"
   },
   "license": "MIT",
-  "packageManager": "yarn@1.23.0"
+  "packageManager": "yarn@1.22.19"
 }
