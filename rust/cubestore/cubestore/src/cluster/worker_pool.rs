@@ -209,7 +209,7 @@ impl<C: Configurator, P: WorkerProcessing, S: ServicesTransport> WorkerProcess<C
                     _ = tokio::time::sleep(self.idle_timeout), if handle_guard.is_some() => {
                         break;
                     }
-                    _ = cancel_token.as_ref().unwrap().cancelled(), if cancel_token.is_some()  => {
+                    _ = async { if cancel_token.is_none() { cancel_token.as_ref().unwrap().cancelled().await } }, if cancel_token.is_some()  => {
                         break;
                     }
                 };
