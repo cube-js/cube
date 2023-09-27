@@ -1579,7 +1579,13 @@ async fn ilike(service: Box<dyn SqlClient>) {
         .exec_query(
             "INSERT INTO s.strings(t, pat) \
              VALUES ('aba', '%ABA'), ('ABa', '%aba%'), ('CABA', 'aba%'), ('ZABA', '%a%b%a%'), ('ZZZ', 'zzz'), ('TTT', 'TTT'),\
-             ('some_underscore', '%some\\\\_underscore%')",
+             ('some_underscore', '%some\\\\_underscore%'),\
+             ('test [ special 1', '%test [%'),\
+             ('test ( special 2', '%test (%'),\
+             ('111 test {)?*|+aaa', '%test {)?*|+aaa'),\
+             ('test2 }]\\\\222 ', 'test2 }]\\\\\\\\%')\
+             ",
+
         )
         .await
         .unwrap();
@@ -1632,12 +1638,16 @@ async fn ilike(service: Box<dyn SqlClient>) {
     assert_eq!(
         to_rows(&r),
         rows(&[
+            ("111 test {)?*|+aaa", "%test {)?*|+aaa"),
             ("ABa", "%aba%"),
             ("TTT", "TTT"),
             ("ZABA", "%a%b%a%"),
             ("ZZZ", "zzz"),
             ("aba", "%ABA"),
             ("some_underscore", "%some\\_underscore%"),
+            ("test ( special 2", "%test (%"),
+            ("test [ special 1", "%test [%"),
+            ("test2 }]\\222 ", "test2 }]\\\\%")
         ])
     );
 
