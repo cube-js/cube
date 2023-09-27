@@ -22,6 +22,7 @@ export function testIncrementalSchemaLoading(type: string): void {
         options: { highWaterMark: number },
       ) => Promise<any>
     };
+    let query: string[];
     let env: Environment;
     let inputSchemas: QuerySchemasResult[];
     let inputTables: QueryTablesResult[];
@@ -46,34 +47,22 @@ export function testIncrementalSchemaLoading(type: string): void {
         process.env.CUBEJS_DB_PORT = `${env.data.port}`;
       }
       driver = (await getDriver(type)).source;
-      const queries = getCreateQueries(type, suffix);
-      console.log(`Creating ${queries.length} fixture tables`);
-      try {
-        for (const q of queries) {
-          await driver.query(q);
-        }
-        console.log(`Creating ${queries.length} fixture tables completed`);
-      } catch (e: any) {
-        console.log('Error creating fixtures', e.stack);
-        throw e;
-      }
     });
   
     afterAll(async () => {
-      try {
-        console.log(`Dropping ${tables.length} fixture tables`);
-        for (const t of tables) {
-          await driver.dropTable(t);
-        }
-        console.log(`Dropping ${tables.length} fixture tables completed`);
-      } finally {
-        await driver.release();
-        await env.stop();
-      }
+      await driver.release();
+      await env.stop();
     });
   
     execute('should establish a connection', async () => {
       await driver.testConnection();
+    });
+  
+    execute('should create the data source', async () => {
+      query = getCreateQueries(type, suffix);
+      await Promise.all(query.map(async (q) => {
+        await driver.query(q);
+      }));
     });
 
     execute('should load and check driver capabilities', async () => {
@@ -114,6 +103,14 @@ export function testIncrementalSchemaLoading(type: string): void {
         column_name: expect.any(String),
         data_type: expect.any(String),
       });
+    });
+
+    execute('should delete the data source', async () => {
+      await Promise.all(
+        tables.map(async (t) => {
+          await driver.dropTable(t);
+        })
+      );
     });
   });
 }
