@@ -1189,6 +1189,7 @@ dependencies = [
 name = "cubehll"
 version = "0.1.0"
 dependencies = [
+ "base64 0.13.0",
  "byteorder",
  "hex",
  "itertools 0.10.1",
