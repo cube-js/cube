@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 use tokio::runtime::{Builder, Runtime};
 use tokio::sync::oneshot::Sender;
 use tokio::sync::{oneshot, watch, Mutex, Notify, RwLock};
+use tokio_util::sync::CancellationToken;
 use tracing::{instrument, Instrument};
 use tracing_futures::WithSubscriber;
 
@@ -56,6 +57,7 @@ impl<
         services_processor: Arc<dyn Callable<Request = S::Request, Response = S::Response>>,
         num: usize,
         timeout: Duration,
+        idle_timeout: Duration,
         name_prefix: &str,
         envs: Vec<(String, String)>,
     ) -> Self {
@@ -71,6 +73,7 @@ impl<
                 envs.clone(),
                 queue.clone(),
                 timeout.clone(),
+                idle_timeout.clone(),
                 stopped_rx.clone(),
             ));
             workers.push(process.clone());
@@ -120,6 +123,7 @@ impl ProcessHandleGuard {
     pub fn new(handle: Child) -> Self {
         Self { handle }
     }
+    #[allow(dead_code)]
     pub fn try_wait(&mut self) -> std::io::Result<Option<ExitStatus>> {
         self.handle.try_wait()
     }
@@ -146,6 +150,7 @@ pub struct WorkerProcess<C: Configurator, P: WorkerProcessing, S: ServicesTransp
     envs: Vec<(String, String)>,
     queue: Arc<unlimited::Queue<Message<P::Request, P::Response>>>,
     timeout: Duration,
+    idle_timeout: Duration,
     processor: PhantomData<(C, P, S)>,
     stopped_rx: RwLock<watch::Receiver<bool>>,
     finished_notify: Arc<Notify>,
@@ -160,6 +165,7 @@ impl<C: Configurator, P: WorkerProcessing, S: ServicesTransport> WorkerProcess<C
         envs: Vec<(String, String)>,
         queue: Arc<unlimited::Queue<Message<P::Request, P::Response>>>,
         timeout: Duration,
+        idle_timeout: Duration,
         stopped_rx: watch::Receiver<bool>,
     ) -> Self {
         WorkerProcess {
@@ -168,6 +174,7 @@ impl<C: Configurator, P: WorkerProcessing, S: ServicesTransport> WorkerProcess<C
             envs,
             queue,
             timeout,
+            idle_timeout,
             stopped_rx: RwLock::new(stopped_rx),
             finished_notify: Arc::new(Notify::new()),
             services_server: Mutex::new(None),
@@ -177,96 +184,95 @@ impl<C: Configurator, P: WorkerProcessing, S: ServicesTransport> WorkerProcess<C
 
     async fn processing_loop(&self) {
         loop {
-            let process = self.spawn_process().await;
+            let mut handle_guard: Option<ProcessHandleGuard> = None;
+            let mut cancel_token: Option<CancellationToken> = None;
+            let mut args_channel = None;
 
-            match process {
-                Ok((mut args_tx, mut res_rx, handle)) => {
-                    let mut handle_guard = ProcessHandleGuard::new(handle);
-                    loop {
-                        let mut stopped_rx = self.stopped_rx.write().await;
-                        let Message {
-                            message,
-                            sender,
-                            span,
-                            dispatcher,
-                        } = tokio::select! {
-                            res = stopped_rx.changed() => {
-                                if res.is_err() || *stopped_rx.borrow() {
-                                    self.finished_notify.notify_waiters();
-                                    return;
-                                }
-                                continue;
-                            }
-                            message = self.queue.pop() => {
-                                message
-                            }
-                        };
-                        //Check if child process is killed
-                        match handle_guard.try_wait() {
-                            Ok(Some(_)) => {
-                                error!(
-                                    "Worker process is killed, reshedule message in another process"
-                                    );
-                                self.queue.push(Message {
-                                    message,
-                                    sender,
-                                    span,
-                                    dispatcher,
-                                });
-                                break;
-                            }
-                            Ok(None) => {}
-                            Err(_) => {
-                                error!(
-                                    "Can't read worker process status, reshedule message in another process"
-                                    );
-                                self.queue.push(Message {
-                                    message,
-                                    sender,
-                                    span,
-                                    dispatcher,
-                                });
-                                break;
-                            }
+            loop {
+                let mut stopped_rx = self.stopped_rx.write().await;
+                let Message {
+                    message,
+                    sender,
+                    span,
+                    dispatcher,
+                } = tokio::select! {
+                    res = stopped_rx.changed() => {
+                        if res.is_err() || *stopped_rx.borrow() {
+                            self.finished_notify.notify_waiters();
+                            return;
                         }
-
-                        let process_message_res_timeout = tokio::time::timeout(
-                            self.timeout,
-                            self.process_message(message, args_tx, res_rx),
-                        )
-                        .instrument(span)
-                        .with_subscriber(dispatcher)
-                        .await;
-                        let process_message_res = match process_message_res_timeout {
-                            Ok(r) => r,
-                            Err(e) => Err(CubeError::internal(format!(
-                                "Timed out after waiting for {}",
-                                e
-                            ))),
-                        };
-                        match process_message_res {
-                            Ok((res, a, r)) => {
-                                if sender.send(Ok(res)).is_err() {
-                                    error!("Error during worker message processing: Send Error");
-                                }
-                                args_tx = a;
-                                res_rx = r;
+                        continue;
+                    }
+                    message = self.queue.pop() => {
+                        message
+                    }
+                    _ = tokio::time::sleep(self.idle_timeout), if handle_guard.is_some() => {
+                        break;
+                    }
+                    _ = cancel_token.as_ref().unwrap().cancelled(), if cancel_token.is_some()  => {
+                        break;
+                    }
+                };
+                let (args_tx, res_rx) = if args_channel.is_none()
+                    || handle_guard.is_none()
+                    || !handle_guard.as_mut().unwrap().is_alive()
+                {
+                    let process = self.spawn_process().await;
+                    match process {
+                        Ok((args_tx, res_rx, handle, c_t)) => {
+                            handle_guard = Some(ProcessHandleGuard::new(handle));
+                            cancel_token = Some(c_t);
+                            (args_tx, res_rx)
+                        }
+                        Err(e) => {
+                            error!("Can't start process: {}", e);
+                            if sender
+                                .send(Err(CubeError::internal(format!(
+                                    "Error during spawn worker pool process: {}",
+                                    e
+                                ))))
+                                .is_err()
+                            {
+                                error!("Error during worker message processing: Send Error");
                             }
-                            Err(e) => {
-                                error!(
-                                    "Error during worker message processing: {}",
-                                    e.display_with_backtrace()
-                                );
-                                if sender.send(Err(e.clone())).is_err() {
-                                    error!("Error during worker message processing: Send Error");
-                                }
-                                break;
-                            }
+                            break;
                         }
                     }
-                }
-                Err(e) => {
-                    error!("Can't start process: {}", e);
+                } else {
+                    args_channel.unwrap()
+                };
+
+                let process_message_res_timeout = tokio::time::timeout(
+                    self.timeout,
+                    self.process_message(message, args_tx, res_rx),
+                )
+                .instrument(span)
+                .with_subscriber(dispatcher)
+                .await;
+                let process_message_res = match process_message_res_timeout {
+                    Ok(r) => r,
+                    Err(e) => Err(CubeError::internal(format!(
+                        "Timed out after waiting for {}",
+                        e
+                    ))),
+                };
+                match process_message_res {
+                    Ok((res, a, r)) => {
+                        if sender.send(Ok(res)).is_err() {
+                            error!("Error during worker message processing: Send Error");
+                        }
+                        args_channel = Some((a, r));
+                    }
+                    Err(e) => {
+                        error!(
+                            "Error during worker message processing: {}",
+                            e.display_with_backtrace()
+                        );
+                        if sender.send(Err(e.clone())).is_err() {
+                            error!("Error during worker message processing: Send Error");
+                        }
+                        break;
+                    }
                 }
             }
         }
@@ -298,6 +304,7 @@ impl<C: Configurator, P: WorkerProcessing, S: ServicesTransport> WorkerProcess<C
             IpcSender<P::Request>,
             IpcReceiver<Result<P::Response, CubeError>>,
             Child,
+            CancellationToken,
         ),
         CubeError,
     > {
@@ -337,12 +344,14 @@ impl<C: Configurator, P: WorkerProcessing, S: ServicesTransport> WorkerProcess<C
             &envs,
         )?;
 
+        let cancel_token = CancellationToken::new();
         *self.services_server.lock().await = Some(S::start_server(
             service_request_rx,
             service_response_tx,
             self.services_processor.clone(),
+            cancel_token.clone(),
         ));
-        Ok((args_tx, res_rx, handle))
+        Ok((args_tx, res_rx, handle, cancel_token))
     }
 }
 
@@ -537,6 +546,7 @@ mod tests {
                 DefaultServicesServerProcessor::new(),
                 4,
                 Duration::from_millis(1000),
+                Duration::from_secs(600),
                 "test",
                 Vec::new(),
             ));
@@ -559,6 +569,7 @@ mod tests {
                 DefaultServicesServerProcessor::new(),
                 4,
                 Duration::from_millis(1000),
+                Duration::from_secs(60),
                 "test",
                 Vec::new(),
             ));
@@ -585,6 +596,7 @@ mod tests {
                 DefaultServicesServerProcessor::new(),
                 4,
                 Duration::from_millis(450),
+                Duration::from_secs(60),
                 "test",
                 Vec::new(),
             ));
@@ -615,6 +627,7 @@ mod tests {
                 DefaultServicesServerProcessor::new(),
                 4,
                 Duration::from_millis(2000),
+                Duration::from_secs(60),
                 "test",
                 Vec::new(),
             ));
@@ -742,6 +755,7 @@ mod tests {
                 TestServicesServerProcessor::new(),
                 1,
                 Duration::from_millis(1000),
+                Duration::from_secs(60),
                 "test",
                 Vec::new(),
             ));

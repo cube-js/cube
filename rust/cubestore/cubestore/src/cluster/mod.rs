@@ -885,6 +885,7 @@ impl ClusterImpl {
                 DefaultServicesServerProcessor::new(),
                 self.config_obj.select_worker_pool_size(),
                 Duration::from_secs(self.config_obj.query_timeout()),
+                Duration::from_secs(self.config_obj.select_worker_idle_timeout()),
                 "sel",
                 vec![(
                     "_CUBESTORE_SUBPROCESS_TYPE".to_string(),

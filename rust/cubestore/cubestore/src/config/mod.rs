@@ -390,6 +390,8 @@ pub trait ConfigObj: DIService {
 
     fn select_worker_pool_size(&self) -> usize;
 
+    fn select_worker_idle_timeout(&self) -> u64;
+
     fn job_runners_count(&self) -> usize;
 
     fn long_term_job_runners_count(&self) -> usize;
@@ -554,6 +556,7 @@ pub struct ConfigObjImpl {
     pub dump_dir: Option<PathBuf>,
     pub store_provider: FileStoreProvider,
     pub select_worker_pool_size: usize,
+    pub select_worker_idle_timeout: u64,
     pub job_runners_count: usize,
     pub long_term_job_runners_count: usize,
     pub bind_address: Option<String>,
@@ -693,6 +696,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn select_worker_pool_size(&self) -> usize {
         self.select_worker_pool_size
+    }
+
+    fn select_worker_idle_timeout(&self) -> u64 {
+        self.select_worker_idle_timeout
     }
 
     fn job_runners_count(&self) -> usize {
@@ -1247,6 +1254,12 @@ impl Config {
                     }
                 },
                 select_worker_pool_size: env_parse("CUBESTORE_SELECT_WORKERS", 4),
+                select_worker_idle_timeout: env_parse_duration(
+                    "CUBESTORE_SELECT_WORKERS_IDLE_TIMEOUT",
+                    10 * 60,
+                    Some(2 * 60 * 60),
+                    None,
+                ),
                 bind_address: Some(
                     env::var("CUBESTORE_BIND_ADDR")
                         .ok()
@@ -1501,6 +1514,7 @@ impl Config {
                     ),
                 },
                 select_worker_pool_size: 0,
+                select_worker_idle_timeout: 600,
                 job_runners_count: 4,
                 long_term_job_runners_count: 8,
                 bind_address: None,
