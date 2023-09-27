@@ -79,7 +79,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-yarn-
       - name: Set Yarn version
-        run: yarn policies set-version v3.6.3
+        run: yarn policies set-version v1.22.19
       - name: Yarn install
         uses: nick-invision/retry@v2
         env:
@@ -134,7 +134,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-yarn-
       - name: Set Yarn version
-        run: yarn policies set-version v3.6.3
+        run: yarn policies set-version v1.22.19
       - name: Yarn install
         uses: nick-invision/retry@v2
         env:
@@ -181,7 +181,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-yarn-
       - name: Set Yarn version
-        run: yarn policies set-version v3.6.3
+        run: yarn policies set-version v1.22.19
       - name: Yarn install
         uses: nick-invision/retry@v2
         env:
@@ -248,7 +248,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-yarn-
       - name: Set Yarn version
-        run: yarn policies set-version v3.6.3
+        run: yarn policies set-version v1.22.19
       - name: Yarn install
         uses: nick-invision/retry@v2
         env:
@@ -342,7 +342,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-yarn-
       - name: Set Yarn version
-        run: yarn policies set-version v3.6.3
+        run: yarn policies set-version v1.22.19
       - name: Yarn install
         uses: nick-invision/retry@v2
         env:
@@ -412,7 +412,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-yarn-
       - name: Set Yarn version
-        run: yarn policies set-version v3.6.3
+        run: yarn policies set-version v1.22.19
       - name: Yarn install
         uses: nick-invision/retry@v2
         env:
@@ -481,7 +481,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-yarn-
       - name: Set Yarn version
-        run: yarn policies set-version v3.6.3
+        run: yarn policies set-version v1.22.19
       - name: Yarn install
         uses: nick-invision/retry@v2
         env:
@@ -609,7 +609,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-yarn-
       - name: Set Yarn version
-        run: yarn policies set-version v3.6.3
+        run: yarn policies set-version v1.22.19
       - name: Yarn install
         uses: nick-invision/retry@v2
         env:
