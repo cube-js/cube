@@ -8,8 +8,6 @@ import {
   getEnv,
   assertDataSource,
 } from '@cubejs-backend/shared';
-import fs from 'fs';
-import path from 'path';
 import { S3, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import {
@@ -25,7 +23,7 @@ import {
   JDBCDriverConfiguration,
 } from '@cubejs-backend/jdbc-driver';
 import { DatabricksQuery } from './DatabricksQuery';
-import { downloadJDBCDriver } from './installer';
+import { resolveJDBCDriver, extractUidFromJdbcUrl } from './helpers';
 
 export type DatabricksDriverConfiguration = JDBCDriverConfiguration &
   {
@@ -91,16 +89,6 @@ export type DatabricksDriverConfiguration = JDBCDriverConfiguration &
     token?: string,
   };
 
-async function fileExistsOr(
-  fsPath: string,
-  fn: () => Promise<string>,
-): Promise<string> {
-  if (fs.existsSync(fsPath)) {
-    return fsPath;
-  }
-  return fn();
-}
-
 type ShowTableRow = {
   database: string,
   tableName: string,
@@ -114,25 +102,6 @@ type ShowDatabasesRow = {
 const DatabricksToGenericType: Record<string, string> = {
   'decimal(10,0)': 'bigint',
 };
-
-async function resolveJDBCDriver(): Promise<string> {
-  return fileExistsOr(
-    path.join(process.cwd(), 'DatabricksJDBC42.jar'),
-    async () => fileExistsOr(
-      path.join(__dirname, '..', 'download', 'DatabricksJDBC42.jar'),
-      async () => {
-        const pathOrNull = await downloadJDBCDriver();
-        if (pathOrNull) {
-          return pathOrNull;
-        }
-        throw new Error(
-          'Please download and place DatabricksJDBC42.jar inside your ' +
-          'project directory'
-        );
-      }
-    )
-  );
-}
 
 /**
  * Databricks driver class.
@@ -202,6 +171,7 @@ export class DatabricksDriver extends JDBCDriver {
       drivername: 'com.databricks.client.jdbc.Driver',
       customClassPath: undefined,
       properties: {
+        UID: extractUidFromJdbcUrl(url),
         // PWD-parameter passed to the connection string has higher priority,
         // so we can set this one to an empty string to avoid a Java error.
         PWD:
