@@ -919,4 +919,60 @@ describe('QueryBuilder.vue', () => {
       expect(wrapper.vm.pivotConfig).toMatchObject(pivotConfig);
     });
   });
+
+  describe('builder computed', () => {
+    describe('validatedQuery', () => {
+      it('correctly updates pivot config after chart type change', async () => {
+        const expectedPivotForTable = {
+          x: ['Orders.status'],
+          y: ['measures'],
+          fillMissingDates: true,
+          joinDateRange: false,
+        };
+
+        const expectedPivotForLine = {
+          x: ['Orders.createdAt.day'],
+          y: ['Orders.status', 'measures'],
+          fillMissingDates: true,
+          joinDateRange: false,
+        };
+
+        const cube = createCubejsApi();
+        jest
+          .spyOn(cube, 'request')
+          .mockImplementation(fetchMock(load))
+          .mockImplementationOnce(fetchMock(meta));
+
+        const wrapper = mount(QueryBuilder, {
+          propsData: {
+            cubejsApi: cube,
+            query: {
+              measures: ['Orders.count'],
+              timeDimensions: [{
+                dimension: 'Orders.createdAt',
+              }],
+            },
+          },
+          scopedSlots: {
+            builder: function ({ updateChartType }) {
+              return this.$createElement('input', {
+                on: { change: () => updateChartType('line')}
+              });
+            },
+          },
+        });
+
+        await flushPromises();
+
+        wrapper.vm.addMember('dimensions', 'Orders.status'); // to trigger first heuristics
+        await wrapper.vm.$nextTick();
+        expect(wrapper.vm.pivotConfig).toEqual(expectedPivotForTable);
+        expect(wrapper.vm.chartType).toBe('table');
+        wrapper.find('input').trigger('change');
+        await wrapper.vm.$nextTick();
+        expect(wrapper.vm.pivotConfig).toEqual(expectedPivotForLine);
+        expect(wrapper.vm.chartType).toBe('line');
+      });
+    });
+  });
 });
