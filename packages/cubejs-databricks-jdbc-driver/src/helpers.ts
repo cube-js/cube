@@ -33,9 +33,8 @@ export async function resolveJDBCDriver(): Promise<string> {
 }
 
 export function extractUidFromJdbcUrl(jdbcUrl: string): string {
-  const [baseUrl, ...params] = jdbcUrl.split(';');
-  const queryString = params.join('&');
-  const standardUrl = `${baseUrl}?${queryString}`;
-  const url = new URL(standardUrl);
-  return url.searchParams.get('UID') || 'token';
+  const { pathname } = new URL(jdbcUrl);
+  const [_, ...params] = pathname.split(';');
+  const searchParams = new URLSearchParams(params.join('&'));
+  return searchParams.get('UID') || 'token';
 }
