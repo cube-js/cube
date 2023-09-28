@@ -5,20 +5,31 @@ redirect_from:
 
 # Overview
 
-Cube can be configured in two ways. The first is through [options][link-config]
-in a configuration file, commonly known as the `cube.js` file, and secondly,
-through [environment variables][link-env-vars]. Values specified in `cube.js`
-will take precedence over environment variables.
+Cube is configured via [environment variables][link-env-vars] and
+[configuration options][link-config] in a configuration file. Usually,
+both would be used to configure a Cube deployment in production.
+
+## Environment variables
+
+Environment variables are mostly used for configuration that is defined
+statically and is not supposed to change while a Cube deployment is running.
 
 <InfoBox>
 
-When using Docker, ensure that the `cube.js` configuration file and your
-`model/` [folder][ref-folder-structure] are mounted to `/cube/conf` within the
-Docker container.
+For example, `CUBEJS_DATASOURCES` defines a list of data sources to connect
+to; changing that list would require the deployment to restart.
 
 </InfoBox>
 
-## Cube Cloud
+See the [environment variables reference][link-env-vars] for all supported options.
+
+### Cube Core
+
+You can set environment variables in any way [supported by
+Docker][link-docker-env-vars], e.g., a `.env` file or the `environment`
+option in the `docker-compose.yml` file.
+
+### Cube Cloud
 
 You can set environment variables in <Btn>Settings → Configuration</Btn>:
 
@@ -26,6 +37,79 @@ You can set environment variables in <Btn>Settings → Configuration</Btn>:
   alt="Cube Cloud Environment Variables Screen"
   src="https://ucarecdn.com/b47693b9-f770-4e01-a0d1-60e3fcf19e23/"
 />
+
+## Configuration options
+
+Configuration options are mostly used for configuration that is defined
+programmatically and applied dynamically while a Cube deployment is running.
+
+<InfoBox>
+
+For example, [`queryRewrite`](/reference/configuration/config#queryrewrite)
+provides a way to inspect, modify, or restrict every query that is being
+processed by Cube.
+
+</InfoBox>
+
+Configuration options take precedence over environment variables.
+See the [configuration options reference][link-config] for all supported options.
+
+### `cube.py` and `cube.js` files
+
+Configuration options can be defined either using Python, in a `cube.py` file,
+or using JavaScript, in a `cube.js` file in the root folder of a Cube project.
+
+<CodeTabs>
+
+```python
+from cube.conf import config
+
+# Base path for the REST API
+config.basePath = '/cube-api'
+
+# Inspect, modify, or restrict every query
+@config
+def query_rewrite(query, security_context):
+  print(query)
+  return query
+```
+
+```javascript
+module.exports = {
+  // Base path for the REST API
+  basePath: '/cube-api',
+
+  // Inspect, modify, or restrict every query
+  queryRewrite: (query, { securityContext }) => {
+    console.log(query);
+    return query;
+  },
+};
+```
+
+</CodeTabs>
+
+Both ways are equivalent; when in doubt, use Python.
+
+<InfoBox>
+
+Support for Python and the `cube.py` file was introduced in v0.34.
+When migrating from `cube.js` to `cube.py`, consider setting `CUBEJS_CONFIG_FILE`.
+
+</InfoBox>
+
+{/* TODO: https://cubedevinc.atlassian.net/browse/CC-3097 */}
+
+### Cube Core
+
+When using Docker, ensure that the configuration file and your [data model
+folder][ref-folder-structure] are mounted to `/cube/conf` within the
+Docker container.
+
+### Cube Cloud
+
+You can edit the configuration file by going into <Btn>Development Mode</Btn>
+and navigating to the <Btn>Data Model</Btn> page.
 
 ## Development Mode
 
@@ -51,24 +135,6 @@ mode does the following:
 [ref-gql-api]: /product/apis-integrations/graphql-api
 [ref-sql-api]: /product/apis-integrations/sql-api
 
-## Concurrency and pooling
-
-<InfoBox>
-
-All Cube database drivers come with presets for concurrency and pooling that
-work out-of-the-box. The following information is included as a reference.
-
-</InfoBox>
-
-For increased performance, Cube uses multiple concurrent connections to
-configured data sources. The `CUBEJS_CONCURRENCY` environment variable controls
-concurrency settings for query queues and the refresh scheduler as well as the
-maximum concurrent connections. For databases that support connection pooling,
-the maximum number of concurrent connections to the database can also be set by
-using the `CUBEJS_DB_MAX_POOL` environment variable; if changing this from the
-default, you must ensure that the new value is greater than the number of
-concurrent connections used by Cube's query queues and refresh scheduler.
-
 [ref-folder-structure]:
   /product/data-modeling/fundamentals/syntax#folder-structure
 [link-config]: /reference/configuration/config
@@ -76,3 +142,5 @@ concurrent connections used by Cube's query queues and refresh scheduler.
 [link-env-vars]: /reference/configuration/environment-variables
 [link-scheduled-refresh]:
   /product/data-modeling/reference/pre-aggregations#scheduled_refresh
+
+[link-docker-env-vars]: https://docs.docker.com/compose/environment-variables/set-environment-variables/

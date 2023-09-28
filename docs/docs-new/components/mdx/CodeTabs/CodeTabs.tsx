@@ -30,7 +30,7 @@ declare global {
 const STORAGE_KEY = "cube-docs.default-code-lang";
 
 // If present, the tab with this language should go first
-const PREFERRED_LANG = 'yaml';
+const PREFERRED_LANGS = ['yaml', 'python'];
 
 export interface CodeTabsProps {
   children: Array<{
@@ -42,7 +42,7 @@ export interface CodeTabsProps {
 }
 
 export const CodeTabs: FC<CodeTabsProps> = ({ children }) => {
-  const [selectedTab, setSelectedTab] = useState(PREFERRED_LANG);
+  const [selectedTab, setSelectedTab] = useState(PREFERRED_LANGS[0]);
   const tabs = useMemo(
     () => {
       let tabs = children.reduce<Record<string, number>>((dict, tab, i) => {
@@ -56,7 +56,7 @@ export const CodeTabs: FC<CodeTabsProps> = ({ children }) => {
       }, {});
 
       // Place the tab with the preferred language on the first position
-      let tabWithPreferredLangKey = Object.keys(tabs).find(key => key === PREFERRED_LANG);
+      let tabWithPreferredLangKey = Object.keys(tabs).find(key => PREFERRED_LANGS.includes(key));
       if (tabWithPreferredLangKey !== undefined) {
         let tabWithPreferredLangValue = tabs[tabWithPreferredLangKey];
         delete tabs[tabWithPreferredLangKey];
@@ -74,10 +74,12 @@ export const CodeTabs: FC<CodeTabsProps> = ({ children }) => {
   useEffect(() => {
     const defaultLang = localStorage.getItem(STORAGE_KEY);
 
-    if (defaultLang) {
-      if (tabs[defaultLang] !== undefined) {
-        setSelectedTab(defaultLang);
-      }
+    if (defaultLang && tabs[defaultLang] !== undefined) {
+      setSelectedTab(defaultLang);
+    }
+    else {
+      const [ lang ] = Object.entries(tabs).find(tab => tab[1] === 0);
+      setSelectedTab(lang);
     }
 
     const syncHanlder = (e: CustomEvent<{ lang: string }>) => {
@@ -134,7 +136,7 @@ export const CodeTabs: FC<CodeTabsProps> = ({ children }) => {
                 onClick={() => {
                   if (
                     lang !== selectedTab &&
-                    (lang === "javascript" || lang === "yaml")
+                    (lang === "python" || lang === "javascript" || lang === "yaml")
                   ) {
                     localStorage.setItem(STORAGE_KEY, lang);
                     window.dispatchEvent(

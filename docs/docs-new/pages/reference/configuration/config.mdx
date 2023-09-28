@@ -5,147 +5,96 @@ redirect_from:
 
 # Configuration options
 
-## Options Reference
+Following [configuration options][ref-config-options] can be defined either
+using Python, in a `cube.py` file, or using JavaScript, in a `cube.js` file.
 
-You can provide the following configuration options to Cube.
-
-```typescript
-interface CubejsConfiguration {
-  dbType: string | ((context: RequestContext) => string);
-  schemaPath: string;
-  basePath: string;
-  webSocketsBasePath: string;
-  logger: (msg: string, params: object) => any;
-  driverFactory: (
-    context: DriverContext
-  ) => DriverConfig | BaseDriver | Promise<BaseDriver> | Promise<DriverConfig>;
-  contextToApiScopes: (context: RequestContext) => string[] | Promise<string[]>;
-  contextToAppId: (context: RequestContext) => string;
-  contextToOrchestratorId: (context: RequestContext) => string;
-  repositoryFactory: (context: RequestContext) => SchemaFileRepository;
-  checkAuth: (req: ExpressRequest, authorization: string) => any;
-  checkSqlAuth: (req: SQLRequest, user: string | null) => any;
-  canSwitchSqlUser: (
-    current: string | null,
-    user: string
-  ) => Promise<bool> | bool;
-  queryRewrite: (query: object, context: RequestContext) => object;
-  preAggregationsSchema: string | ((context: RequestContext) => string);
-  schemaVersion: (context: RequestContext) => string;
-  scheduledRefreshTimer: boolean | number;
-  scheduledRefreshTimeZones: string[];
-  scheduledRefreshContexts: () => Promise<object[]>;
-  extendContext: (req: ExpressRequest) => any;
-  compilerCacheSize: number;
-  maxCompilerCacheKeepAlive: number;
-  updateCompilerCacheKeepAlive: boolean;
-  allowUngroupedWithoutPrimaryKey: boolean;
-  telemetry: boolean;
-  http: {
-    cors: {
-      methods: string | string[];
-      origin: string;
-      allowedHeaders: string | string[];
-      exposedHeaders: string | string[];
-      credentials: boolean;
-      maxAge: number;
-      preflightContinue: boolean;
-      optionsSuccessStatus: number;
-    };
-  };
-  jwt: {
-    jwkUrl?: ((payload: any) => string) | string;
-    key?: string;
-    algorithms?: string[];
-    issuer?: string[];
-    audience?: string;
-    subject?: string;
-    claimsNamespace?: string;
-  };
-  cacheAndQueueDriver: "memory" | "cubestore";
-  orchestratorOptions:
-    | OrchestratorOptions
-    | ((context: RequestContext) => OrchestratorOptions);
-  allowJsDuplicatePropsInSchema: boolean;
-  initApp: (app: ExpressApplication) => void;
-  processSubscriptionsInterval: number;
-}
-
-interface OrchestratorOptions {
-  continueWaitTimeout: number;
-  redisPrefix: string;
-  rollupOnlyMode: boolean;
-  queryCacheOptions: {
-    refreshKeyRenewalThreshold: number;
-    backgroundRenew: boolean;
-    queueOptions: QueueOptions;
-  };
-  preAggregationsOptions: {
-    externalRefresh: boolean;
-    maxPartitions: number;
-    queueOptions: QueueOptions;
-  };
-}
-
-interface QueueOptions {
-  concurrency: number;
-  executionTimeout: number;
-  orphanedTimeout: number;
-  heartBeatInterval: number;
-}
+{/*
 
 interface RequestContext {
   securityContext: object;
   requestId: string;
 }
 
-interface DriverContext extends RequestContext {
-  dataSource: string;
-}
+*/}
 
-interface SchemaFileRepository {
-  dataSchemaFiles(): Promise<FileContent[]>;
-}
-
-interface FileContent {
-  fileName: string;
-  content: string;
-}
-```
-
-### dbType
+### `dbType`
 
 <WarningBox>
 
-Since v0.30.30, using `dbType` is discouraged. Instead of using `dbType`,
+Since v0.30.30, using `dbType` is deprecated. Instead,
 consider defining [`driverFactory`][self-driver-factory] to return a
 `DriverConfig` object instead.
 
 </WarningBox>
 
-Either `String` or `Function` could be passed. Providing a `Function` allows to
-dynamically select a database type depending on the user's context. It is
-usually used in [Multitenancy Setup][ref-multitenancy].
+Data source type.
 
-If no option is passed, Cube will lookup for environment variable
-`CUBEJS_DB_TYPE` to resolve `dbType`.
+```javascript
+module.exports = {
+  // string
+  dbType: 'snowflake',
+
+  // function
+  dbType: ({ securityContext }) => 'databricks',
+};
+```
+
+Either `string` or `function` could be passed. Providing a `Function` allows
+to dynamically select a database type depending on the security context.
+Usually used for [multitenancy][ref-multitenancy].
+
+If not defined, Cube will lookup for environment variable
+`CUBEJS_DB_TYPE` to resolve the data source type.
 
 Called only once per [`appId`][self-opts-ctx-to-appid].
 
-### schemaPath
+### `schemaPath`
 
-Path to data model files. The default value is `/model`.
+Path to data model files.
 
-### basePath
+<CodeTabs>
+
+```python
+from cube.conf import config
+
+# string
+config.schema_path = 'my-data-model'
+```
+
+```javascript
+module.exports = {
+  // string
+  schemaPath: 'my-data-model'
+};
+```
+
+</CodeTabs>
+
+Overrides `CUBEJS_SCHEMA_PATH`. The default value is `model`.
+
+Use [`repositoryFactory`][self-repofactory] for [multitenancy][ref-multitenancy]
+or when a more flexible setup is needed.
+
+{/* TODO: https://cubedevinc.atlassian.net/browse/CC-3095 */}
+
+### `basePath`
 
 [REST API](/reference/rest-api) base path. The default value is `/cubejs-api`.
 
-### webSocketsBasePath
+```
+  basePath: string;
+```
+
+### `webSocketsBasePath`
 
 The base path for the websockets server. By default, the WebSockets server will
 run on the root path.
 
-### logger
+```
+  webSocketsBasePath: string;
+```
+
+### `logger`
 
 A function to setup a custom logger. It accepts the following arguments:
 
@@ -160,7 +109,11 @@ module.exports = {
 };
 ```
 
-### driverFactory
+```
+  logger: (msg: string, params: object) => any;
+```
+
+### `driverFactory`
 
 Set a custom database driver. The function accepts context object as an argument
 to allow dynamically loading database drivers, which is usually used in
@@ -193,7 +146,17 @@ module.exports = {
 };
 ```
 
-### contextToApiScopes
+```
+  driverFactory: (
+    context: DriverContext
+  ) => DriverConfig | BaseDriver | Promise<BaseDriver> | Promise<DriverConfig>;
+
+  interface DriverContext extends RequestContext {
+    dataSource: string;
+  }
+```
+
+### `contextToApiScopes`
 
 This function is used to select accessible [API scopes][ref-rest-scopes], used
 to allow or disallow access to REST API endpoints, based on the [security
@@ -213,7 +176,11 @@ module.exports = {
 };
 ```
 
-### contextToAppId
+```
+  contextToApiScopes: (context: RequestContext) => string[] | Promise<string[]>;
+```
+
+### `contextToAppId`
 
 It is a [Multitenancy Setup][ref-multitenancy] option.
 
@@ -230,7 +197,11 @@ module.exports = {
 };
 ```
 
-### contextToOrchestratorId
+```
+  contextToAppId: (context: RequestContext) => string;
+```
+
+### `contextToOrchestratorId`
 
 <WarningBox>
 
@@ -265,7 +236,11 @@ module.exports = {
 };
 ```
 
-### repositoryFactory
+```
+  contextToOrchestratorId: (context: RequestContext) => string;
+```
+
+### `repositoryFactory`
 
 This option allows to customize the repository for Cube data model files. It is
 a function, which accepts a context object and can dynamically select
@@ -297,7 +272,20 @@ module.exports = {
 };
 ```
 
-### checkAuth
+```
+  repositoryFactory: (context: RequestContext) => SchemaFileRepository;
+
+  interface SchemaFileRepository {
+    dataSchemaFiles(): Promise<FileContent[]>;
+  }
+
+  interface FileContent {
+    fileName: string;
+    content: string;
+  }
+```
+
+### `checkAuth`
 
 Used in both REST and WebSockets API. Can be an `async` function. Default
 implementation parses [JSON Web Tokens (JWT)][link-jwt] in `Authorization`
@@ -318,7 +306,11 @@ module.exports = {
 };
 ```
 
-### checkSqlAuth
+```
+  checkAuth: (req: ExpressRequest, authorization: string) => any;
+```
+
+### `checkSqlAuth`
 
 Used in [SQL API][ref-sql-api], and can be an `async` function. Default
 implementation verify username & password from environment variables:
@@ -344,7 +336,11 @@ module.exports = {
 };
 ```
 
-### canSwitchSqlUser
+```
+  checkSqlAuth: (req: SQLRequest, user: string | null) => any;
+```
+
+### `canSwitchSqlUser`
 
 Used in [SQL API][ref-sql-api], and can be an `async` function. Default
 implementation depends on `CUBEJS_SQL_SUPERUSER` and return `true` when it's
@@ -370,7 +366,14 @@ module.exports = {
 };
 ```
 
-### queryRewrite
+```
+  canSwitchSqlUser: (
+    current: string | null,
+    user: string
+  ) => Promise<bool> | bool;
+```
+
+### `queryRewrite`
 
 <WarningBox>
 
@@ -402,7 +405,11 @@ module.exports = {
 };
 ```
 
-### preAggregationsSchema
+```
+  queryRewrite: (query: object, context: RequestContext) => object;
+```
+
+### `preAggregationsSchema`
 
 Schema name to use for storing pre-aggregations. For some drivers like MySQL
 it's name for pre-aggregation database as there's no database schema concept
@@ -437,7 +444,11 @@ module.exports = {
 };
 ```
 
-### schemaVersion
+```
+  preAggregationsSchema: string | ((context: RequestContext) => string);
+```
+
+### `schemaVersion`
 
 Schema version can be used to tell Cube that the data model should be recompiled
 in case it depends on dynamic definitions fetched from some external database or
@@ -456,7 +467,11 @@ module.exports = {
 };
 ```
 
-### scheduledRefreshTimer
+```
+  schemaVersion: (context: RequestContext) => string;
+```
+
+### `scheduledRefreshTimer`
 
 <WarningBox>
 
@@ -501,7 +516,11 @@ You may also need to configure
 [`scheduledRefreshTimeZones`][self-opts-sched-refresh-tz] and
 [`scheduledRefreshContexts`][self-opts-sched-refresh-ctxs].
 
-### scheduledRefreshTimeZones
+```
+  scheduledRefreshTimer: boolean | number;
+```
+
+### `scheduledRefreshTimeZones`
 
 All time-based calculations performed within Cube are timezone-aware. Using this
 property you can specify multiple timezones in [TZ Database Name][link-wiki-tz]
@@ -523,7 +542,11 @@ comma-separated list of timezones to refresh in
 CUBEJS_SCHEDULED_REFRESH_TIMEZONES=America/Los_Angeles,UTC
 ```
 
-### scheduledRefreshContexts
+```
+  scheduledRefreshTimeZones: string[];
+```
+
+### `scheduledRefreshContexts`
 
 When trying to configure scheduled refreshes for pre-aggregations that use the
 `securityContext` inside `contextToAppId` or `contextToOrchestratorId`, you must
@@ -558,7 +581,11 @@ module.exports = {
 };
 ```
 
-### extendContext
+```
+  scheduledRefreshContexts: () => Promise<object[]>;
+```
+
+### `extendContext`
 
 Option to extend the `RequestContext` with custom values. This method is called
 on each request. Can be async.
@@ -596,29 +623,49 @@ cube(`Users`, {
 });
 ```
 
-### compilerCacheSize
+```
+  extendContext: (req: ExpressRequest) => any;
+```
+
+### `compilerCacheSize`
 
 Maximum number of compiled data models to persist with in-memory cache. Defaults
 to 250, but optimum value will depend on deployed environment. When the max is
 reached, will start dropping the least recently used data models from the cache.
 
-### maxCompilerCacheKeepAlive
+```
+  compilerCacheSize: number;
+```
+
+### `maxCompilerCacheKeepAlive`
 
 Maximum length of time in ms to keep compiled data models in memory. Default
 keeps data models in memory indefinitely.
 
-### updateCompilerCacheKeepAlive
+```
+  maxCompilerCacheKeepAlive: number;
+```
+
+### `updateCompilerCacheKeepAlive`
 
 Providing `updateCompilerCacheKeepAlive: true` keeps frequently used data models
 in memory by reseting their `maxCompilerCacheKeepAlive` every time they are
 accessed.
 
-### allowUngroupedWithoutPrimaryKey
+```
+  updateCompilerCacheKeepAlive: boolean;
+```
+
+### `allowUngroupedWithoutPrimaryKey`
 
 Providing `allowUngroupedWithoutPrimaryKey: true` disables primary key inclusion
 check for `ungrouped` queries.
 
-### telemetry
+```
+  allowUngroupedWithoutPrimaryKey: boolean;
+```
+
+### `telemetry`
 
 Cube collects high-level anonymous usage statistics for servers started in
 development mode. It doesn't track any credentials, data model contents or
@@ -634,9 +681,11 @@ module.exports = {
 };
 ```
 
-### http
+```
+  telemetry: boolean;
+```
 
-#### cors
+### `http.cors`
 
 CORS settings for the Cube REST API can be configured by providing an object
 with options [from here][link-express-cors-opts]:
@@ -656,49 +705,80 @@ module.exports = {
 };
 ```
 
-### jwt
+```
+  http: {
+    cors: {
+      methods: string | string[];
+      origin: string;
+      allowedHeaders: string | string[];
+      exposedHeaders: string | string[];
+      credentials: boolean;
+      maxAge: number;
+      preflightContinue: boolean;
+      optionsSuccessStatus: number;
+    };
+  };
+```
 
-#### jwkUrl
+### `jwt`
+
+```
+  jwt: {
+    jwkUrl?: ((payload: any) => string) | string;
+    key?: string;
+    algorithms?: string[];
+    issuer?: string[];
+    audience?: string;
+    subject?: string;
+    claimsNamespace?: string;
+  };
+```
+
+#### `jwkUrl`
 
 The URL from which JSON Web Key Sets (JWKS) can be retrieved. Can also be set
 using `CUBEJS_JWK_URL`.
 
-#### key
+#### `key`
 
 A JSON string that represents a cryptographic key. Similar to `API_SECRET`. Can
 also be set using `CUBEJS_JWT_KEY`.
 
-#### algorithms
+#### `algorithms`
 
 [Any supported algorithm for decoding JWTs][gh-jsonwebtoken-algs]. Can also be
 set using `CUBEJS_JWT_ALGS`.
 
-#### issuer
+#### `issuer`
 
 An issuer value which will be used to enforce the [`iss` claim from inbound
 JWTs][link-jwt-ref-iss]. Can also be set using `CUBEJS_JWT_ISSUER`.
 
-#### audience
+#### `audience`
 
 An audience value which will be used to enforce the [`aud` claim from inbound
 JWTs][link-jwt-ref-aud]. Can also be set using `CUBEJS_JWT_AUDIENCE`.
 
-#### subject
+#### `subject`
 
 A subject value which will be used to enforce the [`sub` claim from inbound
 JWTs][link-jwt-ref-sub]. Can also be set using `CUBEJS_JWT_SUBJECT`.
 
-#### claimsNamespace
+#### `claimsNamespace`
 
 A namespace within the decoded JWT under which any custom claims can be found.
 Can also be set using `CUBEJS_JWT_CLAIMS_NAMESPACE`.
 
-### cacheAndQueueDriver
+### `cacheAndQueueDriver`
 
 The cache and queue driver to use for the Cube.js deployment. Defaults to
 `memory` in development, `cubestore` in production.
 
-### orchestratorOptions
+```
+  cacheAndQueueDriver: "memory" | "cubestore";
+```
+
+### `orchestratorOptions`
 
 <WarningBox>
 
@@ -742,6 +822,38 @@ module.exports = {
     preAggregationsOptions: { queueOptions },
   },
 };
+```
+
+```
+  orchestratorOptions:
+    | OrchestratorOptions
+    | ((context: RequestContext) => OrchestratorOptions);
+  allowJsDuplicatePropsInSchema: boolean;
+  initApp: (app: ExpressApplication) => void;
+  processSubscriptionsInterval: number;
+
+  interface OrchestratorOptions {
+    continueWaitTimeout: number;
+    redisPrefix: string;
+    rollupOnlyMode: boolean;
+    queryCacheOptions: {
+      refreshKeyRenewalThreshold: number;
+      backgroundRenew: boolean;
+      queueOptions: QueueOptions;
+    };
+    preAggregationsOptions: {
+      externalRefresh: boolean;
+      maxPartitions: number;
+      queueOptions: QueueOptions;
+    };
+  }
+
+  interface QueueOptions {
+    concurrency: number;
+    executionTimeout: number;
+    orphanedTimeout: number;
+    heartBeatInterval: number;
+  }
 ```
 
 ### allowJsDuplicatePropsInSchema
@@ -884,3 +996,4 @@ module.exports = {
   /product/data-modeling/advanced/schema-execution-environment#node-js-globals-process-env-console-log-and-others
 [ref-environment-variables]: /reference/configuration/environment-variables
 [ref-rest-scopes]: /product/apis-integrations/rest-api#configuration-api-scopes
+[ref-config-options]: /product/configuration#configuration-options
