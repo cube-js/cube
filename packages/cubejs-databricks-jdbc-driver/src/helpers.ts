@@ -32,28 +32,10 @@ export async function resolveJDBCDriver(): Promise<string> {
   );
 }
 
-export function extractUidFromJdbcUrl(url: string): string {
-  const regex = /^jdbc:([^:]+):\/\/([^/]+)(\/[^;]*)?(?:;(.*))?$/;
-  const match = url.match(regex);
-
-  if (!match) {
-    throw new Error(`Invalid JDBC URL: ${url}`);
-  }
-
-  const paramsString = match[4];
-  if (!paramsString) {
-    return 'token';
-  }
-  
-  const params: Record<string, string> = {};
-  const paramsArray = paramsString.split(';');
-
-  paramsArray.forEach(param => {
-    const [key, value] = param.split('=');
-    if (key && value) {
-      params[key] = decodeURIComponent(value);
-    }
-  });
-
-  return params.UID || 'token'; // Return null if UID is not found
+export function extractUidFromJdbcUrl(jdbcUrl: string): string {
+  const [baseUrl, ...params] = jdbcUrl.split(';');
+  const queryString = params.join('&');
+  const standardUrl = `${baseUrl}?${queryString}`;
+  const url = new URL(standardUrl);
+  return url.searchParams.get('UID') || 'token';
 }
