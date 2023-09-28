@@ -66,8 +66,6 @@ export function testIncrementalSchemaLoading(type: string): void {
           await driver.dropTable(t);
         }
         console.log(`Dropping ${tables.length} fixture tables completed`);
-      } catch (e: any) {
-        console.log('Error dropping fixtures', e.stack, e);
       } finally {
         await driver.release();
         await env.stop();
