@@ -1492,7 +1492,7 @@ class BaseQuery {
       R.map(s => (
         (cache || this.compilerCache).cache(
           ['collectFrom', methodName].concat(
-            s.path() ? [s.path().join('.')] : [s.cube().name, s.expressionName || s.definition().sql]
+            s.path() ? [s.path().join('.')] : [s.cube().name, s.expression?.toString() || s.expressionName || s.definition().sql]
           ),
           () => fn(() => this.traverseSymbol(s))
         )
