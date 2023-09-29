@@ -8,6 +8,14 @@ redirect_from:
 Following [configuration options][ref-config-options] can be defined either
 using Python, in a `cube.py` file, or using JavaScript, in a `cube.js` file.
 
+<InfoBox>
+
+Note that configuration options follow the [snake case][link-snake-case]
+convention in Python (`base_path`) and the [camel case][link-camel-case] convention in
+JavaScript (`basePath`).
+
+</InfoBox>
+
 {/*
 
 interface RequestContext {
@@ -29,6 +37,8 @@ consider defining [`driverFactory`][self-driver-factory] to return a
 
 Data source type.
 
+Called only once per [`appId`][self-opts-ctx-to-appid].
+
 ```javascript
 module.exports = {
   // string
@@ -46,9 +56,7 @@ Usually used for [multitenancy][ref-multitenancy].
 If not defined, Cube will lookup for environment variable
 `CUBEJS_DB_TYPE` to resolve the data source type.
 
-Called only once per [`appId`][self-opts-ctx-to-appid].
-
-### `schemaPath`
+### `schema_path`
 
 Path to data model files.
 
@@ -77,83 +85,134 @@ or when a more flexible setup is needed.
 
 {/* TODO: https://cubedevinc.atlassian.net/browse/CC-3095 */}
 
-### `basePath`
+### `base_path`
 
-[REST API](/reference/rest-api) base path. The default value is `/cubejs-api`.
+The base path for the [REST API](/reference/rest-api).
 
+<CodeTabs>
+
+```python
+from cube.conf import config
+
+# string
+config.base_path = '/cube-api'
 ```
-  basePath: string;
-```
-
-### `webSocketsBasePath`
-
-The base path for the websockets server. By default, the WebSockets server will
-run on the root path.
-
-```
-  webSocketsBasePath: string;
-```
-
-### `logger`
-
-A function to setup a custom logger. It accepts the following arguments:
-
-- `message`: Cube Backend event message
-- `params`: Parameters of the call
 
 ```javascript
 module.exports = {
-  logger: (msg, params) => {
-    console.log(`${msg}: ${JSON.stringify(params)}`);
+  // string
+  basePath: '/cube-api'
+};
+```
+
+</CodeTabs>
+
+The default value is `/cubejs-api`.
+
+### `web_sockets_base_path`
+
+The base path for the WebSocket server.
+
+<CodeTabs>
+
+```python
+from cube.conf import config
+
+# string
+config.web_sockets_base_path = '/websocket'
+```
+
+```javascript
+module.exports = {
+  // string
+  webSocketsBasePath: '/websocket'
+};
+```
+
+</CodeTabs>
+
+The default value is `/` (the root path).
+
+### `logger`
+
+A function to server as a custom logger.
+
+Accepts the following arguments:
+- `message`: the message to be logged
+- `params`: additional parameters
+
+<CodeTabs>
+
+```python
+from cube.conf import config
+
+@config
+def logger(message: str, params: dict) -> None:
+  print(f"{message}: {params}")
+```
+
+```javascript
+module.exports = {
+  logger: (message, params) => {
+    console.log(`${message}: ${JSON.stringify(params)}`);
   },
 };
 ```
 
+</CodeTabs>
+
+### `driver_factory`
+
+A function to provide a custom configuration for the data source driver.
+Can be asynchronous.
+
+Called once per [`data_source`][ref-schema-ref-datasource] for every
+[orchestrator id][self-orchestrator-id].
+
+{/* TODO: Check with Pavel */}
+
+Should be used to configure data source connections **dynamically** in
+[multitenancy][ref-multitenancy].
+
+Not recommended to be used when [multiple data sources][ref-multiple-data-sources]
+can be configured **statically**. Use `CUBEJS_DATASOURCES` and decorated environment
+variables in that case.
+
+In Python, should return a dictionary; in JavaScript, should return an object.
+It should contain the `type` element corresponding to data source type and other
+options that will be passed to a data source driver. You can lookup supported options
+in the drivers' [source code][link-github-cube-drivers]. 
+
+<CodeTabs>
+
+```python
+from cube.conf import config
+
+@config
+def driver_factory(message: str, params: dict) -> None:
+  print(f"{message}: {params}")
 ```
-  logger: (msg: string, params: object) => any;
-```
-
-### `driverFactory`
-
-Set a custom database driver. The function accepts context object as an argument
-to allow dynamically loading database drivers, which is usually used in
-[Multitenancy Applications][ref-multitenancy].
-
-Called once per [`data_source`][ref-schema-ref-datasource]. Can return a
-`Promise` which resolves to a `DriverConfig`. `DriverConfig` consists of a
-`type` field corresponding to database type and options passed to a driver
-constructor.
 
 ```javascript
 module.exports = {
-  driverFactory: ({ dataSource }) => ({
-    type: "postgres",
+  driverFactory: ({ securityContext, dataSource }) => ({
+    type: 'postgres',
     database: dataSource,
-  }),
+  })
 };
 ```
 
-Drivers can also be instantiated directly in case custom driver implementations
-are used.
+</CodeTabs>
+
+In JavaScript, custom driver implementations can also be loaded:
 
 ```javascript
-const PostgresDriver = require("@cubejs-backend/postgres-driver");
+const VeryCustomDriver = require('cube-custom-driver');
 
 module.exports = {
-  driverFactory: ({ dataSource }) =>
-    new PostgresDriver({ database: dataSource }),
-  dbType: ({ dataSource }) => "postgres",
+  driverFactory: ({ securityContext, dataSource }) =>
+    new VeryCustomDriver(/* options */)
 };
-```
-
-```
-  driverFactory: (
-    context: DriverContext
-  ) => DriverConfig | BaseDriver | Promise<BaseDriver> | Promise<DriverConfig>;
-
-  interface DriverContext extends RequestContext {
-    dataSource: string;
-  }
 ```
 
 ### `contextToApiScopes`
@@ -997,3 +1056,8 @@ module.exports = {
 [ref-environment-variables]: /reference/configuration/environment-variables
 [ref-rest-scopes]: /product/apis-integrations/rest-api#configuration-api-scopes
 [ref-config-options]: /product/configuration#configuration-options
+[self-orchestrator-id]: #contexttoorchestratorid
+[ref-multiple-data-sources]: /product/configuration/advanced/multiple-data-sources
+[link-snake-case]: https://en.wikipedia.org/wiki/Snake_case
+[link-camel-case]: https://en.wikipedia.org/wiki/Camel_case
+[link-github-cube-drivers]: https://github.com/cube-js/cube/tree/master/packages
