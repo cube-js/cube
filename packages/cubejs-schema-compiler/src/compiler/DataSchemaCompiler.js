@@ -58,7 +58,8 @@ export class DataSchemaCompiler {
    * @protected
    */
   async loadPythonContext(files) {
-    const modules = await Promise.all(files.filter((f) => f.fileName.endsWith('.py')).map(async (file) => {
+    // TODO Appropriate template functions loading
+    const modules = await Promise.all(files.filter((f) => f.fileName === 'globals.py').map(async (file) => {
       const exports = await this.nativeInstance.loadPythonContext(
         file.fileName,
         file.content

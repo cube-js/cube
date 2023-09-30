@@ -1,5 +1,5 @@
 source_code = """
-from cube.conf import (
+from cube import (
     settings,
     config
 )
