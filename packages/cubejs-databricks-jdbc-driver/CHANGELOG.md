@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.64](https://github.com/cube-js/cube/compare/v0.33.63...v0.33.64) (2023-09-30)
+
+
+### Bug Fixes
+
+* **databricks-jdbc-driver:** ensure default UID property is set ([#7168](https://github.com/cube-js/cube/issues/7168)) ([0f357f8](https://github.com/cube-js/cube/commit/0f357f841b908d71f7b13fc5df889ebb6945901f))
+
+
+
+
+
 ## [0.33.63](https://github.com/cube-js/cube/compare/v0.33.62...v0.33.63) (2023-09-26)
 
 **Note:** Version bump only for package @cubejs-backend/databricks-jdbc-driver

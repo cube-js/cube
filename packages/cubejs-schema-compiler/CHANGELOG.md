@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.64](https://github.com/cube-js/cube/compare/v0.33.63...v0.33.64) (2023-09-30)
+
+
+### Bug Fixes
+
+* SQL push down expressions incorrectly cache used cube names ([c5f0b03](https://github.com/cube-js/cube/commit/c5f0b03e2582be6969ae2de8d1e7dfc6190141c4))
+
+
+### Features
+
+* **native:** More concise module structure ([#7180](https://github.com/cube-js/cube/issues/7180)) ([e2a80bf](https://github.com/cube-js/cube/commit/e2a80bfa0515696391f5aa69c299038f6e52c405))
+
+
+
+
+
 ## [0.33.63](https://github.com/cube-js/cube/compare/v0.33.62...v0.33.63) (2023-09-26)
 
 

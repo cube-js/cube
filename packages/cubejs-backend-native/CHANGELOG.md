@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.64](https://github.com/cube-js/cube/compare/v0.33.63...v0.33.64) (2023-09-30)
+
+
+### Features
+
+* **native:** More concise module structure ([#7180](https://github.com/cube-js/cube/issues/7180)) ([e2a80bf](https://github.com/cube-js/cube/commit/e2a80bfa0515696391f5aa69c299038f6e52c405))
+* **native:** Support explicit [@config](https://github.com/config)("<name>") annotations ([d345d74](https://github.com/cube-js/cube/commit/d345d748e947c8479145886f6d4ac9e9fbeeccd6))
+
+
+
+
+
 ## [0.33.63](https://github.com/cube-js/cube/compare/v0.33.62...v0.33.63) (2023-09-26)
 
 **Note:** Version bump only for package @cubejs-backend/native
