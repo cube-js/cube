@@ -125,6 +125,9 @@ class Configuration:
         self.orchestrator_options = None
 
     def __call__(self, func):
+        if isinstance(func, str):
+            return AttrRef(self, func)
+
         if not callable(func):
             raise ConfigurationException("@config decorator must be used with functions, actual: '%s'" % type(func).__name__)
 
@@ -132,6 +135,25 @@ class Configuration:
             setattr(self, func.__name__, func)
         else:
             raise ConfigurationException("Unknown configuration property: '%s'" % func.__name__)
+
+class AttrRef:
+    config: Configuration
+    attribute: str
+
+    def __init__(self, config: Configuration, attribue: str):
+        self.config = config
+        self.attribute = attribue
+
+    def __call__(self, func):
+        if not callable(func):
+            raise ConfigurationException("@config decorator must be used with functions, actual: '%s'" % type(func).__name__)
+
+        if hasattr(self.config, self.attribute):
+            setattr(self.config, self.attribute, func)
+        else:
+            raise ConfigurationException("Unknown configuration property: '%s'" % func.__name__)
+
+        return func
 
 config = Configuration()
 # backward compatibility
