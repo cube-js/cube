@@ -104,24 +104,6 @@ The number of concurrent connections each query queue has to the database.
 | --------------- | ------------------------------------------- | ------------------------------------------- |
 | A valid number  | [See database-specific page][ref-config-db] | [See database-specific page][ref-config-db] |
 
-## `CUBEJS_CONFIG_FILE`
-
-The configuiration file to use.
-
-If set, the specified file will be used.
-If unset, either `cube.py` or `cube.js` file will be detected and used.
-If both files are present, an error would be raised.
-
-Use this enviroment variable in cases when you have both `cube.py` and
-`cube.js` files in your Cube project, e.g., when migrating from `cube.js`
-to `cube.py` and running multiple Cube deployments from the same code base.
-
-| Possible Values      | Default in Development | Default in Production |
-| -------------------- | ---------------------- | --------------------- |
-| `cube.py`, `cube.js` | N/A                    | N/A                   |
-
-{/* TODO: https://cubedevinc.atlassian.net/browse/CC-3097 */}
-
 ## `CUBEJS_CUBESTORE_HOST`
 
 The hostname of the Cube Store deployment
