@@ -117,6 +117,9 @@ for model in dbt.models:
   print(model)
 ```
 
+Only dbt models that comply with `Dbt.filter` rules and are not
+materialized as [ephemeral][link-dbt-materializations] will be returned.
+
 #### `Dbt.model`
 
 This method returns a loaded dbt model by its name as an instance of the
@@ -132,6 +135,9 @@ dbt = Dbt.from_url(manifest_url)
 model = dbt.model('orders')
 print(model)
 ```
+
+Only dbt models that comply with `Dbt.filter` rules and are not
+materialized as [ephemeral][link-dbt-materializations] will be returned.
 
 ### `Model` class
 
@@ -502,6 +508,7 @@ cubes:
 [link-cube-dbt-pypi]: https://pypi.org/project/cube_dbt/
 [link-cube-repo-issues]: https://github.com/cube-js/cube/issues
 [link-dbt-manifest]: https://docs.getdbt.com/reference/artifacts/manifest-json
+[link-dbt-materializations]: https://docs.getdbt.com/docs/build/materializations
 
 [ref-cubes]: /product/data-modeling/reference/cube
 [ref-model-syntax]: /product/data-modeling/fundamentals/syntax#model-syntax
