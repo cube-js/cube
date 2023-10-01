@@ -5,6 +5,5 @@ module.exports = {
   "data-blending": "Data blending",
   "dynamic-schema-creation": "Dynamic data models with JavaScript",
   "jinja": "Dynamic data models with Jinja and Python",
-  "polymorphic-cubes": "Polymorphic cubes",
-  "using-dbt": "dbt integration"
+  "polymorphic-cubes": "Polymorphic cubes"
 }
