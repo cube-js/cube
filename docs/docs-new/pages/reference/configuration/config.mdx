@@ -63,7 +63,7 @@ Path to data model files.
 <CodeTabs>
 
 ```python
-from cube.conf import config
+from cube import config
 
 # string
 config.schema_path = 'my-data-model'
@@ -92,7 +92,7 @@ The base path for the [REST API](/reference/rest-api).
 <CodeTabs>
 
 ```python
-from cube.conf import config
+from cube import config
 
 # string
 config.base_path = '/cube-api'
@@ -116,7 +116,7 @@ The base path for the WebSocket server.
 <CodeTabs>
 
 ```python
-from cube.conf import config
+from cube import config
 
 # string
 config.web_sockets_base_path = '/websocket'
@@ -144,7 +144,7 @@ Accepts the following arguments:
 <CodeTabs>
 
 ```python
-from cube.conf import config
+from cube import config
 
 @config
 def logger(message: str, params: dict) -> None:
@@ -186,7 +186,7 @@ in the drivers' [source code][link-github-cube-drivers].
 <CodeTabs>
 
 ```python
-from cube.conf import config
+from cube import config
 
 @config
 def driver_factory(message: str, params: dict) -> None:

@@ -62,14 +62,14 @@ or using JavaScript, in a `cube.js` file in the root folder of a Cube project.
 <CodeTabs>
 
 ```python
-from cube.conf import config
+from cube import config
 
 # Base path for the REST API
-config.basePath = '/cube-api'
+config.base_path = '/cube-api'
 
 # Inspect, modify, or restrict every query
-@config
-def query_rewrite(query, security_context):
+@config('query_rewrite')
+def query_rewrite(query, ctx):
   print(query)
   return query
 ```
