@@ -146,7 +146,7 @@ Accepts the following arguments:
 ```python
 from cube import config
 
-@config
+@config('logger')
 def logger(message: str, params: dict) -> None:
   print(f"{message}: {params}")
 ```
@@ -188,7 +188,7 @@ in the drivers' [source code][link-github-cube-drivers].
 ```python
 from cube import config
 
-@config
+@config('driver_factory')
 def driver_factory(message: str, params: dict) -> None:
   print(f"{message}: {params}")
 ```
