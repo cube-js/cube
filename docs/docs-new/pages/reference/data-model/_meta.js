@@ -6,5 +6,6 @@ module.exports = {
   "joins": "Joins",
   "segments": "Segments",
   "pre-aggregations": "Pre-aggregations",
-  "types-and-formats": "Types and Formats"
+  "types-and-formats": "Types and formats",
+  "context-variables": "Context variables"
 }

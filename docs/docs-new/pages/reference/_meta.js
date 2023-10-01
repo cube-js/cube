@@ -1,5 +1,6 @@
 module.exports = {
   "configuration": "Configuration",
+  "data-model": "Data model",
   "python": "Python packages",
   "frontend": "JavaScript SDK",
   "rest-api": "REST API",
