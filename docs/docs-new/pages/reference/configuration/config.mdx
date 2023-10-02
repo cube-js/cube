@@ -65,13 +65,11 @@ Path to data model files.
 ```python
 from cube import config
 
-# string
 config.schema_path = 'my-data-model'
 ```
 
 ```javascript
 module.exports = {
-  // string
   schemaPath: 'my-data-model'
 };
 ```
@@ -94,13 +92,11 @@ The base path for the [REST API](/reference/rest-api).
 ```python
 from cube import config
 
-# string
 config.base_path = '/cube-api'
 ```
 
 ```javascript
 module.exports = {
-  // string
   basePath: '/cube-api'
 };
 ```
@@ -118,13 +114,11 @@ The base path for the [WebSocket server][ref-websockets].
 ```python
 from cube import config
 
-# string
 config.web_sockets_base_path = '/websocket'
 ```
 
 ```javascript
 module.exports = {
-  // string
   webSocketsBasePath: '/websocket'
 };
 ```
@@ -479,103 +473,146 @@ mode][ref-development-mode] it ignores validation.
 
 Called on each request from Cube SQL API.
 
-For example, you can use `checkSqlAuth` to validate username and password.
+For example, you can use `check_sql_auth` to validate username and password.
+
+<CodeTabs>
+
+```python
+from cube import config
+
+@config('check_sql_auth')
+def check_sql_auth(req: dict, user_name: str) -> dict:
+  if user_name == 'my_user':
+    return {
+      'password': 'my_password',
+      'securityContext': {
+        'some': 'data'
+      }
+    }
+
+  raise Exception('Access denied')
+
+```
 
 ```javascript
 module.exports = {
-  checkSqlAuth: (req, username) => {
-    if (username === "fooUser") {
+  check_sql_auth: (req, user_name) => {
+    if (user_name === 'my_user') {
       return {
-        password: "mypassword",
-        securityContext: {},
+        password: 'my_password',
+        securityContext: {
+          some: 'data'
+        },
       };
     }
 
-    throw new Error("Incorrect user name or password");
-  },
+    throw new Error('Access denied');
+  }
 };
 ```
 
-```
-  checkSqlAuth: (req: SQLRequest, user: string | null) => any;
-```
+</CodeTabs>
 
-### `canSwitchSqlUser`
+### `can_switch_sql_user`
 
-Used in [SQL API][ref-sql-api], and can be an `async` function. Default
+Used in [SQL API][ref-sql-api], and can asynchronous. Default
 implementation depends on `CUBEJS_SQL_SUPERUSER` and return `true` when it's
 equal to session's user.
 
 Called on each change request from Cube SQL API.
 
-For example, you can use `canSwitchSqlUser` to define your custom logic:
+For example, you can use `can_switch_sql_user` to define your custom logic:
+
+<CodeTabs>
+
+```python
+from cube import config
+
+@config('can_switch_sql_user')
+def can_switch_sql_user(current_user: str, new_user: str) -> dict:
+  if current_user == 'admin':
+    return True
+
+  if current_user == 'service':
+    return new_user != 'admin'
+
+  return False
+
+
+```
 
 ```javascript
 module.exports = {
-  canSwitchSqlUser: async (current, username) => {
-    if (current === "admin") {
+  canSwitchSqlUser: (current_user, new_user) => {
+    if (current_user === "admin") {
       return true;
     }
 
-    if (current === "service") {
-      return username !== "admin";
+    if (current_user === "service") {
+      return new_user !== "admin";
     }
 
     return false;
-  },
+  }
 };
 ```
 
-```
-  canSwitchSqlUser: (
-    current: string | null,
-    user: string
-  ) => Promise<bool> | bool;
-```
+</CodeTabs>
 
-### `queryRewrite`
-
-<WarningBox>
-
-In previous versions of Cube, this was called `queryTransformer`.
-
-</WarningBox>
+### `query_rewrite`
 
 This is a security hook to check your query just before it gets processed. You
 can use this very generic API to implement any type of custom security checks
-your app needs and transform input query accordingly.
+your app needs and rewrite input query accordingly.
 
 Called on each request.
 
-For example, you can use `queryRewrite` to add row level security filter where
-needed.
+For example, you can use `query_rewrite` to add row-level security filter, if
+needed:
+
+<CodeTabs>
+
+```python
+from cube import config
+
+@config('query_rewrite')
+def query_rewrite(query: dict, ctx: dict) -> dict:
+  context = ctx['securityContext']
+
+  if 'filter_by_region' in context:
+    query['filters'].append({
+      'member': 'regions.id',
+      'operator': 'equals',
+      'values': [context['region_id']],
+    })
+
+  return query
+```
 
 ```javascript
 module.exports = {
   queryRewrite: (query, { securityContext }) => {
-    if (securityContext.filterByRegion) {
+    if (securityContext.filter_by_region) {
       query.filters.push({
-        member: "regions.id",
-        operator: "equals",
+        member: 'regions.id',
+        operator: 'equals',
         values: [securityContext.region_id],
       });
     }
     return query;
   },
 };
-```
+
 
 ```
-  queryRewrite: (query: object, context: RequestContext) => object;
-```
 
-### `preAggregationsSchema`
+</CodeTabs>
 
-Schema name to use for storing pre-aggregations. For some drivers like MySQL
-it's name for pre-aggregation database as there's no database schema concept
-there. Either `String` or `Function` could be passed. Providing a `Function`
-allows to dynamically set the pre-aggregation schema name depending on the
-user's context.
+### `pre_aggregations_schema`
+
+Schema name to use for storing pre-aggregations. Either string or function
+could be passed. Providing a function allows to dynamically set the
+pre-aggregation schema name depending on the security context.
 
 Defaults to `dev_pre_aggregations` in [development mode][ref-development-mode]
 and `prod_pre_aggregations` in production.
@@ -589,47 +626,69 @@ and production environments to avoid pre-aggregation tables clashes.
 
 </WarningBox>
 
-Called once per [`appId`][self-opts-ctx-to-appid].
+Called once per [`app_id`][self-opts-ctx-to-appid].
+
+<CodeTabs>
+
+```python
+from cube import config
+
+@config('pre_aggregations_schema')
+def pre_aggregations_schema(ctx: dict) -> str:
+  return f"pre_aggregations_{ctx['securityContext']['tenant_id']}"
+```
 
 ```javascript
-// Static usage
 module.exports = {
-  preAggregationsSchema: `my_pre_aggregations`,
-};
-
-// Dynamic usage
-module.exports = {
-  preAggregationsSchema: ({ securityContext }) =>
-    `pre_aggregations_${securityContext.tenantId}`,
+  preAggregationsSchema: ({ securityContext }) => {
+    return `pre_aggregations_${securityContext.tenant_id}`;
+  }
 };
 ```
 
-```
-  preAggregationsSchema: string | ((context: RequestContext) => string);
-```
+</CodeTabs>
 
-### `schemaVersion`
+### `schema_version`
 
-Schema version can be used to tell Cube that the data model should be recompiled
+`schema_version` can be used to tell Cube that the data model should be recompiled
 in case it depends on dynamic definitions fetched from some external database or
-API. This method is called on each request however `RequestContext` parameter is
+API.
+
+This method is called on each request however `RequestContext` parameter is
 reused per application ID as determined by
-[`contextToAppId`][self-opts-ctx-to-appid]. If the returned string is different,
+[`context_to_app_id`][self-opts-ctx-to-appid]. If the returned string is different,
 the data model will be recompiled. It can be used in both multi-tenant and
 single tenant environments.
 
+<CodeTabs>
+
+```python
+from cube import config
+import random
+
+@config('schema_version')
+def schema_version(ctx: dict) -> str:
+  # Don't do this!
+  # Data model would be recompiled on each request
+  context = ctx['securityContext']
+
+  return random.random()
+```
+
 ```javascript
-const tenantIdToDbVersion = {};
-
 module.exports = {
-  schemaVersion: ({ securityContext }) =>
-    tenantIdToDbVersion[securityContext.tenantId],
+  schemaVersion: ({ securityContext }) => {
+    // Don't do this!
+    // Data model would be recompiled on each request
+    return Math.random();
+  }
 };
-```
+
+
 
 ```
-  schemaVersion: (context: RequestContext) => string;
-```
+
+</CodeTabs>
 
 ### `scheduledRefreshTimer`
 
