@@ -36,10 +36,8 @@ model
 ## Model syntax
 
 Cube supports two ways to define data model files: with [YAML][wiki-yaml] or
-JavaScript syntax.
-
-YAML data model files should have the `.yml` extension, whereas JavaScript data
-model files should end with `.js`.
+JavaScript syntax. YAML data model files should have the `.yml` extension,
+whereas JavaScript data model files should end with `.js`.
 
 <CodeTabs>
 
@@ -63,6 +61,11 @@ cubes:
 ```
 
 </CodeTabs>
+
+You define the data model statically or build [dynamic data
+models][ref-dynamic-data-models] programmatically. YAML data models use
+[Jinja and Python][ref-dynamic-data-models-jinja] whereas JavaScript data
+models use [JavaScript][ref-dynamic-data-models-js].
 
 ## Naming
 
@@ -490,8 +493,9 @@ defining dynamic data models.
 [self-syntax]: #code-syntax
 [self-cube-variable]: #cube-variable
 [self-sql-expressions]: #sql-expressions
-[ref-dynamic-data-models]:
-  /product/data-modeling/advanced/dynamic-schema-creation
+[ref-dynamic-data-models]: /product/data-modeling/dynamic
+[ref-dynamic-data-models-jinja]: /product/data-modeling/dynamic/jinja
+[ref-dynamic-data-models-js]: /product/data-modeling/dynamic/dynamic-schema-creation
 [ref-context-variables]: /reference/data-model/context-variables
 [ref-config-model-path]: /reference/configuration/config#schemapath
 [ref-config-repository-factory]:
