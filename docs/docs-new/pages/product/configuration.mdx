@@ -45,7 +45,7 @@ programmatically and applied dynamically while a Cube deployment is running.
 
 <InfoBox>
 
-For example, [`queryRewrite`](/reference/configuration/config#queryrewrite)
+For example, [`query_rewrite`](/reference/configuration/config#query_rewrite)
 provides a way to inspect, modify, or restrict every query that is being
 processed by Cube.
 
@@ -69,8 +69,13 @@ config.base_path = '/cube-api'
 
 # Inspect, modify, or restrict every query
 @config('query_rewrite')
-def query_rewrite(query, ctx):
-  print(query)
+def query_rewrite(query: dict, ctx: dict) -> dict:
+  if 'order_id' in ctx['securityContext']:
+    query['filters'].append({
+      'member': 'orders_view.id',
+      'operator': 'equals',
+      'values': [ctx['securityContext']['order_id']]
+    })
   return query
 ```
 
