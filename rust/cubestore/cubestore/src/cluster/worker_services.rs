@@ -72,9 +72,9 @@ pub trait ServicesTransport {
         reciever: IpcReceiver<Self::TransportRequest>,
         sender: IpcSender<Self::TransportResponse>,
         processor: Arc<dyn Callable<Request = Self::Request, Response = Self::Response>>,
-        cancell_token: CancellationToken,
+        cancel_token: CancellationToken,
     ) -> Self::Server {
-        Self::Server::start(reciever, sender, processor, cancell_token)
+        Self::Server::start(reciever, sender, processor, cancel_token)
     }
 
     fn connect(
@@ -329,7 +329,7 @@ pub trait ServicesServer {
         reciever: IpcReceiver<Self::TransportRequest>,
         sender: IpcSender<Self::TransportResponse>,
         processor: Arc<dyn Callable<Request = Self::Request, Response = Self::Response>>,
-        cancell_token: CancellationToken,
+        cancel_token: CancellationToken,
     ) -> Self;
 
     fn stop(&self);
@@ -350,9 +350,9 @@ impl<P: Callable> ServicesServer for ServicesServerImpl<P> {
         reciever: IpcReceiver<Self::TransportRequest>,
         sender: IpcSender<Self::TransportResponse>,
         processor: Arc<dyn Callable<Request = Self::Request, Response = Self::Response>>,
-        cancell_token: CancellationToken,
+        cancel_token: CancellationToken,
     ) -> Self {
-        let join_handle = Self::processing_loop(reciever, sender, processor, cancell_token);
+        let join_handle = Self::processing_loop(reciever, sender, processor, cancel_token);
         Self {
             join_handle,
             processor: PhantomData,
@@ -374,7 +374,7 @@ impl<P: Callable> ServicesServerImpl<P> {
                 Response = <Self as ServicesServer>::Response,
             >,
         >,
-        cancell_token: CancellationToken,
+        cancel_token: CancellationToken,
     ) -> JoinHandle<()> {
         cube_ext::spawn_blocking(move || loop {
             let req = reciever.recv();
@@ -385,9 +385,9 @@ impl<P: Callable> ServicesServerImpl<P> {
             } = match req {
                 Ok(message) => message,
                 Err(e) => {
-                    if !cancell_token.is_cancelled() {
+                    if !cancel_token.is_cancelled() {
                         log::error!("Error while reading ipc service request: {:?}", e);
-                        cancell_token.cancel();
+                        cancel_token.cancel();
                     }
                     break;
                 }

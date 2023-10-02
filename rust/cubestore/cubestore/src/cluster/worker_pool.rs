@@ -5,6 +5,7 @@ use std::process::{Child, ExitStatus};
 use std::sync::Arc;
 use std::time::Duration;
 
+use crate::util::cancellation_token_guard::CancellationGuard;
 use deadqueue::unlimited;
 use futures::future::join_all;
 use ipc_channel::ipc;
@@ -186,6 +187,7 @@ impl<C: Configurator, P: WorkerProcessing, S: ServicesTransport> WorkerProcess<C
         loop {
             let mut handle_guard: Option<ProcessHandleGuard> = None;
             let mut cancel_token: Option<CancellationToken> = None;
+            let mut _cancel_token_guard: Option<CancellationGuard> = None;
             let mut args_channel = None;
 
             loop {
@@ -221,6 +223,7 @@ impl<C: Configurator, P: WorkerProcessing, S: ServicesTransport> WorkerProcess<C
                     match process {
                         Ok((args_tx, res_rx, handle, c_t)) => {
                             handle_guard = Some(ProcessHandleGuard::new(handle));
+                            _cancel_token_guard = Some(CancellationGuard::new(c_t.clone()));
                             cancel_token = Some(c_t);
                             (args_tx, res_rx)
                         }
