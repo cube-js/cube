@@ -1,4 +1,4 @@
-from cube.conf import (
+from cube import (
     config,
     file_repository
 )

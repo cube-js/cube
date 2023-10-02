@@ -1969,4 +1969,34 @@ describe('SQL Generation', () => {
         });
       });
   });
+
+  it('expression cube name cache', async () => {
+    await runQueryTest(
+      {
+        dimensions: [{
+          // eslint-disable-next-line no-new-func,no-template-curly-in-string
+          expression: new Function('visitors', 'return `CASE WHEN ${visitors.id} > 10 THEN 10 ELSE 0 END`'),
+          expressionName: 'visitors.id_case',
+          // eslint-disable-next-line no-template-curly-in-string
+          definition: 'CASE WHEN ${visitors.id} > 10 THEN 10 ELSE 0 END',
+          cubeName: 'visitors'
+        }],
+      },
+      [{ visitors__id_case: 0 }]
+    );
+
+    await runQueryTest(
+      {
+        dimensions: [{
+          // eslint-disable-next-line no-new-func,no-template-curly-in-string
+          expression: new Function('visitor_checkins', 'return `CASE WHEN ${visitor_checkins.id} > 10 THEN 10 ELSE 0 END`'),
+          expressionName: 'visitors.id_case',
+          // eslint-disable-next-line no-template-curly-in-string
+          definition: 'CASE WHEN ${visitor_checkins.id} > 10 THEN 10 ELSE 0 END',
+          cubeName: 'visitors'
+        }],
+      },
+      [{ visitors__id_case: 0 }]
+    );
+  });
 });

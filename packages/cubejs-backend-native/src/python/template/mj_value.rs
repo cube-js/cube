@@ -1,12 +1,157 @@
 use crate::python::cross::{CLRepr, CLReprKind, CLReprObject};
 use crate::python::runtime::py_runtime;
 use crate::tokio_runtime;
+use log::error;
 use minijinja as mj;
 use minijinja::value::{Object, ObjectKind, SeqObject, StructObject, Value, ValueKind};
-use pyo3::types::PyFunction;
-use pyo3::Py;
+use pyo3::exceptions::PyNotImplementedError;
+use pyo3::types::{PyFunction, PyTuple};
+use pyo3::{AsPyPointer, Py, PyAny, PyErr, PyResult, Python};
 use std::convert::TryInto;
 use std::sync::Arc;
+
+struct JinjaPythonObject {
+    pub(crate) inner: Py<PyAny>,
+}
+
+impl std::fmt::Debug for JinjaPythonObject {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(&self.inner, f)
+    }
+}
+
+impl std::fmt::Display for JinjaPythonObject {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(&self.inner, f)
+    }
+}
+
+impl Object for JinjaPythonObject {
+    fn kind(&self) -> ObjectKind<'_> {
+        ObjectKind::Struct(self)
+    }
+
+    fn call_method(
+        &self,
+        _state: &mj::State,
+        name: &str,
+        args: &[Value],
+    ) -> Result<Value, mj::Error> {
+        let obj_ref = &self.inner;
+
+        let mut arguments = Vec::with_capacity(args.len());
+
+        for arg in args {
+            arguments.push(from_minijinja_value(arg)?);
+        }
+
+        let python_call_res = Python::with_gil(move |py| -> PyResult<CLRepr> {
+            let mut args_tuple = Vec::with_capacity(args.len());
+
+            for arg in arguments {
+                args_tuple.push(arg.into_py(py)?);
+            }
+
+            let tuple = PyTuple::new(py, args_tuple);
+
+            let call_res = obj_ref.call_method1(py, name, tuple)?;
+
+            let is_coroutine = unsafe { pyo3::ffi::PyCoro_CheckExact(call_res.as_ptr()) == 1 };
+            if is_coroutine {
+                Err(PyErr::new::<PyNotImplementedError, _>(
+                    "Calling async methods are not supported",
+                ))
+            } else {
+                CLRepr::from_python_ref(call_res.as_ref(py))
+            }
+        });
+
+        match python_call_res {
+            Ok(r) => Ok(to_minijinja_value(r)),
+            Err(err) => Err(mj::Error::new(
+                minijinja::ErrorKind::InvalidOperation,
+                format!("Error while calling method: {}", err),
+            )),
+        }
+    }
+
+    fn call(&self, _state: &mj::State, args: &[Value]) -> Result<Value, mj::Error> {
+        let obj_ref = &self.inner;
+
+        let mut arguments = Vec::with_capacity(args.len());
+
+        for arg in args {
+            arguments.push(from_minijinja_value(arg)?);
+        }
+
+        let python_call_res = Python::with_gil(move |py| -> PyResult<CLRepr> {
+            let mut args_tuple = Vec::with_capacity(args.len());
+
+            for arg in arguments {
+                args_tuple.push(arg.into_py(py)?);
+            }
+
+            let tuple = PyTuple::new(py, args_tuple);
+
+            let call_res = obj_ref.call1(py, tuple)?;
+
+            let is_coroutine = unsafe { pyo3::ffi::PyCoro_CheckExact(call_res.as_ptr()) == 1 };
+            if is_coroutine {
+                Err(PyErr::new::<PyNotImplementedError, _>(
+                    "Calling async is not supported",
+                ))
+            } else {
+                CLRepr::from_python_ref(call_res.as_ref(py))
+            }
+        });
+
+        match python_call_res {
+            Ok(r) => Ok(to_minijinja_value(r)),
+            Err(err) => Err(mj::Error::new(
+                minijinja::ErrorKind::InvalidOperation,
+                format!("Error while calling method: {}", err),
+            )),
+        }
+    }
+}
+
+impl StructObject for JinjaPythonObject {
+    fn get_field(&self, name: &str) -> Option<Value> {
+        let obj_ref = &self.inner;
+
+        let res = Python::with_gil(move |py| -> PyResult<CLRepr> {
+            let attr_name = obj_ref.getattr(py, name)?;
+
+            CLRepr::from_python_ref(attr_name.as_ref(py))
+        });
+
+        match res {
+            Ok(r) => Some(to_minijinja_value(r)),
+            Err(err) => {
+                error!("Error while getting field '{}': {}", name, err);
+
+                None
+            }
+        }
+    }
+
+    fn fields(&self) -> Vec<Arc<str>> {
+        // TODO(ovr): Should we enable it? dump fn?
+        // let obj_ref = &self.inner;
+        //
+        // Python::with_gil(|py| {
+        //     let mut fields = vec![];
+        //
+        //     for key in obj_ref.as_ref(py).keys() {
+        //         fields.push(key.to_string().into());
+        //     }
+        //
+        //     fields
+        // })
+
+        vec![]
+    }
+}
 
 struct JinjaPythonFunction {
     pub(crate) inner: Py<PyFunction>,
@@ -70,23 +215,23 @@ impl StructObject for JinjaPythonFunction {
     }
 }
 
-struct JinjaDynamicObject {
+struct JinjaDictObject {
     pub(crate) inner: CLReprObject,
 }
 
-impl std::fmt::Debug for JinjaDynamicObject {
+impl std::fmt::Debug for JinjaDictObject {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(&self.inner, f)
     }
 }
 
-impl std::fmt::Display for JinjaDynamicObject {
+impl std::fmt::Display for JinjaDictObject {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Display::fmt(&self.inner, f)
     }
 }
 
-impl StructObject for JinjaDynamicObject {
+impl StructObject for JinjaDictObject {
     fn get_field(&self, name: &str) -> Option<Value> {
         self.inner.get(name).map(|v| to_minijinja_value(v.clone()))
     }
@@ -100,7 +245,7 @@ impl StructObject for JinjaDynamicObject {
     }
 }
 
-impl Object for JinjaDynamicObject {
+impl Object for JinjaDictObject {
     fn kind(&self) -> ObjectKind<'_> {
         ObjectKind::Struct(self)
     }
@@ -194,12 +339,12 @@ pub fn from_minijinja_value(from: &mj::value::Value) -> Result<CLRepr, mj::Error
             }
         }
         ValueKind::String => {
-            if from.is_safe() {
-                // TODO: Danger?
-                Ok(CLRepr::String(from.as_str().unwrap().to_string()))
-            } else {
-                Ok(CLRepr::String(from.as_str().unwrap().to_string()))
-            }
+            // TODO: Danger strings? Should we check from.is_safe()?
+            Ok(CLRepr::String(
+                from.as_str()
+                    .expect("ValueKind::String must return string from as_str()")
+                    .to_string(),
+            ))
         }
         ValueKind::Seq => {
             let seq = if let Some(seq) = from.as_seq() {
@@ -207,7 +352,7 @@ pub fn from_minijinja_value(from: &mj::value::Value) -> Result<CLRepr, mj::Error
             } else {
                 return Err(mj::Error::new(
                     mj::ErrorKind::InvalidOperation,
-                    format!("Unable to convert Seq to Python"),
+                    "Unable to convert Seq to Python".to_string(),
                 ));
             };
 
@@ -264,7 +409,7 @@ pub fn to_minijinja_value(from: CLRepr) -> Value {
         CLRepr::Tuple(inner) | CLRepr::Array(inner) => {
             Value::from_seq_object(JinjaSequenceObject { inner })
         }
-        CLRepr::Object(inner) => Value::from_object(JinjaDynamicObject { inner }),
+        CLRepr::Object(inner) => Value::from_object(JinjaDictObject { inner }),
         CLRepr::String(v) => Value::from(v),
         CLRepr::Float(v) => Value::from(v),
         CLRepr::Int(v) => Value::from(v),
@@ -273,6 +418,7 @@ pub fn to_minijinja_value(from: CLRepr) -> Value {
         CLRepr::PyExternalFunction(inner) | CLRepr::PyFunction(inner) => {
             Value::from_object(JinjaPythonFunction { inner })
         }
+        CLRepr::PyObject(inner) => Value::from_object(JinjaPythonObject { inner }),
         CLRepr::JsFunction(_) => panic!(
             "Converting from {:?} to minijinja::Value is not supported",
             CLReprKind::JsFunction

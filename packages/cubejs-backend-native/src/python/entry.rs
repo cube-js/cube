@@ -20,11 +20,11 @@ fn python_load_config(mut cx: FunctionContext) -> JsResult<JsPromise> {
     py_runtime_init(&mut cx, channel.clone())?;
 
     let conf_res = Python::with_gil(|py| -> PyResult<CubeConfigPy> {
-        let cube_conf_code = include_str!(concat!(
+        let cube_code = include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/python/cube/src/conf/__init__.py"
+            "/python/cube/src/__init__.py"
         ));
-        PyModule::from_code(py, cube_conf_code, "__init__.py", "cube.conf")?;
+        PyModule::from_code(py, cube_code, "__init__.py", "cube")?;
 
         let config_module = PyModule::from_code(py, &file_content_arg, &options_file_name, "")?;
         let settings_py = if config_module.hasattr("__execution_context_locals")? {
@@ -68,7 +68,7 @@ fn python_load_model(mut cx: FunctionContext) -> JsResult<JsPromise> {
             env!("CARGO_MANIFEST_DIR"),
             "/python/cube/src/__init__.py"
         ));
-        PyModule::from_code(py, &cube_code, "__init__.py", "cube")?;
+        PyModule::from_code(py, cube_code, "__init__.py", "cube")?;
 
         let model_module = PyModule::from_code(py, &model_content, &model_file_name, "")?;
         let mut collected_functions = CLReprObject::new();

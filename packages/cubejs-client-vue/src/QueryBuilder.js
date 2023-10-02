@@ -398,7 +398,7 @@ export default {
         this.chartType = chartType || this.chartType;
         this.pivotConfig = ResultSet.getNormalizedPivotConfig(
           validatedQuery,
-          pivotConfig || this.pivotConfig
+          pivotConfig !== undefined ? pivotConfig : this.pivotConfig
         );
         this.copyQueryFromProps(validatedQuery);
       }

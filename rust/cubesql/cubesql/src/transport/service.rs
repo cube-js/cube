@@ -6,7 +6,7 @@ use cubeclient::{
 
 use datafusion::{
     arrow::{datatypes::SchemaRef, record_batch::RecordBatch},
-    physical_plan::{aggregates::AggregateFunction, functions::BuiltinScalarFunction},
+    physical_plan::aggregates::AggregateFunction,
 };
 use minijinja::{context, value::Value, Environment};
 use serde_derive::*;
@@ -392,7 +392,7 @@ impl SqlTemplates {
 
     pub fn scalar_function(
         &self,
-        scalar_function: BuiltinScalarFunction,
+        scalar_function: String,
         args: Vec<String>,
         date_part: Option<String>,
     ) -> Result<String, CubeError> {

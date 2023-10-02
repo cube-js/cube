@@ -3,6 +3,50 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.64](https://github.com/cube-js/cube/compare/v0.33.63...v0.33.64) (2023-09-30)
+
+
+### Bug Fixes
+
+* **cubestore:** Escape regex symbols in all versions of like operator ([#7176](https://github.com/cube-js/cube/issues/7176)) ([e58af39](https://github.com/cube-js/cube/commit/e58af39ee779f1a9372ba24b67ebf56ab532f548))
+* **cubestore:** Escape regex symbols in like operator ([#7175](https://github.com/cube-js/cube/issues/7175)) ([b88c3f3](https://github.com/cube-js/cube/commit/b88c3f343d78c13ef170136d257cf591de8d3f4b))
+* **cubestore:** Wrong pre-aggregations count distinct approx count when using PostgreSQL database ([#7170](https://github.com/cube-js/cube/issues/7170)) ([1d1d4f0](https://github.com/cube-js/cube/commit/1d1d4f055aa96e8b61e59c173aec25635fc4730b))
+* **databricks-jdbc-driver:** ensure default UID property is set ([#7168](https://github.com/cube-js/cube/issues/7168)) ([0f357f8](https://github.com/cube-js/cube/commit/0f357f841b908d71f7b13fc5df889ebb6945901f))
+* SQL push down expressions incorrectly cache used cube names ([c5f0b03](https://github.com/cube-js/cube/commit/c5f0b03e2582be6969ae2de8d1e7dfc6190141c4))
+
+
+### Features
+
+* **native:** More concise module structure ([#7180](https://github.com/cube-js/cube/issues/7180)) ([e2a80bf](https://github.com/cube-js/cube/commit/e2a80bfa0515696391f5aa69c299038f6e52c405))
+* **native:** Support explicit [@config](https://github.com/config)("<name>") annotations ([d345d74](https://github.com/cube-js/cube/commit/d345d748e947c8479145886f6d4ac9e9fbeeccd6))
+
+
+
+
+
+## [0.33.63](https://github.com/cube-js/cube/compare/v0.33.62...v0.33.63) (2023-09-26)
+
+
+### Features
+
+* **cubesql:** Tableau Standard Gregorian missing date groupings support through SQL push down and some other functions([#7172](https://github.com/cube-js/cube/issues/7172)) ([1339f57](https://github.com/cube-js/cube/commit/1339f577badf94aab02483e3431f614b1fe61302))
+* **snowflake-driver:** Upgrade snowflake driver to 1.8.0 ([#7171](https://github.com/cube-js/cube/issues/7171)) ([06a66c6](https://github.com/cube-js/cube/commit/06a66c662e93354e2d1a22e1bf406ea9d1c2825b))
+
+
+
+
+
+## [0.33.62](https://github.com/cube-js/cube/compare/v0.33.61...v0.33.62) (2023-09-25)
+
+
+### Features
+
+* **native:** Jinja - support dynamic Python objects (methods, __call__, fields)  ([#7162](https://github.com/cube-js/cube/issues/7162)) ([6a5f70c](https://github.com/cube-js/cube/commit/6a5f70c3d7b910590f5c8ed411363dc6d694e720))
+
+
+
+
+
 ## [0.33.61](https://github.com/cube-js/cube/compare/v0.33.60...v0.33.61) (2023-09-22)
 
 

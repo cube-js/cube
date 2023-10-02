@@ -1021,7 +1021,7 @@ impl CubeScanWrapperNode {
                     );
                     Ok((resulting_sql, sql_query))
                 }
-                // Expr::ScalarUDF { .. } => {}
+
                 // Expr::TableUDF { .. } => {}
                 Expr::Literal(literal) => {
                     Ok(match literal {
@@ -1127,6 +1127,36 @@ impl CubeScanWrapperNode {
                         }
                     })
                 }
+                Expr::ScalarUDF { fun, args } => {
+                    let mut sql_args = Vec::new();
+                    for arg in args {
+                        let (sql, query) = Self::generate_sql_for_expr(
+                            plan.clone(),
+                            sql_query,
+                            sql_generator.clone(),
+                            arg,
+                            ungrouped_scan_node.clone(),
+                        )
+                        .await?;
+                        sql_query = query;
+                        sql_args.push(sql);
+                    }
+                    Ok((
+                        Self::escape_interpolation_quotes(
+                            sql_generator
+                                .get_sql_templates()
+                                .scalar_function(fun.name.to_string(), sql_args, None)
+                                .map_err(|e| {
+                                    DataFusionError::Internal(format!(
+                                        "Can't generate SQL for scalar function: {}",
+                                        e
+                                    ))
+                                })?,
+                            ungrouped_scan_node.is_some(),
+                        ),
+                        sql_query,
+                    ))
+                }
                 Expr::ScalarFunction { fun, args } => {
                     if let BuiltinScalarFunction::DatePart = &fun {
                         if args.len() >= 2 {
@@ -1199,7 +1229,7 @@ impl CubeScanWrapperNode {
                         Self::escape_interpolation_quotes(
                             sql_generator
                                 .get_sql_templates()
-                                .scalar_function(fun, sql_args, date_part)
+                                .scalar_function(fun.to_string(), sql_args, date_part)
                                 .map_err(|e| {
                                     DataFusionError::Internal(format!(
                                         "Can't generate SQL for scalar function: {}",
@@ -1260,7 +1290,7 @@ impl CubeScanWrapperNode {
                 // Expr::QualifiedWildcard { .. } => {}
                 x => {
                     return Err(DataFusionError::Internal(format!(
-                        "Can't generate SQL for expr: {:?}",
+                        "SQL generation for expression is not supported: {:?}",
                         x
                     )))
                 }

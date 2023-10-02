@@ -880,80 +880,126 @@ describe('QueryBuilder.vue', () => {
     //   expect(wrapper.vm.filters[0].member.name).toBe('Orders.number');
     //   expect(wrapper.vm.filters[0].values).toContain('1');
     // });
+  });
 
-    describe('builder computed', () => {
-      describe('orderMembers', () => {
-        it('does not contain time dimension if granularity is set to none', async () => {
-          const cube = createCubejsApi();
-          jest
-              .spyOn(cube, 'request')
-              .mockImplementation(fetchMock(load))
-              .mockImplementationOnce(fetchMock(meta));
+  describe('builder computed', () => {
+    describe('validatedQuery', () => {
+      it('correctly updates pivot config after chart type change', async () => {
+        const expectedPivotForTable = {
+          x: ['Orders.status'],
+          y: ['measures'],
+          fillMissingDates: true,
+          joinDateRange: false,
+        };
 
-          const wrapper = shallowMount(QueryBuilder, {
-            props: {
-              cubejsApi: cube,
-              query: {
-                measures: ['Orders.count'],
-                timeDimensions: [{
-                  dimension: 'Orders.createdAt',
-                }],
-              },
+        const expectedPivotForLine = {
+          x: ['Orders.createdAt.day'],
+          y: ['Orders.status', 'measures'],
+          fillMissingDates: true,
+          joinDateRange: false,
+        };
+
+        const cube = createCubejsApi();
+        jest
+            .spyOn(cube, 'request')
+            .mockImplementation(fetchMock(load))
+            .mockImplementationOnce(fetchMock(meta));
+
+        const wrapper = shallowMount(QueryBuilder, {
+          propsData: {
+            cubejsApi: cube,
+            query: {
+              measures: ['Orders.count'],
+              timeDimensions: [{
+                dimension: 'Orders.createdAt',
+              }],
             },
-          });
-
-          await flushPromises();
-
-          expect(wrapper.vm.orderMembers.length).toBe(1);
-          expect(wrapper.vm.orderMembers).toEqual(
-              expect.arrayContaining([
-                expect.objectContaining({
-                  id: 'Orders.count',
-                  title: 'Orders Count',
-                  order: 'none',
-                }),
-              ])
-          );
+          },
         });
 
-        it('contains time dimension if granularity is not none', async () => {
-          const cube = createCubejsApi();
-          jest
-              .spyOn(cube, 'request')
-              .mockImplementation(fetchMock(load))
-              .mockImplementationOnce(fetchMock(meta));
+        await flushPromises();
 
-          const wrapper = shallowMount(QueryBuilder, {
-            props: {
-              cubejsApi: cube,
-              query: {
-                measures: ['Orders.count'],
-                timeDimensions: [{
-                  dimension: 'Orders.createdAt',
-                  granularity: 'day',
-                }],
-              },
+        wrapper.vm.addMember('dimensions', 'Orders.status'); // to trigger first heuristics
+        await wrapper.vm.$nextTick();
+        expect(wrapper.vm.pivotConfig).toEqual(expectedPivotForTable);
+        expect(wrapper.vm.chartType).toBe('table');
+        wrapper.vm.updateChart('line');
+        await wrapper.vm.$nextTick();
+        expect(wrapper.vm.pivotConfig).toEqual(expectedPivotForLine);
+        expect(wrapper.vm.chartType).toBe('line');
+      });
+    });
+    describe('orderMembers', () => {
+      it('does not contain time dimension if granularity is set to none', async () => {
+        const cube = createCubejsApi();
+        jest
+            .spyOn(cube, 'request')
+            .mockImplementation(fetchMock(load))
+            .mockImplementationOnce(fetchMock(meta));
+
+        const wrapper = shallowMount(QueryBuilder, {
+          props: {
+            cubejsApi: cube,
+            query: {
+              measures: ['Orders.count'],
+              timeDimensions: [{
+                dimension: 'Orders.createdAt',
+              }],
             },
-          });
-
-          await flushPromises();
-
-          expect(wrapper.vm.orderMembers.length).toBe(2);
-          expect(wrapper.vm.orderMembers).toEqual(
-              expect.arrayContaining([
-                expect.objectContaining({
-                  id: 'Orders.createdAt',
-                  title: 'Orders Created at',
-                  order: 'none'
-                }),
-                expect.objectContaining({
-                  id: 'Orders.count',
-                  title: 'Orders Count',
-                  order: 'none',
-                })
-              ])
-          );
+          },
         });
+
+        await flushPromises();
+
+        expect(wrapper.vm.orderMembers.length).toBe(1);
+        expect(wrapper.vm.orderMembers).toEqual(
+            expect.arrayContaining([
+              expect.objectContaining({
+                id: 'Orders.count',
+                title: 'Orders Count',
+                order: 'none',
+              }),
+            ])
+        );
+      });
+
+      it('contains time dimension if granularity is not none', async () => {
+        const cube = createCubejsApi();
+        jest
+            .spyOn(cube, 'request')
+            .mockImplementation(fetchMock(load))
+            .mockImplementationOnce(fetchMock(meta));
+
+        const wrapper = shallowMount(QueryBuilder, {
+          props: {
+            cubejsApi: cube,
+            query: {
+              measures: ['Orders.count'],
+              timeDimensions: [{
+                dimension: 'Orders.createdAt',
+                granularity: 'day',
+              }],
+            },
+          },
+        });
+
+        await flushPromises();
+
+        expect(wrapper.vm.orderMembers.length).toBe(2);
+        expect(wrapper.vm.orderMembers).toEqual(
+            expect.arrayContaining([
+              expect.objectContaining({
+                id: 'Orders.createdAt',
+                title: 'Orders Created at',
+                order: 'none'
+              }),
+              expect.objectContaining({
+                id: 'Orders.count',
+                title: 'Orders Count',
+                order: 'none',
+              })
+            ])
+        );
       });
     });
   });

@@ -18,10 +18,14 @@ function loadTemplateFile(engine: native.JinjaEngine, fileName: string): void {
 
 async function loadPythonCtxFromUtils(fileName: string) {
   const content = fs.readFileSync(path.join(process.cwd(), 'test', 'templates', fileName), 'utf8');
-  return nativeInstance.loadPythonContext(
+  const ctx = await nativeInstance.loadPythonContext(
     fileName,
     content
   );
+
+  // console.debug(ctx);
+
+  return ctx;
 }
 
 function testTemplateBySnapshot(engine: JinjaEngine, templateName: string, ctx: unknown) {
@@ -68,6 +72,7 @@ suite('Python model', () => {
       arg_seq: expect.any(Object),
       new_int_tuple: expect.any(Object),
       new_str_tuple: expect.any(Object),
+      load_class_model: expect.any(Object),
     });
   });
 });
@@ -88,6 +93,7 @@ darwinSuite('Scope Python model', () => {
       arg_seq: expect.any(Object),
       new_int_tuple: expect.any(Object),
       new_str_tuple: expect.any(Object),
+      load_class_model: expect.any(Object),
     });
   });
 });
@@ -101,6 +107,7 @@ function createTestSuite(utilsFile: string) {
     beforeAll(async () => {
       loadTemplateFile(jinjaEngine, '.utils.jinja');
       loadTemplateFile(jinjaEngine, 'dump_context.yml.jinja');
+      loadTemplateFile(jinjaEngine, 'class-model.yml.jinja');
       loadTemplateFile(jinjaEngine, 'data-model.yml.jinja');
       loadTemplateFile(jinjaEngine, 'arguments-test.yml.jinja');
 
@@ -123,6 +130,9 @@ function createTestSuite(utilsFile: string) {
         userId: 1,
       }
     });
+
+    // todo(ovr): Fix issue with tests
+    // testTemplateWithPythonCtxBySnapshot(jinjaEngine, 'class-model.yml.jinja', {}, utilsFile);
     testTemplateWithPythonCtxBySnapshot(jinjaEngine, 'data-model.yml.jinja', {}, utilsFile);
     testTemplateWithPythonCtxBySnapshot(jinjaEngine, 'arguments-test.yml.jinja', {}, utilsFile);
 
