@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.65](https://github.com/cube-js/cube/compare/v0.33.64...v0.33.65) (2023-10-02)
+
+
+### Features
+
+* **python:** Support `[@template](https://github.com/template).function("name")` definitions ([#7183](https://github.com/cube-js/cube/issues/7183)) ([33823e8](https://github.com/cube-js/cube/commit/33823e8529529e388535a405a9316ad0d86496c9))
+
+
+
+
+
 ## [0.33.64](https://github.com/cube-js/cube/compare/v0.33.63...v0.33.64) (2023-09-30)
 
 

@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.33.65](https://github.com/cube-js/cube/compare/v0.33.64...v0.33.65) (2023-10-02)
+
+
+### Bug Fixes
+
+* **@cubejs-client/vue:** Pivot config can use null from heuristics ([#7167](https://github.com/cube-js/cube/issues/7167)) ([e7043bb](https://github.com/cube-js/cube/commit/e7043bb41099d2c4477430b96a20c562e1908266))
+
+
+### Features
+
+* **python:** Evaluate Jinja templates inside `.yml` and `.yaml` ([#7182](https://github.com/cube-js/cube/issues/7182)) ([69e9437](https://github.com/cube-js/cube/commit/69e9437deccc2f16442a39ceb95d1583bcea195f))
+* **python:** Support `[@template](https://github.com/template).function("name")` definitions ([#7183](https://github.com/cube-js/cube/issues/7183)) ([33823e8](https://github.com/cube-js/cube/commit/33823e8529529e388535a405a9316ad0d86496c9))
+
+
+
+
+
 ## [0.33.64](https://github.com/cube-js/cube/compare/v0.33.63...v0.33.64) (2023-09-30)
 
 
