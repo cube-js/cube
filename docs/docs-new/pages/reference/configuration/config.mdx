@@ -111,7 +111,7 @@ The default value is `/cubejs-api`.
 
 ### `web_sockets_base_path`
 
-The base path for the WebSocket server.
+The base path for the [WebSocket server][ref-websockets].
 
 <CodeTabs>
 
@@ -189,16 +189,30 @@ in the drivers' [source code][link-github-cube-drivers].
 from cube import config
 
 @config('driver_factory')
-def driver_factory(message: str, params: dict) -> None:
-  print(f"{message}: {params}")
+def driver_factory(ctx: dict) -> None:
+  context = ctx['securityContext']
+  data_source = ctx['dataSource']
+ 
+  return {
+    'type': 'postgres',
+    'host': 'demo-db-examples.cube.dev',
+    'user': 'cube',
+    'password': '12345',
+    'database': data_source
+  }
 ```
 
 ```javascript
 module.exports = {
-  driverFactory: ({ securityContext, dataSource }) => ({
-    type: 'postgres',
-    database: dataSource,
-  })
+  driverFactory: ({ securityContext, dataSource }) => {
+    return {
+      type: 'postgres',
+      host: 'demo-db-examples.cube.dev',
+      user: 'cube',
+      password: '12345',
+      database: dataSource
+    }
+  }
 };
 ```
 
@@ -210,34 +224,44 @@ In JavaScript, custom driver implementations can also be loaded:
 const VeryCustomDriver = require('cube-custom-driver');
 
 module.exports = {
-  driverFactory: ({ securityContext, dataSource }) =>
-    new VeryCustomDriver(/* options */)
+  driverFactory: ({ securityContext, dataSource }) => {
+    return new VeryCustomDriver({
+      /* options */
+    })
+  }
 };
 ```
 
-### `contextToApiScopes`
+### `context_to_api_scopes`
 
-This function is used to select accessible [API scopes][ref-rest-scopes], used
-to allow or disallow access to REST API endpoints, based on the [security
-context][ref-sec-ctx].
+This function is used to select accessible [API scopes][ref-rest-scopes]
+and effectively allow or disallow access to REST API endpoints, based on
+the [security context][ref-sec-ctx]. Can be asynchronous.
 
-Can be an `async` function. Security context is provided as the first argument.
-An array of scopes that was set via `CUBEJS_DEFAULT_API_SCOPES` is provided as
-the second argument.
+Security context is provided as the first argument. An array of scopes that
+was set via `CUBEJS_DEFAULT_API_SCOPES` is provided as the second argument.
 
 Called on each request.
+
+<CodeTabs>
+
+```python
+from cube import config
+
+@config('context_to_api_scopes')
+def context_to_api_scopes(context: dict, default_scopes: list[str]) -> list[str]:
+  return ['meta', 'data', 'graphql']
+```
 
 ```javascript
 module.exports = {
   contextToApiScopes: (securityContext, defaultScopes) => {
-    return ["meta", "data", "graphql"];
+    return ['meta', 'data', 'graphql'];
   },
 };
 ```
 
-```
-  contextToApiScopes: (context: RequestContext) => string[] | Promise<string[]>;
-```
+</CodeTabs>
 
 ### `contextToAppId`
 
@@ -1058,6 +1082,8 @@ module.exports = {
 [ref-config-options]: /product/configuration#configuration-options
 [self-orchestrator-id]: #contexttoorchestratorid
 [ref-multiple-data-sources]: /product/configuration/advanced/multiple-data-sources
+[ref-websockets]: /product/apis-integrations/rest-api/real-time-data-fetch
+
 [link-snake-case]: https://en.wikipedia.org/wiki/Snake_case
 [link-camel-case]: https://en.wikipedia.org/wiki/Camel_case
 [link-github-cube-drivers]: https://github.com/cube-js/cube/tree/master/packages
