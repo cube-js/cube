@@ -552,13 +552,13 @@ This section describes the various types that can be assigned to a
 
 ### time
 
-In order to be able to create time series charts, Cube needs to identify time
-dimension which is a timestamp column in your database.
+In order to be able to work with time series data, Cube needs to identify
+time dimension which is a timestamp column in your database. You can define
+several time dimensions in a single cube.
 
-You can define several time dimensions in data models and apply each when
-creating charts. Note that type of target column should be `TIMESTAMP`. Please
-use [this guide][ref-string-time-dims] if your datetime information is stored as
-a string.
+Note that type of target column should be `TIMESTAMP`. Please see
+[this recipe][ref-string-time-dims] if your datetime information is stored
+as a string.
 
 <CodeTabs>
 
@@ -927,8 +927,7 @@ cubes:
 
 </CodeTabs>
 
-[ref-string-time-dims]:
-  /product/data-modeling/fundamentals/additional-concepts#string-time-dimensions
+[ref-string-time-dims]: /guides/recipes/data-modeling/string-time-dimensions
 [ref-schema-ref-preaggs-rollup]:
   /product/data-modeling/reference/pre-aggregations#rollup
 [ref-schema-ref-calc-measures]:
