@@ -34,7 +34,7 @@ We'll use a sample e-commerce database with two tables, `orders` and
 
 ## Cubes
 
-A cube represents a dataset in Cube, and is conceptually similar to a [view in
+A [cube][ref-cubes] represents a dataset in Cube, and is conceptually similar to a [view in
 SQL][wiki-view-sql]. Cubes are typically declared in separate files with one
 cube per file. Within each cube are definitions of [dimensions][self-dimensions]
 and [measures][self-measures]. Typically, a cube points to a single table in
@@ -79,6 +79,11 @@ cubes:
 ```
 
 </CodeTabs>
+
+Note that cubes support [extension][ref-extending-cubes],
+[plymorphism][ref-polymorphic-cubes], and [data blending][ref-data-blending].
+Also, cubes may not only be defined statically; you can actually build
+[dynamic data models][ref-dynamic-data-models].
 
 ## Views
 
@@ -154,6 +159,9 @@ views:
 ```
 
 </CodeTabs>
+
+View may not only be defined statically; you can actually build
+[dynamic data models][ref-dynamic-data-models].
 
 ## Dimensions
 
@@ -250,12 +258,13 @@ cubes:
 
 </CodeTabs>
 
-Dimensions can be of different types, and you can find them all
-[here][ref-schema-dimension-types].
+Dimensions can have [different types][ref-schema-dimension-types]. Also,
+[subquery dimensions][ref-subquery-dimensions] can be used to join cubes
+implicitly.
 
-Time-based properties should be represented as dimensions with type `time`. Time
-dimensions allow grouping the result set by a unit of time (e.g. hours, days,
-weeks). In analytics, this is also known as "granularity".
+Time-based properties should be modeled as dimensions of the `time` time.
+Time dimensions allow grouping the result set by a unit of time (e.g. hours,
+days, weeks, etc.). In analytics, this is also known as "granularity".
 
 We can add the necessary time dimensions to both data models as follows:
 
@@ -442,8 +451,9 @@ cubes:
 
 </CodeTabs>
 
-There are the three [types of join relationships][ref-schema-ref-joins-types]:
-`one_to_one`, `one_to_many`, and `many_to_one`.
+There are three [types of join relationships][ref-schema-ref-joins-types]
+(`one_to_one`, `one_to_many`, and `many_to_one`) and a few [other 
+concepts][ref-working-with-joins].
 
 ## Segments
 
@@ -538,6 +548,13 @@ Pre-Aggregations][ref-caching-preaggs-intro].
 [ref-schema-ref-sql-table]: /product/data-modeling/reference/cube#sql_table
 [ref-tutorial-incremental-preagg]:
   /product/data-modeling/reference/pre-aggregations#incremental
+[ref-cubes]: /reference/data-model/cube
+[ref-extending-cubes]: /product/data-modeling/concepts/code-reusability-extending-cubes
+[ref-polymorphic-cubes]: /product/data-modeling/concepts/polymorphic-cubes
+[ref-data-blending]: /product/data-modeling/concepts/data-blending
+[ref-dynamic-data-models]: /product/data-modeling/dynamic
+[ref-subquery-dimensions]: /product/data-modeling/concepts/subquery-dimensions
+[ref-working-with-joins]: /product/data-modeling/concepts/working-with-joins
 [self-dimensions]: #dimensions
 [self-measures]: #measures
 [wiki-olap]: https://en.wikipedia.org/wiki/Online_analytical_processing

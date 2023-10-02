@@ -1,6 +1,6 @@
 module.exports = {
   "overview": "Overview",
-  "fundamentals": "Fundamentals",
-  "advanced": "Advanced",
+  "concepts": "Concepts",
+  "syntax": "Syntax",
   "dynamic": "Dynamic data models"
 }
