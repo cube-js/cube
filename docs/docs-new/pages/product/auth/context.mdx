@@ -31,21 +31,18 @@ inside:
 - the [`COMPILE_CONTEXT`][ref-cubes-compile-ctx] global, which is used to
   support [multi-tenant deployments][link-multitenancy].
 
-## Using queryRewrite
+## Using query_rewrite
 
-You can use [`queryRewrite`][ref-config-queryrewrite] to amend incoming queries
+You can use [`query_rewrite`][ref-config-queryrewrite] to amend incoming queries
 with filters. For example, let's take the following query:
 
 ```json
 {
-  "dimensions": ["orders.status"],
-  "measures": ["orders.count", "orders.total"],
-  "timeDimensions": [
-    {
-      "dimension": "orders.createdAt",
-      "dateRange": ["2015-01-01", "2015-12-31"],
-      "granularity": "month"
-    }
+  "measures": [
+    "orders_view.count"
+  ],
+  "dimensions": [
+    "orders_view.status"
   ]
 }
 ```
@@ -57,7 +54,7 @@ be injected into the security context:
 {
   "sub": "1234567890",
   "iat": 1516239022,
-  "user_id": 131
+  "user_id": 42
 }
 ```
 
@@ -75,26 +72,60 @@ Cannot create proxy with a non-object as target or handler
 To ensure that users making this query only receive their own orders, define
 `queryRewrite` in the `cube.js` configuration file:
 
+<CodeTabs>
+
+```python
+from cube import config
+
+@config('query_rewrite')
+def query_rewrite(query: dict, ctx: dict) -> dict:
+  if 'user_id' in ctx['securityContext']:
+    query['filters'].append({
+      'member': 'orders_view.users_id',
+      'operator': 'equals',
+      'values': [ctx['securityContext']['user_id']]
+    })
+  return query
+```
+
 ```javascript
 module.exports = {
   queryRewrite: (query, { securityContext }) => {
-    // Ensure `securityContext` has an `id` property
-    if (!securityContext.user_id) {
-      throw new Error("No id found in Security Context!");
+    
+    if (securityContext.user_id) {
+      query.filters.push({
+        member: "orders_view.users_id",
+        operator: "equals",
+        values: [securityContext.user_id],
+      });  
     }
-
-    query.filters.push({
-      member: "orders.user_id",
-      operator: "equals",
-      values: [securityContext.user_id],
-    });
 
     return query;
   },
 };
 ```
 
+</CodeTabs>
+
 To test this, we can generate an API token as follows:
+
+<CodeTabs>
+```python
+# Install the PyJWT with pip install PyJWT
+import jwt
+import datetime
+
+# Secret key to sign the token
+CUBE_API_SECRET = 'secret'
+
+# Create the token
+token_payload = {
+  'user_id': 42
+}
+
+# Generate the JWT token
+token = jwt.encode(token_payload, CUBE_API_SECRET, algorithm='HS256')
+```
 
 ```javascript
 const jwt = require("jsonwebtoken");
@@ -104,6 +135,7 @@ const cubejsToken = jwt.sign({ user_id: 42 }, CUBEJS_API_SECRET, {
   expiresIn: "30d",
 });
 ```
+</CodeTabs>
 
 Using this token, we authorize our request to the Cube API by passing it in the
 Authorization HTTP header.
@@ -120,11 +152,19 @@ And Cube will generate the following SQL:
 
 ```sql
 SELECT
-  count(*) "orders.count"
-  FROM (
-    SELECT * FROM public.orders WHERE user_id = 42
-  ) AS orders
-LIMIT 10000
+  "orders".STATUS "orders_view__status",
+  count("orders".ID) "orders_view__count"
+FROM
+  ECOM.ORDERS AS "orders"
+  LEFT JOIN ECOM.USERS AS "users" ON "orders".USER_ID = "users".ID
+WHERE
+  ("users".ID = 42)
+GROUP BY
+  1
+ORDER BY
+  2 DESC
+LIMIT
+  5000
 ```
 
 ## Using COMPILE_CONTEXT
@@ -197,7 +237,7 @@ build one from a JSON object.
 [link-auth0-jwks]:
   https://auth0.com/docs/tokens/json-web-tokens/json-web-key-sets
 [link-multitenancy]: /product/configuration/advanced/multitenancy
-[ref-config-queryrewrite]: /reference/configuration/config#queryrewrite
+[ref-config-queryrewrite]: /reference/configuration/config#query_rewrite
 [ref-config-sched-refresh]:
   /reference/configuration/config#scheduledrefreshcontexts
 [ref-config-sec-ctx]: /reference/configuration/config#securitycontext
