@@ -6,8 +6,8 @@ template = TemplateContext()
 def arg_sum_integers(a, b):
   return a + b
 
-@template.function
-def arg_bool(a):
+@template.function("arg_bool")
+def ab(a):
   return a + 0
 
 @template.function

@@ -140,9 +140,9 @@ class AttrRef:
     config: Configuration
     attribute: str
 
-    def __init__(self, config: Configuration, attribue: str):
+    def __init__(self, config: Configuration, attribute: str):
         self.config = config
-        self.attribute = attribue
+        self.attribute = attribute
 
     def __call__(self, func):
         if not callable(func):
@@ -163,20 +163,64 @@ class TemplateException(Exception):
     pass
 
 class TemplateContext:
-    def function(self, func):
+    functions: dict[str, Callable]
+
+    def __init__(self):
+        self.functions = {}
+
+    def add_function(self, name, func):
         if not callable(func):
             raise TemplateException("function registration must be used with functions, actual: '%s'" % type(func).__name__)
-    
-        return context_func(func)
 
-    def filter(self, func):
+        self.functions[name] = func
+
+    def add_filter(self, name, func):
         if not callable(func):
             raise TemplateException("function registration must be used with functions, actual: '%s'" % type(func).__name__)
 
         raise TemplateException("filter registration is not supported")
 
+    def function(self, func):
+        if isinstance(func, str):
+            return TemplateFunctionRef(self, func)
+
+        self.add_function(func.__name__, func)
+        return func
+
+    def filter(self, func):
+        if isinstance(func, str):
+            return TemplateFilterRef(self, func)
+
+        self.add_filter(func.__name__, func)
+        return func
+
     def variable(self, func):
         raise TemplateException("variable registration is not supported")
+
+class TemplateFunctionRef:
+    context: TemplateContext
+    attribute: str
+
+    def __init__(self, context: TemplateContext, attribute: str):
+        self.context = context
+        self.attribute = attribute
+
+    def __call__(self, func):
+        self.context.add_function(self.attribute, func)
+        return func
+
+
+class TemplateFilterRef:
+    context: TemplateContext
+    attribute: str
+
+    def __init__(self, context: TemplateContext, attribute: str):
+        self.context = context
+        self.attribute = attribute
+
+    def __call__(self, func):
+        self.context.add_filter(self.attribute, func)
+        return func
 
 def context_func(func):
     func.cube_context_func = True

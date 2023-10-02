@@ -73,7 +73,21 @@ fn python_load_model(mut cx: FunctionContext) -> JsResult<JsPromise> {
         let model_module = PyModule::from_code(py, &model_content, &model_file_name, "")?;
         let mut collected_functions = CLReprObject::new();
 
-        if model_module.hasattr("__execution_context_locals")? {
+        if model_module.hasattr("template")? {
+            let functions = model_module
+                .getattr("template")?
+                .getattr("functions")?
+                .downcast::<PyDict>()?;
+
+            for (local_key, local_value) in functions.iter() {
+                if local_value.is_instance_of::<PyFunction>() {
+                    let fun: Py<PyFunction> = local_value.downcast::<PyFunction>()?.into();
+                    collected_functions
+                        .insert(local_key.to_string(), CLRepr::PyExternalFunction(fun));
+                }
+            }
+            // TODO remove all other ways of defining functions
+        } else if model_module.hasattr("__execution_context_locals")? {
             let execution_context_locals = model_module
                 .getattr("__execution_context_locals")?
                 .downcast::<PyDict>()?;
