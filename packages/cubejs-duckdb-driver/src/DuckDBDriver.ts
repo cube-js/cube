@@ -85,6 +85,10 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
         key: 'memory_limit',
         value: getEnv('duckdbMemoryLimit', this.config),
       },
+      {
+        key: 'schema',
+        value: getEnv('duckdbSchema', this.config),
+      },
     ];
     
     for (const { key, value } of configuration) {
