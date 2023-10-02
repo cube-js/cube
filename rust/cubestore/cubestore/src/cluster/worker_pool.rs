@@ -462,7 +462,6 @@ mod tests {
     use tokio::runtime::Builder;
 
     use crate::cluster::worker_pool::{worker_main, WorkerPool};
-    use crate::config::injection::Injector;
     use crate::config::Config;
     use crate::queryplanner::serialized_plan::SerializedLogicalPlan;
     use crate::util::respawn;
@@ -471,7 +470,6 @@ mod tests {
 
     use crate::cluster::worker_services::{
         Callable, Configurator, DefaultServicesServerProcessor, DefaultServicesTransport,
-        ServicesClient, ServicesClientImpl, ServicesServerImpl, ServicesTransport,
         WorkerProcessing,
     };
 
