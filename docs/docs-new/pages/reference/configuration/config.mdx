@@ -25,36 +25,7 @@ interface RequestContext {
 
 */}
 
-### `dbType`
 
-<WarningBox>
-
-Since v0.30.30, using `dbType` is deprecated. Instead,
-consider defining [`driverFactory`][self-driver-factory] to return a
-`DriverConfig` object instead.
-
-</WarningBox>
-
-Data source type.
-
-Called only once per [`appId`][self-opts-ctx-to-appid].
-
-```javascript
-module.exports = {
-  // string
-  dbType: 'snowflake',
-
-  // function
-  dbType: ({ securityContext }) => 'databricks',
-};
-```
-
-Either `string` or `function` could be passed. Providing a `Function` allows
-to dynamically select a database type depending on the security context.
-Usually used for [multitenancy][ref-multitenancy].
-
-If not defined, Cube will lookup for environment variable
-`CUBEJS_DB_TYPE` to resolve the data source type.
 
 ### `schema_path`
 
@@ -1081,11 +1052,16 @@ Boolean to enable or disable a check duplicate property names in all objects of
 a data model. The default value is `false`, and it is means the compiler would
 use the additional transpiler for check duplicates.
 
+### processSubscriptionsInterval
+
+This property controls how often Websocket client subscriptions are refreshed.
+Defaults to `5000`.
+
 ### initApp
 
 <WarningBox>
 
-This configuration option is likely to change in future versions of Cube
+`initApp` is deprecated and will be removed in a future release.
 
 </WarningBox>
 
@@ -1106,10 +1082,33 @@ module.exports = {
 };
 ```
 
-### processSubscriptionsInterval
+### `dbType`
 
-This property controls how often Websocket client subscriptions are refreshed.
-Defaults to `5000`.
+<WarningBox>
+
+`dbType` is deprecated and will be removed in a future release.
+Use [`driverFactory`][self-driver-factory] instead.
+
+</WarningBox>
+
+Data source type. Called only once per [`appId`][self-opts-ctx-to-appid].
+
+```javascript
+module.exports = {
+  // string
+  dbType: 'snowflake',
+
+  // function
+  dbType: ({ securityContext }) => 'databricks',
+};
+```
+
+Either `string` or `function` could be passed. Providing a `Function` allows
+to dynamically select a database type depending on the security context.
+Usually used for [multitenancy][ref-multitenancy].
+
+If not defined, Cube will lookup for environment variable
+`CUBEJS_DB_TYPE` to resolve the data source type.
 
 ## QueueOptions
 
@@ -1174,6 +1173,8 @@ module.exports = {
   repositoryFactory: ({ securityContext }) => new ApiFileRepository(),
 };
 ```
+
+
 
 [gh-jsonwebtoken-algs]:
   https://github.com/auth0/node-jsonwebtoken#algorithms-supported

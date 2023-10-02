@@ -97,6 +97,9 @@ Support for Python and the `cube.py` file was introduced in v0.34.
 
 </InfoBox>
 
+As of 0.34, Cube uses Node 16.20.2 to execute Javascript-based configuration and Python 3.9 for Python-based configuration. 
+When Cube starts, it will install dependencies in `package.json` via `yarn` and dependencies in `requirements.txt` via `pip`.
+
 ### Cube Core
 
 When using Docker, ensure that the configuration file and your [data model
