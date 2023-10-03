@@ -115,7 +115,7 @@ Get generated SQL string for the given `query`.
 
 Name | Type | Description |
 ------ | ------ | ------ |
-query | [Query](#types-query) &#124; [Query](#types-query)[] | [Query object](query-format)  |
+query | [Query](#types-query) &#124; [Query](#types-query)[] | [Query object][ref-query-format]  |
 options? | [LoadMethodOptions](#types-load-method-options) | - |
 callback? | [LoadMethodCallback](#types-load-method-callback)‹[SqlQuery](#sql-query)› | - |
 
@@ -1030,7 +1030,7 @@ granularity? | [TimeDimensionGranularity](#types-time-dimension-granularity) |
 Name | Type | Description |
 ------ | ------ | ------ |
 apiUrl | string | path to `/cubejs-api/v1` |
-authorization | string | [jwt auth token](security) |
+authorization | string | [jwt auth token][ref-security] |
 credentials? | "omit" &#124; "same-origin" &#124; "include" | - |
 headers? | Record‹string, string› | custom headers |
 
