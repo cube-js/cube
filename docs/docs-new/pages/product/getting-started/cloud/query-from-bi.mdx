@@ -52,22 +52,22 @@ Cube uses the Superset API, which requires a `user` and `password` for
 authentication. You can use your own username and password or create a new
 service account. You can copy a `URL` from any page of your Superset workspace.
 
-Example `cube.js` configuration file for Superset:
+Example `cube.py` configuration file for Superset:
 
-```yaml
-module.exports = {
-  semanticLayerSync: () => {
-    return [{
-      type: "superset",
-      name: "Superset Sync",
-      config: {
-        user: "mail@example.com",
-        password: "4dceae-606a03-93ae6dc7",
-        url: "superset.example.com",
+```python
+from cube import config
+
+@config('semantic_layer_sync')
+def semantic_layer_sync(ctx: dict) -> list:
+   return [{
+      'type': 'superset',
+      'name': 'Superset Sync',
+      'config': {
+        'user': 'mail@example.com',
+        'password': '4dceae-606a03-93ae6dc7',
+        'url': 'superset.example.com',
       }
-    }];
-  }
-};
+    }]
 ```
 
 Replace the fields for user, password, and URL with your Superset credentials,

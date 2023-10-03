@@ -1,115 +1,4 @@
----
-redirect_from:
-  - /drill-downs
-  - /subquery
-  - /working-with-string-time-dimensions
-  - /schema/fundamentals/additional-concepts
----
-
-# Additional Concepts
-
-## Drilldowns
-
-Drilldowns are a powerful feature to facilitate data exploration. It allows
-building an interface to let users dive deeper into visualizations and data
-tables. See [`ResultSet.drillDown()`][ref-cubejs-client-ref-resultset-drilldown]
-on how to use this feature on the client side.
-
-A drilldown is defined on the [measure][ref-schema-ref-measures] level in your
-data model. It’s defined as a list of dimensions called **drill members**. Once
-defined, these drill members will always be used to show underlying data when
-drilling into that measure.
-
-Let’s consider the following example of our imaginary e-commerce store. We have
-the `orders` cube, which describes orders in our store. It’s connected to
-`users` and `products`.
-
-<CodeTabs>
-
-```javascript
-cube(`orders`, {
-  sql_table: `orders`,
-
-  joins: {
-    users: {
-      relationship: `many_to_one`,
-      sql: `${CUBE}.user_id = ${users.id}`,
-    },
-
-    products: {
-      relationship: `many_to_one`,
-      sql: `${CUBE}.product_id = ${products.id}`,
-    },
-  },
-
-  measures: {
-    count: {
-      type: `count`,
-      // Here we define all possible properties we might want
-      // to "drill down" on from our front-end
-      drill_members: [id, status, products.name, users.city],
-    },
-  },
-
-  dimensions: {
-    id: {
-      type: `number`,
-      sql: `id`,
-      primary_key: true,
-      public: true,
-    },
-
-    status: {
-      type: `string`,
-      sql: `status`,
-    },
-  },
-});
-```
-
-```yaml
-cubes:
-  - name: orders
-    sql_table: orders
-
-    joins:
-      - name: users
-        relationship: many_to_one
-        sql: "{CUBE}.user_id = {users.id}"
-
-      - name: products
-        relationship: many_to_one
-        sql: "{CUBE}.product_id = {products.id}"
-
-    measures:
-      - name: count
-        type: count
-        # Here we define all possible properties we might want
-        # to "drill down" on from our front-end
-        drill_members:
-          - id
-          - status
-          - products.name
-          - users.city
-
-    dimensions:
-      - name: id
-        sql: id
-        type: number
-        primary_key: true
-        public: true
-
-      - name: status
-        sql: status
-        type: string
-```
-
-</CodeTabs>
-
-You can follow [this tutorial][blog-drilldown-api] to learn more about building
-a UI for drilldowns.
-
-## Subquery
+# Subquery dimensions
 
 You can use subquery dimensions to reference [measures][ref-schema-ref-measures]
 from other cubes inside a [dimension][ref-schema-ref-dimensions]. Under the
@@ -363,7 +252,7 @@ cubes:
 
 </CodeTabs>
 
-### Under the hood
+## Under the hood
 
 Based on the subquery dimension definition, Cube will create a query that will
 include the primary key dimension of the main cube and all
@@ -400,60 +289,8 @@ LEFT JOIN (
   ON sales_managers__average_deal_amount_subquery.sales_managers__id = sales_managers.id
 ```
 
-## String time dimensions
 
-Cube always expects a timestamp with timezone (or compatible type) as an input
-to the time dimension. However, there are a lot of cases when the underlying
-table's datetime information is stored as a string. Most SQL databases support
-datetime parsing which allows converting strings to timestamps. Let's consider
-an example cube for BigQuery:
-
-<CodeTabs>
-
-```javascript
-cube(`events`, {
-  sql_table: `schema.events`,
-
-  dimensions: {
-    date: {
-      sql: `PARSE_TIMESTAMP('%Y-%m-%d', date)`,
-      type: `time`,
-    },
-  },
-});
-```
-
-```yaml
-cubes:
-  - name: events
-    sql_table: schema.events
-
-    dimensions:
-      - name: date
-        sql: PARSE_TIMESTAMP('%Y-%m-%d', date)
-        type: time
-```
-
-</CodeTabs>
-
-In this particular cube, the `date` column will be parsed using the `%Y-%m-%d`
-format. Please note that as we do not pass timezone parameter to
-[`PARSE_TIMESTAMP`][bq-parse-timestamp], it will set `UTC` as the timezone by
-default. You should always set timezone appropriately for parsed timestamps as
-Cube always does timezone conversions according to user settings.
-
-Although query performance of big data backends like BigQuery or Presto won't
-likely suffer from date parsing, performance of RDBMS backends like Postgres
-most likely will. Adding timestamp columns with indexes should strongly be
-considered in this case.
-
-[blog-drilldown-api]:
-  https://cube.dev/blog/introducing-a-drill-down-table-api-in-cubejs/
-[bq-parse-timestamp]:
-  https://cloud.google.com/bigquery/docs/reference/standard-sql/timestamp_functions#parse_timestamp
-[ref-cubejs-client-ref-resultset-drilldown]:
-  /reference/frontend/cubejs-client-core#drill-down
-[ref-schema-ref-dimensions]: /product/data-modeling/reference/dimensions
-[ref-schema-ref-joins]: /product/data-modeling/reference/joins
-[ref-schema-ref-measures]: /product/data-modeling/reference/measures
+[ref-schema-ref-measures]: /reference/data-model/measures
+[ref-schema-ref-dimensions]: /reference/data-model/dimensions
+[ref-schema-ref-joins]: /reference/data-model/joins
 [wiki-correlated-subquery]: https://en.wikipedia.org/wiki/Correlated_subquery
