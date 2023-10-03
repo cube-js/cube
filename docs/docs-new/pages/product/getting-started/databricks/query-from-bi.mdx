@@ -32,30 +32,56 @@ You can create a new sync by navigating to the <Btn>Semantic Layer Sync</Btn>
 tab on the <Btn>BI Integrations</Btn> page and clicking <Btn>+ Create
 Sync</Btn>. Follow the steps in the wizard to create a sync.
 
-Under the hood, Semantic Layer Sync is configured using the `semanticLayerSync`
-option in the `cube.js` configuration file.
+Under the hood, Semantic Layer Sync is configured using the `semantic_layer_sync`
+option in the `cube.py` configuration file.
 
 Cube uses the Superset API, which requires a `user` and `password` for
 authentication. You can use your own username and password or create a new
 service account. You can copy a `URL` from any page of your Superset workspace.
 
-Example `cube.js` configuration file for Superset:
+Example configuration for Superset:
 
-```yaml
-module.exports = {
-  semanticLayerSync: () => {
-    return [{
-      type: "superset",
-      name: "Superset Sync",
-      config: {
-        user: "mail@example.com",
-        password: "4dceae-606a03-93ae6dc7",
-        url: "superset.example.com",
+<CodeTabs>
+
+```python
+from cube import config
+
+@config('semantic_layer_sync')
+def semantic_layer_sync(ctx: dict) -> list[dict]:
+  return [
+    {
+      'type': 'superset',
+      'name': 'Superset Sync',
+      'config': {
+        'user': 'mail@example.com',
+        'password': '4dceae-606a03-93ae6dc7',
+        'url': 'superset.example.com',
+        'database': 'Cube Cloud: production-deployment'
       }
-    }];
-  }
+    }
+  ]
+```
+
+```javascript
+module.exports = {
+  semanticLayerSync: ({ securityContext }) => {
+    return [
+      {
+        type: "superset",
+        name: "Superset Sync",
+        config: {
+          user: "mail@example.com",
+          password: "4dceae-606a03-93ae6dc7",
+          url: "superset.example.com",
+          database: "Cube Cloud: production-deployment",
+        },
+      },
+    ];
+  },
 };
 ```
+
+</CodeTabs>
 
 Replace the fields for user, password, and URL with your Superset credentials,
 then click on <Btn>Save All</Btn>. You can now go to the <Btn>BI
