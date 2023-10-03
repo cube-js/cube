@@ -11,7 +11,7 @@ We want to run queries against
 [pre-aggregations](/product/caching#pre-aggregations) only to ensure our
 application's superior performance. Usually, accelerating a query is as simple
 as including its measures and dimensions to the pre-aggregation
-[definition](/product/data-modeling/reference/pre-aggregations#measures).
+[definition](/reference/data-model/pre-aggregations#measures).
 
 [Non-additive](/product/caching/getting-started-pre-aggregations#ensuring-pre-aggregations-are-targeted-by-queries-non-additivity)
 measures (e.g., average values or distinct counts) are a special case.
@@ -131,7 +131,7 @@ Let's explore some possible workarounds.
 ### Replacing with approximate additive measures
 
 Often, non-additive `count_distinct` measures can be changed to have the
-[`count_distinct_approx` type](/product/data-modeling/reference/types-and-formats#count_distinct_approx)
+[`count_distinct_approx` type](/reference/data-model/types-and-formats#count_distinct_approx)
 which will make them additive and orders of magnitude more performant. This
 `count_distinct_approx` measures can be used in pre-aggregations. However, there
 are two drawbacks:
@@ -172,7 +172,7 @@ cube(`users`, {
 ### Decomposing into a formula with additive measures
 
 Non-additive `avg` measures can be rewritten as
-[calculated measures](/product/data-modeling/reference/measures#calculated-measures)
+[calculated measures](/reference/data-model/measures#calculated-measures)
 that reference additive measures only. Then, this additive measures can be used
 in pre-aggregations. Please note, however, that you shouldn't include `avg_age`
 measure in your pre-aggregation as it renders it non-additive.

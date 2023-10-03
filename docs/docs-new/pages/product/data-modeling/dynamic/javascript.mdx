@@ -1,18 +1,10 @@
----
-redirect_from:
-  - /schema/dynamic-schema-creation
-  - /schema/advanced/dynamic-schema-creation
----
-
 # Dynamic data models with JavaScript
 
 <InfoBox>
 
 This functionality only works with data models written in JavaScript, not YAML.
 
-<br />
-
-For similar functionality in YAML, see [Dynamic data models with Jinja and Python](/product/data-modeling/advanced/jinja).
+For similar functionality in YAML, see [Dynamic data models with Jinja and Python](/product/data-modeling/dynamic/jinja).
 
 </InfoBox>
 
@@ -29,9 +21,9 @@ Each `asyncModule` call will be invoked only once per data model compilation.
 
 </WarningBox>
 
-[ref-schema-env]: /product/data-modeling/advanced/schema-execution-environment
+[ref-schema-env]: /product/data-modeling/dynamic/schema-execution-environment
 [ref-async-module]:
-  /product/data-modeling/advanced/schema-execution-environment#asyncmodule
+  /product/data-modeling/dynamic/schema-execution-environment#asyncmodule
 
 When creating data models via `asyncModule()`, it is important to be aware of
 the following differences compared to statically defined ones with `cube()`:
@@ -96,7 +88,7 @@ string, and then finally use the [`cube()` global function][ref-globals] to
 generate data models from that data:
 
 [ref-globals]:
-  /product/data-modeling/advanced/schema-execution-environment#cube-js-globals-cube-and-others
+  /product/data-modeling/dynamic/schema-execution-environment#cube-js-globals-cube-and-others
 
 ```javascript
 // model/cubes/DynamicSchema.js
@@ -235,7 +227,7 @@ schemas, as well as ensuring the corresponding database drivers are set up with
 [`driverFactory()`][ref-config-driverfactory] in your [`cube.js` configuration
 file][ref-config].
 
-[ref-schema-datasource]: /product/data-modeling/reference/cube#data_source
+[ref-schema-datasource]: /reference/data-model/cube#data_source
 [ref-config-driverfactory]: /reference/configuration/config#driverfactory
 [ref-config]: /reference/configuration/config
 
