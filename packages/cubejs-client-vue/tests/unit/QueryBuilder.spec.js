@@ -974,5 +974,78 @@ describe('QueryBuilder.vue', () => {
         expect(wrapper.vm.chartType).toBe('line');
       });
     });
+    describe('orderMembers', () => {
+      it('does not contain time dimension if granularity is set to none', async () => {
+        const cube = createCubejsApi();
+        jest
+          .spyOn(cube, 'request')
+          .mockImplementation(fetchMock(load))
+          .mockImplementationOnce(fetchMock(meta));
+
+        const wrapper = mount(QueryBuilder, {
+          propsData: {
+            cubejsApi: cube,
+            query: {
+              measures: ['Orders.count'],
+              timeDimensions: [{
+                dimension: 'Orders.createdAt',
+              }],
+            },
+          },
+        });
+
+        await flushPromises();
+
+        expect(wrapper.vm.orderMembers.length).toBe(1);
+        expect(wrapper.vm.orderMembers).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              id: 'Orders.count',
+              title: 'Orders Count',
+              order: 'none',
+            }),
+          ])
+        );
+      });
+
+      it('contains time dimension if granularity is not none', async () => {
+        const cube = createCubejsApi();
+        jest
+          .spyOn(cube, 'request')
+          .mockImplementation(fetchMock(load))
+          .mockImplementationOnce(fetchMock(meta));
+
+        const wrapper = mount(QueryBuilder, {
+          propsData: {
+            cubejsApi: cube,
+            query: {
+              measures: ['Orders.count'],
+              timeDimensions: [{
+                dimension: 'Orders.createdAt',
+                granularity: 'day',
+              }],
+            },
+          },
+        });
+
+        await flushPromises();
+
+        expect(wrapper.vm.orderMembers.length).toBe(2);
+        expect(wrapper.vm.orderMembers).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              id: 'Orders.createdAt',
+              title: 'Orders Created at',
+              order: 'none'
+            }),
+            expect.objectContaining({
+              id: 'Orders.count',
+              title: 'Orders Count',
+              order: 'none',
+            })
+          ])
+        );
+      });
+    });
   });
 });
