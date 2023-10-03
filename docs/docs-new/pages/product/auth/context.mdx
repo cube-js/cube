@@ -26,8 +26,8 @@ to the data that they are authorized to access.
 It will be accessible as the [`securityContext`][ref-config-sec-ctx] property
 inside:
 
-- The [`queryRewrite`][ref-config-queryrewrite] configuration option in your
-  Cube configuration file.
+- The [`query_rewrite`][ref-config-queryrewrite] configuration option in your
+  Cube configuration  file.
 - the [`COMPILE_CONTEXT`][ref-cubes-compile-ctx] global, which is used to
   support [multi-tenant deployments][link-multitenancy].
 
@@ -70,7 +70,7 @@ Cannot create proxy with a non-object as target or handler
 </WarningBox>
 
 To ensure that users making this query only receive their own orders, define
-`queryRewrite` in the `cube.js` configuration file:
+`query_rewrite` in the configuration file:
 
 <CodeTabs>
 
