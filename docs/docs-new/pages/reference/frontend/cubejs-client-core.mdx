@@ -30,7 +30,7 @@ const cubejsApi = cubejs(
 
 Name | Type | Description |
 ------ | ------ | ------ |
-apiToken | string &#124;  () => *Promise‹string›* | [API token](security) is used to authorize requests and determine SQL database you're accessing. In the development mode, Cube will print the API token to the console on startup. In case of async function `authorization` is updated for `options.transport` on each request. |
+apiToken | string &#124;  () => *Promise‹string›* | [API token][ref-security] is used to authorize requests and determine SQL database you're accessing. In the development mode, Cube will print the API token to the console on startup. In case of async function `authorization` is updated for `options.transport` on each request. |
 options | [CubeJSApiOptions](#types-cube-js-api-options) | - |
 
 >  **cubejs**(**options**: [CubeJSApiOptions](#types-cube-js-api-options)): *[CubejsApi](#cubejs-api)*
@@ -91,7 +91,7 @@ new Chart(context, chartjsConfig(resultSet));
 
 Name | Type | Description |
 ------ | ------ | ------ |
-query | [Query](#types-query) &#124; [Query](#types-query)[] | [Query object](query-format)  |
+query | [Query](#types-query) &#124; [Query](#types-query)[] | [Query object][ref-query-format]  |
 options? | [LoadMethodOptions](#types-load-method-options) | - |
 callback? | [LoadMethodCallback](#types-load-method-callback)‹[ResultSet](#result-set)› | - |
 
@@ -1048,3 +1048,7 @@ values? | never |
 ### `UnaryOperator`
 
 > **UnaryOperator**: *"set" | "notSet"*
+
+
+[ref-query-format]: /product/apis-integrations/rest-api/query-format
+[ref-security]: /product/auth

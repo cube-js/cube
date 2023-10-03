@@ -19,10 +19,10 @@ We want to understand the distribution of orders by their statuses. Let's
 imagine that new order statuses can be added in the future, or we get a list of
 statuses from an external API. To calculate the orders percentage distribution,
 we need to create several
-[measures](/product/data-modeling/fundamentals/concepts#measures) that refer to
+[measures](/product/data-modeling/concepts#measures) that refer to
 each other. But we don't want to manually change the data model for each new
 status. To solve this, we will create a
-[schema dynamically](/product/data-modeling/advanced/dynamic-schema-creation).
+[schema dynamically](/product/data-modeling/dynamic).
 
 ## Data modeling
 
@@ -102,4 +102,4 @@ Please feel free to check out the
 or run it with the `docker-compose up` command. You'll see the result, including
 queried data, in the console.
 
-[ref-modeling-syntax]: /product/data-modeling/fundamentals/syntax
+[ref-modeling-syntax]: /product/data-modeling/syntax

@@ -12,12 +12,12 @@ Can't find join path to join 'cube_a', 'cube_b'
 Error message above indicates that a query failed because it includes members from cubes
 that can't be joined in order to generate a valid query to the upstream data source.
 
-**Please check that you've defined necessary [joins](/product/data-modeling/reference/joins)
-and that they have [correct directions](/product/data-modeling/fundamentals/working-with-joins#transitive-join-pitfalls).**
+**Please check that you've defined necessary [joins](/reference/data-model/joins)
+and that they have [correct directions](/product/data-modeling/concepts/working-with-joins#transitive-join-pitfalls).**
 
-Also, please consider using [views](/product/data-modeling/reference/view) since they
+Also, please consider using [views](/reference/data-model/view) since they
 incapsulate join paths and completely remove the possibility of the error in question.
-You might also consider setting [`public: false`](/product/data-modeling/reference/cube#public)
+You might also consider setting [`public: false`](/reference/data-model/cube#public)
 on your cubes to hide them from end users.
 
 If you’re building a custom data application, you might use the [`meta` endpoint](/reference/rest-api#v1meta)
@@ -31,16 +31,16 @@ cube_a cube: primary key for 'cube_a' is required when join is defined
 in order to make aggregates work properly
 ```
 
-Error message above indicates that you have a [cube](/product/data-modeling/reference/cube)
-with [joins](/product/data-modeling/reference/joins) and
-[pre-aggregations](/product/data-modeling/reference/pre-aggregations). However, that cube
+Error message above indicates that you have a [cube](/reference/data-model/cube)
+with [joins](/reference/data-model/joins) and
+[pre-aggregations](/reference/data-model/pre-aggregations). However, that cube
 doesn't have a primary key.
 
 When generating SQL queries, Cube uses primary keys to avoid fanouts.
 A fanout happens when two tables are joined and a single value gets duplicated in the end result,
 meaning that some values can be double counted. 
 
-**Please define a [primary key](/product/data-modeling/reference/dimensions#primary_key) dimension in this cube to make joins and pre-aggregations work correctly.**
+**Please define a [primary key](/reference/data-model/dimensions#primary_key) dimension in this cube to make joins and pre-aggregations work correctly.**
 
 If your data doesn't have a natural primary key, e.g., `id`, you can define a composite
 primary key by concatenating most or all of the columns in the table, e.g.:
