@@ -40,7 +40,7 @@ from cube import config
 
 @config('context_to_app_id')
 def app_id(ctx):
-  return ctx['securityContext']['tenant_id'
+  return ctx['securityContext']['tenant_id']
 
 @config('query_rewrite')
 def rewrite(query, ctx):
