@@ -1207,30 +1207,6 @@ module.exports = {
 
 </CodeTabs>
 
-### `initApp`
-
-<WarningBox>
-
-This configuration option is deprecated and will likely be removed in
-future versions of Cube.
-
-</WarningBox>
-
-This function allows you to extend the Cube API server with custom Express
-middleware. This is especially useful for adding monitoring and observability
-solutions.
-
-```javascript
-module.exports = {
-  initApp: (app) => {
-    app.use((req, res, next) => {
-      req.foo = "bar";
-      next();
-    });
-  },
-};
-```
-
 ### `process_subscriptions_interval`
 
 This property controls how often WebSocket client subscriptions are refreshed.

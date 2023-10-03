@@ -303,23 +303,23 @@ cubes:
 
 ## `COMPILE_CONTEXT`
 
-There's a global `COMPILE_CONTEXT` that is captured as
-[`RequestContext`][ref-config-req-ctx] at the time of data model compilation. It
-contains `securityContext` and any other variables provided by
+A global `COMPILE_CONTEXT` contains `securityContext` and any other variables provided by
 [`extendContext`][ref-config-ext-ctx].
 
-<CodeTabs>
+Use [Jinja][ref-dynamic-jinja] `{{ }}` syntax to access `COMPILE_CONTEXT` variable.
 
-```javascript
-cube(`users`, {
-  sql_table: `user_${COMPILE_CONTEXT.security_context.deployment_id}.users`,
-});
-```
+<CodeTabs>
 
 ```yaml
 cubes:
   - name: users
-    sql_table: "user_{COMPILE_CONTEXT.security_context.deployment_id}.users"
+    sql_table: "user_{{ COMPILE_CONTEXT.securityContext.deployment_id }}.users"
+```
+
+```javascript
+cube(`users`, {
+  sql_table: `user_${COMPILE_CONTEXT.securityContext.deployment_id}.users`,
+});
 ```
 
 </CodeTabs>
@@ -341,16 +341,10 @@ Use [`queryRewrite`][ref-config-queryrewrite] instead.
 
 </WarningBox>
 
-`SECURITY_CONTEXT` is a user security object that is passed by the Cube Client.
+`SECURITY_CONTEXT` global variable holds a security context that is passed to Cube via API.
 Please read the [Security Context page][ref-sec-ctx] for more information on how
-to set `SECURITY_CONTEXT`.
+to provide security context to Cube.
 
-Security context is suitable for the row level security implementation. For
-example, if you have an `orders` table that contains an `email` field you can
-restrict all queries to render results that belong only to the current user as
-follows:
-
-<CodeTabs>
 
 ```javascript
 cube(`orders`, {
@@ -369,23 +363,9 @@ cube(`orders`, {
 });
 ```
 
-```yaml
-cubes:
-  - name: orders
-    sql: >
-      SELECT * FROM orders WHERE {SECURITY_CONTEXT.email.filter('email')}
-
-    dimensions:
-      - name: date
-        sql: date
-        type: time
-```
-
-</CodeTabs>
-
 To ensure filter value presents for all requests `requiredFilter` can be used:
 
-<CodeTabs>
+
 
 ```javascript
 cube(`orders`, {
@@ -403,21 +383,6 @@ cube(`orders`, {
   },
 });
 ```
-
-```yaml
-cubes:
-  - name: orders
-    sql: >
-      SELECT * FROM orders WHERE
-      {SECURITY_CONTEXT.email.requiredFilter('email')}
-
-    dimensions:
-      - name: date
-        sql: date
-        type: time
-```
-
-</CodeTabs>
 
 You can access values of context variables directly in JavaScript in order to
 use it during your SQL generation. For example:
@@ -456,3 +421,4 @@ cube(`orders`, {
 [ref-syntax-references]: /product/data-modeling/fundamentals/syntax#references
 [ref-dynamic-data-models]: /product/data-modeling/advanced/jinja
 [ref-query-filter]: /product/apis-integrations/rest-api/query-format#query-properties
+[ref-dynamic-jinja]: /product/data-modeling/dynamic/jinja

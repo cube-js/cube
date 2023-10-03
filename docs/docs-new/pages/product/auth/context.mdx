@@ -169,57 +169,60 @@ LIMIT
 
 ## Using COMPILE_CONTEXT
 
-In the example below `user_id`, `company_id`, `sub` and `iat` will be injected
-into the security context and will be accessible in both the [Security
-Context][ref-schema-sec-ctx] and [`COMPILE_CONTEXT`][ref-cubes-compile-ctx]
-global variable in the Cube data model.
+`COMPILE_CONTEXT` can be used to create fully dynamic data models. It enables you to create multiple versions of data model based on the incoming security context.
+The first thing you need to do is to define the mapping rule from a security context to the id of the compiled data model.
+It is done with `context_to_app_id` configuration option.
 
-<InfoBox>
-
-`COMPILE_CONTEXT` is used by Cube at data model compilation time, which allows
-changing the underlying dataset completely; the Security Context is only used at
-query execution time, which simply filters the dataset with a `WHERE` clause.
-
-</InfoBox>
-
-```json
-{
-  "sub": "1234567890",
-  "iat": 1516239022,
-  "user_id": 131,
-  "company_id": 500
-}
+```python
+from cube import config
+ 
+@config('context_to_app_id')
+def context_to_app_id(ctx: dict) -> str:
+  return ctx['securityContext']['team']
 ```
 
-With the same JWT payload as before, we can modify models before they are
-compiled. The following cube will ensure users only see results for their
-`company_id` in a multi-tenant deployment:
+It is common to use some field from the incoming security context as an id for your data model. 
+In our example, as illustrated below, we are using `team` property of the security context as a data model id.
 
-<CodeTabs>
+<Diagram
+  alt="COMPILE_CONTEXT mapping"
+  src="https://ucarecdn.com/7b6a2257-ca50-45e9-a4a4-a177a931407c/"
+/>
+
+Once you have this mapping, you can use `COMPILE_CONTEXT` inside your data model. 
+In the example below we are passing it as a variable into `masked` helper function.
 
 ```yaml
 cubes:
-  - name: orders
-    sql_table: "{COMPILE_CONTEXT.security_context.company_id}.orders"
+  - name: users
+    sql_table: ECOM.USERS
+    public: false
 
-    measures:
-      - name: count
-        type: count
+    dimensions:
+      - name: last_name
+        sql: {{ masked('LAST_NAME', COMPILE_CONTEXT.securityContext) }}
+        type: string
 ```
 
-```javascript
-cube(`orders`, {
-  sql_table: `${COMPILE_CONTEXT.security_context.company_id}.orders`,
+This `masked` helper function is defined in `model/globals.py` as follows: it checks if the current `team` is inside the list of trusted teams. 
+If that's the case, it will render the SQL to get the value of the dimension; if not, it will return just the masked string.
 
-  measures: {
-    count: {
-      type: `count`,
-    },
-  },
-});
+
+```python
+from cube import TemplateContext
+ 
+template = TemplateContext()
+
+@template.function('masked')
+def masked(sql, security_context):
+  trusted_teams = ['cx', 'exec' ]
+  is_trusted_team = security_context.setdefault('team') in trusted_teams
+  if is_trusted_team:
+    return sql
+  else:
+    return "\"'--- masked ---'\""
 ```
 
-</CodeTabs>
 
 ### Usage with pre-aggregations
 
@@ -242,6 +245,6 @@ build one from a JSON object.
   /reference/configuration/config#scheduledrefreshcontexts
 [ref-config-sec-ctx]: /reference/configuration/config#securitycontext
 [ref-schema-sec-ctx]: /product/data-modeling/reference/cube#security-context
-[ref-cubes-compile-ctx]: /product/data-modeling/reference/cube#compile-context
+[ref-cubes-compile-ctx]: /reference/data-model/context-variables#compile_context
 [ref-devtools-playground]:
   /product/workspace/playground#editing-the-security-context
