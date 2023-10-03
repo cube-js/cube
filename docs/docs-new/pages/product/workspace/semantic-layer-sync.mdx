@@ -55,7 +55,7 @@ interested in using Semantic Layer Sync with other BI tools.
 ### Configuration
 
 Under the hood, Semantic Layer Sync is configured using the `semanticLayerSync`
-option in the `cube.js` configuration file.
+option in the `cube.py` or `cube.js` configuration file.
 
 This function accepts a security context and returns an array of configured
 syncs. It can also be asynchronous, allowing for dynamic definition of syncs,
@@ -70,6 +70,28 @@ A sync can be disabled by setting `active` to `false`; such syncs will not run
 automatically. If `active` is undefined, a sync is considered enabled.
 
 Example configuration with a single disabled sync:
+
+<CodeTabs>
+
+```python
+from cube import config
+
+@config('semantic_layer_sync')
+def semantic_layer_sync(ctx: dict) -> list[dict]:
+  return [
+    {
+      'type': 'superset',
+      'name': 'Superset Sync',
+      'active': False,
+      'config': {
+        'user': 'mail@example.com',
+        'password': '4dceae-606a03-93ae6dc7',
+        'url': 'superset.example.com',
+        'database': 'Cube Cloud: staging-deployment'
+      }
+    }
+  ]
+```
 
 ```javascript
 module.exports = {
@@ -90,6 +112,8 @@ module.exports = {
   },
 };
 ```
+
+</CodeTabs>
 
 ### Multitenancy
 
@@ -112,6 +136,29 @@ sense in your use case.
 Example configuration for the case when each department wants have their data
 model synchronized to a dedicated database in a BI tool:
 
+<CodeTabs>
+
+```python
+from cube import config
+
+@config('semantic_layer_sync')
+def semantic_layer_sync(ctx: dict) -> list[dict]:
+  department = ctx['securityContext']['department']
+
+  return [
+    {
+      'type': 'metabase',
+      'name': f"Metabase Sync for {department}",
+      'config': {
+        'user': 'mail@example.com',
+        'password': '4dceae-606a03-93ae6dc7',
+        'url': 'example.metabaseapp.com',
+        'database': f"Cube Cloud: {department}",
+      }
+    }
+  ]
+```
+
 ```javascript
 module.exports = {
   semanticLayerSync: ({ securityContext }) => {
@@ -133,8 +180,46 @@ module.exports = {
 };
 ```
 
+</CodeTabs>
+
 Example confguration for the case when only `admin` data model should be
 synchronized with a couple of BI tools:
+
+<CodeTabs>
+
+```python
+from cube import config
+
+@config('semantic_layer_sync')
+def semantic_layer_sync(ctx: dict) -> list[dict]:
+  if ctx['securityContext']['role'] == 'admin':
+    return [
+      {
+        'type': 'superset',
+        'name': 'Superset Sync',
+        'config': {
+          'user': 'mail@example.com',
+          'password': '4dceae-606a03-93ae6dc7',
+          'url': 'superset.example.com',
+          'database': 'Cube Cloud: sls-test (admin)'
+        }
+      },
+      {
+        'type': 'preset',
+        'name': 'Preset Sync',
+        'config': {
+          'api_token': '07988f63-c200-499e-97c9-ba137d8918aa',
+          'api_secret': 'c19fbab4fd4945899795d32898f2e1165bef8e5ee653',
+          'workspace_url': '12345678.us1a.app.preset.io',
+          'database': 'Cube Cloud: sls-test (admin)'
+        }
+      }
+    ]
+  } else {
+    # Only sync the 'admin' data model
+    return []
+  }
+```
 
 ```javascript
 module.exports = {
@@ -163,11 +248,14 @@ module.exports = {
         },
       ];
     } else {
-      return []; // Only sync the 'admin' data model
+      // Only sync the 'admin' data model
+      return [];
     }
   },
 };
 ```
+
+</CodeTabs>
 
 ### Apache Superset
 
@@ -176,7 +264,28 @@ name and a `password` for authentication. You can use your own user name and
 password or create a new service account. You can copy a `url` at any page of
 your Superset workspace.
 
-Example `cube.js` confguration file for Superset:
+Example confguration for Superset:
+
+<CodeTabs>
+
+```python
+from cube import config
+
+@config('semantic_layer_sync')
+def semantic_layer_sync(ctx: dict) -> list[dict]:
+  return [
+    {
+      'type': 'superset',
+      'name': 'Superset Sync',
+      'config': {
+        'user': 'mail@example.com',
+        'password': '4dceae-606a03-93ae6dc7',
+        'url': 'superset.example.com',
+        'database': 'Cube Cloud: production-deployment'
+      }
+    }
+  ]
+```
 
 ```javascript
 module.exports = {
@@ -197,6 +306,8 @@ module.exports = {
 };
 ```
 
+</CodeTabs>
+
 ### Preset
 
 Data model is synchronized via [Preset API][preset-api] which uses API keys for
@@ -205,7 +316,28 @@ settings][preset-user-settings] in Preset to obtain an `api_token` and an
 `api_secret`. You can also copy a `workspace_url` at any page of your Preset
 workspace.
 
-Example `cube.js` confguration file for Preset:
+Example confguration for Preset:
+
+<CodeTabs>
+
+```python
+from cube import config
+
+@config('semantic_layer_sync')
+def semantic_layer_sync(ctx: dict) -> list[dict]:
+  return [
+    {
+      'type': 'preset',
+      'name': "Preset Sync",
+      'config': {
+        'api_token': '07988f63-c200-499e-97c9-ba137d8918aa',
+        'api_secret': 'c19fbab4fd4945899795d32898f2e1165bef8e5ee653499e92f083b3d088aecb',
+        'workspace_url': '12345678.us1a.app.preset.io',
+        'database': 'Cube Cloud: production-deployment'
+      }
+    }
+  ]
+```
 
 ```javascript
 module.exports = {
@@ -226,6 +358,8 @@ module.exports = {
 };
 ```
 
+</CodeTabs>
+
 ### Metabase
 
 Data model is synchronized via [Metabase API][metabase-api] which uses a `user`
@@ -233,7 +367,28 @@ name and a `password` for authentication. You can use your own user name and
 password or create a new service account. You can copy a `url` at any page of
 your Metabase workspace.
 
-Example `cube.js` confguration file for Metabase:
+Example confguration for Metabase:
+
+<CodeTabs>
+
+```python
+from cube import config
+
+@config('semantic_layer_sync')
+def semantic_layer_sync(ctx: dict) -> list[dict]:
+  return [
+    {
+      'type': 'metabase',
+      'name': 'Metabase Sync',
+      'config': {
+        'user': 'mail@example.com',
+        'password': '4dceae-606a03-93ae6dc7',
+        'url': 'example.metabaseapp.com',
+        'database': 'Cube Cloud: production-deployment'
+      }
+    }
+  ]
+```
 
 ```javascript
 module.exports = {
@@ -253,6 +408,8 @@ module.exports = {
   },
 };
 ```
+
+</CodeTabs>
 
 When a sync is run, Metabase will send an email with a new login notification.
 You can ignore such emails, [configure Metabase][metabase-skip-emails] to skip
@@ -283,7 +440,29 @@ You will also need to specify a `region` and a Tableau `site` name. Consider the
 following URL of a Tableau site: `https://10ax.online.tableau.com/#/site/cubedev/home`.
 In this case, the region would be `10ax` and the site name would be `cubedev`.
 
-Example `cube.js` configuration file for Tableau:
+Example configuration for Tableau:
+
+<CodeTabs>
+
+```python
+from cube import config
+
+@config('semantic_layer_sync')
+def semantic_layer_sync(ctx: dict) -> list[dict]:
+  return [
+    {
+      'type': 'tableau',
+      'name': 'Tableau Sync',
+      'config': {
+        'region': '10ax',
+        'site': 'mytableausite',
+        'personalAccessToken': 'cube-cloud',
+        'personalAccessTokenSecret': 'HW8TFrBfJyen+JQleh0/bw==:1BvJLIti9Fud04rN021EfHMnh4yYD3p4',
+        'database': 'Cube Cloud: production-deployment',
+      },
+    },
+  ]
+```
 
 ```javascript
 module.exports = {
@@ -304,6 +483,8 @@ module.exports = {
   },
 };
 ```
+
+</CodeTabs>
 
 When connecting a Cube Cloud data source to your Tableau workbook, you will be prompted
 to enter the user name and password for Cube Cloud. You can find them at the&nbsp;<Btn>SQL
