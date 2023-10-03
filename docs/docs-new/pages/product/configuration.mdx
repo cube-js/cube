@@ -77,6 +77,7 @@ def query_rewrite(query: dict, ctx: dict) -> dict:
       'values': [ctx['securityContext']['order_id']]
     })
   return query
+  
 ```
 
 ```javascript
@@ -86,7 +87,13 @@ module.exports = {
 
   // Inspect, modify, or restrict every query
   queryRewrite: (query, { securityContext }) => {
-    console.log(query);
+    if (securityContext.order_id) {
+      query.filters.push({
+        member: 'orders_view.id',
+        operator: 'equals',
+        values: [securityContext.order_id]
+      });
+    }
     return query;
   },
 };
@@ -100,7 +107,7 @@ Both ways are equivalent; when in doubt, use Python.
 
 Support for Python and the `cube.py` file was introduced in v0.34.
 
-As of 0.34, Cube uses Node 16.20.2 to execute JavaScript-based
+As of v0.34, Cube uses Node 16.20 to execute JavaScript-based
 configuration and Python 3.9 for Python-based configuration.
 
 </InfoBox>
