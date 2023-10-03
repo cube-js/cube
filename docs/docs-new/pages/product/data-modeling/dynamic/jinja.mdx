@@ -1,27 +1,21 @@
 # Dynamic data models with Jinja and Python
 
-Cube supports authoring data models using the [Jinja templating
-language][jinja]. This allows de-duplicating common patterns in your data models
+Cube supports authoring dynamic data models using the [Jinja templating
+language][jinja] and Python. This allows de-duplicating common patterns in your data models
 as well as dynamically generating data models from a remote data source.
-
-<InfoBox>
-
-This feature is in Public Preview and is subject to change. We'd love to hear
-your feedback on this feature, please post an issue on GitHub.
-
-</InfoBox>
 
 To use a Jinja template, create a file in your data model folder with the
 `.jinja` extension. For example, a file containing the `orders` cube could be
 named `orders.yml.jinja` under the `models/` directory.
 
-## Loops
+## Jinja
+### Loops
 
 Jinja supports [looping][jinja-docs-for-loop] over lists and dictionaries. In
 the following example, we loop over a list of nested properties and generate a
 `LEFT JOIN UNNEST` clause for each one: for each one:
 
-```twig
+```yaml
 {%- set nested_properties = [
   "referrer",
   "href",
@@ -46,7 +40,7 @@ cubes:
 Another useful pattern is to loop over a dictionary of values and generate a
 measure for each one, as in the following example:
 
-```twig
+```yaml
 {%- set metrics = {
   "mau": 30,
   "wau": 7,
@@ -68,7 +62,7 @@ cubes:
       {% endfor %}
 ```
 
-## Macros
+### Macros
 
 Cube data models also support Jinja macros, which allow you to define reusable
 snippets of code. You can read more about macros in the [Jinja
@@ -78,7 +72,7 @@ In the following example, we define a macro called `dimension()` which generates
 a dimension definition in Cube. This macro is then invoked multiple times to
 generate multiple dimensions:
 
-```twig
+```yaml
 {# Declare the macro before using it, otherwise Jinja will throw an error. #}
 {%- macro dimension(column_name, type='string', primary_key=False) -%}
       - name: {{ column_name }}
@@ -103,7 +97,7 @@ cubes:
 You could also use macros to generate SQL snippets for use in the `sql`
 property:
 
-```twig
+```yaml
 {%- macro cents_to_dollars(column_name, precision=2) -%}
   ({{ column_name }} / 100)::NUMERIC(16, {{ precision }})
 {%- endmacro -%}
@@ -117,19 +111,22 @@ cubes:
       FROM app_data.payments
 ```
 
-## Calling Python functions
+## Python
 
 You can declare and invoke Python functions from within a Jinja template. This
-allows the reuse of existing code to generate data models.
+allows the reuse of existing code to generate data models. Cube uses Python 3.9 to execute Python code. 
+It also installs packages listed in the `requirements.txt` with pip on the startup.
 
-In the following example, we'll create a new file called `utils.py`, and within
-it, declare a function called `load_data()` which will load data from a remote
+These helper functions must be located in `model/globals.py` file or explicitly loaded from the YAML files.
+In the following example, we declare a function called `load_data()` which will load data from a remote
 API endpoint. We will then use the function to generate a data model in Cube.
 
 ```python
-# Note that we decorate this function with the `context_func` decorator.
-# This is required in order for data models to be able to call this function.
-@context_func
+from cube import TemplateContext
+ 
+template = TemplateContext()
+
+@template.function('load_data')
 def load_data():
    client = MyApiClient("example.com")
    return client.load_data()
@@ -165,11 +162,11 @@ class MyApiClient:
     return api_response
 ```
 
-Now that we've decorated our function with the `@context_func` decorator, we can
+Now that we've decorated our function with the `@template.function` decorator, we can
 call it from within a Jinja template. In the following example, we'll call the
 `load_data()` function and use the result to generate a data model.
 
-```twig
+```yaml
 cubes:
   {# Here we use the decorated function from earlier #}
   {%- for cube in load_data()["cubes"] %}
