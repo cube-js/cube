@@ -1,5 +1,85 @@
 [
   {
+    "source": "/product/data-modeling/reference/pre-aggregations",
+    "destination": "/reference/data-model/pre-aggregations",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/advanced/jinja",
+    "destination": "/product/data-modeling/dynamic/jinja",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/advanced/data-blending",
+    "destination": "/product/data-modeling/concepts/data-blending",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/advanced/dynamic-schema-creation",
+    "destination": "/product/data-modeling/dynamic",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/reference/measures",
+    "destination": "/reference/data-model/measures",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/reference/joins",
+    "destination": "/reference/data-model/joins",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/fundamentals/syntax",
+    "destination": "/product/data-modeling/syntax",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/advanced/schema-execution-environment",
+    "destination": "/product/data-modeling/dynamic/schema-execution-environment",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/reference/types-and-formats",
+    "destination": "/reference/data-model/types-and-formats",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/reference/cube",
+    "destination": "/reference/data-model/cube",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/fundamentals/concepts",
+    "destination": "/product/data-modeling/concepts",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/reference/dimensions",
+    "destination": "/reference/data-model/dimensions",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/reference/view",
+    "destination": "/reference/data-model/view",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/advanced/code-reusability-extending-cubes",
+    "destination": "/product/data-modeling/concepts/code-reusability-extending-cubes",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/fundamentals/working-with-joins",
+    "destination": "/product/data-modeling/concepts/working-with-joins",
+    "permanent": true
+  },
+  {
+    "source": "/guides/recipes/overview",
+    "destination": "/guides/recipes",
+    "permanent": true
+  },
+  {
     "source": "/",
     "destination": "/product/introduction",
     "permanent": true
