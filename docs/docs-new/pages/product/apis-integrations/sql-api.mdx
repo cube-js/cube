@@ -209,10 +209,11 @@ corresponding aggregating function or special `MEASURE()` function:
 
 <WarningBox>
 
-In cases where measure columns are not aggregated
-`Projection references non-aggregate values` error will be thrown. It means
-there are columns that are neither in `GROUP BY` or aggregated. This is a
+In cases where measure columns are not aggregated or dimensions columns aren't included in `GROUP BY`,
+`Projection references non-aggregate values` error will be thrown. This error means
+there are columns that are neither in `GROUP BY` nor aggregated. This is a
 standard SQL `GROUP BY` operation consistency check enforced by SQL API as well.
+This error can be also thrown if you forget to `GROUP BY` all dimensions included in the query as well.
 
 </WarningBox>
 
