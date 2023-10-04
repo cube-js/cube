@@ -469,6 +469,28 @@ impl<R: AsyncBufRead> Stream for CsvLineStream<R> {
     }
 }
 
+#[async_trait]
+pub trait LocationsValidator: DIService + Send + Sync {
+    async fn validate(&self, locations: &Vec<String>) -> Result<(), CubeError>;
+}
+
+pub struct LocationsValidatorImpl;
+
+#[async_trait]
+impl LocationsValidator for LocationsValidatorImpl {
+    async fn validate(&self, _locations: &Vec<String>) -> Result<(), CubeError> {
+        Ok(())
+    }
+}
+
+impl LocationsValidatorImpl {
+    pub fn new() -> Arc<Self> {
+        Arc::new(Self {})
+    }
+}
+
+crate::di_service!(LocationsValidatorImpl, [LocationsValidator]);
+
 #[automock]
 #[async_trait]
 pub trait ImportService: DIService + Send + Sync {
@@ -482,6 +504,7 @@ pub trait ImportService: DIService + Send + Sync {
     async fn validate_table_location(&self, table_id: u64, location: &str)
         -> Result<(), CubeError>;
     async fn estimate_location_row_count(&self, location: &str) -> Result<u64, CubeError>;
+    async fn validate_locations_size(&self, locations: &Vec<String>) -> Result<(), CubeError>;
 }
 
 crate::di_service!(MockImportService, [ImportService]);
@@ -493,6 +516,7 @@ pub struct ImportServiceImpl {
     remote_fs: Arc<dyn RemoteFs>,
     config_obj: Arc<dyn ConfigObj>,
     limits: Arc<ConcurrencyLimits>,
+    validator: Arc<dyn LocationsValidator>,
 }
 
 crate::di_service!(ImportServiceImpl, [ImportService]);
@@ -505,6 +529,7 @@ impl ImportServiceImpl {
         remote_fs: Arc<dyn RemoteFs>,
         config_obj: Arc<dyn ConfigObj>,
         limits: Arc<ConcurrencyLimits>,
+        validator: Arc<dyn LocationsValidator>,
     ) -> Arc<ImportServiceImpl> {
         Arc::new(ImportServiceImpl {
             meta_store,
@@ -513,6 +538,7 @@ impl ImportServiceImpl {
             remote_fs,
             config_obj,
             limits,
+            validator,
         })
     }
 
@@ -832,6 +858,10 @@ impl ImportService for ImportServiceImpl {
                 Some(tokio::fs::metadata(location).await?.len()),
             ))
         }
+    }
+
+    async fn validate_locations_size(&self, locations: &Vec<String>) -> Result<(), CubeError> {
+        self.validator.validate(locations).await
     }
 }
 

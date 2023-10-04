@@ -363,6 +363,11 @@ impl SqlServiceImpl {
         }
 
         let listener = self.cluster.job_result_listener();
+        if let Some(locations) = locations.as_ref() {
+            self.import_service
+                .validate_locations_size(locations)
+                .await?;
+        }
 
         let partition_split_threshold = if let Some(locations) = locations.as_ref() {
             let size = join_all(
