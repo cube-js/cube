@@ -1,5 +1,10 @@
 [
   {
+    "source": "/product/data-modeling/advanced/using-dbt",
+    "destination": "/guides/dbt",
+    "permanent": true
+  },
+  {
     "source": "/product/data-modeling/reference/pre-aggregations",
     "destination": "/reference/data-model/pre-aggregations",
     "permanent": true
