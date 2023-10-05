@@ -219,6 +219,7 @@ pub enum WorkerMessage {
 #[cfg(not(target_os = "windows"))]
 pub struct WorkerConfigurator;
 
+#[cfg(not(target_os = "windows"))]
 #[async_trait]
 impl Configurator for WorkerConfigurator {
     type Config = Config;
@@ -327,6 +328,7 @@ impl WorkerProcessing for WorkerProcessor {
     }
 }
 
+#[cfg(not(target_os = "windows"))]
 type WorkerServicesTransport = DefaultServicesTransport<DefaultServicesServerProcessor>;
 
 #[cfg(not(target_os = "windows"))]
