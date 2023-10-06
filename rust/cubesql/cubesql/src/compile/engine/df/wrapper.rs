@@ -100,6 +100,7 @@ pub struct CubeScanWrapperNode {
     pub auth_context: AuthContextRef,
     pub wrapped_sql: Option<SqlQuery>,
     pub request: Option<V1LoadRequestQuery>,
+    pub member_fields: Option<Vec<MemberField>>,
 }
 
 impl CubeScanWrapperNode {
@@ -114,16 +115,23 @@ impl CubeScanWrapperNode {
             auth_context,
             wrapped_sql: None,
             request: None,
+            member_fields: None,
         }
     }
 
-    pub fn with_sql_and_request(&self, sql: SqlQuery, request: V1LoadRequestQuery) -> Self {
+    pub fn with_sql_and_request(
+        &self,
+        sql: SqlQuery,
+        request: V1LoadRequestQuery,
+        member_fields: Vec<MemberField>,
+    ) -> Self {
         Self {
             wrapped_plan: self.wrapped_plan.clone(),
             meta: self.meta.clone(),
             auth_context: self.auth_context.clone(),
             wrapped_sql: Some(sql),
             request: Some(request),
+            member_fields: Some(member_fields),
         }
     }
 }
@@ -154,15 +162,29 @@ impl CubeScanWrapperNode {
         transport: Arc<dyn TransportService>,
         load_request_meta: Arc<LoadRequestMeta>,
     ) -> result::Result<Self, CubeError> {
-        let (sql, request) = Self::generate_sql_for_node(
+        let schema = self.schema();
+        let (sql, request, member_fields) = Self::generate_sql_for_node(
             Arc::new(self.clone()),
             transport,
             load_request_meta,
             self.wrapped_plan.clone(),
-            false,
+            true,
         )
         .await
-        .and_then(|SqlGenerationResult { data_source, mut sql, request, .. }| -> result::Result<_, CubeError> {
+        .and_then(|SqlGenerationResult { data_source, mut sql, request, column_remapping, .. }| -> result::Result<_, CubeError> {
+            let member_fields = if let Some(column_remapping) = column_remapping {
+                schema
+                    .fields()
+                    .iter()
+                    .map(|f| MemberField::Member(column_remapping.get(&Column::from_name(f.name().to_string())).map(|x| x.name.to_string()).unwrap_or(f.name().to_string())))
+                    .collect()
+            } else {
+                schema
+                    .fields()
+                    .iter()
+                    .map(|f| MemberField::Member(f.name().to_string()))
+                    .collect()
+            };
             let data_source = data_source.ok_or_else(|| CubeError::internal(format!(
                 "Can't generate SQL for wrapped select: no data source returned"
             )))?;
@@ -178,9 +200,9 @@ impl CubeScanWrapperNode {
                 })?
                 .get_sql_templates();
             sql.finalize_query(sql_templates).map_err(|e| CubeError::internal(e.to_string()))?;
-            Ok((sql, request))
+            Ok((sql, request, member_fields))
         })?;
-        Ok(self.with_sql_and_request(sql, request))
+        Ok(self.with_sql_and_request(sql, request, member_fields))
     }
 
     pub fn generate_sql_for_node(
@@ -1343,6 +1365,7 @@ impl UserDefinedLogicalNode for CubeScanWrapperNode {
             auth_context: self.auth_context.clone(),
             wrapped_sql: self.wrapped_sql.clone(),
             request: self.request.clone(),
+            member_fields: self.member_fields.clone(),
         })
     }
 }
