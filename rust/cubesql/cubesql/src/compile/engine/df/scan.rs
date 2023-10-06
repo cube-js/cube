@@ -365,14 +365,14 @@ impl ExtensionPlanner for CubeScanExtensionPlanner {
                         )))?;
 
                 let schema = SchemaRef::new(wrapper_node.schema().as_ref().into());
-                let member_fields = schema
-                    .fields()
-                    .iter()
-                    .map(|f| MemberField::Member(f.name().to_string()))
-                    .collect();
                 Some(Arc::new(CubeScanExecutionPlan {
                     schema,
-                    member_fields,
+                    member_fields: wrapper_node.member_fields.as_ref().ok_or_else(|| {
+                        DataFusionError::Internal(format!(
+                            "Member fields are not set for wrapper node. Optimization wasn't performed: {:?}",
+                            wrapper_node
+                        ))
+                    })?.clone(),
                     transport: self.transport.clone(),
                     request: wrapper_node.request.clone().unwrap_or(scan_node.request.clone()),
                     wrapped_sql: Some(wrapper_node.wrapped_sql.as_ref().ok_or_else(|| {
