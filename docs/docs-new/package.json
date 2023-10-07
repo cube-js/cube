@@ -38,7 +38,7 @@
     "autoprefixer": "^10.4.14",
     "front-matter": "^4.0.2",
     "glob": "^9.3.4",
-    "postcss": "^8.4.21",
+    "postcss": "^8.4.31",
     "prettier": "^2.8.8",
     "remark": "^14.0.3",
     "remark-frontmatter": "^4.0.1",
