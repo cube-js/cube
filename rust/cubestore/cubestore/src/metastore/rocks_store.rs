@@ -1484,6 +1484,85 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_loop_panic() -> Result<(), CubeError> {
+        let config = Config::test("test_loop_panic");
+        let store_path = env::current_dir().unwrap().join("test_loop_panic-local");
+        let remote_store_path = env::current_dir().unwrap().join("test_loop_panic-remote");
+        let _ = fs::remove_dir_all(store_path.clone());
+        let _ = fs::remove_dir_all(remote_store_path.clone());
+        let remote_fs = LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
+
+        let details = Arc::new(RocksMetaStoreDetails {});
+        let rocks_store = RocksStore::new(
+            store_path.join("metastore").as_path(),
+            BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
+            config.config_obj(),
+            details,
+        )?;
+
+        // read operation
+        {
+            let r = rocks_store
+                .read_operation(|_| -> Result<(), CubeError> {
+                    panic!("panic - task 1");
+                })
+                .await;
+            assert_eq!(
+                r.err().expect("must be error").message,
+                "Unable to receive result for read task: channel closed".to_string()
+            );
+
+            let r = rocks_store
+                .read_operation(|_| -> Result<(), CubeError> {
+                    Err(CubeError::user("error - task 3".to_string()))
+                })
+                .await;
+            assert_eq!(
+                r.err().expect("must be error").message,
+                "error - task 3".to_string()
+            );
+        }
+
+        // write operation
+        {
+            let r = rocks_store
+                .write_operation(|_, _| -> Result<(), CubeError> {
+                    panic!("panic - task 1");
+                })
+                .await;
+            assert_eq!(
+                r.err().expect("must be error").message,
+                "Unable to receive result for write task: channel closed".to_string()
+            );
+
+            let r = rocks_store
+                .write_operation(|_, _| -> Result<(), CubeError> {
+                    panic!("panic - task 2");
+                })
+                .await;
+            assert_eq!(
+                r.err().expect("must be error").message,
+                "Unable to receive result for write task: channel closed".to_string()
+            );
+
+            let r = rocks_store
+                .write_operation(|_, _| -> Result<(), CubeError> {
+                    Err(CubeError::user("error - task 3".to_string()))
+                })
+                .await;
+            assert_eq!(
+                r.err().expect("must be error").message,
+                "error - task 3".to_string()
+            );
+        }
+
+        let _ = fs::remove_dir_all(store_path.clone());
+        let _ = fs::remove_dir_all(remote_store_path.clone());
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_snapshot_uploads() -> Result<(), CubeError> {
         let config = Config::test("test_snapshots_uploads");
         let store_path = env::current_dir()
