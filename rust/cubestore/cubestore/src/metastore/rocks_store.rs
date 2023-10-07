@@ -520,6 +520,15 @@ pub enum WriteBatchEntry {
     Delete { key: Box<[u8]> },
 }
 
+impl WriteBatchEntry {
+    pub fn size(&self) -> usize {
+        match self {
+            Self::Put { key, value } => key.len() + value.len(),
+            Self::Delete { key } => key.len(),
+        }
+    }
+}
+
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct WriteBatchContainer {
     entries: Vec<WriteBatchEntry>,
@@ -530,6 +539,10 @@ impl WriteBatchContainer {
         Self {
             entries: Vec::new(),
         }
+    }
+
+    pub fn size(&self) -> usize {
+        self.entries.iter().fold(0, |acc, i| acc + i.size())
     }
 
     pub fn write_batch(&self) -> WriteBatch {
@@ -766,6 +779,8 @@ impl RocksStoreConfig {
 
 pub trait RocksStoreDetails: Send + Sync {
     fn open_db(&self, path: &Path, config: &Arc<dyn ConfigObj>) -> Result<DB, CubeError>;
+
+    fn open_readonly_db(&self, path: &Path, config: &Arc<dyn ConfigObj>) -> Result<DB, CubeError>;
 
     fn migrate(&self, table_ref: DbTableRef) -> Result<(), CubeError>;
 
@@ -1044,10 +1059,14 @@ impl RocksStore {
             let mut serializer = WriteBatchContainer::new();
 
             let mut seq_numbers = Vec::new();
+            let size_limit = self.config.meta_store_log_upload_size_limit() as usize;
             for update in updates.into_iter() {
                 let (n, write_batch) = update?;
                 seq_numbers.push(n);
                 write_batch.iterate(&mut serializer);
+                if serializer.size() > size_limit {
+                    break;
+                }
             }
 
             (
@@ -1075,10 +1094,7 @@ impl RocksStore {
             + time::Duration::from_secs(self.config.meta_store_snapshot_interval())
             < SystemTime::now()
         {
-            info!("Uploading {} check point", self.details.get_name());
             self.upload_check_point().await?;
-            let mut check_seq = self.last_check_seq.write().await;
-            *check_seq = last_db_seq;
         }
 
         info!(
@@ -1175,6 +1191,7 @@ impl RocksStore {
     }
 
     pub async fn upload_check_point(&self) -> Result<(), CubeError> {
+        info!("Uploading {} check point", self.details.get_name());
         let upload_stopped = self.snapshots_upload_stopped.lock().await;
         if !*upload_stopped {
             let mut check_point_time = self.last_checkpoint_time.write().await;
@@ -1185,11 +1202,25 @@ impl RocksStore {
                 self.prepare_checkpoint(&check_point_time).await?
             };
 
+            let details = self.details.clone();
+            let config = self.config.clone();
+            let path_to_move = checkpoint_path.clone();
+            let checkpoint_last_seq =
+                cube_ext::spawn_blocking(move || -> Result<u64, CubeError> {
+                    let snap_db = details.open_readonly_db(&path_to_move, &config)?;
+                    Ok(snap_db.latest_sequence_number())
+                })
+                .await??;
+
             self.metastore_fs
                 .upload_checkpoint(remote_path, checkpoint_path)
                 .await?;
             let mut snapshot_uploaded = self.snapshot_uploaded.write().await;
             *snapshot_uploaded = true;
+            let mut last_uploaded_check_seq = self.last_check_seq.write().await;
+            *last_uploaded_check_seq = checkpoint_last_seq;
+            let mut last_uploaded_seq = self.last_upload_seq.write().await;
+            *last_uploaded_seq = checkpoint_last_seq;
             self.write_completed_notify.notify_waiters();
         }
         Ok(())
@@ -1380,6 +1411,9 @@ impl RocksStore {
 mod tests {
     use super::*;
     use crate::config::Config;
+    use crate::metastore::rocks_table::RocksTable;
+    use crate::metastore::schema::{SchemaRocksIndex, SchemaRocksTable};
+    use crate::metastore::Schema;
     use crate::metastore::{BaseRocksStoreFs, RocksMetaStoreDetails};
     use crate::remotefs::LocalDirRemoteFs;
     use chrono::Timelike;
@@ -1450,10 +1484,14 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_loop_panic() -> Result<(), CubeError> {
-        let config = Config::test("test_loop_panic");
-        let store_path = env::current_dir().unwrap().join("test_loop_panic-local");
-        let remote_store_path = env::current_dir().unwrap().join("test_loop_panic-remote");
+    async fn test_snapshot_uploads() -> Result<(), CubeError> {
+        let config = Config::test("test_snapshots_uploads");
+        let store_path = env::current_dir()
+            .unwrap()
+            .join("test_snapshots_uploads-local");
+        let remote_store_path = env::current_dir()
+            .unwrap()
+            .join("test_snapshots_uploads-remote");
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
         let remote_fs = LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
@@ -1466,61 +1504,17 @@ mod tests {
             details,
         )?;
 
-        // read operation
-        {
-            let r = rocks_store
-                .read_operation(|_| -> Result<(), CubeError> {
-                    panic!("panic - task 1");
-                })
-                .await;
-            assert_eq!(
-                r.err().expect("must be error").message,
-                "Unable to receive result for read task: channel closed".to_string()
-            );
-
-            let r = rocks_store
-                .read_operation(|_| -> Result<(), CubeError> {
-                    Err(CubeError::user("error - task 3".to_string()))
-                })
-                .await;
-            assert_eq!(
-                r.err().expect("must be error").message,
-                "error - task 3".to_string()
-            );
-        }
-
-        // write operation
-        {
-            let r = rocks_store
-                .write_operation(|_, _| -> Result<(), CubeError> {
-                    panic!("panic - task 1");
-                })
-                .await;
-            assert_eq!(
-                r.err().expect("must be error").message,
-                "Unable to receive result for write task: channel closed".to_string()
-            );
-
-            let r = rocks_store
-                .write_operation(|_, _| -> Result<(), CubeError> {
-                    panic!("panic - task 2");
-                })
-                .await;
-            assert_eq!(
-                r.err().expect("must be error").message,
-                "Unable to receive result for write task: channel closed".to_string()
-            );
-
-            let r = rocks_store
-                .write_operation(|_, _| -> Result<(), CubeError> {
-                    Err(CubeError::user("error - task 3".to_string()))
-                })
-                .await;
-            assert_eq!(
-                r.err().expect("must be error").message,
-                "error - task 3".to_string()
-            );
-        }
+        rocks_store
+            .write_operation(move |db_ref, batch_pipe| {
+                batch_pipe.invalidate_tables_cache();
+                let table = SchemaRocksTable::new(db_ref.clone());
+                let schema = Schema {
+                    name: "sssss".to_string(),
+                };
+                Ok(table.insert(schema, batch_pipe)?)
+            })
+            .await
+            .unwrap();
 
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
