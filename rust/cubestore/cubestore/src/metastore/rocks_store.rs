@@ -1234,6 +1234,11 @@ impl RocksStore {
         *self.last_check_seq.read().await
     }
 
+    #[cfg(test)]
+    pub fn last_seq(&self) -> u64 {
+        self.db.latest_sequence_number()
+    }
+
     fn get_store_path(&self, checkpoint_time: &SystemTime) -> String {
         format!(
             "{}-{}",
@@ -1412,7 +1417,7 @@ mod tests {
     use super::*;
     use crate::config::Config;
     use crate::metastore::rocks_table::RocksTable;
-    use crate::metastore::schema::{SchemaRocksIndex, SchemaRocksTable};
+    use crate::metastore::schema::SchemaRocksTable;
     use crate::metastore::Schema;
     use crate::metastore::{BaseRocksStoreFs, RocksMetaStoreDetails};
     use crate::remotefs::LocalDirRemoteFs;
@@ -1562,9 +1567,22 @@ mod tests {
         Ok(())
     }
 
+    async fn write_test_data(rocks_store: &Arc<RocksStore>, name: String) {
+        rocks_store
+            .write_operation(move |db_ref, batch_pipe| {
+                let table = SchemaRocksTable::new(db_ref.clone());
+                let schema = Schema { name };
+                Ok(table.insert(schema, batch_pipe)?)
+            })
+            .await
+            .unwrap();
+    }
     #[tokio::test]
     async fn test_snapshot_uploads() -> Result<(), CubeError> {
-        let config = Config::test("test_snapshots_uploads");
+        let config = Config::test("test_snapshots_uploads").update_config(|mut c| {
+            c.meta_store_log_upload_size_limit = 300;
+            c
+        });
         let store_path = env::current_dir()
             .unwrap()
             .join("test_snapshots_uploads-local");
@@ -1576,24 +1594,103 @@ mod tests {
         let remote_fs = LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
 
         let details = Arc::new(RocksMetaStoreDetails {});
+
         let rocks_store = RocksStore::new(
             store_path.join("metastore").as_path(),
             BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
             config.config_obj(),
-            details,
+            details.clone(),
         )?;
 
-        rocks_store
-            .write_operation(move |db_ref, batch_pipe| {
-                batch_pipe.invalidate_tables_cache();
-                let table = SchemaRocksTable::new(db_ref.clone());
-                let schema = Schema {
-                    name: "sssss".to_string(),
-                };
-                Ok(table.insert(schema, batch_pipe)?)
-            })
+        assert_eq!(rocks_store.last_upload_seq().await, 0);
+        assert_eq!(rocks_store.last_check_seq().await, 0);
+
+        write_test_data(&rocks_store, "test".to_string()).await;
+        write_test_data(&rocks_store, "test2".to_string()).await;
+
+        rocks_store.upload_check_point().await.unwrap();
+
+        let last_seq = rocks_store.last_seq();
+
+        assert_eq!(rocks_store.last_upload_seq().await, last_seq);
+        assert_eq!(rocks_store.last_check_seq().await, last_seq);
+
+        write_test_data(&rocks_store, "test3".to_string()).await;
+
+        rocks_store.run_upload().await.unwrap();
+
+        assert_eq!(
+            rocks_store.last_upload_seq().await,
+            rocks_store.last_seq() - 1
+        );
+        assert_eq!(rocks_store.last_check_seq().await, last_seq);
+
+        write_test_data(&rocks_store, "test4".to_string()).await;
+
+        rocks_store.run_upload().await.unwrap();
+
+        assert_eq!(
+            rocks_store.last_upload_seq().await,
+            rocks_store.last_seq() - 1
+        );
+        assert_eq!(rocks_store.last_check_seq().await, last_seq);
+
+        let last_upl = rocks_store.last_seq();
+
+        write_test_data(&rocks_store, "a".repeat(150)).await;
+        write_test_data(&rocks_store, "b".repeat(150)).await;
+
+        rocks_store.run_upload().await.unwrap();
+
+        assert_eq!(rocks_store.last_upload_seq().await, last_upl + 2); // +1 is seq number write and +1 first insert batch
+        assert!(rocks_store.last_upload_seq().await < rocks_store.last_seq() - 1);
+        assert_eq!(rocks_store.last_check_seq().await, last_seq);
+
+        rocks_store.run_upload().await.unwrap();
+        assert_eq!(
+            rocks_store.last_upload_seq().await,
+            rocks_store.last_seq() - 1
+        );
+        assert_eq!(rocks_store.last_check_seq().await, last_seq);
+
+        write_test_data(&rocks_store, "c".repeat(150)).await;
+        write_test_data(&rocks_store, "e".repeat(150)).await;
+
+        rocks_store.run_upload().await.unwrap();
+        assert_eq!(
+            rocks_store.last_upload_seq().await,
+            rocks_store.last_seq() - 4
+        );
+        assert_eq!(rocks_store.last_check_seq().await, last_seq);
+
+        let _ = fs::remove_dir_all(store_path.clone());
+        drop(rocks_store);
+
+        let rocks_fs = BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj());
+        let path = store_path.join("metastore").to_string_lossy().to_string();
+        let rocks_store = rocks_fs
+            .load_from_remote(&path, config.config_obj(), details)
             .await
             .unwrap();
+        let all_schemas = rocks_store
+            .read_operation_out_of_queue(move |db_ref| SchemaRocksTable::new(db_ref).all_rows())
+            .await
+            .unwrap();
+        let expected = vec![
+            "test".to_string(),
+            "test2".to_string(),
+            "test3".to_string(),
+            "test4".to_string(),
+            "a".repeat(150),
+            "b".repeat(150),
+            "c".repeat(150),
+        ];
+
+        assert_eq!(expected.len(), all_schemas.len());
+
+        for (exp, row) in expected.into_iter().zip(all_schemas.into_iter()) {
+            assert_eq!(&exp, row.get_row().get_name());
+        }
 
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
