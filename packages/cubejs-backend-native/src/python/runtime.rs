@@ -1,4 +1,4 @@
-use crate::python::cross::CLRepr;
+use crate::cross::{CLRepr, CLReprPython};
 use crate::tokio_runtime_node;
 use cubesql::CubeError;
 use log::{error, trace};

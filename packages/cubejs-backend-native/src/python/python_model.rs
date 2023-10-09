@@ -1,6 +1,6 @@
 use neon::prelude::*;
 
-use crate::python::cross::{CLRepr, CLReprObject};
+use crate::cross::{CLRepr, CLReprObject};
 
 pub struct CubePythonModel {
     functions: CLReprObject,

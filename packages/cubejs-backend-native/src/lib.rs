@@ -5,16 +5,19 @@ extern crate findshlibs;
 mod auth;
 mod channel;
 mod config;
+mod cross;
 mod logger;
 #[cfg(feature = "python")]
 mod python;
 mod stream;
+mod template;
 mod transport;
 mod utils;
 
 use once_cell::sync::OnceCell;
 use std::sync::Arc;
 
+use crate::cross::CLRepr;
 use auth::NodeBridgeAuthService;
 use config::NodeConfig;
 use cubesql::{config::CubeServices, telemetry::ReportingLogger, CubeError};
@@ -210,12 +213,22 @@ fn is_fallback_build(mut cx: FunctionContext) -> JsResult<JsBoolean> {
     Ok(JsBoolean::new(&mut cx, true))
 }
 
+fn debug_js_to_clrepr_to_js(mut cx: FunctionContext) -> JsResult<JsValue> {
+    let arg = cx.argument::<JsValue>(1)?;
+    let arg_clrep = CLRepr::from_js_ref(arg, &mut cx)?;
+
+    arg_clrep.into_js(&mut cx)
+}
+
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("setupLogger", setup_logger)?;
     cx.export_function("registerInterface", register_interface)?;
     cx.export_function("shutdownInterface", shutdown_interface)?;
     cx.export_function("isFallbackBuild", is_fallback_build)?;
+    cx.export_function("__js_to_clrepr_to_js", debug_js_to_clrepr_to_js)?;
+
+    template::template_register_module(&mut cx)?;
 
     #[cfg(feature = "python")]
     python::python_register_module(&mut cx)?;
