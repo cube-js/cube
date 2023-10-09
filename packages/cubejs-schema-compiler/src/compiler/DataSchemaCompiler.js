@@ -6,9 +6,8 @@ import { parse } from '@babel/parser';
 import babelGenerator from '@babel/generator';
 import babelTraverse from '@babel/traverse';
 import R from 'ramda';
-import { isFallbackBuild } from '@cubejs-backend/native';
 
-import { getEnv, isNativeSupported } from '@cubejs-backend/shared';
+import { isNativeSupported } from '@cubejs-backend/shared';
 import { AbstractExtension } from '../extensions';
 import { UserError } from './UserError';
 import { ErrorReporter } from './ErrorReporter';
@@ -132,13 +131,6 @@ export class DataSchemaCompiler {
       if (NATIVE_IS_SUPPORTED !== true) {
         throw new Error(
           `Native extension is required to process jinja files. ${NATIVE_IS_SUPPORTED.reason}. Read more: ` +
-          'https://github.com/cube-js/cube/blob/master/packages/cubejs-backend-native/README.md#supported-architectures-and-platforms'
-        );
-      }
-
-      if (isFallbackBuild()) {
-        throw new Error(
-          'Unable to load jinja file because you are using the fallback build of native extension. Read more: ' +
           'https://github.com/cube-js/cube/blob/master/packages/cubejs-backend-native/README.md#supported-architectures-and-platforms'
         );
       }
