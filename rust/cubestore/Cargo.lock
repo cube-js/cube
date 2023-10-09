@@ -1271,7 +1271,7 @@ checksum = "c2e66c9d817f1720209181c316d28635c050fa304f9c79e47a520882661b7308"
 [[package]]
 name = "datafusion"
 version = "4.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube#823422f3b2bbdcbc0b18e1ee9bf30a377dde010a"
+source = "git+https://github.com/inloco/arrow-datafusion?branch=fix-group-by-null-columns-for-cube-v0-35-43#0443692df45d2f384cafdc667cd6b3b299a8b98c"
 dependencies = [
  "ahash",
  "arrow",
