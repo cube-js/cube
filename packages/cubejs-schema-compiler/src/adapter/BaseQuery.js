@@ -2687,7 +2687,7 @@ class BaseQuery {
     return `SELECT ${sql} as refresh_key`;
   }
 
-  preAggregationInvalidateKeyQueries(cube, preAggregation) {
+  preAggregationInvalidateKeyQueries(cube, preAggregation, preAggregationName) {
     return this.cacheValue(
       ['preAggregationInvalidateKeyQueries', cube, JSON.stringify(preAggregation)],
       () => {
@@ -2711,7 +2711,7 @@ class BaseQuery {
           const renewalThreshold = this.refreshKeyRenewalThresholdForInterval(preAggregation.refreshKey);
           if (preAggregation.refreshKey.incremental) {
             if (!preAggregation.partitionGranularity) {
-              throw new UserError('Incremental refresh key can only be used for partitioned pre-aggregations');
+              throw new UserError(`Incremental refresh key can only be used for partitioned pre-aggregations but set for non-partitioned '${cube}.${preAggregationName}'`);
             }
             // TODO Case when partitioned originalSql is resolved for query without time dimension.
             // Consider fallback to not using such originalSql for consistency?
