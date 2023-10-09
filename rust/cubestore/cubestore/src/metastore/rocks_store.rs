@@ -520,6 +520,15 @@ pub enum WriteBatchEntry {
     Delete { key: Box<[u8]> },
 }
 
+impl WriteBatchEntry {
+    pub fn size(&self) -> usize {
+        match self {
+            Self::Put { key, value } => key.len() + value.len(),
+            Self::Delete { key } => key.len(),
+        }
+    }
+}
+
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct WriteBatchContainer {
     entries: Vec<WriteBatchEntry>,
@@ -530,6 +539,10 @@ impl WriteBatchContainer {
         Self {
             entries: Vec::new(),
         }
+    }
+
+    pub fn size(&self) -> usize {
+        self.entries.iter().fold(0, |acc, i| acc + i.size())
     }
 
     pub fn write_batch(&self) -> WriteBatch {
@@ -766,6 +779,8 @@ impl RocksStoreConfig {
 
 pub trait RocksStoreDetails: Send + Sync {
     fn open_db(&self, path: &Path, config: &Arc<dyn ConfigObj>) -> Result<DB, CubeError>;
+
+    fn open_readonly_db(&self, path: &Path, config: &Arc<dyn ConfigObj>) -> Result<DB, CubeError>;
 
     fn migrate(&self, table_ref: DbTableRef) -> Result<(), CubeError>;
 
@@ -1044,10 +1059,14 @@ impl RocksStore {
             let mut serializer = WriteBatchContainer::new();
 
             let mut seq_numbers = Vec::new();
+            let size_limit = self.config.meta_store_log_upload_size_limit() as usize;
             for update in updates.into_iter() {
                 let (n, write_batch) = update?;
                 seq_numbers.push(n);
                 write_batch.iterate(&mut serializer);
+                if serializer.size() > size_limit {
+                    break;
+                }
             }
 
             (
@@ -1075,10 +1094,7 @@ impl RocksStore {
             + time::Duration::from_secs(self.config.meta_store_snapshot_interval())
             < SystemTime::now()
         {
-            info!("Uploading {} check point", self.details.get_name());
             self.upload_check_point().await?;
-            let mut check_seq = self.last_check_seq.write().await;
-            *check_seq = last_db_seq;
         }
 
         info!(
@@ -1175,6 +1191,7 @@ impl RocksStore {
     }
 
     pub async fn upload_check_point(&self) -> Result<(), CubeError> {
+        info!("Uploading {} check point", self.details.get_name());
         let upload_stopped = self.snapshots_upload_stopped.lock().await;
         if !*upload_stopped {
             let mut check_point_time = self.last_checkpoint_time.write().await;
@@ -1185,11 +1202,25 @@ impl RocksStore {
                 self.prepare_checkpoint(&check_point_time).await?
             };
 
+            let details = self.details.clone();
+            let config = self.config.clone();
+            let path_to_move = checkpoint_path.clone();
+            let checkpoint_last_seq =
+                cube_ext::spawn_blocking(move || -> Result<u64, CubeError> {
+                    let snap_db = details.open_readonly_db(&path_to_move, &config)?;
+                    Ok(snap_db.latest_sequence_number())
+                })
+                .await??;
+
             self.metastore_fs
                 .upload_checkpoint(remote_path, checkpoint_path)
                 .await?;
             let mut snapshot_uploaded = self.snapshot_uploaded.write().await;
             *snapshot_uploaded = true;
+            let mut last_uploaded_check_seq = self.last_check_seq.write().await;
+            *last_uploaded_check_seq = checkpoint_last_seq;
+            let mut last_uploaded_seq = self.last_upload_seq.write().await;
+            *last_uploaded_seq = checkpoint_last_seq;
             self.write_completed_notify.notify_waiters();
         }
         Ok(())
@@ -1201,6 +1232,11 @@ impl RocksStore {
 
     async fn last_check_seq(&self) -> u64 {
         *self.last_check_seq.read().await
+    }
+
+    #[cfg(test)]
+    pub fn last_seq(&self) -> u64 {
+        self.db.latest_sequence_number()
     }
 
     fn get_store_path(&self, checkpoint_time: &SystemTime) -> String {
@@ -1380,6 +1416,9 @@ impl RocksStore {
 mod tests {
     use super::*;
     use crate::config::Config;
+    use crate::metastore::rocks_table::RocksTable;
+    use crate::metastore::schema::SchemaRocksTable;
+    use crate::metastore::Schema;
     use crate::metastore::{BaseRocksStoreFs, RocksMetaStoreDetails};
     use crate::remotefs::LocalDirRemoteFs;
     use chrono::Timelike;
@@ -1520,6 +1559,137 @@ mod tests {
                 r.err().expect("must be error").message,
                 "error - task 3".to_string()
             );
+        }
+
+        let _ = fs::remove_dir_all(store_path.clone());
+        let _ = fs::remove_dir_all(remote_store_path.clone());
+
+        Ok(())
+    }
+
+    async fn write_test_data(rocks_store: &Arc<RocksStore>, name: String) {
+        rocks_store
+            .write_operation(move |db_ref, batch_pipe| {
+                let table = SchemaRocksTable::new(db_ref.clone());
+                let schema = Schema { name };
+                Ok(table.insert(schema, batch_pipe)?)
+            })
+            .await
+            .unwrap();
+    }
+    #[tokio::test]
+    async fn test_snapshot_uploads() -> Result<(), CubeError> {
+        let config = Config::test("test_snapshots_uploads").update_config(|mut c| {
+            c.meta_store_log_upload_size_limit = 300;
+            c
+        });
+        let store_path = env::current_dir()
+            .unwrap()
+            .join("test_snapshots_uploads-local");
+        let remote_store_path = env::current_dir()
+            .unwrap()
+            .join("test_snapshots_uploads-remote");
+        let _ = fs::remove_dir_all(store_path.clone());
+        let _ = fs::remove_dir_all(remote_store_path.clone());
+        let remote_fs = LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
+
+        let details = Arc::new(RocksMetaStoreDetails {});
+
+        let rocks_store = RocksStore::new(
+            store_path.join("metastore").as_path(),
+            BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
+            config.config_obj(),
+            details.clone(),
+        )?;
+
+        assert_eq!(rocks_store.last_upload_seq().await, 0);
+        assert_eq!(rocks_store.last_check_seq().await, 0);
+
+        write_test_data(&rocks_store, "test".to_string()).await;
+        write_test_data(&rocks_store, "test2".to_string()).await;
+
+        rocks_store.upload_check_point().await.unwrap();
+
+        let last_seq = rocks_store.last_seq();
+
+        assert_eq!(rocks_store.last_upload_seq().await, last_seq);
+        assert_eq!(rocks_store.last_check_seq().await, last_seq);
+
+        write_test_data(&rocks_store, "test3".to_string()).await;
+
+        rocks_store.run_upload().await.unwrap();
+
+        assert_eq!(
+            rocks_store.last_upload_seq().await,
+            rocks_store.last_seq() - 1
+        );
+        assert_eq!(rocks_store.last_check_seq().await, last_seq);
+
+        write_test_data(&rocks_store, "test4".to_string()).await;
+
+        rocks_store.run_upload().await.unwrap();
+
+        assert_eq!(
+            rocks_store.last_upload_seq().await,
+            rocks_store.last_seq() - 1
+        );
+        assert_eq!(rocks_store.last_check_seq().await, last_seq);
+
+        let last_upl = rocks_store.last_seq();
+
+        write_test_data(&rocks_store, "a".repeat(150)).await;
+        write_test_data(&rocks_store, "b".repeat(150)).await;
+
+        rocks_store.run_upload().await.unwrap();
+
+        assert_eq!(rocks_store.last_upload_seq().await, last_upl + 2); // +1 is seq number write and +1 first insert batch
+        assert!(rocks_store.last_upload_seq().await < rocks_store.last_seq() - 1);
+        assert_eq!(rocks_store.last_check_seq().await, last_seq);
+
+        rocks_store.run_upload().await.unwrap();
+        assert_eq!(
+            rocks_store.last_upload_seq().await,
+            rocks_store.last_seq() - 1
+        );
+        assert_eq!(rocks_store.last_check_seq().await, last_seq);
+
+        write_test_data(&rocks_store, "c".repeat(150)).await;
+        write_test_data(&rocks_store, "e".repeat(150)).await;
+
+        rocks_store.run_upload().await.unwrap();
+        assert_eq!(
+            rocks_store.last_upload_seq().await,
+            rocks_store.last_seq() - 4
+        );
+        assert_eq!(rocks_store.last_check_seq().await, last_seq);
+
+        let _ = fs::remove_dir_all(store_path.clone());
+        drop(rocks_store);
+
+        let rocks_fs = BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj());
+        let path = store_path.join("metastore").to_string_lossy().to_string();
+        let rocks_store = rocks_fs
+            .load_from_remote(&path, config.config_obj(), details)
+            .await
+            .unwrap();
+        let all_schemas = rocks_store
+            .read_operation_out_of_queue(move |db_ref| SchemaRocksTable::new(db_ref).all_rows())
+            .await
+            .unwrap();
+        let expected = vec![
+            "test".to_string(),
+            "test2".to_string(),
+            "test3".to_string(),
+            "test4".to_string(),
+            "a".repeat(150),
+            "b".repeat(150),
+            "c".repeat(150),
+        ];
+
+        assert_eq!(expected.len(), all_schemas.len());
+
+        for (exp, row) in expected.into_iter().zip(all_schemas.into_iter()) {
+            assert_eq!(&exp, row.get_row().get_name());
         }
 
         let _ = fs::remove_dir_all(store_path.clone());

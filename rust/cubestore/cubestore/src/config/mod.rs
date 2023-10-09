@@ -411,6 +411,8 @@ pub trait ConfigObj: DIService {
 
     fn meta_store_log_upload_interval(&self) -> u64;
 
+    fn meta_store_log_upload_size_limit(&self) -> u64;
+
     fn gc_loop_interval(&self) -> u64;
 
     fn stale_stream_timeout(&self) -> u64;
@@ -562,6 +564,7 @@ pub struct ConfigObjImpl {
     pub in_memory_not_used_timeout: u64,
     pub import_job_timeout: u64,
     pub meta_store_log_upload_interval: u64,
+    pub meta_store_log_upload_size_limit: u64,
     pub meta_store_snapshot_interval: u64,
     pub gc_loop_interval: u64,
     pub stale_stream_timeout: u64,
@@ -733,6 +736,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn meta_store_log_upload_interval(&self) -> u64 {
         self.meta_store_log_upload_interval
+    }
+
+    fn meta_store_log_upload_size_limit(&self) -> u64 {
+        self.meta_store_log_upload_size_limit
     }
 
     fn gc_loop_interval(&self) -> u64 {
@@ -1255,6 +1262,12 @@ impl Config {
                 in_memory_not_used_timeout: 30,
                 import_job_timeout: env_parse("CUBESTORE_IMPORT_JOB_TIMEOUT", 600),
                 meta_store_log_upload_interval: 30,
+                meta_store_log_upload_size_limit: env_parse_size(
+                    "CUBESTORE_METASTORE_UPLOAD_LOG_SIZE_LIMIT",
+                    100 * 1024 * 1024,
+                    Some(1024 * 1024 * 1024),
+                    Some(1 * 1024 * 1024),
+                ) as u64,
                 meta_store_snapshot_interval: 300,
                 gc_loop_interval: 60,
                 stale_stream_timeout: env_parse("CUBESTORE_STALE_STREAM_TIMEOUT", 600),
@@ -1535,6 +1548,7 @@ impl Config {
                 metadata_cache_max_capacity_bytes: 0,
                 metadata_cache_time_to_idle_secs: 1_000,
                 meta_store_log_upload_interval: 30,
+                meta_store_log_upload_size_limit: 100 * 1024 * 1024,
                 meta_store_snapshot_interval: 300,
                 gc_loop_interval: 60,
                 stream_replay_check_interval_secs: 60,
