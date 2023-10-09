@@ -401,6 +401,7 @@ impl QueryPlanner {
                 StatusFlags::empty(),
                 CommandCompletion::Select(0),
             )),
+            (ast::Statement::SetRole { role_name, .. }, _) => self.set_role_to_plan(role_name),
             (ast::Statement::SetVariable { key_values }, _) => {
                 self.set_variable_to_plan(&key_values)
             }
@@ -936,6 +937,28 @@ WHERE `TABLE_SCHEMA` = '{}'",
             StatusFlags::empty(),
             CommandCompletion::Use,
         ))
+    }
+
+    fn set_role_to_plan(
+        &self,
+        role_name: &Option<ast::Ident>,
+    ) -> Result<QueryPlan, CompilationError> {
+        let flags = StatusFlags::SERVER_STATE_CHANGED;
+        let role_name = role_name
+            .as_ref()
+            .map(|role_name| role_name.value.clone())
+            .unwrap_or("none".to_string());
+        let variable =
+            DatabaseVariable::system("role".to_string(), ScalarValue::Utf8(Some(role_name)), None);
+        self.state.set_variables(vec![variable]);
+        match self.state.protocol {
+            DatabaseProtocol::PostgreSQL => Ok(QueryPlan::MetaOk(flags, CommandCompletion::Set)),
+            // TODO: Verify that it's possible to use MetaOk too...
+            DatabaseProtocol::MySQL => Ok(QueryPlan::MetaTabular(
+                flags,
+                Box::new(dataframe::DataFrame::new(vec![], vec![])),
+            )),
+        }
     }
 
     fn set_variable_to_plan(
@@ -7079,6 +7102,16 @@ ORDER BY \"COUNT(count)\" DESC"
                     "set application_name = 'testing app'".to_string(),
                     "show application_name".to_string()
                 ],
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+            .0
+        );
+
+        insta::assert_snapshot!(
+            "pg_set_role_show",
+            execute_queries_with_flags(
+                vec!["SET ROLE NONE".to_string(), "SHOW ROLE".to_string()],
                 DatabaseProtocol::PostgreSQL
             )
             .await?
