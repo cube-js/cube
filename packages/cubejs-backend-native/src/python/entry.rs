@@ -20,27 +20,28 @@ fn python_load_config(mut cx: FunctionContext) -> JsResult<JsPromise> {
     py_runtime_init(&mut cx, channel.clone())?;
 
     let conf_res = Python::with_gil(|py| -> PyResult<CubeConfigPy> {
-        let cube_conf_code = include_str!(concat!(
+        let cube_code = include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/python/cube/src/conf/__init__.py"
+            "/python/cube/src/__init__.py"
         ));
-        PyModule::from_code(py, cube_conf_code, "__init__.py", "cube.conf")?;
+        PyModule::from_code(py, cube_code, "__init__.py", "cube")?;
 
         let config_module = PyModule::from_code(py, &file_content_arg, &options_file_name, "")?;
         let settings_py = if config_module.hasattr("__execution_context_locals")? {
             let execution_context_locals = config_module.getattr("__execution_context_locals")?;
             execution_context_locals.get_item("settings")?
+        } else if config_module.hasattr("config")? {
+            config_module.getattr("config")?
         } else {
+            // backward compatibility
             config_module.getattr("settings")?
         };
 
         let mut cube_conf = CubeConfigPy::new();
 
-        for attr_name in cube_conf.get_static_attrs() {
+        for attr_name in cube_conf.get_attrs() {
             cube_conf.attr(settings_py, attr_name)?;
         }
-
-        cube_conf.apply_dynamic_functions(settings_py)?;
 
         Ok(cube_conf)
     });
@@ -67,12 +68,26 @@ fn python_load_model(mut cx: FunctionContext) -> JsResult<JsPromise> {
             env!("CARGO_MANIFEST_DIR"),
             "/python/cube/src/__init__.py"
         ));
-        PyModule::from_code(py, &cube_code, "__init__.py", "cube")?;
+        PyModule::from_code(py, cube_code, "__init__.py", "cube")?;
 
         let model_module = PyModule::from_code(py, &model_content, &model_file_name, "")?;
         let mut collected_functions = CLReprObject::new();
 
-        if model_module.hasattr("__execution_context_locals")? {
+        if model_module.hasattr("template")? {
+            let functions = model_module
+                .getattr("template")?
+                .getattr("functions")?
+                .downcast::<PyDict>()?;
+
+            for (local_key, local_value) in functions.iter() {
+                if local_value.is_instance_of::<PyFunction>() {
+                    let fun: Py<PyFunction> = local_value.downcast::<PyFunction>()?.into();
+                    collected_functions
+                        .insert(local_key.to_string(), CLRepr::PyExternalFunction(fun));
+                }
+            }
+            // TODO remove all other ways of defining functions
+        } else if model_module.hasattr("__execution_context_locals")? {
             let execution_context_locals = model_module
                 .getattr("__execution_context_locals")?
                 .downcast::<PyDict>()?;

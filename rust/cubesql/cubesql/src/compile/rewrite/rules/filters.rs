@@ -1758,14 +1758,10 @@ impl RewriteRules for FilterRules {
                 filter_replacer(
                     binary_expr(
                         column_expr("?column"),
-                        "<",
-                        binary_expr(
-                            fun_expr(
-                                "DateTrunc",
-                                vec![literal_expr("?granularity"), literal_expr("?expr")],
-                            ),
-                            "+",
-                            literal_expr("?interval"),
+                        "<=",
+                        fun_expr(
+                            "DateTrunc",
+                            vec![literal_expr("?granularity"), literal_expr("?expr")],
                         ),
                     ),
                     "?alias_to_cube",
@@ -2228,29 +2224,94 @@ impl RewriteRules for FilterRules {
                 "filter-replacer-in-date-range",
                 filter_op(
                     filter_op_filters(
-                        filter_member("?member", "FilterMemberOp:afterDate", "?date_range_start"),
-                        filter_member("?member", "FilterMemberOp:beforeDate", "?date_range_end"),
+                        filter_member("?member", "?date_range_start_op", "?date_range_start"),
+                        filter_member("?member", "?date_range_end_op", "?date_range_end"),
                     ),
                     "FilterOpOp:and",
                 ),
                 filter_member("?member", "FilterMemberOp:inDateRange", "?date_range"),
-                self.merge_date_range("?date_range_start", "?date_range_end", "?date_range"),
+                self.merge_date_range(
+                    "?date_range_start",
+                    "?date_range_end",
+                    "?date_range",
+                    "?date_range_start_op",
+                    "?date_range_end_op",
+                ),
             ),
-            rewrite(
-                "filter-replacer-in-date-range-inverse",
+            transforming_chain_rewrite(
+                "filter-replacer-rotate-filter-and-date-range-left",
                 filter_op(
                     filter_op_filters(
-                        filter_member("?member", "FilterMemberOp:beforeDate", "?date_range_end"),
-                        filter_member("?member", "FilterMemberOp:afterDate", "?date_range_start"),
+                        "?time_dimension_filter",
+                        filter_op(filter_op_filters("?left", "?right"), "FilterOpOp:and"),
                     ),
                     "FilterOpOp:and",
                 ),
+                vec![(
+                    "?time_dimension_filter",
+                    filter_member(
+                        "?time_dimension_member",
+                        "?time_dimension_op",
+                        "?time_dimension_value",
+                    ),
+                )],
                 filter_op(
                     filter_op_filters(
-                        filter_member("?member", "FilterMemberOp:afterDate", "?date_range_start"),
-                        filter_member("?member", "FilterMemberOp:beforeDate", "?date_range_end"),
+                        "?pull_up_member",
+                        filter_op(
+                            filter_op_filters("?left_out", "?right_out"),
+                            "FilterOpOp:and",
+                        ),
                     ),
                     "FilterOpOp:and",
+                ),
+                self.rotate_filter_and_date_range(
+                    "?time_dimension_filter",
+                    "?time_dimension_member",
+                    "?time_dimension_op",
+                    "?left",
+                    "?right",
+                    "?pull_up_member",
+                    "?left_out",
+                    "?right_out",
+                ),
+            ),
+            transforming_chain_rewrite(
+                "filter-replacer-rotate-filter-and-date-range-right",
+                filter_op(
+                    filter_op_filters(
+                        filter_op(filter_op_filters("?left", "?right"), "FilterOpOp:and"),
+                        "?time_dimension_filter",
+                    ),
+                    "FilterOpOp:and",
+                ),
+                vec![(
+                    "?time_dimension_filter",
+                    filter_member(
+                        "?time_dimension_member",
+                        "?time_dimension_op",
+                        "?time_dimension_value",
+                    ),
+                )],
+                filter_op(
+                    filter_op_filters(
+                        filter_op(
+                            filter_op_filters("?left_out", "?right_out"),
+                            "FilterOpOp:and",
+                        ),
+                        "?pull_up_member",
+                    ),
+                    "FilterOpOp:and",
+                ),
+                self.rotate_filter_and_date_range(
+                    "?time_dimension_filter",
+                    "?time_dimension_member",
+                    "?time_dimension_op",
+                    "?left",
+                    "?right",
+                    "?pull_up_member",
+                    "?left_out",
+                    "?right_out",
                 ),
             ),
             rewrite(
@@ -2612,9 +2673,9 @@ impl FilterRules {
                                         MemberType::Boolean => op,
                                         MemberType::Time => match expr_op {
                                             Operator::Lt => "beforeDate",
-                                            Operator::LtEq => "beforeDate",
+                                            Operator::LtEq => "beforeOrOnDate",
                                             Operator::Gt => "afterDate",
-                                            Operator::GtEq => "afterDate",
+                                            Operator::GtEq => "afterOrOnDate",
                                             _ => op,
                                         },
                                     };
@@ -2650,18 +2711,11 @@ impl FilterRules {
                                             if let Some(timestamp) =
                                                 Self::scalar_to_native_datetime(&literal)
                                             {
-                                                let minus_one = format_iso_timestamp(
-                                                    timestamp
-                                                        .checked_sub_signed(Duration::milliseconds(
-                                                            1,
-                                                        ))
-                                                        .unwrap(),
-                                                );
                                                 let value = format_iso_timestamp(timestamp);
 
                                                 match expr_op {
-                                                    Operator::Lt => minus_one,
-                                                    Operator::LtEq => minus_one,
+                                                    Operator::Lt => value,
+                                                    Operator::LtEq => value,
                                                     Operator::Gt => value,
                                                     Operator::GtEq => value,
                                                     _ => {
@@ -3706,8 +3760,10 @@ impl FilterRules {
         move |egraph, subst| {
             for op in var_iter!(egraph[subst[op_var]], BinaryExprOp) {
                 let new_op = match op {
-                    Operator::GtEq | Operator::Gt => Operator::GtEq,
-                    Operator::LtEq | Operator::Lt => Operator::Lt,
+                    Operator::GtEq => Operator::GtEq,
+                    Operator::Gt => Operator::Gt,
+                    Operator::LtEq => Operator::LtEq,
+                    Operator::Lt => Operator::Lt,
                     _ => continue,
                 };
 
@@ -3810,27 +3866,101 @@ impl FilterRules {
         date_range_start_var: &'static str,
         date_range_end_var: &'static str,
         date_range_var: &'static str,
+        date_range_start_op_var: &'static str,
+        date_range_end_op_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
         let date_range_start_var = date_range_start_var.parse().unwrap();
         let date_range_end_var = date_range_end_var.parse().unwrap();
         let date_range_var = date_range_var.parse().unwrap();
+        let date_range_start_op_var = date_range_start_op_var.parse().unwrap();
+        let date_range_end_op_var = date_range_end_op_var.parse().unwrap();
         move |egraph, subst| {
+            fn resolve_time_delta(date_var: &String, op: &String) -> String {
+                if op == "afterDate" {
+                    return increment_iso_timestamp_time(date_var);
+                } else if op == "beforeDate" {
+                    return decrement_iso_timestamp_time(date_var);
+                } else {
+                    return date_var.clone();
+                }
+            }
+
+            fn increment_iso_timestamp_time(date_var: &String) -> String {
+                let timestamp = NaiveDateTime::parse_from_str(date_var, "%Y-%m-%dT%H:%M:%S.%fZ");
+                let value = match timestamp {
+                    Ok(val) => format_iso_timestamp(
+                        val.checked_add_signed(Duration::milliseconds(1)).unwrap(),
+                    ),
+                    Err(_) => date_var.clone(),
+                };
+                return value;
+            }
+
+            fn decrement_iso_timestamp_time(date_var: &String) -> String {
+                let timestamp = NaiveDateTime::parse_from_str(date_var, "%Y-%m-%dT%H:%M:%S.%fZ");
+                let value = match timestamp {
+                    Ok(val) => format_iso_timestamp(
+                        val.checked_sub_signed(Duration::milliseconds(1)).unwrap(),
+                    ),
+                    Err(_) => date_var.clone(),
+                };
+                return value;
+            }
+
             for date_range_start in
                 var_iter!(egraph[subst[date_range_start_var]], FilterMemberValues)
             {
                 for date_range_end in
                     var_iter!(egraph[subst[date_range_end_var]], FilterMemberValues)
                 {
-                    let mut result = Vec::new();
-                    result.extend(date_range_start.clone().into_iter());
-                    result.extend(date_range_end.clone().into_iter());
-                    subst.insert(
-                        date_range_var,
-                        egraph.add(LogicalPlanLanguage::FilterMemberValues(FilterMemberValues(
-                            result,
-                        ))),
-                    );
-                    return true;
+                    for date_range_start_op in
+                        var_iter!(egraph[subst[date_range_start_op_var]], FilterMemberOp)
+                    {
+                        for date_range_end_op in
+                            var_iter!(egraph[subst[date_range_end_op_var]], FilterMemberOp)
+                        {
+                            let valid_left_filters =
+                                vec!["afterDate".to_string(), "afterOrOnDate".to_string()];
+                            let valid_right_filters =
+                                vec!["beforeDate".to_string(), "beforeOrOnDate".to_string()];
+
+                            let swap_left_and_right;
+
+                            if valid_left_filters.contains(date_range_start_op)
+                                && valid_right_filters.contains(date_range_end_op)
+                            {
+                                swap_left_and_right = false;
+                            } else if valid_left_filters.contains(date_range_end_op)
+                                || valid_right_filters.contains(date_range_start_op)
+                            {
+                                swap_left_and_right = true;
+                            } else {
+                                return false;
+                            }
+
+                            let mut result = Vec::new();
+                            let resolved_start_date =
+                                resolve_time_delta(&date_range_start[0], date_range_start_op);
+                            let resolved_end_date =
+                                resolve_time_delta(&date_range_end[0], date_range_end_op);
+
+                            if swap_left_and_right {
+                                result.extend(vec![resolved_end_date]);
+                                result.extend(vec![resolved_start_date]);
+                            } else {
+                                result.extend(vec![resolved_start_date]);
+                                result.extend(vec![resolved_end_date]);
+                            }
+
+                            subst.insert(
+                                date_range_var,
+                                egraph.add(LogicalPlanLanguage::FilterMemberValues(
+                                    FilterMemberValues(result),
+                                )),
+                            );
+                            return true;
+                        }
+                    }
                 }
             }
 
@@ -4128,6 +4258,96 @@ impl FilterRules {
                         },
                         _ => true,
                     };
+                }
+            }
+
+            false
+        }
+    }
+
+    fn rotate_filter_and_date_range(
+        &self,
+        time_dimension_filter_var: &'static str,
+        time_dimension_member_var: &'static str,
+        time_dimension_op_var: &'static str,
+        left_var: &'static str,
+        right_var: &'static str,
+        pull_up_member_var: &'static str,
+        left_out_var: &'static str,
+        right_out_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let time_dimension_filter_var = var!(time_dimension_filter_var);
+        let time_dimension_member_var = var!(time_dimension_member_var);
+        let time_dimension_op_var = var!(time_dimension_op_var);
+        let left_var = var!(left_var);
+        let right_var = var!(right_var);
+        let pull_up_member_var = var!(pull_up_member_var);
+        let left_out_var = var!(left_out_var);
+        let right_out_var = var!(right_out_var);
+        move |egraph, subst| {
+            for time_dimension_op in
+                var_iter!(egraph[subst[time_dimension_op_var]], FilterMemberOp).cloned()
+            {
+                fn time_dimension_op_score(time_dimension_op: &str) -> i32 {
+                    match time_dimension_op {
+                        "beforeDate" => -1,
+                        "beforeOrOnDate" => -1,
+                        "afterDate" => 1,
+                        "afterOrOnDate" => 1,
+                        _ => 0,
+                    }
+                }
+
+                let op_score = time_dimension_op_score(&time_dimension_op);
+                if op_score == 0 {
+                    continue;
+                }
+                for time_dimension_member in
+                    var_iter!(egraph[subst[time_dimension_member_var]], FilterMemberMember).cloned()
+                {
+                    if let Some(left_filter_operators) =
+                        egraph[subst[left_var]].data.filter_operators.clone()
+                    {
+                        if let Some(right_filter_operators) =
+                            egraph[subst[right_var]].data.filter_operators.clone()
+                        {
+                            let left_filter_operator_score = left_filter_operators
+                                .iter()
+                                .filter(|(member, _)| member == &time_dimension_member)
+                                .map(|(_, op)| time_dimension_op_score(op))
+                                .sum::<i32>();
+
+                            let right_filter_operator_score = right_filter_operators
+                                .iter()
+                                .filter(|(member, _)| member == &time_dimension_member)
+                                .map(|(_, op)| time_dimension_op_score(op))
+                                .sum::<i32>();
+
+                            if left_filter_operator_score == op_score * -1
+                                && right_filter_operator_score != op_score
+                            {
+                                subst.insert(pull_up_member_var, subst[right_var]);
+
+                                subst.insert(left_out_var, subst[left_var]);
+
+                                subst.insert(right_out_var, subst[time_dimension_filter_var]);
+
+                                return true;
+                            }
+
+                            if right_filter_operator_score == op_score * -1
+                                && left_filter_operator_score != op_score
+                            {
+                                subst.insert(pull_up_member_var, subst[left_var]);
+
+                                subst.insert(left_out_var, subst[time_dimension_filter_var]);
+
+                                subst.insert(right_out_var, subst[right_var]);
+
+                                return true;
+                            }
+                        }
+                    }
                 }
             }
 

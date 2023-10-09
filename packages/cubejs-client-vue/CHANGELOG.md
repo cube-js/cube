@@ -3,6 +3,33 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.34.0](https://github.com/cube-js/cube.js/compare/v0.33.65...v0.34.0) (2023-10-03)
+
+**Note:** Version bump only for package @cubejs-client/vue
+
+
+
+
+
+## [0.33.65](https://github.com/cube-js/cube.js/compare/v0.33.64...v0.33.65) (2023-10-02)
+
+
+### Bug Fixes
+
+* **@cubejs-client/vue:** Pivot config can use null from heuristics ([#7167](https://github.com/cube-js/cube.js/issues/7167)) ([e7043bb](https://github.com/cube-js/cube.js/commit/e7043bb41099d2c4477430b96a20c562e1908266))
+
+
+
+
+
+## [0.33.59](https://github.com/cube-js/cube.js/compare/v0.33.58...v0.33.59) (2023-09-20)
+
+**Note:** Version bump only for package @cubejs-client/vue
+
+
+
+
+
 ## [0.33.58](https://github.com/cube-js/cube.js/compare/v0.33.57...v0.33.58) (2023-09-18)
 
 **Note:** Version bump only for package @cubejs-client/vue

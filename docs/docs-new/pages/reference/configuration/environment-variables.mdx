@@ -910,7 +910,15 @@ The path where Cube loads data models from.
 
 | Possible Values                          | Default in Development | Default in Production |
 | ---------------------------------------- | ---------------------- | --------------------- |
-| A valid path containing Cube data models | `schema`               | `schema`              |
+| A valid path containing Cube data models | `model`                | `model`               |
+
+<WarningBox>
+
+Until v0.34, the default value was `schema`.
+
+</WarningBox>
+
+{/* TODO: https://cubedevinc.atlassian.net/browse/CC-3095 */}
 
 ## `CUBEJS_SQL_PASSWORD`
 

@@ -104,6 +104,7 @@ impl RocksStoreDetails for RocksCacheStoreDetails {
         opts.set_max_subcompactions(rocksdb_config.max_subcompactions);
         opts.set_block_based_table_factory(&block_opts);
         opts.set_compression_type(rocksdb_config.compression_type);
+        opts.set_bottommost_compression_type(rocksdb_config.bottommost_compression_type);
         opts.increase_parallelism(rocksdb_config.parallelism as i32);
 
         DB::open(&opts, path)

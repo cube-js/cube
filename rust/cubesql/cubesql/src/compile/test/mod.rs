@@ -207,6 +207,12 @@ pub fn get_test_tenant_ctx() -> Arc<MetaContext> {
                         "functions/COUNT_DISTINCT".to_string(),
                         "COUNT(DISTINCT {{ args_concat }})".to_string(),
                     ),
+                    ("functions/DATETRUNC".to_string(), "DATE_TRUNC({{ args_concat }})".to_string()),
+                    ("functions/DATEPART".to_string(), "DATE_PART({{ args_concat }})".to_string()),
+                    ("functions/FLOOR".to_string(), "FLOOR({{ args_concat }})".to_string()),
+                    ("functions/TRUNC".to_string(), "TRUNC({{ args_concat }})".to_string()),
+                    ("functions/LEAST".to_string(), "LEAST({{ args_concat }})".to_string()),
+                    ("expressions/extract".to_string(), "EXTRACT({{ date_part }} FROM {{ expr }})".to_string()),
                     (
                         "statements/select".to_string(),
                         r#"SELECT {{ select_concat | map(attribute='aliased') | join(', ') }} 
@@ -223,6 +229,8 @@ pub fn get_test_tenant_ctx() -> Arc<MetaContext> {
                     ("expressions/binary".to_string(), "{{ left }} {{ op }} {{ right }}".to_string()),
                     ("expressions/case".to_string(), "CASE {% if expr %}{{ expr }} {% endif %}{% for when, then in when_then %}WHEN {{ when }} THEN {{ then }}{% endfor %}{% if else_expr %} ELSE {{ else_expr }}{% endif %} END".to_string()),
                     ("expressions/sort".to_string(), "{{ expr }} {% if asc %}ASC{% else %}DESC{% endif %}{% if nulls_first %} NULLS FIRST {% endif %}".to_string()),
+                    ("expressions/cast".to_string(), "CAST({{ expr }} AS {{ data_type }})".to_string()),
+                    ("expressions/interval".to_string(), "INTERVAL '{{ interval }}'".to_string()),
                     ("quotes/identifiers".to_string(), "\"".to_string()),
                     ("quotes/escape".to_string(), "\"\"".to_string()),
                     ("params/param".to_string(), "${{ param_index + 1 }}".to_string())

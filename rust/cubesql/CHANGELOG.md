@@ -3,6 +3,56 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.34.0](https://github.com/cube-js/cube.js/compare/v0.33.65...v0.34.0) (2023-10-03)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+
+
+
+
+## [0.33.63](https://github.com/cube-js/cube.js/compare/v0.33.62...v0.33.63) (2023-09-26)
+
+
+### Features
+
+* **cubesql:** Tableau Standard Gregorian missing date groupings support through SQL push down and some other functions([#7172](https://github.com/cube-js/cube.js/issues/7172)) ([1339f57](https://github.com/cube-js/cube.js/commit/1339f577badf94aab02483e3431f614b1fe61302))
+
+
+
+
+
+## [0.33.62](https://github.com/cube-js/cube/compare/v0.33.61...v0.33.62) (2023-09-25)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+
+
+
+
+## [0.33.60](https://github.com/cube-js/cube.js/compare/v0.33.59...v0.33.60) (2023-09-22)
+
+
+### Bug Fixes
+
+* **cubesql:** `dataRange` filter isn't being push down to time dimension in case of other filters are used ([a4edfae](https://github.com/cube-js/cube.js/commit/a4edfae654f99b0d5a1227dfc569e8f2231e9697)), closes [#6312](https://github.com/cube-js/cube.js/issues/6312)
+
+
+
+
+
+## [0.33.59](https://github.com/cube-js/cube.js/compare/v0.33.58...v0.33.59) (2023-09-20)
+
+
+### Features
+
+* **cubesql:** `EXTRACT` SQL push down ([#7151](https://github.com/cube-js/cube.js/issues/7151)) ([e30c4da](https://github.com/cube-js/cube.js/commit/e30c4da555adfc1515fcc9e0253bc89ca8adc58b))
+* **cubesql:** Add ability to filter dates inclusive of date being passed in when using `<=` or `>=` ([#7041](https://github.com/cube-js/cube.js/issues/7041)) Thanks [@darapuk](https://github.com/darapuk) ! ([6b9ae70](https://github.com/cube-js/cube.js/commit/6b9ae703b113a01fa4e6de54b5597475aed0b85d))
+
+
+
+
+
 ## [0.33.57](https://github.com/cube-js/cube/compare/v0.33.56...v0.33.57) (2023-09-15)
 
 

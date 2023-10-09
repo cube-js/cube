@@ -3,6 +3,115 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.34.0](https://github.com/cube-js/cube/compare/v0.33.65...v0.34.0) (2023-10-03)
+
+**Note:** Version bump only for package cubejs
+
+
+
+
+
+## [0.33.65](https://github.com/cube-js/cube/compare/v0.33.64...v0.33.65) (2023-10-02)
+
+
+### Bug Fixes
+
+* **@cubejs-client/vue:** Pivot config can use null from heuristics ([#7167](https://github.com/cube-js/cube/issues/7167)) ([e7043bb](https://github.com/cube-js/cube/commit/e7043bb41099d2c4477430b96a20c562e1908266))
+
+
+### Features
+
+* **python:** Evaluate Jinja templates inside `.yml` and `.yaml` ([#7182](https://github.com/cube-js/cube/issues/7182)) ([69e9437](https://github.com/cube-js/cube/commit/69e9437deccc2f16442a39ceb95d1583bcea195f))
+* **python:** Support `[@template](https://github.com/template).function("name")` definitions ([#7183](https://github.com/cube-js/cube/issues/7183)) ([33823e8](https://github.com/cube-js/cube/commit/33823e8529529e388535a405a9316ad0d86496c9))
+
+
+
+
+
+## [0.33.64](https://github.com/cube-js/cube/compare/v0.33.63...v0.33.64) (2023-09-30)
+
+
+### Bug Fixes
+
+* **cubestore:** Escape regex symbols in all versions of like operator ([#7176](https://github.com/cube-js/cube/issues/7176)) ([e58af39](https://github.com/cube-js/cube/commit/e58af39ee779f1a9372ba24b67ebf56ab532f548))
+* **cubestore:** Escape regex symbols in like operator ([#7175](https://github.com/cube-js/cube/issues/7175)) ([b88c3f3](https://github.com/cube-js/cube/commit/b88c3f343d78c13ef170136d257cf591de8d3f4b))
+* **cubestore:** Wrong pre-aggregations count distinct approx count when using PostgreSQL database ([#7170](https://github.com/cube-js/cube/issues/7170)) ([1d1d4f0](https://github.com/cube-js/cube/commit/1d1d4f055aa96e8b61e59c173aec25635fc4730b))
+* **databricks-jdbc-driver:** ensure default UID property is set ([#7168](https://github.com/cube-js/cube/issues/7168)) ([0f357f8](https://github.com/cube-js/cube/commit/0f357f841b908d71f7b13fc5df889ebb6945901f))
+* SQL push down expressions incorrectly cache used cube names ([c5f0b03](https://github.com/cube-js/cube/commit/c5f0b03e2582be6969ae2de8d1e7dfc6190141c4))
+
+
+### Features
+
+* **native:** More concise module structure ([#7180](https://github.com/cube-js/cube/issues/7180)) ([e2a80bf](https://github.com/cube-js/cube/commit/e2a80bfa0515696391f5aa69c299038f6e52c405))
+* **native:** Support explicit [@config](https://github.com/config)("<name>") annotations ([d345d74](https://github.com/cube-js/cube/commit/d345d748e947c8479145886f6d4ac9e9fbeeccd6))
+
+
+
+
+
+## [0.33.63](https://github.com/cube-js/cube/compare/v0.33.62...v0.33.63) (2023-09-26)
+
+
+### Features
+
+* **cubesql:** Tableau Standard Gregorian missing date groupings support through SQL push down and some other functions([#7172](https://github.com/cube-js/cube/issues/7172)) ([1339f57](https://github.com/cube-js/cube/commit/1339f577badf94aab02483e3431f614b1fe61302))
+* **snowflake-driver:** Upgrade snowflake driver to 1.8.0 ([#7171](https://github.com/cube-js/cube/issues/7171)) ([06a66c6](https://github.com/cube-js/cube/commit/06a66c662e93354e2d1a22e1bf406ea9d1c2825b))
+
+
+
+
+
+## [0.33.62](https://github.com/cube-js/cube/compare/v0.33.61...v0.33.62) (2023-09-25)
+
+
+### Features
+
+* **native:** Jinja - support dynamic Python objects (methods, __call__, fields)  ([#7162](https://github.com/cube-js/cube/issues/7162)) ([6a5f70c](https://github.com/cube-js/cube/commit/6a5f70c3d7b910590f5c8ed411363dc6d694e720))
+
+
+
+
+
+## [0.33.61](https://github.com/cube-js/cube/compare/v0.33.60...v0.33.61) (2023-09-22)
+
+
+### Features
+
+* **native:** Python - new Jinja API ([#7160](https://github.com/cube-js/cube/issues/7160)) ([ea250ae](https://github.com/cube-js/cube/commit/ea250ae3a9c2c86b375f1ebeebb8304496a1dfc2))
+
+
+
+
+
+## [0.33.60](https://github.com/cube-js/cube/compare/v0.33.59...v0.33.60) (2023-09-22)
+
+
+### Bug Fixes
+
+* **cubesql:** `dataRange` filter isn't being push down to time dimension in case of other filters are used ([a4edfae](https://github.com/cube-js/cube/commit/a4edfae654f99b0d5a1227dfc569e8f2231e9697)), closes [#6312](https://github.com/cube-js/cube/issues/6312)
+
+
+### Features
+
+* **docker:** Python - disable buffering for STDOUT (PYTHONUNBUFFERED) ([#7153](https://github.com/cube-js/cube/issues/7153)) ([5cd0a17](https://github.com/cube-js/cube/commit/5cd0a175bf903d7118735f3526813aa9dd6f9953))
+
+
+
+
+
+## [0.33.59](https://github.com/cube-js/cube/compare/v0.33.58...v0.33.59) (2023-09-20)
+
+
+### Features
+
+* **cubesql:** `EXTRACT` SQL push down ([#7151](https://github.com/cube-js/cube/issues/7151)) ([e30c4da](https://github.com/cube-js/cube/commit/e30c4da555adfc1515fcc9e0253bc89ca8adc58b))
+* **cubesql:** Add ability to filter dates inclusive of date being passed in when using `<=` or `>=` ([#7041](https://github.com/cube-js/cube/issues/7041)) Thanks [@darapuk](https://github.com/darapuk) ! ([6b9ae70](https://github.com/cube-js/cube/commit/6b9ae703b113a01fa4e6de54b5597475aed0b85d))
+* **native:** Cube.py - support all options ([#7145](https://github.com/cube-js/cube/issues/7145)) ([5e5fb18](https://github.com/cube-js/cube/commit/5e5fb1800d2e97b870281b335bfca28ab00a9c10))
+
+
+
+
+
 ## [0.33.58](https://github.com/cube-js/cube/compare/v0.33.57...v0.33.58) (2023-09-18)
 
 

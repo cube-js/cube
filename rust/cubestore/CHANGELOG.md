@@ -3,6 +3,35 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.34.0](https://github.com/cube-js/cube.js/compare/v0.33.65...v0.34.0) (2023-10-03)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.33.64](https://github.com/cube-js/cube.js/compare/v0.33.63...v0.33.64) (2023-09-30)
+
+
+### Bug Fixes
+
+* **cubestore:** Escape regex symbols in all versions of like operator ([#7176](https://github.com/cube-js/cube.js/issues/7176)) ([e58af39](https://github.com/cube-js/cube.js/commit/e58af39ee779f1a9372ba24b67ebf56ab532f548))
+* **cubestore:** Escape regex symbols in like operator ([#7175](https://github.com/cube-js/cube.js/issues/7175)) ([b88c3f3](https://github.com/cube-js/cube.js/commit/b88c3f343d78c13ef170136d257cf591de8d3f4b))
+* **cubestore:** Wrong pre-aggregations count distinct approx count when using PostgreSQL database ([#7170](https://github.com/cube-js/cube.js/issues/7170)) ([1d1d4f0](https://github.com/cube-js/cube.js/commit/1d1d4f055aa96e8b61e59c173aec25635fc4730b))
+
+
+
+
+
+## [0.33.59](https://github.com/cube-js/cube.js/compare/v0.33.58...v0.33.59) (2023-09-20)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
 ## [0.33.57](https://github.com/cube-js/cube/compare/v0.33.56...v0.33.57) (2023-09-15)
 
 

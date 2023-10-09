@@ -33,7 +33,9 @@ input DateTimeFilter {
   inDateRange: [String]
   notInDateRange: [String]
   beforeDate: String
+  beforeOrOnDate: String
   afterDate: String
+  afterOrOnDate: String
   set: Boolean
 }
 

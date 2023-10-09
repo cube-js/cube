@@ -66,6 +66,14 @@ async def load_data():
       ]
     }
     return api_response
+
+class ExampleClassModelB:
+  def get_name_method(self):
+    return "example"
+
+@context_func
+def load_class_model():
+  return ExampleClassModelB()
 """
 
 __execution_context_globals = {}

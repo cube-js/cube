@@ -1074,8 +1074,16 @@ class BaseQuery {
     return `${dimensionSql} < ${timeStampParam}`;
   }
 
+  beforeOrOnDateFilter(dimensionSql, timeStampParam) {
+    return `${dimensionSql} <= ${timeStampParam}`;
+  }
+
   afterDateFilter(dimensionSql, timeStampParam) {
     return `${dimensionSql} > ${timeStampParam}`;
+  }
+
+  afterOrOnDateFilter(dimensionSql, timeStampParam) {
+    return `${dimensionSql} >= ${timeStampParam}`;
   }
 
   timeStampCast(value) {
@@ -1484,7 +1492,7 @@ class BaseQuery {
       R.map(s => (
         (cache || this.compilerCache).cache(
           ['collectFrom', methodName].concat(
-            s.path() ? [s.path().join('.')] : [s.cube().name, s.expressionName || s.definition().sql]
+            s.path() ? [s.path().join('.')] : [s.cube().name, s.expression?.toString() || s.expressionName || s.definition().sql]
           ),
           () => fn(() => this.traverseSymbol(s))
         )
@@ -2424,6 +2432,14 @@ class BaseQuery {
 
         COALESCE: 'COALESCE({{ args_concat }})',
         CONCAT: 'CONCAT({{ args_concat }})',
+        FLOOR: 'FLOOR({{ args_concat }})',
+        CEIL: 'CEIL({{ args_concat }})',
+        TRUNC: 'TRUNC({{ args_concat }})',
+        LEAST: 'LEAST({{ args_concat }})',
+        LOWER: 'LOWER({{ args_concat }})',
+        UPPER: 'UPPER({{ args_concat }})',
+        LEFT: 'LEFT({{ args_concat }})',
+        RIGHT: 'RIGHT({{ args_concat }})',
       },
       statements: {
         select: 'SELECT {{ select_concat | map(attribute=\'aliased\') | join(\', \') }} \n' +
@@ -2436,8 +2452,9 @@ class BaseQuery {
       expressions: {
         column_aliased: '{{expr}} {{quoted_alias}}',
         case: 'CASE {% if expr %}{{ expr }} {% endif %}{% for when, then in when_then %}WHEN {{ when }} THEN {{ then }}{% endfor %}{% if else_expr %} ELSE {{ else_expr }}{% endif %} END',
-        binary: '{{ left }} {{ op }} {{ right }}',
+        binary: '({{ left }} {{ op }} {{ right }})',
         sort: '{{ expr }} {% if asc %}ASC{% else %}DESC{% endif %}{% if nulls_first %} NULLS FIRST{% endif %}',
+        cast: 'CAST({{ expr }} AS {{ data_type }})',
       },
       quotes: {
         identifiers: '"',

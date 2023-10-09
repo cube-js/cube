@@ -10,7 +10,8 @@ use cubeclient::models::{V1LoadRequestQuery, V1LoadResult, V1LoadResultAnnotatio
 pub use datafusion::{
     arrow::{
         array::{
-            ArrayRef, BooleanBuilder, Date32Builder, Float64Builder, Int64Builder, StringBuilder,
+            ArrayRef, BooleanBuilder, Date32Builder, Float64Builder, Int32Builder, Int64Builder,
+            StringBuilder,
         },
         datatypes::{DataType, SchemaRef},
         error::{ArrowError, Result as ArrowResult},
@@ -364,14 +365,14 @@ impl ExtensionPlanner for CubeScanExtensionPlanner {
                         )))?;
 
                 let schema = SchemaRef::new(wrapper_node.schema().as_ref().into());
-                let member_fields = schema
-                    .fields()
-                    .iter()
-                    .map(|f| MemberField::Member(f.name().to_string()))
-                    .collect();
                 Some(Arc::new(CubeScanExecutionPlan {
                     schema,
-                    member_fields,
+                    member_fields: wrapper_node.member_fields.as_ref().ok_or_else(|| {
+                        DataFusionError::Internal(format!(
+                            "Member fields are not set for wrapper node. Optimization wasn't performed: {:?}",
+                            wrapper_node
+                        ))
+                    })?.clone(),
                     transport: self.transport.clone(),
                     request: wrapper_node.request.clone().unwrap_or(scan_node.request.clone()),
                     wrapped_sql: Some(wrapper_node.wrapped_sql.as_ref().ok_or_else(|| {
@@ -896,6 +897,31 @@ pub fn transform_response<V: ValueObject>(
                     }
                 )
             }
+            DataType::Int32 => {
+                build_column!(
+                    DataType::Int32,
+                    Int32Builder,
+                    response,
+                    field_name,
+                    {
+                        (FieldValue::Number(number), builder) => builder.append_value(number.round() as i32)?,
+                        (FieldValue::String(s), builder) => match s.parse::<i32>() {
+                            Ok(v) => builder.append_value(v)?,
+                            Err(error) => {
+                                warn!(
+                                    "Unable to parse value as i32: {}",
+                                    error.to_string()
+                                );
+
+                                builder.append_null()?
+                            }
+                        },
+                    },
+                    {
+                        (ScalarValue::Int32(v), builder) => builder.append_option(v.clone())?,
+                    }
+                )
+            }
             DataType::Int64 => {
                 build_column!(
                     DataType::Int64,
@@ -979,6 +1005,7 @@ pub fn transform_response<V: ValueObject>(
                         (FieldValue::String(s), builder) => {
                             let timestamp = NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%dT%H:%M:%S.%f")
                                 .or_else(|_| NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%d %H:%M:%S.%f"))
+                                .or_else(|_| NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%dT%H:%M:%S"))
                                 .map_err(|e| {
                                     DataFusionError::Execution(format!(
                                         "Can't parse timestamp: '{}': {}",

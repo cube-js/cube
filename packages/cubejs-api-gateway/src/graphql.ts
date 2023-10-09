@@ -77,7 +77,9 @@ const DateTimeFilter = inputObjectType({
     t.list.string('inDateRange');
     t.list.string('notInDateRange');
     t.string('beforeDate');
+    t.string('beforeOrOnDate');
     t.string('afterDate');
+    t.string('afterOrOnDate');
     t.boolean('set');
   }
 });

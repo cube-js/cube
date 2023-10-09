@@ -15,8 +15,8 @@ order's status can change after a long period. In this case, we want to rebuild
 only partitions associated with this order.
 
 In the recipe below, we'll learn how to use the
-[`refresh_key`](/product/data-modeling/reference/pre-aggregations#sql) together
-with the [`FITER_PARAMS`](/product/data-modeling/reference/cube#filter-params)
+[`refresh_key`](/reference/data-model/pre-aggregations#sql) together
+with the [`FITER_PARAMS`](/reference/data-model/cube#filter-params)
 for partition separately.
 
 ## Data modeling
@@ -34,7 +34,7 @@ orders, including number and status:
 In our case, each order has `created_at` and `updated_at` properties. The
 `updated_at` property is the last order update timestamp. To create a
 pre-aggregation with partitions, we need to specify the
-[`partition_granularity` property](/product/data-modeling/reference/pre-aggregations#partition_granularity).
+[`partition_granularity` property](/reference/data-model/pre-aggregations#partition_granularity).
 Partitions will be split monthly by the `created_at` dimension.
 
 <CodeTabs>
@@ -79,7 +79,7 @@ cube(`orders`, {
 </CodeTabs>
 
 As you can see, we defined custom a
-[`refresh_key`](/product/data-modeling/reference/pre-aggregations#sql) that will
+[`refresh_key`](/reference/data-model/pre-aggregations#sql) that will
 check for new values of the `updated_at` property. The refresh key is evaluated
 for each partition separately. For example, if we update orders from August and
 update their `updated_at` property, the current refresh key will update for
@@ -107,7 +107,7 @@ Note that the query for two partitions is the same. It's the reason why **all
 partitions** will be updated.
 
 How do we fix this and update only the partition for August? We can use the
-[`FILTER_PARAMS`](/product/data-modeling/reference/cube#filter-params) for that!
+[`FILTER_PARAMS`](/reference/data-model/cube#filter-params) for that!
 
 Let's update our pre-aggregation definition:
 

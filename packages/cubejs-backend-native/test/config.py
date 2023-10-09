@@ -1,12 +1,11 @@
-from cube.conf import (
+from cube import (
     config,
-    settings,
     file_repository
 )
 
-settings.schema_path = "models"
-settings.pg_sql_port = 5555
-settings.telemetry = False
+config.schema_path = "models"
+config.pg_sql_port = 5555
+config.telemetry = False
 
 @config
 def query_rewrite(query, ctx):
@@ -27,3 +26,19 @@ async def repository_factory(ctx):
 async def context_to_api_scopes():
     print('[python] context_to_api_scopes')
     return ['meta', 'data', 'jobs']
+
+@config
+def schema_version(ctx):
+    print('[python] schema_version', ctx)
+
+    return '1'
+
+@config
+def pre_aggregations_schema(ctx):
+    print('[python] pre_aggregations_schema', ctx)
+
+    return 'schema'
+
+@config
+def logger(msg, params):
+    print('[python] logger msg', msg, 'params=', params)

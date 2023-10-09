@@ -131,7 +131,7 @@ checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
 [[package]]
 name = "arrow"
 version = "5.0.0"
-source = "git+https://github.com/cube-js/arrow-rs?branch=cube#77c45515c84ca6357a7b4d211e3b8b5bbdfa6b43"
+source = "git+https://github.com/cube-js/arrow-rs?branch=cube#12474778e8a77f7c53b6dac404b469489d38f642"
 dependencies = [
  "bitflags",
  "chrono",
@@ -154,7 +154,7 @@ dependencies = [
 [[package]]
 name = "arrow-flight"
 version = "5.0.0"
-source = "git+https://github.com/cube-js/arrow-rs?branch=cube#77c45515c84ca6357a7b4d211e3b8b5bbdfa6b43"
+source = "git+https://github.com/cube-js/arrow-rs?branch=cube#12474778e8a77f7c53b6dac404b469489d38f642"
 dependencies = [
  "arrow",
  "base64 0.13.0",
@@ -1189,6 +1189,7 @@ dependencies = [
 name = "cubehll"
 version = "0.1.0"
 dependencies = [
+ "base64 0.13.0",
  "byteorder",
  "hex",
  "itertools 0.10.1",
@@ -2465,6 +2466,7 @@ dependencies = [
  "glob",
  "libc",
  "libz-sys",
+ "zstd-sys",
 ]
 
 [[package]]
@@ -3333,7 +3335,7 @@ dependencies = [
 [[package]]
 name = "parquet"
 version = "5.0.0"
-source = "git+https://github.com/cube-js/arrow-rs?branch=cube#77c45515c84ca6357a7b4d211e3b8b5bbdfa6b43"
+source = "git+https://github.com/cube-js/arrow-rs?branch=cube#12474778e8a77f7c53b6dac404b469489d38f642"
 dependencies = [
  "arrow",
  "base64 0.13.0",
@@ -5975,18 +5977,18 @@ checksum = "d2d7d3948613f75c98fd9328cfdcc45acc4d360655289d0a7d4ec931392200a3"
 
 [[package]]
 name = "zstd"
-version = "0.9.0+zstd.1.5.0"
+version = "0.12.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "07749a5dc2cb6b36661290245e350f15ec3bbb304e493db54a1d354480522ccd"
+checksum = "1a27595e173641171fc74a1232b7b1c7a7cb6e18222c11e9dfb9888fa424c53c"
 dependencies = [
  "zstd-safe",
 ]
 
 [[package]]
 name = "zstd-safe"
-version = "4.1.1+zstd.1.5.0"
+version = "6.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c91c90f2c593b003603e5e0493c837088df4469da25aafff8bce42ba48caf079"
+checksum = "ee98ffd0b48ee95e6c5168188e44a54550b1564d9d530ee21d5f0eaed1069581"
 dependencies = [
  "libc",
  "zstd-sys",
@@ -5994,10 +5996,11 @@ dependencies = [
 
 [[package]]
 name = "zstd-sys"
-version = "1.6.1+zstd.1.5.0"
+version = "2.0.8+zstd.1.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "615120c7a2431d16cf1cf979e7fc31ba7a5b5e5707b29c8a99e5dbf8a8392a33"
+checksum = "5556e6ee25d32df2586c098bbfa278803692a20d0ab9565e049480d52707ec8c"
 dependencies = [
  "cc",
  "libc",
+ "pkg-config",
 ]

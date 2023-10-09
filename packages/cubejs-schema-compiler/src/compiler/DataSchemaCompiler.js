@@ -17,6 +17,8 @@ const NATIVE_IS_SUPPORTED = isNativeSupported();
 
 const moduleFileCache = {};
 
+const JINJA_SYNTAX = /{%|%}|{{|}}/ig;
+
 export class DataSchemaCompiler {
   constructor(repository, options = {}) {
     this.repository = repository;
@@ -58,7 +60,8 @@ export class DataSchemaCompiler {
    * @protected
    */
   async loadPythonContext(files) {
-    const modules = await Promise.all(files.filter((f) => f.fileName.endsWith('.py')).map(async (file) => {
+    // TODO Appropriate template functions loading
+    const modules = await Promise.all(files.filter((f) => f.fileName === 'globals.py').map(async (file) => {
       const exports = await this.nativeInstance.loadPythonContext(
         file.fileName,
         file.content
@@ -121,7 +124,11 @@ export class DataSchemaCompiler {
   }
 
   transpileFile(file, errorsReport) {
-    if (R.endsWith('.jinja', file.fileName)) {
+    if (R.endsWith('.jinja', file.fileName) ||
+      (R.endsWith('.yml', file.fileName) || R.endsWith('.yaml', file.fileName))
+      // TODO do Jinja syntax check with jinja compiler
+      && file.content.match(JINJA_SYNTAX)
+    ) {
       if (NATIVE_IS_SUPPORTED !== true) {
         throw new Error(
           `Native extension is required to process jinja files. ${NATIVE_IS_SUPPORTED.reason}. Read more: ` +
@@ -233,7 +240,12 @@ export class DataSchemaCompiler {
 
     if (R.endsWith('.js', file.fileName)) {
       this.compileJsFile(file, errorsReport, cubes, contexts, exports, asyncModules, toCompile, compiledFiles);
-    } else if (R.endsWith('.yml.jinja', file.fileName) || R.endsWith('.yaml.jinja', file.fileName)) {
+    } else if (R.endsWith('.yml.jinja', file.fileName) || R.endsWith('.yaml.jinja', file.fileName) ||
+      (
+        R.endsWith('.yml', file.fileName) || R.endsWith('.yaml', file.fileName)
+        // TODO do Jinja syntax check with jinja compiler
+      ) && file.content.match(JINJA_SYNTAX)
+    ) {
       this.yamlCompiler.compileYamlWithJinjaFile(
         file,
         errorsReport,

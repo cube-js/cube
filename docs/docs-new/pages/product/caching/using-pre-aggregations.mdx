@@ -17,7 +17,8 @@ Refresh strategy can be customized by setting the
 pre-aggregation.
 
 The default value of [`refresh_key`][ref-schema-ref-preaggs-refresh-key] is
-`every: 1 hour`. It can be redefined either by overriding the default value of
+`every: 1 hour`, if neither of the cubes overrides it's `refreshKey` parameter. 
+It can be redefined either by overriding the default value of
 the [`every` property][ref-schema-ref-preaggs-refresh-key-every]:
 
 <CodeTabs>
@@ -891,23 +892,23 @@ streaming engine.
 [ref-connect-db-mysql]: /product/configuration/data-sources/mysql
 [ref-connect-db-postgres]: /product/configuration/data-sources/postgres
 [ref-connect-db-snowflake]: /product/configuration/data-sources/snowflake
-[ref-schema-timedimension]: /types-and-formats#types-time
-[ref-schema-ref-preaggs]: /product/data-modeling/reference/pre-aggregations
+[ref-schema-timedimension]: /reference/data-model/types-and-formats#time-1
+[ref-schema-ref-preaggs]: /reference/data-model/pre-aggregations
 [ref-schema-ref-preaggs-index]:
-  /product/data-modeling/reference/pre-aggregations#indexes
+  /reference/data-model/pre-aggregations#indexes
 [ref-schema-ref-preaggs-refresh-key]:
-  /product/data-modeling/reference/pre-aggregations#refresh_key
+  /reference/data-model/pre-aggregations#refresh_key
 [ref-schema-ref-preaggs-refresh-key-every]:
-  /product/data-modeling/reference/pre-aggregations#every
+  /reference/data-model/pre-aggregations#every
 [ref-schema-ref-preaggs-refresh-key-sql]:
-  /product/data-modeling/reference/pre-aggregations#sql
+  /reference/data-model/pre-aggregations#sql
 [ref-deploy-refresh-wrkr]: /product/deployment#refresh-worker
 [ref-schema-ref-preaggs-sched-refresh]:
-  /product/data-modeling/reference/pre-aggregations#scheduled_refresh
+  /reference/data-model/pre-aggregations#scheduled_refresh
 [ref-prod-list-refresh]:
   /product/deployment/production-checklist#set-up-refresh-worker
 [ref-original-sql]:
-  /product/data-modeling/reference/pre-aggregations#original_sql
+  /reference/data-model/pre-aggregations#original_sql
 [self-batching]: #batching
 [self-export-bucket]: #export-bucket
 [wiki-partitioning]: https://en.wikipedia.org/wiki/Partition_(database)

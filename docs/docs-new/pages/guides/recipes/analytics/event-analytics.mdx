@@ -248,7 +248,7 @@ The next step is to identify the events contained within the session and the
 events ending the session. It’s required to get metrics such as session duration
 and events per session, or to identify sessions where specific events occurred
 (we’re going to use that for funnel analysis later on). We’re going to
-[declare a join](/product/data-modeling/reference/joins) such that the `events`
+[declare a join](/reference/data-model/joins) such that the `events`
 cube has a `many_to_one` relation to the `sessions` cube, and specify a
 condition, such as all users' events from session start (inclusive) till the
 start of the next session (exclusive) belong to that session.
@@ -271,7 +271,7 @@ cube("events", {
 ```
 
 To determine the end of the session, we’re going to use the
-[`subQuery` feature](/product/data-modeling/fundamentals/additional-concepts#subquery)
+[`subQuery` feature](/product/data-modeling/concepts/subquery-dimensions)
 in Cube.
 
 ```javascript
@@ -603,4 +603,4 @@ cube("sessions", {
 Now we can use the `with_form_submitted_count` measure to get only sessions when
 the `form_submitted` event occurred.
 
-[ref-modeling-syntax]: /product/data-modeling/fundamentals/syntax
+[ref-modeling-syntax]: /product/data-modeling/syntax

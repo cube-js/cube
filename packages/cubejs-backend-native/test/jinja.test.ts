@@ -18,10 +18,14 @@ function loadTemplateFile(engine: native.JinjaEngine, fileName: string): void {
 
 async function loadPythonCtxFromUtils(fileName: string) {
   const content = fs.readFileSync(path.join(process.cwd(), 'test', 'templates', fileName), 'utf8');
-  return nativeInstance.loadPythonContext(
+  const ctx = await nativeInstance.loadPythonContext(
     fileName,
     content
   );
+
+  // console.debug(ctx);
+
+  return ctx;
 }
 
 function testTemplateBySnapshot(engine: JinjaEngine, templateName: string, ctx: unknown) {
@@ -32,9 +36,9 @@ function testTemplateBySnapshot(engine: JinjaEngine, templateName: string, ctx: 
   });
 }
 
-function testTemplateWithPythonCtxBySnapshot(engine: JinjaEngine, templateName: string, ctx: unknown) {
+function testTemplateWithPythonCtxBySnapshot(engine: JinjaEngine, templateName: string, ctx: unknown, utilsFile: string) {
   test(`render ${templateName}`, async () => {
-    const actual = engine.renderTemplate(templateName, ctx, await loadPythonCtxFromUtils('utils.py'));
+    const actual = engine.renderTemplate(templateName, ctx, await loadPythonCtxFromUtils(utilsFile));
 
     expect(actual).toMatchSnapshot(templateName);
   });
@@ -68,6 +72,7 @@ suite('Python model', () => {
       arg_seq: expect.any(Object),
       new_int_tuple: expect.any(Object),
       new_str_tuple: expect.any(Object),
+      load_class_model: expect.any(Object),
     });
   });
 });
@@ -88,46 +93,56 @@ darwinSuite('Scope Python model', () => {
       arg_seq: expect.any(Object),
       new_int_tuple: expect.any(Object),
       new_str_tuple: expect.any(Object),
+      load_class_model: expect.any(Object),
     });
   });
 });
 
-suite('Jinja', () => {
-  const jinjaEngine = nativeInstance.newJinjaEngine({
-    debugInfo: true
-  });
+function createTestSuite(utilsFile: string) {
+  return () => {
+    const jinjaEngine = nativeInstance.newJinjaEngine({
+      debugInfo: true
+    });
 
-  beforeAll(async () => {
-    loadTemplateFile(jinjaEngine, '.utils.jinja');
-    loadTemplateFile(jinjaEngine, 'dump_context.yml.jinja');
-    loadTemplateFile(jinjaEngine, 'data-model.yml.jinja');
-    loadTemplateFile(jinjaEngine, 'arguments-test.yml.jinja');
+    beforeAll(async () => {
+      loadTemplateFile(jinjaEngine, '.utils.jinja');
+      loadTemplateFile(jinjaEngine, 'dump_context.yml.jinja');
+      loadTemplateFile(jinjaEngine, 'class-model.yml.jinja');
+      loadTemplateFile(jinjaEngine, 'data-model.yml.jinja');
+      loadTemplateFile(jinjaEngine, 'arguments-test.yml.jinja');
+
+      for (let i = 1; i < 9; i++) {
+        loadTemplateFile(jinjaEngine, `0${i}.yml.jinja`);
+      }
+    });
+
+    testTemplateBySnapshot(jinjaEngine, 'dump_context.yml.jinja', {
+      bool_true: true,
+      bool_false: false,
+      string: 'test string',
+      int: 1,
+      float: 3.1415,
+      array_int: [9, 8, 7, 6, 5, 0, 1, 2, 3, 4],
+      array_bool: [true, false, false, true],
+      null: null,
+      undefined,
+      securityContext: {
+        userId: 1,
+      }
+    });
+
+    // todo(ovr): Fix issue with tests
+    // testTemplateWithPythonCtxBySnapshot(jinjaEngine, 'class-model.yml.jinja', {}, utilsFile);
+    testTemplateWithPythonCtxBySnapshot(jinjaEngine, 'data-model.yml.jinja', {}, utilsFile);
+    testTemplateWithPythonCtxBySnapshot(jinjaEngine, 'arguments-test.yml.jinja', {}, utilsFile);
+
+    testLoadBrokenTemplateBySnapshot(jinjaEngine, 'template_error.jinja');
 
     for (let i = 1; i < 9; i++) {
-      loadTemplateFile(jinjaEngine, `0${i}.yml.jinja`);
+      testTemplateBySnapshot(jinjaEngine, `0${i}.yml.jinja`, {});
     }
-  });
+  };
+}
 
-  testTemplateBySnapshot(jinjaEngine, 'dump_context.yml.jinja', {
-    bool_true: true,
-    bool_false: false,
-    string: 'test string',
-    int: 1,
-    float: 3.1415,
-    array_int: [9, 8, 7, 6, 5, 0, 1, 2, 3, 4],
-    array_bool: [true, false, false, true],
-    null: null,
-    undefined,
-    securityContext: {
-      userId: 1,
-    }
-  });
-  testTemplateWithPythonCtxBySnapshot(jinjaEngine, 'data-model.yml.jinja', {});
-  testTemplateWithPythonCtxBySnapshot(jinjaEngine, 'arguments-test.yml.jinja', {});
-
-  testLoadBrokenTemplateBySnapshot(jinjaEngine, 'template_error.jinja');
-
-  for (let i = 1; i < 9; i++) {
-    testTemplateBySnapshot(jinjaEngine, `0${i}.yml.jinja`, {});
-  }
-});
+suite('Jinja (old api)', createTestSuite('utils.py'));
+suite('Jinja (new api)', createTestSuite('jinja-instance.py'));
