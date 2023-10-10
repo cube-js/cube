@@ -5,7 +5,7 @@ expression: "execute_query(\"SELECT * FROM svv_tables ORDER BY table_name DESC\"
 +---------------+--------------+---------------------------+------------+---------+
 | table_catalog | table_schema | table_name                | table_type | remarks |
 +---------------+--------------+---------------------------+------------+---------+
-| db            | public       | NumberCube                | BASE TABLE | NULL    |
-| db            | public       | Logs                      | BASE TABLE | NULL    |
-| db            | public       | KibanaSampleDataEcommerce | BASE TABLE | NULL    |
+| cubedb        | public       | NumberCube                | BASE TABLE | NULL    |
+| cubedb        | public       | Logs                      | BASE TABLE | NULL    |
+| cubedb        | public       | KibanaSampleDataEcommerce | BASE TABLE | NULL    |
 +---------------+--------------+---------------------------+------------+---------+

@@ -8,7 +8,7 @@ import { resolveDependencies, getDependenciesFromPackage } from './maven';
     await resolveDependencies(getDependenciesFromPackage(), {
       showOutput: true,
     });
-  } catch (e) {
+  } catch (e: any) {
     await displayCLIError(e, 'Maven Installer');
   }
 })();

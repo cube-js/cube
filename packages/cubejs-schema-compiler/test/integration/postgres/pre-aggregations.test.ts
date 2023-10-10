@@ -410,6 +410,46 @@ describe('PreAggregations', () => {
         }
       },
     });
+    
+    cube('LambdaVisitors', {
+      extends: visitors,
+      
+      preAggregations: {
+        partitionedLambda: {
+          type: 'rollupLambda',
+          rollups: [partitioned, RealTimeLambdaVisitors.partitioned]
+        },
+        partitioned: {
+          type: 'rollup',
+          measures: [count],
+          dimensions: [id, source],
+          timeDimension: createdAt,
+          granularity: 'day',
+          partitionGranularity: 'month',
+          refreshKey: {
+            every: '1 hour',
+            incremental: true,
+            updateWindow: '1 day'
+          }
+        }
+      }
+    });
+    
+    cube('RealTimeLambdaVisitors', {
+      dataSource: 'ksql',
+      extends: visitors,
+      
+      preAggregations: {
+        partitioned: {
+          type: 'rollup',
+          measures: [count],
+          dimensions: [id, source],
+          timeDimension: createdAt,
+          granularity: 'day',
+          partitionGranularity: 'day'
+        }
+      }
+    });
     `);
 
   it('simple pre-aggregation', () => compiler.compile().then(() => {
@@ -1628,5 +1668,47 @@ describe('PreAggregations', () => {
         ]
       );
     });
+  }));
+
+  it('lambda cross data source refresh key and ungrouped', () => compiler.compile().then(() => {
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'LambdaVisitors.count'
+      ],
+      dimensions: [
+        'LambdaVisitors.source'
+      ],
+      timeDimensions: [{
+        dimension: 'LambdaVisitors.createdAt',
+        granularity: 'day',
+        dateRange: ['2017-01-01', '2017-01-25']
+      }],
+      timezone: 'America/Los_Angeles',
+      order: [{
+        id: 'LambdaVisitors.createdAt'
+      }],
+      preAggregationsSchema: '',
+      queryFactory: {
+        createQuery: (cube, compilers, options) => {
+          if (cube === 'RealTimeLambdaVisitors') {
+            // eslint-disable-next-line global-require
+            const { KsqlQuery } = require('../../../../../cubejs-ksql-driver');
+            return new KsqlQuery(compilers, options);
+          } else {
+            return new PostgresQuery(compilers, options);
+          }
+        }
+      }
+    });
+
+    const queryAndParams = query.buildSqlAndParams();
+    console.log(queryAndParams);
+    const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+    console.log(JSON.stringify(preAggregationsDescription, null, 2));
+    const { partitionInvalidateKeyQueries, loadSql } = preAggregationsDescription.find(p => p.preAggregationId === 'RealTimeLambdaVisitors.partitioned');
+
+    expect(partitionInvalidateKeyQueries).toStrictEqual([]);
+    expect(loadSql[0]).not.toMatch(/GROUP BY/);
+    expect(loadSql[0]).toMatch(/1 `real_time_lambda_visitors__count`/);
   }));
 });

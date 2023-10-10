@@ -265,7 +265,7 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for MySqlConnection {
         debug!("[mysql] on_execute: {}", input);
 
         let mut statement =
-            match parse_sql_to_statement(&input.to_string(), DatabaseProtocol::MySQL) {
+            match parse_sql_to_statement(&input.to_string(), DatabaseProtocol::MySQL, &mut None) {
                 Ok(s) => s,
                 Err(e) => {
                     info.error(ErrorKind::ER_PARSE_ERROR, e.to_string().as_bytes())?;
@@ -501,12 +501,21 @@ impl ProcessingLoop for MySqlServer {
                 }
             };
 
+            let (client_addr, client_port) = match socket.peer_addr() {
+                Ok(peer_addr) => (peer_addr.ip().to_string(), peer_addr.port()),
+                Err(e) => {
+                    error!(
+                        "[mysql] Error while calling peer_addr() on TcpStream: {}",
+                        e
+                    );
+
+                    ("127.0.0.1".to_string(), 0000_u16)
+                }
+            };
+
             let session = self
                 .session_manager
-                .create_session(
-                    DatabaseProtocol::MySQL,
-                    socket.peer_addr().unwrap().to_string(),
-                )
+                .create_session(DatabaseProtocol::MySQL, client_addr, client_port)
                 .await;
 
             let logger = Arc::new(SessionLogger::new(session.state.clone()));

@@ -33,6 +33,27 @@ const asserts: [options: QueryTestOptions, query: Query][] = [
     }
   ],
   [
+    { name: 'Rolling with Quarter granularity' },
+    {
+      measures: [
+        'visitors.checkinsRollingTotal',
+      ],
+      dimensions: [
+        'visitors.source'
+      ],
+      timezone: 'UTC',
+      timeDimensions: [{
+        dimension: 'visitors.createdAt',
+        granularity: 'quarter',
+        dateRange: ['2017-01-01', '2017-01-05']
+      }],
+      order: {
+        'visitors.createdAt': 'asc',
+        'visitors.source': 'asc'
+      }
+    }
+  ],
+  [
     { name: 'Rolling Mixed' },
     {
       measures: [

@@ -1,9 +1,8 @@
 use super::{
-    AggregateFunction, BaseRocksSecondaryIndex, Column, ColumnType, DataFrameValue, IndexId,
-    RocksSecondaryIndex, RocksTable, TableId,
+    AggregateFunction, Column, ColumnType, DataFrameValue, IndexId, RocksSecondaryIndex, TableId,
 };
 use crate::data_frame_from;
-use crate::metastore::{IdRow, ImportFormat, MetaStoreEvent, Schema};
+use crate::metastore::{IdRow, ImportFormat, RocksEntity, Schema};
 use crate::queryplanner::udfs::aggregate_udf_by_kind;
 use crate::queryplanner::udfs::CubeAggregateUDFKind;
 use crate::rocks_table_impl;
@@ -15,7 +14,7 @@ use chrono::Utc;
 use datafusion::physical_plan::expressions::{Column as FusionColumn, Max, Min, Sum};
 use datafusion::physical_plan::{udaf, AggregateExpr, PhysicalExpr};
 use itertools::Itertools;
-use rocksdb::DB;
+
 use serde::{Deserialize, Deserializer, Serialize};
 use std::io::Write;
 use std::sync::Arc;
@@ -104,6 +103,20 @@ impl core::fmt::Display for AggregateColumn {
     }
 }
 
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
+pub enum StreamOffset {
+    Earliest = 1,
+    Latest = 2,
+}
+
+impl DataFrameValue<String> for Option<StreamOffset> {
+    fn value(v: &Self) -> String {
+        v.as_ref()
+            .map(|s| format!("{:?}", s))
+            .unwrap_or("NULL".to_string())
+    }
+}
+
 data_frame_from! {
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
 pub struct Table {
@@ -122,6 +135,16 @@ pub struct Table {
     #[serde(default)]
     build_range_end: Option<DateTime<Utc>>,
     #[serde(default)]
+    seal_at: Option<DateTime<Utc>>,
+    #[serde(default)]
+    sealed: bool,
+    #[serde(default)]
+    select_statement: Option<String>,
+    #[serde(default)]
+    source_columns: Option<Vec<Column>>,
+    #[serde(default)]
+    stream_offset: Option<StreamOffset>,
+    #[serde(default)]
     unique_key_column_indices: Option<Vec<u64>>,
     #[serde(default)]
     aggregate_column_indices: Vec<AggregateColumnIndex>,
@@ -133,6 +156,8 @@ pub struct Table {
     partition_split_threshold: Option<u64>
 }
 }
+
+impl RocksEntity for Table {}
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TablePath {
@@ -157,6 +182,10 @@ impl Table {
         import_format: Option<ImportFormat>,
         is_ready: bool,
         build_range_end: Option<DateTime<Utc>>,
+        seal_at: Option<DateTime<Utc>>,
+        select_statement: Option<String>,
+        source_columns: Option<Vec<Column>>,
+        stream_offset: Option<StreamOffset>,
         unique_key_column_indices: Option<Vec<u64>>,
         aggregate_column_indices: Vec<AggregateColumnIndex>,
         seq_column_index: Option<u64>,
@@ -173,6 +202,11 @@ impl Table {
             is_ready,
             created_at: Some(Utc::now()),
             build_range_end,
+            seal_at,
+            select_statement,
+            source_columns,
+            stream_offset,
+            sealed: false,
             unique_key_column_indices,
             aggregate_column_indices,
             seq_column_index,
@@ -220,6 +254,12 @@ impl Table {
         table
     }
 
+    pub fn update_sealed(&self, sealed: bool) -> Self {
+        let mut table = self.clone();
+        table.sealed = sealed;
+        table
+    }
+
     pub fn update_location_download_size(
         &self,
         location: &str,
@@ -262,6 +302,22 @@ impl Table {
 
     pub fn build_range_end(&self) -> &Option<DateTime<Utc>> {
         &self.build_range_end
+    }
+
+    pub fn seal_at(&self) -> &Option<DateTime<Utc>> {
+        &self.seal_at
+    }
+
+    pub fn select_statement(&self) -> &Option<String> {
+        &self.select_statement
+    }
+
+    pub fn source_columns(&self) -> &Option<Vec<Column>> {
+        &self.source_columns
+    }
+
+    pub fn sealed(&self) -> bool {
+        self.sealed
     }
 
     pub fn unique_key_columns(&self) -> Option<Vec<&Column>> {
@@ -309,6 +365,29 @@ impl Table {
             .as_ref()
             .map(|v| *v)
             .unwrap_or(config_partition_split_threshold)
+    }
+
+    pub fn location_index(&self, location: &str) -> Result<usize, CubeError> {
+        let locations = self.locations().ok_or_else(|| {
+            CubeError::internal(format!(
+                "Locations are not defined but expected for: {:?}",
+                self
+            ))
+        })?;
+        let (pos, _) = locations
+            .iter()
+            .find_position(|l| l.as_str() == location)
+            .ok_or_else(|| {
+                CubeError::internal(format!(
+                    "Location '{}' is not found in table: {:?}",
+                    location, self
+                ))
+            })?;
+        Ok(pos)
+    }
+
+    pub fn stream_offset(&self) -> &Option<StreamOffset> {
+        &self.stream_offset
     }
 }
 

@@ -74,7 +74,7 @@ export class CubeSchemaConverter {
         sourceType: 'module',
         plugins: ['objectRestSpread'],
       });
-    } catch (error) {
+    } catch (error: any) {
       if (error.toString().indexOf('SyntaxError') !== -1) {
         const line = file.content.split('\n')[error.loc.line - 1];
         const spaces = Array(error.loc.column).fill(' ').join('');

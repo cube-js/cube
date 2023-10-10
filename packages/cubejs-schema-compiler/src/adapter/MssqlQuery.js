@@ -73,8 +73,8 @@ export class MssqlQuery extends BaseQuery {
     return GRANULARITY_TO_INTERVAL[granularity](dimension);
   }
 
-  newParamAllocator() {
-    return new MssqlParamAllocator();
+  newParamAllocator(expressionParams) {
+    return new MssqlParamAllocator(expressionParams);
   }
 
   groupByDimensionLimit() {
@@ -119,14 +119,24 @@ export class MssqlQuery extends BaseQuery {
   }
 
   overTimeSeriesSelect(cumulativeMeasures, dateSeriesSql, baseQuery, dateJoinConditionSql, baseQueryAlias) {
-    const forGroupBy = this.timeDimensions.map(
+    // Group by time dimensions
+    const timeDimensionsColumns = this.timeDimensions.map(
       (t) => `${t.dateSeriesAliasName()}.${this.escapeColumnName('date_from')}`
     );
+  
+    // Group by regular dimensions
+    const dimensionColumns = R.flatten(
+      this.dimensions.map(s => s.selectColumns() && s.dimensionSql() && s.aliasName())
+    ).filter(s => !!s);
+  
+    // Combine time dimensions and regular dimensions for GROUP BY clause
+    const allGroupByColumns = timeDimensionsColumns.concat(dimensionColumns);
+  
     const forSelect = this.overTimeSeriesForSelect(cumulativeMeasures);
     return (
       `SELECT ${forSelect} FROM ${dateSeriesSql}` +
       ` LEFT JOIN (${baseQuery}) ${this.asSyntaxJoin} ${baseQueryAlias} ON ${dateJoinConditionSql}` +
-      ` GROUP BY ${forGroupBy}`
+      ` GROUP BY ${allGroupByColumns.join(', ')}`
     );
   }
 

@@ -1,29 +1,25 @@
 {
   "name": "@cubejs-client/playground",
   "author": "Cube Dev, Inc.",
-  "version": "0.31.1",
+  "version": "0.34.0",
   "engines": {},
   "repository": {
     "type": "git",
-    "url": "https://github.com/cube-js/cube.js.git",
+    "url": "https://github.com/cube-js/cube.git",
     "directory": "packages/cubejs-playground"
   },
   "module": "lib/playground/index.js",
   "types": "lib/playground/index.d.ts",
   "scripts": {
     "unit": "react-scripts test",
-    "dev": "kill-port 3080 && yarn start",
-    "start": "SKIP_PREFLIGHT_CHECK=true PORT=3080 react-app-rewired start",
+    "dev": "vite",
     "watch": "tsc --noEmit false --watch",
-    "build": "yarn build:playground && yarn build:lib",
+    "build": "tsc && yarn build:playground && yarn build:lib",
     "build:lib": "tsc --noEmit false && node postbuild.js && cp -R src/img/ lib/img/",
-    "build:playground": "SKIP_PREFLIGHT_CHECK=true react-app-rewired --max-old-space-size=3072 build && rm -Rf ../cubejs-server-core/playground/** && cp -R build/ ../cubejs-server-core/playground/"
+    "build:playground": "SKIP_PREFLIGHT_CHECK=true vite build && rm -Rf ../cubejs-server-core/playground/** && cp -R build/ ../cubejs-server-core/playground/"
   },
   "browserslist": [
-    ">0.2%",
-    "not dead",
-    "not ie <= 11",
-    "not op_mini all"
+    ">0.2% and supports es6-module"
   ],
   "files": [
     "public",
@@ -31,7 +27,6 @@
     "lib"
   ],
   "homepage": ".",
-  "proxy": "http://localhost:4000",
   "license": "MIT",
   "dependencies": {
     "@graphiql/toolkit": "^0.4.3",
@@ -48,6 +43,7 @@
     "html-entities": "^2.3.3",
     "js-cookie": "^2.2.1",
     "js-object-pretty-print": "^0.3.0",
+    "js-yaml": "^4.1.0",
     "jwt-decode": "^3.1.2",
     "less": "^4.1.1",
     "mitt": "^2.1.0",
@@ -66,11 +62,11 @@
     "@ant-design/icons": "^4.7.0",
     "@babel/cli": "^7.5.5",
     "@babel/plugin-proposal-optional-chaining": "^7.11.0",
-    "@cubejs-client/core": "^0.31.0",
-    "@cubejs-client/react": "^0.31.0",
+    "@cubejs-client/core": "^0.34.0",
+    "@cubejs-client/react": "^0.34.0",
     "@types/flexsearch": "^0.7.3",
     "@types/jest": "^26.0.20",
-    "@types/node": "^14.14.35",
+    "@types/node": "^14",
     "@types/react": "^17.0.3",
     "@types/react-beautiful-dnd": "^13.0.0",
     "@types/react-dom": "^17.0.2",
@@ -78,23 +74,22 @@
     "@types/react-router-dom": "^5.1.7",
     "@types/styled-components": "5.1.9",
     "@types/uuid": "^8.3.1",
+    "@vitejs/plugin-react": "^2.1.0",
     "antd": "4.16.13",
     "eslint-config-airbnb": "^18.1.0",
     "eslint-plugin-jsx-a11y": "^6.2.1",
     "eslint-plugin-react": "^7.20.0",
     "fs-extra": "^8.1.0",
     "graphql": "^15.8.0",
-    "less-loader": "^8.1.1",
     "prismjs": "^1.25.0",
     "react": "^17.0.1",
-    "react-app-rewire-yarn-workspaces": "^1.0.3",
-    "react-app-rewired": "^2.1.0",
     "react-dom": "^17.0.1",
     "react-scripts": "4.0.3",
     "recursive-readdir": "^2.2.2",
     "styled-components": "5.2.0",
     "tslib": "^2.3.0",
-    "typescript": "4.8.2"
+    "typescript": "~4.9.5",
+    "vite": "^3.1.0"
   },
   "peerDependencies": {
     "@ant-design/icons": ">=4.7.0",

@@ -1,6 +1,6 @@
 /* eslint-disable global-require,no-restricted-syntax */
 import dotenv from '@cubejs-backend/dotenv';
-import { CubePreAggregationConverter, CubeSchemaConverter } from '@cubejs-backend/schema-compiler';
+import { CubePreAggregationConverter, CubeSchemaConverter, ScaffoldingTemplate, SchemaFormat } from '@cubejs-backend/schema-compiler';
 import spawn from 'cross-spawn';
 import path from 'path';
 import fs from 'fs-extra';
@@ -151,13 +151,52 @@ export class DevServer {
       });
       const tablesSchema = req.body.tablesSchema || (await driver.tablesSchema());
 
-      const ScaffoldingTemplate = require('@cubejs-backend/schema-compiler/scaffolding/ScaffoldingTemplate');
-      const scaffoldingTemplate = new ScaffoldingTemplate(tablesSchema, driver);
+      if (!Object.values(SchemaFormat).includes(req.body.format)) {
+        throw new Error(`Unknown schema format. Must be one of ${Object.values(SchemaFormat)}`);
+      }
+
+      const scaffoldingTemplate = new ScaffoldingTemplate(tablesSchema, driver, {
+        format: req.body.format,
+        snakeCase: true
+      });
       const files = scaffoldingTemplate.generateFilesByTableNames(req.body.tables, { dataSource });
 
       const schemaPath = options.schemaPath || 'schema';
 
-      await Promise.all(files.map(file => fs.writeFile(path.join(schemaPath, file.fileName), file.content)));
+      await fs.emptyDir(path.join(schemaPath, 'cubes'));
+      await fs.emptyDir(path.join(schemaPath, 'views'));
+      
+      await fs.writeFile(path.join(schemaPath, 'views', 'example_view.yml'), `# In Cube, views are used to expose slices of your data graph and act as data marts.
+# You can control which measures and dimensions are exposed to BIs or data apps, 
+# as well as the direction of joins between the exposed cubes.
+# You can learn more about views in documentation here - https://cube.dev/docs/schema/reference/view
+
+
+# The following example shows a view defined on top of orders and customers cubes. 
+# Both orders and customers cubes are exposed using the "includes" parameter to 
+# control which measures and dimensions are exposed.
+# Prefixes can also be applied when exposing measures or dimensions. 
+# In this case, the customers' city dimension is prefixed with the cube name,
+# resulting in "customers_city" when querying the view.
+
+# views:
+#   - name: example_view
+#
+#     cubes:
+#       - join_path: orders
+#         includes:
+#           - status
+#           - created_date
+#
+#           - total_amount
+#           - count
+#      
+#       - join_path: orders.customers
+#         prefix: true
+#         includes: 
+#           - city`);
+      await Promise.all(files.map(file => fs.writeFile(path.join(schemaPath, 'cubes', file.fileName), file.content)));
+
       res.json({ files });
     }));
 
@@ -436,7 +475,7 @@ export class DevServer {
         const type = keyByDataSource('CUBEJS_DB_TYPE', dataSource);
 
         let driver: BaseDriver | null = null;
-        
+
         try {
           if (!variables || !variables[type]) {
             throw new Error(`${type} is required`);
@@ -492,13 +531,22 @@ export class DevServer {
       if (!variables.CUBEJS_API_SECRET) {
         variables.CUBEJS_API_SECRET = options.apiSecret;
       }
-
+      
+      let envs: Record<string, string> = {};
+      const envPath = path.join(process.cwd(), '.env');
+      if (fs.existsSync(envPath)) {
+        envs = dotenv.parse(fs.readFileSync(envPath));
+      }
+      
+      const schemaPath = envs.CUBEJS_SCHEMA_PATH || process.env.CUBEJS_SCHEMA_PATH || 'model';
+      
       variables.CUBEJS_EXTERNAL_DEFAULT = 'true';
       variables.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'true';
       variables.CUBEJS_DEV_MODE = 'true';
+      variables.CUBEJS_SCHEMA_PATH = schemaPath;
       variables = Object.entries(variables).map(([key, value]) => ([key, value].join('=')));
 
-      const repositoryPath = path.join(process.cwd(), options.schemaPath);
+      const repositoryPath = path.join(process.cwd(), schemaPath);
 
       if (!fs.existsSync(repositoryPath)) {
         fs.mkdirSync(repositoryPath);

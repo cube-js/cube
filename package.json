@@ -24,17 +24,17 @@
     "tsc:watch": "tsc --build --watch",
     "clean": "rimraf packages/*/{tsconfig.tsbuildinfo,lib,dist}",
     "postinstall": "lerna link && patch-package",
-    "link:dev": "cd packages/cubejs-backend-shared && cd ../cubejs-backend-shared && npm link && cd ../cubejs-backend-cloud && npm link && cd ../cubejs-backend-native && npm link && cd ../cubejs-server && npm link && cd ../cubejs-server-core && npm link && cd ../cubejs-api-gateway && npm link && cd ../cubejs-schema-compiler && npm link && cd ../cubejs-query-orchestrator && npm link && cd ../cubejs-athena-driver && npm link && cd ../cubejs-bigquery-driver && npm link && cd ../cubejs-postgres-driver && npm link && cd ../cubejs-databricks-jdbc-driver && npm link && cd ../cubejs-mssql-driver && npm link && cd ../cubejs-templates && npm link && cd ../cubejs-client-core && npm link && cd ../cubejs-client-ws-transport && npm link && cd ../cubejs-playground && npm link"
+    "link:dev": "cd packages/cubejs-backend-shared && cd ../cubejs-backend-shared && yarn link && cd ../cubejs-backend-cloud && yarn link && cd ../cubejs-backend-native && yarn link && cd ../cubejs-server && yarn link && cd ../cubejs-server-core && yarn link && cd ../cubejs-api-gateway && yarn link && cd ../cubejs-schema-compiler && yarn link && cd ../cubejs-query-orchestrator && yarn link && cd ../cubejs-athena-driver && yarn link && cd ../cubejs-duckdb-driver && yarn link && cd ../cubejs-bigquery-driver && yarn link && cd ../cubejs-postgres-driver && yarn link && cd ../cubejs-databricks-jdbc-driver && yarn link && cd ../cubejs-mssql-driver && yarn link && cd ../cubejs-clickhouse-driver && yarn link && cd ../cubejs-snowflake-driver && yarn link && cd ../cubejs-cubestore-driver && yarn link && cd ../cubejs-templates && yarn link && cd ../cubejs-client-core && yarn link && cd ../cubejs-client-ws-transport && yarn link && cd ../cubejs-playground && yarn link"
   },
   "author": "Cube Dev, Inc.",
   "dependencies": {
     "@babel/runtime-corejs2": "^7.0.0",
     "@typescript-eslint/eslint-plugin": "^4.17.0",
     "core-js": "^3.6.5",
-    "lerna": "^3.13.1",
+    "lerna": "^4.0.0",
+    "patch-package": "^6.4.7",
     "ramda": "^0.27.0",
     "rollup-plugin-dts": "^1.1.8",
-    "patch-package": "^6.4.7",
     "whatwg-fetch": "^3.0.0"
   },
   "files": [
@@ -64,21 +64,17 @@
     "prettier": "^2.0.5",
     "rimraf": "^3.0.2",
     "rollup": "2.53.1",
-    "rollup-plugin-less": "^1.1.3",
-    "rollup-plugin-local-resolve": "^1.0.7",
     "rollup-plugin-peer-deps-external": "^2.2.4",
-    "rollup-plugin-postcss": "^4.0.0",
-    "rollup-plugin-uglify": "^6.0.4",
-    "typescript": "~4.1.5"
+    "typescript": "~4.9.5"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/cube-js/cube.js.git"
+    "url": "https://github.com/cube-js/cube.git"
   },
   "resolutions": {
-    "@types/node": "^12",
-    "@types/ramda": "0.27.40",
-    "rc-tree": "4.1.5"
+    "@types/node": "^14",
+    "@types/ramda": "0.27.40"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "packageManager": "yarn@1.22.19"
 }

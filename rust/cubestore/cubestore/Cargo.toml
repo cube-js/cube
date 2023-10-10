@@ -17,10 +17,11 @@ libc = { version = "0.2.97", optional = true }
 base64 = "0.13.0"
 bumpalo = "3.6.1"
 tokio = { version = "1.0", features = ["full", "rt"] }
-warp = { git = 'https://github.com/seanmonstar/warp', version = "0.3.0" }
-sqlparser = { git = 'https://github.com/cube-js/sqlparser-rs.git', rev = "a65390c81ffcc34eac2bd35c837c5683d44ec1e0" }
+warp = { version = "0.3.3" }
+sqlparser = { git = 'https://github.com/cube-js/sqlparser-rs.git', rev = "4388f6712dae5073c2d71d74f64cae2edd418066" }
 serde_derive = "1.0.115"
 serde = "1.0.115"
+serde_repr = "0.1"
 serde_bytes = "0.11.5"
 cubehll = { path = "../cubehll" }
 cubezetasketch = { path = "../cubezetasketch" }
@@ -32,8 +33,8 @@ datafusion = { git = "https://github.com/cube-js/arrow-datafusion", branch = "cu
 csv = "1.1.3"
 bytes = "0.5.4"
 serde_json = "1.0.56"
-futures = "0.3.5"
-smallvec = "1.8.0"
+futures = "0.3.26"
+smallvec = "1.11.0"
 flexbuffers = "0.1.1"
 byteorder = "1.3.4"
 log = "=0.4.11"
@@ -41,22 +42,23 @@ simple_logger = "1.7.0"
 async-trait = "0.1.36"
 actix-rt = "2.7.0"
 regex = "1.3.9"
-rocksdb = { version = "0.16.0", default-features = false, features = ["bzip2"] }
+rocksdb = { git = "https://github.com/cube-js/rust-rocksdb", branch = "cubestore", default-features = false, features = ["zstd", "snappy"] }
 uuid = { version = "0.8", features = ["serde", "v4"] }
 num = "0.3.0"
 enum_primitive = "0.1.1"
 msql-srv = { git = 'https://github.com/cube-js/msql-srv', version = '0.9.2' }
 bincode = "1.3.1"
 chrono = "0.4.15"
+chrono-tz = "0.8.2"
 lazy_static = "1.4.0"
 mockall = "0.8.1"
 async-std = "0.99"
-itertools = "0.9.0"
+itertools = "0.11.0"
 bigdecimal = { version = "0.2.0", features = ["serde"] }
 rust-s3 = "0.26.3"
 aws-creds = "0.24.1"
 aws-region = "0.22.1"
-deadqueue = "0.1.0"
+deadqueue = "0.2.4"
 reqwest = { version = "0.11.0", features = ["json", "rustls-tls"], default-features = false }
 nanoid = "0.3.0"
 rand = "0.8.0"
@@ -73,11 +75,12 @@ tarpc = { version = "0.24", features = ["tokio1"] }
 pin-project-lite = "0.2.4"
 paste = "1.0.4"
 mysql_common = "0.26.0"
-flatbuffers = "0.7.0"
+flatbuffers = "23.1.21"
 http-auth-basic = "0.1.2"
 tracing = "0.1.25"
 tracing-futures = { version = "0.2.5", features = ["tokio", "tokio-executor"] }
 lru = "0.6.5"
+moka = { version = "0.10.1", features = ["future"]}
 ctor = "0.1.20"
 json = "0.12.4"
 futures-util = "0.3.17"
@@ -86,6 +89,22 @@ pin-project = "1.0.8"
 tokio-tungstenite = { version = "0.16.0", features = ["native-tls"] }
 deflate = "1.0.0"
 indoc = "1.0"
+rdkafka = { version = "0.29.0" }
+parse-size = "1.0.0"
+humansize = "2.1.3"
+deepsize = "0.2.0"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+rdkafka = { version = "0.29.0", features = ["ssl", "gssapi", "cmake-build"] }
+sasl2-sys = { version = "0.1.6", features = ["vendored"] }
+
+# TODO support ssl for windows
+[target.'cfg(target_os = "windows")'.dependencies]
+rdkafka = { version = "0.29.0", features = ["cmake-build"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+rdkafka = { version = "0.29.0", features = ["ssl", "gssapi"] }
+sasl2-sys = { version = "0.1.6", features = ["vendored"] }
 
 [dev-dependencies]
 pretty_assertions = "0.7.1"

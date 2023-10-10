@@ -1,0 +1,47 @@
+{
+  "name": "@cubejs-backend/docker",
+  "version": "0.31.20",
+  "description": "Cube.js In Docker (virtual package)",
+  "author": "Cube Dev, Inc.",
+  "license": "Apache-2.0",
+  "private": true,
+  "engines": {
+    "node": "^14.0.0 || ^16.0.0 || >=17.0.0"
+  },
+  "scripts": {
+      "link:dev": "yarn link @cubejs-backend/shared @cubejs-backend/server @cubejs-backend/server-core @cubejs-backend/api-gateway @cubejs-backend/schema-compiler @cubejs-backend/query-orchestrator @cubejs-client/ws-transport @cubejs-client/core @cubejs-backend/templates @cubejs-client/playground @cubejs-backend/athena-driver @cubejs-backend/bigquery-driver @cubejs-backend/postgres-driver @cubejs-backend/mssql-driver"
+  },
+  "dependencies": {
+    "@cubejs-backend/athena-driver": "file:/cube-build/packages/cubejs-athena-driver",
+    "@cubejs-backend/bigquery-driver": "file:/cube-build/packages/cubejs-bigquery-driver",
+    "@cubejs-backend/clickhouse-driver": "file:/cube-build/packages/cubejs-clickhouse-driver",
+    "@cubejs-backend/crate-driver": "file:/cube-build/packages/cubejs-crate-driver",
+    "@cubejs-backend/databricks-jdbc-driver": "file:/cube-build/packages/cubejs-jdbc-driver",
+    "@cubejs-backend/dbt-schema-extension": "file:/cube-build/packages/cubejs-dbt-schema-extension",
+    "@cubejs-backend/dremio-driver": "file:/cube-build/packages/cubejs-dremio-driver",
+    "@cubejs-backend/druid-driver": "file:/cube-build/packages/cubejs-druid-driver",
+    "@cubejs-backend/duckdb-driver": "file:/cube-build/packages/cubejs-duckdb-driver",
+    "@cubejs-backend/elasticsearch-driver": "file:/cube-build/packages/cubejs-elasticsearch-driver",
+    "@cubejs-backend/firebolt-driver": "file:/cube-build/packages/cubejs-firebolt-driver",
+    "@cubejs-backend/hive-driver": "file:/cube-build/packages/cubejs-hive-driver",
+    "@cubejs-backend/ksql-driver": "file:/cube-build/packages/cubejs-ksql-driver",
+    "@cubejs-backend/materialize-driver": "file:/cube-build/packages/cubejs-materialize-driver",
+    "@cubejs-backend/mongobi-driver": "file:/cube-build/packages/cubejs-mongobi-driver",
+    "@cubejs-backend/mssql-driver": "file:/cube-build/packages/cubejs-mssql-driver",
+    "@cubejs-backend/mysql-driver": "file:/cube-build/packages/cubejs-mysql-driver",
+    "@cubejs-backend/oracle-driver": "file:/cube-build/packages/cubejs-oracle-driver",
+    "@cubejs-backend/postgres-driver": "file:/cube-build/packages/cubejs-postgres-driver",
+    "@cubejs-backend/prestodb-driver": "file:/cube-build/packages/cubejs-prestodb-driver",
+    "@cubejs-backend/questdb-driver": "file:/cube-build/packages/cubejs-questdb-driver",
+    "@cubejs-backend/redshift-driver": "file:/cube-build/packages/cubejs-redshift-driver",
+    "@cubejs-backend/server": "file:/cube-build/packages/cubejs-server",
+    "@cubejs-backend/snowflake-driver": "file:/cube-build/packages/cubejs-snowflake-driver",
+    "@cubejs-backend/sqlite-driver": "file:/cube-build/packages/cubejs-sqlite-driver",
+    "@cubejs-backend/trino-driver": "file:/cube-build/packages/cubejs-trino-driver",
+    "cubejs-cli": "file:/cube-build/packages/cubejs-cli",
+    "typescript": "~4.1.5"
+  },
+  "resolutions": {
+    "colors": "1.4.0"
+  }
+}

@@ -1,0 +1,23 @@
+version: "2.2"
+
+services:
+  cube:
+    container_name: birdbox-cube
+    image: ${BIRDBOX_CUBEJS_REGISTRY_PATH}cubejs/cube:${BIRDBOX_CUBEJS_VERSION:-latest}
+    environment:
+      CUBEJS_DB_TYPE: prestodb
+
+      CUBEJS_DB_HOST: host.docker.internal
+      CUBEJS_DB_PORT: ${CUBEJS_DB_PORT:-8080}
+      CUBEJS_DB_PRESTO_CATALOG: ${CUBEJS_DB_NAME:-memory}
+      CUBEJS_DB_USER: ${CUBEJS_DB_USER:-presto}
+
+      CUBEJS_DEV_MODE: "true"
+      CUBEJS_WEB_SOCKETS: "true"
+      CUBEJS_API_SECRET: mysupersecret
+      CUBEJS_SCHEMA_PATH: schema
+    volumes:
+      - ./prestodb/schema:/cube/conf/schema
+    ports:
+      - "4000"
+    restart: always

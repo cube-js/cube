@@ -1,5 +1,10 @@
-import { Component } from 'react';
-import { Layout, Button, Modal, Empty, Typography } from 'antd';
+import React, { Component } from 'react';
+import {
+  Layout,
+  Modal,
+  Empty,
+  Typography,
+} from 'antd';
 import { RouterProps } from 'react-router-dom';
 
 import PrismCode from '../../PrismCode';
@@ -7,7 +12,9 @@ import { playgroundAction } from '../../events';
 import { Menu, Tabs, Tree } from '../../components';
 import { Alert, CubeLoader } from '../../atoms';
 import { playgroundFetch } from '../../shared/helpers';
-import { AppContextConsumer } from '../../components/AppContext';
+import { AppContext, AppContextConsumer } from '../../components/AppContext';
+import ButtonDropdown from '../../QueryBuilder/ButtonDropdown';
+import { SchemaFormat } from '../../types';
 
 const { Content, Sider } = Layout;
 
@@ -31,7 +38,11 @@ const schemaToTreeData = (schemas) =>
 
 type SchemaPageProps = RouterProps;
 
-export default class SchemaPage extends Component<SchemaPageProps, any> {
+export class SchemaPage extends Component<SchemaPageProps, any> {
+  static contextType = AppContext;
+
+  context!: React.ContextType<typeof AppContext>;
+
   constructor(props) {
     super(props);
 
@@ -88,32 +99,38 @@ export default class SchemaPage extends Component<SchemaPageProps, any> {
     const result = await res.json();
     this.setState({
       files: result.files,
+      activeTab: (result.files && result.files.length > 0) ? "files" : "schema"
     });
   }
 
-  async generateSchema() {
+  async generateSchema(format: SchemaFormat = SchemaFormat.js) {
     const { checkedKeys, tablesSchema } = this.state;
     const { history } = this.props;
-    playgroundAction('Generate Schema');
+
+    const options = { format };
+
+    playgroundAction('Generate Schema', options);
     const res = await playgroundFetch('/playground/generate-schema', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
+        format,
         tables: checkedKeys
           .filter((k) => !!schemasMap[k])
           .map((e) => schemasMap[e]),
         tablesSchema,
       }),
     });
+
     if (res.status === 200) {
-      playgroundAction('Generate Schema Success');
+      playgroundAction('Generate Schema Success', options);
       await this.loadFiles();
       this.setState({ checkedKeys: [], activeTab: 'files' });
       Modal.success({
-        title: 'Schema files successfully generated!',
-        content: 'You can start building the charts',
+        title: 'Data model files successfully generated!',
+        content: 'You can start exploring your data model and building the charts',
         okText: 'Build',
         cancelText: 'Close',
         okCancel: true,
@@ -122,7 +139,10 @@ export default class SchemaPage extends Component<SchemaPageProps, any> {
         },
       });
     } else {
-      playgroundAction('Generate Schema Fail', { error: await res.text() });
+      playgroundAction('Generate Schema Fail', {
+        error: await res.text(),
+        ...options,
+      });
     }
   }
 
@@ -167,6 +187,14 @@ export default class SchemaPage extends Component<SchemaPageProps, any> {
       activeTab,
       isDocker,
     } = this.state;
+
+    const { playgroundContext } = this.context;
+
+    const [, minor] = playgroundContext.coreServerVersion
+      ? playgroundContext.coreServerVersion.split('.')
+      : [];
+    const isYamlFormatSupported: boolean = !minor || Number(minor) >= 31;
+
     const renderTreeNodes = (data) =>
       data.map((item) => {
         if (item.treeData) {
@@ -221,13 +249,32 @@ export default class SchemaPage extends Component<SchemaPageProps, any> {
             activeKey={activeTab}
             onChange={(tab) => this.setState({ activeTab: tab })}
             tabBarExtraContent={
-              <Button
+              <ButtonDropdown
                 disabled={!checkedKeys.length}
                 type="primary"
-                onClick={() => this.generateSchema()}
+                data-testid="chart-type-btn"
+                overlay={
+                  <Menu data-testid="generate-schema">
+                    <Menu.Item
+                      title={
+                        !isYamlFormatSupported
+                          ? 'yaml schema format is supported by Cube 0.31.0 and later'
+                          : ''
+                      }
+                      disabled={!isYamlFormatSupported}
+                      onClick={() => this.generateSchema(SchemaFormat.yaml)}
+                    >
+                      YAML
+                    </Menu.Item>
+                    <Menu.Item onClick={() => this.generateSchema()}>
+                      JavaScript
+                    </Menu.Item>
+                  </Menu>
+                }
+                style={{ border: 0 }}
               >
-                Generate Schema
-              </Button>
+                Generate Data Model
+              </ButtonDropdown>
             }
           >
             <TabPane tab="Tables" key="schema">
@@ -251,14 +298,13 @@ export default class SchemaPage extends Component<SchemaPageProps, any> {
               message={
                 isDocker ? (
                   <span>
-                    Schema files are located and can be edited in the mount
+                    Data model files are located and can be edited in the mount
                     volume directory.{' '}
                     <Typography.Link
                       href="https://cube.dev/docs/schema/getting-started"
                       target="_blank"
                     >
-                      Learn more about working with Cube data schema in the
-                      docs
+                      Learn more about working with Cube data model in the docs
                     </Typography.Link>
                   </span>
                 ) : (
@@ -283,7 +329,7 @@ export default class SchemaPage extends Component<SchemaPageProps, any> {
           ) : (
             <Empty
               style={{ marginTop: 50 }}
-              description="Select tables to generate Cube schema"
+              description="Select tables to generate Cube data model"
             />
           )}
 

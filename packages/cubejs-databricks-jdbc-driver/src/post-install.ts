@@ -11,7 +11,7 @@ import { downloadJDBCDriver } from './installer';
     if (!fs.existsSync(path.join(__dirname, '..', 'download', 'SparkJDBC42.jar'))) {
       await downloadJDBCDriver();
     }
-  } catch (e) {
+  } catch (e: any) {
     await displayCLIError(e, 'Cube.js Databricks JDBC Installer');
   }
 })();

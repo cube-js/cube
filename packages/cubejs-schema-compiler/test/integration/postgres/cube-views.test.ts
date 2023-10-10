@@ -13,6 +13,8 @@ cube(\`Orders\`, {
   SELECT 2 as id, 2 as product_id, 'completed' as status, '2022-01-02T00:00:00.000Z'::timestamptz as created_at
   \`,
   
+  shown: false,
+  
   refreshKey: {
     sql: \`SELECT MAX(created_at) FROM \${Orders.sql()} orders WHERE \${FILTER_PARAMS.Orders.createdAt.filter('created_at')}\`
   },
@@ -44,6 +46,13 @@ cube(\`Orders\`, {
     count: {
       type: \`count\`,
       //drillMembers: [id, createdAt]
+    },
+    
+    runningTotal: {
+      type: \`count\`,
+      rollingWindow: {
+        trailing: \`unbounded\`
+      },
     },
   },
 
@@ -222,6 +231,10 @@ view(\`OrdersView\`, {
     },
   }
 });
+
+view(\`OrdersView2\`, {
+  includes: [Orders.count],
+});
     `);
 
   async function runQueryTest(q: any, expectedResult: any, additionalTest?: (query: BaseQuery) => any) {
@@ -358,9 +371,33 @@ view(\`OrdersView\`, {
     orders__count: '1',
   }]));
 
+  it('rolling window', async () => runQueryTest({
+    measures: ['OrdersView.runningTotal']
+  }, [{
+    orders_view__running_total: '2',
+  }]));
+
+  it('rolling window with dimension', async () => runQueryTest({
+    measures: ['OrdersView.runningTotal'],
+    dimensions: ['OrdersView.productName'],
+    order: [{ id: 'OrdersView.productName' }],
+  }, [{
+    orders_view__product_name: 'Potato',
+    orders_view__running_total: '1',
+  }, {
+    orders_view__product_name: 'Tomato',
+    orders_view__running_total: '1',
+  }]));
+
   it('check includes are exposed in meta', async () => {
     await compiler.compile();
     const cube = metaTransformer.cubes.find(c => c.config.name === 'OrdersView');
     expect(cube.config.measures.find((({ name }) => name === 'OrdersView.count')).name).toBe('OrdersView.count');
+  });
+
+  it('orders are hidden', async () => {
+    await compiler.compile();
+    const cube = metaTransformer.cubes.find(c => c.config.name === 'Orders');
+    expect(cube.config.measures.filter((({ isVisible }) => isVisible)).length).toBe(0);
   });
 });

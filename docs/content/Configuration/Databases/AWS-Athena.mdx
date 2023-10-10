@@ -14,34 +14,70 @@ permalink: /config/databases/aws-athena
 
 ### <--{"id" : "Setup"}--> Manual
 
-Add the following to a `.env` file in your Cube.js project:
+Add the following to a `.env` file in your Cube project:
 
-```bash
+```dotenv
 CUBEJS_DB_TYPE=athena
 CUBEJS_AWS_KEY=AKIA************
 CUBEJS_AWS_SECRET=****************************************
 CUBEJS_AWS_REGION=us-east-1
 CUBEJS_AWS_S3_OUTPUT_LOCATION=s3://my-athena-output-bucket
 CUBEJS_AWS_ATHENA_WORKGROUP=primary
+CUBEJS_AWS_ATHENA_CATALOG=AwsDataCatalog
 ```
+
+### <--{"id" : "Setup"}--> Cube Cloud
+
+<InfoBox heading="Allowing connections from Cube Cloud IP">
+
+In some cases you'll need to allow connections from your Cube Cloud deployment IP
+address to your database. You can copy the IP address from either the Database
+Setup step in deployment creation, or from <Btn>Settings →
+Configuration</Btn> in your deployment.
+
+</InfoBox>
+
+In Cube Cloud, select **AWS Athena** when creating a new deployment and fill in
+the required fields:
+
+<Screenshot
+  alt="Cube Cloud AWS Athena Configuration Screen"
+  src="https://ucarecdn.com/d30fa31d-e6ea-4a73-9950-1786634a1e32/"
+/>
+
+Cube Cloud also supports connecting to data sources within private VPCs. If you already have VPCs enabled in
+your account, check out the [VPC documentation][ref-cloud-conf-vpc] to learn how
+to get started.
+
+<SuccessBox>
+
+VPC connectivity is available in Cube Cloud on [Premium](https://cube.dev/pricing) tier. [Contact us][cube-contact] for details.
+
+</SuccessBox>
+
+[cube-pricing]: https://cube.dev/pricing/
+[cube-contact]: https://cube.dev/contact/
+[ref-cloud-conf-vpc]: /cloud/configuration/connecting-with-a-vpc
 
 ## Environment Variables
 
-| Environment Variable            | Description                                                                         | Possible Values                                  | Required |
-| ------------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------ | :------: |
-| `CUBEJS_AWS_KEY`                | The AWS Access Key ID to use for database connections                               | A valid AWS Access Key ID                        |    ✅    |
-| `CUBEJS_AWS_SECRET`             | The AWS Secret Access Key to use for database connections                           | A valid AWS Secret Access Key                    |    ✅    |
-| `CUBEJS_AWS_REGION`             | The AWS region of the Cube.js deployment                                            | [A valid AWS region][aws-docs-regions]           |    ✅    |
-| `CUBEJS_AWS_S3_OUTPUT_LOCATION` | The S3 path to store query results made by the Cube.js deployment                   | A valid S3 path                                  |    ❌    |
-| `CUBEJS_AWS_ATHENA_WORKGROUP`   | The name of the workgroup in which the query is being started                       | [A valid Athena Workgroup][aws-athena-workgroup] |    ❌    |
-| `CUBEJS_CONCURRENCY`            | The number of concurrent connections each queue has to the database. Default is `5` | A valid number                                   |    ❌    |
+| Environment Variable            | Description                                                                                                            | Possible Values                                  | Required | [Supports multiple data sources?][ref-config-multiple-ds-decorating-env] |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | :------: | :----------------------------------------------------------------------: |
+| `CUBEJS_AWS_KEY`                | The AWS Access Key ID to use for database connections                                                                  | A valid AWS Access Key ID                        |    ✅    |                                    ✅                                    |
+| `CUBEJS_AWS_SECRET`             | The AWS Secret Access Key to use for database connections                                                              | A valid AWS Secret Access Key                    |    ✅    |                                    ✅                                    |
+| `CUBEJS_AWS_REGION`             | The AWS region of the Cube deployment                                                                                  | [A valid AWS region][aws-docs-regions]           |    ✅    |                                    ✅                                    |
+| `CUBEJS_AWS_S3_OUTPUT_LOCATION` | The S3 path to store query results made by the Cube deployment                                                         | A valid S3 path                                  |    ❌    |                                    ✅                                    |
+| `CUBEJS_AWS_ATHENA_WORKGROUP`   | The name of the workgroup in which the query is being started                                                          | [A valid Athena Workgroup][aws-athena-workgroup] |    ❌    |                                    ✅                                    |
+| `CUBEJS_AWS_ATHENA_CATALOG`     | The name of the catalog to use by default                                                                              | [A valid Athena Catalog name][awsdatacatalog]    |    ❌    |                                    ✅                                    |
+| `CUBEJS_DB_SCHEMA`              | The name of the schema to use as `information_schema` filter. Reduces count of tables loaded during schema generation. | A valid schema name                              |    ❌    |                                    ✅                                    |
+| `CUBEJS_CONCURRENCY`            | The number of concurrent connections each queue has to the database. Default is `5`                                    | A valid number                                   |    ❌    |                                    ❌                                    |
 
 ## Pre-Aggregation Feature Support
 
-### countDistinctApprox
+### count_distinct_approx
 
 Measures of type
-[`countDistinctApprox`][ref-schema-ref-types-formats-countdistinctapprox] can be
+[`count_distinct_approx`][ref-schema-ref-types-formats-countdistinctapprox] can be
 used in pre-aggregations when using AWS Athena as a source database. To learn
 more about AWS Athena's support for approximate aggregate functions, [click
 here][aws-athena-docs-approx-agg-fns].
@@ -79,7 +115,7 @@ AWS Athena **only** supports using AWS S3 for export buckets.
 
 For [improved pre-aggregation performance with large
 datasets][ref-caching-large-preaggs], enable export bucket functionality by
-configuring Cube.js with the following environment variables:
+configuring Cube with the following environment variables:
 
 <InfoBox>
 
@@ -98,12 +134,14 @@ CUBEJS_DB_EXPORT_BUCKET_AWS_REGION=<AWS_REGION>
 
 ## SSL
 
-Cube.js does not require any additional configuration to enable SSL as AWS
-Athena connections are made over HTTPS.
+Cube does not require any additional configuration to enable SSL as AWS Athena
+connections are made over HTTPS.
 
 [aws-athena]: https://aws.amazon.com/athena
 [aws-athena-workgroup]:
   https://docs.aws.amazon.com/athena/latest/ug/workgroups-benefits.html
+[awsdatacatalog]:
+  https://docs.aws.amazon.com/athena/latest/ug/understanding-tables-databases-and-the-data-catalog.html
 [aws-s3]: https://aws.amazon.com/s3/
 [aws-docs-athena-access]:
   https://docs.aws.amazon.com/athena/latest/ug/security-iam-athena.html
@@ -116,6 +154,8 @@ Athena connections are made over HTTPS.
 [ref-caching-large-preaggs]: /caching/using-pre-aggregations#export-bucket
 [ref-caching-using-preaggs-build-strats]:
   /caching/using-pre-aggregations#pre-aggregation-build-strategies
+[ref-config-multiple-ds-decorating-env]:
+  /config/multiple-data-sources#configuring-data-sources-with-environment-variables-decorated-environment-variables
 [ref-schema-ref-types-formats-countdistinctapprox]:
   /schema/reference/types-and-formats#count-distinct-approx
 [self-preaggs-batching]: #batching

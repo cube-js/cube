@@ -1,0 +1,13 @@
+@import "../../../static/styles/variables.scss";
+
+.button {
+  display: inline-block;
+  padding: 0 6px;
+  background: $white;
+  border: 1px solid $dark-05;
+  box-shadow: 2px 2px 0px $dark-05;
+  border-radius: 4px;
+  font-size: inherit;
+  line-height: 24px;
+  margin-right: 2px;
+}

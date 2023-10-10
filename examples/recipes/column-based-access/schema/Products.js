@@ -4,10 +4,10 @@ cube(`Products`, {
   joins: {
     Suppliers: {
       relationship: `belongsTo`,
-      sql: `${CUBE}.supplier_id = ${Suppliers}.id`
+      sql: `${CUBE}.supplier_id = ${Suppliers.id}`
     }
   },
-  
+
   dimensions: {
     name: {
       sql: `name`,

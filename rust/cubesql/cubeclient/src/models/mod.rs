@@ -2,6 +2,8 @@ pub mod v1_cube_meta;
 pub use self::v1_cube_meta::V1CubeMeta;
 pub mod v1_cube_meta_dimension;
 pub use self::v1_cube_meta_dimension::V1CubeMetaDimension;
+pub mod v1_cube_meta_join;
+pub use self::v1_cube_meta_join::V1CubeMetaJoin;
 pub mod v1_cube_meta_measure;
 pub use self::v1_cube_meta_measure::V1CubeMetaMeasure;
 pub mod v1_cube_meta_segment;

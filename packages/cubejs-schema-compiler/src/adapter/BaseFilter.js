@@ -7,7 +7,7 @@ import { BaseDimension } from './BaseDimension';
 
 const moment = momentRange.extendMoment(require('moment-timezone'));
 
-const DATE_OPERATORS = ['inDateRange', 'notInDateRange', 'onTheDate', 'beforeDate', 'afterDate'];
+const DATE_OPERATORS = ['inDateRange', 'notInDateRange', 'onTheDate', 'beforeDate', 'beforeOrOnDate', 'afterDate', 'afterOrOnDate'];
 const dateTimeLocalMsRegex = /^\d\d\d\d-\d\d-\d\dT\d\d:\d\d:\d\d\.\d\d\d$/;
 const dateRegex = /^\d\d\d\d-\d\d-\d\d$/;
 
@@ -30,6 +30,10 @@ export class BaseFilter extends BaseDimension {
     }
 
     return this.conditionSql(this.measure ? this.query.measureSql(this) : this.query.dimensionSql(this));
+  }
+
+  convertTzForRawTimeDimensionIfNeeded(sql) {
+    return sql();
   }
 
   // Evaluates filters on measures to whole where statement in query
@@ -176,12 +180,30 @@ export class BaseFilter extends BaseDimension {
   }
 
   /**
+   * Returns SQL statement for the `notStartsWith` filter.
+   * @param {string} column Column name.
+   * @returns string
+   */
+  notStartsWithWhere(column) {
+    return this.likeOr(column, true, 'starts');
+  }
+
+  /**
    * Returns SQL statement for the `endsWith` filter.
    * @param {string} column Column name.
    * @returns string
    */
   endsWithWhere(column) {
     return this.likeOr(column, false, 'ends');
+  }
+
+  /**
+   * Returns SQL statement for the `endsWith` filter.
+   * @param {string} column Column name.
+   * @returns string
+   */
+  notEndsWithWhere(column) {
+    return this.likeOr(column, true, 'ends');
   }
 
   /**
@@ -310,9 +332,19 @@ export class BaseFilter extends BaseDimension {
     return this.query.beforeDateFilter(column, before);
   }
 
+  beforeOrOnDateWhere(column) {
+    const [before] = this.allocateTimestampParams();
+    return this.query.beforeOrOnDateFilter(column, before);
+  }
+
   afterDateWhere(column) {
     const [after] = this.allocateTimestampParams();
     return this.query.afterDateFilter(column, after);
+  }
+
+  afterOrOnDateWhere(column) {
+    const [after] = this.allocateTimestampParams();
+    return this.query.afterOrOnDateFilter(column, after);
   }
 
   formatFromDate(date) {

@@ -1,6 +1,5 @@
 ---
 source: cubesql/src/compile/mod.rs
-assertion_line: 6264
 expression: "execute_query(\"show columns from KibanaSampleDataEcommerce;\".to_string(),\n            DatabaseProtocol::MySQL).await?"
 ---
 +--------------------+--------------+------+-----+---------+-------+
@@ -10,11 +9,15 @@ expression: "execute_query(\"show columns from KibanaSampleDataEcommerce;\".to_s
 | maxPrice           | numeric      | NO   |     | NULL    |       |
 | minPrice           | numeric      | NO   |     | NULL    |       |
 | avgPrice           | numeric      | NO   |     | NULL    |       |
+| countDistinct      | int          | NO   |     | NULL    |       |
 | order_date         | datetime     | YES  |     | NULL    |       |
+| last_mod           | datetime     | YES  |     | NULL    |       |
 | customer_gender    | varchar(255) | YES  |     | NULL    |       |
+| notes              | varchar(255) | YES  |     | NULL    |       |
 | taxful_total_price | numeric      | YES  |     | NULL    |       |
 | has_subscription   | tinyint(1)   | YES  |     | NULL    |       |
 | is_male            | tinyint(1)   | NO   |     | NULL    |       |
 | is_female          | tinyint(1)   | NO   |     | NULL    |       |
 | __user             | varchar(255) | YES  |     | NULL    |       |
+| __cubeJoinField    | varchar(255) | YES  |     | NULL    |       |
 +--------------------+--------------+------+-----+---------+-------+

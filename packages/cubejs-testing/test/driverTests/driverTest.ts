@@ -1,9 +1,9 @@
 // eslint-disable-next-line import/no-extraneous-dependencies
-import { Query, QueryRecordType, ResultSet } from '@cubejs-client/core';
+import { CubejsApi, Query, QueryRecordType, ResultSet } from '@cubejs-client/core';
 import { uniqBy } from 'ramda';
 import { Schemas } from '../../src';
 
-export type TestType = 'basic' | 'withError';
+export type TestType = 'basic' | 'withError' | 'testFn';
 
 type DriverTestArg = {
   name: string;
@@ -39,7 +39,18 @@ export type DriverTestWithError = {
   type: 'withError';
 };
 
-export type DriverTest = DriverTestBasic | DriverTestWithError;
+type DriverTestFnArg = {
+  name: string;
+  schemas: Schemas,
+  skip?: boolean;
+  testFn: (client: CubejsApi) => Promise<void>;
+};
+
+export type DriverTestFn = DriverTestFnArg & {
+  type: 'testFn';
+};
+
+export type DriverTest = DriverTestBasic | DriverTestWithError | DriverTestFn;
 
 export function driverTest(
   { name, query, expectArray = [], skip, schemas }: DriverTestArg
@@ -51,6 +62,12 @@ export function driverTestWithError(
   { name, query, expectArray = [], skip, schemas }: DriverTestWithErrorArg
 ): DriverTestWithError {
   return { name, query, expectArray, schemas, skip, type: 'withError' };
+}
+
+export function driverTestFn(
+  { name, skip, schemas, testFn }: DriverTestFnArg
+): DriverTestFn {
+  return { name, testFn, schemas, skip, type: 'testFn' };
 }
 
 export function testSet(tests: DriverTest[]) {

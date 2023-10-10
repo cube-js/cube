@@ -1,4 +1,4 @@
-import Icon, {
+import {
   FileFilled,
   MenuOutlined,
   SlackOutlined,
@@ -8,7 +8,6 @@ import { useMediaQuery } from 'react-responsive';
 import { Link } from 'react-router-dom';
 import styled from 'styled-components';
 
-import { DiscourseIcon } from '../../shared/icons/DiscourseIcon';
 import { StyledMenu, StyledMenuButton, StyledMenuItem } from './Menu';
 import { RunOnCubeCloud } from './RunOnCubeCloud';
 
@@ -22,7 +21,11 @@ const StyledHeader = styled(Layout.Header)`
   }
 `;
 
-export default function Header({ selectedKeys }) {
+type Props = {
+  selectedKeys: string[];
+};
+
+export default function Header({ selectedKeys }: Props) {
   const isDesktopOrLaptop = useMediaQuery({
     query: '(min-device-width: 992px)',
   });
@@ -35,7 +38,7 @@ export default function Header({ selectedKeys }) {
     <StyledHeader>
       <div style={{ float: 'left' }}>
         <img
-          src="./cubejs-playground-logo.svg"
+          src="./cube-logo.svg"
           style={{ height: 28, marginRight: 28 }}
           alt=""
         />
@@ -44,15 +47,19 @@ export default function Header({ selectedKeys }) {
       {isDesktopOrLaptop && (
         <StyledMenu theme="light" mode="horizontal" selectedKeys={selectedKeys}>
           <StyledMenuItem key="/build">
-            <Link to="/build">Build</Link>
-          </StyledMenuItem>
-
-          <StyledMenuItem key="/dashboard">
-            <Link to="/dashboard">Dashboard App</Link>
+            <Link to="/build">Playground</Link>
           </StyledMenuItem>
 
           <StyledMenuItem key="/schema">
-            <Link to="/schema">Schema</Link>
+            <Link to="/schema">Data Model</Link>
+          </StyledMenuItem>
+
+          <StyledMenuItem key="/frontend-integrations">
+            <Link to="/frontend-integrations">Frontend Integrations</Link>
+          </StyledMenuItem>
+
+          <StyledMenuItem key="/connect-to-bi">
+            <Link to="/connect-to-bi">Connect to BI</Link>
           </StyledMenuItem>
 
           <StyledMenuButton
@@ -62,16 +69,6 @@ export default function Header({ selectedKeys }) {
           >
             <SlackOutlined />
             Slack
-          </StyledMenuButton>
-
-          <StyledMenuButton
-            noMargin
-            key="discourse"
-            href="https://forum.cube.dev/"
-            target="_blank"
-          >
-            <Icon component={() => <DiscourseIcon />} />
-            Discourse
           </StyledMenuButton>
 
           <StyledMenuButton
@@ -93,13 +90,11 @@ export default function Header({ selectedKeys }) {
             overlay={
               <Menu>
                 <Menu.Item key="/build">
-                  <Link to="/build">Build</Link>
+                  <Link to="/build">Playground</Link>
                 </Menu.Item>
-                <Menu.Item key="/dashboard">
-                  <Link to="/dashboard">Dashboard App</Link>
-                </Menu.Item>
+
                 <Menu.Item key="/schema">
-                  <Link to="/schema">Schema</Link>
+                  <Link to="/schema">Data Model</Link>
                 </Menu.Item>
               </Menu>
             }

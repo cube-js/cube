@@ -1,8 +1,27 @@
-.algolia-autocomplete {
-  line-height: 40px;
-  width: 100%;
+:root {
+  --docsearch-text-color: #a1a1b5;
+  --docsearch-primary-color: #665DE8;
 }
 
-.algolia-autocomplete .ds-suggestions {
-  line-height: 1.5em;
+button.DocSearch.DocSearch-Button {
+  width: 100%;
+  background: none;
+  margin: 0;
+  height: 40px;
+  border: none;
+  padding: 0;
+  box-shadow: none;
+  border-radius: 2px;
+}
+
+.DocSearch-Button-Placeholder {
+  padding-left: 12px;
+}
+ 
+.DocSearch-Button-Keys {
+  display: none;
+}
+
+.DocSearch {
+  z-index: 1000000000;
 }

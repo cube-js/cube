@@ -8,3 +8,8 @@ export type Credentials = {
   apiUrl: string;
   token: string;
 };
+
+export enum SchemaFormat {
+  js = 'js',
+  yaml = 'yaml',
+}

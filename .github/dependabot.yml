@@ -4,9 +4,3 @@ updates:
     directory: "/packages"
     schedule:
       interval: "weekly"
-  - package-ecosystem: "npm"
-    directory: "/examples"
-    schedule:
-      interval: "monthly"
-    allow:
-      - dependency-type: "production"

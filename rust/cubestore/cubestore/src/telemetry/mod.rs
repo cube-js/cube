@@ -1,3 +1,4 @@
+pub mod tracing;
 use crate::CubeError;
 use async_trait::async_trait;
 use chrono::{SecondsFormat, Utc};
@@ -9,6 +10,7 @@ use futures::{Sink, StreamExt};
 use futures_timer::Delay;
 use log::{Level, Log, Metadata, Record};
 use nanoid::nanoid;
+use reqwest::header::HeaderMap;
 use serde_json::{Map, Number, Value};
 use std::collections::{HashMap, HashSet};
 use std::env;
@@ -21,7 +23,7 @@ use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
 
 lazy_static! {
     pub static ref SENDER: Arc<EventSender> = Arc::new(EventSender::new(Arc::new(
-        HttpTelemetryTransport::try_new("https://track.cube.dev/track".to_string()).unwrap()
+        HttpTelemetryTransport::try_new("https://track.cube.dev/track".to_string(), None).unwrap()
     )));
 }
 
@@ -46,10 +48,11 @@ pub trait TelemetryTransport: Sync + Send {
 pub struct HttpTelemetryTransport {
     endpoint_url: String,
     client: reqwest::Client,
+    headers: Option<HeaderMap>,
 }
 
 impl HttpTelemetryTransport {
-    pub fn try_new(endpoint_url: String) -> Result<Self, CubeError> {
+    pub fn try_new(endpoint_url: String, headers: Option<HeaderMap>) -> Result<Self, CubeError> {
         let client = reqwest::ClientBuilder::new()
             .use_rustls_tls()
             .user_agent("cubestore")
@@ -58,6 +61,7 @@ impl HttpTelemetryTransport {
         Ok(Self {
             endpoint_url,
             client,
+            headers,
         })
     }
 }
@@ -74,12 +78,18 @@ impl TelemetryTransport for HttpTelemetryTransport {
 
             log::trace!("sending via http to {} :{:?}", self.endpoint_url, to_send);
 
+            let header_map = self
+                .headers
+                .as_ref()
+                .map_or_else(|| HeaderMap::new(), |m| m.to_owned());
             let res = self
                 .client
                 .post(&self.endpoint_url)
+                .headers(header_map)
                 .json(&to_send)
                 .send()
                 .await?;
+
             if res.status() != 200 {
                 if retry < max_retries - 1 {
                     continue;
@@ -396,7 +406,7 @@ pub async fn init_agent_sender() {
                 "https" | "http" => {
                     log::trace!("using http transport for agent enpoint");
                     Some(Arc::new(EventSender::new(Arc::new(
-                        HttpTelemetryTransport::try_new(endpoint_url).unwrap(),
+                        HttpTelemetryTransport::try_new(endpoint_url, None).unwrap(),
                     ))))
                 }
                 "wss" => {
@@ -464,5 +474,49 @@ impl Log for ReportingLogger {
 
     fn flush(&self) {
         self.logger.flush()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use reqwest::header::{HeaderMap, HeaderName, HeaderValue, AUTHORIZATION};
+
+    #[test]
+    fn test_http_telemetry_transport_try_new() {
+        let transport_without_headers =
+            HttpTelemetryTransport::try_new("http://transport_without_headers".to_string(), None)
+                .unwrap();
+
+        assert_eq!(
+            transport_without_headers.endpoint_url,
+            "http://transport_without_headers"
+        );
+        assert_eq!(transport_without_headers.headers, None);
+
+        let mut headers = HeaderMap::new();
+        headers.insert(AUTHORIZATION, HeaderValue::from_str("token").unwrap());
+        headers.insert(
+            HeaderName::from_static("content-length"),
+            HeaderValue::from_str("10000").unwrap(),
+        );
+
+        let transport_with_headers = HttpTelemetryTransport::try_new(
+            "http://transport_with_header".to_string(),
+            Some(headers.clone()),
+        )
+        .unwrap();
+
+        assert_eq!(
+            transport_with_headers.endpoint_url,
+            "http://transport_with_header"
+        );
+
+        assert_eq!(
+            format!("{:?}", transport_with_headers.headers.unwrap()),
+            Value::String(
+                "{\"authorization\": \"token\", \"content-length\": \"10000\"}".to_string()
+            )
+        );
     }
 }

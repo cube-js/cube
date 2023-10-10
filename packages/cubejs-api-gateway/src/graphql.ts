@@ -8,6 +8,7 @@ import {
   FieldNode,
   VariableNode,
   ValueNode,
+  GraphQLSchema,
 } from 'graphql';
 
 import {
@@ -24,7 +25,7 @@ import {
   makeSchema as nexusMakeSchema,
   asNexusMethod
 } from 'nexus';
-
+import { camelize } from 'inflection';
 import {
   DateTimeResolver,
 } from 'graphql-scalars';
@@ -55,8 +56,13 @@ const StringFilter = inputObjectType({
     t.string('notEquals');
     t.list.string('in');
     t.list.string('notIn');
-    t.string('contains');
-    t.string('notContains');
+    t.list.string('contains');
+    t.list.string('notContains');
+    t.list.string('startsWith');
+    t.list.string('notStartsWith');
+    t.list.string('notContains');
+    t.list.string('endsWith');
+    t.list.string('notEndsWith');
     t.boolean('set');
   }
 });
@@ -64,14 +70,16 @@ const StringFilter = inputObjectType({
 const DateTimeFilter = inputObjectType({
   name: 'DateTimeFilter',
   definition(t) {
-    t.string('equals');
-    t.string('notEquals');
+    t.list.string('equals');
+    t.list.string('notEquals');
     t.list.string('in');
     t.list.string('notIn');
     t.list.string('inDateRange');
     t.list.string('notInDateRange');
     t.string('beforeDate');
+    t.string('beforeOrOnDate');
     t.string('afterDate');
+    t.string('afterOrOnDate');
     t.boolean('set');
   }
 });
@@ -143,26 +151,26 @@ function mapWhereOperator(operator: string, value: any) {
   }
 }
 
-function mapWhereValue(operator: string, value: any) {
-  switch (operator) {
-    case 'set':
-      return undefined;
-    case 'inDateRange':
-    case 'notInDateRange':
-      // This is a hack for named date ranges (e.g. "This year", "Today")
-      // We should use enums in the future
-      if (value.length === 1 && !/^[0-9]/.test(value[0])) {
-        return value[0].toString();
-      }
-      
-      return value.map(v => v.toString());
-    default:
-      return Array.isArray(value) ? value.map(v => v.toString()) : [value.toString()];
+function mapWhereValue(operator: string, value: any): undefined | string | string[] {
+  value = Array.isArray(value) ? value.map(v => v.toString()) : [value.toString()];
+
+  if (operator === 'set') {
+    return undefined;
+  } else if (['inDateRange', 'notInDateRange'].includes(operator)) {
+    if (value.length === 1 && !/^\d\d\d\d-\d\d-\d\d/.test(value[0])) {
+      return value[0].toString();
+    }
   }
+
+  return value;
 }
 
 function safeName(name: string) {
   return name.split('.').slice(1).join('');
+}
+
+function objectName(name: string) {
+  return camelize(name, false);
 }
 
 function capitalize(name: string) {
@@ -226,33 +234,46 @@ function parseArgumentValue(value: ValueNode) {
   }
 }
 
-function getArgumentValue(node: FieldNode, argName: string) {
+function getArgumentValue(node: FieldNode, argName: string, variables: Record<string, any> = {}) {
   const argument = node.arguments?.find(a => a.name.value === argName)?.value;
+
+  if (argument?.kind === 'Variable') {
+    const varValue = variables[argument.name.value];
+    if (varValue === undefined) {
+      throw new Error(`Variable "${argument.name.value}" is not defined`);
+    }
+    return variables[argument.name.value];
+  }
+
   return argument ? parseArgumentValue(argument) : argument;
 }
 
 function getMemberType(metaConfig: any, cubeName: string, memberName: string) {
-  const cubeConfig = metaConfig.find(cube => cube.config.name === cubeName);
+  const cubeConfig = metaConfig.find(cube => (cube.config.name === cubeName) || cube.config.name === capitalize(cubeName));
   if (!cubeConfig) return undefined;
 
   return [MemberType.MEASURES, MemberType.DIMENSIONS].find((memberType) => (cubeConfig.config[memberType]
-    .findIndex(entry => entry.name === `${cubeName}.${memberName}`) !== -1
+    .findIndex(entry => entry.name === `${cubeName}.${memberName}` || entry.name === `${capitalize(cubeName)}.${memberName}`) !== -1
   ));
 }
 
 function whereArgToQueryFilters(
   whereArg: Record<string, any>,
-  prefix?: string
+  prefix?: string,
+  metaConfig: any[] = []
 ) {
   const queryFilters: any[] = [];
   
   Object.keys(whereArg).forEach((key) => {
+    const cubeExists = metaConfig.find((cube) => cube.config.name === key);
+    const normalizedKey = cubeExists ? key : capitalize(key);
+    
     if (['OR', 'AND'].includes(key)) {
       queryFilters.push({
         [key.toLowerCase()]: whereArg[key].reduce(
           (filters, whereBooleanArg) => [
             ...filters,
-            ...whereArgToQueryFilters(whereBooleanArg, prefix),
+            ...whereArgToQueryFilters(whereBooleanArg, prefix, metaConfig),
           ],
           []
         ),
@@ -274,11 +295,12 @@ function whereArgToQueryFilters(
                 []
               ),
             },
-            capitalize(key)
+            normalizedKey,
+            metaConfig
           )
         );
       } else {
-        const res = whereArgToQueryFilters(whereArg[key], capitalize(key));
+        const res = whereArgToQueryFilters(whereArg[key], normalizedKey, metaConfig);
 
         queryFilters.push(...res);
       }
@@ -300,7 +322,7 @@ function whereArgToQueryFilters(
           queryFilters.push({
             member: prefix
               ? `${prefix}.${key}`
-              : `${capitalize(key)}.${member}`,
+              : `${normalizedKey}.${member}`,
             operator: mapWhereOperator(operator, value),
             ...(mapWhereValue(operator, value) && {
               values: mapWhereValue(operator, value),
@@ -333,7 +355,7 @@ function parseDates(result: any) {
   });
 }
 
-export function makeSchema(metaConfig: any) {
+export function makeSchema(metaConfig: any): GraphQLSchema {
   const types: any[] = [
     DateTimeScalar,
     FloatFilter,
@@ -342,15 +364,19 @@ export function makeSchema(metaConfig: any) {
     OrderBy,
     TimeDimension
   ];
-  
+
   function hasMembers(cube: any) {
-    return cube.config.measures.length || cube.config.dimensions.length;
+    if (cube.public === false) {
+      return false;
+    }
+    
+    return ([...cube.config.measures, ...cube.config.dimensions].filter((member) => member.isVisible)).length > 0;
   }
 
   metaConfig.forEach(cube => {
     if (hasMembers(cube)) {
       types.push(objectType({
-        name: `${cube.config.name}Members`,
+        name: `${objectName(cube.config.name)}Members`,
         definition(t) {
           cube.config.measures.forEach(measure => {
             if (measure.isVisible) {
@@ -370,12 +396,12 @@ export function makeSchema(metaConfig: any) {
           });
         }
       }));
-    
+
       types.push(inputObjectType({
-        name: `${cube.config.name}WhereInput`,
+        name: `${objectName(cube.config.name)}WhereInput`,
         definition(t) {
-          t.field('AND', { type: list(nonNull(`${cube.config.name}WhereInput`)) });
-          t.field('OR', { type: list(nonNull(`${cube.config.name}WhereInput`)) });
+          t.field('AND', { type: list(nonNull(`${objectName(cube.config.name)}WhereInput`)) });
+          t.field('OR', { type: list(nonNull(`${objectName(cube.config.name)}WhereInput`)) });
           cube.config.measures.forEach(measure => {
             if (measure.isVisible) {
               t.field(safeName(measure.name), {
@@ -394,7 +420,7 @@ export function makeSchema(metaConfig: any) {
       }));
 
       types.push(inputObjectType({
-        name: `${cube.config.name}OrderByInput`,
+        name: `${objectName(cube.config.name)}OrderByInput`,
         definition(t) {
           cube.config.measures.forEach(measure => {
             if (measure.isVisible) {
@@ -423,20 +449,20 @@ export function makeSchema(metaConfig: any) {
       metaConfig.forEach(cube => {
         if (hasMembers(cube)) {
           t.field(unCapitalize(cube.config.name), {
-            type: `${cube.config.name}WhereInput`
+            type: `${objectName(cube.config.name)}WhereInput`
           });
         }
       });
     }
   }));
-  
+
   types.push(inputObjectType({
     name: 'RootOrderByInput',
     definition(t) {
       metaConfig.forEach(cube => {
         if (hasMembers(cube)) {
           t.field(unCapitalize(cube.config.name), {
-            type: `${cube.config.name}OrderByInput`
+            type: `${objectName(cube.config.name)}OrderByInput`
           });
         }
       });
@@ -449,13 +475,13 @@ export function makeSchema(metaConfig: any) {
       metaConfig.forEach(cube => {
         if (hasMembers(cube)) {
           t.nonNull.field(unCapitalize(cube.config.name), {
-            type: `${cube.config.name}Members`,
+            type: `${objectName(cube.config.name)}Members`,
             args: {
               where: arg({
-                type: `${cube.config.name}WhereInput`
+                type: `${objectName(cube.config.name)}WhereInput`
               }),
               orderBy: arg({
-                type: `${cube.config.name}OrderByInput`
+                type: `${objectName(cube.config.name)}OrderByInput`
               }),
             }
           });
@@ -487,11 +513,11 @@ export function makeSchema(metaConfig: any) {
           const timeDimensions: any[] = [];
           let filters: any[] = [];
           const order: [string, 'asc' | 'desc'][] = [];
-          
+
           if (where) {
-            filters = whereArgToQueryFilters(where);
+            filters = whereArgToQueryFilters(where, undefined, metaConfig);
           }
-          
+
           if (orderBy) {
             Object.entries<any>(orderBy).forEach(([cubeName, members]) => {
               Object.entries<any>(members).forEach(([member, value]) => {
@@ -501,8 +527,10 @@ export function makeSchema(metaConfig: any) {
           }
 
           getFieldNodeChildren(infos.fieldNodes[0], infos).forEach(cubeNode => {
-            const cubeName = capitalize(cubeNode.name.value);
-            const orderByArg = getArgumentValue(cubeNode, 'orderBy');
+            const cubeExists = metaConfig.find((cube) => cube.config.name === cubeNode.name.value);
+            
+            const cubeName = cubeExists ? (cubeNode.name.value) : capitalize(cubeNode.name.value);
+            const orderByArg = getArgumentValue(cubeNode, 'orderBy', infos.variableValues);
             // todo: throw if both RootOrderByInput and [Cube]OrderByInput provided
             if (orderByArg) {
               Object.keys(orderByArg).forEach(key => {
@@ -510,18 +538,19 @@ export function makeSchema(metaConfig: any) {
               });
             }
 
-            const whereArg = getArgumentValue(cubeNode, 'where');
+            const whereArg = getArgumentValue(cubeNode, 'where', infos.variableValues);
             if (whereArg) {
               filters = whereArgToQueryFilters(whereArg, cubeName).concat(filters);
             }
-            
-            const inDateRangeFilters = {};
+
+            // Push down all inDateRange filters to time dimensions to leverage pre-aggregations
+            const dateRangeFilters = {};
             filters = filters.filter((f) => {
-              if (f.operator === 'inDateRange') {
-                inDateRangeFilters[f.member] = f.values;
+              if (f.operator === 'inDateRange' && !dateRangeFilters[f.member]) {
+                dateRangeFilters[f.member] = f.values;
                 return false;
               }
-              
+
               return true;
             });
 
@@ -543,8 +572,8 @@ export function makeSchema(metaConfig: any) {
                       timeDimensions.push({
                         dimension: key,
                         granularity: granularityName,
-                        ...(inDateRangeFilters[key] ? {
-                          dateRange: inDateRangeFilters[key],
+                        ...(dateRangeFilters[key] ? {
+                          dateRange: dateRangeFilters[key],
                         } : null)
                       });
                     }
@@ -554,6 +583,15 @@ export function makeSchema(metaConfig: any) {
                 }
               }
             });
+
+            if (Object.keys(dateRangeFilters).length && !timeDimensions.length) {
+              Object.entries(dateRangeFilters).forEach(([dimension, dateRange]) => {
+                timeDimensions.push({
+                  dimension,
+                  dateRange
+                });
+              });
+            }
           });
 
           const query = {
@@ -567,26 +605,21 @@ export function makeSchema(metaConfig: any) {
             ...(filters.length && { filters }),
             ...(renewQuery && { renewQuery }),
           };
-          
-          // eslint-disable-next-line no-async-promise-executor
-          const results = await (new Promise<any>(async (resolve, reject) => {
-            try {
-              await apiGateway.load({
-                query,
-                queryType: QueryType.REGULAR_QUERY,
-                context: req.context,
-                res: (message) => {
-                  if (message.error) {
-                    reject(new Error(message.error));
-                  }
-                  resolve(message);
-                },
-                apiType: 'graphql',
-              });
-            } catch (e) {
-              reject(e);
-            }
-          }));
+
+          const results = await new Promise<any>((resolve, reject) => {
+            apiGateway.load({
+              query,
+              queryType: QueryType.REGULAR_QUERY,
+              context: req.context,
+              res: (message) => {
+                if (message.error) {
+                  reject(new Error(message.error));
+                }
+                resolve(message);
+              },
+              apiType: 'graphql',
+            }).catch(reject);
+          });
 
           parseDates(results);
 

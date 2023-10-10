@@ -24,19 +24,19 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2022-03-08
+          toolchain: nightly-2022-03-22
           override: true
           components: rustfmt, clippy
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
         with:
-          working-directory: ./rust/cubesql
+          workspaces: ./rust/cubesql -> target
           # default key
           key: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu-16
-          sharedKey: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu-16
+          shared-key: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu-16
       - name: Lint CubeSQL
         run: cd rust/cubesql/cubesql && cargo fmt --all -- --check
       - name: Lint Native
@@ -49,27 +49,27 @@ jobs:
 
   unit:
     runs-on: ubuntu-20.04
-    timeout-minutes: 40
+    timeout-minutes: 60
     name: Unit (Rewrite Engine)
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           # pulls all commits (needed for codecov)
           fetch-depth: 2
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2022-03-08
+          toolchain: nightly-2022-06-22
           override: true
           components: rustfmt
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
         with:
-          working-directory: ./rust/cubesql
+          workspaces: ./rust/cubesql -> target
           # default key
           key: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu-16
-          sharedKey: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu-16
+          shared-key: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu-16
       - name: Install tarpaulin@0.20.1
         uses: baptiste0928/cargo-install@v1
         with:
@@ -80,94 +80,102 @@ jobs:
           CUBESQL_TESTING_CUBE_TOKEN: ${{ secrets.CUBESQL_TESTING_CUBE_TOKEN }}
           CUBESQL_TESTING_CUBE_URL: ${{ secrets.CUBESQL_TESTING_CUBE_URL }}
           CUBESQL_REWRITE_ENGINE: true
+          CUBESQL_SQL_PUSH_DOWN: true
+          CUBESQL_REWRITE_TIMEOUT: 60
         run: cd rust/cubesql && cargo tarpaulin --workspace --no-fail-fast --avoid-cfg-tarpaulin --out Xml
       - name: Upload code coverage
-        uses: codecov/codecov-action@v2
+        uses: codecov/codecov-action@v3
         with:
           files: ./rust/cubesql/cobertura.xml
           verbose: true
           flags: cubesql
-          fail_ci_if_error: true
+          fail_ci_if_error: false
 
   unit_legacy:
     runs-on: ubuntu-20.04
-    timeout-minutes: 40
+    timeout-minutes: 60
     name: Unit (Legacy)
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           # pulls all commits (needed for codecov)
           fetch-depth: 2
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2022-03-08
+          toolchain: nightly-2022-03-22
           override: true
           components: rustfmt
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
         with:
-          working-directory: ./rust/cubesql
+          workspaces: ./rust/cubesql -> target
           # default key
           key: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu-16
-          sharedKey: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu-16
+          shared-key: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu-16
       - name: Unit tests (Legacy Engine)
         env:
           CUBESQL_TESTING_CUBE_TOKEN: ${{ secrets.CUBESQL_TESTING_CUBE_TOKEN }}
           CUBESQL_TESTING_CUBE_URL: ${{ secrets.CUBESQL_TESTING_CUBE_URL }}
+          CUBESQL_SQL_PUSH_DOWN: true
         run: cd rust/cubesql && cargo test
 
   native_linux:
-    needs: [lint,unit,unit_legacy]
+    needs: [lint]
     runs-on: ubuntu-20.04
     timeout-minutes: 60
-    name: Build Linux GNU ${{ matrix.node-version }}.x ${{ matrix.target }}
+    name: Build Linux GNU ${{ matrix.node-version }}.x ${{ matrix.target }} with Python ${{ matrix.python-version }}
     strategy:
       matrix:
-        node-version: [12, 14, 16, 17]
+        node-version: [14, 16, 18]
+        python-version: ["3.9", "3.10", "3.11", "fallback"]
         target: ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"]
+        # minimize number of jobs
+        exclude:
+          - node-version: 18
+            target: "aarch64-unknown-linux-gnu"
+          - node-version: 14
+            target: "aarch64-unknown-linux-gnu"
+          - python-version: 3.10
+            target: "aarch64-unknown-linux-gnu"
       fail-fast: false
     container:
-      image: cubejs/rust-cross:${{ matrix.target }}-10052021
+      image: cubejs/rust-cross:${{ matrix.target }}-30052023
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2022-03-08
+          toolchain: nightly-2022-03-22
           override: true
           components: rustfmt
           target: ${{ matrix.target }}
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
         with:
-          working-directory: ./rust/cubesql
+          workspaces: ./rust/cubesql -> target
           key: cubesql-${{ runner.OS }}-${{ matrix.target }}-${{ matrix.node-version }}
-          sharedKey: cubesql-${{ runner.OS }}-${{ matrix.target }}-${{ matrix.node-version }}
+          shared-key: cubesql-${{ runner.OS }}-${{ matrix.target }}-${{ matrix.node-version }}
       - name: Install Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v1
+        uses: actions/setup-node@v3
         with:
           node-version: ${{ matrix.node-version }}
       - name: Install Yarn
         run: npm install -g yarn
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.5
+        run: yarn policies set-version v1.22.19
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
-        run: echo "::set-output name=dir::$(yarn cache dir)"
-      - name: Restore lerna
-        uses: actions/cache@v2
+        run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
+      - name: Restore yarn cache
+        uses: actions/cache@v3
         with:
-          path: |
-            ${{ steps.yarn-cache-dir-path.outputs.dir }}
-            node_modules
-            rust/cubesql/node_modules
-            packages/*/node_modules
-          key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
+            ${{ runner.os }}-yarn-
       - name: Yarn install
         uses: nick-invision/retry@v2
         env:
@@ -178,77 +186,92 @@ jobs:
           retry_wait_seconds: 15
           timeout_minutes: 20
           command: yarn install --frozen-lockfile
-      - name: Build native
+      - name: Lerna tsc
+        run: yarn tsc
+      - name: Build native (fallback)
+        if: (matrix.python-version == 'fallback')
         env:
           CARGO_BUILD_TARGET: ${{ matrix.target }}
-        run: cd packages/cubejs-backend-native && yarn run native:build
+        working-directory: ./packages/cubejs-backend-native
+        run: yarn run native:build-debug
+      - name: Build native (with Python)
+        if: (matrix.python-version != 'fallback')
+        env:
+          PYO3_PYTHON: python${{ matrix.python-version }}
+          CARGO_BUILD_TARGET: ${{ matrix.target }}
+        working-directory: ./packages/cubejs-backend-native
+        run: yarn run native:build-debug-python
       - name: Test native (GNU only)
         if: (matrix.target == 'x86_64-unknown-linux-gnu')
         env:
+          CUBESQL_STREAM_MODE: true
           CUBEJS_NATIVE_INTERNAL_DEBUG: true
-        run: cd packages/cubejs-backend-native && yarn run test:unit
+        working-directory: ./packages/cubejs-backend-native
+        run: yarn run test:unit
       - name: Run E2E Smoke testing over whole Cube (GNU only)
         if: (matrix.target == 'x86_64-unknown-linux-gnu')
         env:
           CUBEJS_NATIVE_INTERNAL_DEBUG: true
-        run: yarn tsc && cd packages/cubejs-testing && yarn smoke:cubesql
+        working-directory: ./packages/cubejs-testing
+        run: yarn smoke:cubesql
 
-  native:
-    needs: [lint,unit,unit_legacy]
+  native_macos:
+    needs: [lint]
     runs-on: ${{ matrix.os-version }}
     timeout-minutes: 60
-    name: Build ${{ matrix.os-version }} ${{ matrix.node-version }}
+    name: Build ${{ matrix.os-version }} ${{ matrix.target }} ${{ matrix.node-version }} with Python ${{ matrix.python-version }}
 
     strategy:
       matrix:
-        node-version: [12.x, 14.x, 16.x, 17.x]
-        os-version: [windows-2019, macos-11]
+        # We do not need to test under all versions, we do it under linux
+        node-version: [16.x]
+        os-version: ["macos-11"]
+        target: ["x86_64-apple-darwin", "aarch64-apple-darwin"]
+        include:
+          - target: x86_64-apple-darwin
+            python-version: "3.9"
+          - target: x86_64-apple-darwin
+            python-version: "3.10"
+          - target: x86_64-apple-darwin
+            python-version: "3.11"
+          - target: x86_64-apple-darwin
+            python-version: "fallback"
+          - target: aarch64-apple-darwin
+            python-version: "fallback"
       fail-fast: false
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2022-03-08
+          toolchain: nightly-2022-03-22
           override: true
           components: rustfmt
+          target: ${{ matrix.target }}
+      - name: Install Python
+        uses: actions/setup-python@v4
+        if: (matrix.python-version != 'fallback')
+        with:
+          python-version: ${{ matrix.python-version }}
       - name: Install Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v1
+        uses: actions/setup-node@v3
         with:
           node-version: ${{ matrix.node-version }}
-      - name: Install Yarn
-        run: npm install -g yarn
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.5
+        run: yarn policies set-version v1.22.19
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
-        run: echo "::set-output name=dir::$(yarn cache dir)"
-      - name: Restore lerna (excluding Windows)
-        uses: actions/cache@v2
-        if: ${{ !startsWith(matrix.os-version, 'windows') }}
+        run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
+        shell: bash
+      - name: Restore yarn cache
+        uses: actions/cache@v3
         with:
-          path: |
-            ${{ steps.yarn-cache-dir-path.outputs.dir }}
-            node_modules
-            rust/cubesql/node_modules
-            packages/*/node_modules
-          key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
-      # Windows doesn't support links + cache action doesn't support exclude
-      # cache will include rust cache for native, which causes 3GB archive
-      # Right now, GH provides 10 gb for each repository with automatic retention.
-      - name: Restore lerna (Windows only)
-        uses: actions/cache@v2
-        if: ${{ startsWith(matrix.os-version, 'windows') }}
-        with:
-          path: |
-            ${{ steps.yarn-cache-dir-path.outputs.dir }}
-          key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
+            ${{ runner.os }}-yarn-
       - name: Yarn install
         uses: nick-invision/retry@v2
         env:
@@ -259,7 +282,102 @@ jobs:
           retry_wait_seconds: 15
           timeout_minutes: 20
           command: yarn install --frozen-lockfile
-      - name: Build native
+      - name: Lerna tsc
+        run: yarn tsc
+      - name: Build native (fallback)
+        if: (matrix.python-version == 'fallback')
         env:
+          CUBESQL_STREAM_MODE: true
           CUBEJS_NATIVE_INTERNAL_DEBUG: true
-        run: cd packages/cubejs-backend-native && yarn run native:build && yarn run test:unit
+          CARGO_BUILD_TARGET: ${{ matrix.target }}
+        run: cd packages/cubejs-backend-native && yarn run native:build
+      - name: Build native (with Python)
+        if: (matrix.python-version != 'fallback')
+        env:
+          PYO3_PYTHON: python${{ matrix.python-version }}
+          CARGO_BUILD_TARGET: ${{ matrix.target }}
+        run: cd packages/cubejs-backend-native && yarn run native:build-debug-python
+      - name: Tests
+        # We cannot test arm64 on x64
+        if: (matrix.target == 'x86_64-apple-darwin')
+        env:
+          CUBESQL_STREAM_MODE: true
+          CUBEJS_NATIVE_INTERNAL_DEBUG: true
+        run: cd packages/cubejs-backend-native && yarn run test:unit
+
+  native_windows:
+    needs: [lint]
+    runs-on: ${{ matrix.os-version }}
+    timeout-minutes: 60
+    name: Build ${{ matrix.os-version }} ${{ matrix.node-version }} with Python ${{ matrix.python-version }}
+
+    strategy:
+      matrix:
+        # We do not need to test under all versions, we do it under linux
+        node-version: [16.x]
+        os-version: [windows-2019]
+        python-version: ["fallback"]
+      fail-fast: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Disable rustup update (issue workaround for Windows)
+        run: rustup set auto-self-update disable
+        shell: bash
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2022-03-22
+          override: true
+          components: rustfmt
+      - name: Install Python
+        uses: actions/setup-python@v4
+        if: (matrix.python-version != 'fallback')
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Set Yarn version
+        run: yarn policies set-version v1.22.19
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
+        shell: bash
+      - name: Restore yarn cache
+        uses: actions/cache@v3
+        with:
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
+      - name: Yarn install
+        uses: nick-invision/retry@v2
+        env:
+          CUBESTORE_SKIP_POST_INSTALL: true
+        with:
+          max_attempts: 3
+          retry_on: error
+          retry_wait_seconds: 15
+          timeout_minutes: 20
+          command: yarn install --frozen-lockfile
+      - name: Lerna tsc
+        run: yarn tsc
+      - name: Build native (fallback)
+        if: (matrix.python-version == 'fallback')
+        env:
+          CUBESQL_STREAM_MODE: true
+          CUBEJS_NATIVE_INTERNAL_DEBUG: true
+        run: cd packages/cubejs-backend-native && yarn run native:build
+      - name: Build native (with Python)
+        if: (matrix.python-version != 'fallback')
+        env:
+          PYO3_PYTHON: python${{ matrix.python-version }}
+        run: cd packages/cubejs-backend-native && yarn run native:build-debug-python
+      - name: Tests
+        env:
+          CUBESQL_STREAM_MODE: true
+          CUBEJS_NATIVE_INTERNAL_DEBUG: true
+        run: cd packages/cubejs-backend-native && yarn run test:unit

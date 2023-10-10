@@ -1,0 +1,4 @@
+{ cubes:
+  - name: cube_08
+    sql_table: public.orders
+    data_source: {{ 'bigquery' if env_var('NODE_ENV') == 'prod' else 'postgres' }} }

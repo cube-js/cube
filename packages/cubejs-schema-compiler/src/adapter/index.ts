@@ -10,10 +10,12 @@ export * from './PreAggregations';
 export * from './QueryBuilder';
 export * from './QueryCache';
 export * from './QueryFactory';
+export * from './CubeStoreQuery';
 
 // Base queries that can be re-used across different drivers
 export * from './MysqlQuery';
 export * from './PostgresQuery';
+export * from './MssqlQuery';
 
 // Candidates to move from this package to drivers packages
 // export * from './PrestodbQuery';

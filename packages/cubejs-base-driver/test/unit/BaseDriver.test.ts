@@ -8,7 +8,7 @@ class BaseDriverImplementedMock extends BaseDriver {
   // eslint-disable-next-line @typescript-eslint/no-empty-function
   public async testConnection(): Promise<void> {}
 
-  public async query(_query, _values) {
+  public async query(_query: string, _values: unknown[]) {
     return this.response;
   }
 }
@@ -55,5 +55,15 @@ describe('BaseDriver', () => {
       { name: 'decimal_because_bigint_min', type: 'decimal' },
       { name: 'string', type: 'string' }
     ]);
+  });
+  
+  test('wrapQueryWithLimit wraps the query with a limit', () => {
+    const driver = new BaseDriverImplementedMock({});
+    const query = { query: 'SELECT * FROM users', limit: 10 };
+    driver.wrapQueryWithLimit(query);
+    expect(query).toEqual({
+      query: 'SELECT * FROM (SELECT * FROM users) AS t LIMIT 10',
+      limit: 10,
+    });
   });
 });

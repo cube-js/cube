@@ -6,7 +6,6 @@ import omit from 'lodash/omit';
 
 import MenuItem from '../templates/MenuItem';
 import * as styles from '../../../static/styles/index.module.scss';
-import { useFrameworkOfChoice } from '../../stores/frameworkOfChoice';
 import {
   Frontmatter,
   MarkdownNode,
@@ -17,29 +16,21 @@ import {
 import { MenuMode } from 'antd/lib/menu';
 import { layout } from '../../theme';
 
-const menuOrderCloud = [
-  'Cube Cloud Getting Started',
-  'Configuration',
-  'Developer Tools',
-  'Deploys',
-  'Inspecting Queries',
-  'Release Notes',
-  'Cloud Runtime'
-];
-
 const menuOrder = [
   'Cube.js Introduction',
   'Getting Started',
   'Configuration',
-  'Data Schema',
+  'Data Modeling',
   'Caching',
   'Authentication & Authorization',
-  'API Reference',
-  'SQL API',
-  'Frontend Integrations',
+  'APIs & Integrations',
+  'Workspace',
   'Deployment',
-  'Developer Tools',
+  'Monitoring',
   'Examples & Tutorials',
+  'FAQs',
+  'Guides',
+  'Reference'
 ];
 
 const nameRules: Record<string, string> = {
@@ -82,28 +73,22 @@ const defaultProps: Props = {
 
 const MainMenu: React.FC<Props> = (props = defaultProps) => {
   const menuProps = omit(props, ['mobileMode', 'scope']);
-  const [frameworkOfChoice] = useFrameworkOfChoice();
-  const isCloudDocs =
-    (props.selectedKeys || []).filter((e) => e.match(/^cloud/)).length > 0;
-  const menuOrderResolved = isCloudDocs ? menuOrderCloud : menuOrder;
 
   return (
     <Col
       {...layout.leftSidebar.width}
       xs={props.mobileMode === 'menu' ? 24 : 0}
+      className={cx(styles.menuWrapperCol)}
     >
       <div className={cx(styles.menuWrapper, styles.menuWrapperHack)}>
         <Menu {...menuProps} className={styles.antMenu}>
-          <MenuItem to={isCloudDocs ? '/cloud' : '/'} title="Home" />
-          {menuOrderResolved.map((item) => {
+          <MenuItem to="/" title="Home" />
+          {menuOrder.map((item) => {
             const subcategoryData = props.items[item];
             const subCategoryNames = Object.keys(subcategoryData);
 
             const filteredSubcategoryData = subCategoryNames.reduce((result, subCategoryName) => {
-              // Filter by cloud or not cloud
-              const items = subcategoryData[subCategoryName].filter(i => {
-                  return i.frontmatter.permalink.match(isCloudDocs ? /^\/cloud\// : /^(?!\/cloud\/)/);
-              });
+              const items = subcategoryData[subCategoryName]
 
               if (items.length > 0) {
                 return {
@@ -128,16 +113,7 @@ const MainMenu: React.FC<Props> = (props = defaultProps) => {
               >
                 {Object.keys(filteredSubcategoryData).map((subCategory) => {
                   if (subCategory === 'nocat') {
-                    const subItems = filteredSubcategoryData[subCategory].filter(
-                      (subItem: MarkdownNode) => {
-                        return (
-                          !subItem.frontmatter.frameworkOfChoice ||
-                          subItem.frontmatter.frameworkOfChoice ===
-                            frameworkOfChoice
-                        );
-                      }
-                    );
-
+                    const subItems = filteredSubcategoryData[subCategory];
                     return subItems.map(nodeParser);
                   }
                   return (
@@ -149,6 +125,7 @@ const MainMenu: React.FC<Props> = (props = defaultProps) => {
               </Menu.SubMenu>
             );
           })}
+          <MenuItem to="https://cube.dev/blog/category/changelog" title="Changelog" />
         </Menu>
       </div>
     </Col>

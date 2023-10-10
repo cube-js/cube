@@ -143,7 +143,7 @@ describe('MaterializeDriver', () => {
       });
 
       throw new Error('stream must throw an exception');
-    } catch (e) {
+    } catch (e: any) {
       expect(e.message).toEqual(
         'unknown catalog item \'test.random_name_for_table_that_doesnot_exist_sql_must_fail\''
       );

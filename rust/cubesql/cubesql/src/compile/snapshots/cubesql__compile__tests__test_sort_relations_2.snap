@@ -6,6 +6,6 @@ expression: "execute_query(\"select * from (select oid from pg_class order by pg
 | oid   |
 +-------+
 | 18000 |
-| 18014 |
-| 18020 |
+| 18018 |
+| 18028 |
 +-------+

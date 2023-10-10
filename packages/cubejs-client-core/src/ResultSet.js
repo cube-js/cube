@@ -127,6 +127,7 @@ class ResultSet {
       throw new Error('Data blending drillDown query is not currently supported');
     }
 
+    const { query } = this.loadResponses[0];
     const { xValues = [], yValues = [] } = drillDownLocator;
     const normalizedPivotConfig = this.normalizePivotConfig(pivotConfig);
 
@@ -161,13 +162,25 @@ class ResultSet {
 
         if (granularity !== undefined) {
           const range = dayRange(value, value).snapTo(granularity);
+          const originalTimeDimension = query.timeDimensions.find((td) => td.dimension);
+          
+          let dateRange = [
+            range.start,
+            range.end
+          ];
+          
+          if (originalTimeDimension?.dateRange) {
+            const [originalStart, originalEnd] = originalTimeDimension.dateRange;
+            
+            dateRange = [
+              dayjs(originalStart) > range.start ? dayjs(originalStart) : range.start,
+              dayjs(originalEnd) < range.end ? dayjs(originalEnd) : range.end,
+            ];
+          }
 
           timeDimensions.push({
             dimension: [cubeName, dimension].join('.'),
-            dateRange: [
-              range.start,
-              range.end
-            ].map((dt) => dt.format('YYYY-MM-DDTHH:mm:ss.SSS')),
+            dateRange: dateRange.map((dt) => dt.format('YYYY-MM-DDTHH:mm:ss.SSS')),
           });
         } else if (value == null) {
           filters.push({
@@ -182,8 +195,7 @@ class ResultSet {
           });
         }
       });
-
-    const { query } = this.loadResponses[0];
+    
     if (
       timeDimensions.length === 0 &&
       query.timeDimensions.length > 0 &&
@@ -203,8 +215,9 @@ class ResultSet {
   }
 
   series(pivotConfig) {
-    return this.seriesNames(pivotConfig).map(({ title, key }) => ({
+    return this.seriesNames(pivotConfig).map(({ title, shortTitle, key }) => ({
       title,
+      shortTitle,
       key,
       series: this.chartPivot(pivotConfig).map(({ x, ...obj }) => ({ value: obj[key], x }))
     }));
@@ -658,6 +671,15 @@ class ResultSet {
               measures[
                 ResultSet.measureFromAxis(axisValues)
               ].title
+            ) :
+            aliasedAxis, ', '
+        ),
+        shortTitle: this.axisValuesString(
+          pivotConfig.y.find(d => d === 'measures') ?
+            dropLast(1, aliasedAxis).concat(
+              measures[
+                ResultSet.measureFromAxis(axisValues)
+              ].shortTitle
             ) :
             aliasedAxis, ', '
         ),

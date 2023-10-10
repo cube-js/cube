@@ -669,6 +669,35 @@ describe('Multiple datasources', () => {
     );
   });
 
+  test('getEnv("dbExportBucketCsvEscapeSymbol")', () => {
+    process.env.CUBEJS_DB_EXPORT_BUCKET_CSV_ESCAPE_SYMBOL = '"';
+    process.env.CUBEJS_DS_POSTGRES_DB_EXPORT_BUCKET_CSV_ESCAPE_SYMBOL = '\'';
+    process.env.CUBEJS_DS_WRONG_DB_EXPORT_BUCKET_CSV_ESCAPE_SYMBOL = 'wrong1';
+    expect(getEnv('dbExportBucketCsvEscapeSymbol', { dataSource: 'default' })).toEqual('"');
+    expect(getEnv('dbExportBucketCsvEscapeSymbol', { dataSource: 'postgres' })).toEqual('\'');
+    expect(() => getEnv('dbExportBucketCsvEscapeSymbol', { dataSource: 'wrong' })).toThrow(
+      'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
+    );
+
+    process.env.CUBEJS_DB_EXPORT_BUCKET_CSV_ESCAPE_SYMBOL = '\'';
+    process.env.CUBEJS_DS_POSTGRES_DB_EXPORT_BUCKET_CSV_ESCAPE_SYMBOL = '"';
+    process.env.CUBEJS_DS_WRONG_DB_EXPORT_BUCKET_CSV_ESCAPE_SYMBOL = 'wrong2';
+    expect(getEnv('dbExportBucketCsvEscapeSymbol', { dataSource: 'default' })).toEqual('\'');
+    expect(getEnv('dbExportBucketCsvEscapeSymbol', { dataSource: 'postgres' })).toEqual('"');
+    expect(() => getEnv('dbExportBucketCsvEscapeSymbol', { dataSource: 'wrong' })).toThrow(
+      'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
+    );
+
+    delete process.env.CUBEJS_DB_EXPORT_BUCKET_CSV_ESCAPE_SYMBOL;
+    delete process.env.CUBEJS_DS_POSTGRES_DB_EXPORT_BUCKET_CSV_ESCAPE_SYMBOL;
+    delete process.env.CUBEJS_DS_WRONG_DB_EXPORT_BUCKET_CSV_ESCAPE_SYMBOL;
+    expect(getEnv('dbExportBucketCsvEscapeSymbol', { dataSource: 'default' })).toBeUndefined();
+    expect(getEnv('dbExportBucketCsvEscapeSymbol', { dataSource: 'postgres' })).toBeUndefined();
+    expect(() => getEnv('dbExportBucketCsvEscapeSymbol', { dataSource: 'wrong' })).toThrow(
+      'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
+    );
+  });
+
   test('getEnv("dbExportBucketType")', () => {
     process.env.CUBEJS_DB_EXPORT_BUCKET_TYPE = 'default1';
     process.env.CUBEJS_DS_POSTGRES_DB_EXPORT_BUCKET_TYPE = 'postgres1';
@@ -1043,6 +1072,35 @@ describe('Multiple datasources', () => {
     expect(getEnv('databrickToken', { dataSource: 'default' })).toBeUndefined();
     expect(getEnv('databrickToken', { dataSource: 'postgres' })).toBeUndefined();
     expect(() => getEnv('databrickToken', { dataSource: 'wrong' })).toThrow(
+      'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
+    );
+  });
+
+  test('getEnv("databricksCatalog")', () => {
+    process.env.CUBEJS_DB_DATABRICKS_CATALOG = 'default1';
+    process.env.CUBEJS_DS_POSTGRES_DB_DATABRICKS_CATALOG = 'postgres1';
+    process.env.CUBEJS_DS_WRONG_DB_DATABRICKS_CATALOG = 'wrong1';
+    expect(getEnv('databricksCatalog', { dataSource: 'default' })).toEqual('default1');
+    expect(getEnv('databricksCatalog', { dataSource: 'postgres' })).toEqual('postgres1');
+    expect(() => getEnv('databricksCatalog', { dataSource: 'wrong' })).toThrow(
+      'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
+    );
+
+    process.env.CUBEJS_DB_DATABRICKS_CATALOG = 'default2';
+    process.env.CUBEJS_DS_POSTGRES_DB_DATABRICKS_CATALOG = 'postgres2';
+    process.env.CUBEJS_DS_WRONG_DB_DATABRICKS_CATALOG = 'wrong2';
+    expect(getEnv('databricksCatalog', { dataSource: 'default' })).toEqual('default2');
+    expect(getEnv('databricksCatalog', { dataSource: 'postgres' })).toEqual('postgres2');
+    expect(() => getEnv('databricksCatalog', { dataSource: 'wrong' })).toThrow(
+      'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
+    );
+
+    delete process.env.CUBEJS_DB_DATABRICKS_CATALOG;
+    delete process.env.CUBEJS_DS_POSTGRES_DB_DATABRICKS_CATALOG;
+    delete process.env.CUBEJS_DS_WRONG_DB_DATABRICKS_CATALOG;
+    expect(getEnv('databricksCatalog', { dataSource: 'default' })).toBeUndefined();
+    expect(getEnv('databricksCatalog', { dataSource: 'postgres' })).toBeUndefined();
+    expect(() => getEnv('databricksCatalog', { dataSource: 'wrong' })).toThrow(
       'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
     );
   });
@@ -1951,8 +2009,8 @@ describe('Multiple datasources', () => {
     delete process.env.CUBEJS_DB_SNOWFLAKE_CLIENT_SESSION_KEEP_ALIVE;
     delete process.env.CUBEJS_DS_POSTGRES_DB_SNOWFLAKE_CLIENT_SESSION_KEEP_ALIVE;
     delete process.env.CUBEJS_DS_WRONG_DB_SNOWFLAKE_CLIENT_SESSION_KEEP_ALIVE;
-    expect(getEnv('snowflakeSessionKeepAlive', { dataSource: 'default' })).toBeUndefined();
-    expect(getEnv('snowflakeSessionKeepAlive', { dataSource: 'postgres' })).toBeUndefined();
+    expect(getEnv('snowflakeSessionKeepAlive', { dataSource: 'default' })).toEqual(true);
+    expect(getEnv('snowflakeSessionKeepAlive', { dataSource: 'postgres' })).toEqual(true);
     expect(() => getEnv('snowflakeSessionKeepAlive', { dataSource: 'wrong' })).toThrow(
       'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
     );

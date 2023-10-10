@@ -1,9 +1,14 @@
 import crypto from 'crypto';
 import { createCancelablePromise, pausePromise } from '@cubejs-backend/shared';
 
-import { QueryCache } from '../../src';
+import { QueryCache, QueryCacheOptions } from '../../src';
 
-export const QueryCacheTest = (name: string, options?: any) => {
+export type QueryCacheTestOptions = QueryCacheOptions & {
+  beforeAll?: () => Promise<void>,
+  afterAll?: () => Promise<void>,
+};
+
+export const QueryCacheTest = (name: string, options?: QueryCacheTestOptions) => {
   describe(`QueryQueue${name}`, () => {
     const cache = new QueryCache(
       crypto.randomBytes(16).toString('hex'),
@@ -14,8 +19,18 @@ export const QueryCacheTest = (name: string, options?: any) => {
       options,
     );
 
+    beforeAll(async () => {
+      if (options?.beforeAll) {
+        await options?.beforeAll();
+      }
+    });
+
     afterAll(async () => {
       await cache.cleanup();
+
+      if (options?.afterAll) {
+        await options?.afterAll();
+      }
     });
 
     it('withLock', async () => {
@@ -41,7 +56,7 @@ export const QueryCacheTest = (name: string, options?: any) => {
           doLock(1000)
         ];
 
-        await pausePromise(25);
+        await pausePromise(100);
 
         locks.push(doLock(1000));
         locks.push(doLock(1000));
@@ -93,6 +108,60 @@ export const QueryCacheTest = (name: string, options?: any) => {
 
       expect(statusOfResolve).toEqual(true);
       expect(callbackWasExecuted).toEqual(true);
+    });
+
+    it('queryCacheKey format', () => {
+      const key1 = QueryCache.queryCacheKey({
+        query: 'select data',
+        values: ['value'],
+        preAggregations: [],
+        invalidate: [],
+        persistent: true,
+      });
+      expect(key1[0]).toEqual('select data');
+      expect(key1[1]).toEqual(['value']);
+      expect(key1[2]).toEqual([]);
+      expect(key1[3]).toEqual([]);
+      // @ts-ignore
+      expect(key1.persistent).toEqual(true);
+
+      const key2 = QueryCache.queryCacheKey({
+        query: 'select data',
+        values: ['value'],
+        preAggregations: [],
+        invalidate: [],
+        persistent: false,
+      });
+      expect(key2[0]).toEqual('select data');
+      expect(key2[1]).toEqual(['value']);
+      expect(key2[2]).toEqual([]);
+      expect(key2[3]).toEqual([]);
+      // @ts-ignore
+      expect(key2.persistent).toEqual(false);
+
+      const key3 = QueryCache.queryCacheKey({
+        query: 'select data',
+        values: ['value'],
+        persistent: true,
+      });
+      expect(key3[0]).toEqual('select data');
+      expect(key3[1]).toEqual(['value']);
+      expect(key3[2]).toEqual([]);
+      expect(key3[3]).toBeUndefined();
+      // @ts-ignore
+      expect(key3.persistent).toEqual(true);
+
+      const key4 = QueryCache.queryCacheKey({
+        query: 'select data',
+        values: ['value'],
+        persistent: false,
+      });
+      expect(key4[0]).toEqual('select data');
+      expect(key4[1]).toEqual(['value']);
+      expect(key4[2]).toEqual([]);
+      expect(key4[3]).toBeUndefined();
+      // @ts-ignore
+      expect(key4.persistent).toEqual(false);
     });
   });
 };

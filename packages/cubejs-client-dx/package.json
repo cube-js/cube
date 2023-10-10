@@ -1,10 +1,10 @@
 {
   "name": "@cubejs-client/dx",
-  "version": "0.31.0",
+  "version": "0.34.0",
   "engines": {},
   "repository": {
     "type": "git",
-    "url": "https://github.com/cube-js/cube.js.git",
+    "url": "https://github.com/cube-js/cube.git",
     "directory": "packages/cubejs-client-dx"
   },
   "description": "Cube.js Client Developer eXperience",

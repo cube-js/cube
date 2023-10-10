@@ -2,14 +2,14 @@
   "name": "@cubejs-backend/api-gateway",
   "description": "Cube.js API Gateway",
   "author": "Cube Dev, Inc.",
-  "version": "0.31.2",
+  "version": "0.34.1",
   "repository": {
     "type": "git",
-    "url": "https://github.com/cube-js/cube.js.git",
+    "url": "https://github.com/cube-js/cube.git",
     "directory": "packages/cubejs-api-gateway"
   },
   "engines": {
-    "node": "^12.0.0 || ^14.0.0 || >=16.0.0"
+    "node": "^14.0.0 || ^16.0.0 || >=17.0.0"
   },
   "main": "dist/src/index.js",
   "typings": "dist/src/index.d.ts",
@@ -19,23 +19,24 @@
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
-    "lint": "eslint src/* test/* --ext .ts,.js",
-    "lint:fix": "eslint --fix src/* test/* --ext .ts,.js"
+    "lint": "eslint \"**/*.{ts,tsx}\"",
+    "lint:fix": "eslint --fix \"**/*.{ts,tsx}\""
   },
   "files": [
     "README.md",
     "dist/src/*"
   ],
   "dependencies": {
-    "@cubejs-backend/native": "^0.31.2",
-    "@cubejs-backend/shared": "^0.31.0",
-    "@hapi/joi": "^15.1.1",
+    "@cubejs-backend/native": "^0.34.1",
+    "@cubejs-backend/shared": "^0.34.1",
     "@ungap/structured-clone": "^0.3.4",
     "body-parser": "^1.19.0",
-    "chrono-node": "^2.2.6",
+    "chrono-node": "^2.6.2",
     "express-graphql": "^0.12.0",
     "graphql": "^15.8.0",
     "graphql-scalars": "^1.10.0",
+    "inflection": "^1.12.0",
+    "joi": "^17.8.3",
     "jsonwebtoken": "^8.3.0",
     "jwk-to-pem": "^2.0.4",
     "moment": "^2.24.0",
@@ -47,9 +48,8 @@
     "uuid": "^8.3.2"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "^0.31.0",
+    "@cubejs-backend/linter": "^0.34.0",
     "@types/express": "^4.17.9",
-    "@types/hapi__joi": "^15.0.4",
     "@types/jest": "^26.0.20",
     "@types/jsonwebtoken": "^8.5.0",
     "@types/jwk-to-pem": "^2.0.0",
@@ -63,7 +63,7 @@
     "mysql": "^2.18.1",
     "should": "^13.2.3",
     "supertest": "^4.0.2",
-    "typescript": "~4.1.5"
+    "typescript": "~4.9.5"
   },
   "license": "Apache-2.0",
   "eslintConfig": {
@@ -79,6 +79,7 @@
     ],
     "coveragePathIgnorePatterns": [
       ".*\\.d\\.ts"
-    ]
+    ],
+    "snapshotResolver": "<rootDir>/test/snapshotResolver.js"
   }
 }

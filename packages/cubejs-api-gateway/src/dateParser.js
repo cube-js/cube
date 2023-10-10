@@ -72,11 +72,11 @@ export function dateParser(dateString, timezone, now = new Date()) {
     const fromResults = parse(from, new Date(current.format(moment.HTML5_FMT.DATETIME_LOCAL_MS)));
     const toResults = parse(to, new Date(current.format(moment.HTML5_FMT.DATETIME_LOCAL_MS)));
 
-    if (!fromResults) {
+    if (!Array.isArray(fromResults) || !fromResults.length) {
       throw new UserError(`Can't parse date: '${from}'`);
     }
 
-    if (!toResults) {
+    if (!Array.isArray(fromResults) || !fromResults.length) {
       throw new UserError(`Can't parse date: '${to}'`);
     }
 

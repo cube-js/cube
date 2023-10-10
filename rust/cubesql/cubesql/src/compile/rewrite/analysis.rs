@@ -3,11 +3,13 @@ use crate::{
         engine::provider::CubeContext,
         rewrite::{
             converter::{is_expr_node, node_to_expr},
-            AliasExprAlias, ChangeUserCube, ColumnExprColumn, DimensionName, LiteralExprValue,
-            LogicalPlanLanguage, MeasureName, SegmentName, TableScanSourceTableName,
-            TimeDimensionName,
+            expr_column_name, AliasExprAlias, AllMembersAlias, AllMembersCube, ChangeUserCube,
+            ColumnExprColumn, DimensionName, FilterMemberMember, FilterMemberOp, LiteralExprValue,
+            LiteralMemberRelation, LogicalPlanLanguage, MeasureName, SegmentName,
+            TableScanSourceTableName, TimeDimensionName, VirtualFieldCube, VirtualFieldName,
         },
     },
+    transport::V1CubeMetaExt,
     var_iter, CubeError,
 };
 use datafusion::{
@@ -28,13 +30,15 @@ use std::{fmt::Debug, ops::Index, sync::Arc};
 #[derive(Clone, Debug)]
 pub struct LogicalPlanData {
     pub original_expr: Option<Expr>,
-    pub member_name_to_expr: Option<Vec<(String, Expr)>>,
+    pub member_name_to_expr: Option<Vec<(Option<String>, Expr)>>,
     pub column: Option<Column>,
-    pub expr_to_alias: Option<Vec<(Expr, String)>>,
+    pub expr_to_alias: Option<Vec<(Expr, String, Option<bool>)>>,
     pub referenced_expr: Option<Vec<Expr>>,
     pub constant: Option<ConstantFolding>,
     pub constant_in_list: Option<Vec<ScalarValue>>,
     pub cube_reference: Option<String>,
+    pub filter_operators: Option<Vec<(String, String)>>,
+    pub is_empty_list: Option<bool>,
 }
 
 #[derive(Debug, Clone)]
@@ -104,17 +108,35 @@ impl LogicalPlanAnalysis {
     fn make_member_name_to_expr(
         egraph: &EGraph<LogicalPlanLanguage, Self>,
         enode: &LogicalPlanLanguage,
-    ) -> Option<Vec<(String, Expr)>> {
+    ) -> Option<Vec<(Option<String>, Expr)>> {
         let column_name = |id| egraph.index(id).data.column.clone();
         let id_to_column_name_to_expr = |id| egraph.index(id).data.member_name_to_expr.clone();
         let original_expr = |id| egraph.index(id).data.original_expr.clone();
+        let literal_member_relation = |id| {
+            egraph
+                .index(id)
+                .iter()
+                .find(|plan| {
+                    if let LogicalPlanLanguage::LiteralMemberRelation(_) = plan {
+                        true
+                    } else {
+                        false
+                    }
+                })
+                .map(|plan| match plan {
+                    LogicalPlanLanguage::LiteralMemberRelation(LiteralMemberRelation(relation)) => {
+                        relation
+                    }
+                    _ => panic!("Unexpected non-literal member relation"),
+                })
+        };
         let mut map = Vec::new();
         match enode {
             LogicalPlanLanguage::Measure(params) => {
                 if let Some(_) = column_name(params[1]) {
                     let expr = original_expr(params[1])?;
                     let measure_name = var_iter!(egraph[params[0]], MeasureName).next().unwrap();
-                    map.push((measure_name.to_string(), expr.clone()));
+                    map.push((Some(measure_name.to_string()), expr.clone()));
                     Some(map)
                 } else {
                     None
@@ -125,7 +147,7 @@ impl LogicalPlanAnalysis {
                     let expr = original_expr(params[1])?;
                     let dimension_name =
                         var_iter!(egraph[params[0]], DimensionName).next().unwrap();
-                    map.push((dimension_name.to_string(), expr));
+                    map.push((Some(dimension_name.to_string()), expr));
                     Some(map)
                 } else {
                     None
@@ -135,7 +157,7 @@ impl LogicalPlanAnalysis {
                 if let Some(_) = column_name(params[1]) {
                     let expr = original_expr(params[1])?;
                     let segment_name = var_iter!(egraph[params[0]], SegmentName).next().unwrap();
-                    map.push((segment_name.to_string(), expr));
+                    map.push((Some(segment_name.to_string()), expr));
                     Some(map)
                 } else {
                     None
@@ -145,7 +167,46 @@ impl LogicalPlanAnalysis {
                 if let Some(_) = column_name(params[1]) {
                     let expr = original_expr(params[1])?;
                     let cube = var_iter!(egraph[params[0]], ChangeUserCube).next().unwrap();
-                    map.push((format!("{}.__user", cube), expr));
+                    map.push((Some(format!("{}.__user", cube)), expr));
+                    Some(map)
+                } else {
+                    None
+                }
+            }
+            LogicalPlanLanguage::VirtualField(params) => {
+                if let Some(_) = column_name(params[2]) {
+                    let field_name = var_iter!(egraph[params[0]], VirtualFieldName)
+                        .next()
+                        .unwrap();
+                    let cube = var_iter!(egraph[params[1]], VirtualFieldCube)
+                        .next()
+                        .unwrap();
+                    let expr = original_expr(params[2])?;
+                    map.push((Some(format!("{}.{}", cube, field_name.to_string())), expr));
+                    Some(map)
+                } else {
+                    None
+                }
+            }
+            LogicalPlanLanguage::AllMembers(params) => {
+                if let Some((cube, alias)) = var_iter!(egraph[params[0]], AllMembersCube)
+                    .next()
+                    .zip(var_iter!(egraph[params[1]], AllMembersAlias).next())
+                {
+                    let cube = egraph
+                        .analysis
+                        .cube_context
+                        .meta
+                        .find_cube_with_name(&cube)?;
+                    for column in cube.get_columns().iter() {
+                        map.push((
+                            Some(format!("{}.{}", cube.name, column.get_name())),
+                            Expr::Column(Column {
+                                relation: Some(alias.to_string()),
+                                name: column.get_name().to_string(),
+                            }),
+                        ));
+                    }
                     Some(map)
                 } else {
                     None
@@ -157,7 +218,21 @@ impl LogicalPlanAnalysis {
                     let time_dimension_name = var_iter!(egraph[params[0]], TimeDimensionName)
                         .next()
                         .unwrap();
-                    map.push((time_dimension_name.to_string(), expr));
+                    map.push((Some(time_dimension_name.to_string()), expr));
+                    Some(map)
+                } else {
+                    None
+                }
+            }
+            LogicalPlanLanguage::LiteralMember(params) => {
+                if let Some(relation) = literal_member_relation(params[2]) {
+                    let expr = original_expr(params[1])?;
+                    let name = expr_column_name(expr, &None);
+                    let column_expr = Expr::Column(Column {
+                        relation: relation.clone(),
+                        name,
+                    });
+                    map.push((None, column_expr));
                     Some(map)
                 } else {
                     None
@@ -177,10 +252,39 @@ impl LogicalPlanAnalysis {
         }
     }
 
+    fn make_filter_operators(
+        egraph: &EGraph<LogicalPlanLanguage, Self>,
+        enode: &LogicalPlanLanguage,
+    ) -> Option<Vec<(String, String)>> {
+        let filter_operators = |id| egraph.index(id).data.filter_operators.clone();
+        match enode {
+            LogicalPlanLanguage::FilterOp(params) => filter_operators(params[0]),
+            LogicalPlanLanguage::FilterOpFilters(params) => {
+                let mut map = Vec::new();
+                for id in params.iter() {
+                    map.extend(filter_operators(*id)?.into_iter());
+                }
+                Some(map)
+            }
+            LogicalPlanLanguage::FilterMember(params) => {
+                let member = var_iter!(egraph[params[0]], FilterMemberMember)
+                    .next()
+                    .unwrap()
+                    .to_string();
+                let op = var_iter!(egraph[params[1]], FilterMemberOp)
+                    .next()
+                    .unwrap()
+                    .to_string();
+                Some(vec![(member, op)])
+            }
+            _ => None,
+        }
+    }
+
     fn make_expr_to_alias(
         egraph: &EGraph<LogicalPlanLanguage, Self>,
         enode: &LogicalPlanLanguage,
-    ) -> Option<Vec<(Expr, String)>> {
+    ) -> Option<Vec<(Expr, String, Option<bool>)>> {
         let original_expr = |id| egraph.index(id).data.original_expr.clone();
         let id_to_column_name = |id| egraph.index(id).data.column.clone();
         let column_name_to_alias = |id| egraph.index(id).data.expr_to_alias.clone();
@@ -193,16 +297,27 @@ impl LogicalPlanAnalysis {
                         .next()
                         .unwrap()
                         .to_string(),
+                    Some(true),
                 ));
                 Some(map)
             }
             LogicalPlanLanguage::ProjectionExpr(params) => {
                 for id in params.iter() {
                     if let Some(col_name) = id_to_column_name(*id) {
-                        map.push((original_expr(*id)?, col_name.name.to_string()));
-                    } else {
-                        map.extend(column_name_to_alias(*id)?.into_iter());
+                        map.push((original_expr(*id)?, col_name.name.to_string(), None));
+                        continue;
                     }
+                    if let Some(expr) = original_expr(*id) {
+                        match expr {
+                            Expr::Alias(_, _) => (),
+                            expr @ _ => {
+                                let expr_name = expr.name(&DFSchema::empty());
+                                map.push((expr, expr_name.ok()?, Some(false)));
+                                continue;
+                            }
+                        };
+                    }
+                    map.extend(column_name_to_alias(*id)?.into_iter());
                 }
                 Some(map)
             }
@@ -232,6 +347,10 @@ impl LogicalPlanAnalysis {
                 push_referenced_columns(params[0], &mut vec)?;
                 Some(vec)
             }
+            LogicalPlanLanguage::AliasExpr(params) => {
+                push_referenced_columns(params[0], &mut vec)?;
+                Some(vec)
+            }
             LogicalPlanLanguage::AnyExpr(params) => {
                 push_referenced_columns(params[0], &mut vec)?;
                 push_referenced_columns(params[2], &mut vec)?;
@@ -240,6 +359,11 @@ impl LogicalPlanAnalysis {
             LogicalPlanLanguage::BinaryExpr(params) => {
                 push_referenced_columns(params[0], &mut vec)?;
                 push_referenced_columns(params[2], &mut vec)?;
+                Some(vec)
+            }
+            LogicalPlanLanguage::LikeExpr(params) => {
+                push_referenced_columns(params[2], &mut vec)?;
+                push_referenced_columns(params[3], &mut vec)?;
                 Some(vec)
             }
             LogicalPlanLanguage::InListExpr(params) => {
@@ -280,6 +404,10 @@ impl LogicalPlanAnalysis {
                 push_referenced_columns(params[1], &mut vec)?;
                 Some(vec)
             }
+            LogicalPlanLanguage::AggregateUDFExpr(params) => {
+                push_referenced_columns(params[1], &mut vec)?;
+                Some(vec)
+            }
             LogicalPlanLanguage::AggregateFunctionExpr(params) => {
                 push_referenced_columns(params[1], &mut vec)?;
                 Some(vec)
@@ -297,10 +425,12 @@ impl LogicalPlanAnalysis {
             LogicalPlanLanguage::SortExp(params)
             | LogicalPlanLanguage::AggregateGroupExpr(params)
             | LogicalPlanLanguage::AggregateAggrExpr(params)
+            | LogicalPlanLanguage::ProjectionExpr(params)
             | LogicalPlanLanguage::CaseExprWhenThenExpr(params)
             | LogicalPlanLanguage::CaseExprElseExpr(params)
             | LogicalPlanLanguage::CaseExprExpr(params)
             | LogicalPlanLanguage::AggregateFunctionExprArgs(params)
+            | LogicalPlanLanguage::AggregateUDFExprArgs(params)
             | LogicalPlanLanguage::ScalarFunctionExprArgs(params)
             | LogicalPlanLanguage::ScalarUDFExprArgs(params) => {
                 for p in params.iter() {
@@ -360,6 +490,7 @@ impl LogicalPlanAnalysis {
                         || &fun.name == "date_add"
                         || &fun.name == "date_sub"
                         || &fun.name == "date"
+                        || &fun.name == "date_to_timestamp"
                         || &fun.name == "interval_mul"
                     {
                         Self::eval_constant_expr(&egraph, &expr)
@@ -585,6 +716,33 @@ impl LogicalPlanAnalysis {
         }
     }
 
+    fn make_is_empty_list(
+        egraph: &EGraph<LogicalPlanLanguage, Self>,
+        enode: &LogicalPlanLanguage,
+    ) -> Option<bool> {
+        let is_empty_list = |id| egraph.index(id).data.is_empty_list.clone();
+        match enode {
+            LogicalPlanLanguage::FilterOpFilters(params)
+            | LogicalPlanLanguage::CubeScanFilters(params)
+            | LogicalPlanLanguage::CubeScanOrder(params) => {
+                if params.is_empty()
+                    || params.iter().all(|p| {
+                        if let Some(true) = is_empty_list(*p) {
+                            true
+                        } else {
+                            false
+                        }
+                    })
+                {
+                    Some(true)
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    }
+
     fn merge_option_field<T: Clone>(
         &mut self,
         a: &mut LogicalPlanData,
@@ -616,6 +774,8 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
             constant: Self::make_constant(egraph, enode),
             constant_in_list: Self::make_constant_in_list(egraph, enode),
             cube_reference: Self::make_cube_reference(egraph, enode),
+            is_empty_list: Self::make_is_empty_list(egraph, enode),
+            filter_operators: Self::make_filter_operators(egraph, enode),
         }
     }
 
@@ -628,6 +788,8 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
         let (constant_in_list, b) = self.merge_option_field(a, b, |d| &mut d.constant_in_list);
         let (constant, b) = self.merge_option_field(a, b, |d| &mut d.constant);
         let (cube_reference, b) = self.merge_option_field(a, b, |d| &mut d.cube_reference);
+        let (is_empty_list, b) = self.merge_option_field(a, b, |d| &mut d.is_empty_list);
+        let (filter_operators, b) = self.merge_option_field(a, b, |d| &mut d.filter_operators);
         let (column_name, _) = self.merge_option_field(a, b, |d| &mut d.column);
         original_expr
             | member_name_to_expr
@@ -637,6 +799,8 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
             | constant
             | cube_reference
             | column_name
+            | filter_operators
+            | is_empty_list
     }
 
     fn modify(egraph: &mut EGraph<LogicalPlanLanguage, Self>, id: Id) {

@@ -1,0 +1,10 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"\n                WITH w AS (SELECT 1 l)\n                SELECT w.l\n                FROM w\n                UNION ALL (SELECT w.l FROM w)\n                ;\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++---+
+| l |
++---+
+| 1 |
+| 1 |
++---+

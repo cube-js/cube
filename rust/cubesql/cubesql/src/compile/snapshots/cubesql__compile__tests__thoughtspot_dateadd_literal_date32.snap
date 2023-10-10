@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"\n                SELECT \n                    DATE_TRUNC('month', DATEADD(day, CAST(50 AS int), DATE '2014-01-01')) \\\"ca_1\\\", \n                    CASE\n                        WHEN sum(3) IS NOT NULL THEN sum(3)\n                        ELSE 0\n                    END \\\"ca_2\\\"\n                ORDER BY \\\"ca_2\\\" ASC\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++-------------------------+------+
+| ca_1                    | ca_2 |
++-------------------------+------+
+| 2014-02-01T00:00:00.000 | 3    |
++-------------------------+------+

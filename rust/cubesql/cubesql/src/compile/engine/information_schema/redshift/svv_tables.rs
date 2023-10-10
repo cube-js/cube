@@ -68,11 +68,11 @@ pub struct RedshiftSvvTablesTableProvider {
 }
 
 impl RedshiftSvvTablesTableProvider {
-    pub fn new(cubes: &Vec<V1CubeMeta>) -> Self {
+    pub fn new(db_name: &str, cubes: &Vec<V1CubeMeta>) -> Self {
         let mut builder = RedshiftSvvTablesBuilder::new(cubes.len());
 
         for cube in cubes {
-            builder.add_table("db", "public", &cube.name, "BASE TABLE");
+            builder.add_table(db_name, "public", &cube.name, "BASE TABLE");
         }
 
         Self {

@@ -5,7 +5,7 @@ expression: "execute_query(\"\n                SELECT\n                    'db' 
 +----------+--------+---------------------------+-----------+---------+-------+------+---------+--------------+-----------+---------+--------------+----------------+------------+-------------------------+
 | Database | Schema | Name                      | TableType | definer | Oid   | ACL  | HasOids | HasSubtables | RowNumber | Comment | ColumnNumber | TriggersNumber | Constraint | ColumnConstrainsIndexes |
 +----------+--------+---------------------------+-----------+---------+-------+------+---------+--------------+-----------+---------+--------------+----------------+------------+-------------------------+
-| db       | public | KibanaSampleDataEcommerce | User      | ovr     | 18000 | NULL | true    | false        | -1        | NULL    | 11           | false          | NULL       | NULL                    |
-| db       | public | Logs                      | User      | ovr     | 18014 | NULL | true    | false        | -1        | NULL    | 3            | false          | NULL       | NULL                    |
-| db       | public | NumberCube                | User      | ovr     | 18020 | NULL | true    | false        | -1        | NULL    | 2            | false          | NULL       | NULL                    |
+| db       | public | KibanaSampleDataEcommerce | User      | ovr     | 18000 | NULL | true    | false        | -1        | NULL    | 15           | false          | NULL       | NULL                    |
+| db       | public | Logs                      | User      | ovr     | 18018 | NULL | true    | false        | -1        | NULL    | 7            | false          | NULL       | NULL                    |
+| db       | public | NumberCube                | User      | ovr     | 18028 | NULL | true    | false        | -1        | NULL    | 3            | false          | NULL       | NULL                    |
 +----------+--------+---------------------------+-----------+---------+-------+------+---------+--------------+-----------+---------+--------------+----------------+------------+-------------------------+

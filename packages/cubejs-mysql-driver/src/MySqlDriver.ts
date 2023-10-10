@@ -21,6 +21,7 @@ import {
   DownloadTableData,
   IndexesSQL,
   DownloadTableMemoryData,
+  DriverCapabilities,
 } from '@cubejs-backend/base-driver';
 
 const GenericTypeToMySql: Record<GenericDataBaseType, string> = {
@@ -97,11 +98,26 @@ export class MySqlDriver extends BaseDriver implements DriverInterface {
    */
   public constructor(
     config: MySqlDriverConfiguration & {
+      /**
+       * Data source name.
+       */
       dataSource?: string,
+
+      /**
+       * Max pool size value for the [cube]<-->[db] pool.
+       */
       maxPoolSize?: number,
+
+      /**
+       * Time to wait for a response from a connection after validation
+       * request before determining it as not valid. Default - 10000 ms.
+       */
+      testConnectionTimeout?: number,
     } = {}
   ) {
-    super();
+    super({
+      testConnectionTimeout: config.testConnectionTimeout,
+    });
 
     const dataSource =
       config.dataSource ||
@@ -391,5 +407,11 @@ export class MySqlDriver extends BaseDriver implements DriverInterface {
     return MySqlToGenericType[columnType.toLowerCase()] ||
       MySqlToGenericType[columnType.toLowerCase().split('(')[0]] ||
       super.toGenericType(columnType);
+  }
+
+  public capabilities(): DriverCapabilities {
+    return {
+      incrementalSchemaLoading: true,
+    };
   }
 }

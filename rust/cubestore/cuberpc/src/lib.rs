@@ -84,7 +84,7 @@ impl RpcService {
             .map(|m| m.method_call_enum())
             .collect::<Vec<_>>();
         quote! {
-            #[derive(Serialize, Deserialize, Debug)]
+            #[derive(serde::Serialize, serde::Deserialize, Debug)]
             pub enum #method_call {
                 #( #methods ),*
             }
@@ -99,7 +99,7 @@ impl RpcService {
             .map(|m| m.method_result_enum())
             .collect::<Vec<_>>();
         quote! {
-            #[derive(Serialize, Deserialize, Debug)]
+            #[derive(serde::Serialize, serde::Deserialize, Debug)]
             pub enum #method_call {
                 #( #methods ),*
             }

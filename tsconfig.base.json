@@ -6,8 +6,8 @@
   "files": [],
   "compilerOptions": {
     "incremental": true,
-    "lib": ["es2017", "es2018", "es2019", "es2020"],
-    "target": "es2018",
+    "lib": ["es2021"],
+    "target": "es2021",
     "module": "commonjs",
     "baseUrl": ".",
     "paths": {
@@ -19,7 +19,7 @@
         "packages/cubejs-query-orchestrator/src",
         "packages/cubejs-schema-compiler/src",
         "packages/cubejs-server/src",
-        "packages/cubejs-server-core/src",
+        "packages/cubejs-server-core/src"
       ]
     },
     "composite": true,

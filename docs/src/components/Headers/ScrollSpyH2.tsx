@@ -1,12 +1,14 @@
 import React from 'react';
-import kebabCase from 'lodash/kebabCase';
 import ScrollLink from '../templates/ScrollSpyLink';
 import * as styles from '../../../static/styles/index.module.scss';
 import cx from 'classnames';
 import { Icon } from 'antd';
 
+import { getHashFromContent } from './getHashFromContent';
+
 const ScrollSpyH2 = (props) => {
-  const hash = kebabCase(props.children);
+
+  const hash = getHashFromContent(props.children);
 
   return (
     <h2 name={hash} className={styles.hTag}>

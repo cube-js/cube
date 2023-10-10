@@ -95,6 +95,10 @@ describe('SQL Generation', () => {
           type: 'avg',
           sql: \`\${doubledCheckings}\`
         },
+        strCase: {
+          sql: \`CASE WHEN \${visitor_count} > 1 THEN 'More than 1' ELSE (\${visitor_revenue})::text END\`,
+          type: \`string\`
+        },
         ...(['foo', 'bar'].map(m => ({ [m]: { type: 'count' } })).reduce((a, b) => ({ ...a, ...b })))
       },
 
@@ -482,6 +486,20 @@ describe('SQL Generation', () => {
     visitors__visitor_count: '5',
     visitor_checkins__visitor_checkins_count: '6',
     visitors__per_visitor_revenue: '60'
+  }]));
+
+  it('string measure', async () => runQueryTest({
+    measures: [
+      'visitors.strCase',
+    ],
+    timeDimensions: [{
+      dimension: 'visitors.created_at',
+      dateRange: ['2017-01-01', '2017-01-30']
+    }],
+    timezone: 'America/Los_Angeles',
+    order: []
+  }, [{
+    visitors__str_case: 'More than 1'
   }]));
 
   it('running total', async () => {
@@ -1950,5 +1968,35 @@ describe('SQL Generation', () => {
           expect(cols[2]).toEqual('b__count');
         });
       });
+  });
+
+  it('expression cube name cache', async () => {
+    await runQueryTest(
+      {
+        dimensions: [{
+          // eslint-disable-next-line no-new-func,no-template-curly-in-string
+          expression: new Function('visitors', 'return `CASE WHEN ${visitors.id} > 10 THEN 10 ELSE 0 END`'),
+          expressionName: 'visitors.id_case',
+          // eslint-disable-next-line no-template-curly-in-string
+          definition: 'CASE WHEN ${visitors.id} > 10 THEN 10 ELSE 0 END',
+          cubeName: 'visitors'
+        }],
+      },
+      [{ visitors__id_case: 0 }]
+    );
+
+    await runQueryTest(
+      {
+        dimensions: [{
+          // eslint-disable-next-line no-new-func,no-template-curly-in-string
+          expression: new Function('visitor_checkins', 'return `CASE WHEN ${visitor_checkins.id} > 10 THEN 10 ELSE 0 END`'),
+          expressionName: 'visitors.id_case',
+          // eslint-disable-next-line no-template-curly-in-string
+          definition: 'CASE WHEN ${visitor_checkins.id} > 10 THEN 10 ELSE 0 END',
+          cubeName: 'visitors'
+        }],
+      },
+      [{ visitors__id_case: 0 }]
+    );
   });
 });

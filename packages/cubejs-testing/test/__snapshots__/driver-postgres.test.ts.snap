@@ -1216,6 +1216,1404 @@ exports[`postgres driver tests filtering Customers: endsWith filter + dimensions
 
 exports[`postgres driver tests filtering Customers: endsWith filter + dimensions, third_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"true","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `Array []`;
 
+exports[`postgres driver tests filtering Customers: notEndsWith filter + dimensions, first_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"false","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `
+Array [
+  Object {
+    "Customers.customerId": "AH-10465",
+    "Customers.customerName": "Customer 1",
+  },
+  Object {
+    "Customers.customerId": "AS-10225",
+    "Customers.customerName": "Customer 3",
+  },
+  Object {
+    "Customers.customerId": "BB-11545",
+    "Customers.customerName": "Customer 5",
+  },
+  Object {
+    "Customers.customerId": "BS-11755",
+    "Customers.customerName": "Customer 10",
+  },
+  Object {
+    "Customers.customerId": "CA-12775",
+    "Customers.customerName": "Customer 11",
+  },
+  Object {
+    "Customers.customerId": "CC-12475",
+    "Customers.customerName": "Customer 12",
+  },
+  Object {
+    "Customers.customerId": "CS-12355",
+    "Customers.customerName": "Customer 14",
+  },
+  Object {
+    "Customers.customerId": "DB-13405",
+    "Customers.customerName": "Customer 15",
+  },
+  Object {
+    "Customers.customerId": "GA-14725",
+    "Customers.customerName": "Customer 19",
+  },
+  Object {
+    "Customers.customerId": "KL-16555",
+    "Customers.customerName": "Customer 27",
+  },
+  Object {
+    "Customers.customerId": "KN-16705",
+    "Customers.customerName": "Customer 28",
+  },
+  Object {
+    "Customers.customerId": "LR-16915",
+    "Customers.customerName": "Customer 30",
+  },
+  Object {
+    "Customers.customerId": "MC-17605",
+    "Customers.customerName": "Customer 31",
+  },
+  Object {
+    "Customers.customerId": "ML-17755",
+    "Customers.customerName": "Customer 33",
+  },
+  Object {
+    "Customers.customerId": "PF-19165",
+    "Customers.customerName": "Customer 36",
+  },
+  Object {
+    "Customers.customerId": "SB-20185",
+    "Customers.customerName": "Customer 37",
+  },
+  Object {
+    "Customers.customerId": "TB-21175",
+    "Customers.customerName": "Customer 39",
+  },
+  Object {
+    "Customers.customerId": "TS-21205",
+    "Customers.customerName": "Customer 40",
+  },
+]
+`;
+
+exports[`postgres driver tests filtering Customers: notEndsWith filter + dimensions, first_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"true","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `
+Array [
+  Object {
+    "Customers.customerId": "AH-10465",
+    "Customers.customerName": "Customer 1",
+  },
+  Object {
+    "Customers.customerId": "AS-10225",
+    "Customers.customerName": "Customer 3",
+  },
+  Object {
+    "Customers.customerId": "BB-11545",
+    "Customers.customerName": "Customer 5",
+  },
+  Object {
+    "Customers.customerId": "BS-11755",
+    "Customers.customerName": "Customer 10",
+  },
+  Object {
+    "Customers.customerId": "CA-12775",
+    "Customers.customerName": "Customer 11",
+  },
+  Object {
+    "Customers.customerId": "CC-12475",
+    "Customers.customerName": "Customer 12",
+  },
+  Object {
+    "Customers.customerId": "CS-12355",
+    "Customers.customerName": "Customer 14",
+  },
+  Object {
+    "Customers.customerId": "DB-13405",
+    "Customers.customerName": "Customer 15",
+  },
+  Object {
+    "Customers.customerId": "GA-14725",
+    "Customers.customerName": "Customer 19",
+  },
+  Object {
+    "Customers.customerId": "KL-16555",
+    "Customers.customerName": "Customer 27",
+  },
+  Object {
+    "Customers.customerId": "KN-16705",
+    "Customers.customerName": "Customer 28",
+  },
+  Object {
+    "Customers.customerId": "LR-16915",
+    "Customers.customerName": "Customer 30",
+  },
+  Object {
+    "Customers.customerId": "MC-17605",
+    "Customers.customerName": "Customer 31",
+  },
+  Object {
+    "Customers.customerId": "ML-17755",
+    "Customers.customerName": "Customer 33",
+  },
+  Object {
+    "Customers.customerId": "PF-19165",
+    "Customers.customerName": "Customer 36",
+  },
+  Object {
+    "Customers.customerId": "SB-20185",
+    "Customers.customerName": "Customer 37",
+  },
+  Object {
+    "Customers.customerId": "TB-21175",
+    "Customers.customerName": "Customer 39",
+  },
+  Object {
+    "Customers.customerId": "TS-21205",
+    "Customers.customerName": "Customer 40",
+  },
+]
+`;
+
+exports[`postgres driver tests filtering Customers: notEndsWith filter + dimensions, second_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"false","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `Array []`;
+
+exports[`postgres driver tests filtering Customers: notEndsWith filter + dimensions, second_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"true","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `Array []`;
+
+exports[`postgres driver tests filtering Customers: notEndsWith filter + dimensions, third_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"false","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `
+Array [
+  Object {
+    "Customers.customerId": "AH-10465",
+    "Customers.customerName": "Customer 1",
+  },
+  Object {
+    "Customers.customerId": "AJ-10780",
+    "Customers.customerName": "Customer 2",
+  },
+  Object {
+    "Customers.customerId": "AS-10225",
+    "Customers.customerName": "Customer 3",
+  },
+  Object {
+    "Customers.customerId": "AW-10840",
+    "Customers.customerName": "Customer 4",
+  },
+  Object {
+    "Customers.customerId": "BB-11545",
+    "Customers.customerName": "Customer 5",
+  },
+  Object {
+    "Customers.customerId": "BF-11020",
+    "Customers.customerName": "Customer 6",
+  },
+  Object {
+    "Customers.customerId": "BF-11170",
+    "Customers.customerName": "Customer 7",
+  },
+  Object {
+    "Customers.customerId": "BM-11650",
+    "Customers.customerName": "Customer 8",
+  },
+  Object {
+    "Customers.customerId": "BS-11380",
+    "Customers.customerName": "Customer 9",
+  },
+  Object {
+    "Customers.customerId": "BS-11755",
+    "Customers.customerName": "Customer 10",
+  },
+  Object {
+    "Customers.customerId": "CA-12775",
+    "Customers.customerName": "Customer 11",
+  },
+  Object {
+    "Customers.customerId": "CC-12475",
+    "Customers.customerName": "Customer 12",
+  },
+  Object {
+    "Customers.customerId": "CD-12280",
+    "Customers.customerName": "Customer 13",
+  },
+  Object {
+    "Customers.customerId": "CS-12355",
+    "Customers.customerName": "Customer 14",
+  },
+  Object {
+    "Customers.customerId": "DB-13405",
+    "Customers.customerName": "Customer 15",
+  },
+  Object {
+    "Customers.customerId": "DG-13300",
+    "Customers.customerName": "Customer 16",
+  },
+  Object {
+    "Customers.customerId": "DW-13480",
+    "Customers.customerName": "Customer 17",
+  },
+  Object {
+    "Customers.customerId": "EM-14140",
+    "Customers.customerName": "Customer 18",
+  },
+  Object {
+    "Customers.customerId": "GA-14725",
+    "Customers.customerName": "Customer 19",
+  },
+  Object {
+    "Customers.customerId": "GZ-14470",
+    "Customers.customerName": "Customer 20",
+  },
+  Object {
+    "Customers.customerId": "HH-15010",
+    "Customers.customerName": "Customer 21",
+  },
+  Object {
+    "Customers.customerId": "HK-14890",
+    "Customers.customerName": "Customer 22",
+  },
+  Object {
+    "Customers.customerId": "JH-15430",
+    "Customers.customerName": "Customer 23",
+  },
+  Object {
+    "Customers.customerId": "JO-15550",
+    "Customers.customerName": "Customer 24",
+  },
+  Object {
+    "Customers.customerId": "JS-16030",
+    "Customers.customerName": "Customer 25",
+  },
+  Object {
+    "Customers.customerId": "JW-15220",
+    "Customers.customerName": "Customer 26",
+  },
+  Object {
+    "Customers.customerId": "KL-16555",
+    "Customers.customerName": "Customer 27",
+  },
+  Object {
+    "Customers.customerId": "KN-16705",
+    "Customers.customerName": "Customer 28",
+  },
+  Object {
+    "Customers.customerId": "LC-17050",
+    "Customers.customerName": "Customer 29",
+  },
+  Object {
+    "Customers.customerId": "LR-16915",
+    "Customers.customerName": "Customer 30",
+  },
+  Object {
+    "Customers.customerId": "MC-17605",
+    "Customers.customerName": "Customer 31",
+  },
+  Object {
+    "Customers.customerId": "MG-17650",
+    "Customers.customerName": "Customer 32",
+  },
+  Object {
+    "Customers.customerId": "ML-17755",
+    "Customers.customerName": "Customer 33",
+  },
+  Object {
+    "Customers.customerId": "MM-18280",
+    "Customers.customerName": "Customer 34",
+  },
+  Object {
+    "Customers.customerId": "NP-18670",
+    "Customers.customerName": "Customer 35",
+  },
+  Object {
+    "Customers.customerId": "PF-19165",
+    "Customers.customerName": "Customer 36",
+  },
+  Object {
+    "Customers.customerId": "SB-20185",
+    "Customers.customerName": "Customer 37",
+  },
+  Object {
+    "Customers.customerId": "SS-20140",
+    "Customers.customerName": "Customer 38",
+  },
+  Object {
+    "Customers.customerId": "TB-21175",
+    "Customers.customerName": "Customer 39",
+  },
+  Object {
+    "Customers.customerId": "TS-21205",
+    "Customers.customerName": "Customer 40",
+  },
+  Object {
+    "Customers.customerId": "WB-21850",
+    "Customers.customerName": "Customer 41",
+  },
+]
+`;
+
+exports[`postgres driver tests filtering Customers: notEndsWith filter + dimensions, third_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"true","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `
+Array [
+  Object {
+    "Customers.customerId": "AH-10465",
+    "Customers.customerName": "Customer 1",
+  },
+  Object {
+    "Customers.customerId": "AJ-10780",
+    "Customers.customerName": "Customer 2",
+  },
+  Object {
+    "Customers.customerId": "AS-10225",
+    "Customers.customerName": "Customer 3",
+  },
+  Object {
+    "Customers.customerId": "AW-10840",
+    "Customers.customerName": "Customer 4",
+  },
+  Object {
+    "Customers.customerId": "BB-11545",
+    "Customers.customerName": "Customer 5",
+  },
+  Object {
+    "Customers.customerId": "BF-11020",
+    "Customers.customerName": "Customer 6",
+  },
+  Object {
+    "Customers.customerId": "BF-11170",
+    "Customers.customerName": "Customer 7",
+  },
+  Object {
+    "Customers.customerId": "BM-11650",
+    "Customers.customerName": "Customer 8",
+  },
+  Object {
+    "Customers.customerId": "BS-11380",
+    "Customers.customerName": "Customer 9",
+  },
+  Object {
+    "Customers.customerId": "BS-11755",
+    "Customers.customerName": "Customer 10",
+  },
+  Object {
+    "Customers.customerId": "CA-12775",
+    "Customers.customerName": "Customer 11",
+  },
+  Object {
+    "Customers.customerId": "CC-12475",
+    "Customers.customerName": "Customer 12",
+  },
+  Object {
+    "Customers.customerId": "CD-12280",
+    "Customers.customerName": "Customer 13",
+  },
+  Object {
+    "Customers.customerId": "CS-12355",
+    "Customers.customerName": "Customer 14",
+  },
+  Object {
+    "Customers.customerId": "DB-13405",
+    "Customers.customerName": "Customer 15",
+  },
+  Object {
+    "Customers.customerId": "DG-13300",
+    "Customers.customerName": "Customer 16",
+  },
+  Object {
+    "Customers.customerId": "DW-13480",
+    "Customers.customerName": "Customer 17",
+  },
+  Object {
+    "Customers.customerId": "EM-14140",
+    "Customers.customerName": "Customer 18",
+  },
+  Object {
+    "Customers.customerId": "GA-14725",
+    "Customers.customerName": "Customer 19",
+  },
+  Object {
+    "Customers.customerId": "GZ-14470",
+    "Customers.customerName": "Customer 20",
+  },
+  Object {
+    "Customers.customerId": "HH-15010",
+    "Customers.customerName": "Customer 21",
+  },
+  Object {
+    "Customers.customerId": "HK-14890",
+    "Customers.customerName": "Customer 22",
+  },
+  Object {
+    "Customers.customerId": "JH-15430",
+    "Customers.customerName": "Customer 23",
+  },
+  Object {
+    "Customers.customerId": "JO-15550",
+    "Customers.customerName": "Customer 24",
+  },
+  Object {
+    "Customers.customerId": "JS-16030",
+    "Customers.customerName": "Customer 25",
+  },
+  Object {
+    "Customers.customerId": "JW-15220",
+    "Customers.customerName": "Customer 26",
+  },
+  Object {
+    "Customers.customerId": "KL-16555",
+    "Customers.customerName": "Customer 27",
+  },
+  Object {
+    "Customers.customerId": "KN-16705",
+    "Customers.customerName": "Customer 28",
+  },
+  Object {
+    "Customers.customerId": "LC-17050",
+    "Customers.customerName": "Customer 29",
+  },
+  Object {
+    "Customers.customerId": "LR-16915",
+    "Customers.customerName": "Customer 30",
+  },
+  Object {
+    "Customers.customerId": "MC-17605",
+    "Customers.customerName": "Customer 31",
+  },
+  Object {
+    "Customers.customerId": "MG-17650",
+    "Customers.customerName": "Customer 32",
+  },
+  Object {
+    "Customers.customerId": "ML-17755",
+    "Customers.customerName": "Customer 33",
+  },
+  Object {
+    "Customers.customerId": "MM-18280",
+    "Customers.customerName": "Customer 34",
+  },
+  Object {
+    "Customers.customerId": "NP-18670",
+    "Customers.customerName": "Customer 35",
+  },
+  Object {
+    "Customers.customerId": "PF-19165",
+    "Customers.customerName": "Customer 36",
+  },
+  Object {
+    "Customers.customerId": "SB-20185",
+    "Customers.customerName": "Customer 37",
+  },
+  Object {
+    "Customers.customerId": "SS-20140",
+    "Customers.customerName": "Customer 38",
+  },
+  Object {
+    "Customers.customerId": "TB-21175",
+    "Customers.customerName": "Customer 39",
+  },
+  Object {
+    "Customers.customerId": "TS-21205",
+    "Customers.customerName": "Customer 40",
+  },
+  Object {
+    "Customers.customerId": "WB-21850",
+    "Customers.customerName": "Customer 41",
+  },
+]
+`;
+
+exports[`postgres driver tests filtering Customers: notStartsWith + dimensions, first_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"false","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `
+Array [
+  Object {
+    "Customers.customerId": "BB-11545",
+    "Customers.customerName": "Customer 5",
+  },
+  Object {
+    "Customers.customerId": "BF-11020",
+    "Customers.customerName": "Customer 6",
+  },
+  Object {
+    "Customers.customerId": "BF-11170",
+    "Customers.customerName": "Customer 7",
+  },
+  Object {
+    "Customers.customerId": "BM-11650",
+    "Customers.customerName": "Customer 8",
+  },
+  Object {
+    "Customers.customerId": "BS-11380",
+    "Customers.customerName": "Customer 9",
+  },
+  Object {
+    "Customers.customerId": "BS-11755",
+    "Customers.customerName": "Customer 10",
+  },
+  Object {
+    "Customers.customerId": "CA-12775",
+    "Customers.customerName": "Customer 11",
+  },
+  Object {
+    "Customers.customerId": "CC-12475",
+    "Customers.customerName": "Customer 12",
+  },
+  Object {
+    "Customers.customerId": "CD-12280",
+    "Customers.customerName": "Customer 13",
+  },
+  Object {
+    "Customers.customerId": "CS-12355",
+    "Customers.customerName": "Customer 14",
+  },
+  Object {
+    "Customers.customerId": "DB-13405",
+    "Customers.customerName": "Customer 15",
+  },
+  Object {
+    "Customers.customerId": "DG-13300",
+    "Customers.customerName": "Customer 16",
+  },
+  Object {
+    "Customers.customerId": "DW-13480",
+    "Customers.customerName": "Customer 17",
+  },
+  Object {
+    "Customers.customerId": "EM-14140",
+    "Customers.customerName": "Customer 18",
+  },
+  Object {
+    "Customers.customerId": "GA-14725",
+    "Customers.customerName": "Customer 19",
+  },
+  Object {
+    "Customers.customerId": "GZ-14470",
+    "Customers.customerName": "Customer 20",
+  },
+  Object {
+    "Customers.customerId": "HH-15010",
+    "Customers.customerName": "Customer 21",
+  },
+  Object {
+    "Customers.customerId": "HK-14890",
+    "Customers.customerName": "Customer 22",
+  },
+  Object {
+    "Customers.customerId": "JH-15430",
+    "Customers.customerName": "Customer 23",
+  },
+  Object {
+    "Customers.customerId": "JO-15550",
+    "Customers.customerName": "Customer 24",
+  },
+  Object {
+    "Customers.customerId": "JS-16030",
+    "Customers.customerName": "Customer 25",
+  },
+  Object {
+    "Customers.customerId": "JW-15220",
+    "Customers.customerName": "Customer 26",
+  },
+  Object {
+    "Customers.customerId": "KL-16555",
+    "Customers.customerName": "Customer 27",
+  },
+  Object {
+    "Customers.customerId": "KN-16705",
+    "Customers.customerName": "Customer 28",
+  },
+  Object {
+    "Customers.customerId": "LC-17050",
+    "Customers.customerName": "Customer 29",
+  },
+  Object {
+    "Customers.customerId": "LR-16915",
+    "Customers.customerName": "Customer 30",
+  },
+  Object {
+    "Customers.customerId": "MC-17605",
+    "Customers.customerName": "Customer 31",
+  },
+  Object {
+    "Customers.customerId": "MG-17650",
+    "Customers.customerName": "Customer 32",
+  },
+  Object {
+    "Customers.customerId": "ML-17755",
+    "Customers.customerName": "Customer 33",
+  },
+  Object {
+    "Customers.customerId": "MM-18280",
+    "Customers.customerName": "Customer 34",
+  },
+  Object {
+    "Customers.customerId": "NP-18670",
+    "Customers.customerName": "Customer 35",
+  },
+  Object {
+    "Customers.customerId": "PF-19165",
+    "Customers.customerName": "Customer 36",
+  },
+  Object {
+    "Customers.customerId": "SB-20185",
+    "Customers.customerName": "Customer 37",
+  },
+  Object {
+    "Customers.customerId": "SS-20140",
+    "Customers.customerName": "Customer 38",
+  },
+  Object {
+    "Customers.customerId": "TB-21175",
+    "Customers.customerName": "Customer 39",
+  },
+  Object {
+    "Customers.customerId": "TS-21205",
+    "Customers.customerName": "Customer 40",
+  },
+  Object {
+    "Customers.customerId": "WB-21850",
+    "Customers.customerName": "Customer 41",
+  },
+]
+`;
+
+exports[`postgres driver tests filtering Customers: notStartsWith + dimensions, first_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"true","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `
+Array [
+  Object {
+    "Customers.customerId": "BB-11545",
+    "Customers.customerName": "Customer 5",
+  },
+  Object {
+    "Customers.customerId": "BF-11020",
+    "Customers.customerName": "Customer 6",
+  },
+  Object {
+    "Customers.customerId": "BF-11170",
+    "Customers.customerName": "Customer 7",
+  },
+  Object {
+    "Customers.customerId": "BM-11650",
+    "Customers.customerName": "Customer 8",
+  },
+  Object {
+    "Customers.customerId": "BS-11380",
+    "Customers.customerName": "Customer 9",
+  },
+  Object {
+    "Customers.customerId": "BS-11755",
+    "Customers.customerName": "Customer 10",
+  },
+  Object {
+    "Customers.customerId": "CA-12775",
+    "Customers.customerName": "Customer 11",
+  },
+  Object {
+    "Customers.customerId": "CC-12475",
+    "Customers.customerName": "Customer 12",
+  },
+  Object {
+    "Customers.customerId": "CD-12280",
+    "Customers.customerName": "Customer 13",
+  },
+  Object {
+    "Customers.customerId": "CS-12355",
+    "Customers.customerName": "Customer 14",
+  },
+  Object {
+    "Customers.customerId": "DB-13405",
+    "Customers.customerName": "Customer 15",
+  },
+  Object {
+    "Customers.customerId": "DG-13300",
+    "Customers.customerName": "Customer 16",
+  },
+  Object {
+    "Customers.customerId": "DW-13480",
+    "Customers.customerName": "Customer 17",
+  },
+  Object {
+    "Customers.customerId": "EM-14140",
+    "Customers.customerName": "Customer 18",
+  },
+  Object {
+    "Customers.customerId": "GA-14725",
+    "Customers.customerName": "Customer 19",
+  },
+  Object {
+    "Customers.customerId": "GZ-14470",
+    "Customers.customerName": "Customer 20",
+  },
+  Object {
+    "Customers.customerId": "HH-15010",
+    "Customers.customerName": "Customer 21",
+  },
+  Object {
+    "Customers.customerId": "HK-14890",
+    "Customers.customerName": "Customer 22",
+  },
+  Object {
+    "Customers.customerId": "JH-15430",
+    "Customers.customerName": "Customer 23",
+  },
+  Object {
+    "Customers.customerId": "JO-15550",
+    "Customers.customerName": "Customer 24",
+  },
+  Object {
+    "Customers.customerId": "JS-16030",
+    "Customers.customerName": "Customer 25",
+  },
+  Object {
+    "Customers.customerId": "JW-15220",
+    "Customers.customerName": "Customer 26",
+  },
+  Object {
+    "Customers.customerId": "KL-16555",
+    "Customers.customerName": "Customer 27",
+  },
+  Object {
+    "Customers.customerId": "KN-16705",
+    "Customers.customerName": "Customer 28",
+  },
+  Object {
+    "Customers.customerId": "LC-17050",
+    "Customers.customerName": "Customer 29",
+  },
+  Object {
+    "Customers.customerId": "LR-16915",
+    "Customers.customerName": "Customer 30",
+  },
+  Object {
+    "Customers.customerId": "MC-17605",
+    "Customers.customerName": "Customer 31",
+  },
+  Object {
+    "Customers.customerId": "MG-17650",
+    "Customers.customerName": "Customer 32",
+  },
+  Object {
+    "Customers.customerId": "ML-17755",
+    "Customers.customerName": "Customer 33",
+  },
+  Object {
+    "Customers.customerId": "MM-18280",
+    "Customers.customerName": "Customer 34",
+  },
+  Object {
+    "Customers.customerId": "NP-18670",
+    "Customers.customerName": "Customer 35",
+  },
+  Object {
+    "Customers.customerId": "PF-19165",
+    "Customers.customerName": "Customer 36",
+  },
+  Object {
+    "Customers.customerId": "SB-20185",
+    "Customers.customerName": "Customer 37",
+  },
+  Object {
+    "Customers.customerId": "SS-20140",
+    "Customers.customerName": "Customer 38",
+  },
+  Object {
+    "Customers.customerId": "TB-21175",
+    "Customers.customerName": "Customer 39",
+  },
+  Object {
+    "Customers.customerId": "TS-21205",
+    "Customers.customerName": "Customer 40",
+  },
+  Object {
+    "Customers.customerId": "WB-21850",
+    "Customers.customerName": "Customer 41",
+  },
+]
+`;
+
+exports[`postgres driver tests filtering Customers: notStartsWith + dimensions, second_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"false","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `
+Array [
+  Object {
+    "Customers.customerId": "CA-12775",
+    "Customers.customerName": "Customer 11",
+  },
+  Object {
+    "Customers.customerId": "CC-12475",
+    "Customers.customerName": "Customer 12",
+  },
+  Object {
+    "Customers.customerId": "CD-12280",
+    "Customers.customerName": "Customer 13",
+  },
+  Object {
+    "Customers.customerId": "CS-12355",
+    "Customers.customerName": "Customer 14",
+  },
+  Object {
+    "Customers.customerId": "DB-13405",
+    "Customers.customerName": "Customer 15",
+  },
+  Object {
+    "Customers.customerId": "DG-13300",
+    "Customers.customerName": "Customer 16",
+  },
+  Object {
+    "Customers.customerId": "DW-13480",
+    "Customers.customerName": "Customer 17",
+  },
+  Object {
+    "Customers.customerId": "EM-14140",
+    "Customers.customerName": "Customer 18",
+  },
+  Object {
+    "Customers.customerId": "GA-14725",
+    "Customers.customerName": "Customer 19",
+  },
+  Object {
+    "Customers.customerId": "GZ-14470",
+    "Customers.customerName": "Customer 20",
+  },
+  Object {
+    "Customers.customerId": "HH-15010",
+    "Customers.customerName": "Customer 21",
+  },
+  Object {
+    "Customers.customerId": "HK-14890",
+    "Customers.customerName": "Customer 22",
+  },
+  Object {
+    "Customers.customerId": "JH-15430",
+    "Customers.customerName": "Customer 23",
+  },
+  Object {
+    "Customers.customerId": "JO-15550",
+    "Customers.customerName": "Customer 24",
+  },
+  Object {
+    "Customers.customerId": "JS-16030",
+    "Customers.customerName": "Customer 25",
+  },
+  Object {
+    "Customers.customerId": "JW-15220",
+    "Customers.customerName": "Customer 26",
+  },
+  Object {
+    "Customers.customerId": "KL-16555",
+    "Customers.customerName": "Customer 27",
+  },
+  Object {
+    "Customers.customerId": "KN-16705",
+    "Customers.customerName": "Customer 28",
+  },
+  Object {
+    "Customers.customerId": "LC-17050",
+    "Customers.customerName": "Customer 29",
+  },
+  Object {
+    "Customers.customerId": "LR-16915",
+    "Customers.customerName": "Customer 30",
+  },
+  Object {
+    "Customers.customerId": "MC-17605",
+    "Customers.customerName": "Customer 31",
+  },
+  Object {
+    "Customers.customerId": "MG-17650",
+    "Customers.customerName": "Customer 32",
+  },
+  Object {
+    "Customers.customerId": "ML-17755",
+    "Customers.customerName": "Customer 33",
+  },
+  Object {
+    "Customers.customerId": "MM-18280",
+    "Customers.customerName": "Customer 34",
+  },
+  Object {
+    "Customers.customerId": "NP-18670",
+    "Customers.customerName": "Customer 35",
+  },
+  Object {
+    "Customers.customerId": "PF-19165",
+    "Customers.customerName": "Customer 36",
+  },
+  Object {
+    "Customers.customerId": "SB-20185",
+    "Customers.customerName": "Customer 37",
+  },
+  Object {
+    "Customers.customerId": "SS-20140",
+    "Customers.customerName": "Customer 38",
+  },
+  Object {
+    "Customers.customerId": "TB-21175",
+    "Customers.customerName": "Customer 39",
+  },
+  Object {
+    "Customers.customerId": "TS-21205",
+    "Customers.customerName": "Customer 40",
+  },
+  Object {
+    "Customers.customerId": "WB-21850",
+    "Customers.customerName": "Customer 41",
+  },
+]
+`;
+
+exports[`postgres driver tests filtering Customers: notStartsWith + dimensions, second_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"true","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `
+Array [
+  Object {
+    "Customers.customerId": "CA-12775",
+    "Customers.customerName": "Customer 11",
+  },
+  Object {
+    "Customers.customerId": "CC-12475",
+    "Customers.customerName": "Customer 12",
+  },
+  Object {
+    "Customers.customerId": "CD-12280",
+    "Customers.customerName": "Customer 13",
+  },
+  Object {
+    "Customers.customerId": "CS-12355",
+    "Customers.customerName": "Customer 14",
+  },
+  Object {
+    "Customers.customerId": "DB-13405",
+    "Customers.customerName": "Customer 15",
+  },
+  Object {
+    "Customers.customerId": "DG-13300",
+    "Customers.customerName": "Customer 16",
+  },
+  Object {
+    "Customers.customerId": "DW-13480",
+    "Customers.customerName": "Customer 17",
+  },
+  Object {
+    "Customers.customerId": "EM-14140",
+    "Customers.customerName": "Customer 18",
+  },
+  Object {
+    "Customers.customerId": "GA-14725",
+    "Customers.customerName": "Customer 19",
+  },
+  Object {
+    "Customers.customerId": "GZ-14470",
+    "Customers.customerName": "Customer 20",
+  },
+  Object {
+    "Customers.customerId": "HH-15010",
+    "Customers.customerName": "Customer 21",
+  },
+  Object {
+    "Customers.customerId": "HK-14890",
+    "Customers.customerName": "Customer 22",
+  },
+  Object {
+    "Customers.customerId": "JH-15430",
+    "Customers.customerName": "Customer 23",
+  },
+  Object {
+    "Customers.customerId": "JO-15550",
+    "Customers.customerName": "Customer 24",
+  },
+  Object {
+    "Customers.customerId": "JS-16030",
+    "Customers.customerName": "Customer 25",
+  },
+  Object {
+    "Customers.customerId": "JW-15220",
+    "Customers.customerName": "Customer 26",
+  },
+  Object {
+    "Customers.customerId": "KL-16555",
+    "Customers.customerName": "Customer 27",
+  },
+  Object {
+    "Customers.customerId": "KN-16705",
+    "Customers.customerName": "Customer 28",
+  },
+  Object {
+    "Customers.customerId": "LC-17050",
+    "Customers.customerName": "Customer 29",
+  },
+  Object {
+    "Customers.customerId": "LR-16915",
+    "Customers.customerName": "Customer 30",
+  },
+  Object {
+    "Customers.customerId": "MC-17605",
+    "Customers.customerName": "Customer 31",
+  },
+  Object {
+    "Customers.customerId": "MG-17650",
+    "Customers.customerName": "Customer 32",
+  },
+  Object {
+    "Customers.customerId": "ML-17755",
+    "Customers.customerName": "Customer 33",
+  },
+  Object {
+    "Customers.customerId": "MM-18280",
+    "Customers.customerName": "Customer 34",
+  },
+  Object {
+    "Customers.customerId": "NP-18670",
+    "Customers.customerName": "Customer 35",
+  },
+  Object {
+    "Customers.customerId": "PF-19165",
+    "Customers.customerName": "Customer 36",
+  },
+  Object {
+    "Customers.customerId": "SB-20185",
+    "Customers.customerName": "Customer 37",
+  },
+  Object {
+    "Customers.customerId": "SS-20140",
+    "Customers.customerName": "Customer 38",
+  },
+  Object {
+    "Customers.customerId": "TB-21175",
+    "Customers.customerName": "Customer 39",
+  },
+  Object {
+    "Customers.customerId": "TS-21205",
+    "Customers.customerName": "Customer 40",
+  },
+  Object {
+    "Customers.customerId": "WB-21850",
+    "Customers.customerName": "Customer 41",
+  },
+]
+`;
+
+exports[`postgres driver tests filtering Customers: notStartsWith + dimensions, third_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"false","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `
+Array [
+  Object {
+    "Customers.customerId": "AH-10465",
+    "Customers.customerName": "Customer 1",
+  },
+  Object {
+    "Customers.customerId": "AJ-10780",
+    "Customers.customerName": "Customer 2",
+  },
+  Object {
+    "Customers.customerId": "AS-10225",
+    "Customers.customerName": "Customer 3",
+  },
+  Object {
+    "Customers.customerId": "AW-10840",
+    "Customers.customerName": "Customer 4",
+  },
+  Object {
+    "Customers.customerId": "BB-11545",
+    "Customers.customerName": "Customer 5",
+  },
+  Object {
+    "Customers.customerId": "BF-11020",
+    "Customers.customerName": "Customer 6",
+  },
+  Object {
+    "Customers.customerId": "BF-11170",
+    "Customers.customerName": "Customer 7",
+  },
+  Object {
+    "Customers.customerId": "BM-11650",
+    "Customers.customerName": "Customer 8",
+  },
+  Object {
+    "Customers.customerId": "BS-11380",
+    "Customers.customerName": "Customer 9",
+  },
+  Object {
+    "Customers.customerId": "BS-11755",
+    "Customers.customerName": "Customer 10",
+  },
+  Object {
+    "Customers.customerId": "CA-12775",
+    "Customers.customerName": "Customer 11",
+  },
+  Object {
+    "Customers.customerId": "CC-12475",
+    "Customers.customerName": "Customer 12",
+  },
+  Object {
+    "Customers.customerId": "CD-12280",
+    "Customers.customerName": "Customer 13",
+  },
+  Object {
+    "Customers.customerId": "CS-12355",
+    "Customers.customerName": "Customer 14",
+  },
+  Object {
+    "Customers.customerId": "DB-13405",
+    "Customers.customerName": "Customer 15",
+  },
+  Object {
+    "Customers.customerId": "DG-13300",
+    "Customers.customerName": "Customer 16",
+  },
+  Object {
+    "Customers.customerId": "DW-13480",
+    "Customers.customerName": "Customer 17",
+  },
+  Object {
+    "Customers.customerId": "EM-14140",
+    "Customers.customerName": "Customer 18",
+  },
+  Object {
+    "Customers.customerId": "GA-14725",
+    "Customers.customerName": "Customer 19",
+  },
+  Object {
+    "Customers.customerId": "GZ-14470",
+    "Customers.customerName": "Customer 20",
+  },
+  Object {
+    "Customers.customerId": "HH-15010",
+    "Customers.customerName": "Customer 21",
+  },
+  Object {
+    "Customers.customerId": "HK-14890",
+    "Customers.customerName": "Customer 22",
+  },
+  Object {
+    "Customers.customerId": "JH-15430",
+    "Customers.customerName": "Customer 23",
+  },
+  Object {
+    "Customers.customerId": "JO-15550",
+    "Customers.customerName": "Customer 24",
+  },
+  Object {
+    "Customers.customerId": "JS-16030",
+    "Customers.customerName": "Customer 25",
+  },
+  Object {
+    "Customers.customerId": "JW-15220",
+    "Customers.customerName": "Customer 26",
+  },
+  Object {
+    "Customers.customerId": "KL-16555",
+    "Customers.customerName": "Customer 27",
+  },
+  Object {
+    "Customers.customerId": "KN-16705",
+    "Customers.customerName": "Customer 28",
+  },
+  Object {
+    "Customers.customerId": "LC-17050",
+    "Customers.customerName": "Customer 29",
+  },
+  Object {
+    "Customers.customerId": "LR-16915",
+    "Customers.customerName": "Customer 30",
+  },
+  Object {
+    "Customers.customerId": "MC-17605",
+    "Customers.customerName": "Customer 31",
+  },
+  Object {
+    "Customers.customerId": "MG-17650",
+    "Customers.customerName": "Customer 32",
+  },
+  Object {
+    "Customers.customerId": "ML-17755",
+    "Customers.customerName": "Customer 33",
+  },
+  Object {
+    "Customers.customerId": "MM-18280",
+    "Customers.customerName": "Customer 34",
+  },
+  Object {
+    "Customers.customerId": "NP-18670",
+    "Customers.customerName": "Customer 35",
+  },
+  Object {
+    "Customers.customerId": "PF-19165",
+    "Customers.customerName": "Customer 36",
+  },
+  Object {
+    "Customers.customerId": "SB-20185",
+    "Customers.customerName": "Customer 37",
+  },
+  Object {
+    "Customers.customerId": "SS-20140",
+    "Customers.customerName": "Customer 38",
+  },
+  Object {
+    "Customers.customerId": "TB-21175",
+    "Customers.customerName": "Customer 39",
+  },
+  Object {
+    "Customers.customerId": "TS-21205",
+    "Customers.customerName": "Customer 40",
+  },
+  Object {
+    "Customers.customerId": "WB-21850",
+    "Customers.customerName": "Customer 41",
+  },
+]
+`;
+
+exports[`postgres driver tests filtering Customers: notStartsWith + dimensions, third_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"true","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `
+Array [
+  Object {
+    "Customers.customerId": "AH-10465",
+    "Customers.customerName": "Customer 1",
+  },
+  Object {
+    "Customers.customerId": "AJ-10780",
+    "Customers.customerName": "Customer 2",
+  },
+  Object {
+    "Customers.customerId": "AS-10225",
+    "Customers.customerName": "Customer 3",
+  },
+  Object {
+    "Customers.customerId": "AW-10840",
+    "Customers.customerName": "Customer 4",
+  },
+  Object {
+    "Customers.customerId": "BB-11545",
+    "Customers.customerName": "Customer 5",
+  },
+  Object {
+    "Customers.customerId": "BF-11020",
+    "Customers.customerName": "Customer 6",
+  },
+  Object {
+    "Customers.customerId": "BF-11170",
+    "Customers.customerName": "Customer 7",
+  },
+  Object {
+    "Customers.customerId": "BM-11650",
+    "Customers.customerName": "Customer 8",
+  },
+  Object {
+    "Customers.customerId": "BS-11380",
+    "Customers.customerName": "Customer 9",
+  },
+  Object {
+    "Customers.customerId": "BS-11755",
+    "Customers.customerName": "Customer 10",
+  },
+  Object {
+    "Customers.customerId": "CA-12775",
+    "Customers.customerName": "Customer 11",
+  },
+  Object {
+    "Customers.customerId": "CC-12475",
+    "Customers.customerName": "Customer 12",
+  },
+  Object {
+    "Customers.customerId": "CD-12280",
+    "Customers.customerName": "Customer 13",
+  },
+  Object {
+    "Customers.customerId": "CS-12355",
+    "Customers.customerName": "Customer 14",
+  },
+  Object {
+    "Customers.customerId": "DB-13405",
+    "Customers.customerName": "Customer 15",
+  },
+  Object {
+    "Customers.customerId": "DG-13300",
+    "Customers.customerName": "Customer 16",
+  },
+  Object {
+    "Customers.customerId": "DW-13480",
+    "Customers.customerName": "Customer 17",
+  },
+  Object {
+    "Customers.customerId": "EM-14140",
+    "Customers.customerName": "Customer 18",
+  },
+  Object {
+    "Customers.customerId": "GA-14725",
+    "Customers.customerName": "Customer 19",
+  },
+  Object {
+    "Customers.customerId": "GZ-14470",
+    "Customers.customerName": "Customer 20",
+  },
+  Object {
+    "Customers.customerId": "HH-15010",
+    "Customers.customerName": "Customer 21",
+  },
+  Object {
+    "Customers.customerId": "HK-14890",
+    "Customers.customerName": "Customer 22",
+  },
+  Object {
+    "Customers.customerId": "JH-15430",
+    "Customers.customerName": "Customer 23",
+  },
+  Object {
+    "Customers.customerId": "JO-15550",
+    "Customers.customerName": "Customer 24",
+  },
+  Object {
+    "Customers.customerId": "JS-16030",
+    "Customers.customerName": "Customer 25",
+  },
+  Object {
+    "Customers.customerId": "JW-15220",
+    "Customers.customerName": "Customer 26",
+  },
+  Object {
+    "Customers.customerId": "KL-16555",
+    "Customers.customerName": "Customer 27",
+  },
+  Object {
+    "Customers.customerId": "KN-16705",
+    "Customers.customerName": "Customer 28",
+  },
+  Object {
+    "Customers.customerId": "LC-17050",
+    "Customers.customerName": "Customer 29",
+  },
+  Object {
+    "Customers.customerId": "LR-16915",
+    "Customers.customerName": "Customer 30",
+  },
+  Object {
+    "Customers.customerId": "MC-17605",
+    "Customers.customerName": "Customer 31",
+  },
+  Object {
+    "Customers.customerId": "MG-17650",
+    "Customers.customerName": "Customer 32",
+  },
+  Object {
+    "Customers.customerId": "ML-17755",
+    "Customers.customerName": "Customer 33",
+  },
+  Object {
+    "Customers.customerId": "MM-18280",
+    "Customers.customerName": "Customer 34",
+  },
+  Object {
+    "Customers.customerId": "NP-18670",
+    "Customers.customerName": "Customer 35",
+  },
+  Object {
+    "Customers.customerId": "PF-19165",
+    "Customers.customerName": "Customer 36",
+  },
+  Object {
+    "Customers.customerId": "SB-20185",
+    "Customers.customerName": "Customer 37",
+  },
+  Object {
+    "Customers.customerId": "SS-20140",
+    "Customers.customerName": "Customer 38",
+  },
+  Object {
+    "Customers.customerId": "TB-21175",
+    "Customers.customerName": "Customer 39",
+  },
+  Object {
+    "Customers.customerId": "TS-21205",
+    "Customers.customerName": "Customer 40",
+  },
+  Object {
+    "Customers.customerId": "WB-21850",
+    "Customers.customerName": "Customer 41",
+  },
+]
+`;
+
 exports[`postgres driver tests filtering Customers: startsWith + dimensions, first_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"false","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `
 Array [
   Object {
@@ -3135,6 +4533,14 @@ Array [
 exports[`postgres driver tests filtering Products: startsWith filter + dimentions + order, third_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"false","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `Array []`;
 
 exports[`postgres driver tests filtering Products: startsWith filter + dimentions + order, third_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"true","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `Array []`;
+
+exports[`postgres driver tests pre-aggregations Customers: running total without time dimension_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"true","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `
+Array [
+  Object {
+    "Customers.runningTotal": "41",
+  },
+]
+`;
 
 exports[`postgres driver tests querying Customers: dimensions_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"false","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `
 Array [

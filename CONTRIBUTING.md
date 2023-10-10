@@ -18,20 +18,20 @@ Please review the following sections before proposing code changes.
 
 ### Developer Certificate of Origin (DCO)
 
-By contributing to Cube Dev, Inc., You accept and agree to the terms and conditions in the [Developer Certificate of Origin](https://github.com/cube-js/cube.js/blob/master/DCO.md) for Your present and future Contributions submitted to Cube Dev, Inc. Your contribution includes any submissions to the [Cube.js repository](https://github.com/cube-js) when you click on such buttons as `Propose changes` or `Create pull request`. Except for the licenses granted herein, You reserve all right, title, and interest in and to Your Contributions.
+By contributing to Cube Dev, Inc., You accept and agree to the terms and conditions in the [Developer Certificate of Origin](https://github.com/cube-js/cube/blob/master/DCO.md) for Your present and future Contributions submitted to Cube Dev, Inc. Your contribution includes any submissions to the [Cube.js repository](https://github.com/cube-js) when you click on such buttons as `Propose changes` or `Create pull request`. Except for the licenses granted herein, You reserve all right, title, and interest in and to Your Contributions.
 
 ### Our quarterly roadmap
 
-We publish our open source roadmap every quarter and discuss them during our [monthly community calls](https://cube.dev/community-call/). You can find our roadmap under [projects in our Cube.js repository](https://github.com/cube-js/cube.js/projects?query=is%3Aopen+sort%3Aupdated-desc). 
+We publish our open source roadmap every quarter and discuss them during our [monthly community calls](https://cube.dev/community-call/). You can find our roadmap under [projects in our Cube.js repository](https://github.com/cube-js/cube/projects?query=is%3Aopen+sort%3Aupdated-desc). 
 
 ## Step-by-step guide to contributing
 
-1. Find [issues](https://github.com/cube-js/cube.js/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc) where we need help. Search for issues with either [`good first issue`](https://github.com/cube-js/cube.js/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc+label%3A%22good+first+issue%22+) and/or [`help wanted`](https://github.com/cube-js/cube.js/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc+label%3A%22help+wanted%22) labels.
+1. Find [issues](https://github.com/cube-js/cube/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc) where we need help. Search for issues with either [`good first issue`](https://github.com/cube-js/cube/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc+label%3A%22good+first+issue%22+) and/or [`help wanted`](https://github.com/cube-js/cube/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc+label%3A%22help+wanted%22) labels.
 2. Follow the directions in the [Getting Started guide](https://cube.dev/docs/getting-started) to get Cube.js up and running (incl. the [Developer Playground](https://cube.dev/docs/dev-tools/dev-playground)). 
-3. Clone the [Cube.js repo](https://github.com/cube-js/cube.js).
+3. Clone the [Cube.js repo](https://github.com/cube-js/cube).
 4. Submit your Pull Request. 
-5. Testing: Please include test(s) for your code contribution. See some of the test examples for [drivers](https://github.com/cube-js/cube.js/pull/1333/commits/56dadccd62ac4eaceafe650d2853406f5d3d9d43) and [backend](https://github.com/cube-js/cube.js/tree/master/packages/cubejs-backend-shared/test). 
-6. Documentation: When new features are added or there are changes to existing features that require updates to documentation, we encourage you to add/update any missing documentation in the [`/docs` folder](https://github.com/cube-js/cube.js/tree/master/docs). To update an existing documentation page, you can simply click on the `Edit this page` button on the top right corner of the documentation page. 
+5. Testing: Please include test(s) for your code contribution. See some of the test examples for [drivers](https://github.com/cube-js/cube/pull/1333/commits/56dadccd62ac4eaceafe650d2853406f5d3d9d43) and [backend](https://github.com/cube-js/cube/tree/master/packages/cubejs-backend-shared/test). 
+6. Documentation: When new features are added or there are changes to existing features that require updates to documentation, we encourage you to add/update any missing documentation in the [`/docs` folder](https://github.com/cube-js/cube/tree/master/docs). To update an existing documentation page, you can simply click on the `Edit this page` button on the top right corner of the documentation page. 
 7. Relevant team(s) will be pinged automatically for a review based on information in the `CODEOWNERS` file. 
 
 ## Development Workflow
@@ -82,7 +82,7 @@ $ cd packages/cubejs-client-core && yarn && yarn link && cd ../.. && cd packages
 If you are going to develop a JDBC driver, you need to [install Java with JDK][link-java-guide].
 
 [link-java-guide]:
-https://github.com/cube-js/cube.js/blob/master/packages/cubejs-jdbc-driver/README.md#java-installation
+https://github.com/cube-js/cube/blob/master/packages/cubejs-jdbc-driver/README.md#java-installation
 
 #### Development
 
@@ -91,7 +91,7 @@ Cube.js is written in a mixture of plain JavaScript and TypeScript. TypeScript i
 > Attention: Cube.js uses TypeScript configured in incremental mode, which uses cache to speed up compilation,  
 > but in some cases, you can run into a problem with a not recompiled file. To fix it, we recommend running `$ yarn clean` and `$ yarn tsc`.
 
-1. Clone the Cube.js repository, `git clone https://github.com/cube-js/cube.js`. 
+1. Clone the Cube.js repository, `git clone https://github.com/cube-js/cube`. 
 2. Run `yarn install` in the root directory.
 3. Run `yarn build` in the root directory to build the frontend dependent packages. 
 4. Run `yarn build` in `packages/cubejs-playground` to build the frontend.
@@ -111,6 +111,18 @@ Cube.js is written in a mixture of plain JavaScript and TypeScript. TypeScript i
 3. Create a new configuration, using `./node_modules/.bin/cubejs-server` for Node Parameters and the directory of your test project for Working directory.
 4. Run/Debug dev cube.js servers using the new configuration.
 
+## Contributing Database Drivers
+
+To enhance the adoption of community-contributed drivers, we decided to split the database driver contribution process into multiple stages.
+
+1. Each driver which is planned to be contributed to the main Cube repository should be published first as an npm package. Please see [Publishing Driver npm package](#publishing-driver-npm-package) on how to do that.
+2. This NPM package should be contributed to the list of [Third-party community drivers](https://cube.dev/docs/config/databases#third-party-community-drivers).
+3. Please make sure each npm package has a README with instructions on how to install it to the official docker image and how to connect it to the database.
+4. Posting a backlink to an open-source repository would be a good idea here so people can provide feedback on it by posting issues.
+5. Before creating PR for the main repository, please make sure it's tested with the standard Cube E2E testing suite. An example of an E2E testing suite can be found here: https://github.com/cube-js/cube/blob/master/packages/cubejs-testing/test/driver-postgres.test.ts
+6. If you're creating PR for the main repo, please be prepared to become a maintainer for this driver and dedicate some time to it. There're no specific time requirements. As a rule of thumb, you should expect to spend time on a weekly basis.
+7. Due to limited resources Core team will review and merge driver PRs based on popularity and development activity.
+
 ### Implementing a Driver
 
 1. Copy existing driver package structure and name it in `@cubejs-backend/<db-name>-driver` format.
@@ -124,7 +136,7 @@ The rest will be done by `BaseDriver` class.
 6. If db requires connection pooling prefer use `generic-pool` implementation with settings similar to other db packages.
 7. Make sure your driver has `release()` method in case DB expects graceful shutdowns for connections.
 8. Please use yarn to add any dependencies and run `$ yarn` within the package before committing to ensure right `yarn.lock` is in place.
-9. Add this driver dependency to [cubejs-server-core/core/DriverDependencies.js](https://github.com/cube-js/cube.js/blob/master/packages/cubejs-server-core/core/DriverDependencies.js#L1).
+9. Add this driver dependency to [cubejs-server-core/core/DriverDependencies.js](https://github.com/cube-js/cube/blob/master/packages/cubejs-server-core/core/DriverDependencies.js#L1).
 
 ### Implementing a JDBC Driver
 
@@ -155,6 +167,8 @@ If driver class contains `static dialectClass()` method it'll be used to lookup 
 
 Cube.js looks up `cubejs-{dbType}-driver` package among installed modules to fullfil driver dependency if there's no corresponding default driver for the specified database type.
 For example one can publish `cubejs-foo-driver` npm package to fullfil driver dependency for the `foo` database type.
+
+## Other Packages
 
 ### Testing Schema Compiler
 

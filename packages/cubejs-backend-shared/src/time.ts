@@ -106,3 +106,16 @@ export const addSecondsToLocalTimestamp = (timestamp: string, timezone: string, 
     .add(seconds, 'second')
     .toDate();
 };
+
+export const reformatInIsoLocal = (timestamp: string): string => {
+  if (!timestamp) {
+    return timestamp;
+  }
+  if (timestamp.length === 23) {
+    return timestamp;
+  }
+  if (timestamp.length === 24) {
+    return timestamp.replace('Z', '');
+  }
+  return moment.tz(timestamp, 'UTC').utc().format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
+};

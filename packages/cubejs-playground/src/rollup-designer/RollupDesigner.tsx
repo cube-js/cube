@@ -11,6 +11,7 @@ import {
   Tabs,
   Typography,
   Skeleton,
+  Radio,
 } from 'antd';
 import deepEquals from 'fast-deep-equal';
 import { useMemo, useRef, useState } from 'react';
@@ -20,7 +21,7 @@ import { Box, Flex } from '../grid';
 import { useDeepEffect, useIsMounted, useToken } from '../hooks';
 import { useDeepMemo } from '../hooks/deep-memo';
 import { useCloud } from '../cloud';
-import { QueryMemberKey } from '../types';
+import { QueryMemberKey, SchemaFormat } from '../types';
 import { prettifyObject } from '../utils';
 import { Cubes } from './components/Cubes';
 import { Members } from './components/Members';
@@ -86,7 +87,7 @@ function getSelectedKeys(references: PreAggregationReferences) {
         keys.add(`td:${dimension}`);
       }
     } else {
-      references[memberKey]?.map((key) => keys.add(key));
+      references[memberKey]?.map((key) => key != null && keys.add(key));
     }
   });
 
@@ -111,7 +112,7 @@ export function RollupDesigner({
   const token = appToken || designerToken;
 
   const { isCloud, ...cloud } = useCloud();
-  const { query, transformedQuery, isLoading, error } =
+  const { query, transformedQuery, isLoading, error, toggleModal, defaultSchemaFormat } =
     useRollupDesignerContext();
 
   const [isCronValid, setCronValidity] = useState<boolean>(true);
@@ -128,9 +129,11 @@ export function RollupDesigner({
     null
   );
 
-  const { order, limit, filters, ...matchedQuery } = query || {};
+  const [schemaFormat, setSchemaFormat] = useState<SchemaFormat>(
+    defaultSchemaFormat
+  );
 
-  const [timeDimension] = matchedQuery.timeDimensions || [];
+  const { order, limit, filters, ...matchedQuery } = query || {};
 
   const segments = new Set<string>();
   memberTypeCubeMap.segments.forEach(({ members }) => {
@@ -312,7 +315,7 @@ export function RollupDesigner({
     const definition = {
       preAggregationName: preAggName,
       cubeName,
-      code: getRollupDefinitionFromReferences(references, preAggName, settings)
+      code: getRollupDefinitionFromReferences(references, preAggName, settings, schemaFormat)
         .value,
     };
 
@@ -335,6 +338,7 @@ export function RollupDesigner({
 
       if (response.ok) {
         showSuccessMessage();
+        toggleModal();
       } else {
         const { error } = response.json;
         notification.error({
@@ -349,6 +353,7 @@ export function RollupDesigner({
       const { error } = await cloud.addPreAggregationToSchema(definition);
       if (!error) {
         showSuccessMessage();
+        toggleModal();
       } else {
         notification.error({
           message: error,
@@ -371,7 +376,7 @@ export function RollupDesigner({
         <CodeSnippet
           style={{ marginBottom: 16 }}
           code={
-            getRollupDefinitionFromReferences(references, preAggName, settings)
+            getRollupDefinitionFromReferences(references, preAggName, settings, schemaFormat)
               .code
           }
           copyMessage="Rollup definition is copied"
@@ -379,16 +384,43 @@ export function RollupDesigner({
         />
 
         {cubeName ? (
-          <Button
-            data-testid="rd-add-btn"
-            type="primary"
-            loading={saving}
-            disabled={!isCronValid}
-            style={{ width: '100%' }}
-            onClick={handleAddToSchemaClick}
-          >
-            Add to the Data Schema
-          </Button>
+          <Space direction="vertical" style={{width: '100%'}} size={32}>
+            <Flex justifyContent="end" gap={2} alignItems="center">
+              <Box>
+                <Typography.Text>Data Model Format</Typography.Text>
+              </Box>
+
+              <Box>
+                <Radio.Group
+                  options={[
+                    {
+                      label: 'JavaScript',
+                      value: SchemaFormat.js,
+                    },
+                    {
+                      label: 'YAML',
+                      value: SchemaFormat.yaml,
+                    },
+                  ]}
+                  value={schemaFormat}
+                  optionType="button"
+                  buttonStyle="solid"
+                  onChange={(e) => setSchemaFormat(e.target.value)}
+                />
+              </Box>
+            </Flex>
+
+            <Button
+              data-testid="rd-add-btn"
+              type="primary"
+              loading={saving}
+              disabled={!isCronValid}
+              style={{ width: '100%' }}
+              onClick={handleAddToSchemaClick}
+            >
+              Add to the Data Schema
+            </Button>
+          </Space>
         ) : null}
       </>
     );

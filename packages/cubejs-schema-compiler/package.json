@@ -1,26 +1,24 @@
 {
   "name": "@cubejs-backend/schema-compiler",
-  "description": "Cube.js schema compiler",
+  "description": "Cube schema compiler",
   "author": "Cube Dev, Inc.",
-  "version": "0.31.3",
+  "version": "0.34.1",
   "repository": {
     "type": "git",
-    "url": "https://github.com/cube-js/cube.js.git",
+    "url": "https://github.com/cube-js/cube.git",
     "directory": "packages/cubejs-schema-compiler"
   },
   "engines": {
-    "node": "^12.0.0 || ^14.0.0 || >=16.0.0"
+    "node": "^14.0.0 || ^16.0.0 || >=17.0.0"
   },
   "files": [
-    "dist/src",
-    "adapter",
-    "scaffolding"
+    "dist/src"
   ],
   "main": "dist/src/index.js",
   "typings": "dist/src/index.d.ts",
   "scripts": {
     "build": "rm -rf dist && npm run tsc",
-    "generate": "antlr4ts -visitor src/parser/GenericSql.g4",
+    "generate": "antlr4ts -visitor src/parser/GenericSql.g4 src/parser/Python3Lexer.g4 src/parser/Python3Parser.g4",
     "tsc": "tsc",
     "watch": "tsc -w",
     "test": "npm run unit && npm run integration",
@@ -42,33 +40,34 @@
     "@babel/standalone": "^7.12.10",
     "@babel/traverse": "^7.12.10",
     "@babel/types": "^7.12.12",
-    "@cubejs-backend/shared": "^0.31.0",
-    "@hapi/joi": "^17.1.1",
+    "@cubejs-backend/native": "^0.34.1",
+    "@cubejs-backend/shared": "^0.34.1",
     "antlr4ts": "0.5.0-alpha.4",
     "camelcase": "^6.2.0",
     "cron-parser": "^3.5.0",
     "humps": "^2.0.1",
     "inflection": "^1.12.0",
+    "joi": "^17.8.3",
+    "js-yaml": "^4.1.0",
     "lru-cache": "^5.1.1",
     "moment-range": "^4.0.1",
     "moment-timezone": "^0.5.33",
     "node-dijkstra": "^2.5.0",
-    "ramda": "^0.27.0",
+    "ramda": "^0.27.2",
     "syntax-error": "^1.3.0"
   },
   "devDependencies": {
     "@apla/clickhouse": "^1.5.5",
-    "@cubejs-backend/linter": "^0.31.0",
-    "@cubejs-backend/query-orchestrator": "^0.31.3",
+    "@cubejs-backend/linter": "^0.34.0",
+    "@cubejs-backend/query-orchestrator": "^0.34.1",
     "@types/babel__code-frame": "^7.0.2",
     "@types/babel__generator": "^7.6.2",
     "@types/babel__parser": "^7.1.1",
     "@types/babel__traverse": "^7.11.0",
-    "@types/hapi__joi": "^17.1.1",
     "@types/inflection": "^1.5.28",
     "@types/jest": "^26.0.20",
     "@types/lru-cache": "^5.1.0",
-    "@types/node": "^12",
+    "@types/node": "^14",
     "@types/ramda": "^0.27.34",
     "@types/sqlstring": "^2.3.0",
     "@types/syntax-error": "^1.4.1",
@@ -83,7 +82,7 @@
     "source-map-support": "^0.5.19",
     "sqlstring": "^2.3.1",
     "testcontainers": "^8.12",
-    "typescript": "~4.1.5",
+    "typescript": "~4.9.5",
     "uuid": "^8.3.2"
   },
   "license": "Apache-2.0",

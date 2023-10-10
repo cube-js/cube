@@ -1,10 +1,10 @@
 {
   "name": "@cubejs-client/core",
-  "version": "0.31.0",
+  "version": "0.34.0",
   "engines": {},
   "repository": {
     "type": "git",
-    "url": "https://github.com/cube-js/cube.js.git",
+    "url": "https://github.com/cube-js/cube.git",
     "directory": "packages/cubejs-client-core"
   },
   "description": "cube.js client",
@@ -13,10 +13,11 @@
   "types": "index.d.ts",
   "author": "Cube Dev, Inc.",
   "dependencies": {
+    "@babel/runtime": "^7.1.2",
     "core-js": "^3.6.5",
     "cross-fetch": "^3.0.2",
     "dayjs": "^1.10.4",
-    "ramda": "^0.27.0",
+    "ramda": "^0.27.2",
     "url-search-params-polyfill": "^7.0.0",
     "uuid": "^8.3.2"
   },
@@ -35,7 +36,6 @@
   "devDependencies": {
     "@babel/core": "^7.3.3",
     "@babel/preset-env": "^7.3.1",
-    "@babel/runtime": "^7.1.2",
     "@types/jest": "^26.0.9",
     "@types/moment-range": "^4.0.0",
     "babel-jest": "^26.0.1",

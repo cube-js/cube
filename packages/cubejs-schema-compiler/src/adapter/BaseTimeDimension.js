@@ -28,6 +28,14 @@ export class BaseTimeDimension extends BaseFilter {
     return super.selectColumns();
   }
 
+  hasNoRemapping() {
+    const context = this.query.safeEvaluateSymbolContext();
+    if (!context.granularityOverride && !this.granularity) {
+      return null;
+    }
+    return super.hasNoRemapping();
+  }
+
   aliasName() {
     const context = this.query.safeEvaluateSymbolContext();
     if (!context.granularityOverride && !this.granularity) {
@@ -67,6 +75,10 @@ export class BaseTimeDimension extends BaseFilter {
       return this.convertedToTz();
     }
     return this.query.timeGroupedColumn(granularity, this.convertedToTz());
+  }
+
+  convertTzForRawTimeDimensionIfNeeded(sql) {
+    return sql();
   }
 
   convertedToTz() {

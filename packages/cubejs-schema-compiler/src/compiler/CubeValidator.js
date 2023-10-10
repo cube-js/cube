@@ -1,4 +1,4 @@
-const Joi = require('@hapi/joi');
+const Joi = require('joi');
 const cronParser = require('cron-parser');
 
 /* *****************************
@@ -8,15 +8,32 @@ const cronParser = require('cron-parser');
  * and update CubePropContextTranspiler.transpiledFieldsPatterns
  **************************** */
 
+// Update this whenever schema is updated otherwise YAML will be broken
+export const nonStringFields = new Set([
+  'primaryKey',
+  'scheduledRefresh',
+  'unionWithSourceData',
+  'rewriteQueries',
+  'shown',
+  'public',
+  'subQuery',
+  'propagateFiltersToSubQuery',
+  'incremental',
+  'external',
+  'useOriginalSqlPreAggregations',
+  'readOnly',
+  'prefix'
+]);
+
 const identifierRegex = /^[_a-zA-Z][_a-zA-Z0-9]*$/;
 
 const identifier = Joi.string().regex(identifierRegex, 'identifier');
 
 const regexTimeInterval = Joi.string().custom((value, helper) => {
-  if (value.match(/^(-?\d+) (minute|hour|day|week|month|year)$/)) {
+  if (value.match(/^(-?\d+) (minute|hour|day|week|month|quarter|year)$/)) {
     return value;
   } else {
-    return helper.message({ custom: `(${helper.state.path.join('.')} = ${value}) does not match regexp: /^(-?\\d+) (minute|hour|day|week|month|year)$/` });
+    return helper.message({ custom: `(${helper.state.path.join('.')} = ${value}) does not match regexp: /^(-?\\d+) (minute|hour|day|week|month|quarter|year)$/` });
   }
 });
 
@@ -59,6 +76,7 @@ const BaseDimensionWithoutSubQuery = {
   valuesAsSegments: Joi.boolean().strict(),
   primaryKey: Joi.boolean().strict(),
   shown: Joi.boolean().strict(),
+  public: Joi.boolean().strict(),
   title: Joi.string(),
   description: Joi.string(),
   suggestFilterValues: Joi.boolean().strict(),
@@ -81,8 +99,11 @@ const BaseDimension = Object.assign({
 const BaseMeasure = {
   aliases: Joi.array().items(Joi.string()),
   format: Joi.any().valid('percent', 'currency', 'number'),
-  shown: Joi.boolean().strict(),
+  public: Joi.boolean().strict(),
+  // TODO: Deprecate and remove, please use public
   visible: Joi.boolean().strict(),
+  // TODO: Deprecate and remove, please use public
+  shown: Joi.boolean().strict(),
   cumulative: Joi.boolean().strict(),
   filters: Joi.array().items(
     Joi.object().keys({
@@ -180,6 +201,7 @@ const BasePreAggregationWithoutPartitionGranularity = {
     sql: Joi.func().required()
   },
   readOnly: Joi.boolean().strict(),
+  streamOffset: Joi.any().valid('earliest', 'latest'),
 };
 
 const BasePreAggregation = {
@@ -198,12 +220,14 @@ const OriginalSqlSchema = condition(
     (s) => defined(s.timeDimensionReference),
     inherit(BasePreAggregation, {
       type: Joi.any().valid('originalSql').required(),
+      uniqueKeyColumns: Joi.array().items(Joi.string()),
       partitionGranularity: BasePreAggregation.partitionGranularity.required(),
       timeDimensionReference: Joi.func().required(),
       allowNonStrictDateRangeMatch: Joi.bool(),
     }),
     inherit(BasePreAggregation, {
       type: Joi.any().valid('originalSql').required(),
+      uniqueKeyColumns: Joi.array().items(Joi.string()),
       partitionGranularity: BasePreAggregation.partitionGranularity.required(),
       timeDimension: Joi.func().required(),
       allowNonStrictDateRangeMatch: Joi.bool(),
@@ -215,7 +239,7 @@ const OriginalSqlSchema = condition(
   }),
 );
 
-const GranularitySchema = Joi.string().valid('second', 'minute', 'hour', 'day', 'week', 'month', 'year').required();
+const GranularitySchema = Joi.string().valid('second', 'minute', 'hour', 'day', 'week', 'month', 'quarter', 'year').required();
 
 const ReferencesFields = ['timeDimensionReference', 'rollupReferences', 'measureReferences', 'dimensionReferences', 'segmentReferences'];
 const NonReferencesFields = ['timeDimension', 'rollups', 'measures', 'dimensions', 'segments'];
@@ -395,6 +419,14 @@ const CubeRefreshKeySchema = condition(
   )
 );
 
+const measureType = Joi.string().valid(
+  'number', 'string', 'boolean', 'time', 'sum', 'avg', 'min', 'max', 'countDistinct', 'runningTotal', 'countDistinctApprox'
+);
+
+const measureTypeWithCount = Joi.string().valid(
+  'count', 'number', 'string', 'boolean', 'time', 'sum', 'avg', 'min', 'max', 'countDistinct', 'runningTotal', 'countDistinctApprox'
+);
+
 const MeasuresSchema = Joi.object().pattern(identifierRegex, Joi.alternatives().conditional(
   Joi.ref('.type'), [
     {
@@ -405,23 +437,27 @@ const MeasuresSchema = Joi.object().pattern(identifierRegex, Joi.alternatives().
       })
     },
     {
-      is: Joi.string().valid(
-        'number', 'sum', 'avg', 'min', 'max', 'countDistinct', 'runningTotal', 'countDistinctApprox'
-      ),
+      is: measureType,
       then: inherit(BaseMeasure, {
         sql: Joi.func().required(),
-        type: Joi.any().valid(
-          'number', 'sum', 'avg', 'min', 'max', 'countDistinct', 'runningTotal', 'countDistinctApprox'
-        ).required()
+        type: measureType.required()
       }),
       otherwise: Joi.object().keys({
-        type: Joi.string().valid(
-          'count', 'number', 'sum', 'avg', 'min', 'max', 'countDistinct', 'runningTotal', 'countDistinctApprox'
-        ).required()
+        type: measureTypeWithCount.required()
       })
     }
   ]
 ));
+
+const SegmentsSchema = Joi.object().pattern(identifierRegex, Joi.object().keys({
+  aliases: Joi.array().items(Joi.string()),
+  sql: Joi.func().required(),
+  title: Joi.string(),
+  description: Joi.string(),
+  meta: Joi.any(),
+  shown: Joi.boolean().strict(),
+  public: Joi.boolean().strict(),
+}));
 
 /* *****************************
  * ATTENTION:
@@ -430,17 +466,8 @@ const MeasuresSchema = Joi.object().pattern(identifierRegex, Joi.alternatives().
  * and update CubePropContextTranspiler.transpiledFieldsPatterns
  **************************** */
 
-const cubeSchema = Joi.object().keys({
+const baseSchema = {
   name: identifier,
-  sql: Joi.alternatives().conditional(
-    Joi.ref('..isView'), [
-      {
-        is: true,
-        then: Joi.forbidden(),
-        otherwise: Joi.func().required()
-      }
-    ]
-  ),
   refreshKey: CubeRefreshKeySchema,
   fileName: Joi.string().required(),
   extends: Joi.func(),
@@ -450,10 +477,15 @@ const cubeSchema = Joi.object().keys({
   dataSource: Joi.string(),
   description: Joi.string(),
   rewriteQueries: Joi.boolean().strict(),
-  isView: Joi.boolean().strict(),
+  shown: Joi.boolean().strict(),
+  public: Joi.boolean().strict(),
   joins: Joi.object().pattern(identifierRegex, Joi.object().keys({
     sql: Joi.func().required(),
-    relationship: Joi.any().valid('hasMany', 'belongsTo', 'hasOne').required()
+    relationship: Joi.any().valid(
+      'belongsTo', 'belongs_to', 'many_to_one', 'manyToOne',
+      'hasMany', 'has_many', 'one_to_many', 'oneToMany',
+      'hasOne', 'has_one', 'one_to_one', 'oneToOne'
+    ).required()
   })),
   measures: MeasuresSchema,
   dimensions: Joi.object().pattern(identifierRegex, Joi.alternatives().try(
@@ -481,25 +513,48 @@ const cubeSchema = Joi.object().keys({
     inherit(BaseDimensionWithoutSubQuery, {
       latitude: Joi.object().keys({
         sql: Joi.func().required()
-      }),
+      }).required(),
       longitude: Joi.object().keys({
         sql: Joi.func().required()
-      })
+      }).required()
     }),
     inherit(BaseDimension, {
       sql: Joi.func().required()
     })
   )),
-  segments: Joi.object().pattern(identifierRegex, Joi.object().keys({
-    aliases: Joi.array().items(Joi.string()),
-    sql: Joi.func().required(),
-    title: Joi.string(),
-    description: Joi.string(),
-    meta: Joi.any()
-  })),
+  segments: SegmentsSchema,
   preAggregations: PreAggregationsAlternatives,
+};
+
+const cubeSchema = inherit(baseSchema, {
+  sql: Joi.func(),
+  sqlTable: Joi.func(),
+}).xor('sql', 'sqlTable').messages({
+  'object.xor': 'You must use either sql or sqlTable within a model, but not both'
+});
+
+const viewSchema = inherit(baseSchema, {
+  isView: Joi.boolean().strict(),
   includes: Joi.func(),
   excludes: Joi.func(),
+  cubes: Joi.array().items(
+    Joi.object().keys({
+      joinPath: Joi.func().required(),
+      prefix: Joi.boolean(),
+      alias: Joi.string(),
+      includes: Joi.alternatives([
+        Joi.string().valid('*'),
+        Joi.array().items(Joi.alternatives([
+          Joi.string().required(),
+          Joi.object().keys({
+            name: Joi.string().required(),
+            alias: Joi.string()
+          })
+        ]))
+      ]).required(),
+      excludes: Joi.array().items(Joi.string().required()),
+    })
+  ),
 });
 
 function formatErrorMessageFromDetails(explain, d) {
@@ -557,7 +612,7 @@ function collectFunctionFieldsPatterns(patterns, path, o) {
 
 export function functionFieldsPatterns() {
   const functionPatterns = new Set();
-  collectFunctionFieldsPatterns(functionPatterns, '', cubeSchema);
+  collectFunctionFieldsPatterns(functionPatterns, '', { ...cubeSchema, ...viewSchema });
   return Array.from(functionPatterns);
 }
 
@@ -574,7 +629,7 @@ export class CubeValidator {
   }
 
   validate(cube, errorReporter) {
-    const result = cubeSchema.validate(cube);
+    const result = cube.isView ? viewSchema.validate(cube) : cubeSchema.validate(cube);
 
     if (result.error != null) {
       errorReporter.error(formatErrorMessage(result.error), result.error);

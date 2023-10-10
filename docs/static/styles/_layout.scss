@@ -87,7 +87,7 @@ a {
   img:not(.mainTabImg) {
     border: 1px solid #ECECF0;
     border-radius: 4px;
-    max-width: 100%;
+    width: 100%;
     margin: 24px 0;
     box-shadow: none !important;
   }
@@ -95,9 +95,30 @@ a {
   margin-bottom: 200px;
 }
 
+.titleWrapper {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  gap: 28px;
+  padding-top: 48px;
+  margin-bottom: 24px;
+
+  @media screen and (max-width: 576px) {
+    flex-flow: column;
+    gap: 4px;
+  }
+
+  h1 {
+    margin: 0;
+    padding: 0;
+  }
+}
+
 .searchBoxWrapper {
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
+  padding: 12px 20px;
+  width: 100%;
 }
 
 .searchBox {
@@ -351,27 +372,34 @@ span.group-header {
 }
 
 .menuWrapperHack {
-  padding-top: 56px !important;
-  margin-top: -40px;
   @media screen and (max-width: 767px) {
+    height: 100% !important;
+    position: fixed;
+    top: 0;
     padding-top: 70px !important;
     margin-top: 0;
   }
 }
 
+.menuWrapperCol {
+  position: sticky;
+  top: 64px;
+}
+
 .menuWrapper {
-  height: 100%;
-  width: inherit;
+  // height: 100%;
+  height: calc(100vh - 64px);
+  width: 100%;
   background: $sidebar-bg;
-  padding: 16px 24px;
+  padding: 16px 24px 24px;
   overflow-y: auto;
   overflow-x: hidden;
-  position: fixed;
+  // position: fixed;
   //padding-left: calc(9999px + 24px);
   //padding-right: 24px;
   //margin-left: -9999px;
   //min-width: 245px;
-  max-height: calc(100% - 66px);
+  // max-height: calc(100% - 66px);
   //background: $light;
 
   @media screen and (max-width: 767px) {
@@ -662,7 +690,7 @@ span.group-header {
   padding: 0 1rem;
   position: sticky;
   top: 0;
-  z-index: 1;
+  z-index: 999999999;
   width: 100%;
   filter: drop-shadow(0px 0px 15px rgba(67, 67, 107, 0.1));
   height: $header-max-height;

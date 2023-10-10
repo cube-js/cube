@@ -1,8 +1,7 @@
 ---
 source: cubesql/src/compile/mod.rs
-assertion_line: 4118
-expression: "execute_query(\"SELECT * FROM information_schema.processlist\".to_string()).await?"
-
+assertion_line: 5710
+expression: "execute_query(\"SELECT * FROM information_schema.processlist\".to_string(),\n            DatabaseProtocol::MySQL).await?"
 ---
 +----+------+-----------+----+---------+------+------------------------+------+
 | ID | USER | HOST      | DB | COMMAND | TIME | STATE                  | INFO |

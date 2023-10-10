@@ -1,49 +1,11 @@
 import { prepareCompiler } from './PrepareCompiler';
-
-export function makeCubeSchema({ preAggregations }) {
-  return ` 
-      cube('CubeA', {
-        sql: \`select * from test\`,
-   
-        measures: {
-          count: {
-            type: 'count'
-          }
-        },
-  
-        dimensions: {
-          id: {
-            type: 'number',
-            sql: 'id',
-            primaryKey: true
-          },
-          type: {
-            type: 'string',
-            sql: 'type',
-          },
-          createdAt: {
-            type: 'time',
-            sql: 'created_at'
-          },
-        },
-        
-        segments: {
-          sfUsers: {
-            sql: \`\${CUBE}.location = 'San Francisco'\`
-          }
-        },
-
-        preAggregations: {
-          ${preAggregations}
-        },
-      }) 
-    `;
-}
+import { createCubeSchema } from './utils';
 
 describe('Schema Testing', () => {
   const schemaCompile = async () => {
     const { compiler, cubeEvaluator } = prepareCompiler(
-      makeCubeSchema({
+      createCubeSchema({
+        name: 'CubeA',
         preAggregations: `
           main: {
                 type: 'originalSql',
@@ -208,7 +170,8 @@ describe('Schema Testing', () => {
     const logger = jest.fn();
 
     const { compiler } = prepareCompiler(
-      makeCubeSchema({
+      createCubeSchema({
+        name: 'CubeA',
         preAggregations: `
             main: {
                 type: 'originalSql',
@@ -247,5 +210,80 @@ describe('Schema Testing', () => {
     expect(logger.mock.calls[1]).toEqual([
       'You specified both buildRangeEnd and refreshRangeEnd, buildRangeEnd will be used.'
     ]);
+  });
+
+  it('visibility modifier', async () => {
+    const { compiler, metaTransformer } = prepareCompiler([
+      createCubeSchema({
+        name: 'CubeA',
+        publicly: false
+      }),
+      createCubeSchema({
+        name: 'CubeB',
+        publicly: true
+      }),
+      createCubeSchema({
+        name: 'CubeC',
+        shown: false
+      })
+    ]);
+    await compiler.compile();
+
+    expect(metaTransformer.cubes[0]).toMatchObject({
+      isVisible: false,
+      config: {
+        name: 'CubeA',
+      }
+    });
+    expect(metaTransformer.cubes[1]).toMatchObject({
+      isVisible: true,
+      config: {
+        name: 'CubeB',
+      }
+    });
+    expect(metaTransformer.cubes[2]).toMatchObject({
+      isVisible: false,
+      config: {
+        name: 'CubeC',
+      }
+    });
+  });
+
+  it('join types', async () => {
+    const { compiler, cubeEvaluator } = prepareCompiler([
+      createCubeSchema({
+        name: 'CubeA',
+        joins: `{
+          CubeB: {
+            sql: \`SQL ON clause\`,
+            relationship: 'one_to_one'
+          },
+          CubeC: {
+            sql: \`SQL ON clause\`,
+            relationship: 'one_to_many'
+          },
+          CubeD: {
+            sql: \`SQL ON clause\`,
+            relationship: 'many_to_one'
+          },
+        }`
+      }),
+      createCubeSchema({
+        name: 'CubeB',
+      }),
+      createCubeSchema({
+        name: 'CubeC',
+      }),
+      createCubeSchema({
+        name: 'CubeD',
+      }),
+    ]);
+    await compiler.compile();
+
+    expect(cubeEvaluator.cubeFromPath('CubeA').joins).toMatchObject({
+      CubeB: { relationship: 'hasOne' },
+      CubeC: { relationship: 'hasMany' },
+      CubeD: { relationship: 'belongsTo' }
+    });
   });
 });

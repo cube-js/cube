@@ -1,0 +1,118 @@
+---
+title: Create a project
+permalink: /getting-started/core/create-a-project
+category: Getting Started
+subCategory: Cube Core
+menuOrder: 3
+---
+
+In this step, we will create a Cube Core project on your computer, connect a
+data source, and generate data models.
+
+## Scaffold a project
+
+Start by opening your terminal to create a new folder for the project, then
+create a `docker-compose.yml` file within it:
+
+```bash{promptUser: user}
+mkdir my-first-cube-project && cd $_
+touch docker-compose.yml
+```
+
+Open the `docker-compose.yml` file and add the following content:
+
+```yaml
+version: '2.2'
+
+services:
+  cube:
+    image: cubejs/cube:latest
+    ports:
+      - 4000:4000
+      - 15432:15432
+    environment:
+      - CUBEJS_DEV_MODE=true
+    volumes:
+      - .:/cube/conf
+```
+
+Note that we're setting the `CUBEJS_DEV_MODE` environment variable to `true` to
+enable the [Development Mode](/configuration/overview#development-mode). This is
+handy for local development but not suitable for
+[production](/deployment/production-checklist).
+
+<InfoBox>
+
+If you're using Linux as the Docker host OS, you'll also need to add
+`network_mode: 'host'` to your `docker-compose.yml`.
+
+</InfoBox>
+
+## Start the development server
+
+From the newly-created project directory, run the following command to start
+Cube:
+
+```bash{promptUser: user}
+docker compose up -d
+```
+
+<InfoBox>
+
+Using Windows? Remember to use [PowerShell][powershell-docs] or
+[WSL2][wsl2-docs] to run the command below.
+
+</InfoBox>
+
+## Connect a data source
+
+Head to [http://localhost:4000](http://localhost:4000) to open the [Developer
+Playground][ref-devtools-playground].
+
+The Playground has a database connection wizard that loads when Cube is first
+started up and no `.env` file is found. After database credentials have been set
+up, an `.env` file will automatically be created and populated with credentials.
+
+<Screenshot src="https://ucarecdn.com/fb36b103-1102-488d-a4aa-f0a44cd0b8ea/" />
+
+<InfoBox>
+
+Want to use a sample database instead? Select <Btn>PostgreSQL</Btn> and use the
+credentials below:
+
+<br />
+
+| Field    | Value              |
+| -------- | ------------------ |
+| Host     | `demo-db.cube.dev` |
+| Port     | `5432`             |
+| Database | `ecom`             |
+| Username | `cube`             |
+| Password | `12345`            |
+
+</InfoBox>
+
+After selecting the data source, enter valid credentials for it and
+click&nbsp;<Btn>Apply</Btn>. Check the [Connecting to Databases][ref-conf-db]
+page for more details on specific data sources.
+
+<Screenshot src="https://ucarecdn.com/ca898215-9d0a-4bae-ad2b-33fd89a525f8/" />
+
+You should see tables available to you from the configured database; select the
+`orders` table. After selecting the table, click&nbsp;<Btn>Generate Data
+Model</Btn> and pick either&nbsp;<Btn>YAML</Btn> (recommended)
+or&nbsp;<Btn>JavaScript</Btn> format:
+
+<Screenshot src="https://ucarecdn.com/c43d0904-d744-429b-96a8-af7a8db959e0/" />
+
+Finally, click <Btn>Build</Btn> in the dialog, which should take you to
+the&nbsp;<Btn>Build</Btn> page.
+
+You're now ready for the next step, [querying the
+data][ref-getting-started-core-query-cube].
+
+[powershell-docs]: https://learn.microsoft.com/en-us/powershell/
+[ref-conf-db]: /config/databases
+[ref-getting-started-core-query-cube]: /getting-started/core/query-data
+[ref-devtools-playground]: /dev-tools/dev-playground
+[wsl2-docs]: https://learn.microsoft.com/en-us/windows/wsl/install

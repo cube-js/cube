@@ -1,11 +1,10 @@
 /* eslint-disable @typescript-eslint/no-empty-function */
 
-import { withTimeout } from '@cubejs-backend/shared';
+import { SchemaFileRepository, withTimeout } from '@cubejs-backend/shared';
 
 import {
   CreateOptions,
   CubejsServerCore,
-  SchemaFileRepository,
   ServerCoreInitializedOptions
 } from '../../src';
 import { OptsHandler } from '../../src/core/OptsHandler';
@@ -33,13 +32,13 @@ const repositoryWithoutPreAggregations: SchemaFileRepository = {
       fileName: 'main.js', content: `
 cube('Bar', {
   sql: 'select * from bar',
-  
+
   measures: {
     count: {
       type: 'count'
     }
   },
-  
+
   dimensions: {
     time: {
       sql: 'timestamp',
@@ -55,6 +54,28 @@ cube('Bar', {
 const repositoryWithoutContent: SchemaFileRepository = {
   localPath: () => __dirname,
   dataSchemaFiles: () => Promise.resolve([{ fileName: 'main.js', content: '' }]),
+};
+
+const repositoryWithDataSource: SchemaFileRepository = {
+  localPath: () => __dirname,
+  dataSchemaFiles: () => Promise.resolve([{ fileName: 'main.js', content: `
+cube('Bar', {
+  sql: 'select * from bar',
+
+  measures: {
+    count: {
+      type: 'count'
+    }
+  },
+  dimensions: {
+    time: {
+      sql: 'timestamp',
+      type: 'time'
+    }
+  },
+  dataSource: 'main'
+});
+` }]),
 };
 
 describe('index.test', () => {
@@ -103,7 +124,7 @@ describe('index.test', () => {
     };
 
     expect(() => new CubejsServerCore(options))
-      .toThrowError(/"compilerCacheSize" must be larger than or equal to 0/);
+      .toThrowError(/"compilerCacheSize" must be greater than or equal to 0/);
   });
 
   test('Should create instance of CubejsServerCore, orchestratorOptions as func', () => {
@@ -113,12 +134,12 @@ describe('index.test', () => {
       .toBeInstanceOf(CubejsServerCore);
   });
 
-  const getCreateOrchestratorOptionsFromServer = (options: CreateOptions) => {
+  const getCreateOrchestratorOptionsFromServer = async (options: CreateOptions) => {
     const cubejsServerCore = new CubejsServerCoreOpen(<any>options);
     expect(cubejsServerCore).toBeInstanceOf(CubejsServerCore);
 
     const createOrchestratorApiSpy = jest.spyOn(cubejsServerCore, 'createOrchestratorApi');
-    cubejsServerCore.getOrchestratorApi({
+    await cubejsServerCore.getOrchestratorApi({
       requestId: 'XXX',
       authInfo: null,
       securityContext: null,
@@ -132,7 +153,7 @@ describe('index.test', () => {
     const options: CreateOptions = { dbType: () => <any>null };
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const [driverFactory, orchestratorOptions] = getCreateOrchestratorOptionsFromServer(options);
+    const [driverFactory, orchestratorOptions] = await getCreateOrchestratorOptionsFromServer(options);
 
     try {
       await driverFactory('mongo');
@@ -146,8 +167,7 @@ describe('index.test', () => {
   test('driverFactory should return driver, failure', async () => {
     const options: CreateOptions = { dbType: () => <any>'mongo', driverFactory: () => <any>null, };
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const [driverFactory, orchestratorOptions] = getCreateOrchestratorOptionsFromServer(options);
+    const [driverFactory, _orchestratorOptions] = await getCreateOrchestratorOptionsFromServer(options);
 
     try {
       await driverFactory('default');
@@ -161,8 +181,7 @@ describe('index.test', () => {
   test('externalDriverFactory should return driver, failure', async () => {
     const options: CreateOptions = { dbType: () => <any>'mongo', externalDriverFactory: () => <any>null, };
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const [driverFactory, orchestratorOptions] = getCreateOrchestratorOptionsFromServer(options);
+    const [_driverFactory, orchestratorOptions] = await getCreateOrchestratorOptionsFromServer(options);
 
     try {
       await orchestratorOptions.externalDriverFactory();
@@ -265,6 +284,16 @@ describe('index.test', () => {
         subject: 'http://localhost:4000',
         claimsNamespace: 'http://localhost:4000',
       },
+      http: {
+        cors: {
+          origin: '*',
+          methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+          preflightContinue: false,
+          optionsSuccessStatus: 204,
+          maxAge: 86400,
+          credentials: true,
+        }
+      },
       dashboardAppPath: 'string',
       dashboardAppPort: 4444,
       livePreview: true,
@@ -276,7 +305,7 @@ describe('index.test', () => {
 
     const createOrchestratorApiSpy = jest.spyOn(cubejsServerCore, 'createOrchestratorApi');
 
-    cubejsServerCore.getOrchestratorApi({
+    await cubejsServerCore.getOrchestratorApi({
       requestId: 'XXX',
       authInfo: null,
       securityContext: null,
@@ -301,7 +330,7 @@ describe('index.test', () => {
     ]);
     createOrchestratorApiSpy.mockRestore();
 
-    const compilerApi = cubejsServerCore.getCompilerApi({
+    const compilerApi = await cubejsServerCore.getCompilerApi({
       authInfo: null,
       securityContext: null,
       requestId: 'XXX'
@@ -365,6 +394,53 @@ describe('index.test', () => {
       expect(metaConfigExtended.cubeDefinitions).toEqual({});
       expect(metaConfigExtendedSpy).toHaveBeenCalled();
       metaConfigExtendedSpy.mockClear();
+    });
+
+    test('CompilerApi dataSources default', async () => {
+      const dataSources = await compilerApi.dataSources({
+        driverFactory: jest.fn(async () => true)
+      });
+
+      expect(dataSources).toHaveProperty('dataSources');
+      expect(dataSources.dataSources).toEqual([]);
+    });
+  });
+
+  describe('CompilerApi dataSources method', () => {
+    const logger = jest.fn(() => {});
+    const compilerApi = new CompilerApi(
+      repositoryWithDataSource,
+      async () => 'mysql',
+      { logger }
+    );
+
+    const dataSourcesSpy = jest.spyOn(compilerApi, 'dataSources');
+    test('CompilerApi dataSources', async () => {
+      const dataSources = await compilerApi.dataSources({
+        driverFactory: jest.fn(async () => true)
+      });
+
+      expect(dataSources).toHaveProperty('dataSources');
+      expect(dataSources.dataSources).toEqual([{
+        dataSource: 'main',
+        dbType: 'mysql',
+      }]);
+      
+      expect(dataSourcesSpy).toHaveBeenCalled();
+      dataSourcesSpy.mockClear();
+    });
+
+    test('CompilerApi dataSources with driverFactory error', async () => {
+      const dataSources = await compilerApi.dataSources({
+        driverFactory: jest.fn(async () => {
+          throw new Error('Some driverFactory error');
+        })
+      });
+
+      expect(dataSources).toHaveProperty('dataSources');
+      expect(dataSources.dataSources).toEqual([]);
+      expect(dataSourcesSpy).toHaveBeenCalled();
+      dataSourcesSpy.mockClear();
     });
   });
 
@@ -567,7 +643,7 @@ describe('index.test', () => {
 
       const createOrchestratorApiSpy = jest.spyOn(cubejsServerCore, 'createOrchestratorApi');
 
-      cubejsServerCore.getOrchestratorApi({
+      await cubejsServerCore.getOrchestratorApi({
         requestId: 'XXX',
         authInfo: null,
         securityContext: null,
@@ -714,9 +790,14 @@ describe('index.test', () => {
       2 * 1000,
     );
 
+    let counter = 0;
     const refreshSchedulerMock = {
       runScheduledRefresh: jest.fn(async () => {
-        await timeoutKiller.cancel();
+        counter += 1;
+        if (counter === 3) {
+          // Kill the timer after processing all 3 test contexts
+          await timeoutKiller.cancel();
+        }
         return {
           finished: true,
         };

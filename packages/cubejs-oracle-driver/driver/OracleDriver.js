@@ -58,7 +58,9 @@ class OracleDriver extends BaseDriver {
    * Class constructor.
    */
   constructor(config = {}) {
-    super();
+    super({
+      testConnectionTimeout: config.testConnectionTimeout,
+    });
 
     const dataSource =
       config.dataSource ||
@@ -69,7 +71,7 @@ class OracleDriver extends BaseDriver {
     this.db.partRows = 100000;
     this.db.maxRows = 100000;
     this.db.prefetchRows = 500;
-    this.config = config || {
+    this.config = {
       user: getEnv('dbUser', { dataSource }),
       password: getEnv('dbPass', { dataSource }),
       db: getEnv('dbName', { dataSource }),
@@ -80,11 +82,9 @@ class OracleDriver extends BaseDriver {
         config.maxPoolSize ||
         getEnv('dbMaxPoolSize', { dataSource }) ||
         50,
+      ...config
     };
-
-    if (!this.config.connectionString) {
-      this.config.connectionString = `${this.config.host}/${this.config.db}`
-    }
+    this.config.connectionString = this.config.connectionString || `${this.config.host}:${this.config.port}/${this.config.db}`;
   }
 
   async tablesSchema() {
@@ -113,27 +113,41 @@ class OracleDriver extends BaseDriver {
     if (!this.pool) {
       this.pool = await this.db.createPool(this.config);
     }
+
     return this.pool.getConnection()
   }
 
   async testConnection() {
-    return (
-      await this.getConnectionFromPool()
-    ).execute('SELECT 1 FROM DUAL');
+    await this.query('SELECT 1 FROM DUAL', {});
   }
 
   async query(query, values) {
     const conn = await this.getConnectionFromPool();
+
     try {
       const res = await conn.execute(query, values || {});
       return res && res.rows;
     } catch (e) {
       throw (e);
+    } finally {
+      try {
+        await conn.close();
+      } catch (e) {
+        throw e;
+      }
     }
   }
 
   release() {
     return this.pool && this.pool.close();
+  }
+
+  readOnly() {
+    return true;
+  }
+
+  wrapQueryWithLimit(query) {
+    query.query = `SELECT * FROM (${query.query}) AS t WHERE ROWNUM <= ${query.limit}`;
   }
 }
 

@@ -6,7 +6,10 @@ use sqlparser::{
     parser::Parser,
 };
 
-use crate::{compile::CompilationError, sql::session::DatabaseProtocol};
+use crate::{
+    compile::{qtrace::Qtrace, CompilationError},
+    sql::session::DatabaseProtocol,
+};
 
 use super::CompilationResult;
 
@@ -42,6 +45,7 @@ lazy_static! {
 pub fn parse_sql_to_statements(
     query: &String,
     protocol: DatabaseProtocol,
+    qtrace: &mut Option<Qtrace>,
 ) -> CompilationResult<Vec<Statement>> {
     let original_query = query.clone();
 
@@ -163,11 +167,10 @@ pub fn parse_sql_to_statements(
     );
     let query = query.replace("AND TABLE_TYPE IN ( 'TABLE', 'VIEW', 'EXTERNAL TABLE')", "");
     let query = query.replace(
-        // REGEXP_REPLACE
         // Subquery must have alias
         // Incorrect alias for subquery
         "FROM (select lbv_cols.schemaname, lbv_cols.tablename, lbv_cols.columnname,REGEXP_REPLACE(REGEXP_REPLACE(lbv_cols.columntype,'\\\\(.*\\\\)'),'^_.+','ARRAY') as columntype_rep,columntype, lbv_cols.columnnum from pg_get_late_binding_view_cols() lbv_cols( schemaname name, tablename name, columnname name, columntype text, columnnum int)) lbv_columns   WHERE",
-        "FROM (select schemaname, tablename, columnname,columntype as columntype_rep,columntype, columnnum from get_late_binding_view_cols_unpacked) as lbv_columns   WHERE",
+        "FROM (select schemaname, tablename, columnname,REGEXP_REPLACE(REGEXP_REPLACE(columntype,'\\\\(.*\\\\)'),'^_.+','ARRAY') as columntype_rep,columntype, columnnum from get_late_binding_view_cols_unpacked) as lbv_columns   WHERE",
     );
     let query = query.replace(
         // Subquery must have alias
@@ -240,6 +243,49 @@ pub fn parse_sql_to_statements(
         "",
     );
 
+    // Microstrategy
+    // TODO: Support Subquery Node
+    let query = query.replace("= (SELECT current_schema())", "= current_schema()");
+
+    // Grafana
+    // TODO: Support InSubquery Node
+    let query = query.replace(
+        "WHERE quote_ident(table_schema) NOT IN ('information_schema', 'pg_catalog', '_timescaledb_cache', '_timescaledb_catalog', '_timescaledb_internal', '_timescaledb_config', 'timescaledb_information', 'timescaledb_experimental') AND table_type = 'BASE TABLE' AND quote_ident(table_schema) IN (SELECT CASE WHEN TRIM(s[i]) = '\"$user\"' THEN user ELSE TRIM(s[i]) END FROM generate_series(array_lower(string_to_array(current_setting('search_path'), ','), 1), array_upper(string_to_array(current_setting('search_path'), ','), 1)) AS i, string_to_array(current_setting('search_path'), ',') AS s)",
+        "WHERE quote_ident(table_schema) IN (current_user, current_schema()) AND table_type = 'BASE TABLE'"
+    );
+    let query = query.replace(
+        "where quote_ident(table_schema) not in ('information_schema',\
+\n                             'pg_catalog',\
+\n                             '_timescaledb_cache',\
+\n                             '_timescaledb_catalog',\
+\n                             '_timescaledb_internal',\
+\n                             '_timescaledb_config',\
+\n                             'timescaledb_information',\
+\n                             'timescaledb_experimental')\
+\n      and \
+\n          quote_ident(table_schema) IN (\
+\n          SELECT\
+\n            CASE WHEN trim(s[i]) = '\"$user\"' THEN user ELSE trim(s[i]) END\
+\n          FROM\
+\n            generate_series(\
+\n              array_lower(string_to_array(current_setting('search_path'),','),1),\
+\n              array_upper(string_to_array(current_setting('search_path'),','),1)\
+\n            ) as i,\
+\n            string_to_array(current_setting('search_path'),',') s\
+\n          )",
+        "WHERE quote_ident(table_schema) IN (current_user, current_schema())",
+    );
+
+    // psqlODBC
+    let query = query.replace(
+        "select NULL, NULL, NULL",
+        "select NULL, NULL AS NULL2, NULL AS NULL3",
+    );
+
+    if let Some(qtrace) = qtrace {
+        qtrace.set_replaced_query(&query)
+    }
+
     let parse_result = match protocol {
         DatabaseProtocol::MySQL => Parser::parse_sql(&MySqlDialectWithBackTicks {}, query.as_str()),
         DatabaseProtocol::PostgreSQL => Parser::parse_sql(&PostgreSqlDialect {}, query.as_str()),
@@ -254,8 +300,9 @@ pub fn parse_sql_to_statements(
 pub fn parse_sql_to_statement(
     query: &String,
     protocol: DatabaseProtocol,
+    qtrace: &mut Option<Qtrace>,
 ) -> CompilationResult<Statement> {
-    match parse_sql_to_statements(query, protocol)? {
+    match parse_sql_to_statements(query, protocol, qtrace)? {
         stmts => {
             if stmts.len() == 1 {
                 Ok(stmts[0].clone())
@@ -287,6 +334,7 @@ mod tests {
         let result = parse_sql_to_statement(
             &"-- 6dcd92a04feb50f14bbcf07c661680ba SELECT NOW".to_string(),
             DatabaseProtocol::MySQL,
+            &mut None,
         );
         match result {
             Ok(_) => panic!("This test should throw an error"),
@@ -303,6 +351,7 @@ mod tests {
         let result = parse_sql_to_statement(
             &"SELECT NOW(); SELECT NOW();".to_string(),
             DatabaseProtocol::MySQL,
+            &mut None,
         );
         match result {
             Ok(_) => panic!("This test should throw an error"),
@@ -328,6 +377,7 @@ mod tests {
         "
             .to_string(),
             DatabaseProtocol::MySQL,
+            &mut None,
         );
         match result {
             Ok(_) => {}
@@ -340,6 +390,7 @@ mod tests {
         let result = parse_sql_to_statement(
             &"-- 6dcd92a04feb50f14bbcf07c661680ba SELECT NOW".to_string(),
             DatabaseProtocol::PostgreSQL,
+            &mut None,
         );
         match result {
             Ok(_) => panic!("This test should throw an error"),
@@ -356,6 +407,7 @@ mod tests {
         let result = parse_sql_to_statement(
             &"SELECT NOW(); SELECT NOW();".to_string(),
             DatabaseProtocol::PostgreSQL,
+            &mut None,
         );
         match result {
             Ok(_) => panic!("This test should throw an error"),
@@ -381,6 +433,7 @@ mod tests {
         "
             .to_string(),
             DatabaseProtocol::PostgreSQL,
+            &mut None,
         );
         match result {
             Ok(_) => {}

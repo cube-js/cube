@@ -24,8 +24,8 @@
 /packages/cubejs-schema-compiler/      @cube-js/schema-compiler
 /packages/*-schema-extension/          @cube-js/schema-compiler
 
+# Doc reviewers
+/docs/      @cube-js/doc-reviewers
+
 # Developer Relations and Community
-*.md        @cube-js/developer-relations-and-community
-/docs/      @cube-js/developer-relations-and-community
 /examples/  @cube-js/developer-relations-and-community
-/guides/    @cube-js/developer-relations-and-community

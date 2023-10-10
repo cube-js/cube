@@ -1,4 +1,5 @@
 /* eslint-disable no-throw-literal */
+import * as stream from 'stream';
 import pt from 'promise-timeout';
 import {
   QueryOrchestrator,
@@ -6,20 +7,21 @@ import {
   DriverFactoryByDataSource,
   DriverType,
   QueryOrchestratorOptions,
+  QueryBody,
 } from '@cubejs-backend/query-orchestrator';
 
-import { DbTypeAsyncFn, ExternalDbTypeFn, RequestContext } from './types';
+import { DatabaseType, RequestContext } from './types';
 
 export interface OrchestratorApiOptions extends QueryOrchestratorOptions {
-  contextToDbType: DbTypeAsyncFn;
-  contextToExternalDbType: ExternalDbTypeFn;
+  contextToDbType: (dataSource: string) => Promise<DatabaseType>;
+  contextToExternalDbType: () => DatabaseType;
   redisPrefix?: string;
 }
 
 export class OrchestratorApi {
   private seenDataSources: Record<string, boolean> = {};
 
-  protected readonly orchestrator: QueryOrchestrator;
+  protected orchestrator: QueryOrchestrator;
 
   protected readonly continueWaitTimeout: number;
 
@@ -52,7 +54,23 @@ export class OrchestratorApi {
     await this.orchestrator.forceReconcile(datasource);
   }
 
-  public async executeQuery(query) {
+  /**
+   * Returns stream object which will be used to stream results from
+   * the data source if applicable. Throw otherwise.
+   *
+   * @throw Error
+   */
+  public async streamQuery(query: QueryBody): Promise<stream.Writable> {
+    // TODO merge with fetchQuery
+    return this.orchestrator.streamQuery(query);
+  }
+
+  /**
+   * Push query to the queue, fetch and return result if query takes
+   * less than `continueWaitTimeout` seconds, throw `ContinueWaitError`
+   * error otherwise.
+   */
+  public async executeQuery(query: QueryBody) {
     const queryForLog = query.query && query.query.replace(/\s+/g, ' ');
     const startQueryTime = (new Date()).getTime();
 
@@ -63,10 +81,18 @@ export class OrchestratorApi {
         requestId: query.requestId
       });
 
-      let fetchQueryPromise = query.loadRefreshKeysOnly ?
-        this.orchestrator.loadRefreshKeys(query) :
-        this.orchestrator.fetchQuery(query);
+      let fetchQueryPromise = query.loadRefreshKeysOnly
+        ? this.orchestrator.loadRefreshKeys(query)
+        : this.orchestrator.fetchQuery(query);
 
+      if (query.isJob) {
+        // We want to immediately resolve and return a jobed build query result
+        // (initialized by the /cubejs-system/v1/pre-aggregations/jobs endpoint)
+        // because the following stack was optimized for such behavior.
+        const job = await fetchQueryPromise;
+        return job;
+      }
+      
       fetchQueryPromise = pt.timeout(fetchQueryPromise, this.continueWaitTimeout * 1000);
 
       const data = await fetchQueryPromise;
@@ -78,34 +104,19 @@ export class OrchestratorApi {
         requestId: query.requestId
       });
 
-      const extractDbType = async (response) => {
-        const dbType = await this.options.contextToDbType({
-          ...query.context,
-          dataSource: response.dataSource,
-        });
-        return dbType;
-      };
-
-      const extractExternalDbType = (response) => (
-        this.options.contextToExternalDbType({
-          ...query.context,
-          dataSource: response.dataSource,
-        })
-      );
-
       if (Array.isArray(data)) {
         const res = await Promise.all(
           data.map(async (item) => ({
             ...item,
-            dbType: await extractDbType(item),
-            extDbType: extractExternalDbType(item),
+            dbType: await this.options.contextToDbType(item.dataSource),
+            extDbType: this.options.contextToExternalDbType(),
           }))
         );
         return res;
       }
 
-      data.dbType = await extractDbType(data);
-      data.extDbType = extractExternalDbType(data);
+      data.dbType = await this.options.contextToDbType(data.dataSource);
+      data.extDbType = this.options.contextToExternalDbType();
 
       return data;
     } catch (err) {
@@ -205,6 +216,29 @@ export class OrchestratorApi {
     }
   }
 
+  /**
+   * Determines whether the partition table already exists or not.
+   */
+  public async isPartitionExist(
+    request: string,
+    external: boolean,
+    dataSource = 'default',
+    schema: string,
+    table: string,
+    key: any,
+    token: string,
+  ): Promise<[boolean, string]> {
+    return this.orchestrator.isPartitionExist(
+      request,
+      external,
+      dataSource,
+      schema,
+      table,
+      key,
+      token,
+    );
+  }
+
   public async release() {
     return Promise.all([
       ...Object.keys(this.seenDataSources).map(ds => this.releaseDriver(this.driverFactory, ds)),
@@ -269,5 +303,9 @@ export class OrchestratorApi {
 
   public async unSubscribeQueueEvents(id) {
     return this.orchestrator.unSubscribeQueueEvents(id);
+  }
+
+  public async updateRefreshEndReached() {
+    return this.orchestrator.updateRefreshEndReached();
   }
 }

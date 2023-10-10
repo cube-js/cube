@@ -1,6 +1,6 @@
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { expect } from '@jest/globals';
-import { driverTest, driverTestWithError } from './driverTest';
+import { driverTest, driverTestFn, driverTestWithError } from './driverTest';
 
 const commonSchemas = [
   'CAST.js',
@@ -9,6 +9,7 @@ const commonSchemas = [
   'Products.sql.js',
   'Customers.js',
   'ECommerce.js',
+  'HiddenECommerce.js',
   'Products.js',
 ];
 
@@ -245,7 +246,61 @@ export const filteringCustomersEndsWithFilterThird = driverTest({
   schemas: commonSchemas,
 });
 
-export const filteringCustomersStartsWithAndDimensionsFirst = driverTest({
+export const filteringCustomersNotEndsWithFilterFirst = driverTest({
+  name: 'filtering Customers: notEndsWith filter + dimensions, first',
+  query: {
+    dimensions: [
+      'Customers.customerId',
+      'Customers.customerName'
+    ],
+    filters: [
+      {
+        member: 'Customers.customerId',
+        operator: 'notEndsWith',
+        values: ['0'],
+      },
+    ],
+  },
+  schemas: commonSchemas,
+});
+
+export const filteringCustomersNotEndsWithFilterSecond = driverTest({
+  name: 'filtering Customers: notEndsWith filter + dimensions, second',
+  query: {
+    dimensions: [
+      'Customers.customerId',
+      'Customers.customerName'
+    ],
+    filters: [
+      {
+        member: 'Customers.customerId',
+        operator: 'notEndsWith',
+        values: ['0', '5'],
+      },
+    ],
+  },
+  schemas: commonSchemas,
+});
+
+export const filteringCustomersNotEndsWithFilterThird = driverTest({
+  name: 'filtering Customers: notEndsWith filter + dimensions, third',
+  query: {
+    dimensions: [
+      'Customers.customerId',
+      'Customers.customerName'
+    ],
+    filters: [
+      {
+        member: 'Customers.customerId',
+        operator: 'notEndsWith',
+        values: ['9'],
+      },
+    ],
+  },
+  schemas: commonSchemas,
+});
+
+export const filteringCustomersStartsWithFirst = driverTest({
   name: 'filtering Customers: startsWith + dimensions, first',
   query: {
     dimensions: [
@@ -263,7 +318,7 @@ export const filteringCustomersStartsWithAndDimensionsFirst = driverTest({
   schemas: commonSchemas,
 });
 
-export const filteringCustomersStartsWithAndDimensionsSecond = driverTest({
+export const filteringCustomersStartsWithSecond = driverTest({
   name: 'filtering Customers: startsWith + dimensions, second',
   query: {
     dimensions: [
@@ -281,7 +336,7 @@ export const filteringCustomersStartsWithAndDimensionsSecond = driverTest({
   schemas: commonSchemas,
 });
 
-export const filteringCustomersStartsWithAndDimensionsThird = driverTest({
+export const filteringCustomersStartsWithThird = driverTest({
   name: 'filtering Customers: startsWith + dimensions, third',
   query: {
     dimensions: [
@@ -299,8 +354,8 @@ export const filteringCustomersStartsWithAndDimensionsThird = driverTest({
   schemas: commonSchemas,
 });
 
-export const filteringCustomersEndsWithFilterAndDimensionsFirst = driverTest({
-  name: 'filtering Customers: endsWith filter + dimensions, first',
+export const filteringCustomersNotStartsWithFirst = driverTest({
+  name: 'filtering Customers: notStartsWith + dimensions, first',
   query: {
     dimensions: [
       'Customers.customerId',
@@ -309,16 +364,16 @@ export const filteringCustomersEndsWithFilterAndDimensionsFirst = driverTest({
     filters: [
       {
         member: 'Customers.customerId',
-        operator: 'endsWith',
-        values: ['0'],
+        operator: 'notStartsWith',
+        values: ['A'],
       },
     ],
   },
   schemas: commonSchemas,
 });
 
-export const filteringCustomersEndsWithFilterAndDimensionsSecond = driverTest({
-  name: 'filtering Customers: endsWith filter + dimensions, second',
+export const filteringCustomersNotStartsWithSecond = driverTest({
+  name: 'filtering Customers: notStartsWith + dimensions, second',
   query: {
     dimensions: [
       'Customers.customerId',
@@ -327,16 +382,16 @@ export const filteringCustomersEndsWithFilterAndDimensionsSecond = driverTest({
     filters: [
       {
         member: 'Customers.customerId',
-        operator: 'endsWith',
-        values: ['0', '5'],
+        operator: 'notStartsWith',
+        values: ['A', 'B'],
       },
     ],
   },
   schemas: commonSchemas,
 });
 
-export const filteringCustomersEndsWithFilterAndDimensionsThird = driverTest({
-  name: 'filtering Customers: endsWith filter + dimensions, third',
+export const filteringCustomersNotStartsWithThird = driverTest({
+  name: 'filtering Customers: notStartsWith + dimensions, third',
   query: {
     dimensions: [
       'Customers.customerId',
@@ -345,8 +400,8 @@ export const filteringCustomersEndsWithFilterAndDimensionsThird = driverTest({
     filters: [
       {
         member: 'Customers.customerId',
-        operator: 'endsWith',
-        values: ['9'],
+        operator: 'notStartsWith',
+        values: ['Z'],
       },
     ],
   },
@@ -1182,6 +1237,16 @@ export const filteringECommerceEndsWithDimensionsThird = driverTest({
   schemas: commonSchemas
 });
 
+export const preAggsCustomersRunningTotal = driverTest({
+  name: 'pre-aggregations Customers: running total without time dimension',
+  query: {
+    measures: [
+      'Customers.runningTotal'
+    ]
+  },
+  schemas: commonSchemas
+});
+
 export const queryingEcommerceTotalQuantifyAvgDiscountTotal = driverTestWithError({
   name: 'querying ECommerce: total quantity, avg discount, total ' +
   'sales, total profit by product + order + total -- noisy ' +
@@ -1205,4 +1270,35 @@ export const queryingEcommerceTotalQuantifyAvgDiscountTotal = driverTestWithErro
   expectArray: [(e) => expect(e).toEqual('error')],
   schemas: commonSchemas,
   skip: true
+});
+
+export const hiddenMember = driverTestWithError({
+  name: 'hidden member',
+  query: {
+    measures: [
+      'ECommerce.hiddenSum'
+    ]
+  },
+  schemas: commonSchemas,
+  expectArray: [(e) => expect(e.toString()).toMatch(/hidden/)],
+});
+
+export const hiddenCube = driverTestFn({
+  name: 'hidden cube',
+  schemas: commonSchemas,
+  testFn: async (client) => {
+    const meta = await client.meta();
+    expect(meta.cubes.find(cube => cube.name === 'HiddenECommerce')).toBe(undefined);
+  }
+});
+
+export const viewMetaExposed = driverTestFn({
+  name: 'view meta exposed',
+  schemas: commonSchemas,
+  testFn: async (client) => {
+    const meta = await client.meta();
+    const view = meta.cubes.find(cube => cube.name === 'ECommerceView');
+    expect(view?.measures?.find(m => m.name === 'ECommerceView.count')?.aggType).toBe('count');
+    expect(view?.measures?.find(m => m.name === 'ECommerceView.count')?.meta?.foo).toBe('bar');
+  }
 });

@@ -14,6 +14,10 @@ const operators = {
     { name: 'notEquals', title: 'does not equal' },
     { name: 'set', title: 'is set' },
     { name: 'notSet', title: 'is not set' },
+    { name: 'startsWith', title: 'starts with' },
+    { name: 'notStartsWith', title: 'does not start with' },
+    { name: 'endsWith', title: 'ends with' },
+    { name: 'notEndsWith', title: 'does not end with' },
   ],
   number: [
     { name: 'equals', title: 'equals' },
@@ -31,7 +35,9 @@ const operators = {
     { name: 'inDateRange', title: 'in date range' },
     { name: 'notInDateRange', title: 'not in date range' },
     { name: 'afterDate', title: 'after date' },
+    { name: 'afterOrOnDate', title: 'after or on date' },
     { name: 'beforeDate', title: 'before date' },
+    { name: 'beforeOrOnDate', title: 'before or on date' },
   ],
 };
 
@@ -76,6 +82,8 @@ class Meta {
             {
               cubeName: cube.name,
               cubeTitle: cube.title,
+              type: cube.type,
+              public: cube.public,
               members
             },
           ];

@@ -51,7 +51,7 @@ export class PrestodbQuery extends BaseQuery {
   convertTz(field) {
     const atTimezone = `${field} AT TIME ZONE '${this.timezone}'`;
     return this.timezone ?
-      `CAST(date_add('minute', timezone_minute(${atTimezone}), date_add('hour', timezone_hour(${atTimezone}), ${atTimezone})) AS TIMESTAMP)` :
+      `CAST(date_add('minute', timezone_minute(${atTimezone}), date_add('hour', timezone_hour(${atTimezone}), ${field})) AS TIMESTAMP)` :
       field;
   }
 
@@ -107,5 +107,14 @@ export class PrestodbQuery extends BaseQuery {
     const offsetClause = this.offset ? ` OFFSET ${parseInt(this.offset, 10)}` : '';
 
     return `${offsetClause}${limitClause}`;
+  }
+
+  sqlTemplates() {
+    const templates = super.sqlTemplates();
+    templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
+    templates.functions.DATEPART = 'DATE_PART({{ args_concat }})';
+    templates.expressions.extract = 'EXTRACT({{ date_part }} FROM {{ expr }})';
+    templates.expressions.interval = 'INTERVAL \'{{ num }}\' {{ date_part }}';
+    return templates;
   }
 }

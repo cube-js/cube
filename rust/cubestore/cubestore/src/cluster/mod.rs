@@ -4,11 +4,14 @@ pub mod transport;
 #[cfg(not(target_os = "windows"))]
 pub mod worker_pool;
 
+pub mod rate_limiter;
+
 #[cfg(not(target_os = "windows"))]
 use crate::cluster::worker_pool::{worker_main, MessageProcessor, WorkerPool};
 
 use crate::ack_error;
 use crate::cluster::message::NetworkMessage;
+use crate::cluster::rate_limiter::{ProcessRateLimiter, TaskType, TraceIndex};
 use crate::cluster::transport::{ClusterTransport, MetaStoreTransport, WorkerConnection};
 use crate::config::injection::{DIService, Injector};
 use crate::config::{is_router, WorkerServices};
@@ -28,9 +31,11 @@ use crate::metastore::{
 };
 use crate::queryplanner::query_executor::{QueryExecutor, SerializedRecordBatchStream};
 use crate::queryplanner::serialized_plan::SerializedPlan;
+use crate::queryplanner::trace_data_loaded::DataLoadedSize;
 use crate::remotefs::RemoteFs;
 use crate::store::compaction::CompactionService;
 use crate::store::ChunkDataStore;
+use crate::telemetry::tracing::TracingHelper;
 use crate::util::aborting_join_handle::AbortingJoinHandle;
 use crate::CubeError;
 use arrow::datatypes::SchemaRef;
@@ -127,6 +132,11 @@ pub trait Cluster: DIService + Send + Sync {
     ) -> Result<(), CubeError>;
 
     async fn free_memory_chunk(&self, node_name: &str, chunk_id: u64) -> Result<(), CubeError>;
+    async fn free_deleted_memory_chunks(
+        &self,
+        node_name: &str,
+        chunk_ids: Vec<u64>,
+    ) -> Result<(), CubeError>;
 
     fn job_result_listener(&self) -> JobResultListener;
 
@@ -173,6 +183,7 @@ pub struct ClusterImpl {
     server_name: String,
     server_addresses: Vec<String>,
     job_notify: Arc<Notify>,
+    long_running_job_notify: Arc<Notify>,
     meta_store_sender: Sender<MetaStoreEvent>,
     #[cfg(not(target_os = "windows"))]
     select_process_pool: RwLock<
@@ -180,7 +191,7 @@ pub struct ClusterImpl {
             Arc<
                 WorkerPool<
                     WorkerMessage,
-                    (SchemaRef, Vec<SerializedRecordBatchStream>),
+                    (SchemaRef, Vec<SerializedRecordBatchStream>, usize),
                     WorkerProcessor,
                 >,
             >,
@@ -191,6 +202,8 @@ pub struct ClusterImpl {
     stop_token: CancellationToken,
     close_worker_socket_tx: watch::Sender<bool>,
     close_worker_socket_rx: RwLock<watch::Receiver<bool>>,
+    tracing_helper: Arc<dyn TracingHelper>,
+    process_rate_limiter: Arc<dyn ProcessRateLimiter>,
 }
 
 crate::di_service!(ClusterImpl, [Cluster]);
@@ -201,6 +214,7 @@ pub enum WorkerMessage {
         SerializedPlan,
         HashMap<String, String>,
         HashMap<u64, Vec<SerializedRecordBatchStream>>,
+        Option<(u64, u64)>,
     ),
 }
 #[cfg(not(target_os = "windows"))]
@@ -208,42 +222,65 @@ pub struct WorkerProcessor;
 
 #[cfg(not(target_os = "windows"))]
 #[async_trait]
-impl MessageProcessor<WorkerMessage, (SchemaRef, Vec<SerializedRecordBatchStream>)>
+impl MessageProcessor<WorkerMessage, (SchemaRef, Vec<SerializedRecordBatchStream>, usize)>
     for WorkerProcessor
 {
     async fn process(
         services: &WorkerServices,
         args: WorkerMessage,
-    ) -> Result<(SchemaRef, Vec<SerializedRecordBatchStream>), CubeError> {
+    ) -> Result<(SchemaRef, Vec<SerializedRecordBatchStream>, usize), CubeError> {
         match args {
-            WorkerMessage::Select(plan_node, remote_to_local_names, chunk_id_to_record_batches) => {
-                let time = SystemTime::now();
-                debug!("Running select in worker started");
-                let plan_node_to_send = plan_node.clone();
-                let result = chunk_id_to_record_batches
-                    .into_iter()
-                    .map(|(id, batches)| -> Result<_, CubeError> {
-                        Ok((
-                            id,
-                            batches
+            WorkerMessage::Select(
+                plan_node,
+                remote_to_local_names,
+                chunk_id_to_record_batches,
+                trace_id_and_span_id,
+            ) => {
+                let future = async move {
+                    let time = SystemTime::now();
+                    debug!("Running select in worker started");
+                    let plan_node_to_send = plan_node.clone();
+                    let result = tracing::trace_span!("Deserialize in_memory chunks").in_scope(
+                        move || {
+                            chunk_id_to_record_batches
                                 .into_iter()
-                                .map(|b| b.read())
-                                .collect::<Result<Vec<_>, _>>()?,
-                        ))
-                    })
-                    .collect::<Result<HashMap<_, _>, _>>()?;
-                let res = services
-                    .query_executor
-                    .clone()
-                    .execute_worker_plan(plan_node_to_send, remote_to_local_names, result)
-                    .await;
-                debug!(
-                    "Running select in worker completed ({:?})",
-                    time.elapsed().unwrap()
-                );
-                let (schema, records) = res?;
-                let records = SerializedRecordBatchStream::write(schema.as_ref(), records)?;
-                Ok((schema, records))
+                                .map(|(id, batches)| -> Result<_, CubeError> {
+                                    Ok((
+                                        id,
+                                        batches
+                                            .into_iter()
+                                            .map(|b| b.read())
+                                            .collect::<Result<Vec<_>, _>>()?,
+                                    ))
+                                })
+                                .collect::<Result<HashMap<_, _>, _>>()
+                        },
+                    )?;
+                    let res = services
+                        .query_executor
+                        .clone()
+                        .execute_worker_plan(plan_node_to_send, remote_to_local_names, result)
+                        .await;
+                    debug!(
+                        "Running select in worker completed ({:?})",
+                        time.elapsed().unwrap()
+                    );
+                    let (schema, records, data_loaded_size) = res?;
+                    let records = SerializedRecordBatchStream::write(schema.as_ref(), records)?;
+                    Ok((schema, records, data_loaded_size))
+                };
+                let span = trace_id_and_span_id.map(|(t, s)| {
+                    tracing::info_span!(
+                        "Process on selec worker",
+                        cube_dd_trace_id = t,
+                        cube_dd_parent_span_id = s
+                    )
+                });
+                if let Some(span) = span {
+                    future.instrument(span).await
+                } else {
+                    future.await
+                }
             }
         }
     }
@@ -253,7 +290,11 @@ impl MessageProcessor<WorkerMessage, (SchemaRef, Vec<SerializedRecordBatchStream
 #[ctor::ctor]
 fn proc_handler() {
     crate::util::respawn::register_handler(
-        worker_main::<WorkerMessage, (SchemaRef, Vec<SerializedRecordBatchStream>), WorkerProcessor>,
+        worker_main::<
+            WorkerMessage,
+            (SchemaRef, Vec<SerializedRecordBatchStream>, usize),
+            WorkerProcessor,
+        >,
     );
 }
 
@@ -263,9 +304,11 @@ struct JobRunner {
     chunk_store: Arc<dyn ChunkDataStore>,
     compaction_service: Arc<dyn CompactionService>,
     import_service: Arc<dyn ImportService>,
+    process_rate_limiter: Arc<dyn ProcessRateLimiter>,
     server_name: String,
     notify: Arc<Notify>,
     stop_token: CancellationToken,
+    is_long_term: bool,
 }
 
 lazy_static! {
@@ -277,7 +320,9 @@ lazy_static! {
 impl Cluster for ClusterImpl {
     async fn notify_job_runner(&self, node_name: String) -> Result<(), CubeError> {
         if self.server_name == node_name || is_self_reference(&node_name) {
-            self.job_notify.notify_waiters();
+            // TODO `notify_one()` was replaced by `notify_waiters()` here. Revisit in case of delays in job processing.
+            self.job_notify.notify_one();
+            self.long_running_job_notify.notify_one();
         } else {
             self.send_to_worker(&node_name, NetworkMessage::NotifyJobListeners)
                 .await?;
@@ -405,6 +450,23 @@ impl Cluster for ClusterImpl {
         }
     }
 
+    async fn free_deleted_memory_chunks(
+        &self,
+        node_name: &str,
+        chunk_ids: Vec<u64>,
+    ) -> Result<(), CubeError> {
+        let response = self
+            .send_or_process_locally(
+                node_name,
+                NetworkMessage::FreeDeletedMemoryChunks(chunk_ids),
+            )
+            .await?;
+        match response {
+            NetworkMessage::FreeDeletedMemoryChunksResult(r) => r,
+            x => panic!("Unexpected result for add chunk: {:?}", x),
+        }
+    }
+
     fn job_result_listener(&self) -> JobResultListener {
         JobResultListener {
             receiver: self.meta_store_sender.subscribe(),
@@ -412,11 +474,7 @@ impl Cluster for ClusterImpl {
     }
 
     fn node_name_by_partition(&self, p: &IdRow<Partition>) -> String {
-        if let Some(id) = p.get_row().multi_partition_id() {
-            pick_worker_by_ids(self.config_obj.as_ref(), [id]).to_string()
-        } else {
-            pick_worker_by_partitions(self.config_obj.as_ref(), [p]).to_string()
-        }
+        node_name_by_partition(self.config_obj.as_ref(), p)
     }
 
     async fn node_name_for_chunk_repartition(
@@ -458,18 +516,28 @@ impl Cluster for ClusterImpl {
         let node_name = self.node_name_by_partition(&partition);
         let mut futures = Vec::new();
         if let Some(name) = partition.get_row().get_full_name(partition.get_id()) {
-            futures.push(self.warmup_download(&node_name, name, partition.get_row().file_size()));
+            futures.push(self.warmup_download_with_corruption_check(
+                &node_name,
+                name,
+                partition.get_row().file_size(),
+                &partition,
+                None,
+            ));
         }
         for chunk in chunks.iter() {
             let name = chunk.get_row().get_full_name(chunk.get_id());
-            futures.push(self.warmup_download(&node_name, name, chunk.get_row().file_size()));
+            futures.push(self.warmup_download_with_corruption_check(
+                &node_name,
+                name,
+                chunk.get_row().file_size(),
+                &partition,
+                Some(chunk.get_id()),
+            ));
         }
         let res = join_all(futures)
             .await
             .into_iter()
             .collect::<Result<Vec<_>, _>>();
-
-        deactivate_table_on_corrupt_data(self.meta_store.clone(), &res, &partition).await;
 
         res?;
         Ok(())
@@ -537,14 +605,29 @@ impl Cluster for ClusterImpl {
                 let res = chunk_store.free_memory_chunk(chunk_id).await;
                 NetworkMessage::FreeMemoryChunkResult(res)
             }
+            NetworkMessage::FreeDeletedMemoryChunks(ids) => {
+                let chunk_store = self
+                    .injector
+                    .upgrade()
+                    .unwrap()
+                    .get_service_typed::<dyn ChunkDataStore>()
+                    .await;
+                let res = chunk_store.free_deleted_memory_chunks(ids).await;
+                NetworkMessage::FreeDeletedMemoryChunksResult(res)
+            }
             NetworkMessage::FreeMemoryChunkResult(_) => {
-                panic!("AddChunkResult sent to worker");
+                panic!("FreeMemoryChunkResult sent to worker");
+            }
+            NetworkMessage::FreeDeletedMemoryChunksResult(_) => {
+                panic!("FreeDeletedMemoryChunksResult sent to worker");
             }
             NetworkMessage::MetaStoreCall(_) | NetworkMessage::MetaStoreCallResult(_) => {
                 panic!("MetaStoreCall sent to worker");
             }
             NetworkMessage::NotifyJobListeners => {
-                self.job_notify.notify_waiters();
+                // TODO `notify_one()` was replaced by `notify_waiters()` here. Revisit in case of delays in job processing.
+                self.job_notify.notify_one();
+                self.long_running_job_notify.notify_one();
                 NetworkMessage::NotifyJobListenersSuccess
             }
             NetworkMessage::NotifyJobListenersSuccess => {
@@ -690,9 +773,6 @@ impl JobRunner {
                 _ = self.notify.notified() => {
                     self.fetch_and_process().await
                 }
-                _ = Delay::new(Duration::from_secs(5)) => {
-                    self.fetch_and_process().await
-                }
             };
             if let Err(e) = res {
                 error!("Error in processing loop: {}", e);
@@ -703,7 +783,7 @@ impl JobRunner {
     async fn fetch_and_process(&self) -> Result<(), CubeError> {
         let job = self
             .meta_store
-            .start_processing_job(self.server_name.to_string())
+            .start_processing_job(self.server_name.to_string(), self.is_long_term)
             .await?;
         if let Some(to_process) = job {
             self.run_local(to_process).await?;
@@ -775,7 +855,8 @@ impl JobRunner {
                 "Running job {} ({:?}): {:?}",
                 e.message,
                 start.elapsed()?,
-                self.meta_store.get_job(job_id).await?
+                // Job can be removed by the time of fetch
+                self.meta_store.get_job(job_id).await.unwrap_or(job)
             );
         } else if let Ok(Err(cube_err)) = res {
             self.meta_store
@@ -784,7 +865,8 @@ impl JobRunner {
             error!(
                 "Running job join error ({:?}): {:?}",
                 start.elapsed()?,
-                self.meta_store.get_job(job_id).await?
+                // Job can be removed by the time of fetch
+                self.meta_store.get_job(job_id).await.unwrap_or(job)
             );
         } else if let Ok(Ok(Err(cube_err))) = res {
             self.meta_store
@@ -798,7 +880,8 @@ impl JobRunner {
             error!(
                 "Running job error ({:?}): {:?}",
                 start.elapsed()?,
-                self.meta_store.get_job(job_id).await?
+                // Job can be removed by the time of fetch
+                self.meta_store.get_job(job_id).await.unwrap_or(job)
             );
         } else {
             let job = self
@@ -841,8 +924,35 @@ impl JobRunner {
                 if let RowKey::Table(TableId::Partitions, partition_id) = job.row_reference() {
                     let compaction_service = self.compaction_service.clone();
                     let partition_id = *partition_id;
+                    let process_rate_limiter = self.process_rate_limiter.clone();
+                    let timeout = Some(Duration::from_secs(self.config_obj.import_job_timeout()));
+                    let metastore = self.meta_store.clone();
                     Ok(cube_ext::spawn(async move {
-                        compaction_service.compact(partition_id).await
+                        process_rate_limiter
+                            .wait_for_allow(TaskType::Job, timeout)
+                            .await?; //TODO config, may be same ad orphaned timeout
+
+                        let (_, _, table, _) =
+                            metastore.get_partition_for_compaction(partition_id).await?;
+                        let table_id = table.get_id();
+                        let trace_obj = metastore.get_trace_obj_by_table_id(table_id).await?;
+                        let trace_index = TraceIndex {
+                            table_id: Some(table_id),
+                            trace_obj,
+                        };
+
+                        let data_loaded_size = DataLoadedSize::new();
+                        let res = compaction_service
+                            .compact(partition_id, data_loaded_size.clone())
+                            .await;
+                        process_rate_limiter
+                            .commit_task_usage(
+                                TaskType::Job,
+                                data_loaded_size.get() as i64,
+                                trace_index,
+                            )
+                            .await;
+                        res
                     }))
                 } else {
                     Self::fail_job_row_key(job)
@@ -852,9 +962,25 @@ impl JobRunner {
                 if let RowKey::Table(TableId::Partitions, partition_id) = job.row_reference() {
                     let compaction_service = self.compaction_service.clone();
                     let partition_id = *partition_id;
+                    log::warn!(
+                        "JobType::InMemoryChunksCompaction is deprecated and should not be used"
+                    );
                     Ok(cube_ext::spawn(async move {
                         compaction_service
                             .compact_in_memory_chunks(partition_id)
+                            .await
+                    }))
+                } else {
+                    Self::fail_job_row_key(job)
+                }
+            }
+            JobType::NodeInMemoryChunksCompaction(_) => {
+                if let RowKey::Table(TableId::Tables, _) = job.row_reference() {
+                    let compaction_service = self.compaction_service.clone();
+                    let node_name = self.server_name.clone();
+                    Ok(cube_ext::spawn(async move {
+                        compaction_service
+                            .compact_node_in_memory_chunks(node_name)
                             .await
                     }))
                 } else {
@@ -906,11 +1032,40 @@ impl JobRunner {
                     let table_id = *table_id;
                     let import_service = self.import_service.clone();
                     let location = location.to_string();
+                    let process_rate_limiter = self.process_rate_limiter.clone();
+                    let timeout = Some(Duration::from_secs(self.config_obj.import_job_timeout()));
+                    let metastore = self.meta_store.clone();
                     Ok(cube_ext::spawn(async move {
-                        import_service
+                        let is_streaming = Table::is_stream_location(&location);
+                        let data_loaded_size = if is_streaming {
+                            None
+                        } else {
+                            Some(DataLoadedSize::new())
+                        };
+                        if !is_streaming {
+                            process_rate_limiter
+                                .wait_for_allow(TaskType::Job, timeout)
+                                .await?; //TODO config, may be same ad orphaned timeout
+                        }
+                        let res = import_service
                             .clone()
-                            .import_table_part(table_id, &location)
-                            .await
+                            .import_table_part(table_id, &location, data_loaded_size.clone())
+                            .await;
+                        if let Some(data_loaded) = &data_loaded_size {
+                            let trace_obj = metastore.get_trace_obj_by_table_id(table_id).await?;
+                            let trace_index = TraceIndex {
+                                table_id: Some(table_id),
+                                trace_obj,
+                            };
+                            process_rate_limiter
+                                .commit_task_usage(
+                                    TaskType::Job,
+                                    data_loaded.get() as i64,
+                                    trace_index,
+                                )
+                                .await;
+                        }
+                        res
                     }))
                 } else {
                     Self::fail_job_row_key(job)
@@ -920,8 +1075,35 @@ impl JobRunner {
                 if let RowKey::Table(TableId::Chunks, chunk_id) = job.row_reference() {
                     let chunk_store = self.chunk_store.clone();
                     let chunk_id = *chunk_id;
+                    let process_rate_limiter = self.process_rate_limiter.clone();
+                    let timeout = Some(Duration::from_secs(self.config_obj.import_job_timeout()));
+                    let metastore = self.meta_store.clone();
                     Ok(cube_ext::spawn(async move {
-                        chunk_store.repartition_chunk(chunk_id).await
+                        process_rate_limiter
+                            .wait_for_allow(TaskType::Job, timeout)
+                            .await?; //TODO config, may be same ad orphaned timeout
+                        let chunk = metastore.get_chunk(chunk_id).await?;
+                        let (_, _, table, _) = metastore
+                            .get_partition_for_compaction(chunk.get_row().get_partition_id())
+                            .await?;
+                        let table_id = table.get_id();
+                        let trace_obj = metastore.get_trace_obj_by_table_id(table_id).await?;
+                        let trace_index = TraceIndex {
+                            table_id: Some(table_id),
+                            trace_obj,
+                        };
+                        let data_loaded_size = DataLoadedSize::new();
+                        let res = chunk_store
+                            .repartition_chunk(chunk_id, data_loaded_size.clone())
+                            .await;
+                        process_rate_limiter
+                            .commit_task_usage(
+                                TaskType::Job,
+                                data_loaded_size.get() as i64,
+                                trace_index,
+                            )
+                            .await;
+                        res
                     }))
                 } else {
                     Self::fail_job_row_key(job)
@@ -951,6 +1133,8 @@ impl ClusterImpl {
         query_executor: Arc<dyn QueryExecutor>,
         meta_store_sender: Sender<MetaStoreEvent>,
         cluster_transport: Arc<dyn ClusterTransport>,
+        tracing_helper: Arc<dyn TracingHelper>,
+        process_rate_limiter: Arc<dyn ProcessRateLimiter>,
     ) -> Arc<ClusterImpl> {
         let (close_worker_socket_tx, close_worker_socket_rx) = watch::channel(false);
         Arc::new_cyclic(|this| ClusterImpl {
@@ -963,6 +1147,7 @@ impl ClusterImpl {
             meta_store,
             cluster_transport,
             job_notify: Arc::new(Notify::new()),
+            long_running_job_notify: Arc::new(Notify::new()),
             meta_store_sender,
             #[cfg(not(target_os = "windows"))]
             select_process_pool: RwLock::new(None),
@@ -971,6 +1156,8 @@ impl ClusterImpl {
             stop_token: CancellationToken::new(),
             close_worker_socket_tx,
             close_worker_socket_rx: RwLock::new(close_worker_socket_rx),
+            tracing_helper,
+            process_rate_limiter,
         })
     }
 
@@ -1008,22 +1195,52 @@ impl ClusterImpl {
             ));
         }
 
-        for _ in 0..self.config_obj.job_runners_count() {
+        for i in
+            0..self.config_obj.job_runners_count() + self.config_obj.long_term_job_runners_count()
+        {
             // TODO number of job event loops
+            let is_long_running = i >= self.config_obj.job_runners_count();
             let job_runner = JobRunner {
                 config_obj: self.config_obj.clone(),
                 meta_store: self.meta_store.clone(),
                 chunk_store: self.injector.upgrade().unwrap().get_service_typed().await,
                 compaction_service: self.injector.upgrade().unwrap().get_service_typed().await,
                 import_service: self.injector.upgrade().unwrap().get_service_typed().await,
+                process_rate_limiter: self.process_rate_limiter.clone(),
                 server_name: self.server_name.clone(),
-                notify: self.job_notify.clone(),
+                notify: if is_long_running {
+                    self.long_running_job_notify.clone()
+                } else {
+                    self.job_notify.clone()
+                },
                 stop_token: self.stop_token.clone(),
+                is_long_term: is_long_running,
             };
             futures.push(cube_ext::spawn(async move {
                 job_runner.processing_loop().await;
             }));
         }
+        let process_rate_limiter = self.process_rate_limiter.clone();
+        futures.extend(process_rate_limiter.spawn_processing_loop().await);
+
+        let stop_token = self.stop_token.clone();
+        let long_running_job_notify = self.long_running_job_notify.clone();
+        let job_notify = self.job_notify.clone();
+
+        futures.push(cube_ext::spawn(async move {
+            loop {
+                tokio::select! {
+                    _ = stop_token.cancelled() => {
+                        return;
+                    }
+                    _ = Delay::new(Duration::from_secs(5)) => {
+                        job_notify.notify_one();
+                        long_running_job_notify.notify_one();
+                    }
+                };
+            }
+        }));
+
         join_all(futures)
             .await
             .into_iter()
@@ -1038,6 +1255,8 @@ impl ClusterImpl {
         if let Some(pool) = self.select_process_pool.read().await.as_ref() {
             pool.stop_workers().await?;
         }
+
+        self.process_rate_limiter.stop_processing_loops();
 
         self.close_worker_socket_tx.send(true)?;
         Ok(())
@@ -1205,11 +1424,41 @@ impl ClusterImpl {
         .await
     }
 
-    #[instrument(level = "trace", skip(self, plan_node))]
     async fn run_local_select_worker(
         &self,
         plan_node: SerializedPlan,
     ) -> Result<(SchemaRef, Vec<SerializedRecordBatchStream>), CubeError> {
+        self.process_rate_limiter
+            .wait_for_allow(
+                TaskType::Select,
+                Some(Duration::from_secs(self.config_obj.query_timeout())),
+            )
+            .await?;
+        let trace_index = TraceIndex {
+            table_id: None,
+            trace_obj: plan_node.trace_obj(),
+        };
+        let res = self.run_local_select_worker_impl(plan_node).await;
+        match res {
+            Ok((schema, records, data_loaded_size)) => {
+                self.process_rate_limiter
+                    .commit_task_usage(TaskType::Select, data_loaded_size as i64, trace_index)
+                    .await;
+                Ok((schema, records))
+            }
+            Err(e) => {
+                self.process_rate_limiter
+                    .commit_task_usage(TaskType::Select, 0, trace_index)
+                    .await;
+                Err(e)
+            }
+        }
+    }
+    #[instrument(level = "trace", skip(self, plan_node))]
+    async fn run_local_select_worker_impl(
+        &self,
+        plan_node: SerializedPlan,
+    ) -> Result<(SchemaRef, Vec<SerializedRecordBatchStream>, usize), CubeError> {
         let start = SystemTime::now();
         debug!("Running select");
         let remote_to_local_names = self.warmup_select_worker_files(&plan_node).await?;
@@ -1228,13 +1477,21 @@ impl ClusterImpl {
         let in_memory_chunks_to_load = plan_node.in_memory_chunks_to_load();
         let in_memory_chunks_futures = in_memory_chunks_to_load
             .iter()
-            .map(|c| chunk_store.get_chunk_columns(c.clone()))
+            .map(|(c, p, i)| {
+                chunk_store
+                    .get_chunk_columns_with_preloaded_meta(c.clone(), p.clone(), i.clone())
+                    .instrument(tracing::span!(
+                        tracing::Level::TRACE,
+                        "get in memory chunk columns",
+                        row_count = c.get_row().get_row_count()
+                    ))
+            })
             .collect::<Vec<_>>();
 
         let chunk_id_to_record_batches = in_memory_chunks_to_load
             .clone()
             .into_iter()
-            .map(|c| c.get_id())
+            .map(|(c, _, _)| c.get_id())
             .zip(
                 join_all(in_memory_chunks_futures)
                     .await
@@ -1247,8 +1504,22 @@ impl ClusterImpl {
         let mut res = None;
         #[cfg(not(target_os = "windows"))]
         {
-            if let Some(pool) = self.select_process_pool.read().await.clone() {
-                let chunk_id_to_record_batches = chunk_id_to_record_batches
+            if let Some(pool) = self
+                .select_process_pool
+                .read()
+                .instrument(tracing::span!(
+                    tracing::Level::TRACE,
+                    "awaiting process_pool lock"
+                ))
+                .await
+                .clone()
+            {
+                let span = tracing::span!(
+                    tracing::Level::TRACE,
+                    "Serialize chunks into SerializedRecordBatchStream"
+                );
+                let chunk_id_to_record_batches = span.in_scope(|| {
+                    chunk_id_to_record_batches
                     .iter()
                     .map(
                         |(id, b)| -> Result<(u64, Vec<SerializedRecordBatchStream>), CubeError> {
@@ -1261,12 +1532,14 @@ impl ClusterImpl {
                             ))
                         },
                     )
-                    .collect::<Result<HashMap<_, _>, _>>()?;
+                    .collect::<Result<HashMap<_, _>, _>>()
+                })?;
                 res = Some(
                     pool.process(WorkerMessage::Select(
                         plan_node.clone(),
                         remote_to_local_names.clone(),
                         chunk_id_to_record_batches,
+                        self.tracing_helper.trace_and_span_id(),
                     ))
                     .instrument(tracing::span!(
                         tracing::Level::TRACE,
@@ -1279,7 +1552,7 @@ impl ClusterImpl {
 
         if res.is_none() {
             // TODO optimize for no double conversion
-            let (schema, records) = self
+            let (schema, records, data_loaded_size) = self
                 .query_executor
                 .execute_worker_plan(
                     plan_node.clone(),
@@ -1288,7 +1561,7 @@ impl ClusterImpl {
                 )
                 .await?;
             let records = SerializedRecordBatchStream::write(schema.as_ref(), records);
-            res = Some(Ok((schema, records?)))
+            res = Some(Ok((schema, records?, data_loaded_size)))
         }
 
         info!("Running select completed ({:?})", start.elapsed()?);
@@ -1304,7 +1577,7 @@ impl ClusterImpl {
         let chunk_id_to_record_batches = in_memory_chunks_to_load
             .clone()
             .into_iter()
-            .map(|c| (c.get_id(), Vec::new()))
+            .map(|(c, _, _)| (c.get_id(), Vec::new()))
             .collect();
 
         let res = self
@@ -1322,14 +1595,20 @@ impl ClusterImpl {
         let to_download = plan_node.files_to_download();
         let file_futures = to_download
             .iter()
-            .map(|(partition, remote, file_size)| {
+            .map(|(partition, remote, file_size, chunk_id)| {
                 let meta_store = self.meta_store.clone();
                 async move {
                     let res = self
                         .remote_fs
                         .download_file(remote, file_size.clone())
                         .await;
-                    deactivate_table_on_corrupt_data(meta_store, &res, &partition).await;
+                    deactivate_table_on_corrupt_data(
+                        meta_store,
+                        &res,
+                        &partition,
+                        chunk_id.clone(),
+                    )
+                    .await;
                     res
                 }
             })
@@ -1346,10 +1625,25 @@ impl ClusterImpl {
                     .collect::<Result<Vec<_>, _>>()?
                     .into_iter(),
             )
-            .map(|((_, remote_path, _), path)| (remote_path, path))
+            .map(|((_, remote_path, _, _), path)| (remote_path, path))
             .collect::<HashMap<_, _>>();
 
         Ok(remote_to_local_names)
+    }
+
+    async fn warmup_download_with_corruption_check(
+        &self,
+        node_name: &str,
+        remote_path: String,
+        expected_file_size: Option<u64>,
+        partition: &IdRow<Partition>,
+        chunk_id: Option<u64>,
+    ) -> Result<(), CubeError> {
+        let res = self
+            .warmup_download(&node_name, remote_path, expected_file_size)
+            .await;
+        deactivate_table_on_corrupt_data(self.meta_store.clone(), &res, partition, chunk_id).await;
+        res
     }
 
     pub async fn try_to_connect(&mut self) -> Result<(), CubeError> {
@@ -1587,7 +1881,8 @@ impl ClusterImpl {
                         c.get_row().file_size(),
                     )
                     .await;
-                deactivate_table_on_corrupt_data(self.meta_store.clone(), &result, &p).await;
+                // TODO: propagate 'not found' and log in debug mode. Compaction might remove files,
+                //       so they are not errors most of the time.
                 ack_error!(result);
             }
         }
@@ -1678,6 +1973,13 @@ fn is_self_reference(name: &str) -> bool {
     name.starts_with("@loop:")
 }
 
+pub fn node_name_by_partition<'a>(config: &'a dyn ConfigObj, p: &IdRow<Partition>) -> String {
+    if let Some(id) = p.get_row().multi_partition_id() {
+        pick_worker_by_ids(config, [id]).to_string()
+    } else {
+        pick_worker_by_partitions(config, [p]).to_string()
+    }
+}
 /// Picks a worker by opaque id for any distributing work in a cluster.
 /// Ids usually come from multi-partitions of the metastore.
 pub fn pick_worker_by_ids<'a>(

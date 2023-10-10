@@ -246,7 +246,7 @@ describe('PreAggregations', () => {
 
     test('fail if rollup doesn\'t already exist', async () => {
       await expect(preAggregations.loadAllPreAggregationsIfNeeded(basicQuery))
-        .rejects.toThrowError(/Your configuration restricts query requests to only be served from pre-aggregations/);
+        .rejects.toThrowError(/No pre-aggregation partitions were built yet/);
     });
   });
 

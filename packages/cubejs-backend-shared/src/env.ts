@@ -1,6 +1,7 @@
 /* eslint-disable no-restricted-syntax */
 import { get } from 'env-var';
 import { displayCLIWarning } from './cli';
+import { isNativeSupported } from './platform';
 
 export class InvalidConfiguration extends Error {
   public constructor(key: string, value: any, description: string) {
@@ -45,17 +46,11 @@ export function asPortNumber(input: number, envName: string) {
 }
 
 /**
- * Multiple data sources cache.
- */
-let dataSourcesCache: string[];
-
-/**
  * Determines whether multiple data sources were declared or not.
  */
 function isMultipleDataSources(): boolean {
   // eslint-disable-next-line no-use-before-define
-  dataSourcesCache = dataSourcesCache || getEnv('dataSources');
-  return dataSourcesCache.length > 0;
+  return getEnv('dataSources').length > 0;
 }
 
 /**
@@ -66,7 +61,8 @@ function isMultipleDataSources(): boolean {
 export function assertDataSource(dataSource = 'default'): string {
   if (!isMultipleDataSources()) {
     return dataSource;
-  } else if (dataSourcesCache.indexOf(dataSource) >= 0) {
+    // eslint-disable-next-line no-use-before-define
+  } else if (getEnv('dataSources').indexOf(dataSource) >= 0) {
     return dataSource;
   } else {
     throw new Error(
@@ -155,6 +151,9 @@ const variables: Record<string, (...args: any) => any> = {
   rollupOnlyMode: () => get('CUBEJS_ROLLUP_ONLY')
     .default('false')
     .asBoolStrict(),
+  schemaPath: () => get('CUBEJS_SCHEMA_PATH')
+    .default('schema')
+    .asString(),
   refreshWorkerMode: () => {
     const refreshWorkerMode = get('CUBEJS_REFRESH_WORKER').asBool();
     if (refreshWorkerMode !== undefined) {
@@ -180,7 +179,11 @@ const variables: Record<string, (...args: any) => any> = {
     .asIntPositive(),
   dockerImageVersion: () => get('CUBEJS_DOCKER_IMAGE_VERSION')
     .asString(),
-  concurrency: () => get('CUBEJS_CONCURRENCY').asInt(),
+  concurrency: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => get(keyByDataSource('CUBEJS_CONCURRENCY', dataSource)).asInt(),
   // It's only excepted for CI, nothing else.
   internalExceptions: () => get('INTERNAL_EXCEPTIONS_YOU_WILL_BE_FIRED')
     .default('false')
@@ -189,6 +192,9 @@ const variables: Record<string, (...args: any) => any> = {
     .asString(),
   maxPartitionsPerCube: () => get('CUBEJS_MAX_PARTITIONS_PER_CUBE')
     .default('10000')
+    .asInt(),
+  scheduledRefreshBatchSize: () => get('CUBEJS_SCHEDULED_REFRESH_BATCH_SIZE')
+    .default('1')
     .asInt(),
 
   /** ****************************************************************
@@ -292,6 +298,44 @@ const variables: Record<string, (...args: any) => any> = {
   ),
 
   /**
+   * Kafka host for direct downloads from ksqlDb
+   */
+  dbKafkaHost: ({ dataSource }: {
+    dataSource: string,
+  }) => (
+    process.env[keyByDataSource('CUBEJS_DB_KAFKA_HOST', dataSource)]
+  ),
+
+  /**
+   * Kafka user for direct downloads from ksqlDb
+   */
+  dbKafkaUser: ({ dataSource }: {
+    dataSource: string,
+  }) => (
+    process.env[keyByDataSource('CUBEJS_DB_KAFKA_USER', dataSource)]
+  ),
+
+  /**
+   * Kafka password for direct downloads from ksqlDb
+   */
+  dbKafkaPass: ({ dataSource }: {
+    dataSource: string,
+  }) => (
+    process.env[keyByDataSource('CUBEJS_DB_KAFKA_PASS', dataSource)]
+  ),
+
+  /**
+   * `true` if Kafka should use SASL_SSL for direct downloads from ksqlDb
+   */
+  dbKafkaUseSsl: ({ dataSource }: {
+    dataSource: string,
+  }) => (
+    get(keyByDataSource('CUBEJS_DB_KAFKA_USE_SSL', dataSource))
+      .default('false')
+      .asBool()
+  ),
+
+  /**
    * Database domain.
    */
   dbDomain: ({
@@ -352,7 +396,7 @@ const variables: Record<string, (...args: any) => any> = {
   }) => (
     process.env[keyByDataSource('CUBEJS_DB_PASS', dataSource)]
   ),
-  
+
   /**
    * Database name.
    */
@@ -375,7 +419,7 @@ const variables: Record<string, (...args: any) => any> = {
     }
     return val;
   },
-  
+
   /**
    * Database name.
    * @deprecated
@@ -406,7 +450,7 @@ const variables: Record<string, (...args: any) => any> = {
     }
     return val;
   },
-  
+
   /**
    * Database name.
    * @deprecated
@@ -508,6 +552,52 @@ const variables: Record<string, (...args: any) => any> = {
     return convertTimeStrToMs(value, key);
   },
 
+  /**
+   * Max limit which can be specified in the incoming query.
+   */
+  dbQueryLimit: (): number => get('CUBEJS_DB_QUERY_LIMIT')
+    .default(50000)
+    .asInt(),
+
+  /**
+   * Query limit wich will be used in the query to the data source if
+   * limit property was not specified in the query.
+   */
+  dbQueryDefaultLimit: (): number => get('CUBEJS_DB_QUERY_DEFAULT_LIMIT')
+    .default(10000)
+    .asInt(),
+
+  /**
+   * Query stream `highWaterMark` value.
+   */
+  dbQueryStreamHighWaterMark: (): number => get('CUBEJS_DB_QUERY_STREAM_HIGH_WATER_MARK')
+    .default(8192)
+    .asInt(),
+
+  /**
+   * Expire time for touch records
+   */
+  touchPreAggregationTimeout: (): number => get('CUBEJS_TOUCH_PRE_AGG_TIMEOUT')
+    .default(60 * 60 * 24)
+    .asInt(),
+
+  /**
+   * Expire time for touch records
+   */
+  dropPreAggregationsWithoutTouch: (): boolean => get('CUBEJS_DROP_PRE_AGG_WITHOUT_TOUCH')
+    .default('true')
+    .asBoolStrict(),
+
+  /**
+   * Fetch Columns by Ordinal Position
+   *
+   * Currently defaults to 'false' as changing this in a live deployment could break existing pre-aggregations.
+   * This will eventually default to true.
+   */
+  fetchColumnsByOrdinalPosition: (): boolean => get('CUBEJS_DB_FETCH_COLUMNS_BY_ORDINAL_POSITION')
+    .default('false')
+    .asBoolStrict(),
+
   /** ****************************************************************
    * JDBC options                                                    *
    ***************************************************************** */
@@ -537,7 +627,18 @@ const variables: Record<string, (...args: any) => any> = {
   /** ****************************************************************
    * Export Bucket options                                           *
    ***************************************************************** */
-  
+
+  /**
+   * Export bucket CSV escape symbol.
+   */
+  dbExportBucketCsvEscapeSymbol: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[keyByDataSource('CUBEJS_DB_EXPORT_BUCKET_CSV_ESCAPE_SYMBOL', dataSource)]
+  ),
+
   /**
    * Export bucket storage type.
    */
@@ -679,6 +780,14 @@ const variables: Record<string, (...args: any) => any> = {
    ***************************************************************** */
 
   /**
+   * Accept Databricks policy flag. This environment variable doesn't
+   * need to be split by the data source.
+   */
+  databrickAcceptPolicy: () => (
+    get('CUBEJS_DB_DATABRICKS_ACCEPT_POLICY').asBoolStrict()
+  ),
+
+  /**
    * Databricks jdbc-connection url.
    */
   databrickUrl: ({
@@ -703,7 +812,7 @@ const variables: Record<string, (...args: any) => any> = {
    * Databricks jdbc-connection token.
    */
   databrickToken: ({
-    dataSource
+    dataSource,
   }: {
     dataSource: string,
   }) => (
@@ -713,12 +822,16 @@ const variables: Record<string, (...args: any) => any> = {
   ),
 
   /**
-   * Accept Databricks policy flag. This environment variable doesn't
-   * need to be split by the data source.
+   * Databricks catalog name.
+   * https://www.databricks.com/product/unity-catalog
    */
-  databrickAcceptPolicy: () => (
-    get('CUBEJS_DB_DATABRICKS_ACCEPT_POLICY').asBoolStrict()
-  ),
+  databricksCatalog: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => process.env[
+    keyByDataSource('CUBEJS_DB_DATABRICKS_CATALOG', dataSource)
+  ],
 
   /** ****************************************************************
    * Athena Driver                                                   *
@@ -785,6 +898,20 @@ const variables: Record<string, (...args: any) => any> = {
     // TODO (buntarb): Deprecate and replace?
     process.env[
       keyByDataSource('CUBEJS_AWS_ATHENA_WORKGROUP', dataSource)
+    ]
+  ),
+
+  /**
+   * Athena AWS Catalog.
+   */
+  athenaAwsCatalog: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    // TODO (buntarb): Deprecate and replace?
+    process.env[
+      keyByDataSource('CUBEJS_AWS_ATHENA_CATALOG', dataSource)
     ]
   ),
 
@@ -1161,7 +1288,7 @@ const variables: Record<string, (...args: any) => any> = {
         );
       }
     } else {
-      return undefined;
+      return true;
     }
   },
 
@@ -1238,6 +1365,80 @@ const variables: Record<string, (...args: any) => any> = {
     ];
   },
 
+  /** ****************************************************************
+   * duckdb                                                         *
+   ***************************************************************** */
+
+  duckdbMotherDuckToken: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_DUCKDB_MOTHERDUCK_TOKEN', dataSource)
+    ]
+  ),
+  
+  duckdbS3Region: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_DUCKDB_S3_REGION', dataSource)
+    ]
+  ),
+  
+  duckdbS3AccessKeyId: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_DUCKDB_S3_ACCESS_KEY_ID', dataSource)
+    ]
+  ),
+  
+  duckdbS3SecretAccessKeyId: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_DUCKDB_S3_SECRET_ACCESS_KEY', dataSource)
+    ]
+  ),
+  
+  duckdbS3Endpoint: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_DUCKDB_S3_ENDPOINT', dataSource)
+    ]
+  ),
+
+  duckdbMemoryLimit: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_DUCKDB_MEMORY_LIMIT', dataSource)
+    ]
+  ),
+
+  duckdbSchema: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_DUCKDB_SCHEMA', dataSource)
+    ]
+  ),
+
   /**
    * Presto catalog.
    */
@@ -1263,6 +1464,12 @@ const variables: Record<string, (...args: any) => any> = {
     .asString(),
   cubeStorePass: () => get('CUBEJS_CUBESTORE_PASS')
     .asString(),
+  cubeStoreMaxConnectRetries: () => get('CUBEJS_CUBESTORE_MAX_CONNECT_RETRIES')
+    .default('10')
+    .asInt(),
+  cubeStoreNoHeartBeatTimeout: () => get('CUBEJS_CUBESTORE_NO_HEART_BEAT_TIMEOUT')
+    .default('30')
+    .asInt(),
 
   // Redis
   redisPoolMin: () => get('CUBEJS_REDIS_POOL_MIN')
@@ -1274,6 +1481,9 @@ const variables: Record<string, (...args: any) => any> = {
   redisUseIORedis: () => get('CUBEJS_REDIS_USE_IOREDIS')
     .default('false')
     .asBoolStrict(),
+  redisAcquireTimeout: () => get('CUBEJS_REDIS_ACQUIRE_TIMEOUT')
+    .default('5000')
+    .asInt(),
   allowUngroupedWithoutPrimaryKey: () => get('CUBEJS_ALLOW_UNGROUPED_WITHOUT_PRIMARY_KEY')
     .default('false')
     .asBoolStrict(),
@@ -1344,6 +1554,8 @@ const variables: Record<string, (...args: any) => any> = {
     .asString(),
   cacheAndQueueDriver: () => get('CUBEJS_CACHE_AND_QUEUE_DRIVER')
     .asString(),
+  defaultApiScope: () => get('CUBEJS_DEFAULT_API_SCOPES')
+    .asArray(','),
   jwkUrl: () => get('CUBEJS_JWK_URL')
     .asString(),
   jwtKey: () => get('CUBEJS_JWT_KEY')
@@ -1386,9 +1598,29 @@ const variables: Record<string, (...args: any) => any> = {
     return undefined;
   },
   pgSqlPort: () => {
+    if (process.env.CUBEJS_PG_SQL_PORT === 'false') {
+      return undefined;
+    }
+    
     const port = asFalseOrPort(process.env.CUBEJS_PG_SQL_PORT || 'false', 'CUBEJS_PG_SQL_PORT');
     if (port) {
       return port;
+    }
+
+    const isDevMode = get('CUBEJS_DEV_MODE')
+      .default('false')
+      .asBoolStrict();
+
+    if (isDevMode) {
+      if (isNativeSupported()) {
+        return 15432;
+      } else {
+        displayCLIWarning(
+          'Native module is not supported on your platform. Please use official docker image as a recommended way'
+        );
+
+        return false;
+      }
     }
 
     return undefined;
@@ -1428,7 +1660,8 @@ const variables: Record<string, (...args: any) => any> = {
     .asInt(),
   maxSourceRowLimit: () => get('CUBEJS_MAX_SOURCE_ROW_LIMIT')
     .default(200000)
-    .asInt()
+    .asInt(),
+  convertTzForRawTimeDimension: () => get('CUBESQL_SQL_PUSH_DOWN').default('false').asBoolStrict(),
 };
 
 type Vars = typeof variables;

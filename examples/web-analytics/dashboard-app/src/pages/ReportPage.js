@@ -8,8 +8,8 @@ import SegmentsDialog from "../components/SegmentsDialog";
 
 import { getUserPreference, setUserPreference } from "../utils.js";
 
-const DEFAULT_BEGIN_DATE = moment().subtract(7, 'days');
-const DEFAULT_END_DATE = moment();
+const DEFAULT_BEGIN_DATE = moment('2020-01-01');
+const DEFAULT_END_DATE = moment('2021-05-01');
 
 // TODO: that should be dynamic and loaded from Cube.js schema
 const segments = [
@@ -21,16 +21,16 @@ const segments = [
 ];
 
 const getDateRange = () => {
-  const savedDateRange = getUserPreference('daterange');
+  return [
+    DEFAULT_BEGIN_DATE,
+    DEFAULT_END_DATE
+  ];
+  // const savedDateRange = getUserPreference('daterange');
 
-  if (savedDateRange) {
-    return savedDateRange.map(date => moment(date));
-  } else {
-    return [
-      DEFAULT_BEGIN_DATE,
-      DEFAULT_END_DATE
-    ]
-  }
+  // if (savedDateRange) {
+  //   return savedDateRange.map(date => moment(date));
+  // } else {
+  // }
 };
 
 const withTimeFunc = ({ query, ...vizState }, begin, end, segment) => {

@@ -9,7 +9,7 @@ scan the `docs/content/` folder and generate a static HTML site.
 
 [link-gatsby]: https://www.gatsbyjs.com/
 [link-docs-live]: https://cube.dev/docs
-[link-docs-content]: https://github.com/cube-js/cube.js/tree/master/docs/content
+[link-docs-content]: https://github.com/cube-js/cube/tree/master/docs/content
 
 ## Development
 

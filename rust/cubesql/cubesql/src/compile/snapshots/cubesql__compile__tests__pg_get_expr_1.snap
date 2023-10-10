@@ -5,20 +5,29 @@ expression: "execute_query(\"\n                SELECT\n                    attre
 +----------+--------------------+---------+
 | attrelid | attname            | default |
 +----------+--------------------+---------+
+| 18000    | __cubeJoinField    | NULL    |
 | 18000    | __user             | NULL    |
 | 18000    | avgPrice           | NULL    |
 | 18000    | count              | NULL    |
+| 18000    | countDistinct      | NULL    |
 | 18000    | customer_gender    | NULL    |
 | 18000    | has_subscription   | NULL    |
 | 18000    | is_female          | NULL    |
 | 18000    | is_male            | NULL    |
+| 18000    | last_mod           | NULL    |
 | 18000    | maxPrice           | NULL    |
 | 18000    | minPrice           | NULL    |
+| 18000    | notes              | NULL    |
 | 18000    | order_date         | NULL    |
 | 18000    | taxful_total_price | NULL    |
-| 18014    | __user             | NULL    |
-| 18014    | agentCount         | NULL    |
-| 18014    | agentCountApprox   | NULL    |
-| 18020    | __user             | NULL    |
-| 18020    | someNumber         | NULL    |
+| 18018    | __cubeJoinField    | NULL    |
+| 18018    | __user             | NULL    |
+| 18018    | agentCount         | NULL    |
+| 18018    | agentCountApprox   | NULL    |
+| 18018    | content            | NULL    |
+| 18018    | id                 | NULL    |
+| 18018    | read               | NULL    |
+| 18028    | __cubeJoinField    | NULL    |
+| 18028    | __user             | NULL    |
+| 18028    | someNumber         | NULL    |
 +----------+--------------------+---------+

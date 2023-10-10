@@ -11,7 +11,7 @@ permalink: /config/databases/databricks/jdbc
 
 ## Setup
 
-### Manual
+### <--{"id" : "Setup"}--> Environment Variables
 
 Add the following to a `.env` file in your Cube project:
 
@@ -20,29 +20,50 @@ CUBEJS_DB_TYPE=databricks-jdbc
 # CUBEJS_DB_NAME is optional
 CUBEJS_DB_NAME=default
 # You can find this inside the cluster's configuration
-CUBEJS_DB_DATABRICKS_URL=jdbc:spark://dbc-XXXXXXX-XXXX.cloud.databricks.com:443/default;transportMode=http;ssl=1;httpPath=sql/protocolv1/o/XXXXX/XXXXX;AuthMech=3;UID=token
+CUBEJS_DB_DATABRICKS_URL=jdbc:databricks://dbc-XXXXXXX-XXXX.cloud.databricks.com:443/default;transportMode=http;ssl=1;httpPath=sql/protocolv1/o/XXXXX/XXXXX;AuthMech=3;UID=token
 # You can specify the personal access token separately from `CUBEJS_DB_DATABRICKS_URL` by doing this:
 CUBEJS_DB_DATABRICKS_TOKEN=XXXXX
+# This accepts the Databricks usage policy and must be set to `true` to use the Databricks JDBC driver
+CUBEJS_DB_DATABRICKS_ACCEPT_POLICY=true
+```
+
+### <--{"id" : "Setup"}--> Docker
+
+Create a `.env` file [as above](#setup-environment-variables), then extend the
+`cubejs/cube:jdk` Docker image tag to build a Cube image with the JDBC driver:
+
+```dockerfile
+FROM cubejs/cube:jdk
+
+COPY . .
+RUN npm install
+```
+
+You can then build and run the image using the following commands:
+
+```bash{promptUser: user}
+docker build -t cubejs-jdk .
+docker run -it -p 4000:4000 --env-file=.env cubejs-jdk
 ```
 
 ## Environment Variables
 
-| Environment Variable                 | Description                                                                                     | Possible Values       | Required |
-| ------------------------------------ | ----------------------------------------------------------------------------------------------- | --------------------- | :------: |
-| `CUBEJS_DB_NAME`                     | The name of the database to connect to                                                          | A valid database name |    ✅    |
-| `CUBEJS_DB_DATABRICKS_URL`           | The URL for a JDBC connection                                                                   | A valid JDBC URL      |    ✅    |
-| `CUBEJS_DB_DATABRICKS_ACCEPT_POLICY` | Whether or not to accept the license terms for the Databricks JDBC driver                       | `true`, `false`       |    ✅    |
-| `CUBEJS_DB_DATABRICKS_TOKEN`         | The [personal access token][databricks-docs-pat] used to authenticate the Databricks connection        | A valid token             |    ✅    |
-| `CUBEJS_DB_EXPORT_BUCKET_MOUNT_DIR`  | The path for the [Databricks DBFS mount][databricks-docs-dbfs]                                  | A valid mount path    |    ❌    |
-| `CUBEJS_CONCURRENCY`                 | The number of concurrent connections each queue has to the database. Default is `2`             | A valid number        |    ❌    |
-| `CUBEJS_DB_MAX_POOL`                 | The maximum number of concurrent database connections to pool. Default is `8`                   | A valid number        |    ❌    |
+| Environment Variable                 | Description                                                                                     | Possible Values       | Required | [Supports multiple data sources?][ref-config-multiple-ds-decorating-env] |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------- | --------------------- | :------: | :----------------------------------------------------------------------: |
+| `CUBEJS_DB_NAME`                     | The name of the database to connect to                                                          | A valid database name |    ✅    |                                    ✅                                    |
+| `CUBEJS_DB_DATABRICKS_URL`           | The URL for a JDBC connection                                                                   | A valid JDBC URL      |    ✅    |                                    ✅                                    |
+| `CUBEJS_DB_DATABRICKS_ACCEPT_POLICY` | Whether or not to accept the license terms for the Databricks JDBC driver                       | `true`, `false`       |    ✅    |                                    ✅                                    |
+| `CUBEJS_DB_DATABRICKS_TOKEN`         | The [personal access token][databricks-docs-pat] used to authenticate the Databricks connection | A valid token         |    ✅    |                                    ✅                                    |
+| `CUBEJS_DB_EXPORT_BUCKET_MOUNT_DIR`  | The path for the [Databricks DBFS mount][databricks-docs-dbfs]                                  | A valid mount path    |    ❌    |                                    ✅                                    |
+| `CUBEJS_CONCURRENCY`                 | The number of concurrent connections each queue has to the database. Default is `2`             | A valid number        |    ❌    |                                    ❌                                    |
+| `CUBEJS_DB_MAX_POOL`                 | The maximum number of concurrent database connections to pool. Default is `8`                   | A valid number        |    ❌    |                                    ✅                                    |
 
 ## Pre-Aggregation Feature Support
 
-### countDistinctApprox
+### count_distinct_approx
 
 Measures of type
-[`countDistinctApprox`][ref-schema-ref-types-formats-countdistinctapprox] can
+[`count_distinct_approx`][ref-schema-ref-types-formats-countdistinctapprox] can
 not be used in pre-aggregations when using Databricks as a data source.
 
 ## Pre-Aggregation Build Strategies
@@ -134,10 +155,12 @@ bucket][self-preaggs-export-bucket] **must be** configured.
 [databricks-docs-pat]:
   https://docs.databricks.com/dev-tools/api/latest/authentication.html#token-management
 [gh-cubejs-jdbc-install]:
-  https://github.com/cube-js/cube.js/blob/master/packages/cubejs-jdbc-driver/README.md#java-installation
+  https://github.com/cube-js/cube/blob/master/packages/cubejs-jdbc-driver/README.md#java-installation
 [ref-caching-large-preaggs]: /caching/using-pre-aggregations#export-bucket
 [ref-caching-using-preaggs-build-strats]:
   /caching/using-pre-aggregations#pre-aggregation-build-strategies
+[ref-config-multiple-ds-decorating-env]:
+  /config/multiple-data-sources#configuring-data-sources-with-environment-variables-decorated-environment-variables
 [ref-schema-ref-types-formats-countdistinctapprox]:
   /schema/reference/types-and-formats#count-distinct-approx
 [self-preaggs-simple]: #simple

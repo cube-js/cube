@@ -1,5 +1,5 @@
 use bitflags::bitflags;
-use datafusion::arrow::datatypes::{DataType, Field, IntervalUnit};
+use datafusion::arrow::datatypes::{DataType, Field, IntervalUnit, TimeUnit};
 use msql_srv::{
     ColumnFlags as MysqlColumnFlags, ColumnType as MysqlColumnType, StatusFlags as MysqlStatusFlags,
 };
@@ -79,6 +79,30 @@ impl ColumnType {
             ColumnType::Interval(IntervalUnit::MonthDayNano) | ColumnType::Decimal(_, _) => 16,
             ColumnType::String | ColumnType::VarStr => 64,
             ColumnType::Blob | ColumnType::List(_) => 128,
+        }
+    }
+
+    pub fn to_arrow(&self) -> DataType {
+        match self {
+            ColumnType::Date(large) => {
+                if *large {
+                    DataType::Date64
+                } else {
+                    DataType::Date32
+                }
+            }
+            ColumnType::Interval(unit) => DataType::Interval(unit.clone()),
+            ColumnType::String => DataType::Utf8,
+            ColumnType::VarStr => DataType::Utf8,
+            ColumnType::Boolean => DataType::Boolean,
+            ColumnType::Double => DataType::Float64,
+            ColumnType::Int8 => DataType::Int64,
+            ColumnType::Int32 => DataType::Int64,
+            ColumnType::Int64 => DataType::Int64,
+            ColumnType::Blob => DataType::Utf8,
+            ColumnType::Decimal(p, s) => DataType::Decimal(*p, *s),
+            ColumnType::List(field) => DataType::List(field.clone()),
+            ColumnType::Timestamp => DataType::Timestamp(TimeUnit::Millisecond, None),
         }
     }
 }

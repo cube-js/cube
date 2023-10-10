@@ -1,0 +1,132 @@
+query CubeQuery {
+  cube {
+    orders {
+      count
+      createdAt {
+        day
+      }
+    }
+  }
+}
+
+query CubeQuery {
+  cube(where: { orders: { status: { equals: "shipped" } } }) {
+    orders {
+      count
+      createdAt {
+        day
+      }
+    }
+  }
+}
+
+query CubeQuery {
+  cube(
+    where: {
+      orders: { createdAt: { inDateRange: ["2022-01-01", "2022-02-01"] } }
+    }
+  ) {
+    orders(orderBy: { createdAt: asc }) {
+      count
+      createdAt {
+        value
+      }
+    }
+  }
+}
+
+query CubeQuery {
+  cube(
+    where: {
+      orders: { createdAt: { inDateRange: ["2022-01-01", "2022-02-01"] } }
+    }
+  ) {
+    orders(orderBy: { createdAt: asc }) {
+      count
+      createdAt {
+        day
+      }
+    }
+  }
+}
+
+query CubeQuery {
+  cube(where: { orders: { createdAt: { inDateRange: "This month" } } }) {
+    orders {
+      count
+      createdAt {
+        value
+      }
+    }
+  }
+}
+
+query CubeQuery {
+  cube(where: { orders: { createdAt: { inDateRange: "This month" } } }) {
+    orders {
+      count
+      createdAt {
+        day
+      }
+    }
+  }
+}
+
+query CubeQuery {
+  cube(where: { orders: { createdAt: { inDateRange: "2 weeks ago to now" } } }) {
+    orders {
+      count
+      createdAt {
+        day
+      }
+    }
+  }
+}
+
+query CubeQuery {
+  cube(
+    where: {
+      orders: { createdAt: { notInDateRange: ["2022-01-01", "2022-02-01"] } }
+    }
+  ) {
+    orders {
+      count
+      createdAt {
+        day
+      }
+    }
+  }
+}
+
+query CubeQuery {
+  cube {
+    orders(orderBy: { count: desc, status: asc }) {
+      count
+      status
+      createdAt {
+        value
+      }
+    }
+    users(orderBy: { city: desc }) {
+      city
+    }
+  }
+}
+
+query CubeQuery {
+  cube(
+    where: {
+      orders: { status: { in: ["canceled", "active"] } }
+      OR: [
+        {
+          users: { OR: [{ city: { set: false } }, { city: { equals: "US" } }] }
+        }
+      ]
+    }
+  ) {
+    orders {
+      count
+      status
+    }
+  }
+}

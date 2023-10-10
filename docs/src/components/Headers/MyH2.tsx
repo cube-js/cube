@@ -1,5 +1,9 @@
 import React from 'react';
-import kebabCase from 'lodash/kebabCase';
 
-const MyH2 = (props) => <h2 name={kebabCase(props.children)} {...props} />;
+import { getHashFromContent } from './getHashFromContent';
+
+const MyH2 = (props) => {
+  const hash = getHashFromContent(props.children);
+  return (<h2 name={hash} {...props} />);
+}
 export default MyH2;

@@ -81,6 +81,10 @@ pre[class*="language-"] {
   color: $dark-04;
 }
 
+.token.punctuation + * {
+  color: $dark-04;
+}
+
 .namespace {
   opacity: .7;
 }
@@ -123,11 +127,9 @@ pre[class*="language-"] {
   font-weight: 500;
 }
 
+.token.key.atrule,
 .token.function,
-.token.class-name {
-  color: $pink-02;
-}
-
+.token.class-name,
 .token.regex,
 .token.important,
 .token.variable {
@@ -147,3 +149,41 @@ pre[class*="language-"] {
   cursor: help;
 }
 
+.language-tree {
+  > .token.entry-dir {
+    color: $purple-02;
+  }
+
+  > .token.entry-name {
+    color: $pink-02;
+  }
+}
+
+.language-bash {
+
+  > .command-line-prompt {
+    border-right: none;
+    margin-right: 0;
+  }
+
+  > .command-line-prompt > span:before {
+    color: #999;
+    content: " ";
+    display: block;
+    padding-right: 0.8em;
+  }
+
+  /* Prompt for all users */
+  > .command-line-prompt > span[data-user]:before {
+    content: "$";
+  }
+
+  /* Prompt for root */
+  > .command-line-prompt > span[data-user="root"]:before {
+    content: "#";
+  }
+
+  > .command-line-prompt > span[data-prompt]:before {
+    content: attr(data-prompt);
+  }
+}

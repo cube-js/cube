@@ -39,6 +39,14 @@ type LogicalOrFilter = {
   or: (QueryFilter | LogicalAndFilter)[]
 };
 
+type MemberExpression = {
+  expression: Function;
+  cubeName: string;
+  name: string;
+  expressionName: string;
+  definition: string;
+};
+
 /**
  * Query datetime dimention interface.
  */
@@ -52,8 +60,8 @@ interface QueryTimeDimension {
  * Incoming network query data type.
  */
 interface Query {
-  measures: Member[];
-  dimensions?: (Member | TimeMember)[];
+  measures: (Member | MemberExpression)[];
+  dimensions?: (Member | TimeMember | MemberExpression)[];
   filters?: (QueryFilter | LogicalAndFilter | LogicalOrFilter)[];
   timeDimensions?: QueryTimeDimension[];
   segments?: Member[];
@@ -61,7 +69,7 @@ interface Query {
   offset?: number;
   total?: boolean;
   totalQuery?: boolean;
-  order?: QueryOrderType;
+  order?: any;
   timezone?: string;
   renewQuery?: boolean;
   ungrouped?: boolean;
@@ -81,6 +89,7 @@ interface NormalizedQueryFilter extends QueryFilter {
 interface NormalizedQuery extends Query {
   filters?: NormalizedQueryFilter[];
   rowLimit?: null | number;
+  order?: [{ id: string; desc: boolean }];
 }
 
 export {
@@ -91,4 +100,5 @@ export {
   Query,
   NormalizedQueryFilter,
   NormalizedQuery,
+  MemberExpression,
 };

@@ -1,0 +1,62 @@
+---
+redirect_from:
+  - /faqs/troubleshooting
+---
+
+# Troubleshooting
+
+## Error: Unsupported db type: undefined
+
+This error message might mean that there's no `CUBEJS_DB_TYPE` defined. Please
+visit **Settings > Configuration** and define this environment variable.
+
+If this doesn't help, please reach out to us in our support chat, we'd be happy
+to help!
+
+## Error: Internal: deadline has elapsed OR Error: Query execution timeout after 10 min of waiting
+
+This error happens when a query remains queued for an excessive amount of time.
+To troubleshoot, try increasing concurrency and/or timeout limits. The default
+concurrency is 4 for most data warehouses and the default timeout is 10 minutes.
+You can increase these values by adjusting the `CUBEJS_CONCURRENCY` or
+`CUBEJS_DB_TIMEOUT` environment variables in **Settings > Configuration**. If
+your timeout limit is already high, we recommend either adding a pre-aggregation
+or refactoring your SQL for better efficiency.
+
+If these methods don't help, please reach out to us in our support chat!
+
+## Error: Error during create table: CREATE TABLE with pre-aggregations
+
+This usually means Cube can't create a pre-aggregation table, which could be due
+to a few different reasons. Further down the error log, you should see more
+details which will help narrow down the scope of the issue.
+
+If you see `has a key that already exists in Name index` message, it means that your
+multitenancy setup is missing the `pre_aggregations_schema` configuration setting in your `cube.py` file. 
+
+If you see `Error: Query execution timeout after 10 min of waiting` message, it means pre-aggregation is too large to be built.
+
+For any other error types, feel free to reach out to us in our support chat.
+
+## Warning: There were queries in these timezones which are not added in the CUBEJS_SCHEDULED_REFRESH_TIMEZONES environment variable.
+
+If you want your query to use pre-aggregations, you must define all necessary
+timezones using either the `CUBEJS_SCHEDULED_REFRESH_TIMEZONES` environment
+variable, or in the `scheduled_refresh_time_zones` configuration option in the `cube.py` file.
+
+Without this configuration, Cube will default to `UTC`. The warning reflects
+Cube's inability to find the query's timezone in the desired pre-aggregation.
+
+## Cube Cloud API is down after upgrading the version of Cube
+
+You may roll back to a previous Cube version at any time in **Settings >
+Configuration**.
+
+We always recommend testing new Cube versions in your staging environment before
+updating your production environment. We do not recommend setting your
+production deployment to the latest version since it will automatically upgrade
+to the latest version every time it's released on the next build or settings
+update.
+
+[ref-caching-using-preaggs-export-bucket]:
+  /product/caching/using-pre-aggregations#pre-aggregation-build-strategies-export-bucket

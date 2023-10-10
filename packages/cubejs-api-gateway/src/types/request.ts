@@ -117,17 +117,93 @@ type QueryRequest = BaseRequest & {
   queryType?: RequestType;
   apiType?: ApiType;
   resType?: ResultType
+  memberToAlias?: Record<string, string>;
+  expressionParams?: string[];
+  exportAnnotatedSql?: boolean;
+  memberExpressions?: boolean;
 };
+
+type SqlApiRequest = BaseRequest & {
+  query: Record<string, any>;
+  sqlQuery?: [string, string[]];
+  apiType?: ApiType;
+  streaming?: boolean;
+};
+
+/**
+ * Pre-aggregations selector object.
+ */
+type PreAggsSelector = {
+  contexts?: {securityContext: any}[],
+  timezones: string[],
+  dataSources?: string[],
+  cubes?: string[],
+  preAggregations?: string[],
+};
+
+/**
+ * Posted pre-aggs job object.
+ */
+type PreAggJob = {
+  request: string;
+  context: {securityContext: any};
+  preagg: string;
+  table: string;
+  target: string;
+  structure: string;
+  content: string;
+  updated: number;
+  key: any[];
+  status: string;
+  timezone: string;
+  dataSource: string;
+};
+
+/**
+ * The `/cubejs-system/v1/pre-aggregations/jobs` endpoint object type.
+ */
+type PreAggsJobsRequest = {
+  action: 'post' | 'get' | 'delete',
+  selector?: PreAggsSelector,
+  tokens?: string[]
+  resType?: 'object' | 'array'
+};
+
+type PreAggJobStatusItem = {
+  token: string;
+  table: string;
+  status: string;
+  selector: PreAggsSelector;
+};
+
+type PreAggJobStatusObject = {
+  [token: string]: {
+    table: string;
+    status: string;
+    selector: PreAggsSelector;
+  }
+};
+
+type PreAggJobStatusResponse =
+  | PreAggJobStatusItem[]
+  | PreAggJobStatusObject;
 
 export {
   RequestContext,
   RequestExtension,
   ExtendedRequestContext,
   Request,
+  SqlApiRequest,
   QueryRewriteFn,
   SecurityContextExtractorFn,
   ExtendContextFn,
   ResponseResultFn,
   BaseRequest,
   QueryRequest,
+  PreAggsJobsRequest,
+  PreAggsSelector,
+  PreAggJob,
+  PreAggJobStatusItem,
+  PreAggJobStatusObject,
+  PreAggJobStatusResponse,
 };

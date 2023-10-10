@@ -1,0 +1,10 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"select count(1) from (select 1 a) x union all select cast(null as decimal) order by 1;\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++-----------------+
+| COUNT(UInt8(1)) |
++-----------------+
+| 1.0000000000    |
+| NULL            |
++-----------------+

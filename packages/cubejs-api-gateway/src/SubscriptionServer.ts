@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { UserError } from './UserError';
 import type { ApiGateway } from './gateway';
 import type { LocalSubscriptionStore } from './LocalSubscriptionStore';
-import { ExtendedRequestContext } from './interfaces';
+import { ExtendedRequestContext, ContextAcceptorFn } from './interfaces';
 
 const methodParams: Record<string, string[]> = {
   load: ['query', 'queryType'],
@@ -26,6 +26,7 @@ export class SubscriptionServer {
     protected readonly apiGateway: ApiGateway,
     protected readonly sendMessage: WebSocketSendMessageFn,
     protected readonly subscriptionStore: LocalSubscriptionStore,
+    protected readonly contextAcceptor: ContextAcceptorFn,
   ) {
   }
 
@@ -54,6 +55,11 @@ export class SubscriptionServer {
       if (message.authorization) {
         authContext = { isSubscription: true };
         await this.apiGateway.checkAuthFn(authContext, message.authorization);
+        const acceptanceResult = await this.contextAcceptor(authContext);
+        if (!acceptanceResult.accepted) {
+          this.sendMessage(connectionId, acceptanceResult.rejectMessage);
+          return;
+        }
         await this.subscriptionStore.setAuthContext(connectionId, authContext);
         this.sendMessage(connectionId, { handshake: true });
         return;

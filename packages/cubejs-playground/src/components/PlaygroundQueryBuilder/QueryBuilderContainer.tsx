@@ -7,8 +7,15 @@ import styled from 'styled-components';
 
 import { Button, CubeLoader } from '../../atoms';
 import { useCloud } from '../../cloud';
-import { useAppContext, useCubejsApi, useSecurityContext } from '../../hooks';
-import { useRollupDesignerContext, RollupDesignerContext } from '../../rollup-designer';
+import {
+  useAppContext,
+  useCubejsApi,
+  useSecurityContext
+} from '../../hooks';
+import {
+  RollupDesignerContext,
+  useRollupDesignerContext,
+} from '../../rollup-designer';
 import { ChartRendererStateProvider } from '../QueryTabs/ChartRendererStateProvider';
 import { QueryTabs, QueryTabsProps } from '../QueryTabs/QueryTabs';
 import {
@@ -32,7 +39,6 @@ type QueryBuilderContainerProps = Pick<
   | 'defaultQuery'
   | 'initialVizState'
   | 'schemaVersion'
-  | 'dashboardSource'
   | 'extra'
   | 'onVizStateChanged'
   | 'onSchemaChange'
@@ -71,10 +77,11 @@ export function QueryBuilderContainer(props: QueryBuilderContainerProps) {
             <QueryTabsRenderer
               apiUrl={apiUrl!}
               token={currentToken!}
-              dashboardSource={props.dashboardSource}
               securityContextToken={securityContextToken}
-              onTabChange={props.onTabChange}
               extra={props.extra}
+              schemaVersion={props.schemaVersion}
+              onSchemaChange={props.onSchemaChange}
+              onTabChange={props.onTabChange}
               onVizStateChanged={props.onVizStateChanged}
               onSecurityContextModalOpen={() => setIsModalOpen(true)}
             />
@@ -93,7 +100,6 @@ type QueryTabsRendererProps = {
 } & Pick<
   PlaygroundQueryBuilderProps,
   | 'schemaVersion'
-  | 'dashboardSource'
   | 'onVizStateChanged'
   | 'onSchemaChange'
   | 'extra'
@@ -104,8 +110,6 @@ function QueryTabsRenderer({
   apiUrl,
   token,
   securityContextToken,
-  dashboardSource,
-  schemaVersion,
   onSecurityContextModalOpen,
   ...props
 }: QueryTabsRendererProps) {
@@ -138,7 +142,7 @@ function QueryTabsRenderer({
               size="small"
               onClick={() => toggleModal()}
             >
-              Add Rollup to Schema
+              Add Rollup to Data Model
             </Button>
           ) : null}
         </Space>
@@ -157,9 +161,9 @@ function QueryTabsRenderer({
             query,
             chartType,
           }}
-          dashboardSource={dashboardSource}
-          schemaVersion={schemaVersion}
+          schemaVersion={props.schemaVersion}
           extra={props.extra}
+          onSchemaChange={props.onSchemaChange}
           onVizStateChanged={(vizState) => {
             saveTab({
               query: vizState.query || {},

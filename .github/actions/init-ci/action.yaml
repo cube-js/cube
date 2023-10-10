@@ -7,11 +7,11 @@ runs:
   using: "composite"
   steps:
     - name: Use Node.js ${{ inputs.node }}
-      uses: actions/setup-node@v1
+      uses: actions/setup-node@v3
       with:
         node-version: ${{ inputs.node }}
     - name: Cache node modules
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         # npm cache files are stored in `~/.npm` on Linux/macOS
         path: ~/.npm

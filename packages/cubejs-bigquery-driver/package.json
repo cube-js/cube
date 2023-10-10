@@ -2,14 +2,14 @@
   "name": "@cubejs-backend/bigquery-driver",
   "description": "Cube.js BigQuery database driver",
   "author": "Cube Dev, Inc.",
-  "version": "0.31.3",
+  "version": "0.34.1",
   "repository": {
     "type": "git",
-    "url": "https://github.com/cube-js/cube.js.git",
+    "url": "https://github.com/cube-js/cube.git",
     "directory": "packages/cubejs-bigquery-driver"
   },
   "engines": {
-    "node": "^12.0.0 || ^14.0.0 || >=16.0.0"
+    "node": "^14.0.0 || ^16.0.0 || >=17.0.0"
   },
   "scripts": {
     "build": "rm -rf dist && npm run tsc",
@@ -28,18 +28,18 @@
   "main": "index.js",
   "types": "dist/src/index.d.ts",
   "dependencies": {
-    "@cubejs-backend/base-driver": "^0.31.3",
+    "@cubejs-backend/base-driver": "^0.34.1",
     "@cubejs-backend/dotenv": "^9.0.2",
-    "@cubejs-backend/shared": "^0.31.0",
+    "@cubejs-backend/shared": "^0.34.1",
     "@google-cloud/bigquery": "^5.6.0",
     "@google-cloud/storage": "^5.7.2",
     "ramda": "^0.27.2"
   },
   "devDependencies": {
-    "@cubejs-backend/testing-shared": "^0.31.3",
+    "@cubejs-backend/testing-shared": "^0.34.1",
     "@types/dedent": "^0.7.0",
     "@types/ramda": "^0.27.40",
-    "typescript": "~4.1.5"
+    "typescript": "~4.9.5"
   },
   "license": "Apache-2.0",
   "publishConfig": {

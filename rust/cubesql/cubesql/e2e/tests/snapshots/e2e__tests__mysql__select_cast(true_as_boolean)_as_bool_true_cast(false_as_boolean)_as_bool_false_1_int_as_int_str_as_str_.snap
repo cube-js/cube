@@ -1,6 +1,6 @@
 ---
 source: cubesql/e2e/tests/mysql.rs
-assertion_line: 180
+assertion_line: 181
 expression: self.print_query_result(&mut response).await
 ---
 bool_true type: (MYSQL_TYPE_TINY:1024) flags: (empty)

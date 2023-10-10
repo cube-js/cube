@@ -52,10 +52,12 @@ export const devLogger = (level) => (type, { error, warning, ...message }) => {
     case 'info': {
       if (!error && !warning && [
         'Executing SQL',
+        'Streaming SQL',
         'Executing Load Pre Aggregation SQL',
         'Load Request Success',
         'Performing query',
         'Performing query completed',
+        'Streaming successfully completed',
       ].includes(type)) {
         logDetails();
         break;

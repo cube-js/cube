@@ -5,7 +5,7 @@ import Button from "../Button"
 import FeedbackForm from './FeedbackForm'
 
 const FeedbackBlock = (props: propsType) => {
-  const { page } = props;
+  const { page} = props;
   const [date, setDate] = useState('');
   const [feedback, setFeedbackState] = useState('');
   const [isShowThanks, setShowThanks] = useState(false);
@@ -17,7 +17,8 @@ const FeedbackBlock = (props: propsType) => {
     const date = new Date().toISOString();
     setDate(date);
     setFeedbackState(state);
-    event('page_feedback_like', { page, date, feedback: state });
+    console.log({ page, date, feedback: state })
+    // event('page_feedback_like', { page, date, feedback: state });
   };
   const setFeedbackMessage = (message: string) => {
     if (message) {
@@ -34,7 +35,7 @@ const FeedbackBlock = (props: propsType) => {
       <div className={styles.thanksBlock}>Thank you for the feedback!</div>
     );
   }
-  
+
   return (
     <div className={styles.feedbackBlock}>
       <div className={styles.feedbackBlock__wrap}>
@@ -73,7 +74,7 @@ const FeedbackBlock = (props: propsType) => {
 };
 
 interface propsType {
-  page: string;
+  page?: string;
 }
 
 export default FeedbackBlock;

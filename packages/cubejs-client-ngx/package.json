@@ -1,11 +1,11 @@
 {
   "name": "@cubejs-client/ngx",
-  "version": "0.31.0",
+  "version": "0.34.0",
   "author": "Cube Dev, Inc.",
   "engines": {},
   "repository": {
     "type": "git",
-    "url": "https://github.com/cube-js/cube.js.git",
+    "url": "https://github.com/cube-js/cube.git",
     "directory": "packages/cubejs-client-ngx"
   },
   "description": "Cube.js client for Angular",

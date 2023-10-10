@@ -1,107 +1,226 @@
 ---
-title: Lambda Pre-Aggregations
+title: Lambda pre-aggregations
 permalink: /caching/pre-aggregations/lambda-pre-aggregations
 category: Caching
 menuOrder: 4
 ---
 
-Lambda pre-aggregations follow the [Lambda architecture](https://en.wikipedia.org/wiki/Lambda_architecture) design to union real-time and batch data. Cube acts as a serving layer and uses pre-aggregations as a batch layer and source data or other pre-aggregations, usually [streaming][streaming-pre-agg], as a speed layer.
+Lambda pre-aggregations follow the
+[Lambda architecture](https://en.wikipedia.org/wiki/Lambda_architecture) design
+to union real-time and batch data. Cube acts as a serving layer and uses
+pre-aggregations as a batch layer and source data or other pre-aggregations,
+usually [streaming][streaming-pre-agg], as a speed layer. Due to this design,
+lambda pre-aggregations **only** work with data that is newer than the existing
+batched pre-aggregations.
 
 <WarningBox>
 
-Lambda pre-aggregations only work with Cube Store. 
-
-Additionally, we’re going to remove support for external storages, other than Cube Store, later this year. [Cube Store will replace Redis](https://cube.dev/blog/replacing-redis-with-cube-store) and, therefore will be a required component to run Cube even without pre-aggregations.
+Lambda pre-aggregations only work with Cube Store.
 
 </WarningBox>
 
 ## Use cases
 
-Below we are looking at the most common examples of using lambda pre-aggregations.
+Below we are looking at the most common examples of using lambda
+pre-aggregations.
 
 ### Batch and source data
 
-Batch data is coming from pre-aggregation and real-time data is coming from the data source.
+Batch data is coming from pre-aggregation and real-time data is coming from the
+data source.
 
 <div style="text-align: center">
   <img
     alt="Lambda pre-aggregation batch and source diagram"
-    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Caching/lambda-batch-source.png"
+    src="https://ucarecdn.com/a304a8a3-0eb4-4580-a425-052fa353ad69/"
     style="border: none"
     width="100%"
   />
 </div>
 
-First, you need to create pre-aggregations that will contain your batch data. In the following example, we call it **batch.** Please note, it must have `timeDimension`, and Cube will use it to union batch data with source data.
+First, you need to create pre-aggregations that will contain your batch data. In
+the following example, we call it `batch`. Please note, it must have a
+`time_dimension` and `partition_granularity` specified. Cube will use these
+properties to union batch data with freshly-retrieved source data.
 
-You control the batch part of your data with `buildRangeStart` and `buildRangeEnd` properties of pre-aggregation to determine specific window for your batched data.
+You may also control the batch part of your data with the `build_range_start` and
+`build_range_end` properties of a pre-aggregation to determine a specific window
+for your batched data.
 
-Next, you need to create a lambda pre-aggregation. To do that, create pre-aggregation with type `rollupLambda`, specify rollups you would like to use with `rollups` property, and finally set `unionWithSourceData: true` to use source data as a real-time layer.
+Next, you need to create a lambda pre-aggregation. To do that, create
+pre-aggregation with type `rollup_lambda`, specify rollups you would like to use
+with `rollups` property, and finally set `union_with_source_data: true` to use
+source data as a real-time layer.
 
-Please make sure that the lambda pre-aggregation definition comes first when defining your pre-aggregations.
+Please make sure that the lambda pre-aggregation definition comes first when
+defining your pre-aggregations.
 
+<CodeTabs>
 
-```js
-lambda: {
-  type: `rollupLambda`,
-  unionWithSourceData: true,
-  rollups: [Users.batch]
-},
-batch: {
-  measures: [Users.count],
-  dimensions: [Users.name],
-  timeDimension: Users.createdAt,
-  granularity: `day`,
-  buildRangeStart: {
-    sql: `SELECT '2020-01-01'`
-  },
-  buildRangeEnd: {
-    sql: `SELECT '2022-05-30'`
-  }
-}
+```yaml
+cubes:
+  - name: users
+    # ...
+
+    pre_aggregations:
+      - name: lambda
+        type: rollup_lambda
+        union_with_source_data: true
+        rollups:
+          - CUBE.batch
+
+      - name: batch
+        measures:
+          - users.count
+        dimensions:
+          - users.name
+        time_dimension: users.created_at
+        granularity: day
+        partition_granularity: day
+        build_range_start:
+          sql: SELECT '2020-01-01'
+        build_range_end:
+          sql: SELECT '2022-05-30'
 ```
+
+```javascript
+cube('users', {
+  // ...
+
+  pre_aggregations: {
+    lambda: {
+      type: `rollup_lambda`,
+      union_with_source_data: true,
+      rollups: [CUBE.batch]
+    },
+
+    batch: {
+      measures: [users.count],
+      dimensions: [users.name],
+      time_dimension: users.created_at,
+      granularity: `day`,
+      partition_granularity: `day`,
+      build_range_start: {
+        sql: `SELECT '2020-01-01'`
+      },
+      build_range_end: {
+        sql: `SELECT '2022-05-30'`
+      },
+    },
+  },
+})
+```
+
+</CodeTabs>
 
 ### Batch and streaming data
 
-In this scenario, batch data is comes from one pre-aggregation and real-time data comes from a [streaming pre-aggregation][streaming-pre-agg].
+In this scenario, batch data is comes from one pre-aggregation and real-time
+data comes from a [streaming pre-aggregation][streaming-pre-agg].
 
 <div style="text-align: center">
   <img
     alt="Lambda pre-aggregation batch and streaming diagram"
-    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Caching/lambda-batch-streaming.png"
+    src="https://ucarecdn.com/88b1be0f-c2ff-4af2-b5f2-50a6a34760c2/"
     style="border: none"
     width="100%"
   />
 </div>
 
+You can use lambda pre-aggregations to combine data from multiple
+pre-aggregations, where one pre-aggregation can have batch data and another
+streaming.
 
-You can use lambda pre-aggregations to combine data from multiple pre-aggregation, where one pre-aggregation can have batch data and another streaming.
+<CodeTabs>
 
-```js
-batchStreamingLambda: {
-  type: `rollupLambda`,
-  rollups: [Users.batch, streaming]
-},
-batch: {
-  type: `rollup`,
-  measures: [Users.count],
-  dimensions: [Users.name],
-  timeDimension: Users.createdAt,
-  granularity: `day`,
-  buildRangeStart: {
-    sql: `SELECT '2020-01-01'`
-  },
-  buildRangeEnd: {
-    sql: `SELECT '2022-05-30'`
-  }
-},
-streaming: {
-  type: `rollup`,
-  measures: [StreamingUsers.count],
-  dimensions: [StreamingUsers.name],
-  timeDimension: StreamingUsers.createdAt,
-  granularity: `day`
-}
+```yaml
+cubes:
+  - name: streaming_users
+    # This cube uses a streaming SQL data source such as ksqlDB
+    # ...
+
+    pre_aggregations:
+      - name: streaming
+        type: rollup
+        measures:
+          - CUBE.count
+        dimensions:
+          - CUBE.name
+        time_dimension: CUBE.created_at
+      granularity: day,
+      partition_granularity: day
+
+  - name: users
+    # This cube uses a data source such as ClickHouse or BigQuery
+    # ...
+
+    pre_aggregations:
+      - name: batch_streaming_lambda
+        type: rollup_lambda
+        rollups:
+          - users.batch
+          - streaming_users.streaming
+
+      - name: batch
+        type: rollup
+        measures:
+          - users.count
+        dimensions:
+          - users.name
+        time_dimension: users.created_at
+        granularity: day
+        partition_granularity: day
+        build_range_start:
+          sql: SELECT '2020-01-01'
+        build_range_end:
+          sql: SELECT '2022-05-30'
 ```
+
+```javascript
+// This cube uses a streaming SQL data source such as ksqlDB
+cube('streaming_users', {
+  // ...
+
+  pre_aggregations: {
+    streaming: {
+      type: `rollup`,
+      measures: [CUBE.count],
+      dimensions: [CUBE.name],
+      time_dimension: CUBE.created_at,
+      granularity: `day`,
+      partition_granularity: `day`,
+    },
+  },
+});
+
+// This cube uses a data source such as ClickHouse or BigQuery
+cube('users', {
+  // ...
+
+  pre_aggregations: {
+    batch_streaming_lambda: {
+      type: `rollup_lambda`,
+      rollups: [users.batch, streaming_users.streaming]
+    },
+
+    batch: {
+      type: `rollup`,
+      measures: [users.count],
+      dimensions: [users.name],
+      time_dimension: users.created_at,
+      granularity: `day`,
+      partition_granularity: `day`,
+      build_range_start: {
+        sql: `SELECT '2020-01-01'`
+      },
+      build_range_end: {
+        sql: `SELECT '2022-05-30'`
+      },
+    },
+  },
+});
+```
+
+</CodeTabs>
 
 [streaming-pre-agg]: /caching/using-pre-aggregations#streaming-pre-aggregations

@@ -80,8 +80,10 @@ pub struct SessionState {
     pub connection_id: u32,
     // secret for this session
     pub secret: u32,
-    // client address, immutable
-    pub host: String,
+    // client ip, immutable
+    pub client_ip: String,
+    // client port, immutable
+    pub client_port: u16,
     // client protocol, mysql/postgresql, immutable
     pub protocol: DatabaseProtocol,
 
@@ -104,7 +106,8 @@ pub struct SessionState {
 impl SessionState {
     pub fn new(
         connection_id: u32,
-        host: String,
+        client_ip: String,
+        client_port: u16,
         protocol: DatabaseProtocol,
         auth_context: Option<AuthContextRef>,
     ) -> Self {
@@ -113,7 +116,8 @@ impl SessionState {
         Self {
             connection_id,
             secret: rng.gen(),
-            host,
+            client_ip,
+            client_port,
             protocol,
             variables: RwLockSync::new(None),
             properties: RwLockSync::new(SessionProperties::new(None, None)),
@@ -395,9 +399,9 @@ impl Session {
             usesysid: 0,
             usename: self.state.user(),
             application_name,
-            client_addr: None,
+            client_addr: self.state.client_ip.clone(),
             client_hostname: None,
-            client_port: None,
+            client_port: self.state.client_port.clone(),
             query,
         }
     }
@@ -406,7 +410,7 @@ impl Session {
     pub fn to_process_list(self: &Arc<Self>) -> SessionProcessList {
         SessionProcessList {
             id: self.state.connection_id,
-            host: self.state.host.clone(),
+            host: self.state.client_ip.clone(),
             user: self.state.user(),
             database: self.state.database(),
         }
@@ -430,8 +434,8 @@ pub struct SessionStatActivity {
     pub usesysid: u32,
     pub usename: Option<String>,
     pub application_name: Option<String>,
-    pub client_addr: Option<String>,
+    pub client_addr: String,
     pub client_hostname: Option<String>,
-    pub client_port: Option<String>,
+    pub client_port: u16,
     pub query: Option<String>,
 }

@@ -97,7 +97,7 @@ describe('SQL API', () => {
         await createPostgresClient('admin', 'wrong_password');
 
         throw new Error('Code must thrown auth error, something wrong...');
-      } catch (e) {
+      } catch (e: any) {
         expect(e.message).toContain('password authentication failed for user "admin"');
       }
     });
@@ -137,7 +137,7 @@ describe('SQL API', () => {
         await conn.query('SELECT "user", "uid" FROM SecurityContextTest WHERE __user = \'usr2\'');
 
         throw new Error('Code must thrown auth error, something wrong...');
-      } catch (e) {
+      } catch (e: any) {
         expect(e.message).toContain('You cannot change security context via __user from moderator to usr2, because it\'s not allowed');
       } finally {
         await conn.end();
@@ -151,7 +151,7 @@ describe('SQL API', () => {
         await conn.query('SELECT "user", "uid" FROM SecurityContextTest WHERE __user = \'moderator\'');
 
         throw new Error('Code must thrown auth error, something wrong...');
-      } catch (e) {
+      } catch (e: any) {
         expect(e.message).toContain('You cannot change security context via __user from usr1 to moderator, because it\'s not allowed');
       } finally {
         await conn.end();

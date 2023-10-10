@@ -1,8 +1,8 @@
 /**
  * @title @cubejs-client/core
  * @permalink /@cubejs-client-core
- * @menuCategory Frontend Integrations
- * @subcategory Reference
+ * @menuCategory Reference
+ * @subcategory Frontend
  * @menuOrder 2
  * @description Vanilla JavaScript Cube.js client.
  */
@@ -96,9 +96,13 @@ declare module '@cubejs-client/core' {
      */
     subscribe?: boolean;
     /**
-     * A Cube.js API instance. If not provided will be taken from `CubeProvider`
+     * A Cube API instance. If not provided will be taken from `CubeProvider`
      */
     cubejsApi?: CubejsApi;
+    /**
+     * If enabled, all members of the 'number' type will be automatically converted to numerical values on the client side
+     */
+    castNumerics?: boolean;
     /**
      * Function that receives `ProgressResult` on each `Continue wait` message.
      */
@@ -261,6 +265,7 @@ declare module '@cubejs-client/core' {
   export type Series<T> = {
     key: string;
     title: string;
+    shortTitle: string;
     series: T[];
   };
 
@@ -273,6 +278,7 @@ declare module '@cubejs-client/core' {
   export type SeriesNamesColumn = {
     key: string;
     title: string;
+    shortTitle: string;
     yValues: string[];
   };
 
@@ -425,6 +431,7 @@ declare module '@cubejs-client/core' {
      *   {
      *     key: 'Stories.count',
      *     title: 'Stories Count',
+     *     shortTitle: 'Count',
      *     series: [
      *       { x: '2015-01-01T00:00:00', value: 27120 },
      *       { x: '2015-02-01T00:00:00', value: 25861 },
@@ -455,6 +462,7 @@ declare module '@cubejs-client/core' {
      *   {
      *     key: 'Stories.count',
      *     title: 'Stories Count',
+     *     shortTitle: 'Count',
      *     yValues: ['Stories.count'],
      *   },
      * ]
@@ -756,7 +764,9 @@ declare module '@cubejs-client/core' {
     | 'contains'
     | 'notContains'
     | 'startsWith'
+    | 'notStartsWith'
     | 'endsWith'
+    | 'notEndsWith'
     | 'gt'
     | 'gte'
     | 'lt'
@@ -764,7 +774,9 @@ declare module '@cubejs-client/core' {
     | 'inDateRange'
     | 'notInDateRange'
     | 'beforeDate'
-    | 'afterDate';
+    | 'beforeOrOnDate'
+    | 'afterDate'
+    | 'afterOrOnDate';
 
   export type TimeDimensionGranularity = 'second' | 'minute' | 'hour' | 'day' | 'week' | 'month' | 'quarter' | 'year';
 
@@ -815,8 +827,8 @@ declare module '@cubejs-client/core' {
 
   type QueryArrayRecordType<T extends DeeplyReadonly<Query[]>> =
     T extends readonly [infer First, ...infer Rest]
-      ? SingleQueryRecordType<First> | QueryArrayRecordType<Rest & DeeplyReadonly<Query[]>>
-      : never;
+    ? SingleQueryRecordType<First> | QueryArrayRecordType<Rest & DeeplyReadonly<Query[]>>
+    : never;
 
   // If we can't infer any members at all, then return any.
   type SingleQueryRecordType<T extends DeeplyReadonly<Query>> = ExtractMembers<T> extends never
@@ -824,23 +836,31 @@ declare module '@cubejs-client/core' {
     : { [K in string & ExtractMembers<T>]: string | number | boolean | null };
 
   type ExtractMembers<T extends DeeplyReadonly<Query>> =
-    | ( T extends { dimensions: readonly (infer Names)[]; } ? Names : never )
-    | ( T extends { measures: readonly (infer Names)[]; } ? Names : never )
-    | ( T extends { timeDimensions: (infer U); } ? ExtractTimeMembers<U> : never );
+    | (T extends { dimensions: readonly (infer Names)[]; } ? Names : never)
+    | (T extends { measures: readonly (infer Names)[]; } ? Names : never)
+    | (T extends { timeDimensions: (infer U); } ? ExtractTimeMembers<U> : never);
 
   type ExtractTimeMembers<T> =
     T extends readonly [infer First, ...infer Rest]
-      ? ExtractTimeMember<First> | ExtractTimeMembers<Rest>
-      : never;
+    ? ExtractTimeMember<First> | ExtractTimeMembers<Rest>
+    : never;
 
   type ExtractTimeMember<T> =
     T extends { dimension: infer Dimension, granularity: infer Granularity }
-      ? Dimension | `${Dimension & string}.${Granularity & string}`
-      : never;
+    ? Dimension | `${Dimension & string}.${Granularity & string}`
+    : never;
 
   export class ProgressResult {
     stage(): string;
     timeElapsed(): string;
+  }
+
+  export interface UnsubscribeObj {
+    /**
+     * Allows to stop requests in-flight in long polling or web socket subscribe loops.
+     * It doesn't cancel any submitted requests to the underlying databases.
+     */
+    unsubscribe(): Promise<void>;
   }
 
   export type SqlQueryTuple = [string, any[], any];
@@ -944,6 +964,18 @@ declare module '@cubejs-client/core' {
     segments: TCubeSegment[];
   };
 
+
+  export type CubeMap = {
+    measures: Record<string, TCubeMeasure>;
+    dimensions: Record<string, TCubeDimension>;
+    segments: Record<string, TCubeSegment>;
+  };
+
+  export type CubesMap = Record<
+    string,
+    CubeMap
+  >;
+
   export type MetaResponse = {
     cubes: Cube[];
   };
@@ -958,6 +990,9 @@ declare module '@cubejs-client/core' {
    * @order 4
    */
   export class Meta {
+
+    constructor(metaResponse: MetaResponse);
+
     /**
      * Raw meta response
      */
@@ -971,7 +1006,7 @@ declare module '@cubejs-client/core' {
     /**
      * A map of all cubes where the key is a cube name
      */
-    cubesMap: Record<string, Pick<Cube, 'dimensions' | 'measures' | 'segments'>>;
+    cubesMap: CubesMap;
 
     /**
      * Get all members of a specific type for a given query.
@@ -1039,13 +1074,13 @@ declare module '@cubejs-client/core' {
      * const context = document.getElementById('myChart');
      * new Chart(context, chartjsConfig(resultSet));
      * ```
-     * @param query - [Query object](query-format)
+     * @param query - [Query object](/product/apis-integrations/rest-api/query-format)
      */
     load<QueryType extends DeeplyReadonly<Query | Query[]>>(
       query: QueryType,
       options?: LoadMethodOptions,
       callback?: LoadMethodCallback<ResultSet<QueryRecordType<QueryType>>>,
-    ): void;
+    ): UnsubscribeObj;
 
     load<QueryType extends DeeplyReadonly<Query | Query[]>>(
       query: QueryType,
@@ -1055,10 +1090,11 @@ declare module '@cubejs-client/core' {
     ): Promise<ResultSet<QueryRecordType<QueryType>>>;
 
     /**
-     * Allows you to fetch data and receive updates over time. See [Real-Time Data Fetch](real-time-data-fetch)
+     * Allows you to fetch data and receive updates over time. See [Real-Time Data Fetch](/product/apis-integrations/rest-api/real-time-data-fetch)
      *
      * ```js
-     * cubejsApi.subscribe(
+     * // Subscribe to a query's updates
+     * const subscription = await cubejsApi.subscribe(
      *   {
      *     measures: ['Logs.count'],
      *     timeDimensions: [
@@ -1076,32 +1112,35 @@ declare module '@cubejs-client/core' {
      *     }
      *   }
      * );
+     *
+     * // Unsubscribe from a query's updates
+     * subscription.unsubscribe();
      * ```
      */
     subscribe<QueryType extends DeeplyReadonly<Query | Query[]>>(
       query: QueryType,
       options: LoadMethodOptions | null,
       callback: LoadMethodCallback<ResultSet<QueryRecordType<QueryType>>>,
-    ): void;
+    ): UnsubscribeObj;
 
     sql(query: DeeplyReadonly<Query | Query[]>, options?: LoadMethodOptions): Promise<SqlQuery>;
     /**
      * Get generated SQL string for the given `query`.
      * @param query - [Query object](query-format)
      */
-    sql(query: DeeplyReadonly<Query | Query[]>, options?: LoadMethodOptions, callback?: LoadMethodCallback<SqlQuery>): void;
+    sql(query: DeeplyReadonly<Query | Query[]>, options?: LoadMethodOptions, callback?: LoadMethodCallback<SqlQuery>): UnsubscribeObj;
 
     meta(options?: LoadMethodOptions): Promise<Meta>;
     /**
      * Get meta description of cubes available for querying.
      */
-    meta(options?: LoadMethodOptions, callback?: LoadMethodCallback<Meta>): void;
+    meta(options?: LoadMethodOptions, callback?: LoadMethodCallback<Meta>): UnsubscribeObj;
 
     dryRun(query: DeeplyReadonly<Query | Query[]>, options?: LoadMethodOptions): Promise<DryRunResponse>;
     /**
      * Get query related meta without query execution
      */
-    dryRun(query: DeeplyReadonly<Query | Query[]>, options: LoadMethodOptions, callback?: LoadMethodCallback<DryRunResponse>): void;
+    dryRun(query: DeeplyReadonly<Query | Query[]>, options: LoadMethodOptions, callback?: LoadMethodCallback<DryRunResponse>): UnsubscribeObj;
   }
 
   /**
@@ -1125,7 +1164,7 @@ declare module '@cubejs-client/core' {
    * );
    * ```
    *
-   * @param apiToken - [API token](security) is used to authorize requests and determine SQL database you're accessing. In the development mode, Cube.js Backend will print the API token to the console on startup. In case of async function `authorization` is updated for `options.transport` on each request.
+   * @param apiToken - [API token](/product/auth) is used to authorize requests and determine SQL database you're accessing. In the development mode, Cube.js Backend will print the API token to the console on startup. In case of async function `authorization` is updated for `options.transport` on each request.
    * @order 1
    */
   export default function cubejs(apiToken: string | (() => Promise<string>), options: CubeJSApiOptions): CubejsApi;
@@ -1213,7 +1252,7 @@ declare module '@cubejs-client/core' {
   export function getQueryMembers(query: DeeplyReadonly<Query>): string[];
 
   export function areQueriesEqual(query1: DeeplyReadonly<Query> | null, query2: DeeplyReadonly<Query> | null): boolean;
-  
+
   export function validateQuery(query: DeeplyReadonly<Query> | null | undefined): Query;
 
   export type ProgressResponse = {

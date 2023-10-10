@@ -82,3 +82,16 @@ You can create the Supergraph in two ways.
 
 
 Done! You now load the `supergraph.graphql` in the `gateway.js` and run the Apollo Gateway with a Federated Supergraph!
+
+# Using Apollo GraphOS
+
+Create a Supergraph and initial Subgraph for the Cube GraphQL API in Apollo Studio by following this [tutorial](https://www.apollographql.com/docs/graphos/getting-started/).
+
+Next, add another subgraph for the Apollo Server.
+
+```bash
+rover subgraph publish cube-team@main \
+  --schema "./apollo.graphql" \
+  --name ApolloServer \
+  --routing-url "https://apollo.examplescube.dev/graphql"
+```

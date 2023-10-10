@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"SELECT * FROM pg_catalog.pg_user ORDER BY usesysid ASC\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++---------+----------+-------------+----------+---------+--------------+----------+----------+-----------+
+| usename | usesysid | usecreatedb | usesuper | userepl | usebypassrls | passwd   | valuntil | useconfig |
++---------+----------+-------------+----------+---------+--------------+----------+----------+-----------+
+| ovr     | 10       | true        | true     | false   | true         | ******** | NULL     | NULL      |
++---------+----------+-------------+----------+---------+--------------+----------+----------+-----------+

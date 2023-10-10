@@ -3,8 +3,8 @@ title: Connecting to Hex
 permalink: /config/downstream/hex
 ---
 
-You can connect to Cube from Hex, a collaborative data platform, using the [Cube SQL
-API][ref-sql-api].
+You can connect to Cube from Hex, a collaborative data platform, using the [Cube
+SQL API][ref-sql-api].
 
 Here's a short video guide on how to connect Hex to Cube.
 
@@ -21,43 +21,38 @@ here][ref-getting-started].
 
 ### <--{"id" : "Enable Cube SQL API"}--> Cube Cloud
 
-Click **How to connect your BI tool** link on the Overview page, navigate to the SQL API tab
-and enable it. Once enabled, you should see the screen like the one below with
-your connection credentials:
+Click **How to connect your BI tool** link on the Overview page, navigate to the
+SQL API tab and enable it. Once enabled, you should see the screen like the one
+below with your connection credentials:
 
-<div style="text-align: center">
-  <img
-    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/cube-sql-api-modal.png"
-    style="border: none"
-    width="80%"
-  />
-</div>
+<Screenshot src="https://ucarecdn.com/fc74ee91-b8a9-4c46-81ed-cb3daeef6b83/" />
 
 ### <--{"id" : "Enable Cube SQL API"}--> Self-hosted Cube
 
 You need to set the following environment variables to enable the Cube SQL API.
-These credentials will be required to connect to Cube from Hex
-later.
+These credentials will be required to connect to Cube from Hex later.
 
 ```dotenv
 CUBEJS_PG_SQL_PORT=5432
 CUBEJS_SQL_USER=myusername
 CUBEJS_SQL_PASSWORD=mypassword
 ```
+
 ## Connecting from Hex
 
 Hex connects to Cube as to a Postgres database.
 
 ## Querying data
 
-Your cubes will be exposed as tables, where both your measures and dimensions are columns.
+Your cubes will be exposed as tables, where both your measures and dimensions
+are columns.
 
-You can write SQL in Hex that will be executed in Cube. Learn more about Cube SQL
-syntax on the [reference page][ref-sql-api].
+You can write SQL in Hex that will be executed in Cube. Learn more about Cube
+SQL syntax on the [reference page][ref-sql-api].
 
 <div style="text-align: center">
   <img
-    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Configuration/Downstream/hex-1.png"
+    src="https://ucarecdn.com/93e1aa12-b418-47a1-9567-c29384c25275/"
     style="border: none"
     width="100%"
   />
@@ -67,11 +62,11 @@ You can also create a visualization of the executed SQL query.
 
 <div style="text-align: center">
   <img
-    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Configuration/Downstream/hex-2.png"
+    src="https://ucarecdn.com/f59e28d5-bc94-4052-85e1-4cf115e7fd19/"
     style="border: none"
     width="100%"
   />
 </div>
 
-[ref-getting-started]: /cloud/getting-started
+[ref-getting-started]: /getting-started/cloud/overview
 [ref-sql-api]: /backend/sql

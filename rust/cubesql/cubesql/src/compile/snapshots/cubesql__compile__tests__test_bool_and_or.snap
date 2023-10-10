@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"\n                SELECT\n                    bool_and(ttt) and_ttt, bool_or(ttt) or_ttt,\n                    bool_and(ttf) and_ttf, bool_or(ttf) or_ttf,\n                    bool_and(fff) and_fff, bool_or(fff) or_fff,\n                    bool_and(ttn) and_ttn, bool_or(ttn) or_ttn,\n                    bool_and(tfn) and_tfn, bool_or(tfn) or_tfn,\n                    bool_and(ffn) and_ffn, bool_or(ffn) or_ffn,\n                    bool_and(nnn) and_nnn, bool_or(nnn) or_nnn\n                FROM (\n                    SELECT true ttt, true  ttf, false fff, true ttn, true  tfn, false ffn, null::bool nnn\n                    UNION ALL\n                    SELECT true ttt, true  ttf, false fff, true ttn, false tfn, false ffn, null       nnn\n                    UNION ALL\n                    SELECT true ttt, false ttf, false fff, null ttn, null  tfn, null  ffn, null       nnn\n                ) tbl\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++---------+--------+---------+--------+---------+--------+---------+--------+---------+--------+---------+--------+---------+--------+
+| and_ttt | or_ttt | and_ttf | or_ttf | and_fff | or_fff | and_ttn | or_ttn | and_tfn | or_tfn | and_ffn | or_ffn | and_nnn | or_nnn |
++---------+--------+---------+--------+---------+--------+---------+--------+---------+--------+---------+--------+---------+--------+
+| true    | true   | false   | true   | false   | false  | true    | true   | false   | true   | false   | false  | NULL    | NULL   |
++---------+--------+---------+--------+---------+--------+---------+--------+---------+--------+---------+--------+---------+--------+

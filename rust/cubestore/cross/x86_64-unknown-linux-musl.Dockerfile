@@ -6,9 +6,11 @@ RUN apt-get update \
     && apt-get -y upgrade \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y software-properties-common pkg-config wget musl-tools libc6-dev apt-transport-https ca-certificates \
     && wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - \
-    && add-apt-repository "deb https://apt.llvm.org/focal/ llvm-toolchain-focal-12 main"  \
+    && add-apt-repository "deb https://apt.llvm.org/focal/ llvm-toolchain-focal-14 main"  \
+    && add-apt-repository -y ppa:deadsnakes/ppa \
     && apt-get update \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y llvm-12 clang-12 libclang-12-dev clang-12 make \
+    # llvm14-dev will install python 3.8 as bin/python3
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y llvm-14 clang-14 libclang-14-dev clang-14 make cmake \
     && rm -rf /var/lib/apt/lists/*;
 
 RUN ln -s /usr/include/x86_64-linux-gnu/asm /usr/include/x86_64-linux-musl/asm && \
@@ -19,8 +21,7 @@ RUN ln -s /usr/include/x86_64-linux-gnu/asm /usr/include/x86_64-linux-musl/asm &
 RUN mkdir /musl
 
 # https://www.openssl.org/source/old/1.1.1/
-ARG OPENSSL_VERSION=1.1.1l
-
+ARG OPENSSL_VERSION=1.1.1q
 RUN wget https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz -O - | tar -xz &&\
     cd openssl-${OPENSSL_VERSION} && \
     CC="musl-gcc -fPIE -pie" ./Configure no-shared no-async --prefix=/musl --openssldir=/musl/ssl linux-x86_64 && \
@@ -36,6 +37,8 @@ ENV RUSTFLAGS="-C target-feature=-crt-static"
 
 ENV OPENSSL_STATIC=true
 ENV OPENSSL_DIR=/musl
+ENV OPENSSL_ROOT_DIR=/musl
+ENV OPENSSL_LIBRARIES=/musl/lib
 
 
 ENV PATH="/cargo/bin:$PATH"

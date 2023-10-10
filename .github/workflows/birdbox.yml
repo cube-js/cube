@@ -16,6 +16,7 @@ on:
     branches:
       - 'master'
 
+# touch to trigger
 jobs:
   cli:
     runs-on: ubuntu-20.04
@@ -23,11 +24,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-20.04, ubuntu-18.04, macos-10.15, windows-2019]
-        node-version: [14.x]
+        os: [ubuntu-20.04, ubuntu-18.04, macos-11, windows-2019]
+        node-version: [16.x]
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
+      - name: Disable rustup update (issue workaround for Windows)
+        run: rustup set auto-self-update disable
+        if: contains(runner.os, 'windows')
+        shell: bash
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
@@ -35,11 +40,11 @@ jobs:
           override: true
           components: rustfmt
       - name: Install Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v1
+        uses: actions/setup-node@v3
         with:
           node-version: ${{ matrix.node-version }}
       - name: Restore lerna
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           # npm cache files are stored in `~/.npm` on Linux/macOS
           path: |
@@ -47,11 +52,11 @@ jobs:
             node_modules
             rust/cubestore/node_modules
             packages/*/node_modules
-          key: ${{ runner.os }}-workspace-main-14.x-${{ hashFiles('**/yarn.lock') }}
+          key: ${{ runner.os }}-workspace-main-16.x-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-workspace-main-14.x-
+            ${{ runner.os }}-workspace-main-16.x-
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.5
+        run: yarn policies set-version v1.22.19
       - name: Yarn install
         uses: nick-invision/retry@v2
         env:
@@ -95,19 +100,19 @@ jobs:
         arch: ['', '-alpine']
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
           toolchain: nightly-2022-06-22
           override: true
           components: rustfmt
-      - name: Install Node.js 14.x
-        uses: actions/setup-node@v1
+      - name: Install Node.js 16.x
+        uses: actions/setup-node@v3
         with:
-          node-version: 14.x
+          node-version: 16.x
       - name: Restore lerna
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           # npm cache files are stored in `~/.npm` on Linux/macOS
           path: |
@@ -115,11 +120,11 @@ jobs:
             node_modules
             rust/cubestore/node_modules
             packages/*/node_modules
-          key: ${{ runner.os }}-workspace-main-14.x-${{ hashFiles('**/yarn.lock') }}
+          key: ${{ runner.os }}-workspace-main-16.x-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-workspace-main-14.x-
+            ${{ runner.os }}-workspace-main-16.x-
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.5
+        run: yarn policies set-version v1.22.19
       - name: Yarn install
         uses: nick-invision/retry@v2
         env:
@@ -164,19 +169,19 @@ jobs:
             container: cypress/browsers:node12.18.3-chrome89-ff86
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
           toolchain: nightly-2022-06-22
           override: true
           components: rustfmt
-      - name: Install Node.js 14.x
-        uses: actions/setup-node@v1
+      - name: Install Node.js 16.x
+        uses: actions/setup-node@v3
         with:
-          node-version: 14.x
+          node-version: 16.x
       - name: Restore lerna
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           # npm cache files are stored in `~/.npm` on Linux/macOS
           path: |
@@ -184,11 +189,11 @@ jobs:
             node_modules
             rust/cubestore/node_modules
             packages/*/node_modules
-          key: ${{ runner.os }}-workspace-main-14.x-${{ hashFiles('**/yarn.lock') }}
+          key: ${{ runner.os }}-workspace-main-16.x-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-workspace-main-14.x-
+            ${{ runner.os }}-workspace-main-16.x-
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.5
+        run: yarn policies set-version v1.22.19
       - name: Yarn install
         uses: nick-invision/retry@v2
         env:

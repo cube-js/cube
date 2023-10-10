@@ -6,23 +6,24 @@ import {
   Query,
   validateQuery,
   TransformedQuery,
+  getQueryMembers,
 } from '@cubejs-client/core';
 import {
   QueryBuilder,
   SchemaChangeProps,
   VizState,
 } from '@cubejs-client/react';
-import { Col, Row, Space } from 'antd';
+import { Alert, Col, Row, Space } from 'antd';
+import { SyncOutlined } from '@ant-design/icons';
 import React, { RefObject, useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
 
-import { Card } from '../../../atoms';
+import { Button, Card } from '../../../atoms';
 import { FatalError } from '../../../components/Error/FatalError';
 import ChartContainer from '../../../ChartContainer';
 import { SectionHeader, SectionRow } from '../../../components';
 import ChartRenderer from '../../../components/ChartRenderer/ChartRenderer';
 import Settings from '../../../components/Settings/Settings';
-import DashboardSource from '../../../DashboardSource';
 import { playgroundAction } from '../../../events';
 import {
   useDeepEffect,
@@ -35,7 +36,7 @@ import MemberGroup from '../../../QueryBuilder/MemberGroup';
 import SelectChartType from '../../../QueryBuilder/SelectChartType';
 import TimeGroup from '../../../QueryBuilder/TimeGroup';
 import { UIFramework } from '../../../types';
-import { dispatchPlaygroundEvent } from '../../../utils';
+import { containsPrivateFields, dispatchPlaygroundEvent } from '../../../utils';
 import {
   useChartRendererState,
   useChartRendererStateMethods,
@@ -170,7 +171,6 @@ export type PlaygroundQueryBuilderProps = {
   cubejsToken: string;
   queryId: string;
   defaultQuery?: Query;
-  dashboardSource?: DashboardSource;
   schemaVersion?: number;
   initialVizState?: VizState;
   extra?: React.FC<any>;
@@ -192,7 +192,6 @@ export function PlaygroundQueryBuilder({
   cubejsToken,
   defaultQuery,
   queryId,
-  dashboardSource,
   schemaVersion = 0,
   initialVizState,
   extra: Extra,
@@ -203,15 +202,20 @@ export function PlaygroundQueryBuilder({
 
   const isGraphQLSupported = useServerCoreVersionGte('0.29.0');
 
-  const { isChartRendererReady, queryStatus, queryError, queryRequestId } =
-    useChartRendererState(queryId);
+  const {
+    isChartRendererReady,
+    queryStatus,
+    queryError,
+    queryRequestId,
+    resultSetExists,
+  } = useChartRendererState(queryId);
   const {
     setQueryStatus,
     setQueryLoading,
     setChartRendererReady,
     setQueryError,
   } = useChartRendererStateMethods();
-  
+
   const { refreshToken } = useSecurityContext();
 
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -315,7 +319,7 @@ export function PlaygroundQueryBuilder({
         availableFilterMembers,
       }) => {
         let parsedDateRange;
-        
+
         if (dryRunResponse) {
           const { timeDimensions = [] } = dryRunResponse.pivotQuery || {};
           parsedDateRange = timeDimensions[0]?.dateRange;
@@ -323,6 +327,16 @@ export function PlaygroundQueryBuilder({
           // @ts-ignore
           parsedDateRange = query.timeDimensions[0].dateRange;
         }
+
+        const hasPrivateFields = containsPrivateFields(
+          getQueryMembers(query),
+          meta
+        );
+
+        const queriesEqual = areQueriesEqual(
+          validateQuery(query),
+          validateQuery(queryRef.current)
+        );
 
         return (
           <Wrapper data-testid={`query-builder-${queryId}`}>
@@ -413,6 +427,14 @@ export function PlaygroundQueryBuilder({
                       />
                     </Section>
                   </Row>
+
+                  {hasPrivateFields ? (
+                    <Alert
+                      type="warning"
+                      message="Some of the fields you have selected are private and will not be available for querying in production."
+                      style={{ marginTop: 16 }}
+                    />
+                  ) : null}
                 </Card>
 
                 <SectionRow
@@ -455,7 +477,9 @@ export function PlaygroundQueryBuilder({
                   <Space style={{ marginLeft: 'auto' }}>
                     {Extra ? (
                       <Extra
-                        queryRequestId={queryRequestId || queryError?.response?.requestId}
+                        queryRequestId={
+                          queryRequestId || queryError?.response?.requestId
+                        }
                         queryStatus={queryStatus}
                         error={queryError}
                       />
@@ -467,6 +491,23 @@ export function PlaygroundQueryBuilder({
                         query={query}
                         {...(queryStatus as QueryStatus)}
                       />
+                    ) : null}
+
+                    {resultSetExists && queriesEqual ? (
+                      <Button
+                        icon={<SyncOutlined />}
+                        onClick={async () => {
+                          await refreshToken();
+
+                          handleRunButtonClick({
+                            query: validateQuery(query),
+                            pivotConfig,
+                            chartType: chartType || 'line',
+                          });
+                        }}
+                      >
+                        Rerun query
+                      </Button>
                     ) : null}
                   </Space>
                 </SectionRow>
@@ -506,7 +547,6 @@ export function PlaygroundQueryBuilder({
                     pivotConfig={pivotConfig}
                     framework={framework}
                     chartingLibrary={chartingLibrary}
-                    dashboardSource={dashboardSource}
                     setFramework={(currentFramework) => {
                       if (currentFramework !== framework) {
                         setQueryLoading(queryId, false);
@@ -529,16 +569,18 @@ export function PlaygroundQueryBuilder({
                     isFetchingMeta={isFetchingMeta}
                     render={({ framework }) => {
                       if (richMetaError) {
-                        return <FatalError error={richMetaError} stack={metaErrorStack} />;
+                        return (
+                          <FatalError
+                            error={richMetaError}
+                            stack={metaErrorStack}
+                          />
+                        );
                       }
 
                       return (
                         <ChartRenderer
                           queryId={queryId}
-                          areQueriesEqual={areQueriesEqual(
-                            validateQuery(query),
-                            validateQuery(queryRef.current)
-                          )}
+                          areQueriesEqual={queriesEqual}
                           isFetchingMeta={isFetchingMeta}
                           queryError={queryError}
                           framework={framework}

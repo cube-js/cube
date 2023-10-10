@@ -47,16 +47,27 @@ export interface DownloadTableMemoryData extends DownloadTableBase {
 }
 
 export interface DownloadTableCSVData extends DownloadTableBase {
-  csvFile: string[];
   /**
-   * Some drivers know types of response
+   * An array of unloaded CSV data temporary URLs.
+   */
+  csvFile: string[];
+
+  /**
+   * Unloaded data fields types.
    */
   types?: TableStructure;
 
   /**
-   * Some drivers export csv files with no header row.
+   * Determine whether CSV file contains header or not.
    */
   csvNoHeader?: boolean;
+
+  csvDelimiter?: string;
+
+  /**
+   * The CSV file escape symbol.
+   */
+  exportBucketCsvEscapeSymbol?: string;
 }
 
 export interface StreamTableData extends DownloadTableBase {
@@ -69,6 +80,9 @@ export interface StreamTableData extends DownloadTableBase {
 
 export interface StreamingSourceTableData extends DownloadTableBase {
   streamingTable: string;
+  selectStatement?: string;
+  partitions?: number;
+  streamOffset?: string;
   streamingSource: {
     name: string;
     type: string;
@@ -94,24 +108,29 @@ export function isDownloadTableMemoryData(tableData: any): tableData is Download
 export type DownloadTableData = DownloadTableMemoryData | DownloadTableCSVData | StreamTableData | StreamingSourceTableData;
 
 export interface ExternalDriverCompatibilities {
-  csvImport?: true,
-  streamImport?: true,
+  csvImport?: boolean,
+  streamImport?: boolean,
 }
 
 export interface DriverCapabilities extends ExternalDriverCompatibilities {
-  unloadWithoutTempTable?: true,
+  unloadWithoutTempTable?: boolean,
   streamingSource?: boolean,
+  incrementalSchemaLoading?: boolean,
 }
 
 export type StreamOptions = {
   highWaterMark: number;
 };
 
+export type StreamingSourceOptions = {
+  streamOffset?: boolean;
+};
+
 export interface DownloadQueryResultsBase {
   types: TableStructure
 }
 
-export type DownloadQueryResultsOptions = StreamOptions & ExternalDriverCompatibilities;
+export type DownloadQueryResultsOptions = StreamOptions & ExternalDriverCompatibilities & StreamingSourceOptions;
 
 export type IndexesSQL = {
   sql: [string, unknown[]];
@@ -137,21 +156,41 @@ export type QueryOptions = {
   inlineTables?: InlineTables,
   [key: string]: any
 };
+
+export type ExternalCreateTableOptions = {
+  aggregationsColumns?: string[],
+  createTableIndexes?: CreateTableIndex[],
+  sealAt?: string
+};
 export type DownloadQueryResultsResult = DownloadQueryResultsBase & (DownloadTableMemoryData | DownloadTableCSVData | StreamTableData | StreamingSourceTableData | StreamTableDataWithTypes);
 
 // eslint-disable-next-line camelcase
 export type TableQueryResult = { table_name?: string, TABLE_NAME?: string };
 
+// eslint-disable-next-line camelcase
+export type QuerySchemasResult = { schema_name: string };
+
+// eslint-disable-next-line camelcase
+export type QueryTablesResult = { schema_name: string, table_name: string };
+
+// eslint-disable-next-line camelcase
+export type QueryColumnsResult = { schema_name: string, table_name: string } & TableColumnQueryResult;
+
 export interface DriverInterface {
-  createSchemaIfNotExists(schemaName: string): Promise<any>;
+  createSchemaIfNotExists(schemaName: string): Promise<void>;
   uploadTableWithIndexes(
-    table: string, columns: TableStructure, tableData: DownloadTableData, indexesSql: IndexesSQL, uniqueKeyColumns: string[], queryTracingObj: any, aggregationsColumns: string[], createTableIndexes: CreateTableIndex[]
+    table: string, columns: TableStructure, tableData: DownloadTableData, indexesSql: IndexesSQL, uniqueKeyColumns: string[], queryTracingObj: any, externalOptions: ExternalCreateTableOptions
   ): Promise<void>;
   loadPreAggregationIntoTable: (preAggregationTableName: string, loadSql: string, params: any, options: any) => Promise<any>;
   //
   query<R = unknown>(query: string, params: unknown[], options?: QueryOptions): Promise<R[]>;
   //
   tableColumnTypes: (table: string) => Promise<TableStructure>;
+  queryColumnTypes: (sql: string, params?: unknown[]) => Promise<{ name: any; type: string; }[]>;
+  //
+  getSchemas: () => Promise<QuerySchemasResult[]>;
+  getTablesForSpecificSchemas: (schemas: QuerySchemasResult[]) => Promise<QueryTablesResult[]>;
+  getColumnsForSpecificTables: (tables: QueryTablesResult[]) => Promise<QueryColumnsResult[]>;
   // eslint-disable-next-line camelcase
   getTablesQuery: (schemaName: string) => Promise<TableQueryResult[]>;
   // Remove table from database
@@ -159,13 +198,25 @@ export interface DriverInterface {
   // Download data from Query (for readOnly)
   downloadQueryResults: (query: string, values: unknown[], options: DownloadQueryResultsOptions) => Promise<DownloadQueryResultsResult>;
   // Download table
-  downloadTable: (table: string, options: ExternalDriverCompatibilities) => Promise<DownloadTableMemoryData | DownloadTableCSVData>;
-  // Some drivers can implement streaming from SQL
+  downloadTable: (table: string, options: ExternalDriverCompatibilities & StreamingSourceOptions) => Promise<DownloadTableMemoryData | DownloadTableCSVData>;
+  
+  /**
+   * Returns stream table object that includes query result stream and
+   * queried fields types.
+   */
   stream?: (table: string, values: unknown[], options: StreamOptions) => Promise<StreamTableData>;
-  // Some drivers can implement UNLOAD data to external storage
+  
+  /**
+   * Returns to the Cubestore an object with links to unloaded to an
+   * export bucket data.
+   */
   unload?: (table: string, options: UnloadOptions) => Promise<DownloadTableCSVData>;
-  // Some drivers can implement UNLOAD data to external storage
+  
+  /**
+   * Determines whether export bucket feature is configured or not.
+   */
   isUnloadSupported?: (options: UnloadOptions) => Promise<boolean>;
+  
   // Current timestamp, defaults to new Date().getTime()
   nowTimestamp(): number;
   // Shutdown the driver

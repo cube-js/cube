@@ -12,7 +12,9 @@ import {
   BaseDriver,
   DownloadQueryResultsOptions,
   DownloadQueryResultsResult,
+  DriverCapabilities,
   DriverInterface,
+  QuerySchemasResult,
   StreamOptions,
   StreamTableDataWithTypes,
 } from '@cubejs-backend/base-driver';
@@ -77,11 +79,26 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
    */
   public constructor(
     config: ClickHouseDriverOptions & {
+      /**
+       * Data source name.
+       */
       dataSource?: string,
+
+      /**
+       * Max pool size value for the [cube]<-->[db] pool.
+       */
       maxPoolSize?: number,
+
+      /**
+       * Time to wait for a response from a connection after validation
+       * request before determining it as not valid. Default - 10000 ms.
+       */
+      testConnectionTimeout?: number,
     } = {},
   ) {
-    super();
+    super({
+      testConnectionTimeout: config.testConnectionTimeout,
+    });
 
     const dataSource =
       config.dataSource ||
@@ -179,7 +196,9 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
   }
 
   public readOnly() {
-    return !!this.config.readOnly || this.readOnlyMode;
+    return (this.config.readOnly != null || this.readOnlyMode) ?
+      (!!this.config.readOnly || this.readOnlyMode) :
+      true;
   }
 
   public async query(query: string, values: unknown[]) {
@@ -249,6 +268,40 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
         FROM system.columns
        WHERE database = '${this.config.queryOptions.database}'
     `;
+  }
+
+  protected override getTablesForSpecificSchemasQuery(schemasPlaceholders: string) {
+    const query = `
+      SELECT database as schema_name,
+            name as table_name
+      FROM system.tables
+      WHERE database IN (${schemasPlaceholders})
+    `;
+    return query;
+  }
+
+  protected override getColumnsForSpecificTablesQuery(conditionString: string) {
+    const query = `
+      SELECT name as ${this.quoteIdentifier('column_name')},
+             table as ${this.quoteIdentifier('table_name')},
+             database as ${this.quoteIdentifier('schema_name')},
+             type as ${this.quoteIdentifier('data_type')}
+      FROM system.columns
+      WHERE ${conditionString}
+    `;
+    return query;
+  }
+
+  protected override getColumnNameForSchemaName() {
+    return 'database';
+  }
+
+  protected override getColumnNameForTableName() {
+    return 'table';
+  }
+
+  public override async getSchemas(): Promise<QuerySchemasResult[]> {
+    return [{ schema_name: this.config.queryOptions.database }];
   }
 
   public async stream(
@@ -340,7 +393,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
      * Nullable(DateTime('UTC'))
      */
     if (columnType.includes('(')) {
-      const types = columnType.toLowerCase().match(/([a-z']+)/g);
+      const types = columnType.toLowerCase().match(/([a-z0-9']+)/g);
       if (types) {
         for (const type of types) {
           if (type in ClickhouseTypeToGeneric) {
@@ -353,11 +406,17 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     return super.toGenericType(columnType);
   }
 
-  public async createSchemaIfNotExists(schemaName: string): Promise<unknown[]> {
-    return this.query(`CREATE DATABASE IF NOT EXISTS ${schemaName}`, []);
+  public async createSchemaIfNotExists(schemaName: string): Promise<void> {
+    await this.query(`CREATE DATABASE IF NOT EXISTS ${schemaName}`, []);
   }
 
   public getTablesQuery(schemaName: string) {
     return this.query('SELECT name as table_name FROM system.tables WHERE database = ?', [schemaName]);
+  }
+
+  public capabilities(): DriverCapabilities {
+    return {
+      incrementalSchemaLoading: true,
+    };
   }
 }

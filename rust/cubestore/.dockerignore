@@ -2,5 +2,10 @@ target
 Dockerfile
 .cubestore
 upstream
+dist
+js-wrapper
+bin
+cross
+downloaded
 cubestore/.cubestore
 cubestore/upstream

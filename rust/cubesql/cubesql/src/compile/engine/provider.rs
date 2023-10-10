@@ -45,16 +45,18 @@ use super::information_schema::postgres::{
     InfoSchemaTestingBlockingProvider, InfoSchemaTestingDatasetProvider, PgCatalogAmProvider,
     PgCatalogAttrdefProvider, PgCatalogAttributeProvider, PgCatalogClassProvider,
     PgCatalogConstraintProvider, PgCatalogDatabaseProvider, PgCatalogDependProvider,
-    PgCatalogDescriptionProvider, PgCatalogEnumProvider, PgCatalogIndexProvider,
-    PgCatalogMatviewsProvider, PgCatalogNamespaceProvider, PgCatalogProcProvider,
-    PgCatalogRangeProvider, PgCatalogRolesProvider, PgCatalogSequenceProvider,
-    PgCatalogSettingsProvider, PgCatalogStatActivityProvider, PgCatalogStatioUserTablesProvider,
-    PgCatalogStatsProvider, PgCatalogTableProvider, PgCatalogTypeProvider,
-    PgPreparedStatementsProvider,
+    PgCatalogDescriptionProvider, PgCatalogEnumProvider, PgCatalogExtensionProvider,
+    PgCatalogIndexProvider, PgCatalogMatviewsProvider, PgCatalogNamespaceProvider,
+    PgCatalogProcProvider, PgCatalogRangeProvider, PgCatalogRolesProvider,
+    PgCatalogSequenceProvider, PgCatalogSettingsProvider, PgCatalogStatActivityProvider,
+    PgCatalogStatioUserTablesProvider, PgCatalogStatsProvider, PgCatalogTableProvider,
+    PgCatalogTypeProvider, PgCatalogUserProvider, PgPreparedStatementsProvider,
 };
 
 use super::information_schema::redshift::{
-    RedshiftLateBindingViewUnpackedTableProvider, RedshiftSvvExternalSchemasTableProvider,
+    RedshiftLateBindingViewUnpackedTableProvider, RedshiftStlDdltextProvider,
+    RedshiftStlQueryProvider, RedshiftStlQuerytextProvider,
+    RedshiftSvvExternalSchemasTableProvider, RedshiftSvvTableInfoProvider,
     RedshiftSvvTablesTableProvider,
 };
 
@@ -332,10 +334,22 @@ impl DatabaseProtocol {
             "pg_catalog.pg_sequence".to_string()
         } else if let Some(_) = any.downcast_ref::<PgCatalogStatsProvider>() {
             "pg_catalog.pg_stats".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogUserProvider>() {
+            "pg_catalog.pg_user".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogExtensionProvider>() {
+            "pg_catalog.pg_extension".to_string()
         } else if let Some(_) = any.downcast_ref::<RedshiftSvvTablesTableProvider>() {
             "public.svv_tables".to_string()
         } else if let Some(_) = any.downcast_ref::<RedshiftSvvExternalSchemasTableProvider>() {
             "public.svv_external_schemas".to_string()
+        } else if let Some(_) = any.downcast_ref::<RedshiftSvvTableInfoProvider>() {
+            "public.svv_table_info".to_string()
+        } else if let Some(_) = any.downcast_ref::<RedshiftStlDdltextProvider>() {
+            "public.stl_ddltext".to_string()
+        } else if let Some(_) = any.downcast_ref::<RedshiftStlQueryProvider>() {
+            "public.stl_query".to_string()
+        } else if let Some(_) = any.downcast_ref::<RedshiftStlQuerytextProvider>() {
+            "public.stl_querytext".to_string()
         } else if let Some(_) = any.downcast_ref::<RedshiftLateBindingViewUnpackedTableProvider>() {
             "public.get_late_binding_view_cols_unpacked".to_string()
         } else if let Some(_) = any.downcast_ref::<PostgresSchemaConstraintColumnUsageProvider>() {
@@ -361,7 +375,7 @@ impl DatabaseProtocol {
     ) -> Option<std::sync::Arc<dyn datasource::TableProvider>> {
         let (_, schema, table) = match tr {
             datafusion::catalog::TableReference::Partial { schema, table, .. } => (
-                "db".to_string(),
+                context.session_state.database().unwrap_or("db".to_string()),
                 schema.to_ascii_lowercase(),
                 table.to_ascii_lowercase(),
             ),
@@ -377,13 +391,13 @@ impl DatabaseProtocol {
             datafusion::catalog::TableReference::Bare { table } => {
                 if table.starts_with("pg_") {
                     (
-                        "db".to_string(),
+                        context.session_state.database().unwrap_or("db".to_string()),
                         "pg_catalog".to_string(),
                         table.to_ascii_lowercase(),
                     )
                 } else {
                     (
-                        "db".to_string(),
+                        context.session_state.database().unwrap_or("db".to_string()),
                         "public".to_string(),
                         table.to_ascii_lowercase(),
                     )
@@ -408,12 +422,22 @@ impl DatabaseProtocol {
                 match table.as_str() {
                     "svv_tables" => {
                         return Some(Arc::new(RedshiftSvvTablesTableProvider::new(
+                            &context.session_state.database().unwrap_or("db".to_string()),
                             &context.meta.cubes,
                         )))
                     }
                     "svv_external_schemas" => {
                         return Some(Arc::new(RedshiftSvvExternalSchemasTableProvider::new()))
                     }
+                    "svv_table_info" => {
+                        return Some(Arc::new(RedshiftSvvTableInfoProvider::new(
+                            &context.session_state.database().unwrap_or("db".to_string()),
+                            &context.meta.tables,
+                        )))
+                    }
+                    "stl_ddltext" => return Some(Arc::new(RedshiftStlDdltextProvider::new())),
+                    "stl_query" => return Some(Arc::new(RedshiftStlQueryProvider::new())),
+                    "stl_querytext" => return Some(Arc::new(RedshiftStlQuerytextProvider::new())),
                     "get_late_binding_view_cols_unpacked" => {
                         return Some(Arc::new(RedshiftLateBindingViewUnpackedTableProvider::new()))
                     }
@@ -423,11 +447,13 @@ impl DatabaseProtocol {
             "information_schema" => match table.as_str() {
                 "columns" => {
                     return Some(Arc::new(PostgresSchemaColumnsProvider::new(
+                        &context.session_state.database().unwrap_or("db".to_string()),
                         &context.meta.cubes,
                     )))
                 }
                 "tables" => {
                     return Some(Arc::new(PostgresSchemaTableProvider::new(
+                        &context.session_state.database().unwrap_or("db".to_string()),
                         &context.meta.cubes,
                     )))
                 }
@@ -444,13 +470,15 @@ impl DatabaseProtocol {
                 }
                 "role_table_grants" => {
                     return Some(Arc::new(PostgresInfoSchemaRoleTableGrantsProvider::new(
-                        context.session_state.user().unwrap_or("test".to_string()),
+                        &context.session_state.database().unwrap_or("db".to_string()),
+                        &context.session_state.user().unwrap_or("test".to_string()),
                         &context.meta.cubes,
                     )))
                 }
                 "role_column_grants" => {
                     return Some(Arc::new(PostgresInfoSchemaRoleColumnGrantsProvider::new(
-                        context.session_state.user().unwrap_or("test".to_string()),
+                        &context.session_state.database().unwrap_or("db".to_string()),
+                        &context.session_state.user().unwrap_or("test".to_string()),
                         &context.meta.cubes,
                     )))
                 }
@@ -473,7 +501,10 @@ impl DatabaseProtocol {
             },
             "pg_catalog" => match table.as_str() {
                 "pg_tables" => {
-                    return Some(Arc::new(PgCatalogTableProvider::new(&context.meta.cubes)))
+                    return Some(Arc::new(PgCatalogTableProvider::new(
+                        &context.session_state.user().unwrap_or("test".to_string()),
+                        &context.meta.cubes,
+                    )))
                 }
                 "pg_type" => {
                     return Some(Arc::new(PgCatalogTypeProvider::new(&context.meta.tables)))
@@ -531,6 +562,12 @@ impl DatabaseProtocol {
                 "pg_stats" => {
                     return Some(Arc::new(PgCatalogStatsProvider::new(&context.meta.tables)))
                 }
+                "pg_user" => {
+                    return Some(Arc::new(PgCatalogUserProvider::new(
+                        &context.session_state.user().unwrap_or("test".to_string()),
+                    )))
+                }
+                "pg_extension" => return Some(Arc::new(PgCatalogExtensionProvider::new())),
                 _ => return None,
             },
             _ => return None,

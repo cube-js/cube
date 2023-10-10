@@ -5,10 +5,10 @@
       "path": "packages/cubejs-backend-shared"
     },
     {
-      "path": "packages/cubejs-backend-native"
+      "path": "packages/cubejs-templates"
     },
     {
-      "path": "packages/cubejs-templates"
+      "path": "packages/cubejs-backend-native"
     },
     {
       "path": "packages/cubejs-backend-cloud"
@@ -17,10 +17,13 @@
       "path": "packages/cubejs-backend-maven"
     },
     {
-      "path": "packages/cubejs-api-gateway"
+      "path": "packages/cubejs-base-driver"
     },
     {
-      "path": "packages/cubejs-base-driver"
+      "path": "rust/cubestore"
+    },
+    {
+      "path": "packages/cubejs-cubestore-driver"
     },
     {
       "path": "packages/cubejs-query-orchestrator"
@@ -30,6 +33,9 @@
     },
     {
       "path": "packages/cubejs-testing-shared"
+    },
+    {
+      "path": "packages/cubejs-api-gateway"
     },
     {
       "path": "packages/cubejs-testing"
@@ -45,6 +51,9 @@
     },
     {
       "path": "packages/cubejs-postgres-driver"
+    },
+    {
+      "path": "packages/cubejs-duckdb-driver"
     },
     {
       "path": "packages/cubejs-questdb-driver"
@@ -83,16 +92,19 @@
       "path": "packages/cubejs-databricks-jdbc-driver"
     },
     {
-      "path": "rust/cubestore"
+      "path": "packages/cubejs-prestodb-driver"
     },
     {
-      "path": "packages/cubejs-cubestore-driver"
+      "path": "packages/cubejs-trino-driver"
     },
     {
       "path": "packages/cubejs-server-core"
     },
     {
       "path": "packages/cubejs-server"
+    },
+    {
+      "path": "packages/cubejs-testing-drivers"
     },
     {
       "path": "packages/cubejs-cli"

@@ -1,0 +1,64 @@
+---
+title: SQL API Reference Templates
+category: Internal
+---
+
+## Function/operator template
+
+Find and replace the following placeholders:
+
+- `FN_NAME` with the SQL function or operator name
+- `FN_ARGS` with the function arguments
+- `FN_DESCRIPTION` with the function or operator description
+- `SELECT_EXAMPLE_OUTPUT` with the output of a selection SQL example
+- `PROJECT_EXAMPLE_OUTPUT` with the output of a projection SQL example
+- `OUTER_QUERY_EXAMPLE_OUTPUT` with the output of an outer query SQL example
+
+Complete the following tasks:
+
+- Test the function/operator as per the Cube Query Rewrite support table
+- Save the outputs and use them as examples, remove unsupported examples if
+  necessary
+  - Update the Cube Query Rewrite support table
+
+### <--{"id" : "String Functions and Operators"}--> FN_NAME
+
+<WarningBox heading={"Cube Query Rewrite"}>
+
+Within a Cube Query Rewrite, this function/operator may behave differently. Use
+the table below for support:
+
+|           | Selections | Projections | Outer Query                              |
+| --------- | ---------- | ----------- | ---------------------------------------- |
+| `FN_NAME` | ❓         | ❓          | [✅][ref-backend-sql-query-fundamentals] |
+
+</WarningBox>
+
+FN_DESCRIPTION
+
+```sql
+FN_NAME(FN_ARGS)
+```
+
+The example below uses `FN_NAME` in a selection within a Cube query rewrite:
+
+```sql
+SELECT COUNT(*) FROM Orders WHERE FN_NAME(Orders.status) = 'completed';
+SELECT_EXAMPLE_OUTPUT
+```
+
+The example below uses `FN_NAME` in a projection within a Cube query rewrite:
+
+```sql
+SELECT FN_NAME(Orders.status) FROM Orders LIMIT 1;
+PROJECT_EXAMPLE_OUTPUT
+```
+
+The example below uses `FN_NAME` in post-processing with an outer query:
+
+```sql
+SELECT FN_NAME(Orders.status)
+FROM (SELECT * FROM Orders) orders
+LIMIT 1;
+OUTER_QUERY_EXAMPLE_OUTPUT
+```

@@ -12,6 +12,8 @@ export const Code = styled.pre`
   font-size: 13px;
   white-space: pre-wrap;
   margin: 0;
+  max-width: 100%;
+  overflow: auto;
 `;
 
 type CubeError = Error & {
@@ -27,11 +29,11 @@ type FatalErrorProps = {
 
 export function FatalError({ error, stack }: FatalErrorProps) {
   const [visible, setVisible] = useState(false);
-  
+
   const ansiHtmlError = useMemo(() => {
     return generateAnsiHTML(error.toString()).replace(/(Error:\s)/g, '');
   }, [error])
-  
+
   const errorStack = stack || (typeof error !== 'string' ? error.response?.stack  : null);
 
   return (

@@ -1,9 +1,9 @@
-use super::{BaseRocksSecondaryIndex, IndexId, RocksSecondaryIndex, RocksTable, TableId};
+use super::{IndexId, RocksSecondaryIndex, TableId};
 use crate::base_rocks_secondary_index;
-use crate::metastore::{DataFrameValue, IdRow, MetaStoreEvent};
+use crate::metastore::{DataFrameValue, RocksEntity};
 use crate::rocks_table_impl;
 use byteorder::{BigEndian, WriteBytesExt};
-use rocksdb::DB;
+
 use serde::{Deserialize, Deserializer, Serialize};
 use std::io::{Cursor, Write};
 
@@ -13,6 +13,12 @@ pub enum SourceCredentials {
         user: Option<String>,
         password: Option<String>,
         url: String,
+    },
+    Kafka {
+        user: Option<String>,
+        password: Option<String>,
+        host: String,
+        use_ssl: bool,
     },
 }
 
@@ -29,6 +35,8 @@ pub struct Source {
     source_credentials: SourceCredentials
 }
 }
+
+impl RocksEntity for Source {}
 
 impl Source {
     pub fn new(name: String, source_credentials: SourceCredentials) -> Self {

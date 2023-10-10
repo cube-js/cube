@@ -35,7 +35,7 @@ export class LivePreviewWatcher {
       };
 
       return this.auth;
-    } catch (e) {
+    } catch (e: any) {
       internalExceptions(e);
       throw new Error('Live-preview token is invalid');
     }
@@ -123,7 +123,7 @@ export class LivePreviewWatcher {
         this.uploading = true;
         await this.deploy();
       }
-    } catch (e) {
+    } catch (e: any) {
       if (e.response && e.response.statusCode === 302) {
         this.auth = null;
         this.stopWatch('token expired or invalid, please re-run live-preview mode');

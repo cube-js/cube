@@ -1,0 +1,7 @@
+{
+  "extends": "ts-node/node16/tsconfig.json",
+  "compilerOptions": {
+
+  },
+  "include": ["./migrate-content.ts"]
+}

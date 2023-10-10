@@ -20,8 +20,8 @@ class PostgresParamAllocator extends ParamAllocator {
 }
 
 export class PostgresQuery extends BaseQuery {
-  newParamAllocator() {
-    return new PostgresParamAllocator();
+  newParamAllocator(expressionParams) {
+    return new PostgresParamAllocator(expressionParams);
   }
 
   convertTz(field) {
@@ -44,11 +44,16 @@ export class PostgresQuery extends BaseQuery {
     return `round(hll_cardinality(hll_add_agg(hll_hash_any(${sql}))))`;
   }
 
-  preAggregationTableName(cube, preAggregationName, skipSchema) {
-    const name = super.preAggregationTableName(cube, preAggregationName, skipSchema);
-    if (name.length > 64) {
-      throw new UserError(`Postgres can not work with table names that longer than 64 symbols. Consider using the 'sqlAlias' attribute in your cube and in your pre-aggregation definition for ${name}.`);
-    }
-    return name;
+  sqlTemplates() {
+    const templates = super.sqlTemplates();
+    // eslint-disable-next-line no-template-curly-in-string
+    templates.params.param = '${{ param_index + 1 }}';
+    templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
+    templates.functions.CONCAT = 'CONCAT({% for arg in args %}CAST({{arg}} AS TEXT){% if not loop.last %},{% endif %}{% endfor %})';
+    templates.functions.DATEPART = 'DATE_PART({{ args_concat }})';
+    templates.expressions.interval = 'INTERVAL \'{{ interval }}\'';
+    templates.expressions.extract = 'EXTRACT({{ date_part }} FROM {{ expr }})';
+
+    return templates;
   }
 }

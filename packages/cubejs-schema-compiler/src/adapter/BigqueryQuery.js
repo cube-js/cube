@@ -144,4 +144,15 @@ export class BigqueryQuery extends BaseQuery {
       every: '2 minutes'
     };
   }
+
+  sqlTemplates() {
+    const templates = super.sqlTemplates();
+    templates.quotes.identifiers = '`';
+    templates.quotes.escape = '\\`';
+    templates.functions.DATETRUNC = 'DATETIME_TRUNC(CAST({{ args[1] }} AS DATETIME), {{ date_part }})';
+    templates.expressions.binary = '{% if op == \'%\' %}MOD({{ left }}, {{ right }}){% else %}({{ left }} {{ op }} {{ right }}){% endif %}';
+    templates.expressions.interval = 'INTERVAL {{ interval }}';
+    templates.expressions.extract = 'EXTRACT({% if date_part == \'DOW\' %}DAYOFWEEK{% elif date_part == \'DOY\' %}DAYOFYEAR{% else %}{{ date_part }}{% endif %} FROM {{ expr }})';
+    return templates;
+  }
 }

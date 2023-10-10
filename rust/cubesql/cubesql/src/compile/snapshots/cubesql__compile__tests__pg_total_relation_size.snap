@@ -6,6 +6,6 @@ expression: "execute_query(\"SELECT\n                    oid,\n                 
 | oid   | relname                   | relsize |
 +-------+---------------------------+---------+
 | 18000 | KibanaSampleDataEcommerce | 8192    |
-| 18014 | Logs                      | 8192    |
-| 18020 | NumberCube                | 8192    |
+| 18018 | Logs                      | 8192    |
+| 18028 | NumberCube                | 8192    |
 +-------+---------------------------+---------+

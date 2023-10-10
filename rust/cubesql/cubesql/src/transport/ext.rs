@@ -25,14 +25,27 @@ impl V1CubeMetaMeasureExt for V1CubeMetaMeasure {
 
                 agg_type.eq(&"countDistinct".to_string())
                     || agg_type.eq(&"countDistinctApprox".to_string())
+                    || agg_type.eq(&"number".to_string())
             } else if expect_agg_type.eq(&"sum".to_string()) {
                 let agg_type = self.agg_type.as_ref().unwrap();
 
                 agg_type.eq(&"sum".to_string())
                     || agg_type.eq(&"count".to_string())
                     || agg_type.eq(&"number".to_string())
+            } else if expect_agg_type.eq(&"min".to_string())
+                || expect_agg_type.eq(&"max".to_string())
+            {
+                let agg_type = self.agg_type.as_ref().unwrap();
+
+                agg_type.eq(&"number".to_string())
+                    || agg_type.eq(&"string".to_string())
+                    || agg_type.eq(&"time".to_string())
+                    || agg_type.eq(&"boolean".to_string())
+                    || agg_type.eq(expect_agg_type)
             } else {
-                self.agg_type.as_ref().unwrap().eq(expect_agg_type)
+                let agg_type = self.agg_type.as_ref().unwrap();
+
+                agg_type.eq(&"number".to_string()) || agg_type.eq(expect_agg_type)
             }
         } else {
             false
@@ -113,6 +126,7 @@ impl V1CubeMetaDimensionExt for V1CubeMetaDimension {
 
 #[derive(Debug)]
 pub struct CubeColumn {
+    member_name: String,
     name: String,
     description: Option<String>,
     column_type: ColumnType,
@@ -120,6 +134,10 @@ pub struct CubeColumn {
 }
 
 impl CubeColumn {
+    pub fn member_name(&self) -> &String {
+        &self.member_name
+    }
+
     pub fn get_name(&self) -> &String {
         &self.name
     }
@@ -174,6 +192,7 @@ impl V1CubeMetaExt for V1CubeMeta {
 
         for measure in &self.measures {
             columns.push(CubeColumn {
+                member_name: measure.name.clone(),
                 name: measure.get_real_name(),
                 description: None,
                 column_type: measure.get_sql_type(),
@@ -183,6 +202,7 @@ impl V1CubeMetaExt for V1CubeMeta {
 
         for dimension in &self.dimensions {
             columns.push(CubeColumn {
+                member_name: dimension.name.clone(),
                 name: dimension.get_real_name(),
                 description: None,
                 column_type: dimension.get_sql_type(),
@@ -192,6 +212,7 @@ impl V1CubeMetaExt for V1CubeMeta {
 
         for segment in &self.segments {
             columns.push(CubeColumn {
+                member_name: segment.name.clone(),
                 name: segment.get_real_name(),
                 description: None,
                 column_type: ColumnType::Boolean,
@@ -200,8 +221,17 @@ impl V1CubeMetaExt for V1CubeMeta {
         }
 
         columns.push(CubeColumn {
+            member_name: "__user".to_string(),
             name: "__user".to_string(),
             description: Some("Virtual column for security context switching".to_string()),
+            column_type: ColumnType::String,
+            can_be_null: true,
+        });
+
+        columns.push(CubeColumn {
+            member_name: "__cubeJoinField".to_string(),
+            name: "__cubeJoinField".to_string(),
+            description: Some("Virtual column for joining cubes".to_string()),
             column_type: ColumnType::String,
             can_be_null: true,
         });
@@ -214,6 +244,7 @@ impl V1CubeMetaExt for V1CubeMeta {
 
         for measure in &self.measures {
             columns.push(CubeColumn {
+                member_name: measure.name.clone(),
                 name: measure.get_real_name(),
                 description: None,
                 column_type: measure.get_sql_type(),
@@ -223,6 +254,7 @@ impl V1CubeMetaExt for V1CubeMeta {
 
         for dimension in &self.dimensions {
             columns.push(CubeColumn {
+                member_name: dimension.name.clone(),
                 name: dimension.get_real_name(),
                 description: None,
                 column_type: dimension.get_sql_type(),

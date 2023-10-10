@@ -1,8 +1,10 @@
 import R from 'ramda';
 import { getEnv } from '@cubejs-backend/shared';
+import { camelize } from 'inflection';
 
 import { UserError } from './UserError';
 import { DynamicReference } from './DynamicReference';
+import { camelizeCube } from './utils';
 
 const FunctionRegex = /function\s+\w+\(([A-Za-z0-9_,]*)|\(([\s\S]*?)\)\s*=>|\(?(\w+)\)?\s*=>/;
 const CONTEXT_SYMBOLS = {
@@ -15,12 +17,13 @@ const CONTEXT_SYMBOLS = {
 const CURRENT_CUBE_CONSTANTS = ['CUBE', 'TABLE'];
 
 export class CubeSymbols {
-  constructor() {
+  constructor(evaluateViews) {
     this.symbols = {};
     this.builtCubes = {};
     this.cubeDefinitions = {};
     this.funcArgumentsValues = {};
     this.cubeList = [];
+    this.evaluateViews = evaluateViews || false;
   }
 
   compile(cubes, errorReporter) {
@@ -29,10 +32,13 @@ export class CubeSymbols {
       R.fromPairs
     )(cubes);
     this.cubeList = cubes.map(c => (c.name ? this.getCubeDefinition(c.name) : this.createCube(c)));
-    this.symbols = R.pipe(
-      R.map((c) => [c.name, this.transform(c.name, errorReporter.inContext(`${c.name} cube`))]),
-      R.fromPairs
+    // TODO support actual dependency sorting to allow using views inside views
+    const sortedByDependency = R.pipe(
+      R.sortBy(c => !!c.isView),
     )(cubes);
+    for (const cube of sortedByDependency) {
+      this.symbols[cube.name] = this.transform(cube.name, errorReporter.inContext(`${cube.name} cube`));
+    }
   }
 
   getCubeDefinition(cubeName) {
@@ -40,6 +46,7 @@ export class CubeSymbols {
       const cubeDefinition = this.cubeDefinitions[cubeName];
       this.builtCubes[cubeName] = this.createCube(cubeDefinition);
     }
+
     return this.builtCubes[cubeName];
   }
 
@@ -47,6 +54,7 @@ export class CubeSymbols {
     let measures;
     let dimensions;
     let segments;
+
     const cubeObject = Object.assign({
       allDefinitions(type) {
         if (cubeDefinition.extends) {
@@ -117,8 +125,20 @@ export class CubeSymbols {
       errorReporter.error(`${duplicateNames.join(', ')} defined more than once`);
     }
 
+    camelizeCube(cube);
+
+    this.camelCaseTypes(cube.joins);
+    this.camelCaseTypes(cube.measures);
+    this.camelCaseTypes(cube.dimensions);
+    this.camelCaseTypes(cube.segments);
+    this.camelCaseTypes(cube.preAggregations);
+
     if (cube.preAggregations) {
       this.transformPreAggregations(cube.preAggregations);
+    }
+
+    if (this.evaluateViews) {
+      this.prepareIncludes(cube, errorReporter);
     }
 
     return Object.assign(
@@ -128,6 +148,25 @@ export class CubeSymbols {
       cube.segments || {},
       cube.preAggregations || {}
     );
+  }
+
+  /**
+   * @private
+   */
+  camelCaseTypes(obj) {
+    if (!obj) {
+      return;
+    }
+
+    // eslint-disable-next-line no-restricted-syntax
+    for (const member of Object.values(obj)) {
+      if (member.type && member.type.indexOf('_') !== -1) {
+        member.type = camelize(member.type, true);
+      }
+      if (member.relationship && member.relationship.indexOf('_') !== -1) {
+        member.relationship = camelize(member.relationship, true);
+      }
+    }
   }
 
   transformPreAggregations(preAggregations) {
@@ -165,6 +204,189 @@ export class CubeSymbols {
         index.type = 'regular';
       }
     }
+  }
+
+  /**
+   * @protected
+   */
+  prepareIncludes(cube, errorReporter) {
+    if (!cube.includes && !cube.cubes) {
+      return;
+    }
+    const types = ['measures', 'dimensions', 'segments'];
+    for (const type of types) {
+      const cubeIncludes = cube.cubes && this.membersFromCubes(cube.cubes, type, errorReporter) || [];
+      const includes = cube.includes && this.membersFromIncludeExclude(cube.includes, cube.name, type) || [];
+      const excludes = cube.excludes && this.membersFromIncludeExclude(cube.excludes, cube.name, type) || [];
+      // cube includes will take precedence in case of member clash
+      const finalIncludes = this.diffByMember(this.diffByMember(includes, cubeIncludes).concat(cubeIncludes), excludes);
+      const includeMembers = this.generateIncludeMembers(finalIncludes, cube.name, type);
+      for (const [memberName, memberDefinition] of includeMembers) {
+        if (cube[type]?.[memberName]) {
+          errorReporter.error(`Included member '${memberName}' conflicts with existing member of '${cube.name}'. Please consider excluding this member.`);
+        } else {
+          cube[type][memberName] = memberDefinition;
+        }
+      }
+    }
+  }
+
+  /**
+   * @protected
+   */
+  membersFromCubes(cubes, type, errorReporter) {
+    return R.unnest(cubes.map(cubeInclude => {
+      const fullPath = this.evaluateReferences(null, cubeInclude.joinPath, { collectJoinHints: true });
+      const split = fullPath.split('.');
+      const cubeReference = split[split.length - 1];
+      const cubeName = cubeInclude.alias || cubeReference;
+      let includes;
+      const fullMemberName = (memberName) => (cubeInclude.prefix ? `${cubeName}_${memberName}` : memberName);
+      if (cubeInclude.includes === '*') {
+        const membersObj = this.symbols[cubeReference]?.cubeObj()?.[type] || {};
+        includes = Object.keys(membersObj).map(memberName => ({ member: `${fullPath}.${memberName}`, name: fullMemberName(memberName) }));
+      } else {
+        includes = cubeInclude.includes.map(include => {
+          const member = include.alias || include;
+          if (member.indexOf('.') !== -1) {
+            errorReporter.error(`Paths aren't allowed in cube includes but '${member}' provided as include member`);
+          }
+          const name = fullMemberName(include.alias || member);
+          if (include.name) {
+            const resolvedMember = this.symbols[cubeReference]?.cubeObj()?.[type]?.[include.name];
+            return resolvedMember ? {
+              member: `${fullPath}.${include.name}`,
+              name,
+            } : undefined;
+          } else {
+            const resolvedMember = this.symbols[cubeReference]?.cubeObj()?.[type]?.[include];
+            return resolvedMember ? {
+              member: `${fullPath}.${include}`,
+              name
+            } : undefined;
+          }
+        });
+      }
+
+      const excludes = (cubeInclude.excludes || []).map(exclude => {
+        if (exclude.indexOf('.') !== -1) {
+          errorReporter.error(`Paths aren't allowed in cube excludes but '${exclude}' provided as exclude member`);
+        }
+        const resolvedMember = this.symbols[cubeReference]?.cubeObj()?.[type]?.[exclude];
+        return resolvedMember ? {
+          member: `${cubeReference}.${exclude}`
+        } : undefined;
+      });
+      return this.diffByMember(includes.filter(Boolean), excludes.filter(Boolean));
+    }));
+  }
+
+  diffByMember(includes, excludes) {
+    const excludesMap = new Map();
+    for (const exclude of excludes) {
+      excludesMap.set(exclude.member, true);
+    }
+    return includes.filter(include => !excludesMap.get(include.member));
+  }
+
+  membersFromIncludeExclude(referencesFn, cubeName, type) {
+    const references = this.evaluateReferences(cubeName, referencesFn);
+    return R.unnest(references.map(ref => {
+      const path = ref.split('.');
+      if (path.length === 1) {
+        const membersObj = this.symbols[path[0]]?.cubeObj()?.[type] || {};
+        return Object.keys(membersObj).map(memberName => ({ member: `${ref}.${memberName}` }));
+      } else if (path.length === 2) {
+        const resolvedMember = this.symbols[path[0]]?.cubeObj()?.[type]?.[path[1]];
+        return resolvedMember ? [{ member: ref }] : undefined;
+      } else {
+        throw new Error(`Unexpected path length ${path.length} for ${ref}`);
+      }
+    })).filter(Boolean);
+  }
+
+  /**
+   * @protected
+   */
+  generateIncludeMembers(members, cubeName, type) {
+    return members.map(memberRef => {
+      const path = memberRef.member.split('.');
+      const resolvedMember = this.symbols[path[path.length - 2]]?.cubeObj()?.[type]?.[path[path.length - 1]];
+      if (!resolvedMember) {
+        throw new Error(`Can't resolve '${memberRef.member}' while generating include members`);
+      }
+
+      // eslint-disable-next-line no-new-func
+      const sql = new Function(path[0], `return \`\${${memberRef.member}}\`;`);
+      let memberDefinition;
+      if (type === 'measures') {
+        memberDefinition = {
+          sql,
+          type: 'number',
+          aggType: resolvedMember.type,
+          meta: resolvedMember.meta,
+          description: resolvedMember.description,
+        };
+      } else if (type === 'dimensions') {
+        memberDefinition = {
+          sql,
+          type: resolvedMember.type,
+          meta: resolvedMember.meta,
+          description: resolvedMember.description,
+        };
+      } else if (type === 'segments') {
+        memberDefinition = {
+          sql,
+          meta: resolvedMember.meta,
+          description: resolvedMember.description,
+        };
+      } else {
+        throw new Error(`Unexpected member type: ${type}`);
+      }
+      return [memberRef.name || path[path.length - 1], memberDefinition];
+    });
+  }
+
+  evaluateReferences(cube, referencesFn, options = {}) {
+    const cubeEvaluator = this;
+
+    const fullPath = (joinHints, path) => {
+      if (joinHints?.length > 0) {
+        return R.uniq(joinHints.concat(path));
+      } else {
+        return path;
+      }
+    };
+
+    const arrayOrSingle = cubeEvaluator.resolveSymbolsCall(referencesFn, (name) => {
+      const referencedCube = cubeEvaluator.symbols[name] && name || cube;
+      const resolvedSymbol =
+        cubeEvaluator.resolveSymbol(
+          cube,
+          name
+        );
+      // eslint-disable-next-line no-underscore-dangle
+      if (resolvedSymbol._objectWithResolvedProperties) {
+        return resolvedSymbol;
+      }
+      return cubeEvaluator.pathFromArray(fullPath(cubeEvaluator.joinHints(), [referencedCube, name]));
+    }, {
+      // eslint-disable-next-line no-shadow
+      sqlResolveFn: (symbol, cube, n) => cubeEvaluator.pathFromArray(fullPath(cubeEvaluator.joinHints(), [cube, n])),
+      // eslint-disable-next-line no-shadow
+      cubeAliasFn: (cube) => cubeEvaluator.pathFromArray(fullPath(cubeEvaluator.joinHints(), [cube])),
+      collectJoinHints: options.collectJoinHints,
+    });
+    if (!Array.isArray(arrayOrSingle)) {
+      return arrayOrSingle.toString();
+    }
+
+    const references = arrayOrSingle.map(p => p.toString());
+    return options.originalSorting ? references : R.sortBy(R.identity, references);
+  }
+
+  pathFromArray(array) {
+    return array.join('.');
   }
 
   resolveSymbolsCall(func, nameResolver, context) {
@@ -238,6 +460,7 @@ export class CubeSymbols {
       joinHints = joinHints.concat(cubeName);
     }
     const self = this;
+    const { sqlResolveFn, cubeAliasFn, query, cubeReferencesUsed } = self.resolveSymbolsCallContext || {};
     return new Proxy({}, {
       get: (v, propertyName) => {
         if (propertyName === '__cubeName') {
@@ -251,7 +474,6 @@ export class CubeSymbols {
           }
           return undefined;
         }
-        const { sqlResolveFn, cubeAliasFn, query, cubeReferencesUsed } = self.resolveSymbolsCallContext || {};
         if (propertyName === 'toString') {
           return () => {
             if (query) {
@@ -261,7 +483,10 @@ export class CubeSymbols {
             if (cubeReferencesUsed) {
               cubeReferencesUsed.push(cube.cubeName());
             }
-            return cubeAliasFn && cubeAliasFn(cube.cubeName()) || cube.cubeName();
+            return cubeAliasFn && this.withSymbolsCallContext(
+              () => cubeAliasFn(cube.cubeName()),
+              { ...this.resolveSymbolsCallContext, joinHints }
+            ) || cube.cubeName();
           };
         }
         if (propertyName === 'sql') {

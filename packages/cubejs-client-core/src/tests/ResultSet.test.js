@@ -467,11 +467,13 @@ describe('ResultSet', () => {
         {
           key: 'one,Users.count',
           title: 'one, Users Count',
+          shortTitle: 'one, Count',
           yValues: ['Users.count'],
         },
         {
           key: 'two,Users.count',
           title: 'two, Users Count',
+          shortTitle: 'two, Count',
           yValues: ['Users.count'],
         },
       ]);
@@ -589,11 +591,13 @@ describe('ResultSet', () => {
         {
           key: '0,Users.count',
           title: '0, Users Count',
+          shortTitle: '0, Count',
           yValues: ['Users.count'],
         },
         {
           key: '1,Users.count',
           title: '1, Users Count',
+          shortTitle: '1, Count',
           yValues: ['Users.count'],
         },
       ]);

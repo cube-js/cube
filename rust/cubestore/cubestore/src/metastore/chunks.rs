@@ -1,17 +1,24 @@
-use super::{BaseRocksSecondaryIndex, Chunk, IndexId, RocksSecondaryIndex, RocksTable, TableId};
-use crate::metastore::{IdRow, MetaStoreEvent};
+use super::{Chunk, IndexId, RocksSecondaryIndex, TableId};
+
 use crate::rocks_table_impl;
+use crate::table::Row;
 use crate::{base_rocks_secondary_index, CubeError};
 use byteorder::{BigEndian, WriteBytesExt};
 use chrono::{DateTime, Utc};
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
-use rocksdb::DB;
+
 use serde::{Deserialize, Deserializer};
 use std::io::Cursor;
 
 impl Chunk {
-    pub fn new(partition_id: u64, row_count: usize, in_memory: bool) -> Chunk {
+    pub fn new(
+        partition_id: u64,
+        row_count: usize,
+        min: Option<Row>,
+        max: Option<Row>,
+        in_memory: bool,
+    ) -> Chunk {
         Chunk {
             partition_id,
             row_count: row_count as u64,
@@ -28,6 +35,9 @@ impl Chunk {
                     .to_lowercase(),
             ),
             file_size: None,
+            replay_handle_id: None,
+            min,
+            max,
         }
     }
 
@@ -81,7 +91,26 @@ impl Chunk {
         let mut to_update = self.clone();
         to_update.active = false;
         to_update.deactivated_at = Some(Utc::now());
+        to_update.replay_handle_id = None;
         to_update
+    }
+
+    pub fn replay_handle_id(&self) -> &Option<u64> {
+        &self.replay_handle_id
+    }
+
+    pub fn set_replay_handle_id(&self, replay_handle_id: Option<u64>) -> Chunk {
+        let mut to_update = self.clone();
+        to_update.replay_handle_id = replay_handle_id;
+        to_update
+    }
+
+    pub fn min(&self) -> &Option<Row> {
+        &self.min
+    }
+
+    pub fn max(&self) -> &Option<Row> {
+        &self.max
     }
 
     pub fn uploaded(&self) -> bool {
@@ -127,10 +156,14 @@ pub fn chunk_file_name(chunk_id: u64, suffix: &Option<String>) -> String {
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum ChunkRocksIndex {
     PartitionId = 1,
+    ReplayHandleId = 2,
 }
 
 rocks_table_impl!(Chunk, ChunkRocksTable, TableId::Chunks, {
-    vec![Box::new(ChunkRocksIndex::PartitionId)]
+    vec![
+        Box::new(ChunkRocksIndex::PartitionId),
+        Box::new(ChunkRocksIndex::ReplayHandleId),
+    ]
 });
 
 base_rocks_secondary_index!(Chunk, ChunkRocksIndex);
@@ -138,12 +171,16 @@ base_rocks_secondary_index!(Chunk, ChunkRocksIndex);
 #[derive(Hash, Clone, Debug)]
 pub enum ChunkIndexKey {
     ByPartitionId(u64),
+    ByReplayHandleId(Option<u64>),
 }
 
 impl RocksSecondaryIndex<Chunk, ChunkIndexKey> for ChunkRocksIndex {
     fn typed_key_by(&self, row: &Chunk) -> ChunkIndexKey {
         match self {
             ChunkRocksIndex::PartitionId => ChunkIndexKey::ByPartitionId(row.partition_id),
+            ChunkRocksIndex::ReplayHandleId => {
+                ChunkIndexKey::ByReplayHandleId(row.replay_handle_id.clone())
+            }
         }
     }
 
@@ -154,18 +191,26 @@ impl RocksSecondaryIndex<Chunk, ChunkIndexKey> for ChunkRocksIndex {
                 buf.write_u64::<BigEndian>(*partition_id).unwrap();
                 buf.into_inner()
             }
+            ChunkIndexKey::ByReplayHandleId(handle_id) => {
+                let mut buf = Cursor::new(Vec::new());
+                buf.write_u64::<BigEndian>(*handle_id.as_ref().unwrap_or(&0))
+                    .unwrap();
+                buf.into_inner()
+            }
         }
     }
 
     fn is_unique(&self) -> bool {
         match self {
             ChunkRocksIndex::PartitionId => false,
+            ChunkRocksIndex::ReplayHandleId => false,
         }
     }
 
     fn version(&self) -> u32 {
         match self {
             ChunkRocksIndex::PartitionId => 1,
+            ChunkRocksIndex::ReplayHandleId => 1,
         }
     }
 

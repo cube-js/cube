@@ -14,6 +14,7 @@ import { OracleQuery } from './OracleQuery';
 import { SqliteQuery } from './SqliteQuery';
 import { AWSElasticSearchQuery } from './AWSElasticSearchQuery';
 import { ElasticSearchQuery } from './ElasticSearchQuery';
+import { CubeStoreQuery } from './CubeStoreQuery';
 
 const ADAPTERS = {
   postgres: PostgresQuery,
@@ -36,6 +37,7 @@ const ADAPTERS = {
   awselasticsearch: AWSElasticSearchQuery,
   elasticsearch: ElasticSearchQuery,
   materialize: PostgresQuery,
+  cubestore: CubeStoreQuery,
 };
 
 export const queryClass = (dbType, dialectClass) => dialectClass || ADAPTERS[dbType];

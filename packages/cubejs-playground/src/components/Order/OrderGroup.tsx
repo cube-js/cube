@@ -1,7 +1,14 @@
+import { TOrderMember } from '@cubejs-client/core';
 import { DragDropContext, Droppable } from 'react-beautiful-dnd';
 import DraggableItem from './DraggableItem';
 
-export default function OrderGroup({ orderMembers, onOrderChange, onReorder }) {
+type Props = {
+  orderMembers: TOrderMember[];
+  onOrderChange: any;
+  onReorder: any;
+};
+
+export default function OrderGroup({ orderMembers, onOrderChange, onReorder }: Props) {
   return (
     <DragDropContext
       onDragEnd={({ source, destination }) => {

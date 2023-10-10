@@ -5,7 +5,7 @@ import { afterAll, beforeAll, expect, jest } from '@jest/globals';
 import cubejs, { CubejsApi, Query } from '@cubejs-client/core';
 import { PostgresDBRunner } from '@cubejs-backend/testing-shared';
 import { BirdBox, getBirdbox } from '../src';
-import { DEFAULT_CONFIG } from './smoke-tests';
+import { DEFAULT_API_TOKEN, DEFAULT_CONFIG } from './smoke-tests';
 
 describe('postgres pa', () => {
   jest.setTimeout(60 * 5 * 1000);
@@ -32,7 +32,7 @@ describe('postgres pa', () => {
         cubejsConfig: 'smoke/cube.js',
       },
     );
-    client = cubejs(async () => 'test', {
+    client = cubejs(async () => DEFAULT_API_TOKEN, {
       apiUrl: birdbox.configuration.apiUrl,
     });
   });

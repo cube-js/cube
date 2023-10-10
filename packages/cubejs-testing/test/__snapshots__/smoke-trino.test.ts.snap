@@ -1,0 +1,31 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`trino query measure grouped by time dimension with timezone: measure-group-by 1`] = `
+Array [
+  Object {
+    "Orders.createdAt": "2022-12-05T08:00:00.000",
+    "Orders.createdAt.hour": "2022-12-05T08:00:00.000",
+    "Orders.totalAmount": 300,
+  },
+  Object {
+    "Orders.createdAt": "2022-12-05T10:00:00.000",
+    "Orders.createdAt.hour": "2022-12-05T10:00:00.000",
+    "Orders.totalAmount": 300,
+  },
+  Object {
+    "Orders.createdAt": "2022-12-05T11:00:00.000",
+    "Orders.createdAt.hour": "2022-12-05T11:00:00.000",
+    "Orders.totalAmount": 500,
+  },
+  Object {
+    "Orders.createdAt": "2022-12-05T12:00:00.000",
+    "Orders.createdAt.hour": "2022-12-05T12:00:00.000",
+    "Orders.totalAmount": 600,
+  },
+  Object {
+    "Orders.createdAt": "2022-12-05T13:00:00.000",
+    "Orders.createdAt.hour": "2022-12-05T13:00:00.000",
+    "Orders.totalAmount": 700,
+  },
+]
+`;

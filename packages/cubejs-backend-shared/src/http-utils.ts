@@ -88,7 +88,7 @@ export async function downloadAndExtractFile(url: string, { cwd }: DownloadAndEx
 
   try {
     mkdirpSync(cwd);
-  } catch (e) {
+  } catch (e: any) {
     internalExceptions(e);
   }
 
@@ -103,7 +103,7 @@ export async function downloadAndExtractFile(url: string, { cwd }: DownloadAndEx
 
   try {
     fs.unlinkSync(savedFilePath);
-  } catch (e) {
+  } catch (e: any) {
     internalExceptions(e);
   }
 

@@ -1,11 +1,11 @@
 import cn from 'classnames';
-import GatsbyLink from 'gatsby-link';
 import React, { useEffect, useRef, useState } from 'react';
 
 import * as styles from './styles.module.scss';
 import cubeJsLogo from './cube-logo.svg';
 import cubeCloudLogo from './cube-logo-cloud.svg';
 import cubeCloudLogoSmall from './cube-logo-cloud-min.svg';
+import { Version } from '../Version';
 
 export const DocsSwitcher = () => {
   const [isCloudPage, setIsCloudPage] = useState(false);
@@ -48,12 +48,13 @@ export const DocsSwitcher = () => {
 
   return (
     <div ref={switchWrapperRef} className={styles.docsSwitcher}>
-      <GatsbyLink to={'/'} className={cubejsClasses} activeClassName="active">
-        <img src={cubeJsLogo} alt='Cube.js Logo' />
-      </GatsbyLink>
-      <GatsbyLink to={'/cloud'} className={cubeCloudClasses} activeClassName="active">
-        <img src={cloudLogo} alt='Cube Cloud Logo' />
-      </GatsbyLink>
+      <div className={styles.logo}>
+        <img src={cubeJsLogo} alt='Cube Logo' />
+        <Version />
+      </div>
+      {/*<GatsbyLink to={'/cloud'} className={cubeCloudClasses} activeClassName="active">*/}
+      {/*  <img src={cloudLogo} alt='Cube Cloud Logo' />*/}
+      {/*</GatsbyLink>*/}
     </div>
   );
 };

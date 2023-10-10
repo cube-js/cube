@@ -2,3 +2,7 @@ src/parser/GenericSqlLexer.ts
 src/parser/GenericSqlListener.ts
 src/parser/GenericSqlParser.ts
 src/parser/GenericSqlVisitor.ts
+src/parser/Python3Lexer.ts
+src/parser/Python3ParserListener.ts
+src/parser/Python3Parser.ts
+src/parser/Python3ParserVisitor.ts

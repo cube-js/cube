@@ -10,9 +10,11 @@ services:
       CUBEJS_DB_NAME: test
       CUBEJS_DB_USER: test
       CUBEJS_DB_PASS: test
-      CUBEJS_DEV_MODE: "true"
+      CUBEJS_DEV_MODE: ${CUBEJS_DEV_MODE:-true}
       CUBEJS_WEB_SOCKETS: "true"
       CUBEJS_API_SECRET: mysupersecret
+      CUBEJS_CACHE_AND_QUEUE_DRIVER: memory
+      CUBEJS_SCHEMA_PATH: schema
     depends_on:
       - db
     links:

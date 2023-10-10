@@ -8,18 +8,19 @@ use std::time::Duration;
 use async_trait::async_trait;
 use deadqueue::unlimited;
 use futures::future::join_all;
+use futures::future::BoxFuture;
 use ipc_channel::ipc;
 use ipc_channel::ipc::{IpcReceiver, IpcSender};
 use log::error;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use tokio::runtime::Builder;
+use tokio::runtime::{Builder, Runtime};
 use tokio::sync::oneshot::Sender;
 use tokio::sync::{oneshot, watch, Notify, RwLock};
 use tracing::{instrument, Instrument};
 use tracing_futures::WithSubscriber;
 
-use crate::config::{Config, WorkerServices};
+use crate::config::{env_parse, Config, WorkerServices};
 use crate::util::respawn::respawn;
 use crate::CubeError;
 use datafusion::cube_ext;
@@ -298,13 +299,17 @@ impl<
         }
         ctx += &self.name;
 
+        let title = std::env::var("CUBESTORE_SELECT_WORKER_TITLE")
+            .ok()
+            .unwrap_or("--sel-worker".to_string());
+
         let handle = respawn(
             WorkerProcessArgs {
                 args: args_rx,
                 results: res_tx,
                 processor: PhantomData::<P>::default(),
             },
-            &["--sel-worker".to_string()],
+            &[title],
             &[("CUBESTORE_LOG_CONTEXT".to_string(), ctx)],
         )?;
         Ok((args_tx, res_rx, handle))
@@ -331,11 +336,15 @@ where
     if let Ok(var) = std::env::var("CUBESTORE_EVENT_LOOP_WORKER_THREADS") {
         tokio_builder.worker_threads(var.parse().unwrap());
     }
+    let stack_size = env_parse("CUBESTORE_SELECT_WORKER_STACK_SIZE", 4 * 1024 * 1024);
+    tokio_builder.thread_stack_size(stack_size);
     let runtime = tokio_builder.build().unwrap();
+    worker_setup(&runtime);
     runtime.block_on(async move {
-        let config = Config::default();
-        config.configure_injector().await;
+        let config = get_worker_config().await;
         let services = config.worker_services().await;
+
+        spawn_background_processes(config.clone());
 
         loop {
             let res = rx.recv();
@@ -359,6 +368,70 @@ where
             }
         }
     })
+}
+
+fn worker_setup(runtime: &Runtime) {
+    let startup = SELECT_WORKER_SETUP.read().unwrap();
+    if startup.is_some() {
+        startup.as_ref().unwrap()(runtime);
+    }
+}
+
+async fn get_worker_config() -> Config {
+    let custom_fn = SELECT_WORKER_CONFIGURE_FN.read().unwrap();
+    if let Some(func) = custom_fn.as_ref() {
+        func().await
+    } else {
+        let config = Config::default();
+        config.configure_injector().await;
+        config
+    }
+}
+
+fn spawn_background_processes(config: Config) {
+    let custom_fn = SELECT_WORKER_SPAWN_BACKGROUND_FN.read().unwrap();
+    if let Some(func) = custom_fn.as_ref() {
+        func(config);
+    }
+}
+
+lazy_static! {
+    static ref SELECT_WORKER_SETUP: std::sync::RwLock<Option<Box<dyn Fn(&Runtime) + Send + Sync>>> =
+        std::sync::RwLock::new(None);
+}
+
+lazy_static! {
+    static ref SELECT_WORKER_CONFIGURE_FN: std::sync::RwLock<Option<Box<dyn Fn() -> BoxFuture<'static, Config> + Send + Sync>>> =
+        std::sync::RwLock::new(None);
+}
+
+lazy_static! {
+    static ref SELECT_WORKER_SPAWN_BACKGROUND_FN: std::sync::RwLock<Option<Box<dyn Fn(Config) + Send + Sync>>> =
+        std::sync::RwLock::new(None);
+}
+
+pub fn register_select_worker_setup(f: fn(&Runtime)) {
+    let mut setup = SELECT_WORKER_SETUP.write().unwrap();
+    assert!(setup.is_none(), "select worker setup already registered");
+    *setup = Some(Box::new(f));
+}
+
+pub fn register_select_worker_configure_fn(f: fn() -> BoxFuture<'static, Config>) {
+    let mut func = SELECT_WORKER_CONFIGURE_FN.write().unwrap();
+    assert!(
+        func.is_none(),
+        "select worker configure function already registered"
+    );
+    *func = Some(Box::new(f));
+}
+
+pub fn register_select_worker_spawn_background_fn(f: fn(Config)) {
+    let mut func = SELECT_WORKER_SPAWN_BACKGROUND_FN.write().unwrap();
+    assert!(
+        func.is_none(),
+        "select worker spawn background function already registered"
+    );
+    *func = Some(Box::new(f));
 }
 
 #[cfg(test)]

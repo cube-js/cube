@@ -2,15 +2,15 @@
   "name": "@cubejs-backend/druid-driver",
   "description": "Cube.js Druid database driver",
   "author": "Cube Dev, Inc.",
-  "version": "0.31.3",
+  "version": "0.34.1",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/cube-js/cube.js.git",
+    "url": "https://github.com/cube-js/cube.git",
     "directory": "packages/cubejs-druid-driver"
   },
   "engines": {
-    "node": "^12.0.0 || ^14.0.0 || >=16.0.0"
+    "node": "^14.0.0 || ^16.0.0 || >=17.0.0"
   },
   "main": "dist/src/index.js",
   "typings": "dist/src/index.d.ts",
@@ -28,20 +28,20 @@
     "dist/src/*"
   ],
   "dependencies": {
-    "@cubejs-backend/base-driver": "^0.31.3",
-    "@cubejs-backend/schema-compiler": "^0.31.3",
-    "@cubejs-backend/shared": "^0.31.0",
+    "@cubejs-backend/base-driver": "^0.34.1",
+    "@cubejs-backend/schema-compiler": "^0.34.1",
+    "@cubejs-backend/shared": "^0.34.1",
     "axios": "^0.21.1",
     "moment-timezone": "^0.5.31"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "^0.31.0",
+    "@cubejs-backend/linter": "^0.34.0",
     "@types/generic-pool": "^3.1.9",
     "@types/jest": "^26.0.20",
-    "@types/node": "^10.17.55",
+    "@types/node": "^14",
     "jest": "^26.6.3",
     "testcontainers": "^8.12",
-    "typescript": "~4.1.5"
+    "typescript": "~4.9.5"
   },
   "publishConfig": {
     "access": "public"

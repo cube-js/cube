@@ -6,21 +6,21 @@ export function meta(this: ProjectReflection) {
     if (!reflection) {
       return null;
     }
-    
+
     if (reflection?.comment) {
       return reflection;
     }
 
     return findModuleRelection(reflection?.children?.[0]);
   }
-  
+
   function tagConverter(tag: string)  {
     const tags = {
       menucategory: 'category',
       subcategory: 'subCategory',
       menuorder: 'menuOrder'
     };
-    
+
     return tags[tag] ?? tag;
   }
 
@@ -28,15 +28,8 @@ export function meta(this: ProjectReflection) {
 
   if (moduleReflection) {
     const { comment } = moduleReflection;
-    const md = ['---'];
-
-    (comment?.tags || []).forEach((tag: CommentTag) => {
-      if (tag.tagName !== 'description') {
-        const text = tag.text.startsWith('@') ? `'${tag.text}'` : tag.text;
-        md.push(`${tagConverter(tag.tagName)}: ${text}`.replace('\n', ''));
-      }
-    });
-    md.push('---');
+    const title = (comment?.tags || []).find((tag: CommentTag) => tag.tagName === 'title');
+    const md = [`# ${title.text}`];
     const description = (comment?.tags || []).find((tag: CommentTag) => tag.tagName === 'description');
 
     if (description) {

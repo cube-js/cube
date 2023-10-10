@@ -2,38 +2,39 @@
 title: Dimensions
 permalink: /schema/reference/dimensions
 scope: cubejs
-category: Data Schema
+category: Data Modeling
 subCategory: Reference
-menuOrder: 10
+menuOrder: 23
 proofread: 06/18/2019
 redirect_from:
   - /dimensions
 ---
 
 The `dimensions` property contains a set of dimensions. You can think about a
-dimension as an attribute related to a measure, e.g. the measure `userCount` can
-have dimensions like `country`, `age`, `occupation`, etc.
+dimension as an attribute related to a measure, e.g. the measure `user_count`
+can have dimensions like `country`, `age`, `occupation`, etc.
 
 Any dimension should have the following properties: `name`, `sql` and `type`.
 
-## Naming
+## Parameters
 
-You can name a dimension by following the same rules as for measure, so each
-name should:
+### <--{"id" : "Parameters"}--> name
 
-- Be unique within a cube
-- Start with a lowercase letter
-- Consist of numbers, letters and `_`
+The `name` parameter serves as the identifier of a dimension. It must be unique
+among all dimensions, measures, and segments within a cube and follow the
+[naming conventions][ref-naming].
+
+<CodeTabs>
 
 ```javascript
-cube(`Products`, {
+cube(`products`, {
   dimensions: {
     price: {
       sql: `price`,
       type: `number`,
     },
 
-    brandName: {
+    brand_name: {
       sql: `brand_name`,
       type: `string`,
     },
@@ -41,58 +42,21 @@ cube(`Products`, {
 });
 ```
 
-## Parameters
+```yaml
+cubes:
+  - name: products
 
-### <--{"id" : "Parameters"}--> title
+    dimensions:
+      - name: price
+        sql: price
+        type: number
 
-You can use the `title` parameter to change a dimension's displayed name. By
-default, Cube.js will humanize your dimension key to create a display name. In
-order to override default behavior, please use the `title` property:
-
-```javascript
-cube('Products', {
-  dimensions: {
-    metaValue: {
-      type: `string`,
-      sql: `meta_value`,
-      title: `Size`,
-    },
-  },
-});
+      - name: brand_name
+        sql: brand_name
+        type: string
 ```
 
-### <--{"id" : "Parameters"}--> description
-
-You can add details to a dimension's definition via the `description` property:
-
-```javascript
-cube('Products', {
-  dimensions: {
-    comment: {
-      type: `string`,
-      sql: `comments`,
-      description: `Comments for orders`,
-    },
-  },
-});
-```
-
-### <--{"id" : "Parameters"}--> shown
-
-You can manage the visibility of the dimension using the `shown` property. The
-default value of `shown` is `true`.
-
-```javascript
-cube('Products', {
-  dimensions: {
-    comment: {
-      type: `string`,
-      sql: `comments`,
-      shown: false,
-    },
-  },
-});
-```
+</CodeTabs>
 
 ### <--{"id" : "Parameters"}--> case
 
@@ -104,8 +68,12 @@ declares a condition and result if the rule returns a true value. The second
 The following static `label` example will create a `size` dimension with values
 `xl` and `xxl`:
 
+<CodeTabs>
+
 ```javascript
-cube('Products', {
+cube(`products`, {
+  // ...
+
   dimensions: {
     size: {
       type: `string`,
@@ -123,11 +91,37 @@ cube('Products', {
 });
 ```
 
+```yaml
+cubes:
+  - name: products
+    # ...
+
+    dimensions:
+      - name: size
+        type: string
+        case:
+          when:
+            - sql: "{CUBE}.meta_value = 'xl-en'"
+              label: xl
+            - sql: "{CUBE}.meta_value = 'xl'"
+              label: xl
+            - sql: "{CUBE}.meta_value = 'xxl-en'"
+              label: xxl
+            - sql: "{CUBE}.meta_value = 'xxl'"
+              label: xxl
+          else:
+            label: Unknown
+```
+
+</CodeTabs>
+
 The `label` property can be defined dynamically as an object with a `sql`
-property:
+property in JavaScript models:
 
 ```javascript
-cube('Products', {
+cube(`products`, {
+  // ...
+
   dimensions: {
     size: {
       type: `string`,
@@ -157,6 +151,114 @@ cube('Products', {
 });
 ```
 
+### <--{"id" : "Parameters"}--> description
+
+You can add details to a dimension's definition via the `description` property:
+
+<CodeTabs>
+
+```javascript
+cube(`products`, {
+  // ...
+
+  dimensions: {
+    comment: {
+      description: `Comments for orders`,
+      sql: `comments`,
+      type: `string`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: products
+    # ...
+
+    dimensions:
+      - name: comment
+        description: Comments for orders
+        sql: comments
+        type: string
+```
+
+</CodeTabs>
+
+### <--{"id" : "Parameters"}--> format
+
+`format` is an optional parameter. It is used to format the output of dimensions
+in different ways, for example, a link for `external_url`. Please refer to the
+[Dimension Formats][ref-schema-ref-dims-formats] for the full list of supported
+formats.
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  measures: {
+    total: {
+      sql: `amount`,
+      type: `running_total`,
+      format: `currency`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: total
+        sql: amount
+        type: running_total
+        format: currency
+```
+
+</CodeTabs>
+
+### <--{"id" : "Parameters"}--> meta
+
+Custom metadata. Can be used to pass any information to the frontend.
+
+<CodeTabs>
+
+```javascript
+cube(`products`, {
+  // ...
+
+  dimensions: {
+    users_count: {
+      sql: `${users.count}`,
+      type: `number`,
+      meta: {
+        any: "value",
+      },
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: products
+    # ...
+
+    dimensions:
+      - name: users_count
+        sql: "{users.count}"
+        type: number
+        meta:
+          any: value
+```
+
+</CodeTabs>
+
 ### <--{"id" : "Parameters"}--> primaryKey
 
 Specify which dimension is a primary key for a cube. The default value is
@@ -166,77 +268,264 @@ A primary key is used to make [joins][ref-schema-ref-joins] work properly.
 
 <WarningBox>
 
-Setting `primaryKey` to `true` will change the default value of `shown`
-parameter to `false`. If you still want `shown` to be `true`, set it manually.
+Setting `primary_key` to `true` will change the default value of `public`
+parameter to `false`. If you still want `public` to be `true`, set it manually.
 
 </WarningBox>
 
+<CodeTabs>
+
 ```javascript
-cube('Products', {
+cube(`products`, {
+  // ...
+
   dimensions: {
     id: {
       sql: `id`,
       type: `number`,
-      primaryKey: true,
+      primary_key: true,
     },
   },
 });
 ```
 
-### <--{"id" : "Parameters"}--> subQuery
+```yaml
+cubes:
+  - name: products
+    # ...
 
-The `subQuery` statement allows you to reference a measure in a dimension. It's
-an advanced concept and you can learn more about it [here][ref-subquery].
-
-```javascript
-cube('Products', {
-  dimensions: {
-    usersCount: {
-      sql: `${Users.count}`,
-      type: `number`,
-      subQuery: true,
-    },
-  },
-});
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
 ```
 
-### <--{"id" : "Parameters"}--> propagateFiltersToSubQuery
+</CodeTabs>
+
+### <--{"id" : "Parameters"}--> propagate_filters_to_sub_query
 
 When this statement is set to `true`, the filters applied to the query will be
 passed to the [subquery][self-subquery].
 
+<CodeTabs>
+
 ```javascript
-cube('Products', {
+cube(`products`, {
+  // ...
+
   dimensions: {
-    usersCount: {
-      sql: `${Users.count}`,
+    users_count: {
+      sql: `${users.count}`,
       type: `number`,
-      subQuery: true,
-      propagateFiltersToSubQuery: true,
+      sub_query: true,
+      propagate_filters_to_sub_query: true,
     },
   },
 });
 ```
 
-### <--{"id" : "Parameters"}--> meta
+```yaml
+cubes:
+  - name: products
+    # ...
 
-Custom metadata. Can be used to pass any information to the frontend.
+    dimensions:
+      - name: users_count
+        sql: "{users.count}"
+        type: number
+        sub_query: true
+        propagate_filters_to_sub_query: true
+```
+
+</CodeTabs>
+
+### <--{"id" : "Parameters"}--> public
+
+<InfoBox>
+
+Prior to v0.33, this property was called `shown`.
+
+</InfoBox>
+
+The `public` property is used to manage the visibility of a dimension. Valid
+values for `public` are `true` and `false`. When set to `false`, this dimension
+**cannot** be queried through the API. Defaults to `true`.
+
+<CodeTabs>
 
 ```javascript
-cube('Products', {
+cube(`products`, {
+  // ...
+
   dimensions: {
-    usersCount: {
-      sql: `${Users.count}`,
-      type: `number`,
-      //...
-      meta: {
-        any: 'value',
-      },
+    comment: {
+      sql: `comments`,
+      type: `string`,
+      public: false,
     },
   },
 });
 ```
+
+```yaml
+cubes:
+  - name: products
+    # ...
+
+    dimensions:
+      - name: comment
+        sql: comments
+        public: false
+        shown: false
+```
+
+</CodeTabs>
+
+### <--{"id" : "Parameters"}--> sql
+
+`sql` is a required parameter. It can take any valid SQL expression depending on
+the `type` of the dimension. Please refer to the [Dimension
+Types][ref-schema-ref-dims-types] to understand what the `sql` parameter should
+be for a given dimension type.
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    dimensions:
+      - name: created_at
+        sql: created_at
+        type: time
+```
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  dimensions: {
+    created_at: {
+      sql: `created_at`,
+      type: `time`,
+    },
+  },
+});
+```
+
+</CodeTabs>
+
+### <--{"id" : "Parameters"}--> sub_query
+
+The `sub_query` statement allows you to reference a measure in a dimension. It's
+an advanced concept and you can learn more about it [here][ref-subquery].
+
+<CodeTabs>
+
+```javascript
+cube(`products`, {
+  // ...
+
+  dimensions: {
+    users_count: {
+      sql: `${users.count}`,
+      type: `number`,
+      sub_query: true,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: products
+    # ...
+
+    dimensions:
+      - name: users_count
+        sql: "{users.count}"
+        type: number
+        sub_query: true
+```
+
+</CodeTabs>
+
+### <--{"id" : "Parameters"}--> title
+
+You can use the `title` parameter to change a dimension's displayed name. By
+default, Cube will humanize your dimension key to create a display name. In
+order to override default behavior, please use the `title` property:
+
+<CodeTabs>
+
+```javascript
+cube(`products`, {
+  // ...
+
+  dimensions: {
+    meta_value: {
+      title: `Size`,
+      sql: `meta_value`,
+      type: `string`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: products
+    # ...
+
+    dimensions:
+      - name: meta_value
+        title: Size
+        sql: meta_value
+        type: string
+```
+
+</CodeTabs>
+
+### <--{"id" : "Parameters"}--> type
+
+`type` is a required parameter. There are various types that can be assigned to
+a dimension. Please refer to the [Dimension Types][ref-schema-ref-dims-types]
+for the full list of dimension types.
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  dimensions: {
+    rating: {
+      sql: `rating`,
+      type: `number`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    dimensions:
+      - name: rating
+        sql: rating
+        type: number
+```
+
+</CodeTabs>
 
 [ref-schema-ref-joins]: /schema/reference/joins
 [ref-subquery]: /schema/fundamentals/additional-concepts#subquery
 [self-subquery]: #sub-query
+[ref-naming]: /data-modeling/syntax#naming
+[ref-schema-ref-dims-types]: /schema/reference/types-and-formats#dimension-types
+[ref-schema-ref-dims-formats]:
+  /schema/reference/types-and-formats#dimension-formats

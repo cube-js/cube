@@ -1,4 +1,4 @@
-import { Required } from '@cubejs-backend/shared';
+import { Required, SchemaFileRepository } from '@cubejs-backend/shared';
 import {
   CheckAuthFn,
   CheckAuthMiddlewareFn,
@@ -8,10 +8,10 @@ import {
   QueryRewriteFn,
   CheckSQLAuthFn,
   CanSwitchSQLUserFn,
+  ContextToApiScopesFn,
 } from '@cubejs-backend/api-gateway';
 import { BaseDriver, RedisPoolOptions, CacheAndQueryDriverType } from '@cubejs-backend/query-orchestrator';
 import { BaseQuery } from '@cubejs-backend/schema-compiler';
-import type { SchemaFileRepository } from './FileRepository';
 
 export interface QueueOptions {
   concurrency?: number;
@@ -49,6 +49,7 @@ export interface OrchestratorOptions {
   queryCacheOptions?: QueryCacheOptions;
   preAggregationsOptions?: PreAggregationsOptions;
   rollupOnlyMode?: boolean;
+  testConnectionTimeout?: number;
 }
 
 export interface QueueInitedOptions {
@@ -77,6 +78,7 @@ export interface OrchestratorInitedOptions {
   redisPrefix?: string;
   redisPoolOptions?: RedisPoolOptions;
   rollupOnlyMode?: boolean;
+  testConnectionTimeout?: number;
 }
 
 export interface RequestContext {
@@ -120,17 +122,18 @@ export type DatabaseType =
   | 'questdb'
   | 'materialize';
 
-export type ContextToAppIdFn = (context: RequestContext) => string;
-export type ContextToOrchestratorIdFn = (context: RequestContext) => string;
+export type ContextToAppIdFn = (context: RequestContext) => string | Promise<string>;
+export type ContextToOrchestratorIdFn = (context: RequestContext) => string | Promise<string>;
 
-export type OrchestratorOptionsFn = (context: RequestContext) => OrchestratorOptions;
+export type OrchestratorOptionsFn = (context: RequestContext) => OrchestratorOptions | Promise<OrchestratorOptions>;
 
-export type PreAggregationsSchemaFn = (context: RequestContext) => string;
+export type PreAggregationsSchemaFn = (context: RequestContext) => string | Promise<string>;
 
 // internal
 export type DriverOptions = {
   dataSource?: string,
   maxPoolSize?: number,
+  testConnectionTimeout?: number,
 };
 
 export type DriverConfig = {
@@ -156,6 +159,12 @@ export type ExternalDialectFactoryFn = (context: RequestContext) => BaseQuery;
 
 export type LoggerFn = (msg: string, params: Record<string, any>) => void;
 
+export type BiToolSyncConfig = {
+  type: string;
+  active?: boolean;
+  config: Record<string, any>;
+};
+
 export interface CreateOptions {
   dbType?: DatabaseType | DbTypeFn;
   externalDbType?: DatabaseType | ExternalDbTypeFn;
@@ -171,6 +180,7 @@ export interface CreateOptions {
   cacheAndQueueDriver?: CacheAndQueryDriverType;
   contextToAppId?: ContextToAppIdFn;
   contextToOrchestratorId?: ContextToOrchestratorIdFn;
+  contextToApiScopes?: ContextToApiScopesFn;
   repositoryFactory?: (context: RequestContext) => SchemaFileRepository;
   checkAuthMiddleware?: CheckAuthMiddlewareFn;
   checkAuth?: CheckAuthFn;
@@ -187,6 +197,7 @@ export interface CreateOptions {
   scheduledRefreshTimeZones?: string[];
   scheduledRefreshContexts?: () => Promise<UserBackgroundContext[]>;
   scheduledRefreshConcurrency?: number;
+  scheduledRefreshBatchSize?: number;
   compilerCacheSize?: number;
   maxCompilerCacheKeepAlive?: number;
   updateCompilerCacheKeepAlive?: boolean;
@@ -203,6 +214,7 @@ export interface CreateOptions {
   // Internal flag, that we use to detect serverless env
   serverless?: boolean;
   allowNodeRequire?: boolean;
+  semanticLayerSync?: () => Promise<BiToolSyncConfig[]> | BiToolSyncConfig[];
 }
 
 export interface DriverDecoratedOptions extends CreateOptions {
@@ -228,3 +240,23 @@ export type ServerCoreInitializedOptions = Required<
 export type SystemOptions = {
   isCubeConfigEmpty: boolean;
 };
+
+// Types to support the ContextAcceptance mechanism
+export type ContextAcceptanceResult = {
+  accepted: boolean;
+};
+
+export type ContextAcceptanceResultHttp = ContextAcceptanceResult & {
+  rejectHeaders?: { [key: string]: string };
+  rejectStatusCode?: number;
+};
+
+export type ContextAcceptanceResultWs = ContextAcceptanceResult & {
+  rejectMessage?: any;
+};
+
+export interface ContextAcceptor {
+  shouldAccept(context: RequestContext | null): Promise<ContextAcceptanceResult> | ContextAcceptanceResult;
+  shouldAcceptHttp(context: RequestContext | null): Promise<ContextAcceptanceResultHttp> | ContextAcceptanceResultHttp;
+  shouldAcceptWs(context: RequestContext | null): Promise<ContextAcceptanceResultWs> | ContextAcceptanceResultWs;
+}

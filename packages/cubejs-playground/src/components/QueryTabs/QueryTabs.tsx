@@ -1,5 +1,10 @@
-import { ChartType, PivotConfig, Query, validateQuery } from '@cubejs-client/core';
-import { Tabs } from 'antd';
+import {
+  ChartType,
+  PivotConfig,
+  Query,
+  validateQuery,
+} from '@cubejs-client/core';
+import { Input, Tabs } from 'antd';
 import equals from 'fast-deep-equal';
 import { ReactNode, useEffect, useState } from 'react';
 import styled from 'styled-components';
@@ -28,6 +33,7 @@ type QueryTab = {
   id: string;
   query: Query;
   chartType?: ChartType;
+  name?: string;
 };
 
 type QueryTabs = {
@@ -68,6 +74,8 @@ export function QueryTabs({
     setQueryRequestId,
   } = useChartRendererStateMethods();
 
+  const [editableTabId, setEditableTabId] = useState<string>();
+  const [editableTabValue, setEditableTabValue] = useState<string>('');
   const [ready, setReady] = useState<boolean>(false);
   const [queryTabs, saveTabs] = useLocalStorage<QueryTabs>('queryTabs', {
     activeId: '1',
@@ -187,7 +195,10 @@ export function QueryTabs({
       (tab) => tab.id === queryTabs.activeId
     );
 
-    if (query && !equals(validateQuery(currentTab?.query), validateQuery(query))) {
+    if (
+      query &&
+      !equals(validateQuery(currentTab?.query), validateQuery(query))
+    ) {
       const id = getNextId();
 
       saveTabs({
@@ -230,6 +241,20 @@ export function QueryTabs({
           ? {
               ...currentTab,
               ...tab,
+            }
+          : currentTab;
+      }),
+    });
+  }
+  
+  function setTabName(tabId: string, name: string) {
+    saveTabs({
+      ...queryTabs,
+      tabs: tabs.map((currentTab) => {
+        return tabId === currentTab.id
+          ? {
+              ...currentTab,
+              name
             }
           : currentTab;
       }),
@@ -292,8 +317,45 @@ export function QueryTabs({
         <TabPane
           key={tab.id}
           data-testid={`query-tab-${tab.id}`}
-          tab={`Query ${tab.id}`}
           closable={tabs.length > 1}
+          tab={
+            editableTabId === tab.id ? (
+              <Input
+                autoFocus
+                size="small"
+                value={editableTabValue}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    setEditableTabId(undefined);
+                    
+                    if (editableTabValue.trim()) {
+                      setTabName(tab.id, editableTabValue.trim());
+                      setEditableTabValue('');
+                    }
+                  }
+                  e.stopPropagation();
+                }}
+                onChange={(e) => setEditableTabValue(e.target.value)}
+                onBlur={() => {
+                  if (editableTabValue.trim()) {
+                    setTabName(tab.id, editableTabValue.trim());
+                    setEditableTabValue('');
+                  }
+                  setEditableTabId(undefined);
+                }}
+              />
+            ) : (
+              <span
+                style={{ userSelect: 'none' }}
+                onDoubleClick={() => {
+                  setEditableTabValue(tab.name || `Query ${tab.id}`);
+                  setEditableTabId(tab.id);
+                }}
+              >
+                {tab.name ? tab.name : `Query ${tab.id}`}
+              </span>
+            )
+          }
         >
           {children(tab, handleTabSave)}
           {drilldownConfig.query ? (

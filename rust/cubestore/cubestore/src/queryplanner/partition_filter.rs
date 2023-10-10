@@ -97,19 +97,47 @@ impl MinMaxCondition {
         let n = self.min.len();
         assert_eq!(n, min_row.len());
         assert_eq!(n, max_row.len());
+        let mut min_satisfied = false;
+        let mut max_satisfied = false;
+        let mut min_max_are_equal = true;
         for i in 0..n {
-            if self.min[i].is_some()
-                && cmp_same_types(&max_row[i], self.min[i].as_ref().unwrap()) < Ordering::Equal
-            {
-                return false;
-            }
-            if self.max[i].is_some()
-                && cmp_same_types(self.max[i].as_ref().unwrap(), &min_row[i]) < Ordering::Equal
-            {
-                return false;
-            }
             if min_row[i] != max_row[i] {
-                return true;
+                min_max_are_equal = false;
+            }
+            if !min_satisfied {
+                if self.min[i].is_some() {
+                    match cmp_same_types(&max_row[i], self.min[i].as_ref().unwrap()) {
+                        Ordering::Less => {
+                            return false;
+                        }
+                        Ordering::Equal => {} //We on the border of the range, so we should compare next part
+                        Ordering::Greater => min_satisfied = true, //Min condition satisfied
+                    }
+                } else {
+                    min_satisfied = true;
+                }
+            }
+            if !max_satisfied {
+                if self.max[i].is_some() {
+                    match cmp_same_types(self.max[i].as_ref().unwrap(), &min_row[i]) {
+                        Ordering::Less => {
+                            return false;
+                        }
+                        Ordering::Equal => {} //We on the border of the range, so we should compare next part
+                        Ordering::Greater => max_satisfied = true, //Max condition satisfied
+                    }
+                } else {
+                    max_satisfied = true;
+                }
+            }
+            if max_satisfied && min_satisfied {
+                //min and max value of the current part is equal so we can check rest of rows as separate range
+                if min_max_are_equal {
+                    min_satisfied = false;
+                    max_satisfied = false;
+                } else {
+                    return true;
+                }
             }
         }
 
@@ -954,6 +982,305 @@ mod tests {
         };
         assert!(mm.can_match_min(&[TableValue::Int(0), TableValue::Int(12)]));
         assert!(mm.can_match_max(&[TableValue::Int(0), TableValue::Int(9)]));
+    }
+
+    #[test]
+    fn multipart_equal_condition() {
+        let c = MinMaxCondition {
+            min: vec![
+                Some(TableValue::Int(20)),
+                Some(TableValue::Int(1)),
+                Some(TableValue::Int(10)),
+                None,
+            ],
+            max: vec![
+                Some(TableValue::Int(20)),
+                Some(TableValue::Int(1)),
+                Some(TableValue::Int(10)),
+                None,
+            ],
+        };
+        let res = c.can_match(
+            &[
+                TableValue::Int(20),
+                TableValue::Int(2),
+                TableValue::Int(10),
+                TableValue::Int(10),
+            ],
+            &[
+                TableValue::Int(80),
+                TableValue::Int(3),
+                TableValue::Int(12),
+                TableValue::Int(10),
+            ],
+        );
+        assert_eq!(res, false);
+
+        let res = c.can_match(
+            &[
+                TableValue::Int(10),
+                TableValue::Int(10),
+                TableValue::Int(10),
+                TableValue::Int(10),
+            ],
+            &[
+                TableValue::Int(20),
+                TableValue::Int(1),
+                TableValue::Int(8),
+                TableValue::Int(10),
+            ],
+        );
+        assert_eq!(res, false);
+
+        let res = c.can_match(
+            &[
+                TableValue::Int(80),
+                TableValue::Int(14),
+                TableValue::Int(13),
+                TableValue::Int(10),
+            ],
+            &[
+                TableValue::Int(80),
+                TableValue::Int(14),
+                TableValue::Int(14),
+                TableValue::Int(10),
+            ],
+        );
+        assert_eq!(res, false);
+
+        let res = c.can_match(
+            &[
+                TableValue::Int(20),
+                TableValue::Int(1),
+                TableValue::Int(10),
+                TableValue::Int(10),
+            ],
+            &[
+                TableValue::Int(20),
+                TableValue::Int(1),
+                TableValue::Int(10),
+                TableValue::Int(10),
+            ],
+        );
+        assert_eq!(res, true);
+    }
+
+    #[test]
+    fn multipart_parital_conditions() {
+        let c = MinMaxCondition {
+            min: vec![None, Some(TableValue::Int(20))],
+            max: vec![Some(TableValue::Int(20)), Some(TableValue::Int(30))],
+        };
+        let res = c.can_match(
+            &[TableValue::Int(10), TableValue::Int(5)],
+            &[TableValue::Int(10), TableValue::Int(33)],
+        );
+        assert!(res);
+
+        let res = c.can_match(
+            &[TableValue::Int(10), TableValue::Int(25)],
+            &[TableValue::Int(10), TableValue::Int(33)],
+        );
+        assert!(res);
+
+        let res = c.can_match(
+            &[TableValue::Int(10), TableValue::Int(5)],
+            &[TableValue::Int(10), TableValue::Int(25)],
+        );
+        assert!(res);
+
+        let res = c.can_match(
+            &[TableValue::Int(10), TableValue::Int(5)],
+            &[TableValue::Int(10), TableValue::Int(15)],
+        );
+        assert!(!res);
+
+        let res = c.can_match(
+            &[TableValue::Int(10), TableValue::Int(5)],
+            &[TableValue::Int(11), TableValue::Int(15)],
+        );
+        assert!(res);
+
+        //TODO The question here is should be match in this case, but work with such cases is
+        //complicated
+        let res = c.can_match(
+            &[TableValue::Int(10), TableValue::Int(35)],
+            &[TableValue::Int(11), TableValue::Int(15)],
+        );
+        assert!(res);
+
+        let res = c.can_match(
+            &[TableValue::Int(20), TableValue::Int(29)],
+            &[TableValue::Int(25), TableValue::Int(15)],
+        );
+        assert!(res);
+
+        let res = c.can_match(
+            &[TableValue::Int(20), TableValue::Int(30)],
+            &[TableValue::Int(25), TableValue::Int(15)],
+        );
+        assert!(res);
+
+        let res = c.can_match(
+            &[TableValue::Int(21), TableValue::Int(31)],
+            &[TableValue::Int(25), TableValue::Int(15)],
+        );
+        assert!(!res);
+
+        let res = c.can_match(
+            &[TableValue::Int(20), TableValue::Int(31)],
+            &[TableValue::Int(25), TableValue::Int(15)],
+        );
+        assert!(!res);
+    }
+    #[test]
+    fn multipart_diffirent_conditions() {
+        let c = MinMaxCondition {
+            min: vec![
+                Some(TableValue::Int(90)),
+                Some(TableValue::Int(4)),
+                None,
+                Some(TableValue::Int(4)),
+            ],
+            max: vec![
+                Some(TableValue::Int(90)),
+                Some(TableValue::Int(4)),
+                None,
+                Some(TableValue::Int(4)),
+            ],
+        };
+        let res = c.can_match(
+            &[
+                TableValue::Int(90),
+                TableValue::Int(4),
+                TableValue::Int(10),
+                TableValue::Int(12),
+            ],
+            &[
+                TableValue::Int(92),
+                TableValue::Int(1),
+                TableValue::Int(10),
+                TableValue::Int(12),
+            ],
+        );
+        assert!(res);
+
+        let res = c.can_match(
+            &[
+                TableValue::Int(90),
+                TableValue::Int(3),
+                TableValue::Int(10),
+                TableValue::Int(12),
+            ],
+            &[
+                TableValue::Int(92),
+                TableValue::Int(1),
+                TableValue::Int(10),
+                TableValue::Int(12),
+            ],
+        );
+        assert!(res);
+
+        let res = c.can_match(
+            &[
+                TableValue::Int(90),
+                TableValue::Int(4),
+                TableValue::Int(10),
+                TableValue::Int(12),
+            ],
+            &[
+                TableValue::Int(90),
+                TableValue::Int(4),
+                TableValue::Int(10),
+                TableValue::Int(12),
+            ],
+        );
+        assert!(!res);
+
+        let res = c.can_match(
+            &[
+                TableValue::Int(90),
+                TableValue::Int(4),
+                TableValue::Int(10),
+                TableValue::Int(4),
+            ],
+            &[
+                TableValue::Int(90),
+                TableValue::Int(4),
+                TableValue::Int(10),
+                TableValue::Int(4),
+            ],
+        );
+        assert!(res);
+        let res = c.can_match(
+            &[
+                TableValue::Int(90),
+                TableValue::Int(4),
+                TableValue::Int(10),
+                TableValue::Int(2),
+            ],
+            &[
+                TableValue::Int(90),
+                TableValue::Int(4),
+                TableValue::Int(10),
+                TableValue::Int(6),
+            ],
+        );
+        assert!(res);
+    }
+    #[test]
+    fn multipart_open_end_conditions() {
+        let c = MinMaxCondition {
+            min: vec![Some(TableValue::Int(20)), None],
+            max: vec![None, Some(TableValue::Int(30))],
+        };
+        let res = c.can_match(
+            &[TableValue::Int(5), TableValue::Int(30)],
+            &[TableValue::Int(10), TableValue::Int(15)],
+        );
+        assert!(!res);
+
+        let res = c.can_match(
+            &[TableValue::Int(15), TableValue::Int(30)],
+            &[TableValue::Int(25), TableValue::Int(15)],
+        );
+        assert!(res);
+
+        let res = c.can_match(
+            &[TableValue::Int(10), TableValue::Int(30)],
+            &[TableValue::Int(20), TableValue::Int(15)],
+        );
+        assert!(res);
+
+        let res = c.can_match(
+            &[TableValue::Int(20), TableValue::Int(15)],
+            &[TableValue::Int(20), TableValue::Int(40)],
+        );
+        assert!(res);
+
+        let res = c.can_match(
+            &[TableValue::Int(22), TableValue::Int(15)],
+            &[TableValue::Int(22), TableValue::Int(40)],
+        );
+        assert!(res);
+
+        let res = c.can_match(
+            &[TableValue::Int(22), TableValue::Int(10)],
+            &[TableValue::Int(22), TableValue::Int(25)],
+        );
+        assert!(res);
+
+        let res = c.can_match(
+            &[TableValue::Int(22), TableValue::Int(40)],
+            &[TableValue::Int(22), TableValue::Int(45)],
+        );
+        assert!(!res);
+
+        let res = c.can_match(
+            &[TableValue::Int(22), TableValue::Int(40)],
+            &[TableValue::Int(23), TableValue::Int(45)],
+        );
+        assert!(res);
     }
 
     #[test]

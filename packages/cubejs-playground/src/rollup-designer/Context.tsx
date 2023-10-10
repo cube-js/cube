@@ -9,6 +9,7 @@ import {
 } from 'react';
 
 import { useToggle } from '../hooks';
+import { SchemaFormat } from '../types';
 import { RollupDesignerModal } from './components/RollupDesignerModal';
 
 type RollupDesignerContextValue = {
@@ -21,6 +22,7 @@ type RollupDesignerContextValue = {
   setQuery: (query: Query | null) => void;
   transformedQuery: TransformedQuery | null;
   setTransformedQuery: (transformedQuery: TransformedQuery | null) => void;
+  defaultSchemaFormat: SchemaFormat
 };
 
 export const Context = createContext<RollupDesignerContextValue>(
@@ -32,6 +34,7 @@ type ContextProps = {
   children: ReactNode;
   cubejsApi?: CubejsApi;
   token?: string;
+  defaultSchemaFormat?: SchemaFormat
 };
 
 export function RollupDesignerContext({
@@ -101,6 +104,7 @@ export function RollupDesignerContext({
         setTransformedQuery,
         memberTypeCubeMap,
         error,
+        defaultSchemaFormat: props.defaultSchemaFormat || SchemaFormat.js
       }}
     >
       {children}

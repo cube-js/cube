@@ -4,13 +4,11 @@ import uniq from 'lodash/uniq';
 import { Layout, Row, Col } from 'antd';
 import { StaticQuery, graphql } from 'gatsby';
 
-import FrameworkOfChoiceStore from '../../stores/frameworkOfChoice';
 import Search from '../Search';
 import Header from '../Header';
 import MobileFooter from './MobileFooter';
 import MainMenu from './MainMenu';
 import ScrollMenu from './ScrollMenu';
-import FrameworkSwitcher from '../templates/FrameworkSwitcher';
 
 import PurpleBanner from "@cube-dev/purple-banner";
 
@@ -67,7 +65,7 @@ const fixNodeCategory = (node: MarkdownNode): MarkdownNode => ({
 
 // @TODO Move this entire thing into a Gatsby plugin
 const parseResults = (
-  nodes: LayoutQueryResponse['allMarkdownRemark']['edges']
+  nodes: LayoutQueryResponse['allMdx']['edges']
 ) => {
   let allNodes = nodes.reduce((categories, { node }) => {
     const newNode = fixNodeCategory(node);
@@ -189,80 +187,65 @@ class AppLayout extends React.Component<
       })
     );
 
-    const pageFrameworkOfChoice: string =
-      pageData && pageData?.mdx?.frontmatter?.frameworkOfChoice!;
-
     return (
-      <FrameworkOfChoiceStore>
-        <StaticQuery
-          query={layoutQuery}
-          render={(data: LayoutQueryResponse) => (
-            <>
-              <Row>
-                <PurpleBanner utmSource='docs'/>
-                <Header
-                  className={cx(styles.header, {
-                    [styles.fixed]: this.state.mobileMode === MobileModes.MENU,
-                  })}
-                  mobileSearch={this.state.mobileMode === MobileModes.SEARCH}
-                >
-                  <Search
-                    mobile={this.state.mobileMode === MobileModes.SEARCH}
-                    onClose={() => this.setMobileMode(MobileModes.CONTENT)}
-                    navigate={this.props.navigate}
-                  />
-                </Header>
-                <Col
-                  md={24}
-                  className={cx(styles.contentColumn, {
-                    fixed: this.state.mobileMode === MobileModes.MENU,
-                  })}
-                >
-                  <MainMenu
-                    items={parseResults(data.allMdx.edges)}
-                    {...menuProps}
-                  />
-                  <Col
-                    {...layout.contentArea.width}
-                    xs={
-                      this.state.mobileMode === 'content'
-                        ? { span: 22, offset: 1 }
-                        : 0
-                    }
-                  >
-                    {pageFrameworkOfChoice && (
-                      <div
-                        className={styles.contentWrapper}
-                        style={{ margin: '0 24px' }}
-                      >
-                        <div className={styles.frameworkSwitcherWrapper}>
-                          <FrameworkSwitcher value={pageFrameworkOfChoice} />
-                        </div>
-                      </div>
-                    )}
-                    <Layout.Content
-                      className={styles.contentWrapper}
-                      style={{ margin: '0 24px 100px 24px' }}
-                    >
-                      {childrenWithProps}
-                    </Layout.Content>
-                  </Col>
-                  {!this.state.noscrollmenu && (
-                    <ScrollMenu
-                      sections={this.state.sections}
-                      githubUrl={this.state.githubUrl}
-                    />
-                  )}
-                </Col>
-                <MobileFooter
-                  mobileMode={this.state.mobileMode}
-                  setMobileMode={this.setMobileMode}
+      <StaticQuery
+        query={layoutQuery}
+        render={(data: LayoutQueryResponse) => (
+          <>
+            <Row>
+              <PurpleBanner utmSource='docs'/>
+              <Header
+                className={cx(styles.header, {
+                  [styles.fixed]: this.state.mobileMode === MobileModes.MENU,
+                })}
+                mobileSearch={this.state.mobileMode === MobileModes.SEARCH}
+              >
+                <Search
+                  mobile={this.state.mobileMode === MobileModes.SEARCH}
+                  onClose={() => this.setMobileMode(MobileModes.CONTENT)}
+                  navigate={this.props.navigate}
                 />
-              </Row>
-            </>
-          )}
-        />
-      </FrameworkOfChoiceStore>
+              </Header>
+              <Col
+                md={24}
+                className={cx(styles.contentColumn, {
+                  fixed: this.state.mobileMode === MobileModes.MENU,
+                })}
+              >
+                <MainMenu
+                  items={parseResults(data.allMdx.edges)}
+                  {...menuProps}
+                />
+                <Col
+                  {...layout.contentArea.width}
+                  xs={
+                    this.state.mobileMode === 'content'
+                      ? { span: 22, offset: 1 }
+                      : 0
+                  }
+                >
+                  <Layout.Content
+                    className={styles.contentWrapper}
+                    style={{ margin: '0 24px 100px 24px' }}
+                  >
+                    {childrenWithProps}
+                  </Layout.Content>
+                </Col>
+                {!this.state.noscrollmenu && (
+                  <ScrollMenu
+                    sections={this.state.sections}
+                    githubUrl={this.state.githubUrl}
+                  />
+                )}
+              </Col>
+              <MobileFooter
+                mobileMode={this.state.mobileMode}
+                setMobileMode={this.setMobileMode}
+              />
+            </Row>
+          </>
+        )}
+      />
     );
   }
 }
@@ -296,7 +279,6 @@ const layoutQuery = graphql`
             category
             menuOrder
             subCategory
-            frameworkOfChoice
           }
         }
       }

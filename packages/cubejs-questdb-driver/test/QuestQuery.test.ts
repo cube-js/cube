@@ -118,4 +118,24 @@ describe('QuestQuery', () => {
 
       expect(queryAndParams[0]).toContain('GROUP BY "visitors__created_at_day"');
     }));
+
+  it('test query like',
+    () => compiler.compile().then(() => {
+      const query = new QuestQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: [],
+        filters: [
+          {
+            member: 'visitors.name',
+            operator: 'contains',
+            values: [
+              'demo',
+            ],
+          },
+        ],
+      });
+
+      const queryAndParams = query.buildSqlAndParams();
+
+      expect(queryAndParams[0]).toContain('ILIKE \'%\' || $1 || \'%\'');
+    }));
 });

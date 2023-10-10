@@ -15,8 +15,9 @@ on:
 jobs:
   debian:
     name: Debian Rust ${{ matrix.rust }}
-    runs-on: ubuntu-20.04
-    timeout-minutes: 60
+    # 22.04 has gcc 11, new binutils (ld)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
@@ -24,18 +25,36 @@ jobs:
     env:
       RUST: ${{ matrix.rust }}
     steps:
+      - name: Maximize build space (disk space limitations)
+        run: |
+          echo "Before"
+          df -h
+          sudo apt-get remove -y 'php.*'
+          sudo apt-get remove -y '^mongodb-.*'
+          sudo apt-get remove -y '^mysql-.*'
+          sudo apt-get autoremove -y
+          sudo apt-get clean
+
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          echo "After"
+          df -h
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
           toolchain: ${{ matrix.rust }}
           override: true
           components: rustfmt
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
         with:
-          working-directory: ./rust/cubestore
-          key: ubuntu-20.04
+          workspaces: ./rust/cubestore -> target
+          # We should use a separate key for testing to pass disk space limitations
+          shared-key: cubestore-testing
+          key: ubuntu-22.04
       - name: Run cargo fmt cubestore
         uses: actions-rs/cargo@v1
         with:
@@ -76,20 +95,20 @@ jobs:
     if: github.ref != 'refs/heads/master'
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
+        uses: docker/setup-buildx-action@v2
         with:
-          version: v0.6.3
+          version: v0.9.1
       - name: Cache Docker layers
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: /tmp/.buildx-cache
           key: ${{ runner.os }}-${{ matrix.target }}-buildx-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-${{ matrix.target }}-buildx-
       - name: Build only
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         with:
           context: ./rust/cubestore/
           file: ./rust/cubestore/Dockerfile
@@ -119,7 +138,7 @@ jobs:
             executable_name: cubestored
             cross: true
             strip: true
-            compress: true
+            compress: false
           - os: ubuntu-20.04
             target: x86_64-unknown-linux-musl
             executable_name: cubestored
@@ -134,7 +153,8 @@ jobs:
             strip: true
             # cubestored.exe: CantPackException: superfluous data between sections
             compress: false
-          - os: macos-latest
+            # Please use minimal possible version of macOS, because it produces constraint on libstdc++
+          - os: macos-11
             target: x86_64-apple-darwin
             executable_name: cubestored
             cross: false
@@ -146,11 +166,15 @@ jobs:
             cross: true
             # Unable to recognise the format of the input file `rust/cubestore/target/aarch64-unknown-linux-gnu/release/cubestored'
             strip: false
-            # UPX is broken, issue https://github.com/cube-js/cube.js/issues/4474
+            # UPX is broken, issue https://github.com/cube-js/cube/issues/4474
             compress: false
       fail-fast: false
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
+      - name: Disable rustup update (issue workaround for Windows)
+        run: rustup set auto-self-update disable
+        if: contains(runner.os, 'windows')
+        shell: bash
       - name: Setup Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
@@ -166,6 +190,8 @@ jobs:
       - run: source .github/actions/${{ matrix.before_script }}.sh
         if: ${{ matrix.before_script }}
         shell: bash
+      - uses: ilammy/msvc-dev-cmd@v1
+        if: ${{ startsWith(matrix.os, 'windows') }}
       - name: Install OpenSSL for Windows
         if: ${{ startsWith(matrix.os, 'windows') }}
         run: vcpkg integrate install; vcpkg install openssl:x64-windows
@@ -181,6 +207,10 @@ jobs:
           OPENSSL_LIB_DIR: 'C:/vcpkg/packages/openssl_x64-windows/lib'
           OPENSSL_INCLUDE_DIR: 'C:/vcpkg/packages/openssl_x64-windows/include'
           LIBCLANG_PATH: 'C:\Program Files\LLVM\bin'
+      # Hotfix before https://github.com/actions/runner-images/pull/7125 will be released/rolled on the productions servers
+      - name: Hotfix for macOS (pkg-config)
+        if: contains(runner.os, 'macos')
+        run: brew install pkg-config
       - name: Build with Cross
         if: ${{ matrix.cross }}
         run: |
@@ -192,11 +222,6 @@ jobs:
         if: ${{ !matrix.cross }}
         run: |
           cd rust/cubestore && cargo build --release --target=${{ matrix.target }}
-      - name: Brew update & install upx (workaround to use upx from github, instead of bintray)
-        if: ${{ matrix.os == 'macos-latest' }}
-        run: |
-          brew update
-          brew install upx
       - name: Compress binaries
         uses: svenstaro/upx-action@v2
         if: ${{ matrix.compress }}

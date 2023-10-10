@@ -16,7 +16,7 @@ import {
   BaseDriver,
   DownloadQueryResultsOptions, DownloadTableMemoryData, DriverInterface,
   GenericDataBaseType, IndexesSQL, TableStructure, StreamOptions,
-  StreamTableDataWithTypes, QueryOptions, DownloadQueryResultsResult,
+  StreamTableDataWithTypes, QueryOptions, DownloadQueryResultsResult, DriverCapabilities,
 } from '@cubejs-backend/base-driver';
 import { QueryStream } from './QueryStream';
 
@@ -61,6 +61,11 @@ export type PostgresDriverConfiguration = Partial<PoolConfig> & {
   storeTimezone?: string,
   executionTimeout?: number,
   readOnly?: boolean,
+
+  /**
+   * The export bucket CSV file escape symbol.
+   */
+  exportBucketCsvEscapeSymbol?: string,
 };
 
 /**
@@ -86,11 +91,26 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
    */
   public constructor(
     config: Partial<Config> & {
+      /**
+       * Data source name.
+       */
       dataSource?: string,
+
+      /**
+       * Max pool size value for the [cube]<-->[db] pool.
+       */
       maxPoolSize?: number,
+
+      /**
+       * Time to wait for a response from a connection after validation
+       * request before determining it as not valid. Default - 10000 ms.
+       */
+      testConnectionTimeout?: number,
     } = {}
   ) {
-    super();
+    super({
+      testConnectionTimeout: config.testConnectionTimeout,
+    });
 
     const dataSource =
       config.dataSource ||
@@ -116,6 +136,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     this.config = <Partial<Config>>{
       ...this.getInitialConfiguration(dataSource),
       executionTimeout: getEnv('dbQueryTimeout', { dataSource }),
+      exportBucketCsvEscapeSymbol: getEnv('dbExportBucketCsvEscapeSymbol', { dataSource }),
       ...config,
     };
     this.enabled = true;
@@ -235,6 +256,31 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     });
   }
 
+  public async streamQuery(sql: string, values: string[]): Promise<QueryStream> {
+    const conn = await this.pool.connect();
+    try {
+      await this.prepareConnection(conn);
+      const query: QueryStream = new QueryStream(sql, values, {
+        types: { getTypeParser: this.getTypeParser },
+        highWaterMark: getEnv('dbQueryStreamHighWaterMark'),
+      });
+      const rowsStream: QueryStream = await conn.query(query);
+      const cleanup = (err?: Error) => {
+        if (!rowsStream.destroyed) {
+          conn.release();
+          rowsStream.destroy(err);
+        }
+      };
+      rowsStream.once('end', cleanup);
+      rowsStream.once('error', cleanup);
+      rowsStream.once('close', cleanup);
+      return rowsStream;
+    } catch (e) {
+      await conn.release();
+      throw e;
+    }
+  }
+
   public async stream(
     query: string,
     values: unknown[],
@@ -252,11 +298,11 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
         highWaterMark
       });
       const rowStream: QueryStream = await conn.query(queryStream);
-      const meta = await rowStream.fields();
+      const fields = await await rowStream.fields();
 
       return {
         rowStream,
-        types: this.mapFields(meta),
+        types: this.mapFields(fields),
         release: async () => {
           await conn.release();
         }
@@ -360,5 +406,11 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
 
   public fromGenericType(columnType: string) {
     return GenericTypeToPostgres[columnType] || super.fromGenericType(columnType);
+  }
+
+  public capabilities(): DriverCapabilities {
+    return {
+      incrementalSchemaLoading: true,
+    };
   }
 }

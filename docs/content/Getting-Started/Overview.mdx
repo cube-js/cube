@@ -1,26 +1,46 @@
 ---
-title: Getting Started
+title: Getting started with Cube
+menuTitle: Overview
 permalink: /getting-started
 category: Getting Started
 menuOrder: 1
-isDisableFeedbackBlock: true
+isDisableFeedbackBlock: false
 ---
 
-You can get started with Cube locally or self-host it with Docker.
+Cube is a cloud-native application, packaged and distributed as Docker images
+and designed to run in a containerized environment.
 
-Alternatively, you can get started with [Cube Cloud](https://cube.dev/cloud/). It provides managed experience for Cube and has a free tier for development projects and proofs of concept.
+You can get started with Cube in one of two ways.
 
-<Grid cols={2}>
+We recommend using [Cube Cloud][cube-cloud], our managed platform for Cube,
+because it's the easiest way to build, test, deploy, and manage Cube projects.
+Cube Cloud includes features such as collaboration for teams, a web-based data
+model editor, auto-scaling, and observability. Cube Cloud also comes with a
+free tier for development and proof-of-concept projects.
+
+Alternatively, you can run Cube on your own infrastructure with Docker.
+
+<Grid cols={2} imageSize={[undefined, 50]}>
   <GridItem
-    url="getting-started/docker"
-    imageUrl="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Getting-Started/docker-logo.svg"
-    title="Docker"
+    url="getting-started/cloud/overview"
+    imageUrl="https://static.cube.dev/icons/cube.svg"
+    title="Cube Cloud"
   />
   <GridItem
-    url="cloud/getting-started/create"
-    imageUrl="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Getting-Started/cube-cloud-logo.svg"
-    title="Cube Cloud"
+    url="getting-started/core/overview"
+    imageUrl="https://static.cube.dev/icons/docker.svg"
+    title="Cube Core"
   />
 </Grid>
 
-There's also a legacy option to get started with [Node.js](getting-started/nodejs).
+## Migrating from Cube Core to Cube Cloud
+
+Cube Cloud supports several ways for importing existing Cube projects:
+
+- [Import a GitHub repository](/cloud/getting-started/github)
+- [Import a GitLab repository](/cloud/getting-started/ssh/gitlab)
+- [Import a Bitbucket repository](/cloud/getting-started/ssh/bitbucket)
+- [Import a Git repository](/cloud/getting-started/ssh/git)
+- [Import a local project with CLI](/cloud/getting-started/cli)
+
+[cube-cloud]: https://cube.dev/cloud/

@@ -9,12 +9,12 @@ documentation = "https://cube.dev/docs"
 homepage = "https://cube.dev"
 
 [dependencies]
-datafusion = { git = 'https://github.com/cube-js/arrow-datafusion.git', rev = "aac786a07fde784be70d4d738cf8f1986cc33dec", default-features = false, features = ["unicode_expressions"] }
+datafusion = { git = 'https://github.com/cube-js/arrow-datafusion.git', rev = "be967a63967f23bdd946a45925d07af0a11dcc39", default-features = false, features = ["regex_expressions", "unicode_expressions"] }
 anyhow = "1.0"
 thiserror = "1.0"
 cubeclient = { path = "../cubeclient" }
 pg-srv = { path = "../pg-srv" }
-sqlparser = { git = 'https://github.com/cube-js/sqlparser-rs.git', rev = "13aff89fcbc3545c92a94ce771bafa739363fad5" }
+sqlparser = { git = 'https://github.com/cube-js/sqlparser-rs.git', rev = "037562f7975fcc92b725efbfbaaf050272668593" }
 lazy_static = "1.4.0"
 base64 = "0.13.0"
 tokio = { version = "1.0", features = ["full", "rt", "tracing"] }
@@ -53,18 +53,30 @@ egg = "0.7.1"
 paste = "1.0.6"
 csv = "1.1.6"
 tracing = { version = "0.1.35", features = ["async-await"] }
-console-subscriber = "0.1.6"
+async-stream = "0.3.3"
+futures-core = "0.3.23"
+futures-util = "0.3.23"
+sha1_smol = "1.0.0"
+tera = { version = "1", default-features = false }
+minijinja = { version = "1", features = ["json", "loader"] }
+
 
 [dev-dependencies]
 pretty_assertions = "1.0.0"
 insta = "1.12"
 mysql_async = "0.29"
 portpicker = "0.1.1"
-tokio-postgres = { version = "0.7.6", features = ["with-chrono-0_4", "runtime"] }
+tokio-postgres = { version = "0.7.7", features = ["with-chrono-0_4", "runtime"] }
 rust_decimal = { version = "1.23", features = ["db-tokio-postgres"] }
 pg_interval = "0.4.1"
+criterion = { version = "0.4.0", features = ["html_reports"] }
+console-subscriber = "0.1.6"
 
 [[test]]
 name = "e2e"
 path = "e2e/main.rs"
+harness = false
+
+[[bench]]
+name = "benchmarks"
 harness = false

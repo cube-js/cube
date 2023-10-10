@@ -4,10 +4,10 @@ cube(`Users`, {
   joins: {
     Orders: {
       relationship: 'hasMany',
-      sql: `${Users}.id = ${Orders}.user_id`,
+      sql: `${CUBE}.id = ${Orders.userId}`,
     }
   },
-  
+
   dimensions: {
     name: {
       sql: `first_name || ' ' || last_name`,

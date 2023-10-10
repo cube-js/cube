@@ -69,6 +69,9 @@ export class KsqlQuery extends BaseQuery {
   }
 
   public groupByClause() {
+    if (this.ungrouped) {
+      return '';
+    }
     const dimensionsForSelect: any[] = this.dimensionsForSelect();
     const dimensionColumns = dimensionsForSelect.map(s => s.selectColumns() && s.dimensionSql())
       .reduce((a, b) => a.concat(b), [])
@@ -76,18 +79,39 @@ export class KsqlQuery extends BaseQuery {
     return dimensionColumns.length ? ` GROUP BY ${dimensionColumns.join(', ')}` : '';
   }
 
-  public preAggregationInvalidateKeyQueries(cube: string, preAggregation: any) {
-    // always empty as streaming tables are constantly refreshed by Cube Store
+  public partitionInvalidateKeyQueries(cube: string, preAggregation: any) {
     return [];
+  }
+
+  public preAggregationStartEndQueries(cube: string, preAggregation: any) {
+    if (preAggregation.partitionGranularity) {
+      if (!preAggregation.refreshRangeStart) {
+        throw new Error('Pre aggregation schema for kSql source with partition granularity must contains buildRangeStart parameter');
+      }
+      if (!preAggregation.refreshRangeEnd) {
+        throw new Error('Pre aggregation schema for kSql source with partition granularity must contains buildRangeEnd parameter');
+      }
+    }
+    const res = this.evaluateSymbolSqlWithContext(() => [
+      
+      preAggregation.refreshRangeStart && [this.evaluateSql(cube, preAggregation.refreshRangeStart.sql, {}), [], { external: true }],
+      preAggregation.refreshRangeEnd && [this.evaluateSql(cube, preAggregation.refreshRangeEnd.sql, {}), [], { external: true }]
+    ], { preAggregationQuery: true });
+    return res;
   }
 
   public preAggregationReadOnly(cube: string, preAggregation: any) {
     const [sql] = this.preAggregationSql(cube, preAggregation);
-    return preAggregation.type === 'originalSql' && Boolean(KsqlQuery.extractTableFromSimpleSelectAsteriskQuery(sql));
+    return preAggregation.type === 'originalSql' && Boolean(KsqlQuery.extractTableFromSimpleSelectAsteriskQuery(sql)) ||
+      preAggregation.type === 'rollup' && !!this.dimensionsForSelect().find(d => d.definition().primaryKey);
+  }
+
+  public preAggregationAllowUngroupingWithPrimaryKey(_cube: any, _preAggregation: any) {
+    return true;
   }
 
   public static extractTableFromSimpleSelectAsteriskQuery(sql: string) {
-    const match = sql.match(/^SELECT \* FROM ([\S]+)$/);
+    const match = sql.match(/^\s*select\s+\*\s+from\s+([a-zA-Z0-9_\-`".*]+)\s*/i);
     return match && match[1];
   }
 }

@@ -3,7 +3,7 @@ import R from 'ramda';
 import camelCase from 'camelcase';
 
 import { UserError } from './UserError';
-import { BaseMeasure } from '../adapter';
+import { BaseMeasure, BaseQuery } from '../adapter';
 
 export class CubeToMetaTransformer {
   constructor(cubeValidator, cubeEvaluator, contextEvaluator, joinGraph) {
@@ -15,26 +15,38 @@ export class CubeToMetaTransformer {
   }
 
   compile(cubes, errorReporter) {
-    // eslint-disable-next-line no-multi-assign
-    this.cubes = this.queries = this.cubeSymbols.cubeList
+    this.cubes = this.cubeSymbols.cubeList
       .filter(this.cubeValidator.isCubeValid.bind(this.cubeValidator))
       .map((v) => this.transform(v, errorReporter.inContext(`${v.name} cube`)))
       .filter(Boolean);
+
+    /**
+     * @deprecated
+     * @protected
+     */
+    this.queries = this.cubes;
   }
 
+  /**
+   * @protected
+   */
   transform(cube) {
     const cubeTitle = cube.title || this.titleize(cube.name);
     
+    const isCubeVisible = this.isVisible(cube, true);
+
     return {
+      isVisible: isCubeVisible,
       config: {
         name: cube.name,
+        type: cube.isView ? 'view' : 'cube',
         title: cubeTitle,
         description: cube.description,
         connectedComponent: this.joinGraph.connectedComponents()[cube.name],
         measures: R.compose(
           R.map((nameToMetric) => ({
             ...this.measureConfig(cube.name, cubeTitle, nameToMetric),
-            isVisible: this.isVisible(nameToMetric[1], true)
+            isVisible: isCubeVisible ? this.isVisible(nameToMetric[1], true) : false
           })),
           R.toPairs
         )(cube.measures || {}),
@@ -49,7 +61,7 @@ export class CubeToMetaTransformer {
               nameToDimension[1].suggestFilterValues == null ? true : nameToDimension[1].suggestFilterValues,
             format: nameToDimension[1].format,
             meta: nameToDimension[1].meta,
-            isVisible: this.isVisible(nameToDimension[1], !nameToDimension[1].primaryKey)
+            isVisible: isCubeVisible ? this.isVisible(nameToDimension[1], !nameToDimension[1].primaryKey) : false
           })),
           R.toPairs
         )(cube.dimensions || {}),
@@ -60,7 +72,7 @@ export class CubeToMetaTransformer {
             shortTitle: this.title(cubeTitle, nameToSegment, true),
             description: nameToSegment[1].description,
             meta: nameToSegment[1].meta,
-            isVisible: this.isVisible(nameToSegment[1], true)
+            isVisible: isCubeVisible ? this.isVisible(nameToSegment[1], true) : false
           })),
           R.toPairs
         )(cube.segments || {})
@@ -87,13 +99,24 @@ export class CubeToMetaTransformer {
     )(this.queries);
   }
 
+  /**
+   * @protected
+   */
   isVisible(symbol, defaultValue) {
+    if (symbol.public != null) {
+      return symbol.public;
+    }
+
+    // TODO: Deprecated, should be removed in the future
     if (symbol.visible != null) {
       return symbol.visible;
     }
+
+    // TODO: Deprecated, should be removed in the futur
     if (symbol.shown != null) {
       return symbol.shown;
     }
+
     return defaultValue;
   }
 
@@ -106,6 +129,9 @@ export class CubeToMetaTransformer {
       cubeName, drillMembers, { originalSorting: true }
     )) || [];
 
+    // TODO support type qualifiers on min and max
+    const type = BaseQuery.isCalculatedMeasureType(nameToMetric[1].type) ? nameToMetric[1].type : 'number';
+
     return {
       name,
       title: this.title(cubeTitle, nameToMetric),
@@ -114,8 +140,8 @@ export class CubeToMetaTransformer {
       format: nameToMetric[1].format,
       cumulativeTotal: nameToMetric[1].cumulative || BaseMeasure.isCumulative(nameToMetric[1]),
       cumulative: nameToMetric[1].cumulative || BaseMeasure.isCumulative(nameToMetric[1]),
-      type: 'number', // TODO
-      aggType: nameToMetric[1].type,
+      type,
+      aggType: nameToMetric[1].aggType || nameToMetric[1].type,
       drillMembers: drillMembersArray,
       drillMembersGrouped: {
         measures: drillMembersArray.filter((member) => this.cubeEvaluator.isMeasure(member)),

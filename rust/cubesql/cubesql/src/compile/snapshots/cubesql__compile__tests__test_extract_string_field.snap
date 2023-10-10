@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"SELECT EXTRACT('YEAR' FROM CAST ('2020-12-25 22:48:48.000' AS timestamptz))\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++-------------+
+| Int32(2020) |
++-------------+
+| 2020        |
++-------------+

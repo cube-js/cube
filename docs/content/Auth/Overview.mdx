@@ -6,29 +6,28 @@ category: Authentication & Authorization
 menuOrder: 1
 ---
 
-In Cube.js, authorization (or access control) is based on the **security
-context**. The diagram below shows how it works during the request processing in
-Cube.js:
+In Cube, authorization (or access control) is based on the **security context**.
+The diagram below shows how it works during the request processing in Cube:
 
 <div style="text-align: center">
   <img
-    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/authentication-overview.png"
+    src="https://ucarecdn.com/98431f1f-4693-4218-adcc-34e8635eb2dd/"
     style="border: none"
     width="80%"
   />
 </div>
 
-Authentication is handled outside of Cube.js. A typical use case would be:
+Authentication is handled outside of Cube. A typical use case would be:
 
-1. A web server serves an HTML page containing the Cube.js client, which needs
-   to communicate securely with the Cube.js API.
+1. A web server serves an HTML page containing the Cube client, which needs to
+   communicate securely with the Cube API.
 2. The web server should generate a JWT with an expiry to achieve this. The
    server could include the token in the HTML it serves or provide the token to
    the frontend via an XHR request, which is then stored it in local storage or
    a cookie.
 3. The JavaScript client is initialized using this token, and includes it in
-   calls to the Cube.js API.
-4. The token is received by Cube.js, and verified using any available JWKS (if
+   calls to the Cube API.
+4. The token is received by Cube, and verified using any available JWKS (if
    configured)
 5. Once decoded, the token claims are injected into the [security
    context][ref-sec-ctx].
@@ -42,9 +41,9 @@ can still use it to [pass a security context][ref-sec-ctx].
 
 ## Generating JSON Web Tokens (JWT)
 
-Authentication tokens are generated based on your API secret. Cube.js CLI
-generates an API Secret when a project is scaffolded and saves this value in the
-`.env` file as `CUBEJS_API_SECRET`.
+Authentication tokens are generated based on your API secret. Cube CLI generates
+an API Secret when a project is scaffolded and saves this value in the `.env`
+file as `CUBEJS_API_SECRET`.
 
 You can generate two types of tokens:
 
@@ -118,29 +117,20 @@ const cubejsApi = cubejs(
 ```
 
 You can optionally store this token in local storage or in a cookie, so that you
-can then use it to query the Cube.js API.
+can then use it to query the Cube API.
 
 ## Using JSON Web Key Sets (JWKS)
 
-Cube.js has out-of-the-box support for the following identity providers:
-
-- [Auth0][ref-jwt-auth0]
-- [AWS Cognito][ref-jwt-aws-cognito]
-
 <InfoBox>
 
-If you don't see your identity provider listed, please let us know with a post
-under the [Ideas category on our Discourse forum][link-discourse-ideas].
+Looking for a guide on how to connect a specific identity provider? Check out
+our recipes for using [Auth0][ref-recipe-auth0] or [AWS Cognito][ref-recipe-cognito] with Cube.
 
 </InfoBox>
 
-[link-discourse-ideas]: https://forum.cube.dev/c/ideas/12
-[ref-jwt-auth0]: /security/jwt/auth0
-[ref-jwt-aws-cognito]: /security/jwt/aws-cognito
-
 ### <--{"id" : "Using JSON Web Key Sets (JWKS)"}--> Configuration
 
-As mentioned previously, Cube.js supports verifying JWTs using industry-standard
+As mentioned previously, Cube supports verifying JWTs using industry-standard
 JWKS. The JWKS can be provided either from a URL, or as a JSON object conforming
 to [JWK specification RFC 7517 Section 4][link-jwk-ref], encoded as a string.
 
@@ -166,8 +156,8 @@ CUBEJS_JWT_KEY='<JWK_AS_STRING>'
 
 <InfoBox>
 
-When using a URL to fetch the JWKS, Cube.js will automatically cache the
-response, re-use it and update if a key rotation has occurred.
+When using a URL to fetch the JWKS, Cube will automatically cache the response,
+re-use it and update if a key rotation has occurred.
 
 </InfoBox>
 
@@ -189,8 +179,8 @@ CUBEJS_JWK_URL='<URL_TO_JWKS_JSON>'
 
 ### <--{"id" : "Using JSON Web Key Sets (JWKS)"}--> Verifying claims
 
-Cube.js can also verify the audience, subject and issuer claims in JWTs.
-Similarly to JWK configuration, these can also be configured in the `cube.js`
+Cube can also verify the audience, subject and issuer claims in JWTs. Similarly
+to JWK configuration, these can also be configured in the `cube.js`
 configuration file:
 
 ```javascript
@@ -213,7 +203,7 @@ CUBEJS_JWT_SUBJECT='<SUBJECT_FROM_IDENTITY_PROVIDER>'
 
 ### <--{"id" : "Using JSON Web Key Sets (JWKS)"}--> Custom claims namespace
 
-Cube.js can also extract claims defined in custom namespaces. Simply specify the
+Cube can also extract claims defined in custom namespaces. Simply specify the
 namespace in your `cube.js` configuration file:
 
 ```javascript
@@ -226,10 +216,10 @@ module.exports = {
 
 ### <--{"id" : "Using JSON Web Key Sets (JWKS)"}--> Caching
 
-Cube.js caches JWKS by default when
+Cube caches JWKS by default when
 [`CUBEJS_JWK_URL` or `jwt.jwkUrl` is specified](#configuration).
 
-- If the response contains a `Cache-Control` header, then Cube.js uses it to
+- If the response contains a `Cache-Control` header, then Cube uses it to
   determine cache expiry.
 - The keys inside the JWKS are checked for expiry values and used for cache
   expiry.
@@ -238,16 +228,16 @@ Cube.js caches JWKS by default when
 
 ## Custom authentication
 
-Cube.js also allows you to provide your own JWT verification logic by setting a
+Cube also allows you to provide your own JWT verification logic by setting a
 [`checkAuth()`][ref-config-check-auth] function in the `cube.js` configuration
 file. This function is expected to verify a JWT and assigns its' claims to the
 security context.
 
 <WarningBox>
 
-Previous versions of Cube.js allowed setting a `checkAuthMiddleware()`
-parameter, which is now deprecated. We advise [migrating to a newer version of
-Cube.js][ref-config-migrate-cubejs].
+Previous versions of Cube allowed setting a `checkAuthMiddleware()` parameter,
+which is now deprecated. We advise [migrating to a newer version of
+Cube][ref-config-migrate-cubejs].
 
 </WarningBox>
 
@@ -274,4 +264,7 @@ module.exports = {
 [ref-config-check-auth]: /config#check-auth
 [ref-config-migrate-cubejs]:
   /configuration/overview#migration-from-express-to-docker-template
+[ref-recipe-auth0]: /recipes/authn-with-auth0
+[ref-recipe-cognito]: /recipes/authn-with-aws-cognito
 [ref-sec-ctx]: /security/context
+[link-slack]: https://slack.cube.dev/

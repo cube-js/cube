@@ -1,6 +1,6 @@
 import cubejs from '@cubejs-client/core';
 import './App.css';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Accordion, Col, Container, Form, Row } from 'react-bootstrap';
 import jwt from 'jsonwebtoken';
 import { LineChart } from './LineChart';
@@ -27,21 +27,17 @@ function App() {
   const [ merchantId, setMerchantId ] = useState(defaultMerchantId);
   const merchant = merchants.find(x => x.id === merchantId);
 
-  const cubejsApi = cubejs(
+  const cubejsApi = useMemo(() => cubejs(
     merchant.token,
     { apiUrl },
-  );
+  ), [merchant.token, apiUrl]);
 
   useEffect(() => {
     cubejsApi
       .meta()
       .then(() => setStatus(true))
       .catch(() => setStatus(false));
-  }, [
-    cubejsApi,
-    merchant.token,
-    apiUrl,
-  ]);
+  }, [cubejsApi]);
 
   const [ ordersData, setOrdersData ] = useState([]);
 
@@ -57,11 +53,7 @@ function App() {
       })
       .then(data => setOrdersData(data.tablePivot()))
       .catch(() => setStatus(false));
-  }, [
-    cubejsApi,
-    merchant.token,
-    apiUrl,
-  ]);
+  }, [cubejsApi]);
 
   const [ categoriesData, setCategoriesData ] = useState([]);
 
@@ -74,11 +66,7 @@ function App() {
       .then(data => setCategoriesData(data.tablePivot()))
       .catch(() => {
       });
-  }, [
-    cubejsApi,
-    merchant.token,
-    apiUrl,
-  ]);
+  }, [cubejsApi]);
 
   return (
     <Container>

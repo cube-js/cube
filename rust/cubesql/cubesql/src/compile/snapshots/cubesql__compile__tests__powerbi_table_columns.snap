@@ -1,6 +1,5 @@
 ---
 source: cubesql/src/compile/mod.rs
-assertion_line: 8850
 expression: "execute_query(\"select COLUMN_NAME, ORDINAL_POSITION, IS_NULLABLE, case when (data_type like '%unsigned%') then DATA_TYPE || ' unsigned' else DATA_TYPE end as DATA_TYPE\n                from INFORMATION_SCHEMA.columns\n                where TABLE_SCHEMA = 'public' and TABLE_NAME = 'KibanaSampleDataEcommerce'\n                order by TABLE_SCHEMA, TABLE_NAME, ORDINAL_POSITION\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
 ---
 +--------------------+------------------+-------------+-----------------------------+
@@ -10,11 +9,15 @@ expression: "execute_query(\"select COLUMN_NAME, ORDINAL_POSITION, IS_NULLABLE, 
 | maxPrice           | 2                | NO          | numeric                     |
 | minPrice           | 3                | NO          | numeric                     |
 | avgPrice           | 4                | NO          | numeric                     |
-| order_date         | 5                | YES         | timestamp without time zone |
-| customer_gender    | 6                | YES         | text                        |
-| taxful_total_price | 7                | YES         | numeric                     |
-| has_subscription   | 8                | YES         | boolean                     |
-| is_male            | 9                | NO          | boolean                     |
-| is_female          | 10               | NO          | boolean                     |
-| __user             | 11               | YES         | text                        |
+| countDistinct      | 5                | NO          | bigint                      |
+| order_date         | 6                | YES         | timestamp without time zone |
+| last_mod           | 7                | YES         | timestamp without time zone |
+| customer_gender    | 8                | YES         | text                        |
+| notes              | 9                | YES         | text                        |
+| taxful_total_price | 10               | YES         | numeric                     |
+| has_subscription   | 11               | YES         | boolean                     |
+| is_male            | 12               | NO          | boolean                     |
+| is_female          | 13               | NO          | boolean                     |
+| __user             | 14               | YES         | text                        |
+| __cubeJoinField    | 15               | YES         | text                        |
 +--------------------+------------------+-------------+-----------------------------+

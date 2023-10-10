@@ -1,0 +1,17 @@
+{
+  "name": "hello-cube-acl",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "cubejs-server"
+  },
+  "template": "docker",
+  "templateVersion": "0.31.3",
+  "dependencies": {
+    "jwt-decode": "^3.1.2"
+  },
+  "devDependencies": {
+    "@cubejs-backend/postgres-driver": "^0.31.3",
+    "@cubejs-backend/server": "^0.31.3"
+  }
+}

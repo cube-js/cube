@@ -2,7 +2,6 @@ import dotenv from '@cubejs-backend/dotenv';
 
 import CubeCore, {
   CreateOptions as CoreCreateOptions,
-  CubejsServerCore,
   DatabaseType,
   DriverContext,
   DriverOptions,
@@ -49,7 +48,7 @@ type RequireOne<T, K extends keyof T> = {
 };
 
 export class CubejsServer {
-  protected readonly core: CubejsServerCore;
+  protected readonly core: CubeCore;
 
   protected readonly config: RequireOne<CreateOptions, 'webSockets' | 'http' | 'sqlPort' | 'pgSqlPort'>;
 
@@ -72,13 +71,17 @@ export class CubejsServer {
         ...config.http,
         cors: {
           allowedHeaders: 'authorization,content-type,x-request-id',
-          ...config.http?.cors
-        }
+          ...config.http?.cors,
+        },
       },
     };
 
-    this.core = CubeCore.create(config, systemOptions);
+    this.core = this.createCoreInstance(config, systemOptions);
     this.server = null;
+  }
+
+  protected createCoreInstance(config: CreateOptions, systemOptions?: SystemOptions): CubeCore {
+    return new CubeCore(config, systemOptions);
   }
 
   public async listen(options: http.ServerOptions = {}) {

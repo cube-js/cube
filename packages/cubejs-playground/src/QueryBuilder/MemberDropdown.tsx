@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { AvailableCube } from '@cubejs-client/react';
-import { ButtonProps, Input, Menu as AntdMenu } from 'antd';
+import { ButtonProps, Input, Menu as AntdMenu, Tag } from 'antd';
 import styled from 'styled-components';
 import FlexSearch from 'flexsearch';
+import { LockOutlined } from '@ant-design/icons';
 import { CubeMember, BaseCubeMember } from '@cubejs-client/core';
 
 import ButtonDropdown from './ButtonDropdown';
-import { useDeepMemo } from '../hooks/deep-memo';
+import { useDeepMemo } from '../hooks';
 import { getNameMemberPairs } from '../shared/members';
 
 const Menu = styled(AntdMenu)`
@@ -63,10 +64,6 @@ function filterMembersByKeys(
     });
 }
 
-function visibilityFilter({ isVisible }: CubeMember) {
-  return isVisible === undefined || isVisible;
-}
-
 type MemberDropdownProps = {
   availableCubes: AvailableCube<CubeMember>[];
   showNoMembersPlaceholder?: boolean;
@@ -85,7 +82,7 @@ export default function MemberMenu({
   const [filteredKeys, setFilteredKeys] = useState<string[]>([]);
 
   const hasMembers = availableCubes.some(
-    (cube) => cube.members.filter(visibilityFilter).length > 0
+    (cube) => cube.members.length > 0
   );
 
   const indexedMembers = useDeepMemo(() => {
@@ -105,7 +102,7 @@ export default function MemberMenu({
       if (currentSearch !== search) {
         return;
       }
-      
+
       setFilteredKeys(results as string[]);
     })();
 
@@ -121,6 +118,11 @@ export default function MemberMenu({
   return (
     <ButtonDropdown
       {...buttonProps}
+      onOverlayClose={() => {
+        setFilteredKeys([]);
+        setSearch('');
+        searchInputRef.current?.setValue('');
+      }}
       onClick={() => {
         // we need to delay focusing since React needs to render <Menu /> first :)
         setTimeout(() => {
@@ -158,6 +160,7 @@ export default function MemberMenu({
             setSearch('');
             setFilteredKeys([]);
             onClick(indexedMembers[event.key]);
+            searchInputRef.current?.setValue('');
           }}
         >
           {hasMembers ? (
@@ -184,17 +187,37 @@ export default function MemberMenu({
               </SearchMenuItem>
 
               {members.map((cube) => {
-                const members = cube.members.filter(visibilityFilter);
-
-                if (!members.length) {
+                if (!cube.members.length) {
                   return null;
                 }
 
                 return (
-                  <Menu.ItemGroup key={cube.cubeName} title={cube.cubeTitle}>
-                    {members.map((m) => (
+                  <Menu.ItemGroup
+                    key={cube.cubeName}
+                    title={
+                      cube.type ? (
+                        <span>
+                          {cube.cubeTitle}{' '}
+                          {cube.public === false ? <LockOutlined /> : null}
+                          {' '}
+                          <Tag
+                            color={cube.type === 'view' ? '#D26E0B' : '#7A77FF'}
+                            style={{
+                              padding: '0 4px',
+                              lineHeight: 1.5
+                            }}
+                          >
+                            {cube.type}
+                          </Tag>
+                        </span>
+                      ) : (
+                        cube.cubeTitle
+                      )
+                    }
+                  >
+                    {cube.members.map((m) => (
                       <Menu.Item key={m.name} data-testid={m.name}>
-                        {m.shortTitle}
+                        {m.shortTitle}{' '}{m.isVisible === false ? <LockOutlined /> : null}
                       </Menu.Item>
                     ))}
                   </Menu.ItemGroup>

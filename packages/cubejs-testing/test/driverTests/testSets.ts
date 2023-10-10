@@ -12,12 +12,15 @@ import {
   filteringCustomersEndsWithFilterFirst,
   filteringCustomersEndsWithFilterSecond,
   filteringCustomersEndsWithFilterThird,
-  filteringCustomersStartsWithAndDimensionsFirst,
-  filteringCustomersStartsWithAndDimensionsSecond,
-  filteringCustomersStartsWithAndDimensionsThird,
-  filteringCustomersEndsWithFilterAndDimensionsFirst,
-  filteringCustomersEndsWithFilterAndDimensionsSecond,
-  filteringCustomersEndsWithFilterAndDimensionsThird,
+  filteringCustomersNotEndsWithFilterFirst,
+  filteringCustomersNotEndsWithFilterSecond,
+  filteringCustomersNotEndsWithFilterThird,
+  filteringCustomersStartsWithFirst,
+  filteringCustomersStartsWithSecond,
+  filteringCustomersStartsWithThird,
+  filteringCustomersNotStartsWithFirst,
+  filteringCustomersNotStartsWithSecond,
+  filteringCustomersNotStartsWithThird,
   queryingProductDimensions,
   queryingProductsDimensionsAndOrder,
   queryingProductsDimensionsAndOrderAndLimit,
@@ -51,7 +54,7 @@ import {
   filteringECommerceEndsWithDimensionsFirst,
   filteringECommerceEndsWithDimensionsSecond,
   filteringECommerceEndsWithDimensionsThird,
-  queryingEcommerceTotalQuantifyAvgDiscountTotal,
+  queryingEcommerceTotalQuantifyAvgDiscountTotal, hiddenMember, hiddenCube, viewMetaExposed, preAggsCustomersRunningTotal,
 } from './tests';
 import { testSet } from './driverTest';
 
@@ -97,15 +100,18 @@ const withoutOrderingTestSet = testSet([
   filteringCustomersCubeFirst,
   filteringCustomersCubeSecond,
   filteringCustomersCubeThird,
+  filteringCustomersStartsWithFirst,
+  filteringCustomersStartsWithSecond,
+  filteringCustomersStartsWithThird,
+  filteringCustomersNotStartsWithFirst,
+  filteringCustomersNotStartsWithSecond,
+  filteringCustomersNotStartsWithThird,
   filteringCustomersEndsWithFilterFirst,
   filteringCustomersEndsWithFilterSecond,
   filteringCustomersEndsWithFilterThird,
-  filteringCustomersStartsWithAndDimensionsFirst,
-  filteringCustomersStartsWithAndDimensionsSecond,
-  filteringCustomersStartsWithAndDimensionsThird,
-  filteringCustomersEndsWithFilterAndDimensionsFirst,
-  filteringCustomersEndsWithFilterAndDimensionsSecond,
-  filteringCustomersEndsWithFilterAndDimensionsThird,
+  filteringCustomersNotEndsWithFilterFirst,
+  filteringCustomersNotEndsWithFilterSecond,
+  filteringCustomersNotEndsWithFilterThird,
   queryingProductDimensions,
   queryingECommerceDimensions,
   queryingECommerceDimensionsLimit,
@@ -118,11 +124,21 @@ const withoutOrderingTestSet = testSet([
   filteringECommerceStartsWithDimensionsThird,
   filteringECommerceEndsWithDimensionsFirst,
   filteringECommerceEndsWithDimensionsSecond,
-  filteringECommerceEndsWithDimensionsThird
+  filteringECommerceEndsWithDimensionsThird,
 ]);
 
 export const mainTestSet = testSet([
   ...skippedTestSet,
   ...withOrderingTestSet,
   ...withoutOrderingTestSet,
+  viewMetaExposed
+]);
+
+export const preAggsTestSet = testSet([
+  preAggsCustomersRunningTotal,
+]);
+
+export const productionTestSet = testSet([
+  hiddenMember,
+  hiddenCube,
 ]);

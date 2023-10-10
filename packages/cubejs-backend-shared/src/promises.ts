@@ -3,7 +3,7 @@ import crypto from 'crypto';
 
 import { Optional } from './type-helpers';
 
-type CancelablePromiseCancel = (waitExecution?: boolean) => Promise<any>;
+export type CancelablePromiseCancel = (waitExecution?: boolean) => Promise<any>;
 
 export interface CancelablePromise<T> extends Promise<T> {
   cancel: CancelablePromiseCancel;
@@ -115,7 +115,7 @@ export function createCancelableInterval<T>(
   let intervalId: number = 0;
   let duplicatedExecutionTracked: boolean = false;
 
-  const timeout = setInterval(
+  const timerId = setInterval(
     async () => {
       if (execution) {
         if (options.onDuplicatedExecution) {
@@ -152,7 +152,7 @@ export function createCancelableInterval<T>(
 
   return {
     cancel: async (waitExecution: boolean = true) => {
-      clearInterval(timeout);
+      clearInterval(timerId);
 
       if (execution) {
         await execution.cancel(waitExecution);
@@ -362,7 +362,7 @@ export const asyncMemoizeBackground = <Ret, Arguments>(
 
       bucket.item = item;
       bucket.lifetime = Date.now() + options.extractCacheLifetime(item);
-    } catch (e) {
+    } catch (e: any) {
       options.onBackgroundException(e);
     }
   };

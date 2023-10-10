@@ -5,6 +5,7 @@
  */
 
 /* eslint-disable no-restricted-syntax,import/no-extraneous-dependencies */
+import { Readable } from 'stream';
 import {
   getEnv,
   assertDataSource,
@@ -18,14 +19,20 @@ import genericPool, { Factory, Pool } from 'generic-pool';
 import { DriverOptionsInterface, SupportedDrivers } from './supported-drivers';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { JDBCDriverConfiguration } from './types';
+import { QueryStream, nextFn, Row } from './QueryStream';
 
-const DriverManager = require('jdbc/lib/drivermanager');
-const Connection = require('jdbc/lib/connection');
-const DatabaseMetaData = require('jdbc/lib/databasemetadata');
-const jinst = require('jdbc/lib/jinst');
+const DriverManager = require('@cubejs-backend/jdbc/lib/drivermanager');
+const Connection = require('@cubejs-backend/jdbc/lib/connection');
+const DatabaseMetaData = require('@cubejs-backend/jdbc/lib/databasemetadata');
+const jinst = require('@cubejs-backend/jdbc/lib/jinst');
 const mvn = require('node-java-maven');
 
 let mvnPromise: Promise<void> | null = null;
+
+type JdbcStatement = {
+  setQueryTimeout: (t: number) => any,
+  execute: (q: string) => any,
+};
 
 const initMvn = (customClassPath: any) => {
   if (!mvnPromise) {
@@ -36,6 +43,7 @@ const initMvn = (customClassPath: any) => {
         } else {
           if (!jinst.isJvmCreated()) {
             jinst.addOption('-Xrs');
+            jinst.addOption('-Dfile.encoding=UTF8');
             const classPath = (mvnResults && mvnResults.classpath || []).concat(customClassPath || []);
             jinst.setupClasspath(classPath);
           }
@@ -68,11 +76,26 @@ export class JDBCDriver extends BaseDriver {
 
   public constructor(
     config: Partial<JDBCDriverConfiguration> & {
+      /**
+       * Data source name.
+       */
       dataSource?: string,
+
+      /**
+       * Max pool size value for the [cube]<-->[db] pool.
+       */
       maxPoolSize?: number,
+
+      /**
+       * Time to wait for a response from a connection after validation
+       * request before determining it as not valid. Default - 60000 ms.
+       */
+      testConnectionTimeout?: number,
     } = {}
   ) {
-    super();
+    super({
+      testConnectionTimeout: config.testConnectionTimeout || 60000,
+    });
 
     const dataSource =
       config.dataSource ||
@@ -118,25 +141,38 @@ export class JDBCDriver extends BaseDriver {
       },
       // @ts-expect-error Promise<Function> vs Promise<void>
       destroy: async (connection) => promisify(connection.close.bind(connection)),
-      validate: (connection) => {
-        const isValid = promisify(connection.isValid.bind(connection));
-        try {
-          return isValid(this.testConnectionTimeout() / 1000);
-        } catch (e) {
-          return false;
-        }
-      }
+      validate: async (connection) => (
+        new Promise((resolve) => {
+          const isValid = promisify(connection.isValid.bind(connection));
+          const timeout = setTimeout(() => {
+            if (this.logger) {
+              this.logger('Connection validation failed by timeout', {
+                testConnectionTimeout: this.testConnectionTimeout(),
+              });
+            }
+            resolve(false);
+          }, this.testConnectionTimeout());
+          isValid(0).then((valid: boolean) => {
+            clearTimeout(timeout);
+            if (!valid && this.logger) {
+              this.logger('Connection validation failed', {});
+            }
+            resolve(valid);
+          }).catch((e: { stack?: string }) => {
+            clearTimeout(timeout);
+            this.databasePoolError(e);
+            resolve(false);
+          });
+        })
+      )
     }, {
       min: 0,
-      max:
-        config.maxPoolSize ||
-        getEnv('dbMaxPoolSize', { dataSource }) ||
-        8,
+      max: config.maxPoolSize || getEnv('dbMaxPoolSize', { dataSource }) || 8,
       evictionRunIntervalMillis: 10000,
       softIdleTimeoutMillis: 30000,
       idleTimeoutMillis: 30000,
       testOnBorrow: true,
-      acquireTimeoutMillis: 20000,
+      acquireTimeoutMillis: 120000,
       ...(poolOptions || {})
     }) as ExtendedPool;
   }
@@ -163,10 +199,10 @@ export class JDBCDriver extends BaseDriver {
     try {
       connection = await this.pool._factory.create();
     } catch (e: any) {
-      err = e.message;
+      err = e.message || e;
     }
     if (err) {
-      throw new Error(err);
+      throw new Error(err.toString());
     } else {
       await this.pool._factory.destroy(connection);
     }
@@ -184,7 +220,8 @@ export class JDBCDriver extends BaseDriver {
     const cancelObj: {cancel?: Function} = {};
     const promise = this.queryPromised(queryWithParams, cancelObj, this.prepareConnectionQueries());
     (promise as CancelablePromise<any>).cancel =
-      () => cancelObj.cancel && cancelObj.cancel() || Promise.reject(new Error('Statement is not ready'));
+      () => cancelObj.cancel && cancelObj.cancel() ||
+      Promise.reject(new Error('Statement is not ready'));
     return promise;
   }
 
@@ -212,6 +249,59 @@ export class JDBCDriver extends BaseDriver {
         await this.pool.release(conn);
       }
     } catch (ex: any) {
+      if (ex.cause) {
+        throw new Error(ex.cause.getMessageSync());
+      } else {
+        throw ex;
+      }
+    }
+  }
+
+  public async streamQuery(sql: string, values: string[]): Promise<Readable> {
+    const conn = await this.pool.acquire();
+    const query = applyParams(sql, values);
+    const cancelObj: {cancel?: Function} = {};
+    try {
+      const createStatement = promisify(conn.createStatement.bind(conn));
+      const statement = await createStatement();
+
+      if (cancelObj) {
+        cancelObj.cancel = promisify(statement.cancel.bind(statement));
+      }
+
+      const executeQuery = promisify(statement.execute.bind(statement));
+      const resultSet = await executeQuery(query);
+      return new Promise((resolve, reject) => {
+        resultSet.toObjectIter(
+          (
+            err: unknown,
+            res: {
+                labels: string[],
+                types: number[],
+                rows: { next: nextFn },
+              },
+          ) => {
+            if (err) reject(err);
+            const rowsStream = new QueryStream(res.rows.next);
+            let connectionReleased = false;
+            const cleanup = (e?: Error) => {
+              if (!connectionReleased) {
+                this.pool.release(conn);
+                connectionReleased = true;
+              }
+              if (!rowsStream.destroyed) {
+                rowsStream.destroy(e);
+              }
+            };
+            rowsStream.once('end', cleanup);
+            rowsStream.once('error', cleanup);
+            rowsStream.once('close', cleanup);
+            resolve(rowsStream);
+          }
+        );
+      });
+    } catch (ex: any) {
+      await this.pool.release(conn);
       if (ex.cause) {
         throw new Error(ex.cause.getMessageSync());
       } else {

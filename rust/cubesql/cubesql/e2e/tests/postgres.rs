@@ -264,22 +264,59 @@ impl PostgresIntegrationTestSuite {
         }
     }
 
-    async fn test_cancel(&self) -> RunResult<()> {
-        let cancel_token = self.client.cancel_token();
+    async fn test_cancel_execute_prepared(&self) -> RunResult<()> {
+        let client = PostgresIntegrationTestSuite::create_client(
+            format!("host=127.0.0.1 port={} user=test password=test", self.port)
+                .parse()
+                .unwrap(),
+        )
+        .await;
+
+        let cancel_token = client.cancel_token();
         let cancel = async move {
-            tokio::time::sleep(Duration::from_millis(1000)).await;
+            sleep(Duration::from_millis(1000)).await;
 
             cancel_token.cancel_query(NoTls).await
         };
 
         // testing_blocking tables will neven finish. It's a special testing table
-        let sleep = self
-            .client
-            .batch_execute("SELECT * FROM information_schema.testing_blocking");
+        let sleep = client.batch_execute("SELECT * FROM information_schema.testing_blocking");
 
         match join!(sleep, cancel) {
             (Err(ref e), Ok(())) if e.code() == Some(&SqlState::QUERY_CANCELED) => {}
-            t => panic!("unexpected return {:?}", t),
+            res => panic!(
+                "unexpected return, prepared must be cancelled, actual: {:?}",
+                res
+            ),
+        };
+
+        Ok(())
+    }
+
+    async fn test_cancel_simple_query(&self) -> RunResult<()> {
+        let client = PostgresIntegrationTestSuite::create_client(
+            format!("host=127.0.0.1 port={} user=test password=test", self.port)
+                .parse()
+                .unwrap(),
+        )
+        .await;
+
+        let cancel_token = client.cancel_token();
+        let cancel = async move {
+            sleep(Duration::from_millis(1000)).await;
+
+            cancel_token.cancel_query(NoTls).await
+        };
+
+        // testing_blocking tables will neven finish. It's a special testing table
+        let sleep = client.simple_query("SELECT * FROM information_schema.testing_blocking");
+
+        match join!(sleep, cancel) {
+            (Err(ref e), Ok(())) if e.code() == Some(&SqlState::QUERY_CANCELED) => {}
+            (_, err) => panic!(
+                "unexpected return, simple query must be cancelled, actual: {:?}",
+                err
+            ),
         };
 
         Ok(())
@@ -547,6 +584,72 @@ impl PostgresIntegrationTestSuite {
             }
         ).await?;
 
+        self.test_simple_query(
+            r#"declare test_cursor_fetching_less_than_batch_size cursor with hold for SELECT * from information_schema.testing_dataset order by id;"#
+                .to_string(),
+            |messages| {
+                assert_eq!(messages.len(), 1);
+            }
+        ).await?;
+
+        self.test_simple_query(
+            r#"fetch 800 in test_cursor_fetching_less_than_batch_size; fetch 800 in test_cursor_fetching_less_than_batch_size; fetch 5000 in test_cursor_fetching_less_than_batch_size;"#
+                .to_string(),
+            |messages| {
+                // 5000 rows | 3 completions
+                assert_eq!(messages.len(), 5003);
+
+                self.assert_row(&messages[0], "0".to_string());
+                self.assert_row(&messages[799], "799".to_string());
+
+                self.assert_complete(&messages[800], 800);
+
+                self.assert_row(&messages[801], "800".to_string());
+                self.assert_row(&messages[1600], "1599".to_string());
+
+                self.assert_complete(&messages[1601], 800);
+
+                self.assert_row(&messages[1602], "1600".to_string());
+                self.assert_row(&messages[5001], "4999".to_string());
+
+                self.assert_complete(&messages[5002], 3400);
+            },
+        )
+        .await?;
+
+        self.test_simple_query(
+            r#"declare test_cursor_fetching_more_than_batch_size cursor with hold for SELECT * from information_schema.testing_dataset order by id;"#
+                .to_string(),
+            |messages| {
+                assert_eq!(messages.len(), 1);
+            }
+        ).await?;
+
+        self.test_simple_query(
+            r#"fetch 2400 in test_cursor_fetching_more_than_batch_size; fetch 2400 in test_cursor_fetching_more_than_batch_size; fetch 5000 in test_cursor_fetching_more_than_batch_size;"#
+                .to_string(),
+            |messages| {
+                // 5000 rows | 3 completions
+                assert_eq!(messages.len(), 5003);
+
+                self.assert_row(&messages[0], "0".to_string());
+                self.assert_row(&messages[2399], "2399".to_string());
+
+                self.assert_complete(&messages[2400], 2400);
+
+                self.assert_row(&messages[2401], "2400".to_string());
+                self.assert_row(&messages[4800], "4799".to_string());
+
+                self.assert_complete(&messages[4801], 2400);
+
+                self.assert_row(&messages[4802], "4800".to_string());
+                self.assert_row(&messages[5001], "4999".to_string());
+
+                self.assert_complete(&messages[5002], 200);
+            },
+        )
+        .await?;
+
         Ok(())
     }
 
@@ -790,6 +893,16 @@ impl PostgresIntegrationTestSuite {
             panic!("Must be Row command, 0")
         }
 
+        let messages = new_client
+            .simple_query(&"SELECT table_catalog FROM information_schema.tables LIMIT 1")
+            .await?;
+        if let SimpleQueryMessage::Row(row) = &messages[0] {
+            // default one
+            assert_eq!(row.get(0), Some("meow"));
+        } else {
+            panic!("Must be Row command, 0")
+        }
+
         Ok(())
     }
 
@@ -810,6 +923,22 @@ impl PostgresIntegrationTestSuite {
 
         Ok(())
     }
+
+    fn assert_row(&self, message: &SimpleQueryMessage, expected_value: String) {
+        if let SimpleQueryMessage::Row(row) = message {
+            assert_eq!(row.get(0), Some(expected_value.as_str()));
+        } else {
+            panic!("Must be Row command, {}", expected_value)
+        }
+    }
+
+    fn assert_complete(&self, message: &SimpleQueryMessage, expected_value: u64) {
+        if let SimpleQueryMessage::CommandComplete(rows) = message {
+            assert_eq!(rows, &expected_value);
+        } else {
+            panic!("Must be CommandComplete command, {}", expected_value)
+        }
+    }
 }
 
 #[async_trait]
@@ -820,7 +949,8 @@ impl AsyncTestSuite for PostgresIntegrationTestSuite {
     }
 
     async fn run(&mut self) -> RunResult<()> {
-        self.test_cancel().await?;
+        self.test_cancel_simple_query().await?;
+        self.test_cancel_execute_prepared().await?;
         self.test_prepare().await?;
         self.test_extended_error().await?;
         self.test_prepare_empty_query().await?;
@@ -931,6 +1061,29 @@ impl AsyncTestSuite for PostgresIntegrationTestSuite {
         .await?;
 
         self.test_simple_query(r#"SET DateStyle = 'ISO'"#.to_string(), |messages| {
+            assert_eq!(messages.len(), 1);
+
+            // SET
+            if let SimpleQueryMessage::Row(_) = messages[0] {
+                panic!("Must be CommandComplete command, (SET is used)")
+            }
+        })
+        .await?;
+
+        self.test_simple_query(
+            r#"SET search_path = public, other_schema"#.to_string(),
+            |messages| {
+                assert_eq!(messages.len(), 1);
+
+                // SET
+                if let SimpleQueryMessage::Row(_) = messages[0] {
+                    panic!("Must be CommandComplete command, (SET is used)")
+                }
+            },
+        )
+        .await?;
+
+        self.test_simple_query(r#"SET ROLE "cube""#.to_string(), |messages| {
             assert_eq!(messages.len(), 1);
 
             // SET

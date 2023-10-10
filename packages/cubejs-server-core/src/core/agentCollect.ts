@@ -62,7 +62,7 @@ class WebSocketTransport implements AgentTransport {
         if (method === 'callback' && this.callbacks[params.callbackId]) {
           this.callbacks[params.callbackId](params.result);
         }
-      } catch (e) {
+      } catch (e: any) {
         this.logger('Agent Error', { error: (e.stack || e).toString() });
       }
     });
@@ -124,8 +124,11 @@ class HttpTransport implements AgentTransport {
     const result = await fetch(this.endpointUrl, {
       agent: this.agent,
       method: 'post',
-      body: JSON.stringify(data),
-      headers: { 'Content-Type': 'application/json' },
+      body: await deflate(JSON.stringify(data)),
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Encoding': 'deflate'
+      },
     });
     return result.status === 200;
   }
@@ -151,14 +154,12 @@ export default async (event: Record<string, any>, endpointUrl: string, logger: a
   });
   lastEvent = new Date();
 
-  const flush = async (toFlush?: any[], retries?: number) => {
+  const flush = async (toFlush: any[], retries?: number) => {
     if (!transport) {
       transport = /^http/.test(endpointUrl) ?
         new HttpTransport(endpointUrl) :
         new WebSocketTransport(endpointUrl, logger, clearTransport);
     }
-
-    if (!toFlush) toFlush = trackEvents.splice(0, getEnv('agentFrameSize'));
     if (!toFlush.length) return false;
     if (retries == null) retries = 3;
 
@@ -168,17 +169,27 @@ export default async (event: Record<string, any>, endpointUrl: string, logger: a
       if (!result && retries > 0) return flush(toFlush, retries - 1);
   
       return true;
-    } catch (e) {
+    } catch (e: any) {
       if (retries > 0) return flush(toFlush, retries - 1);
       logger('Agent Error', { error: (e.stack || e).toString() });
     }
 
     return true;
   };
+
+  const flushAllByChunks = async () => {
+    const agentFrameSize: number = getEnv('agentFrameSize');
+    const toFlushArray = [];
+    while (trackEvents.length > 0) {
+      toFlushArray.push(trackEvents.splice(0, agentFrameSize));
+    }
+    await Promise.all(toFlushArray.map(toFlush => flush(toFlush)));
+  };
+
   if (!agentInterval) {
     agentInterval = setInterval(async () => {
       if (trackEvents.length) {
-        await flush();
+        await flushAllByChunks();
       } else if (new Date().getTime() - lastEvent.getTime() > 3000) {
         clearInterval(agentInterval);
         agentInterval = null;

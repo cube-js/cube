@@ -2,6 +2,7 @@
 .env.bigquery.sh
 .env.postgres.sh
 .env.databricks.sh
+.cubestore
 dist
 cypress/videos
 cypress/screenshots
@@ -10,7 +11,7 @@ cypress/snapshots
 birdbox-test-project
 birdbox-fixtures/datasets
 birdbox-fixtures/postgresql/.cubestore
-birdbox-fixtures/postgresql/cube.js
+# birdbox-fixtures/postgresql/cube.js
 birdbox-fixtures/postgresql/schema/CAST.js
 birdbox-fixtures/postgresql/schema/Customers.js
 birdbox-fixtures/postgresql/schema/Customers.sql.js

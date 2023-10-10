@@ -1,6 +1,6 @@
 use std::{any::type_name, collections::HashMap, convert::TryFrom, sync::Arc, thread};
 
-use chrono::{Datelike, Duration, NaiveDate, NaiveDateTime};
+use chrono::{Datelike, Duration, NaiveDate, NaiveDateTime, NaiveTime};
 use datafusion::{
     arrow::{
         array::{
@@ -19,6 +19,7 @@ use datafusion::{
         },
     },
     error::{DataFusionError, Result},
+    execution::context::SessionContext,
     logical_plan::{create_udaf, create_udf},
     physical_plan::{
         functions::{
@@ -28,13 +29,14 @@ use datafusion::{
         udaf::AggregateUDF,
         udf::ScalarUDF,
         udtf::TableUDF,
-        ColumnarValue,
+        Accumulator, ColumnarValue,
     },
     scalar::ScalarValue,
 };
 use itertools::izip;
 use pg_srv::{PgType, PgTypeId};
 use regex::Regex;
+use sha1_smol::Sha1;
 
 use crate::{
     compile::engine::df::{
@@ -47,6 +49,9 @@ use crate::{
 pub type ReturnTypeFunction = Arc<dyn Fn(&[DataType]) -> Result<Arc<DataType>> + Send + Sync>;
 pub type ScalarFunctionImplementation =
     Arc<dyn Fn(&[ColumnarValue]) -> Result<ColumnarValue> + Send + Sync>;
+pub type StateTypeFunction = Arc<dyn Fn(&DataType) -> Result<Arc<Vec<DataType>>> + Send + Sync>;
+pub type AccumulatorFunctionImplementation =
+    Arc<dyn Fn() -> Result<Box<dyn Accumulator>> + Send + Sync>;
 
 pub fn create_version_udf(v: String) -> ScalarUDF {
     let fun = make_scalar_function(move |_args: &[ArrayRef]| {
@@ -379,22 +384,62 @@ pub fn create_ucase_udf() -> ScalarUDF {
 
 pub fn create_isnull_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
-        assert!(args.len() == 1);
+        let result = match args.len() {
+            1 => {
+                let len = args[0].len();
+                let mut builder = BooleanBuilder::new(len);
+                for i in 0..len {
+                    builder.append_value(args[0].is_null(i))?;
+                }
 
-        let len = args[0].len();
-        let mut builder = BooleanBuilder::new(len);
-        for i in 0..len {
-            builder.append_value(args[0].is_null(i))?;
-        }
+                Arc::new(builder.finish()) as ArrayRef
+            }
+            2 => {
+                if args[0].data_type() != &DataType::Utf8 || args[1].data_type() != &DataType::Utf8
+                {
+                    return Err(DataFusionError::Internal(format!(
+                        "isnull with 2 arguments supports only (Utf8, Utf8), actual: ({}, {})",
+                        args[0].data_type(),
+                        args[1].data_type(),
+                    )));
+                }
 
-        Ok(Arc::new(builder.finish()) as ArrayRef)
+                let exprs = downcast_string_arg!(&args[0], "expr", i32);
+                let replacements = downcast_string_arg!(&args[1], "replacement", i32);
+
+                let result = exprs
+                    .iter()
+                    .zip(replacements.iter())
+                    .map(|(expr, replacement)| if expr.is_some() { expr } else { replacement })
+                    .collect::<StringArray>();
+
+                Arc::new(result)
+            }
+            _ => {
+                return Err(DataFusionError::Internal(format!(
+                    "isnull accepts 1 or 2 arguments, actual: {}",
+                    args.len(),
+                )))
+            }
+        };
+        Ok(result)
     });
 
-    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Boolean)));
+    let return_type: ReturnTypeFunction = Arc::new(move |types| match types.len() {
+        1 => Ok(Arc::new(DataType::Boolean)),
+        2 => Ok(Arc::new(types[0].clone())),
+        _ => Err(DataFusionError::Internal(format!(
+            "isnull accepts 1 or 2 arguments, actual: {}",
+            types.len(),
+        ))),
+    });
 
     ScalarUDF::new(
         "isnull",
-        &Signature::any(1, Volatility::Immutable),
+        &Signature::one_of(
+            vec![TypeSignature::Any(1), TypeSignature::Any(2)],
+            Volatility::Immutable,
+        ),
         &return_type,
         &fun,
     )
@@ -711,9 +756,50 @@ pub fn create_datediff_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
         assert!(args.len() == 3);
 
-        return Err(DataFusionError::NotImplemented(format!(
-            "datediff is not implemented, it's stub"
-        )));
+        let datepart_array = downcast_string_arg!(args[0], "datepart", i32);
+        match (&args[1].data_type(), &args[2].data_type()) {
+            (
+                DataType::Timestamp(TimeUnit::Nanosecond, None),
+                DataType::Timestamp(TimeUnit::Nanosecond, None),
+            ) => (),
+            _ => {
+                return Err(DataFusionError::Execution(format!(
+                    "date arguments must be of type TimestampNanosecond, actual: {}, {}",
+                    &args[1].data_type(),
+                    &args[2].data_type(),
+                )));
+            }
+        }
+        let left_date_array =
+            downcast_primitive_arg!(args[1], "left_date", TimestampNanosecondType);
+        let right_date_array =
+            downcast_primitive_arg!(args[2], "right_date", TimestampNanosecondType);
+
+        let result = izip!(datepart_array, left_date_array, right_date_array)
+            .map(|args| {
+                match args {
+                    (Some(datepart), Some(left_date), Some(right_date)) => {
+                        match datepart.to_lowercase().as_str() {
+                            // TODO: support more dateparts as needed
+                            "day" | "days" | "d" => {
+                                let nanoseconds_in_day = 86_400_000_000_000_i64;
+                                let left_days = left_date / nanoseconds_in_day;
+                                let right_days = right_date / nanoseconds_in_day;
+                                let day_difference = right_days - left_days;
+                                Ok(Some(day_difference))
+                            }
+                            _ => Err(DataFusionError::Execution(format!(
+                                "unsupported DATEDIFF datepart: {}",
+                                datepart,
+                            ))),
+                        }
+                    }
+                    _ => Ok(None),
+                }
+            })
+            .collect::<Result<PrimitiveArray<Int64Type>>>()?;
+
+        Ok(Arc::new(result) as ArrayRef)
     });
 
     let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int64)));
@@ -736,11 +822,37 @@ pub fn create_dateadd_udf() -> ScalarUDF {
         )));
     });
 
-    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int64)));
+    let return_type: ReturnTypeFunction =
+        Arc::new(move |_| Ok(Arc::new(DataType::Timestamp(TimeUnit::Nanosecond, None))));
 
     ScalarUDF::new(
         "dateadd",
         &Signature::any(3, Volatility::Immutable),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_to_date_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 2 || args.len() == 3);
+
+        return Err(DataFusionError::NotImplemented(format!(
+            "to_date is not implemented, it's stub"
+        )));
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Date32)));
+
+    ScalarUDF::new(
+        "to_date",
+        &Signature::one_of(
+            vec![
+                TypeSignature::Exact(vec![DataType::Utf8, DataType::Utf8]),
+                TypeSignature::Exact(vec![DataType::Utf8, DataType::Utf8, DataType::Boolean]),
+            ],
+            Volatility::Immutable,
+        ),
         &return_type,
         &fun,
     )
@@ -1225,7 +1337,11 @@ fn last_day_of_month(y: i32, m: u32) -> u32 {
     if m == 12 {
         return 31;
     }
-    NaiveDate::from_ymd(y, m + 1, 1).pred().day()
+    NaiveDate::from_ymd_opt(y, m + 1, 1)
+        .expect(&format!("Invalid year month: {}-{}", y, m))
+        .pred_opt()
+        .expect(&format!("Invalid year month: {}-{}", y, m))
+        .day()
 }
 
 pub fn create_interval_mul_udf() -> ScalarUDF {
@@ -1324,9 +1440,12 @@ fn postgres_datetime_format_to_iso(format: String) -> String {
         .replace(".%f", "%.f")
         .replace("YYYY", "%Y")
         .replace("yyyy", "%Y")
+        // NOTE: "%q" is not a part of chrono
+        .replace("Q", "%q")
         .replace("DD", "%d")
         .replace("dd", "%d")
         .replace("HH24", "%H")
+        .replace("HH12", "%I")
         .replace("MI", "%M")
         .replace("mi", "%M")
         .replace("SS", "%S")
@@ -1463,15 +1582,20 @@ pub fn create_to_char_udf() -> ScalarUDF {
 
             for (i, duration) in durations.iter().enumerate() {
                 let format = formats.value(i);
-                let replaced_format =
+                let format =
                     postgres_datetime_format_to_iso(format.to_string()).replace("TZ", &timezone);
 
                 let secs = duration.num_seconds();
                 let nanosecs = duration.num_nanoseconds().unwrap_or(0) - secs * 1_000_000_000;
-                let timestamp = NaiveDateTime::from_timestamp(secs, nanosecs as u32);
+                let timestamp = NaiveDateTime::from_timestamp_opt(secs, nanosecs as u32)
+                    .expect(format!("Invalid secs {} nanosecs {}", secs, nanosecs).as_str());
+
+                // chrono's strftime is missing quarter format, as such a workaround is required
+                let quarter = &format!("{}", timestamp.date().month0() / 3 + 1);
+                let format = format.replace("%q", quarter);
 
                 builder
-                    .append_value(timestamp.format(&replaced_format).to_string())
+                    .append_value(timestamp.format(&format).to_string())
                     .unwrap();
             }
 
@@ -1535,15 +1659,15 @@ pub fn create_format_type_udf() -> ScalarUDF {
                 (Some(oid), typemod) => Some(match PgTypeId::from_oid(oid) {
                     Some(type_id) => {
                         let typemod_str = || match type_id {
-                            PgTypeId::BPCHAR | PgTypeId::VARCHAR => match typemod {
+                            PgTypeId::BPCHAR
+                            | PgTypeId::VARCHAR
+                            | PgTypeId::ARRAYBPCHAR
+                            | PgTypeId::ARRAYVARCHAR => match typemod {
                                 Some(typemod) if typemod >= 5 => format!("({})", typemod - 4),
                                 _ => "".to_string(),
                             },
-                            PgTypeId::NUMERIC => match typemod {
+                            PgTypeId::NUMERIC | PgTypeId::ARRAYNUMERIC => match typemod {
                                 Some(typemod) if typemod >= 4 => format!("(0,{})", typemod - 4),
-                                Some(typemod) if typemod >= 0 => {
-                                    format!("(65535,{})", 65532 + typemod)
-                                }
                                 _ => "".to_string(),
                             },
                             _ => match typemod {
@@ -1564,20 +1688,30 @@ pub fn create_format_type_udf() -> ScalarUDF {
                             PgTypeId::OID => format!("oid{}", typemod_str()),
                             PgTypeId::TID => format!("tid{}", typemod_str()),
                             PgTypeId::PGCLASS => format!("pg_class{}", typemod_str()),
+                            PgTypeId::ARRAYPGCLASS => format!("pg_class{}[]", typemod_str()),
                             PgTypeId::FLOAT4 => "real".to_string(),
                             PgTypeId::FLOAT8 => "double precision".to_string(),
                             PgTypeId::MONEY => format!("money{}", typemod_str()),
+                            PgTypeId::ARRAYMONEY => format!("money{}[]", typemod_str()),
                             PgTypeId::INET => format!("inet{}", typemod_str()),
                             PgTypeId::ARRAYBOOL => "boolean[]".to_string(),
                             PgTypeId::ARRAYBYTEA => format!("bytea{}[]", typemod_str()),
+                            PgTypeId::ARRAYNAME => format!("name{}[]", typemod_str()),
                             PgTypeId::ARRAYINT2 => "smallint[]".to_string(),
                             PgTypeId::ARRAYINT4 => "integer[]".to_string(),
                             PgTypeId::ARRAYTEXT => format!("text{}[]", typemod_str()),
+                            PgTypeId::ARRAYTID => format!("tid{}[]", typemod_str()),
+                            PgTypeId::ARRAYBPCHAR => format!("character{}[]", typemod_str()),
+                            PgTypeId::ARRAYVARCHAR => {
+                                format!("character varying{}[]", typemod_str())
+                            }
                             PgTypeId::ARRAYINT8 => "bigint[]".to_string(),
                             PgTypeId::ARRAYFLOAT4 => "real[]".to_string(),
                             PgTypeId::ARRAYFLOAT8 => "double precision[]".to_string(),
+                            PgTypeId::ARRAYOID => format!("oid{}[]", typemod_str()),
                             PgTypeId::ACLITEM => format!("aclitem{}", typemod_str()),
                             PgTypeId::ARRAYACLITEM => format!("aclitem{}[]", typemod_str()),
+                            PgTypeId::ARRAYINET => format!("inet{}[]", typemod_str()),
                             PgTypeId::BPCHAR => match typemod {
                                 Some(typemod) if typemod < 0 => "bpchar".to_string(),
                                 _ => format!("character{}", typemod_str()),
@@ -1588,38 +1722,83 @@ pub fn create_format_type_udf() -> ScalarUDF {
                             PgTypeId::TIMESTAMP => {
                                 format!("timestamp{} without time zone", typemod_str())
                             }
+                            PgTypeId::ARRAYTIMESTAMP => {
+                                format!("timestamp{} without time zone[]", typemod_str())
+                            }
+                            PgTypeId::ARRAYDATE => format!("date{}[]", typemod_str()),
+                            PgTypeId::ARRAYTIME => {
+                                format!("time{} without time zone[]", typemod_str())
+                            }
                             PgTypeId::TIMESTAMPTZ => {
                                 format!("timestamp{} with time zone", typemod_str())
+                            }
+                            PgTypeId::ARRAYTIMESTAMPTZ => {
+                                format!("timestamp{} with time zone[]", typemod_str())
                             }
                             PgTypeId::INTERVAL => match typemod {
                                 Some(typemod) if typemod >= 0 => "-".to_string(),
                                 _ => "interval".to_string(),
                             },
+                            PgTypeId::ARRAYINTERVAL => match typemod {
+                                Some(typemod) if typemod >= 0 => "-".to_string(),
+                                _ => "interval[]".to_string(),
+                            },
+                            PgTypeId::ARRAYNUMERIC => format!("numeric{}[]", typemod_str()),
                             PgTypeId::TIMETZ => format!("time{} with time zone", typemod_str()),
+                            PgTypeId::ARRAYTIMETZ => {
+                                format!("time{} with time zone[]", typemod_str())
+                            }
                             PgTypeId::NUMERIC => format!("numeric{}", typemod_str()),
                             PgTypeId::RECORD => format!("record{}", typemod_str()),
                             PgTypeId::ANYARRAY => format!("anyarray{}", typemod_str()),
                             PgTypeId::ANYELEMENT => format!("anyelement{}", typemod_str()),
+                            PgTypeId::ARRAYRECORD => format!("record{}[]", typemod_str()),
                             PgTypeId::PGLSN => format!("pg_lsn{}", typemod_str()),
+                            PgTypeId::ARRAYPGLSN => format!("pg_lsn{}[]", typemod_str()),
                             PgTypeId::ANYENUM => format!("anyenum{}", typemod_str()),
                             PgTypeId::ANYRANGE => format!("anyrange{}", typemod_str()),
                             PgTypeId::INT4RANGE => format!("int4range{}", typemod_str()),
+                            PgTypeId::ARRAYINT4RANGE => format!("int4range{}[]", typemod_str()),
                             PgTypeId::NUMRANGE => format!("numrange{}", typemod_str()),
+                            PgTypeId::ARRAYNUMRANGE => format!("numrange{}[]", typemod_str()),
                             PgTypeId::TSRANGE => format!("tsrange{}", typemod_str()),
+                            PgTypeId::ARRAYTSRANGE => format!("tsrange{}[]", typemod_str()),
                             PgTypeId::TSTZRANGE => format!("tstzrange{}", typemod_str()),
+                            PgTypeId::ARRAYTSTZRANGE => format!("tstzrange{}[]", typemod_str()),
                             PgTypeId::DATERANGE => format!("daterange{}", typemod_str()),
+                            PgTypeId::ARRAYDATERANGE => format!("daterange{}[]", typemod_str()),
                             PgTypeId::INT8RANGE => format!("int8range{}", typemod_str()),
+                            PgTypeId::ARRAYINT8RANGE => format!("int8range{}[]", typemod_str()),
                             PgTypeId::INT4MULTIRANGE => format!("int4multirange{}", typemod_str()),
                             PgTypeId::NUMMULTIRANGE => format!("nummultirange{}", typemod_str()),
                             PgTypeId::TSMULTIRANGE => format!("tsmultirange{}", typemod_str()),
                             PgTypeId::DATEMULTIRANGE => format!("datemultirange{}", typemod_str()),
                             PgTypeId::INT8MULTIRANGE => format!("int8multirange{}", typemod_str()),
-                            PgTypeId::CHARACTERDATA => {
-                                format!("information_schema.character_data{}", typemod_str())
+                            PgTypeId::ARRAYINT4MULTIRANGE => {
+                                format!("int4multirange{}[]", typemod_str())
+                            }
+                            PgTypeId::ARRAYNUMMULTIRANGE => {
+                                format!("nummultirange{}[]", typemod_str())
+                            }
+                            PgTypeId::ARRAYTSMULTIRANGE => {
+                                format!("tsmultirange{}[]", typemod_str())
+                            }
+                            PgTypeId::ARRAYDATEMULTIRANGE => {
+                                format!("datemultirange{}[]", typemod_str())
+                            }
+                            PgTypeId::ARRAYINT8MULTIRANGE => {
+                                format!("int8multirange{}[]", typemod_str())
+                            }
+                            PgTypeId::ARRAYPGCONSTRAINT => {
+                                format!("pg_constraint{}[]", typemod_str())
                             }
                             PgTypeId::PGCONSTRAINT => format!("pg_constraint{}", typemod_str()),
-                            PgTypeId::PGNAMESPACE => {
-                                format!("pg_namespace{}", typemod_str())
+                            PgTypeId::ARRAYPGNAMESPACE => {
+                                format!("pg_namespace{}[]", typemod_str())
+                            }
+                            PgTypeId::PGNAMESPACE => format!("pg_namespace{}", typemod_str()),
+                            PgTypeId::CHARACTERDATA => {
+                                format!("information_schema.character_data{}", typemod_str())
                             }
                             PgTypeId::SQLIDENTIFIER => {
                                 format!("information_schema.sql_identifier{}", typemod_str())
@@ -2778,4 +2957,1809 @@ pub fn create_regexp_substr_udf() -> ScalarUDF {
         &return_type,
         &fun,
     )
+}
+
+pub fn create_position_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 2);
+
+        return Err(DataFusionError::NotImplemented(format!(
+            "POSITION is not implemented, it's a stub"
+        )));
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int32)));
+
+    ScalarUDF::new(
+        "position",
+        &Signature::exact(vec![DataType::Utf8, DataType::Utf8], Volatility::Immutable),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_date_to_timestamp_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 1);
+
+        match args[0].data_type() {
+            DataType::Date32 => {
+                let date_arr = downcast_primitive_arg!(args[0], "date", Date32Type);
+
+                let result = date_arr
+                    .iter()
+                    .map(|date| {
+                        date.map(|date| {
+                            let nanoseconds_in_day = 86_400_000_000_000_i64;
+                            let timestamp = date as i64 * nanoseconds_in_day;
+                            timestamp
+                        })
+                    })
+                    .collect::<PrimitiveArray<TimestampNanosecondType>>();
+
+                Ok(Arc::new(result) as ArrayRef)
+            }
+            DataType::Utf8 => {
+                let date_arr = downcast_string_arg!(args[0], "date", i32);
+
+                let result = date_arr
+                    .iter()
+                    .map(|date| match date {
+                        Some(date) => {
+                            let date = NaiveDate::parse_from_str(date, "%Y-%m-%d")
+                                .map_err(|e| DataFusionError::Execution(e.to_string()))?;
+                            let time = NaiveTime::from_hms_opt(0, 0, 0).ok_or(
+                                DataFusionError::Execution(
+                                    "Cannot initalize default zero NaiveTime".to_string(),
+                                ),
+                            )?;
+                            Ok(Some(NaiveDateTime::new(date, time).timestamp_nanos()))
+                        }
+                        None => Ok(None),
+                    })
+                    .collect::<Result<PrimitiveArray<TimestampNanosecondType>>>()?;
+
+                Ok(Arc::new(result) as ArrayRef)
+            }
+            _ => Err(DataFusionError::Execution(format!(
+                "DATE_TO_TIMESTAMP doesn't support this type: {}",
+                args[0].data_type(),
+            ))),
+        }
+    });
+
+    let return_type: ReturnTypeFunction =
+        Arc::new(move |_| Ok(Arc::new(DataType::Timestamp(TimeUnit::Nanosecond, None))));
+
+    ScalarUDF::new(
+        "date_to_timestamp",
+        &Signature::one_of(
+            vec![
+                TypeSignature::Exact(vec![DataType::Date32]),
+                TypeSignature::Exact(vec![DataType::Utf8]),
+            ],
+            Volatility::Immutable,
+        ),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_sha1_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 1);
+
+        let strings = downcast_string_arg!(args[0], "str", i32);
+
+        let result = strings
+            .iter()
+            .map(|string| {
+                string.map(|string| {
+                    let mut hasher = Sha1::new();
+                    hasher.update(string.as_bytes());
+                    hasher.digest().to_string()
+                })
+            })
+            .collect::<StringArray>();
+
+        Ok(Arc::new(result))
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Utf8)));
+
+    ScalarUDF::new(
+        "sha1",
+        &Signature::exact(vec![DataType::Utf8], Volatility::Immutable),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_current_setting_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 1);
+
+        let setting_names = downcast_string_arg!(args[0], "str", i32);
+
+        let result = setting_names
+            .iter()
+            .map(|setting_name| {
+                if let Some(setting_name) = setting_name {
+                    Ok(Some(match setting_name.to_ascii_lowercase().as_str() {
+                        "max_index_keys" => "32".to_string(), // Taken from PostgreSQL
+                        "search_path" => "\"$user\", public".to_string(), // Taken from PostgreSQL
+                        "server_version_num" => "140002".to_string(), // Matches 14.2
+                        setting_name => Err(DataFusionError::Execution(format!(
+                            "unrecognized configuration parameter \"{}\"",
+                            setting_name
+                        )))?,
+                    }))
+                } else {
+                    Ok(None)
+                }
+            })
+            .collect::<Result<StringArray>>()?;
+
+        Ok(Arc::new(result))
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Utf8)));
+
+    ScalarUDF::new(
+        "current_setting",
+        &Signature::exact(vec![DataType::Utf8], Volatility::Stable),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_quote_ident_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 1);
+
+        let idents = downcast_string_arg!(args[0], "str", i32);
+
+        let re = Regex::new(r"^[a-z_][a-z0-9_]*$").unwrap();
+        let result = idents
+            .iter()
+            .map(|ident| {
+                ident.map(|ident| {
+                    if re.is_match(ident) {
+                        return ident.to_string();
+                    }
+                    format!("\"{}\"", ident.replace("\"", "\"\""))
+                })
+            })
+            .collect::<StringArray>();
+
+        Ok(Arc::new(result))
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Utf8)));
+
+    ScalarUDF::new(
+        "quote_ident",
+        &Signature::exact(vec![DataType::Utf8], Volatility::Immutable),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_pg_encoding_to_char_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        let encoding_ids = downcast_primitive_arg!(args[0], "encoding_id", Int32Type);
+
+        let result = encoding_ids
+            .iter()
+            .map(|oid| match oid {
+                Some(0) => Some("SQL_ASCII".to_string()),
+                Some(6) => Some("UTF8".to_string()),
+                Some(_) => Some("".to_string()),
+                _ => None,
+            })
+            .collect::<StringArray>();
+
+        Ok(Arc::new(result))
+    });
+
+    create_udf(
+        "pg_encoding_to_char",
+        vec![DataType::Int32],
+        Arc::new(DataType::Utf8),
+        Volatility::Immutable,
+        fun,
+    )
+}
+
+pub fn create_array_to_string_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 2);
+
+        let input_arr = downcast_list_arg!(args[0], "strs");
+        let join_strs = downcast_string_arg!(args[1], "join_str", i32);
+
+        let mut builder = StringBuilder::new(input_arr.len());
+
+        for i in 0..input_arr.len() {
+            if input_arr.is_null(i) || join_strs.is_null(i) {
+                builder.append_null()?;
+                continue;
+            }
+
+            let array = input_arr.value(i);
+            let join_str = join_strs.value(i);
+            let strings = downcast_string_arg!(array, "str", i32);
+            let joined_string =
+                itertools::Itertools::intersperse(strings.iter().filter_map(|s| s), join_str)
+                    .collect::<String>();
+            builder.append_value(joined_string)?;
+        }
+
+        Ok(Arc::new(builder.finish()) as ArrayRef)
+    });
+
+    create_udf(
+        "array_to_string",
+        vec![
+            DataType::List(Box::new(Field::new("item", DataType::Utf8, true))),
+            DataType::Utf8,
+        ],
+        Arc::new(DataType::Utf8),
+        Volatility::Immutable,
+        fun,
+    )
+}
+
+// https://docs.aws.amazon.com/redshift/latest/dg/r_CHARINDEX.html
+pub fn create_charindex_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 2);
+
+        return Err(DataFusionError::NotImplemented(format!(
+            "charindex is not implemented, it's stub"
+        )));
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int32)));
+
+    ScalarUDF::new(
+        "charindex",
+        &Signature::exact(vec![DataType::Utf8, DataType::Utf8], Volatility::Immutable),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_to_regtype_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 1);
+
+        let regtype_arr = downcast_string_arg!(args[0], "regtype", i32);
+
+        let pg_types = PgType::get_all();
+
+        let result = regtype_arr
+            .iter()
+            .map(|regtype| match regtype {
+                Some(regtype) => pg_types
+                    .iter()
+                    .find(|typ| typ.typname == regtype || typ.regtype == regtype)
+                    .map(|typ| typ.oid as i32),
+                None => None,
+            })
+            .collect::<PrimitiveArray<Int32Type>>();
+
+        Ok(Arc::new(result) as ArrayRef)
+    });
+
+    // TODO: `to_regtype` should return regtype but we use `oid` since it's used for comparison with oids
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Int32)));
+
+    ScalarUDF::new(
+        "to_regtype",
+        &Signature::exact(vec![DataType::Utf8], Volatility::Immutable),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_pg_get_indexdef_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() == 3);
+
+        let index_oids = downcast_primitive_arg!(args[0], "index_oid", UInt32Type);
+        let column_nos = downcast_primitive_arg!(args[1], "column_no", Int64Type);
+        let prettys = downcast_boolean_arr!(&args[2], "pretty");
+
+        let result = izip!(index_oids, column_nos, prettys)
+            .map(|_| None as Option<&str>)
+            .collect::<StringArray>();
+
+        Ok(Arc::new(result) as ArrayRef)
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Utf8)));
+
+    ScalarUDF::new(
+        "pg_get_indexdef",
+        &Signature::exact(
+            vec![DataType::UInt32, DataType::Int64, DataType::Boolean],
+            Volatility::Immutable,
+        ),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_udf_stub(
+    name: &'static str,
+    type_signature: TypeSignature,
+    return_type: Option<DataType>,
+    volatility: Option<Volatility>,
+) -> ScalarUDF {
+    let fun = make_scalar_function(move |_| {
+        Err(DataFusionError::NotImplemented(format!(
+            "{} is not implemented, it's a stub",
+            name
+        )))
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |args| {
+        if let Some(return_type) = &return_type {
+            return Ok(Arc::new(return_type.clone()));
+        }
+
+        if args.len() > 0 {
+            return Ok(Arc::new(args[0].clone()));
+        }
+
+        Ok(Arc::new(DataType::Null))
+    });
+
+    ScalarUDF::new(
+        name,
+        &Signature::new(type_signature, volatility.unwrap_or(Volatility::Immutable)),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_udaf_stub(
+    name: &'static str,
+    type_signature: TypeSignature,
+    return_type: Option<DataType>,
+    volatility: Option<Volatility>,
+) -> AggregateUDF {
+    let fun: AccumulatorFunctionImplementation = Arc::new(move || {
+        Err(DataFusionError::NotImplemented(format!(
+            "{} is not implemented, it's a stub",
+            name
+        )))
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |args| {
+        if let Some(return_type) = &return_type {
+            return Ok(Arc::new(return_type.clone()));
+        }
+
+        if args.len() > 0 {
+            return Ok(Arc::new(args[0].clone()));
+        }
+
+        Ok(Arc::new(DataType::Null))
+    });
+
+    let state_type: StateTypeFunction = Arc::new(move |dt| Ok(Arc::new(vec![dt.clone()])));
+
+    AggregateUDF::new(
+        name,
+        &Signature::new(type_signature, volatility.unwrap_or(Volatility::Immutable)),
+        &return_type,
+        &fun,
+        &state_type,
+    )
+}
+
+pub fn create_udtf_stub(
+    name: &'static str,
+    type_signature: TypeSignature,
+    return_type: Option<DataType>,
+    volatility: Option<Volatility>,
+) -> TableUDF {
+    let fun = make_table_function(move |_| {
+        Err(DataFusionError::NotImplemented(format!(
+            "{} is not implemented, it's a stub",
+            name
+        )))
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |args| {
+        if let Some(return_type) = &return_type {
+            return Ok(Arc::new(return_type.clone()));
+        }
+
+        if args.len() > 0 {
+            return Ok(Arc::new(args[0].clone()));
+        }
+
+        Ok(Arc::new(DataType::Null))
+    });
+
+    TableUDF::new(
+        name,
+        &Signature::new(type_signature, volatility.unwrap_or(Volatility::Immutable)),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn create_inet_server_addr_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |_: &[ArrayRef]| {
+        let mut builder = StringBuilder::new(1);
+        builder.append_value("127.0.0.1/32").unwrap();
+
+        Ok(Arc::new(builder.finish()) as ArrayRef)
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Utf8)));
+
+    ScalarUDF::new(
+        "inet_server_addr",
+        &Signature::exact(vec![], Volatility::Immutable),
+        &return_type,
+        &fun,
+    )
+}
+
+pub fn register_fun_stubs(mut ctx: SessionContext) -> SessionContext {
+    macro_rules! register_fun_stub {
+        ($FTYP:ident, $NAME:expr, argc=$ARGC:expr $(, rettyp=$RETTYP:ident)? $(, vol=$VOL:ident)?) => {
+            register_fun_stub!(
+                __internal,
+                $FTYP,
+                $NAME,
+                tsig=TypeSignature::Any($ARGC)
+                $(, rettyp=$RETTYP)?
+                $(, vol=$VOL)?
+            );
+        };
+
+        ($FTYP:ident, $NAME:expr, tsig=[$($DT:ident),+] $(, rettyp=$RETTYP:ident)? $(, vol=$VOL:ident)?) => {
+            register_fun_stub!(
+                __internal,
+                $FTYP,
+                $NAME,
+                tsig=TypeSignature::Exact(vec![$(__typ!($DT)),+])
+                $(, rettyp=$RETTYP)?
+                $(, vol=$VOL)?
+            );
+        };
+
+        ($FTYP:ident, $NAME:expr, tsigs=[$([$($DT:ident),*],)+] $(, rettyp=$RETTYP:ident)? $(, vol=$VOL:ident)?) => {
+            register_fun_stub!(
+                __internal,
+                $FTYP,
+                $NAME,
+                tsig=TypeSignature::OneOf(vec![$(TypeSignature::Exact(vec![$(__typ!($DT)),*]),)+])
+                $(, rettyp=$RETTYP)?
+                $(, vol=$VOL)?
+            );
+        };
+
+        (__internal, udf, $NAME:expr, tsig=$TSIG:expr $(, rettyp=$RETTYP:ident)? $(, vol=$VOL:ident)?) => {{
+            ctx.register_udf(create_udf_stub($NAME, $TSIG, __rettyp!($($RETTYP)?), __vol!($($VOL)?)));
+        }};
+
+        (__internal, udaf, $NAME:expr, tsig=$TSIG:expr $(, rettyp=$RETTYP:ident)? $(, vol=$VOL:ident)?) => {{
+            ctx.register_udaf(create_udaf_stub($NAME, $TSIG, __rettyp!($($RETTYP)?), __vol!($($VOL)?)));
+        }};
+
+        (__internal, udtf, $NAME:expr, tsig=$TSIG:expr $(, rettyp=$RETTYP:ident)? $(, vol=$VOL:ident)?) => {{
+            ctx.register_udtf(create_udtf_stub($NAME, $TSIG, __rettyp!($($RETTYP)?), __vol!($($VOL)?)));
+        }};
+    }
+
+    macro_rules! __rettyp {
+        ($RETTYP:ident) => {
+            Some(__typ!($RETTYP))
+        };
+        () => {
+            None
+        };
+    }
+
+    macro_rules! __typ {
+        (List<$LTYP:ident>) => {
+            DataType::List(Box::new(Field::new("item", DataType::$LTYP, true)))
+        };
+        (ListUtf8) => {
+            __typ!(List<Utf8>)
+        };
+        (ListInt32) => {
+            __typ!(List<Int32>)
+        };
+        (Interval) => {
+            DataType::Interval(IntervalUnit::MonthDayNano)
+        };
+        (Time) => {
+            DataType::Time64(TimeUnit::Nanosecond)
+        };
+        (Timestamp) => {
+            DataType::Timestamp(TimeUnit::Nanosecond, None)
+        };
+        (TimestampTz) => {
+            DataType::Timestamp(TimeUnit::Nanosecond, Some("UTC".to_string()))
+        };
+        (Oid) => {
+            __typ!(UInt32)
+        };
+        (Regclass) => {
+            __typ!(Utf8)
+        };
+        (Regnamespace) => {
+            __typ!(Utf8)
+        };
+        (Regtype) => {
+            __typ!(Utf8)
+        };
+        (Xid) => {
+            __typ!(UInt32)
+        };
+        (Xid8) => {
+            __typ!(UInt64)
+        };
+        ($TYP:ident) => {
+            DataType::$TYP
+        };
+    }
+
+    macro_rules! __vol {
+        ($VOL:ident) => {
+            Some(Volatility::$VOL)
+        };
+        () => {
+            None
+        };
+    }
+
+    // NOTE: types accepted as "numeric" in Postgres are implemented as "Float64" here
+    // NOTE: lack of "rettyp" implies "type of first arg"
+    register_fun_stub!(udf, "acosd", tsig = [Float64], rettyp = Float64);
+    register_fun_stub!(udf, "acosh", tsig = [Float64], rettyp = Float64);
+    register_fun_stub!(
+        udf,
+        "age",
+        tsigs = [[Timestamp], [Timestamp, Timestamp],],
+        rettyp = Interval,
+        vol = Stable
+    );
+    register_fun_stub!(udf, "asind", tsig = [Float64], rettyp = Float64);
+    register_fun_stub!(udf, "asinh", tsig = [Float64], rettyp = Float64);
+    register_fun_stub!(udf, "atan2", tsig = [Float64, Float64], rettyp = Float64);
+    register_fun_stub!(udf, "atan2d", tsig = [Float64, Float64], rettyp = Float64);
+    register_fun_stub!(udf, "atand", tsig = [Float64], rettyp = Float64);
+    register_fun_stub!(udf, "atanh", tsig = [Float64], rettyp = Float64);
+    register_fun_stub!(udf, "bit_count", tsig = [Binary], rettyp = Int64);
+    register_fun_stub!(
+        udf,
+        "brin_desummarize_range",
+        tsig = [Regclass, Int64],
+        rettyp = Null
+    );
+    register_fun_stub!(
+        udf,
+        "brin_summarize_new_values",
+        tsig = [Regclass],
+        rettyp = Int32,
+        vol = Volatile
+    );
+    register_fun_stub!(
+        udf,
+        "brin_summarize_range",
+        tsig = [Regclass, Int64],
+        rettyp = Int32,
+        vol = Volatile
+    );
+    register_fun_stub!(udf, "cbrt", tsig = [Float64], rettyp = Float64);
+    register_fun_stub!(udf, "ceiling", tsig = [Float64], rettyp = Float64);
+    register_fun_stub!(
+        udf,
+        "clock_timestamp",
+        argc = 0,
+        rettyp = TimestampTz,
+        vol = Volatile
+    );
+    register_fun_stub!(
+        udf,
+        "col_description",
+        tsig = [Oid, Int32],
+        rettyp = Utf8,
+        vol = Stable
+    );
+    register_fun_stub!(udf, "convert", tsig = [Binary, Utf8, Utf8], rettyp = Binary);
+    register_fun_stub!(udf, "convert_from", tsig = [Binary, Utf8], rettyp = Utf8);
+    register_fun_stub!(udf, "convert_to", tsig = [Utf8, Utf8], rettyp = Binary);
+    register_fun_stub!(udf, "cosd", tsig = [Float64], rettyp = Float64);
+    register_fun_stub!(udf, "cosh", tsig = [Float64], rettyp = Float64);
+    register_fun_stub!(udf, "cot", tsig = [Float64], rettyp = Float64);
+    register_fun_stub!(udf, "cotd", tsig = [Float64], rettyp = Float64);
+    register_fun_stub!(
+        udf,
+        "current_catalog",
+        argc = 0,
+        rettyp = Utf8,
+        vol = Stable
+    );
+    register_fun_stub!(udf, "current_query", argc = 0, rettyp = Utf8, vol = Stable);
+    register_fun_stub!(udf, "current_role", argc = 0, rettyp = Utf8, vol = Stable);
+    register_fun_stub!(
+        udf,
+        "current_time",
+        tsigs = [[], [Int32],],
+        rettyp = Time,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "date_bin",
+        tsig = [Interval, Timestamp, Timestamp],
+        rettyp = Timestamp
+    );
+    register_fun_stub!(udf, "decode", tsig = [Utf8, Utf8], rettyp = Binary);
+    register_fun_stub!(udf, "degrees", tsig = [Float64], rettyp = Float64);
+    register_fun_stub!(udf, "dexp", tsig = [Float64], rettyp = Float64);
+    register_fun_stub!(udf, "div", tsig = [Float64, Float64], rettyp = Float64);
+    register_fun_stub!(
+        udf,
+        "dlog1",
+        tsigs = [[Int16], [Int32], [Int64], [Float64],]
+    );
+    register_fun_stub!(udf, "dlog10", tsig = [Float64], rettyp = Float64);
+    register_fun_stub!(udf, "encode", tsig = [Binary, Utf8], rettyp = Utf8);
+    register_fun_stub!(udf, "factorial", tsig = [Int64], rettyp = Float64);
+    register_fun_stub!(udf, "gcd", argc = 2);
+    register_fun_stub!(
+        udf,
+        "gen_random_uuid",
+        argc = 0,
+        rettyp = Utf8,
+        vol = Volatile
+    );
+    register_fun_stub!(udf, "get_bit", tsig = [Binary, Int64], rettyp = Int32);
+    register_fun_stub!(udf, "get_byte", tsig = [Binary, Int32], rettyp = Int32);
+    register_fun_stub!(
+        udf,
+        "gin_clean_pending_list",
+        tsig = [Regclass],
+        rettyp = Int64,
+        vol = Volatile
+    );
+    register_fun_stub!(
+        udf,
+        "has_any_column_privilege",
+        tsigs = [
+            [Utf8, Utf8],
+            [Oid, Utf8],
+            [Utf8, Utf8, Utf8],
+            [Utf8, Oid, Utf8],
+            [Oid, Utf8, Utf8],
+            [Oid, Oid, Utf8],
+        ],
+        rettyp = Boolean,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "has_column_privilege",
+        tsigs = [
+            [Utf8, Utf8, Utf8],
+            [Oid, Utf8, Utf8],
+            [Utf8, Int16, Utf8],
+            [Oid, Int16, Utf8],
+            [Utf8, Utf8, Utf8, Utf8],
+            [Utf8, Oid, Utf8, Utf8],
+            [Utf8, Utf8, Int16, Utf8],
+            [Utf8, Oid, Int16, Utf8],
+            [Oid, Utf8, Utf8, Utf8],
+            [Oid, Oid, Utf8, Utf8],
+            [Oid, Utf8, Int16, Utf8],
+            [Oid, Oid, Int16, Utf8],
+        ],
+        rettyp = Boolean,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "has_database_privilege",
+        tsigs = [
+            [Utf8, Utf8],
+            [Oid, Utf8],
+            [Utf8, Utf8, Utf8],
+            [Utf8, Oid, Utf8],
+            [Oid, Utf8, Utf8],
+            [Oid, Oid, Utf8],
+        ],
+        rettyp = Boolean,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "has_foreign_data_wrapper_privilege",
+        tsigs = [
+            [Utf8, Utf8],
+            [Oid, Utf8],
+            [Utf8, Utf8, Utf8],
+            [Utf8, Oid, Utf8],
+            [Oid, Utf8, Utf8],
+            [Oid, Oid, Utf8],
+        ],
+        rettyp = Boolean,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "has_function_privilege",
+        tsigs = [
+            [Utf8, Utf8],
+            [Oid, Utf8],
+            [Utf8, Utf8, Utf8],
+            [Utf8, Oid, Utf8],
+            [Oid, Utf8, Utf8],
+            [Oid, Oid, Utf8],
+        ],
+        rettyp = Boolean,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "has_language_privilege",
+        tsigs = [
+            [Utf8, Utf8],
+            [Oid, Utf8],
+            [Utf8, Utf8, Utf8],
+            [Utf8, Oid, Utf8],
+            [Oid, Utf8, Utf8],
+            [Oid, Oid, Utf8],
+        ],
+        rettyp = Boolean,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "has_parameter_privilege",
+        tsigs = [[Utf8, Utf8], [Utf8, Utf8, Utf8], [Oid, Utf8, Utf8],],
+        rettyp = Boolean,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "has_sequence_privilege",
+        tsigs = [
+            [Utf8, Utf8],
+            [Oid, Utf8],
+            [Utf8, Utf8, Utf8],
+            [Utf8, Oid, Utf8],
+            [Oid, Utf8, Utf8],
+            [Oid, Oid, Utf8],
+        ],
+        rettyp = Boolean,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "has_server_privilege",
+        tsigs = [
+            [Utf8, Utf8],
+            [Oid, Utf8],
+            [Utf8, Utf8, Utf8],
+            [Utf8, Oid, Utf8],
+            [Oid, Utf8, Utf8],
+            [Oid, Oid, Utf8],
+        ],
+        rettyp = Boolean,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "has_table_privilege",
+        tsigs = [
+            [Utf8, Utf8],
+            [Oid, Utf8],
+            [Utf8, Utf8, Utf8],
+            [Utf8, Oid, Utf8],
+            [Oid, Utf8, Utf8],
+            [Oid, Oid, Utf8],
+        ],
+        rettyp = Boolean,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "has_tablespace_privilege",
+        tsigs = [
+            [Utf8, Utf8],
+            [Oid, Utf8],
+            [Utf8, Utf8, Utf8],
+            [Utf8, Oid, Utf8],
+            [Oid, Utf8, Utf8],
+            [Oid, Oid, Utf8],
+        ],
+        rettyp = Boolean,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "has_type_privilege",
+        tsigs = [
+            [Utf8, Utf8],
+            [Oid, Utf8],
+            [Utf8, Utf8, Utf8],
+            [Utf8, Oid, Utf8],
+            [Oid, Utf8, Utf8],
+            [Oid, Oid, Utf8],
+        ],
+        rettyp = Boolean,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "inet_client_addr",
+        argc = 0,
+        rettyp = Utf8,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "inet_client_port",
+        argc = 0,
+        rettyp = Int32,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "inet_server_port",
+        argc = 0,
+        rettyp = Int32,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "isfinite",
+        tsigs = [[Date32], [Timestamp], [Interval],],
+        rettyp = Boolean
+    );
+    register_fun_stub!(udf, "justify_days", tsig = [Interval], rettyp = Interval);
+    register_fun_stub!(udf, "justify_hours", tsig = [Interval], rettyp = Interval);
+    register_fun_stub!(
+        udf,
+        "justify_interval",
+        tsig = [Interval],
+        rettyp = Interval
+    );
+    register_fun_stub!(udf, "lcm", argc = 2);
+    register_fun_stub!(
+        udf,
+        "localtime",
+        tsigs = [[], [Int32],],
+        rettyp = Time,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "make_date",
+        tsig = [Int32, Int32, Int32],
+        rettyp = Date32
+    );
+    register_fun_stub!(
+        udf,
+        "make_interval",
+        tsigs = [
+            [],
+            [Int32],
+            [Int32, Int32],
+            [Int32, Int32, Int32],
+            [Int32, Int32, Int32, Int32],
+            [Int32, Int32, Int32, Int32, Int32],
+            [Int32, Int32, Int32, Int32, Int32, Int32],
+            [Int32, Int32, Int32, Int32, Int32, Int32, Float64],
+        ],
+        rettyp = Interval
+    );
+    register_fun_stub!(
+        udf,
+        "make_time",
+        tsig = [Int32, Int32, Float64],
+        rettyp = Time
+    );
+    register_fun_stub!(
+        udf,
+        "make_timestamp",
+        tsig = [Int32, Int32, Int32, Int32, Int32, Float64],
+        rettyp = Timestamp
+    );
+    register_fun_stub!(
+        udf,
+        "make_timestamptz",
+        tsigs = [
+            [Int32, Int32, Int32, Int32, Int32, Float64],
+            [Int32, Int32, Int32, Int32, Int32, Float64, Utf8],
+        ],
+        rettyp = TimestampTz
+    );
+    register_fun_stub!(udf, "min_scale", tsig = [Float64], rettyp = Int32);
+    register_fun_stub!(udf, "mod", argc = 2);
+    register_fun_stub!(
+        udf,
+        "obj_description",
+        tsigs = [[Oid], [Oid, Utf8],],
+        rettyp = Utf8,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "parse_ident",
+        tsigs = [[Utf8], [Utf8, Boolean],],
+        rettyp = ListUtf8
+    );
+    register_fun_stub!(
+        udf,
+        "pg_advisory_lock",
+        tsigs = [[Int64], [Int32, Int32],],
+        rettyp = Null
+    );
+    register_fun_stub!(
+        udf,
+        "pg_advisory_lock_shared",
+        tsigs = [[Int64], [Int32, Int32],],
+        rettyp = Null
+    );
+    register_fun_stub!(
+        udf,
+        "pg_advisory_unlock",
+        tsigs = [[Int64], [Int32, Int32],],
+        rettyp = Boolean,
+        vol = Volatile
+    );
+    register_fun_stub!(udf, "pg_advisory_unlock_all", argc = 0, rettyp = Null);
+    register_fun_stub!(
+        udf,
+        "pg_advisory_unlock_shared",
+        tsigs = [[Int64], [Int32, Int32],],
+        rettyp = Boolean,
+        vol = Volatile
+    );
+    register_fun_stub!(
+        udf,
+        "pg_advisory_xact_lock",
+        tsigs = [[Int64], [Int32, Int32],],
+        rettyp = Null
+    );
+    register_fun_stub!(
+        udf,
+        "pg_advisory_xact_lock_shared",
+        tsigs = [[Int64], [Int32, Int32],],
+        rettyp = Null
+    );
+    register_fun_stub!(
+        udf,
+        "pg_blocking_pids",
+        tsig = [Int32],
+        rettyp = ListInt32,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "pg_cancel_backend",
+        tsig = [Int32],
+        rettyp = Boolean,
+        vol = Volatile
+    );
+    register_fun_stub!(
+        udf,
+        "pg_char_to_encoding",
+        tsig = [Utf8],
+        rettyp = Int32,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "pg_client_encoding",
+        argc = 0,
+        rettyp = Utf8,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "pg_collation_actual_version",
+        tsig = [Oid],
+        rettyp = Utf8,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "pg_collation_is_visible",
+        tsig = [Oid],
+        rettyp = Boolean,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "pg_column_compression",
+        argc = 1,
+        rettyp = Utf8,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "pg_column_size",
+        argc = 1,
+        rettyp = Int32,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "pg_conf_load_time",
+        argc = 0,
+        rettyp = TimestampTz,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "pg_conversion_is_visible",
+        tsig = [Oid],
+        rettyp = Boolean,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "pg_current_logfile",
+        tsigs = [[], [Utf8],],
+        rettyp = Utf8,
+        vol = Volatile
+    );
+    register_fun_stub!(
+        udf,
+        "pg_current_xact_id",
+        argc = 0,
+        rettyp = Xid8,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "pg_current_xact_id_if_assigned",
+        argc = 0,
+        rettyp = Xid8,
+        vol = Volatile
+    );
+    register_fun_stub!(
+        udf,
+        "pg_database_collation_actual_version",
+        tsig = [Oid],
+        rettyp = Utf8,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "pg_database_size",
+        tsigs = [[Utf8], [Oid],],
+        rettyp = Int64,
+        vol = Volatile
+    );
+    register_fun_stub!(
+        udf,
+        "pg_describe_object",
+        tsig = [Oid, Oid, Int32],
+        rettyp = Utf8,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "pg_drop_replication_slot",
+        tsig = [Utf8],
+        rettyp = Null
+    );
+    register_fun_stub!(
+        udf,
+        "pg_event_trigger_table_rewrite_oid",
+        argc = 0,
+        rettyp = Oid,
+        vol = Volatile
+    );
+    register_fun_stub!(
+        udf,
+        "pg_event_trigger_table_rewrite_reason",
+        argc = 0,
+        rettyp = Int32,
+        vol = Volatile
+    );
+    register_fun_stub!(
+        udf,
+        "pg_export_snapshot",
+        argc = 0,
+        rettyp = Utf8,
+        vol = Volatile
+    );
+    register_fun_stub!(
+        udf,
+        "pg_filenode_relation",
+        tsig = [Oid, Oid],
+        rettyp = Regclass,
+        vol = Volatile
+    );
+    register_fun_stub!(
+        udf,
+        "pg_function_is_visible",
+        tsig = [Oid],
+        rettyp = Boolean,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "pg_get_functiondef",
+        tsig = [Oid],
+        rettyp = Utf8,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "pg_get_function_arguments",
+        tsig = [Oid],
+        rettyp = Utf8,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "pg_get_function_identity_arguments",
+        tsig = [Oid],
+        rettyp = Utf8,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "pg_get_function_result",
+        tsig = [Oid],
+        rettyp = Utf8,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "pg_get_ruledef",
+        tsigs = [[Oid], [Oid, Boolean],],
+        rettyp = Utf8,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "pg_get_statisticsobjdef",
+        tsig = [Oid],
+        rettyp = Utf8,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "pg_get_triggerdef",
+        tsigs = [[Oid], [Oid, Boolean],],
+        rettyp = Utf8,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "pg_get_viewdef",
+        tsigs = [[Oid], [Oid, Boolean], [Oid, Int32], [Utf8], [Utf8, Boolean],],
+        rettyp = Utf8,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "pg_get_wal_replay_pause_state",
+        argc = 0,
+        rettyp = Utf8,
+        vol = Volatile
+    );
+    register_fun_stub!(
+        udf,
+        "pg_has_role",
+        tsigs = [
+            [Utf8, Utf8],
+            [Oid, Utf8],
+            [Utf8, Utf8, Utf8],
+            [Utf8, Oid, Utf8],
+            [Oid, Utf8, Utf8],
+            [Oid, Oid, Utf8],
+        ],
+        rettyp = Boolean,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "pg_import_system_collations",
+        tsig = [Regnamespace],
+        rettyp = Int32,
+        vol = Volatile
+    );
+    register_fun_stub!(
+        udf,
+        "pg_index_column_has_property",
+        tsig = [Regclass, Int32, Utf8],
+        rettyp = Boolean,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "pg_index_has_property",
+        tsig = [Regclass, Utf8],
+        rettyp = Boolean,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "pg_indexam_has_property",
+        tsig = [Oid, Utf8],
+        rettyp = Boolean,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "pg_indexes_size",
+        tsig = [Regclass],
+        rettyp = Int64,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "pg_is_in_recovery",
+        argc = 0,
+        rettyp = Boolean,
+        vol = Volatile
+    );
+    register_fun_stub!(
+        udf,
+        "pg_is_wal_replay_paused",
+        argc = 0,
+        rettyp = Boolean,
+        vol = Volatile
+    );
+    register_fun_stub!(
+        udf,
+        "pg_jit_available",
+        argc = 0,
+        rettyp = Boolean,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "pg_last_xact_replay_timestamp",
+        argc = 0,
+        rettyp = TimestampTz,
+        vol = Volatile
+    );
+    register_fun_stub!(
+        udf,
+        "pg_log_backend_memory_contexts",
+        tsig = [Int32],
+        rettyp = Boolean,
+        vol = Volatile
+    );
+    register_fun_stub!(
+        udf,
+        "pg_notification_queue_usage",
+        argc = 0,
+        rettyp = Float64,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "pg_opclass_is_visible",
+        tsig = [Oid],
+        rettyp = Boolean,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "pg_operator_is_visible",
+        tsig = [Oid],
+        rettyp = Boolean,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "pg_opfamily_is_visible",
+        tsig = [Oid],
+        rettyp = Boolean,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "pg_partition_root",
+        tsig = [Regclass],
+        rettyp = Regclass,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "pg_postmaster_start_time",
+        argc = 0,
+        rettyp = TimestampTz,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "pg_promote",
+        tsigs = [[], [Boolean], [Boolean, Int32],],
+        rettyp = Boolean,
+        vol = Volatile
+    );
+    register_fun_stub!(
+        udf,
+        "pg_read_binary_file",
+        tsigs = [[Utf8], [Utf8, Int64, Int64], [Utf8, Int64, Int64, Boolean],],
+        rettyp = Binary,
+        vol = Volatile
+    );
+    register_fun_stub!(
+        udf,
+        "pg_read_file",
+        tsigs = [[Utf8], [Utf8, Int64, Int64], [Utf8, Int64, Int64, Boolean],],
+        rettyp = Utf8,
+        vol = Volatile
+    );
+    register_fun_stub!(
+        udf,
+        "pg_relation_filenode",
+        tsig = [Regclass],
+        rettyp = Oid,
+        vol = Volatile
+    );
+    register_fun_stub!(
+        udf,
+        "pg_relation_filepath",
+        tsig = [Regclass],
+        rettyp = Utf8,
+        vol = Volatile
+    );
+    register_fun_stub!(
+        udf,
+        "pg_relation_size",
+        tsigs = [[Regclass], [Regclass, Utf8],],
+        rettyp = Int64,
+        vol = Volatile
+    );
+    register_fun_stub!(
+        udf,
+        "pg_reload_conf",
+        argc = 0,
+        rettyp = Boolean,
+        vol = Volatile
+    );
+    register_fun_stub!(
+        udf,
+        "pg_replication_origin_create",
+        tsig = [Utf8],
+        rettyp = Oid,
+        vol = Volatile
+    );
+    register_fun_stub!(
+        udf,
+        "pg_replication_origin_drop",
+        tsig = [Utf8],
+        rettyp = Null
+    );
+    register_fun_stub!(
+        udf,
+        "pg_replication_origin_oid",
+        tsig = [Utf8],
+        rettyp = Oid,
+        vol = Volatile
+    );
+    register_fun_stub!(
+        udf,
+        "pg_replication_origin_session_is_setup",
+        argc = 0,
+        rettyp = Boolean,
+        vol = Volatile
+    );
+    register_fun_stub!(
+        udf,
+        "pg_replication_origin_session_reset",
+        argc = 0,
+        rettyp = Null
+    );
+    register_fun_stub!(
+        udf,
+        "pg_replication_origin_session_setup",
+        tsig = [Utf8],
+        rettyp = Null
+    );
+    register_fun_stub!(
+        udf,
+        "pg_replication_origin_xact_reset",
+        argc = 0,
+        rettyp = Null
+    );
+    register_fun_stub!(
+        udf,
+        "pg_rotate_logfile",
+        argc = 0,
+        rettyp = Boolean,
+        vol = Volatile
+    );
+    register_fun_stub!(
+        udf,
+        "pg_safe_snapshot_blocking_pids",
+        tsig = [Int32],
+        rettyp = ListInt32,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "pg_settings_get_flags",
+        tsig = [Utf8],
+        rettyp = ListUtf8,
+        vol = Stable
+    );
+    register_fun_stub!(udf, "pg_size_bytes", tsig = [Utf8], rettyp = Int64);
+    register_fun_stub!(
+        udf,
+        "pg_size_pretty",
+        tsigs = [[Int64], [Float64],],
+        rettyp = Utf8
+    );
+    register_fun_stub!(
+        udf,
+        "pg_statistics_obj_is_visible",
+        tsig = [Oid],
+        rettyp = Boolean,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "pg_table_size",
+        tsig = [Regclass],
+        rettyp = Int64,
+        vol = Volatile
+    );
+    register_fun_stub!(
+        udf,
+        "pg_tablespace_location",
+        tsig = [Oid],
+        rettyp = Utf8,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "pg_tablespace_size",
+        tsigs = [[Utf8], [Oid],],
+        rettyp = Int64,
+        vol = Volatile
+    );
+    register_fun_stub!(
+        udf,
+        "pg_terminate_backend",
+        tsigs = [[Int32], [Int32, Int64],],
+        rettyp = Boolean,
+        vol = Volatile
+    );
+    register_fun_stub!(
+        udf,
+        "pg_trigger_depth",
+        argc = 0,
+        rettyp = Int32,
+        vol = Volatile
+    );
+    register_fun_stub!(
+        udf,
+        "pg_try_advisory_lock",
+        tsigs = [[Int64], [Int32, Int32],],
+        rettyp = Boolean,
+        vol = Volatile
+    );
+    register_fun_stub!(
+        udf,
+        "pg_try_advisory_lock_shared",
+        tsigs = [[Int64], [Int32, Int32],],
+        rettyp = Boolean,
+        vol = Volatile
+    );
+    register_fun_stub!(
+        udf,
+        "pg_try_advisory_xact_lock",
+        tsigs = [[Int64], [Int32, Int32],],
+        rettyp = Boolean,
+        vol = Volatile
+    );
+    register_fun_stub!(
+        udf,
+        "pg_try_advisory_xact_lock_shared",
+        tsigs = [[Int64], [Int32, Int32],],
+        rettyp = Boolean,
+        vol = Volatile
+    );
+    register_fun_stub!(
+        udf,
+        "pg_ts_config_is_visible",
+        tsig = [Oid],
+        rettyp = Boolean,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "pg_ts_dict_is_visible",
+        tsig = [Oid],
+        rettyp = Boolean,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "pg_ts_parser_is_visible",
+        tsig = [Oid],
+        rettyp = Boolean,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "pg_ts_template_is_visible",
+        tsig = [Oid],
+        rettyp = Boolean,
+        vol = Stable
+    );
+    register_fun_stub!(udf, "pg_typeof", argc = 1, rettyp = Regtype, vol = Stable);
+    register_fun_stub!(udf, "pg_wal_replay_pause", argc = 0, rettyp = Null);
+    register_fun_stub!(udf, "pg_wal_replay_resume", argc = 0, rettyp = Null);
+    register_fun_stub!(
+        udf,
+        "pg_xact_commit_timestamp",
+        tsig = [Xid],
+        rettyp = TimestampTz,
+        vol = Volatile
+    );
+    register_fun_stub!(
+        udf,
+        "pg_xact_status",
+        tsig = [Xid8],
+        rettyp = Utf8,
+        vol = Stable
+    );
+    register_fun_stub!(udf, "pi", argc = 0, rettyp = Float64);
+    register_fun_stub!(udf, "power", tsig = [Float64, Float64], rettyp = Float64);
+    register_fun_stub!(udf, "quote_literal", argc = 1, rettyp = Utf8);
+    register_fun_stub!(udf, "quote_nullable", argc = 1, rettyp = Utf8);
+    register_fun_stub!(udf, "radians", tsig = [Float64], rettyp = Float64);
+    register_fun_stub!(
+        udf,
+        "regexp_count",
+        tsigs = [[Utf8, Utf8], [Utf8, Utf8, Int32], [Utf8, Utf8, Int32, Utf8],],
+        rettyp = Int32
+    );
+    register_fun_stub!(
+        udf,
+        "regexp_instr",
+        tsigs = [
+            [Utf8, Utf8],
+            [Utf8, Utf8, Int32],
+            [Utf8, Utf8, Int32, Int32],
+            [Utf8, Utf8, Int32, Int32, Int32],
+            [Utf8, Utf8, Int32, Int32, Int32, Utf8],
+            [Utf8, Utf8, Int32, Int32, Int32, Utf8, Int32],
+        ],
+        rettyp = Int32
+    );
+    register_fun_stub!(
+        udf,
+        "regexp_like",
+        tsigs = [[Utf8, Utf8], [Utf8, Utf8, Utf8],],
+        rettyp = Boolean
+    );
+    register_fun_stub!(
+        udf,
+        "regexp_split_to_array",
+        tsigs = [[Utf8, Utf8], [Utf8, Utf8, Utf8],],
+        rettyp = ListUtf8
+    );
+    register_fun_stub!(
+        udf,
+        "row_security_active",
+        tsigs = [[Utf8], [Oid],],
+        rettyp = Boolean,
+        vol = Stable
+    );
+    register_fun_stub!(udf, "scale", tsig = [Float64], rettyp = Int32);
+    register_fun_stub!(
+        udf,
+        "set_bit",
+        tsig = [Binary, Int64, Int32],
+        rettyp = Binary
+    );
+    register_fun_stub!(
+        udf,
+        "set_byte",
+        tsig = [Binary, Int32, Int32],
+        rettyp = Binary
+    );
+    register_fun_stub!(
+        udf,
+        "set_config",
+        tsig = [Utf8, Utf8, Boolean],
+        rettyp = Utf8
+    );
+    register_fun_stub!(
+        udf,
+        "shobj_description",
+        tsig = [Oid, Utf8],
+        rettyp = Utf8,
+        vol = Stable
+    );
+    register_fun_stub!(udf, "sign", tsig = [Float64], rettyp = Float64);
+    register_fun_stub!(udf, "sind", tsig = [Float64], rettyp = Float64);
+    register_fun_stub!(udf, "sinh", tsig = [Float64], rettyp = Float64);
+    register_fun_stub!(
+        udf,
+        "statement_timestamp",
+        argc = 0,
+        rettyp = TimestampTz,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "string_to_array",
+        tsigs = [[Utf8, Utf8], [Utf8, Utf8, Utf8],],
+        rettyp = ListUtf8
+    );
+    register_fun_stub!(udf, "tand", tsig = [Float64], rettyp = Float64);
+    register_fun_stub!(udf, "tanh", tsig = [Float64], rettyp = Float64);
+    register_fun_stub!(udf, "timeofday", argc = 0, rettyp = Utf8, vol = Volatile);
+    register_fun_stub!(
+        udf,
+        "to_ascii",
+        tsigs = [[Utf8], [Utf8, Utf8], [Utf8, Int32],],
+        rettyp = Utf8
+    );
+    register_fun_stub!(udf, "to_hex", tsigs = [[Int32], [Int64],], rettyp = Utf8);
+    register_fun_stub!(udf, "to_number", tsig = [Utf8, Utf8], rettyp = Float64);
+    register_fun_stub!(
+        udf,
+        "transaction_timestamp",
+        argc = 0,
+        rettyp = TimestampTz,
+        vol = Stable
+    );
+    register_fun_stub!(udf, "trim_scale", tsig = [Float64], rettyp = Float64);
+    register_fun_stub!(udf, "txid_current", argc = 0, rettyp = Int64, vol = Stable);
+    register_fun_stub!(
+        udf,
+        "txid_current_if_assigned",
+        argc = 0,
+        rettyp = Int64,
+        vol = Volatile
+    );
+    register_fun_stub!(
+        udf,
+        "txid_status",
+        tsig = [Int64],
+        rettyp = Utf8,
+        vol = Stable
+    );
+    register_fun_stub!(udf, "unistr", tsig = [Utf8], rettyp = Utf8);
+    register_fun_stub!(
+        udf,
+        "width_bucket",
+        tsig = [Float64, Float64, Float64, Int32],
+        rettyp = Int32
+    );
+    // TODO: "width_bucket" also has a two-arg variant with anyarray args
+
+    register_fun_stub!(udaf, "any_value", argc = 1);
+    register_fun_stub!(udaf, "bit_and", tsigs = [[Int16], [Int32], [Int64],]);
+    register_fun_stub!(udaf, "bit_or", tsigs = [[Int16], [Int32], [Int64],]);
+    register_fun_stub!(udaf, "bit_xor", tsigs = [[Int16], [Int32], [Int64],]);
+    register_fun_stub!(udaf, "every", tsig = [Boolean], rettyp = Boolean);
+    register_fun_stub!(udaf, "median", argc = 1);
+    register_fun_stub!(
+        udaf,
+        "string_agg",
+        tsigs = [[Utf8, Utf8], [Binary, Binary],]
+    );
+    register_fun_stub!(
+        udaf,
+        "regr_avgx",
+        tsig = [Float64, Float64],
+        rettyp = Float64
+    );
+    register_fun_stub!(
+        udaf,
+        "regr_avgy",
+        tsig = [Float64, Float64],
+        rettyp = Float64
+    );
+    register_fun_stub!(
+        udaf,
+        "regr_count",
+        tsig = [Float64, Float64],
+        rettyp = Int64
+    );
+    register_fun_stub!(
+        udaf,
+        "regr_intercept",
+        tsig = [Float64, Float64],
+        rettyp = Float64
+    );
+    register_fun_stub!(udaf, "regr_r2", tsig = [Float64, Float64], rettyp = Float64);
+    register_fun_stub!(
+        udaf,
+        "regr_slope",
+        tsig = [Float64, Float64],
+        rettyp = Float64
+    );
+    register_fun_stub!(
+        udaf,
+        "regr_sxx",
+        tsig = [Float64, Float64],
+        rettyp = Float64
+    );
+    register_fun_stub!(
+        udaf,
+        "regr_sxy",
+        tsig = [Float64, Float64],
+        rettyp = Float64
+    );
+    register_fun_stub!(
+        udaf,
+        "regr_syy",
+        tsig = [Float64, Float64],
+        rettyp = Float64
+    );
+    register_fun_stub!(
+        udaf,
+        "variance",
+        tsigs = [[Int16], [Int32], [Int64], [Float64],],
+        rettyp = Float64
+    );
+
+    register_fun_stub!(
+        udtf,
+        "pg_listening_channels",
+        argc = 0,
+        rettyp = Utf8,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udtf,
+        "pg_ls_dir",
+        tsigs = [[Utf8], [Utf8, Boolean, Boolean],],
+        rettyp = Utf8,
+        vol = Volatile
+    );
+    register_fun_stub!(
+        udtf,
+        "pg_partition_ancestors",
+        tsig = [Regclass],
+        rettyp = Regclass,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udtf,
+        "pg_tablespace_databases",
+        tsig = [Oid],
+        rettyp = Oid,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udtf,
+        "regexp_matches",
+        tsigs = [[Utf8, Utf8], [Utf8, Utf8, Utf8],],
+        rettyp = ListUtf8
+    );
+    register_fun_stub!(
+        udtf,
+        "regexp_split_to_table",
+        tsigs = [[Utf8, Utf8], [Utf8, Utf8, Utf8],],
+        rettyp = Utf8
+    );
+    register_fun_stub!(
+        udtf,
+        "string_to_table",
+        tsigs = [[Utf8, Utf8], [Utf8, Utf8, Utf8],],
+        rettyp = Utf8
+    );
+
+    ctx
 }

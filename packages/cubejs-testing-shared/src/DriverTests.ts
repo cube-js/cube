@@ -13,6 +13,7 @@ export interface DriverTestsOptions {
   csvNoHeader?: boolean
   // Some drivers unload from a CTAS query, others unload from a stream.
   wrapLoadQueryWithCtas?: boolean
+  delimiter?: string
 }
 
 export class DriverTests {
@@ -34,6 +35,8 @@ export class DriverTests {
       SELECT 2 AS id, 200 AS amount, 'new' AS status
       UNION ALL
       SELECT 3 AS id, 400 AS amount, 'processed' AS status
+      UNION ALL
+      SELECT 4 AS id, 500 AS amount, NULL AS status
     ) AS data
     ORDER BY 1
   `;
@@ -42,13 +45,17 @@ export class DriverTests {
     { id: 1, amount: 100, status: 'new' },
     { id: 2, amount: 200, status: 'new' },
     { id: 3, amount: 400, status: 'processed' },
+    { id: 4, amount: 500, status: null },
   ];
 
-  public static CSV_ROWS = dedent`
-    orders__status,orders__amount
-    new,300
-    processed,400
-  `;
+  protected getExpectedCsvRows() {
+    return dedent`
+      orders__status,orders__amount
+      new,300
+      processed,400
+      ,500
+    `;
+  }
 
   public async testQuery() {
     const rows = await this.driver.query(DriverTests.QUERY, []);
@@ -70,17 +77,69 @@ export class DriverTests {
       SELECT orders.status AS orders__status, sum(orders.amount) AS orders__amount        
       FROM (${DriverTests.QUERY}) AS orders
       GROUP BY 1
-      ORDER BY 1
+      ORDER BY 2
     `;
     const tableName = await this.createUnloadTable(query);
     assert(this.driver.unload);
     const data = await this.driver.unload(tableName, { maxFileSize: 64 });
     expect(data.csvFile.length).toEqual(1);
     const string = await downloadAndGunzip(data.csvFile[0]);
+    let expectedCsvRows = this.getExpectedCsvRows();
+    if (this.options.delimiter) {
+      expectedCsvRows = expectedCsvRows.replaceAll(/,/g, this.options.delimiter);
+    }
     const expectedRows = this.options.csvNoHeader
-      ? DriverTests.skipFirstLine(DriverTests.CSV_ROWS)
-      : DriverTests.CSV_ROWS;
+      ? DriverTests.skipFirstLine(expectedCsvRows)
+      : expectedCsvRows;
     expect(string.trim()).toEqual(expectedRows);
+  }
+
+  public async testUnloadEscapeSymbolOp1(Driver: any) {
+    process.env.CUBEJS_DB_EXPORT_BUCKET_CSV_ESCAPE_SYMBOL = '"';
+    const driver = new Driver({}) as DriverInterface;
+    const query = `
+      SELECT orders.status AS orders__status, sum(orders.amount) AS orders__amount        
+      FROM (${DriverTests.QUERY}) AS orders
+      GROUP BY 1
+      ORDER BY 1
+    `;
+    const tableName = await this.createUnloadTable(query);
+    assert(driver.unload);
+    const data = await driver.unload(tableName, { maxFileSize: 64 });
+    expect(data.exportBucketCsvEscapeSymbol).toBe('"');
+    await driver.release();
+  }
+
+  public async testUnloadEscapeSymbolOp2(Driver: any) {
+    process.env.CUBEJS_DB_EXPORT_BUCKET_CSV_ESCAPE_SYMBOL = '\'';
+    const driver = new Driver({}) as DriverInterface;
+    const query = `
+      SELECT orders.status AS orders__status, sum(orders.amount) AS orders__amount        
+      FROM (${DriverTests.QUERY}) AS orders
+      GROUP BY 1
+      ORDER BY 1
+    `;
+    const tableName = await this.createUnloadTable(query);
+    assert(driver.unload);
+    const data = await driver.unload(tableName, { maxFileSize: 64 });
+    expect(data.exportBucketCsvEscapeSymbol).toBe('\'');
+    await driver.release();
+  }
+
+  public async testUnloadEscapeSymbolOp3(Driver: any) {
+    delete process.env.CUBEJS_DB_EXPORT_BUCKET_CSV_ESCAPE_SYMBOL;
+    const driver = new Driver({}) as DriverInterface;
+    const query = `
+      SELECT orders.status AS orders__status, sum(orders.amount) AS orders__amount        
+      FROM (${DriverTests.QUERY}) AS orders
+      GROUP BY 1
+      ORDER BY 1
+    `;
+    const tableName = await this.createUnloadTable(query);
+    assert(driver.unload);
+    const data = await driver.unload(tableName, { maxFileSize: 64 });
+    expect(data.exportBucketCsvEscapeSymbol).toBeUndefined();
+    await driver.release();
   }
 
   public async testUnloadEmpty() {
@@ -120,15 +179,17 @@ export class DriverTests {
     return text.split('\n').slice(1).join('\n');
   }
 
-  private static rowsToString(rows: Record<string, any>[]): Record<string, string>[] {
-    const result: Record<string, string>[] = [];
+  private static rowsToString(rows: Record<string, any>[]): Record<string, string | null>[] {
+    const result: Record<string, string | null>[] = [];
+
     for (const row of rows) {
       const newRow: Record<string, string> = {};
       for (const k of Object.keys(row)) {
-        newRow[k] = row[k].toString();
+        newRow[k] = row[k] === null ? null : row[k].toString();
       }
       result.push(newRow);
     }
+
     return result;
   }
 }

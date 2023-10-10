@@ -1,0 +1,113 @@
+---
+title: GraphQL API
+permalink: /backend/graphql
+category: Reference
+subCategory: GraphQL API
+menuOrder: 3
+---
+
+## `cube`
+
+```graphql
+query {
+  cube [([cubeQueryArgs])] {
+    <cubeName> [([cubeArgs])] {
+      <cubeMember>
+    }
+  }
+}
+```
+
+| Key             | Schema                              | Description                                |
+| --------------- | ----------------------------------- | ------------------------------------------ |
+| `cubeQueryArgs` | [`CubeQueryArgs`](#cube-query-args) | Options that apply to the entire query     |
+| `cubeArgs`      | [`CubeArgs`](#cube-args)            | Options that apply only to a specific cube |
+
+## `CubeQueryArgs`
+
+| Key          | Schema                                | Description                                                                                                                                                                                                            |
+| ------------ | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `where`      | [`RootWhereInput`](#root-where-input) | Represents a SQL `WHERE` clause                                                                                                                                                                                        |
+| `limit`      | `Int`                                 | A row limit for your query. The default value is `10000`. The maximum allowed limit is `50000`. If you'd like to request more rows than the maximum allowed limit, consider using [pagination][ref-recipe-pagination]. |
+| `offset`     | `Int`                                 | The number of initial rows to be skipped for your query. The default value is `0`                                                                                                                                      |
+| `timezone`   | `String`                              | The timezone to use for the query. The default value is `UTC`                                                                                                                                                          |
+| `renewQuery` | `Boolean`                             | If `renewQuery` is set to `true`, Cube will renew all `refreshKey` for queries and query results in the foreground. The default value is `false`                                                                       |
+
+[ref-recipe-pagination]: /recipes/pagination
+
+## `RootWhereInput`
+
+| Key          | Schema                                   | Description |
+| ------------ | ---------------------------------------- | ----------- |
+| `AND`        | [`[RootWhereInput!]`](#root-where-input) |             |
+| `OR`         | [`[RootWhereInput!]`](#root-where-input) |             |
+| `<cubeName>` | [`CubeWhereInput`](#cube-where-input)    |             |
+
+## `CubeArgs`
+
+| Key       | Schema                                | Description |
+| --------- | ------------------------------------- | ----------- |
+| `where`   | [`CubeWhereInput`](#cube-where-input) |             |
+| `orderBy` | `CubeOrderByInput`                    |             |
+
+## `CubeWhereInput`
+
+| Key            | Schema                                   | Description |
+| -------------- | ---------------------------------------- | ----------- |
+| `AND`          | [`[RootWhereInput!]`](#root-where-input) |             |
+| `OR`           | [`[RootWhereInput!]`](#root-where-input) |             |
+| `<cubeMember>` | [`Filter`](#filter)                      |             |
+
+## `CubeOrderByInput`
+
+| Key            | Schema                 | Description |
+| -------------- | ---------------------- | ----------- |
+| `<cubeMember>` | [`OrderBy`](#order-by) |             |
+
+## `Filter`
+
+[`DateTimeFilter`](#date-time-filter) | [`FloatFilter`](#float-time-filter) |
+[`StringFilter`](#string-time-filter)
+
+## `DateTimeFilter`
+
+| Key              | Schema     | Description |
+| ---------------- | ---------- | ----------- |
+| `equals`         | `String`   |             |
+| `notEquals`      | `String`   |             |
+| `in`             | `[String]` |             |
+| `notIn`          | `[String]` |             |
+| `inDateRange`    | `[String]` |             |
+| `notInDateRange` | `[String]` |             |
+| `beforeDate`     | `String`   |             |
+| `afterDate`      | `String`   |             |
+| `set`            | `Boolean`  |             |
+
+## `FloatFilter`
+
+| Key         | Schema    | Description |
+| ----------- | --------- | ----------- |
+| `equals`    | `Float`   |             |
+| `notEquals` | `Float`   |             |
+| `in`        | `[Float]` |             |
+| `notIn`     | `[Float]` |             |
+| `set`       | `Boolean` |             |
+
+## `StringFilter`
+
+| Key           | Schema     | Description |
+| ------------- | ---------- | ----------- |
+| `equals`      | `String`   |             |
+| `notEquals`   | `String`   |             |
+| `in`          | `[String]` |             |
+| `notIn`       | `[String]` |             |
+| `contains`    | `String`   |             |
+| `notContains` | `String`   |             |
+| `set`         | `Boolean`  |             |
+
+## `OrderBy`
+
+`asc` | `desc`
+
+[ref-schema-ref-preagg-granularity]:
+  /schema/reference/pre-aggregations#granularity

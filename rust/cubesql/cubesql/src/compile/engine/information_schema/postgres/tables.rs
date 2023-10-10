@@ -119,15 +119,15 @@ pub struct InfoSchemaTableProvider {
 }
 
 impl InfoSchemaTableProvider {
-    pub fn new(cubes: &Vec<V1CubeMeta>) -> Self {
+    pub fn new(db_name: &str, cubes: &Vec<V1CubeMeta>) -> Self {
         let mut builder = InformationSchemaTablesBuilder::new();
         // information_schema
-        builder.add_table("db", "information_schema", "tables", "VIEW");
-        builder.add_table("db", "information_schema", "columns", "VIEW");
-        builder.add_table("db", "information_schema", "pg_tables", "VIEW");
+        builder.add_table(db_name, "information_schema", "tables", "VIEW");
+        builder.add_table(db_name, "information_schema", "columns", "VIEW");
+        builder.add_table(db_name, "information_schema", "pg_tables", "VIEW");
 
         for cube in cubes {
-            builder.add_table("db", "public", &cube.name, "BASE TABLE");
+            builder.add_table(db_name, "public", &cube.name, "BASE TABLE");
         }
 
         Self {

@@ -44,8 +44,21 @@ export class MaterializeDriver extends PostgresDriver {
    */
   public constructor(
     options: PostgresDriverConfiguration & {
+      /**
+       * Data source name.
+       */
       dataSource?: string,
+
+      /**
+       * Max pool size value for the [cube]<-->[db] pool.
+       */
       maxPoolSize?: number,
+
+      /**
+       * Time to wait for a response from a connection after validation
+       * request before determining it as not valid. Default - 10000 ms.
+       */
+      testConnectionTimeout?: number,
     } = {},
   ) {
     super(options);
@@ -66,14 +79,13 @@ export class MaterializeDriver extends PostgresDriver {
    * @param {string} schemaName
    * @return {Promise<Array<unknown>>}
    */
-  public async createSchemaIfNotExists(schemaName: string): Promise<unknown[]> {
+  public async createSchemaIfNotExists(schemaName: string): Promise<void> {
     const schemas = await this.query(
       `SHOW SCHEMAS WHERE name = '${schemaName}'`, []
     );
     if (schemas.length === 0) {
       await this.query(`CREATE SCHEMA IF NOT EXISTS ${schemaName}`, []);
     }
-    return [];
   }
 
   public async uploadTableWithIndexes(
@@ -82,7 +94,7 @@ export class MaterializeDriver extends PostgresDriver {
     tableData: DownloadTableMemoryData,
     indexesSql: IndexesSQL
   ) {
-    return BaseDriver.prototype.uploadTableWithIndexes.bind(this)(table, columns, tableData, indexesSql, [], null, [], []);
+    return BaseDriver.prototype.uploadTableWithIndexes.bind(this)(table, columns, tableData, indexesSql, [], null, {});
   }
 
   /**

@@ -1,6 +1,7 @@
 import R from 'ramda';
 import moment from 'moment';
-import Joi from '@hapi/joi';
+import Joi from 'joi';
+import { getEnv } from '@cubejs-backend/shared';
 
 import { UserError } from './UserError';
 import { dateParser } from './dateParser';
@@ -39,14 +40,23 @@ const getPivotQuery = (queryType, queries) => {
 
 const id = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$/);
 const dimensionWithTime = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+(\.(second|minute|hour|day|week|month|year))?$/);
+const memberExpression = Joi.object().keys({
+  expression: Joi.func().required(),
+  cubeName: Joi.string().required(),
+  name: Joi.string().required(),
+  expressionName: Joi.string(),
+  definition: Joi.string(),
+});
 
 const operators = [
   'equals',
   'notEquals',
   'contains',
-  'startsWith',
-  'endsWith',
   'notContains',
+  'startsWith',
+  'notStartsWith',
+  'endsWith',
+  'notEndsWith',
   'in',
   'notIn',
   'gt',
@@ -59,25 +69,28 @@ const operators = [
   'notInDateRange',
   'onTheDate',
   'beforeDate',
+  'beforeOrOnDate',
   'afterDate',
+  'afterOrOnDate',
   'measureFilter',
 ];
 
 const oneFilter = Joi.object().keys({
   dimension: id,
   member: id,
-  operator: Joi.valid(operators).required(),
-  values: Joi.array().items(Joi.string().allow('', null), Joi.lazy(() => oneFilter))
+  operator: Joi.valid(...operators).required(),
+  values: Joi.array().items(Joi.string().allow('', null), Joi.number(), Joi.boolean(), Joi.link('...'))
 }).xor('dimension', 'member');
 
 const oneCondition = Joi.object().keys({
-  or: Joi.array().items(oneFilter, Joi.lazy(() => oneCondition).description('oneCondition schema')),
-  and: Joi.array().items(oneFilter, Joi.lazy(() => oneCondition).description('oneCondition schema')),
+  or: Joi.array().items(oneFilter, Joi.link('...').description('oneCondition schema')),
+  and: Joi.array().items(oneFilter, Joi.link('...').description('oneCondition schema')),
 }).xor('or', 'and');
 
 const querySchema = Joi.object().keys({
-  measures: Joi.array().items(id),
-  dimensions: Joi.array().items(dimensionWithTime),
+  // TODO add member expression alternatives only for SQL API queries?
+  measures: Joi.array().items(Joi.alternatives(id, memberExpression)),
+  dimensions: Joi.array().items(Joi.alternatives(dimensionWithTime, memberExpression)),
   filters: Joi.array().items(oneFilter, oneCondition),
   timeDimensions: Joi.array().items(Joi.object().keys({
     dimension: id.required(),
@@ -94,7 +107,7 @@ const querySchema = Joi.object().keys({
   ),
   segments: Joi.array().items(id),
   timezone: Joi.string(),
-  limit: Joi.number().integer().min(1).max(50000),
+  limit: Joi.number().integer().min(1),
   offset: Joi.number().integer().min(0),
   total: Joi.boolean(),
   renewQuery: Joi.boolean(),
@@ -104,10 +117,7 @@ const querySchema = Joi.object().keys({
 
 const normalizeQueryOrder = order => {
   let result = [];
-  const normalizeOrderItem = (k, direction) => ({
-    id: k,
-    desc: direction === 'desc'
-  });
+  const normalizeOrderItem = (k, direction) => ([k, direction]);
   if (order) {
     result = Array.isArray(order) ?
       order.map(([k, direction]) => normalizeOrderItem(k, direction)) :
@@ -118,15 +128,16 @@ const normalizeQueryOrder = order => {
 
 const DateRegex = /^\d\d\d\d-\d\d-\d\d$/;
 
-const checkQueryFilters = (filter) => {
-  filter.find(f => {
+const normalizeQueryFilters = (filter) => (
+  filter.map(f => {
+    const res = { ...f };
     if (f.or) {
-      checkQueryFilters(f.or);
-      return false;
+      res.or = normalizeQueryFilters(f.or);
+      return res;
     }
     if (f.and) {
-      checkQueryFilters(f.and);
-      return false;
+      res.and = normalizeQueryFilters(f.and);
+      return res;
     }
 
     if (!f.operator) {
@@ -137,35 +148,32 @@ const checkQueryFilters = (filter) => {
       throw new UserError(`Operator ${f.operator} not supported for filter: ${JSON.stringify(f)}`);
     }
 
-    if (!f.values && ['set', 'notSet', 'measureFilter'].indexOf(f.operator) === -1) {
+    if ((!f.values || f.values.length === 0) && ['set', 'notSet', 'measureFilter'].indexOf(f.operator) === -1) {
       throw new UserError(`Values required for filter: ${JSON.stringify(f)}`);
     }
-    return false;
-  });
 
-  return true;
-};
+    if (f.values) {
+      res.values = f.values.map(v => (v != null ? v.toString() : v));
+    }
 
-const validatePostRewrite = (query) => {
-  const validQuery = query.measures && query.measures.length ||
-    query.dimensions && query.dimensions.length ||
-    query.timeDimensions && query.timeDimensions.filter(td => !!td.granularity).length;
-  if (!validQuery) {
-    throw new UserError(
-      'Query should contain either measures, dimensions or timeDimensions with granularities in order to be valid'
-    );
-  }
-  return query;
-};
+    if (f.dimension) {
+      res.member = f.dimension;
+      delete res.dimension;
+    }
+
+    return res;
+  })
+);
 
 /**
  * Normalize incoming network query.
  * @param {Query} query
+ * @param {boolean} persistent
  * @throws {UserError}
  * @returns {NormalizedQuery}
  */
-const normalizeQuery = (query) => {
-  const { error } = Joi.validate(query, querySchema);
+const normalizeQuery = (query, persistent) => {
+  const { error } = querySchema.validate(query);
   if (error) {
     throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
   }
@@ -178,34 +186,38 @@ const normalizeQuery = (query) => {
     );
   }
 
-  checkQueryFilters(query.filters || []);
-
-  const regularToTimeDimension = (query.dimensions || []).filter(d => d.split('.').length === 3).map(d => ({
+  const regularToTimeDimension = (query.dimensions || []).filter(d => typeof d === 'string' && d.split('.').length === 3).map(d => ({
     dimension: d.split('.').slice(0, 2).join('.'),
     granularity: d.split('.')[2]
   }));
   const timezone = query.timezone || 'UTC';
+
+  const def = getEnv('dbQueryDefaultLimit') <= getEnv('dbQueryLimit')
+    ? getEnv('dbQueryDefaultLimit')
+    : getEnv('dbQueryLimit');
+
+  let newLimit;
+  if (!persistent) {
+    if (
+      typeof query.limit === 'number' &&
+      query.limit > getEnv('dbQueryLimit')
+    ) {
+      throw new Error('The query limit has been exceeded.');
+    }
+    newLimit = typeof query.limit === 'number'
+      ? query.limit
+      : def;
+  } else {
+    newLimit = query.limit;
+  }
+
   return {
     ...query,
-    rowLimit: query.rowLimit || query.limit,
+    limit: newLimit,
     timezone,
     order: normalizeQueryOrder(query.order),
-    filters: (query.filters || []).map(f => {
-      const { dimension, member, ...filter } = f;
-      const normalizedFlter = {
-        ...filter,
-        member: member || dimension
-      };
-
-      Object.defineProperty(normalizedFlter, 'dimension', {
-        get() {
-          console.warn('Warning: Attribute `filter.dimension` is deprecated. Please use \'member\' instead of \'dimension\'.');
-          return this.member;
-        }
-      });
-      return normalizedFlter;
-    }),
-    dimensions: (query.dimensions || []).filter(d => d.split('.').length !== 3),
+    filters: normalizeQueryFilters(query.filters || []),
+    dimensions: (query.dimensions || []).filter(d => typeof d !== 'string' || d.split('.').length !== 3),
     timeDimensions: (query.timeDimensions || []).map(td => {
       let dateRange;
 
@@ -231,7 +243,28 @@ const normalizeQuery = (query) => {
   };
 };
 
+const remapQueryOrder = order => {
+  let result = [];
+  const normalizeOrderItem = (k, direction) => ({
+    id: k,
+    desc: direction === 'desc'
+  });
+  if (order) {
+    result = Array.isArray(order) ?
+      order.map(([k, direction]) => normalizeOrderItem(k, direction)) :
+      Object.keys(order).map(k => normalizeOrderItem(k, order[k]));
+  }
+  return result;
+};
+
+const remapToQueryAdapterFormat = (query) => (query ? {
+  ...query,
+  rowLimit: query.limit,
+  order: remapQueryOrder(query.order),
+} : query);
+
 const queryPreAggregationsSchema = Joi.object().keys({
+  expand: Joi.array().items(Joi.string()),
   metadata: Joi.object(),
   timezone: Joi.string(),
   timezones: Joi.array().items(Joi.string()),
@@ -244,7 +277,7 @@ const queryPreAggregationsSchema = Joi.object().keys({
 });
 
 const normalizeQueryPreAggregations = (query, defaultValues) => {
-  const { error } = Joi.validate(query, queryPreAggregationsSchema);
+  const { error } = queryPreAggregationsSchema.validate(query);
   if (error) {
     throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
   }
@@ -252,7 +285,8 @@ const normalizeQueryPreAggregations = (query, defaultValues) => {
   return {
     metadata: query.metadata,
     timezones: query.timezones || (query.timezone && [query.timezone]) || defaultValues?.timezones || ['UTC'],
-    preAggregations: query.preAggregations
+    preAggregations: query.preAggregations,
+    expand: query.expand
   };
 };
 
@@ -270,7 +304,7 @@ const queryPreAggregationPreviewSchema = Joi.object().keys({
 });
 
 const normalizeQueryPreAggregationPreview = (query) => {
-  const { error } = Joi.validate(query, queryPreAggregationPreviewSchema);
+  const { error } = queryPreAggregationPreviewSchema.validate(query);
   if (error) {
     throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
   }
@@ -284,7 +318,7 @@ const queryCancelPreAggregationPreviewSchema = Joi.object().keys({
 });
 
 const normalizeQueryCancelPreAggregations = query => {
-  const { error } = Joi.validate(query, queryCancelPreAggregationPreviewSchema);
+  const { error } = queryCancelPreAggregationPreviewSchema.validate(query);
   if (error) {
     throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
   }
@@ -295,9 +329,9 @@ const normalizeQueryCancelPreAggregations = query => {
 export {
   getQueryGranularity,
   getPivotQuery,
-  validatePostRewrite,
   normalizeQuery,
   normalizeQueryPreAggregations,
   normalizeQueryPreAggregationPreview,
   normalizeQueryCancelPreAggregations,
+  remapToQueryAdapterFormat,
 };

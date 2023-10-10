@@ -7,6 +7,7 @@ use async_trait::async_trait;
 use datafusion::cube_ext;
 use hex::ToHex;
 use log::{error, info, warn};
+use mockall::automock;
 use msql_srv::*;
 use std::convert::TryFrom;
 use std::io;
@@ -87,7 +88,9 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Backend {
                     metastore::ColumnType::String => ColumnType::MYSQL_TYPE_STRING,
                     metastore::ColumnType::Timestamp => ColumnType::MYSQL_TYPE_STRING,
                     metastore::ColumnType::Int => ColumnType::MYSQL_TYPE_LONGLONG,
-                    metastore::ColumnType::Decimal { .. } => ColumnType::MYSQL_TYPE_DECIMAL,
+                    metastore::ColumnType::Int96 => ColumnType::MYSQL_TYPE_STRING,
+                    metastore::ColumnType::Decimal { .. }
+                    | metastore::ColumnType::Decimal96 { .. } => ColumnType::MYSQL_TYPE_DECIMAL,
                     metastore::ColumnType::Boolean => ColumnType::MYSQL_TYPE_STRING,
                     metastore::ColumnType::Bytes => ColumnType::MYSQL_TYPE_STRING,
                     metastore::ColumnType::HyperLogLog(_) => ColumnType::MYSQL_TYPE_STRING,
@@ -104,7 +107,15 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Backend {
                     TableValue::String(s) => rw.write_col(s)?,
                     TableValue::Timestamp(s) => rw.write_col(s.to_string())?,
                     TableValue::Int(i) => rw.write_col(i)?,
+                    TableValue::Int96(i) => rw.write_col(i.to_string())?,
                     TableValue::Decimal(v) => {
+                        let scale = u8::try_from(
+                            data_frame.get_columns()[i].get_column_type().target_scale(),
+                        )
+                        .unwrap();
+                        rw.write_col(v.to_string(scale))?
+                    }
+                    TableValue::Decimal96(v) => {
                         let scale = u8::try_from(
                             data_frame.get_columns()[i].get_column_type().target_scale(),
                         )
@@ -230,6 +241,7 @@ impl MySqlServer {
     }
 }
 
+#[automock]
 #[async_trait]
 pub trait SqlAuthService: Send + Sync {
     async fn authenticate(&self, user: Option<String>) -> Result<Option<String>, CubeError>;

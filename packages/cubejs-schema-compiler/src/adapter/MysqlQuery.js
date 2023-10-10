@@ -86,4 +86,11 @@ export class MysqlQuery extends BaseQuery {
     }
     return name;
   }
+
+  sqlTemplates() {
+    const templates = super.sqlTemplates();
+    templates.quotes.identifiers = '`';
+    templates.quotes.escape = '\\`';
+    return templates;
+  }
 }

@@ -1,36 +1,54 @@
 ---
-title: Using Pre-Aggregations
+title: Using pre-aggregations
 permalink: /caching/using-pre-aggregations
 category: Caching
 menuOrder: 3
 ---
 
-Pre-aggregations is a powerful way to speed up your Cube.js queries. There are
-many configuration options to consider. Please make sure to also check [the
-Pre-Aggregations reference in the data schema section][ref-schema-ref-preaggs].
+Pre-aggregations is a powerful way to speed up your Cube queries. There are many
+configuration options to consider. Please make sure to also check [the
+Pre-Aggregations reference in the data modeling
+section][ref-schema-ref-preaggs].
 
 ## Refresh Strategy
 
 Refresh strategy can be customized by setting the
-[`refreshKey`][ref-schema-ref-preaggs-refresh-key] property for the
+[`refresh_key`][ref-schema-ref-preaggs-refresh-key] property for the
 pre-aggregation.
 
-The default value of [`refreshKey`][ref-schema-ref-preaggs-refresh-key] is
-`every: '1 hour'`. It can be redefined either by overriding the default value of
+The default value of [`refresh_key`][ref-schema-ref-preaggs-refresh-key] is
+`every: 1 hour`. It can be redefined either by overriding the default value of
 the [`every` property][ref-schema-ref-preaggs-refresh-key-every]:
 
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    pre_aggregations:
+      - name: amount_by_created
+        type: rollup
+        measures:
+          - amount
+        time_dimension: created_at
+        granularity: month
+        refresh_key:
+          every: 12 hour
+```
+
 ```javascript
-cube(`Orders`, {
+cube(`orders`, {
+  // ...
 
-  ...,
-
-  preAggregations: {
-    amountByCreated: {
+  pre_aggregations: {
+    amount_by_created: {
       type: `rollup`,
       measures: [amount],
-      timeDimension: createdAt,
+      time_dimension: created_at,
       granularity: `month`,
-      refreshKey: {
+      refresh_key: {
         every: `12 hour`,
       },
     },
@@ -38,20 +56,39 @@ cube(`Orders`, {
 });
 ```
 
+</CodeTabs>
+
 Or by providing a [`sql` property][ref-schema-ref-preaggs-refresh-key-sql]
-instead, and leaving `every` unchanged from its' default value:
+instead, and leaving `every` unchanged from its default value:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    pre_aggregations:
+      - name: amount_by_created
+        measures:
+          - amount
+        time_dimension: created_at
+        granularity: month
+        refresh_key:
+          # every will default to `10 seconds` here
+          sql: SELECT MAX(created_at) FROM orders
+```
 
 ```javascript
-cube(`Orders`, {
+cube(`orders`, {
+  // ...
 
-  ...,
-
-  preAggregations: {
-    amountByCreated: {
+  pre_aggregations: {
+    amount_by_created: {
       measures: [amount],
-      timeDimension: createdAt,
+      time_dimension: created_at,
       granularity: `month`,
-      refreshKey: {
+      refresh_key: {
         // every will default to `10 seconds` here
         sql: `SELECT MAX(created_at) FROM orders`,
       },
@@ -60,19 +97,38 @@ cube(`Orders`, {
 });
 ```
 
+</CodeTabs>
+
 Or both `every` and `sql` can be defined together:
 
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    pre_aggregations:
+      - name: amount_by_created
+        measures:
+          - amount
+        time_dimension: created_at
+        granularity: month
+        refresh_key:
+          every: 12 hour
+          sql: SELECT MAX(created_at) FROM orders
+```
+
 ```javascript
-cube(`Orders`, {
+cube(`orders`, {
+  // ...
 
-  ...,
-
-  preAggregations: {
-    amountByCreated: {
+  pre_aggregations: {
+    amount_by_created: {
       measures: [amount],
-      timeDimension: createdAt,
+      time_dimension: created_at,
       granularity: `month`,
-      refreshKey: {
+      refresh_key: {
         every: `12 hour`,
         sql: `SELECT MAX(created_at) FROM orders`,
       },
@@ -81,21 +137,23 @@ cube(`Orders`, {
 });
 ```
 
-When `every` and `sql` are used together, Cube.js will run the query from the
-`sql` property on an interval defined by the `every` property. If the query
-returns new results, then the pre-aggregation will be refreshed.
+</CodeTabs>
+
+When `every` and `sql` are used together, Cube will run the query from the `sql`
+property on an interval defined by the `every` property. If the query returns
+new results, then the pre-aggregation will be refreshed.
 
 ## Rollup Only Mode
 
-To make Cube.js _only_ serve requests from pre-aggregations, the
-[`CUBEJS_ROLLUP_ONLY` environment variable][ref-config-env-general] can be set
-to `true` on an API instance. This will prevent serving data on API requests
+To make Cube _only_ serve requests from pre-aggregations, the
+[`CUBEJS_ROLLUP_ONLY`][ref-config-env-rolluponly] environment variable can be
+set to `true` on an API instance. This will prevent serving data on API requests
 from the source database.
 
 <WarningBox>
 
 When using this configuration in a single node deployment (where the API
-instance and [Refresh Worker ][ref-deploy-refresh-wrkr] are configured on the
+instance and [Refresh Worker][ref-deploy-refresh-wrkr] are configured on the
 same host), requests made to the API that cannot be satisfied by a rollup throw
 an error. Scheduled refreshes will continue to work in the background.
 
@@ -113,57 +171,285 @@ like [BigQuery](/config/databases/google-bigquery) or
 [AWS Athena](/config/databases/aws-athena).
 
 Any `rollup` pre-aggregation can be partitioned by time using the
-`partitionGranularity` property in [a pre-aggregation
+`partition_granularity` property in [a pre-aggregation
 definition][ref-schema-ref-preaggs]. In the example below, the
-`partitionGranularity` is set to `month`, which means Cube will generate
+`partition_granularity` is set to `month`, which means Cube will generate
 separate tables for each month's worth of data. Once built, it will continue to
 refresh on a daily basis the last 3 months of data.
 
-```typescript
-cube(`Orders`, {
-  sql: `select * from orders`,
+<CodeTabs>
 
-  ...,
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    pre_aggregations:
+      - name: category_and_date
+        measures:
+          - count
+          - revenue
+        dimensions:
+          - category
+        time_dimension: created_at
+        granularity: day
+        partition_granularity: month
+        refresh_key:
+          every: 1 day
+          incremental: true
+          update_window: 3 months
+```
+
+```javascript
+cube(`orders`, {
+  // ...
 
   preAggregations: {
-    categoryAndDate: {
-      measures: [Orders.count, revenue],
+    category_and_date: {
+      measures: [count, revenue],
       dimensions: [category],
-      timeDimension: createdAt,
+      time_dimension: created_at,
       granularity: `day`,
-      partitionGranularity: `month`,
-      refreshKey: {
+      partition_granularity: `month`,
+      refresh_key: {
         every: `1 day`,
         incremental: true,
-        updateWindow: `3 months`
+        update_window: `3 months`
       }
     },
   },
 });
 ```
 
+</CodeTabs>
+
 ## Using Indexes
 
-For larger pre-aggregations, performance can be significantly improved by adding
-an [index][ref-schema-ref-preaggs-index]. This is done by defining the `indexes`
-property for a pre-aggregation:
+### When to use indexes?
 
-```typescript
-cube(`Orders`, {
-  ...,
+Indexes are great when you filter large amounts of data across one or several
+dimension columns. You can read more about them
+[here][ref-schema-ref-preaggs-index].
 
-  preAggregations: {
-    status: {
-      measures: [CUBE.count],
-      dimensions: [CUBE.status, Products.name, ProductCategories.name],
-      timeDimension: CUBE.createdAt,
-      granularity: `day`,
+### Best Practices
+
+To maximize performance, you can introduce an index per type of query so the set
+of dimensions used in the query overlap as much as possible with the ones
+defined in the index. Measures are traditionally only used in indexes if you
+plan to filter a measured value and the cardinality of the possible values of
+the measure is low.
+
+The order in which columns are specified in the index is **very** important;
+suboptimal ordering can lead to diminished performance. To improve the
+performance of an index the main thing to consider is the order of the columns
+defined in it. 
+
+The rule of thumb for index column order is:
+- Single value filters come first
+- `GROUP BY` columns come second
+- Everything else used in the query comes afterward
+
+**Example:**
+
+Suppose you have a pre-aggregation that has millions of rows with the following
+structure:
+
+| timestamp           | product_name  | product_category | zip_code | order_total |
+| ------------------- | ------------- | ---------------- | -------- | ----------- |
+| 2023-01-01 10:00:00 | Plastic Chair | Furniture        | 88523    | 2000        |
+| 2023-01-01 10:00:00 | Keyboard      | Electronics      | 88523    | 1000        |
+| 2023-01-01 10:00:00 | Mouse         | Electronics      | 88523    | 800         |
+| 2023-01-01 11:00:00 | Plastic Chair | Furniture        | 88524    | 3000        |
+| 2023-01-01 11:00:00 | Keyboard      | Electronics      | 88524    | 2000        |
+
+The pre-aggregation code would look as follows:
+
+<CodeTabs>
+
+```javascript
+cube('orders', {
+  // ...
+
+  pre_aggregations: {
+    main: {
+      measures: [order_total],
+      dimensions: [product_name, product_category, zip_code],
+      time_dimension: timestamp,
+      granularity: `hour`,
+      partition_granularity: `day`,
+      allow_non_strict_date_range_match: true,
+      refresh_key: {
+        every: `1 hour`,
+        incremental: true,
+        update_window: `1 day`,
+      },
+      build_range_start: {
+        sql: `SELECT DATE_SUB(NOW(), 365)`,
+      },
+      build_range_end: {
+        sql: `SELECT NOW()`,
+      },
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    pre_aggregations:
+      - name: main
+        measures:
+          - order_total
+        dimensions:
+          - product_name
+          - product_category
+          - zip_code
+        time_dimension: timestamp
+        granularity: hour
+        partition_granularity: day
+        allow_non_strict_date_range_match: true
+        refresh_key:
+          every: 1 hour
+          incremental: true
+          update_window: 1 day
+        build_range_start:
+          sql: SELECT DATE_SUB(NOW(), 365)
+        build_range_end:
+          sql: SELECT NOW()
+```
+
+</CodeTabs>
+
+You run the following query on a regular basis, with the only difference between
+queries being the filter values:
+
+```JSON
+{
+  "measures": [
+    "orders.order_total"
+  ],
+  "timeDimensions": [
+    {
+      "dimension": "orders.timestamp",
+      "granularity": "hour",
+      "dateRange": [
+        "2022-12-14T06:00:00.000",
+        "2023-01-13T06:00:00.000"
+      ]
+    }
+  ],
+  "order": {
+    "orders.timestamp": "asc"
+  },
+  "filters": [
+    {
+      "member": "orders.product_category",
+      "operator": "equals",
+      "values": [
+        "Electronics"
+      ]
+    },
+    {
+      "member": "orders.product_name",
+      "operator": "equals",
+      "values": [
+        "Keyboard",
+        "Mouse"
+      ]
+    }
+  ],
+  "dimensions": [
+    "orders.zip_code"
+  ],
+  "limit": 10000
+}
+```
+
+After running this on a dataset with millions of records you find that it's
+taking a long time to run, so you decide to add an index to target this specific
+query. Taking into account the best practices mentioned previously you should
+define an index as follows:
+
+<CodeTabs>
+
+```javascript
+cube('orders', {
+  // ...
+
+  pre_aggregations: {
+    main: {
+      // ...
+
       indexes: {
-        statusIndex: {
-          columns: [CUBE.status, Products.name],
+        category_productname_zipcode_index: {
+          columns: [product_category, zip_code, product_name],
         },
-        aggregatedIndex: {
-          columns: [CUBE.status],
+      },
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    pre_aggregations:
+      - name: main
+        # ...
+        
+        indexes:
+          - name: category_productname_zipcode_index
+            columns:
+              - product_category
+              - zip_code
+              - product_name
+```
+
+</CodeTabs>
+
+Then the data within `category_productname_zipcode_index` would look like:
+
+| product_category | product_name  | zip_code | timestamp           | order_total |
+| ---------------- | ------------- | -------- | ------------------- | ----------- |
+| Furniture        | Plastic Chair | 88523    | 2023-01-01 10:00:00 | 2000        |
+| Electronics      | Keyboard      | 88523    | 2023-01-01 10:00:00 | 1000        |
+| Electronics      | Mouse         | 88523    | 2023-01-01 10:00:00 | 800         |
+| Furniture        | Plastic Chair | 88524    | 2023-01-01 11:00:00 | 3000        |
+| Electronics      | Keyboard      | 88524    | 2023-01-01 11:00:00 | 2000        |
+
+`product_category` column comes first as it's a single value filter. 
+Then `zip_code` as it's `GROUP BY` column.
+`product_name` comes last as it's a multiple value filter.
+
+It might sound counter-intuitive to have `GROUP BY` columns before filter ones, however Cube Store always performs scans on sorted data, and if `GROUP BY` matches index ordering, merge sort-based algorithms are used for querying, which are usually much faster than hash-based group by in case of index ordering doesn't match the query. If in doubt, always use `EXPLAIN` and `EXPLAIN ANALYZE` in Cube Store to figure out the final query plan.
+
+### Aggregated indexes
+
+Aggregated indexes can be defined as well. You can read more about them
+[here][ref-schema-ref-preaggs-index].
+
+Example:
+
+<CodeTabs>
+
+```javascript
+cube('orders', {
+  // ...
+
+  pre_aggregations: {
+    main: {
+      // ...
+
+      indexes: {
+        // ...
+        
+        zip_code_index: {
+          columns: [zip_code],
           type: `aggregate`,
         },
       },
@@ -172,35 +458,32 @@ cube(`Orders`, {
 });
 ```
 
-For example, if the pre-aggregated data looks like:
+```yaml
+cubes:
+  - name: orders
+    # ...
+    
+    pre_aggregations:
+      - name: main
+        # ...
 
-| created_at | status     | products\_\_name | product_categories\_\_name | count |
-| ---------- | ---------- | ---------------- | -------------------------- | ----- |
-| 2022-08-01 | completed  | Plastic Chair    | Furniture                  | 4     |
-| 2022-08-01 | processing | Plastic Chair    | Furniture                  | 11    |
-| 2022-08-01 | shipped    | Plastic Chair    | Furniture                  | 2     |
-| 2022-08-01 | completed  | Keyboard         | Electronics                | 1     |
-| 2022-08-01 | processing | Keyboard         | Electronics                | 3     |
-| 2022-08-01 | shipped    | Keyboard         | Electronics                | 7     |
+        indexes:
+          # ...
 
-Then the data within `statusIndex` would look like:
+          - name: zip_code_index
+            columns:
+              - zip_code
+            type: aggregate
+```
 
-| status     | products\_\_name | created_at | product_categories\_\_name | count |
-| ---------- | ---------------- | ---------- | -------------------------- | ----- |
-| completed  | Plastic Chair    | 2022-08-01 | Furniture                  | 4     |
-| processing | Plastic Chair    | 2022-08-01 | Furniture                  | 11    |
-| shipped    | Plastic Chair    | 2022-08-01 | Furniture                  | 2     |
-| completed  | Keyboard         | 2022-08-01 | Electronics                | 1     |
-| processing | Keyboard         | 2022-08-01 | Electronics                | 3     |
-| shipped    | Keyboard         | 2022-08-01 | Electronics                | 7     |
+</CodeTabs>
 
-And the data within `aggregatedIndex` would look like:
+And the data for `zip_code_index` would look like the following:
 
-| status     | count |
-| ---------- | ----- |
-| completed  | 5     |
-| processing | 14    |
-| shipped    | 9     |
+| zip_code | order_total |
+| -------- | ----------- |
+| 88523    | 3800        |
+| 88524    | 5000        |
 
 ## Inspecting Pre-Aggregations
 
@@ -208,9 +491,18 @@ Cube Store partially supports the MySQL protocol. This allows you to execute
 simple queries using a familiar SQL syntax. You can connect using the MySQL CLI
 client, for example:
 
-```bash
+```bash{promptUser: user}
 mysql -h <CUBESTORE_IP> --user=cubestore -pcubestore
 ```
+
+<WarningBox>
+
+Only Linux and Mac OS versions of MySQL client are supported as of right now.
+You can install one on ubuntu using `apt-get install default-mysql-client`
+command or `brew install mysql-client` on Mac OS. Windows versions of the MySQL
+client aren't supported.
+
+</WarningBox>
 
 To check which pre-aggregations are managed by Cube Store, you could run the
 following query:
@@ -283,8 +575,8 @@ Alternatively, you can store pre-aggregations **internally** in the source
 database. To store a pre-aggregation internally, set `external: false` in
 pre-aggregation definition.
 
-Please note, that [originalSql][ref-original-sql] pre-aggregations are stored
-**internally** by default. It is not recommended to store `originalSql`
+Please note, that [original_sql][ref-original-sql] pre-aggregations are stored
+**internally** by default. It is not recommended to store `original_sql`
 pre-aggregations in Cube Store.
 
 ## Joins between pre-aggregations
@@ -301,57 +593,103 @@ When making a query that joins data from two different cubes, Cube can use
 pre-aggregations instead of running the base SQL queries. To get started, first
 ensure both cubes have valid pre-aggregations:
 
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    pre_aggregations:
+      - name: orders_rollup
+        measures:
+          - CUBE.count
+        dimensions:
+          - CUBE.user_id
+          - CUBE.status
+        time_dimension: CUBE.created_at
+        granularity: day
+
+    joins:
+      - name: users
+        sql: "{CUBE.user_id} = ${users.id}"
+        relationship: many_to_one
+
+  - name: users
+    # ...
+
+    pre_aggregations:
+      - name: users_rollup
+        dimensions:
+          - CUBE.id
+          - CUBE.name
+```
+
 ```javascript
-// Orders
-cube(`Orders`, {
-  sql: `SELECT * FROM public.orders`,
+cube(`orders`, {
+  // ...
 
-  ...,
-
-  preAggregations: {
-    ordersRollup: {
+  pre_aggregations: {
+    orders_rollup: {
       measures: [CUBE.count],
-      dimensions: [CUBE.userId, CUBE.status],
-      timeDimension: CUBE.createdAt,
+      dimensions: [CUBE.user_id, CUBE.status],
+      time_dimension: CUBE.created_at,
       granularity: `day`,
     },
   },
 
   joins: {
-    Users: {
-      sql: `${CUBE.userId} = ${Users.id}`,
-      relationship: `belongsTo`
+    users: {
+      sql: `${CUBE.user_id} = ${users.id}`,
+      relationship: `many_to_one`
     },
   },
 });
 
-// Users
-cube(`Users`, {
-  sql: `SELECT * FROM public.users`,
+cube(`users`, {
+  // ...
 
-  ...,
-
-  preAggregations: {
-    usersRollup: {
+  pre_aggregations: {
+    users_rollup: {
       dimensions: [CUBE.id, CUBE.name],
     },
   },
 });
 ```
 
-Before we continue, let's add an index to the `ordersRollup` pre-aggregation so
-that the `rollupJoin` pre-aggregation can work correctly:
+</CodeTabs>
+
+Before we continue, let's add an index to the `orders_rollup` pre-aggregation so
+that the `rollup_join` pre-aggregation can work correctly:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    pre_aggregations:
+      - name: orders_rollup
+        # ...
+
+        indexes:
+          - name: user_index
+            columns:
+              - CUBE.user_id
+```
 
 ```javascript
-cube(`Orders`, {
-  ...,
+cube(`orders`, {
+  // ...
 
-  preAggregations: {
-    ordersRollup: {
-      ...,
+  pre_aggregations: {
+    orders_rollup: {
+      // ...
+
       indexes: {
-        userIndex: {
-          columns: [CUBE.userId],
+        user_index: {
+          columns: [CUBE.user_id],
         },
       },
     },
@@ -359,41 +697,70 @@ cube(`Orders`, {
 });
 ```
 
-Now we can add a new pre-aggregation of type `rollupJoin` to the `Orders` cube:
+</CodeTabs>
+
+Now we can add a new pre-aggregation of type `rollup_join` to the `orders` cube:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    pre_aggregations:
+      # ...
+
+      - name: orders_with_users_rollup
+        type: rollup_join
+        measures:
+          - CUBE.count
+        dimensions:
+          - users.name
+        time_dimension: CUBE.created_at
+        granularity: day
+        rollups:
+          - users.users_rollup
+          - CUBE.orders_rollup
+```
 
 ```javascript
-cube(`Orders`, {
-  ...,
+cube(`orders`, {
+  // ...
 
-  preAggregations: {
-    ordersWithUsersRollup: {
-      type: `rollupJoin`,
+  pre_aggregations: {
+    // ...
+
+    orders_with_users_rollup: {
+      type: `rollup_join`,
       measures: [CUBE.count],
-      dimensions: [Users.name],
-      timeDimension: CUBE.createdAt,
+      dimensions: [users.name],
+      time_dimension: CUBE.created_at,
       granularity: `day`,
-      rollups: [Users.usersRollup, CUBE.ordersRollup],
+      rollups: [users.users_rollup, CUBE.orders_rollup],
     },
   },
 });
 ```
 
+</CodeTabs>
+
 With all of the above set up, making a query such as the following will now use
-`Orders.ordersRollup` and `Users.usersRollup`, avoiding a database request:
+`orders.orders_rollup` and `users.users_rollup`, avoiding a database request:
 
 ```json
 {
-  "dimensions": ["Users.name"],
+  "dimensions": ["users.name"],
   "timeDimensions": [
     {
-      "dimension": "Orders.createdAt",
+      "dimension": "orders.created_at",
       "dateRange": "This month"
     }
   ],
   "order": {
-    "Orders.count": "desc"
+    "orders.count": "desc"
   },
-  "measures": ["Orders.count"]
+  "measures": ["orders.count"]
 }
 ```
 
@@ -427,7 +794,7 @@ or [Export Bucket][self-export-bucket] strategies instead.
 <div style="text-align: center">
   <img
     alt="Internal vs External vs External with Cube Store diagram"
-    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Caching/build-regular.png"
+    src="https://ucarecdn.com/9aee19aa-2d52-4022-928d-5c97be9417e5/"
     style="border: none"
     width="100%"
   />
@@ -435,21 +802,20 @@ or [Export Bucket][self-export-bucket] strategies instead.
 
 ### <--{"id" : "Pre-Aggregation Build Strategies"}--> Batching
 
-Batching is a more performant strategy where Cube.js sends compressed CSVs for
-Cube Store to ingest.
+Batching is a more performant strategy where Cube sends compressed CSVs for Cube
+Store to ingest.
 
 <div style="text-align: center">
   <img
     alt="Internal vs External vs External with Cube Store diagram"
-    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Caching/build-batching.png"
+    src="https://ucarecdn.com/deb0194a-f7cb-49bc-84a6-d07bdeb8bd36/"
     style="border: none"
     width="100%"
   />
 </div>
 
-The performance scales to the amount of memory available on the Cube.js
-instance. Batching is automatically enabled for any databases that can support
-it.
+The performance scales to the amount of memory available on the Cube instance.
+Batching is automatically enabled for any databases that can support it.
 
 ### <--{"id" : "Pre-Aggregation Build Strategies"}--> Export bucket
 
@@ -457,6 +823,13 @@ it.
 
 The export bucket strategy requires permission to execute `CREATE TABLE`
 statements in the data source as part of the pre-aggregation build process.
+
+</WarningBox>
+
+<WarningBox>
+
+Do not confuse the export bucket with the Cube Store storage bucket.
+Those are two separate storages and should never be mixed.
 
 </WarningBox>
 
@@ -468,7 +841,7 @@ Cube Store in parallel:
 <div style="text-align: center">
   <img
     alt="Internal vs External vs External with Cube Store diagram"
-    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Caching/build-export-bucket.png"
+    src="https://ucarecdn.com/f43999c4-cf91-4d36-9650-3078312fb9c9/"
     style="border: none"
     width="100%"
   />
@@ -483,30 +856,34 @@ refer to the database-specific documentation for more details:
 - [Snowflake][ref-connect-db-snowflake]
 
 When using cloud storage, it is important to correctly configure any data
-retention policies to clean up the data in the export bucket as Cube.js does not
+retention policies to clean up the data in the export bucket as Cube does not
 currently manage this. For most use-cases, 1 day is sufficient.
 
 ## Streaming pre-aggregations
 
-Streaming pre-aggregations are different from traditional pre-aggregations in the way they are being updated. Traditional pre-aggregations follow the “pull” model — Cube **pulls updates** from the data source based on some cadence and/or condition. Streaming pre-aggregations follow the “push” model — Cube **subscribes to the updates** from the data source and always keeps pre-aggregation up to date. 
+Streaming pre-aggregations are different from traditional pre-aggregations in
+the way they are being updated. Traditional pre-aggregations follow the “pull”
+model — Cube **pulls updates** from the data source based on some cadence and/or
+condition. Streaming pre-aggregations follow the “push” model — Cube
+**subscribes to the updates** from the data source and always keeps
+pre-aggregation up to date.
 
-You don’t need to define `refreshKey` for streaming pre-aggregations. Whether pre-aggregation is streaming or not is defined by the data source. 
+You don’t need to define `refresh_key` for streaming pre-aggregations. Whether
+pre-aggregation is streaming or not is defined by the data source.
 
-Currently, Cube supports only one streaming data source - [ksqlDB](/config/databases/ksqldb). All pre-aggregations where data source is ksqlDB are streaming. 
+Currently, Cube supports only one streaming data source -
+[ksqlDB](/config/databases/ksqldb). All pre-aggregations where data source is
+ksqlDB are streaming.
 
-We’re working on supporting streaming pre-aggregations for the following data sources -
-
-- Materialize
-- Flink SQL
-- Spark Streaming
-
-Please [let us know](https://cube.dev/contact) if you are interested in early access to any of these drivers or would like Cube to support any other SQL streaming engine.
+We are working on supporting more data sources for streaming pre-aggregations,
+please [let us know](https://cube.dev/contact) if you are interested in early
+access to any of these drivers or would like Cube to support any other SQL
+streaming engine.
 
 [ref-caching-in-mem-default-refresh-key]: /caching#default-refresh-keys
 [ref-config-db]: /config/databases
 [ref-config-driverfactory]: /config#driver-factory
-[ref-config-env]: /reference/environment-variables#cube-store
-[ref-config-env-general]: /config#general
+[ref-config-env-rolluponly]: /reference/environment-variables#cubejs-rollup-only
 [ref-config-extdriverfactory]: /config#external-driver-factory
 [ref-connect-db-athena]: /config/databases/aws-athena
 [ref-connect-db-redshift]: /config/databases/aws-redshift
