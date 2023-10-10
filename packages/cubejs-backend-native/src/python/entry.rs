@@ -1,8 +1,7 @@
-use crate::python::cross::{CLRepr, CLReprObject};
+use crate::cross::{CLRepr, CLReprObject, PythonRef};
 use crate::python::cube_config::CubeConfigPy;
 use crate::python::python_model::CubePythonModel;
 use crate::python::runtime::py_runtime_init;
-use crate::python::template;
 use neon::prelude::*;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyFunction, PyList, PyString, PyTuple};
@@ -82,8 +81,10 @@ fn python_load_model(mut cx: FunctionContext) -> JsResult<JsPromise> {
             for (local_key, local_value) in functions.iter() {
                 if local_value.is_instance_of::<PyFunction>() {
                     let fun: Py<PyFunction> = local_value.downcast::<PyFunction>()?.into();
-                    collected_functions
-                        .insert(local_key.to_string(), CLRepr::PyExternalFunction(fun));
+                    collected_functions.insert(
+                        local_key.to_string(),
+                        CLRepr::PythonRef(PythonRef::PyExternalFunction(fun)),
+                    );
                 }
             }
             // TODO remove all other ways of defining functions
@@ -97,8 +98,10 @@ fn python_load_model(mut cx: FunctionContext) -> JsResult<JsPromise> {
                     let has_attr = local_value.hasattr("cube_context_func")?;
                     if has_attr {
                         let fun: Py<PyFunction> = local_value.downcast::<PyFunction>()?.into();
-                        collected_functions
-                            .insert(local_key.to_string(), CLRepr::PyExternalFunction(fun));
+                        collected_functions.insert(
+                            local_key.to_string(),
+                            CLRepr::PythonRef(PythonRef::PyExternalFunction(fun)),
+                        );
                     }
                 }
             }
@@ -117,8 +120,10 @@ fn python_load_model(mut cx: FunctionContext) -> JsResult<JsPromise> {
                 let has_attr = fun.hasattr("cube_context_func")?;
                 if has_attr {
                     let fun: Py<PyFunction> = fun.into();
-                    collected_functions
-                        .insert(fun_name.to_string(), CLRepr::PyExternalFunction(fun));
+                    collected_functions.insert(
+                        fun_name.to_string(),
+                        CLRepr::PythonRef(PythonRef::PyExternalFunction(fun)),
+                    );
                 }
             }
         };
@@ -140,8 +145,6 @@ pub fn python_register_module(cx: &mut ModuleContext) -> NeonResult<()> {
 
     cx.export_function("pythonLoadConfig", python_load_config)?;
     cx.export_function("pythonLoadModel", python_load_model)?;
-
-    template::template_register_module(cx)?;
 
     Ok(())
 }
