@@ -149,7 +149,7 @@ export class CubejsServerCore {
 
   public coreServerVersion: string | null = null;
 
-  private contextAcceptor: ContextAcceptor;
+  protected contextAcceptor: ContextAcceptor;
 
   /**
    * Class constructor.
