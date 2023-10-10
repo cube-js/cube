@@ -12988,7 +12988,7 @@ draft-js@^0.10.0, draft-js@~0.10.0:
     immutable "~3.7.4"
     object-assign "^4.1.0"
 
-duckdb@^0.9.1-dev157.0:
+duckdb@^0.9.1-dev166.0:
   version "0.9.1-dev97.0"
   resolved "https://registry.yarnpkg.com/duckdb/-/duckdb-0.9.1-dev97.0.tgz#601d56c8c9acccff4af9a5c965ab698c0630f323"
   integrity sha512-0E5MC1Y8jeUArClaJUC8zKU1R1vcJGP9mpWy3gFDu6X/sC5SDgu2xHqnu9sunKeBanUv0Ptp5SLbbEdodyV81w==
