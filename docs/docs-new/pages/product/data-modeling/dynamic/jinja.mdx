@@ -4,11 +4,12 @@ Cube supports authoring dynamic data models using the [Jinja templating
 language][jinja] and Python. This allows de-duplicating common patterns in your data models
 as well as dynamically generating data models from a remote data source.
 
-To use a Jinja template, create a file in your data model folder with the
-`.jinja` extension. For example, a file containing the `orders` cube could be
-named `orders.yml.jinja` under the `models/` directory.
+Jinja is supported in all YAML data model files.
 
 ## Jinja
+
+Please check the [Jinja documentation][jinja-docs] for details on Jinja syntax.
+
 ### Loops
 
 Jinja supports [looping][jinja-docs-for-loop] over lists and dictionaries. In
@@ -196,6 +197,7 @@ cubes:
 ```
 
 [jinja]: https://jinja.palletsprojects.com/
+[jinja-docs]: https://jinja.palletsprojects.com/en/3.1.x/templates/
 [jinja-docs-for-loop]: https://jinja.palletsprojects.com/en/3.1.x/templates/#for
 [jinja-docs-macros]:
   https://jinja.palletsprojects.com/en/3.1.x/templates/#macros
