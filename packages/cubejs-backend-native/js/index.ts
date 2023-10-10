@@ -386,10 +386,6 @@ export class NativeInstance {
     }
 
     public newJinjaEngine(options: { debugInfo?: boolean }): JinjaEngine {
-      if (isFallbackBuild()) {
-        throw new Error('Python (newJinjaEngine) is not supported in fallback build');
-      }
-
       return this.getNative().newJinjaEngine(options);
     }
 
