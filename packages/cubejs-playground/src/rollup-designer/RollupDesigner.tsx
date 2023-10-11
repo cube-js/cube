@@ -229,7 +229,7 @@ export function RollupDesigner({
     if (transformedQuery) {
       cubeName = (
         transformedQuery?.leafMeasures[0] ||
-        transformedQuery?.sortedDimensions[0] ||
+        transformedQuery?.ownedDimensions[0] ||
         'CubeName'
       ).split('.')[0];
     } else if (!areReferencesEmpty(references)) {
