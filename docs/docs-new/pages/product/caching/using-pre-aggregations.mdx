@@ -573,6 +573,14 @@ used for query processing:
 +-----------+-----------------+--------------------------------------------------------------------------------------------------------------------------+
 ```
 
+In most of the cases for aggregation, Cube Store will use `HashAggregate` or `InplaceAggregate` strategy as well as `Merge` and `MergeSort` operators to union different partitions.
+Even for larger datasets, scan operations on sorted data will almost always be much more efficient and faster than hash aggregate as the Cube Store optimizer decides to use those only if there's an index with appropriate sorting.
+So, as a rule of thumb, if you see in your plan `PartialHashAggregate` and `FinalHashAggregate` nodes together with `Merge` operators those queries most likely perform sub-optimally.
+On another hand, if you see `PartialInplaceAggregate`, `FinalInplaceAggregate`, and `FullInplaceAggregate` together with `MergeSort` operators in your plan, then there's a high chance the query performs optimally.
+Sometimes, there can be exceptions to this rule. 
+For example, a total count query run on top of the index will perform `HashAggregate` strategy on top of `MergeSort` nodes even if all required indexes are in place.
+This query would be optimal as well.
+
 ## Pre-Aggregations Storage
 
 The default pre-aggregations storage in Cube is its own purpose-built storage
