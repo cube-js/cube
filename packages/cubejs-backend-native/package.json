@@ -59,11 +59,9 @@
           ]
         ],
         "constraints": {
-          "platform": [
-            "linux"
-          ],
-          "arch": [
-            "x64"
+          "platform-arch": [
+            "linux-x64",
+            "linux-arm64"
           ]
         }
       }
