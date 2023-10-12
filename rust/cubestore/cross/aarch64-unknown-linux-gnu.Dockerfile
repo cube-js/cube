@@ -115,7 +115,7 @@ RUN wget https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VER
       --with-build-python=/usr/bin/python3.9 && \
     make -j $(nproc) && \
     make install && \
-    cd .. && rm -rf Python-${PYTHON_VERSION}; \
+    cd .. && rm -rf Python-${PYTHON_VERSION};
 
 ENV PKG_CONFIG_ALLOW_CROSS=true
 ENV PKG_CONFIG_ALL_STATIC=true
