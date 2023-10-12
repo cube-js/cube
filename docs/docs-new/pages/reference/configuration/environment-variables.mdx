@@ -221,7 +221,15 @@ The [maximum memory limit][duckdb-docs-config] for DuckDB. Equivalent to
 
 [duckdb-docs-config]: https://duckdb.org/docs/sql/configuration.html
 
-## `CUBEJS_DB_DUCKDB_MOTHER_DUCK_TOKEN`
+## `CUBEJS_DB_DUCKDB_SCHEMA`
+
+The [default search schema][duckdb-docs-config] for DuckDB.
+
+| Possible Values     | Default in Development | Default in Production |
+| ------------------- | ---------------------- | --------------------- |
+| A valid schema name | `main`                 | `main`                |
+
+## `CUBEJS_DB_DUCKDB_MOTHERDUCK_TOKEN`
 
 The [service token][motherduck-docs-svc-token] to use for connections to
 MotherDuck.
