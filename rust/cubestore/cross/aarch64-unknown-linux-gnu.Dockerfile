@@ -71,6 +71,7 @@ RUN wget https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VER
     echo "ac_cv_file__dev_ptmx=no" >> config.site-aarch64 && \
     echo "ac_cv_file__dev_ptc=no" >> config.site-aarch64 && \
     CONFIG_SITE=config.site-aarch64 ./configure  \
+      --enable-shared \
       --enable-optimizations \
       --disable-ipv6 \
       --prefix=/usr/aarch64-linux-gnu \
@@ -89,6 +90,7 @@ RUN wget https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VER
     echo "ac_cv_file__dev_ptmx=no" >> config.site-aarch64 && \
     echo "ac_cv_file__dev_ptc=no" >> config.site-aarch64 && \
     CONFIG_SITE=config.site-aarch64 ./configure  \
+      --enable-shared \
       --enable-optimizations \
       --disable-ipv6 \
       --prefix=/usr/aarch64-linux-gnu \
@@ -107,6 +109,7 @@ RUN wget https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VER
     echo "ac_cv_file__dev_ptmx=no" >> config.site-aarch64 && \
     echo "ac_cv_file__dev_ptc=no" >> config.site-aarch64 && \
     CONFIG_SITE=config.site-aarch64 ./configure  \
+      --enable-shared \
       --enable-optimizations \
       --disable-ipv6 \
       --prefix=/usr/aarch64-linux-gnu \
@@ -125,6 +128,7 @@ RUN wget https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VER
     echo "ac_cv_file__dev_ptmx=no" >> config.site-aarch64 && \
     echo "ac_cv_file__dev_ptc=no" >> config.site-aarch64 && \
     CONFIG_SITE=config.site-aarch64 ./configure  \
+      --enable-shared \
       --enable-optimizations \
       --disable-ipv6 \
       --prefix=/usr/aarch64-linux-gnu \
