@@ -76,7 +76,7 @@ RUN wget https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VER
       --prefix=/usr/aarch64-linux-gnu \
       --build=aarch64-unknown-linux-gnu \
       --host=x86_64-linux-gnu \
-      --with-build-python=/usr/bin/python3.12 && \
+      --with-build-python=/usr/bin/python3.11 && \
     make -j $(nproc) && \
     make install && \
     cd .. && rm -rf Python-${PYTHON_VERSION};
