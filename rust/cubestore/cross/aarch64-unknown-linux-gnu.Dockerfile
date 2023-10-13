@@ -11,7 +11,7 @@ RUN apt-get update \
     && add-apt-repository -y ppa:deadsnakes/ppa \
     && apt-get update \
     # python3 on x86 is required for cross compiling python :D
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y python3.11 python3.10 python3.9 \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y python3.12 python3.11 python3.10 python3.9 \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y libffi-dev binutils-multiarch binutils-aarch64-linux-gnu gcc-multilib g++-multilib \
     # llvm14-dev will install python 3.8 as bin/python3
     && DEBIAN_FRONTEND=noninteractive apt-get install -y llvm-14 clang-14 libclang-14-dev clang-14 \
@@ -62,6 +62,24 @@ RUN wget https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz -O - |
 ENV PYO3_CROSS_PYTHON_VERSION=3.11 \
     PYO3_CROSS_INCLUDE_DIR=/usr/aarch64-linux-gnu/include \
     PYO3_CROSS_LIB_DIR=/usr/aarch64-linux-gnu/lib
+
+ENV PYTHON_VERSION=3.12.0
+RUN wget https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tgz -O - | tar -xz && \
+    cd Python-${PYTHON_VERSION} && \
+    touch config.site-aarch64 && \
+    echo "ac_cv_buggy_getaddrinfo=no" >> config.site-aarch64 && \
+    echo "ac_cv_file__dev_ptmx=no" >> config.site-aarch64 && \
+    echo "ac_cv_file__dev_ptc=no" >> config.site-aarch64 && \
+    CONFIG_SITE=config.site-aarch64 ./configure  \
+      --enable-optimizations \
+      --disable-ipv6 \
+      --prefix=/usr/aarch64-linux-gnu \
+      --build=aarch64-unknown-linux-gnu \
+      --host=x86_64-linux-gnu \
+      --with-build-python=/usr/bin/python3.12 && \
+    make -j $(nproc) && \
+    make install && \
+    cd .. && rm -rf Python-${PYTHON_VERSION};
 
 ENV PYTHON_VERSION=3.11.3
 RUN wget https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tgz -O - | tar -xz && \
