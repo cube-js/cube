@@ -11,7 +11,7 @@ RUN apt-get update \
     && add-apt-repository -y ppa:deadsnakes/ppa \
     && apt-get update \
     # python3 on x86 is required for cross compiling python :D
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y python3.11 python3.10 python3.9 \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y python3.12 python3.11 python3.10 python3.9 \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y libffi-dev binutils-multiarch binutils-aarch64-linux-gnu gcc-multilib g++-multilib \
     # llvm14-dev will install python 3.8 as bin/python3
     && DEBIAN_FRONTEND=noninteractive apt-get install -y llvm-14 clang-14 libclang-14-dev clang-14 \
@@ -76,7 +76,7 @@ RUN wget https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VER
       --prefix=/usr/aarch64-linux-gnu \
       --build=aarch64-unknown-linux-gnu \
       --host=x86_64-linux-gnu \
-      --with-build-python=/usr/bin/python3.11 && \
+      --with-build-python=/usr/bin/python3.12 && \
     make -j $(nproc) && \
     make install && \
     cd .. && rm -rf Python-${PYTHON_VERSION};
