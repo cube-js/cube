@@ -511,7 +511,7 @@ jobs:
             IMAGE_VERSION=${{ steps.prep.outputs.version }}
 
   docker-debian-jdk:
-    needs: [npm, cubestore, native_linux]
+    needs: [npm, cubestore_linux, native_linux]
     name: Debian with jdk docker image
     runs-on: ubuntu-20.04
     timeout-minutes: 30
