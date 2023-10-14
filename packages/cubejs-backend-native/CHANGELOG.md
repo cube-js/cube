@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.4](https://github.com/cube-js/cube/compare/v0.34.3...v0.34.4) (2023-10-14)
+
+
+### Bug Fixes
+
+* **cross:** Enable shared python for aarch64-unknown-linux-gnu ([#7225](https://github.com/cube-js/cube/issues/7225)) ([2c4f48a](https://github.com/cube-js/cube/commit/2c4f48a615616bb99bc95ad34e9fc1a420c685c0))
+
+
+
+
+
 ## [0.34.3](https://github.com/cube-js/cube/compare/v0.34.2...v0.34.3) (2023-10-12)
 
 
