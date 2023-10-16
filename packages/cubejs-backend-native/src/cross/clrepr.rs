@@ -72,13 +72,19 @@ pub enum CLReprKind {
     Null,
 }
 
+#[derive(Debug, Clone)]
+pub enum StringType {
+    Normal,
+    Safe,
+}
+
 /// Cross language representation is abstraction to transfer values between
 /// JavaScript and Python across Rust. Converting between two different languages requires
 /// to use Context which is available on the call (one for python and one for js), which result as
 /// blocking.
 #[derive(Debug, Clone)]
 pub enum CLRepr {
-    String(String),
+    String(String, StringType),
     Bool(bool),
     Float(f64),
     Int(i64),
@@ -118,7 +124,7 @@ impl CLRepr {
     #[allow(unused)]
     pub fn kind(&self) -> CLReprKind {
         match self {
-            CLRepr::String(_) => CLReprKind::String,
+            CLRepr::String(_, _) => CLReprKind::String,
             CLRepr::Bool(_) => CLReprKind::Bool,
             CLRepr::Float(_) => CLReprKind::Float,
             CLRepr::Int(_) => CLReprKind::Int,
@@ -139,7 +145,7 @@ impl CLRepr {
     ) -> Result<Self, Throw> {
         if from.is_a::<JsString, _>(cx) {
             let v = from.downcast_or_throw::<JsString, _>(cx)?;
-            Ok(CLRepr::String(v.value(cx)))
+            Ok(CLRepr::String(v.value(cx), StringType::Normal))
         } else if from.is_a::<JsArray, _>(cx) {
             let v = from.downcast_or_throw::<JsArray, _>(cx)?;
             let el = v.to_vec(cx)?;
@@ -205,7 +211,7 @@ impl CLRepr {
         #[cfg(feature = "python")] tcx: IntoJsContext,
     ) -> JsResult<'a, JsValue> {
         Ok(match from {
-            CLRepr::String(v) => cx.string(v).upcast(),
+            CLRepr::String(v, _) => cx.string(v).upcast(),
             CLRepr::Bool(v) => cx.boolean(v).upcast(),
             CLRepr::Float(v) => cx.number(v).upcast(),
             CLRepr::Int(v) => cx.number(v as f64).upcast(),

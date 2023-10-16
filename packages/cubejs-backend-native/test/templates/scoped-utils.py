@@ -1,5 +1,5 @@
 source_code = """
-from cube import context_func
+from cube import (context_func, SafeString)
 
 @context_func
 def arg_sum_integers(a, b):
@@ -36,6 +36,10 @@ def new_int_tuple():
 @context_func
 def new_str_tuple():
   return ("hello", "word")
+
+@context_func
+def new_safe_string():
+  return SafeString('"safe string"')
 
 @context_func
 def load_data_sync():

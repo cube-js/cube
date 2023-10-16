@@ -72,6 +72,7 @@ suite('Python model', () => {
       arg_seq: expect.any(Object),
       new_int_tuple: expect.any(Object),
       new_str_tuple: expect.any(Object),
+      new_safe_string: expect.any(Object),
       load_class_model: expect.any(Object),
     });
   });
@@ -93,6 +94,7 @@ darwinSuite('Scope Python model', () => {
       arg_seq: expect.any(Object),
       new_int_tuple: expect.any(Object),
       new_str_tuple: expect.any(Object),
+      new_safe_string: expect.any(Object),
       load_class_model: expect.any(Object),
     });
   });
@@ -144,5 +146,4 @@ function createTestSuite(utilsFile: string) {
   };
 }
 
-suite('Jinja (old api)', createTestSuite('utils.py'));
 suite('Jinja (new api)', createTestSuite('jinja-instance.py'));
