@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.5](https://github.com/cube-js/cube/compare/v0.34.4...v0.34.5) (2023-10-16)
+
+
+### Features
+
+* **native:** Support SafeString for Python & Jinja ([#7242](https://github.com/cube-js/cube/issues/7242)) ([c6069cd](https://github.com/cube-js/cube/commit/c6069cd343d75dbc24a59ae4b941460231409350))
+
+
+
+
+
 ## [0.34.4](https://github.com/cube-js/cube/compare/v0.34.3...v0.34.4) (2023-10-14)
 
 

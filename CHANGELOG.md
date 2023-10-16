@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.5](https://github.com/cube-js/cube/compare/v0.34.4...v0.34.5) (2023-10-16)
+
+
+### Features
+
+* **duckdb-driver:** upgrade duckdb driver to 0.9.1 ([#7174](https://github.com/cube-js/cube/issues/7174)) ([f9889d4](https://github.com/cube-js/cube/commit/f9889d41d5f74e254e17d1bcf35dab6d46da4df4))
+* **native:** Support SafeString for Python & Jinja ([#7242](https://github.com/cube-js/cube/issues/7242)) ([c6069cd](https://github.com/cube-js/cube/commit/c6069cd343d75dbc24a59ae4b941460231409350))
+
+
+
+
+
 ## [0.34.4](https://github.com/cube-js/cube/compare/v0.34.3...v0.34.4) (2023-10-14)
 
 
