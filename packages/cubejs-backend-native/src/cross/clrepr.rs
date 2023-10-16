@@ -56,7 +56,6 @@ impl std::fmt::Display for CLReprObject {
     }
 }
 
-#[allow(unused)]
 #[derive(Debug)]
 pub enum CLReprKind {
     String,
@@ -68,6 +67,7 @@ pub enum CLReprKind {
     Object,
     JsFunction,
     #[cfg(feature = "python")]
+    #[allow(unused)]
     PythonRef,
     Null,
 }
@@ -75,6 +75,7 @@ pub enum CLReprKind {
 #[derive(Debug, Clone)]
 pub enum StringType {
     Normal,
+    #[allow(unused)]
     Safe,
 }
 
