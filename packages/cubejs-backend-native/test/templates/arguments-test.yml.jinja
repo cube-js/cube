@@ -3,8 +3,6 @@
 {%- set my_map = {'field_a' : 5, 'field_b' : 15} -%}
 {%- set my_int_tuple = new_int_tuple() -%}
 {%- set my_str_tuple = new_str_tuple() -%}
-{%- set unsafe_string = '"unsafe string"' -%}
-{%- set safe_string = new_safe_string() -%}
 
 test:
   arg_sum_integers_int_int: {{ arg_sum_integers(1, 1) }}
@@ -17,5 +15,3 @@ test:
   arg_seq_2: {{ arg_seq(my_sequence_2) }}
   arg_sum_tuple: {{ arg_sum_tuple(my_int_tuple) }}
   arg_sum_map: {{ arg_sum_map(my_map) }}
-  unsafe_string: "{{ unsafe_string }}"
-  safe_string: "{{ safe_string }}"

@@ -185,9 +185,7 @@ exports[`Jinja (new api) render arguments-test.yml.jinja: arguments-test.yml.jin
   arg_seq_1: [1, 2, 3, 4, 5]
   arg_seq_2: [5, 4, 3, 2, 1]
   arg_sum_tuple: 3
-  arg_sum_map: 20
-  unsafe_string: \\"\\"unsafe string\\"\\"
-  safe_string: \\"\\"safe string\\"\\""
+  arg_sum_map: 20"
 `;
 
 exports[`Jinja (new api) render data-model.yml.jinja: data-model.yml.jinja 1`] = `
@@ -230,6 +228,12 @@ print:
   env_var:
     exist: test
     unknown_fallback: value"
+`;
+
+exports[`Jinja (new api) render python.yml.jinja: python.yml.jinja 1`] = `
+"test:
+  unsafe_string: \\"\\"unsafe string\\" <>\\"
+  safe_string: \\"\\"safe string\\" <>\\""
 `;
 
 exports[`Jinja (new api) render template_error.jinja: template_error.jinja 1`] = `

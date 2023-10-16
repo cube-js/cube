@@ -39,7 +39,7 @@ def new_str_tuple():
 
 @context_func
 def new_safe_string():
-  return SafeString('"safe string"')
+  return SafeString('"safe string" <>')
 
 @context_func
 def load_data_sync():

@@ -29,9 +29,7 @@ impl CLReprPython for CLRepr {
             return Ok(Self::Null);
         }
 
-        return Ok(if v.get_type().is_exact_instance_of::<PyString>() {
-            Self::String(v.to_string(), StringType::Normal)
-        } else if v.get_type().is_subclass_of::<PyString>()? {
+        return Ok(if v.get_type().is_subclass_of::<PyString>()? {
             let string_type = if v.hasattr("is_safe")? {
                 StringType::Safe
             } else {

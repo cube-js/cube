@@ -1,0 +1,6 @@
+{%- set unsafe_string = '"unsafe string" <>' -%}
+{%- set safe_string = new_safe_string() -%}
+
+test:
+  unsafe_string: "{{ unsafe_string }}"
+  safe_string: "{{ safe_string }}"

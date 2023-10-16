@@ -40,7 +40,7 @@ def new_str_tuple():
 
 @template.function
 def new_safe_string():
-  return SafeString('"safe string"')
+  return SafeString('"safe string" <>')
 
 @template.function
 def load_data_sync():
