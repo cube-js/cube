@@ -98,6 +98,7 @@ impl JinjaEngine {
                 Err(err)
             },
         );
+        engine.set_auto_escape_callback(|_name: &str| mj::AutoEscape::Json);
 
         Ok(Self { inner: engine })
     }
