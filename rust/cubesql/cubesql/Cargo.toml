@@ -9,6 +9,7 @@ documentation = "https://cube.dev/docs"
 homepage = "https://cube.dev"
 
 [dependencies]
+arc-swap = "1"
 datafusion = { git = 'https://github.com/cube-js/arrow-datafusion.git', rev = "be967a63967f23bdd946a45925d07af0a11dcc39", default-features = false, features = ["regex_expressions", "unicode_expressions"] }
 anyhow = "1.0"
 thiserror = "1.0"
