@@ -230,9 +230,9 @@ print:
     unknown_fallback: value"
 `;
 
-exports[`Jinja (new api) render python.yml.jinja: python.yml.jinja 1`] = `
+exports[`Jinja (new api) render python.yml: python.yml 1`] = `
 "test:
-  unsafe_string: \\"\\"unsafe string\\" <>\\"
+  unsafe_string: \\"\\"\\\\\\"unsafe string\\\\\\" <>\\"\\"
   safe_string: \\"\\"safe string\\" <>\\""
 `;
 

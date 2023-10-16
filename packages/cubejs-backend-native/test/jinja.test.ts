@@ -112,7 +112,7 @@ function createTestSuite(utilsFile: string) {
       loadTemplateFile(jinjaEngine, 'class-model.yml.jinja');
       loadTemplateFile(jinjaEngine, 'data-model.yml.jinja');
       loadTemplateFile(jinjaEngine, 'arguments-test.yml.jinja');
-      loadTemplateFile(jinjaEngine, 'python.yml.jinja');
+      loadTemplateFile(jinjaEngine, 'python.yml');
 
       for (let i = 1; i < 9; i++) {
         loadTemplateFile(jinjaEngine, `0${i}.yml.jinja`);
@@ -138,7 +138,7 @@ function createTestSuite(utilsFile: string) {
     // testTemplateWithPythonCtxBySnapshot(jinjaEngine, 'class-model.yml.jinja', {}, utilsFile);
     testTemplateWithPythonCtxBySnapshot(jinjaEngine, 'data-model.yml.jinja', {}, utilsFile);
     testTemplateWithPythonCtxBySnapshot(jinjaEngine, 'arguments-test.yml.jinja', {}, utilsFile);
-    testTemplateWithPythonCtxBySnapshot(jinjaEngine, 'python.yml.jinja', {}, utilsFile);
+    testTemplateWithPythonCtxBySnapshot(jinjaEngine, 'python.yml', {}, utilsFile);
 
     testLoadBrokenTemplateBySnapshot(jinjaEngine, 'template_error.jinja');
 
