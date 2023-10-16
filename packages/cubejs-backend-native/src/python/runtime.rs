@@ -1,4 +1,4 @@
-use crate::python::cross::CLRepr;
+use crate::cross::{CLRepr, CLReprPython};
 use crate::tokio_runtime_node;
 use cubesql::CubeError;
 use log::{error, trace};
@@ -80,7 +80,10 @@ impl PyRuntime {
                 args,
                 callback: PyScheduledCallback::Channel(rx),
             })
-            .await?;
+            .await
+            .map_err(|err| {
+                CubeError::internal(format!("Unable to schedule python function call: {}", err))
+            })?;
 
         tx.await?
     }
@@ -193,7 +196,11 @@ impl PyRuntime {
     pub fn new(js_channel: neon::event::Channel) -> Self {
         let (sender, mut receiver) = tokio::sync::mpsc::channel::<PyScheduledFun>(1024);
 
+        trace!("New Python runtime");
+
         std::thread::spawn(|| {
+            trace!("Initializing executor in a separate thread");
+
             std::thread::spawn(|| {
                 pyo3_asyncio::tokio::get_runtime()
                     .block_on(pyo3_asyncio::tokio::re_exports::pending::<()>())
@@ -203,17 +210,18 @@ impl PyRuntime {
                 pyo3_asyncio::tokio::run(py, async move {
                     loop {
                         if let Some(task) = receiver.recv().await {
-                            trace!("[py_runtime] task");
+                            trace!("New task");
 
                             if let Err(err) = Self::process_task(task, &js_channel) {
-                                error!("[py_runtime] Error while processing task: {:?}", err)
+                                error!("Error while processing python task: {:?}", err)
                             };
                         }
                     }
                 })
             });
-            if let Err(err) = res {
-                error!("Critical error while processing python calls: {}", err)
+            match res {
+                Ok(_) => trace!("Python runtime loop was closed without error"),
+                Err(err) => error!("Critical error while processing python call: {}", err),
             }
         });
 

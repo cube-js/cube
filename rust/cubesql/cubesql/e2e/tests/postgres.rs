@@ -1083,6 +1083,16 @@ impl AsyncTestSuite for PostgresIntegrationTestSuite {
         )
         .await?;
 
+        self.test_simple_query(r#"SET ROLE "cube""#.to_string(), |messages| {
+            assert_eq!(messages.len(), 1);
+
+            // SET
+            if let SimpleQueryMessage::Row(_) = messages[0] {
+                panic!("Must be CommandComplete command, (SET is used)")
+            }
+        })
+        .await?;
+
         // Tableau Desktop
         self.test_simple_query(
             r#"SET DateStyle = 'ISO';SET extra_float_digits = 2;show transaction_isolation"#

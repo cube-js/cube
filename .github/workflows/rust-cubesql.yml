@@ -71,7 +71,7 @@ jobs:
           key: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu-16
           shared-key: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu-16
       - name: Install tarpaulin@0.20.1
-        uses: baptiste0928/cargo-install@v1
+        uses: baptiste0928/cargo-install@v2
         with:
           crate: cargo-tarpaulin
           version: "0.20.1"
@@ -194,6 +194,11 @@ jobs:
           CARGO_BUILD_TARGET: ${{ matrix.target }}
         working-directory: ./packages/cubejs-backend-native
         run: yarn run native:build-debug
+      - name: Setup cross compilation
+        if: (matrix.target == 'aarch64-unknown-linux-gnu')
+        uses: allenevans/set-env@v2.0.0
+        with:
+          PYO3_CROSS_PYTHON_VERSION: ${{ matrix.python-version }}
       - name: Build native (with Python)
         if: (matrix.python-version != 'fallback')
         env:

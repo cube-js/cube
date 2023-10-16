@@ -1,5 +1,5 @@
-use crate::python::cross::{CLRepr, CLReprObject};
-use crate::python::template::mj_value::to_minijinja_value;
+use crate::cross::{CLRepr, CLReprObject};
+use crate::template::mj_value::to_minijinja_value;
 use crate::utils::bind_method;
 use log::trace;
 use minijinja as mj;

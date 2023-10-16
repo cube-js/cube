@@ -1287,6 +1287,35 @@ impl RocksStoreDetails for RocksMetaStoreDetails {
             .map_err(|err| CubeError::internal(format!("DB::open error for metastore: {}", err)))
     }
 
+    fn open_readonly_db(&self, path: &Path, config: &Arc<dyn ConfigObj>) -> Result<DB, CubeError> {
+        let rocksdb_config = config.metastore_rocksdb_config();
+        let mut opts = Options::default();
+        opts.set_prefix_extractor(rocksdb::SliceTransform::create_fixed_prefix(13));
+
+        let block_opts = {
+            let mut block_opts = BlockBasedOptions::default();
+            // https://github.com/facebook/rocksdb/blob/v7.9.2/include/rocksdb/table.h#L524
+            block_opts.set_format_version(5);
+            block_opts.set_checksum_type(rocksdb_config.checksum_type.as_rocksdb_enum());
+
+            let cache = Cache::new_lru_cache(rocksdb_config.cache_capacity)?;
+            block_opts.set_block_cache(&cache);
+
+            block_opts
+        };
+
+        opts.set_block_based_table_factory(&block_opts);
+        opts.set_compression_type(rocksdb_config.compression_type);
+        opts.set_bottommost_compression_type(rocksdb_config.bottommost_compression_type);
+
+        DB::open_for_read_only(&opts, path, false).map_err(|err| {
+            CubeError::internal(format!(
+                "DB::open_for_read_only error for metastore: {}",
+                err
+            ))
+        })
+    }
+
     fn migrate(&self, table_ref: DbTableRef) -> Result<(), CubeError> {
         SchemaRocksTable::new(table_ref.clone()).migrate()?;
         TableRocksTable::new(table_ref.clone()).migrate()?;

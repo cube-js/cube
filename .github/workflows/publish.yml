@@ -132,6 +132,11 @@ jobs:
         env:
           CARGO_BUILD_TARGET: ${{ matrix.target }}
         run: cd packages/cubejs-backend-native && npm run native:build-release
+      - name: Setup cross compilation
+        if: (matrix.target == 'aarch64-unknown-linux-gnu')
+        uses: allenevans/set-env@v2.0.0
+        with:
+          PYO3_CROSS_PYTHON_VERSION: ${{ matrix.python-version }}
       - name: Build native (with Python)
         if: (matrix.python-version != 'fallback')
         env:
@@ -506,7 +511,7 @@ jobs:
             IMAGE_VERSION=${{ steps.prep.outputs.version }}
 
   docker-debian-jdk:
-    needs: [npm, cubestore, native_linux]
+    needs: [npm, cubestore_linux, native_linux]
     name: Debian with jdk docker image
     runs-on: ubuntu-20.04
     timeout-minutes: 30

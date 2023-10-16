@@ -432,7 +432,7 @@ jobs:
   integration-smoke:
     needs: [ latest-tag-sha ]
     runs-on: ubuntu-20.04
-    timeout-minutes: 60
+    timeout-minutes: 90
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)
 
     strategy:
@@ -575,6 +575,22 @@ jobs:
             tag: tmp-dev
       fail-fast: false
     steps:
+      - name: Maximize build space (disk space limitations)
+        run: |
+          echo "Before"
+          df -h
+          sudo apt-get remove -y 'php.*'
+          sudo apt-get remove -y '^mongodb-.*'
+          sudo apt-get remove -y '^mysql-.*'
+          sudo apt-get autoremove -y
+          sudo apt-get clean
+
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          echo "After"
+          df -h
       - name: Checkout
         uses: actions/checkout@v4
       - name: Set up QEMU

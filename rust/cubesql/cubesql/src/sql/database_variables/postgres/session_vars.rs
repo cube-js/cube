@@ -96,5 +96,14 @@ pub fn defaults() -> DatabaseVariables {
         ),
     );
 
+    variables.insert(
+        "role".to_string(),
+        DatabaseVariable::system(
+            "role".to_string(),
+            ScalarValue::Utf8(Some("none".to_string())),
+            None,
+        ),
+    );
+
     variables
 }

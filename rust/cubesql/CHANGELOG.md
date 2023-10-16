@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.1](https://github.com/cube-js/cube.js/compare/v0.34.0...v0.34.1) (2023-10-09)
+
+
+### Bug Fixes
+
+* **cubesql:** Support unaliased columns for SQL push down ([#7199](https://github.com/cube-js/cube.js/issues/7199)) ([e92e15c](https://github.com/cube-js/cube.js/commit/e92e15c81205f9a05f3df88513d4b934fa039886))
+
+
+### Features
+
+* **cubesql:** Support `SET ROLE name` ([d02077e](https://github.com/cube-js/cube.js/commit/d02077ed44f8641850bf74f200c91cb6864fddbe))
+
+
+
+
+
 # [0.34.0](https://github.com/cube-js/cube.js/compare/v0.33.65...v0.34.0) (2023-10-03)
 
 **Note:** Version bump only for package @cubejs-backend/cubesql
