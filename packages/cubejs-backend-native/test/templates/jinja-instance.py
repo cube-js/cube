@@ -1,4 +1,4 @@
-from cube import TemplateContext
+from cube import (TemplateContext, SafeString)
 
 template = TemplateContext()
 
@@ -37,6 +37,10 @@ def new_int_tuple():
 @template.function
 def new_str_tuple():
   return ("1", "2")
+
+@template.function
+def new_safe_string():
+  return SafeString('"safe string" <>')
 
 @template.function
 def load_data_sync():

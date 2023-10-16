@@ -57,8 +57,8 @@ function testLoadBrokenTemplateBySnapshot(engine: JinjaEngine, templateName: str
 }
 
 suite('Python model', () => {
-  it('load utils.py', async () => {
-    const pythonModule = await loadPythonCtxFromUtils('utils.py');
+  it('load jinja-instance.py', async () => {
+    const pythonModule = await loadPythonCtxFromUtils('jinja-instance.py');
 
     expect(pythonModule).toEqual({
       load_data: expect.any(Object),
@@ -72,6 +72,7 @@ suite('Python model', () => {
       arg_seq: expect.any(Object),
       new_int_tuple: expect.any(Object),
       new_str_tuple: expect.any(Object),
+      new_safe_string: expect.any(Object),
       load_class_model: expect.any(Object),
     });
   });
@@ -93,6 +94,7 @@ darwinSuite('Scope Python model', () => {
       arg_seq: expect.any(Object),
       new_int_tuple: expect.any(Object),
       new_str_tuple: expect.any(Object),
+      new_safe_string: expect.any(Object),
       load_class_model: expect.any(Object),
     });
   });
@@ -110,6 +112,7 @@ function createTestSuite(utilsFile: string) {
       loadTemplateFile(jinjaEngine, 'class-model.yml.jinja');
       loadTemplateFile(jinjaEngine, 'data-model.yml.jinja');
       loadTemplateFile(jinjaEngine, 'arguments-test.yml.jinja');
+      loadTemplateFile(jinjaEngine, 'python.yml');
 
       for (let i = 1; i < 9; i++) {
         loadTemplateFile(jinjaEngine, `0${i}.yml.jinja`);
@@ -135,6 +138,7 @@ function createTestSuite(utilsFile: string) {
     // testTemplateWithPythonCtxBySnapshot(jinjaEngine, 'class-model.yml.jinja', {}, utilsFile);
     testTemplateWithPythonCtxBySnapshot(jinjaEngine, 'data-model.yml.jinja', {}, utilsFile);
     testTemplateWithPythonCtxBySnapshot(jinjaEngine, 'arguments-test.yml.jinja', {}, utilsFile);
+    testTemplateWithPythonCtxBySnapshot(jinjaEngine, 'python.yml', {}, utilsFile);
 
     testLoadBrokenTemplateBySnapshot(jinjaEngine, 'template_error.jinja');
 
@@ -144,5 +148,4 @@ function createTestSuite(utilsFile: string) {
   };
 }
 
-suite('Jinja (old api)', createTestSuite('utils.py'));
 suite('Jinja (new api)', createTestSuite('jinja-instance.py'));

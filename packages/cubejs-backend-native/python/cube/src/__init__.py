@@ -226,7 +226,14 @@ def context_func(func):
     func.cube_context_func = True
     return func
 
+class SafeString(str):
+    is_safe: bool
+
+    def __init__(self, v: str):
+        self.is_safe = True
+
 __all__ = [
     'context_func',
-    'TemplateContext'
+    'TemplateContext',
+    'SafeString',
 ]
