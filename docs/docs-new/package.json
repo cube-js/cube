@@ -15,7 +15,7 @@
     "update-links": "ts-node --esm scripts/update-links.mjs"
   },
   "dependencies": {
-    "@cube-dev/marketing-ui": "0.0.1-beta.16",
+    "@cube-dev/marketing-ui": "0.0.1-beta.17",
     "@cubejs-client/core": "^0.32.17",
     "@radix-ui/react-dialog": "^1.0.4",
     "@radix-ui/react-navigation-menu": "^1.1.3",
