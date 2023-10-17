@@ -130,10 +130,10 @@
   dependencies:
     "@jridgewell/trace-mapping" "0.3.9"
 
-"@cube-dev/marketing-ui@0.0.1-beta.16":
-  version "0.0.1-beta.16"
-  resolved "https://registry.yarnpkg.com/@cube-dev/marketing-ui/-/marketing-ui-0.0.1-beta.16.tgz#3b33edc17fe8ed37e07545a0ec04aa92bdce440d"
-  integrity sha512-aYLC2VXbsNk07c6lrhr4X7Y1Bc65anzicPF9U704n58VdxEqPRy15idJ49PsQLlpjxIoltD+hlAmbqZRaeV9BQ==
+"@cube-dev/marketing-ui@0.0.1-beta.17":
+  version "0.0.1-beta.17"
+  resolved "https://registry.yarnpkg.com/@cube-dev/marketing-ui/-/marketing-ui-0.0.1-beta.17.tgz#c044375dd51b3fa4d6df19cb607814d4dc610bcd"
+  integrity sha512-wE5pqO6yKyP5axmQqQo88RaxggnJIxkMzcjFSefOCbbIKtwC/SSaBe3mLYXOP5HJ8Bb34wNEV1m6rxkp0d93Lg==
   dependencies:
     algoliasearch "^4.17.0"
     classnames "^2.3.2"
