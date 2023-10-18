@@ -50,19 +50,23 @@ cubes:
       - name: brand_name
         sql: brand_name
         type: string
+
+
 ```
 
 </CodeTabs>
 
 ### case
 
-The `case` statement is used to define if/then/else conditions to display data.
-It contains two parameters: `when` and `then`. The first `when` statement
-declares a condition and result if the rule returns a true value. The second
-`else` statement declares results for options when rules return a false value.
+The `case` statement is used to define dimensions based on SQL conditions.
 
-The following static `label` example will create a `size` dimension with values
-`xl` and `xxl`:
+The `when` parameters declares a series of `sql` conditions and `labels`
+that are returned if the condition is truthy. The `else` parameter declares
+the default `label` that would be returned if there's no truthy `sql`
+condition.
+
+The following example will create a `size` dimension with values
+`xl`, `xxl`, and `Unknown`:
 
 <CodeTabs>
 
@@ -75,16 +79,17 @@ cube(`products`, {
       type: `string`,
       case: {
         when: [
-          { sql: `${CUBE}.meta_value = 'xl-en'`, label: `xl` },
-          { sql: `${CUBE}.meta_value = 'xl'`, label: `xl` },
-          { sql: `${CUBE}.meta_value = 'xxl-en'`, label: `xxl` },
-          { sql: `${CUBE}.meta_value = 'xxl'`, label: `xxl` },
+          { sql: `${CUBE}.size_value = 'xl-en'`, label: `xl` },
+          { sql: `${CUBE}.size_value = 'xl'`, label: `xl` },
+          { sql: `${CUBE}.size_value = 'xxl-en'`, label: `xxl` },
+          { sql: `${CUBE}.size_value = 'xxl'`, label: `xxl` },
         ],
         else: { label: `Unknown` },
       },
     },
   },
 });
+
 ```
 
 ```yaml
@@ -97,13 +102,13 @@ cubes:
         type: string
         case:
           when:
-            - sql: "{CUBE}.meta_value = 'xl-en'"
+            - sql: "{CUBE}.size_value = 'xl-en'"
               label: xl
-            - sql: "{CUBE}.meta_value = 'xl'"
+            - sql: "{CUBE}.size_value = 'xl'"
               label: xl
-            - sql: "{CUBE}.meta_value = 'xxl-en'"
+            - sql: "{CUBE}.size_value = 'xxl-en'"
               label: xxl
-            - sql: "{CUBE}.meta_value = 'xxl'"
+            - sql: "{CUBE}.size_value = 'xxl'"
               label: xxl
           else:
             label: Unknown
