@@ -112,6 +112,34 @@ cubes:
       FROM app_data.payments
 ```
 
+### Escaping unsafe strings
+
+[Auto-escaping][jinja-docs-autoescaping] of unsafe string values in Jinja
+templates is enabled by default. It means that any strings coming from Python
+might get wrapped in quotes, potentially breaking YAML syntax.
+
+You can work around that by using the [`safe` Jinja
+filter][jinja-docs-filters-safe] with such string values:
+
+```yaml
+cubes:
+  - name: my_cube
+    description: {{ get_unsafe_string() | safe }}
+```
+
+Alternatively, you can wrap unsafe strings into instances of the following
+class in your Python code, effectively marking them as safe. This is
+particularly useful for library code, e.g., similar to the
+[`cube_dbt`][ref-cube-dbt] package.
+
+```python
+class SafeString(str):
+    is_safe: bool
+
+    def __init__(self, v: str):
+        self.is_safe = True
+```
+
 ## Python
 
 You can declare and invoke Python functions from within a Jinja template. This
@@ -201,3 +229,6 @@ cubes:
 [jinja-docs-for-loop]: https://jinja.palletsprojects.com/en/3.1.x/templates/#for
 [jinja-docs-macros]:
   https://jinja.palletsprojects.com/en/3.1.x/templates/#macros
+[jinja-docs-autoescaping]: https://jinja.palletsprojects.com/en/3.1.x/api/#autoescaping
+[jinja-docs-filters-safe]: https://jinja.palletsprojects.com/en/3.1.x/templates/#jinja-filters.safe
+[ref-cube-dbt]: /reference/python/cube_dbt
