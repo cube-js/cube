@@ -15,7 +15,7 @@ use crate::config::injection::{DIService, Injector};
 use crate::config::processing_loop::ProcessingLoop;
 use crate::http::HttpServer;
 use crate::import::limits::ConcurrencyLimits;
-use crate::import::{ImportService, ImportServiceImpl};
+use crate::import::{ImportService, ImportServiceImpl, LocationsValidator, LocationsValidatorImpl};
 use crate::metastore::{
     BaseRocksStoreFs, MetaStore, MetaStoreRpcClient, RocksMetaStore, RocksStoreConfig,
 };
@@ -1961,8 +1961,15 @@ impl Config {
             .await;
 
         self.injector
+            .register_typed::<dyn LocationsValidator, _, _, _>(async move |_| {
+                LocationsValidatorImpl::new()
+            })
+            .await;
+
+        self.injector
             .register_typed::<dyn ImportService, _, _, _>(async move |i| {
                 ImportServiceImpl::new(
+                    i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
