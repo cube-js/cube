@@ -216,17 +216,23 @@ using Cube Cloud.
 
 ## Storage
 
-<WarningBox>
+Cube Store cluster uses both persistent and scratch storage.
+
+### Persistent storage
+
+Cube Store makes use of a separate storage layer for storing metadata as well as
+for persisting pre-aggregations as Parquet files.
+
+Cube Store [can be configured][ref-config-env] to use either AWS S3 or
+Google Cloud Storage (GCS) as persistent storage. If desired, local path on
+the server can also be used in case all Cube Store cluster nodes are
+co-located on a single machine.
+
+<InfoBox>
 
 Cube Store can only use one type of remote storage at runtime.
 
-</WarningBox>
-
-Cube Store makes use of a separate storage layer for storing metadata as well as
-for persisting pre-aggregations as Parquet files. Cube Store [can be configured
-to use either AWS S3 or Google Cloud Storage][ref-config-env]. If desired, local
-path on the server can also be used in case all Cube Store cluster nodes are
-co-located on a single machine.
+</InfoBox>
 
 <WarningBox>
 
@@ -242,6 +248,7 @@ A simplified example using AWS S3 might look like:
 
 ```yaml
 version: "2.2"
+
 services:
   cubestore_router:
     image: cubejs/cubestore:latest
@@ -253,6 +260,7 @@ services:
       - CUBESTORE_S3_REGION=<BUCKET_REGION_IN_S3>
       - CUBESTORE_AWS_ACCESS_KEY_ID=<AWS_ACCESS_KEY_ID>
       - CUBESTORE_AWS_SECRET_ACCESS_KEY=<AWS_SECRET_ACCESS_KEY>
+
   cubestore_worker_1:
     image: cubejs/cubestore:latest
     environment:
@@ -268,12 +276,16 @@ services:
       - cubestore_router
 ```
 
-### Local Storage
+Note that you can’t use the same bucket as an export bucket and persistent
+storage for Cube Store. It's recommended to use two separate buckets. 
 
-Separately from remote storage, Cube Store requires local scratch space to warm
-up partitions by downloading Parquet files before querying them. By default,
-this directory should be mounted to `.cubestore/data` dir inside contained and
-can be configured by [CUBESTORE_DATA_DIR][ref-config-env] environment variable.
+### Scratch storage
+
+Separately from persistent storage, Cube Store requires local scratch space
+to warm up partitions by downloading Parquet files before querying them.
+
+By default, this folder should be mounted to `.cubestore/data` inside the
+container and can be configured by `CUBESTORE_DATA_DIR` environment variable.
 It is advised to use local SSDs for this scratch space to maximize querying
 performance.
 
@@ -292,6 +304,16 @@ defined by `CUBESTORE_AWS_CREDS_REFRESH_EVERY_MINS`, which is set to `180` by
 default.
 
 </WarningBox>
+
+### Garbage collection
+
+Cleanup isn’t done in export buckets; however, it's done in the persistent
+storage of Cube Store. The default time-to-live (TTL) for orphaned
+pre-aggregation tables is one day.
+
+Refresh worker should be able to finish pre-aggregation refresh before
+garbage collection starts. It means that all pre-aggregation partitions
+should be built before any tables are removed.
 
 ## Security
 
