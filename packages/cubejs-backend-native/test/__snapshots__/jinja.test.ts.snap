@@ -6,9 +6,9 @@ exports[`Jinja (new api) render 01.yml.jinja: 01.yml.jinja 1`] = `
     sql: >
       SELECT
         order_id,
-        SUM(CASE WHEN payment_method = '\\"TRANSFER\\"' THEN amount END) AS bank_transfer_amount,
-        SUM(CASE WHEN payment_method = '\\"CREDIT\\"' THEN amount END) AS credit_card_amount,
-        SUM(CASE WHEN payment_method = '\\"GIFT\\"' THEN amount END) AS gift_card_amount,
+        SUM(CASE WHEN payment_method = 'TRANSFER' THEN amount END) AS bank_transfer_amount,
+        SUM(CASE WHEN payment_method = 'CREDIT' THEN amount END) AS credit_card_amount,
+        SUM(CASE WHEN payment_method = 'GIFT' THEN amount END) AS gift_card_amount,
         SUM(amount) AS total_amount
       FROM app_data.payments
       GROUP BY 1
@@ -17,9 +17,9 @@ exports[`Jinja (new api) render 01.yml.jinja: 01.yml.jinja 1`] = `
     sql: >
       SELECT
         order_id,
-        SUM(CASE WHEN payment_method = '\\"TRANSFER\\"' THEN amount END) AS bank_transfer_amount,
-        SUM(CASE WHEN payment_method = '\\"CREDIT\\"' THEN amount END) AS credit_card_amount,
-        SUM(CASE WHEN payment_method = '\\"GIFT\\"' THEN amount END) AS gift_card_amount
+        SUM(CASE WHEN payment_method = 'TRANSFER' THEN amount END) AS bank_transfer_amount,
+        SUM(CASE WHEN payment_method = 'CREDIT' THEN amount END) AS credit_card_amount,
+        SUM(CASE WHEN payment_method = 'GIFT' THEN amount END) AS gift_card_amount
       FROM app_data.payments
       GROUP BY 1"
 `;
