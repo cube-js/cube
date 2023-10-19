@@ -80,7 +80,7 @@ cubes:
         sql: timestamp
         type: time
   
-  - name: cube_04_\\"product_purchases\\"
+  - name: cube_04_product_purchases
     extends: \\"base_events\\"
     sql_table: public.events
 
@@ -89,7 +89,7 @@ cubes:
         sql: timestamp
         type: time
   
-  - name: cube_04_\\"page_views\\"
+  - name: cube_04_page_views
     extends: \\"base_events\\"
     sql_table: public.events
 

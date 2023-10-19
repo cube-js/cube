@@ -25,7 +25,7 @@ cubes:
   {% endfor %}
 
   {%- for table in tables[1:] %}
-  - name: cube_04_{{ table }}
+  - name: cube_04_{{ table | safe }}
     extends: {{ tables[0] }}
     sql_table: public.events
 
