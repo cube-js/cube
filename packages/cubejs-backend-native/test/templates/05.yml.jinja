@@ -16,6 +16,6 @@ cubes:
         type: count_distinct
         sql: user_id
         rolling_window:
-          trailing: {{ days }} day
+          trailing: {{ days | safe }} day
           offset: start
       {% endfor %}

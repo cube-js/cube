@@ -11,9 +11,9 @@ cubes:
     sql: >
       SELECT
       {%- for prop in nested_properties %}
-        {{ prop }}_prop.value AS {{ prop }}
+        {{ prop | safe }}_prop.value AS {{ prop | safe }}
       {%- endfor %}
       FROM public.events
       {%- for prop in nested_properties %}
-      LEFT JOIN UNNEST(properties) AS {{ prop }}_prop ON {{ prop }}_prop.key = '{{ prop }}'
+      LEFT JOIN UNNEST(properties) AS {{ prop | safe }}_prop ON {{ prop | safe }}_prop.key = '{{ prop | safe }}'
       {%- endfor %}
