@@ -14,7 +14,7 @@ cubes:
       FROM public.events
       WHERE
       {%- for inner_table in tables %}
-        {FILTER_PARAMS.cube_04_{{ inner_table }}.timestamp.filter('timestamp')}
+        {FILTER_PARAMS.cube_04_{{ inner_table | safe }}.timestamp.filter('timestamp')}
         {%- if not loop.last %} AND {% endif %}
       {%- endfor %}
 

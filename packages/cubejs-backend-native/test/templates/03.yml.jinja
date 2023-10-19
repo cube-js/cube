@@ -6,8 +6,8 @@ cubes:
       {%- for country in countries %}
       SELECT 
         *,
-        '{{ country }}' as country
-      FROM {{ country }}_orders
+        '{{ country | safe }}' as country
+      FROM {{ country | safe }}_orders
       {% if not loop.last %}
       UNION ALL
       {% endif %}

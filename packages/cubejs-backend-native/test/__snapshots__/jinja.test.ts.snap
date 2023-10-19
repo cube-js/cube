@@ -6,9 +6,9 @@ exports[`Jinja (new api) render 01.yml.jinja: 01.yml.jinja 1`] = `
     sql: >
       SELECT
         order_id,
-        SUM(CASE WHEN payment_method = '\\"bank_transfer\\"' THEN amount END) AS \\"bank_transfer\\"_amount,
-        SUM(CASE WHEN payment_method = '\\"credit_card\\"' THEN amount END) AS \\"credit_card\\"_amount,
-        SUM(CASE WHEN payment_method = '\\"gift_card\\"' THEN amount END) AS \\"gift_card\\"_amount,
+        SUM(CASE WHEN payment_method = '\\"TRANSFER\\"' THEN amount END) AS bank_transfer_amount,
+        SUM(CASE WHEN payment_method = '\\"CREDIT\\"' THEN amount END) AS credit_card_amount,
+        SUM(CASE WHEN payment_method = '\\"GIFT\\"' THEN amount END) AS gift_card_amount,
         SUM(amount) AS total_amount
       FROM app_data.payments
       GROUP BY 1
@@ -17,9 +17,9 @@ exports[`Jinja (new api) render 01.yml.jinja: 01.yml.jinja 1`] = `
     sql: >
       SELECT
         order_id,
-        SUM(CASE WHEN payment_method = '\\"bank_transfer\\"' THEN amount END) AS \\"bank_transfer\\"_amount,
-        SUM(CASE WHEN payment_method = '\\"credit_card\\"' THEN amount END) AS \\"credit_card\\"_amount,
-        SUM(CASE WHEN payment_method = '\\"gift_card\\"' THEN amount END) AS \\"gift_card\\"_amount
+        SUM(CASE WHEN payment_method = '\\"TRANSFER\\"' THEN amount END) AS bank_transfer_amount,
+        SUM(CASE WHEN payment_method = '\\"CREDIT\\"' THEN amount END) AS credit_card_amount,
+        SUM(CASE WHEN payment_method = '\\"GIFT\\"' THEN amount END) AS gift_card_amount
       FROM app_data.payments
       GROUP BY 1"
 `;
@@ -29,17 +29,17 @@ exports[`Jinja (new api) render 02.yml.jinja: 02.yml.jinja 1`] = `
   - name: cube_02
     sql: >
       SELECT
-        \\"referrer\\"_prop.value AS \\"referrer\\"
-        \\"href\\"_prop.value AS \\"href\\"
-        \\"host\\"_prop.value AS \\"host\\"
-        \\"pathname\\"_prop.value AS \\"pathname\\"
-        \\"search\\"_prop.value AS \\"search\\"
+        referrer_prop.value AS referrer
+        href_prop.value AS href
+        host_prop.value AS host
+        pathname_prop.value AS pathname
+        search_prop.value AS search
       FROM public.events
-      LEFT JOIN UNNEST(properties) AS \\"referrer\\"_prop ON \\"referrer\\"_prop.key = '\\"referrer\\"'
-      LEFT JOIN UNNEST(properties) AS \\"href\\"_prop ON \\"href\\"_prop.key = '\\"href\\"'
-      LEFT JOIN UNNEST(properties) AS \\"host\\"_prop ON \\"host\\"_prop.key = '\\"host\\"'
-      LEFT JOIN UNNEST(properties) AS \\"pathname\\"_prop ON \\"pathname\\"_prop.key = '\\"pathname\\"'
-      LEFT JOIN UNNEST(properties) AS \\"search\\"_prop ON \\"search\\"_prop.key = '\\"search\\"'"
+      LEFT JOIN UNNEST(properties) AS referrer_prop ON referrer_prop.key = 'referrer'
+      LEFT JOIN UNNEST(properties) AS href_prop ON href_prop.key = 'href'
+      LEFT JOIN UNNEST(properties) AS host_prop ON host_prop.key = 'host'
+      LEFT JOIN UNNEST(properties) AS pathname_prop ON pathname_prop.key = 'pathname'
+      LEFT JOIN UNNEST(properties) AS search_prop ON search_prop.key = 'search'"
 `;
 
 exports[`Jinja (new api) render 03.yml.jinja: 03.yml.jinja 1`] = `
@@ -50,15 +50,15 @@ cubes:
     sql: >
       SELECT 
         *,
-        '\\"au\\"' as country
-      FROM \\"au\\"_orders
+        'au' as country
+      FROM au_orders
       
       UNION ALL
       
       SELECT 
         *,
-        '\\"us\\"' as country
-      FROM \\"us\\"_orders
+        'us' as country
+      FROM us_orders
       "
 `;
 
@@ -71,9 +71,9 @@ cubes:
       SELECT *
       FROM public.events
       WHERE
-        {FILTER_PARAMS.cube_04_\\"base_events\\".timestamp.filter('timestamp')} AND 
-        {FILTER_PARAMS.cube_04_\\"product_purchases\\".timestamp.filter('timestamp')} AND 
-        {FILTER_PARAMS.cube_04_\\"page_views\\".timestamp.filter('timestamp')}
+        {FILTER_PARAMS.cube_04_base_events.timestamp.filter('timestamp')} AND 
+        {FILTER_PARAMS.cube_04_product_purchases.timestamp.filter('timestamp')} AND 
+        {FILTER_PARAMS.cube_04_page_views.timestamp.filter('timestamp')}
 
     dimensions:
       - name: timestamp
