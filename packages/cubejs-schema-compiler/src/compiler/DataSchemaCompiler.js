@@ -68,7 +68,10 @@ export class DataSchemaCompiler {
 
       return {
         fileName: file.fileName,
-        exports
+        exports: {
+          ...exports.variables,
+          ...exports.functions,
+        }
       };
     }));
 

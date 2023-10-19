@@ -38,7 +38,11 @@ function testTemplateBySnapshot(engine: JinjaEngine, templateName: string, ctx: 
 
 function testTemplateWithPythonCtxBySnapshot(engine: JinjaEngine, templateName: string, ctx: unknown, utilsFile: string) {
   test(`render ${templateName}`, async () => {
-    const actual = engine.renderTemplate(templateName, ctx, await loadPythonCtxFromUtils(utilsFile));
+    const pyCtx = await loadPythonCtxFromUtils(utilsFile);
+    const actual = engine.renderTemplate(templateName, ctx, {
+      ...pyCtx.variables,
+      ...pyCtx.functions,
+    });
 
     expect(actual).toMatchSnapshot(templateName);
   });
@@ -60,7 +64,7 @@ suite('Python model', () => {
   it('load jinja-instance.py', async () => {
     const pythonModule = await loadPythonCtxFromUtils('jinja-instance.py');
 
-    expect(pythonModule).toEqual({
+    expect(pythonModule.functions).toEqual({
       load_data: expect.any(Object),
       load_data_sync: expect.any(Object),
       arg_bool: expect.any(Object),
@@ -75,6 +79,13 @@ suite('Python model', () => {
       new_safe_string: expect.any(Object),
       load_class_model: expect.any(Object),
     });
+
+    expect(pythonModule.variables).toEqual({
+      var1: 'test string',
+      var2: true,
+      var3: undefined,
+      var4: expect.any(Object),
+    });
   });
 });
 
@@ -82,7 +93,7 @@ darwinSuite('Scope Python model', () => {
   it('load scoped-utils.py', async () => {
     const pythonModule = await loadPythonCtxFromUtils('scoped-utils.py');
 
-    expect(pythonModule).toEqual({
+    expect(pythonModule.functions).toEqual({
       load_data: expect.any(Object),
       load_data_sync: expect.any(Object),
       arg_bool: expect.any(Object),
@@ -113,6 +124,7 @@ function createTestSuite(utilsFile: string) {
       loadTemplateFile(jinjaEngine, 'data-model.yml.jinja');
       loadTemplateFile(jinjaEngine, 'arguments-test.yml.jinja');
       loadTemplateFile(jinjaEngine, 'python.yml');
+      loadTemplateFile(jinjaEngine, 'variables.yml.jinja');
 
       for (let i = 1; i < 9; i++) {
         loadTemplateFile(jinjaEngine, `0${i}.yml.jinja`);
@@ -139,6 +151,7 @@ function createTestSuite(utilsFile: string) {
     testTemplateWithPythonCtxBySnapshot(jinjaEngine, 'data-model.yml.jinja', {}, utilsFile);
     testTemplateWithPythonCtxBySnapshot(jinjaEngine, 'arguments-test.yml.jinja', {}, utilsFile);
     testTemplateWithPythonCtxBySnapshot(jinjaEngine, 'python.yml', {}, utilsFile);
+    testTemplateWithPythonCtxBySnapshot(jinjaEngine, 'variables.yml.jinja', {}, utilsFile);
 
     testLoadBrokenTemplateBySnapshot(jinjaEngine, 'template_error.jinja');
 

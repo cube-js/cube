@@ -250,3 +250,11 @@ exports[`Jinja (new api) render template_error.jinja: template_error.jinja 1`] =
 
 -------------------------------------------------------------------------------]
 `;
+
+exports[`Jinja (new api) render variables.yml.jinja: variables.yml.jinja 1`] = `
+"variables:
+  var1: \\"test string\\"
+  var2: true
+  var3: null
+  var4: {\\"key1\\":\\"value1\\",\\"key2\\":true}"
+`;

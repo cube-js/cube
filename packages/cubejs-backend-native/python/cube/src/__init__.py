@@ -164,15 +164,23 @@ class TemplateException(Exception):
 
 class TemplateContext:
     functions: dict[str, Callable]
+    variables: dict[str, Any]
 
     def __init__(self):
         self.functions = {}
+        self.variables = {}
 
     def add_function(self, name, func):
         if not callable(func):
             raise TemplateException("function registration must be used with functions, actual: '%s'" % type(func).__name__)
 
         self.functions[name] = func
+
+    def add_variable(self, name, val):
+        if name in self.functions:
+            raise TemplateException("unable to register variable: name '%s' is already in use for function" % name)
+
+        self.variables[name] = val
 
     def add_filter(self, name, func):
         if not callable(func):
@@ -193,9 +201,6 @@ class TemplateContext:
 
         self.add_filter(func.__name__, func)
         return func
-
-    def variable(self, func):
-        raise TemplateException("variable registration is not supported")
 
 class TemplateFunctionRef:
     context: TemplateContext

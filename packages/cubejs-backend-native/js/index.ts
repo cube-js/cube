@@ -364,12 +364,13 @@ export const pythonLoadConfig = async (content: string, options: { fileName: str
 export type PythonCtx = {
     __type: 'PythonCtx'
 } & {
-    [key: string]: Function
+  functions: Record<string, Function>
+  variables: Record<string, Function>
 };
 
 export interface JinjaEngine {
     loadTemplate(templateName: string, templateContent: string): void;
-    renderTemplate(templateName: string, context: unknown, pythonContext: PythonCtx | null): string;
+    renderTemplate(templateName: string, context: unknown, pythonContext: Record<string, any> | null): string;
 }
 
 export class NativeInstance {

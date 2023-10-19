@@ -1,6 +1,10 @@
 from cube import (TemplateContext, SafeString)
 
 template = TemplateContext()
+template.add_variable('var1', "test string")
+template.add_variable('var2', True)
+template.add_variable('var3', None)
+template.add_variable('var4', {'key1': 'value1', 'key2': True})
 
 @template.function
 def arg_sum_integers(a, b):
