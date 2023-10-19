@@ -28,6 +28,7 @@ libc = "0.2"
 findshlibs = "0.10.2"
 convert_case = "0.6.0"
 minijinja = { version = "1", features = ["json", "loader"] }
+log-reroute = "0.1"
 # python
 pyo3 = { version = "0.19", features = [], optional = true }
 pyo3-asyncio = { version = "0.19", features = ["tokio-runtime", "attributes"], optional = true }
