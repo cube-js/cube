@@ -26,7 +26,7 @@ module.exports = {
   ksql: '@cubejs-backend/ksql-driver',
   questdb: '@cubejs-backend/questdb-driver',
   materialize: '@cubejs-backend/materialize-driver',
-  vertica: '@knowitall/vertica-driver',
+  vertica: '@cubejs-backend/vertica-driver',
   // List for JDBC drivers
   'databricks-jdbc': '@cubejs-backend/databricks-jdbc-driver',
 };

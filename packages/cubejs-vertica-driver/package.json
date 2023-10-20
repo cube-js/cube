@@ -1,5 +1,5 @@
 {
-  "name": "@knowitall/vertica-driver",
+  "name": "@cubejs-backend/vertica-driver",
   "description": "Cube.js Vertica database driver",
   "author": "Cube Dev, Inc.",
   "version": "0.32.0",
