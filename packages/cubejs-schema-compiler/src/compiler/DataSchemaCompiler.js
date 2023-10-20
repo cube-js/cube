@@ -58,32 +58,20 @@ export class DataSchemaCompiler {
   /**
    * @protected
    */
-  async loadPythonContext(files) {
-    // TODO Appropriate template functions loading
-    const modules = await Promise.all(files.filter((f) => f.fileName === 'globals.py').map(async (file) => {
-      const exports = await this.nativeInstance.loadPythonContext(
-        file.fileName,
-        file.content
+  async loadPythonContext(files, nsFileName) {
+    const ns = files.find((f) => f.fileName === nsFileName);
+    if (ns) {
+      return this.nativeInstance.loadPythonContext(
+        ns.fileName,
+        ns.content
       );
-
-      return {
-        fileName: file.fileName,
-        exports: {
-          ...exports.variables,
-          ...exports.functions,
-        }
-      };
-    }));
-
-    const res = {};
-
-    for (const mod of modules) {
-      for (const [symbolName, symbolFun] of Object.entries(mod.exports)) {
-        res[symbolName] = symbolFun;
-      }
     }
 
-    return res;
+    return {
+      filters: {},
+      variables: {},
+      functions: {}
+    };
   }
 
   /**
@@ -92,7 +80,8 @@ export class DataSchemaCompiler {
   async doCompile() {
     const files = await this.repository.dataSchemaFiles();
 
-    this.pythonContext = await this.loadPythonContext(files);
+    this.pythonContext = await this.loadPythonContext(files, 'globals.py');
+    this.yamlCompiler.initFromPythonContext(this.pythonContext);
 
     const toCompile = files.filter((f) => !this.filesToCompile || this.filesToCompile.indexOf(f.fileName) !== -1);
 

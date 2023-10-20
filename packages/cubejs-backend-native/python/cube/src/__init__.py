@@ -165,10 +165,12 @@ class TemplateException(Exception):
 class TemplateContext:
     functions: dict[str, Callable]
     variables: dict[str, Any]
+    filters: dict[str, Callable]
 
     def __init__(self):
         self.functions = {}
         self.variables = {}
+        self.filters = {}
 
     def add_function(self, name, func):
         if not callable(func):
@@ -186,7 +188,7 @@ class TemplateContext:
         if not callable(func):
             raise TemplateException("function registration must be used with functions, actual: '%s'" % type(func).__name__)
 
-        raise TemplateException("filter registration is not supported")
+        self.filters[name] = func
 
     def function(self, func):
         if isinstance(func, str):
