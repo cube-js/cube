@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.6](https://github.com/cube-js/cube/compare/v0.34.5...v0.34.6) (2023-10-20)
+
+
+### Bug Fixes
+
+* **cubestore:** Window function don't work with only one Following bound ([#7216](https://github.com/cube-js/cube/issues/7216)) ([a0d23cb](https://github.com/cube-js/cube/commit/a0d23cbcecdac9d73bc1d2291e11a3e4d08acde1))
+* **docs:** update marketing-ui version ([#7249](https://github.com/cube-js/cube/issues/7249)) ([0b6755c](https://github.com/cube-js/cube/commit/0b6755c0f4c7d49cb9ac22ec58165649479aa26d))
+* **native:** Init logger earlier without javascript side (silient errors) ([#7228](https://github.com/cube-js/cube/issues/7228)) ([1f6d49d](https://github.com/cube-js/cube/commit/1f6d49dbd0aa2e792db8c3bcefd54a8a434b4000))
+* **native:** Jinja - enable autoescape for .jinja (old naming) files ([#7243](https://github.com/cube-js/cube/issues/7243)) ([abf5a0c](https://github.com/cube-js/cube/commit/abf5a0cc05d378691e736c859fdbd9209ad1a336))
+
+
+### Features
+
+* **native:** Jinja - passing variables via TemplateContext from Python ([#7280](https://github.com/cube-js/cube/issues/7280)) ([e3dec88](https://github.com/cube-js/cube/commit/e3dec888870f6c37da2957ff49988e5769e37f3d))
+
+
+
+
+
 ## [0.34.5](https://github.com/cube-js/cube/compare/v0.34.4...v0.34.5) (2023-10-16)
 
 
