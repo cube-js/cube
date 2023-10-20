@@ -255,6 +255,9 @@ exports[`Jinja (new api) render variables.yml.jinja: variables.yml.jinja 1`] = `
 "variables:
   var1: \\"test string\\"
   var2: true
-  var3: null
-  var4: {\\"key1\\":\\"value1\\",\\"key2\\":true}"
+  var3: false
+  var4: null
+  var5: {\\"obj_key\\":\\"val\\"}
+  var6: [1,2,3,4,5,6]
+  var7: [6,5,4,3,2,1]"
 `;

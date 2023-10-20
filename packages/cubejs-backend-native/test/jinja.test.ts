@@ -83,8 +83,11 @@ suite('Python model', () => {
     expect(pythonModule.variables).toEqual({
       var1: 'test string',
       var2: true,
-      var3: undefined,
-      var4: expect.any(Object),
+      var3: false,
+      var4: undefined,
+      var5: { obj_key: 'val' },
+      var6: [1, 2, 3, 4, 5, 6],
+      var7: [6, 5, 4, 3, 2, 1],
     });
   });
 });
