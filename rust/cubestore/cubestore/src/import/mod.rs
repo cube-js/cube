@@ -861,7 +861,7 @@ impl LocationHelper {
             }
         } else if location.starts_with("temp://") {
             let remote_path = Self::temp_uploads_path(location);
-            match remote_fs.list_with_metadata(&remote_path).await {
+            match remote_fs.list_with_metadata(remote_path).await {
                 Ok(list) => {
                     let list_res = list.iter().next().ok_or(CubeError::internal(format!(
                         "Location {} can't be listed in remote_fs",
