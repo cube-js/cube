@@ -1,6 +1,6 @@
 use crate::config::ConfigObj;
 use crate::di_service;
-use crate::remotefs::{RemoteFile, RemoteFs};
+use crate::remotefs::{CommonRemoteFsUtils, RemoteFile, RemoteFs};
 use crate::util::lock::acquire_lock;
 use crate::CubeError;
 use async_trait::async_trait;
@@ -32,9 +32,10 @@ pub struct QueueRemoteFs {
 
 impl Debug for QueueRemoteFs {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_struct("QueueRemoteFs")
-            .field("remote_fs", &self.remote_fs)
-            .finish()
+        f.debug_struct("QueueRemoteFs").finish()
+        //TODO FIX IT
+        /* .field("remote_fs", &self.remote_fs)
+        .finish() */
     }
 }
 
@@ -148,7 +149,7 @@ impl QueueRemoteFs {
                 {
                     let res = self
                         .remote_fs
-                        .upload_file(&temp_upload_path, &remote_path)
+                        .upload_file(temp_upload_path, remote_path.clone())
                         .await;
                     self.result_sender
                         .send(RemoteFsOpResult::Upload(remote_path, res))?;
@@ -157,7 +158,7 @@ impl QueueRemoteFs {
             RemoteFsOp::Delete(file) => {
                 self.result_sender.send(RemoteFsOpResult::Delete(
                     file.to_string(),
-                    self.remote_fs.delete_file(file.as_str()).await,
+                    self.remote_fs.delete_file(file.to_string()).await,
                 ))?;
             }
             x => panic!("Unexpected operation: {:?}", x),
@@ -170,7 +171,7 @@ impl QueueRemoteFs {
             RemoteFsOp::Download(file, expected_file_size) => {
                 let result = self
                     .remote_fs
-                    .download_file(file.as_str(), expected_file_size)
+                    .download_file(file.clone(), expected_file_size)
                     .await;
                 let mut downloading =
                     acquire_lock("download loop downloading", self.downloading.write()).await?;
@@ -186,10 +187,26 @@ impl QueueRemoteFs {
 
 #[async_trait]
 impl RemoteFs for QueueRemoteFs {
+    async fn temp_upload_path(&self, remote_path: String) -> Result<String, CubeError> {
+        CommonRemoteFsUtils::temp_upload_path(self, remote_path).await
+    }
+
+    async fn uploads_dir(&self) -> Result<String, CubeError> {
+        CommonRemoteFsUtils::uploads_dir(self).await
+    }
+
+    async fn check_upload_file(
+        &self,
+        remote_path: String,
+        expected_size: u64,
+    ) -> Result<(), CubeError> {
+        CommonRemoteFsUtils::check_upload_file(self, remote_path, expected_size).await
+    }
+
     async fn upload_file(
         &self,
-        local_upload_path: &str,
-        remote_path: &str,
+        local_upload_path: String,
+        remote_path: String,
     ) -> Result<u64, CubeError> {
         if !self.config.upload_to_remote() {
             log::info!("Skipping upload {}", remote_path);
@@ -203,7 +220,7 @@ impl RemoteFs for QueueRemoteFs {
         loop {
             let res = receiver.recv().await?;
             if let RemoteFsOpResult::Upload(file, result) = res {
-                if &file == remote_path {
+                if file == remote_path {
                     return result;
                 }
             }
@@ -212,15 +229,15 @@ impl RemoteFs for QueueRemoteFs {
 
     async fn download_file(
         &self,
-        remote_path: &str,
+        remote_path: String,
         expected_file_size: Option<u64>,
     ) -> Result<String, CubeError> {
         // We might be lucky and the file has already been downloaded.
-        if let Ok(local_path) = self.local_file(remote_path).await {
+        if let Ok(local_path) = self.local_file(remote_path.clone()).await {
             let metadata = tokio::fs::metadata(&local_path).await;
             if metadata.is_ok() {
                 if let Err(e) = QueueRemoteFs::check_file_size(
-                    remote_path,
+                    &remote_path,
                     expected_file_size,
                     &local_path,
                     metadata.unwrap(),
@@ -236,7 +253,7 @@ impl RemoteFs for QueueRemoteFs {
         {
             let mut downloading =
                 acquire_lock("download file downloading", self.downloading.write()).await?;
-            if !downloading.contains(remote_path) {
+            if !downloading.contains(&remote_path) {
                 self.download_queue.push(RemoteFsOp::Download(
                     remote_path.to_string(),
                     expected_file_size,
@@ -247,10 +264,10 @@ impl RemoteFs for QueueRemoteFs {
         loop {
             let res = receiver.recv().await?;
             if let RemoteFsOpResult::Download(file, result) = res {
-                if &file == remote_path {
+                if file == remote_path {
                     match result {
                         Ok(f) => {
-                            let local_path = self.local_file(remote_path).await?;
+                            let local_path = self.local_file(remote_path.clone()).await?;
                             let metadata = tokio::fs::metadata(&local_path).await.map_err(|e| {
                                 CubeError::internal(format!(
                                     "Error while listing local file for consistency check {}: {}",
@@ -258,7 +275,7 @@ impl RemoteFs for QueueRemoteFs {
                                 ))
                             })?;
                             if let Err(e) = QueueRemoteFs::check_file_size(
-                                remote_path,
+                                &remote_path,
                                 expected_file_size,
                                 &local_path,
                                 metadata,
@@ -271,7 +288,7 @@ impl RemoteFs for QueueRemoteFs {
                         }
                         Err(err) => {
                             //Check if file doesn't exists in remoteFs
-                            if self.remote_fs.list(&file).await?.is_empty() {
+                            if self.remote_fs.list(file.clone()).await?.is_empty() {
                                 return Err(CubeError::corrupt_data(format!(
                                     "File {} doesn't exist in remote file system",
                                     file
@@ -285,7 +302,7 @@ impl RemoteFs for QueueRemoteFs {
         }
     }
 
-    async fn delete_file(&self, remote_path: &str) -> Result<(), CubeError> {
+    async fn delete_file(&self, remote_path: String) -> Result<(), CubeError> {
         if !self.config.upload_to_remote() {
             log::info!("Skipping delete {}", remote_path);
             return Ok(());
@@ -296,26 +313,29 @@ impl RemoteFs for QueueRemoteFs {
         loop {
             let res = receiver.recv().await?;
             if let RemoteFsOpResult::Delete(file, result) = res {
-                if &file == remote_path {
+                if file == remote_path {
                     return result;
                 }
             }
         }
     }
 
-    async fn list(&self, remote_prefix: &str) -> Result<Vec<String>, CubeError> {
+    async fn list(&self, remote_prefix: String) -> Result<Vec<String>, CubeError> {
         self.remote_fs.list(remote_prefix).await
     }
 
-    async fn list_with_metadata(&self, remote_prefix: &str) -> Result<Vec<RemoteFile>, CubeError> {
+    async fn list_with_metadata(
+        &self,
+        remote_prefix: String,
+    ) -> Result<Vec<RemoteFile>, CubeError> {
         self.remote_fs.list_with_metadata(remote_prefix).await
     }
 
-    async fn local_path(&self) -> String {
+    async fn local_path(&self) -> Result<String, CubeError> {
         self.remote_fs.local_path().await
     }
 
-    async fn local_file(&self, remote_path: &str) -> Result<String, CubeError> {
+    async fn local_file(&self, remote_path: String) -> Result<String, CubeError> {
         self.remote_fs.local_file(remote_path).await
     }
 }
@@ -370,14 +390,30 @@ mod test {
 
     #[async_trait]
     impl RemoteFs for MockFs {
+        async fn temp_upload_path(&self, remote_path: String) -> Result<String, CubeError> {
+            CommonRemoteFsUtils::temp_upload_path(self, remote_path).await
+        }
+
+        async fn uploads_dir(&self) -> Result<String, CubeError> {
+            CommonRemoteFsUtils::uploads_dir(self).await
+        }
+
+        async fn check_upload_file(
+            &self,
+            remote_path: String,
+            expected_size: u64,
+        ) -> Result<(), CubeError> {
+            CommonRemoteFsUtils::check_upload_file(self, remote_path, expected_size).await
+        }
+
         async fn upload_file(
             &self,
-            local_upload_path: &str,
-            remote_path: &str,
+            local_upload_path: String,
+            remote_path: String,
         ) -> Result<u64, CubeError> {
             let res = self
                 .base_fs
-                .upload_file(local_upload_path, remote_path)
+                .upload_file(local_upload_path, remote_path.clone())
                 .await;
             if let Ok(size) = res {
                 self.check_upload_file(remote_path, size).await?
@@ -387,7 +423,7 @@ mod test {
 
         async fn download_file(
             &self,
-            remote_path: &str,
+            remote_path: String,
             expected_file_size: Option<u64>,
         ) -> Result<String, CubeError> {
             let res = self
@@ -400,17 +436,17 @@ mod test {
             res
         }
 
-        async fn delete_file(&self, _remote_path: &str) -> Result<(), CubeError> {
+        async fn delete_file(&self, _remote_path: String) -> Result<(), CubeError> {
             Ok(())
         }
 
-        async fn list(&self, remote_prefix: &str) -> Result<Vec<String>, CubeError> {
+        async fn list(&self, remote_prefix: String) -> Result<Vec<String>, CubeError> {
             self.base_fs.list(remote_prefix).await
         }
 
         async fn list_with_metadata(
             &self,
-            remote_prefix: &str,
+            remote_prefix: String,
         ) -> Result<Vec<RemoteFile>, CubeError> {
             let mut res = self
                 .base_fs
@@ -429,11 +465,11 @@ mod test {
             Ok(res)
         }
 
-        async fn local_path(&self) -> String {
+        async fn local_path(&self) -> Result<String, CubeError> {
             self.base_fs.local_path().await
         }
 
-        async fn local_file(&self, remote_path: &str) -> Result<String, CubeError> {
+        async fn local_file(&self, remote_path: String) -> Result<String, CubeError> {
             self.base_fs.local_file(remote_path).await
         }
     }
@@ -478,7 +514,10 @@ mod test {
 
         let r = tokio::spawn(QueueRemoteFs::wait_processing_loops(queue_fs.clone()));
         let res = queue_fs
-            .upload_file(path.to_str().unwrap(), "temp-upload/foo.csv")
+            .upload_file(
+                path.to_str().unwrap().to_string(),
+                "temp-upload/foo.csv".to_string(),
+            )
             .await;
         queue_fs.stop_processing_loops().unwrap();
         r.await.unwrap().unwrap();
@@ -501,7 +540,10 @@ mod test {
 
         let r = tokio::spawn(QueueRemoteFs::wait_processing_loops(queue_fs.clone()));
         let res = queue_fs
-            .upload_file(path.to_str().unwrap(), "temp-upload/foo.csv")
+            .upload_file(
+                path.to_str().unwrap().to_string(),
+                "temp-upload/foo.csv".to_string(),
+            )
             .await;
         queue_fs.stop_processing_loops().unwrap();
         r.await.unwrap().unwrap();
@@ -524,7 +566,10 @@ mod test {
 
         let r = tokio::spawn(QueueRemoteFs::wait_processing_loops(queue_fs.clone()));
         let res = queue_fs
-            .upload_file(path.to_str().unwrap(), "temp-upload/foo.csv")
+            .upload_file(
+                path.to_str().unwrap().to_string(),
+                "temp-upload/foo.csv".to_string(),
+            )
             .await;
         queue_fs.stop_processing_loops().unwrap();
         r.await.unwrap().unwrap();
@@ -542,7 +587,9 @@ mod test {
             config.injector().get_service("original_remote_fs").await,
         );
         let r = tokio::spawn(QueueRemoteFs::wait_processing_loops(queue_fs.clone()));
-        let res = queue_fs.download_file("temp-upload/foo.csv", None).await;
+        let res = queue_fs
+            .download_file("temp-upload/foo.csv".to_string(), None)
+            .await;
         match res {
             Ok(_) => assert!(false),
             Err(e) => assert!(e.is_corrupt_data()),
@@ -564,13 +611,24 @@ mod test {
         );
         let r = tokio::spawn(QueueRemoteFs::wait_processing_loops(queue_fs.clone()));
         queue_fs
-            .upload_file(path.to_str().unwrap(), "temp-upload/foo.csv")
+            .upload_file(
+                path.to_str().unwrap().to_string(),
+                "temp-upload/foo.csv".to_string(),
+            )
             .await
             .unwrap();
 
-        std::fs::remove_file(queue_fs.local_file("temp-upload/foo.csv").await.unwrap()).unwrap();
+        std::fs::remove_file(
+            queue_fs
+                .local_file("temp-upload/foo.csv".to_string())
+                .await
+                .unwrap(),
+        )
+        .unwrap();
 
-        let res = queue_fs.download_file("temp-upload/foo.csv", Some(1)).await;
+        let res = queue_fs
+            .download_file("temp-upload/foo.csv".to_string(), Some(1))
+            .await;
 
         match res {
             Ok(_) => assert!(false),
@@ -597,12 +655,23 @@ mod test {
         let r = tokio::spawn(QueueRemoteFs::wait_processing_loops(queue_fs.clone()));
 
         queue_fs
-            .upload_file(path.to_str().unwrap(), "temp-upload/foo.csv")
+            .upload_file(
+                path.to_str().unwrap().to_string(),
+                "temp-upload/foo.csv".to_string(),
+            )
             .await
             .unwrap();
-        std::fs::remove_file(queue_fs.local_file("temp-upload/foo.csv").await.unwrap()).unwrap();
+        std::fs::remove_file(
+            queue_fs
+                .local_file("temp-upload/foo.csv".to_string())
+                .await
+                .unwrap(),
+        )
+        .unwrap();
 
-        let res = queue_fs.download_file("temp-upload/foo.csv", None).await;
+        let res = queue_fs
+            .download_file("temp-upload/foo.csv".to_string(), None)
+            .await;
 
         match res {
             Ok(_) => assert!(false),

@@ -623,7 +623,7 @@ impl SqlServiceImpl {
             )
             .await?;
 
-        let mut dump_dir = PathBuf::from(&self.remote_fs.local_path().await);
+        let mut dump_dir = PathBuf::from(&self.remote_fs.local_path().await?);
         dump_dir.push("dumps");
         tokio::fs::create_dir_all(&dump_dir).await?;
 
@@ -640,7 +640,7 @@ impl SqlServiceImpl {
                 log::debug!("Dumping data files to {:?}", data_dir);
                 // TODO: download in parallel.
                 for (_, f, size, _) in p.all_required_files() {
-                    let f = self.remote_fs.download_file(&f, size).await?;
+                    let f = self.remote_fs.download_file(f, size).await?;
                     let name = Path::new(&f).file_name().ok_or_else(|| {
                         CubeError::internal(format!("Could not get filename of '{}'", f))
                     })?;
@@ -1397,7 +1397,7 @@ impl SqlService for SqlServiceImpl {
                         );
                         let mut mocked_names = HashMap::new();
                         for (_, f, _, _) in worker_plan.files_to_download() {
-                            let name = self.remote_fs.local_file(&f).await?;
+                            let name = self.remote_fs.local_file(f.clone()).await?;
                             mocked_names.insert(f, name);
                         }
                         let chunk_ids_to_batches = worker_plan
@@ -1442,8 +1442,8 @@ impl SqlService for SqlServiceImpl {
         // TODO persist file size
         self.remote_fs
             .upload_file(
-                file_path.to_string_lossy().as_ref(),
-                &format!("temp-uploads/{}", name),
+                file_path.to_string_lossy().to_string(),
+                format!("temp-uploads/{}", name),
             )
             .await?;
         Ok(())
@@ -2308,49 +2308,65 @@ mod tests {
         let _ = fs::remove_dir_all(remote_store_path.clone());
     }
 
-    #[derive(Debug)]
+    //#[derive(Debug)]
     pub struct FailingRemoteFs(Arc<dyn RemoteFs>);
 
     crate::di_service!(FailingRemoteFs, [RemoteFs]);
+    use crate::remotefs::CommonRemoteFsUtils;
 
     #[async_trait::async_trait]
     impl RemoteFs for FailingRemoteFs {
+        async fn temp_upload_path(&self, remote_path: String) -> Result<String, CubeError> {
+            CommonRemoteFsUtils::temp_upload_path(self, remote_path).await
+        }
+
+        async fn uploads_dir(&self) -> Result<String, CubeError> {
+            CommonRemoteFsUtils::uploads_dir(self).await
+        }
+
+        async fn check_upload_file(
+            &self,
+            remote_path: String,
+            expected_size: u64,
+        ) -> Result<(), CubeError> {
+            CommonRemoteFsUtils::check_upload_file(self, remote_path, expected_size).await
+        }
         async fn upload_file(
             &self,
-            _temp_upload_path: &str,
-            _remote_path: &str,
+            _temp_upload_path: String,
+            _remote_path: String,
         ) -> Result<u64, CubeError> {
             Err(CubeError::internal("Not allowed".to_string()))
         }
 
         async fn download_file(
             &self,
-            remote_path: &str,
+            remote_path: String,
             expected_file_size: Option<u64>,
         ) -> Result<String, CubeError> {
             self.0.download_file(remote_path, expected_file_size).await
         }
 
-        async fn delete_file(&self, remote_path: &str) -> Result<(), CubeError> {
+        async fn delete_file(&self, remote_path: String) -> Result<(), CubeError> {
             self.0.delete_file(remote_path).await
         }
 
-        async fn list(&self, remote_prefix: &str) -> Result<Vec<String>, CubeError> {
+        async fn list(&self, remote_prefix: String) -> Result<Vec<String>, CubeError> {
             self.0.list(remote_prefix).await
         }
 
         async fn list_with_metadata(
             &self,
-            remote_prefix: &str,
+            remote_prefix: String,
         ) -> Result<Vec<RemoteFile>, CubeError> {
             self.0.list_with_metadata(remote_prefix).await
         }
 
-        async fn local_path(&self) -> String {
+        async fn local_path(&self) -> Result<String, CubeError> {
             self.0.local_path().await
         }
 
-        async fn local_file(&self, remote_path: &str) -> Result<String, CubeError> {
+        async fn local_file(&self, remote_path: String) -> Result<String, CubeError> {
             self.0.local_file(remote_path).await
         }
     }
@@ -2382,7 +2398,7 @@ mod tests {
 
             let remote_fs = services.injector.get_service_typed::<QueueRemoteFs>().await;
 
-            let temp_upload = remote_fs.temp_upload_path("").await.unwrap();
+            let temp_upload = remote_fs.temp_upload_path("".to_string()).await.unwrap();
             let res = fs::read_dir(temp_upload.clone()).unwrap();
             assert!(res.into_iter().next().is_none(), "Expected empty uploads directory but found: {:?}", fs::read_dir(temp_upload).unwrap().into_iter().map(|e| e.unwrap().path().to_string_lossy().to_string()).collect::<Vec<_>>());
         })
@@ -2802,7 +2818,6 @@ mod tests {
                          ) AS `lambda` where a = 1 group by 1, 2 order by 3 desc").await.unwrap();
             match &result.get_rows()[0].values()[0] {
                 TableValue::String(s) => {
-                    println!("!! s {}", s);
                     assert_eq!(s,
                                 "Sort\
                                 \n  Projection, [sel__a, sel__b, sel__c]\
@@ -2838,7 +2853,6 @@ mod tests {
                          ) AS `lambda` where a = 1 group by 1, 2 order by 3 desc").await.unwrap();
             match &result.get_rows()[0].values()[0] {
                 TableValue::String(s) => {
-                    println!("!! s {}", s);
                     assert_eq!(s,
                                 "Sort\
                                 \n  Projection, [sel__a, sel__b, sel__c]\
@@ -2971,8 +2985,8 @@ mod tests {
                 let remote_fs = services.injector.get_service_typed::<dyn RemoteFs>().await;
                 remote_fs
                     .upload_file(
-                        path.to_str().unwrap(),
-                        &chunk.get_row().get_full_name(chunk.get_id()),
+                        path.to_str().unwrap().to_string(),
+                        chunk.get_row().get_full_name(chunk.get_id()),
                     )
                     .await
                     .unwrap();
@@ -3481,7 +3495,7 @@ mod tests {
 
                 let remote_fs = services.injector.get_service_typed::<dyn RemoteFs>().await;
                 let files = remote_fs
-                    .list("")
+                    .list("".to_string())
                     .await
                     .unwrap()
                     .into_iter()
@@ -3989,6 +4003,7 @@ mod tests {
         Config::test("compaction").update_config(|mut config| {
             config.partition_split_threshold = 5;
             config.compaction_chunks_count_threshold = 0;
+            config.select_worker_pool_size = 1;
             config
         }).start_test(async move |services| {
             let service = services.sql_service;
@@ -4075,7 +4090,7 @@ mod tests {
                 file.shutdown().await.unwrap();
 
                 let remote_fs = services.injector.get_service_typed::<dyn RemoteFs>().await;
-                remote_fs.upload_file(path_2.to_str().unwrap(), "temp-uploads/foo-3.csv.gz").await.unwrap();
+                remote_fs.upload_file(path_2.to_str().unwrap().to_string(), "temp-uploads/foo-3.csv.gz".to_string()).await.unwrap();
 
                 vec!["temp://foo-3.csv.gz".to_string()]
             };
@@ -4275,7 +4290,10 @@ mod tests {
                         .injector
                         .get_service_typed::<dyn RemoteFs>()
                         .await
-                        .upload_file(path_2.to_str().unwrap(), "temp-uploads/orders.csv.gz")
+                        .upload_file(
+                            path_2.to_str().unwrap().to_string(),
+                            "temp-uploads/orders.csv.gz".to_string(),
+                        )
                         .await
                         .unwrap();
 

@@ -1,5 +1,6 @@
 pub mod aborting_join_handle;
 pub mod batch_memory;
+pub mod cancellation_token_guard;
 pub mod decimal;
 pub mod error;
 pub mod int96;

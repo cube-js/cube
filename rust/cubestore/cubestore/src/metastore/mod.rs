@@ -5944,7 +5944,7 @@ mod tests {
             .await
             .unwrap();
         rocks_meta_store.run_upload().await.unwrap();
-        let uploaded = remote_fs.list("metastore-").await.unwrap();
+        let uploaded = remote_fs.list("metastore-".to_string()).await.unwrap();
         assert!(uploaded.is_empty());
 
         rocks_meta_store.upload_check_point().await.unwrap();
@@ -5957,7 +5957,7 @@ mod tests {
 
         rocks_meta_store.run_upload().await.unwrap();
 
-        let uploaded = remote_fs.list("metastore-").await.unwrap();
+        let uploaded = remote_fs.list("metastore-".to_string()).await.unwrap();
 
         let logs_uploaded = uploaded
             .into_iter()
@@ -5968,7 +5968,7 @@ mod tests {
 
         rocks_meta_store.run_upload().await.unwrap();
 
-        let uploaded = remote_fs.list("metastore-").await.unwrap();
+        let uploaded = remote_fs.list("metastore-".to_string()).await.unwrap();
 
         let logs_uploaded = uploaded
             .into_iter()
@@ -5985,7 +5985,7 @@ mod tests {
 
         rocks_meta_store.run_upload().await.unwrap();
 
-        let uploaded = remote_fs.list("metastore-").await.unwrap();
+        let uploaded = remote_fs.list("metastore-".to_string()).await.unwrap();
 
         let logs_uploaded = uploaded
             .into_iter()
