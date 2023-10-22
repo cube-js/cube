@@ -2,7 +2,6 @@ import fs from 'fs';
 import path from 'path';
 
 import * as native from '../js';
-import type { JinjaEngine, PythonCtx } from '../js';
 
 type InitJinjaFn = () => Promise<{
   pyCtx: native.PythonCtx,
