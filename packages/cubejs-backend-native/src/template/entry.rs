@@ -9,8 +9,6 @@ use std::cell::RefCell;
 use std::error::Error;
 
 #[cfg(feature = "python")]
-use pyo3::prelude::*;
-#[cfg(feature = "python")]
 use pyo3::{exceptions::PyNotImplementedError, prelude::*, types::PyTuple, AsPyPointer};
 
 trait NeonMiniJinjaContext {
@@ -120,17 +118,24 @@ impl JinjaEngine {
                     CLRepr::PythonRef(py_ref) => match py_ref {
                         PythonRef::PyFunction(py_fun_ref)
                         | PythonRef::PyExternalFunction(py_fun_ref) => py_fun_ref,
-                        _ => unreachable!(),
+                        other => {
+                            return cx.throw_error(format!(
+                            "minijinja::filter must be a function, actual: CLRepr::PythonRef({:?})",
+                            other
+                        ))
+                        }
                     },
-                    other => panic!(
-                        "Converting from {:?} to minijinja::filter is not supported",
-                        other.kind()
-                    ),
+                    other => {
+                        return cx.throw_error(format!(
+                            "minijinja::filter must be a function, actual: {:?}",
+                            other.kind()
+                        ))
+                    }
                 };
 
                 engine.add_filter(
                     filter_name.value(cx),
-                    move |state: &mj::State,
+                    move |_state: &mj::State,
                           args: &[mj::value::Value]|
                           -> Result<mj::value::Value, mj::Error> {
                         let mut arguments = Vec::with_capacity(args.len());
