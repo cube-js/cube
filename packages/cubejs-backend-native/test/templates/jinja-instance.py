@@ -86,3 +86,11 @@ class ExampleClassModelA:
 @template.function
 def load_class_model():
   return ExampleClassModelA()
+
+@template.filter
+def str_filter(i):
+  return 'str from python'
+
+@template.filter
+def filter_return_arg(i):
+  return i

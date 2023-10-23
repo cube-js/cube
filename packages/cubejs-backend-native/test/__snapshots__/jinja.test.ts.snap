@@ -230,6 +230,12 @@ print:
     unknown_fallback: \\"value\\""
 `;
 
+exports[`Jinja (new api) render filters.yml.jinja: filters.yml.jinja 1`] = `
+"variables:
+  str_filter: \\"str from python\\"
+  str_filter_test_arg: \\"my string\\""
+`;
+
 exports[`Jinja (new api) render python.yml: python.yml 1`] = `
 "test:
   unsafe_string: \\"\\"\\\\\\"unsafe string\\\\\\" <>\\"\\"

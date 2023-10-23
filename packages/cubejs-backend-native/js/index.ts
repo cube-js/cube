@@ -364,8 +364,9 @@ export const pythonLoadConfig = async (content: string, options: { fileName: str
 export type PythonCtx = {
     __type: 'PythonCtx'
 } & {
+  filters: Record<string, Function>
   functions: Record<string, Function>
-  variables: Record<string, Function>
+  variables: Record<string, any>
 };
 
 export interface JinjaEngine {
@@ -386,7 +387,7 @@ export class NativeInstance {
       return this.native;
     }
 
-    public newJinjaEngine(options: { debugInfo?: boolean }): JinjaEngine {
+    public newJinjaEngine(options: { debugInfo?: boolean, filters: Record<string, Function> }): JinjaEngine {
       return this.getNative().newJinjaEngine(options);
     }
 

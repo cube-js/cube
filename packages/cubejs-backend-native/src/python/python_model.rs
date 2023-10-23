@@ -5,13 +5,15 @@ use crate::cross::{CLRepr, CLReprObject};
 pub struct CubePythonModel {
     functions: CLReprObject,
     variables: CLReprObject,
+    filters: CLReprObject,
 }
 
 impl CubePythonModel {
-    pub fn new(functions: CLReprObject, variables: CLReprObject) -> Self {
+    pub fn new(functions: CLReprObject, variables: CLReprObject, filters: CLReprObject) -> Self {
         Self {
             functions,
             variables,
+            filters,
         }
     }
 }
@@ -24,6 +26,7 @@ impl CubePythonModel {
         let mut obj = CLReprObject::new();
         obj.insert("functions".to_string(), CLRepr::Object(self.functions));
         obj.insert("variables".to_string(), CLRepr::Object(self.variables));
+        obj.insert("filters".to_string(), CLRepr::Object(self.filters));
 
         CLRepr::Object(obj).into_js(cx)
     }

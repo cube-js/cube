@@ -34,3 +34,6 @@ pub fn to_minijinja_value(from: CLRepr) -> mjv::Value {
         ),
     }
 }
+
+#[cfg(feature = "python")]
+pub use python::from_minijinja_value;
