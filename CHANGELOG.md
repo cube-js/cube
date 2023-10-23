@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.7](https://github.com/cube-js/cube/compare/v0.34.6...v0.34.7) (2023-10-23)
+
+
+### Features
+
+* **native:** Jinja - passing filters via TemplateContext from Python ([#7284](https://github.com/cube-js/cube/issues/7284)) ([1e92352](https://github.com/cube-js/cube/commit/1e9235293f3843caacc1d20fc458e0184e933c40))
+
+
+
+
+
 ## [0.34.6](https://github.com/cube-js/cube/compare/v0.34.5...v0.34.6) (2023-10-20)
 
 
