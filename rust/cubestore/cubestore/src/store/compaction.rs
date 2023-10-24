@@ -580,7 +580,7 @@ impl CompactionService for CompactionServiceImpl {
         let old_partition_local = if let Some(f) = old_partition_remote {
             let result = self
                 .remote_fs
-                .download_file(&f, partition.get_row().file_size())
+                .download_file(f, partition.get_row().file_size())
                 .await;
             deactivate_table_on_corrupt_data(self.meta_store.clone(), &result, &partition, None)
                 .await;
@@ -591,11 +591,11 @@ impl CompactionService for CompactionServiceImpl {
         let mut new_local_files = Vec::new();
         if let Some(c) = &new_chunk {
             let remote = ChunkStore::chunk_remote_path(c.get_id(), c.get_row().suffix());
-            new_local_files.push(self.remote_fs.temp_upload_path(&remote).await?);
+            new_local_files.push(self.remote_fs.temp_upload_path(remote).await?);
         } else {
             for p in new_partitions.iter() {
                 let new_remote_path = partition_file_name(p.get_id(), p.get_row().suffix());
-                new_local_files.push(self.remote_fs.temp_upload_path(&new_remote_path).await?);
+                new_local_files.push(self.remote_fs.temp_upload_path(new_remote_path).await?);
             }
         }
 
@@ -677,7 +677,7 @@ impl CompactionService for CompactionServiceImpl {
             let remote = ChunkStore::chunk_remote_path(c.get_id(), c.get_row().suffix());
             let file_size = self
                 .remote_fs
-                .upload_file(&new_local_files[0], &remote)
+                .upload_file(new_local_files[0].clone(), remote.clone())
                 .await?;
             let chunk_ids = chunks.iter().map(|c| c.get_id()).collect_vec();
             // In memory chunks shouldn't ever get here. Otherwise replay handle should be defined.
@@ -690,7 +690,7 @@ impl CompactionService for CompactionServiceImpl {
                     "Cancelled compaction of {}. It runs concurrently with multi-split",
                     partition_id
                 );
-                self.remote_fs.delete_file(&remote).await?;
+                self.remote_fs.delete_file(remote).await?;
             }
             return Ok(());
         }
@@ -706,7 +706,7 @@ impl CompactionService for CompactionServiceImpl {
                     let new_remote_path = partition_file_name(p.get_id(), p.get_row().suffix());
                     let file_size = self
                         .remote_fs
-                        .upload_file(&new_local_files[i], new_remote_path.as_str())
+                        .upload_file(new_local_files[i].clone(), new_remote_path.to_string())
                         .await?;
                     filtered_partitions.push((p, file_size));
                 }
@@ -1066,7 +1066,7 @@ async fn download_files(
             let (f, size) = take(f);
             let fs = fs.clone();
             tasks.push(cube_ext::spawn(
-                async move { fs.download_file(&f, size).await },
+                async move { fs.download_file(f, size).await },
             ))
         }
         remote_files.clear();
@@ -1937,7 +1937,7 @@ mod tests {
             .get_full_name(partition.get_id())
             .unwrap();
         let local = remote_fs
-            .download_file(&remote, partition.get_row().file_size())
+            .download_file(remote.clone(), partition.get_row().file_size())
             .await
             .unwrap();
         let reader = Arc::new(
@@ -2089,14 +2089,14 @@ impl MultiSplit {
         let mut in_files = Vec::new();
         collect_remote_files(&p, &mut in_files);
         for (f, _) in &mut in_files {
-            *f = self.fs.local_file(f).await?;
+            *f = self.fs.local_file(f.clone()).await?;
         }
 
         let mut out_files = Vec::with_capacity(children.len());
         let mut out_remote_paths = Vec::with_capacity(children.len());
         for c in &children {
             let remote_path = partition_file_name(c.get_id(), c.get_row().suffix());
-            out_files.push(self.fs.temp_upload_path(&remote_path).await?);
+            out_files.push(self.fs.temp_upload_path(remote_path.clone()).await?);
             out_remote_paths.push(remote_path);
         }
 
@@ -2139,7 +2139,7 @@ impl MultiSplit {
             let local_path = out_files[i].to_string();
             let remote_path = out_files[i].to_string();
             uploads.push(cube_ext::spawn(async move {
-                fs.upload_file(&local_path, &remote_path).await
+                fs.upload_file(local_path, remote_path).await
             }));
         }
         Ok(())

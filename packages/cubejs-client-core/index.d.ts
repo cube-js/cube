@@ -153,6 +153,9 @@ declare module '@cubejs-client/core' {
     sortedDimensions: string[];
     sortedTimeDimensions: [[string, string]];
     measureToLeafMeasures?: Record<string, LeafMeasure[]>;
+    ownedDimensions: string[];
+    ownedTimeDimensionsAsIs: [[string, string | null]];
+    ownedTimeDimensionsWithRollupGranularity: [[string, string]];
   };
 
   export type PreAggregationType = 'rollup' | 'rollupJoin' | 'rollupLambda' | 'originalSql';

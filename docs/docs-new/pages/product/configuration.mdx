@@ -107,13 +107,7 @@ Both ways are equivalent; when in doubt, use Python.
 
 Support for Python and the `cube.py` file was introduced in v0.34.
 
-As of v0.34, Cube uses Node 16.20 to execute JavaScript-based
-configuration and Python 3.9 for Python-based configuration.
-
 </InfoBox>
-
-When Cube starts, it will install dependencies in `package.json` via `yarn`
-and dependencies in `requirements.txt` via `pip`.
 
 ### Cube Core
 
@@ -126,7 +120,36 @@ Docker container.
 You can edit the configuration file by going into <Btn>Development Mode</Btn>
 and navigating to the <Btn>Data Model</Btn> page.
 
-## Development Mode
+## Runtimes and dependencies
+
+As of v0.34, Cube uses Python v3.9 and Node.js v16.20 as runtime environments
+for the code of configuration and [dynamic data models][ref-dynamic-data-models].
+
+It's recommended to use `requirements.txt` and `package.json` files to
+specify dependencies for your Python and JavaScript code, respectively.
+
+### Cube Core
+
+If you have specified Python packages in the `requirements.txt` file,
+make sure to install them by running `pip install -r requirements.txt`
+inside the Docker container.
+
+If you have specified npm packages in the `package.json` file, make sure
+to install them by running `npm install` inside the Docker container.
+Alternatively, you can run `npm install` on your local machine and mount
+the `node_modules` folder under `/cube/conf` in the Docker container;
+however, if your dependencies contain native extensions, they might not work
+when provided this way.
+
+To automate the installation of dependencies, build and use a [custom
+Docker image][ref-custom-docker-image].
+
+### Cube Cloud
+
+Cube Cloud automatically installs dependencies from `requirements.txt` and
+`package.json` files.
+
+## Development mode
 
 Cube can be run in an insecure, development mode by setting the
 `CUBEJS_DEV_MODE` environment variable to `true`. Putting Cube in development
@@ -157,5 +180,7 @@ mode does the following:
 [link-env-vars]: /reference/configuration/environment-variables
 [link-scheduled-refresh]:
   /reference/data-model/pre-aggregations#scheduled_refresh
+[ref-dynamic-data-models]: /product/data-modeling/dynamic
+[ref-custom-docker-image]: /product/deployment/core#extend-the-docker-image
 
 [link-docker-env-vars]: https://docs.docker.com/compose/environment-variables/set-environment-variables/

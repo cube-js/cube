@@ -3,6 +3,54 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.7](https://github.com/cube-js/cube/compare/v0.34.6...v0.34.7) (2023-10-23)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.34.6](https://github.com/cube-js/cube/compare/v0.34.5...v0.34.6) (2023-10-20)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.34.5](https://github.com/cube-js/cube/compare/v0.34.4...v0.34.5) (2023-10-16)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.34.4](https://github.com/cube-js/cube/compare/v0.34.3...v0.34.4) (2023-10-14)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.34.3](https://github.com/cube-js/cube/compare/v0.34.2...v0.34.3) (2023-10-12)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.34.2](https://github.com/cube-js/cube/compare/v0.34.1...v0.34.2) (2023-10-12)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
 ## [0.34.1](https://github.com/cube-js/cube/compare/v0.34.0...v0.34.1) (2023-10-09)
 
 **Note:** Version bump only for package @cubejs-backend/api-gateway

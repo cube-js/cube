@@ -96,7 +96,7 @@ module.exports = {
 
 Now, you can use the `securityContext` in your data model:
 
-```twig filename="model/cubes/users.yml.jinja"
+```twig filename="model/cubes/users.yml"
 {# Is the current team trusted? #}
 {% set trusted_teams = ['cx', 'exec' ] %}
 {% set is_trusted_team = COMPILE_CONTEXT.securityContext.team in trusted_teams %}

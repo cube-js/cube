@@ -13133,13 +13133,13 @@ draft-js@^0.10.0, draft-js@~0.10.0:
     immutable "~3.7.4"
     object-assign "^4.1.0"
 
-duckdb@^0.8.1:
-  version "0.8.1"
-  resolved "https://registry.yarnpkg.com/duckdb/-/duckdb-0.8.1.tgz#73b689701e31951e7b2cf04b954188746e7773ef"
-  integrity sha512-a2SJDuvBVKy5muYFxXTANlqdNX1daF3NHzpqRdrk0Qx5n3Sh7BxL66O+WY9epaDFukiXEpz45sds5T1LaPaHog==
+duckdb@^0.9.1:
+  version "0.9.1"
+  resolved "https://registry.yarnpkg.com/duckdb/-/duckdb-0.9.1.tgz#7e2d32c3f3ee56ce8e733b95435e6387f931c240"
+  integrity sha512-mYfQXKADGUoBVOfy6OordgEkPlY6EtEIgrwRbFgVDoen2iQRVymr4RcDGhA2QTrniwgK+GnhszCu0vqrZJ1sFQ==
   dependencies:
     "@mapbox/node-pre-gyp" "^1.0.0"
-    node-addon-api "*"
+    node-addon-api "^7.0.0"
     node-gyp "^9.3.0"
 
 duplexer3@^0.1.4:
@@ -20765,11 +20765,6 @@ no-case@^3.0.4:
     lower-case "^2.0.2"
     tslib "^2.0.3"
 
-node-addon-api@*:
-  version "6.0.0"
-  resolved "https://registry.yarnpkg.com/node-addon-api/-/node-addon-api-6.0.0.tgz#cfb3574e6df708ff71a30db6c4762d9e06e11c27"
-  integrity sha512-GyHvgPvUXBvAkXa0YvYnhilSB1A+FRYMpIVggKzPZqdaZfevZOuzfWzyvgzOwRLHBeo/MMswmJFsrNF4Nw1pmA==
-
 node-addon-api@^1.7.1:
   version "1.7.2"
   resolved "https://registry.yarnpkg.com/node-addon-api/-/node-addon-api-1.7.2.tgz#3df30b95720b53c24e59948b49532b662444f54d"
@@ -20784,6 +20779,11 @@ node-addon-api@^4.2.0:
   version "4.3.0"
   resolved "https://registry.yarnpkg.com/node-addon-api/-/node-addon-api-4.3.0.tgz#52a1a0b475193e0928e98e0426a0d1254782b77f"
   integrity sha512-73sE9+3UaLYYFmDsFZnqCInzPyh3MqIwZO9cw58yIqAZhONrrabrYyYe3TuIqtIiOuTXVhsGau8hcrhhwSsDIQ==
+
+node-addon-api@^7.0.0:
+  version "7.0.0"
+  resolved "https://registry.yarnpkg.com/node-addon-api/-/node-addon-api-7.0.0.tgz#8136add2f510997b3b94814f4af1cce0b0e3962e"
+  integrity sha512-vgbBJTS4m5/KkE16t5Ly0WW9hz46swAstv0hYYwMtbG7AznRhNyfLRe8HZAiWIpcHzoO7HxhLuBQj9rJ/Ho0ZA==
 
 node-cache@^4.1.1:
   version "4.2.1"

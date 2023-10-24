@@ -156,7 +156,7 @@ impl SchedulerImpl {
         match task {
             GCTask::RemoveRemoteFile(remote_path) => {
                 log::trace!("Removing deactivated data file: {}", remote_path);
-                if let Err(e) = self.remote_fs.delete_file(&remote_path).await {
+                if let Err(e) = self.remote_fs.delete_file(remote_path.clone()).await {
                     log::error!(
                         "Could not remove deactivated data file({}): {}",
                         remote_path,
@@ -747,7 +747,7 @@ impl SchedulerImpl {
         if let MetaStoreEvent::Delete(TableId::WALs, row_id) = event {
             let file = self
                 .remote_fs
-                .local_file(WALStore::wal_remote_path(row_id).as_str())
+                .local_file(WALStore::wal_remote_path(row_id))
                 .await?;
             tokio::fs::remove_file(file).await?;
         }

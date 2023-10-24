@@ -280,10 +280,12 @@ services:
 
 ## Extend the Docker image
 
-If you need to use npm packages with native extensions inside [the `cube.js`
-configuration file][ref-config-js], you'll need to build your own Docker image.
-You can do this by first creating a `Dockerfile` and a corresponding
-`.dockerignore`:
+If you need to use dependencies (i.e., Python or npm packages) with native
+extensions inside [configuration files][ref-config-files] or [dynamic data
+models][ref-dynamic-data-models], build a custom Docker image.
+
+You can do this by creating a `Dockerfile` and a corresponding
+`.dockerignore` file:
 
 ```bash{promptUser: user}
 touch Dockerfile
@@ -296,23 +298,26 @@ Add this to the `Dockerfile`:
 FROM cubejs/cube:latest
 
 COPY . .
+RUN apt update && apt install -y pip
+RUN pip install -r requirements.txt
 RUN npm install
 ```
 
 And this to the `.dockerignore`:
 
 ```gitignore
-node_modules
-npm-debug.log
 schema
+cube.py
 cube.js
 .env
+node_modules
+npm-debug.log
 ```
 
 Then start the build process by running the following command:
 
 ```bash{promptUser: user}
-docker build -t <YOUR-USERNAME>/cubejs-custom-build .
+docker build -t <YOUR-USERNAME>/cube-custom-image .
 ```
 
 Finally, update your `docker-compose.yml` to use your newly-built image:
@@ -322,23 +327,32 @@ version: "2.2"
 
 services:
   cube_api:
-    image: <YOUR-USERNAME>/cubejs-custom-build
+    image: <YOUR-USERNAME>/cube-custom-image
     ports:
       - 4000:4000
     environment:
-      - CUBEJS_DB_TYPE=bigquery
-      - CUBEJS_DB_BQ_PROJECT_ID=cubejs-bq-cluster
-      - CUBEJS_DB_BQ_CREDENTIALS=<BQ-KEY>
-      - CUBEJS_DB_EXPORT_BUCKET=cubestore
-      - CUBEJS_CUBESTORE_HOST=cubestore_router
       - CUBEJS_API_SECRET=secret
+      # Other environment variables
     volumes:
       - .:/cube/conf
-      # Prevent dev dependencies leaking
-      - .empty:/cube/conf/node_modules/@cubejs-backend/
     depends_on:
       - cubestore_router
       - cube_refresh_worker
+      # Other container dependencies
+```
+
+Note that you shoudn't mount the whole current folder (`.:/cube/conf`)
+if you have dependencies in `package.json`. Doing so would effectively
+hide the `node_modules` folder inside the container, where dependency files
+installed with `npm install` reside, and result in errors like this:
+`Error: Cannot find module 'my_dependency'`. In that case, mount individual files:
+
+```yaml
+    # ...
+    volumes:
+      - ./schema:/cube/conf/schema
+      - ./cube.js:/cube/conf/cube.js
+      # Other necessary files
 ```
 
 [medium-letsencrypt-nginx]:
@@ -346,7 +360,8 @@ services:
 [link-cubejs-docker]: https://hub.docker.com/r/cubejs/cube
 [link-docker-app]: https://www.docker.com/products/docker-app
 [link-nginx]: https://www.nginx.com/
-[ref-config-js]: /reference/configuration/config
+[ref-config-files]: /product/configuration#cubepy-and-cubejs-files
+[ref-dynamic-data-models]: /product/data-modeling/dynamic
 [ref-config-queryrewrite]: /reference/configuration/config#queryrewrite
 [ref-config-sched-ref-ctx]:
   /reference/configuration/config#scheduledrefreshcontexts

@@ -364,12 +364,14 @@ export const pythonLoadConfig = async (content: string, options: { fileName: str
 export type PythonCtx = {
     __type: 'PythonCtx'
 } & {
-    [key: string]: Function
+  filters: Record<string, Function>
+  functions: Record<string, Function>
+  variables: Record<string, any>
 };
 
 export interface JinjaEngine {
     loadTemplate(templateName: string, templateContent: string): void;
-    renderTemplate(templateName: string, context: unknown, pythonContext: PythonCtx | null): string;
+    renderTemplate(templateName: string, context: unknown, pythonContext: Record<string, any> | null): string;
 }
 
 export class NativeInstance {
@@ -385,17 +387,16 @@ export class NativeInstance {
       return this.native;
     }
 
-    public newJinjaEngine(options: { debugInfo?: boolean }): JinjaEngine {
-      if (isFallbackBuild()) {
-        throw new Error('Python (newJinjaEngine) is not supported in fallback build');
-      }
-
+    public newJinjaEngine(options: { debugInfo?: boolean, filters: Record<string, Function> }): JinjaEngine {
       return this.getNative().newJinjaEngine(options);
     }
 
     public loadPythonContext(fileName: string, content: unknown): Promise<PythonCtx> {
       if (isFallbackBuild()) {
-        throw new Error('Python (loadPythonContext) is not supported in fallback build');
+        throw new Error(
+          'Python (loadPythonContext) is not supported because you are using the fallback build of native extension. Read more: ' +
+          'https://github.com/cube-js/cube/blob/master/packages/cubejs-backend-native/README.md#supported-architectures-and-platforms'
+        );
       }
 
       return this.getNative().pythonLoadModel(fileName, content);

@@ -3,6 +3,83 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.7](https://github.com/cube-js/cube/compare/v0.34.6...v0.34.7) (2023-10-23)
+
+
+### Features
+
+* **native:** Jinja - passing filters via TemplateContext from Python ([#7284](https://github.com/cube-js/cube/issues/7284)) ([1e92352](https://github.com/cube-js/cube/commit/1e9235293f3843caacc1d20fc458e0184e933c40))
+
+
+
+
+
+## [0.34.6](https://github.com/cube-js/cube/compare/v0.34.5...v0.34.6) (2023-10-20)
+
+
+### Bug Fixes
+
+* **native:** Init logger earlier without javascript side (silient errors) ([#7228](https://github.com/cube-js/cube/issues/7228)) ([1f6d49d](https://github.com/cube-js/cube/commit/1f6d49dbd0aa2e792db8c3bcefd54a8a434b4000))
+* **native:** Jinja - enable autoescape for .jinja (old naming) files ([#7243](https://github.com/cube-js/cube/issues/7243)) ([abf5a0c](https://github.com/cube-js/cube/commit/abf5a0cc05d378691e736c859fdbd9209ad1a336))
+
+
+### Features
+
+* **native:** Jinja - passing variables via TemplateContext from Python ([#7280](https://github.com/cube-js/cube/issues/7280)) ([e3dec88](https://github.com/cube-js/cube/commit/e3dec888870f6c37da2957ff49988e5769e37f3d))
+
+
+
+
+
+## [0.34.5](https://github.com/cube-js/cube/compare/v0.34.4...v0.34.5) (2023-10-16)
+
+
+### Features
+
+* **native:** Support SafeString for Python & Jinja ([#7242](https://github.com/cube-js/cube/issues/7242)) ([c6069cd](https://github.com/cube-js/cube/commit/c6069cd343d75dbc24a59ae4b941460231409350))
+
+
+
+
+
+## [0.34.4](https://github.com/cube-js/cube/compare/v0.34.3...v0.34.4) (2023-10-14)
+
+
+### Bug Fixes
+
+* **cross:** Enable shared python for aarch64-unknown-linux-gnu ([#7225](https://github.com/cube-js/cube/issues/7225)) ([2c4f48a](https://github.com/cube-js/cube/commit/2c4f48a615616bb99bc95ad34e9fc1a420c685c0))
+
+
+
+
+
+## [0.34.3](https://github.com/cube-js/cube/compare/v0.34.2...v0.34.3) (2023-10-12)
+
+
+### Bug Fixes
+
+* **native:** Improve error on scheduling Python task ([#7222](https://github.com/cube-js/cube/issues/7222)) ([c14c025](https://github.com/cube-js/cube/commit/c14c0251935d04cc2fa887b44f560024c6ce967d))
+
+
+### Features
+
+* **native:** Enable Python support for Linux/ARM64 ([#7220](https://github.com/cube-js/cube/issues/7220)) ([5486e26](https://github.com/cube-js/cube/commit/5486e2623057c189b6e15ef2e0dcbfa6e5e6dad0))
+
+
+
+
+
+## [0.34.2](https://github.com/cube-js/cube/compare/v0.34.1...v0.34.2) (2023-10-12)
+
+
+### Features
+
+* **native:** Support jinja inside yml in fallback build (without python) ([#7203](https://github.com/cube-js/cube/issues/7203)) ([e3e7e0e](https://github.com/cube-js/cube/commit/e3e7e0e987d1f0b433873779063fa709c0b43eeb))
+
+
+
+
+
 ## [0.34.1](https://github.com/cube-js/cube/compare/v0.34.0...v0.34.1) (2023-10-09)
 
 **Note:** Version bump only for package @cubejs-backend/native

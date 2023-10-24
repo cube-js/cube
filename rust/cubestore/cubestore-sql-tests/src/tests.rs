@@ -4394,6 +4394,21 @@ async fn rolling_window_query(service: Box<dyn SqlClient>) {
         rows(&[(1, 17), (2, 17), (3, 23), (4, 23), (5, 5)])
     );
 
+    let r = service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE 1 FOLLOWING) \
+             FROM (SELECT day, SUM(n) as n FROM s.Data GROUP BY 1) \
+             ROLLING_WINDOW DIMENSION day \
+             FROM 1 TO 5 EVERY 1 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[(1, 17), (2, 23), (3, 23), (4, 5), (5, 5)])
+    );
+
     // Same, without preceding, i.e. with missing nodes.
     let r = service
         .exec_query(
@@ -4760,6 +4775,28 @@ async fn rolling_window_query_timestamps(service: Box<dyn SqlClient>) {
             (jan[2], 17),
             (jan[3], 23),
             (jan[4], 23),
+            (jan[5], 5)
+        ])
+    );
+    let r = service
+        .exec_query(
+            "select day, rolling(sum(n) range interval '1 day' following offset start) \
+             from (select day, sum(n) as n from s.data group by 1) \
+             rolling_window dimension day \
+               from to_timestamp('2021-01-01t00:00:00z') \
+               to to_timestamp('2021-01-05t00:00:00z') \
+               every interval '1 day' \
+             order by 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (jan[1], 17),
+            (jan[2], 23),
+            (jan[3], 23),
+            (jan[4], 5),
             (jan[5], 5)
         ])
     );

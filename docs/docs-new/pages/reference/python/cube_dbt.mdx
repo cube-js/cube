@@ -101,6 +101,8 @@ dbt = Dbt.from_url(manifest_url).filter(
 
 Use to expose only necessary dbt models to the semantic layer.
 
+Note that values in `paths` should not be prefixed with `models/`.
+
 #### `Dbt.models`
 
 This property exposes a list of loaded dbt models as instances of the

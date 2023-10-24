@@ -2,7 +2,7 @@ use convert_case::{Case, Casing};
 use neon::prelude::*;
 use pyo3::{PyAny, PyResult};
 
-use crate::python::cross::{CLRepr, CLReprObject};
+use crate::cross::{CLRepr, CLReprObject, CLReprPython};
 
 pub struct CubeConfigPy {
     properties: CLReprObject,

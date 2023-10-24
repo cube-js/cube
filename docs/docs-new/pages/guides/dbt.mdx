@@ -176,7 +176,7 @@ This is particularly useful if you keep your data marts under
 from cube_dbt import Dbt
 
 manifest_url = 'https://cube-dbt-integration.s3.amazonaws.com/manifest.json'
-dbt = Dbt.from_url(manifest_url).filter(paths=['models/marts/'])
+dbt = Dbt.from_url(manifest_url).filter(paths=['marts/'])
 ```
 
 You can also load only models with certain tags. This is useful if you'd
@@ -211,7 +211,7 @@ from cube import TemplateContext
 from cube_dbt import Dbt
 
 manifest_url = 'https://cube-dbt-integration.s3.amazonaws.com/manifest.json'
-dbt = Dbt.from_url(manifest_url).filter(paths=['models/marts/'])
+dbt = Dbt.from_url(manifest_url).filter(paths=['marts/'])
 
 template = TemplateContext()
 

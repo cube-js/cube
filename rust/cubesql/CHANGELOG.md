@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.6](https://github.com/cube-js/cube/compare/v0.34.5...v0.34.6) (2023-10-20)
+
+
+### Bug Fixes
+
+* **native:** Init logger earlier without javascript side (silient errors) ([#7228](https://github.com/cube-js/cube/issues/7228)) ([1f6d49d](https://github.com/cube-js/cube/commit/1f6d49dbd0aa2e792db8c3bcefd54a8a434b4000))
+
+
+
+
+
 ## [0.34.1](https://github.com/cube-js/cube.js/compare/v0.34.0...v0.34.1) (2023-10-09)
 
 

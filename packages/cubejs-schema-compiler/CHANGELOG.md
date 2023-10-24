@@ -3,6 +3,63 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.7](https://github.com/cube-js/cube/compare/v0.34.6...v0.34.7) (2023-10-23)
+
+
+### Features
+
+* **native:** Jinja - passing filters via TemplateContext from Python ([#7284](https://github.com/cube-js/cube/issues/7284)) ([1e92352](https://github.com/cube-js/cube/commit/1e9235293f3843caacc1d20fc458e0184e933c40))
+
+
+
+
+
+## [0.34.6](https://github.com/cube-js/cube/compare/v0.34.5...v0.34.6) (2023-10-20)
+
+
+### Features
+
+* **native:** Jinja - passing variables via TemplateContext from Python ([#7280](https://github.com/cube-js/cube/issues/7280)) ([e3dec88](https://github.com/cube-js/cube/commit/e3dec888870f6c37da2957ff49988e5769e37f3d))
+
+
+
+
+
+## [0.34.5](https://github.com/cube-js/cube/compare/v0.34.4...v0.34.5) (2023-10-16)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.34.4](https://github.com/cube-js/cube/compare/v0.34.3...v0.34.4) (2023-10-14)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.34.3](https://github.com/cube-js/cube/compare/v0.34.2...v0.34.3) (2023-10-12)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.34.2](https://github.com/cube-js/cube/compare/v0.34.1...v0.34.2) (2023-10-12)
+
+
+### Features
+
+* **native:** Support jinja inside yml in fallback build (without python) ([#7203](https://github.com/cube-js/cube/issues/7203)) ([e3e7e0e](https://github.com/cube-js/cube/commit/e3e7e0e987d1f0b433873779063fa709c0b43eeb))
+
+
+
+
+
 ## [0.34.1](https://github.com/cube-js/cube/compare/v0.34.0...v0.34.1) (2023-10-09)
 
 

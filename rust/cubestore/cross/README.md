@@ -37,6 +37,7 @@ docker push cubejs/rust-cross:x86_64-unknown-linux-musl-$CROSS_VERSION
 docker push cubejs/rust-cross:aarch64-unknown-linux-gnu-$CROSS_VERSION
 
 # Verify versions
-docker run --rm -it cubejs/rust-cross:x86_64-unknown-linux-gnu-$CROSS_VERSION cc --version
-docker run --rm -it cubejs/rust-cross:x86_64-unknown-linux-gnu-buster-$CROSS_VERSION cc --version
+docker run --platform linux/amd64 --rm -it cubejs/rust-cross:x86_64-unknown-linux-gnu-$CROSS_VERSION cc --version
+docker run --platform linux/amd64 --rm -it cubejs/rust-cross:x86_64-unknown-linux-gnu-buster-$CROSS_VERSION cc --version
+docker run --platform linux/amd64 --rm -it cubejs/rust-cross:aarch64-unknown-linux-gnu-$CROSS_VERSION cc --version
 ```
