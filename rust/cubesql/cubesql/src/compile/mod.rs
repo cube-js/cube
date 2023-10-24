@@ -18520,7 +18520,7 @@ ORDER BY \"COUNT(count)\" DESC"
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
-            "SELECT COALESCE(customer_gender, 'N/A'), MIN(avgPrice) mp FROM (SELECT AVG(avgPrice) avgPrice, customer_gender FROM KibanaSampleDataEcommerce GROUP BY 2 LIMIT 1) a GROUP BY 1"
+            "SELECT COALESCE(customer_gender, 'N/A'), AVG(avgPrice) mp FROM KibanaSampleDataEcommerce a GROUP BY 1"
                 .to_string(),
             DatabaseProtocol::PostgreSQL,
         )
@@ -18549,7 +18549,7 @@ ORDER BY \"COUNT(count)\" DESC"
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
-            "SELECT CASE WHEN customer_gender = 'female' THEN 'f' ELSE 'm' END, MIN(avgPrice) mp FROM (SELECT AVG(avgPrice) avgPrice, customer_gender FROM KibanaSampleDataEcommerce GROUP BY 2 LIMIT 1) a GROUP BY 1"
+            "SELECT CASE WHEN customer_gender = 'female' THEN 'f' ELSE 'm' END, AVG(avgPrice) mp FROM KibanaSampleDataEcommerce a GROUP BY 1"
                 .to_string(),
             DatabaseProtocol::PostgreSQL,
         )
@@ -18666,7 +18666,7 @@ ORDER BY \"COUNT(count)\" DESC"
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
-            "SELECT * FROM (SELECT CASE WHEN customer_gender = 'female' THEN 'f' ELSE 'm' END, MIN(avgPrice) mp FROM (SELECT AVG(avgPrice) avgPrice, customer_gender FROM KibanaSampleDataEcommerce GROUP BY 2 LIMIT 1) a GROUP BY 1) q LIMIT 1123"
+            "SELECT * FROM (SELECT CASE WHEN customer_gender = 'female' THEN 'f' ELSE 'm' END, AVG(avgPrice) mp FROM KibanaSampleDataEcommerce a GROUP BY 1) q LIMIT 1123"
                 .to_string(),
             DatabaseProtocol::PostgreSQL,
         )
@@ -18686,6 +18686,27 @@ ORDER BY \"COUNT(count)\" DESC"
             .unwrap()
             .sql
             .contains("LIMIT 1123"));
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_case_wrapper_ungrouped_on_dimension() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT CASE WHEN SUM(taxful_total_price) > 0 THEN SUM(taxful_total_price) ELSE 0 END FROM KibanaSampleDataEcommerce a"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+            .await;
 
         let physical_plan = query_plan.as_physical_plan().await.unwrap();
         println!(
