@@ -18,12 +18,18 @@ export function useCubeQuery(query, options = {}) {
   let subscribeRequest = null;
 
   const progressCallback = ({ progressResponse }) => setProgress(progressResponse);
+  
+  useEffect(() => {
+    if (options.cubejsApi && !options.cubeApi) {
+      console.warn('"cubejsApi" is deprecated and will be removed in the following version. Use "cubeApi" instead.');
+    }
+  }, [options.cubeApi, options.cubejsApi]);
 
   async function fetch() {
     const { resetResultSetOnChange } = options;
-    const cubejsApi = options.cubejsApi || context?.cubejsApi;
+    const cubeApi = options.cubeApi || options.cubejsApi || context?.cubeApi || context?.cubejsApi;
 
-    if (!cubejsApi) {
+    if (!cubeApi) {
       throw new Error('Cube API client is not provided');
     }
 
@@ -35,7 +41,7 @@ export function useCubeQuery(query, options = {}) {
     setLoading(true);
     
     try {
-      const response = await cubejsApi.load(query, {
+      const response = await cubeApi.load(query, {
         mutexObj: mutexRef.current,
         mutexKey: 'query',
         progressCallback,
@@ -62,9 +68,9 @@ export function useCubeQuery(query, options = {}) {
   useEffect(() => {
     const { skip = false, resetResultSetOnChange } = options;
 
-    const cubejsApi = options.cubejsApi || context?.cubejsApi;
+    const cubeApi = options.cubejsApi || context?.cubejsApi;
 
-    if (!cubejsApi) {
+    if (!cubeApi) {
       throw new Error('Cube API client is not provided');
     }
 
@@ -87,7 +93,7 @@ export function useCubeQuery(query, options = {}) {
           }
 
           if (options.subscribe) {
-            subscribeRequest = cubejsApi.subscribe(
+            subscribeRequest = cubeApi.subscribe(
               query,
               {
                 mutexObj: mutexRef.current,
