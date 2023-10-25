@@ -68,7 +68,7 @@ export function useCubeQuery(query, options = {}) {
   useEffect(() => {
     const { skip = false, resetResultSetOnChange } = options;
 
-    const cubeApi = options.cubejsApi || context?.cubejsApi;
+    const cubeApi = options.cubeApi || options.cubejsApi || context?.cubeApi || context?.cubejsApi;
 
     if (!cubeApi) {
       throw new Error('Cube API client is not provided');
