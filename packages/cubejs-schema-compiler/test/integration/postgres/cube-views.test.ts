@@ -235,6 +235,17 @@ view(\`OrdersView\`, {
 view(\`OrdersView2\`, {
   includes: [Orders.count],
 });
+
+view(\`OrdersView3\`, {
+  cubes: [{
+    join_path: Orders,
+    includes: '*'
+  }, {
+    join_path: Orders.Products.ProductCategories,
+    includes: '*',
+    split: true
+  }]
+});
     `);
 
   async function runQueryTest(q: any, expectedResult: any, additionalTest?: (query: BaseQuery) => any) {
@@ -400,4 +411,13 @@ view(\`OrdersView2\`, {
     const cube = metaTransformer.cubes.find(c => c.config.name === 'Orders');
     expect(cube.config.measures.filter((({ isVisible }) => isVisible)).length).toBe(0);
   });
+
+  it('split views', async () => runQueryTest({
+    measures: ['OrdersView3.count'],
+    dimensions: ['OrdersView3_ProductCategories.name'],
+    order: [{ id: 'OrdersView3_ProductCategories.name' }],
+  }, [{
+    orders_view3__count: '2',
+    orders_view3__product_categories__name: 'Groceries',
+  }]));
 });
