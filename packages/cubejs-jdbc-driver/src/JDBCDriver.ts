@@ -15,6 +15,7 @@ import { BaseDriver } from '@cubejs-backend/base-driver';
 import * as SqlString from 'sqlstring';
 import { promisify } from 'util';
 import genericPool, { Factory, Pool } from 'generic-pool';
+import path from 'path';
 
 import { DriverOptionsInterface, SupportedDrivers } from './supported-drivers';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -37,7 +38,10 @@ type JdbcStatement = {
 const initMvn = (customClassPath: any) => {
   if (!mvnPromise) {
     mvnPromise = new Promise((resolve, reject) => {
-      mvn((err: any, mvnResults: any) => {
+      const options = {
+        packageJsonPath: `${path.join(__dirname, '../..')}/package.json`,
+      };
+      mvn(options, (err: any, mvnResults: any) => {
         if (err && !err.message.includes('Could not find java property')) {
           reject(err);
         } else {
