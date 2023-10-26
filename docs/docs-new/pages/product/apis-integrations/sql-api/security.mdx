@@ -23,8 +23,19 @@ module.exports = {
       };
     }
 
-    throw new Error("Incorrect user name or password");
+    return {
+      password: null,
+      securityContext: {
+        invalidUser: true
+      },
+    };
   },
+  queryRewrite: (query, { securityContext }) => {
+    if (securityContext.invalidUser) {
+      throw new Error("Incorrect user name or password");
+    }
+    return query;
+  }
 };
 ```
 
