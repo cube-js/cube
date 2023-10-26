@@ -376,9 +376,15 @@ export type PythonCtx = {
   variables: Record<string, any>
 };
 
+export type JinjaEngineOptions = {
+  debugInfo?: boolean,
+  filters: Record<string, Function>,
+  workers: number
+};
+
 export interface JinjaEngine {
     loadTemplate(templateName: string, templateContent: string): void;
-    renderTemplate(templateName: string, context: unknown, pythonContext: Record<string, any> | null): string;
+    renderTemplate(templateName: string, context: unknown, pythonContext: Record<string, any> | null): Promise<string>;
 }
 
 export class NativeInstance {
@@ -394,7 +400,7 @@ export class NativeInstance {
       return this.native;
     }
 
-    public newJinjaEngine(options: { debugInfo?: boolean, filters: Record<string, Function> }): JinjaEngine {
+    public newJinjaEngine(options: JinjaEngineOptions): JinjaEngine {
       return this.getNative().newJinjaEngine(options);
     }
 

@@ -230,7 +230,7 @@ export class DataSchemaCompiler {
         // TODO do Jinja syntax check with jinja compiler
       ) && file.content.match(JINJA_SYNTAX)
     ) {
-      this.yamlCompiler.compileYamlWithJinjaFile(
+      asyncModules.push(() => this.yamlCompiler.compileYamlWithJinjaFile(
         file,
         errorsReport,
         cubes,
@@ -241,7 +241,7 @@ export class DataSchemaCompiler {
         compiledFiles,
         this.standalone ? {} : this.cloneCompileContextWithGetterAlias(this.compileContext),
         this.pythonContext
-      );
+      ));
     } else if (R.endsWith('.yml', file.fileName) || R.endsWith('.yaml', file.fileName)) {
       this.yamlCompiler.compileYamlFile(file, errorsReport, cubes, contexts, exports, asyncModules, toCompile, compiledFiles);
     }
