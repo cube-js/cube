@@ -9,7 +9,7 @@ use pyo3::{AsPyPointer, Py, PyAny, PyErr, PyObject, Python, ToPyObject};
 
 #[derive(Debug, Clone)]
 pub enum PythonRef {
-    PyObject(Py<PyAny>),
+    PyObject(PyObject),
     PyFunction(Py<PyFunction>),
     /// Special type to transfer functions through JavaScript
     /// In JS it's an external object. It's not the same as Function.
