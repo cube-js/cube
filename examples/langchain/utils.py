@@ -1,16 +1,10 @@
 import streamlit as st
-import pickle
 import datetime
 import os
 import psycopg2
 
 from dotenv import load_dotenv
-from pathlib import Path
-from typing import List
-from langchain.vectorstores import VectorStore
 from langchain.prompts import PromptTemplate
-from langchain.embeddings import OpenAIEmbeddings
-from langchain.vectorstores.faiss import FAISS
 from langchain.docstore.document import Document
 
 
@@ -28,21 +22,6 @@ def check_input(question: str):
         raise Exception("Please enter a question.")
     else:
         pass
-
-
-def init_vectorstore() -> VectorStore:
-    vectorstore: VectorStore = None
-    if not Path("vectorstore.pkl").exists():
-        st.warning("vectorstore.pkl does not exist, please run ingest.py first")
-    with open("vectorstore.pkl", "rb") as f:
-        vectorstore = pickle.load(f)
-    return vectorstore
-
-
-def create_vectorstore(documents: List[Document]) -> VectorStore:
-    embeddings = OpenAIEmbeddings()
-    vectorstore = FAISS.from_documents(documents, embeddings)
-    return vectorstore
 
 
 _postgres_prompt = """\
