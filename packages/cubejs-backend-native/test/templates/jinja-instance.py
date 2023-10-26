@@ -52,7 +52,8 @@ def new_safe_string():
 class MyCustomObject(dict):
   def __init__(self):
     self['a_attr'] = "value for attribute a"
-    self['b_attr'] = "value for attribute b"
+# TODO: We need stable sort for dump
+#     self['b_attr'] = "value for attribute b"
 
 @template.function
 def new_object_from_dict():

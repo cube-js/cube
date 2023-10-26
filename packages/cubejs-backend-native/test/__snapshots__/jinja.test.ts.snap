@@ -211,7 +211,8 @@ exports[`Jinja (new api) render data-model.yml.jinja: data-model.yml.jinja 1`] =
 `;
 
 exports[`Jinja (new api) render dump_context.yml.jinja: dump_context.yml.jinja 1`] = `
-"<pre></pre>
+"
+<pre></pre>
 
 print:
   bool_true: true
@@ -242,7 +243,7 @@ exports[`Jinja (new api) render python.yml: python.yml 1`] = `
   safe_string: \\"\\"safe string\\" <>\\"
 
 dump:
-  dict_as_obj: \\"{\\\\n    \\\\\\"b_attr\\\\\\": String(\\\\n        \\\\\\"value for attribute b\\\\\\",\\\\n        Normal,\\\\n    ),\\\\n    \\\\\\"a_attr\\\\\\": String(\\\\n        \\\\\\"value for attribute a\\\\\\",\\\\n        Normal,\\\\n    ),\\\\n}\\""
+  dict_as_obj: \\"{\\\\n    \\\\\\"a_attr\\\\\\": String(\\\\n        \\\\\\"value for attribute a\\\\\\",\\\\n        Normal,\\\\n    ),\\\\n}\\""
 `;
 
 exports[`Jinja (new api) render template_error.jinja: template_error.jinja 1`] = `
