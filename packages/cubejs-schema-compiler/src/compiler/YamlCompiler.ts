@@ -45,11 +45,6 @@ export class YamlCompiler {
   }
 
   public initFromPythonContext(ctx: PythonCtx) {
-    console.log({
-      debugInfo: getEnv('devMode'),
-      filters: ctx.filters,
-    });
-
     this.jinjaEngine = this.nativeInstance.newJinjaEngine({
       debugInfo: getEnv('devMode'),
       filters: ctx.filters,
