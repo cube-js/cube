@@ -541,6 +541,7 @@ const viewSchema = inherit(baseSchema, {
     Joi.object().keys({
       joinPath: Joi.func().required(),
       prefix: Joi.boolean(),
+      split: Joi.boolean(),
       alias: Joi.string(),
       includes: Joi.alternatives([
         Joi.string().valid('*'),
@@ -553,6 +554,8 @@ const viewSchema = inherit(baseSchema, {
         ]))
       ]).required(),
       excludes: Joi.array().items(Joi.string().required()),
+    }).oxor('split', 'prefix').messages({
+      'object.oxor': 'Using split together with prefix is not supported'
     })
   ),
 });
@@ -641,6 +644,6 @@ export class CubeValidator {
   }
 
   isCubeValid(cube) {
-    return this.validCubes[cube.name];
+    return this.validCubes[cube.name] || cube.isSplitView;
   }
 }

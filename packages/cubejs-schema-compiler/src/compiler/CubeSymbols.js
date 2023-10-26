@@ -37,7 +37,13 @@ export class CubeSymbols {
       R.sortBy(c => !!c.isView),
     )(cubes);
     for (const cube of sortedByDependency) {
-      this.symbols[cube.name] = this.transform(cube.name, errorReporter.inContext(`${cube.name} cube`));
+      const splitViews = {};
+      this.symbols[cube.name] = this.transform(cube.name, errorReporter.inContext(`${cube.name} cube`), splitViews);
+      for (const viewName of Object.keys(splitViews)) {
+        // TODO can we define it when cubeList is defined?
+        this.cubeList.push(splitViews[viewName]);
+        this.symbols[viewName] = splitViews[viewName];
+      }
     }
   }
 
@@ -110,7 +116,7 @@ export class CubeSymbols {
     return cubeObject;
   }
 
-  transform(cubeName, errorReporter) {
+  transform(cubeName, errorReporter, splitViews) {
     const cube = this.getCubeDefinition(cubeName);
     const duplicateNames = R.compose(
       R.map(nameToDefinitions => nameToDefinitions[0]),
@@ -138,7 +144,7 @@ export class CubeSymbols {
     }
 
     if (this.evaluateViews) {
-      this.prepareIncludes(cube, errorReporter);
+      this.prepareIncludes(cube, errorReporter, splitViews);
     }
 
     return Object.assign(
@@ -209,24 +215,28 @@ export class CubeSymbols {
   /**
    * @protected
    */
-  prepareIncludes(cube, errorReporter) {
+  prepareIncludes(cube, errorReporter, splitViews) {
     if (!cube.includes && !cube.cubes) {
       return;
     }
     const types = ['measures', 'dimensions', 'segments'];
     for (const type of types) {
-      const cubeIncludes = cube.cubes && this.membersFromCubes(cube.cubes, type, errorReporter) || [];
+      const cubeIncludes = cube.cubes && this.membersFromCubes(cube, cube.cubes, type, errorReporter, splitViews) || [];
       const includes = cube.includes && this.membersFromIncludeExclude(cube.includes, cube.name, type) || [];
       const excludes = cube.excludes && this.membersFromIncludeExclude(cube.excludes, cube.name, type) || [];
       // cube includes will take precedence in case of member clash
       const finalIncludes = this.diffByMember(this.diffByMember(includes, cubeIncludes).concat(cubeIncludes), excludes);
       const includeMembers = this.generateIncludeMembers(finalIncludes, cube.name, type);
-      for (const [memberName, memberDefinition] of includeMembers) {
-        if (cube[type]?.[memberName]) {
-          errorReporter.error(`Included member '${memberName}' conflicts with existing member of '${cube.name}'. Please consider excluding this member.`);
-        } else {
-          cube[type][memberName] = memberDefinition;
-        }
+      this.applyIncludeMembers(includeMembers, cube, type, errorReporter);
+    }
+  }
+
+  applyIncludeMembers(includeMembers, cube, type, errorReporter) {
+    for (const [memberName, memberDefinition] of includeMembers) {
+      if (cube[type]?.[memberName]) {
+        errorReporter.error(`Included member '${memberName}' conflicts with existing member of '${cube.name}'. Please consider excluding this member.`);
+      } else {
+        cube[type][memberName] = memberDefinition;
       }
     }
   }
@@ -234,7 +244,7 @@ export class CubeSymbols {
   /**
    * @protected
    */
-  membersFromCubes(cubes, type, errorReporter) {
+  membersFromCubes(parentCube, cubes, type, errorReporter, splitViews) {
     return R.unnest(cubes.map(cubeInclude => {
       const fullPath = this.evaluateReferences(null, cubeInclude.joinPath, { collectJoinHints: true });
       const split = fullPath.split('.');
@@ -277,7 +287,29 @@ export class CubeSymbols {
           member: `${cubeReference}.${exclude}`
         } : undefined;
       });
-      return this.diffByMember(includes.filter(Boolean), excludes.filter(Boolean));
+
+      const finalIncludes = this.diffByMember(includes.filter(Boolean), excludes.filter(Boolean));
+
+      if (cubeInclude.split) {
+        const viewName = `${parentCube.name}_${cubeName}`;
+        let splitViewDef = splitViews[viewName];
+        if (!splitViewDef) {
+          splitViews[viewName] = this.createCube({
+            name: viewName,
+            isView: true,
+            // TODO might worth adding to validation as it goes around it right now
+            isSplitView: true,
+          });
+          splitViewDef = splitViews[viewName];
+        }
+
+        const includeMembers = this.generateIncludeMembers(finalIncludes, parentCube.name, type);
+        this.applyIncludeMembers(includeMembers, splitViewDef, type, errorReporter);
+
+        return [];
+      } else {
+        return finalIncludes;
+      }
     }));
   }
 
