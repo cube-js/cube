@@ -339,7 +339,7 @@ impl Rewriter {
                     vec![]
                 };
                 let extractor = Extractor::new(&runner.egraph, BestCubePlan);
-                let (_, best) = extractor.find_best(root);
+                let (best_cost, best) = extractor.find_best(root);
                 let qtrace_best_graph = if Qtrace::is_enabled() {
                     best.as_ref().iter().cloned().collect()
                 } else {
@@ -354,6 +354,7 @@ impl Rewriter {
                         .map(|(i, n)| format!("{}: {:?}", i, n))
                         .join(", ")
                 );
+                log::debug!("Best cost: {:?}", best_cost);
                 let converter =
                     LanguageToLogicalPlanConverter::new(best, cube_context.clone(), auth_context);
                 Ok((

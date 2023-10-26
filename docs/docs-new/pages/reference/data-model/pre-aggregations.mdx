@@ -1512,8 +1512,56 @@ from `GROUP BY` last. For range filter columns like `contains`, `>`, `<`, `>=`,
 before `GROUP BY` dimensions. Otherwise, for low selectivity range filters,
 consider putting these columns after `GROUP BY` dimensions.
 
-For `original_sql` pre-aggregations, the original column names as strings can be
-used:
+In the case that you want to reference the time dimension in the index, the original column name as a string can be used.
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  sql_table: `orders`,
+
+  pre_aggregations: {
+    category_and_date: {
+      measures: [CUBE.count],
+      dimensions: [CUBE.category],
+      time_dimension: CUBE.created_at,
+      granularity: `day`,
+      indexes: {
+        category_created_at_index: {
+          columns: [CUBE.category, `orders__created_at_day`],
+        },
+      },
+    },
+  },
+
+  // ...
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    sql_table: orders
+
+    pre_aggregations:
+      - name: category_and_date
+        measures:
+          - CUBE.count
+        dimensions:
+          - CUBE.category
+        time_dimension: CUBE.created_at
+        granularity: day
+        indexes:
+          - name: category_created_at_index
+            columns:
+              - CUBE.category
+              - orders__created_at_day
+    # ...
+```
+
+</CodeTabs>
+
+The same approach works for `original_sql` pre-aggregations:
 
 <CodeTabs>
 

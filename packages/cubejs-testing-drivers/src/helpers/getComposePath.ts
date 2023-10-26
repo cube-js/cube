@@ -40,7 +40,7 @@ export function getComposePath(type: string, isLocal: boolean): [path: string, f
       } : {}),
       store: {
         container_name: 'store',
-        image: 'cubejs/cubestore:latest',
+        image: `cubejs/cubestore:${process.arch === 'arm64' ? 'arm64v8' : 'latest'}`,
         ports: ['3030'],
         restart: 'always',
       }

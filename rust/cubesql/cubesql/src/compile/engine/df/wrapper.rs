@@ -437,15 +437,28 @@ impl CubeScanWrapperNode {
                                 .chain(group_expr.iter())
                                 .chain(aggr_expr.iter())
                                 .map(|e| {
-                                    Ok((
-                                        Column {
-                                            relation: alias.clone(),
-                                            name: expr_name(&e, &schema)?,
-                                        },
-                                        e.clone(),
-                                    ))
+                                    let name = expr_name(&e, &schema)?;
+                                    Ok(vec![
+                                        (
+                                            Column {
+                                                relation: alias.clone(),
+                                                name: name.clone(),
+                                            },
+                                            e.clone(),
+                                        ),
+                                        (
+                                            Column {
+                                                relation: None,
+                                                name: name,
+                                            },
+                                            e.clone(),
+                                        ),
+                                    ])
                                 })
-                                .collect::<Result<HashMap<_, _>>>()?;
+                                .collect::<Result<Vec<_>>>()?
+                                .into_iter()
+                                .flatten()
+                                .collect::<HashMap<_, _>>();
 
                             let (order, mut sql) = Self::generate_column_expr(
                                 plan.clone(),
