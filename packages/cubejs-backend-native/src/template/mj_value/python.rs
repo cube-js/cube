@@ -232,7 +232,7 @@ impl StructObject for JinjaPythonObject {
                     for key in dict_ref.keys() {
                         fields.push(key.to_string().into());
                     }
-                },
+                }
                 Err(err) => {
                     #[cfg(debug_assertions)]
                     log::trace!("Unable to extract PyDict: {:?}", err)
