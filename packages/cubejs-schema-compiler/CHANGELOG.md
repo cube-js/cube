@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.9](https://github.com/cube-js/cube/compare/v0.34.8...v0.34.9) (2023-10-26)
+
+
+### Features
+
+* **native:** Jinja - support fields reflection for PyObject ([#7312](https://github.com/cube-js/cube/issues/7312)) ([e2569a9](https://github.com/cube-js/cube/commit/e2569a9407f86380831d410be8df0e9ef27d5b40))
+* Split view support ([#7308](https://github.com/cube-js/cube/issues/7308)) ([1e722dd](https://github.com/cube-js/cube/commit/1e722dd0cc1a29b6e6554b855b7899abe5746a07))
+
+
+
+
+
 ## [0.34.8](https://github.com/cube-js/cube/compare/v0.34.7...v0.34.8) (2023-10-25)
 
 **Note:** Version bump only for package @cubejs-backend/schema-compiler

@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.9](https://github.com/cube-js/cube/compare/v0.34.8...v0.34.9) (2023-10-26)
+
+
+### Bug Fixes
+
+* Correct GraphQL endpoint displayed on front-end ([#7226](https://github.com/cube-js/cube/issues/7226)) Thanks [@peterklingelhofer](https://github.com/peterklingelhofer) ! ([4ae0f18](https://github.com/cube-js/cube/commit/4ae0f18b05184c9d3bf1df6bca6d18bbb29f63b1))
+
+
+
+
+
 ## [0.34.2](https://github.com/cube-js/cube/compare/v0.34.1...v0.34.2) (2023-10-12)
 
 

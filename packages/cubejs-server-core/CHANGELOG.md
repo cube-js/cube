@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.9](https://github.com/cube-js/cube/compare/v0.34.8...v0.34.9) (2023-10-26)
+
+
+### Bug Fixes
+
+* **server-core:** Specify maximum for continueWaitTimeout (90 seconds) ([#7301](https://github.com/cube-js/cube/issues/7301)) ([148fb96](https://github.com/cube-js/cube/commit/148fb966d25d2f15d413300304a664ee275a1686))
+
+
+
+
+
 ## [0.34.8](https://github.com/cube-js/cube/compare/v0.34.7...v0.34.8) (2023-10-25)
 
 **Note:** Version bump only for package @cubejs-backend/server-core

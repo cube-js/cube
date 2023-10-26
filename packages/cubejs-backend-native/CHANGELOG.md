@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.9](https://github.com/cube-js/cube/compare/v0.34.8...v0.34.9) (2023-10-26)
+
+
+### Features
+
+* **native:** Jinja - support fields reflection for PyObject ([#7312](https://github.com/cube-js/cube/issues/7312)) ([e2569a9](https://github.com/cube-js/cube/commit/e2569a9407f86380831d410be8df0e9ef27d5b40))
+* **native:** Jinja - upgrade engine (fixes macros memory leak & stack overflow) ([#7313](https://github.com/cube-js/cube/issues/7313)) ([792e265](https://github.com/cube-js/cube/commit/792e265507d12e4d55d4777fa83b5c2148acbc9e))
+
+
+
+
+
 ## [0.34.8](https://github.com/cube-js/cube/compare/v0.34.7...v0.34.8) (2023-10-25)
 
 **Note:** Version bump only for package @cubejs-backend/native
