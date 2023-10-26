@@ -441,8 +441,8 @@ these values can result in application instability and/or downtime.
 You can pass this object to set advanced options for the query orchestrator.
 
 | Option                                       | Description                                                                                                                                                                                                                                                                                                                                                                                       | Default Value           |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
-| continueWaitTimeout                          | Long polling interval                                                                                                                                                                                                                                                                                                                                                                             | `5`                     |
+|----------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------|
+| continueWaitTimeout                          | Long polling interval in seconds, maximum is 90                                                                                                                                                                                                                                                                                                                                                   | `5`                     |
 | rollupOnlyMode                               | When enabled, an error will be thrown if a query can't be served from a pre-aggregation (rollup)                                                                                                                                                                                                                                                                                                  | `false`                 |
 | queryCacheOptions                            | Query cache options for DB queries                                                                                                                                                                                                                                                                                                                                                                | `{}`                    |
 | queryCacheOptions.refreshKeyRenewalThreshold | Time in seconds to cache the result of [`refresh_key`][ref-schema-cube-ref-refresh-key] check                                                                                                                                                                                                                                                                                                     | `defined by DB dialect` |
@@ -479,7 +479,7 @@ Timeout and interval options' values are in seconds.
 from cube import config
 
 config.orchestrator_options = {
-  'continueWaitTimeout': 1000,
+  'continueWaitTimeout': 10,
   'rollupOnlyMode': False,
   'queryCacheOptions': {
     'refreshKeyRenewalThreshold': 30,
@@ -507,7 +507,7 @@ config.orchestrator_options = {
 ```javascript
 module.exports = {
   orchestratorOptions: {
-    continueWaitTimeout: 1000,
+    continueWaitTimeout: 10,
     rollupOnlyMode: false,
     queryCacheOptions: {
       refreshKeyRenewalThreshold: 30,
