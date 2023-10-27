@@ -5461,6 +5461,12 @@ impl SplitRules {
         let distinct_var = distinct_var.map(|v| var!(v));
         let out_expr_var = out_expr_var.map(|v| var!(v));
         let meta = self.cube_context.meta.clone();
+        let disable_strict_agg_type_match = self
+            .cube_context
+            .sessions
+            .server
+            .config_obj
+            .disable_strict_agg_type_match();
         move |egraph, subst| {
             for alias_to_cube in var_iter!(
                 egraph[subst[cube_expr_var]],
@@ -5501,7 +5507,10 @@ impl SplitRules {
                                                     Some(&fun),
                                                     *distinct,
                                                 );
-                                                if !measure.is_same_agg_type(&agg_type.unwrap()) {
+                                                if !measure.is_same_agg_type(
+                                                    &agg_type.unwrap(),
+                                                    disable_strict_agg_type_match,
+                                                ) {
                                                     if let Some(expr_name) = original_expr_name(
                                                         egraph,
                                                         subst[aggr_expr_var],

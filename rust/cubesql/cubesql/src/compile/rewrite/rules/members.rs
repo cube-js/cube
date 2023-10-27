@@ -1975,6 +1975,12 @@ impl MemberRules {
         let cast_data_type_var = cast_data_type_var.map(|var| var!(var));
         let measure_out_var = var!(measure_out_var);
         let meta_context = self.cube_context.meta.clone();
+        let disable_strict_agg_type_match = self
+            .cube_context
+            .sessions
+            .server
+            .config_obj
+            .disable_strict_agg_type_match();
         move |egraph, subst| {
             if let Some(alias) = original_expr_name(egraph, subst[original_expr_var]) {
                 for measure_name in var_iter!(egraph[subst[measure_name_var]], MeasureName)
@@ -2040,6 +2046,7 @@ impl MemberRules {
                                                 cube_alias.to_string(),
                                                 subst[original_expr_var],
                                                 alias_to_cube.clone(),
+                                                disable_strict_agg_type_match,
                                             );
                                             return true;
                                         }
@@ -2088,6 +2095,12 @@ impl MemberRules {
         let cast_data_type_var = cast_data_type_var.map(|var| var!(var));
         let measure_out_var = measure_out_var.parse().unwrap();
         let meta_context = self.cube_context.meta.clone();
+        let disable_strict_agg_type_match = self
+            .cube_context
+            .sessions
+            .server
+            .config_obj
+            .disable_strict_agg_type_match();
         move |egraph, subst| {
             for column in measure_var
                 .map(|measure_var| {
@@ -2153,6 +2166,7 @@ impl MemberRules {
                                                 cube_alias,
                                                 subst[aggr_expr_var],
                                                 alias_to_cube,
+                                                disable_strict_agg_type_match,
                                             );
 
                                             return true;
@@ -2192,8 +2206,14 @@ impl MemberRules {
         cube_alias: String,
         expr: Id,
         alias_to_cube: Vec<((String, String), String)>,
+        disable_strict_agg_type_match: bool,
     ) {
-        if call_agg_type.is_some() && !measure.is_same_agg_type(call_agg_type.as_ref().unwrap()) {
+        if call_agg_type.is_some()
+            && !measure.is_same_agg_type(
+                call_agg_type.as_ref().unwrap(),
+                disable_strict_agg_type_match,
+            )
+        {
             let mut agg_type = measure
                 .agg_type
                 .as_ref()

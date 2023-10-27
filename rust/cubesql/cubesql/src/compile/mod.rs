@@ -1660,8 +1660,11 @@ mod tests {
     use crate::{
         compile::{
             rewrite::rewriter::Rewriter,
-            test::{get_string_cube_meta, get_test_tenant_ctx_with_meta},
+            test::{
+                get_string_cube_meta, get_test_session_with_config, get_test_tenant_ctx_with_meta,
+            },
         },
+        config::{ConfigObj, ConfigObjImpl},
         sql::{dataframe::batch_to_dataframe, types::StatusFlags},
     };
     use datafusion::{logical_plan::PlanVisitor, physical_plan::displayable};
@@ -1697,6 +1700,23 @@ mod tests {
         let query =
             convert_sql_to_cube_query(&query, get_test_tenant_ctx(), get_test_session(db).await)
                 .await;
+
+        query.unwrap()
+    }
+
+    async fn convert_select_to_query_plan_with_config(
+        query: String,
+        db: DatabaseProtocol,
+        config_obj: Arc<dyn ConfigObj>,
+    ) -> QueryPlan {
+        env::set_var("TZ", "UTC");
+
+        let query = convert_sql_to_cube_query(
+            &query,
+            get_test_tenant_ctx(),
+            get_test_session_with_config(db, config_obj).await,
+        )
+        .await;
 
         query.unwrap()
     }
@@ -18610,6 +18630,40 @@ ORDER BY \"COUNT(count)\" DESC"
             "SELECT CASE WHEN customer_gender = 'female' THEN 'f' ELSE 'm' END, AVG(avgPrice) mp FROM KibanaSampleDataEcommerce a GROUP BY 1"
                 .to_string(),
             DatabaseProtocol::PostgreSQL,
+        )
+            .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert!(logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql
+            .contains("CASE WHEN"));
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_case_wrapper_non_strict_match() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let mut config = ConfigObjImpl::default();
+
+        config.disable_strict_agg_type_match = true;
+
+        let query_plan = convert_select_to_query_plan_with_config(
+            "SELECT CASE WHEN customer_gender = 'female' THEN 'f' ELSE 'm' END, SUM(avgPrice) mp FROM KibanaSampleDataEcommerce a GROUP BY 1"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+            Arc::new(config)
         )
             .await;
 
