@@ -151,6 +151,29 @@ views:
 
 </CodeTabs>
 
+### <--{"id" : "Parameters"}--> meta
+
+Custom metadata. Can be used to pass any information to the frontend.
+
+<CodeTabs>
+
+```javascript
+view(`active_users`, {
+  meta: {
+    any: "value",
+  }
+});
+```
+
+```yaml
+views:
+  - name: active_users
+    meta:
+      any: value
+```
+
+</CodeTabs>
+
 ### <--{"id" : "Parameters"}--> cubes
 
 Use `cubes` parameter in view to include exposed cubes in bulk.
