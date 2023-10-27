@@ -22,33 +22,12 @@ import {
   DownloadQueryResultsResult,
   DownloadQueryResultsOptions,
   DriverCapabilities,
-  QueryTablesResult,
 } from '@cubejs-backend/base-driver';
 import { formatToTimeZone } from 'date-fns-timezone';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { S3, GetObjectCommand } from '@aws-sdk/client-s3';
 import { Storage } from '@google-cloud/storage';
 import { HydrationMap, HydrationStream } from './HydrationStream';
-
-// eslint-disable-next-line import/order
-const util = require('snowflake-sdk/lib/util');
-
-// TODO Remove when https://github.com/snowflakedb/snowflake-connector-nodejs/pull/158 is resolved
-util.construct_hostname = (region: any, account: any) => {
-  let host;
-  if (region === 'us-west-2') {
-    region = null;
-  }
-  if (account.indexOf('.') > 0) {
-    account = account.substring(0, account.indexOf('.'));
-  }
-  if (region) {
-    host = `${account}.${region}.snowflakecomputing.com`;
-  } else {
-    host = `${account}.snowflakecomputing.com`;
-  }
-  return host;
-};
 
 type HydrationConfiguration = {
   types: string[], toValue: (column: Column) => ((value: any) => any) | null
