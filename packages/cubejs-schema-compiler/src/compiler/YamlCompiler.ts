@@ -168,6 +168,10 @@ export class YamlCompiler {
       return this.extractProgramBodyIfNeeded(ast);
     } else if (typeof obj === 'boolean') {
       return t.booleanLiteral(obj);
+    } else if (typeof obj === 'number') {
+      return t.numericLiteral(obj);
+    } else if (obj === null) {
+      return t.nullLiteral();
     }
 
     if (typeof obj === 'object' && obj !== null) {
