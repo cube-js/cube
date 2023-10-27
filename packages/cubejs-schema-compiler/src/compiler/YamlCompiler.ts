@@ -170,7 +170,8 @@ export class YamlCompiler {
       return t.booleanLiteral(obj);
     } else if (typeof obj === 'number') {
       return t.numericLiteral(obj);
-    } else if (obj === null) {
+    } else if (obj === null && propertyPath.includes('meta')) {
+      // null is purposefully not allowed in fields other than meta
       return t.nullLiteral();
     }
 
