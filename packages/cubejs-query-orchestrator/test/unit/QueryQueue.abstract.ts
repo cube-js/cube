@@ -324,7 +324,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
     test('removed before reconciled', async () => {
       const query: QueryKey = ['select * from', []];
       const key = queue.redisHash(query);
-      await queue.processQuery(key);
+      await queue.processQuery(key, null);
       const result = await queue.executeInQueue('foo', key, query);
       expect(result).toBe('select * from bar');
     });

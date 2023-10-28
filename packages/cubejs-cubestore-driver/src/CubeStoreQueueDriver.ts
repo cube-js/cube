@@ -13,6 +13,8 @@ import {
   QueryKeyHash,
   ProcessingId,
   QueueId,
+  GetActiveAndToProcessResponse,
+  QueryKeysTuple,
 } from '@cubejs-backend/base-driver';
 import { getProcessUid } from '@cubejs-backend/shared';
 
@@ -106,33 +108,39 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
     // nothing to do
   }
 
-  public async getActiveQueries(): Promise<string[]> {
+  public async getActiveQueries(): Promise<QueryKeyHash[]> {
     const rows = await this.driver.query('QUEUE ACTIVE ?', [
       this.options.redisQueuePrefix
     ]);
     return rows.map((row) => row.id);
   }
 
-  public async getToProcessQueries(): Promise<string[]> {
+  public async getToProcessQueries(): Promise<QueryKeyHash[]> {
     const rows = await this.driver.query('QUEUE PENDING ?', [
       this.options.redisQueuePrefix
     ]);
     return rows.map((row) => row.id);
   }
 
-  public async getActiveAndToProcess(): Promise<[active: string[], toProcess: string[]]> {
+  public async getActiveAndToProcess(): Promise<GetActiveAndToProcessResponse> {
     const rows = await this.driver.query('QUEUE LIST ?', [
       this.options.redisQueuePrefix
     ]);
     if (rows.length) {
-      const active: string[] = [];
-      const toProcess: string[] = [];
+      const active: QueryKeysTuple[] = [];
+      const toProcess: QueryKeysTuple[] = [];
 
       for (const row of rows) {
         if (row.status === 'active') {
-          active.push(row.id);
+          active.push([
+            row.id,
+            row.queue_id ? parseInt(row.queue_id, 10) : null,
+          ]);
         } else {
-          toProcess.push(row.id);
+          toProcess.push([
+            row.id,
+            row.queue_id ? parseInt(row.queue_id, 10) : null,
+          ]);
         }
       }
 

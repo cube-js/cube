@@ -33,8 +33,17 @@ export class LocalQueueDriverConnection {
     return stalled.concat(orphaned);
   }
 
+  /**
+   * @returns {Promise<GetActiveAndToProcessResponse>}
+   */
   async getActiveAndToProcess() {
-    return [this.queueArray(this.active), this.queueArray(this.toProcess)];
+    const active = this.queueArray(this.active);
+    const toProcess = this.queueArray(this.toProcess);
+
+    return [
+      active.map((queryKeyHash) => [queryKeyHash, null]),
+      toProcess.map((queryKeyHash) => [queryKeyHash, null])
+    ];
   }
 
   getResultPromise(resultListKey) {
@@ -247,12 +256,14 @@ export class LocalQueueDriverConnection {
   retrieveForProcessing(queryKey, processingId) {
     const key = this.redisHash(queryKey);
     let lockAcquired = false;
+
     if (!this.processingLocks[key]) {
       this.processingLocks[key] = processingId;
       lockAcquired = true;
     } else {
       return null;
     }
+
     let added = 0;
     if (Object.keys(this.active).length < this.concurrency && !this.active[key]) {
       this.active[key] = { key, order: processingId };

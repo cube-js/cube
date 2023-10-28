@@ -87,7 +87,10 @@ export class RedisQueueDriverConnection implements QueueDriverConnectionInterfac
     const active = await this.getActiveQueries();
     const toProcess = await this.getToProcessQueries();
 
-    return [active, toProcess];
+    return [
+      active.map((queryKeyHash) => [queryKeyHash, null]),
+      toProcess.map((queryKeyHash) => [queryKeyHash, null])
+    ];
   }
 
   public async addToQueue(
@@ -142,11 +145,11 @@ export class RedisQueueDriverConnection implements QueueDriverConnectionInterfac
   }
 
   public getToProcessQueries() {
-    return this.redisClient.zrangeAsync([this.toProcessRedisKey(), 0, -1]);
+    return this.redisClient.zrangeAsync([this.toProcessRedisKey(), 0, -1]) as Promise<QueryKeyHash[]>;
   }
 
   public getActiveQueries() {
-    return this.redisClient.zrangeAsync([this.activeRedisKey(), 0, -1]);
+    return this.redisClient.zrangeAsync([this.activeRedisKey(), 0, -1]) as Promise<QueryKeyHash[]>;
   }
 
   public async getQueryAndRemove(queryKey: QueryKeyHash): Promise<[QueryDef]> {
