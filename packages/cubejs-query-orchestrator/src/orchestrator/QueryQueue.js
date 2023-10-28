@@ -79,9 +79,9 @@ export class QueryQueue {
 
     /**
      * @protected
-     * @type {function([QueryKeyHash, QueueId | null]): Promise<void>}
+     * @type {function(QueryKeyHash, QueueId | null): Promise<void>}
      */
-    this.sendProcessMessageFn = options.sendProcessMessageFn || (([queryKey, queryId]) => { this.processQuery(queryKey, queryId); });
+    this.sendProcessMessageFn = options.sendProcessMessageFn || ((queryKey, queryId) => { this.processQuery(queryKey, queryId); });
 
     /**
      * @protected
@@ -545,7 +545,7 @@ export class QueryQueue {
             }
           }),
           R.take(this.concurrency),
-          R.map(this.sendProcessMessageFn)
+          R.map((([queryKey, queueId]) => this.sendProcessMessageFn(queryKey, queueId)))
         )(toProcess)
       );
     } finally {

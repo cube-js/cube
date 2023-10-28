@@ -22,8 +22,8 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
 
     let delayCount = 0;
     let streamCount = 0;
-    const processMessagePromises = [];
-    const processCancelPromises = [];
+    const processMessagePromises: Promise<any>[] = [];
+    const processCancelPromises: Promise<any>[] = [];
     let cancelledQuery;
 
     const tenantPrefix = crypto.randomBytes(6).toString('hex');
@@ -48,8 +48,8 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
           });
         },
       },
-      sendProcessMessageFn: async (queryKeyHashed) => {
-        processMessagePromises.push(queue.processQuery.bind(queue)(queryKeyHashed));
+      sendProcessMessageFn: async (queryKeyHashed, queueId) => {
+        processMessagePromises.push(queue.processQuery.bind(queue)(queryKeyHashed, queueId));
       },
       sendCancelMessageFn: async (query) => {
         processCancelPromises.push(queue.processCancel.bind(queue)(query));
