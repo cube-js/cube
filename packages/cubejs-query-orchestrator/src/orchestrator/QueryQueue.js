@@ -430,8 +430,11 @@ export class QueryQueue {
         queueConnection.getToProcessQueries()
       ]);
 
-      const mapWithDefinition = (arr) => Promise.all(arr.map(async queryKey => ({
-        ...(await queueConnection.getQueryDef(queryKey)),
+      /**
+       * @param {QueryKeysTuple[]} arr
+       */
+      const mapWithDefinition = (arr) => Promise.all(arr.map(async ([queryKey, queueId]) => ({
+        ...(await queueConnection.getQueryDef(queryKey, queueId)),
         queryKey
       })));
 
@@ -506,20 +509,22 @@ export class QueryQueue {
     const queueConnection = await this.queueDriver.createConnection();
     try {
       const toCancel = await queueConnection.getQueriesToCancel();
-      await Promise.all(toCancel.map(async queryKey => {
-        const [query] = await queueConnection.getQueryAndRemove(queryKey);
-        if (query) {
+
+      await Promise.all(toCancel.map(async ([queryKey, queueId]) => {
+        const [queryDef] = await queueConnection.getQueryAndRemove(queryKey);
+        if (queryDef) {
           this.logger('Removing orphaned query', {
-            queryKey: query.queryKey,
+            queueId: queueId || queryDef.queueId /** Special handling for Redis */,
+            queryKey: queryDef.queryKey,
             queuePrefix: this.redisQueuePrefix,
-            requestId: query.requestId,
-            metadata: query.query?.metadata,
-            preAggregationId: query.query?.preAggregation?.preAggregationId,
-            newVersionEntry: query.query?.newVersionEntry,
-            preAggregation: query.query?.preAggregation,
-            addedToQueueTime: query.addedToQueueTime,
+            requestId: queryDef.requestId,
+            metadata: queryDef.query?.metadata,
+            preAggregationId: queryDef.query?.preAggregation?.preAggregationId,
+            newVersionEntry: queryDef.query?.newVersionEntry,
+            preAggregation: queryDef.query?.preAggregation,
+            addedToQueueTime: queryDef.addedToQueueTime,
           });
-          await this.sendCancelMessageFn(query);
+          await this.sendCancelMessageFn(queryDef);
         }
       }));
 

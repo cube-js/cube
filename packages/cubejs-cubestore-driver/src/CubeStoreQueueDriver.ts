@@ -31,6 +31,13 @@ function hashQueryKey(queryKey: QueryKey, processUid?: string): QueryKeyHash {
   return hash as any;
 }
 
+type CubeStoreListResponse = {
+  id: unknown,
+  // eslint-disable-next-line camelcase
+  queue_id?: string
+  status: string
+};
+
 class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
   public constructor(
     protected readonly driver: CubeStoreDriver,
@@ -108,22 +115,28 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
     // nothing to do
   }
 
-  public async getActiveQueries(): Promise<QueryKeyHash[]> {
-    const rows = await this.driver.query('QUEUE ACTIVE ?', [
+  public async getActiveQueries(): Promise<QueryKeysTuple[]> {
+    const rows = await this.driver.query<CubeStoreListResponse>('QUEUE ACTIVE ?', [
       this.options.redisQueuePrefix
     ]);
-    return rows.map((row) => row.id);
+    return rows.map((row) => [
+      row.id as QueryKeyHash,
+      row.queue_id ? parseInt(row.queue_id, 10) : null,
+    ]);
   }
 
-  public async getToProcessQueries(): Promise<QueryKeyHash[]> {
-    const rows = await this.driver.query('QUEUE PENDING ?', [
+  public async getToProcessQueries(): Promise<QueryKeysTuple[]> {
+    const rows = await this.driver.query<CubeStoreListResponse>('QUEUE PENDING ?', [
       this.options.redisQueuePrefix
     ]);
-    return rows.map((row) => row.id);
+    return rows.map((row) => [
+      row.id as QueryKeyHash,
+      row.queue_id ? parseInt(row.queue_id, 10) : null,
+    ]);
   }
 
   public async getActiveAndToProcess(): Promise<GetActiveAndToProcessResponse> {
-    const rows = await this.driver.query('QUEUE LIST ?', [
+    const rows = await this.driver.query<CubeStoreListResponse>('QUEUE LIST ?', [
       this.options.redisQueuePrefix
     ]);
     if (rows.length) {
@@ -133,12 +146,12 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
       for (const row of rows) {
         if (row.status === 'active') {
           active.push([
-            row.id,
+            row.id as QueryKeyHash,
             row.queue_id ? parseInt(row.queue_id, 10) : null,
           ]);
         } else {
           toProcess.push([
-            row.id,
+            row.id as QueryKeyHash,
             row.queue_id ? parseInt(row.queue_id, 10) : null,
           ]);
         }
@@ -165,7 +178,7 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
   }
 
   public async getQueryStageState(onlyKeys: boolean): Promise<QueryStageStateResponse> {
-    const rows = await this.driver.query(`QUEUE LIST ${onlyKeys ? '?' : 'WITH_PAYLOAD ?'}`, [
+    const rows = await this.driver.query<CubeStoreListResponse & { payload: string }>(`QUEUE LIST ${onlyKeys ? '?' : 'WITH_PAYLOAD ?'}`, [
       this.options.redisQueuePrefix
     ]);
 
@@ -175,15 +188,15 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
 
     for (const row of rows) {
       if (!onlyKeys) {
-        defs[row.id] = this.decodeQueryDefFromRow(row, 'getQueryStageState');
+        defs[row.id as string] = this.decodeQueryDefFromRow(row, 'getQueryStageState');
       }
 
       if (row.status === 'pending') {
-        toProcess.push(row.id);
+        toProcess.push(row.id as string);
       } else if (row.status === 'active') {
-        active.push(row.id);
+        active.push(row.id as string);
         // TODO: getQueryStage is broken for Executing query stage...
-        toProcess.push(row.id);
+        toProcess.push(row.id as string);
       }
     }
 
@@ -201,29 +214,38 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
     return null;
   }
 
-  public async getStalledQueries(): Promise<string[]> {
-    const rows = await this.driver.query('QUEUE STALLED ? ?', [
+  public async getStalledQueries(): Promise<QueryKeysTuple[]> {
+    const rows = await this.driver.query<CubeStoreListResponse>('QUEUE STALLED ? ?', [
       this.options.heartBeatTimeout * 1000,
       this.options.redisQueuePrefix
     ]);
-    return rows.map((row) => row.id);
+    return rows.map((row) => [
+      row.id as QueryKeyHash,
+      row.queue_id ? parseInt(row.queue_id, 10) : null,
+    ]);
   }
 
-  public async getOrphanedQueries(): Promise<string[]> {
-    const rows = await this.driver.query('QUEUE ORPHANED ? ?', [
+  public async getOrphanedQueries(): Promise<QueryKeysTuple[]> {
+    const rows = await this.driver.query<CubeStoreListResponse>('QUEUE ORPHANED ? ?', [
       this.options.orphanedTimeout * 1000,
       this.options.redisQueuePrefix
     ]);
-    return rows.map((row) => row.id);
+    return rows.map((row) => [
+      row.id as QueryKeyHash,
+      row.queue_id ? parseInt(row.queue_id, 10) : null,
+    ]);
   }
 
-  public async getQueriesToCancel(): Promise<string[]> {
-    const rows = await this.driver.query('QUEUE TO_CANCEL ? ? ?', [
+  public async getQueriesToCancel(): Promise<QueryKeysTuple[]> {
+    const rows = await this.driver.query<CubeStoreListResponse>('QUEUE TO_CANCEL ? ? ?', [
       this.options.heartBeatTimeout * 1000,
       this.options.orphanedTimeout * 1000,
       this.options.redisQueuePrefix,
     ]);
-    return rows.map((row) => row.id);
+    return rows.map((row) => [
+      row.id as QueryKeyHash,
+      row.queue_id ? parseInt(row.queue_id, 10) : null,
+    ]);
   }
 
   protected decodeQueryDefFromRow(row: { payload: string, extra?: string | null }, method: string): QueryDef {

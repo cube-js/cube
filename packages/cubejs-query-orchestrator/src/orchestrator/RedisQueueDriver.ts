@@ -13,7 +13,7 @@ import {
   AddToQueueOptions,
   AddToQueueResponse,
   ProcessingId,
-  RetrieveForProcessingResponse,
+  RetrieveForProcessingResponse, QueryKeysTuple,
 } from '@cubejs-backend/base-driver';
 
 import { BaseQueueDriver } from './BaseQueueDriver';
@@ -88,8 +88,8 @@ export class RedisQueueDriverConnection implements QueueDriverConnectionInterfac
     const toProcess = await this.getToProcessQueries();
 
     return [
-      active.map((queryKeyHash) => [queryKeyHash, null]),
-      toProcess.map((queryKeyHash) => [queryKeyHash, null])
+      active,
+      toProcess
     ];
   }
 
@@ -109,7 +109,8 @@ export class RedisQueueDriverConnection implements QueueDriverConnectionInterfac
       stageQueryKey: options.stageQueryKey,
       priority,
       requestId: options.requestId,
-      addedToQueueTime: new Date().getTime()
+      addedToQueueTime: new Date().getTime(),
+      queueId: options.queueId,
     };
 
     const tx = this.redisClient.multi()
@@ -144,12 +145,16 @@ export class RedisQueueDriverConnection implements QueueDriverConnectionInterfac
     ];
   }
 
-  public getToProcessQueries() {
-    return this.redisClient.zrangeAsync([this.toProcessRedisKey(), 0, -1]) as Promise<QueryKeyHash[]>;
+  public async getToProcessQueries(): Promise<QueryKeysTuple[]> {
+    const rows = await this.redisClient.zrangeAsync([this.toProcessRedisKey(), 0, -1]);
+
+    return rows.map((queryKeyHash) => [queryKeyHash, null]);
   }
 
-  public getActiveQueries() {
-    return this.redisClient.zrangeAsync([this.activeRedisKey(), 0, -1]) as Promise<QueryKeyHash[]>;
+  public async getActiveQueries(): Promise<QueryKeysTuple[]> {
+    const rows = await this.redisClient.zrangeAsync([this.activeRedisKey(), 0, -1]);
+
+    return rows.map((queryKeyHash) => [queryKeyHash, null]);
   }
 
   public async getQueryAndRemove(queryKey: QueryKeyHash): Promise<[QueryDef]> {
@@ -217,16 +222,20 @@ export class RedisQueueDriverConnection implements QueueDriverConnectionInterfac
     }
   }
 
-  public getOrphanedQueries() {
-    return this.redisClient.zrangebyscoreAsync(
+  public async getOrphanedQueries(): Promise<QueryKeysTuple[]> {
+    const rows = await this.redisClient.zrangebyscoreAsync(
       [this.recentRedisKey(), 0, new Date().getTime()]
     );
+
+    return rows.map((queryKeyHash) => [queryKeyHash, null]);
   }
 
-  public getStalledQueries() {
-    return this.redisClient.zrangebyscoreAsync(
+  public getStalledQueries(): Promise<QueryKeysTuple[]> {
+    const rows = this.redisClient.zrangebyscoreAsync(
       [this.heartBeatRedisKey(), 0, (new Date().getTime() - this.heartBeatTimeout * 1000)]
     );
+
+    return rows.map((queryKeyHash) => [queryKeyHash, null]);
   }
 
   public async getQueryStageState(onlyKeys: boolean): Promise<QueryStageStateResponse> {
