@@ -1,7 +1,7 @@
 import R from 'ramda';
 import { EventEmitter } from 'events';
 import { getEnv, getProcessUid } from '@cubejs-backend/shared';
-import { QueueDriverInterface, QueryKey, QueryKeyHash } from '@cubejs-backend/base-driver';
+import { QueueDriverInterface, QueryKey, QueryKeyHash, QueueId } from '@cubejs-backend/base-driver';
 import { CubeStoreQueueDriver } from '@cubejs-backend/cubestore-driver';
 
 import { TimeoutError } from './TimeoutError';
@@ -79,9 +79,9 @@ export class QueryQueue {
 
     /**
      * @protected
-     * @type {function(string): Promise<void>}
+     * @type {function(QueryKeyHash, QueueId | null): Promise<void>}
      */
-    this.sendProcessMessageFn = options.sendProcessMessageFn || ((queryKey) => { this.processQuery(queryKey); });
+    this.sendProcessMessageFn = options.sendProcessMessageFn || ((queryKey, queryId) => { this.processQuery(queryKey, queryId); });
 
     /**
      * @protected
@@ -527,9 +527,9 @@ export class QueryQueue {
 
       await Promise.all(
         R.pipe(
-          R.filter(p => {
-            if (active.indexOf(p) === -1) {
-              const subKeys = p.split('@');
+          R.filter(([queryKey, _queueId]) => {
+            if (active.findIndex(([p, _a]) => p === queryKey) === -1) {
+              const subKeys = queryKey.split('@');
               if (subKeys.length === 1) {
                 // common queries
                 return true;
@@ -545,7 +545,7 @@ export class QueryQueue {
             }
           }),
           R.take(this.concurrency),
-          R.map(this.sendProcessMessageFn)
+          R.map((([queryKey, queueId]) => this.sendProcessMessageFn(queryKey, queueId)))
         )(toProcess)
       );
     } finally {
@@ -555,7 +555,7 @@ export class QueryQueue {
 
   /**
    * Apply query timeout to the query. Throw if query execution time takes more
-   * then specified timeout. Returns resolved `promise` value.
+   * than specified timeout. Returns resolved `promise` value.
    *
    * @param {Promise<*>} promise
    * @returns {Promise<*>}
@@ -635,6 +635,7 @@ export class QueryQueue {
    * Execute query without adding it to the queue.
    *
    * @param {*} query
+   * @param {QueueId} queueId
    * @returns {Promise<{ result: undefined | Object, error: string | undefined }>}
    */
   async processQuerySkipQueue(query, queueId) {
@@ -705,13 +706,13 @@ export class QueryQueue {
    * of the logic related with the queues updates, heartbeat, etc.
    *
    * @param {QueryKeyHash} queryKeyHashed
+   * @param {QueueId | null} queueId Real queue id, only for Cube Store
    * @return {Promise<{ result: undefined | Object, error: string | undefined }>}
    */
-  async processQuery(queryKeyHashed) {
+  async processQuery(queryKeyHashed, queueId) {
     const queueConnection = await this.queueDriver.createConnection();
 
     let insertedCount;
-    let queueId;
     let activeKeys;
     let queueSize;
     let query;
@@ -722,7 +723,14 @@ export class QueryQueue {
       const retrieveResult = await queueConnection.retrieveForProcessing(queryKeyHashed, processingId);
 
       if (retrieveResult) {
-        [insertedCount, queueId, activeKeys, queueSize, query, processingLockAcquired] = retrieveResult;
+        let retrieveQueueId;
+
+        [insertedCount, retrieveQueueId, activeKeys, queueSize, query, processingLockAcquired] = retrieveResult;
+
+        // Backward compatibility for old Cube Store, Redis and Memory
+        if (retrieveQueueId) {
+          queueId = retrieveQueueId;
+        }
       }
 
       const activated = activeKeys && activeKeys.indexOf(queryKeyHashed) !== -1;

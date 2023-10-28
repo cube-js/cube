@@ -10,7 +10,8 @@ export interface QueryKeyHash extends String {
   __type: 'QueryKeyHash'
 }
 
-export type GetActiveAndToProcessResponse = [active: string[], toProcess: string[]];
+export type QueryKeysTuple = [keyHash: QueryKeyHash, queueId: QueueId | null /** Cube Store supports real QueueId */];
+export type GetActiveAndToProcessResponse = [active: QueryKeysTuple[], toProcess: QueryKeysTuple[]];
 export type AddToQueueResponse = [added: number, queueId: QueueId | null, queueSize: number, addedToQueueTime: number];
 export type QueryStageStateResponse = [active: string[], toProcess: string[]] | [active: string[], toProcess: string[], defs: Record<string, QueryDef>];
 export type RetrieveForProcessingSuccess = [
@@ -73,8 +74,8 @@ export interface QueueDriverConnectionInterface {
    */
   addToQueue(keyScore: number, queryKey: QueryKey, orphanedTime: number, queryHandler: string, query: AddToQueueQuery, priority: number, options: AddToQueueOptions): Promise<AddToQueueResponse>;
   // Return query keys which was sorted by priority and time
-  getToProcessQueries(): Promise<string[]>;
-  getActiveQueries(): Promise<string[]>;
+  getToProcessQueries(): Promise<QueryKeyHash[]>;
+  getActiveQueries(): Promise<QueryKeyHash[]>;
   getQueryDef(hash: QueryKeyHash, queueId: QueueId | null): Promise<QueryDef | null>;
   // Queries which was added to queue, but was not processed and not needed
   getOrphanedQueries(): Promise<string[]>;
