@@ -5224,8 +5224,10 @@ ORDER BY \"COUNT(count)\" DESC"
         let mut output_flags = StatusFlags::empty();
 
         for query in queries {
-            let query = convert_sql_to_cube_query(&query, meta.clone(), session.clone()).await;
-            match query.unwrap() {
+            let query = convert_sql_to_cube_query(&query, meta.clone(), session.clone())
+                .await
+                .map_err(|e| CubeError::internal(format!("Error during planning: {}", e)))?;
+            match query {
                 QueryPlan::DataFusionSelect(flags, plan, ctx) => {
                     let df = DFDataFrame::new(ctx.state, &plan);
                     let batches = df.collect().await?;
@@ -7188,6 +7190,36 @@ ORDER BY \"COUNT(count)\" DESC"
             )
             .await?
             .0
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_set_user() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "set_good_user",
+            execute_queries_with_flags(
+                vec![
+                    "SET user = 'good_user'".to_string(),
+                    "select current_user".to_string()
+                ],
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+            .0
+        );
+
+        insta::assert_snapshot!(
+            "set_bad_user",
+            execute_queries_with_flags(
+                vec!["SET user = 'bad_user'".to_string()],
+                DatabaseProtocol::PostgreSQL
+            )
+            .await
+            .err()
+            .unwrap()
+            .to_string()
         );
 
         Ok(())
