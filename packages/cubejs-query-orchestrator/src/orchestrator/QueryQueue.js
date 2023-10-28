@@ -727,7 +727,7 @@ export class QueryQueue {
 
         [insertedCount, retrieveQueueId, activeKeys, queueSize, query, processingLockAcquired] = retrieveResult;
 
-        // Backward compatibility for old Cube Store
+        // Backward compatibility for old Cube Store, Redis and Memory
         if (retrieveQueueId) {
           queueId = retrieveQueueId;
         }
