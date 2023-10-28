@@ -375,6 +375,14 @@ pub fn get_test_transport() -> Arc<dyn TransportService> {
         ) -> Result<CubeStreamReceiver, CubeError> {
             panic!("It's a fake transport");
         }
+
+        async fn can_switch_user_for_session(
+            &self,
+            _ctx: AuthContextRef,
+            _to_user: String,
+        ) -> Result<bool, CubeError> {
+            panic!("It's a fake transport");
+        }
     }
 
     Arc::new(TestConnectionTransport {})

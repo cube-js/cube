@@ -403,7 +403,7 @@ impl QueryPlanner {
             )),
             (ast::Statement::SetRole { role_name, .. }, _) => self.set_role_to_plan(role_name),
             (ast::Statement::SetVariable { key_values }, _) => {
-                self.set_variable_to_plan(&key_values)
+                self.set_variable_to_plan(&key_values).await
             }
             (ast::Statement::ShowVariable { variable }, _) => {
                 self.show_variable_to_plan(variable).await
@@ -961,7 +961,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         }
     }
 
-    fn set_variable_to_plan(
+    async fn set_variable_to_plan(
         &self,
         key_values: &Vec<ast::SetVariableKeyValue>,
     ) -> Result<QueryPlan, CompilationError> {
@@ -1069,6 +1069,58 @@ WHERE `TABLE_SCHEMA` = '{}'",
                         ));
                     }
                 }
+            }
+        }
+
+        let user_variables = session_columns_to_update
+            .drain_filter(|v| {
+                v.name.to_lowercase() == "user" || v.name.to_lowercase() == "current_user"
+            })
+            .collect::<Vec<_>>();
+
+        for v in user_variables {
+            let auth_context = self.state.auth_context().ok_or(CompilationError::user(
+                "No auth context set but tried to set current user".to_string(),
+            ))?;
+            let to_user = match v.value {
+                ScalarValue::Utf8(Some(user)) => user,
+                _ => {
+                    return Err(CompilationError::user(format!(
+                        "Invalid user value: {:?}",
+                        v.value
+                    )))
+                }
+            };
+            if self
+                .session_manager
+                .server
+                .transport
+                .can_switch_user_for_session(auth_context.clone(), to_user.clone())
+                .await
+                .map_err(|e| {
+                    CompilationError::internal(format!(
+                        "Error calling can_switch_user_for_session: {}",
+                        e
+                    ))
+                })?
+            {
+                self.state.set_user(Some(to_user.clone()));
+                let authenticate_response = self
+                    .session_manager
+                    .server
+                    .auth
+                    .authenticate(Some(to_user.clone()))
+                    .await
+                    .map_err(|e| {
+                        CompilationError::internal(format!("Error calling authenticate: {}", e))
+                    })?;
+                self.state
+                    .set_auth_context(Some(authenticate_response.context));
+            } else {
+                return Err(CompilationError::user(format!(
+                    "{:?} is not allowed to switch to '{}'",
+                    auth_context, to_user
+                )));
             }
         }
 

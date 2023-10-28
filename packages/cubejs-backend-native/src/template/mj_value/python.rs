@@ -233,9 +233,9 @@ impl StructObject for JinjaPythonObject {
                         fields.push(key.to_string().into());
                     }
                 }
-                Err(err) => {
+                Err(_err) => {
                     #[cfg(debug_assertions)]
-                    log::trace!("Unable to extract PyDict: {:?}", err)
+                    log::trace!("Unable to extract PyDict: {:?}", _err)
                 }
             }
 

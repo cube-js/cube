@@ -169,7 +169,9 @@ pub async fn call_raw_js_with_channel_as_callback<T, R>(
     channel: Arc<Channel>,
     js_method: Arc<Root<JsFunction>>,
     argument: T,
-    arg_to_js_value: Box<dyn for<'a> FnOnce(&mut TaskContext<'a>, T) -> Handle<'a, JsValue> + Send>,
+    arg_to_js_value: Box<
+        dyn for<'a> FnOnce(&mut TaskContext<'a>, T) -> NeonResult<Handle<'a, JsValue>> + Send,
+    >,
     result_from_js_value: Box<
         dyn FnOnce(&mut FunctionContext, Handle<JsValue>) -> Result<R, CubeError> + Send,
     >,
@@ -194,7 +196,7 @@ where
         };
 
         let this = cx.undefined();
-        let arg_js_value = arg_to_js_value(&mut cx, argument);
+        let arg_js_value = arg_to_js_value(&mut cx, argument)?;
         let args: Vec<Handle<JsValue>> = vec![
             arg_js_value,
             async_channel.to_object(&mut cx)?.upcast::<JsValue>(),
