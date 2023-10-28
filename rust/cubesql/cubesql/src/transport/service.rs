@@ -95,6 +95,12 @@ pub trait TransportService: Send + Sync + Debug {
         schema: SchemaRef,
         member_fields: Vec<MemberField>,
     ) -> Result<CubeStreamReceiver, CubeError>;
+
+    async fn can_switch_user_for_session(
+        &self,
+        ctx: AuthContextRef,
+        to_user: String,
+    ) -> Result<bool, CubeError>;
 }
 
 #[async_trait]
@@ -231,6 +237,14 @@ impl TransportService for HttpTransport {
         _schema: SchemaRef,
         _member_fields: Vec<MemberField>,
     ) -> Result<CubeStreamReceiver, CubeError> {
+        panic!("Does not work for standalone mode yet");
+    }
+
+    async fn can_switch_user_for_session(
+        &self,
+        _ctx: AuthContextRef,
+        _to_user: String,
+    ) -> Result<bool, CubeError> {
         panic!("Does not work for standalone mode yet");
     }
 }
