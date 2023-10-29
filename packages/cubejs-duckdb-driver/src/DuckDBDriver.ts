@@ -16,6 +16,7 @@ import { HydrationStream, transformRow } from './HydrationStream';
 export type DuckDBDriverConfiguration = {
   dataSource?: string,
   initSql?: string,
+  schema?: string,
 };
 
 type InitPromise = {
@@ -33,7 +34,7 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
   ) {
     super();
 
-    this.schema = getEnv('duckdbSchema', this.config);
+    this.schema = this.config.schema || getEnv('duckdbSchema', this.config);
   }
 
   protected async init(): Promise<InitPromise> {
