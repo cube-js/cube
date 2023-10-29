@@ -44,3 +44,10 @@ export function camelizeCube(cube: any): unknown {
 
   return cube;
 }
+
+export function multiline(strings: Array<String>) {
+  return strings
+    .map(string => string.replace(/^\s+/gm, ''))
+    .filter(string => string !== '')
+    .join('');
+}

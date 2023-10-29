@@ -79,8 +79,19 @@ Common rules apply to names of entities within the data model. All names must:
 - start with a letter
 - consist of letters, numbers, and underscore (`_`) symbols only
 
-It is also recommended that names use [snake
-case][wiki-snake-case]<!-- and follow the style guide -->.
+It is also recommended that names use [snake case][wiki-snake-case] and follow
+the [style guide][ref-style-guide].
+
+Cube and view names should be distinct when compared case-insensitively.
+For example, you can't have a cube named `orders` and a view named `Orders`
+within the same data model.
+
+<WarningBox>
+
+Before v0.34, it was allowed to have cubes and views with distinct names when
+compared case-sensitively, e.g., `orders` and `Orders`.
+
+</WarningBox>
 
 Good examples of names:
 
@@ -335,3 +346,4 @@ You can find [Context variables reference here][ref-context-variables]
 [ref-config-repository-factory]: /config#options-reference-repository-factory
 [wiki-snake-case]: https://en.wikipedia.org/wiki/Snake_case
 [wiki-yaml]: https://en.wikipedia.org/wiki/YAML
+[ref-style-guide]: /docs/style-guide
