@@ -230,8 +230,8 @@ export class RedisQueueDriverConnection implements QueueDriverConnectionInterfac
     return rows.map((queryKeyHash) => [queryKeyHash, null]);
   }
 
-  public getStalledQueries(): Promise<QueryKeysTuple[]> {
-    const rows = this.redisClient.zrangebyscoreAsync(
+  public async getStalledQueries(): Promise<QueryKeysTuple[]> {
+    const rows = await this.redisClient.zrangebyscoreAsync(
       [this.heartBeatRedisKey(), 0, (new Date().getTime() - this.heartBeatTimeout * 1000)]
     );
 
