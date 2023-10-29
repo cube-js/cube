@@ -113,31 +113,33 @@ describe('Yaml Schema Testing', () => {
 
   it('accepts cube meta', async () => {
     const { compiler } = prepareYamlCompiler(
-      `cubes:
-  - name: Users
-    sql: SELECT * FROM e2e.users
-    meta:
-      scalars:
-        example_string: "foo"
-        example_integer: 1
-        example_float: 1.0
-        example_boolean: true
-        example_null: null
-      sequence:
-        - 1
-        - 2
-        - 3
-      mixed_sequence:
-        - 1
-        - "foo"
-        - 3
-    dimensions:
-      - sql: id
-        type: number
-        primaryKey: true
+      `
+      cubes:
+      - name: Users
+        sql: SELECT * FROM e2e.users
+        meta:
+          scalars:
+            example_string: "foo"
+            example_integer: 1
+            example_float: 1.0
+            example_boolean: true
+            example_null: null
+          sequence:
+            - 1
+            - 2
+            - 3
+          mixed_sequence:
+            - 1
+            - "foo"
+            - 3
+        dimensions:
+          - name: id
+            sql: id
+            type: number
+            primaryKey: true
       `
     );
-    
+
     await compiler.compile();
   });
 });
