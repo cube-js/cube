@@ -127,6 +127,59 @@ SELECT
 LIMIT 10000
 ```
 
+## Using Scopes
+
+Starting from version v0.32.5, a "scope" security feature was introduced.
+This feature aims to allow users to configure access to specific APIs based on
+the claims provided in the JWT token.
+
+Provide a new `contextToApiScopes` function in the `cube.js` file 
+to modify the scopes provisioned to users. 
+This function takes two optional parameters,
+`securityContext` and `defaultScopes`, and returns a promise that must be
+resolved with the array of allowed scopes.
+
+The `defaultScopes` parameter is an array that contains the allowed 
+scopes, by default it contains every scope except `jobs`. 
+Cube uses this parameter if no `contextToApiScopes` function was provided.
+
+```javascript
+console.log(defaultScopes); // ['graphql', 'meta', 'data']
+```
+
+A possible implementation of a `contextToApiScopes` function with 
+full access to Cube's APIs, with the exception of an Admin user that is able
+to trigger pre-aggregation builds could look like this:
+
+```javascript
+async function contextToApiScopes(
+  securityContext?: any,
+  defaultScopes?: string[],
+): Promise<string[]> {
+  if (securityContext && securityContext.isAdmin) {
+    defaultScopes.push('jobs');
+  }
+  return defaultScopes;
+}
+```
+
+The following table shows the complete list of permissions with corresponding
+APIs:
+
+| Permission | APIs                          | Default enabled |
+| ---------- | ----------------------------- | --------------- |
+| `graphql`  | /graphql                      | ✅              |
+| `meta`     | /v1/meta                      | ✅              |
+|            | /v1/pre-aggregations/can-use  | ✅              |
+| `data`     | /v1/load                      | ✅              |
+|            | /v1/subscribe                 | ✅              |
+|            | /v1/sql                       | ✅              |
+|            | /v1/dry-run                   | ✅              |
+| `jobs`     | /v1/run-scheduled-refresh     | ❌              |
+|            | /v1/pre-aggregations/jobs     | ❌              |
+
+The rest of the APIs continue to work as before without any changes.
+
 ## Using COMPILE_CONTEXT
 
 In the example below `user_id`, `company_id`, `sub` and `iat` will be injected
