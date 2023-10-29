@@ -244,23 +244,31 @@ class ApiGateway {
      * data scope                                                    *
      *************************************************************** */
 
-    app.get(`${this.basePath}/v1/load`, userMiddlewares, (async (req, res) => {
-      await this.load({
-        query: req.query.query,
-        context: req.context,
-        res: this.resToResultFn(res),
-        queryType: req.query.queryType,
-      });
+    app.get(`${this.basePath}/v1/load`, userMiddlewares, (async (req, res, next) => {
+      try {
+        await this.load({
+          query: req.query.query,
+          context: req.context,
+          res: this.resToResultFn(res),
+          queryType: req.query.queryType,
+        });
+      } catch (err) {
+        next(err);
+      }
     }));
 
     const jsonParser = bodyParser.json({ limit: '1mb' });
-    app.post(`${this.basePath}/v1/load`, jsonParser, userMiddlewares, (async (req, res) => {
-      await this.load({
-        query: req.body.query,
-        context: req.context,
-        res: this.resToResultFn(res),
-        queryType: req.body.queryType
-      });
+    app.post(`${this.basePath}/v1/load`, jsonParser, userMiddlewares, (async (req, res, next) => {
+      try {
+        await this.load({
+          query: req.body.query,
+          context: req.context,
+          res: this.resToResultFn(res),
+          queryType: req.body.queryType
+        });
+      } catch (err) {
+        next(err);
+      }
     }));
 
     app.get(`${this.basePath}/v1/subscribe`, userMiddlewares, (async (req, res) => {

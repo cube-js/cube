@@ -6,7 +6,7 @@ import express from 'express';
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
 
-import { ApiGateway, ApiGatewayOptions, Query, Request } from '../src';
+import { ApiGateway, ApiGatewayOptions, CubejsHandlerError, Query, Request } from '../src';
 import { generateAuthToken } from './utils';
 import {
   preAggregationsResultFactory,
@@ -184,6 +184,34 @@ describe('API Gateway', () => {
     expect(res.body && res.body.data).toStrictEqual([{ 'Foo.bar': 42 }]);
 
     expect(queryRewrite.mock.calls.length).toEqual(1);
+  });
+
+  test('Ensure async errors passed on to error handling middleware ', async () => {
+    const queryRewrite = jest.fn(async () => {
+      throw new CubejsHandlerError(403, 'Forbidden', 'Unauthorized Access');
+    });
+
+    const { app } = createApiGateway(
+      new AdapterApiMock(),
+      new DataSourceStorageMock(),
+      {
+        checkAuth: (req: Request, authorization) => {
+          if (authorization) {
+            req.authInfo = jwt.verify(authorization, API_SECRET);
+          }
+        },
+        queryRewrite
+      }
+    );
+
+    await request(app)
+      .get(
+        '/cubejs-api/v1/load?query={"measures":["Foo.bar"],"filters":[{"dimension":"Foo.id","operator":"equals","values":[null]}]}'
+      )
+      .set('Authorization', 'Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOjUsImlhdCI6MTYxMTg1NzcwNSwiZXhwIjoyNDc1ODU3NzA1fQ.tTieqdIcxDLG8fHv8YWwfvg_rPVe1XpZKUvrCdzVn3g')
+      .expect(403);
+
+    expect(queryRewrite).toHaveBeenCalledTimes(1);
   });
 
   test('query transform with checkAuth (return securityContext as string)', async () => {
@@ -808,8 +836,6 @@ describe('API Gateway', () => {
           this.$testConnectionsDone = true;
 
           throw new Error('It\'s expected exception for testing');
-
-          return [];
         }
       }
 
@@ -833,8 +859,6 @@ describe('API Gateway', () => {
           this.$testConnectionsDone = true;
 
           throw new Error('It\'s expected exception for testing');
-
-          return [];
         }
       }
 
