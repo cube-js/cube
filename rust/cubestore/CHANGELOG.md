@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.11](https://github.com/cube-js/cube/compare/v0.34.10...v0.34.11) (2023-10-29)
+
+
+### Features
+
+* **cubestore:** Queue - expose queueId for LIST/ACTIVE/PENDING/TO_CANCEL ([#7351](https://github.com/cube-js/cube/issues/7351)) ([7b1a0c0](https://github.com/cube-js/cube/commit/7b1a0c05347d0a0f874978b4462f580ddc814b93))
+
+
+
+
+
 ## [0.34.9](https://github.com/cube-js/cube/compare/v0.34.8...v0.34.9) (2023-10-26)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore

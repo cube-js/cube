@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.11](https://github.com/cube-js/cube/compare/v0.34.10...v0.34.11) (2023-10-29)
+
+
+### Features
+
+* **cubesql:** Allow changing current user through `SET user = ?` ([#7350](https://github.com/cube-js/cube/issues/7350)) ([2c9c8d6](https://github.com/cube-js/cube/commit/2c9c8d68d1bd76b005ebf863b6899ea463d59aae))
+* **cubestore:** Queue - expose queueId for LIST/ACTIVE/PENDING/TO_CANCEL ([#7351](https://github.com/cube-js/cube/issues/7351)) ([7b1a0c0](https://github.com/cube-js/cube/commit/7b1a0c05347d0a0f874978b4462f580ddc814b93))
+* **query-orchestrator:** Pass queueId for orphaned query cancellation ([#7353](https://github.com/cube-js/cube/issues/7353)) ([08ce078](https://github.com/cube-js/cube/commit/08ce078e4f094c18da9fdd265629e4bb01a8a2c9))
+* **query-orchestrator:** Use real queueId in processQuery for events ([#7352](https://github.com/cube-js/cube/issues/7352)) ([bf83762](https://github.com/cube-js/cube/commit/bf83762adfb75585ae233b2c671971761f133048))
+
+
+
+
+
 ## [0.34.10](https://github.com/cube-js/cube/compare/v0.34.9...v0.34.10) (2023-10-27)
 
 
