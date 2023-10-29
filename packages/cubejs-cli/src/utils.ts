@@ -1,3 +1,4 @@
+import logUpdate from 'log-update';
 import os from 'os';
 import { spawn } from 'cross-spawn';
 import fs from 'fs-extra';
@@ -22,12 +23,10 @@ export const executeCommand = (command: string, args: string[]) => {
 
 export const writePackageJson = async (json: any) => fs.writeJson('package.json', json, {
   spaces: 2,
-  EOL: os.EOL
+  EOL: os.EOL,
 });
 
-export const npmInstall = (dependencies: string[], isDev?: boolean) => executeCommand(
-  'npm', ['install', isDev ? '--save-dev' : '--save'].concat(dependencies)
-);
+export const npmInstall = (dependencies: string[], isDev?: boolean) => executeCommand('npm', ['install', isDev ? '--save-dev' : '--save'].concat(dependencies));
 
 export const displayWarning = (message: string) => {
   console.log(`${chalk.yellow('Warning.')} ${message}`);
@@ -66,7 +65,7 @@ export const displayError = async (text: string | string[], options = {}) => {
   await event({
     event: 'Error',
     error: Array.isArray(text) ? text.join('\n') : text.toString(),
-    ...options
+    ...options,
   });
 
   console.error('');
@@ -83,13 +82,50 @@ export const logStage = async (stage: string, eventName: string, props?: Record<
   if (eventName) {
     await track({
       event: eventName,
-      ...props
+      ...props,
     });
   }
 };
 
 export function findMaxVersion(versions: string[]): SemVer {
-  return versions
-    .map((v) => <SemVer>semverParse(v))
-    .reduce((a, b) => (semverCompare(a, b) === 1 ? a : b));
+  return versions.map((v) => <SemVer>semverParse(v)).reduce((a, b) => (semverCompare(a, b) === 1 ? a : b));
+}
+
+export function debounce<T extends(...args: any[]) => void>(func: T, delay: number): (...args: Parameters<T>) => void {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  return (...args: Parameters<T>): void => {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+    timeoutId = setTimeout(() => {
+      func(...args);
+    }, delay);
+  };
+}
+
+export function createLogger() {
+  let index = 0;
+  const frames = ['-', '\\', '|', '/'];
+  let spinnerIntervalId;
+
+  return {
+    spin(text: string) {
+      spinnerIntervalId = setInterval(() => {
+        const frame = frames[(index = ++index % frames.length)];
+        logUpdate(`${frame} ${text}`);
+      }, 80);
+    },
+    ready(text: string) {
+      clearInterval(spinnerIntervalId);
+      logUpdate(`✔ ${text}`);
+    },
+    persist() {
+      clearInterval(spinnerIntervalId);
+      logUpdate.done();
+    },
+    clear() {
+      clearInterval(spinnerIntervalId);
+      logUpdate.clear();
+    },
+  };
 }

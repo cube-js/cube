@@ -8,12 +8,18 @@ import dotenv from '@cubejs-backend/dotenv';
 import { isFilePath } from '@cubejs-backend/shared';
 import { displayWarning } from './utils';
 
+export type DotCubeCloudAuth = {
+  auth: string;
+  deploymentId?: number;
+  url?: string;
+};
+
 type ConfigurationFull = {
   auth: {
     [organizationUrl: string]: {
-      auth: string,
-    }
-  }
+      auth: string;
+    };
+  };
 };
 
 type Configuration = Partial<ConfigurationFull>;
@@ -44,17 +50,16 @@ export class Config {
 
   public async envFile(envFile: string) {
     if (await fs.pathExists(envFile)) {
-      const env = dotenv.config({ path: envFile, multiline: 'line-breaks' }).parsed;
+      const env = dotenv.config({
+        path: envFile,
+        multiline: 'line-breaks',
+      }).parsed;
       if (env) {
         if ('CUBEJS_DEV_MODE' in env) {
           delete env.CUBEJS_DEV_MODE;
         }
 
-        const resolvePossibleFiles = [
-          'CUBEJS_DB_SSL_CA',
-          'CUBEJS_DB_SSL_CERT',
-          'CUBEJS_DB_SSL_KEY',
-        ];
+        const resolvePossibleFiles = ['CUBEJS_DB_SSL_CA', 'CUBEJS_DB_SSL_CERT', 'CUBEJS_DB_SSL_KEY'];
 
         // eslint-disable-next-line no-restricted-syntax
         for (const [key, value] of Object.entries(env)) {
@@ -95,10 +100,12 @@ export class Config {
       return config.auth;
     }
 
-    const auth = await inquirer.prompt([{
-      name: 'auth',
-      message: `Cube Cloud Auth Token${url ? ` for ${url}` : ''}`
-    }]);
+    const auth = await inquirer.prompt([
+      {
+        name: 'auth',
+        message: `Cube Cloud Auth Token${url ? ` for ${url}` : ''}`,
+      },
+    ]);
 
     return (await this.addAuthToken(auth.auth, config)).auth;
   }
@@ -112,7 +119,7 @@ export class Config {
     if (payload && typeof payload === 'object' && payload.url) {
       config.auth = config.auth || {};
       config.auth[payload.url] = {
-        auth: authToken
+        auth: authToken,
       };
 
       if (payload.deploymentId) {
@@ -146,7 +153,7 @@ export class Config {
       return {
         ...deployAuth[dotCubeCloud.url],
         url: dotCubeCloud.url,
-        deploymentId: dotCubeCloud.deploymentId
+        deploymentId: dotCubeCloud.deploymentId,
       };
     }
 
@@ -154,19 +161,23 @@ export class Config {
     let url = Object.keys(auth)[0];
     if (Object.keys(auth).length > 1) {
       // eslint-disable-next-line prefer-destructuring
-      url = (await inquirer.prompt([{
-        type: 'list',
-        name: 'url',
-        message: 'Please select an organization',
-        choices: Object.keys(auth)
-      }])).url;
+      url = (
+        await inquirer.prompt([
+          {
+            type: 'list',
+            name: 'url',
+            message: 'Please select an organization',
+            choices: Object.keys(auth),
+          },
+        ])
+      ).url;
     }
 
     const authToken = auth[url];
     const deployments = await this.cloudReq({
       url: () => 'build/deploy/deployments',
       method: 'GET',
-      auth: { ...authToken, url }
+      auth: { ...authToken, url },
     });
 
     if (!Array.isArray(deployments)) {
@@ -180,24 +191,26 @@ export class Config {
 
     let deploymentId = deployments[0].id;
     if (deployments.length > 1) {
-      const { deployment } = await inquirer.prompt([{
-        type: 'list',
-        name: 'deployment',
-        message: 'Please select a deployment to deploy to',
-        choices: deployments
-      }]);
-      deploymentId = deployments.find(d => d.name === deployment).id;
+      const { deployment } = await inquirer.prompt([
+        {
+          type: 'list',
+          name: 'deployment',
+          message: 'Please select a deployment to deploy to',
+          choices: deployments,
+        },
+      ]);
+      deploymentId = deployments.find((d) => d.name === deployment).id;
     }
 
     await this.writeDotCubeCloud({
       url,
-      deploymentId
+      deploymentId,
     });
 
     return {
       ...authToken,
       url,
-      deploymentId
+      deploymentId,
     };
   }
 
@@ -217,24 +230,26 @@ export class Config {
     await fs.writeJson(this.dotCubeCloudFile(), config);
   }
 
-  public async cloudReq(options: {
-    url: (deploymentId: string) => string,
-    auth: { auth: string, deploymentId?: string, url?: string },
-  } & RequestPromiseOptions) {
+  public async cloudReq<T = any>(
+    options: {
+      url: (deploymentId: string) => string;
+      auth?: DotCubeCloudAuth;
+    } & RequestPromiseOptions
+  ): Promise<T> {
     const { url, auth, ...restOptions } = options;
 
-    const authorization = auth || await this.deployAuthForCurrentDir();
+    const authorization = auth || (await this.deployAuthForCurrentDir());
     if (!authorization) {
-      throw new Error('Auth isn\'t set');
+      throw new Error('Auth is not set');
     }
 
     return rp({
       headers: {
-        authorization: authorization.auth
+        authorization: authorization.auth,
       },
       ...restOptions,
       url: `${authorization.url}/${url(authorization.deploymentId)}`,
-      json: true
+      json: true,
     });
   }
 
@@ -243,15 +258,15 @@ export class Config {
       url: `${process.env.CUBE_CLOUD_HOST || 'https://cubecloud.dev'}/v1/token`,
       method: 'POST',
       headers: {
-        'Content-type': 'application/json'
+        'Content-type': 'application/json',
       },
       json: true,
       body: {
-        token: authToken
-      }
+        token: authToken,
+      },
     });
 
-    if (res && res.error) {
+    if (res?.error) {
       throw res.error;
     }
 

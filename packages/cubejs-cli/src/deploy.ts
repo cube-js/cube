@@ -1,18 +1,17 @@
 import crypto from 'crypto';
 import fs from 'fs-extra';
 import path from 'path';
+import { ContentHash } from './command/watch/types';
 
-type DeployDirectoryOptions = {
-  directory: string,
+type FileHash = {
+  hash: string;
 };
 
 export class DeployDirectory {
-  public constructor(
-    protected readonly options: DeployDirectoryOptions
-  ) { }
+  public constructor(protected readonly directory: string) {}
 
-  public async fileHashes(directory: string = this.options.directory) {
-    let result = {};
+  public async fileHashes(directory: string = this.directory) {
+    let result: Record<string, FileHash> = {};
 
     const files = await fs.readdir(directory);
     // eslint-disable-next-line no-restricted-syntax
@@ -24,14 +23,31 @@ export class DeployDirectory {
       }
       const stat = await fs.stat(filePath);
       if (stat.isDirectory()) {
-        result = { ...result, ...await this.fileHashes(filePath) };
+        result = { ...result, ...(await this.fileHashes(filePath)) };
       } else {
-        result[path.relative(this.options.directory, filePath)] = {
-          hash: await this.fileHash(filePath)
+        result[path.relative(this.directory, filePath)] = {
+          hash: await this.fileHash(filePath),
         };
       }
     }
     return result;
+  }
+
+  public async contentHash(): Promise<ContentHash> {
+    const pathsHash = crypto.createHash('sha1');
+    const contentHash = crypto.createHash('sha1');
+
+    Object.entries(await this.fileHashes())
+      .sort(([a], [b]) => (a > b ? 1 : -1))
+      .forEach(([filePath, file]) => {
+        pathsHash.update(filePath);
+        contentHash.update(file.hash);
+      });
+
+    return {
+      pathsHash: pathsHash.digest('hex'),
+      contentHash: contentHash.digest('hex'),
+    };
   }
 
   protected filter(file: string) {
@@ -51,12 +67,12 @@ export class DeployDirectory {
   }
 
   protected fileHash(file: string) {
-    return new Promise((resolve, reject) => {
+    return new Promise<string>((resolve, reject) => {
       const hash = crypto.createHash('sha1');
       const stream = fs.createReadStream(file);
 
-      stream.on('error', err => reject(err));
-      stream.on('data', chunk => hash.update(chunk));
+      stream.on('error', (err) => reject(err));
+      stream.on('data', (chunk) => hash.update(chunk));
       stream.on('end', () => resolve(hash.digest('hex')));
     });
   }

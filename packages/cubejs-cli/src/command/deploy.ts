@@ -19,7 +19,7 @@ const deploy = async ({ directory, auth, uploadEnv, token }: any) => {
     await config.addAuthToken(token);
 
     await event({
-      event: 'Cube Cloud CLI Authenticate'
+      event: 'Cube Cloud CLI Authenticate',
     });
 
     console.log('Token successfully added!');
@@ -30,22 +30,22 @@ const deploy = async ({ directory, auth, uploadEnv, token }: any) => {
     format: '- Uploading files | {bar} | {percentage}% || {value} / {total} | {file}',
     barCompleteChar: '\u2588',
     barIncompleteChar: '\u2591',
-    hideCursor: true
+    hideCursor: true,
   });
 
-  const deployDir = new DeployDirectory({ directory });
-  const fileHashes: any = await deployDir.fileHashes();
+  const deployDir = new DeployDirectory(directory);
+  const fileHashes = await deployDir.fileHashes();
 
   const upstreamHashes = await config.cloudReq({
     url: (deploymentId: string) => `build/deploy/${deploymentId}/files`,
     method: 'GET',
-    auth
+    auth,
   });
 
   const { transaction, deploymentName } = await config.cloudReq({
     url: (deploymentId: string) => `build/deploy/${deploymentId}/start-upload`,
     method: 'POST',
-    auth
+    auth,
   });
 
   if (uploadEnv) {
@@ -56,7 +56,7 @@ const deploy = async ({ directory, auth, uploadEnv, token }: any) => {
       body: {
         envVariables: JSON.stringify(envVariables),
       },
-      auth
+      auth,
     });
   }
 
@@ -66,7 +66,7 @@ const deploy = async ({ directory, auth, uploadEnv, token }: any) => {
   const fileHashesPosix = {};
 
   bar.start(files.length, 0, {
-    file: ''
+    file: '',
   });
 
   try {
@@ -88,11 +88,11 @@ const deploy = async ({ directory, auth, uploadEnv, token }: any) => {
               value: fs.createReadStream(path.join(directory, file)),
               options: {
                 filename: path.basename(file),
-                contentType: 'application/octet-stream'
-              }
-            }
+                contentType: 'application/octet-stream',
+              },
+            },
           },
-          auth
+          auth,
         });
       }
     }
@@ -102,9 +102,9 @@ const deploy = async ({ directory, auth, uploadEnv, token }: any) => {
       method: 'POST',
       body: {
         transaction,
-        files: fileHashesPosix
+        files: fileHashesPosix,
       },
-      auth
+      auth,
     });
   } finally {
     bar.stop();
@@ -120,13 +120,10 @@ export function configureDeployCommand(program: CommanderStatic) {
     .option('--upload-env', 'Upload .env file to CubeCloud')
     .option('--token <token>', 'Add auth token to CubeCloud')
     .option('--directory [path]', 'Specify path to conf directory', './')
-    .action(
-      (options) => deploy({
-        ...options,
-        directory: path.join(process.cwd(), options.directory)
-      })
-        .catch(e => displayError(e.stack || e))
-    )
+    .action((options) => deploy({
+      ...options,
+      directory: path.join(process.cwd(), options.directory),
+    }).catch((e) => displayError(e.stack || e)))
     .on('--help', () => {
       console.log('');
       console.log('Examples:');
