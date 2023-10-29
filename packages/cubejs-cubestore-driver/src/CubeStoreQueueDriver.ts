@@ -95,14 +95,14 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
     throw new Error('Empty response on QUEUE ADD');
   }
 
-  // TODO: Looks useless, because we can do it in one step - getQueriesToCancel
-  public async getQueryAndRemove(hash: QueryKeyHash): Promise<[QueryDef]> {
-    return [await this.cancelQuery(hash)];
+  public async getQueryAndRemove(hash: QueryKeyHash, queueId: QueueId | null): Promise<[QueryDef]> {
+    return [await this.cancelQuery(hash, queueId)];
   }
 
-  public async cancelQuery(hash: QueryKeyHash): Promise<QueryDef | null> {
+  public async cancelQuery(hash: QueryKeyHash, queueId: QueueId | null): Promise<QueryDef | null> {
     const rows = await this.driver.query('QUEUE CANCEL ?', [
-      this.prefixKey(hash)
+      // queryKeyHash as compatibility fallback
+      queueId || this.prefixKey(hash),
     ]);
     if (rows && rows.length) {
       return this.decodeQueryDefFromRow(rows[0], 'cancelQuery');
