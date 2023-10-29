@@ -1,10 +1,10 @@
 import { Readable } from 'stream';
 import { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
-import type { QueryKey, QueryKeyHash } from '@cubejs-backend/base-driver';
+import type { QueryKey } from '@cubejs-backend/base-driver';
 import { pausePromise } from '@cubejs-backend/shared';
 import crypto from 'crypto';
 
-import { QueryQueue, RedisQueueDriverConnection } from '../../src';
+import { QueryQueue } from '../../src';
 import { processUidRE } from '../../src/orchestrator/utils';
 
 export type QueryQueueTestOptions = {
@@ -279,9 +279,11 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
         await pausePromise(2000 + 500 /*  additional timeout on CI */);
 
         expect(await connection.getOrphanedQueries()).toEqual([
-          connection.redisHash(['1', []]),
-          // Redis doesnt support queueId, it will return Null
-          name.includes('Redis') ? null : expect.any(Number)
+          [
+            connection.redisHash(['1', []]),
+            // Redis doesnt support queueId, it will return Null
+            name.includes('Redis') ? null : expect.any(Number)
+          ]
         ]);
       } finally {
         await connection.getQueryAndRemove(connection.redisHash(['1', []]));
