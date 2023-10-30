@@ -36,7 +36,7 @@
     "@cubejs-backend/sqlite-driver": "^0.34.12",
     "@cubejs-backend/trino-driver": "^0.34.12",
     "cubejs-cli": "^0.34.12",
-    "@cubejs-backend/vertica-driver": "^0.32.3",
+    "@knowitall/vertica-driver": "^0.32.3",
     "typescript": "~4.9.5"
   },
   "resolutions": {
