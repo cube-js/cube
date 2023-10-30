@@ -403,7 +403,7 @@ impl QueryPlanner {
             )),
             (ast::Statement::SetRole { role_name, .. }, _) => self.set_role_to_plan(role_name),
             (ast::Statement::SetVariable { key_values }, _) => {
-                self.set_variable_to_plan(&key_values)
+                self.set_variable_to_plan(&key_values).await
             }
             (ast::Statement::ShowVariable { variable }, _) => {
                 self.show_variable_to_plan(variable).await
@@ -961,7 +961,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         }
     }
 
-    fn set_variable_to_plan(
+    async fn set_variable_to_plan(
         &self,
         key_values: &Vec<ast::SetVariableKeyValue>,
     ) -> Result<QueryPlan, CompilationError> {
@@ -1069,6 +1069,58 @@ WHERE `TABLE_SCHEMA` = '{}'",
                         ));
                     }
                 }
+            }
+        }
+
+        let user_variables = session_columns_to_update
+            .drain_filter(|v| {
+                v.name.to_lowercase() == "user" || v.name.to_lowercase() == "current_user"
+            })
+            .collect::<Vec<_>>();
+
+        for v in user_variables {
+            let auth_context = self.state.auth_context().ok_or(CompilationError::user(
+                "No auth context set but tried to set current user".to_string(),
+            ))?;
+            let to_user = match v.value {
+                ScalarValue::Utf8(Some(user)) => user,
+                _ => {
+                    return Err(CompilationError::user(format!(
+                        "Invalid user value: {:?}",
+                        v.value
+                    )))
+                }
+            };
+            if self
+                .session_manager
+                .server
+                .transport
+                .can_switch_user_for_session(auth_context.clone(), to_user.clone())
+                .await
+                .map_err(|e| {
+                    CompilationError::internal(format!(
+                        "Error calling can_switch_user_for_session: {}",
+                        e
+                    ))
+                })?
+            {
+                self.state.set_user(Some(to_user.clone()));
+                let authenticate_response = self
+                    .session_manager
+                    .server
+                    .auth
+                    .authenticate(Some(to_user.clone()))
+                    .await
+                    .map_err(|e| {
+                        CompilationError::internal(format!("Error calling authenticate: {}", e))
+                    })?;
+                self.state
+                    .set_auth_context(Some(authenticate_response.context));
+            } else {
+                return Err(CompilationError::user(format!(
+                    "{:?} is not allowed to switch to '{}'",
+                    auth_context, to_user
+                )));
             }
         }
 
@@ -1660,8 +1712,11 @@ mod tests {
     use crate::{
         compile::{
             rewrite::rewriter::Rewriter,
-            test::{get_string_cube_meta, get_test_tenant_ctx_with_meta},
+            test::{
+                get_string_cube_meta, get_test_session_with_config, get_test_tenant_ctx_with_meta,
+            },
         },
+        config::{ConfigObj, ConfigObjImpl},
         sql::{dataframe::batch_to_dataframe, types::StatusFlags},
     };
     use datafusion::{logical_plan::PlanVisitor, physical_plan::displayable};
@@ -1697,6 +1752,23 @@ mod tests {
         let query =
             convert_sql_to_cube_query(&query, get_test_tenant_ctx(), get_test_session(db).await)
                 .await;
+
+        query.unwrap()
+    }
+
+    async fn convert_select_to_query_plan_with_config(
+        query: String,
+        db: DatabaseProtocol,
+        config_obj: Arc<dyn ConfigObj>,
+    ) -> QueryPlan {
+        env::set_var("TZ", "UTC");
+
+        let query = convert_sql_to_cube_query(
+            &query,
+            get_test_tenant_ctx(),
+            get_test_session_with_config(db, config_obj).await,
+        )
+        .await;
 
         query.unwrap()
     }
@@ -5152,8 +5224,10 @@ ORDER BY \"COUNT(count)\" DESC"
         let mut output_flags = StatusFlags::empty();
 
         for query in queries {
-            let query = convert_sql_to_cube_query(&query, meta.clone(), session.clone()).await;
-            match query.unwrap() {
+            let query = convert_sql_to_cube_query(&query, meta.clone(), session.clone())
+                .await
+                .map_err(|e| CubeError::internal(format!("Error during planning: {}", e)))?;
+            match query {
                 QueryPlan::DataFusionSelect(flags, plan, ctx) => {
                     let df = DFDataFrame::new(ctx.state, &plan);
                     let batches = df.collect().await?;
@@ -7116,6 +7190,36 @@ ORDER BY \"COUNT(count)\" DESC"
             )
             .await?
             .0
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_set_user() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "set_good_user",
+            execute_queries_with_flags(
+                vec![
+                    "SET user = 'good_user'".to_string(),
+                    "select current_user".to_string()
+                ],
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+            .0
+        );
+
+        insta::assert_snapshot!(
+            "set_bad_user",
+            execute_queries_with_flags(
+                vec!["SET user = 'bad_user'".to_string()],
+                DatabaseProtocol::PostgreSQL
+            )
+            .await
+            .err()
+            .unwrap()
+            .to_string()
         );
 
         Ok(())
@@ -18520,7 +18624,7 @@ ORDER BY \"COUNT(count)\" DESC"
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
-            "SELECT COALESCE(customer_gender, 'N/A'), MIN(avgPrice) mp FROM (SELECT AVG(avgPrice) avgPrice, customer_gender FROM KibanaSampleDataEcommerce GROUP BY 2 LIMIT 1) a GROUP BY 1"
+            "SELECT COALESCE(customer_gender, 'N/A'), AVG(avgPrice) mp FROM KibanaSampleDataEcommerce a GROUP BY 1"
                 .to_string(),
             DatabaseProtocol::PostgreSQL,
         )
@@ -18549,7 +18653,7 @@ ORDER BY \"COUNT(count)\" DESC"
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
-            "SELECT CASE WHEN customer_gender = 'female' THEN 'f' ELSE 'm' END, MIN(avgPrice) mp FROM (SELECT AVG(avgPrice) avgPrice, customer_gender FROM KibanaSampleDataEcommerce GROUP BY 2 LIMIT 1) a GROUP BY 1"
+            "SELECT CASE WHEN customer_gender = 'female' THEN 'f' ELSE 'm' END, AVG(avgPrice) mp FROM KibanaSampleDataEcommerce a GROUP BY 1"
                 .to_string(),
             DatabaseProtocol::PostgreSQL,
         )
@@ -18571,6 +18675,35 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_case_wrapper_alias_with_order() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT CASE WHEN customer_gender = 'female' THEN 'f' ELSE 'm' END AS \"f822c516-3515-11c2-8464-5d4845a02f73\", AVG(avgPrice) mp FROM KibanaSampleDataEcommerce a GROUP BY CASE WHEN customer_gender = 'female' THEN 'f' ELSE 'm' END ORDER BY CASE WHEN customer_gender = 'female' THEN 'f' ELSE 'm' END NULLS FIRST LIMIT 500"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+            .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert!(logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql
+            .contains("ORDER BY \"case_when_a_cust\""));
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+    }
+
+    #[tokio::test]
     async fn test_case_wrapper_ungrouped() {
         if !Rewriter::sql_push_down_enabled() {
             return;
@@ -18581,6 +18714,40 @@ ORDER BY \"COUNT(count)\" DESC"
             "SELECT CASE WHEN customer_gender = 'female' THEN 'f' ELSE 'm' END, AVG(avgPrice) mp FROM KibanaSampleDataEcommerce a GROUP BY 1"
                 .to_string(),
             DatabaseProtocol::PostgreSQL,
+        )
+            .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert!(logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql
+            .contains("CASE WHEN"));
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_case_wrapper_non_strict_match() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let mut config = ConfigObjImpl::default();
+
+        config.disable_strict_agg_type_match = true;
+
+        let query_plan = convert_select_to_query_plan_with_config(
+            "SELECT CASE WHEN customer_gender = 'female' THEN 'f' ELSE 'm' END, SUM(avgPrice) mp FROM KibanaSampleDataEcommerce a GROUP BY 1"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+            Arc::new(config)
         )
             .await;
 
@@ -18666,7 +18833,7 @@ ORDER BY \"COUNT(count)\" DESC"
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
-            "SELECT * FROM (SELECT CASE WHEN customer_gender = 'female' THEN 'f' ELSE 'm' END, MIN(avgPrice) mp FROM (SELECT AVG(avgPrice) avgPrice, customer_gender FROM KibanaSampleDataEcommerce GROUP BY 2 LIMIT 1) a GROUP BY 1) q LIMIT 1123"
+            "SELECT * FROM (SELECT CASE WHEN customer_gender = 'female' THEN 'f' ELSE 'm' END, AVG(avgPrice) mp FROM KibanaSampleDataEcommerce a GROUP BY 1) q LIMIT 1123"
                 .to_string(),
             DatabaseProtocol::PostgreSQL,
         )
@@ -18686,6 +18853,27 @@ ORDER BY \"COUNT(count)\" DESC"
             .unwrap()
             .sql
             .contains("LIMIT 1123"));
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_case_wrapper_ungrouped_on_dimension() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT CASE WHEN SUM(taxful_total_price) > 0 THEN SUM(taxful_total_price) ELSE 0 END FROM KibanaSampleDataEcommerce a"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+            .await;
 
         let physical_plan = query_plan.as_physical_plan().await.unwrap();
         println!(

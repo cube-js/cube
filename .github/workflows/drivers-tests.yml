@@ -167,8 +167,8 @@ jobs:
           DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET }}
 
           # Snowflake
-          DRIVERS_TESTS_CUBEJS_DB_USER: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_USER }}
-          DRIVERS_TESTS_CUBEJS_DB_PASS: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_PASS }}
+          DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_USER: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_USER }}
+          DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_PASS: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_PASS }}
         run: |
           cd ./packages/cubejs-testing-drivers
           export DEBUG=testcontainers

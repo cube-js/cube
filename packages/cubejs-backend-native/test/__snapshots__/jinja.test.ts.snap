@@ -6,9 +6,9 @@ exports[`Jinja (new api) render 01.yml.jinja: 01.yml.jinja 1`] = `
     sql: >
       SELECT
         order_id,
-        SUM(CASE WHEN payment_method = 'bank_transfer' THEN amount END) AS bank_transfer_amount,
-        SUM(CASE WHEN payment_method = 'credit_card' THEN amount END) AS credit_card_amount,
-        SUM(CASE WHEN payment_method = 'gift_card' THEN amount END) AS gift_card_amount,
+        SUM(CASE WHEN payment_method = 'TRANSFER' THEN amount END) AS bank_transfer_amount,
+        SUM(CASE WHEN payment_method = 'CREDIT' THEN amount END) AS credit_card_amount,
+        SUM(CASE WHEN payment_method = 'GIFT' THEN amount END) AS gift_card_amount,
         SUM(amount) AS total_amount
       FROM app_data.payments
       GROUP BY 1
@@ -17,9 +17,9 @@ exports[`Jinja (new api) render 01.yml.jinja: 01.yml.jinja 1`] = `
     sql: >
       SELECT
         order_id,
-        SUM(CASE WHEN payment_method = 'bank_transfer' THEN amount END) AS bank_transfer_amount,
-        SUM(CASE WHEN payment_method = 'credit_card' THEN amount END) AS credit_card_amount,
-        SUM(CASE WHEN payment_method = 'gift_card' THEN amount END) AS gift_card_amount
+        SUM(CASE WHEN payment_method = 'TRANSFER' THEN amount END) AS bank_transfer_amount,
+        SUM(CASE WHEN payment_method = 'CREDIT' THEN amount END) AS credit_card_amount,
+        SUM(CASE WHEN payment_method = 'GIFT' THEN amount END) AS gift_card_amount
       FROM app_data.payments
       GROUP BY 1"
 `;
@@ -66,7 +66,7 @@ exports[`Jinja (new api) render 04.yml.jinja: 04.yml.jinja 1`] = `
 "
 
 cubes:
-  - name: cube_04_base_events
+  - name: cube_04_\\"base_events\\"
     sql: >
       SELECT *
       FROM public.events
@@ -81,7 +81,7 @@ cubes:
         type: time
   
   - name: cube_04_product_purchases
-    extends: base_events
+    extends: \\"base_events\\"
     sql_table: public.events
 
     dimensions:
@@ -90,7 +90,7 @@ cubes:
         type: time
   
   - name: cube_04_page_views
-    extends: base_events
+    extends: \\"base_events\\"
     sql_table: public.events
 
     dimensions:
@@ -108,21 +108,21 @@ cubes:
     sql_table: public.orders
 
     measures:
-      - name: day
+      - name: \\"day\\"
         type: count_distinct
         sql: user_id
         rolling_window:
           trailing: 1 day
           offset: start
       
-      - name: mau
+      - name: \\"mau\\"
         type: count_distinct
         sql: user_id
         rolling_window:
           trailing: 30 day
           offset: start
       
-      - name: wau
+      - name: \\"wau\\"
         type: count_distinct
         sql: user_id
         rolling_window:
@@ -137,22 +137,22 @@ exports[`Jinja (new api) render 06.yml.jinja: 06.yml.jinja 1`] = `
     sql_table: public.orders
 
     dimensions:
-      - name: id
-        sql: id
-        type: number
+      - name: \\"id\\"
+        sql: \\"id\\"
+        type: \\"number\\"
         primary_key: true
         
-      - name: status
-        sql: status
-        type: string
+      - name: \\"status\\"
+        sql: \\"status\\"
+        type: \\"string\\"
         
-      - name: created_at
-        sql: created_at
-        type: time
+      - name: \\"created_at\\"
+        sql: \\"created_at\\"
+        type: \\"time\\"
         
-      - name: completed_at
-        sql: completed_at
-        type: time
+      - name: \\"completed_at\\"
+        sql: \\"completed_at\\"
+        type: \\"time\\"
         "
 `;
 
@@ -162,8 +162,8 @@ exports[`Jinja (new api) render 07.yml.jinja: 07.yml.jinja 1`] = `
     sql: >
       SELECT
         id AS payment_id,
-        (amount / 100)::NUMERIC(16, 2) AS amount_usd,
-        ((order_selling_price - order_cost_price) / order_cost_price) AS markup
+        (\\"amount\\" / 100)::NUMERIC(16, 2) AS amount_usd,
+        ((\\"order_selling_price\\" - \\"order_cost_price\\") / \\"order_cost_price\\") AS markup
       FROM app_data.payments"
 `;
 
@@ -171,7 +171,7 @@ exports[`Jinja (new api) render 08.yml.jinja: 08.yml.jinja 1`] = `
 "{ cubes:
   - name: cube_08
     sql_table: public.orders
-    data_source: postgres }"
+    data_source: \\"postgres\\" }"
 `;
 
 exports[`Jinja (new api) render arguments-test.yml.jinja: arguments-test.yml.jinja 1`] = `
@@ -180,10 +180,10 @@ exports[`Jinja (new api) render arguments-test.yml.jinja: arguments-test.yml.jin
   arg_sum_integers_int_float: 4.140000000000001
   arg_bool_true: 1
   arg_bool_false: 0
-  arg_str: hello world
-  arg_null: none
-  arg_seq_1: [1, 2, 3, 4, 5]
-  arg_seq_2: [5, 4, 3, 2, 1]
+  arg_str: \\"hello world\\"
+  arg_null: null
+  arg_seq_1: [1,2,3,4,5]
+  arg_seq_2: [5,4,3,2,1]
   arg_sum_tuple: 3
   arg_sum_map: 20"
 `;
@@ -191,43 +191,59 @@ exports[`Jinja (new api) render arguments-test.yml.jinja: arguments-test.yml.jin
 exports[`Jinja (new api) render data-model.yml.jinja: data-model.yml.jinja 1`] = `
 "cubes:
 
-  - name: cube_from_api
+  - name: \\"cube_from_api\\"
     measures:
-      - name: count
-        type: count
-      - name: total
-        type: sum
-        sql: amount
+      - name: \\"count\\"
+        type: \\"count\\"
+      - name: \\"total\\"
+        type: \\"sum\\"
+        sql: \\"amount\\"
 
-  - name: cube_from_api_with_dimensions
+  - name: \\"cube_from_api_with_dimensions\\"
     measures:
-      - name: active_users
-        type: count_distinct
-        sql: user_id
+      - name: \\"active_users\\"
+        type: \\"count_distinct\\"
+        sql: \\"user_id\\"
     dimensions:
-      - name: city
-        type: string
-        sql: city_column"
+      - name: \\"city\\"
+        type: \\"string\\"
+        sql: \\"city_column\\""
 `;
 
 exports[`Jinja (new api) render dump_context.yml.jinja: dump_context.yml.jinja 1`] = `
-"<pre></pre>
+"
+<pre></pre>
 
 print:
   bool_true: true
   bool_false: false
-  string: test string
+  string: \\"test string\\"
   int: 1
   float: 3.1415
-  array_int: [9, 8, 7, 6, 5, 0, 1, 2, 3, 4]
-  array_bool: [true, false, false, true]
-  null: none
-  undefined: none
+  array_int: [9,8,7,6,5,0,1,2,3,4]
+  array_bool: [true,false,false,true]
+  null: null
+  undefined: null
   security_context:
     userId: 1
   env_var:
-    exist: test
-    unknown_fallback: value"
+    exist: \\"test\\"
+    unknown_fallback: \\"value\\""
+`;
+
+exports[`Jinja (new api) render filters.yml.jinja: filters.yml.jinja 1`] = `
+"variables:
+  str_filter: \\"str from python\\"
+  str_filter_test_arg: \\"my string\\""
+`;
+
+exports[`Jinja (new api) render python.yml: python.yml 1`] = `
+"test:
+  unsafe_string: \\"\\"\\\\\\"unsafe string\\\\\\" <>\\"\\"
+  safe_string: \\"\\"safe string\\" <>\\"
+
+dump:
+  dict_as_obj: \\"{\\\\n    \\\\\\"a_attr\\\\\\": String(\\\\n        \\\\\\"value for attribute a\\\\\\",\\\\n        Normal,\\\\n    ),\\\\n}\\""
 `;
 
 exports[`Jinja (new api) render template_error.jinja: template_error.jinja 1`] = `
@@ -245,247 +261,13 @@ exports[`Jinja (new api) render template_error.jinja: template_error.jinja 1`] =
 -------------------------------------------------------------------------------]
 `;
 
-exports[`Jinja (old api) render 01.yml.jinja: 01.yml.jinja 1`] = `
-"cubes:
-  - name: cube_01_1
-    sql: >
-      SELECT
-        order_id,
-        SUM(CASE WHEN payment_method = 'bank_transfer' THEN amount END) AS bank_transfer_amount,
-        SUM(CASE WHEN payment_method = 'credit_card' THEN amount END) AS credit_card_amount,
-        SUM(CASE WHEN payment_method = 'gift_card' THEN amount END) AS gift_card_amount,
-        SUM(amount) AS total_amount
-      FROM app_data.payments
-      GROUP BY 1
-      
-  - name: cube_01_2
-    sql: >
-      SELECT
-        order_id,
-        SUM(CASE WHEN payment_method = 'bank_transfer' THEN amount END) AS bank_transfer_amount,
-        SUM(CASE WHEN payment_method = 'credit_card' THEN amount END) AS credit_card_amount,
-        SUM(CASE WHEN payment_method = 'gift_card' THEN amount END) AS gift_card_amount
-      FROM app_data.payments
-      GROUP BY 1"
-`;
-
-exports[`Jinja (old api) render 02.yml.jinja: 02.yml.jinja 1`] = `
-"cubes:
-  - name: cube_02
-    sql: >
-      SELECT
-        referrer_prop.value AS referrer
-        href_prop.value AS href
-        host_prop.value AS host
-        pathname_prop.value AS pathname
-        search_prop.value AS search
-      FROM public.events
-      LEFT JOIN UNNEST(properties) AS referrer_prop ON referrer_prop.key = 'referrer'
-      LEFT JOIN UNNEST(properties) AS href_prop ON href_prop.key = 'href'
-      LEFT JOIN UNNEST(properties) AS host_prop ON host_prop.key = 'host'
-      LEFT JOIN UNNEST(properties) AS pathname_prop ON pathname_prop.key = 'pathname'
-      LEFT JOIN UNNEST(properties) AS search_prop ON search_prop.key = 'search'"
-`;
-
-exports[`Jinja (old api) render 03.yml.jinja: 03.yml.jinja 1`] = `
-"
-
-cubes:
-  - name: cube_03
-    sql: >
-      SELECT 
-        *,
-        'au' as country
-      FROM au_orders
-      
-      UNION ALL
-      
-      SELECT 
-        *,
-        'us' as country
-      FROM us_orders
-      "
-`;
-
-exports[`Jinja (old api) render 04.yml.jinja: 04.yml.jinja 1`] = `
-"
-
-cubes:
-  - name: cube_04_base_events
-    sql: >
-      SELECT *
-      FROM public.events
-      WHERE
-        {FILTER_PARAMS.cube_04_base_events.timestamp.filter('timestamp')} AND 
-        {FILTER_PARAMS.cube_04_product_purchases.timestamp.filter('timestamp')} AND 
-        {FILTER_PARAMS.cube_04_page_views.timestamp.filter('timestamp')}
-
-    dimensions:
-      - name: timestamp
-        sql: timestamp
-        type: time
-  
-  - name: cube_04_product_purchases
-    extends: base_events
-    sql_table: public.events
-
-    dimensions:
-      - name: timestamp
-        sql: timestamp
-        type: time
-  
-  - name: cube_04_page_views
-    extends: base_events
-    sql_table: public.events
-
-    dimensions:
-      - name: timestamp
-        sql: timestamp
-        type: time
-  "
-`;
-
-exports[`Jinja (old api) render 05.yml.jinja: 05.yml.jinja 1`] = `
-"
-
-cubes:
-  - name: cube_05
-    sql_table: public.orders
-
-    measures:
-      - name: day
-        type: count_distinct
-        sql: user_id
-        rolling_window:
-          trailing: 1 day
-          offset: start
-      
-      - name: mau
-        type: count_distinct
-        sql: user_id
-        rolling_window:
-          trailing: 30 day
-          offset: start
-      
-      - name: wau
-        type: count_distinct
-        sql: user_id
-        rolling_window:
-          trailing: 7 day
-          offset: start
-      "
-`;
-
-exports[`Jinja (old api) render 06.yml.jinja: 06.yml.jinja 1`] = `
-"cubes:
-  - name: cube_06
-    sql_table: public.orders
-
-    dimensions:
-      - name: id
-        sql: id
-        type: number
-        primary_key: true
-        
-      - name: status
-        sql: status
-        type: string
-        
-      - name: created_at
-        sql: created_at
-        type: time
-        
-      - name: completed_at
-        sql: completed_at
-        type: time
-        "
-`;
-
-exports[`Jinja (old api) render 07.yml.jinja: 07.yml.jinja 1`] = `
-"cubes:
-  - name: cube_07
-    sql: >
-      SELECT
-        id AS payment_id,
-        (amount / 100)::NUMERIC(16, 2) AS amount_usd,
-        ((order_selling_price - order_cost_price) / order_cost_price) AS markup
-      FROM app_data.payments"
-`;
-
-exports[`Jinja (old api) render 08.yml.jinja: 08.yml.jinja 1`] = `
-"{ cubes:
-  - name: cube_08
-    sql_table: public.orders
-    data_source: postgres }"
-`;
-
-exports[`Jinja (old api) render arguments-test.yml.jinja: arguments-test.yml.jinja 1`] = `
-"test:
-  arg_sum_integers_int_int: 2
-  arg_sum_integers_int_float: 4.140000000000001
-  arg_bool_true: 1
-  arg_bool_false: 0
-  arg_str: hello world
-  arg_null: none
-  arg_seq_1: [1, 2, 3, 4, 5]
-  arg_seq_2: [5, 4, 3, 2, 1]
-  arg_sum_tuple: 3
-  arg_sum_map: 20"
-`;
-
-exports[`Jinja (old api) render data-model.yml.jinja: data-model.yml.jinja 1`] = `
-"cubes:
-
-  - name: cube_from_api
-    measures:
-      - name: count
-        type: count
-      - name: total
-        type: sum
-        sql: amount
-
-  - name: cube_from_api_with_dimensions
-    measures:
-      - name: active_users
-        type: count_distinct
-        sql: user_id
-    dimensions:
-      - name: city
-        type: string
-        sql: city_column"
-`;
-
-exports[`Jinja (old api) render dump_context.yml.jinja: dump_context.yml.jinja 1`] = `
-"<pre></pre>
-
-print:
-  bool_true: true
-  bool_false: false
-  string: test string
-  int: 1
-  float: 3.1415
-  array_int: [9, 8, 7, 6, 5, 0, 1, 2, 3, 4]
-  array_bool: [true, false, false, true]
-  null: none
-  undefined: none
-  security_context:
-    userId: 1
-  env_var:
-    exist: test
-    unknown_fallback: value"
-`;
-
-exports[`Jinja (old api) render template_error.jinja: template_error.jinja 1`] = `
-[Error: syntax error: unknown statement unexpected_block_name (in template_error.jinja:10)
--------------------------------------------------------------------------------
-   7 | 7
-   8 | {%- for country in countries %}
-   9 | 9
-  10 > {%- unexpected_block_name %}
-     i ^^^^^^^^^^^^^^^^^^^^^^^^ syntax error
-  11 | 11
-  12 | 12
-  13 | 13
-
--------------------------------------------------------------------------------]
+exports[`Jinja (new api) render variables.yml.jinja: variables.yml.jinja 1`] = `
+"variables:
+  var1: \\"test string\\"
+  var2: true
+  var3: false
+  var4: null
+  var5: {\\"obj_key\\":\\"val\\"}
+  var6: [1,2,3,4,5,6]
+  var7: [6,5,4,3,2,1]"
 `;

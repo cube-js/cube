@@ -1,4 +1,4 @@
-use crate::cross::{CLRepr, CLReprObject, PythonRef};
+use crate::cross::*;
 use crate::python::cube_config::CubeConfigPy;
 use crate::python::python_model::CubePythonModel;
 use crate::python::runtime::py_runtime_init;
@@ -70,14 +70,15 @@ fn python_load_model(mut cx: FunctionContext) -> JsResult<JsPromise> {
         PyModule::from_code(py, cube_code, "__init__.py", "cube")?;
 
         let model_module = PyModule::from_code(py, &model_content, &model_file_name, "")?;
+
         let mut collected_functions = CLReprObject::new();
+        let mut collected_variables = CLReprObject::new();
+        let mut collected_filters = CLReprObject::new();
 
         if model_module.hasattr("template")? {
-            let functions = model_module
-                .getattr("template")?
-                .getattr("functions")?
-                .downcast::<PyDict>()?;
+            let template = model_module.getattr("template")?;
 
+            let functions = template.getattr("functions")?.downcast::<PyDict>()?;
             for (local_key, local_value) in functions.iter() {
                 if local_value.is_instance_of::<PyFunction>() {
                     let fun: Py<PyFunction> = local_value.downcast::<PyFunction>()?.into();
@@ -87,6 +88,22 @@ fn python_load_model(mut cx: FunctionContext) -> JsResult<JsPromise> {
                     );
                 }
             }
+
+            let variables = template.getattr("variables")?.downcast::<PyDict>()?;
+            for (local_key, local_value) in variables.iter() {
+                collected_variables
+                    .insert(local_key.to_string(), CLRepr::from_python_ref(local_value)?);
+            }
+
+            let filters = template.getattr("filters")?.downcast::<PyDict>()?;
+            for (local_key, local_value) in filters.iter() {
+                let fun: Py<PyFunction> = local_value.downcast::<PyFunction>()?.into();
+                collected_filters.insert(
+                    local_key.to_string(),
+                    CLRepr::PythonRef(PythonRef::PyExternalFunction(fun)),
+                );
+            }
+
             // TODO remove all other ways of defining functions
         } else if model_module.hasattr("__execution_context_locals")? {
             let execution_context_locals = model_module
@@ -128,7 +145,11 @@ fn python_load_model(mut cx: FunctionContext) -> JsResult<JsPromise> {
             }
         };
 
-        Ok(CubePythonModel::new(collected_functions))
+        Ok(CubePythonModel::new(
+            collected_functions,
+            collected_variables,
+            collected_filters,
+        ))
     });
 
     deferred.settle_with(&channel, move |mut cx| match conf_res {

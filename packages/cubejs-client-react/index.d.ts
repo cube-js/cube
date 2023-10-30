@@ -457,9 +457,15 @@ declare module '@cubejs-client/react' {
 
   type UseCubeQueryOptions = {
     /**
+     * @deprecated Use the `cubeApi` option
      * A `CubejsApi` instance to use. Taken from the context if the param is not passed
      */
     cubejsApi?: CubejsApi;
+    
+    /**
+     * A `CubejsApi` instance to use. Taken from the context if the param is not passed
+     */
+    cubeApi?: CubejsApi;
     /**
      * Query execution will be skipped when `skip` is set to `true`. You can use this flag to avoid sending incomplete queries.
      */
@@ -491,6 +497,7 @@ declare module '@cubejs-client/react' {
    */
   type CubeFetchOptions = {
     skip?: boolean;
+    cubeApi?: CubejsApi;
     cubejsApi?: CubejsApi;
     query?: Query;
   };

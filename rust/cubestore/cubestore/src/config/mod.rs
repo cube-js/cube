@@ -6,6 +6,7 @@ use crate::cachestore::{
     CacheEvictionPolicy, CacheStore, CacheStoreSchedulerImpl, ClusterCacheStoreClient,
     LazyRocksCacheStore,
 };
+use crate::cluster::ingestion::job_processor::{JobProcessor, JobProcessorImpl};
 use crate::cluster::rate_limiter::{BasicProcessRateLimiter, ProcessRateLimiter};
 use crate::cluster::transport::{
     ClusterTransport, ClusterTransportImpl, MetaStoreTransport, MetaStoreTransportImpl,
@@ -15,7 +16,7 @@ use crate::config::injection::{DIService, Injector};
 use crate::config::processing_loop::ProcessingLoop;
 use crate::http::HttpServer;
 use crate::import::limits::ConcurrencyLimits;
-use crate::import::{ImportService, ImportServiceImpl};
+use crate::import::{ImportService, ImportServiceImpl, LocationsValidator, LocationsValidatorImpl};
 use crate::metastore::{
     BaseRocksStoreFs, MetaStore, MetaStoreRpcClient, RocksMetaStore, RocksStoreConfig,
 };
@@ -389,6 +390,8 @@ pub trait ConfigObj: DIService {
 
     fn select_worker_pool_size(&self) -> usize;
 
+    fn select_worker_idle_timeout(&self) -> u64;
+
     fn job_runners_count(&self) -> usize;
 
     fn long_term_job_runners_count(&self) -> usize;
@@ -553,6 +556,7 @@ pub struct ConfigObjImpl {
     pub dump_dir: Option<PathBuf>,
     pub store_provider: FileStoreProvider,
     pub select_worker_pool_size: usize,
+    pub select_worker_idle_timeout: u64,
     pub job_runners_count: usize,
     pub long_term_job_runners_count: usize,
     pub bind_address: Option<String>,
@@ -692,6 +696,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn select_worker_pool_size(&self) -> usize {
         self.select_worker_pool_size
+    }
+
+    fn select_worker_idle_timeout(&self) -> u64 {
+        self.select_worker_idle_timeout
     }
 
     fn job_runners_count(&self) -> usize {
@@ -1246,6 +1254,12 @@ impl Config {
                     }
                 },
                 select_worker_pool_size: env_parse("CUBESTORE_SELECT_WORKERS", 4),
+                select_worker_idle_timeout: env_parse_duration(
+                    "CUBESTORE_SELECT_WORKERS_IDLE_TIMEOUT",
+                    10 * 60,
+                    Some(2 * 60 * 60),
+                    None,
+                ),
                 bind_address: Some(
                     env::var("CUBESTORE_BIND_ADDR")
                         .ok()
@@ -1500,6 +1514,7 @@ impl Config {
                     ),
                 },
                 select_worker_pool_size: 0,
+                select_worker_idle_timeout: 600,
                 job_runners_count: 4,
                 long_term_job_runners_count: 8,
                 bind_address: None,
@@ -1651,10 +1666,10 @@ impl Config {
         let remote_fs = self.remote_fs().await.unwrap();
         let _ = fs::remove_dir_all(store_path.clone());
         if clean_remote {
-            let remote_files = remote_fs.list("").await.unwrap();
+            let remote_files = remote_fs.list("".to_string()).await.unwrap();
             for file in remote_files {
                 debug!("Cleaning {}", file);
-                let _ = remote_fs.delete_file(file.as_str()).await.unwrap();
+                let _ = remote_fs.delete_file(file).await.unwrap();
             }
         }
         {
@@ -1678,9 +1693,9 @@ impl Config {
         let _ = DB::destroy(&Options::default(), self.cache_store_path());
         let _ = fs::remove_dir_all(store_path.clone());
         if clean_remote {
-            let remote_files = remote_fs.list("").await.unwrap();
+            let remote_files = remote_fs.list("".to_string()).await.unwrap();
             for file in remote_files {
-                let _ = remote_fs.delete_file(file.as_str()).await;
+                let _ = remote_fs.delete_file(file).await;
             }
         }
     }
@@ -1961,8 +1976,15 @@ impl Config {
             .await;
 
         self.injector
+            .register_typed::<dyn LocationsValidator, _, _, _>(async move |_| {
+                LocationsValidatorImpl::new()
+            })
+            .await;
+
+        self.injector
             .register_typed::<dyn ImportService, _, _, _>(async move |i| {
                 ImportServiceImpl::new(
+                    i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
@@ -2126,6 +2148,17 @@ impl Config {
                     Duration::from_secs(c.query_timeout()),
                     Duration::from_secs(c.import_job_timeout() * 2),
                     query_cache_to_move,
+                )
+            })
+            .await;
+
+        self.injector
+            .register_typed::<dyn JobProcessor, _, _, _>(async move |i| {
+                JobProcessorImpl::new(
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
                 )
             })
             .await;

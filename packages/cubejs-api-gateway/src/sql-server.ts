@@ -63,6 +63,8 @@ export class SQLServer {
       return this.contextByNativeReq(request, current.securityContext, request.id);
     };
 
+    const canSwitchUserForSession = async (session, user) => session.superuser || canSwitchSqlUser(session.user, user);
+
     this.sqlInterfaceInstance = await registerInterface({
       port: options.sqlPort,
       pgPort: options.pgSqlPort,
@@ -193,6 +195,7 @@ export class SQLServer {
           }
         });
       },
+      canSwitchUserForSession: async ({ session, user }) => canSwitchUserForSession(session, user)
     });
   }
 

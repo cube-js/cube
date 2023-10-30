@@ -1,6 +1,13 @@
-from cube import TemplateContext
+from cube import (TemplateContext, SafeString)
 
 template = TemplateContext()
+template.add_variable('var1', "test string")
+template.add_variable('var2', True)
+template.add_variable('var3', False)
+template.add_variable('var4', None)
+template.add_variable('var5', {'obj_key': 'val'})
+template.add_variable('var6', [1,2,3,4,5,6])
+template.add_variable('var7', [6,5,4,3,2,1])
 
 @template.function
 def arg_sum_integers(a, b):
@@ -39,6 +46,20 @@ def new_str_tuple():
   return ("1", "2")
 
 @template.function
+def new_safe_string():
+  return SafeString('"safe string" <>')
+
+class MyCustomObject(dict):
+  def __init__(self):
+    self['a_attr'] = "value for attribute a"
+# TODO: We need stable sort for dump
+#     self['b_attr'] = "value for attribute b"
+
+@template.function
+def new_object_from_dict():
+  return MyCustomObject()
+
+@template.function
 def load_data_sync():
   client = MyApiClient("google.com")
   return client.load_data()
@@ -75,3 +96,11 @@ class ExampleClassModelA:
 @template.function
 def load_class_model():
   return ExampleClassModelA()
+
+@template.filter
+def str_filter(i):
+  return 'str from python'
+
+@template.filter
+def filter_return_arg(i):
+  return i

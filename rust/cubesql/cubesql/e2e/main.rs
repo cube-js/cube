@@ -43,12 +43,9 @@ fn main() {
         .with_module_level("datafusion", Level::Warn.to_level_filter())
         .with_module_level("pg_srv", Level::Warn.to_level_filter());
 
-    ReportingLogger::init(
-        Box::new(logger),
-        Box::new(LocalReporter::new()),
-        log_level.to_level_filter(),
-    )
-    .unwrap();
+    log::set_boxed_logger(Box::new(logger)).unwrap();
+
+    ReportingLogger::init(Box::new(LocalReporter::new()), log_level.to_level_filter()).unwrap();
 
     rt.block_on(async {
         let mut runner = TestsRunner::new();

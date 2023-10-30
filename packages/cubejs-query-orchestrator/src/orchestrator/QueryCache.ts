@@ -702,7 +702,10 @@ export class QueryCache {
       expireSecs,
       cacheKey,
       renewalThreshold,
-      options,
+      {
+        ...options,
+        renewCycle: true
+      },
     ).catch(e => {
       if (!(e instanceof ContinueWaitError)) {
         this.logger('Error while renew cycle', {
@@ -727,6 +730,7 @@ export class QueryCache {
       useCsvQuery?: boolean,
       lambdaTypes?: TableStructure,
       persistent?: boolean,
+      renewCycle?: boolean,
     }
   ) {
     options = options || { dataSource: 'default' };
@@ -762,6 +766,7 @@ export class QueryCache {
               lambdaTypes: options.lambdaTypes,
               persistent: options.persistent,
               primaryQuery: true,
+              renewCycle: options.renewCycle,
             }
           ),
           refreshKeyValues: cacheKeyQueryResults,
@@ -837,11 +842,12 @@ export class QueryCache {
       lambdaTypes?: TableStructure,
       persistent?: boolean,
       primaryQuery?: boolean,
+      renewCycle?: boolean,
     }
   ) {
     const spanId = crypto.randomBytes(16).toString('hex');
     options = options || { dataSource: 'default' };
-    const { renewalThreshold, primaryQuery } = options;
+    const { renewalThreshold, primaryQuery, renewCycle } = options;
     const renewalKey = options.renewalKey && this.queryRedisKey(options.renewalKey);
     const redisKey = this.queryRedisKey(cacheKey);
     const fetchNew = () => (
@@ -865,7 +871,7 @@ export class QueryCache {
           .cacheDriver
           .set(redisKey, result, expiration)
           .then(({ bytes }) => {
-            this.logger('Renewed', { cacheKey, requestId: options.requestId, spanId, primaryQuery });
+            this.logger('Renewed', { cacheKey, requestId: options.requestId, spanId, primaryQuery, renewCycle });
             this.logger('Outgoing network usage', {
               service: 'cache',
               requestId: options.requestId,
@@ -877,7 +883,7 @@ export class QueryCache {
           });
       }).catch(e => {
         if (!(e instanceof ContinueWaitError)) {
-          this.logger('Dropping Cache', { cacheKey, error: e.stack || e, requestId: options.requestId, spanId, primaryQuery });
+          this.logger('Dropping Cache', { cacheKey, error: e.stack || e, requestId: options.requestId, spanId, primaryQuery, renewCycle });
           this.cacheDriver.remove(redisKey)
             .catch(err => this.logger('Error removing key', {
               cacheKey,
@@ -891,7 +897,7 @@ export class QueryCache {
     );
 
     if (options.forceNoCache) {
-      this.logger('Force no cache for', { cacheKey, requestId: options.requestId, spanId, primaryQuery });
+      this.logger('Force no cache for', { cacheKey, requestId: options.requestId, spanId, primaryQuery, renewCycle });
       return fetchNew();
     }
 
@@ -926,6 +932,7 @@ export class QueryCache {
             requestId: options.requestId,
             spanId,
             primaryQuery,
+            renewCycle
           });
           res = inMemoryValue;
         }
@@ -949,6 +956,7 @@ export class QueryCache {
         requestId: options.requestId,
         spanId,
         primaryQuery,
+        renewCycle
       });
       if (
         renewalKey && (
@@ -959,24 +967,24 @@ export class QueryCache {
         )
       ) {
         if (options.waitForRenew) {
-          this.logger('Waiting for renew', { cacheKey, renewalThreshold, requestId: options.requestId, spanId, primaryQuery });
+          this.logger('Waiting for renew', { cacheKey, renewalThreshold, requestId: options.requestId, spanId, primaryQuery, renewCycle });
           return fetchNew();
         } else {
-          this.logger('Renewing existing key', { cacheKey, renewalThreshold, requestId: options.requestId, spanId, primaryQuery });
+          this.logger('Renewing existing key', { cacheKey, renewalThreshold, requestId: options.requestId, spanId, primaryQuery, renewCycle });
           fetchNew().catch(e => {
             if (!(e instanceof ContinueWaitError)) {
-              this.logger('Error renewing', { cacheKey, error: e.stack || e, requestId: options.requestId, spanId, primaryQuery });
+              this.logger('Error renewing', { cacheKey, error: e.stack || e, requestId: options.requestId, spanId, primaryQuery, renewCycle });
             }
           });
         }
       }
-      this.logger('Using cache for', { cacheKey, requestId: options.requestId, spanId, primaryQuery });
+      this.logger('Using cache for', { cacheKey, requestId: options.requestId, spanId, primaryQuery, renewCycle });
       if (options.useInMemory && renewedAgo + inMemoryCacheDisablePeriod <= renewalThreshold * 1000) {
         this.memoryCache.set(redisKey, parsedResult);
       }
       return parsedResult.result;
     } else {
-      this.logger('Missing cache for', { cacheKey, requestId: options.requestId, spanId, primaryQuery });
+      this.logger('Missing cache for', { cacheKey, requestId: options.requestId, spanId, primaryQuery, renewCycle });
       return fetchNew();
     }
   }

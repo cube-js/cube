@@ -1,5 +1,5 @@
 use crate::di_service;
-use crate::remotefs::{LocalDirRemoteFs, RemoteFile, RemoteFs};
+use crate::remotefs::{CommonRemoteFsUtils, LocalDirRemoteFs, RemoteFile, RemoteFs};
 use crate::util::lock::acquire_lock;
 use crate::CubeError;
 use async_trait::async_trait;
@@ -144,15 +144,31 @@ di_service!(MINIORemoteFs, [RemoteFs]);
 
 #[async_trait]
 impl RemoteFs for MINIORemoteFs {
+    async fn temp_upload_path(&self, remote_path: String) -> Result<String, CubeError> {
+        CommonRemoteFsUtils::temp_upload_path(self, remote_path).await
+    }
+
+    async fn uploads_dir(&self) -> Result<String, CubeError> {
+        CommonRemoteFsUtils::uploads_dir(self).await
+    }
+
+    async fn check_upload_file(
+        &self,
+        remote_path: String,
+        expected_size: u64,
+    ) -> Result<(), CubeError> {
+        CommonRemoteFsUtils::check_upload_file(self, remote_path, expected_size).await
+    }
+
     async fn upload_file(
         &self,
-        temp_upload_path: &str,
-        remote_path: &str,
+        temp_upload_path: String,
+        remote_path: String,
     ) -> Result<u64, CubeError> {
         {
             let time = SystemTime::now();
             debug!("Uploading {}", remote_path);
-            let path = self.s3_path(remote_path);
+            let path = self.s3_path(&remote_path);
             info!("path {}", remote_path);
             let bucket = self.bucket.read().unwrap().clone();
             let temp_upload_path_copy = temp_upload_path.to_string();
@@ -170,11 +186,11 @@ impl RemoteFs for MINIORemoteFs {
             }
         }
 
-        let size = fs::metadata(temp_upload_path).await?.len();
-        self.check_upload_file(remote_path, size).await?;
+        let size = fs::metadata(&temp_upload_path).await?.len();
+        self.check_upload_file(remote_path.clone(), size).await?;
 
-        let local_path = self.dir.as_path().join(remote_path);
-        if Path::new(temp_upload_path) != local_path {
+        let local_path = self.dir.as_path().join(&remote_path);
+        if Path::new(&temp_upload_path) != local_path {
             fs::create_dir_all(local_path.parent().unwrap())
                 .await
                 .map_err(|e| {
@@ -191,10 +207,10 @@ impl RemoteFs for MINIORemoteFs {
 
     async fn download_file(
         &self,
-        remote_path: &str,
+        remote_path: String,
         _expected_file_size: Option<u64>,
     ) -> Result<String, CubeError> {
-        let local_file = self.dir.as_path().join(remote_path);
+        let local_file = self.dir.as_path().join(&remote_path);
         let local_dir = local_file.parent().unwrap();
         let downloads_dir = local_dir.join("downloads");
 
@@ -204,7 +220,7 @@ impl RemoteFs for MINIORemoteFs {
         if !local_file.exists() {
             let time = SystemTime::now();
             debug!("Downloading {}", remote_path);
-            let path = self.s3_path(remote_path);
+            let path = self.s3_path(&remote_path);
             info!("path {}", remote_path);
             let bucket = self.bucket.read().unwrap().clone();
             let status_code = cube_ext::spawn_blocking(move || -> Result<u16, CubeError> {
@@ -230,11 +246,11 @@ impl RemoteFs for MINIORemoteFs {
         Ok(local_file_str)
     }
 
-    async fn delete_file(&self, remote_path: &str) -> Result<(), CubeError> {
+    async fn delete_file(&self, remote_path: String) -> Result<(), CubeError> {
         let time = SystemTime::now();
         debug!("Deleting {}", remote_path);
         info!("remote_path {}", remote_path);
-        let path = self.s3_path(remote_path);
+        let path = self.s3_path(&remote_path);
         info!("path {}", remote_path);
         let bucket = self.bucket.read().unwrap().clone();
         let (_, status_code) =
@@ -248,7 +264,7 @@ impl RemoteFs for MINIORemoteFs {
         }
 
         let _guard = acquire_lock("delete file", self.delete_mut.lock()).await?;
-        let local = self.dir.as_path().join(remote_path);
+        let local = self.dir.as_path().join(&remote_path);
         if fs::metadata(local.clone()).await.is_ok() {
             fs::remove_file(local.clone()).await?;
             LocalDirRemoteFs::remove_empty_paths(self.dir.as_path().to_path_buf(), local.clone())
@@ -258,7 +274,7 @@ impl RemoteFs for MINIORemoteFs {
         Ok(())
     }
 
-    async fn list(&self, remote_prefix: &str) -> Result<Vec<String>, CubeError> {
+    async fn list(&self, remote_prefix: String) -> Result<Vec<String>, CubeError> {
         Ok(self
             .list_with_metadata(remote_prefix)
             .await?
@@ -267,8 +283,11 @@ impl RemoteFs for MINIORemoteFs {
             .collect::<Vec<_>>())
     }
 
-    async fn list_with_metadata(&self, remote_prefix: &str) -> Result<Vec<RemoteFile>, CubeError> {
-        let path = self.s3_path(remote_prefix);
+    async fn list_with_metadata(
+        &self,
+        remote_prefix: String,
+    ) -> Result<Vec<RemoteFile>, CubeError> {
+        let path = self.s3_path(&remote_prefix);
         let bucket = self.bucket.read().unwrap().clone();
         let list = cube_ext::spawn_blocking(move || bucket.list_blocking(path, None)).await??;
         let leading_slash = Regex::new(format!("^{}", self.s3_path("")).as_str()).unwrap();
@@ -290,11 +309,11 @@ impl RemoteFs for MINIORemoteFs {
         Ok(result)
     }
 
-    async fn local_path(&self) -> String {
-        self.dir.to_str().unwrap().to_owned()
+    async fn local_path(&self) -> Result<String, CubeError> {
+        Ok(self.dir.to_str().unwrap().to_owned())
     }
 
-    async fn local_file(&self, remote_path: &str) -> Result<String, CubeError> {
+    async fn local_file(&self, remote_path: String) -> Result<String, CubeError> {
         let buf = self.dir.join(remote_path);
         fs::create_dir_all(buf.parent().unwrap()).await?;
         Ok(buf.to_str().unwrap().to_string())

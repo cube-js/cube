@@ -2,7 +2,7 @@ import stream, { TransformCallback } from 'stream';
 
 export function transformRow(row: any) {
   for (const [field, value] of Object.entries(row)) {
-    if (typeof value === 'number') {
+    if (typeof value === 'number' || typeof value === 'bigint') {
       row[field] = value.toString();
     } else if (Object.prototype.toString.call(value) === '[object Date]') {
       row[field] = (value as any).toISOString();

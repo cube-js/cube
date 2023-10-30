@@ -528,7 +528,8 @@ impl QueryContext {
         match selection {
             Selection::Measure(measure) => {
                 if measure.agg_type.is_some()
-                    && !measure.is_same_agg_type(&call_agg_type)
+                    // TODO not used
+                    && !measure.is_same_agg_type(&call_agg_type, false)
                 {
                     return Err(CompilationError::user(format!(
                         "Measure aggregation type doesn't match. The aggregation type for '{}' is '{}()' but '{}()' was provided",

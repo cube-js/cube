@@ -1,15 +1,15 @@
 use crate::cross::clrepr::CLReprObject;
-use crate::cross::CLRepr;
+use crate::cross::{CLRepr, StringType};
 use pyo3::exceptions::{PyNotImplementedError, PyTypeError};
 use pyo3::types::{
-    PyBool, PyComplex, PyDate, PyDict, PyFloat, PyFrame, PyFunction, PyInt, PyList, PySet,
-    PyString, PyTraceback, PyTuple,
+    PyBool, PyComplex, PyDate, PyDict, PyFloat, PyFrame, PyFunction, PyInt, PyList, PySequence,
+    PySet, PyString, PyTraceback, PyTuple,
 };
 use pyo3::{AsPyPointer, Py, PyAny, PyErr, PyObject, Python, ToPyObject};
 
 #[derive(Debug, Clone)]
 pub enum PythonRef {
-    PyObject(Py<PyAny>),
+    PyObject(PyObject),
     PyFunction(Py<PyFunction>),
     /// Special type to transfer functions through JavaScript
     /// In JS it's an external object. It's not the same as Function.
@@ -30,7 +30,13 @@ impl CLReprPython for CLRepr {
         }
 
         return Ok(if v.get_type().is_subclass_of::<PyString>()? {
-            Self::String(v.to_string())
+            let string_type = if v.hasattr("is_safe")? {
+                StringType::Safe
+            } else {
+                StringType::Normal
+            };
+
+            Self::String(v.to_string(), string_type)
         } else if v.get_type().is_subclass_of::<PyBool>()? {
             Self::Bool(v.downcast::<PyBool>()?.is_true())
         } else if v.get_type().is_subclass_of::<PyFloat>()? {
@@ -92,19 +98,28 @@ impl CLReprPython for CLRepr {
                 "Unable to represent PyDate type as CLR from Python".to_string(),
             ));
         } else if v.get_type().is_subclass_of::<PyFrame>()? {
-            return Err(PyErr::new::<PyTypeError, _>(
-                "Unable to represent PyFrame type as CLR from Python".to_string(),
-            ));
+            let frame = v.downcast::<PyFrame>()?;
+
+            return Err(PyErr::new::<PyTypeError, _>(format!(
+                "Unable to represent PyFrame type as CLR from Python, value: {:?}",
+                frame
+            )));
         } else if v.get_type().is_subclass_of::<PyTraceback>()? {
-            return Err(PyErr::new::<PyTypeError, _>(
-                "Unable to represent PyTraceback type as CLR from Python".to_string(),
-            ));
+            let trb = v.downcast::<PyTraceback>()?;
+
+            return Err(PyErr::new::<PyTypeError, _>(format!(
+                "Unable to represent PyTraceback type as CLR from Python, value: {:?}",
+                trb
+            )));
         } else {
             let is_sequence = unsafe { pyo3::ffi::PySequence_Check(v.as_ptr()) == 1 };
             if is_sequence {
-                return Err(PyErr::new::<PyTypeError, _>(
-                    "Unable to represent PyTraceback type as CLR from Python".to_string(),
-                ));
+                let seq = v.downcast::<PySequence>()?;
+
+                return Err(PyErr::new::<PyTypeError, _>(format!(
+                    "Unable to represent PySequence type as CLR from Python, value: {:?}",
+                    seq
+                )));
             }
 
             Self::PythonRef(PythonRef::PyObject(v.into()))
@@ -113,7 +128,7 @@ impl CLReprPython for CLRepr {
 
     fn into_py_impl(from: CLRepr, py: Python) -> Result<PyObject, PyErr> {
         Ok(match from {
-            CLRepr::String(v) => PyString::new(py, &v).to_object(py),
+            CLRepr::String(v, _) => PyString::new(py, &v).to_object(py),
             CLRepr::Bool(v) => PyBool::new(py, v).to_object(py),
             CLRepr::Float(v) => PyFloat::new(py, v).to_object(py),
             CLRepr::Int(v) => {

@@ -7,6 +7,7 @@ mod channel;
 mod config;
 mod cross;
 mod logger;
+mod node_obj_serializer;
 #[cfg(feature = "python")]
 mod python;
 mod stream;
@@ -20,6 +21,7 @@ use std::sync::Arc;
 use crate::cross::CLRepr;
 use auth::NodeBridgeAuthService;
 use config::NodeConfig;
+use cubesql::telemetry::LocalReporter;
 use cubesql::{config::CubeServices, telemetry::ReportingLogger, CubeError};
 use log::Level;
 use logger::NodeBridgeLogger;
@@ -58,6 +60,15 @@ fn tokio_runtime() -> Result<&'static Runtime, CubeError> {
     })
 }
 
+fn create_logger(log_level: log::Level) -> SimpleLogger {
+    SimpleLogger::new()
+        .with_level(Level::Error.to_level_filter())
+        .with_module_level("cubesql", log_level.to_level_filter())
+        .with_module_level("cubejs_native", log_level.to_level_filter())
+        .with_module_level("datafusion", Level::Warn.to_level_filter())
+        .with_module_level("pg_srv", Level::Warn.to_level_filter())
+}
+
 fn setup_logger(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let options = cx.argument::<JsObject>(0)?;
     let cube_logger = options
@@ -80,15 +91,10 @@ fn setup_logger(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         Level::Trace
     };
 
-    let logger = SimpleLogger::new()
-        .with_level(Level::Error.to_level_filter())
-        .with_module_level("cubesql", log_level.to_level_filter())
-        .with_module_level("cubejs_native", log_level.to_level_filter())
-        .with_module_level("datafusion", Level::Warn.to_level_filter())
-        .with_module_level("pg_srv", Level::Warn.to_level_filter());
+    let logger = create_logger(log_level);
+    log_reroute::reroute_boxed(Box::new(logger));
 
     ReportingLogger::init(
-        Box::new(logger),
         Box::new(NodeBridgeLogger::new(cx.channel(), cube_logger)),
         log_level.to_level_filter(),
     )
@@ -113,6 +119,9 @@ fn register_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
         .root(&mut cx);
     let transport_sql_generator = options
         .get::<JsFunction, _, _>(&mut cx, "sqlGenerators")?
+        .root(&mut cx);
+    let transport_can_switch_user_for_session = options
+        .get::<JsFunction, _, _>(&mut cx, "canSwitchUserForSession")?
         .root(&mut cx);
 
     let nonce_handle = options.get_value(&mut cx, "nonce")?;
@@ -151,6 +160,7 @@ fn register_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
         transport_sql,
         transport_meta,
         transport_sql_generator,
+        transport_can_switch_user_for_session,
     );
     let auth_service = NodeBridgeAuthService::new(cx.channel(), check_auth);
 
@@ -222,6 +232,18 @@ fn debug_js_to_clrepr_to_js(mut cx: FunctionContext) -> JsResult<JsValue> {
 
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {
+    // We use log_rerouter to swap logger, because we init logger from js side in api-gateway
+    log_reroute::init().unwrap();
+
+    let logger = Box::new(create_logger(Level::Error));
+    log_reroute::reroute_boxed(logger);
+
+    ReportingLogger::init(
+        Box::new(LocalReporter::new()),
+        Level::Error.to_level_filter(),
+    )
+    .unwrap();
+
     cx.export_function("setupLogger", setup_logger)?;
     cx.export_function("registerInterface", register_interface)?;
     cx.export_function("shutdownInterface", shutdown_interface)?;

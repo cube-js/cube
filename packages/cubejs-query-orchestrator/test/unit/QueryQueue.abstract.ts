@@ -1,6 +1,6 @@
 import { Readable } from 'stream';
 import { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
-import type { QueryKey, QueryKeyHash } from '@cubejs-backend/base-driver';
+import type { QueryKey } from '@cubejs-backend/base-driver';
 import { pausePromise } from '@cubejs-backend/shared';
 import crypto from 'crypto';
 
@@ -22,8 +22,8 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
 
     let delayCount = 0;
     let streamCount = 0;
-    const processMessagePromises = [];
-    const processCancelPromises = [];
+    const processMessagePromises: Promise<any>[] = [];
+    const processCancelPromises: Promise<any>[] = [];
     let cancelledQuery;
 
     const tenantPrefix = crypto.randomBytes(6).toString('hex');
@@ -48,8 +48,8 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
           });
         },
       },
-      sendProcessMessageFn: async (queryKeyHashed) => {
-        processMessagePromises.push(queue.processQuery.bind(queue)(queryKeyHashed));
+      sendProcessMessageFn: async (queryKeyHashed, queueId) => {
+        processMessagePromises.push(queue.processQuery.bind(queue)(queryKeyHashed, queueId));
       },
       sendCancelMessageFn: async (query) => {
         processCancelPromises.push(queue.processCancel.bind(queue)(query));
@@ -259,6 +259,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
 
         let orphanedTimeout = 2;
         await connection.addToQueue(keyScore, ['1', []], time + (orphanedTimeout * 1000), 'delay', { isJob: true, orphanedTimeout: time, }, priority, {
+          queueId: 1,
           stageQueryKey: '1',
           requestId: '1',
           orphanedTimeout,
@@ -267,7 +268,9 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
         expect(await connection.getOrphanedQueries()).toEqual([]);
 
         orphanedTimeout = 60;
+
         await connection.addToQueue(keyScore, ['2', []], time + (orphanedTimeout * 1000), 'delay', { isJob: true, orphanedTimeout: time, }, priority, {
+          queueId: 2,
           stageQueryKey: '2',
           requestId: '2',
           orphanedTimeout,
@@ -276,7 +279,11 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
         await pausePromise(2000 + 500 /*  additional timeout on CI */);
 
         expect(await connection.getOrphanedQueries()).toEqual([
-          connection.redisHash(['1', []])
+          [
+            connection.redisHash(['1', []]),
+            // Redis doesnt support queueId, it will return Null
+            name.includes('Redis') ? null : expect.any(Number)
+          ]
         ]);
       } finally {
         await connection.getQueryAndRemove(connection.redisHash(['1', []]));
@@ -324,7 +331,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
     test('removed before reconciled', async () => {
       const query: QueryKey = ['select * from', []];
       const key = queue.redisHash(query);
-      await queue.processQuery(key);
+      await queue.processQuery(key, null);
       const result = await queue.executeInQueue('foo', key, query);
       expect(result).toBe('select * from bar');
     });
@@ -394,11 +401,11 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
       await queue.reconcileQueue();
 
       await redisClient.addToQueue(
-        keyScore, 'activated1', time, 'handler', <any>['select'], priority, { stageQueryKey: 'race', requestId: '1' }
+        keyScore, 'activated1', time, 'handler', <any>['select'], priority, { stageQueryKey: 'race', requestId: '1', queueId: 1 }
       );
 
       await redisClient.addToQueue(
-        keyScore + 100, 'activated2', time + 100, 'handler2', <any>['select2'], priority, { stageQueryKey: 'race2', requestId: '1' }
+        keyScore + 100, 'activated2', time + 100, 'handler2', <any>['select2'], priority, { stageQueryKey: 'race2', requestId: '1', queueId: 2 }
       );
 
       const processingId1 = await redisClient.getNextProcessingId();

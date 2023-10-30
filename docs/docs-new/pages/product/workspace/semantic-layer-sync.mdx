@@ -311,10 +311,13 @@ module.exports = {
 ### Preset
 
 Data model is synchronized via [Preset API][preset-api] which uses API keys for
-authentication. You can generate a new API key in your [user
+authentication.
+
+You can generate a new API key in your [user
 settings][preset-user-settings] in Preset to obtain an `api_token` and an
 `api_secret`. You can also copy a `workspace_url` at any page of your Preset
-workspace.
+workspace. Note that your use should have the [workspace
+role][preset-user-roles] of `Workspace Admin`.
 
 Example confguration for Preset:
 
@@ -538,6 +541,7 @@ and clicking <Btn>Show History</Btn> next to a relevant sync.
 [ref-dev-mode]: /product/workspace/dev-mode
 [preset-api]: https://api-docs.preset.io
 [preset-user-settings]: https://manage.app.preset.io/app/user
+[preset-user-roles]: https://docs.preset.io/docs/role-based-access-security-rbac#change-user-access-to-a-workspace
 [superset-api]: https://superset.apache.org/docs/api/
 [metabase-api]:
   https://www.metabase.com/learn/administration/metabase-api#authenticate-your-requests-with-a-session-token

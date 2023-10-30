@@ -375,15 +375,17 @@ impl CacheStoreSqlService {
                     .queue_to_cancel(prefix.value, orphaned_timeout, heartbeat_timeout)
                     .await?;
 
-                let columns = vec![Column::new("id".to_string(), ColumnType::String, 0)];
+                let columns = vec![
+                    // id is a path, we cannot change it, because it's breaking change
+                    Column::new("id".to_string(), ColumnType::String, 0),
+                    Column::new("queue_id".to_string(), ColumnType::String, 1),
+                ];
 
                 (
                     Arc::new(DataFrame::new(
                         columns,
                         rows.into_iter()
-                            .map(|item| {
-                                Row::new(vec![TableValue::String(item.get_row().get_key().clone())])
-                            })
+                            .map(|item| QueueItem::queue_to_cancel_row(item))
                             .collect(),
                     )),
                     true,
@@ -401,20 +403,22 @@ impl CacheStoreSqlService {
                     .await?;
 
                 let mut columns = vec![
+                    // id is a path, we cannot change it, because it's breaking change
                     Column::new("id".to_string(), ColumnType::String, 0),
-                    Column::new("status".to_string(), ColumnType::String, 1),
-                    Column::new("extra".to_string(), ColumnType::String, 2),
+                    Column::new("queue_id".to_string(), ColumnType::String, 1),
+                    Column::new("status".to_string(), ColumnType::String, 2),
+                    Column::new("extra".to_string(), ColumnType::String, 3),
                 ];
 
                 if with_payload {
-                    columns.push(Column::new("payload".to_string(), ColumnType::String, 3));
+                    columns.push(Column::new("payload".to_string(), ColumnType::String, 4));
                 }
 
                 (
                     Arc::new(DataFrame::new(
                         columns,
                         rows.into_iter()
-                            .map(|item| item.into_row().into_queue_list_row(with_payload))
+                            .map(|item| QueueItem::queue_list_row(item, with_payload))
                             .collect(),
                     )),
                     true,

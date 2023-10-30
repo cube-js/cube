@@ -64,6 +64,11 @@ export interface MetaPayload {
     session: SessionContext,
 }
 
+export interface CanSwitchUserPayload {
+  session: SessionContext,
+  user: string,
+}
+
 export type SQLInterfaceOptions = {
     port?: number,
     pgPort?: number,
@@ -75,6 +80,7 @@ export type SQLInterfaceOptions = {
     stream: (payload: LoadPayload) => unknown | Promise<unknown>,
     sqlApiLoad: (payload: SqlApiLoadPayload) => unknown | Promise<unknown>,
     sqlGenerators: (paramsJson: string) => unknown | Promise<unknown>,
+    canSwitchUserForSession: (payload: CanSwitchUserPayload) => unknown | Promise<unknown>,
 };
 
 function loadNative() {
@@ -300,6 +306,7 @@ export const registerInterface = async (options: SQLInterfaceOptions): Promise<S
     stream: wrapNativeFunctionWithStream(options.stream),
     sqlApiLoad: wrapNativeFunctionWithStream(options.sqlApiLoad),
     sqlGenerators: wrapRawNativeFunctionWithChannelCallback(options.sqlGenerators),
+    canSwitchUserForSession: wrapRawNativeFunctionWithChannelCallback(options.canSwitchUserForSession),
   });
 };
 
@@ -364,12 +371,14 @@ export const pythonLoadConfig = async (content: string, options: { fileName: str
 export type PythonCtx = {
     __type: 'PythonCtx'
 } & {
-    [key: string]: Function
+  filters: Record<string, Function>
+  functions: Record<string, Function>
+  variables: Record<string, any>
 };
 
 export interface JinjaEngine {
     loadTemplate(templateName: string, templateContent: string): void;
-    renderTemplate(templateName: string, context: unknown, pythonContext: PythonCtx | null): string;
+    renderTemplate(templateName: string, context: unknown, pythonContext: Record<string, any> | null): string;
 }
 
 export class NativeInstance {
@@ -385,7 +394,7 @@ export class NativeInstance {
       return this.native;
     }
 
-    public newJinjaEngine(options: { debugInfo?: boolean }): JinjaEngine {
+    public newJinjaEngine(options: { debugInfo?: boolean, filters: Record<string, Function> }): JinjaEngine {
       return this.getNative().newJinjaEngine(options);
     }
 

@@ -31,12 +31,8 @@ fn main() {
 
     // console_subscriber::init();
 
-    ReportingLogger::init(
-        Box::new(logger),
-        Box::new(LocalReporter::new()),
-        log_level.to_level_filter(),
-    )
-    .unwrap();
+    log::set_boxed_logger(Box::new(logger)).unwrap();
+    ReportingLogger::init(Box::new(LocalReporter::new()), log_level.to_level_filter()).unwrap();
 
     let config = Config::default();
 

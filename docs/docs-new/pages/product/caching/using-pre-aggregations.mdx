@@ -228,15 +228,22 @@ cube(`orders`, {
 
 ### When to use indexes?
 
-Indexes are great when you filter large amounts of data across one or several
-dimension columns. You can read more about them
-[here][ref-schema-ref-preaggs-index].
+When you define pre-aggregation without any indexes, the default index will be created.
+For the default index, dimensions come first, time dimensions come second, and measures come last.
+At query time, if the default index can't be selected for merge sort scan, then hash aggregation would be used.
+It usually means that the full table needs to be scanned to get query results.
+And it's usually no big deal if the pre-aggregation table is only several MB in size.
+Once you go over, indexes are usually required to achieve optimal performance.
+Especially if not all columns from pre-aggregation are used in a particular query.
+You can read more about indexes [here][ref-schema-ref-preaggs-index].
 
 ### Best Practices
 
 To maximize performance, you can introduce an index per type of query so the set
 of dimensions used in the query overlap as much as possible with the ones
-defined in the index. Measures are traditionally only used in indexes if you
+defined in the index. 
+As indexes are sorted copies of the data, you don't incur any additional costs on the data warehouse side, however, you multiply your build time for a given pre-aggregation with every index added.
+Measures are traditionally only used in indexes if you
 plan to filter a measured value and the cardinality of the possible values of
 the measure is low.
 
@@ -244,6 +251,10 @@ The order in which columns are specified in the index is **very** important;
 suboptimal ordering can lead to diminished performance. To improve the
 performance of an index the main thing to consider is the order of the columns
 defined in it.
+
+The key property of additive rollups is that for most queries, there's at least one index that makes a particular query scan very little amount of data which makes it very fast.
+There however exceptions to this rule like TopK queries, use of low selectivity range filters without high selectivity single value filters, etc.
+Optimization of those use cases usually should be handled by remodeling data and queries.
 
 The rule of thumb for index column order is:
 
@@ -258,11 +269,11 @@ structure:
 
 | timestamp           | product_name  | product_category | zip_code | order_total |
 | ------------------- | ------------- | ---------------- | -------- | ----------- |
-| 2023-01-01 10:00:00 | Plastic Chair | Furniture        | 88523    | 2000        |
 | 2023-01-01 10:00:00 | Keyboard      | Electronics      | 88523    | 1000        |
 | 2023-01-01 10:00:00 | Mouse         | Electronics      | 88523    | 800         |
-| 2023-01-01 11:00:00 | Plastic Chair | Furniture        | 88524    | 3000        |
+| 2023-01-01 10:00:00 | Plastic Chair | Furniture        | 88523    | 2000        |
 | 2023-01-01 11:00:00 | Keyboard      | Electronics      | 88524    | 2000        |
+| 2023-01-01 11:00:00 | Plastic Chair | Furniture        | 88524    | 3000        |
 
 The pre-aggregation code would look as follows:
 
@@ -416,13 +427,13 @@ cubes:
 
 Then the data within `category_productname_zipcode_index` would look like:
 
-| product_category | product_name  | zip_code | timestamp           | order_total |
-| ---------------- | ------------- | -------- | ------------------- | ----------- |
-| Furniture        | Plastic Chair | 88523    | 2023-01-01 10:00:00 | 2000        |
-| Electronics      | Keyboard      | 88523    | 2023-01-01 10:00:00 | 1000        |
-| Electronics      | Mouse         | 88523    | 2023-01-01 10:00:00 | 800         |
-| Furniture        | Plastic Chair | 88524    | 2023-01-01 11:00:00 | 3000        |
-| Electronics      | Keyboard      | 88524    | 2023-01-01 11:00:00 | 2000        |
+| product_category | zip_code | product_name  | timestamp           | order_total |
+| ---------------- | -------- | ------------- | ------------------- | ----------- |
+| Electronics      | 88523    | Mouse         | 2023-01-01 10:00:00 | 800         |
+| Electronics      | 88523    | Plastic Chair | 2023-01-01 10:00:00 | 2000        |
+| Furniture        | 88523    | Keyboard      | 2023-01-01 10:00:00 | 1000        |
+| Electronics      | 88524    | Keyboard      | 2023-01-01 11:00:00 | 2000        |
+| Furniture        | 88524    | Plastic Chair | 2023-01-01 11:00:00 | 3000        |
 
 `product_category` column comes first as it's a single value filter. Then
 `zip_code` as it's `GROUP BY` column. `product_name` comes last as it's a

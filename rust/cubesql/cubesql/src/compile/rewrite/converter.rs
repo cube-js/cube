@@ -1773,6 +1773,7 @@ impl LanguageToLogicalPlanConverter {
                 LogicalPlanLanguage::CubeScan(_) => return true,
                 _ => (),
             },
+            LogicalPlanLanguage::CubeScanWrapper(_) => return true,
             _ => (),
         }
 

@@ -12,6 +12,7 @@ pub struct BestCubePlan;
 /// - `filters` > `filter_members` - optimize for push down of filters
 /// - `filter_members` > `cube_members` - optimize for `inDateRange` filter push down to time dimension
 /// - `member_errors` > `cube_members` - extra cube members may be required (e.g. CASE)
+/// - `member_errors` > `wrapper_nodes` - use SQL push down where possible if cube scan can't be detected
 /// - match errors by priority - optimize for more specific errors
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct CubePlanCost {
@@ -21,13 +22,15 @@ pub struct CubePlanCost {
     filters: i64,
     structure_points: i64,
     filter_members: i64,
+    empty_wrappers: i64,
     member_errors: i64,
+    wrapper_nodes: i64,
+    ast_size_outside_wrapper: usize,
     cube_members: i64,
     errors: i64,
-    ast_size_outside_wrapper: usize,
-    wrapper_nodes: i64,
     cube_scan_nodes: i64,
     ast_size: usize,
+    ast_size_inside_wrapper: usize,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -99,11 +102,13 @@ impl CubePlanCost {
             cube_members: self.cube_members + other.cube_members,
             errors: self.errors + other.errors,
             structure_points: self.structure_points + other.structure_points,
+            empty_wrappers: self.empty_wrappers + other.empty_wrappers,
             ast_size_outside_wrapper: self.ast_size_outside_wrapper
                 + other.ast_size_outside_wrapper,
             wrapper_nodes: self.wrapper_nodes + other.wrapper_nodes,
             cube_scan_nodes: self.cube_scan_nodes + other.cube_scan_nodes,
             ast_size: self.ast_size + other.ast_size,
+            ast_size_inside_wrapper: self.ast_size_inside_wrapper + other.ast_size_inside_wrapper,
         }
     }
 
@@ -112,7 +117,11 @@ impl CubePlanCost {
             replacers: self.replacers,
             table_scans: self.table_scans,
             filters: self.filters,
-            non_detected_cube_scans: self.non_detected_cube_scans,
+            non_detected_cube_scans: match state {
+                CubePlanState::Wrapped => 0,
+                CubePlanState::Unwrapped(_) => self.non_detected_cube_scans,
+                CubePlanState::Wrapper => 0,
+            },
             filter_members: self.filter_members,
             member_errors: self.member_errors,
             cube_members: self.cube_members,
@@ -123,9 +132,21 @@ impl CubePlanCost {
                 CubePlanState::Unwrapped(size) => *size,
                 CubePlanState::Wrapper => 0,
             } + self.ast_size_outside_wrapper,
+            empty_wrappers: match state {
+                CubePlanState::Wrapped => 0,
+                CubePlanState::Unwrapped(_) => 0,
+                CubePlanState::Wrapper => {
+                    if self.ast_size_inside_wrapper == 0 {
+                        1
+                    } else {
+                        0
+                    }
+                }
+            } + self.empty_wrappers,
             wrapper_nodes: self.wrapper_nodes,
             cube_scan_nodes: self.cube_scan_nodes,
             ast_size: self.ast_size,
+            ast_size_inside_wrapper: self.ast_size_inside_wrapper,
         }
     }
 }
@@ -162,6 +183,11 @@ impl CostFunction<LogicalPlanLanguage> for BestCubePlan {
             LogicalPlanLanguage::Union(_) => 1,
             LogicalPlanLanguage::Window(_) => 1,
             LogicalPlanLanguage::Subquery(_) => 1,
+            _ => 0,
+        };
+
+        let ast_size_inside_wrapper = match enode {
+            LogicalPlanLanguage::WrappedSelect(_) => 1,
             _ => 0,
         };
 
@@ -242,7 +268,9 @@ impl CostFunction<LogicalPlanLanguage> for BestCubePlan {
                 errors: this_errors,
                 structure_points,
                 wrapper_nodes,
+                empty_wrappers: 0,
                 ast_size_outside_wrapper: 0,
+                ast_size_inside_wrapper,
                 cube_scan_nodes,
                 ast_size: 1,
             },

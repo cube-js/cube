@@ -74,6 +74,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4361135be9122e0870de935d7c439aef945b9f9ddd4199a553b5270b49c82a27"
 
 [[package]]
+name = "arc-swap"
+version = "1.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bddcadddf5e9015d310179a59bb28c4d4b9920ad0f11e8e14dbadf654890c9a6"
+
+[[package]]
 name = "arrayref"
 version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -595,7 +601,7 @@ dependencies = [
 [[package]]
 name = "cube-ext"
 version = "1.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=00ed6a6d469a69f57dd1f08c1fda3f7c2cf12d80#00ed6a6d469a69f57dd1f08c1fda3f7c2cf12d80"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=be967a63967f23bdd946a45925d07af0a11dcc39#be967a63967f23bdd946a45925d07af0a11dcc39"
 dependencies = [
  "arrow",
  "chrono",
@@ -631,6 +637,7 @@ dependencies = [
  "findshlibs",
  "libc",
  "log",
+ "log-reroute",
  "minijinja",
  "neon",
  "once_cell",
@@ -649,6 +656,7 @@ name = "cubesql"
 version = "0.28.0"
 dependencies = [
  "anyhow",
+ "arc-swap",
  "async-stream",
  "async-trait",
  "base64 0.13.0",
@@ -743,7 +751,7 @@ dependencies = [
 [[package]]
 name = "datafusion"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=00ed6a6d469a69f57dd1f08c1fda3f7c2cf12d80#00ed6a6d469a69f57dd1f08c1fda3f7c2cf12d80"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=be967a63967f23bdd946a45925d07af0a11dcc39#be967a63967f23bdd946a45925d07af0a11dcc39"
 dependencies = [
  "ahash",
  "arrow",
@@ -776,7 +784,7 @@ dependencies = [
 [[package]]
 name = "datafusion-common"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=00ed6a6d469a69f57dd1f08c1fda3f7c2cf12d80#00ed6a6d469a69f57dd1f08c1fda3f7c2cf12d80"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=be967a63967f23bdd946a45925d07af0a11dcc39#be967a63967f23bdd946a45925d07af0a11dcc39"
 dependencies = [
  "arrow",
  "ordered-float 2.10.0",
@@ -787,7 +795,7 @@ dependencies = [
 [[package]]
 name = "datafusion-data-access"
 version = "1.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=00ed6a6d469a69f57dd1f08c1fda3f7c2cf12d80#00ed6a6d469a69f57dd1f08c1fda3f7c2cf12d80"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=be967a63967f23bdd946a45925d07af0a11dcc39#be967a63967f23bdd946a45925d07af0a11dcc39"
 dependencies = [
  "async-trait",
  "chrono",
@@ -800,7 +808,7 @@ dependencies = [
 [[package]]
 name = "datafusion-expr"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=00ed6a6d469a69f57dd1f08c1fda3f7c2cf12d80#00ed6a6d469a69f57dd1f08c1fda3f7c2cf12d80"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=be967a63967f23bdd946a45925d07af0a11dcc39#be967a63967f23bdd946a45925d07af0a11dcc39"
 dependencies = [
  "ahash",
  "arrow",
@@ -811,7 +819,7 @@ dependencies = [
 [[package]]
 name = "datafusion-physical-expr"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=00ed6a6d469a69f57dd1f08c1fda3f7c2cf12d80#00ed6a6d469a69f57dd1f08c1fda3f7c2cf12d80"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=be967a63967f23bdd946a45925d07af0a11dcc39#be967a63967f23bdd946a45925d07af0a11dcc39"
 dependencies = [
  "ahash",
  "arrow",
@@ -1612,6 +1620,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "log-reroute"
+version = "0.1.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "741a3ba679a9a1d331319dda1c7d8f204e9f6760fd867e28576a45d17048bc02"
+dependencies = [
+ "arc-swap",
+ "log",
+ "once_cell",
+]
+
+[[package]]
 name = "lz4"
 version = "1.23.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1685,9 +1704,9 @@ dependencies = [
 
 [[package]]
 name = "minijinja"
-version = "1.0.4"
+version = "1.0.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "822ebf53abf914648234330ca59b88226ed278551b1b42b47e472957c12660d6"
+checksum = "1f98b09920c8be9ff96a5625aca5b5db7a4f4ba025132ff7d7aacb72c0244a45"
 dependencies = [
  "memo-map",
  "self_cell",
@@ -3085,7 +3104,7 @@ checksum = "6e63cff320ae2c57904679ba7cb63280a3dc4613885beafb148ee7bf9aa9042d"
 [[package]]
 name = "sqlparser"
 version = "0.16.0"
-source = "git+https://github.com/cube-js/sqlparser-rs.git?rev=ac5fc7cbf4368cd4c9e6c2af0e0e35d2eff7cc16#ac5fc7cbf4368cd4c9e6c2af0e0e35d2eff7cc16"
+source = "git+https://github.com/cube-js/sqlparser-rs.git?rev=037562f7975fcc92b725efbfbaaf050272668593#037562f7975fcc92b725efbfbaaf050272668593"
 dependencies = [
  "log",
 ]

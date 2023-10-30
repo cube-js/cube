@@ -81,7 +81,7 @@ impl RemoteFsCleanup {
                     files_to_remove.remove(&f);
                 }
                 for f in files_to_remove.iter() {
-                    if let Err(e) = self.remote_fs.delete_file(&f).await {
+                    if let Err(e) = self.remote_fs.delete_file(f.clone()).await {
                         log::error!("Error while deleting {} in remote fs: {}", f, e);
                     }
                 }
@@ -89,7 +89,7 @@ impl RemoteFsCleanup {
 
             files_to_remove.clear();
 
-            let res_remote_files = remote_fs.list_with_metadata("").await;
+            let res_remote_files = remote_fs.list_with_metadata("".to_string()).await;
             let remote_files = match res_remote_files {
                 Err(e) => {
                     log::error!("could not get the list of remote files: {}", e);
@@ -141,7 +141,7 @@ impl RemoteFsCleanup {
     async fn cleanup_local_files_loop(&self) {
         let token = self.stopped_token.child_token();
         let remote_fs = self.remote_fs.clone();
-        let local_dir = remote_fs.local_path().await;
+        let local_dir = remote_fs.local_path().await.unwrap();
         let cleanup_interval = Duration::from_secs(self.config.local_files_cleanup_interval_secs());
         let cleanup_local_files_delay =
             Duration::from_secs(self.config.local_files_cleanup_delay_secs());
@@ -331,10 +331,10 @@ mod test {
                 let files = remove_root_paritition(meta_store.get_all_filenames().await.unwrap());
                 assert_eq!(files.len(), 2);
                 for f in files.iter() {
-                    let path = remote_fs.local_file(&f).await.unwrap();
+                    let path = remote_fs.local_file(f.clone()).await.unwrap();
                     assert!(Path::new(&path).exists());
                 }
-                let path = remote_fs.local_file("metastore").await.unwrap();
+                let path = remote_fs.local_file("metastore".to_string()).await.unwrap();
                 assert!(Path::new(&path).exists());
 
                 meta_store
@@ -347,18 +347,18 @@ mod test {
                     1
                 );
                 for f in files.iter() {
-                    let path = remote_fs.local_file(&f).await.unwrap();
+                    let path = remote_fs.local_file(f.clone()).await.unwrap();
                     assert!(Path::new(&path).exists());
                 }
                 Delay::new(Duration::from_millis(4000)).await; // TODO logger init conflict
 
-                let path = remote_fs.local_file(&files[0]).await.unwrap();
+                let path = remote_fs.local_file(files[0].clone()).await.unwrap();
                 assert!(!Path::new(&path).exists());
 
-                let path = remote_fs.local_file(&files[1]).await.unwrap();
+                let path = remote_fs.local_file(files[1].clone()).await.unwrap();
                 assert!(Path::new(&path).exists());
 
-                let path = remote_fs.local_file("metastore").await.unwrap();
+                let path = remote_fs.local_file("metastore".to_string()).await.unwrap();
                 assert!(Path::new(&path).exists());
 
                 let _ = service.exec_query("SELECT * FROM test.tst").await.unwrap();

@@ -9,6 +9,7 @@ use datafusion::arrow::datatypes::SchemaRef;
 
 use crate::{
     compile::engine::df::{scan::MemberField, wrapper::SqlQuery},
+    config::{ConfigObj, ConfigObjImpl},
     sql::{
         session::DatabaseProtocol, AuthContextRef, AuthenticateResponse, HttpAuthContext,
         ServerManager, Session, SessionManager, SqlAuthService,
@@ -265,10 +266,18 @@ pub fn get_test_tenant_ctx_with_meta(meta: Vec<V1CubeMeta>) -> Arc<MetaContext> 
 }
 
 pub async fn get_test_session(protocol: DatabaseProtocol) -> Arc<Session> {
+    get_test_session_with_config(protocol, Arc::new(ConfigObjImpl::default())).await
+}
+
+pub async fn get_test_session_with_config(
+    protocol: DatabaseProtocol,
+    config_obj: Arc<dyn ConfigObj>,
+) -> Arc<Session> {
     let server = Arc::new(ServerManager::new(
         get_test_auth(),
         get_test_transport(),
         None,
+        config_obj,
     ));
 
     let db_name = match &protocol {
@@ -365,6 +374,18 @@ pub fn get_test_transport() -> Arc<dyn TransportService> {
             _member_fields: Vec<MemberField>,
         ) -> Result<CubeStreamReceiver, CubeError> {
             panic!("It's a fake transport");
+        }
+
+        async fn can_switch_user_for_session(
+            &self,
+            _ctx: AuthContextRef,
+            to_user: String,
+        ) -> Result<bool, CubeError> {
+            if to_user == "good_user" {
+                Ok(true)
+            } else {
+                Ok(false)
+            }
         }
     }
 

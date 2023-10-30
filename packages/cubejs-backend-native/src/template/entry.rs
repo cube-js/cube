@@ -1,66 +1,15 @@
-use crate::cross::{CLRepr, CLReprObject};
-use crate::template::mj_value::to_minijinja_value;
+use crate::cross::*;
+use crate::template::mj_value::*;
+use crate::template::neon::NeonMiniJinjaContext;
 use crate::utils::bind_method;
+
 use log::trace;
 use minijinja as mj;
-use neon::context::Context;
 use neon::prelude::*;
 use std::cell::RefCell;
-use std::error::Error;
 
-trait NeonMiniJinjaContext {
-    fn throw_from_mj_error<T>(&mut self, err: mj::Error) -> NeonResult<T>;
-}
-
-impl<'a> NeonMiniJinjaContext for FunctionContext<'a> {
-    fn throw_from_mj_error<T>(&mut self, err: mj::Error) -> NeonResult<T> {
-        let codeblock = if let Some(source) = err.template_source() {
-            let lines: Vec<_> = source.lines().enumerate().collect();
-            let idx = err.line().unwrap_or(1).saturating_sub(1);
-            let skip = idx.saturating_sub(3);
-
-            let pre = lines.iter().skip(skip).take(3.min(idx)).collect::<Vec<_>>();
-            let post = lines.iter().skip(idx + 1).take(3).collect::<Vec<_>>();
-
-            let mut content = "".to_string();
-
-            for (idx, line) in pre {
-                content += &format!("{:>4} | {}\r\n", idx + 1, line);
-            }
-
-            content += &format!("{:>4} > {}\r\n", idx + 1, lines[idx].1);
-
-            if let Some(_span) = err.range() {
-                // TODO(ovr): improve
-                content += &format!(
-                    "     i {}{} {}\r\n",
-                    " ".repeat(0),
-                    "^".repeat(24),
-                    err.kind(),
-                );
-            } else {
-                content += &format!("     | {}\r\n", "^".repeat(24));
-            }
-
-            for (idx, line) in post {
-                content += &format!("{:>4} | {}\r\n", idx + 1, line);
-            }
-
-            format!("{}\r\n{}\r\n{}", "-".repeat(79), content, "-".repeat(79))
-        } else {
-            "".to_string()
-        };
-
-        if let Some(next_err) = err.source() {
-            self.throw_error(format!(
-                "{} caused by: {:#}\r\n{}",
-                err, next_err, codeblock
-            ))
-        } else {
-            self.throw_error(format!("{}\r\n{}", err, codeblock))
-        }
-    }
-}
+#[cfg(feature = "python")]
+use pyo3::{exceptions::PyNotImplementedError, prelude::*, types::PyTuple, AsPyPointer};
 
 struct JinjaEngine {
     inner: mj::Environment<'static>,
@@ -98,6 +47,81 @@ impl JinjaEngine {
                 Err(err)
             },
         );
+        engine.set_auto_escape_callback(|_name: &str| mj::AutoEscape::Json);
+
+        #[cfg(feature = "python")]
+        {
+            let filters = options
+                .get_value(cx, "filters")?
+                .downcast_or_throw::<JsObject, _>(cx)?;
+
+            let filter_names = filters.get_own_property_names(cx)?;
+            for i in 0..filter_names.len(cx) {
+                let filter_name: Handle<JsString> = filter_names.get(cx, i)?;
+                let filter_fun = CLRepr::from_js_ref(filters.get_value(cx, filter_name)?, cx)?;
+
+                let py_fun = match filter_fun {
+                    CLRepr::PythonRef(py_ref) => match py_ref {
+                        PythonRef::PyFunction(py_fun_ref)
+                        | PythonRef::PyExternalFunction(py_fun_ref) => py_fun_ref,
+                        other => {
+                            return cx.throw_error(format!(
+                            "minijinja::filter must be a function, actual: CLRepr::PythonRef({:?})",
+                            other
+                        ))
+                        }
+                    },
+                    other => {
+                        return cx.throw_error(format!(
+                            "minijinja::filter must be a function, actual: {:?}",
+                            other.kind()
+                        ))
+                    }
+                };
+
+                engine.add_filter(
+                    filter_name.value(cx),
+                    move |_state: &mj::State,
+                          args: &[mj::value::Value]|
+                          -> Result<mj::value::Value, mj::Error> {
+                        let mut arguments = Vec::with_capacity(args.len());
+
+                        for arg in args {
+                            arguments.push(from_minijinja_value(arg)?);
+                        }
+
+                        let python_call_res = Python::with_gil(|py| {
+                            let mut args_tuple = Vec::with_capacity(args.len());
+
+                            for arg in arguments {
+                                args_tuple.push(arg.into_py(py)?);
+                            }
+
+                            let tuple = PyTuple::new(py, args_tuple);
+
+                            let call_res = py_fun.call1(py, tuple)?;
+
+                            let is_coroutine =
+                                unsafe { pyo3::ffi::PyCoro_CheckExact(call_res.as_ptr()) == 1 };
+                            if is_coroutine {
+                                Err(PyErr::new::<PyNotImplementedError, _>(
+                                    "Calling async is not supported",
+                                ))
+                            } else {
+                                CLRepr::from_python_ref(call_res.as_ref(py))
+                            }
+                        });
+                        match python_call_res {
+                            Ok(r) => Ok(to_minijinja_value(r)),
+                            Err(err) => Err(mj::Error::new(
+                                minijinja::ErrorKind::InvalidOperation,
+                                format!("Error while calling filter: {}", err),
+                            )),
+                        }
+                    },
+                )
+            }
+        }
 
         Ok(Self { inner: engine })
     }

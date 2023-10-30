@@ -10,7 +10,10 @@ pub fn to_minijinja_value(from: CLRepr) -> mjv::Value {
         CLRepr::Tuple(inner) | CLRepr::Array(inner) => {
             mjv::Value::from_seq_object(value::JinjaSequenceObject { inner })
         }
-        CLRepr::String(v) => mjv::Value::from(v),
+        CLRepr::String(v, mode) => match mode {
+            StringType::Normal => mjv::Value::from(v),
+            StringType::Safe => mjv::Value::from_safe_string(v),
+        },
         CLRepr::Float(v) => mjv::Value::from(v),
         CLRepr::Int(v) => mjv::Value::from(v),
         CLRepr::Bool(v) => mjv::Value::from(v),
@@ -31,3 +34,6 @@ pub fn to_minijinja_value(from: CLRepr) -> mjv::Value {
         ),
     }
 }
+
+#[cfg(feature = "python")]
+pub use python::from_minijinja_value;

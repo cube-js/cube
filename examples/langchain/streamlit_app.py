@@ -8,20 +8,16 @@ import jwt
 from dotenv import load_dotenv
 from langchain import OpenAI
 from langchain.embeddings import OpenAIEmbeddings
-from langchain.vectorstores.faiss import FAISS
+from langchain.vectorstores import FAISS
 from langchain.document_loaders import CubeSemanticLoader
 from pathlib import Path
 
 from utils import (
-    create_docs_from_values,
-    create_vectorstore,
-    init_vectorstore,
     check_input,
     log,
     call_sql_api,
     CUBE_SQL_API_PROMPT,
     _NO_ANSWER_TEXT,
-    PROMPT_POSTFIX,
 )
 
 load_dotenv()
@@ -67,7 +63,10 @@ question = st.text_input(
 
 if st.button("Submit", type="primary"):
     check_input(question)
-    vectorstore = init_vectorstore()
+    if not Path("vectorstore.pkl").exists():
+        st.warning("vectorstore.pkl does not exist.")
+    with open("vectorstore.pkl", "rb") as f:
+        vectorstore = pickle.load(f)
 
     # log("Quering vectorstore and building the prompt...")
 
