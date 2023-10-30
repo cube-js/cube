@@ -716,7 +716,7 @@ export class QueryQueue {
    * of the logic related with the queues updates, heartbeat, etc.
    *
    * @param {QueryKeyHash} queryKeyHashed
-   * @param {QueueId | null} queueId Real queue id, only for Cube Store
+   * @param {QueueId | null} queueId Supported by new Cube Store and Memory
    * @return {Promise<{ result: undefined | Object, error: string | undefined }>}
    */
   async processQuery(queryKeyHashed, queueId) {
@@ -729,7 +729,7 @@ export class QueryQueue {
     let processingLockAcquired;
 
     try {
-      const processingId = await queueConnection.getNextProcessingId();
+      const processingId = queueId || /** for Redis only */ await queueConnection.getNextProcessingId();
       const retrieveResult = await queueConnection.retrieveForProcessing(queryKeyHashed, processingId);
 
       if (retrieveResult) {
