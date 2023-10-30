@@ -44,12 +44,13 @@ export default function App() {
 
 ### `UseCubeQueryOptions`
 
-Name | Type | Description |
------- | ------ | ------ |
-cubejsApi? | CubejsApi | A `CubejsApi` instance to use. Taken from the context if the param is not passed |
-resetResultSetOnChange? | boolean | When `true` the resultSet will be reset to `null` first |
-skip? | boolean | Query execution will be skipped when `skip` is set to `true`. You can use this flag to avoid sending incomplete queries. |
-subscribe? | boolean | Use continuous fetch behavior. See [Real-Time Data Fetch](real-time-data-fetch) |
+Name | Type | Description | Optional? |
+------ | ------ | ------ | --- |
+`cubejsApi` | `CubejsApi` | A `CubejsApi` instance to use. Taken from the context if the param is not passed | ✅ Yes |
+`resetResultSetOnChange` | `boolean` | When `true` the resultSet will be reset to `null` first | ✅ Yes |
+`skip` | `boolean` | Query execution will be skipped when `skip` is set to `true`. You can use this flag to avoid sending incomplete queries. | ✅ Yes |
+`subscribe` | `boolean` | Use continuous fetch behavior. See [Real-Time Data Fetch](real-time-data-fetch) | ✅ Yes |
+`castNumerics` | `boolean` | Pass `true` if you'd like all members with the `number` type to be automatically converted to JavaScript `Number` type. Note that this is a potentially unsafe operation since numbers more than [`Number.MAX_SAFE_INTEGER`][link-mdn-max-safe-integer] or less than `Number.MIN_SAFE_INTEGER` can't be represented as JavaScript `Number` | ✅ Yes |
 
 ### `UseCubeQueryResult`
 
@@ -265,16 +266,24 @@ export default function DisplayComponent() {
 
 ### `CubeContextProps`
 
-Name | Type |
------- | ------ |
-cubejsApi | CubejsApi |
+Name | Type | Optional? |
+------ | ------ | --- |
+`cubejsApi` | `CubejsApi` | ❌ No |
+`options` | `CubeProviderOptions` | ✅ Yes |
 
 ### `CubeProviderProps`
 
-Name | Type |
------- | ------ |
-children | React.ReactNode |
-cubejsApi | CubejsApi |
+Name | Type | Optional? |
+------ | ------ | --- |
+`cubejsApi` | `CubejsApi` | ❌ No |
+`children` | `React.ReactNode` | ❌ No |
+`options` | `CubeProviderOptions` | ✅ Yes |
+
+### `CubeProviderOptions`
+
+Name | Type | Optional? |
+------ | ------ | --- |
+`castNumerics` | `boolean` | ✅ Yes |
 
 ### `MemberUpdater`
 
@@ -365,3 +374,6 @@ Name | Type |
 chartType? | [ChartType](#types-chart-type) |
 pivotConfig? | PivotConfig |
 shouldApplyHeuristicOrder? | boolean |
+
+
+[link-mdn-max-safe-integer]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Number/MAX_SAFE_INTEGER
