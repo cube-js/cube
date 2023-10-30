@@ -3,6 +3,41 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.12](https://github.com/cube-js/cube/compare/v0.34.11...v0.34.12) (2023-10-30)
+
+
+### Bug Fixes
+
+* **duckdb-driver:** Specify schema for information_schema queries ([#7355](https://github.com/cube-js/cube/issues/7355)) ([60f2078](https://github.com/cube-js/cube/commit/60f20783fb295ad4bcdd8a9d6622a04c565a674a))
+
+
+
+
+
+## [0.34.11](https://github.com/cube-js/cube/compare/v0.34.10...v0.34.11) (2023-10-29)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [0.34.10](https://github.com/cube-js/cube/compare/v0.34.9...v0.34.10) (2023-10-27)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [0.34.9](https://github.com/cube-js/cube/compare/v0.34.8...v0.34.9) (2023-10-26)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
 ## [0.34.8](https://github.com/cube-js/cube/compare/v0.34.7...v0.34.8) (2023-10-25)
 
 **Note:** Version bump only for package @cubejs-backend/duckdb-driver

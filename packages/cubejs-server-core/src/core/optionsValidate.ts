@@ -3,7 +3,7 @@ import DriverDependencies from './DriverDependencies';
 
 const schemaQueueOptions = Joi.object().strict(true).keys({
   concurrency: Joi.number().min(1).integer(),
-  continueWaitTimeout: Joi.number().min(0).integer(),
+  continueWaitTimeout: Joi.number().min(0).max(90).integer(),
   executionTimeout: Joi.number().min(0).integer(),
   orphanedTimeout: Joi.number().min(0).integer(),
   heartBeatInterval: Joi.number().min(0).integer(),
@@ -128,7 +128,7 @@ const schemaOptions = Joi.object().keys({
           idleTimeoutMillis: Joi.number().min(0),
         })
       }),
-      continueWaitTimeout: Joi.number().min(0).integer(),
+      continueWaitTimeout: Joi.number().min(0).max(90).integer(),
       skipExternalCacheAndQueue: Joi.boolean(),
       queryCacheOptions: Joi.object().keys({
         refreshKeyRenewalThreshold: Joi.number().min(0).integer(),

@@ -3,6 +3,68 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.12](https://github.com/cube-js/cube/compare/v0.34.11...v0.34.12) (2023-10-30)
+
+
+### Bug Fixes
+
+* **duckdb-driver:** Specify schema for information_schema queries ([#7355](https://github.com/cube-js/cube/issues/7355)) ([60f2078](https://github.com/cube-js/cube/commit/60f20783fb295ad4bcdd8a9d6622a04c565a674a))
+
+
+### Features
+
+* **cubestore-driver:** Queue - protect possible race condition on cancellation ([#7356](https://github.com/cube-js/cube/issues/7356)) ([a788954](https://github.com/cube-js/cube/commit/a7889543f4fc786ab05a6141227d5f31fc6ffff8))
+
+
+
+
+
+## [0.34.11](https://github.com/cube-js/cube/compare/v0.34.10...v0.34.11) (2023-10-29)
+
+
+### Features
+
+* **cubesql:** Allow changing current user through `SET user = ?` ([#7350](https://github.com/cube-js/cube/issues/7350)) ([2c9c8d6](https://github.com/cube-js/cube/commit/2c9c8d68d1bd76b005ebf863b6899ea463d59aae))
+* **cubestore:** Queue - expose queueId for LIST/ACTIVE/PENDING/TO_CANCEL ([#7351](https://github.com/cube-js/cube/issues/7351)) ([7b1a0c0](https://github.com/cube-js/cube/commit/7b1a0c05347d0a0f874978b4462f580ddc814b93))
+* **query-orchestrator:** Pass queueId for orphaned query cancellation ([#7353](https://github.com/cube-js/cube/issues/7353)) ([08ce078](https://github.com/cube-js/cube/commit/08ce078e4f094c18da9fdd265629e4bb01a8a2c9))
+* **query-orchestrator:** Use real queueId in processQuery for events ([#7352](https://github.com/cube-js/cube/issues/7352)) ([bf83762](https://github.com/cube-js/cube/commit/bf83762adfb75585ae233b2c671971761f133048))
+
+
+
+
+
+## [0.34.10](https://github.com/cube-js/cube/compare/v0.34.9...v0.34.10) (2023-10-27)
+
+
+### Features
+
+* **cubesql:** Introduce `CUBESQL_DISABLE_STRICT_AGG_TYPE_MATCH` to avoid aggregation type checking during querying ([#7316](https://github.com/cube-js/cube/issues/7316)) ([61089f0](https://github.com/cube-js/cube/commit/61089f056af44f69f79420ce9767e4bb68030f26))
+
+
+
+
+
+## [0.34.9](https://github.com/cube-js/cube/compare/v0.34.8...v0.34.9) (2023-10-26)
+
+
+### Bug Fixes
+
+* Correct GraphQL endpoint displayed on front-end ([#7226](https://github.com/cube-js/cube/issues/7226)) Thanks [@peterklingelhofer](https://github.com/peterklingelhofer) ! ([4ae0f18](https://github.com/cube-js/cube/commit/4ae0f18b05184c9d3bf1df6bca6d18bbb29f63b1))
+* **databricks-jdbc-driver:** Failed to read package.json issue ([#7311](https://github.com/cube-js/cube/issues/7311)) ([abb3506](https://github.com/cube-js/cube/commit/abb35067daa016eec07592db0e41fa0750a112aa))
+* **server-core:** Specify maximum for continueWaitTimeout (90 seconds) ([#7301](https://github.com/cube-js/cube/issues/7301)) ([148fb96](https://github.com/cube-js/cube/commit/148fb966d25d2f15d413300304a664ee275a1686))
+
+
+### Features
+
+* **native:** Jinja - support fields reflection for PyObject ([#7312](https://github.com/cube-js/cube/issues/7312)) ([e2569a9](https://github.com/cube-js/cube/commit/e2569a9407f86380831d410be8df0e9ef27d5b40))
+* **native:** Jinja - upgrade engine (fixes macros memory leak & stack overflow) ([#7313](https://github.com/cube-js/cube/issues/7313)) ([792e265](https://github.com/cube-js/cube/commit/792e265507d12e4d55d4777fa83b5c2148acbc9e))
+* **oracle-driver:** Update package.json ([#7273](https://github.com/cube-js/cube/issues/7273)) Thanks [@rongfengliang](https://github.com/rongfengliang) ! ([9983661](https://github.com/cube-js/cube/commit/998366131cf825fbf3dd48c6aa48ace2a80776c5))
+* Split view support ([#7308](https://github.com/cube-js/cube/issues/7308)) ([1e722dd](https://github.com/cube-js/cube/commit/1e722dd0cc1a29b6e6554b855b7899abe5746a07))
+
+
+
+
+
 ## [0.34.8](https://github.com/cube-js/cube/compare/v0.34.7...v0.34.8) (2023-10-25)
 
 

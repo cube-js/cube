@@ -64,6 +64,11 @@ export interface MetaPayload {
     session: SessionContext,
 }
 
+export interface CanSwitchUserPayload {
+  session: SessionContext,
+  user: string,
+}
+
 export type SQLInterfaceOptions = {
     port?: number,
     pgPort?: number,
@@ -75,6 +80,7 @@ export type SQLInterfaceOptions = {
     stream: (payload: LoadPayload) => unknown | Promise<unknown>,
     sqlApiLoad: (payload: SqlApiLoadPayload) => unknown | Promise<unknown>,
     sqlGenerators: (paramsJson: string) => unknown | Promise<unknown>,
+    canSwitchUserForSession: (payload: CanSwitchUserPayload) => unknown | Promise<unknown>,
 };
 
 function loadNative() {
@@ -300,6 +306,7 @@ export const registerInterface = async (options: SQLInterfaceOptions): Promise<S
     stream: wrapNativeFunctionWithStream(options.stream),
     sqlApiLoad: wrapNativeFunctionWithStream(options.sqlApiLoad),
     sqlGenerators: wrapRawNativeFunctionWithChannelCallback(options.sqlGenerators),
+    canSwitchUserForSession: wrapRawNativeFunctionWithChannelCallback(options.canSwitchUserForSession),
   });
 };
 

@@ -180,6 +180,12 @@ impl WrapperRules {
         let cube_members_var = var!(cube_members_var);
         let measure_out_var = var!(measure_out_var);
         let cube_context = self.cube_context.clone();
+        let disable_strict_agg_type_match = self
+            .cube_context
+            .sessions
+            .server
+            .config_obj
+            .disable_strict_agg_type_match();
         move |egraph, subst| {
             if let Some(alias) = original_expr_name(egraph, subst[original_expr_var]) {
                 for fun in fun_name_var
@@ -224,8 +230,10 @@ impl WrapperRules {
                                         cube_context.meta.find_measure_with_name(member.to_string())
                                     {
                                         if call_agg_type.is_none()
-                                            || measure
-                                                .is_same_agg_type(call_agg_type.as_ref().unwrap())
+                                            || measure.is_same_agg_type(
+                                                call_agg_type.as_ref().unwrap(),
+                                                disable_strict_agg_type_match,
+                                            )
                                         {
                                             let column_expr_column =
                                                 egraph.add(LogicalPlanLanguage::ColumnExprColumn(

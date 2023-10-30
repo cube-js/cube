@@ -83,6 +83,7 @@ suite('Python model', () => {
       new_int_tuple: expect.any(Object),
       new_str_tuple: expect.any(Object),
       new_safe_string: expect.any(Object),
+      new_object_from_dict: expect.any(Object),
       load_class_model: expect.any(Object),
     });
 
@@ -115,6 +116,7 @@ darwinSuite('Scope Python model', () => {
       new_int_tuple: expect.any(Object),
       new_str_tuple: expect.any(Object),
       new_safe_string: expect.any(Object),
+      new_object_from_dict: expect.any(Object),
       load_class_model: expect.any(Object),
     });
   });

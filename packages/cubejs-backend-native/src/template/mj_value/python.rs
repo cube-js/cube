@@ -7,8 +7,8 @@ use minijinja as mj;
 use minijinja::value as mjv;
 use minijinja::value::{Object, ObjectKind, StructObject, Value};
 use pyo3::exceptions::PyNotImplementedError;
-use pyo3::types::{PyFunction, PyTuple};
-use pyo3::{AsPyPointer, Py, PyAny, PyErr, PyResult, Python};
+use pyo3::types::{PyDict, PyFunction, PyTuple};
+use pyo3::{AsPyPointer, Py, PyErr, PyObject, PyResult, Python};
 use std::convert::TryInto;
 use std::sync::Arc;
 
@@ -97,7 +97,7 @@ pub fn from_minijinja_value(from: &mjv::Value) -> Result<CLRepr, mj::Error> {
 }
 
 pub struct JinjaPythonObject {
-    pub(crate) inner: Py<PyAny>,
+    pub(crate) inner: PyObject,
 }
 
 impl std::fmt::Debug for JinjaPythonObject {
@@ -222,20 +222,25 @@ impl StructObject for JinjaPythonObject {
     }
 
     fn fields(&self) -> Vec<Arc<str>> {
-        // TODO(ovr): Should we enable it? dump fn?
-        // let obj_ref = &self.inner;
-        //
-        // Python::with_gil(|py| {
-        //     let mut fields = vec![];
-        //
-        //     for key in obj_ref.as_ref(py).keys() {
-        //         fields.push(key.to_string().into());
-        //     }
-        //
-        //     fields
-        // })
+        let obj_ref = &self.inner as &PyObject;
 
-        vec![]
+        Python::with_gil(|py| {
+            let mut fields: Vec<Arc<str>> = vec![];
+
+            match obj_ref.downcast::<PyDict>(py) {
+                Ok(dict_ref) => {
+                    for key in dict_ref.keys() {
+                        fields.push(key.to_string().into());
+                    }
+                }
+                Err(_err) => {
+                    #[cfg(debug_assertions)]
+                    log::trace!("Unable to extract PyDict: {:?}", _err)
+                }
+            }
+
+            fields
+        })
     }
 }
 

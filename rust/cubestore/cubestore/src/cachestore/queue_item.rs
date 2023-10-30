@@ -180,11 +180,25 @@ impl QueueItem {
         Row::new(res)
     }
 
-    pub fn into_queue_list_row(self, with_payload: bool) -> Row {
+    pub fn queue_to_cancel_row(item: IdRow<QueueItem>) -> Row {
+        let row_id = item.get_id();
+        let row = item.into_row();
+
+        Row::new(vec![
+            TableValue::String(row.key),
+            TableValue::String(row_id.to_string()),
+        ])
+    }
+
+    pub fn queue_list_row(item: IdRow<QueueItem>, with_payload: bool) -> Row {
+        let row_id = item.get_id();
+        let row = item.into_row();
+
         let mut res = vec![
-            TableValue::String(self.key),
-            TableValue::String(self.status.to_string()),
-            if let Some(extra) = self.extra {
+            TableValue::String(row.key),
+            TableValue::String(row_id.to_string()),
+            TableValue::String(row.status.to_string()),
+            if let Some(extra) = row.extra {
                 TableValue::String(extra)
             } else {
                 TableValue::Null
@@ -192,7 +206,7 @@ impl QueueItem {
         ];
 
         if with_payload {
-            res.push(TableValue::String(self.value));
+            res.push(TableValue::String(row.value));
         }
 
         Row::new(res)

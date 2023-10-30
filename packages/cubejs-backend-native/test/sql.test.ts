@@ -148,6 +148,7 @@ describe('SQLInterface', () => {
       meta,
       stream,
       sqlGenerators,
+      canSwitchUserForSession: (_payload) => true,
     });
     console.log(instance);
 

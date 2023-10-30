@@ -48,6 +48,14 @@ step.
   src="https://cubedev-blog-images.s3.us-east-2.amazonaws.com/dc025b24-674f-4f32-ac44-421d546ee676.GIF"
 />
 
+<InfoBox>
+
+It's not recommended to use [Tableau extracts][link-tableau-extracts] when
+connecting to Cube. Use [pre-aggregations][ref-pre-aggs] to improve querying
+performance and manage data freshness upstream of Tableau.
+
+</InfoBox>
+
 ## Querying data
 
 Your cubes will be exposed as tables, where both your measures and dimensions
@@ -60,3 +68,6 @@ are columns.
 
 [ref-getting-started]: /product/getting-started/cloud
 [ref-sql-api]: /product/apis-integrations/sql-api
+[ref-pre-aggs]: /product/caching/using-pre-aggregations
+
+[link-tableau-extracts]: https://help.tableau.com/current/pro/desktop/en-us/extracting_data.htm
