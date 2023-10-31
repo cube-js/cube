@@ -1466,7 +1466,7 @@ impl Config {
                 transport_max_message_size,
                 transport_max_frame_size: env_parse_size(
                     "CUBESTORE_TRANSPORT_MAX_FRAME_SIZE",
-                    32 << 20,
+                    64 << 20,
                     Some(256 << 20),
                     Some(4 << 20),
                 ),
