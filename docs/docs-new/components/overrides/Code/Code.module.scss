@@ -1,3 +1,7 @@
 .Code {
-  display: inline-block;
+  white-space: nowrap;
+}
+
+pre > .Code {
+  white-space: inherit;
 }

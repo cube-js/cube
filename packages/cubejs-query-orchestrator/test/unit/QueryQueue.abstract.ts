@@ -286,8 +286,8 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
           ]
         ]);
       } finally {
-        await connection.getQueryAndRemove(connection.redisHash(['1', []]));
-        await connection.getQueryAndRemove(connection.redisHash(['2', []]));
+        await connection.getQueryAndRemove(connection.redisHash(['1', []]), null);
+        await connection.getQueryAndRemove(connection.redisHash(['2', []]), null);
 
         queue.queueDriver.release(connection);
       }
@@ -428,8 +428,8 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
       expect(retrieve4[0]).toBe(1);
       expect(!!retrieve4[5]).toBe(true);
 
-      console.log(await redisClient.getQueryAndRemove('activated1' as any));
-      console.log(await redisClient.getQueryAndRemove('activated2' as any));
+      console.log(await redisClient.getQueryAndRemove('activated1' as any, null));
+      console.log(await redisClient.getQueryAndRemove('activated2' as any, null));
 
       await queue.queueDriver.release(redisClient);
       await queue.queueDriver.release(redisClient2);

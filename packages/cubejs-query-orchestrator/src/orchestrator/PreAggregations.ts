@@ -2456,6 +2456,6 @@ export class PreAggregations {
 
   public async cancelQueriesFromQueue(queryKeys: string[], dataSource: string) {
     const queue = await this.getQueue(dataSource);
-    return Promise.all(queryKeys.map(queryKey => queue.cancelQuery(queryKey)));
+    return Promise.all(queryKeys.map(queryKey => queue.cancelQuery(queryKey as any, null)));
   }
 }

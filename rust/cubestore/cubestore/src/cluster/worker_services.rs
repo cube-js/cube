@@ -80,8 +80,9 @@ pub trait ServicesTransport {
     fn connect(
         sender: IpcSender<Self::TransportRequest>,
         reciever: IpcReceiver<Self::TransportResponse>,
+        timeout: Duration,
     ) -> Arc<Self::Client> {
-        Self::Client::connect(sender, reciever)
+        Self::Client::connect(sender, reciever, timeout)
     }
 }
 
@@ -131,6 +132,7 @@ pub trait ServicesClient: Callable {
     fn connect(
         sender: IpcSender<Self::TransportRequest>,
         reciever: IpcReceiver<Self::TransportResponse>,
+        timeout: Duration,
     ) -> Arc<Self>;
 
     fn stop(&self);
@@ -158,9 +160,10 @@ impl<P: Callable> ServicesClient for ServicesClientImpl<P> {
     fn connect(
         sender: IpcSender<Self::TransportRequest>,
         reciever: IpcReceiver<Self::TransportResponse>,
+        timeout: Duration,
     ) -> Arc<Self> {
         let queue = Arc::new(unlimited::Queue::new());
-        let handle = Self::processing_loop(sender, reciever, queue.clone());
+        let handle = Self::processing_loop(sender, reciever, queue.clone(), timeout);
         Arc::new(Self {
             processor: PhantomData,
             handle,
@@ -197,6 +200,7 @@ impl<P: Callable> ServicesClientImpl<P> {
                 ServicesClientMessage<<Self as Callable>::Request, <Self as Callable>::Response>,
             >,
         >,
+        timeout: Duration,
     ) -> JoinHandle<()> {
         let (message_broadcast_tx, _) = broadcast::channel(10000);
 
@@ -252,7 +256,7 @@ impl<P: Callable> ServicesClientImpl<P> {
                 cube_ext::spawn(async move {
                     loop {
                         let broadcast_message = tokio::select! {
-                            _ = tokio::time::sleep(Duration::from_secs(5)) => { //TODO! config
+                            _ = tokio::time::sleep(timeout) => {
                                 Err(CubeError::internal(format!(
                                     "Worker service timeout for message id: {}",
                                     message_id

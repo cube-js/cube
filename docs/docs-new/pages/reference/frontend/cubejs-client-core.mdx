@@ -750,12 +750,13 @@ yValues? | string[] |
 
 ### `LoadMethodOptions`
 
-Name | Type | Description |
------- | ------ | ------ |
-progressCallback? |  | - |
-mutexKey? | string | Key to store the current request's MUTEX inside the `mutexObj`. MUTEX object is used to reject orphaned queries results when new queries are sent. For example: if two queries are sent with the same `mutexKey` only the last one will return results. |
-mutexObj? | Object | Object to store MUTEX |
-subscribe? | boolean | Pass `true` to use continuous fetch behavior. |
+Name | Type | Optional? | Description |
+------ | ------ | ------ | --- |
+`castNumerics` | `boolean` | ✅ Yes | Pass `true` if you'd like all members with the `number` type to be automatically converted to JavaScript `Number` type. Note that this is a potentially unsafe operation since numbers more than [`Number.MAX_SAFE_INTEGER`][link-mdn-max-safe-integer] or less than `Number.MIN_SAFE_INTEGER` can't be represented as JavaScript `Number` |
+`mutexKey` | `string` | ✅ Yes | Key to store the current request's MUTEX inside the `mutexObj`. MUTEX object is used to reject orphaned queries results when new queries are sent. For example: if two queries are sent with the same `mutexKey` only the last one will return results. |
+`mutexObj` | `Object` | ✅ Yes | Object to store MUTEX |
+`progressCallback` |  | ✅ Yes |  |
+`subscribe` | `boolean` | ✅ Yes | Pass `true` to use continuous fetch behavior. |
 
 ### `LoadResponse`
 
@@ -1049,6 +1050,9 @@ values? | never |
 
 > **UnaryOperator**: *"set" | "notSet"*
 
+
+
+[link-mdn-max-safe-integer]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Number/MAX_SAFE_INTEGER
 
 [ref-query-format]: /product/apis-integrations/rest-api/query-format
 [ref-security]: /product/auth

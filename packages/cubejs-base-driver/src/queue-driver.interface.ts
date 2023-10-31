@@ -89,8 +89,8 @@ export interface QueueDriverConnectionInterface {
   retrieveForProcessing(hash: QueryKeyHash, processingId: ProcessingId): Promise<RetrieveForProcessingResponse>;
   freeProcessingLock(hash: QueryKeyHash, processingId: ProcessingId, activated: unknown): Promise<void>;
   optimisticQueryUpdate(hash: QueryKeyHash, toUpdate: unknown, processingId: ProcessingId, queueId: QueueId | null): Promise<boolean>;
-  cancelQuery(queryKey: QueryKey): Promise<QueryDef | null>;
-  getQueryAndRemove(hash: QueryKeyHash): Promise<[QueryDef]>;
+  cancelQuery(queryKey: QueryKey, queueId: QueueId | null): Promise<QueryDef | null>;
+  getQueryAndRemove(hash: QueryKeyHash, queueId: QueueId | null): Promise<[QueryDef]>;
   setResultAndRemoveQuery(hash: QueryKeyHash, executionResult: any, processingId: ProcessingId, queueId: QueueId | null): Promise<unknown>;
   release(): void;
   //
