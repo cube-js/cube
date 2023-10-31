@@ -577,7 +577,15 @@ impl CubeScanWrapperNode {
                                     } else {
                                         None
                                     };
-                                // TODO time dimensions, filters, segments, order, limit, offset
+
+                                if let Some(limit) = limit {
+                                    load_request.limit = Some(limit as i32);
+                                }
+
+                                if let Some(offset) = offset {
+                                    load_request.offset = Some(offset as i32);
+                                }
+                                // TODO time dimensions, filters, segments
 
                                 let sql_response = transport
                                     .sql(
