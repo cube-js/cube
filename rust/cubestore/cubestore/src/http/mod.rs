@@ -1,5 +1,7 @@
 pub mod status;
 
+#[cfg(feature = "ws-close-reason")]
+use std::error::Error;
 use std::sync::Arc;
 
 use warp::{Filter, Rejection, Reply};
@@ -155,6 +157,31 @@ impl HttpServer {
                                 match msg {
                                     Err(e) => {
                                         error!("Websocket error: {:?}", e);
+
+                                        #[cfg(feature = "ws-close-reason")]
+                                        {
+                                            let close_message = if let Some(source) = e.source() {
+                                                if let Some(err) = source.downcast_ref::<tokio_tungstenite::tungstenite::Error>() {
+                                                    match err {
+                                                        tokio_tungstenite::tungstenite::Error::Capacity(err) => {
+                                                            warp::ws::Message::close_with(1009_u16, format!("{}", err))
+                                                        },
+                                                        _ => {
+                                                            break;
+                                                        }
+                                                    }
+                                                } else {
+                                                    warp::ws::Message::close_with(1011_u16, "Internal server error: Unknown reason")
+                                                }
+                                            } else {
+                                                warp::ws::Message::close_with(1011_u16, "Internal server error: No reason")
+                                            };
+
+                                            if let Err(e) = web_socket.send(close_message).await {
+                                                error!("Websocket close send error: {:?}", e)
+                                            };
+                                        }
+
                                         break;
                                     }
                                     Ok(msg) => {
