@@ -93,6 +93,15 @@ cubes:
       - name: name
         sql: "{CUBE}.name"
         type: string
+
+
+
+
+
+
+
+
+
 ```
 
 </CodeTabs>
@@ -125,7 +134,7 @@ data source.
 FILTER_PARAMS.cube_name.member_name.filter(sql_expression)
 ```
 
-The `filter()` function accepts the SQL expression, which could be either
+The `filter()` function accepts a SQL expression, which could be either
 a plain string or a function returning one.
 
 ### String
@@ -173,6 +182,11 @@ cubes:
       - name: date
         sql: date
         type: time
+
+
+
+
+
 ```
 
 </CodeTabs>
@@ -196,7 +210,6 @@ WHERE
   "time_dimensions": [
     {
       "dimension": "order_facts.date",
-      "granularity": "day",
       "dateRange": ["2018-01-01", "2018-12-31"]
     }
   ]
@@ -205,9 +218,32 @@ WHERE
 
 ### Function
 
-You can also pass a function instead of a SQL expression as a `filter()`
-argument. This way, you can add BigQuery shard filtering, which will reduce
-your billing cost.
+You can also pass a function as a `filter()` argument. This way, you can
+add BigQuery shard filtering, which will reduce your billing cost.
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: events
+    sql: >
+      SELECT *
+      FROM schema.`events*`
+      WHERE {FILTER_PARAMS.events.date.filter(
+        lambda x, y: f"""
+          _TABLE_SUFFIX >= FORMAT_TIMESTAMP('%Y%m%d', TIMESTAMP({x})) AND
+          _TABLE_SUFFIX <= FORMAT_TIMESTAMP('%Y%m%d', TIMESTAMP({y}))
+        """
+      )}
+
+    dimensions:
+      - name: date
+        sql: date
+        type: time
+        
+
+
+```
 
 ```javascript
 cube(`events`, {
@@ -215,10 +251,10 @@ cube(`events`, {
     SELECT *
     FROM schema.\`events*\`
     WHERE ${FILTER_PARAMS.events.date.filter(
-      (from, to) => `
-      _TABLE_SUFFIX >= FORMAT_TIMESTAMP('%Y%m%d', TIMESTAMP(${from})) AND
-      _TABLE_SUFFIX <= FORMAT_TIMESTAMP('%Y%m%d', TIMESTAMP(${to}))
-    `
+      (x, y) => `
+        _TABLE_SUFFIX >= FORMAT_TIMESTAMP('%Y%m%d', TIMESTAMP(${x})) AND
+        _TABLE_SUFFIX <= FORMAT_TIMESTAMP('%Y%m%d', TIMESTAMP(${y}))
+      `
     )}
   `,
 
@@ -230,6 +266,8 @@ cube(`events`, {
   },
 });
 ```
+
+</CodeTabs>
 
 <InfoBox>
 
@@ -297,6 +335,9 @@ cubes:
       - name: created_at
         sql: created_at
         type: time
+
+
+
 ```
 
 </CodeTabs>

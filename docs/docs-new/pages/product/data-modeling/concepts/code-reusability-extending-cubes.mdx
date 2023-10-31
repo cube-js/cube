@@ -151,8 +151,9 @@ in any `sql` property, then extending cubes can do one of two things:
   cubes:
     - name: product_purchases
       sql: >
-        SELECT * FROM events WHERE
-        {FILTER_PARAMS.product_purchases.timestamp.filter('time')}
+        SELECT *
+        FROM events
+        WHERE {FILTER_PARAMS.product_purchases.timestamp.filter('time')}
 
       # ...
   ```
@@ -180,7 +181,9 @@ in any `sql` property, then extending cubes can do one of two things:
   cubes:
     - name: base_events
       sql: >
-        SELECT * FROM events WHERE
+        SELECT *
+        FROM events
+        WHERE
           {FILTER_PARAMS.base_events.timestamp.filter('time')} AND
           {FILTER_PARAMS.product_purchases.timestamp.filter('time')} AND
           {FILTER_PARAMS.page_views.timestamp.filter('time')}
