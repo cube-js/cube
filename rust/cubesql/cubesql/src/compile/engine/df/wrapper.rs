@@ -713,6 +713,8 @@ impl CubeScanWrapperNode {
                 ungrouped_scan_node.clone(),
             )
             .await?;
+            let expr_sql =
+                Self::escape_interpolation_quotes(expr_sql, ungrouped_scan_node.is_some());
             sql = new_sql_query;
 
             let original_alias = expr_name(&original_expr, &schema)?;
@@ -889,18 +891,15 @@ impl CubeScanWrapperNode {
                         ungrouped_scan_node.clone(),
                     )
                     .await?;
-                    let resulting_sql = Self::escape_interpolation_quotes(
-                        sql_generator
-                            .get_sql_templates()
-                            .binary_expr(left, op.to_string(), right)
-                            .map_err(|e| {
-                                DataFusionError::Internal(format!(
-                                    "Can't generate SQL for binary expr: {}",
-                                    e
-                                ))
-                            })?,
-                        ungrouped_scan_node.is_some(),
-                    );
+                    let resulting_sql = sql_generator
+                        .get_sql_templates()
+                        .binary_expr(left, op.to_string(), right)
+                        .map_err(|e| {
+                            DataFusionError::Internal(format!(
+                                "Can't generate SQL for binary expr: {}",
+                                e
+                            ))
+                        })?;
                     Ok((resulting_sql, sql_query))
                 }
                 // Expr::AnyExpr { .. } => {}
@@ -908,8 +907,46 @@ impl CubeScanWrapperNode {
                 // Expr::ILike(_) => {}
                 // Expr::SimilarTo(_) => {}
                 // Expr::Not(_) => {}
-                // Expr::IsNotNull(_) => {}
-                // Expr::IsNull(_) => {}
+                Expr::IsNotNull(expr) => {
+                    let (expr, sql_query) = Self::generate_sql_for_expr(
+                        plan.clone(),
+                        sql_query,
+                        sql_generator.clone(),
+                        *expr,
+                        ungrouped_scan_node.clone(),
+                    )
+                    .await?;
+                    let resulting_sql = sql_generator
+                        .get_sql_templates()
+                        .is_null_expr(expr, true)
+                        .map_err(|e| {
+                            DataFusionError::Internal(format!(
+                                "Can't generate SQL for is not null expr: {}",
+                                e
+                            ))
+                        })?;
+                    Ok((resulting_sql, sql_query))
+                }
+                Expr::IsNull(expr) => {
+                    let (expr, sql_query) = Self::generate_sql_for_expr(
+                        plan.clone(),
+                        sql_query,
+                        sql_generator.clone(),
+                        *expr,
+                        ungrouped_scan_node.clone(),
+                    )
+                    .await?;
+                    let resulting_sql = sql_generator
+                        .get_sql_templates()
+                        .is_null_expr(expr, false)
+                        .map_err(|e| {
+                            DataFusionError::Internal(format!(
+                                "Can't generate SQL for is null expr: {}",
+                                e
+                            ))
+                        })?;
+                    Ok((resulting_sql, sql_query))
+                }
                 // Expr::Negative(_) => {}
                 // Expr::GetIndexedField { .. } => {}
                 // Expr::Between { .. } => {}
@@ -967,18 +1004,12 @@ impl CubeScanWrapperNode {
                     } else {
                         None
                     };
-                    let resulting_sql = Self::escape_interpolation_quotes(
-                        sql_generator
-                            .get_sql_templates()
-                            .case(expr, when_then_expr_sql, else_expr)
-                            .map_err(|e| {
-                                DataFusionError::Internal(format!(
-                                    "Can't generate SQL for case: {}",
-                                    e
-                                ))
-                            })?,
-                        ungrouped_scan_node.is_some(),
-                    );
+                    let resulting_sql = sql_generator
+                        .get_sql_templates()
+                        .case(expr, when_then_expr_sql, else_expr)
+                        .map_err(|e| {
+                            DataFusionError::Internal(format!("Can't generate SQL for case: {}", e))
+                        })?;
                     Ok((resulting_sql, sql_query))
                 }
                 Expr::Cast { expr, data_type } => {
@@ -1022,18 +1053,12 @@ impl CubeScanWrapperNode {
                             )));
                         }
                     };
-                    let resulting_sql = Self::escape_interpolation_quotes(
-                        sql_generator
-                            .get_sql_templates()
-                            .cast_expr(expr, data_type.to_string())
-                            .map_err(|e| {
-                                DataFusionError::Internal(format!(
-                                    "Can't generate SQL for cast: {}",
-                                    e
-                                ))
-                            })?,
-                        ungrouped_scan_node.is_some(),
-                    );
+                    let resulting_sql = sql_generator
+                        .get_sql_templates()
+                        .cast_expr(expr, data_type.to_string())
+                        .map_err(|e| {
+                            DataFusionError::Internal(format!("Can't generate SQL for cast: {}", e))
+                        })?;
                     Ok((resulting_sql, sql_query))
                 }
                 // Expr::TryCast { .. } => {}
@@ -1050,18 +1075,15 @@ impl CubeScanWrapperNode {
                         ungrouped_scan_node.clone(),
                     )
                     .await?;
-                    let resulting_sql = Self::escape_interpolation_quotes(
-                        sql_generator
-                            .get_sql_templates()
-                            .sort_expr(expr, asc, nulls_first)
-                            .map_err(|e| {
-                                DataFusionError::Internal(format!(
-                                    "Can't generate SQL for sort expr: {}",
-                                    e
-                                ))
-                            })?,
-                        ungrouped_scan_node.is_some(),
-                    );
+                    let resulting_sql = sql_generator
+                        .get_sql_templates()
+                        .sort_expr(expr, asc, nulls_first)
+                        .map_err(|e| {
+                            DataFusionError::Internal(format!(
+                                "Can't generate SQL for sort expr: {}",
+                                e
+                            ))
+                        })?;
                     Ok((resulting_sql, sql_query))
                 }
 
@@ -1142,18 +1164,15 @@ impl CubeScanWrapperNode {
                                 };
                                 let interval = format!("{} {}", num, date_part);
                                 (
-                                    Self::escape_interpolation_quotes(
-                                        sql_generator
-                                            .get_sql_templates()
-                                            .interval_expr(interval, num, date_part.to_string())
-                                            .map_err(|e| {
-                                                DataFusionError::Internal(format!(
-                                                    "Can't generate SQL for interval: {}",
-                                                    e
-                                                ))
-                                            })?,
-                                        ungrouped_scan_node.is_some(),
-                                    ),
+                                    sql_generator
+                                        .get_sql_templates()
+                                        .interval_expr(interval, num, date_part.to_string())
+                                        .map_err(|e| {
+                                            DataFusionError::Internal(format!(
+                                                "Can't generate SQL for interval: {}",
+                                                e
+                                            ))
+                                        })?,
                                     sql_query,
                                 )
                             } else {
@@ -1185,18 +1204,15 @@ impl CubeScanWrapperNode {
                         sql_args.push(sql);
                     }
                     Ok((
-                        Self::escape_interpolation_quotes(
-                            sql_generator
-                                .get_sql_templates()
-                                .scalar_function(fun.name.to_string(), sql_args, None)
-                                .map_err(|e| {
-                                    DataFusionError::Internal(format!(
-                                        "Can't generate SQL for scalar function: {}",
-                                        e
-                                    ))
-                                })?,
-                            ungrouped_scan_node.is_some(),
-                        ),
+                        sql_generator
+                            .get_sql_templates()
+                            .scalar_function(fun.name.to_string(), sql_args, None)
+                            .map_err(|e| {
+                                DataFusionError::Internal(format!(
+                                    "Can't generate SQL for scalar function: {}",
+                                    e
+                                ))
+                            })?,
                         sql_query,
                     ))
                 }
@@ -1221,18 +1237,15 @@ impl CubeScanWrapperNode {
                                     )
                                     .await?;
                                     return Ok((
-                                        Self::escape_interpolation_quotes(
-                                            sql_generator
-                                                .get_sql_templates()
-                                                .extract_expr(date_part.to_string(), arg_sql)
-                                                .map_err(|e| {
-                                                    DataFusionError::Internal(format!(
+                                        sql_generator
+                                            .get_sql_templates()
+                                            .extract_expr(date_part.to_string(), arg_sql)
+                                            .map_err(|e| {
+                                                DataFusionError::Internal(format!(
                                                     "Can't generate SQL for scalar function: {}",
                                                     e
                                                 ))
-                                                })?,
-                                            ungrouped_scan_node.is_some(),
-                                        ),
+                                            })?,
                                         query,
                                     ));
                                 }
@@ -1269,18 +1282,15 @@ impl CubeScanWrapperNode {
                         sql_args.push(sql);
                     }
                     Ok((
-                        Self::escape_interpolation_quotes(
-                            sql_generator
-                                .get_sql_templates()
-                                .scalar_function(fun.to_string(), sql_args, date_part)
-                                .map_err(|e| {
-                                    DataFusionError::Internal(format!(
-                                        "Can't generate SQL for scalar function: {}",
-                                        e
-                                    ))
-                                })?,
-                            ungrouped_scan_node.is_some(),
-                        ),
+                        sql_generator
+                            .get_sql_templates()
+                            .scalar_function(fun.to_string(), sql_args, date_part)
+                            .map_err(|e| {
+                                DataFusionError::Internal(format!(
+                                    "Can't generate SQL for scalar function: {}",
+                                    e
+                                ))
+                            })?,
                         sql_query,
                     ))
                 }
@@ -1311,18 +1321,15 @@ impl CubeScanWrapperNode {
                         sql_args.push(sql);
                     }
                     Ok((
-                        Self::escape_interpolation_quotes(
-                            sql_generator
-                                .get_sql_templates()
-                                .aggregate_function(fun, sql_args, distinct)
-                                .map_err(|e| {
-                                    DataFusionError::Internal(format!(
-                                        "Can't generate SQL for aggregate function: {}",
-                                        e
-                                    ))
-                                })?,
-                            ungrouped_scan_node.is_some(),
-                        ),
+                        sql_generator
+                            .get_sql_templates()
+                            .aggregate_function(fun, sql_args, distinct)
+                            .map_err(|e| {
+                                DataFusionError::Internal(format!(
+                                    "Can't generate SQL for aggregate function: {}",
+                                    e
+                                ))
+                            })?,
                         sql_query,
                     ))
                 }

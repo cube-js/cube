@@ -18,11 +18,11 @@ pub struct BestCubePlan;
 pub struct CubePlanCost {
     replacers: i64,
     table_scans: i64,
+    empty_wrappers: i64,
     non_detected_cube_scans: i64,
     filters: i64,
     structure_points: i64,
     filter_members: i64,
-    empty_wrappers: i64,
     member_errors: i64,
     wrapper_nodes: i64,
     ast_size_outside_wrapper: usize,

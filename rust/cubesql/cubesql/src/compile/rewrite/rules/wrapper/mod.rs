@@ -7,6 +7,7 @@ mod cast;
 mod column;
 mod cube_scan_wrapper;
 mod extract;
+mod is_null_expr;
 mod limit;
 mod literal;
 mod order;
@@ -50,6 +51,7 @@ impl RewriteRules for WrapperRules {
         self.alias_rules(&mut rules);
         self.case_rules(&mut rules);
         self.binary_expr_rules(&mut rules);
+        self.is_null_expr_rules(&mut rules);
         self.sort_expr_rules(&mut rules);
         self.cast_rules(&mut rules);
         self.column_rules(&mut rules);
