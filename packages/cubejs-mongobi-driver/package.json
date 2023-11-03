@@ -42,7 +42,7 @@
     "@cubejs-backend/linter": "^0.34.0",
     "@types/generic-pool": "^3.1.9",
     "testcontainers": "^9.8.0",
-    "typescript": "~5.0.4"
+    "typescript": "~5.2.2"
   },
   "eslintConfig": {
     "extends": "../cubejs-linter"

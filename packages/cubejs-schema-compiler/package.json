@@ -82,7 +82,7 @@
     "source-map-support": "^0.5.19",
     "sqlstring": "^2.3.1",
     "testcontainers": "^8.12",
-    "typescript": "~5.0.4",
+    "typescript": "~5.2.2",
     "uuid": "^8.3.2"
   },
   "license": "Apache-2.0",

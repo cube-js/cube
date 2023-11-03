@@ -36,7 +36,7 @@
     "@cubejs-backend/sqlite-driver": "^0.34.12",
     "@cubejs-backend/trino-driver": "^0.34.13",
     "cubejs-cli": "^0.34.13",
-    "typescript": "~5.0.4"
+    "typescript": "~5.2.2"
   },
   "resolutions": {
     "colors": "1.4.0"
