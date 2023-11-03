@@ -1034,7 +1034,7 @@ impl CubeScanWrapperNode {
                         DataType::UInt64 => "INTEGER",
                         DataType::Float16 => "FLOAT",
                         DataType::Float32 => "FLOAT",
-                        DataType::Float64 => "DOUBLE",
+                        DataType::Float64 => "DOUBLE PRECISION",
                         DataType::Timestamp(_, _) => "TIMESTAMP",
                         DataType::Date32 => "DATE",
                         DataType::Date64 => "DATE",
