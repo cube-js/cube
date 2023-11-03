@@ -72,7 +72,7 @@
     "@types/react-dom": "^17.0.2",
     "@types/react-router": "^5.1.12",
     "@types/react-router-dom": "^5.1.7",
-    "@types/styled-components": "5.1.9",
+    "@types/styled-components": "^5.1.9",
     "@types/uuid": "^8.3.1",
     "@vitejs/plugin-react": "^2.1.0",
     "antd": "4.16.13",
