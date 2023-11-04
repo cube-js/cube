@@ -731,6 +731,11 @@ declare module '@cubejs-client/core' {
     query(): Query;
     rawData(): T[];
     annotation(): QueryAnnotations;
+
+    /**
+     * @return the total number of rows if the `total` option was set, when sending the query
+     */
+    totalRows(): number | null;
   }
 
   export type Filter = BinaryFilter | UnaryFilter | LogicalOrFilter | LogicalAndFilter;
