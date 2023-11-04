@@ -2433,6 +2433,8 @@ class BaseQuery {
         STDDEV_SAMP: 'STDDEV_SAMP({{ args_concat }})',
         VAR_POP: 'VAR_POP({{ args_concat }})',
         VAR_SAMP: 'VAR_SAMP({{ args_concat }})',
+        COVAR_POP: 'COVAR_POP({{ args_concat }})',
+        COVAR_SAMP: 'COVAR_SAMP({{ args_concat }})',
 
         COALESCE: 'COALESCE({{ args_concat }})',
         CONCAT: 'CONCAT({{ args_concat }})',
