@@ -138,17 +138,23 @@ export class CubeEvaluator extends CubeSymbols {
 
     for (const memberName of Object.keys(members)) {
       let ownedByCube = true;
+      let aliasMember = false;
 
       const member = members[memberName];
       if (member.sql && !member.subQuery) {
         const funcArgs = this.funcArguments(member.sql);
-        const cubeReferences = this.collectUsedCubeReferences(cube.name, member.sql);
+        const { cubeReferencesUsed, evaluatedSql, pathReferencesUsed } = this.collectUsedCubeReferences(cube.name, member.sql);
         // We won't check for FILTER_PARAMS here as it shouldn't affect ownership and it should obey the same reference rules.
         // To affect ownership FILTER_PARAMS can be declared as `${FILTER_PARAMS.Foo.bar.filter(`${Foo.bar}`)}`.
-        if (funcArgs.length > 0 && cubeReferences.length === 0) {
+        // It isn't owned if there are non {CUBE} references
+        if (funcArgs.length > 0 && cubeReferencesUsed.length === 0) {
           ownedByCube = false;
         }
-        const foreignCubes = cubeReferences.filter(usedCube => usedCube !== cube.name);
+        // Aliases one to one some another member as in case of views
+        if (!ownedByCube && pathReferencesUsed.length === 1 && this.pathFromArray(pathReferencesUsed[0]) === evaluatedSql) {
+          aliasMember = true;
+        }
+        const foreignCubes = cubeReferencesUsed.filter(usedCube => usedCube !== cube.name);
         if (foreignCubes.length > 0) {
           errorReporter.error(`Member '${cube.name}.${memberName}' references foreign cubes: ${foreignCubes.join(', ')}. Please split and move this definition to corresponding cubes.`);
         }
@@ -158,7 +164,7 @@ export class CubeEvaluator extends CubeSymbols {
         errorReporter.error(`View '${cube.name}' defines own member '${cube.name}.${memberName}'. Please move this member definition to one of the cubes.`);
       }
 
-      members[memberName] = { ...members[memberName], ownedByCube };
+      members[memberName] = { ...members[memberName], ownedByCube, aliasMember };
     }
   }
 
@@ -357,8 +363,9 @@ export class CubeEvaluator extends CubeSymbols {
     const cubeEvaluator = this;
 
     const cubeReferencesUsed = [];
+    const pathReferencesUsed = [];
 
-    cubeEvaluator.resolveSymbolsCall(sqlFn, (name) => {
+    const evaluatedSql = cubeEvaluator.resolveSymbolsCall(sqlFn, (name) => {
       const referencedCube = cubeEvaluator.symbols[name] && name || cube;
       const resolvedSymbol =
         cubeEvaluator.resolveSymbol(
@@ -369,14 +376,20 @@ export class CubeEvaluator extends CubeSymbols {
       if (resolvedSymbol._objectWithResolvedProperties) {
         return resolvedSymbol;
       }
-      return cubeEvaluator.pathFromArray([referencedCube, name]);
+      const path = [referencedCube, name];
+      pathReferencesUsed.push(path);
+      return cubeEvaluator.pathFromArray(path);
     }, {
       // eslint-disable-next-line no-shadow
-      sqlResolveFn: (symbol, cube, n) => cubeEvaluator.pathFromArray([cube, n]),
+      sqlResolveFn: (symbol, cube, n) => {
+        const path = [cube, n];
+        pathReferencesUsed.push(path);
+        return cubeEvaluator.pathFromArray(path);
+      },
       contextSymbols: BaseQuery.emptyParametrizedContextSymbols(this, () => '$empty_param$'),
       cubeReferencesUsed,
     });
-    return cubeReferencesUsed;
+    return { cubeReferencesUsed, pathReferencesUsed, evaluatedSql };
   }
 
   evaluatePreAggregationReferences(cube, aggregation) {
