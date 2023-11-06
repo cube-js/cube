@@ -1,7 +1,7 @@
 use crate::template::neon::*;
 use cubesql::CubeError;
 
-use log::trace;
+use log::{error, trace};
 use minijinja as mj;
 use neon::prelude::*;
 use neon::types::Deferred;
@@ -17,38 +17,55 @@ struct JinjaEngineWorker {
 }
 
 impl JinjaEngineWorker {
+    #[inline(always)]
+    fn process_render(job: JinjaEngineWorkerJob, js_channel: &Channel, env: &mj::Environment) {
+        let template = match env.get_template(&job.template_name) {
+            Ok(t) => t,
+            Err(err) => {
+                job.deferred
+                    .settle_with(&js_channel, move |mut cx| -> NeonResult<Handle<JsString>> {
+                        cx.throw_from_mj_error(err)
+                    });
+
+                return;
+            }
+        };
+
+        let result = template.render(job.ctx);
+        job.deferred
+            .settle_with(&js_channel, move |mut cx| -> NeonResult<Handle<JsString>> {
+                match result {
+                    Ok(r) => Ok(cx.string(r)),
+                    Err(err) => cx.throw_from_mj_error(err),
+                }
+            });
+    }
+
     fn new(
         id: usize,
         env: mj::Environment<'static>,
-        js_channel: neon::event::Channel,
+        js_channel: Channel,
         receiver: async_channel::Receiver<JinjaEngineWorkerJob>,
     ) -> Self {
         let thread = std::thread::spawn(move || loop {
             if let Ok(job) = receiver.recv_blocking() {
-                let template = match env.get_template(&job.template_name) {
-                    Ok(t) => t,
-                    Err(err) => {
-                        job.deferred.settle_with(
-                            &js_channel,
-                            move |mut cx| -> NeonResult<Handle<JsString>> {
-                                cx.throw_from_mj_error(err)
-                            },
-                        );
+                if let Err(err) =
+                    std::panic::catch_unwind(|| Self::process_render(job, &js_channel, &env))
+                {
+                    let internal_err = CubeError::panic(err);
 
-                        continue;
-                    }
-                };
+                    error!("Panic while rendering jinja template: {}", internal_err);
 
-                let result = template.render(job.ctx);
-                job.deferred.settle_with(
-                    &js_channel,
-                    move |mut cx| -> NeonResult<Handle<JsString>> {
-                        match result {
-                            Ok(r) => Ok(cx.string(r)),
-                            Err(err) => cx.throw_from_mj_error(err),
-                        }
-                    },
-                );
+                    job.deferred.settle_with(
+                        &js_channel,
+                        move |mut cx| -> NeonResult<Handle<JsString>> {
+                            cx.throw_error(format!(
+                                "Panic while rendering jinja template: {}",
+                                internal_err
+                            ))
+                        },
+                    );
+                }
             } else {
                 trace!(
                     "Closing jinja thread, id: {}, threadId: {}",
