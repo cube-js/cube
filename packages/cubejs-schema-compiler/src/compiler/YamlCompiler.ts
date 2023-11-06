@@ -48,10 +48,11 @@ export class YamlCompiler {
     this.jinjaEngine = this.nativeInstance.newJinjaEngine({
       debugInfo: getEnv('devMode'),
       filters: ctx.filters,
+      workers: 1,
     });
   }
 
-  public compileYamlWithJinjaFile(
+  public async compileYamlWithJinjaFile(
     file: FileContent,
     errorsReport: ErrorReporter,
     cubes,
@@ -65,7 +66,7 @@ export class YamlCompiler {
   ) {
     const compiledFile = {
       fileName: file.fileName,
-      content: this.getJinjaEngine().renderTemplate(file.fileName, compileContext, {
+      content: await this.getJinjaEngine().renderTemplate(file.fileName, compileContext, {
         ...pythonContext.functions,
         ...pythonContext.variables
       }),
