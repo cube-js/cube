@@ -1,9 +1,8 @@
 use crate::cross::*;
+use crate::python::python_fn_call_sync;
 use crate::template::mj_value::{from_minijinja_value, to_minijinja_value};
 use minijinja as mj;
 use neon::prelude::*;
-use pyo3::prelude::*;
-use pyo3::{exceptions::PyNotImplementedError, types::PyTuple, AsPyPointer};
 
 pub fn mj_inject_python_extension(
     cx: &mut FunctionContext,
@@ -50,28 +49,7 @@ pub fn mj_inject_python_extension(
                     arguments.push(from_minijinja_value(arg)?);
                 }
 
-                let python_call_res = Python::with_gil(|py| {
-                    let mut args_tuple = Vec::with_capacity(args.len());
-
-                    for arg in arguments {
-                        args_tuple.push(arg.into_py(py)?);
-                    }
-
-                    let tuple = PyTuple::new(py, args_tuple);
-
-                    let call_res = py_fun.call1(py, tuple)?;
-
-                    let is_coroutine =
-                        unsafe { pyo3::ffi::PyCoro_CheckExact(call_res.as_ptr()) == 1 };
-                    if is_coroutine {
-                        Err(PyErr::new::<PyNotImplementedError, _>(
-                            "Calling async is not supported",
-                        ))
-                    } else {
-                        CLRepr::from_python_ref(call_res.as_ref(py))
-                    }
-                });
-                match python_call_res {
+                match python_fn_call_sync(&py_fun, arguments) {
                     Ok(r) => Ok(to_minijinja_value(r)),
                     Err(err) => Err(mj::Error::new(
                         minijinja::ErrorKind::InvalidOperation,
