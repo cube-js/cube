@@ -672,7 +672,7 @@ export class PreAggregations {
     return flattenDimensionMembers
       .map(member => (
         { [member.dimension]: PreAggregations.firstNonAliasMember(query, [member])[0] }
-      ));
+      )).reduce((a, b) => ({ ...a, ...b }), {});
   }
 
   static flattenDimensionMembers(query) {
