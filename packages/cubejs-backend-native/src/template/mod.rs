@@ -1,3 +1,5 @@
+#[cfg(feature = "python")]
+mod engine_python;
 mod entry;
 mod mj_value;
 mod neon;
