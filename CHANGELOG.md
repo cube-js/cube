@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.16](https://github.com/cube-js/cube/compare/v0.34.15...v0.34.16) (2023-11-06)
+
+
+### Features
+
+* **cubesql:** Enable `COVAR` aggr functions push down ([89d841a](https://github.com/cube-js/cube/commit/89d841a049c0064b902bf3cdc631cb056984ddd4))
+* **native:** Jinja - async render ([#7309](https://github.com/cube-js/cube/issues/7309)) ([cd1019c](https://github.com/cube-js/cube/commit/cd1019c9fa904ba76b334e941726ff871d2e3a44))
+* **server:** Mark cube.py as stable ([#7381](https://github.com/cube-js/cube/issues/7381)) ([e0517bb](https://github.com/cube-js/cube/commit/e0517bb4d77ce635b0495ab0b95606c139d40628))
+
+
+
+
+
 ## [0.34.15](https://github.com/cube-js/cube/compare/v0.34.14...v0.34.15) (2023-11-06)
 
 

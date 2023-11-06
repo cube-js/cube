@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.16](https://github.com/cube-js/cube/compare/v0.34.15...v0.34.16) (2023-11-06)
+
+
+### Features
+
+* **server:** Mark cube.py as stable ([#7381](https://github.com/cube-js/cube/issues/7381)) ([e0517bb](https://github.com/cube-js/cube/commit/e0517bb4d77ce635b0495ab0b95606c139d40628))
+
+
+
+
+
 ## [0.34.15](https://github.com/cube-js/cube/compare/v0.34.14...v0.34.15) (2023-11-06)
 
 **Note:** Version bump only for package @cubejs-backend/server
