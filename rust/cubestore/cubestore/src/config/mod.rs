@@ -442,6 +442,8 @@ pub trait ConfigObj: DIService {
 
     fn cachestore_cache_max_size(&self) -> u64;
 
+    fn cachestore_cache_max_entry_size(&self) -> usize;
+
     fn cachestore_cache_compaction_trigger_size(&self) -> u64;
 
     fn cachestore_cache_max_keys(&self) -> u32;
@@ -582,6 +584,7 @@ pub struct ConfigObjImpl {
     pub cachestore_cache_eviction_loop_interval: u64,
     pub cachestore_cache_ttl_persist_loop_interval: u64,
     pub cachestore_cache_max_size: u64,
+    pub cachestore_cache_max_entry_size: usize,
     pub cachestore_cache_compaction_trigger_size: u64,
     pub cachestore_cache_threshold_to_force_eviction: u8,
     pub cachestore_queue_results_expire: u64,
@@ -796,6 +799,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn cachestore_cache_max_size(&self) -> u64 {
         self.cachestore_cache_max_size
+    }
+
+    fn cachestore_cache_max_entry_size(&self) -> usize {
+        self.cachestore_cache_max_entry_size
     }
 
     fn cachestore_cache_compaction_trigger_size(&self) -> u64 {
@@ -1151,6 +1158,20 @@ impl Config {
             Some(32 << 20),
         );
 
+        let transport_max_message_size = env_parse_size(
+            "CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE",
+            64 << 20,
+            Some(256 << 20),
+            Some(16 << 20),
+        );
+
+        let cachestore_cache_max_entry_size = env_parse_size(
+            "CUBESTORE_CACHE_MAX_ENTRY_SIZE",
+            (64 << 20) - (1024 << 10),
+            Some(transport_max_message_size - (1024 << 10)),
+            None,
+        );
+
         let cachestore_cache_compaction_trigger_size = env_parse_size(
             "CUBESTORE_CACHE_COMPACTION_TRIGGER_SIZE",
             Self::calculate_cache_compaction_trigger_size(cachestore_cache_max_size),
@@ -1322,6 +1343,7 @@ impl Config {
                     Some(0),
                 ),
                 cachestore_cache_max_size: cachestore_cache_max_size as u64,
+                cachestore_cache_max_entry_size,
                 cachestore_cache_compaction_trigger_size,
                 cachestore_cache_threshold_to_force_eviction: 25,
                 cachestore_queue_results_expire: env_parse_duration(
@@ -1441,15 +1463,10 @@ impl Config {
                     * 1024
                     * 1024,
                 disk_space_cache_duration_secs: 300,
-                transport_max_message_size: env_parse_size(
-                    "CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE",
-                    64 << 20,
-                    Some(256 << 20),
-                    Some(16 << 20),
-                ),
+                transport_max_message_size,
                 transport_max_frame_size: env_parse_size(
                     "CUBESTORE_TRANSPORT_MAX_FRAME_SIZE",
-                    32 << 20,
+                    64 << 20,
                     Some(256 << 20),
                     Some(4 << 20),
                 ),
@@ -1535,6 +1552,7 @@ impl Config {
                 cachestore_cache_eviction_loop_interval: 60,
                 cachestore_cache_ttl_persist_loop_interval: 15,
                 cachestore_cache_max_size: 4096 << 20,
+                cachestore_cache_max_entry_size: 64 << 20,
                 cachestore_cache_compaction_trigger_size: 4096 * 2 << 20,
                 cachestore_cache_threshold_to_force_eviction: 25,
                 cachestore_queue_results_expire: 90,

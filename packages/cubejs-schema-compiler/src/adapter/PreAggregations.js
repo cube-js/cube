@@ -266,13 +266,15 @@ export class PreAggregations {
   }
 
   static transformQueryToCanUseForm(query) {
-    const sortedDimensions = this.squashDimensions(query);
+    const flattenDimensionMembers = this.flattenDimensionMembers(query);
+    const sortedDimensions = this.squashDimensions(query, flattenDimensionMembers);
+    const aliasedToFirstNonAliasedDimension = this.aliasedToFirstNonAliasedDimension(query, flattenDimensionMembers);
     const measures = query.measures.concat(query.measureFilters);
-    const measurePaths = R.uniq(measures.map(m => m.measure));
+    const measurePaths = R.uniq(PreAggregations.firstNonAliasMember(query, measures));
     const collectLeafMeasures = query.collectLeafMeasures.bind(query);
-    const dimensionsList = query.dimensions.map(dim => dim.dimension);
-    const segmentsList = query.segments.map(s => s.segment);
-    const ownedDimensions = PreAggregations.ownedMembers(query, PreAggregations.concatDimensionMembers(query));
+    const dimensionsList = PreAggregations.firstNonAliasMember(query, query.dimensions);
+    const segmentsList = PreAggregations.firstNonAliasMember(query, query.segments);
+    const ownedDimensions = PreAggregations.ownedMembers(query, flattenDimensionMembers);
     const ownedTimeDimensions = query.timeDimensions.map(td => {
       const owned = PreAggregations.ownedMembers(query, [td]);
       let { dimension } = td;
@@ -280,6 +282,19 @@ export class PreAggregations {
       // TODO kind of calculation which isn't supported yet
       if (owned.length === 1) {
         [dimension] = owned;
+      }
+      return query.newTimeDimension({
+        dimension,
+        dateRange: td.dateRange,
+        granularity: td.granularity,
+      });
+    }).map(d => query.newTimeDimension(d));
+
+    const firstNonAliasTimeDimensions = query.timeDimensions.map(td => {
+      const nonAlias = PreAggregations.firstNonAliasMember(query, [td]);
+      let { dimension } = td;
+      if (nonAlias.length === 1) {
+        [dimension] = nonAlias;
       }
       return query.newTimeDimension({
         dimension,
@@ -319,8 +334,8 @@ export class PreAggregations {
       return true;
     }
 
-    const sortedTimeDimensions = PreAggregations.sortTimeDimensionsWithRollupGranularity(query.timeDimensions);
-    const timeDimensions = PreAggregations.timeDimensionsAsIs(query.timeDimensions);
+    const sortedTimeDimensions = PreAggregations.sortTimeDimensionsWithRollupGranularity(firstNonAliasTimeDimensions);
+    const timeDimensions = PreAggregations.timeDimensionsAsIs(firstNonAliasTimeDimensions);
     const ownedTimeDimensionsWithRollupGranularity = PreAggregations.sortTimeDimensionsWithRollupGranularity(ownedTimeDimensions);
     const ownedTimeDimensionsAsIs = PreAggregations.timeDimensionsAsIs(ownedTimeDimensions);
 
@@ -328,7 +343,9 @@ export class PreAggregations {
 
     const allFiltersWithinSelectedDimensions =
       R.all(d => dimensionsList.indexOf(d) !== -1)(
-        query.filters.map(f => f.dimension)
+        R.flatten(
+          query.filters.map(f => f.getMembers())
+        ).map(f => PreAggregations.firstNonAliasMember(query, [f])[0])
       );
 
     const isAdditive = R.all(m => m.isAdditive(), query.measures);
@@ -345,7 +362,8 @@ export class PreAggregations {
 
     let filterDimensionsSingleValueEqual = this.collectFilterDimensionsWithSingleValueEqual(
       query.filters,
-      dimensionsList.concat(segmentsList).reduce((map, d) => map.set(d, 1), new Map())
+      dimensionsList.concat(segmentsList).reduce((map, d) => map.set(d, 1), new Map()),
+      aliasedToFirstNonAliasedDimension
     );
 
     filterDimensionsSingleValueEqual =
@@ -381,6 +399,14 @@ export class PreAggregations {
     );
   }
 
+  static firstNonAliasMember(query, members) {
+    return members.map(
+      member => query
+        .collectFrom([member], query.collectMemberNamesFor.bind(query), 'collectMemberNamesFor')
+        .find(d => !query.cubeEvaluator.byPathAnyType(d).aliasMember)
+    );
+  }
+
   static sortTimeDimensionsWithRollupGranularity(timeDimensions) {
     return timeDimensions && R.sortBy(
       R.prop(0),
@@ -395,13 +421,14 @@ export class PreAggregations {
     ) || [];
   }
 
-  static collectFilterDimensionsWithSingleValueEqual(filters, map) {
+  static collectFilterDimensionsWithSingleValueEqual(filters, map, aliasedToFirstNonAliasedDimension) {
     // eslint-disable-next-line no-restricted-syntax
     for (const f of filters) {
       if (f.operator === 'equals') {
-        map.set(f.dimension, Math.min(map.get(f.dimension) || 2, f.values.length));
+        const nonAliasedDimension = aliasedToFirstNonAliasedDimension[f.dimension] || f.dimension;
+        map.set(nonAliasedDimension, Math.min(map.get(nonAliasedDimension) || 2, f.values.length));
       } else if (f.operator === 'and') {
-        const res = this.collectFilterDimensionsWithSingleValueEqual(f.values, map);
+        const res = this.collectFilterDimensionsWithSingleValueEqual(f.values, map, aliasedToFirstNonAliasedDimension);
         if (res == null) return null;
       } else {
         return null;
@@ -632,14 +659,29 @@ export class PreAggregations {
     }
   }
 
-  static squashDimensions(query) {
+  static squashDimensions(query, flattenDimensionMembers) {
     return R.pipe(R.uniq, R.sortBy(R.identity))(
-      query.dimensions.concat(query.filters).map(d => d.dimension).concat(query.segments.map(s => s.segment))
+      PreAggregations.firstNonAliasMember(
+        query,
+        flattenDimensionMembers
+      )
     );
   }
 
-  static concatDimensionMembers(query) {
-    return query.dimensions.concat(query.filters).concat(query.segments);
+  static aliasedToFirstNonAliasedDimension(query, flattenDimensionMembers) {
+    return flattenDimensionMembers
+      .map(member => (
+        { [member.dimension]: PreAggregations.firstNonAliasMember(query, [member])[0] }
+      )).reduce((a, b) => ({ ...a, ...b }), {});
+  }
+
+  static flattenDimensionMembers(query) {
+    return R.flatten(
+      query.dimensions
+        .concat(query.filters)
+        .concat(query.segments)
+        .map(m => m.getMembers()),
+    );
   }
 
   // eslint-disable-next-line no-unused-vars

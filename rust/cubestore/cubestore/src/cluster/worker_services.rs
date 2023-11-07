@@ -246,12 +246,12 @@ impl<P: Callable> ServicesClientImpl<P> {
                     payload: message,
                 };
 
+                let mut broadcast_rx = message_broadcast_tx.subscribe();
+
                 if let Err(e) = sender.send(ipc_message) {
                     log::error!("Error while sending ipc service request: {:?}", e);
                     break;
                 }
-
-                let mut broadcast_rx = message_broadcast_tx.subscribe();
 
                 cube_ext::spawn(async move {
                     loop {

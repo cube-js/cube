@@ -3,6 +3,53 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.16](https://github.com/cube-js/cube/compare/v0.34.15...v0.34.16) (2023-11-06)
+
+
+### Features
+
+* **cubesql:** Enable `COVAR` aggr functions push down ([89d841a](https://github.com/cube-js/cube/commit/89d841a049c0064b902bf3cdc631cb056984ddd4))
+* **native:** Jinja - async render ([#7309](https://github.com/cube-js/cube/issues/7309)) ([cd1019c](https://github.com/cube-js/cube/commit/cd1019c9fa904ba76b334e941726ff871d2e3a44))
+
+
+
+
+
+## [0.34.15](https://github.com/cube-js/cube/compare/v0.34.14...v0.34.15) (2023-11-06)
+
+
+### Bug Fixes
+
+* Single value non-additive pre-aggregation match in views ([9666f24](https://github.com/cube-js/cube/commit/9666f24650e93ad6fd6990f6b82fb957e26c2885))
+
+
+
+
+
+## [0.34.14](https://github.com/cube-js/cube/compare/v0.34.13...v0.34.14) (2023-11-05)
+
+
+### Bug Fixes
+
+* Views with proxy dimensions and non-additive measures don't not match pre-aggregations ([#7374](https://github.com/cube-js/cube/issues/7374)) ([7189720](https://github.com/cube-js/cube/commit/718972090612f31326bad84fcf792d674ea622a9)), closes [#7099](https://github.com/cube-js/cube/issues/7099)
+
+
+### Features
+
+* **cubesql:** SQL push down for several ANSI SQL functions ([ac2bf15](https://github.com/cube-js/cube/commit/ac2bf15954e6b143b9014ff4b8f72c6098253c82))
+
+
+
+
+
+## [0.34.13](https://github.com/cube-js/cube/compare/v0.34.12...v0.34.13) (2023-10-31)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
 ## [0.34.12](https://github.com/cube-js/cube/compare/v0.34.11...v0.34.12) (2023-10-30)
 
 **Note:** Version bump only for package @cubejs-backend/schema-compiler

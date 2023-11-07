@@ -442,6 +442,13 @@ impl SqlTemplates {
         )
     }
 
+    pub fn is_null_expr(&self, expr: String, negate: bool) -> Result<String, CubeError> {
+        self.render_template(
+            "expressions/is_null",
+            context! { expr => expr, negate => negate },
+        )
+    }
+
     pub fn sort_expr(
         &self,
         expr: String,

@@ -3,6 +3,29 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.14](https://github.com/cube-js/cube.js/compare/v0.34.13...v0.34.14) (2023-11-05)
+
+
+### Features
+
+* **cubesql:** SQL push down for several ANSI SQL functions ([ac2bf15](https://github.com/cube-js/cube.js/commit/ac2bf15954e6b143b9014ff4b8f72c6098253c82))
+* **cubesql:** SQL push down support for `IS NULL` and `IS NOT NULL` expressions ([9b3c27d](https://github.com/cube-js/cube.js/commit/9b3c27d502adbcda8a98a4de486a9d0baf4307aa))
+
+
+
+
+
+## [0.34.13](https://github.com/cube-js/cube.js/compare/v0.34.12...v0.34.13) (2023-10-31)
+
+
+### Bug Fixes
+
+* **cubesql:** SQL push down for limit and offset for ungrouped queries ([67da8c3](https://github.com/cube-js/cube.js/commit/67da8c31463d81e0f84ed1430a1c2d848f910f66))
+
+
+
+
+
 ## [0.34.11](https://github.com/cube-js/cube/compare/v0.34.10...v0.34.11) (2023-10-29)
 
 

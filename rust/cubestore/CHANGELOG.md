@@ -3,6 +3,41 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.15](https://github.com/cube-js/cube.js/compare/v0.34.14...v0.34.15) (2023-11-06)
+
+
+### Bug Fixes
+
+* **cubestore:** Fix broadcasting for worker services ([#7375](https://github.com/cube-js/cube.js/issues/7375)) ([1726632](https://github.com/cube-js/cube.js/commit/1726632e9ffa223f8dba9a9c0914d13cb2ad283b))
+
+
+
+
+
+## [0.34.14](https://github.com/cube-js/cube.js/compare/v0.34.13...v0.34.14) (2023-11-05)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.34.13](https://github.com/cube-js/cube.js/compare/v0.34.12...v0.34.13) (2023-10-31)
+
+
+### Bug Fixes
+
+* **cubestore:** Error with pre-aggregation and filters containing comma. ([#7364](https://github.com/cube-js/cube.js/issues/7364)) ([ac4037e](https://github.com/cube-js/cube.js/commit/ac4037e7bc4d76fcfee113f3e55174b8335f5e73))
+
+
+### Features
+
+* **cubestore:** Introduce limit for cache_max_entry_size ([#7363](https://github.com/cube-js/cube.js/issues/7363)) ([2295fe0](https://github.com/cube-js/cube.js/commit/2295fe037600137dc52452d2f9a4c806aa784419))
+
+
+
+
+
 ## [0.34.12](https://github.com/cube-js/cube/compare/v0.34.11...v0.34.12) (2023-10-30)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore

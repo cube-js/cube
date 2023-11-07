@@ -3,6 +3,65 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.16](https://github.com/cube-js/cube/compare/v0.34.15...v0.34.16) (2023-11-06)
+
+
+### Features
+
+* **cubesql:** Enable `COVAR` aggr functions push down ([89d841a](https://github.com/cube-js/cube/commit/89d841a049c0064b902bf3cdc631cb056984ddd4))
+* **native:** Jinja - async render ([#7309](https://github.com/cube-js/cube/issues/7309)) ([cd1019c](https://github.com/cube-js/cube/commit/cd1019c9fa904ba76b334e941726ff871d2e3a44))
+* **server:** Mark cube.py as stable ([#7381](https://github.com/cube-js/cube/issues/7381)) ([e0517bb](https://github.com/cube-js/cube/commit/e0517bb4d77ce635b0495ab0b95606c139d40628))
+
+
+
+
+
+## [0.34.15](https://github.com/cube-js/cube/compare/v0.34.14...v0.34.15) (2023-11-06)
+
+
+### Bug Fixes
+
+* **cubestore:** Fix broadcasting for worker services ([#7375](https://github.com/cube-js/cube/issues/7375)) ([1726632](https://github.com/cube-js/cube/commit/1726632e9ffa223f8dba9a9c0914d13cb2ad283b))
+* Single value non-additive pre-aggregation match in views ([9666f24](https://github.com/cube-js/cube/commit/9666f24650e93ad6fd6990f6b82fb957e26c2885))
+
+
+
+
+
+## [0.34.14](https://github.com/cube-js/cube/compare/v0.34.13...v0.34.14) (2023-11-05)
+
+
+### Bug Fixes
+
+* Views with proxy dimensions and non-additive measures don't not match pre-aggregations ([#7374](https://github.com/cube-js/cube/issues/7374)) ([7189720](https://github.com/cube-js/cube/commit/718972090612f31326bad84fcf792d674ea622a9)), closes [#7099](https://github.com/cube-js/cube/issues/7099)
+
+
+### Features
+
+* **cubesql:** SQL push down for several ANSI SQL functions ([ac2bf15](https://github.com/cube-js/cube/commit/ac2bf15954e6b143b9014ff4b8f72c6098253c82))
+* **cubesql:** SQL push down support for `IS NULL` and `IS NOT NULL` expressions ([9b3c27d](https://github.com/cube-js/cube/commit/9b3c27d502adbcda8a98a4de486a9d0baf4307aa))
+
+
+
+
+
+## [0.34.13](https://github.com/cube-js/cube/compare/v0.34.12...v0.34.13) (2023-10-31)
+
+
+### Bug Fixes
+
+* **cubesql:** SQL push down for limit and offset for ungrouped queries ([67da8c3](https://github.com/cube-js/cube/commit/67da8c31463d81e0f84ed1430a1c2d848f910f66))
+* **cubestore:** Error with pre-aggregation and filters containing comma. ([#7364](https://github.com/cube-js/cube/issues/7364)) ([ac4037e](https://github.com/cube-js/cube/commit/ac4037e7bc4d76fcfee113f3e55174b8335f5e73))
+
+
+### Features
+
+* **cubestore:** Introduce limit for cache_max_entry_size ([#7363](https://github.com/cube-js/cube/issues/7363)) ([2295fe0](https://github.com/cube-js/cube/commit/2295fe037600137dc52452d2f9a4c806aa784419))
+
+
+
+
+
 ## [0.34.12](https://github.com/cube-js/cube/compare/v0.34.11...v0.34.12) (2023-10-30)
 
 
