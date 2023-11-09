@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.17](https://github.com/cube-js/cube/compare/v0.34.16...v0.34.17) (2023-11-09)
+
+
+### Bug Fixes
+
+* **cubestore-driver:** Check introspection results on import ([#7382](https://github.com/cube-js/cube/issues/7382)) ([a8b8ad0](https://github.com/cube-js/cube/commit/a8b8ad07fd64b1ff7aea9ba0610e7ab01c174e77))
+
+
+
+
+
 ## [0.34.15](https://github.com/cube-js/cube/compare/v0.34.14...v0.34.15) (2023-11-06)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore-driver

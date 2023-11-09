@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.17](https://github.com/cube-js/cube/compare/v0.34.16...v0.34.17) (2023-11-09)
+
+
+### Bug Fixes
+
+* **cubestore-driver:** Check introspection results on import ([#7382](https://github.com/cube-js/cube/issues/7382)) ([a8b8ad0](https://github.com/cube-js/cube/commit/a8b8ad07fd64b1ff7aea9ba0610e7ab01c174e77))
+* **duckdb-driver:** Compatibility issue with Cube Store for DATE type ([#7394](https://github.com/cube-js/cube/issues/7394)) ([3e1389b](https://github.com/cube-js/cube/commit/3e1389b3a94db85d6b4d343e876a349b843cbf27))
+
+
+
+
+
 ## [0.34.16](https://github.com/cube-js/cube/compare/v0.34.15...v0.34.16) (2023-11-06)
 
 
