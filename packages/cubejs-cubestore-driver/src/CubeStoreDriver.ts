@@ -240,6 +240,10 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
   }
 
   private async importRows(table: string, columns: Column[], indexesSql: any, aggregations: any, tableData: DownloadTableMemoryData, queryTracingObj?: any) {
+    if (!columns || columns.length === 0) {
+      throw new Error('Unable to import (as rows) in Cube Store: empty columns. Most probably, introspection has failed.');
+    }
+
     await this.createTableWithOptions(table, columns, { indexes: indexesSql, aggregations, buildRangeEnd: queryTracingObj?.buildRangeEnd }, queryTracingObj);
     try {
       const batchSize = 2000; // TODO make dynamic?
@@ -267,6 +271,10 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
   }
 
   private async importCsvFile(tableData: DownloadTableCSVData, table: string, columns: Column[], indexes: any, aggregations: any, queryTracingObj?: any) {
+    if (!columns || columns.length === 0) {
+      throw new Error('Unable to import (as csv) in Cube Store: empty columns. Most probably, introspection has failed.');
+    }
+
     const files = Array.isArray(tableData.csvFile) ? tableData.csvFile : [tableData.csvFile];
     const options: CreateTableOptions = {
       buildRangeEnd: queryTracingObj?.buildRangeEnd,
@@ -285,6 +293,10 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
   }
 
   private async importStream(columns: Column[], tableData: StreamTableData, table: string, indexes: string, aggregations: string, queryTracingObj?: any) {
+    if (!columns || columns.length === 0) {
+      throw new Error('Unable to import (as stream) in Cube Store: empty columns. Most probably, introspection has failed.');
+    }
+
     const tempFiles: string[] = [];
     try {
       const pipelinePromises: Promise<any>[] = [];
