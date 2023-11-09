@@ -2,7 +2,9 @@ import {
   BaseDriver,
   DriverInterface,
   StreamOptions,
-  QueryOptions, StreamTableData,
+  QueryOptions,
+  StreamTableData,
+  GenericDataBaseType,
 } from '@cubejs-backend/base-driver';
 import { getEnv } from '@cubejs-backend/shared';
 import { promisify } from 'util';
@@ -24,6 +26,13 @@ type InitPromise = {
   db: Database;
 };
 
+const DuckDBToGenericType: Record<string, GenericDataBaseType> = {
+  // DATE_TRUNC returns DATE, but Cube Store still doesn't support DATE type
+  // DuckDB's driver transform date/timestamp to Date object, but HydrationStream converts any Date object to ISO timestamp
+  // That's why It's safe to use timestamp here
+  date: 'timestamp',
+};
+
 export class DuckDBDriver extends BaseDriver implements DriverInterface {
   protected initPromise: Promise<InitPromise> | null = null;
 
@@ -35,6 +44,14 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
     super();
 
     this.schema = this.config.schema || getEnv('duckdbSchema', this.config);
+  }
+
+  public toGenericType(columnType: string): GenericDataBaseType {
+    if (columnType.toLowerCase() in DuckDBToGenericType) {
+      return DuckDBToGenericType[columnType.toLowerCase()];
+    }
+
+    return super.toGenericType(columnType.toLowerCase());
   }
 
   protected async init(): Promise<InitPromise> {
