@@ -922,6 +922,7 @@ declare module '@cubejs-client/core' {
       measures: string[];
       dimensions: string[];
     };
+    format?: 'currency' | 'percent';
   };
 
   export type TCubeDimension = BaseCubeMember & {
