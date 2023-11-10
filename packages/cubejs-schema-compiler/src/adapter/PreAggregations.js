@@ -142,7 +142,7 @@ export class PreAggregations {
     }
     return [];
   }
- 
+
   preAggregationDescriptionFor(cube, foundPreAggregation) {
     const { preAggregationName, preAggregation, references } = foundPreAggregation;
 
@@ -170,7 +170,7 @@ export class PreAggregations {
     }[preAggregation.type] || uniqueKeyColumnsDefault)();
 
     const aggregationsColumns = this.aggregationsColumns(cube, preAggregation);
-    
+
     return {
       preAggregationId: `${cube}.${preAggregationName}`,
       timezone: this.query.options && this.query.options.timezone,
@@ -268,12 +268,12 @@ export class PreAggregations {
   static transformQueryToCanUseForm(query) {
     const flattenDimensionMembers = this.flattenDimensionMembers(query);
     const sortedDimensions = this.squashDimensions(query, flattenDimensionMembers);
-    const aliasedToFirstNonAliasedDimension = this.aliasedToFirstNonAliasedDimension(query, flattenDimensionMembers);
+    const allBackAliasMembers = this.allBackAliasMembers(query);
     const measures = query.measures.concat(query.measureFilters);
-    const measurePaths = R.uniq(PreAggregations.firstNonAliasMember(query, measures));
+    const measurePaths = R.uniq(measures.map(m => m.expressionPath()));
     const collectLeafMeasures = query.collectLeafMeasures.bind(query);
-    const dimensionsList = PreAggregations.firstNonAliasMember(query, query.dimensions);
-    const segmentsList = PreAggregations.firstNonAliasMember(query, query.segments);
+    const dimensionsList = query.dimensions.map(dim => dim.expressionPath());
+    const segmentsList = query.segments.map(s => s.expressionPath());
     const ownedDimensions = PreAggregations.ownedMembers(query, flattenDimensionMembers);
     const ownedTimeDimensions = query.timeDimensions.map(td => {
       const owned = PreAggregations.ownedMembers(query, [td]);
@@ -290,19 +290,6 @@ export class PreAggregations {
       });
     }).map(d => query.newTimeDimension(d));
 
-    const firstNonAliasTimeDimensions = query.timeDimensions.map(td => {
-      const nonAlias = PreAggregations.firstNonAliasMember(query, [td]);
-      let { dimension } = td;
-      if (nonAlias.length === 1) {
-        [dimension] = nonAlias;
-      }
-      return query.newTimeDimension({
-        dimension,
-        dateRange: td.dateRange,
-        granularity: td.granularity,
-      });
-    }).map(d => query.newTimeDimension(d));
-
     const measureToLeafMeasures = {};
 
     const leafMeasurePaths =
@@ -311,14 +298,14 @@ export class PreAggregations {
           const leafMeasures = query.collectFrom([m], collectLeafMeasures, 'collectLeafMeasures');
           measureToLeafMeasures[m.measure] = leafMeasures.map((measure) => {
             const baseMeasure = query.newMeasure(measure);
-            
+
             return {
               measure,
               additive: baseMeasure.isAdditive(),
               type: baseMeasure.definition().type
             };
           });
-          
+
           return leafMeasures;
         }),
         R.unnest,
@@ -334,8 +321,8 @@ export class PreAggregations {
       return true;
     }
 
-    const sortedTimeDimensions = PreAggregations.sortTimeDimensionsWithRollupGranularity(firstNonAliasTimeDimensions);
-    const timeDimensions = PreAggregations.timeDimensionsAsIs(firstNonAliasTimeDimensions);
+    const sortedTimeDimensions = PreAggregations.sortTimeDimensionsWithRollupGranularity(query.timeDimensions);
+    const timeDimensions = PreAggregations.timeDimensionsAsIs(query.timeDimensions);
     const ownedTimeDimensionsWithRollupGranularity = PreAggregations.sortTimeDimensionsWithRollupGranularity(ownedTimeDimensions);
     const ownedTimeDimensionsAsIs = PreAggregations.timeDimensionsAsIs(ownedTimeDimensions);
 
@@ -345,7 +332,7 @@ export class PreAggregations {
       R.all(d => dimensionsList.indexOf(d) !== -1)(
         R.flatten(
           query.filters.map(f => f.getMembers())
-        ).map(f => PreAggregations.firstNonAliasMember(query, [f])[0])
+        ).map(f => query.cubeEvaluator.pathFromArray(f.path()))
       );
 
     const isAdditive = R.all(m => m.isAdditive(), query.measures);
@@ -363,7 +350,6 @@ export class PreAggregations {
     let filterDimensionsSingleValueEqual = this.collectFilterDimensionsWithSingleValueEqual(
       query.filters,
       dimensionsList.concat(segmentsList).reduce((map, d) => map.set(d, 1), new Map()),
-      aliasedToFirstNonAliasedDimension
     );
 
     filterDimensionsSingleValueEqual =
@@ -387,7 +373,8 @@ export class PreAggregations {
       filterDimensionsSingleValueEqual,
       ownedDimensions,
       ownedTimeDimensionsWithRollupGranularity,
-      ownedTimeDimensionsAsIs
+      ownedTimeDimensionsAsIs,
+      allBackAliasMembers
     };
   }
 
@@ -399,36 +386,52 @@ export class PreAggregations {
     );
   }
 
-  static firstNonAliasMember(query, members) {
+  static backAliasMembers(query, members) {
     return members.map(
-      member => query
-        .collectFrom([member], query.collectMemberNamesFor.bind(query), 'collectMemberNamesFor')
-        .find(d => !query.cubeEvaluator.byPathAnyType(d).aliasMember)
-    );
+      member => {
+        const collectedMembers = query
+          .collectFrom([member], query.collectMemberNamesFor.bind(query), 'collectMemberNamesFor');
+        const memberPath = member.expressionPath();
+        let nonAliasSeen = false;
+        return collectedMembers
+          .filter(d => {
+            if (!query.cubeEvaluator.byPathAnyType(d).aliasMember) {
+              nonAliasSeen = true;
+            }
+            return !nonAliasSeen;
+          })
+          .map(d => (
+            { [query.cubeEvaluator.byPathAnyType(d).aliasMember]: memberPath }
+          )).reduce((a, b) => ({ ...a, ...b }), {});
+      }
+    ).reduce((a, b) => ({ ...a, ...b }), {});
+  }
+
+  static allBackAliasMembers(query) {
+    return this.backAliasMembers(query, this.flattenAllMembers(query));
   }
 
   static sortTimeDimensionsWithRollupGranularity(timeDimensions) {
     return timeDimensions && R.sortBy(
       R.prop(0),
-      timeDimensions.map(d => [d.dimension, d.rollupGranularity()])
+      timeDimensions.map(d => [d.expressionPath(), d.rollupGranularity()])
     ) || [];
   }
 
   static timeDimensionsAsIs(timeDimensions) {
     return timeDimensions && R.sortBy(
       R.prop(0),
-      timeDimensions.map(d => [d.dimension, d.granularity]),
+      timeDimensions.map(d => [d.expressionPath(), d.granularity]),
     ) || [];
   }
 
-  static collectFilterDimensionsWithSingleValueEqual(filters, map, aliasedToFirstNonAliasedDimension) {
+  static collectFilterDimensionsWithSingleValueEqual(filters, map) {
     // eslint-disable-next-line no-restricted-syntax
     for (const f of filters) {
       if (f.operator === 'equals') {
-        const nonAliasedDimension = aliasedToFirstNonAliasedDimension[f.dimension] || f.dimension;
-        map.set(nonAliasedDimension, Math.min(map.get(nonAliasedDimension) || 2, f.values.length));
+        map.set(f.expressionPath(), Math.min(map.get(f.expressionPath()) || 2, f.values.length));
       } else if (f.operator === 'and') {
-        const res = this.collectFilterDimensionsWithSingleValueEqual(f.values, map, aliasedToFirstNonAliasedDimension);
+        const res = this.collectFilterDimensionsWithSingleValueEqual(f.values, map);
         if (res == null) return null;
       } else {
         return null;
@@ -512,6 +515,12 @@ export class PreAggregations {
           )
         ));
 
+    const backAlias = (references) => references.map(r => (
+      Array.isArray(r) ?
+        [transformedQuery.allBackAliasMembers[r[0]] || r[0], r[1]] :
+        transformedQuery.allBackAliasMembers[r] || r
+    ));
+
     /**
      * Determine whether pre-aggregation can be used or not.
      * @param {*} references
@@ -519,9 +528,7 @@ export class PreAggregations {
      */
     const canUsePreAggregationNotAdditive = (references) => {
       const refTimeDimensions =
-        references.sortedTimeDimensions ||
-        sortTimeDimensions(references.timeDimensions);
-      
+        backAlias(references.sortedTimeDimensions || sortTimeDimensions(references.timeDimensions));
       const qryTimeDimensions = references.allowNonStrictDateRangeMatch
         ? transformedQuery.timeDimensions
         : transformedQuery.sortedTimeDimensions;
@@ -538,12 +545,13 @@ export class PreAggregations {
       ) && (
         filterDimensionsSingleValueEqual &&
         references.dimensions.length === filterDimensionsSingleValueEqual.size &&
-        R.all(d => filterDimensionsSingleValueEqual.has(d), references.dimensions) ||
+        R.all(d => filterDimensionsSingleValueEqual.has(d), backAlias(references.dimensions)) ||
         transformedQuery.allFiltersWithinSelectedDimensions &&
-        R.equals(references.sortedDimensions || references.dimensions, transformedQuery.sortedDimensions)
+        R.equals(backAlias(references.sortedDimensions || references.dimensions), transformedQuery.sortedDimensions)
       ) && (
-        R.all(m => references.measures.indexOf(m) !== -1, transformedQuery.measures) ||
-        R.all(m => references.measures.indexOf(m) !== -1, transformedQuery.leafMeasures)
+        R.all(m => backAlias(references.measures).indexOf(m) !== -1, transformedQuery.measures) ||
+        // TODO do we need backAlias here?
+        R.all(m => backAlias(references.measures).indexOf(m) !== -1, transformedQuery.leafMeasures)
       ));
     };
     
@@ -649,7 +657,7 @@ export class PreAggregations {
       transformedQuery.leafMeasureAdditive &&
       !transformedQuery.hasMultipliedMeasures
         ? (r) => canUsePreAggregationLeafMeasureAdditive(r) ||
-          canUsePreAggregationNotAdditive(r)
+        canUsePreAggregationNotAdditive(r)
         : canUsePreAggregationNotAdditive;
 
     if (refs) {
@@ -661,18 +669,8 @@ export class PreAggregations {
 
   static squashDimensions(query, flattenDimensionMembers) {
     return R.pipe(R.uniq, R.sortBy(R.identity))(
-      PreAggregations.firstNonAliasMember(
-        query,
-        flattenDimensionMembers
-      )
+      flattenDimensionMembers.map(d => d.expressionPath())
     );
-  }
-
-  static aliasedToFirstNonAliasedDimension(query, flattenDimensionMembers) {
-    return flattenDimensionMembers
-      .map(member => (
-        { [member.dimension]: PreAggregations.firstNonAliasMember(query, [member])[0] }
-      )).reduce((a, b) => ({ ...a, ...b }), {});
   }
 
   static flattenDimensionMembers(query) {
@@ -680,6 +678,18 @@ export class PreAggregations {
       query.dimensions
         .concat(query.filters)
         .concat(query.segments)
+        .map(m => m.getMembers()),
+    );
+  }
+
+  static flattenAllMembers(query) {
+    return R.flatten(
+      query.measures
+        .concat(query.dimensions)
+        .concat(query.segments)
+        .concat(query.filters)
+        .concat(query.measureFilters)
+        .concat(query.timeDimensions)
         .map(m => m.getMembers()),
     );
   }

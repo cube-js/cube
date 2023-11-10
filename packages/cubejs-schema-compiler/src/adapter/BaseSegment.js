@@ -35,4 +35,12 @@ export class BaseSegment {
   path() {
     return this.query.cubeEvaluator.parsePath('segments', this.segment);
   }
+
+  expressionPath() {
+    // TODO expression support
+    // if (this.expression) {
+    //   return `expr:${this.expression.expressionName}`;
+    // }
+    return this.query.cubeEvaluator.pathFromArray(this.path());
+  }
 }
