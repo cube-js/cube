@@ -966,6 +966,7 @@ declare module '@cubejs-client/core' {
     measures: TCubeMeasure[];
     dimensions: TCubeDimension[];
     segments: TCubeSegment[];
+    connectedComponent?: number;
   };
 
 
