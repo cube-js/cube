@@ -270,7 +270,7 @@ export class PreAggregations {
     const sortedDimensions = this.squashDimensions(query, flattenDimensionMembers);
     const allBackAliasMembers = this.allBackAliasMembers(query);
     const measures = query.measures.concat(query.measureFilters);
-    const measurePaths = R.uniq(measures.map(m => m.expressionPath()));
+    const measurePaths = R.uniq(this.flattenMembers(measures).map(m => m.expressionPath()));
     const collectLeafMeasures = query.collectLeafMeasures.bind(query);
     const dimensionsList = query.dimensions.map(dim => dim.expressionPath());
     const segmentsList = query.segments.map(s => s.expressionPath());
@@ -673,12 +673,17 @@ export class PreAggregations {
     );
   }
 
-  static flattenDimensionMembers(query) {
+  static flattenMembers(members) {
     return R.flatten(
+      members.map(m => m.getMembers()),
+    );
+  }
+
+  static flattenDimensionMembers(query) {
+    return this.flattenMembers(
       query.dimensions
         .concat(query.filters)
         .concat(query.segments)
-        .map(m => m.getMembers()),
     );
   }
 
