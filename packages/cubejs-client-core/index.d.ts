@@ -915,6 +915,7 @@ declare module '@cubejs-client/core' {
     title: string;
     shortTitle: string;
     isVisible?: boolean;
+    description?: string;
     meta?: any;
   };
 
@@ -933,7 +934,7 @@ declare module '@cubejs-client/core' {
     suggestFilterValues: boolean;
   };
 
-  export type TCubeSegment = Omit<BaseCubeMember, 'type'>;
+  export type TCubeSegment = Omit<BaseCubeMember, 'type' | 'description'>;
 
   type TCubeMemberByType<T> = T extends 'measures'
     ? TCubeMeasure
