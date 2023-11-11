@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.19](https://github.com/cube-js/cube/compare/v0.34.18...v0.34.19) (2023-11-11)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
 ## [0.34.16](https://github.com/cube-js/cube/compare/v0.34.15...v0.34.16) (2023-11-06)
 
 **Note:** Version bump only for package @cubejs-backend/api-gateway

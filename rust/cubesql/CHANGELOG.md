@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.19](https://github.com/cube-js/cube.js/compare/v0.34.18...v0.34.19) (2023-11-11)
+
+
+### Features
+
+* **cubesql:** SQL push down support for window functions ([#7403](https://github.com/cube-js/cube.js/issues/7403)) ([b1da6c0](https://github.com/cube-js/cube.js/commit/b1da6c0e38e3b586c3d4b1ddf9c00be57065d960))
+
+
+
+
+
 ## [0.34.14](https://github.com/cube-js/cube.js/compare/v0.34.13...v0.34.14) (2023-11-05)
 
 
