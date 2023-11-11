@@ -41,8 +41,8 @@ use datafusion::{
     logical_plan::{
         build_join_schema, build_table_udf_schema, exprlist_to_fields, normalize_cols,
         plan::{Aggregate, Extension, Filter, Join, Projection, Sort, TableUDFs, Window},
-        CrossJoin, DFField, DFSchema, DFSchemaRef, Distinct, EmptyRelation, Expr, Like, Limit,
-        LogicalPlan, LogicalPlanBuilder, TableScan, Union,
+        replace_col_to_expr, CrossJoin, DFField, DFSchema, DFSchemaRef, Distinct, EmptyRelation,
+        Expr, Like, Limit, LogicalPlan, LogicalPlanBuilder, TableScan, Union,
     },
     physical_plan::planner::DefaultPhysicalPlanner,
     scalar::ScalarValue,
@@ -1671,8 +1671,10 @@ impl LanguageToLogicalPlanConverter {
                     match_expr_list_node!(node_by_id, to_expr, params[2], WrappedSelectGroupExpr);
                 let aggr_expr =
                     match_expr_list_node!(node_by_id, to_expr, params[3], WrappedSelectAggrExpr);
-                let from = Arc::new(self.to_logical_plan(params[4])?);
-                let joins = match_list_node!(node_by_id, params[5], WrappedSelectJoins)
+                let window_expr =
+                    match_expr_list_node!(node_by_id, to_expr, params[4], WrappedSelectWindowExpr);
+                let from = Arc::new(self.to_logical_plan(params[5])?);
+                let joins = match_list_node!(node_by_id, params[6], WrappedSelectJoins)
                     .into_iter()
                     .map(|j| {
                         if let LogicalPlanLanguage::WrappedSelectJoin(params) = j {
@@ -1688,28 +1690,49 @@ impl LanguageToLogicalPlanConverter {
                     .collect::<Result<Vec<_>, _>>()?;
 
                 let filter_expr =
-                    match_expr_list_node!(node_by_id, to_expr, params[6], WrappedSelectFilterExpr);
+                    match_expr_list_node!(node_by_id, to_expr, params[7], WrappedSelectFilterExpr);
                 let having_expr =
-                    match_expr_list_node!(node_by_id, to_expr, params[7], WrappedSelectHavingExpr);
-                let limit = match_data_node!(node_by_id, params[8], WrappedSelectLimit);
-                let offset = match_data_node!(node_by_id, params[9], WrappedSelectOffset);
+                    match_expr_list_node!(node_by_id, to_expr, params[8], WrappedSelectHavingExpr);
+                let limit = match_data_node!(node_by_id, params[9], WrappedSelectLimit);
+                let offset = match_data_node!(node_by_id, params[10], WrappedSelectOffset);
                 let order_expr =
-                    match_expr_list_node!(node_by_id, to_expr, params[10], WrappedSelectOrderExpr);
-                let alias = match_data_node!(node_by_id, params[11], WrappedSelectAlias);
-                let ungrouped = match_data_node!(node_by_id, params[12], WrappedSelectUngrouped);
+                    match_expr_list_node!(node_by_id, to_expr, params[11], WrappedSelectOrderExpr);
+                let alias = match_data_node!(node_by_id, params[12], WrappedSelectAlias);
+                let ungrouped = match_data_node!(node_by_id, params[13], WrappedSelectUngrouped);
 
                 let group_expr = normalize_cols(group_expr, &from)?;
                 let aggr_expr = normalize_cols(aggr_expr, &from)?;
                 let projection_expr = normalize_cols(projection_expr, &from)?;
-                let all_expr = match select_type {
+                let all_expr_without_window = match select_type {
                     WrappedSelectType::Projection => projection_expr.clone(),
                     WrappedSelectType::Aggregate => {
                         group_expr.iter().chain(aggr_expr.iter()).cloned().collect()
                     }
                 };
+                let without_window_fields =
+                    exprlist_to_fields(all_expr_without_window.iter(), from.schema())?;
+                let replace_map = all_expr_without_window
+                    .iter()
+                    .zip(without_window_fields.iter())
+                    .map(|(e, f)| (f.qualified_column(), e.clone()))
+                    .collect::<Vec<_>>();
+                let replace_map = replace_map
+                    .iter()
+                    .map(|(c, e)| (c, e))
+                    .collect::<HashMap<_, _>>();
+                let window_expr_rebased = window_expr
+                    .iter()
+                    .map(|e| replace_col_to_expr(e.clone(), &replace_map))
+                    .collect::<Result<Vec<_>, _>>()?;
                 let schema = DFSchema::new_with_metadata(
                     // TODO support joins schema
-                    exprlist_to_fields(all_expr.iter(), from.schema())?,
+                    without_window_fields
+                        .into_iter()
+                        .chain(
+                            exprlist_to_fields(window_expr_rebased.iter(), from.schema())?
+                                .into_iter(),
+                        )
+                        .collect(),
                     HashMap::new(),
                 )?;
 
@@ -1725,6 +1748,7 @@ impl LanguageToLogicalPlanConverter {
                         projection_expr,
                         group_expr,
                         aggr_expr,
+                        window_expr_rebased,
                         from,
                         joins,
                         filter_expr,

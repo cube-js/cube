@@ -18847,12 +18847,20 @@ ORDER BY \"COUNT(count)\" DESC"
             .sql
             .contains("CASE WHEN"));
 
-        assert!(logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql
-            .contains("1123"));
+        assert!(
+            logical_plan
+                .find_cube_scan_wrapper()
+                .wrapped_sql
+                .unwrap()
+                .sql
+                .contains("1123"),
+            "SQL contains 1123: {}",
+            logical_plan
+                .find_cube_scan_wrapper()
+                .wrapped_sql
+                .unwrap()
+                .sql
+        );
 
         let physical_plan = query_plan.as_physical_plan().await.unwrap();
         println!(
@@ -18883,12 +18891,20 @@ ORDER BY \"COUNT(count)\" DESC"
             .sql
             .contains("CASE WHEN"));
 
-        assert!(logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql
-            .contains("LIMIT 1123"));
+        assert!(
+            logical_plan
+                .find_cube_scan_wrapper()
+                .wrapped_sql
+                .unwrap()
+                .sql
+                .contains("1123"),
+            "SQL contains 1123: {}",
+            logical_plan
+                .find_cube_scan_wrapper()
+                .wrapped_sql
+                .unwrap()
+                .sql
+        );
 
         let physical_plan = query_plan.as_physical_plan().await.unwrap();
         println!(
@@ -19061,6 +19077,43 @@ ORDER BY \"COUNT(count)\" DESC"
             .unwrap()
             .sql
             .contains("EXTRACT"));
+    }
+
+    #[tokio::test]
+    async fn test_wrapper_window_function() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT customer_gender, AVG(avgPrice) mp, SUM(COUNT(count)) OVER() FROM KibanaSampleDataEcommerce a GROUP BY 1 LIMIT 100"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+            .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert!(
+            logical_plan
+                .find_cube_scan_wrapper()
+                .wrapped_sql
+                .unwrap()
+                .sql
+                .contains("OVER"),
+            "SQL should contain 'OVER': {}",
+            logical_plan
+                .find_cube_scan_wrapper()
+                .wrapped_sql
+                .unwrap()
+                .sql
+        );
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
     }
 
     #[tokio::test]

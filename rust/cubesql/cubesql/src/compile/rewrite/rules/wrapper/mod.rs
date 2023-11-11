@@ -15,6 +15,8 @@ mod projection;
 mod scalar_function;
 mod sort_expr;
 mod udf_function;
+mod window;
+mod window_function;
 mod wrapper_pull_up;
 
 use crate::compile::{
@@ -44,7 +46,9 @@ impl RewriteRules for WrapperRules {
         self.projection_rules(&mut rules);
         self.limit_rules(&mut rules);
         self.order_rules(&mut rules);
+        self.window_rules(&mut rules);
         self.aggregate_function_rules(&mut rules);
+        self.window_function_rules(&mut rules);
         self.scalar_function_rules(&mut rules);
         self.udf_function_rules(&mut rules);
         self.extract_rules(&mut rules);
