@@ -1,16 +1,15 @@
 use crate::compile::rewrite::{
-    analysis::LogicalPlanAnalysis, cube_scan_wrapper, rewrite, rules::wrapper::WrapperRules, sort,
-    wrapped_select, wrapped_select_order_expr_empty_tail, wrapper_pullup_replacer,
+    analysis::LogicalPlanAnalysis, cube_scan_wrapper, rewrite, rules::wrapper::WrapperRules,
+    window, wrapped_select, wrapped_select_window_expr_empty_tail, wrapper_pullup_replacer,
     wrapper_pushdown_replacer, LogicalPlanLanguage,
 };
 use egg::Rewrite;
 
 impl WrapperRules {
-    pub fn order_rules(&self, rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>) {
+    pub fn window_rules(&self, rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>) {
         rules.extend(vec![rewrite(
-            "wrapper-push-down-order-to-cube-scan",
-            sort(
-                "?order_expr",
+            "wrapper-push-down-window-to-cube-scan",
+            window(
                 cube_scan_wrapper(
                     wrapper_pullup_replacer(
                         wrapped_select(
@@ -18,14 +17,14 @@ impl WrapperRules {
                             "?projection_expr",
                             "?group_expr",
                             "?aggr_expr",
-                            "?window_expr",
+                            wrapped_select_window_expr_empty_tail(),
                             "?cube_scan_input",
                             "?joins",
                             "?filter_expr",
                             "?having_expr",
                             "?limit",
                             "?offset",
-                            wrapped_select_order_expr_empty_tail(),
+                            "?order_expr",
                             "?select_alias",
                             "?select_ungrouped",
                         ),
@@ -35,6 +34,7 @@ impl WrapperRules {
                     ),
                     "CubeScanWrapperFinalized:false",
                 ),
+                "?window_expr",
             ),
             cube_scan_wrapper(
                 wrapped_select(
@@ -57,7 +57,7 @@ impl WrapperRules {
                         "?ungrouped",
                         "?cube_members",
                     ),
-                    wrapper_pullup_replacer(
+                    wrapper_pushdown_replacer(
                         "?window_expr",
                         "?alias_to_cube",
                         "?ungrouped",
@@ -74,7 +74,7 @@ impl WrapperRules {
                     "?having_expr",
                     "?limit",
                     "?offset",
-                    wrapper_pushdown_replacer(
+                    wrapper_pullup_replacer(
                         "?order_expr",
                         "?alias_to_cube",
                         "?ungrouped",
@@ -89,9 +89,9 @@ impl WrapperRules {
 
         Self::list_pushdown_pullup_rules(
             rules,
-            "wrapper-order-expr",
-            "SortExp",
-            "WrappedSelectOrderExpr",
+            "wrapper-window-expr",
+            "WindowWindowExpr",
+            "WrappedSelectWindowExpr",
         );
     }
 }
