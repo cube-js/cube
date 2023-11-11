@@ -701,6 +701,10 @@ class ResultSet {
     return this.loadResponse.pivotQuery || null;
   }
 
+  totalRows() {
+    return this.loadResponses[0].total;
+  }
+
   rawData() {
     if (this.queryType !== QUERY_TYPE.REGULAR_QUERY) {
       throw new Error(`Method is not supported for a '${this.queryType}' query type. Please use decompose`);
