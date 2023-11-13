@@ -1429,7 +1429,47 @@ impl CubeScanWrapperNode {
                     Ok((resulting_sql, sql_query))
                 }
                 // Expr::AggregateUDF { .. } => {}
-                // Expr::InList { .. } => {}
+                Expr::InList {
+                    expr,
+                    list,
+                    negated,
+                } => {
+                    let mut sql_query = sql_query;
+                    let (sql_expr, query) = Self::generate_sql_for_expr(
+                        plan.clone(),
+                        sql_query,
+                        sql_generator.clone(),
+                        *expr,
+                        ungrouped_scan_node.clone(),
+                    )
+                    .await?;
+                    sql_query = query;
+                    let mut sql_in_exprs = Vec::new();
+                    for expr in list {
+                        let (sql, query) = Self::generate_sql_for_expr(
+                            plan.clone(),
+                            sql_query,
+                            sql_generator.clone(),
+                            expr,
+                            ungrouped_scan_node.clone(),
+                        )
+                        .await?;
+                        sql_query = query;
+                        sql_in_exprs.push(sql);
+                    }
+                    Ok((
+                        sql_generator
+                            .get_sql_templates()
+                            .in_list_expr(sql_expr, sql_in_exprs, negated)
+                            .map_err(|e| {
+                                DataFusionError::Internal(format!(
+                                    "Can't generate SQL for in list expr: {}",
+                                    e
+                                ))
+                            })?,
+                        sql_query,
+                    ))
+                }
                 // Expr::Wildcard => {}
                 // Expr::QualifiedWildcard { .. } => {}
                 x => {
