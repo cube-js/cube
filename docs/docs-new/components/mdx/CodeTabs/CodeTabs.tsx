@@ -78,7 +78,7 @@ export const CodeTabs: FC<CodeTabsProps> = ({ children }) => {
       setSelectedTab(defaultLang);
     }
     else {
-      const [ lang ] = Object.entries(tabs).find(tab => tab[1] === 0);
+      let lang = Object.keys(tabs).find(key => PREFERRED_LANGS.includes(key));
       setSelectedTab(lang);
     }
 
