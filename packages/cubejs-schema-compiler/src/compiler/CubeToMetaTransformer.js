@@ -36,17 +36,19 @@ export class CubeToMetaTransformer {
     const isCubeVisible = this.isVisible(cube, true);
 
     return {
-      isVisible: isCubeVisible,
       config: {
         name: cube.name,
         type: cube.isView ? 'view' : 'cube',
         title: cubeTitle,
+        isVisible: isCubeVisible,
+        public: isCubeVisible,
         description: cube.description,
         connectedComponent: this.joinGraph.connectedComponents()[cube.name],
         measures: R.compose(
           R.map((nameToMetric) => ({
             ...this.measureConfig(cube.name, cubeTitle, nameToMetric),
-            isVisible: isCubeVisible ? this.isVisible(nameToMetric[1], true) : false
+            isVisible: isCubeVisible ? this.isVisible(nameToMetric[1], true) : false,
+            public: isCubeVisible ? this.isVisible(nameToMetric[1], true) : false
           })),
           R.toPairs
         )(cube.measures || {}),
@@ -61,7 +63,8 @@ export class CubeToMetaTransformer {
               nameToDimension[1].suggestFilterValues == null ? true : nameToDimension[1].suggestFilterValues,
             format: nameToDimension[1].format,
             meta: nameToDimension[1].meta,
-            isVisible: isCubeVisible ? this.isVisible(nameToDimension[1], !nameToDimension[1].primaryKey) : false
+            isVisible: isCubeVisible ? this.isVisible(nameToDimension[1], !nameToDimension[1].primaryKey) : false,
+            public: isCubeVisible ? this.isVisible(nameToDimension[1], !nameToDimension[1].primaryKey) : false,
           })),
           R.toPairs
         )(cube.dimensions || {}),
@@ -72,7 +75,8 @@ export class CubeToMetaTransformer {
             shortTitle: this.title(cubeTitle, nameToSegment, true),
             description: nameToSegment[1].description,
             meta: nameToSegment[1].meta,
-            isVisible: isCubeVisible ? this.isVisible(nameToSegment[1], true) : false
+            isVisible: isCubeVisible ? this.isVisible(nameToSegment[1], true) : false,
+            public: isCubeVisible ? this.isVisible(nameToSegment[1], true) : false,
           })),
           R.toPairs
         )(cube.segments || {})
