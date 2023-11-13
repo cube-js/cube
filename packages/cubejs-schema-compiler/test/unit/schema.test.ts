@@ -230,20 +230,20 @@ describe('Schema Testing', () => {
     await compiler.compile();
 
     expect(metaTransformer.cubes[0]).toMatchObject({
-      isVisible: false,
       config: {
+        isVisible: false,
         name: 'CubeA',
       }
     });
     expect(metaTransformer.cubes[1]).toMatchObject({
-      isVisible: true,
       config: {
+        isVisible: true,
         name: 'CubeB',
       }
     });
     expect(metaTransformer.cubes[2]).toMatchObject({
-      isVisible: false,
       config: {
+        isVisible: false,
         name: 'CubeC',
       }
     });
