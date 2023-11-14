@@ -536,6 +536,24 @@ impl SqlTemplates {
         )
     }
 
+    pub fn in_list_expr(
+        &self,
+        expr: String,
+        in_exprs: Vec<String>,
+        negated: bool,
+    ) -> Result<String, CubeError> {
+        let in_exprs_concat = in_exprs.join(", ");
+        self.render_template(
+            "expressions/in_list",
+            context! {
+                expr => expr,
+                in_exprs_concat => in_exprs_concat,
+                in_exprs => in_exprs,
+                negated => negated
+            },
+        )
+    }
+
     pub fn param(&self, param_index: usize) -> Result<String, CubeError> {
         self.render_template("params/param", context! { param_index => param_index })
     }
