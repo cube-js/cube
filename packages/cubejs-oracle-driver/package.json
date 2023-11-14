@@ -19,6 +19,9 @@
   "optionalDependencies": {
     "oracledb": "^6.2.0"
   },
+  "jest": {
+    "testEnvironment": "node"
+  },
   "license": "Apache-2.0",
   "publishConfig": {
     "access": "public"

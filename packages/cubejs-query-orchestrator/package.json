@@ -60,6 +60,7 @@
     "extends": "../cubejs-linter"
   },
   "jest": {
+    "testEnvironment": "node",
     "collectCoverage": false,
     "coverageDirectory": "coverage/",
     "collectCoverageFrom": [

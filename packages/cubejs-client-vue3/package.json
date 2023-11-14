@@ -36,18 +36,20 @@
     "vue-loader": "^16.2.0"
   },
   "devDependencies": {
-    "@vue/cli-plugin-babel": "~4.5.0",
-    "@vue/cli-plugin-eslint": "~4.5.0",
-    "@vue/cli-plugin-unit-jest": "^4.2.3",
-    "@vue/cli-service": "~4.5.0",
-    "@vue/test-utils": "^2.0.0-rc.6",
+    "@vue/cli-plugin-babel": "^5.0",
+    "@vue/cli-plugin-eslint": "^5.0",
+    "@vue/cli-plugin-unit-jest": "^5.0",
+    "@vue/cli-service": "^5.0",
+    "@vue/test-utils": "^2.4",
+    "@vue/babel-preset-app": "^5",
+    "@vue/vue2-jest": "^26",
+    "@vue/vue3-jest": "^26",
     "babel-core": "7.0.0-bridge.0",
     "babel-eslint": "^10.1.0",
     "babel-jest": "^23.6.0",
     "eslint": "^7.21.0",
     "eslint-plugin-vue": "^6.2.1",
-    "vue": "^3.0.0",
-    "vue-jest": "^5.0.0-0"
+    "vue": "^3.0"
   },
   "peerDependencies": {
     "vue": "^3.0.0"
@@ -76,6 +78,9 @@
     "last 2 versions",
     "not ie <= 8"
   ],
+  "jest": {
+    "testEnvironment": "node"
+  },
   "license": "MIT",
   "publishConfig": {
     "access": "public"
