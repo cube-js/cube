@@ -140,7 +140,7 @@ export class DruidDriver extends BaseDriver {
     const { rows, columns } = await this.client.query<any>(query, this.normalizeQueryValues(values));
     if (!columns) {
       throw new Error(
-        'You are using an old version of Druid. Unable to detect column types for pre-aggregation on empty values in readOnly mode.'
+        'You are using an old version of Druid. Unable to detect column types in readOnly mode.'
       );
     }
 
