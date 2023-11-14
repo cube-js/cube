@@ -13,7 +13,7 @@ use ipc_channel::ipc::{IpcReceiver, IpcSender};
 use log::error;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use tokio::runtime::{Builder, Runtime};
+use tokio::runtime::Builder;
 use tokio::sync::oneshot::Sender;
 use tokio::sync::{oneshot, watch, Mutex, Notify, RwLock};
 use tokio_util::sync::CancellationToken;
@@ -391,7 +391,7 @@ where
     let stack_size = env_parse("CUBESTORE_SELECT_WORKER_STACK_SIZE", 4 * 1024 * 1024);
     tokio_builder.thread_stack_size(stack_size);
     let runtime = tokio_builder.build().unwrap();
-    worker_setup(&runtime);
+    C::setup(&runtime);
     runtime.block_on(async move {
         let services_client = S::connect(services_sender, services_reciever, timeout);
         let config = match C::configure(services_client).await {
@@ -438,24 +438,6 @@ where
     })
 }
 
-fn worker_setup(runtime: &Runtime) {
-    let startup = SELECT_WORKER_SETUP.read().unwrap();
-    if startup.is_some() {
-        startup.as_ref().unwrap()(runtime);
-    }
-}
-
-lazy_static! {
-    static ref SELECT_WORKER_SETUP: std::sync::RwLock<Option<Box<dyn Fn(&Runtime) + Send + Sync>>> =
-        std::sync::RwLock::new(None);
-}
-
-pub fn register_select_worker_setup(f: fn(&Runtime)) {
-    let mut setup = SELECT_WORKER_SETUP.write().unwrap();
-    assert!(setup.is_none(), "select worker setup already registered");
-    *setup = Some(Box::new(f));
-}
-
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
@@ -466,7 +448,7 @@ mod tests {
     use datafusion::logical_plan::ToDFSchema;
     use futures_timer::Delay;
     use serde::{Deserialize, Serialize};
-    use tokio::runtime::Builder;
+    use tokio::runtime::{Builder, Runtime};
 
     use crate::cluster::worker_pool::{worker_main, WorkerPool};
     use crate::config::Config;
@@ -506,6 +488,7 @@ mod tests {
         type Config = Config;
         type ServicesRequest = ();
         type ServicesResponse = ();
+        fn setup(_runtime: &Runtime) {}
         async fn configure(
             _services_client: Arc<dyn Callable<Request = (), Response = ()>>,
         ) -> Result<Self::Config, CubeError> {
@@ -708,6 +691,9 @@ mod tests {
         type Config = TestConfig;
         type ServicesRequest = i64;
         type ServicesResponse = bool;
+
+        fn setup(_runtime: &Runtime) {}
+
         async fn configure(
             services_client: Arc<dyn Callable<Request = i64, Response = bool>>,
         ) -> Result<Self::Config, CubeError> {
