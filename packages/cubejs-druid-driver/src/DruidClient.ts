@@ -1,5 +1,4 @@
 import Axios, { AxiosRequestConfig } from 'axios';
-import { DownloadQueryResultsResult } from '@cubejs-backend/base-driver';
 
 export type DruidClientBaseConfiguration = {
   user?: string,
