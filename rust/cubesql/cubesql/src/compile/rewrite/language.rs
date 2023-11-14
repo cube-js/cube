@@ -356,6 +356,7 @@ macro_rules! variant_field_struct {
                 BuiltinScalarFunction::MD5 => "MD5",
                 BuiltinScalarFunction::NullIf => "NullIf",
                 BuiltinScalarFunction::OctetLength => "OctetLength",
+                BuiltinScalarFunction::Pi => "Pi",
                 BuiltinScalarFunction::Random => "Random",
                 BuiltinScalarFunction::RegexpReplace => "RegexpReplace",
                 BuiltinScalarFunction::Repeat => "Repeat",

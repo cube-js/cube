@@ -19629,4 +19629,18 @@ ORDER BY \"COUNT(count)\" DESC"
             .sql
             .contains("NOT IN ("));
     }
+
+    #[tokio::test]
+    async fn test_pi() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pi",
+            execute_query(
+                "SELECT PI() AS PI".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
 }
