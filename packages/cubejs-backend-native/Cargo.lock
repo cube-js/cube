@@ -2943,9 +2943,9 @@ dependencies = [
 
 [[package]]
 name = "self_cell"
-version = "1.0.0"
+version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a3926e239738d36060909ffe6f511502f92149a45a1fade7fe031cb2d33e88b"
+checksum = "e388332cd64eb80cd595a00941baf513caffae8dce9cfd0467fc9c66397dade6"
 
 [[package]]
 name = "semver"
