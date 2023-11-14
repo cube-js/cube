@@ -914,7 +914,9 @@ declare module '@cubejs-client/core' {
     name: string;
     title: string;
     shortTitle: string;
+    description?: string;
     isVisible?: boolean;
+    public?: boolean;
     meta?: any;
   };
 
@@ -968,10 +970,14 @@ declare module '@cubejs-client/core' {
   export type Cube = {
     name: string;
     title: string;
+    description?: string;
     measures: TCubeMeasure[];
     dimensions: TCubeDimension[];
     segments: TCubeSegment[];
     connectedComponent?: number;
+    type?: 'view' | 'cube';
+    isVisible?: boolean;
+    public?: boolean;
   };
 
 
