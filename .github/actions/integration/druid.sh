@@ -6,7 +6,7 @@ export DEBUG=testcontainers
 
 export TEST_POSTGRES_VERSION=13
 export TEST_ZOOKEEPER_VERSION=3.5
-export TEST_DRUID_VERSION=0.19.0
+export TEST_DRUID_VERSION=27.0.0
 
 echo "::group::Druid ${TEST_DRUID_VERSION}";
 
