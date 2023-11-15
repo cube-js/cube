@@ -21,7 +21,7 @@
     "@nivo/bar": "^0.80.0",
     "@nivo/colors": "^0.79.1",
     "@nivo/core": "^0.80.0",
-    "jsonwebtoken": "^8.5.1",
+    "jsonwebtoken": "^9.0.0",
     "moment": "^2.29.4",
     "numeral": "^2.0.6",
     "prop-types": "^15.8.1",

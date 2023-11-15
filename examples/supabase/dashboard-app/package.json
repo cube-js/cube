@@ -11,7 +11,7 @@
     "antd": "^4.20.5",
     "chart.js": "^3.7.1",
     "cube-example-wrapper": "^1.0.26",
-    "jsonwebtoken": "^8.5.1",
+    "jsonwebtoken": "^9.0.0",
     "react": "^18.1.0",
     "react-chartjs-2": "^4.1.0",
     "react-dom": "^18.1.0",
