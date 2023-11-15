@@ -235,6 +235,7 @@ pub fn get_test_tenant_ctx() -> Arc<MetaContext> {
                     ("expressions/interval".to_string(), "INTERVAL '{{ interval }}'".to_string()),
                     ("expressions/window_function".to_string(), "{{ fun_call }} OVER ({% if partition_by %}PARTITION BY {{ partition_by }}{% if order_by %} {% endif %}{% endif %}{% if order_by %}ORDER BY {{ order_by }}{% endif %})".to_string()),
                     ("expressions/in_list".to_string(), "{{ expr }} {% if negated %}NOT {% endif %}IN ({{ in_exprs_concat }})".to_string()),
+                    ("expressions/negative".to_string(), "-({{ expr }})".to_string()),
                     ("quotes/identifiers".to_string(), "\"".to_string()),
                     ("quotes/escape".to_string(), "\"\"".to_string()),
                     ("params/param".to_string(), "${{ param_index + 1 }}".to_string())

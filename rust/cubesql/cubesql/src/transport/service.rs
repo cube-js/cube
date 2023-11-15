@@ -498,6 +498,10 @@ impl SqlTemplates {
         )
     }
 
+    pub fn negative_expr(&self, expr: String) -> Result<String, CubeError> {
+        self.render_template("expressions/negative", context! { expr => expr })
+    }
+
     pub fn sort_expr(
         &self,
         expr: String,

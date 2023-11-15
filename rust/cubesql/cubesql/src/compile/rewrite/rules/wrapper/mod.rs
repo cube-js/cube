@@ -11,6 +11,7 @@ mod in_list_expr;
 mod is_null_expr;
 mod limit;
 mod literal;
+mod negative_expr;
 mod order;
 mod projection;
 mod scalar_function;
@@ -62,6 +63,7 @@ impl RewriteRules for WrapperRules {
         self.column_rules(&mut rules);
         self.literal_rules(&mut rules);
         self.in_list_expr_rules(&mut rules);
+        self.negative_expr_rules(&mut rules);
 
         rules
     }
