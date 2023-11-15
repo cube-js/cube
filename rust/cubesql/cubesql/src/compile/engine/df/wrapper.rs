@@ -1398,18 +1398,7 @@ impl CubeScanWrapperNode {
                         )
                         .await?;
                         sql_query = query;
-                        sql_order_by.push(
-                            sql_generator
-                                .get_sql_templates()
-                                // TODO asc/desc
-                                .sort_expr(sql, true, false)
-                                .map_err(|e| {
-                                    DataFusionError::Internal(format!(
-                                        "Can't generate SQL for sort expr: {}",
-                                        e
-                                    ))
-                                })?,
-                        );
+                        sql_order_by.push(sql);
                     }
                     let resulting_sql = sql_generator
                         .get_sql_templates()
