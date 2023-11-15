@@ -19155,6 +19155,58 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_wrapper_long_alias_names() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT customer_gender AS long_long_long_long_long_long_long_long_a, AVG(avgPrice) AS long_long_long_long_long_long_long_long_b, SUM(COUNT(count)) OVER() AS long_long_long_long_long_long_long_long_c FROM KibanaSampleDataEcommerce a GROUP BY 1 LIMIT 100"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+            .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert!(
+            logical_plan
+                .find_cube_scan_wrapper()
+                .wrapped_sql
+                .unwrap()
+                .sql
+                .contains("long_l_1"),
+            "SQL should contain long_l_1: {}",
+            logical_plan
+                .find_cube_scan_wrapper()
+                .wrapped_sql
+                .unwrap()
+                .sql
+        );
+
+        assert!(
+            logical_plan
+                .find_cube_scan_wrapper()
+                .wrapped_sql
+                .unwrap()
+                .sql
+                .contains("long_l_1"),
+            "SQL should contain long_l_2: {}",
+            logical_plan
+                .find_cube_scan_wrapper()
+                .wrapped_sql
+                .unwrap()
+                .sql
+        );
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+    }
+
+    #[tokio::test]
     async fn test_thoughtspot_pg_date_trunc_year() {
         init_logger();
 

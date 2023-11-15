@@ -745,7 +745,10 @@ impl CubeScanWrapperNode {
                 truncated_alias.truncate(16);
                 let mut alias = truncated_alias.clone();
                 for i in 1..10000 {
-                    if !next_remapping.contains_key(&Column::from_name(&alias)) {
+                    if !next_remapping
+                        .iter()
+                        .any(|(_, v)| v == &Column::from_name(&alias))
+                    {
                         break;
                     }
                     alias = format!("{}_{}", truncated_alias, i);
