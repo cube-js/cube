@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.21](https://github.com/cube-js/cube/compare/v0.34.20...v0.34.21) (2023-11-15)
+
+
+### Features
+
+* **cubesql:** SQL push down support for synthetic fields ([#7418](https://github.com/cube-js/cube/issues/7418)) ([d2bdc1b](https://github.com/cube-js/cube/commit/d2bdc1bedbb89ffee14d3bda1c8045b833076e35))
+* **cubesql:** Support SQL push down for more functions ([#7406](https://github.com/cube-js/cube/issues/7406)) ([b1606da](https://github.com/cube-js/cube/commit/b1606daba70ab92952b1cbbacd94dd7294b17ad5))
+
+
+
+
+
 ## [0.34.20](https://github.com/cube-js/cube/compare/v0.34.19...v0.34.20) (2023-11-14)
 
 
