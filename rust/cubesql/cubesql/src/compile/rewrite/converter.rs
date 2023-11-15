@@ -1343,18 +1343,33 @@ impl LanguageToLogicalPlanConverter {
                                                     ))
                                                 })?;
                                             for column in cube.get_columns() {
-                                                // TODO literal members and cube members
-                                                fields.push((
-                                                    DFField::new(
-                                                        Some(&alias),
-                                                        column.get_name(),
-                                                        column.get_column_type().to_arrow(),
-                                                        true,
-                                                    ),
-                                                    MemberField::Member(
-                                                        column.member_name().to_string(),
-                                                    ),
-                                                ));
+                                                if self.cube_context.meta.is_synthetic_field(
+                                                    column.member_name().to_string(),
+                                                ) {
+                                                    fields.push((
+                                                        DFField::new(
+                                                            Some(&alias),
+                                                            column.get_name(),
+                                                            column.get_column_type().to_arrow(),
+                                                            true,
+                                                        ),
+                                                        MemberField::Literal(ScalarValue::Utf8(
+                                                            None,
+                                                        )),
+                                                    ));
+                                                } else {
+                                                    fields.push((
+                                                        DFField::new(
+                                                            Some(&alias),
+                                                            column.get_name(),
+                                                            column.get_column_type().to_arrow(),
+                                                            true,
+                                                        ),
+                                                        MemberField::Member(
+                                                            column.member_name().to_string(),
+                                                        ),
+                                                    ));
+                                                }
                                             }
                                         }
                                     }
