@@ -66,9 +66,11 @@ impl WrapperRules {
                         .iter()
                         .find(|(cn, _)| cn == &column.name)
                     {
-                        if let Some(_) = cube_context
+                        if cube_context
                             .meta
                             .find_dimension_with_name(member.to_string())
+                            .is_some()
+                            || cube_context.meta.is_synthetic_field(member.to_string())
                         {
                             let column_expr_column =
                                 egraph.add(LogicalPlanLanguage::ColumnExprColumn(

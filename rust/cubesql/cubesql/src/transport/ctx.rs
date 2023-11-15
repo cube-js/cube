@@ -169,6 +169,24 @@ impl MetaContext {
         }
     }
 
+    pub fn is_synthetic_field(&self, name: String) -> bool {
+        let cube_and_member_name = name.split(".").collect::<Vec<_>>();
+        if cube_and_member_name.len() == 1
+            && MetaContext::is_synthetic_field_name(cube_and_member_name[0])
+        {
+            return true;
+        }
+        if let Some(_) = self.find_cube_with_name(cube_and_member_name[0]) {
+            MetaContext::is_synthetic_field_name(cube_and_member_name[1])
+        } else {
+            false
+        }
+    }
+
+    pub fn is_synthetic_field_name(field_name: &str) -> bool {
+        field_name == "__user" || field_name == "__cubeJoinField"
+    }
+
     pub fn find_df_data_type(&self, member_name: String) -> Option<DataType> {
         self.find_cube_with_name(member_name.split(".").next()?)?
             .df_data_type(member_name.as_str())
