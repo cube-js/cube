@@ -2485,6 +2485,7 @@ class BaseQuery {
         cast: 'CAST({{ expr }} AS {{ data_type }})',
         window_function: '{{ fun_call }} OVER ({% if partition_by_concat %}PARTITION BY {{ partition_by_concat }}{% if order_by_concat %} {% endif %}{% endif %}{% if order_by_concat %}ORDER BY {{ order_by_concat }}{% endif %})',
         in_list: '{{ expr }} {% if negated %}NOT {% endif %}IN ({{ in_exprs_concat }})',
+        negative: '-({{ expr }})',
       },
       quotes: {
         identifiers: '"',
