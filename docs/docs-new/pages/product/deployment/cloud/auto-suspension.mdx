@@ -12,12 +12,18 @@ Auto-suspension is available in Cube Cloud on
 
 </SuccessBox>
 
-Cube Cloud can automatically suspend deployments when not in use to prevent
-[resource consumption][ref-deployment-pricing] when infrastructure is not being
-actively used, which helps manage spend and preventing unnecessary quota use.
+Cube Cloud can automatically suspend deployments when not in use to reduce
+[resource consumption][ref-deployment-pricing], which helps manage your spend.
 
-This is useful for deployments that are not used 24/7, such as staging
-deployments. Auto-suspension will hibernate the deployment when **no** API
+<WarningBox>
+
+Auto-suspension is useful for deployments that are not used 24/7, such as
+staging deployments. However, **auto-suspension shall not be used for production
+deployments**. See [effects on experience][self-effects] for details.
+
+</WarningBox>
+
+Auto-suspension will hibernate the deployment when **no** API
 requests are received after a period of time, and automatically resume the
 deployment when API requests start coming in again:
 
@@ -37,6 +43,25 @@ unnecessary resource consumption.
 During auto-suspension, resources are monitored in 5 minute intervals. This
 means that if a deployment was suspended 4 minutes ago, and a request comes in,
 the deployment will resume immediately and 5 minute of CCU usage will be billed.
+
+## Effects on experience
+
+If auto-suspension is enabled, the behavior of your Cube Cloud deployment will
+experience some notable changes.
+
+When a deployment is auto-suspended:
+
+- [Data model][ref-data-model] compilation artifacts are discarded since the
+API instances are de-provisioned.
+- [Monitoring integrations][ref-monitoring] are also suspended, which prevents
+the export of metrics and logs.
+
+When a deployment is resumed from auto-suspension:
+
+- [Data model][ref-data-model] compilation would need to be done from scratch.
+It applies to all tenants in case [multitenancy][ref-multitenancy] is set up.
+Consequently, one or more queries served after a deployment is resumed from
+auto-suspension are likely to have suboptimal performance.
 
 ## Configuration
 
@@ -94,3 +119,7 @@ response times to be significantly longer than usual.
   /product/deployment/cloud/deployment-types#production-multi-cluster
 [ref-deployment-pricing]: /product/deployment/cloud/pricing
 [ref-workspace-dev-api]: /product/workspace/dev-mode
+[ref-monitoring]: /product/monitoring/integrations
+[ref-data-model]: /product/data-modeling/overview
+[ref-multitenancy]: /product/configuration/advanced/multitenancy
+[self-effects]: #effects-on-experience

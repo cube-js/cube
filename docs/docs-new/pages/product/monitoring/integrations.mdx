@@ -25,6 +25,12 @@ deployments.
 
 </InfoBox>
 
+<WarningBox>
+
+Monitoring integrations suspend their work when a deployment goes to [auto-suspension][ref-autosuspend].
+
+</WarningBox>
+
 Under the hood, Cube Cloud uses [Vector][vector], an open-source tool for
 collecting and delivering monitoring data. It supports a [wide range of
 destinations][vector-docs-sinks], also known as _sinks_.
@@ -243,13 +249,7 @@ You can also customize the user name and password for `prometheus_exporter` by
 setting `CUBE_CLOUD_MONITORING_METRICS_USER` and
 `CUBE_CLOUD_MONITORING_METRICS_PASSWORD` environment variables, respectively.
 
-## Auto-suspend behavior
-
-If [auto-suspension][ref-deploy-autosuspend] is enabled for a deployment with
-configured monitoring integrations, then the integrations will also be
-suspended, which prevents the export of metrics and logs.
-
-[ref-deploy-autosuspend]: /product/deployment/cloud/auto-suspension
+[ref-autosuspend]: /product/deployment/cloud/auto-suspension#effects-on-experience
 [self-sinks-for-metrics]: #configuration-sinks-for-metrics
 [ref-vpc]: /product/configuration/vpc
 [vector]: https://vector.dev/
