@@ -9,7 +9,6 @@ import {
 import { getEnv } from '@cubejs-backend/shared';
 import { promisify } from 'util';
 import * as stream from 'stream';
-// eslint-disable-next-line import/no-extraneous-dependencies
 import { Connection, Database } from 'duckdb';
 
 import { DuckDBQuery } from './DuckDBQuery';
