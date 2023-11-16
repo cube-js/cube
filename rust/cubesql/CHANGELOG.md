@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.22](https://github.com/cube-js/cube.js/compare/v0.34.21...v0.34.22) (2023-11-16)
+
+
+### Bug Fixes
+
+* **cubesql:** Window PARTITION BY, ORDER BY queries fail for SQL push down ([62b359f](https://github.com/cube-js/cube.js/commit/62b359f2d33d0c8fd59aa570e7e3a83718a3f7e8))
+
+
+### Features
+
+* **cubesql:** Ambiguous column references for SQL push down ([c5f1648](https://github.com/cube-js/cube.js/commit/c5f16485f2b7324f5e8c5ce3642ec9e9d29de534))
+
+
+
+
+
 ## [0.34.21](https://github.com/cube-js/cube.js/compare/v0.34.20...v0.34.21) (2023-11-15)
 
 
