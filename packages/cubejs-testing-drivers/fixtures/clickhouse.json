@@ -15,7 +15,7 @@
     "ports" : ["4000"]
   },
   "data": {
-    "image": "clickhouse/clickhouse-server",
+    "image": "clickhouse/clickhouse-server:23.10",
     "environment": {
       "CLICKHOUSE_DB": "test",
       "CLICKHOUSE_USER": "test",
