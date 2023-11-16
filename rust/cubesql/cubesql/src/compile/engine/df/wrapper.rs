@@ -930,7 +930,27 @@ impl CubeScanWrapperNode {
                 // Expr::Like(_) => {}-=
                 // Expr::ILike(_) => {}
                 // Expr::SimilarTo(_) => {}
-                // Expr::Not(_) => {}
+                Expr::Not(expr) => {
+                    let (expr, sql_query) = Self::generate_sql_for_expr(
+                        plan.clone(),
+                        sql_query,
+                        sql_generator.clone(),
+                        *expr,
+                        ungrouped_scan_node.clone(),
+                    )
+                    .await?;
+                    let resulting_sql =
+                        sql_generator
+                            .get_sql_templates()
+                            .not_expr(expr)
+                            .map_err(|e| {
+                                DataFusionError::Internal(format!(
+                                    "Can't generate SQL for not expr: {}",
+                                    e
+                                ))
+                            })?;
+                    Ok((resulting_sql, sql_query))
+                }
                 Expr::IsNotNull(expr) => {
                     let (expr, sql_query) = Self::generate_sql_for_expr(
                         plan.clone(),
