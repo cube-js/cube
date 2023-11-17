@@ -56,6 +56,8 @@ export class SnowflakeQuery extends BaseQuery {
     templates.functions.DATEPART = 'DATE_PART({{ args_concat }})';
     templates.functions.LOG = 'LOG({% if args[1] is undefined %}10, {% endif %}{{ args_concat }})';
     templates.functions.DLOG10 = 'LOG(10, {{ args_concat }})';
+    templates.functions.CHARACTERLENGTH = 'LENGTH({{ args[0] }})';
+    templates.functions.BTRIM = 'TRIM({{ args_concat }})';
     templates.expressions.extract = 'EXTRACT({{ date_part }} FROM {{ expr }})';
     templates.expressions.interval = 'INTERVAL \'{{ interval }}\'';
     return templates;

@@ -1253,6 +1253,37 @@ impl CubeScanWrapperNode {
                     })
                 }
                 Expr::ScalarUDF { fun, args } => {
+                    let date_part_err = |dp| {
+                        DataFusionError::Internal(format!(
+                        "Can't generate SQL for scalar function: date part '{}' is not supported",
+                        dp
+                    ))
+                    };
+                    let date_part = match fun.name.as_str() {
+                        "datediff" | "dateadd" => match &args[0] {
+                            Expr::Literal(ScalarValue::Utf8(Some(date_part))) => {
+                                // Security check to prevent SQL injection
+                                if DATE_PART_REGEX.is_match(date_part) {
+                                    Ok(Some(date_part.to_string()))
+                                } else {
+                                    Err(date_part_err(date_part))
+                                }
+                            }
+                            _ => Err(date_part_err(&args[0].to_string())),
+                        },
+                        _ => Ok(None),
+                    }?;
+                    let interval = match fun.name.as_str() {
+                        "dateadd" => match &args[1] {
+                            Expr::Literal(ScalarValue::Int64(Some(interval))) => {
+                                Ok(Some(interval.to_string()))
+                            }
+                            _ => Err(DataFusionError::Internal(format!(
+                                "Can't generate SQL for scalar function: interval must be Int64"
+                            ))),
+                        },
+                        _ => Ok(None),
+                    }?;
                     let mut sql_args = Vec::new();
                     for arg in args {
                         let (sql, query) = Self::generate_sql_for_expr(
@@ -1269,7 +1300,7 @@ impl CubeScanWrapperNode {
                     Ok((
                         sql_generator
                             .get_sql_templates()
-                            .scalar_function(fun.name.to_string(), sql_args, None)
+                            .scalar_function(fun.name.to_string(), sql_args, date_part, interval)
                             .map_err(|e| {
                                 DataFusionError::Internal(format!(
                                     "Can't generate SQL for scalar function: {}",
@@ -1347,7 +1378,7 @@ impl CubeScanWrapperNode {
                     Ok((
                         sql_generator
                             .get_sql_templates()
-                            .scalar_function(fun.to_string(), sql_args, date_part)
+                            .scalar_function(fun.to_string(), sql_args, date_part, None)
                             .map_err(|e| {
                                 DataFusionError::Internal(format!(
                                     "Can't generate SQL for scalar function: {}",

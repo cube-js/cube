@@ -410,12 +410,18 @@ impl SqlTemplates {
         scalar_function: String,
         args: Vec<String>,
         date_part: Option<String>,
+        interval: Option<String>,
     ) -> Result<String, CubeError> {
         let function = scalar_function.to_string().to_uppercase();
         let args_concat = args.join(", ");
         self.render_template(
             &format!("functions/{}", function),
-            context! { args_concat => args_concat, args => args, date_part => date_part },
+            context! {
+                args_concat => args_concat,
+                args => args,
+                date_part => date_part,
+                interval => interval,
+            },
         )
     }
 
