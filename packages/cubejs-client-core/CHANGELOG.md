@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.19](https://github.com/cube-js/cube/compare/v0.34.18...v0.34.19) (2023-11-11)
+
+
+### Bug Fixes
+
+* support for format in typings for measures ([#7401](https://github.com/cube-js/cube/issues/7401)) ([1f7e1b3](https://github.com/cube-js/cube/commit/1f7e1b300f06a1b53adfa2850314bd9f145f6651))
+
+
+### Features
+
+* **@cubejs-client/core:** expose total rows ([#7140](https://github.com/cube-js/cube/issues/7140)) ([#7372](https://github.com/cube-js/cube/issues/7372)) Thanks [@hannosgit](https://github.com/hannosgit)! ([a4d08c9](https://github.com/cube-js/cube/commit/a4d08c961c3dad880c9a00df630e6f27917f1898))
+
+
+
+
+
 ## [0.34.9](https://github.com/cube-js/cube/compare/v0.34.8...v0.34.9) (2023-10-26)
 
 **Note:** Version bump only for package @cubejs-client/core

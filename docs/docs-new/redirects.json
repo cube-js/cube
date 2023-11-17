@@ -196,12 +196,12 @@
   },
   {
     "source": "/examples",
-    "destination": "/guides/examples",
+    "destination": "/guides/recipes",
     "permanent": true
   },
   {
     "source": "/tutorials",
-    "destination": "/guides/examples",
+    "destination": "/guides/recipes",
     "permanent": true
   },
   {

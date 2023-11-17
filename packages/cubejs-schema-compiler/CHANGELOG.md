@@ -3,6 +3,74 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.22](https://github.com/cube-js/cube/compare/v0.34.21...v0.34.22) (2023-11-16)
+
+
+### Bug Fixes
+
+* **cubesql:** Window PARTITION BY, ORDER BY queries fail for SQL push down ([62b359f](https://github.com/cube-js/cube/commit/62b359f2d33d0c8fd59aa570e7e3a83718a3f7e8))
+
+
+
+
+
+## [0.34.21](https://github.com/cube-js/cube/compare/v0.34.20...v0.34.21) (2023-11-15)
+
+
+### Features
+
+* **cubesql:** Support SQL push down for more functions ([#7406](https://github.com/cube-js/cube/issues/7406)) ([b1606da](https://github.com/cube-js/cube/commit/b1606daba70ab92952b1cbbacd94dd7294b17ad5))
+
+
+
+
+
+## [0.34.20](https://github.com/cube-js/cube/compare/v0.34.19...v0.34.20) (2023-11-14)
+
+
+### Bug Fixes
+
+* Expose `isVisible` and `public` properties in meta consistently ([35ca1d0](https://github.com/cube-js/cube/commit/35ca1d0c104ea6111d4db3b8649cd52a5fabcf79))
+
+
+### Features
+
+* **cubesql:** Support `[NOT] IN` SQL push down ([c64994a](https://github.com/cube-js/cube/commit/c64994ac26e1174ce121c79af46fa6a62747b7e9))
+
+
+
+
+
+## [0.34.19](https://github.com/cube-js/cube/compare/v0.34.18...v0.34.19) (2023-11-11)
+
+
+### Features
+
+* **cubesql:** SQL push down support for window functions ([#7403](https://github.com/cube-js/cube/issues/7403)) ([b1da6c0](https://github.com/cube-js/cube/commit/b1da6c0e38e3b586c3d4b1ddf9c00be57065d960))
+
+
+
+
+
+## [0.34.18](https://github.com/cube-js/cube/compare/v0.34.17...v0.34.18) (2023-11-10)
+
+
+### Bug Fixes
+
+* Non-additive pre-aggregations based on proxy dimension doesn't match anymore ([#7396](https://github.com/cube-js/cube/issues/7396)) ([910a49d](https://github.com/cube-js/cube/commit/910a49d87ebfade22ab5ac2463eca9b43f2d5742))
+
+
+
+
+
+## [0.34.17](https://github.com/cube-js/cube/compare/v0.34.16...v0.34.17) (2023-11-09)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
 ## [0.34.16](https://github.com/cube-js/cube/compare/v0.34.15...v0.34.16) (2023-11-06)
 
 

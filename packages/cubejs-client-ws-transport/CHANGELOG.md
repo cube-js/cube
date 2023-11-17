@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.19](https://github.com/cube-js/cube/compare/v0.34.18...v0.34.19) (2023-11-11)
+
+**Note:** Version bump only for package @cubejs-client/ws-transport
+
+
+
+
+
 ## [0.34.14](https://github.com/cube-js/cube/compare/v0.34.13...v0.34.14) (2023-11-05)
 
 **Note:** Version bump only for package @cubejs-client/ws-transport

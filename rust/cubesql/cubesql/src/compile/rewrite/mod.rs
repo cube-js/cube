@@ -249,6 +249,7 @@ crate::plan_to_language! {
             projection_expr: Vec<Expr>,
             group_expr: Vec<Expr>,
             aggr_expr: Vec<Expr>,
+            window_expr: Vec<Expr>,
             from: Arc<LogicalPlan>,
             joins: Vec<LogicalPlan>,
             filter_expr: Vec<Expr>,
@@ -691,6 +692,19 @@ fn agg_fun_expr(fun_name: impl Display, args: Vec<impl Display>, distinct: impl 
     )
 }
 
+fn window_fun_expr_var_arg(
+    fun_name: impl Display,
+    arg_list: impl Display,
+    partition_by: impl Display,
+    order_by: impl Display,
+    window_frame: impl Display,
+) -> String {
+    format!(
+        "(WindowFunctionExpr {} {} {} {} {})",
+        fun_name, arg_list, partition_by, order_by, window_frame
+    )
+}
+
 fn udaf_expr(fun_name: impl Display, args: Vec<impl Display>) -> String {
     format!(
         "(AggregateUDFExpr {} {})",
@@ -703,11 +717,16 @@ fn limit(skip: impl Display, fetch: impl Display, input: impl Display) -> String
     format!("(Limit {} {} {})", skip, fetch, input)
 }
 
+fn window(input: impl Display, window_expr: impl Display) -> String {
+    format!("(Window {} {})", input, window_expr)
+}
+
 fn wrapped_select(
     select_type: impl Display,
     projection_expr: impl Display,
     group_expr: impl Display,
     aggr_expr: impl Display,
+    window_expr: impl Display,
     from: impl Display,
     joins: impl Display,
     filter_expr: impl Display,
@@ -719,11 +738,12 @@ fn wrapped_select(
     ungrouped: impl Display,
 ) -> String {
     format!(
-        "(WrappedSelect {} {} {} {} {} {} {} {} {} {} {} {} {})",
+        "(WrappedSelect {} {} {} {} {} {} {} {} {} {} {} {} {} {})",
         select_type,
         projection_expr,
         group_expr,
         aggr_expr,
+        window_expr,
         from,
         joins,
         filter_expr,
@@ -761,6 +781,15 @@ fn wrapped_select_aggr_expr(left: impl Display, right: impl Display) -> String {
 
 fn wrapped_select_aggr_expr_empty_tail() -> String {
     "WrappedSelectAggrExpr".to_string()
+}
+
+#[allow(dead_code)]
+fn wrapped_select_window_expr(left: impl Display, right: impl Display) -> String {
+    format!("(WrappedSelectWindowExpr {} {})", left, right)
+}
+
+fn wrapped_select_window_expr_empty_tail() -> String {
+    "WrappedSelectWindowExpr".to_string()
 }
 
 #[allow(dead_code)]

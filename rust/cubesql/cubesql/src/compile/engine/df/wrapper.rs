@@ -297,6 +297,7 @@ impl CubeScanWrapperNode {
                         projection_expr,
                         group_expr,
                         aggr_expr,
+                        window_expr,
                         from,
                         joins: _joins,
                         filter_expr: _filter_expr,
@@ -431,6 +432,20 @@ impl CubeScanWrapperNode {
                                 ungrouped_scan_node.clone(),
                             )
                             .await?;
+
+                            let (window, sql) = Self::generate_column_expr(
+                                plan.clone(),
+                                schema.clone(),
+                                window_expr.clone(),
+                                sql,
+                                generator.clone(),
+                                &column_remapping,
+                                &mut next_remapping,
+                                alias.clone(),
+                                can_rename_columns,
+                                ungrouped_scan_node.clone(),
+                            )
+                            .await?;
                             // Sort node always comes on top and pushed down to select so we need to replace columns here by appropriate column definitions
                             let order_replace_map = projection_expr
                                 .iter()
@@ -504,6 +519,12 @@ impl CubeScanWrapperNode {
                                                 )
                                             }),
                                         )
+                                        .chain(window.iter().map(|m| {
+                                            Self::ungrouped_member_def(
+                                                m,
+                                                &ungrouped_scan_node.used_cubes,
+                                            )
+                                        }))
                                         .collect::<Result<_>>()?,
                                 );
                                 load_request.dimensions = Some(
@@ -724,7 +745,10 @@ impl CubeScanWrapperNode {
                 truncated_alias.truncate(16);
                 let mut alias = truncated_alias.clone();
                 for i in 1..10000 {
-                    if !next_remapping.contains_key(&Column::from_name(&alias)) {
+                    if !next_remapping
+                        .iter()
+                        .any(|(_, v)| v == &Column::from_name(&alias))
+                    {
                         break;
                     }
                     alias = format!("{}_{}", truncated_alias, i);
@@ -906,7 +930,27 @@ impl CubeScanWrapperNode {
                 // Expr::Like(_) => {}-=
                 // Expr::ILike(_) => {}
                 // Expr::SimilarTo(_) => {}
-                // Expr::Not(_) => {}
+                Expr::Not(expr) => {
+                    let (expr, sql_query) = Self::generate_sql_for_expr(
+                        plan.clone(),
+                        sql_query,
+                        sql_generator.clone(),
+                        *expr,
+                        ungrouped_scan_node.clone(),
+                    )
+                    .await?;
+                    let resulting_sql =
+                        sql_generator
+                            .get_sql_templates()
+                            .not_expr(expr)
+                            .map_err(|e| {
+                                DataFusionError::Internal(format!(
+                                    "Can't generate SQL for not expr: {}",
+                                    e
+                                ))
+                            })?;
+                    Ok((resulting_sql, sql_query))
+                }
                 Expr::IsNotNull(expr) => {
                     let (expr, sql_query) = Self::generate_sql_for_expr(
                         plan.clone(),
@@ -947,7 +991,26 @@ impl CubeScanWrapperNode {
                         })?;
                     Ok((resulting_sql, sql_query))
                 }
-                // Expr::Negative(_) => {}
+                Expr::Negative(expr) => {
+                    let (expr, sql_query) = Self::generate_sql_for_expr(
+                        plan.clone(),
+                        sql_query,
+                        sql_generator.clone(),
+                        *expr,
+                        ungrouped_scan_node.clone(),
+                    )
+                    .await?;
+                    let resulting_sql = sql_generator
+                        .get_sql_templates()
+                        .negative_expr(expr)
+                        .map_err(|e| {
+                            DataFusionError::Internal(format!(
+                                "Can't generate SQL for not expr: {}",
+                                e
+                            ))
+                        })?;
+                    Ok((resulting_sql, sql_query))
+                }
                 // Expr::GetIndexedField { .. } => {}
                 // Expr::Between { .. } => {}
                 Expr::Case {
@@ -1333,9 +1396,111 @@ impl CubeScanWrapperNode {
                         sql_query,
                     ))
                 }
-                // Expr::WindowFunction { .. } => {}
+                Expr::WindowFunction {
+                    fun,
+                    args,
+                    partition_by,
+                    order_by,
+                    window_frame,
+                } => {
+                    let mut sql_args = Vec::new();
+                    for arg in args {
+                        let (sql, query) = Self::generate_sql_for_expr(
+                            plan.clone(),
+                            sql_query,
+                            sql_generator.clone(),
+                            arg,
+                            ungrouped_scan_node.clone(),
+                        )
+                        .await?;
+                        sql_query = query;
+                        sql_args.push(sql);
+                    }
+                    let mut sql_partition_by = Vec::new();
+                    for arg in partition_by {
+                        let (sql, query) = Self::generate_sql_for_expr(
+                            plan.clone(),
+                            sql_query,
+                            sql_generator.clone(),
+                            arg,
+                            ungrouped_scan_node.clone(),
+                        )
+                        .await?;
+                        sql_query = query;
+                        sql_partition_by.push(sql);
+                    }
+                    let mut sql_order_by = Vec::new();
+                    for arg in order_by {
+                        let (sql, query) = Self::generate_sql_for_expr(
+                            plan.clone(),
+                            sql_query,
+                            sql_generator.clone(),
+                            arg,
+                            ungrouped_scan_node.clone(),
+                        )
+                        .await?;
+                        sql_query = query;
+                        sql_order_by.push(sql);
+                    }
+                    let resulting_sql = sql_generator
+                        .get_sql_templates()
+                        .window_function_expr(
+                            fun,
+                            sql_args,
+                            sql_partition_by,
+                            sql_order_by,
+                            window_frame,
+                        )
+                        .map_err(|e| {
+                            DataFusionError::Internal(format!(
+                                "Can't generate SQL for window function: {}",
+                                e
+                            ))
+                        })?;
+                    Ok((resulting_sql, sql_query))
+                }
                 // Expr::AggregateUDF { .. } => {}
-                // Expr::InList { .. } => {}
+                Expr::InList {
+                    expr,
+                    list,
+                    negated,
+                } => {
+                    let mut sql_query = sql_query;
+                    let (sql_expr, query) = Self::generate_sql_for_expr(
+                        plan.clone(),
+                        sql_query,
+                        sql_generator.clone(),
+                        *expr,
+                        ungrouped_scan_node.clone(),
+                    )
+                    .await?;
+                    sql_query = query;
+                    let mut sql_in_exprs = Vec::new();
+                    for expr in list {
+                        let (sql, query) = Self::generate_sql_for_expr(
+                            plan.clone(),
+                            sql_query,
+                            sql_generator.clone(),
+                            expr,
+                            ungrouped_scan_node.clone(),
+                        )
+                        .await?;
+                        sql_query = query;
+                        sql_in_exprs.push(sql);
+                    }
+                    Ok((
+                        sql_generator
+                            .get_sql_templates()
+                            .in_list_expr(sql_expr, sql_in_exprs, negated)
+                            .map_err(|e| {
+                                DataFusionError::Internal(format!(
+                                    "Can't generate SQL for in list expr: {}",
+                                    e
+                                ))
+                            })?,
+                        sql_query,
+                    ))
+                }
                 // Expr::Wildcard => {}
                 // Expr::QualifiedWildcard { .. } => {}
                 x => {

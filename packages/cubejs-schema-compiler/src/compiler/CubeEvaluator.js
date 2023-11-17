@@ -138,7 +138,7 @@ export class CubeEvaluator extends CubeSymbols {
 
     for (const memberName of Object.keys(members)) {
       let ownedByCube = true;
-      let aliasMember = false;
+      let aliasMember;
 
       const member = members[memberName];
       if (member.sql && !member.subQuery) {
@@ -151,8 +151,8 @@ export class CubeEvaluator extends CubeSymbols {
           ownedByCube = false;
         }
         // Aliases one to one some another member as in case of views
-        if (!ownedByCube && pathReferencesUsed.length === 1 && this.pathFromArray(pathReferencesUsed[0]) === evaluatedSql) {
-          aliasMember = true;
+        if (!ownedByCube && !member.filters && BaseQuery.isCalculatedMeasureType(member.type) && pathReferencesUsed.length === 1 && this.pathFromArray(pathReferencesUsed[0]) === evaluatedSql) {
+          aliasMember = this.pathFromArray(pathReferencesUsed[0]);
         }
         const foreignCubes = cubeReferencesUsed.filter(usedCube => usedCube !== cube.name);
         if (foreignCubes.length > 0) {
@@ -164,7 +164,10 @@ export class CubeEvaluator extends CubeSymbols {
         errorReporter.error(`View '${cube.name}' defines own member '${cube.name}.${memberName}'. Please move this member definition to one of the cubes.`);
       }
 
-      members[memberName] = { ...members[memberName], ownedByCube, aliasMember };
+      members[memberName] = { ...members[memberName], ownedByCube };
+      if (aliasMember) {
+        members[memberName].aliasMember = aliasMember;
+      }
     }
   }
 

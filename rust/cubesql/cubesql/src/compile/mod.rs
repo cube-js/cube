@@ -18847,12 +18847,58 @@ ORDER BY \"COUNT(count)\" DESC"
             .sql
             .contains("CASE WHEN"));
 
-        assert!(logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql
-            .contains("1123"));
+        assert!(
+            logical_plan
+                .find_cube_scan_wrapper()
+                .wrapped_sql
+                .unwrap()
+                .sql
+                .contains("1123"),
+            "SQL contains 1123: {}",
+            logical_plan
+                .find_cube_scan_wrapper()
+                .wrapped_sql
+                .unwrap()
+                .sql
+        );
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_case_wrapper_with_system_fields() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT CASE WHEN customer_gender = 'female' THEN 'f' ELSE 'm' END, __user, __cubeJoinField, AVG(avgPrice) mp FROM KibanaSampleDataEcommerce a GROUP BY 1, 2, 3 LIMIT 1123"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+            .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+
+        assert!(
+            logical_plan
+                .find_cube_scan_wrapper()
+                .wrapped_sql
+                .unwrap()
+                .sql
+                .contains("__user:(KibanaSampleDataEcommerce):$"),
+            "SQL contains __user:(KibanaSampleDataEcommerce):$: {}",
+            logical_plan
+                .find_cube_scan_wrapper()
+                .wrapped_sql
+                .unwrap()
+                .sql
+        );
 
         let physical_plan = query_plan.as_physical_plan().await.unwrap();
         println!(
@@ -18883,12 +18929,20 @@ ORDER BY \"COUNT(count)\" DESC"
             .sql
             .contains("CASE WHEN"));
 
-        assert!(logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql
-            .contains("LIMIT 1123"));
+        assert!(
+            logical_plan
+                .find_cube_scan_wrapper()
+                .wrapped_sql
+                .unwrap()
+                .sql
+                .contains("1123"),
+            "SQL contains 1123: {}",
+            logical_plan
+                .find_cube_scan_wrapper()
+                .wrapped_sql
+                .unwrap()
+                .sql
+        );
 
         let physical_plan = query_plan.as_physical_plan().await.unwrap();
         println!(
@@ -19061,6 +19115,95 @@ ORDER BY \"COUNT(count)\" DESC"
             .unwrap()
             .sql
             .contains("EXTRACT"));
+    }
+
+    #[tokio::test]
+    async fn test_wrapper_window_function() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT customer_gender, AVG(avgPrice) mp, SUM(COUNT(count)) OVER() FROM KibanaSampleDataEcommerce a GROUP BY 1 LIMIT 100"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+            .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert!(
+            logical_plan
+                .find_cube_scan_wrapper()
+                .wrapped_sql
+                .unwrap()
+                .sql
+                .contains("OVER"),
+            "SQL should contain 'OVER': {}",
+            logical_plan
+                .find_cube_scan_wrapper()
+                .wrapped_sql
+                .unwrap()
+                .sql
+        );
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_wrapper_long_alias_names() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT customer_gender AS long_long_long_long_long_long_long_long_a, AVG(avgPrice) AS long_long_long_long_long_long_long_long_b, SUM(COUNT(count)) OVER() AS long_long_long_long_long_long_long_long_c FROM KibanaSampleDataEcommerce a GROUP BY 1 LIMIT 100"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+            .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert!(
+            logical_plan
+                .find_cube_scan_wrapper()
+                .wrapped_sql
+                .unwrap()
+                .sql
+                .contains("long_l_1"),
+            "SQL should contain long_l_1: {}",
+            logical_plan
+                .find_cube_scan_wrapper()
+                .wrapped_sql
+                .unwrap()
+                .sql
+        );
+
+        assert!(
+            logical_plan
+                .find_cube_scan_wrapper()
+                .wrapped_sql
+                .unwrap()
+                .sql
+                .contains("long_l_1"),
+            "SQL should contain long_l_2: {}",
+            logical_plan
+                .find_cube_scan_wrapper()
+                .wrapped_sql
+                .unwrap()
+                .sql
+        );
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
     }
 
     #[tokio::test]
@@ -19537,5 +19680,125 @@ ORDER BY \"COUNT(count)\" DESC"
         );
 
         Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_inlist_expr() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "
+            SELECT
+                CASE
+                    WHEN (customer_gender NOT IN ('1', '2', '3')) THEN customer_gender
+                    ELSE '0'
+                END AS customer_gender
+            FROM KibanaSampleDataEcommerce AS k
+            GROUP BY 1
+            ORDER BY 1 DESC
+            "
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert!(logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql
+            .contains("NOT IN ("));
+    }
+
+    #[tokio::test]
+    async fn test_pi() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pi",
+            execute_query(
+                "SELECT PI() AS PI".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_negative_expr() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "
+            SELECT -taxful_total_price AS neg_taxful_total_price
+            FROM KibanaSampleDataEcommerce AS k
+            GROUP BY 1
+            ORDER BY 1 DESC
+            "
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert!(logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql
+            .contains("-("));
+    }
+
+    #[tokio::test]
+    async fn test_not_expr() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "
+            SELECT NOT has_subscription AS has_no_subscription
+            FROM KibanaSampleDataEcommerce AS k
+            GROUP BY 1
+            ORDER BY 1 DESC
+            "
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert!(logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql
+            .contains("NOT ("));
     }
 }

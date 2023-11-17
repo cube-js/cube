@@ -3,6 +3,57 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.22](https://github.com/cube-js/cube/compare/v0.34.21...v0.34.22) (2023-11-16)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [0.34.21](https://github.com/cube-js/cube/compare/v0.34.20...v0.34.21) (2023-11-15)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [0.34.20](https://github.com/cube-js/cube/compare/v0.34.19...v0.34.20) (2023-11-14)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [0.34.19](https://github.com/cube-js/cube/compare/v0.34.18...v0.34.19) (2023-11-11)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [0.34.18](https://github.com/cube-js/cube/compare/v0.34.17...v0.34.18) (2023-11-10)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [0.34.17](https://github.com/cube-js/cube/compare/v0.34.16...v0.34.17) (2023-11-09)
+
+
+### Bug Fixes
+
+* **duckdb-driver:** Compatibility issue with Cube Store for DATE type ([#7394](https://github.com/cube-js/cube/issues/7394)) ([3e1389b](https://github.com/cube-js/cube/commit/3e1389b3a94db85d6b4d343e876a349b843cbf27))
+
+
+
+
+
 ## [0.34.16](https://github.com/cube-js/cube/compare/v0.34.15...v0.34.16) (2023-11-06)
 
 **Note:** Version bump only for package @cubejs-backend/duckdb-driver

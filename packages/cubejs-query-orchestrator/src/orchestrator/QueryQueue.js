@@ -515,7 +515,7 @@ export class QueryQueue {
       const toCancel = await queueConnection.getQueriesToCancel();
 
       await Promise.all(toCancel.map(async ([queryKey, queueId]) => {
-        const [queryDef] = await queueConnection.getQueryAndRemove(queryKey);
+        const [queryDef] = await queueConnection.getQueryAndRemove(queryKey, queueId);
         if (queryDef) {
           this.logger('Removing orphaned query', {
             queueId: queueId || queryDef.queueId /** Special handling for Redis */,

@@ -498,7 +498,6 @@ class ApiGateway {
     return metaConfig
       .map((cube) => ({
         config: {
-          public: cube.isVisible,
           ...cube.config,
           measures: cube.config.measures?.filter(visibilityFilter),
           dimensions: cube.config.dimensions?.filter(visibilityFilter),

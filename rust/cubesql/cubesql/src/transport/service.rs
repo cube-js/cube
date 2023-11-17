@@ -6,7 +6,8 @@ use cubeclient::{
 
 use datafusion::{
     arrow::{datatypes::SchemaRef, record_batch::RecordBatch},
-    physical_plan::aggregates::AggregateFunction,
+    logical_plan::window_frames::WindowFrame,
+    physical_plan::{aggregates::AggregateFunction, window_functions::WindowFunction},
 };
 use minijinja::{context, value::Value, Environment};
 use serde_derive::*;
@@ -418,6 +419,54 @@ impl SqlTemplates {
         )
     }
 
+    pub fn window_function_name(&self, window_function: WindowFunction) -> String {
+        match window_function {
+            WindowFunction::AggregateFunction(aggregate_function) => {
+                self.aggregate_function_name(aggregate_function, false)
+            }
+            WindowFunction::BuiltInWindowFunction(built_in_window_function) => {
+                built_in_window_function.to_string()
+            }
+        }
+    }
+
+    pub fn window_function(
+        &self,
+        window_function: WindowFunction,
+        args: Vec<String>,
+    ) -> Result<String, CubeError> {
+        let function = self.window_function_name(window_function);
+        let args_concat = args.join(", ");
+        self.render_template(
+            &format!("functions/{}", function),
+            context! { args_concat => args_concat, args => args },
+        )
+    }
+
+    pub fn window_function_expr(
+        &self,
+        window_function: WindowFunction,
+        args: Vec<String>,
+        partition_by: Vec<String>,
+        order_by: Vec<String>,
+        _window_frame: Option<WindowFrame>,
+    ) -> Result<String, CubeError> {
+        let fun_call = self.window_function(window_function, args)?;
+        let partition_by_concat = partition_by.join(", ");
+        let order_by_concat = order_by.join(", ");
+        // TODO window_frame
+        self.render_template(
+            "expressions/window_function",
+            context! {
+                fun_call => fun_call,
+                partition_by => partition_by,
+                partition_by_concat => partition_by_concat,
+                order_by => order_by,
+                order_by_concat => order_by_concat
+            },
+        )
+    }
+
     pub fn case(
         &self,
         expr: Option<String>,
@@ -447,6 +496,14 @@ impl SqlTemplates {
             "expressions/is_null",
             context! { expr => expr, negate => negate },
         )
+    }
+
+    pub fn negative_expr(&self, expr: String) -> Result<String, CubeError> {
+        self.render_template("expressions/negative", context! { expr => expr })
+    }
+
+    pub fn not_expr(&self, expr: String) -> Result<String, CubeError> {
+        self.render_template("expressions/not", context! { expr => expr })
     }
 
     pub fn sort_expr(
@@ -484,6 +541,24 @@ impl SqlTemplates {
         self.render_template(
             "expressions/cast",
             context! { expr => expr, data_type => data_type },
+        )
+    }
+
+    pub fn in_list_expr(
+        &self,
+        expr: String,
+        in_exprs: Vec<String>,
+        negated: bool,
+    ) -> Result<String, CubeError> {
+        let in_exprs_concat = in_exprs.join(", ");
+        self.render_template(
+            "expressions/in_list",
+            context! {
+                expr => expr,
+                in_exprs_concat => in_exprs_concat,
+                in_exprs => in_exprs,
+                negated => negated
+            },
         )
     }
 

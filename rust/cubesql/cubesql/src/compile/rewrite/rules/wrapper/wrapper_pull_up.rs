@@ -39,6 +39,12 @@ impl WrapperRules {
                             "?cube_members",
                         ),
                         wrapper_pullup_replacer(
+                            "?window_expr",
+                            "?alias_to_cube",
+                            "?ungrouped",
+                            "?cube_members",
+                        ),
+                        wrapper_pullup_replacer(
                             "?cube_scan_input",
                             "?alias_to_cube",
                             "?ungrouped",
@@ -67,6 +73,7 @@ impl WrapperRules {
                             "?projection_expr",
                             "?group_expr",
                             "?aggr_expr",
+                            "?window_expr",
                             "?cube_scan_input",
                             wrapped_select_joins_empty_tail(),
                             wrapped_select_filter_expr_empty_tail(),
@@ -110,11 +117,18 @@ impl WrapperRules {
                             "?cube_members",
                         ),
                         wrapper_pullup_replacer(
+                            "?window_expr",
+                            "?alias_to_cube",
+                            "?ungrouped",
+                            "?cube_members",
+                        ),
+                        wrapper_pullup_replacer(
                             wrapped_select(
                                 "?inner_select_type",
                                 "?inner_projection_expr",
                                 "?inner_group_expr",
                                 "?inner_aggr_expr",
+                                "?inner_window_expr",
                                 "?inner_cube_scan_input",
                                 "?inner_joins",
                                 "?inner_filter_expr",
@@ -152,11 +166,13 @@ impl WrapperRules {
                             "?projection_expr",
                             "?group_expr",
                             "?aggr_expr",
+                            "?window_expr",
                             wrapped_select(
                                 "?inner_select_type",
                                 "?inner_projection_expr",
                                 "?inner_group_expr",
                                 "?inner_aggr_expr",
+                                "?inner_window_expr",
                                 "?inner_cube_scan_input",
                                 "?inner_joins",
                                 "?inner_filter_expr",

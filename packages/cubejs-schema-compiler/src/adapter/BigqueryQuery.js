@@ -150,6 +150,7 @@ export class BigqueryQuery extends BaseQuery {
     templates.quotes.identifiers = '`';
     templates.quotes.escape = '\\`';
     templates.functions.DATETRUNC = 'DATETIME_TRUNC(CAST({{ args[1] }} AS DATETIME), {{ date_part }})';
+    templates.functions.LOG = 'LOG({{ args_concat }}{% if args[1] is undefined %}, 10{% endif %})';
     templates.expressions.binary = '{% if op == \'%\' %}MOD({{ left }}, {{ right }}){% else %}({{ left }} {{ op }} {{ right }}){% endif %}';
     templates.expressions.interval = 'INTERVAL {{ interval }}';
     templates.expressions.extract = 'EXTRACT({% if date_part == \'DOW\' %}DAYOFWEEK{% elif date_part == \'DOY\' %}DAYOFYEAR{% else %}{{ date_part }}{% endif %} FROM {{ expr }})';

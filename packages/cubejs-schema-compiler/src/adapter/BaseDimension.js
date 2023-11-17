@@ -100,4 +100,11 @@ export class BaseDimension {
     }
     return this.query.cubeEvaluator.parsePath('dimensions', this.dimension);
   }
+
+  expressionPath() {
+    if (this.expression) {
+      return `expr:${this.expression.expressionName}`;
+    }
+    return this.query.cubeEvaluator.pathFromArray(this.path());
+  }
 }

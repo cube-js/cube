@@ -18,6 +18,7 @@ impl WrapperRules {
                             "?projection_expr",
                             "?group_expr",
                             "?aggr_expr",
+                            "?window_expr",
                             "?cube_scan_input",
                             "?joins",
                             "?filter_expr",
@@ -52,6 +53,12 @@ impl WrapperRules {
                     ),
                     wrapper_pullup_replacer(
                         "?aggr_expr",
+                        "?alias_to_cube",
+                        "?ungrouped",
+                        "?cube_members",
+                    ),
+                    wrapper_pullup_replacer(
+                        "?window_expr",
                         "?alias_to_cube",
                         "?ungrouped",
                         "?cube_members",
