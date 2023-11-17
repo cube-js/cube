@@ -2816,6 +2816,48 @@ async fn planning_inplace_aggregate(service: Box<dyn SqlClient>) {
        \n          Scan, index: default:1:[1], fields: [day, hits]\
        \n            Empty"
     );
+
+    service
+        .exec_query("CREATE TABLE s.DataBool(url text, segment boolean, day int, hits int)")
+        .await
+        .unwrap();
+
+    let p = service
+        .plan_query(
+            "SELECT url, day, SUM(hits) FROM s.DataBool where segment = true  GROUP BY 1, 2",
+        )
+        .await
+        .unwrap();
+    let phys_plan = pp_phys_plan(p.worker.as_ref());
+    assert_eq!(
+        phys_plan,
+        "Projection, [url, day, SUM(s.DataBool.hits)@2:SUM(hits)]\
+         \n  FinalInplaceAggregate\
+         \n    Worker\
+         \n      PartialInplaceAggregate\
+         \n        Filter\
+         \n          MergeSort\
+         \n            Scan, index: default:2:[2]:sort_on[url, segment, day], fields: *\
+         \n              Empty"
+    );
+    let p = service
+        .plan_query(
+            "SELECT url, day, SUM(hits) FROM s.DataBool where segment = false  GROUP BY 1, 2",
+        )
+        .await
+        .unwrap();
+    let phys_plan = pp_phys_plan(p.worker.as_ref());
+    assert_eq!(
+        phys_plan,
+        "Projection, [url, day, SUM(s.DataBool.hits)@2:SUM(hits)]\
+         \n  FinalInplaceAggregate\
+         \n    Worker\
+         \n      PartialInplaceAggregate\
+         \n        Filter\
+         \n          MergeSort\
+         \n            Scan, index: default:2:[2]:sort_on[url, segment, day], fields: *\
+         \n              Empty"
+    );
 }
 
 async fn planning_hints(service: Box<dyn SqlClient>) {
