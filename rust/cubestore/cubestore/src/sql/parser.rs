@@ -161,7 +161,11 @@ impl QueueCommand {
             QueueCommand::Add { .. } => "add",
             QueueCommand::Get { .. } => "get",
             QueueCommand::ToCancel { .. } => "tocancel",
-            QueueCommand::List { .. } => "list",
+            QueueCommand::List { status_filter, .. } => match status_filter {
+                Some(QueueItemStatus::Active) => "active",
+                Some(QueueItemStatus::Pending) => "pending",
+                _ => "list",
+            },
             QueueCommand::Cancel { .. } => "cancel",
             QueueCommand::Heartbeat { .. } => "heartbeat",
             QueueCommand::Ack { .. } => "ack",
