@@ -82,6 +82,7 @@ pub mod parser;
 
 use crate::sql::cachestore::CacheStoreSqlService;
 use mockall::automock;
+use crate::util::metrics;
 
 #[automock]
 #[async_trait]
@@ -944,6 +945,10 @@ impl SqlService for SqlServiceImpl {
                 schema_name,
                 if_not_exists,
             } => {
+                app_metrics::DATA_QUERIES.add_with_tags(1, Some(&vec![
+                    metrics::format_tag("command", "create_schema")
+                ]));
+
                 let name = schema_name.to_string();
                 let res = self.create_schema(name, if_not_exists).await?;
                 Ok(Arc::new(DataFrame::from(vec![res])))
@@ -963,6 +968,10 @@ impl SqlService for SqlServiceImpl {
                 unique_key,
                 partitioned_index,
             } => {
+                app_metrics::DATA_QUERIES.add_with_tags(1, Some(&vec![
+                    metrics::format_tag("command", "create_table")
+                ]));
+
                 let nv = &name.0;
                 if nv.len() != 2 {
                     return Err(CubeError::user(format!(
@@ -1127,6 +1136,10 @@ impl SqlService for SqlServiceImpl {
                 columns,
                 ..
             }) => {
+                app_metrics::DATA_QUERIES.add_with_tags(1, Some(&vec![
+                    metrics::format_tag("command", "create_index")
+                ]));
+
                 if table_name.0.len() != 2 {
                     return Err(CubeError::user(format!(
                         "Schema's name should be present in table name but found: {}",
@@ -1163,6 +1176,10 @@ impl SqlService for SqlServiceImpl {
                 credentials,
                 or_update,
             } => {
+                app_metrics::DATA_QUERIES.add_with_tags(1, Some(&vec![
+                    metrics::format_tag("command", "create_source")
+                ]));
+
                 if or_update {
                     let creds = match source_type.as_str() {
                         "ksql" => {
@@ -1209,6 +1226,10 @@ impl SqlService for SqlServiceImpl {
                 columns,
                 if_not_exists,
             }) => {
+                app_metrics::DATA_QUERIES.add_with_tags(1, Some(&vec![
+                    metrics::format_tag("command", "create_partitioned_index")
+                ]));
+
                 if name.0.len() != 2 {
                     return Err(CubeError::user(format!(
                         "Expected name for PARTITIONED INDEX in the form '<SCHEMA>.<INDEX>', found: {}",
@@ -1230,9 +1251,10 @@ impl SqlService for SqlServiceImpl {
             CubeStoreStatement::Statement(Statement::Drop {
                 object_type, names, ..
             }) => {
-                match object_type {
+                let command = match object_type {
                     ObjectType::Schema => {
                         self.db.delete_schema(names[0].to_string()).await?;
+                        &"drop_schema"
                     }
                     ObjectType::Table => {
                         let table = self
@@ -1240,14 +1262,21 @@ impl SqlService for SqlServiceImpl {
                             .get_table(names[0].0[0].to_string(), names[0].0[1].to_string())
                             .await?;
                         self.db.drop_table(table.get_id()).await?;
+                        &"drop_table"
                     }
                     ObjectType::PartitionedIndex => {
                         let schema = names[0].0[0].value.clone();
                         let name = names[0].0[1].value.clone();
                         self.db.drop_partitioned_index(schema, name).await?;
+                        &"drop_partitioned_index"
                     }
                     _ => return Err(CubeError::user("Unsupported drop operation".to_string())),
-                }
+                };
+
+                app_metrics::DATA_QUERIES.add_with_tags(1, Some(&vec![
+                    metrics::format_tag("command", command)
+                ]));
+
                 Ok(Arc::new(DataFrame::new(vec![], vec![])))
             }
             CubeStoreStatement::Statement(Statement::Insert {
@@ -1256,6 +1285,10 @@ impl SqlService for SqlServiceImpl {
                 source,
                 ..
             }) => {
+                app_metrics::DATA_QUERIES.add_with_tags(1, Some(&vec![
+                    metrics::format_tag("command", "insert")
+                ]));
+
                 let data = if let SetExpr::Values(Values(data_series)) = &source.body {
                     data_series
                 } else {
@@ -1295,6 +1328,7 @@ impl SqlService for SqlServiceImpl {
                         context.trace_obj.clone(),
                     )
                     .await?;
+
                 // TODO distribute and combine
                 let res = match logical_plan {
                     QueryPlan::Meta(logical_plan) => {
@@ -1302,7 +1336,10 @@ impl SqlService for SqlServiceImpl {
                         Arc::new(self.query_planner.execute_meta_plan(logical_plan).await?)
                     }
                     QueryPlan::Select(serialized, workers) => {
-                        app_metrics::DATA_QUERIES.increment();
+                        app_metrics::DATA_QUERIES.add_with_tags(1, Some(&vec![
+                            metrics::format_tag("command", "select")
+                        ]));
+
                         let cluster = self.cluster.clone();
                         let executor = self.query_executor.clone();
                         timeout(
