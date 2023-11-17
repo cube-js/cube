@@ -118,6 +118,11 @@ export class DatabricksQuery extends BaseQuery {
   public sqlTemplates() {
     const templates = super.sqlTemplates();
     templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
+    templates.functions.BTRIM = 'TRIM({% if args[1] is defined %}{{ args[1] }} FROM {% endif %}{{ args[0] }})';
+    templates.functions.LTRIM = 'LTRIM({{ args|reverse|join(", ") }})';
+    templates.functions.RTRIM = 'RTRIM({{ args|reverse|join(", ") }})';
+    // Databricks has a DATEDIFF function but produces values different from Redshift
+    delete templates.functions.DATEDIFF;
     return templates;
   }
 }

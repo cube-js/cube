@@ -217,6 +217,9 @@ pub fn get_test_tenant_ctx_customized(custom_templates: Vec<(String, String)>) -
                     ("functions/FLOOR".to_string(), "FLOOR({{ args_concat }})".to_string()),
                     ("functions/TRUNC".to_string(), "TRUNC({{ args_concat }})".to_string()),
                     ("functions/LEAST".to_string(), "LEAST({{ args_concat }})".to_string()),
+                    ("functions/DATEDIFF".to_string(), "DATEDIFF({{ date_part }}, {{ args[1] }}, {{ args[2] }})".to_string()),
+                    // DATEADD is being rewritten to DATE_ADD
+                    // ("functions/DATEADD".to_string(), "DATEADD({{ date_part }}, {{ interval }}, {{ args[2] }})".to_string()),
                     ("expressions/extract".to_string(), "EXTRACT({{ date_part }} FROM {{ expr }})".to_string()),
                     (
                         "statements/select".to_string(),

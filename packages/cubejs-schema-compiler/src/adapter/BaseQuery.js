@@ -2470,6 +2470,24 @@ class BaseQuery {
 
         STDDEV: 'STDDEV_SAMP({{ args_concat }})',
         SUBSTR: 'SUBSTRING({{ args_concat }})',
+        CHARACTERLENGTH: 'CHAR_LENGTH({{ args[0] }})',
+
+        // Non-ANSI functions
+        BTRIM: 'BTRIM({{ args_concat }})',
+        LTRIM: 'LTRIM({{ args_concat }})',
+        RTRIM: 'RTRIM({{ args_concat }})',
+        ATAN2: 'ATAN2({{ args_concat }})',
+        COT: 'COT({{ args_concat }})',
+        DEGREES: 'DEGREES({{ args_concat }})',
+        RADIANS: 'RADIANS({{ args_concat }})',
+        SIGN: 'SIGN({{ args_concat }})',
+        ASCII: 'ASCII({{ args_concat }})',
+        STRPOS: 'POSITION({{ args[1] }} IN {{ args[0] }})',
+        REPLACE: 'REPLACE({{ args_concat }})',
+        DATEDIFF: 'DATEDIFF({{ date_part }}, {{ args[1] }}, {{ args[2] }})',
+        TO_CHAR: 'TO_CHAR({{ args_concat }})',
+        // DATEADD is being rewritten to DATE_ADD
+        // DATEADD: 'DATEADD({{ date_part }}, {{ interval }}, {{ args[2] }})',
       },
       statements: {
         select: 'SELECT {{ select_concat | map(attribute=\'aliased\') | join(\', \') }} \n' +

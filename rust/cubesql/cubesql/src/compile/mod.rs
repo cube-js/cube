@@ -1747,14 +1747,25 @@ mod tests {
         }
     }
 
-    async fn convert_select_to_query_plan(query: String, db: DatabaseProtocol) -> QueryPlan {
+    async fn convert_select_to_query_plan_customized(
+        query: String,
+        db: DatabaseProtocol,
+        custom_templates: Vec<(String, String)>,
+    ) -> QueryPlan {
         env::set_var("TZ", "UTC");
 
-        let query =
-            convert_sql_to_cube_query(&query, get_test_tenant_ctx(), get_test_session(db).await)
-                .await;
+        let query = convert_sql_to_cube_query(
+            &query,
+            get_test_tenant_ctx_customized(custom_templates),
+            get_test_session(db).await,
+        )
+        .await;
 
         query.unwrap()
+    }
+
+    async fn convert_select_to_query_plan(query: String, db: DatabaseProtocol) -> QueryPlan {
+        convert_select_to_query_plan_customized(query, db, vec![]).await
     }
 
     async fn convert_select_to_query_plan_with_config(
@@ -19832,5 +19843,168 @@ ORDER BY \"COUNT(count)\" DESC"
             .unwrap()
             .sql
             .contains("NOT ("));
+    }
+
+    #[tokio::test]
+    async fn test_datediff_push_down() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "
+            SELECT DATEDIFF(DAY, order_date, last_mod) AS d
+            FROM KibanaSampleDataEcommerce AS k
+            GROUP BY 1
+            ORDER BY 1 DESC
+            "
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert!(logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql
+            .contains("DATEDIFF(day,"));
+
+        // BigQuery
+        let query_plan = convert_select_to_query_plan_customized(
+            "
+            SELECT DATEDIFF(DAY, order_date, last_mod) AS d
+            FROM KibanaSampleDataEcommerce AS k
+            GROUP BY 1
+            ORDER BY 1 DESC
+            "
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+            vec![
+                ("functions/DATEDIFF".to_string(), "DATETIME_DIFF(CAST({{ args[2] }} AS DATETIME), CAST({{ args[1] }} AS DATETIME), {{ date_part }})".to_string()),
+            ]
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql;
+        assert!(sql.contains("DATETIME_DIFF(CAST("));
+        assert!(sql.contains("day)"));
+    }
+
+    // redshift-dateadd-[literal-date32-]to-interval rewrites DATEADD to DATE_ADD
+    #[tokio::test]
+    #[ignore]
+    async fn test_dateadd_push_down() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "
+            SELECT DATEADD(DAY, 7, order_date) AS d
+            FROM KibanaSampleDataEcommerce AS k
+            GROUP BY 1
+            ORDER BY 1 DESC
+            "
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert!(logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql
+            .contains("DATEADD(day, 7,"));
+
+        // BigQuery
+        let query_plan = convert_select_to_query_plan_customized(
+            "
+            SELECT DATEADD(DAY, 7, order_date) AS d
+            FROM KibanaSampleDataEcommerce AS k
+            GROUP BY 1
+            ORDER BY 1 DESC
+            "
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+            vec![
+                ("functions/DATEADD".to_string(), "DATETIME_ADD(CAST({{ args[2] }} AS DATETTIME), INTERVAL {{ interval }} {{ date_part }})".to_string()),
+            ],
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql;
+        assert!(sql.contains("DATETIME_ADD(CAST("));
+        assert!(sql.contains("INTERVAL 7 day)"));
+
+        // Postgres
+        let query_plan = convert_select_to_query_plan_customized(
+            "
+            SELECT DATEADD(DAY, 7, order_date) AS d
+            FROM KibanaSampleDataEcommerce AS k
+            GROUP BY 1
+            ORDER BY 1 DESC
+            "
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+            vec![(
+                "functions/DATEADD".to_string(),
+                "({{ args[2] }} + \'{{ interval }} {{ date_part }}\'::interval)".to_string(),
+            )],
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql;
+        assert!(sql.contains("+ '7 day'::interval"));
     }
 }
