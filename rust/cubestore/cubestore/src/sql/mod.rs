@@ -81,8 +81,8 @@ pub mod cachestore;
 pub mod parser;
 
 use crate::sql::cachestore::CacheStoreSqlService;
-use mockall::automock;
 use crate::util::metrics;
+use mockall::automock;
 
 #[automock]
 #[async_trait]
@@ -945,9 +945,10 @@ impl SqlService for SqlServiceImpl {
                 schema_name,
                 if_not_exists,
             } => {
-                app_metrics::DATA_QUERIES.add_with_tags(1, Some(&vec![
-                    metrics::format_tag("command", "create_schema")
-                ]));
+                app_metrics::DATA_QUERIES.add_with_tags(
+                    1,
+                    Some(&vec![metrics::format_tag("command", "create_schema")]),
+                );
 
                 let name = schema_name.to_string();
                 let res = self.create_schema(name, if_not_exists).await?;
@@ -968,9 +969,10 @@ impl SqlService for SqlServiceImpl {
                 unique_key,
                 partitioned_index,
             } => {
-                app_metrics::DATA_QUERIES.add_with_tags(1, Some(&vec![
-                    metrics::format_tag("command", "create_table")
-                ]));
+                app_metrics::DATA_QUERIES.add_with_tags(
+                    1,
+                    Some(&vec![metrics::format_tag("command", "create_table")]),
+                );
 
                 let nv = &name.0;
                 if nv.len() != 2 {
@@ -1136,9 +1138,10 @@ impl SqlService for SqlServiceImpl {
                 columns,
                 ..
             }) => {
-                app_metrics::DATA_QUERIES.add_with_tags(1, Some(&vec![
-                    metrics::format_tag("command", "create_index")
-                ]));
+                app_metrics::DATA_QUERIES.add_with_tags(
+                    1,
+                    Some(&vec![metrics::format_tag("command", "create_index")]),
+                );
 
                 if table_name.0.len() != 2 {
                     return Err(CubeError::user(format!(
@@ -1176,9 +1179,10 @@ impl SqlService for SqlServiceImpl {
                 credentials,
                 or_update,
             } => {
-                app_metrics::DATA_QUERIES.add_with_tags(1, Some(&vec![
-                    metrics::format_tag("command", "create_source")
-                ]));
+                app_metrics::DATA_QUERIES.add_with_tags(
+                    1,
+                    Some(&vec![metrics::format_tag("command", "create_source")]),
+                );
 
                 if or_update {
                     let creds = match source_type.as_str() {
@@ -1226,9 +1230,13 @@ impl SqlService for SqlServiceImpl {
                 columns,
                 if_not_exists,
             }) => {
-                app_metrics::DATA_QUERIES.add_with_tags(1, Some(&vec![
-                    metrics::format_tag("command", "create_partitioned_index")
-                ]));
+                app_metrics::DATA_QUERIES.add_with_tags(
+                    1,
+                    Some(&vec![metrics::format_tag(
+                        "command",
+                        "create_partitioned_index",
+                    )]),
+                );
 
                 if name.0.len() != 2 {
                     return Err(CubeError::user(format!(
@@ -1273,9 +1281,8 @@ impl SqlService for SqlServiceImpl {
                     _ => return Err(CubeError::user("Unsupported drop operation".to_string())),
                 };
 
-                app_metrics::DATA_QUERIES.add_with_tags(1, Some(&vec![
-                    metrics::format_tag("command", command)
-                ]));
+                app_metrics::DATA_QUERIES
+                    .add_with_tags(1, Some(&vec![metrics::format_tag("command", command)]));
 
                 Ok(Arc::new(DataFrame::new(vec![], vec![])))
             }
@@ -1285,9 +1292,8 @@ impl SqlService for SqlServiceImpl {
                 source,
                 ..
             }) => {
-                app_metrics::DATA_QUERIES.add_with_tags(1, Some(&vec![
-                    metrics::format_tag("command", "insert")
-                ]));
+                app_metrics::DATA_QUERIES
+                    .add_with_tags(1, Some(&vec![metrics::format_tag("command", "insert")]));
 
                 let data = if let SetExpr::Values(Values(data_series)) = &source.body {
                     data_series
@@ -1336,9 +1342,10 @@ impl SqlService for SqlServiceImpl {
                         Arc::new(self.query_planner.execute_meta_plan(logical_plan).await?)
                     }
                     QueryPlan::Select(serialized, workers) => {
-                        app_metrics::DATA_QUERIES.add_with_tags(1, Some(&vec![
-                            metrics::format_tag("command", "select")
-                        ]));
+                        app_metrics::DATA_QUERIES.add_with_tags(
+                            1,
+                            Some(&vec![metrics::format_tag("command", "select")]),
+                        );
 
                         let cluster = self.cluster.clone();
                         let executor = self.query_executor.clone();

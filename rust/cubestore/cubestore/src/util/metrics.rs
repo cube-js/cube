@@ -61,7 +61,7 @@ pub const fn distribution(name: &'static str) -> IntMetric {
     }
 }
 
-pub const fn format_tag(name: &'static str, value: &str) -> String {
+pub fn format_tag(name: &'static str, value: &str) -> String {
     format!("{}:{}", name, value)
 }
 
