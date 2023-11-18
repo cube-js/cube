@@ -33,6 +33,7 @@ CUBEJS_DB_PASS=**********
 | `CUBEJS_DB_USER`                | The username used to connect to the database                                        | A valid database username |    ✅    |                                    ✅                                    |
 | `CUBEJS_DB_PASS`                | The password used to connect to the database                                        | A valid database password |    ✅    |                                    ✅                                    |
 | `CUBEJS_DB_CLICKHOUSE_READONLY` | Whether the ClickHouse user has read-only access or not                             | `true`, `false`           |    ❌    |                                    ✅                                    |
+| `CUBEJS_DB_CLICKHOUSE_WITHFILL` | Whether to use Clickhouse's `WITH FILL` modifier for date ranged queries            | `true`, `false`           |    ❌    |                                    ✅                                    |
 | `CUBEJS_CONCURRENCY`            | The number of concurrent connections each queue has to the database. Default is `5` | A valid number            |    ❌    |                                    ❌                                    |
 | `CUBEJS_DB_MAX_POOL`            | The maximum number of concurrent database connections to pool. Default is `20`      | A valid number            |    ❌    |                                    ✅                                    |
 
@@ -82,11 +83,21 @@ You can connect to a ClickHouse database when your user's permissions are
 [restricted][clickhouse-readonly] to read-only, by setting
 `CUBEJS_DB_CLICKHOUSE_READONLY` to `true`.
 
+You can use Clickhouse's [`WITH FILL` MODIFIER][clickhouse-with-fill] to fill
+any dates within the defined date range with `0` values. This will make sure
+that the date range is fully filled with data. This is useful for showing a
+true axis on a chart or exporting data for all dates given.
+
+Be aware that using `WITH FILL` may increase query times or resources used and you may need to increase the `limit`
+provided to your Cube queries.
+
 [clickhouse]: https://clickhouse.tech/
 [clickhouse-docs-users]:
   https://clickhouse.tech/docs/en/operations/settings/settings-users/
 [clickhouse-readonly]:
   https://clickhouse.tech/docs/en/operations/settings/permissions-for-queries/#settings_readonly
+[clickhouse-with-fill]:
+  https://clickhouse.com/docs/en/sql-reference/statements/select/order-by#order-by-expr-with-fill-modifier
 [ref-caching-using-preaggs-build-strats]:
   /caching/using-pre-aggregations#pre-aggregation-build-strategies
 [ref-config-multiple-ds-decorating-env]:
