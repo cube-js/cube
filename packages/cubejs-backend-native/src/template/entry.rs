@@ -1,6 +1,6 @@
 use crate::cross::*;
 use crate::template::mj_value::*;
-use crate::template::neon::*;
+use crate::template::neon_mj::*;
 use crate::utils::bind_method;
 
 use log::trace;

@@ -37,18 +37,34 @@ pub(crate) trait NeonMiniJinjaContext<'a>: Context<'a> {
                 content += &format!("{:>4} | {}\r\n", idx + 1, line);
             }
 
-            format!("{}\r\n{}\r\n{}", "-".repeat(79), content, "-".repeat(79))
+            let header = if let Some(ref filename) = err.name() {
+                format!("{:-^79}", format!(" {} ", filename))
+            } else {
+                "-".repeat(79)
+            };
+
+            format!("\r\n{}\r\n{}{}", header, content, "-".repeat(79))
         } else {
-            "".to_string()
+            if let Some(ref filename) = err.name() {
+                format!(" in {}:{}", filename, err.line().unwrap_or(0))
+            } else {
+                "".to_string()
+            }
+        };
+
+        let formatted_err = if let Some(ref detail) = err.detail() {
+            format!("{}: {}", err.kind(), detail)
+        } else {
+            format!("{}", err.kind())
         };
 
         if let Some(next_err) = err.source() {
             self.throw_error(format!(
-                "{} caused by: {:#}\r\n{}",
-                err, next_err, codeblock
+                "{} caused by: {:#}{}",
+                formatted_err, next_err, codeblock
             ))
         } else {
-            self.throw_error(format!("{}\r\n{}", err, codeblock))
+            self.throw_error(format!("{}{}", formatted_err, codeblock))
         }
     }
 }

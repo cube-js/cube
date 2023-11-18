@@ -1,4 +1,5 @@
 use crate::cross::{CLRepr, CLReprPython};
+use crate::python::neon_py::*;
 use crate::tokio_runtime_node;
 use cubesql::CubeError;
 use log::{error, trace};
@@ -122,13 +123,13 @@ impl PyRuntime {
                         deferred.settle_with(
                             js_channel,
                             move |mut cx| -> NeonResult<Handle<JsError>> {
-                                cx.throw_error(format!("Python error: {}", err))
+                                cx.throw_from_python_error(err)
                             },
                         );
                     }
                     PyScheduledCallback::Channel(chan) => {
                         let send_res =
-                            chan.send(Err(CubeError::internal(format!("Python error: {}", err))));
+                            chan.send(Err(CubeError::internal(format_python_error(err))));
                         if send_res.is_err() {
                             return Err(CubeError::internal(
                                 "Unable to send result back to consumer".to_string(),
@@ -167,10 +168,9 @@ impl PyRuntime {
                         PyScheduledCallback::Channel(chan) => {
                             let _ = match res {
                                 Ok(r) => chan.send(Ok(r)),
-                                Err(err) => chan.send(Err(CubeError::internal(format!(
-                                    "Python error: {}",
-                                    err
-                                )))),
+                                Err(err) => {
+                                    chan.send(Err(CubeError::internal(format_python_error(err))))
+                                }
                             };
                         }
                     }
