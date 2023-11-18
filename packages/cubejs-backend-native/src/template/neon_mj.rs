@@ -44,12 +44,10 @@ pub(crate) trait NeonMiniJinjaContext<'a>: Context<'a> {
             };
 
             format!("\r\n{}\r\n{}{}", header, content, "-".repeat(79))
+        } else if let Some(ref filename) = err.name() {
+            format!(" in {}:{}", filename, err.line().unwrap_or(0))
         } else {
-            if let Some(ref filename) = err.name() {
-                format!(" in {}:{}", filename, err.line().unwrap_or(0))
-            } else {
-                "".to_string()
-            }
+            "".to_string()
         };
 
         let formatted_err = if let Some(ref detail) = err.detail() {
