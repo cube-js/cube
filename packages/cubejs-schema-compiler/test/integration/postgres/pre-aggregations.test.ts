@@ -88,6 +88,10 @@ describe('PreAggregations', () => {
           type: 'string',
           sql: 'source'
         },
+        sourceAndId: {
+          type: 'string',
+          sql: \`\${source} || '_' || \${id}\`,
+        },
         createdAt: {
           type: 'time',
           sql: 'created_at'
@@ -220,6 +224,12 @@ describe('PreAggregations', () => {
           granularity: 'hour',
           partitionGranularity: 'month'
         },
+        sourceAndIdRollup: {
+          measures: [count],
+          dimensions: [sourceAndId, source],
+          timeDimension: createdAt,
+          granularity: 'hour',
+        }
       }
     })
     
@@ -743,6 +753,103 @@ describe('PreAggregations', () => {
           {
             visitors_view__signed_up_at_day: '2017-01-05T00:00:00.000Z',
             visitors_view__google_unique_source_count: '1'
+          }
+        ]
+      );
+    });
+  }));
+
+  it('non-leaf additive measure', () => compiler.compile().then(() => {
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'visitors_view.count'
+      ],
+      dimensions: ['visitors_view.sourceAndId'],
+      timezone: 'America/Los_Angeles',
+      order: [{
+        id: 'visitors_view.sourceAndId'
+      }],
+      preAggregationsSchema: ''
+    });
+
+    const queryAndParams = query.buildSqlAndParams();
+    console.log(queryAndParams);
+    const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
+    console.log(preAggregationsDescription);
+    expect((<any>preAggregationsDescription)[0].loadSql[0]).toMatch(/visitors_source_and_id_rollup/);
+
+    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
+      expect(res).toEqual(
+        [
+          {
+            visitors_view__count: '1',
+            visitors_view__source_and_id: 'google_3'
+          },
+          {
+            visitors_view__count: '1',
+            visitors_view__source_and_id: 'some_1'
+          },
+          {
+            visitors_view__count: '1',
+            visitors_view__source_and_id: 'some_2'
+          },
+          {
+            visitors_view__count: '3',
+            visitors_view__source_and_id: null
+          }
+        ]
+      );
+    });
+  }));
+
+  it('non-leaf additive measure with time dimension', () => compiler.compile().then(() => {
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'visitors_view.count'
+      ],
+      dimensions: ['visitors_view.sourceAndId'],
+      timezone: 'America/Los_Angeles',
+      timeDimensions: [{
+        dimension: 'visitors_view.signedUpAt',
+        granularity: 'day',
+        dateRange: ['2017-01-01', '2017-01-30']
+      }],
+      order: [{
+        id: 'visitors_view.createdAt',
+      }, {
+        id: 'visitors_view.sourceAndId'
+      }],
+      preAggregationsSchema: ''
+    });
+
+    const queryAndParams = query.buildSqlAndParams();
+    console.log(queryAndParams);
+    const preAggregationsDescription = query.preAggregations?.preAggregationsDescription();
+    console.log(preAggregationsDescription);
+    expect((<any>preAggregationsDescription)[0].loadSql[0]).toMatch(/visitors_source_and_id_rollup/);
+
+    return dbRunner.evaluateQueryWithPreAggregations(query).then(res => {
+      expect(res).toEqual(
+        [
+          {
+            visitors_view__count: '1',
+            visitors_view__signed_up_at_day: '2017-01-05T00:00:00.000Z',
+            visitors_view__source_and_id: 'google_3'
+          },
+          {
+            visitors_view__count: '1',
+            visitors_view__signed_up_at_day: '2017-01-02T00:00:00.000Z',
+            visitors_view__source_and_id: 'some_1'
+          },
+          {
+            visitors_view__count: '1',
+            visitors_view__signed_up_at_day: '2017-01-04T00:00:00.000Z',
+            visitors_view__source_and_id: 'some_2'
+          },
+          {
+            visitors_view__count: '2',
+            visitors_view__signed_up_at_day: '2017-01-06T00:00:00.000Z',
+            visitors_view__source_and_id: null
           }
         ]
       );
