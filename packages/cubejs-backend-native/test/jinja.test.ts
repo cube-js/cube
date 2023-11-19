@@ -53,6 +53,23 @@ function testTemplateWithPythonCtxBySnapshot(init: InitJinjaFn, templateName: st
   });
 }
 
+function testTemplateErrorWithPythonCtxBySnapshot(init: InitJinjaFn, templateName: string, ctx: unknown) {
+  test(`render ${templateName}`, async () => {
+    const { jinjaEngine, pyCtx } = await init();
+
+    try {
+      await jinjaEngine.renderTemplate(templateName, ctx, {
+        ...pyCtx.variables,
+        ...pyCtx.functions,
+      });
+
+      throw new Error(`Template ${templateName} should throw an error!`);
+    } catch (e) {
+      expect(e).toMatchSnapshot(templateName);
+    }
+  });
+}
+
 function testLoadBrokenTemplateBySnapshot(init: InitJinjaFn, templateName: string) {
   test(`render ${templateName}`, async () => {
     try {
@@ -85,6 +102,7 @@ suite('Python model', () => {
       new_safe_string: expect.any(Object),
       new_object_from_dict: expect.any(Object),
       load_class_model: expect.any(Object),
+      throw_exception: expect.any(Object),
     });
 
     expect(pythonModule.variables).toEqual({
@@ -118,6 +136,7 @@ darwinSuite('Scope Python model', () => {
       new_safe_string: expect.any(Object),
       new_object_from_dict: expect.any(Object),
       load_class_model: expect.any(Object),
+      throw_exception: expect.any(Object),
     });
   });
 });
@@ -160,6 +179,7 @@ suite('Jinja (new api)', () => {
     loadTemplateFile(jinjaEngine, 'python.yml');
     loadTemplateFile(jinjaEngine, 'variables.yml.jinja');
     loadTemplateFile(jinjaEngine, 'filters.yml.jinja');
+    loadTemplateFile(jinjaEngine, 'template_error_python.jinja');
 
     for (let i = 1; i < 9; i++) {
       loadTemplateFile(jinjaEngine, `0${i}.yml.jinja`);
@@ -188,8 +208,9 @@ suite('Jinja (new api)', () => {
   testTemplateWithPythonCtxBySnapshot(initJinjaEngine, 'python.yml', {});
   testTemplateWithPythonCtxBySnapshot(initJinjaEngine, 'variables.yml.jinja', {});
   testTemplateWithPythonCtxBySnapshot(initJinjaEngine, 'filters.yml.jinja', {});
+  testTemplateErrorWithPythonCtxBySnapshot(initJinjaEngine, 'template_error_python.jinja', {});
 
-  testLoadBrokenTemplateBySnapshot(initJinjaEngine, 'template_error.jinja');
+  testLoadBrokenTemplateBySnapshot(initJinjaEngine, 'template_error_syntax.jinja');
 
   for (let i = 1; i < 9; i++) {
     testTemplateBySnapshot(initJinjaEngine, `0${i}.yml.jinja`, {});
