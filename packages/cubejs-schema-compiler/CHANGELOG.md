@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.23](https://github.com/cube-js/cube/compare/v0.34.22...v0.34.23) (2023-11-19)
+
+
+### Bug Fixes
+
+* Match additive pre-aggregations with missing members for views and proxy members ([#7433](https://github.com/cube-js/cube/issues/7433)) ([e236079](https://github.com/cube-js/cube/commit/e236079ad0ecef2b43f285f4a5154bcd8cb8a9e2))
+
+
+### Features
+
+* **cubesql:** Support `-` (unary minus) SQL push down ([a0a2e12](https://github.com/cube-js/cube/commit/a0a2e129e4cf3264df75bbdf53a962a892e4e9c2))
+* **cubesql:** Support `NOT` SQL push down ([#7422](https://github.com/cube-js/cube/issues/7422)) ([7b1ff0d](https://github.com/cube-js/cube/commit/7b1ff0d897ec9a5cfffba1e09444ff7baa8bea5b))
+
+
+
+
+
 ## [0.34.22](https://github.com/cube-js/cube/compare/v0.34.21...v0.34.22) (2023-11-16)
 
 

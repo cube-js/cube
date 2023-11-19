@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.23](https://github.com/cube-js/cube/compare/v0.34.22...v0.34.23) (2023-11-19)
+
+
+### Bug Fixes
+
+* **duckdb-driver:**  Crash with high concurrency (unsuccessful or closed pending query result) ([#7424](https://github.com/cube-js/cube/issues/7424)) ([a2e42ac](https://github.com/cube-js/cube/commit/a2e42ac930ea1cabb1d13c8c8dbde7c808139d55))
+
+
+### Features
+
+* **duckdb-driver:** Upgrade to 0.9.2 ([#7425](https://github.com/cube-js/cube/issues/7425)) ([d630243](https://github.com/cube-js/cube/commit/d630243dfe045acc46426a4d58acfdeeed7ca1da))
+
+
+
+
+
 ## [0.34.22](https://github.com/cube-js/cube/compare/v0.34.21...v0.34.22) (2023-11-16)
 
 **Note:** Version bump only for package @cubejs-backend/duckdb-driver

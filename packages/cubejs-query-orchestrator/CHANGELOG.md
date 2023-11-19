@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.23](https://github.com/cube-js/cube/compare/v0.34.22...v0.34.23) (2023-11-19)
+
+
+### Features
+
+* **cubestore-driver:** Queue - protect possible race condition on removing orphaned queries ([#7426](https://github.com/cube-js/cube/issues/7426)) ([7142e9c](https://github.com/cube-js/cube/commit/7142e9cf146379182cc57e68d4456bd0f00137a5))
+
+
+
+
+
 ## [0.34.21](https://github.com/cube-js/cube/compare/v0.34.20...v0.34.21) (2023-11-15)
 
 **Note:** Version bump only for package @cubejs-backend/query-orchestrator
