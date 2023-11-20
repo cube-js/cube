@@ -160,7 +160,7 @@ impl QueueCommand {
         match self {
             QueueCommand::Add { .. } => "add",
             QueueCommand::Get { .. } => "get",
-            QueueCommand::ToCancel { .. } => "tocancel",
+            QueueCommand::ToCancel { .. } => "to_cancel",
             QueueCommand::List { status_filter, .. } => match status_filter {
                 Some(QueueItemStatus::Active) => "active",
                 Some(QueueItemStatus::Pending) => "pending",
