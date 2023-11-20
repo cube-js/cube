@@ -9,6 +9,7 @@ use crate::sql::parser::{
 use crate::sql::{QueryPlans, SqlQueryContext, SqlService};
 use crate::store::DataFrame;
 use crate::table::{Row, TableValue};
+use crate::util::metrics;
 use crate::{app_metrics, CubeError};
 use async_trait::async_trait;
 use datafusion::sql::parser::Statement as DFStatement;
@@ -174,7 +175,13 @@ impl CacheStoreSqlService {
         _context: SqlQueryContext,
         command: CacheCommand,
     ) -> Result<Arc<DataFrame>, CubeError> {
-        app_metrics::CACHE_QUERIES.increment();
+        app_metrics::CACHE_QUERIES.add_with_tags(
+            1,
+            Some(&vec![metrics::format_tag(
+                "command",
+                command.as_tag_command(),
+            )]),
+        );
         let execution_time = SystemTime::now();
 
         let (result, track_time) = match command {
@@ -268,7 +275,13 @@ impl CacheStoreSqlService {
         _context: SqlQueryContext,
         command: QueueCommand,
     ) -> Result<Arc<DataFrame>, CubeError> {
-        app_metrics::QUEUE_QUERIES.increment();
+        app_metrics::QUEUE_QUERIES.add_with_tags(
+            1,
+            Some(&vec![metrics::format_tag(
+                "command",
+                command.as_tag_command(),
+            )]),
+        );
         let execution_time = SystemTime::now();
 
         let (result, track_time) = match command {
