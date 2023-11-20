@@ -12,11 +12,11 @@ export abstract class AbstractSetMemoryQueue {
 
   protected execution: boolean = false;
 
-  public addToQueue(item: string) {
+  public async addToQueue(item: string) {
     this.queue.add(item);
 
     if (this.queue.size > 100) {
-      console.log('Too large capacity', this.queue.size);
+      await this.onCapacity();
     }
 
     this.run().catch(e => console.log(e));
@@ -37,7 +37,7 @@ export abstract class AbstractSetMemoryQueue {
           toExecute.push(item);
           this.queue.delete(item);
 
-          if (toExecute.length > this.concurrency) {
+          if (toExecute.length >= this.concurrency) {
             break;
           }
         }
@@ -46,15 +46,22 @@ export abstract class AbstractSetMemoryQueue {
           toExecute
         });
 
-        await Promise.all(toExecute.map(async (item) => this.execute(item)));
-        toExecute = [];
-      } while (toExecute.length > 0);
+        try {
+          await Promise.all(toExecute.map(async (item) => this.execute(item)));
+        } catch (e) {
+          console.log(e);
+        } finally {
+          toExecute = [];
+        }
+      } while (this.queue.size > 0);
     } finally {
       this.execution = false;
     }
   }
 
-  abstract execute(item: string): Promise<void>;
+  protected abstract onCapacity(): Promise<void>;
+
+  protected abstract execute(item: string): Promise<void>;
 }
 
 export class TableTouchMemoryQueue extends AbstractSetMemoryQueue {
@@ -67,9 +74,34 @@ export class TableTouchMemoryQueue extends AbstractSetMemoryQueue {
     super(capacity, concurrency);
   }
 
-  public async execute(tableName: string): Promise<void> {
+  protected async onCapacity(): Promise<void> {
+    console.log('Too large capacity (touch)', this.queue.size);
+  }
+
+  protected async execute(tableName: string): Promise<void> {
     const key = this.queryCache.getKey('SQL_PRE_AGGREGATIONS_TABLES_TOUCH', tableName);
     console.log('touch', key);
     await this.queryCache.getCacheDriver().set(key, new Date().getTime(), this.touchTablePersistTime);
+  }
+}
+
+export class TableUsedMemoryQueue extends AbstractSetMemoryQueue {
+  public constructor(
+    capacity: number,
+    concurrency: number,
+    protected readonly queryCache: QueryCache,
+    protected readonly touchTablePersistTime: number
+  ) {
+    super(capacity, concurrency);
+  }
+
+  protected async onCapacity(): Promise<void> {
+    console.log('Too large capacity (used)', this.queue.size);
+  }
+
+  protected async execute(tableName: string): Promise<void> {
+    const key = this.queryCache.getKey('SQL_PRE_AGGREGATIONS_TABLES_USED', tableName);
+    console.log('used', key);
+    await this.queryCache.getCacheDriver().set(key, true, this.touchTablePersistTime);
   }
 }
