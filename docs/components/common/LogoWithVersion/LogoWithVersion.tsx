@@ -5,7 +5,7 @@ import styles from './LogoWithVersion.module.scss';
 import { Anchor } from '@/components/overrides/Anchor/Anchor';
 
 const cn = classNames.bind(styles);
-const PACKAGE_VERSION = require('../../../../../lerna.json').version;
+const PACKAGE_VERSION = require('../../../../lerna.json').version;
 
 export const LogoWithVersion = () => {
   return (
