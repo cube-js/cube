@@ -905,7 +905,12 @@ declare module '@cubejs-client/core' {
     name: string;
     title: string;
     shortTitle: string;
+    description?: string;
+    /**
+     * @deprecated use `public` instead
+     */
     isVisible?: boolean;
+    public?: boolean;
     meta?: any;
   };
 
@@ -915,6 +920,9 @@ declare module '@cubejs-client/core' {
     title: string;
     shortTitle: string;
     description?: string;
+    /**
+     * @deprecated use `public` instead
+     */
     isVisible?: boolean;
     public?: boolean;
     meta?: any;
@@ -976,6 +984,9 @@ declare module '@cubejs-client/core' {
     segments: TCubeSegment[];
     connectedComponent?: number;
     type?: 'view' | 'cube';
+    /**
+     * @deprecated use `public` instead
+     */
     isVisible?: boolean;
     public?: boolean;
   };
