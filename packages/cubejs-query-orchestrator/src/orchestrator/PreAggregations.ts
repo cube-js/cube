@@ -1985,8 +1985,8 @@ export class PreAggregations {
     this.touchTablePersistTime = options.touchTablePersistTime || getEnv('touchPreAggregationTimeout');
     this.usedTablePersistTime = options.usedTablePersistTime || getEnv('dbQueryTimeout');
 
-    this.touchQueue = new TableTouchMemoryQueue(8_192, 2, this.queryCache, this.touchTablePersistTime);
-    this.usedQueue = new TableUsedMemoryQueue(4_096, 3, this.queryCache, this.usedTablePersistTime);
+    this.touchQueue = new TableTouchMemoryQueue(8_192, 1, this.queryCache, this.touchTablePersistTime);
+    this.usedQueue = new TableUsedMemoryQueue(4_096, 1, this.queryCache, this.usedTablePersistTime);
 
     this.externalDriverFactory = options.externalDriverFactory;
     this.structureVersionPersistTime = options.structureVersionPersistTime || 60 * 60 * 24 * 30;

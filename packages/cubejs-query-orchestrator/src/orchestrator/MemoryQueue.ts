@@ -1,25 +1,33 @@
 import { QueryCache } from './QueryCache';
+import { pausePromise, Semaphore } from '@cubejs-backend/shared';
 
 export abstract class AbstractSetMemoryQueue {
   protected readonly queue: Set<string> = new Set();
 
+  protected readonly execution_sem: Semaphore;
+
+  protected readonly add_sem: Semaphore;
+
   public constructor(
     protected readonly capacity: number,
-    protected readonly concurrency: number,
+    concurrency: number,
   ) {
-
+    this.execution_sem = new Semaphore(concurrency);
+    this.add_sem = new Semaphore(capacity);
   }
 
   protected execution: boolean = false;
 
   public async addToQueue(item: string) {
+    const next = this.add_sem.acquire();
     this.queue.add(item);
 
-    if (this.queue.size > 100) {
+    if (this.queue.size > this.capacity) {
       await this.onCapacity();
     }
 
     this.run().catch(e => console.log(e));
+    await next;
   }
 
   public async run(): Promise<void> {
@@ -30,30 +38,18 @@ export abstract class AbstractSetMemoryQueue {
     this.execution = true;
 
     try {
-      let toExecute: string[] = [];
+      while (this.queue.size) {
+        const toExecute = this.queue[Symbol.iterator]().next().value;
+        if (toExecute) {
+          this.queue.delete(toExecute);
+          await this.execution_sem.acquire();
 
-      do {
-        for (const item of this.queue) {
-          toExecute.push(item);
-          this.queue.delete(item);
-
-          if (toExecute.length >= this.concurrency) {
-            break;
-          }
+          this.execute(toExecute).finally(() => {
+            this.execution_sem.release();
+            this.add_sem.release();
+          });
         }
-
-        console.log('toExecute', toExecute.length, {
-          toExecute
-        });
-
-        try {
-          await Promise.all(toExecute.map(async (item) => this.execute(item)));
-        } catch (e) {
-          console.log(e);
-        } finally {
-          toExecute = [];
-        }
-      } while (this.queue.size > 0);
+      }
     } finally {
       this.execution = false;
     }
