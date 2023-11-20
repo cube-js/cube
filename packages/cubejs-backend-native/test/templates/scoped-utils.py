@@ -88,6 +88,10 @@ class ExampleClassModelB:
 @context_func
 def load_class_model():
   return ExampleClassModelB()
+
+@context_func
+def throw_exception():
+    raise Exception('Random Exception')
 """
 
 __execution_context_globals = {}

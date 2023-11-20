@@ -745,7 +745,10 @@ impl CubeScanWrapperNode {
                 truncated_alias.truncate(16);
                 let mut alias = truncated_alias.clone();
                 for i in 1..10000 {
-                    if !next_remapping.contains_key(&Column::from_name(&alias)) {
+                    if !next_remapping
+                        .iter()
+                        .any(|(_, v)| v == &Column::from_name(&alias))
+                    {
                         break;
                     }
                     alias = format!("{}_{}", truncated_alias, i);
@@ -927,7 +930,27 @@ impl CubeScanWrapperNode {
                 // Expr::Like(_) => {}-=
                 // Expr::ILike(_) => {}
                 // Expr::SimilarTo(_) => {}
-                // Expr::Not(_) => {}
+                Expr::Not(expr) => {
+                    let (expr, sql_query) = Self::generate_sql_for_expr(
+                        plan.clone(),
+                        sql_query,
+                        sql_generator.clone(),
+                        *expr,
+                        ungrouped_scan_node.clone(),
+                    )
+                    .await?;
+                    let resulting_sql =
+                        sql_generator
+                            .get_sql_templates()
+                            .not_expr(expr)
+                            .map_err(|e| {
+                                DataFusionError::Internal(format!(
+                                    "Can't generate SQL for not expr: {}",
+                                    e
+                                ))
+                            })?;
+                    Ok((resulting_sql, sql_query))
+                }
                 Expr::IsNotNull(expr) => {
                     let (expr, sql_query) = Self::generate_sql_for_expr(
                         plan.clone(),
@@ -968,7 +991,26 @@ impl CubeScanWrapperNode {
                         })?;
                     Ok((resulting_sql, sql_query))
                 }
-                // Expr::Negative(_) => {}
+                Expr::Negative(expr) => {
+                    let (expr, sql_query) = Self::generate_sql_for_expr(
+                        plan.clone(),
+                        sql_query,
+                        sql_generator.clone(),
+                        *expr,
+                        ungrouped_scan_node.clone(),
+                    )
+                    .await?;
+                    let resulting_sql = sql_generator
+                        .get_sql_templates()
+                        .negative_expr(expr)
+                        .map_err(|e| {
+                            DataFusionError::Internal(format!(
+                                "Can't generate SQL for not expr: {}",
+                                e
+                            ))
+                        })?;
+                    Ok((resulting_sql, sql_query))
+                }
                 // Expr::GetIndexedField { .. } => {}
                 // Expr::Between { .. } => {}
                 Expr::Case {
@@ -1398,18 +1440,7 @@ impl CubeScanWrapperNode {
                         )
                         .await?;
                         sql_query = query;
-                        sql_order_by.push(
-                            sql_generator
-                                .get_sql_templates()
-                                // TODO asc/desc
-                                .sort_expr(sql, true, false)
-                                .map_err(|e| {
-                                    DataFusionError::Internal(format!(
-                                        "Can't generate SQL for sort expr: {}",
-                                        e
-                                    ))
-                                })?,
-                        );
+                        sql_order_by.push(sql);
                     }
                     let resulting_sql = sql_generator
                         .get_sql_templates()

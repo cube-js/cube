@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"SELECT PI() AS PI\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++-------------------+
+| PI                |
++-------------------+
+| 3.141592653589793 |
++-------------------+

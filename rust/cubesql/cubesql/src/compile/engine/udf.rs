@@ -3634,6 +3634,7 @@ pub fn register_fun_stubs(mut ctx: SessionContext) -> SessionContext {
         rettyp = Int64,
         vol = Volatile
     );
+    register_fun_stub!(udf, "greatest", argc = 2);
     register_fun_stub!(
         udf,
         "has_any_column_privilege",

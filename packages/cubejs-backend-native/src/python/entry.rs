@@ -1,5 +1,6 @@
 use crate::cross::*;
 use crate::python::cube_config::CubeConfigPy;
+use crate::python::neon_py::*;
 use crate::python::python_model::CubePythonModel;
 use crate::python::runtime::py_runtime_init;
 use neon::prelude::*;
@@ -47,7 +48,7 @@ fn python_load_config(mut cx: FunctionContext) -> JsResult<JsPromise> {
 
     deferred.settle_with(&channel, move |mut cx| match conf_res {
         Ok(c) => c.to_object(&mut cx),
-        Err(err) => cx.throw_error(format!("Python error: {}", err)),
+        Err(py_err) => cx.throw_from_python_error(py_err),
     });
 
     Ok(promise)
@@ -154,7 +155,7 @@ fn python_load_model(mut cx: FunctionContext) -> JsResult<JsPromise> {
 
     deferred.settle_with(&channel, move |mut cx| match conf_res {
         Ok(c) => c.to_object(&mut cx),
-        Err(err) => cx.throw_error(format!("Python error: {}", err)),
+        Err(py_err) => cx.throw_from_python_error(py_err),
     });
 
     Ok(promise)
