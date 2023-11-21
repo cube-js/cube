@@ -49,4 +49,3 @@ export class TableTouchMemoryQueue extends AbstractSetMemoryQueue {
     }
   }
 }
-
