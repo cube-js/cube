@@ -653,7 +653,6 @@ export class PreAggregationLoader {
     const versionEntryByContentVersion = getVersionEntryByContentVersion(versionEntries);
     if (versionEntryByContentVersion && !this.forceBuild) {
       const targetTableName = this.targetTableName(versionEntryByContentVersion);
-      // No need to block here
       // Await blocks here, only when Queue is full
       await this.preAggregations.updateLastTouch(targetTableName);
       return {
@@ -673,7 +672,6 @@ export class PreAggregationLoader {
       const versionEntryByStructureVersion = versionEntries.byStructure[`${this.preAggregation.tableName}_${structureVersion}`];
       if (versionEntryByStructureVersion) {
         const targetTableName = this.targetTableName(versionEntryByStructureVersion);
-        // No need to block here
         // Await blocks here, only when Queue is full
         await this.preAggregations.updateLastTouch(targetTableName);
         return {
@@ -715,7 +713,6 @@ export class PreAggregationLoader {
         throw new Error(`Pre-aggregation table is not found for ${this.preAggregation.tableName} after it was successfully created`);
       }
       const targetTableName = this.targetTableName(lastVersion);
-      // No need to block here
       // Await blocks here, only when Queue is full
       await this.preAggregations.updateLastTouch(targetTableName);
       return {
