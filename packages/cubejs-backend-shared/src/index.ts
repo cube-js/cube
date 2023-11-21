@@ -20,4 +20,5 @@ export * from './time';
 export * from './process';
 export * from './platform';
 export * from './FileRepository';
-export * from './Semaphore';
+export * from './semaphore';
+export * from './queue';

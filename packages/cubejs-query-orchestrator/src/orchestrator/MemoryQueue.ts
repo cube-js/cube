@@ -1,64 +1,5 @@
-import { Semaphore } from '@cubejs-backend/shared';
+import { AbstractSetMemoryQueue } from '@cubejs-backend/shared';
 import { QueryCache } from './QueryCache';
-
-export abstract class AbstractSetMemoryQueue {
-  protected readonly queue: Set<string> = new Set();
-
-  protected readonly executionSem: Semaphore;
-
-  protected readonly addSem: Semaphore;
-
-  public constructor(
-    protected readonly capacity: number,
-    concurrency: number,
-  ) {
-    this.executionSem = new Semaphore(concurrency);
-    this.addSem = new Semaphore(capacity);
-  }
-
-  protected execution: boolean = false;
-
-  public async addToQueue(item: string) {
-    const next = this.addSem.acquire();
-    this.queue.add(item);
-
-    if (this.queue.size > this.capacity) {
-      await this.onCapacity();
-    }
-
-    this.run().catch(e => console.log(e));
-    await next;
-  }
-
-  public async run(): Promise<void> {
-    if (this.execution) {
-      return;
-    }
-
-    this.execution = true;
-
-    try {
-      while (this.queue.size) {
-        const toExecute = this.queue[Symbol.iterator]().next().value;
-        if (toExecute) {
-          this.queue.delete(toExecute);
-          await this.executionSem.acquire();
-
-          this.execute(toExecute).finally(() => {
-            this.executionSem.release();
-            this.addSem.release();
-          });
-        }
-      }
-    } finally {
-      this.execution = false;
-    }
-  }
-
-  protected abstract onCapacity(): Promise<void>;
-
-  protected abstract execute(item: string): Promise<void>;
-}
 
 export class TableTouchMemoryQueue extends AbstractSetMemoryQueue {
   public constructor(
@@ -73,7 +14,7 @@ export class TableTouchMemoryQueue extends AbstractSetMemoryQueue {
 
   protected lastWarningDate: Date | null = null;
 
-  protected async onCapacity(): Promise<void> {
+  protected onCapacity(): void {
     let showWarning = false;
 
     if (this.lastWarningDate) {
@@ -122,7 +63,7 @@ export class TableUsedMemoryQueue extends AbstractSetMemoryQueue {
 
   protected lastWarningDate: Date | null = null;
 
-  protected async onCapacity(): Promise<void> {
+  protected onCapacity(): void {
     let showWarning = false;
 
     if (this.lastWarningDate) {
