@@ -8,7 +8,7 @@ import {
   FROM_PARTITION_RANGE,
   getEnv,
   inDbTimeZone,
-  MAX_SOURCE_ROW_LIMIT, MaybeCancelablePromise, reformatInIsoLocal,
+  MAX_SOURCE_ROW_LIMIT, MaybeCancelablePromise, reformatInIsoLocal, Semaphore,
   timeSeries,
   TO_PARTITION_RANGE,
   utcToLocalTimeZone,
@@ -1969,7 +1969,7 @@ export class PreAggregations {
 
   private readonly touchQueue: TableTouchMemoryQueue;
 
-  private readonly usedQueue: TableUsedMemoryQueue;
+  private readonly usedQueue: Semaphore = new Semaphore(1);
 
   public constructor(
     private readonly redisPrefix: string,
@@ -1979,12 +1979,8 @@ export class PreAggregations {
     options,
   ) {
     this.options = options || {};
-    this.touchTablePersistTime = options.touchTablePersistTime || getEnv('touchPreAggregationTimeout');
+    this.touchQueue = new TableTouchMemoryQueue(8_192, 1, this.logger, this.queryCache, options.touchTablePersistTime || getEnv('touchPreAggregationTimeout'));
     this.usedTablePersistTime = options.usedTablePersistTime || getEnv('dbQueryTimeout');
-
-    this.touchQueue = new TableTouchMemoryQueue(8_192, 1, this.logger, this.queryCache, this.touchTablePersistTime);
-    this.usedQueue = new TableUsedMemoryQueue(4_096, 1, this.logger, this.queryCache, this.usedTablePersistTime);
-
     this.externalDriverFactory = options.externalDriverFactory;
     this.structureVersionPersistTime = options.structureVersionPersistTime || 60 * 60 * 24 * 30;
     this.dropPreAggregationsWithoutTouch = options.dropPreAggregationsWithoutTouch || getEnv('dropPreAggregationsWithoutTouch');
@@ -2003,7 +1999,9 @@ export class PreAggregations {
   }
 
   public async addTableUsed(tableName: string) {
-    return this.usedQueue.addToQueue(tableName);
+    return this.usedQueue.execute(async () => {
+      await this.queryCache.getCacheDriver().set(this.tablesUsedRedisKey(tableName), true, this.usedTablePersistTime);
+    });
   }
 
   public async tablesUsed() {
