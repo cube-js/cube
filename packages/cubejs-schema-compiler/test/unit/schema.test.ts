@@ -249,6 +249,25 @@ describe('Schema Testing', () => {
     });
   });
 
+  it('dimensions', async () => {
+    const { compiler, metaTransformer } = prepareCompiler([
+      createCubeSchema({
+        name: 'CubeA',
+        publicly: false,
+      }),
+    ]);
+    await compiler.compile();
+
+    const { dimensions } = metaTransformer.cubes[0].config;
+
+    expect(dimensions).toBeDefined();
+    expect(dimensions.length).toBeGreaterThan(0);
+    expect(dimensions.every((dimension) => dimension.primaryKey)).toBeDefined();
+    expect(dimensions.every((dimension) => typeof dimension.primaryKey === 'boolean')).toBe(true);
+    expect(dimensions.find((dimension) => dimension.name === 'CubeA.id').primaryKey).toBe(true);
+    expect(dimensions.find((dimension) => dimension.name === 'CubeA.type').primaryKey).toBe(false);
+  });
+
   it('join types', async () => {
     const { compiler, cubeEvaluator } = prepareCompiler([
       createCubeSchema({
