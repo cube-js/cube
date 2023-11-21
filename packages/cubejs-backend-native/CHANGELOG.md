@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.23](https://github.com/cube-js/cube/compare/v0.34.22...v0.34.23) (2023-11-19)
+
+
+### Features
+
+* **native:** Jinja - print tracebacks for Python errors ([#7435](https://github.com/cube-js/cube/issues/7435)) ([734094c](https://github.com/cube-js/cube/commit/734094c6c9a9f89de3504d980daa5fa0e0198ae5))
+
+
+
+
+
 ## [0.34.22](https://github.com/cube-js/cube/compare/v0.34.21...v0.34.22) (2023-11-16)
 
 **Note:** Version bump only for package @cubejs-backend/native

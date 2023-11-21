@@ -533,6 +533,9 @@ export class PreAggregations {
         ? transformedQuery.timeDimensions
         : transformedQuery.sortedTimeDimensions;
 
+      const backAliasMeasures = backAlias(references.measures);
+      const backAliasSortedDimensions = backAlias(references.sortedDimensions || references.dimensions);
+      const backAliasDimensions = backAlias(references.dimensions);
       return ((
         transformedQuery.hasNoTimeDimensionsWithoutGranularity
       ) && (
@@ -545,13 +548,13 @@ export class PreAggregations {
       ) && (
         filterDimensionsSingleValueEqual &&
         references.dimensions.length === filterDimensionsSingleValueEqual.size &&
-        R.all(d => filterDimensionsSingleValueEqual.has(d), backAlias(references.dimensions)) ||
+        R.all(d => filterDimensionsSingleValueEqual.has(d), backAliasDimensions) ||
         transformedQuery.allFiltersWithinSelectedDimensions &&
-        R.equals(backAlias(references.sortedDimensions || references.dimensions), transformedQuery.sortedDimensions)
+        R.equals(backAliasSortedDimensions, transformedQuery.sortedDimensions)
       ) && (
-        R.all(m => backAlias(references.measures).indexOf(m) !== -1, transformedQuery.measures) ||
+        R.all(m => backAliasMeasures.indexOf(m) !== -1, transformedQuery.measures) ||
         // TODO do we need backAlias here?
-        R.all(m => backAlias(references.measures).indexOf(m) !== -1, transformedQuery.leafMeasures)
+        R.all(m => backAliasMeasures.indexOf(m) !== -1, transformedQuery.leafMeasures)
       ));
     };
     
@@ -619,33 +622,39 @@ export class PreAggregations {
         ? transformedQuery.ownedTimeDimensionsAsIs.map(expandTimeDimension)
         : transformedQuery.ownedTimeDimensionsWithRollupGranularity.map(expandTimeDimension);
 
-      const dimensionsMatch = (dimensions) => R.all(
+      const dimensionsMatch = (dimensions, doBackAlias) => R.all(
         d => (
-          references.sortedDimensions ||
-          references.dimensions
+          doBackAlias ?
+            backAlias(references.sortedDimensions || references.dimensions) :
+            (references.sortedDimensions || references.dimensions)
         ).indexOf(d) !== -1,
         dimensions
       );
 
-      const timeDimensionsMatch = (timeDimensionsList) => R.allPass(
+      const timeDimensionsMatch = (timeDimensionsList, doBackAlias) => R.allPass(
         timeDimensionsList.map(
           tds => R.anyPass(tds.map(td => R.contains(td)))
         )
       )(
-        references.sortedTimeDimensions ||
-        sortTimeDimensions(references.timeDimensions)
+        doBackAlias ?
+          backAlias(references.sortedTimeDimensions || sortTimeDimensions(references.timeDimensions)) :
+          (references.sortedTimeDimensions || sortTimeDimensions(references.timeDimensions))
       );
 
+      const backAliasMeasures = backAlias(references.measures);
       return ((
         windowGranularityMatches(references)
       ) && (
         R.all(
           m => references.measures.indexOf(m) !== -1,
           transformedQuery.leafMeasures,
+        ) || R.all(
+          m => backAliasMeasures.indexOf(m) !== -1,
+          transformedQuery.measures,
         )
       ) && (
-        dimensionsMatch(transformedQuery.sortedDimensions) && timeDimensionsMatch(queryTimeDimensionsList) ||
-        dimensionsMatch(transformedQuery.ownedDimensions) && timeDimensionsMatch(ownedQueryTimeDimensionsList)
+        dimensionsMatch(transformedQuery.sortedDimensions, true) && timeDimensionsMatch(queryTimeDimensionsList, true) ||
+        dimensionsMatch(transformedQuery.ownedDimensions, false) && timeDimensionsMatch(ownedQueryTimeDimensionsList, false)
       ));
     };
 

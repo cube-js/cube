@@ -11,8 +11,6 @@ on:
       - 'package.json'
       - 'rollup.config.js'
       - 'yarn.lock'
-      - 'docs-gen/**'
-      - 'docs/**'
     branches:
       - master
 jobs:
