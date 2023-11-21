@@ -21,6 +21,11 @@ export abstract class AbstractSetMemoryQueue {
 
   protected execution: boolean = false;
 
+  /**
+   * It's important to await result of adding to queue, because
+   * if queue reached max capacity, it will block adding to queue
+   * to protect out of memory
+   */
   public async addToQueue(item: string) {
     const next = this.addSem.acquire();
     this.queue.add(item);
@@ -30,7 +35,9 @@ export abstract class AbstractSetMemoryQueue {
     }
 
     this.run().catch(e => console.error(e));
-    await next;
+
+    // block as OOM protection
+    return next;
   }
 
   public async run(): Promise<void> {
