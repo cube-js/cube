@@ -53,3 +53,9 @@ export class Semaphore {
     }
   }
 }
+
+export class Mutex extends Semaphore {
+  public constructor() {
+    super(1);
+  }
+}
