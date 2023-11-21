@@ -71,7 +71,7 @@ export class CubeToMetaTransformer {
             public: isCubeVisible
               ? this.isVisible(nameToDimension[1], !nameToDimension[1].primaryKey)
               : false,
-            isPrimaryKey: !!nameToDimension[1].primaryKey,
+            primaryKey: !!nameToDimension[1].primaryKey,
           })),
           R.toPairs
         )(cube.dimensions || {}),
