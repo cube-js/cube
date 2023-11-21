@@ -97,8 +97,15 @@ export class TableTouchMemoryQueue extends AbstractSetMemoryQueue {
 
   protected async execute(tableName: string): Promise<void> {
     const key = this.queryCache.getKey('SQL_PRE_AGGREGATIONS_TABLES_TOUCH', tableName);
-    console.log('touch', key);
-    await this.queryCache.getCacheDriver().set(key, new Date().getTime(), this.touchTablePersistTime);
+
+    try {
+      await this.queryCache.getCacheDriver().set(key, new Date().getTime(), this.touchTablePersistTime);
+    } catch (e: any) {
+      this.logger('Error on pre-aggregation touch update', {
+        error: (e.stack || e),
+        key
+      });
+    }
   }
 }
 
@@ -139,7 +146,14 @@ export class TableUsedMemoryQueue extends AbstractSetMemoryQueue {
 
   protected async execute(tableName: string): Promise<void> {
     const key = this.queryCache.getKey('SQL_PRE_AGGREGATIONS_TABLES_USED', tableName);
-    console.log('used', key);
-    await this.queryCache.getCacheDriver().set(key, true, this.touchTablePersistTime);
+
+    try {
+      await this.queryCache.getCacheDriver().set(key, true, this.touchTablePersistTime);
+    } catch (e: any) {
+      this.logger('Error on pre-aggregation used update', {
+        error: (e.stack || e),
+        key
+      });
+    }
   }
 }
