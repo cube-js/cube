@@ -989,6 +989,7 @@ declare module '@cubejs-client/core' {
      */
     isVisible?: boolean;
     public?: boolean;
+    primaryKey?: boolean;
   };
 
 
