@@ -1,25 +1,25 @@
+import { Semaphore } from '@cubejs-backend/shared';
 import { QueryCache } from './QueryCache';
-import { pausePromise, Semaphore } from '@cubejs-backend/shared';
 
 export abstract class AbstractSetMemoryQueue {
   protected readonly queue: Set<string> = new Set();
 
-  protected readonly execution_sem: Semaphore;
+  protected readonly executionSem: Semaphore;
 
-  protected readonly add_sem: Semaphore;
+  protected readonly addSem: Semaphore;
 
   public constructor(
     protected readonly capacity: number,
     concurrency: number,
   ) {
-    this.execution_sem = new Semaphore(concurrency);
-    this.add_sem = new Semaphore(capacity);
+    this.executionSem = new Semaphore(concurrency);
+    this.addSem = new Semaphore(capacity);
   }
 
   protected execution: boolean = false;
 
   public async addToQueue(item: string) {
-    const next = this.add_sem.acquire();
+    const next = this.addSem.acquire();
     this.queue.add(item);
 
     if (this.queue.size > this.capacity) {
@@ -42,11 +42,11 @@ export abstract class AbstractSetMemoryQueue {
         const toExecute = this.queue[Symbol.iterator]().next().value;
         if (toExecute) {
           this.queue.delete(toExecute);
-          await this.execution_sem.acquire();
+          await this.executionSem.acquire();
 
           this.execute(toExecute).finally(() => {
-            this.execution_sem.release();
-            this.add_sem.release();
+            this.executionSem.release();
+            this.addSem.release();
           });
         }
       }
@@ -64,14 +64,26 @@ export class TableTouchMemoryQueue extends AbstractSetMemoryQueue {
   public constructor(
     capacity: number,
     concurrency: number,
+    protected readonly logger: any,
     protected readonly queryCache: QueryCache,
     protected readonly touchTablePersistTime: number
   ) {
     super(capacity, concurrency);
   }
 
+  protected lastWarningDate: Date | null = null;
+
   protected async onCapacity(): Promise<void> {
-    console.log('Too large capacity (touch)', this.queue.size);
+    let showWarning = false;
+
+    if (this.lastWarningDate) {
+    } else {
+      showWarning = true;
+    }
+
+    if (showWarning) {
+      this.logger('TableTouchMemoryQueue not enought capacity: {}')
+    }
   }
 
   protected async execute(tableName: string): Promise<void> {
@@ -85,6 +97,7 @@ export class TableUsedMemoryQueue extends AbstractSetMemoryQueue {
   public constructor(
     capacity: number,
     concurrency: number,
+    protected readonly logger: any,
     protected readonly queryCache: QueryCache,
     protected readonly touchTablePersistTime: number
   ) {
