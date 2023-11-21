@@ -77,12 +77,21 @@ export class TableTouchMemoryQueue extends AbstractSetMemoryQueue {
     let showWarning = false;
 
     if (this.lastWarningDate) {
+      const now = new Date();
+      const diffInMS = now.getTime() - this.lastWarningDate.getTime();
+
+      if (diffInMS > 60 * 1000) {
+        showWarning = true;
+        this.lastWarningDate = now;
+      }
     } else {
       showWarning = true;
     }
 
     if (showWarning) {
-      this.logger('TableTouchMemoryQueue not enought capacity: {}')
+      this.logger('TableTouchMemoryQueue not enough capacity', {
+        message: `TableTouchMemoryQueue reached max capacity: ${this.capacity}. Please reduce number of pre-aggregations by using higher granularity.`
+      });
     }
   }
 
@@ -104,8 +113,28 @@ export class TableUsedMemoryQueue extends AbstractSetMemoryQueue {
     super(capacity, concurrency);
   }
 
+  protected lastWarningDate: Date | null = null;
+
   protected async onCapacity(): Promise<void> {
-    console.log('Too large capacity (used)', this.queue.size);
+    let showWarning = false;
+
+    if (this.lastWarningDate) {
+      const now = new Date();
+      const diffInMS = now.getTime() - this.lastWarningDate.getTime();
+
+      if (diffInMS > 60 * 1000) {
+        showWarning = true;
+        this.lastWarningDate = now;
+      }
+    } else {
+      showWarning = true;
+    }
+
+    if (showWarning) {
+      this.logger('TableUsedMemoryQueue not enough capacity', {
+        message: `TableUsedMemoryQueue reached max capacity: ${this.capacity}. Please reduce number of pre-aggregations by using higher granularity.`
+      });
+    }
   }
 
   protected async execute(tableName: string): Promise<void> {
