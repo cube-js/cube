@@ -941,6 +941,7 @@ declare module '@cubejs-client/core' {
   };
 
   export type TCubeDimension = BaseCubeMember & {
+    primaryKey?: boolean;
     suggestFilterValues: boolean;
   };
 
@@ -989,7 +990,6 @@ declare module '@cubejs-client/core' {
      */
     isVisible?: boolean;
     public?: boolean;
-    primaryKey?: boolean;
   };
 
 
