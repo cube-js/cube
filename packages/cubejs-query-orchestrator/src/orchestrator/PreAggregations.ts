@@ -33,7 +33,7 @@ import { QueryQueue } from './QueryQueue';
 import { LargeStreamWarning } from './StreamObjectsCounter';
 import { CacheAndQueryDriverType } from './QueryOrchestrator';
 import { RedisPool } from './RedisPool';
-import { TableTouchMemoryQueue, TableUsedMemoryQueue } from './MemoryQueue';
+import { TableTouchMemoryQueue } from './TableTouchMemoryQueue';
 
 /// Name of the inline table containing the lambda rows.
 export const LAMBDA_TABLE_PREFIX = 'lambda';
