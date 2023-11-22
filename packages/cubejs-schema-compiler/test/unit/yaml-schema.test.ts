@@ -123,6 +123,7 @@ describe('Yaml Schema Testing', () => {
             example_integer: 1
             example_float: 1.0
             example_boolean: true
+            example_null: null
           sequence:
             - 1
             - 2

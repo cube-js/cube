@@ -171,6 +171,8 @@ export class YamlCompiler {
       return t.booleanLiteral(obj);
     } else if (typeof obj === 'number') {
       return t.numericLiteral(obj);
+    } else if (obj === null && propertyPath.includes('meta')) {
+      return t.nullLiteral();
     }
 
     if (typeof obj === 'object' && obj !== null) {
