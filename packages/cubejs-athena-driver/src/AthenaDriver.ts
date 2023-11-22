@@ -133,7 +133,8 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
 
     this.config = {
       ...restConfig,
-      credentials: credentials || accessKeyId && secretAccessKey
+      credentials: typeof credentials !== undefined? credentials :
+       accessKeyId && secretAccessKey
         ? { accessKeyId, secretAccessKey }
         : undefined,
       region:
