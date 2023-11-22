@@ -11,7 +11,7 @@ use datafusion::physical_plan::aggregates::AggregateFunction;
 use egg::{EGraph, Rewrite, Subst};
 
 impl WrapperRules {
-    pub fn aggregate_function_rules(
+    pub fn window_function_rules(
         &self,
         rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
     ) {

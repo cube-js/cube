@@ -1,14 +1,14 @@
 use crate::cross::*;
 use crate::python::runtime::py_runtime;
+use crate::python::{python_obj_call_sync, python_obj_method_call_sync};
 use crate::template::mj_value::to_minijinja_value;
 use crate::tokio_runtime;
 use log::error;
 use minijinja as mj;
 use minijinja::value as mjv;
 use minijinja::value::{Object, ObjectKind, StructObject, Value};
-use pyo3::exceptions::PyNotImplementedError;
-use pyo3::types::{PyDict, PyFunction, PyTuple};
-use pyo3::{AsPyPointer, Py, PyErr, PyObject, PyResult, Python};
+use pyo3::types::{PyDict, PyFunction};
+use pyo3::{Py, PyObject, PyResult, Python};
 use std::convert::TryInto;
 use std::sync::Arc;
 
@@ -131,28 +131,7 @@ impl Object for JinjaPythonObject {
             arguments.push(from_minijinja_value(arg)?);
         }
 
-        let python_call_res = Python::with_gil(move |py| -> PyResult<CLRepr> {
-            let mut args_tuple = Vec::with_capacity(args.len());
-
-            for arg in arguments {
-                args_tuple.push(arg.into_py(py)?);
-            }
-
-            let tuple = PyTuple::new(py, args_tuple);
-
-            let call_res = obj_ref.call_method1(py, name, tuple)?;
-
-            let is_coroutine = unsafe { pyo3::ffi::PyCoro_CheckExact(call_res.as_ptr()) == 1 };
-            if is_coroutine {
-                Err(PyErr::new::<PyNotImplementedError, _>(
-                    "Calling async methods are not supported",
-                ))
-            } else {
-                CLRepr::from_python_ref(call_res.as_ref(py))
-            }
-        });
-
-        match python_call_res {
+        match python_obj_method_call_sync(obj_ref, name, arguments) {
             Ok(r) => Ok(to_minijinja_value(r)),
             Err(err) => Err(mj::Error::new(
                 minijinja::ErrorKind::InvalidOperation,
@@ -170,28 +149,7 @@ impl Object for JinjaPythonObject {
             arguments.push(from_minijinja_value(arg)?);
         }
 
-        let python_call_res = Python::with_gil(move |py| -> PyResult<CLRepr> {
-            let mut args_tuple = Vec::with_capacity(args.len());
-
-            for arg in arguments {
-                args_tuple.push(arg.into_py(py)?);
-            }
-
-            let tuple = PyTuple::new(py, args_tuple);
-
-            let call_res = obj_ref.call1(py, tuple)?;
-
-            let is_coroutine = unsafe { pyo3::ffi::PyCoro_CheckExact(call_res.as_ptr()) == 1 };
-            if is_coroutine {
-                Err(PyErr::new::<PyNotImplementedError, _>(
-                    "Calling async is not supported",
-                ))
-            } else {
-                CLRepr::from_python_ref(call_res.as_ref(py))
-            }
-        });
-
-        match python_call_res {
+        match python_obj_call_sync(obj_ref, arguments) {
             Ok(r) => Ok(to_minijinja_value(r)),
             Err(err) => Err(mj::Error::new(
                 minijinja::ErrorKind::InvalidOperation,
@@ -233,9 +191,9 @@ impl StructObject for JinjaPythonObject {
                         fields.push(key.to_string().into());
                     }
                 }
-                Err(err) => {
+                Err(_err) => {
                     #[cfg(debug_assertions)]
-                    log::trace!("Unable to extract PyDict: {:?}", err)
+                    log::trace!("Unable to extract PyDict: {:?}", _err)
                 }
             }
 

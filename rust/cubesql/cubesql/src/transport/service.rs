@@ -6,7 +6,8 @@ use cubeclient::{
 
 use datafusion::{
     arrow::{datatypes::SchemaRef, record_batch::RecordBatch},
-    physical_plan::aggregates::AggregateFunction,
+    logical_plan::window_frames::WindowFrame,
+    physical_plan::{aggregates::AggregateFunction, window_functions::WindowFunction},
 };
 use minijinja::{context, value::Value, Environment};
 use serde_derive::*;
@@ -95,6 +96,12 @@ pub trait TransportService: Send + Sync + Debug {
         schema: SchemaRef,
         member_fields: Vec<MemberField>,
     ) -> Result<CubeStreamReceiver, CubeError>;
+
+    async fn can_switch_user_for_session(
+        &self,
+        ctx: AuthContextRef,
+        to_user: String,
+    ) -> Result<bool, CubeError>;
 }
 
 #[async_trait]
@@ -231,6 +238,14 @@ impl TransportService for HttpTransport {
         _schema: SchemaRef,
         _member_fields: Vec<MemberField>,
     ) -> Result<CubeStreamReceiver, CubeError> {
+        panic!("Does not work for standalone mode yet");
+    }
+
+    async fn can_switch_user_for_session(
+        &self,
+        _ctx: AuthContextRef,
+        _to_user: String,
+    ) -> Result<bool, CubeError> {
         panic!("Does not work for standalone mode yet");
     }
 }
@@ -404,6 +419,54 @@ impl SqlTemplates {
         )
     }
 
+    pub fn window_function_name(&self, window_function: WindowFunction) -> String {
+        match window_function {
+            WindowFunction::AggregateFunction(aggregate_function) => {
+                self.aggregate_function_name(aggregate_function, false)
+            }
+            WindowFunction::BuiltInWindowFunction(built_in_window_function) => {
+                built_in_window_function.to_string()
+            }
+        }
+    }
+
+    pub fn window_function(
+        &self,
+        window_function: WindowFunction,
+        args: Vec<String>,
+    ) -> Result<String, CubeError> {
+        let function = self.window_function_name(window_function);
+        let args_concat = args.join(", ");
+        self.render_template(
+            &format!("functions/{}", function),
+            context! { args_concat => args_concat, args => args },
+        )
+    }
+
+    pub fn window_function_expr(
+        &self,
+        window_function: WindowFunction,
+        args: Vec<String>,
+        partition_by: Vec<String>,
+        order_by: Vec<String>,
+        _window_frame: Option<WindowFrame>,
+    ) -> Result<String, CubeError> {
+        let fun_call = self.window_function(window_function, args)?;
+        let partition_by_concat = partition_by.join(", ");
+        let order_by_concat = order_by.join(", ");
+        // TODO window_frame
+        self.render_template(
+            "expressions/window_function",
+            context! {
+                fun_call => fun_call,
+                partition_by => partition_by,
+                partition_by_concat => partition_by_concat,
+                order_by => order_by,
+                order_by_concat => order_by_concat
+            },
+        )
+    }
+
     pub fn case(
         &self,
         expr: Option<String>,
@@ -425,6 +488,13 @@ impl SqlTemplates {
         self.render_template(
             "expressions/binary",
             context! { left => left, op => op, right => right },
+        )
+    }
+
+    pub fn is_null_expr(&self, expr: String, negate: bool) -> Result<String, CubeError> {
+        self.render_template(
+            "expressions/is_null",
+            context! { expr => expr, negate => negate },
         )
     }
 

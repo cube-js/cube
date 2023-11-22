@@ -5,13 +5,6 @@ redirect_from:
 
 # PowerBI
 
-<WarningBox heading={`Power BI support is in preview`}>
-
-Power BI support is in preview, not all features and requests may work at this
-point.
-
-</WarningBox>
-
 You can connect to Cube from Power BI, interactive data visualization software
 product developed by Microsoft, using the [Cube SQL API][ref-sql-api].
 
@@ -45,7 +38,16 @@ CUBEJS_SQL_PASSWORD=mypassword
 
 ## Connecting from Power BI
 
-Power BI connects to Cube as to a Postgres database.
+Power BI connects to Cube as to a Postgres database using the
+[DirectQuery][link-powerbi-directquery] connectivity mode.
+
+<InfoBox>
+
+It's not recommended to import data into Power BI when connecting to Cube;
+choose DirectQuery instead. Use [pre-aggregations][ref-pre-aggs] to improve
+querying performance and manage data freshness upstream of Power BI.
+
+</InfoBox>
 
 ## Querying data
 
@@ -54,3 +56,6 @@ are columns.
 
 [ref-getting-started]: /product/getting-started/cloud
 [ref-sql-api]: /product/apis-integrations/sql-api
+[ref-pre-aggs]: /product/caching/using-pre-aggregations
+
+[link-powerbi-directquery]: https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-use-directquery

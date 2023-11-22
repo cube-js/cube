@@ -164,4 +164,11 @@ export class BaseMeasure {
     }
     return this.query.cubeEvaluator.parsePath('measures', this.measure);
   }
+
+  expressionPath() {
+    if (this.expression) {
+      return `expr:${this.expression.expressionName}`;
+    }
+    return this.query.cubeEvaluator.pathFromArray(this.path());
+  }
 }

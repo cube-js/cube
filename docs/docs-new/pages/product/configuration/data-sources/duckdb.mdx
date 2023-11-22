@@ -49,15 +49,16 @@ If you are not using MotherDuck, leave the **MotherDuck Token** field blank.
 
 ## Environment Variables
 
-| Environment Variable                       | Description                                                                                                           | Possible Values                                               | Required | [Supports multiple data sources?][ref-config-multiple-ds-decorating-env] |
-| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- | :------: | :----------------------------------------------------------------------: |
-| `CUBEJS_DB_DUCKDB_MEMORY_LIMIT`         | The maximum memory limit for DuckDB. Equivalent to `SET memory_limit=<MEMORY_LIMIT>`. Default is 75% of available RAM | A valid memory limit                                          |    ❌    |                                    ✅                                    |
-| `CUBEJS_DB_DUCKDB_MOTHER_DUCK_TOKEN`    | The service token to use for connections to MotherDuck                                                                | A valid [MotherDuck service token][motherduck-docs-svc-token] |    ❌    |                                    ✅                                    |
-| `CUBEJS_DB_DUCKDB_S3_ACCESS_KEY_ID`     | The Access Key ID to use for database connections                                                                     | A valid Access Key ID                                         |    ❌    |                                    ✅                                    |
-| `CUBEJS_DB_DUCKDB_S3_SECRET_ACCESS_KEY` | The Secret Access Key to use for database connections                                                                 | A valid Secret Access Key                                     |    ❌    |                                    ✅                                    |
-| `CUBEJS_DB_DUCKDB_S3_ENDPOINT`          | The S3 endpoint                                                                                                       | A valid [S3 endpoint][duckdb-docs-s3-import]                  |    ✅    |                                    ✅                                    |
-| `CUBEJS_DB_DUCKDB_S3_REGION`            | The [region of the bucket][duckdb-docs-s3-import]                                                                     | A valid AWS region                                            |    ✅    |                                    ✅                                    |
-| `CUBEJS_CONCURRENCY`                    | The number of concurrent connections each queue has to the database. Default is `2`                                   | A valid number                                                |    ❌    |                                    ❌                                    |
+| Environment Variable                    | Description                                                                                                           | Possible Values                                               | Required | [Supports multiple data sources?][ref-config-multiple-ds-decorating-env] |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- | :------: | :----------------------------------------------------------------------: |
+| `CUBEJS_DB_DUCKDB_MEMORY_LIMIT`         | The maximum memory limit for DuckDB. Equivalent to `SET memory_limit=<MEMORY_LIMIT>`. Default is 75% of available RAM | A valid memory limit                                          |    ❌    |                                    ✅                                     |
+| `CUBEJS_DB_DUCKDB_SCHEMA`               | The [default search schema][link-duckdb-configuration-ref]                                                            | A valid schema name                                           |    ❌    |                                    ✅                                     |
+| `CUBEJS_DB_DUCKDB_MOTHERDUCK_TOKEN`     | The service token to use for connections to MotherDuck                                                                | A valid [MotherDuck service token][motherduck-docs-svc-token] |    ❌    |                                    ✅                                     |
+| `CUBEJS_DB_DUCKDB_S3_ACCESS_KEY_ID`     | The Access Key ID to use for database connections                                                                     | A valid Access Key ID                                         |    ❌    |                                    ✅                                     |
+| `CUBEJS_DB_DUCKDB_S3_SECRET_ACCESS_KEY` | The Secret Access Key to use for database connections                                                                 | A valid Secret Access Key                                     |    ❌    |                                    ✅                                     |
+| `CUBEJS_DB_DUCKDB_S3_ENDPOINT`          | The S3 endpoint                                                                                                       | A valid [S3 endpoint][duckdb-docs-s3-import]                  |    ✅    |                                    ✅                                     |
+| `CUBEJS_DB_DUCKDB_S3_REGION`            | The [region of the bucket][duckdb-docs-s3-import]                                                                     | A valid AWS region                                            |    ✅    |                                    ✅                                     |
+| `CUBEJS_CONCURRENCY`                    | The number of concurrent connections each queue has to the database. Default is `2`                                   | A valid number                                                |    ❌    |                                    ❌                                     |
 
 ## Pre-Aggregation Feature Support
 
@@ -110,6 +111,7 @@ connections are made over HTTPS.
 [duckdb-docs-approx-agg-fns]:
   https://duckdb.org/docs/sql/aggregates.html#approximate-aggregates
 [duckdb-docs-s3-import]: https://duckdb.org/docs/guides/import/s3_import
+[link-duckdb-configuration-ref]: https://duckdb.org/docs/sql/configuration.html#configuration-reference
 [motherduck]: https://motherduck.com/
 [motherduck-docs-architecture]:
   https://motherduck.com/docs/architecture-and-capabilities#hybrid-execution

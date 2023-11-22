@@ -35,7 +35,7 @@ async function loadPythonCtxFromUtils(fileName: string) {
 function testTemplateBySnapshot(init: InitJinjaFn, templateName: string, ctx: unknown) {
   test(`render ${templateName}`, async () => {
     const { jinjaEngine } = await init();
-    const actual = jinjaEngine.renderTemplate(templateName, ctx, null);
+    const actual = await jinjaEngine.renderTemplate(templateName, ctx, null);
 
     expect(actual).toMatchSnapshot(templateName);
   });
@@ -44,7 +44,7 @@ function testTemplateBySnapshot(init: InitJinjaFn, templateName: string, ctx: un
 function testTemplateWithPythonCtxBySnapshot(init: InitJinjaFn, templateName: string, ctx: unknown) {
   test(`render ${templateName}`, async () => {
     const { jinjaEngine, pyCtx } = await init();
-    const actual = jinjaEngine.renderTemplate(templateName, ctx, {
+    const actual = await jinjaEngine.renderTemplate(templateName, ctx, {
       ...pyCtx.variables,
       ...pyCtx.functions,
     });
@@ -138,7 +138,8 @@ suite('Jinja (new api)', () => {
       pyCtx = await loadPythonCtxFromUtils('jinja-instance.py');
       jinjaEngine = nativeInstance.newJinjaEngine({
         debugInfo: true,
-        filters: pyCtx.filters
+        filters: pyCtx.filters,
+        workers: 1,
       });
 
       return {

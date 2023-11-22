@@ -8,22 +8,26 @@ pub struct BestCubePlan;
 /// This cost struct maintains following structural relationships:
 /// - `replacers` > other nodes - having replacers in structure means not finished processing
 /// - `table_scans` > other nodes - having table scan means not detected cube scan
+/// - `empty_wrappers` > `non_detected_cube_scans` - we don't want empty wrapper to hide non detected cube scan errors
 /// - `non_detected_cube_scans` > other nodes - minimize cube scans without members
 /// - `filters` > `filter_members` - optimize for push down of filters
 /// - `filter_members` > `cube_members` - optimize for `inDateRange` filter push down to time dimension
 /// - `member_errors` > `cube_members` - extra cube members may be required (e.g. CASE)
 /// - `member_errors` > `wrapper_nodes` - use SQL push down where possible if cube scan can't be detected
+/// - `non_pushed_down_window` > `wrapper_nodes` - prefer to always push down window functions
 /// - match errors by priority - optimize for more specific errors
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct CubePlanCost {
     replacers: i64,
     table_scans: i64,
+    empty_wrappers: i64,
     non_detected_cube_scans: i64,
     filters: i64,
     structure_points: i64,
     filter_members: i64,
-    empty_wrappers: i64,
     member_errors: i64,
+    // TODO if pre-aggregation can be used for window functions, then it'd be suboptimal
+    non_pushed_down_window: i64,
     wrapper_nodes: i64,
     ast_size_outside_wrapper: usize,
     cube_members: i64,
@@ -98,6 +102,7 @@ impl CubePlanCost {
                 0
             }) + other.non_detected_cube_scans,
             filter_members: self.filter_members + other.filter_members,
+            non_pushed_down_window: self.non_pushed_down_window + other.non_pushed_down_window,
             member_errors: self.member_errors + other.member_errors,
             cube_members: self.cube_members + other.cube_members,
             errors: self.errors + other.errors,
@@ -124,6 +129,7 @@ impl CubePlanCost {
             },
             filter_members: self.filter_members,
             member_errors: self.member_errors,
+            non_pushed_down_window: self.non_pushed_down_window,
             cube_members: self.cube_members,
             errors: self.errors,
             structure_points: self.structure_points,
@@ -183,6 +189,11 @@ impl CostFunction<LogicalPlanLanguage> for BestCubePlan {
             LogicalPlanLanguage::Union(_) => 1,
             LogicalPlanLanguage::Window(_) => 1,
             LogicalPlanLanguage::Subquery(_) => 1,
+            _ => 0,
+        };
+
+        let non_pushed_down_window = match enode {
+            LogicalPlanLanguage::Window(_) => 1,
             _ => 0,
         };
 
@@ -264,6 +275,7 @@ impl CostFunction<LogicalPlanLanguage> for BestCubePlan {
                 filter_members,
                 non_detected_cube_scans,
                 member_errors,
+                non_pushed_down_window,
                 cube_members,
                 errors: this_errors,
                 structure_points,

@@ -2,7 +2,9 @@ import {
   BaseDriver,
   DriverInterface,
   StreamOptions,
-  QueryOptions, StreamTableData,
+  QueryOptions,
+  StreamTableData,
+  GenericDataBaseType,
 } from '@cubejs-backend/base-driver';
 import { getEnv } from '@cubejs-backend/shared';
 import { promisify } from 'util';
@@ -16,6 +18,7 @@ import { HydrationStream, transformRow } from './HydrationStream';
 export type DuckDBDriverConfiguration = {
   dataSource?: string,
   initSql?: string,
+  schema?: string,
 };
 
 type InitPromise = {
@@ -23,13 +26,32 @@ type InitPromise = {
   db: Database;
 };
 
+const DuckDBToGenericType: Record<string, GenericDataBaseType> = {
+  // DATE_TRUNC returns DATE, but Cube Store still doesn't support DATE type
+  // DuckDB's driver transform date/timestamp to Date object, but HydrationStream converts any Date object to ISO timestamp
+  // That's why It's safe to use timestamp here
+  date: 'timestamp',
+};
+
 export class DuckDBDriver extends BaseDriver implements DriverInterface {
   protected initPromise: Promise<InitPromise> | null = null;
+
+  private schema: string;
 
   public constructor(
     protected readonly config: DuckDBDriverConfiguration = {},
   ) {
     super();
+
+    this.schema = this.config.schema || getEnv('duckdbSchema', this.config);
+  }
+
+  public toGenericType(columnType: string): GenericDataBaseType {
+    if (columnType.toLowerCase() in DuckDBToGenericType) {
+      return DuckDBToGenericType[columnType.toLowerCase()];
+    }
+
+    return super.toGenericType(columnType.toLowerCase());
   }
 
   protected async init(): Promise<InitPromise> {
@@ -121,6 +143,26 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
       connection,
       db
     };
+  }
+
+  public override informationSchemaQuery(): string {
+    if (this.schema) {
+      return `${super.informationSchemaQuery()} AND table_catalog = '${this.schema}'`;
+    }
+
+    return super.informationSchemaQuery();
+  }
+
+  public override getSchemasQuery(): string {
+    if (this.schema) {
+      return `
+        SELECT table_schema as ${super.quoteIdentifier('schema_name')}
+        FROM information_schema.tables
+        WHERE table_catalog = '${this.schema}'
+        GROUP BY table_schema
+      `;
+    }
+    return super.getSchemasQuery();
   }
 
   protected async getConnection(): Promise<Connection> {

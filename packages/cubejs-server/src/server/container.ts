@@ -268,10 +268,6 @@ export class ServerContainer {
     }
 
     if (fs.existsSync(path.join(process.cwd(), 'cube.py'))) {
-      console.log(
-        `${color.yellow('warning')} You are using Python configuration 🐍, which is an experimental feature and may not support all features`
-      );
-
       const supported = isNativeSupported();
       if (supported !== true) {
         throw new Error(

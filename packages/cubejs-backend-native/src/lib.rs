@@ -1,4 +1,5 @@
 #![feature(async_closure)]
+#![feature(thread_id_value)]
 
 extern crate findshlibs;
 
@@ -7,6 +8,7 @@ mod channel;
 mod config;
 mod cross;
 mod logger;
+mod node_obj_serializer;
 #[cfg(feature = "python")]
 mod python;
 mod stream;
@@ -119,6 +121,9 @@ fn register_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let transport_sql_generator = options
         .get::<JsFunction, _, _>(&mut cx, "sqlGenerators")?
         .root(&mut cx);
+    let transport_can_switch_user_for_session = options
+        .get::<JsFunction, _, _>(&mut cx, "canSwitchUserForSession")?
+        .root(&mut cx);
 
     let nonce_handle = options.get_value(&mut cx, "nonce")?;
     let nonce = if nonce_handle.is_a::<JsString, _>(&mut cx) {
@@ -156,6 +161,7 @@ fn register_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
         transport_sql,
         transport_meta,
         transport_sql_generator,
+        transport_can_switch_user_for_session,
     );
     let auth_service = NodeBridgeAuthService::new(cx.channel(), check_auth);
 

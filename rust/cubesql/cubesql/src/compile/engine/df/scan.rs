@@ -140,6 +140,7 @@ pub struct WrappedSelectNode {
     pub projection_expr: Vec<Expr>,
     pub group_expr: Vec<Expr>,
     pub aggr_expr: Vec<Expr>,
+    pub window_expr: Vec<Expr>,
     pub from: Arc<LogicalPlan>,
     pub joins: Vec<(Arc<LogicalPlan>, Expr, JoinType)>,
     pub filter_expr: Vec<Expr>,
@@ -158,6 +159,7 @@ impl WrappedSelectNode {
         projection_expr: Vec<Expr>,
         group_expr: Vec<Expr>,
         aggr_expr: Vec<Expr>,
+        window_expr: Vec<Expr>,
         from: Arc<LogicalPlan>,
         joins: Vec<(Arc<LogicalPlan>, Expr, JoinType)>,
         filter_expr: Vec<Expr>,
@@ -174,6 +176,7 @@ impl WrappedSelectNode {
             projection_expr,
             group_expr,
             aggr_expr,
+            window_expr,
             from,
             joins,
             filter_expr,
@@ -207,6 +210,7 @@ impl UserDefinedLogicalNode for WrappedSelectNode {
         exprs.extend(self.projection_expr.clone());
         exprs.extend(self.group_expr.clone());
         exprs.extend(self.aggr_expr.clone());
+        exprs.extend(self.window_expr.clone());
         exprs.extend(self.joins.iter().map(|(_, expr, _)| expr.clone()));
         exprs.extend(self.filter_expr.clone());
         exprs.extend(self.having_expr.clone());
@@ -217,11 +221,12 @@ impl UserDefinedLogicalNode for WrappedSelectNode {
     fn fmt_for_explain(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "WrappedSelect: select_type={:?}, projection_expr={:?}, group_expr={:?}, aggregate_expr={:?}, from={:?}, joins={:?}, filter_expr={:?}, having_expr={:?}, limit={:?}, offset={:?}, order_expr={:?}, alias={:?}",
+            "WrappedSelect: select_type={:?}, projection_expr={:?}, group_expr={:?}, aggregate_expr={:?}, window_expr={:?}, from={:?}, joins={:?}, filter_expr={:?}, having_expr={:?}, limit={:?}, offset={:?}, order_expr={:?}, alias={:?}",
             self.select_type,
             self.projection_expr,
             self.group_expr,
             self.aggr_expr,
+            self.window_expr,
             self.from,
             self.joins,
             self.filter_expr,
@@ -261,6 +266,7 @@ impl UserDefinedLogicalNode for WrappedSelectNode {
         let mut projection_expr = vec![];
         let mut group_expr = vec![];
         let mut aggregate_expr = vec![];
+        let mut window_expr = vec![];
         let limit = None;
         let offset = None;
         let alias = None;
@@ -276,6 +282,10 @@ impl UserDefinedLogicalNode for WrappedSelectNode {
 
         for _ in self.aggr_expr.iter() {
             aggregate_expr.push(exprs_iter.next().unwrap().clone());
+        }
+
+        for _ in self.window_expr.iter() {
+            window_expr.push(exprs_iter.next().unwrap().clone());
         }
 
         for _ in self.joins.iter() {
@@ -300,6 +310,7 @@ impl UserDefinedLogicalNode for WrappedSelectNode {
             projection_expr,
             group_expr,
             aggregate_expr,
+            window_expr,
             from,
             joins
                 .into_iter()
@@ -1175,6 +1186,14 @@ mod tests {
                 _schema: SchemaRef,
                 _member_fields: Vec<MemberField>,
             ) -> Result<CubeStreamReceiver, CubeError> {
+                panic!("It's a fake transport");
+            }
+
+            async fn can_switch_user_for_session(
+                &self,
+                _ctx: AuthContextRef,
+                _to_user: String,
+            ) -> Result<bool, CubeError> {
                 panic!("It's a fake transport");
             }
         }

@@ -342,6 +342,7 @@ impl<C: Configurator, P: WorkerProcessing, S: ServicesTransport> WorkerProcess<C
                 processor: PhantomData::<(C, P, S)>::default(),
                 services_sender: service_request_tx,
                 services_reciever: service_response_rx,
+                timeout: self.timeout.clone(),
             },
             &[title],
             &envs,
@@ -365,6 +366,7 @@ pub struct WorkerProcessArgs<C: Configurator, P: WorkerProcessing, S: ServicesTr
     processor: PhantomData<(C, P, S)>,
     services_sender: IpcSender<S::TransportRequest>,
     services_reciever: IpcReceiver<S::TransportResponse>,
+    timeout: Duration,
 }
 
 pub fn worker_main<C, P, S>(a: WorkerProcessArgs<C, P, S>) -> i32
@@ -373,8 +375,13 @@ where
     P: WorkerProcessing<Config = C::Config>,
     S: ServicesTransport<Request = C::ServicesRequest, Response = C::ServicesResponse>,
 {
-    let (rx, tx, services_sender, services_reciever) =
-        (a.args, a.results, a.services_sender, a.services_reciever);
+    let (rx, tx, services_sender, services_reciever, timeout) = (
+        a.args,
+        a.results,
+        a.services_sender,
+        a.services_reciever,
+        a.timeout,
+    );
     let mut tokio_builder = Builder::new_multi_thread();
     tokio_builder.enable_all();
     tokio_builder.thread_name("cubestore-worker");
@@ -386,7 +393,7 @@ where
     let runtime = tokio_builder.build().unwrap();
     worker_setup(&runtime);
     runtime.block_on(async move {
-        let services_client = S::connect(services_sender, services_reciever);
+        let services_client = S::connect(services_sender, services_reciever, timeout);
         let config = match C::configure(services_client).await {
             Err(e) => {
                 error!(

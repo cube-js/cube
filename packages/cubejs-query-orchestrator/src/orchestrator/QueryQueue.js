@@ -1,7 +1,7 @@
 import R from 'ramda';
 import { EventEmitter } from 'events';
 import { getEnv, getProcessUid } from '@cubejs-backend/shared';
-import { QueueDriverInterface, QueryKey, QueryKeyHash } from '@cubejs-backend/base-driver';
+import { QueueDriverInterface, QueryKey, QueryKeyHash, QueueId, QueryDef } from '@cubejs-backend/base-driver';
 import { CubeStoreQueueDriver } from '@cubejs-backend/cubestore-driver';
 
 import { TimeoutError } from './TimeoutError';
@@ -79,15 +79,17 @@ export class QueryQueue {
 
     /**
      * @protected
-     * @type {function(string): Promise<void>}
+     * @type {function(QueryKeyHash, QueueId | null): Promise<void>}
      */
-    this.sendProcessMessageFn = options.sendProcessMessageFn || ((queryKey) => { this.processQuery(queryKey); });
+    this.sendProcessMessageFn = options.sendProcessMessageFn || ((queryKey, queryId) => { this.processQuery(queryKey, queryId); });
 
     /**
      * @protected
+     * @param {QueryDef} query
+     * @param {QueueId | null} queueId
      * @type {function(*): Promise<void>}
      */
-    this.sendCancelMessageFn = options.sendCancelMessageFn || ((query) => { this.processCancel(query); });
+    this.sendCancelMessageFn = options.sendCancelMessageFn || ((query, queueId) => { this.processCancel(query, queueId); });
 
     /**
      * @protected
@@ -430,8 +432,11 @@ export class QueryQueue {
         queueConnection.getToProcessQueries()
       ]);
 
-      const mapWithDefinition = (arr) => Promise.all(arr.map(async queryKey => ({
-        ...(await queueConnection.getQueryDef(queryKey)),
+      /**
+       * @param {QueryKeysTuple[]} arr
+       */
+      const mapWithDefinition = (arr) => Promise.all(arr.map(async ([queryKey, queueId]) => ({
+        ...(await queueConnection.getQueryDef(queryKey, queueId)),
         queryKey
       })));
 
@@ -467,16 +472,18 @@ export class QueryQueue {
   /**
    * Cancel query by its `queryKey`.
    *
-   * @param {*} queryKey
+   * @param {QueryKeyHash} queryKey
+   * @param {QueueId | null} queueId
    * @returns {void}
    */
-  async cancelQuery(queryKey) {
+  async cancelQuery(queryKey, queueId) {
     const queueConnection = await this.queueDriver.createConnection();
     try {
-      const query = await queueConnection.cancelQuery(queryKey);
+      const query = await queueConnection.cancelQuery(queryKey, queueId);
 
       if (query) {
         this.logger('Cancelling query manual', {
+          queueId,
           queryKey: query.queryKey,
           queuePrefix: this.redisQueuePrefix,
           requestId: query.requestId,
@@ -506,20 +513,23 @@ export class QueryQueue {
     const queueConnection = await this.queueDriver.createConnection();
     try {
       const toCancel = await queueConnection.getQueriesToCancel();
-      await Promise.all(toCancel.map(async queryKey => {
-        const [query] = await queueConnection.getQueryAndRemove(queryKey);
-        if (query) {
+
+      await Promise.all(toCancel.map(async ([queryKey, queueId]) => {
+        const [queryDef] = await queueConnection.getQueryAndRemove(queryKey);
+        if (queryDef) {
           this.logger('Removing orphaned query', {
-            queryKey: query.queryKey,
+            queueId: queueId || queryDef.queueId /** Special handling for Redis */,
+            queryKey: queryDef.queryKey,
             queuePrefix: this.redisQueuePrefix,
-            requestId: query.requestId,
-            metadata: query.query?.metadata,
-            preAggregationId: query.query?.preAggregation?.preAggregationId,
-            newVersionEntry: query.query?.newVersionEntry,
-            preAggregation: query.query?.preAggregation,
-            addedToQueueTime: query.addedToQueueTime,
+            requestId: queryDef.requestId,
+            metadata: queryDef.query?.metadata,
+            preAggregationId: queryDef.query?.preAggregation?.preAggregationId,
+            newVersionEntry: queryDef.query?.newVersionEntry,
+            preAggregation: queryDef.query?.preAggregation,
+            addedToQueueTime: queryDef.addedToQueueTime,
           });
-          await this.sendCancelMessageFn(query);
+
+          await this.sendCancelMessageFn(queryDef, queueId);
         }
       }));
 
@@ -527,9 +537,9 @@ export class QueryQueue {
 
       await Promise.all(
         R.pipe(
-          R.filter(p => {
-            if (active.indexOf(p) === -1) {
-              const subKeys = p.split('@');
+          R.filter(([queryKey, _queueId]) => {
+            if (active.findIndex(([p, _a]) => p === queryKey) === -1) {
+              const subKeys = queryKey.split('@');
               if (subKeys.length === 1) {
                 // common queries
                 return true;
@@ -545,7 +555,7 @@ export class QueryQueue {
             }
           }),
           R.take(this.concurrency),
-          R.map(this.sendProcessMessageFn)
+          R.map((([queryKey, queueId]) => this.sendProcessMessageFn(queryKey, queueId)))
         )(toProcess)
       );
     } finally {
@@ -555,7 +565,7 @@ export class QueryQueue {
 
   /**
    * Apply query timeout to the query. Throw if query execution time takes more
-   * then specified timeout. Returns resolved `promise` value.
+   * than specified timeout. Returns resolved `promise` value.
    *
    * @param {Promise<*>} promise
    * @returns {Promise<*>}
@@ -635,6 +645,7 @@ export class QueryQueue {
    * Execute query without adding it to the queue.
    *
    * @param {*} query
+   * @param {QueueId} queueId
    * @returns {Promise<{ result: undefined | Object, error: string | undefined }>}
    */
   async processQuerySkipQueue(query, queueId) {
@@ -705,24 +716,31 @@ export class QueryQueue {
    * of the logic related with the queues updates, heartbeat, etc.
    *
    * @param {QueryKeyHash} queryKeyHashed
+   * @param {QueueId | null} queueId Supported by new Cube Store and Memory
    * @return {Promise<{ result: undefined | Object, error: string | undefined }>}
    */
-  async processQuery(queryKeyHashed) {
+  async processQuery(queryKeyHashed, queueId) {
     const queueConnection = await this.queueDriver.createConnection();
 
     let insertedCount;
-    let queueId;
     let activeKeys;
     let queueSize;
     let query;
     let processingLockAcquired;
 
     try {
-      const processingId = await queueConnection.getNextProcessingId();
+      const processingId = queueId || /** for Redis only */ await queueConnection.getNextProcessingId();
       const retrieveResult = await queueConnection.retrieveForProcessing(queryKeyHashed, processingId);
 
       if (retrieveResult) {
-        [insertedCount, queueId, activeKeys, queueSize, query, processingLockAcquired] = retrieveResult;
+        let retrieveQueueId;
+
+        [insertedCount, retrieveQueueId, activeKeys, queueSize, query, processingLockAcquired] = retrieveResult;
+
+        // Backward compatibility for old Cube Store, Redis and Memory
+        if (retrieveQueueId) {
+          queueId = retrieveQueueId;
+        }
       }
 
       const activated = activeKeys && activeKeys.indexOf(queryKeyHashed) !== -1;
@@ -853,7 +871,8 @@ export class QueryQueue {
                 preAggregation: queryWithCancelHandle.query?.preAggregation,
                 addedToQueueTime: queryWithCancelHandle.addedToQueueTime,
               });
-              await this.sendCancelMessageFn(queryWithCancelHandle);
+
+              await this.sendCancelMessageFn(queryWithCancelHandle, queueId);
             }
           }
         }
@@ -934,9 +953,10 @@ export class QueryQueue {
   /**
    * Processing cancel query flow.
    *
-   * @param {*} query
+   * @param {QueryDef} query
+   * @param {QueueId | null} queueId
    */
-  async processCancel(query) {
+  async processCancel(query, queueId) {
     const { queryHandler } = query;
     try {
       if (!this.cancelHandlers[queryHandler]) {
@@ -945,6 +965,7 @@ export class QueryQueue {
       await this.cancelHandlers[queryHandler](query);
     } catch (e) {
       this.logger('Error while cancel', {
+        queueId,
         queryKey: query.queryKey,
         error: e.stack || e,
         queuePrefix: this.redisQueuePrefix,
