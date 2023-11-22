@@ -209,6 +209,13 @@ impl SqlResultCache {
     }
 }
 
+impl Drop for SqlResultCache {
+    fn drop(&mut self) {
+        app_metrics::DATA_QUERIES_CACHE_SIZE.report(0);
+        app_metrics::DATA_QUERIES_CACHE_WEIGHT.report(0);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::queryplanner::serialized_plan::SerializedPlan;
