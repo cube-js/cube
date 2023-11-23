@@ -322,9 +322,9 @@ impl RemoteFs for MINIORemoteFs {
 //TODO
 impl MINIORemoteFs {
     fn s3_path(&self, remote_path: &str) -> String {
-        match &self.sub_path {
-            Some(sub_path) => format!("{}/{}", sub_path, remote_path),
-            None => remote_path.to_string(),
-        }
+        self.sub_path
+            .as_ref()
+            .map(|p| format!("{}/{}", p, remote_path))
+            .unwrap_or_else(|| format!("{}", remote_path))
     }
 }
