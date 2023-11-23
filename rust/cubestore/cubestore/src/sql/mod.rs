@@ -967,6 +967,7 @@ impl SqlService for SqlServiceImpl {
                         columns,
                         external,
                         with_options,
+                        if_not_exists,
                         ..
                     },
                 indexes,
@@ -1116,8 +1117,23 @@ impl SqlService for SqlServiceImpl {
                         ))),
                     })?;
 
-                let res = self
-                    .create_table(
+                let exists_table = if if_not_exists {
+                    let table = self
+                        .db
+                        .get_table(schema_name.clone(), table_name.clone())
+                        .await;
+                    if let Ok(table) = table {
+                        Some(table)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+                let res = if let Some(table) = exists_table {
+                    table
+                } else {
+                    self.create_table(
                         schema_name.clone(),
                         table_name.clone(),
                         &columns,
@@ -1135,7 +1151,8 @@ impl SqlService for SqlServiceImpl {
                         partitioned_index,
                         &context.trace_obj,
                     )
-                    .await?;
+                    .await?
+                };
                 Ok(Arc::new(DataFrame::from(vec![res])))
             }
             CubeStoreStatement::Statement(Statement::CreateIndex {
@@ -2425,6 +2442,36 @@ mod tests {
         }
     }
 
+    #[tokio::test]
+    async fn create_table_if_not_exists() {
+        Config::test("create_table_if_not_exists").start_with_injector_override(async move |injector| {
+            injector.register_typed::<dyn RemoteFs, _, _, _>(async move |injector| {
+                Arc::new(FailingRemoteFs(
+                    injector.get_service_typed::<QueueRemoteFs>().await,
+                ))
+            })
+                .await
+        }, async move |services| {
+            let service = services.sql_service;
+
+            let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+            let created_table = service
+                .exec_query("CREATE TABLE foo.values (id int, dec_value decimal, dec_value_1 decimal(18, 2))")
+                .await.unwrap();
+            let res = service
+                .exec_query("CREATE TABLE foo.values (id int, dec_value decimal, dec_value_1 decimal(18, 2))")
+                .await;
+            assert!(res.is_err());
+            let res = service
+                .exec_query("CREATE TABLE IF NOT EXISTS foo.values (id int, dec_value decimal, dec_value_1 decimal(18, 2))")
+                .await;
+            assert_eq!(res.unwrap(), created_table);
+
+
+        })
+            .await;
+    }
     #[tokio::test]
     async fn failed_upload_drop() {
         Config::test("failed_upload_drop").start_with_injector_override(async move |injector| {
