@@ -388,30 +388,30 @@ export interface JinjaEngine {
 }
 
 export class NativeInstance {
-    protected native: any | null = null;
+  protected native: any | null = null;
 
-    protected getNative(): any {
-      if (this.native) {
-        return this.native;
-      }
-
-      this.native = loadNative();
-
+  protected getNative(): any {
+    if (this.native) {
       return this.native;
     }
 
-    public newJinjaEngine(options: JinjaEngineOptions): JinjaEngine {
-      return this.getNative().newJinjaEngine(options);
-    }
+    this.native = loadNative();
 
-    public loadPythonContext(fileName: string, content: unknown): Promise<PythonCtx> {
-      if (isFallbackBuild()) {
-        throw new Error(
-          'Python (loadPythonContext) is not supported because you are using the fallback build of native extension. Read more: ' +
+    return this.native;
+  }
+
+  public newJinjaEngine(options: JinjaEngineOptions): JinjaEngine {
+    return this.getNative().newJinjaEngine(options);
+  }
+
+  public loadPythonContext(fileName: string, content: unknown): Promise<PythonCtx> {
+    if (isFallbackBuild()) {
+      throw new Error(
+        'Python (loadPythonContext) is not supported because you are using the fallback build of native extension. Read more: ' +
           'https://github.com/cube-js/cube/blob/master/packages/cubejs-backend-native/README.md#supported-architectures-and-platforms'
-        );
-      }
-
-      return this.getNative().pythonLoadModel(fileName, content);
+      );
     }
+
+    return this.getNative().pythonLoadModel(fileName, content);
+  }
 }

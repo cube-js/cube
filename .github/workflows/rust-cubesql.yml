@@ -128,14 +128,13 @@ jobs:
     name: Build Linux GNU ${{ matrix.node-version }}.x ${{ matrix.target }} with Python ${{ matrix.python-version }}
     strategy:
       matrix:
-        node-version: [14, 16, 18]
+        # Current used version + 1 LTS
+        node-version: [16, 18]
         python-version: ["3.9", "3.10", "3.11", "fallback"]
         target: ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"]
         # minimize number of jobs
         exclude:
           - node-version: 18
-            target: "aarch64-unknown-linux-gnu"
-          - node-version: 14
             target: "aarch64-unknown-linux-gnu"
           - python-version: 3.10
             target: "aarch64-unknown-linux-gnu"
