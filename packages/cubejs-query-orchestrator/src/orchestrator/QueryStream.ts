@@ -8,7 +8,7 @@ export class QueryStream extends stream.Transform {
 
   public queryKey: string;
 
-  public streams: Map<string, QueryStream>;
+  public streams: Map<string, stream.Stream>;
 
   public aliasNameToMember: { [alias: string]: string };
 
@@ -23,7 +23,7 @@ export class QueryStream extends stream.Transform {
     aliasNameToMember,
   }: {
     key: string;
-    streams: Map<string, QueryStream>;
+    streams: Map<string, stream.Stream>;
     aliasNameToMember: { [alias: string]: string } | null;
   }) {
     super({
