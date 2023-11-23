@@ -127,19 +127,15 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
 
     const { schema, ...restConfig } = config;
     
-    let { credentials } = config;
-    
-    if (typeof credentials === undefined) {
-      credentials = accessKeyId && secretAccessKey ? { accessKeyId, secretAccessKey } : undefined;
-    }
-
     this.schema = schema ||
       getEnv('dbName', { dataSource }) ||
       getEnv('dbSchema', { dataSource });
 
     this.config = {
+      credentials: accessKeyId && secretAccessKey
+        ? { accessKeyId, secretAccessKey }
+        : undefined,
       ...restConfig,
-      credentials,
       region:
         config.region ||
         getEnv('athenaAwsRegion', { dataSource }),
