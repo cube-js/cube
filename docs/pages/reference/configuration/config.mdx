@@ -1110,7 +1110,7 @@ def check_sql_auth(req: dict, user_name: str) -> dict:
 
 ```javascript
 module.exports = {
-  check_sql_auth: (req, user_name) => {
+  checkSqlAuth: (req, user_name) => {
     if (user_name === 'my_user') {
       return {
         password: 'my_password',
