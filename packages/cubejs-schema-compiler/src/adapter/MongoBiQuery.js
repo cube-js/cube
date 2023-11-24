@@ -13,7 +13,7 @@ export class MongoBiQuery extends MysqlQuery {
       result = `TIMESTAMPADD(HOUR, ${hourInt}, ${result})`;
     }
     if (minuteInt !== 0) {
-      result = `TIMESTAMPADD(HOUR, ${minuteInt}, ${result})`;
+      result = `TIMESTAMPADD(MINUTE, ${minuteInt}, ${result})`;
     }
     return result;
   }
