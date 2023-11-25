@@ -30,17 +30,24 @@ pub struct TraceIndex {
 
 #[async_trait]
 pub trait ProcessRateLimiter: DIService + Send + Sync {
-    async fn commit_task_usage(&self, task_type: TaskType, size: i64, trace_index: TraceIndex);
+    async fn commit_task_usage(
+        &self,
+        task_type: TaskType,
+        size: i64,
+        wait_ms: u64,
+        trace_index: TraceIndex,
+    );
 
     async fn current_budget(&self, task_type: TaskType) -> Option<i64>;
 
     async fn current_budget_f64(&self, task_type: TaskType) -> Option<f64>;
 
+    // Return waiting time in ms
     async fn wait_for_allow(
         &self,
         task_type: TaskType,
         timeout: Option<Duration>,
-    ) -> Result<(), CubeError>;
+    ) -> Result<u64, CubeError>;
 
     async fn spawn_processing_loop(self: Arc<Self>) -> Vec<JoinHandle<()>>;
 
@@ -61,7 +68,14 @@ impl BasicProcessRateLimiter {
 
 #[async_trait]
 impl ProcessRateLimiter for BasicProcessRateLimiter {
-    async fn commit_task_usage(&self, _task_type: TaskType, _size: i64, _trace_index: TraceIndex) {}
+    async fn commit_task_usage(
+        &self,
+        _task_type: TaskType,
+        _size: i64,
+        _wait_ms: u64,
+        _trace_index: TraceIndex,
+    ) {
+    }
 
     async fn current_budget(&self, _task_type: TaskType) -> Option<i64> {
         None
@@ -75,8 +89,8 @@ impl ProcessRateLimiter for BasicProcessRateLimiter {
         &self,
         _task_type: TaskType,
         _timeout: Option<Duration>,
-    ) -> Result<(), CubeError> {
-        Ok(())
+    ) -> Result<u64, CubeError> {
+        Ok(0)
     }
 
     async fn spawn_processing_loop(self: Arc<Self>) -> Vec<JoinHandle<()>> {
