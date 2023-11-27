@@ -772,7 +772,7 @@ export class QueryQueue {
         const heartBeatTimer = setInterval(
           () => {
             if ((Date.now() - queryProcessHeartbeat) > 5 * 60 * 1000) {
-              this.logger('Query process heartbeat', {
+              this.logger('Query processing heartbeat', {
                 queueId,
                 queryKey: query.queryKey,
                 requestId: query.requestId,
