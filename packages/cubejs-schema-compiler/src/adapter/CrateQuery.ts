@@ -2,16 +2,16 @@ import { PostgresQuery } from './PostgresQuery';
 import { UserError } from '../compiler/UserError';
 
 export class CrateQuery extends PostgresQuery {
-  hllInit(sql) {
+  public hllInit(_sql): string {
     throw new UserError('Not implemented yet');
   }
 
-  hllMerge(sql) {
+  public hllMerge(_sql): string {
     throw new UserError('Not implemented yet');
   }
 
   // to implement after merge
-  countDistinctApprox(sql) {
+  public countDistinctApprox(_sql): string {
     throw new UserError('Not implemented yet');
   }
 }

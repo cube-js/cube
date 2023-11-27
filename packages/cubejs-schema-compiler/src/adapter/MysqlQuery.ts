@@ -16,7 +16,7 @@ const GRANULARITY_TO_INTERVAL = {
 };
 
 class MysqlFilter extends BaseFilter {
-  likeIgnoreCase(column, not, param, type) {
+  public likeIgnoreCase(column, not, param, type) {
     const p = (!type || type === 'contains' || type === 'ends') ? '%' : '';
     const s = (!type || type === 'contains' || type === 'starts') ? '%' : '';
     return `${column}${not ? ' NOT' : ''} LIKE CONCAT('${p}', ${this.allocateParam(param)}, '${s}')`;
@@ -24,62 +24,62 @@ class MysqlFilter extends BaseFilter {
 }
 
 export class MysqlQuery extends BaseQuery {
-  newFilter(filter) {
+  public newFilter(filter) {
     return new MysqlFilter(this, filter);
   }
 
-  convertTz(field) {
+  public convertTz(field) {
     return `CONVERT_TZ(${field}, @@session.time_zone, '${moment().tz(this.timezone).format('Z')}')`;
   }
 
-  timeStampCast(value) {
+  public timeStampCast(value) {
     return `TIMESTAMP(convert_tz(${value}, '+00:00', @@session.time_zone))`;
   }
 
-  timestampFormat() {
+  public timestampFormat() {
     return moment.HTML5_FMT.DATETIME_LOCAL_MS;
   }
 
-  dateTimeCast(value) {
+  public dateTimeCast(value) {
     return `TIMESTAMP(${value})`;
   }
 
-  subtractInterval(date, interval) {
+  public subtractInterval(date, interval) {
     return `DATE_SUB(${date}, INTERVAL ${interval})`;
   }
 
-  addInterval(date, interval) {
+  public addInterval(date, interval) {
     return `DATE_ADD(${date}, INTERVAL ${interval})`;
   }
 
-  timeGroupedColumn(granularity, dimension) {
+  public timeGroupedColumn(granularity, dimension) {
     return `CAST(${GRANULARITY_TO_INTERVAL[granularity](dimension)} AS DATETIME)`;
   }
 
-  escapeColumnName(name) {
+  public escapeColumnName(name) {
     return `\`${name}\``;
   }
 
-  seriesSql(timeDimension) {
+  public seriesSql(timeDimension) {
     const values = timeDimension.timeSeries().map(
       ([from, to]) => `select '${from}' f, '${to}' t`
     ).join(' UNION ALL ');
     return `SELECT TIMESTAMP(dates.f) date_from, TIMESTAMP(dates.t) date_to FROM (${values}) AS dates`;
   }
 
-  concatStringsSql(strings) {
+  public concatStringsSql(strings) {
     return `CONCAT(${strings.join(', ')})`;
   }
 
-  unixTimestampSql() {
+  public unixTimestampSql() {
     return 'UNIX_TIMESTAMP()';
   }
 
-  wrapSegmentForDimensionSelect(sql) {
+  public wrapSegmentForDimensionSelect(sql) {
     return `IF(${sql}, 1, 0)`;
   }
 
-  preAggregationTableName(cube, preAggregationName, skipSchema) {
+  public preAggregationTableName(cube, preAggregationName, skipSchema) {
     const name = super.preAggregationTableName(cube, preAggregationName, skipSchema);
     if (name.length > 64) {
       throw new UserError(`MySQL can not work with table names that longer than 64 symbols. Consider using the 'sqlAlias' attribute in your cube and in your pre-aggregation definition for ${name}.`);
@@ -87,7 +87,7 @@ export class MysqlQuery extends BaseQuery {
     return name;
   }
 
-  sqlTemplates() {
+  public sqlTemplates() {
     const templates = super.sqlTemplates();
     templates.quotes.identifiers = '`';
     templates.quotes.escape = '\\`';

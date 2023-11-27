@@ -14,7 +14,7 @@ const GRANULARITY_TO_INTERVAL = {
 };
 
 class HiveFilter extends BaseFilter {
-  likeIgnoreCase(column, not, param, type) {
+  public likeIgnoreCase(column, not, param, type) {
     const p = (!type || type === 'contains' || type === 'ends') ? '%' : '';
     const s = (!type || type === 'contains' || type === 'starts') ? '%' : '';
     return `${column}${not ? ' NOT' : ''} LIKE CONCAT('${p}', ${this.allocateParam(param)}, '${s}')`;
@@ -22,43 +22,43 @@ class HiveFilter extends BaseFilter {
 }
 
 export class HiveQuery extends BaseQuery {
-  newFilter(filter) {
+  public newFilter(filter) {
     return new HiveFilter(this, filter);
   }
 
-  convertTz(field) {
+  public convertTz(field) {
     return `from_utc_timestamp(${field}, '${this.timezone}')`;
   }
 
-  timeStampCast(value) {
+  public timeStampCast(value) {
     return `from_utc_timestamp(replace(replace(${value}, 'T', ' '), 'Z', ''), 'UTC')`;
   }
 
-  dateTimeCast(value) {
+  public dateTimeCast(value) {
     return `from_utc_timestamp(${value}, 'UTC')`; // TODO
   }
 
-  subtractInterval(date, interval) {
+  public subtractInterval(date, interval) {
     const [number, type] = this.parseInterval(interval);
 
     return `(${date} - INTERVAL '${number}' ${type})`;
   }
 
-  addInterval(date, interval) {
+  public addInterval(date, interval) {
     const [number, type] = this.parseInterval(interval);
 
     return `(${date} + INTERVAL '${number}' ${type})`;
   }
 
-  timeGroupedColumn(granularity, dimension) {
+  public timeGroupedColumn(granularity, dimension) {
     return GRANULARITY_TO_INTERVAL[granularity](dimension);
   }
 
-  escapeColumnName(name) {
+  public escapeColumnName(name) {
     return `\`${name}\``;
   }
 
-  simpleQuery() {
+  public simpleQuery() {
     const ungrouped = this.evaluateSymbolSqlWithContext(
       () => `${this.commonQuery()} ${this.baseWhere(this.allFilters)}`, {
         ungroupedForWrappingGroupBy: true
@@ -68,21 +68,21 @@ export class HiveQuery extends BaseQuery {
       () => this.dimensionsForSelect().map(
         d => d.aliasName()
       ).concat(this.measures.map(m => m.selectColumns())).filter(s => !!s), {
-        ungroupedAliases: R.fromPairs(this.forSelect().map(m => [m.measure || m.dimension, m.aliasName()]))
+        ungroupedAliases: R.fromPairs(this.forSelect().map((m: any) => [m.measure || m.dimension, m.aliasName()]))
       }
     );
     return `SELECT ${select} FROM (${ungrouped}) AS ${this.escapeColumnName('hive_wrapper')} 
     ${this.groupByClause()}${this.baseHaving(this.measureFilters)}${this.orderBy()}${this.groupByDimensionLimit()}`;
   }
 
-  seriesSql(timeDimension) {
+  public seriesSql(timeDimension) {
     const values = timeDimension.timeSeries().map(
       ([from, to]) => `select '${from}' f, '${to}' t`
     ).join(' UNION ALL ');
     return `SELECT ${this.timeStampCast('dates.f')} date_from, ${this.timeStampCast('dates.t')} date_to FROM (${values}) AS dates`;
   }
 
-  groupByClause() {
+  public groupByClause() {
     const dimensionsForSelect = this.dimensionsForSelect();
     const dimensionColumns =
       R.flatten(dimensionsForSelect.map(
@@ -91,7 +91,7 @@ export class HiveQuery extends BaseQuery {
     return dimensionColumns.length ? ` GROUP BY ${dimensionColumns.join(', ')}` : '';
   }
 
-  getFieldIndex(id) {
+  public getFieldIndex(id) {
     const dimension = this.dimensionsForSelect().find(d => d.dimension === id);
     if (dimension) {
       return super.getFieldIndex(id);
@@ -99,11 +99,11 @@ export class HiveQuery extends BaseQuery {
     return this.escapeColumnName(this.aliasName(id));
   }
 
-  unixTimestampSql() {
+  public unixTimestampSql() {
     return 'unix_timestamp()';
   }
 
-  defaultRefreshKeyRenewalThreshold() {
+  public defaultRefreshKeyRenewalThreshold() {
     return 120;
   }
 }

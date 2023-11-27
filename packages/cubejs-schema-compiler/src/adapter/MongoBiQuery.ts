@@ -3,7 +3,7 @@ import moment from 'moment-timezone';
 import { MysqlQuery } from './MysqlQuery';
 
 export class MongoBiQuery extends MysqlQuery {
-  convertTz(field) {
+  public convertTz(field: string): string {
     const tz = moment().tz(this.timezone);
     // TODO respect day light saving
     const [hour, minute] = tz.format('Z').split(':');
@@ -18,7 +18,7 @@ export class MongoBiQuery extends MysqlQuery {
     return result;
   }
 
-  timeStampCast(value) {
+  public timeStampCast(value: string): string {
     return `TIMESTAMP(${value})`;
   }
 }

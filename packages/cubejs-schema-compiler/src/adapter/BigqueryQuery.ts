@@ -13,13 +13,13 @@ const GRANULARITY_TO_INTERVAL = {
 };
 
 class BigqueryFilter extends BaseFilter {
-  likeIgnoreCase(column, not, param, type) {
+  public likeIgnoreCase(column, not, param, type) {
     const p = (!type || type === 'contains' || type === 'ends') ? '%' : '';
     const s = (!type || type === 'contains' || type === 'starts') ? '%' : '';
     return `LOWER(${column})${not ? ' NOT' : ''} LIKE CONCAT('${p}', LOWER(${this.allocateParam(param)}) , '${s}')`;
   }
 
-  castParameter() {
+  public castParameter() {
     if (this.definition().type === 'boolean') {
       return 'CAST(? AS BOOL)';
     } else if (this.measure || this.definition().type === 'number') {
@@ -29,48 +29,48 @@ class BigqueryFilter extends BaseFilter {
     return '?';
   }
 
-  castToString(sql) {
+  public castToString(sql) {
     return `CAST(${sql} as STRING)`;
   }
 }
 
 export class BigqueryQuery extends BaseQuery {
-  convertTz(field) {
+  public convertTz(field) {
     return `DATETIME(${field}, '${this.timezone}')`;
   }
 
-  timeStampCast(value) {
+  public timeStampCast(value) {
     return `TIMESTAMP(${value})`;
   }
 
-  dateTimeCast(value) {
+  public dateTimeCast(value) {
     return `DATETIME(TIMESTAMP(${value}))`;
   }
 
-  escapeColumnName(name) {
+  public escapeColumnName(name) {
     return `\`${name}\``;
   }
 
-  timeGroupedColumn(granularity, dimension) {
+  public timeGroupedColumn(granularity, dimension) {
     return `DATETIME_TRUNC(${dimension}, ${GRANULARITY_TO_INTERVAL[granularity]})`;
   }
 
-  newFilter(filter) {
+  public newFilter(filter) {
     return new BigqueryFilter(this, filter);
   }
 
-  dateSeriesSql(timeDimension) {
+  public dateSeriesSql(timeDimension) {
     return `${timeDimension.dateSeriesAliasName()} AS (${this.seriesSql(timeDimension)})`;
   }
 
-  seriesSql(timeDimension) {
+  public seriesSql(timeDimension) {
     const values = timeDimension.timeSeries().map(
       ([from, to]) => `select '${from}' f, '${to}' t`
     ).join(' UNION ALL ');
     return `SELECT ${this.dateTimeCast('dates.f')} date_from, ${this.dateTimeCast('dates.t')} date_to FROM (${values}) AS dates`;
   }
 
-  overTimeSeriesSelect(cumulativeMeasures, dateSeriesSql, baseQuery, dateJoinConditionSql, baseQueryAlias) {
+  public overTimeSeriesSelect(cumulativeMeasures, dateSeriesSql, baseQuery, dateJoinConditionSql, baseQueryAlias) {
     const forSelect = this.overTimeSeriesForSelect(cumulativeMeasures);
     const outerSeriesAlias = this.cubeAlias('outer_series');
     const outerBase = this.cubeAlias('outer_base');
@@ -90,62 +90,62 @@ export class BigqueryQuery extends BaseQuery {
     `;
   }
 
-  subtractInterval(date, interval) {
+  public subtractInterval(date, interval) {
     return `DATETIME_SUB(${date}, INTERVAL ${interval})`;
   }
 
-  addInterval(date, interval) {
+  public addInterval(date, interval) {
     return `DATETIME_ADD(${date}, INTERVAL ${interval})`;
   }
 
-  subtractTimestampInterval(date, interval) {
+  public subtractTimestampInterval(date, interval) {
     return `TIMESTAMP_SUB(${date}, INTERVAL ${interval})`;
   }
 
-  addTimestampInterval(date, interval) {
+  public addTimestampInterval(date, interval) {
     return `TIMESTAMP_ADD(${date}, INTERVAL ${interval})`;
   }
 
-  nowTimestampSql() {
+  public nowTimestampSql() {
     return 'CURRENT_TIMESTAMP()';
   }
 
-  unixTimestampSql() {
+  public unixTimestampSql() {
     return `UNIX_SECONDS(${this.nowTimestampSql()})`;
   }
 
   // eslint-disable-next-line no-unused-vars
-  preAggregationLoadSql(cube, preAggregation, tableName) {
+  public preAggregationLoadSql(cube, preAggregation, tableName) {
     return this.preAggregationSql(cube, preAggregation);
   }
 
-  hllInit(sql) {
+  public hllInit(sql) {
     return `HLL_COUNT.INIT(${sql})`;
   }
 
-  hllMerge(sql) {
+  public hllMerge(sql) {
     return `HLL_COUNT.MERGE(${sql})`;
   }
 
-  countDistinctApprox(sql) {
+  public countDistinctApprox(sql) {
     return `APPROX_COUNT_DISTINCT(${sql})`;
   }
 
-  concatStringsSql(strings) {
+  public concatStringsSql(strings) {
     return `CONCAT(${strings.join(', ')})`;
   }
 
-  defaultRefreshKeyRenewalThreshold() {
+  public defaultRefreshKeyRenewalThreshold() {
     return 120;
   }
 
-  defaultEveryRefreshKey() {
+  public defaultEveryRefreshKey() {
     return {
       every: '2 minutes'
     };
   }
 
-  sqlTemplates() {
+  public sqlTemplates() {
     const templates = super.sqlTemplates();
     templates.quotes.identifiers = '`';
     templates.quotes.escape = '\\`';

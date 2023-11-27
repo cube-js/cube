@@ -12,45 +12,45 @@ const GRANULARITY_TO_INTERVAL = {
 };
 
 export class SnowflakeQuery extends BaseQuery {
-  convertTz(field) {
+  public convertTz(field) {
     return `CONVERT_TIMEZONE('${this.timezone}', ${field}::timestamp_tz)::timestamp_ntz`;
   }
 
-  timeGroupedColumn(granularity, dimension) {
+  public timeGroupedColumn(granularity, dimension) {
     return `date_trunc('${GRANULARITY_TO_INTERVAL[granularity]}', ${dimension})`;
   }
 
-  timeStampCast(value) {
+  public timeStampCast(value) {
     return `${value}::timestamp_tz`;
   }
 
-  defaultRefreshKeyRenewalThreshold() {
+  public defaultRefreshKeyRenewalThreshold() {
     return 120;
   }
 
-  defaultEveryRefreshKey() {
+  public defaultEveryRefreshKey() {
     return {
       every: '2 minutes'
     };
   }
 
-  nowTimestampSql() {
+  public nowTimestampSql() {
     return 'CURRENT_TIMESTAMP';
   }
 
-  hllInit(sql) {
+  public hllInit(sql) {
     return `HLL_EXPORT(HLL_ACCUMULATE(${sql}))`;
   }
 
-  hllMerge(sql) {
+  public hllMerge(sql) {
     return `HLL_ESTIMATE(HLL_COMBINE(HLL_IMPORT(${sql})))`;
   }
 
-  countDistinctApprox(sql) {
+  public countDistinctApprox(sql) {
     return `APPROX_COUNT_DISTINCT(${sql})`;
   }
 
-  sqlTemplates() {
+  public sqlTemplates() {
     const templates = super.sqlTemplates();
     templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
     templates.functions.DATEPART = 'DATE_PART({{ args_concat }})';
