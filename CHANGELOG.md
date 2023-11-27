@@ -3,6 +3,37 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.25](https://github.com/cube-js/cube/compare/v0.34.24...v0.34.25) (2023-11-24)
+
+
+### Bug Fixes
+
+* **api-gateway:** Handle invalid query (invalid JSON) as 400 Bad Request ([#7455](https://github.com/cube-js/cube/issues/7455)) ([c632727](https://github.com/cube-js/cube/commit/c6327275f01cd7c2b43750f88b3d6b13809edba4))
+* **mongobi-driver:** Correct time zone conversion for minutes, fix [#7152](https://github.com/cube-js/cube/issues/7152) ([#7456](https://github.com/cube-js/cube/issues/7456)) ([5ae2009](https://github.com/cube-js/cube/commit/5ae2009a8231432020e09fb6dfeaa8f40ef152fa))
+* Validation problem with ECDSA SSL keys ([#7453](https://github.com/cube-js/cube/issues/7453)) ([567d2ca](https://github.com/cube-js/cube/commit/567d2cad9a81e82dacd27e99fce9f28db42e9d75))
+
+
+
+
+
+## [0.34.24](https://github.com/cube-js/cube/compare/v0.34.23...v0.34.24) (2023-11-23)
+
+
+### Bug Fixes
+
+* **athena-driver:** Allow to pass custom credentials, fix [#7407](https://github.com/cube-js/cube/issues/7407) ([#7429](https://github.com/cube-js/cube/issues/7429)) ([f005c5b](https://github.com/cube-js/cube/commit/f005c5b88418c1c9e34f476c25e523f64434c9ca))
+* **cubestore:** Natural order for Int96 and Decimal96 ([#7419](https://github.com/cube-js/cube/issues/7419)) ([5671a5c](https://github.com/cube-js/cube/commit/5671a5cb28db517676f451acc928c4d4b36d9bae))
+
+
+### Features
+
+* **cubestore:** Metrics - track command for data/cache/queue ([#7430](https://github.com/cube-js/cube/issues/7430)) ([91db103](https://github.com/cube-js/cube/commit/91db103b541da77c6f46f692bbf9c5d138cb6156))
+* **schema-compiler:** add dimension primaryKey property to transform result ([#7443](https://github.com/cube-js/cube/issues/7443)) ([baabd41](https://github.com/cube-js/cube/commit/baabd41fed8bd1476d0489dc97c3f78c9106a63b))
+
+
+
+
+
 ## [0.34.23](https://github.com/cube-js/cube/compare/v0.34.22...v0.34.23) (2023-11-19)
 
 

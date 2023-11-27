@@ -8,7 +8,7 @@ import { LogoWithVersion } from '@/components/common/LogoWithVersion/LogoWithVer
 
 const repo = "https://github.com/cube-js/cube";
 const branch = "master";
-const path = "/docs/docs-new/";
+const path = "/docs/";
 
 const config: DocsThemeConfig = {
   logo: LogoWithVersion,

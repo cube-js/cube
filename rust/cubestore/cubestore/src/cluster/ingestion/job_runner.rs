@@ -203,7 +203,7 @@ impl JobRunner {
                     let job_processor = self.job_processor.clone();
                     let job_to_move = job.clone();
                     Ok(cube_ext::spawn(async move {
-                        process_rate_limiter
+                        let wait_ms = process_rate_limiter
                             .wait_for_allow(TaskType::Job, timeout)
                             .await?; //TODO config, may be same ad orphaned timeout
 
@@ -222,6 +222,7 @@ impl JobRunner {
                                     .commit_task_usage(
                                         TaskType::Job,
                                         job_res.data_loaded_size() as i64,
+                                        wait_ms,
                                         trace_index,
                                     )
                                     .await;
@@ -314,7 +315,7 @@ impl JobRunner {
                             Some(DataLoadedSize::new())
                         };
                         if !is_streaming {
-                            process_rate_limiter
+                            let wait_ms = process_rate_limiter
                                 .wait_for_allow(TaskType::Job, timeout)
                                 .await?; //TODO config, may be same ad orphaned timeout
                             match job_processor.process_job(job_to_move).await {
@@ -329,6 +330,7 @@ impl JobRunner {
                                         .commit_task_usage(
                                             TaskType::Job,
                                             job_res.data_loaded_size() as i64,
+                                            wait_ms,
                                             trace_index,
                                         )
                                         .await;
@@ -357,7 +359,7 @@ impl JobRunner {
                     let job_to_move = job.clone();
                     let job_processor = self.job_processor.clone();
                     Ok(cube_ext::spawn(async move {
-                        process_rate_limiter
+                        let wait_ms = process_rate_limiter
                             .wait_for_allow(TaskType::Job, timeout)
                             .await?; //TODO config, may be same ad orphaned timeout
                         let chunk = metastore.get_chunk(chunk_id).await?;
@@ -377,6 +379,7 @@ impl JobRunner {
                                         .commit_task_usage(
                                             TaskType::Job,
                                             job_res.data_loaded_size() as i64,
+                                            wait_ms,
                                             trace_index,
                                         )
                                         .await;

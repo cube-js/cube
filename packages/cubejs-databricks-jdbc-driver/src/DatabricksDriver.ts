@@ -3,7 +3,7 @@
  * @license Apache-2.0
  * @fileoverview The `DatabricksDriver` and related types declaration.
  */
-
+/* eslint-disable camelcase */
 import {
   getEnv,
   assertDataSource,

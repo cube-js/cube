@@ -3,6 +3,28 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.25](https://github.com/cube-js/cube/compare/v0.34.24...v0.34.25) (2023-11-24)
+
+
+### Bug Fixes
+
+* **mongobi-driver:** Correct time zone conversion for minutes, fix [#7152](https://github.com/cube-js/cube/issues/7152) ([#7456](https://github.com/cube-js/cube/issues/7456)) ([5ae2009](https://github.com/cube-js/cube/commit/5ae2009a8231432020e09fb6dfeaa8f40ef152fa))
+
+
+
+
+
+## [0.34.24](https://github.com/cube-js/cube/compare/v0.34.23...v0.34.24) (2023-11-23)
+
+
+### Features
+
+* **schema-compiler:** add dimension primaryKey property to transform result ([#7443](https://github.com/cube-js/cube/issues/7443)) ([baabd41](https://github.com/cube-js/cube/commit/baabd41fed8bd1476d0489dc97c3f78c9106a63b))
+
+
+
+
+
 ## [0.34.23](https://github.com/cube-js/cube/compare/v0.34.22...v0.34.23) (2023-11-19)
 
 
