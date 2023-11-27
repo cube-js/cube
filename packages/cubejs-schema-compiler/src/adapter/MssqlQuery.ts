@@ -18,12 +18,13 @@ const abbrs = {
 };
 
 moment.fn.zoneName = () => {
+  // @ts-ignore
   const abbr = this.zoneAbbr();
   return abbrs[abbr] || abbr;
 };
 
 class MssqlParamAllocator extends ParamAllocator {
-  paramPlaceHolder(paramIndex) {
+  public paramPlaceHolder(paramIndex) {
     return `@_${paramIndex + 1}`;
   }
 }
@@ -41,11 +42,11 @@ const GRANULARITY_TO_INTERVAL = {
 
 class MssqlFilter extends BaseFilter {
   // noinspection JSMethodCanBeStatic
-  escapeWildcardChars(param) {
+  public escapeWildcardChars(param) {
     return typeof param === 'string' ? param.replace(/([_%])/gi, '[$1]') : param;
   }
 
-  likeIgnoreCase(column, not, param, type) {
+  public likeIgnoreCase(column, not, param, type) {
     const p = (!type || type === 'contains' || type === 'ends') ? '%' : '';
     const s = (!type || type === 'contains' || type === 'starts') ? '%' : '';
     return `LOWER(${column})${not ? ' NOT' : ''} LIKE CONCAT('${p}', LOWER(${this.allocateParam(param)}) , '${s}')`;
@@ -53,31 +54,31 @@ class MssqlFilter extends BaseFilter {
 }
 
 export class MssqlQuery extends BaseQuery {
-  newFilter(filter) {
+  public newFilter(filter) {
     return new MssqlFilter(this, filter);
   }
 
-  convertTz(field) {
+  public convertTz(field) {
     return `TODATETIMEOFFSET(${field}, '${moment().tz(this.timezone).format('Z')}')`;
   }
 
-  timeStampCast(value) {
+  public timeStampCast(value) {
     return `CAST(${value} AS DATETIME2)`; // TODO
   }
 
-  dateTimeCast(value) {
+  public dateTimeCast(value) {
     return `CAST(${value} AS DATETIME2)`;
   }
 
-  timeGroupedColumn(granularity, dimension) {
+  public timeGroupedColumn(granularity, dimension) {
     return GRANULARITY_TO_INTERVAL[granularity](dimension);
   }
 
-  newParamAllocator(expressionParams) {
+  public newParamAllocator(expressionParams) {
     return new MssqlParamAllocator(expressionParams);
   }
 
-  groupByDimensionLimit() {
+  public groupByDimensionLimit() {
     if (this.rowLimit) {
       return this.offset ? ` OFFSET ${parseInt(this.offset, 10)} ROWS FETCH NEXT ${parseInt(this.rowLimit, 10)} ROWS ONLY` : '';
     } else {
@@ -85,7 +86,7 @@ export class MssqlQuery extends BaseQuery {
     }
   }
 
-  topLimit() {
+  public topLimit() {
     if (this.offset) {
       return '';
     }
@@ -99,7 +100,7 @@ export class MssqlQuery extends BaseQuery {
    * @returns {string}
    * @override
    */
-  groupByClause() {
+  public groupByClause() {
     const dimensionsForSelect = this.dimensionsForSelect();
     const dimensionColumns = R.flatten(
       dimensionsForSelect.map(s => s.selectColumns() && s.dimensionSql())
@@ -113,12 +114,12 @@ export class MssqlQuery extends BaseQuery {
    * @returns {string}
    * @override
    */
-  aggregateSubQueryGroupByClause() {
+  public aggregateSubQueryGroupByClause() {
     const dimensionColumns = this.dimensionColumns(this.escapeColumnName(QueryAlias.AGG_SUB_QUERY_KEYS));
     return dimensionColumns.length ? ` GROUP BY ${dimensionColumns.join(', ')}` : '';
   }
 
-  overTimeSeriesSelect(cumulativeMeasures, dateSeriesSql, baseQuery, dateJoinConditionSql, baseQueryAlias) {
+  public overTimeSeriesSelect(cumulativeMeasures, dateSeriesSql, baseQuery, dateJoinConditionSql, baseQueryAlias) {
     // Group by time dimensions
     const timeDimensionsColumns = this.timeDimensions.map(
       (t) => `${t.dateSeriesAliasName()}.${this.escapeColumnName('date_from')}`
@@ -140,38 +141,38 @@ export class MssqlQuery extends BaseQuery {
     );
   }
 
-  nowTimestampSql() {
+  public nowTimestampSql() {
     return 'CURRENT_TIMESTAMP';
   }
 
-  unixTimestampSql() {
+  public unixTimestampSql() {
     // eslint-disable-next-line quotes
     return `DATEDIFF(SECOND,'1970-01-01', GETUTCDATE())`;
   }
 
-  preAggregationLoadSql(cube, preAggregation, tableName) {
+  public preAggregationLoadSql(cube, preAggregation, tableName) {
     const sqlAndParams = this.preAggregationSql(cube, preAggregation);
     return [`SELECT * INTO ${tableName} FROM (${sqlAndParams[0]}) AS PreAggregation`, sqlAndParams[1]];
   }
 
-  wrapSegmentForDimensionSelect(sql) {
+  public wrapSegmentForDimensionSelect(sql) {
     return `CAST((CASE WHEN ${sql} THEN 1 ELSE 0 END) AS BIT)`;
   }
 
-  seriesSql(timeDimension) {
+  public seriesSql(timeDimension) {
     const values = timeDimension.timeSeries().map(([from, to]) => `('${from}', '${to}')`);
     return `SELECT ${this.dateTimeCast('date_from')} date_from, ${this.dateTimeCast(
       'date_to'
     )} date_to FROM (VALUES ${values}) ${this.asSyntaxTable} dates (date_from, date_to)`;
   }
 
-  subtractInterval(date, interval) {
+  public subtractInterval(date, interval) {
     const amountInterval = interval.split(' ', 2);
     const negativeInterval = (amountInterval[0]) * -1;
     return `DATEADD(${amountInterval[1]}, ${negativeInterval}, ${date})`;
   }
 
-  addInterval(date, interval) {
+  public addInterval(date, interval) {
     const amountInterval = interval.split(' ', 2);
     return `DATEADD(${amountInterval[1]}, ${amountInterval[0]}, ${date})`;
   }

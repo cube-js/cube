@@ -1648,6 +1648,9 @@ class BaseQuery {
     ).filter(s => !!s).join(', ');
   }
 
+  /**
+   * @returns {Array<BaseDimension|BaseMeasure>}
+   */
   forSelect() {
     return this.dimensionsForSelect().concat(this.measures);
   }
@@ -2190,7 +2193,7 @@ class BaseQuery {
    * @param {boolean?} isPreAggregationName Pre-agg flag.
    * @returns {string}
    */
-  aliasName(name, isPreAggregationName) {
+  aliasName(name, isPreAggregationName = false) {
     if (this.options.memberToAlias && this.options.memberToAlias[name]) {
       return this.options.memberToAlias[name];
     }
