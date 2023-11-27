@@ -99,6 +99,7 @@
     ],
     "coveragePathIgnorePatterns": [
       ".*\\.d\\.ts"
-    ]
+    ],
+    "globalSetup": "<rootDir>/dist/test/global-setup.js"
   }
 }
