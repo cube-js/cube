@@ -769,7 +769,14 @@ export class QueryQueue {
         await queueConnection.optimisticQueryUpdate(queryKeyHashed, { startQueryTime }, processingId, queueId);
 
         const heartBeatTimer = setInterval(
-          () => queueConnection.updateHeartBeat(queryKeyHashed),
+          () => {
+            this.logger('Query process heartbeat', {
+              queueId,
+              queryKey: query.queryKey,
+              requestId: query.requestId,
+            });
+            return queueConnection.updateHeartBeat(queryKeyHashed);
+          },
           this.heartBeatInterval * 1000
         );
         try {
