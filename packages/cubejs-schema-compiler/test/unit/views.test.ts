@@ -1,7 +1,7 @@
 import { prepareYamlCompiler } from './PrepareCompiler';
 import { createSchemaYaml } from './utils';
 
-describe('Views Includes/Excludes', () => {
+describe('Views YAML', () => {
   const schemaCompile = async (views: unknown[]) => {
     const { compiler, cubeEvaluator } = prepareYamlCompiler(
       createSchemaYaml({
@@ -13,6 +13,10 @@ describe('Views Includes/Excludes', () => {
               name: 'id',
               sql: 'id',
               type: 'number',
+              description: 'Description for CubeA.id',
+              meta: {
+                key: 'Meta.key for CubeA.id'
+              },
               primary_key: true,
             }],
             joins: [{
@@ -29,12 +33,20 @@ describe('Views Includes/Excludes', () => {
                 name: 'id',
                 sql: 'id',
                 type: 'number',
+                description: 'Description for CubeB.id',
+                meta: {
+                  key: 'Meta.key for CubeB.id'
+                },
                 primary_key: true,
               },
               {
                 name: 'other_id',
                 sql: 'other_id',
                 type: 'number',
+                description: 'Description for CubeB.other_id',
+                meta: {
+                  key: 'Meta.key for CubeB.other_id'
+                },
               }
             ]
           },
@@ -48,11 +60,19 @@ describe('Views Includes/Excludes', () => {
                 sql: 'id',
                 type: 'number',
                 primary_key: true,
+                description: 'Description for CubeC.id',
+                meta: {
+                  key: 'Meta.key for CubeC.id'
+                },
               },
               {
                 name: 'dimension_1',
                 sql: 'dimension_1',
                 type: 'number',
+                description: 'Description for CubeC.dimension_1',
+                meta: {
+                  key: 'Meta.key for CubeC.dimension_1'
+                },
               }
             ]
           }
@@ -64,6 +84,19 @@ describe('Views Includes/Excludes', () => {
 
     return { compiler, cubeEvaluator };
   };
+
+  function dimensionFixtureForCube(name: string) {
+    return {
+      description: `Description for ${name}`,
+      meta: {
+        key: `Meta.key for ${name}`
+      },
+      ownedByCube: false,
+      sql: expect.any(Function),
+      aliasMember: name,
+      type: 'number',
+    };
+  }
 
   it('includes * + prefix a,b,c', async () => {
     const { cubeEvaluator } = await schemaCompile([{
@@ -83,30 +116,9 @@ describe('Views Includes/Excludes', () => {
     }]);
 
     expect(cubeEvaluator.getCubeDefinition('simple_view').dimensions).toEqual({
-      CubeA_id: {
-        description: undefined,
-        meta: undefined,
-        ownedByCube: false,
-        sql: expect.any(Function),
-        aliasMember: 'CubeA.id',
-        type: 'number',
-      },
-      CubeB_id: {
-        description: undefined,
-        meta: undefined,
-        ownedByCube: false,
-        sql: expect.any(Function),
-        aliasMember: 'CubeB.id',
-        type: 'number',
-      },
-      CubeB_other_id: {
-        description: undefined,
-        meta: undefined,
-        ownedByCube: false,
-        sql: expect.any(Function),
-        aliasMember: 'CubeB.other_id',
-        type: 'number',
-      },
+      CubeA_id: dimensionFixtureForCube('CubeA.id'),
+      CubeB_id: dimensionFixtureForCube('CubeB.id'),
+      CubeB_other_id: dimensionFixtureForCube('CubeB.other_id'),
     });
   });
 
@@ -134,14 +146,7 @@ describe('Views Includes/Excludes', () => {
     }]);
 
     expect(cubeEvaluator.getCubeDefinition('simple_view').dimensions).toEqual({
-      CubeB_other_id: {
-        description: undefined,
-        meta: undefined,
-        ownedByCube: false,
-        sql: expect.any(Function),
-        aliasMember: 'CubeB.other_id',
-        type: 'number',
-      },
+      CubeB_other_id: dimensionFixtureForCube('CubeB.other_id'),
     });
   });
 
@@ -168,14 +173,7 @@ describe('Views Includes/Excludes', () => {
     }]);
 
     expect(cubeEvaluator.getCubeDefinition('simple_view').dimensions).toEqual({
-      CubeB_other_id: {
-        description: undefined,
-        meta: undefined,
-        ownedByCube: false,
-        sql: expect.any(Function),
-        aliasMember: 'CubeB.other_id',
-        type: 'number',
-      },
+      CubeB_other_id: dimensionFixtureForCube('CubeB.other_id'),
     });
   });
 
@@ -198,22 +196,8 @@ describe('Views Includes/Excludes', () => {
     }]);
 
     expect(cubeEvaluator.getCubeDefinition('simple_view').dimensions).toEqual({
-      id: {
-        description: undefined,
-        meta: undefined,
-        ownedByCube: false,
-        sql: expect.any(Function),
-        aliasMember: 'CubeA.id',
-        type: 'number',
-      },
-      other_id: {
-        description: undefined,
-        meta: undefined,
-        ownedByCube: false,
-        sql: expect.any(Function),
-        aliasMember: 'CubeB.other_id',
-        type: 'number',
-      },
+      id: dimensionFixtureForCube('CubeA.id'),
+      other_id: dimensionFixtureForCube('CubeB.other_id'),
     });
   });
 
@@ -245,30 +229,9 @@ describe('Views Includes/Excludes', () => {
     }]);
 
     expect(cubeEvaluator.getCubeDefinition('simple_view').dimensions).toEqual({
-      id: {
-        description: undefined,
-        meta: undefined,
-        ownedByCube: false,
-        sql: expect.any(Function),
-        aliasMember: 'CubeA.id',
-        type: 'number',
-      },
-      CubeB_other_id: {
-        description: undefined,
-        meta: undefined,
-        ownedByCube: false,
-        sql: expect.any(Function),
-        aliasMember: 'CubeB.other_id',
-        type: 'number',
-      },
-      CubeC_dimension_1: {
-        description: undefined,
-        meta: undefined,
-        ownedByCube: false,
-        sql: expect.any(Function),
-        aliasMember: 'CubeC.dimension_1',
-        type: 'number',
-      },
+      id: dimensionFixtureForCube('CubeA.id'),
+      CubeB_other_id: dimensionFixtureForCube('CubeB.other_id'),
+      CubeC_dimension_1: dimensionFixtureForCube('CubeC.dimension_1'),
     });
   });
 
@@ -298,30 +261,9 @@ describe('Views Includes/Excludes', () => {
     }]);
 
     expect(cubeEvaluator.getCubeDefinition('simple_view').dimensions).toEqual({
-      id: {
-        description: undefined,
-        meta: undefined,
-        ownedByCube: false,
-        sql: expect.any(Function),
-        aliasMember: 'CubeA.id',
-        type: 'number',
-      },
-      other_id: {
-        description: undefined,
-        meta: undefined,
-        ownedByCube: false,
-        sql: expect.any(Function),
-        aliasMember: 'CubeB.other_id',
-        type: 'number',
-      },
-      dimension_1: {
-        description: undefined,
-        meta: undefined,
-        ownedByCube: false,
-        sql: expect.any(Function),
-        aliasMember: 'CubeC.dimension_1',
-        type: 'number',
-      },
+      id: dimensionFixtureForCube('CubeA.id'),
+      other_id: dimensionFixtureForCube('CubeB.other_id'),
+      dimension_1: dimensionFixtureForCube('CubeC.dimension_1')
     });
   });
 
@@ -337,22 +279,8 @@ describe('Views Includes/Excludes', () => {
     }]);
 
     expect(cubeEvaluator.getCubeDefinition('simple_view').dimensions).toEqual({
-      id: {
-        description: undefined,
-        meta: undefined,
-        ownedByCube: false,
-        sql: expect.any(Function),
-        aliasMember: 'CubeA.id',
-        type: 'number',
-      },
-      other_id: {
-        description: undefined,
-        meta: undefined,
-        ownedByCube: false,
-        sql: expect.any(Function),
-        aliasMember: 'CubeB.other_id',
-        type: 'number',
-      },
+      id: dimensionFixtureForCube('CubeA.id'),
+      other_id: dimensionFixtureForCube('CubeB.other_id'),
     });
   });
 
@@ -370,22 +298,8 @@ describe('Views Includes/Excludes', () => {
     }]);
 
     expect(cubeEvaluator.getCubeDefinition('simple_view').dimensions).toEqual({
-      id: {
-        description: undefined,
-        meta: undefined,
-        ownedByCube: false,
-        sql: expect.any(Function),
-        aliasMember: 'CubeA.id',
-        type: 'number',
-      },
-      other_id: {
-        description: undefined,
-        meta: undefined,
-        ownedByCube: false,
-        sql: expect.any(Function),
-        aliasMember: 'CubeB.other_id',
-        type: 'number',
-      },
+      id: dimensionFixtureForCube('CubeA.id'),
+      other_id: dimensionFixtureForCube('CubeB.other_id'),
     });
   });
 });
