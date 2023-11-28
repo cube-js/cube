@@ -195,6 +195,10 @@ impl SqlGenerator for SqlGeneratorMock {
 }
 
 pub fn get_test_tenant_ctx() -> Arc<MetaContext> {
+    get_test_tenant_ctx_customized(Vec::new())
+}
+
+pub fn get_test_tenant_ctx_customized(custom_templates: Vec<(String, String)>) -> Arc<MetaContext> {
     let sql_generator: Arc<dyn SqlGenerator + Send + Sync> = Arc::new(SqlGeneratorMock {
         sql_templates: Arc::new(
             SqlTemplates::new(
@@ -241,7 +245,7 @@ pub fn get_test_tenant_ctx() -> Arc<MetaContext> {
                     ("quotes/escape".to_string(), "\"\"".to_string()),
                     ("params/param".to_string(), "${{ param_index + 1 }}".to_string())
                 ]
-                .into_iter()
+                .into_iter().chain(custom_templates.into_iter())
                 .collect(),
             )
             .unwrap(),

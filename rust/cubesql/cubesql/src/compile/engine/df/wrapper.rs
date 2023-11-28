@@ -1515,7 +1515,7 @@ impl CubeScanWrapperNode {
 
     fn escape_interpolation_quotes(s: String, ungrouped: bool) -> String {
         if ungrouped {
-            s.replace("`", "\\`")
+            s.replace("\\", "\\\\").replace("`", "\\`")
         } else {
             s
         }

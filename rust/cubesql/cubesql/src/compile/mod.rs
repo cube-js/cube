@@ -1713,7 +1713,8 @@ mod tests {
         compile::{
             rewrite::rewriter::Rewriter,
             test::{
-                get_string_cube_meta, get_test_session_with_config, get_test_tenant_ctx_with_meta,
+                get_string_cube_meta, get_test_session_with_config, get_test_tenant_ctx_customized,
+                get_test_tenant_ctx_with_meta,
             },
         },
         config::{ConfigObj, ConfigObjImpl},
@@ -18999,6 +19000,37 @@ ORDER BY \"COUNT(count)\" DESC"
             "Physical plan: {}",
             displayable(physical_plan.as_ref()).indent()
         );
+    }
+
+    #[tokio::test]
+    async fn test_case_wrapper_escaping() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query_plan = convert_sql_to_cube_query(
+            &"SELECT CASE WHEN customer_gender = '\\`' THEN customer_gender ELSE 'N/A' END as \"\\`\" FROM KibanaSampleDataEcommerce a".to_string(),
+            get_test_tenant_ctx_customized(vec![
+                ("expressions/binary".to_string(), "{{ left }} \\`{{ op }} {{ right }}".to_string())
+            ]),
+            get_test_session(DatabaseProtocol::PostgreSQL).await,
+        ).await.unwrap();
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert!(logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql
+            // Expect 6 backslashes as output is JSON and it's escaped one more time
+            .contains("\\\\\\\\\\\\`"));
     }
 
     #[tokio::test]
