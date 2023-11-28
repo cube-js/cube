@@ -805,10 +805,29 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
 
     fn modify(egraph: &mut EGraph<LogicalPlanLanguage, Self>, id: Id) {
         if let Some(ConstantFolding::Scalar(c)) = &egraph[id].data.constant {
+            // TODO: ideally all constants should be aliased, but this requires
+            // rewrites to extract `.data.constant` instead of `literal_expr`.
+            let alias_name = if c.is_null() {
+                egraph[id]
+                    .data
+                    .original_expr
+                    .as_ref()
+                    .map(|expr| expr.name(&DFSchema::empty()).unwrap())
+            } else {
+                None
+            };
             let c = c.clone();
             let value = egraph.add(LogicalPlanLanguage::LiteralExprValue(LiteralExprValue(c)));
             let literal_expr = egraph.add(LogicalPlanLanguage::LiteralExpr([value]));
-            egraph.union(id, literal_expr);
+            if let Some(alias_name) = alias_name {
+                let alias = egraph.add(LogicalPlanLanguage::AliasExprAlias(AliasExprAlias(
+                    alias_name,
+                )));
+                let alias_expr = egraph.add(LogicalPlanLanguage::AliasExpr([literal_expr, alias]));
+                egraph.union(id, alias_expr);
+            } else {
+                egraph.union(id, literal_expr);
+            }
         }
     }
 }
