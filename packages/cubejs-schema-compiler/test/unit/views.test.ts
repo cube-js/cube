@@ -14,6 +14,11 @@ describe('Views Includes/Excludes', () => {
               sql: 'id',
               type: 'number',
               primary_key: true,
+            }],
+            joins: [{
+              name: 'CubeC',
+              relationship: 'one_to_one',
+              sql: 'SQL clause',
             }]
           },
           {
@@ -32,6 +37,24 @@ describe('Views Includes/Excludes', () => {
                 type: 'number',
               }
             ]
+          },
+          // A -> C
+          {
+            name: 'CubeC',
+            sql_table: 'cube_b',
+            dimensions: [
+              {
+                name: 'id',
+                sql: 'id',
+                type: 'number',
+                primary_key: true,
+              },
+              {
+                name: 'dimension_1',
+                sql: 'dimension_1',
+                type: 'number',
+              }
+            ]
           }
         ],
         views
@@ -42,7 +65,7 @@ describe('Views Includes/Excludes', () => {
     return { compiler, cubeEvaluator };
   };
 
-  it('includes * + prefix a,b', async () => {
+  it('includes * + prefix a,b,c', async () => {
     const { cubeEvaluator } = await schemaCompile([{
       name: 'simple_view',
       cubes: [
@@ -156,7 +179,7 @@ describe('Views Includes/Excludes', () => {
     });
   });
 
-  it('includes * + exclude id from b', async () => {
+  it('includes * (a,b) + exclude id from b', async () => {
     const { cubeEvaluator } = await schemaCompile([{
       name: 'simple_view',
       cubes: [
@@ -189,6 +212,114 @@ describe('Views Includes/Excludes', () => {
         ownedByCube: false,
         sql: expect.any(Function),
         aliasMember: 'CubeB.other_id',
+        type: 'number',
+      },
+    });
+  });
+
+  it('includes * (a,b, a.c) with prefix + exclude id from b,c', async () => {
+    const { cubeEvaluator } = await schemaCompile([{
+      name: 'simple_view',
+      cubes: [
+        {
+          join_path: 'CubeA',
+          includes: '*',
+        },
+        {
+          join_path: 'CubeB',
+          includes: '*',
+          prefix: true,
+          excludes: [
+            'id'
+          ]
+        },
+        {
+          join_path: 'CubeA.CubeC',
+          includes: '*',
+          prefix: true,
+          excludes: [
+            'id'
+          ]
+        },
+      ]
+    }]);
+
+    expect(cubeEvaluator.getCubeDefinition('simple_view').dimensions).toEqual({
+      id: {
+        description: undefined,
+        meta: undefined,
+        ownedByCube: false,
+        sql: expect.any(Function),
+        aliasMember: 'CubeA.id',
+        type: 'number',
+      },
+      CubeB_other_id: {
+        description: undefined,
+        meta: undefined,
+        ownedByCube: false,
+        sql: expect.any(Function),
+        aliasMember: 'CubeB.other_id',
+        type: 'number',
+      },
+      CubeC_dimension_1: {
+        description: undefined,
+        meta: undefined,
+        ownedByCube: false,
+        sql: expect.any(Function),
+        aliasMember: 'CubeC.dimension_1',
+        type: 'number',
+      },
+    });
+  });
+
+  it('includes * (a,b, a.c) + exclude id from b,c', async () => {
+    const { cubeEvaluator } = await schemaCompile([{
+      name: 'simple_view',
+      cubes: [
+        {
+          join_path: 'CubeA',
+          includes: '*',
+        },
+        {
+          join_path: 'CubeB',
+          includes: '*',
+          excludes: [
+            'id'
+          ]
+        },
+        {
+          join_path: 'CubeA.CubeC',
+          includes: '*',
+          excludes: [
+            'id'
+          ]
+        },
+      ]
+    }]);
+
+    expect(cubeEvaluator.getCubeDefinition('simple_view').dimensions).toEqual({
+      id: {
+        description: undefined,
+        meta: undefined,
+        ownedByCube: false,
+        sql: expect.any(Function),
+        aliasMember: 'CubeA.id',
+        type: 'number',
+      },
+      other_id: {
+        description: undefined,
+        meta: undefined,
+        ownedByCube: false,
+        sql: expect.any(Function),
+        aliasMember: 'CubeB.other_id',
+        type: 'number',
+      },
+      dimension_1: {
+        description: undefined,
+        meta: undefined,
+        ownedByCube: false,
+        sql: expect.any(Function),
+        aliasMember: 'CubeC.dimension_1',
         type: 'number',
       },
     });
