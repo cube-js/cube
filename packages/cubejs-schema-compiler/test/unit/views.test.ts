@@ -75,6 +75,10 @@ describe('Views YAML', () => {
                 },
               }
             ]
+          },
+          {
+            name: 'CubeBChild',
+            extends: 'CubeB',
           }
         ],
         views
@@ -85,7 +89,7 @@ describe('Views YAML', () => {
     return { compiler, cubeEvaluator };
   };
 
-  function dimensionFixtureForCube(name: string) {
+  function dimensionFixtureForCube(aliasName: string, name: string = aliasName) {
     return {
       description: `Description for ${name}`,
       meta: {
@@ -93,7 +97,7 @@ describe('Views YAML', () => {
       },
       ownedByCube: false,
       sql: expect.any(Function),
-      aliasMember: name,
+      aliasMember: aliasName,
       type: 'number',
     };
   }
@@ -263,6 +267,38 @@ describe('Views YAML', () => {
     expect(cubeEvaluator.getCubeDefinition('simple_view').dimensions).toEqual({
       id: dimensionFixtureForCube('CubeA.id'),
       other_id: dimensionFixtureForCube('CubeB.other_id'),
+      dimension_1: dimensionFixtureForCube('CubeC.dimension_1')
+    });
+  });
+
+  it('includes * a, bchild) + exclude id from b,c', async () => {
+    const { cubeEvaluator } = await schemaCompile([{
+      name: 'simple_view',
+      cubes: [
+        {
+          join_path: 'CubeA',
+          includes: '*',
+        },
+        {
+          join_path: 'CubeBChild',
+          includes: '*',
+          excludes: [
+            'id'
+          ]
+        },
+        {
+          join_path: 'CubeA.CubeC',
+          includes: '*',
+          excludes: [
+            'id'
+          ]
+        },
+      ]
+    }]);
+
+    expect(cubeEvaluator.getCubeDefinition('simple_view').dimensions).toEqual({
+      id: dimensionFixtureForCube('CubeA.id'),
+      other_id: dimensionFixtureForCube('CubeBChild.other_id', 'CubeB.other_id'),
       dimension_1: dimensionFixtureForCube('CubeC.dimension_1')
     });
   });
