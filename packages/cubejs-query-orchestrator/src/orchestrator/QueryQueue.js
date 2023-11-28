@@ -875,9 +875,10 @@ export class QueryQueue {
               await this.sendCancelMessageFn(queryWithCancelHandle, queueId);
             }
           }
+        } finally {
+          // catch block can throw an exception, it's why it's important to clearInterval here
+          clearInterval(heartBeatTimer);
         }
-
-        clearInterval(heartBeatTimer);
 
         if (!(await queueConnection.setResultAndRemoveQuery(queryKeyHashed, executionResult, processingId, queueId))) {
           this.logger('Orphaned execution result', {
