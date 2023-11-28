@@ -1109,7 +1109,8 @@ WHERE `TABLE_SCHEMA` = '{}'",
                     .session_manager
                     .server
                     .auth
-                    .authenticate(Some(to_user.clone()))
+                    // TODO do we want to send actual password here?
+                    .authenticate(Some(to_user.clone()), None)
                     .await
                     .map_err(|e| {
                         CompilationError::internal(format!("Error calling authenticate: {}", e))

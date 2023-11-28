@@ -64,7 +64,7 @@ type CheckSQLAuthSuccessResponse = {
  * auth logic.
  */
 type CheckSQLAuthFn =
-  (ctx: any, user: string | null) =>
+  (ctx: any, user: string | null, password: string | null) =>
     Promise<CheckSQLAuthSuccessResponse> |
     CheckSQLAuthSuccessResponse;
 

@@ -507,7 +507,7 @@ impl AsyncPostgresShim {
             .session
             .server
             .auth
-            .authenticate(Some(user.clone()))
+            .authenticate(Some(user.clone()), Some(password_message.password.clone()))
             .await;
 
         let mut auth_context: Option<AuthContextRef> = None;
@@ -516,7 +516,7 @@ impl AsyncPostgresShim {
             Ok(authenticate_response) => {
                 auth_context = Some(authenticate_response.context);
                 match authenticate_response.password {
-                    None => true,
+                    None => false,
                     Some(password) => password == password_message.password,
                 }
             }
