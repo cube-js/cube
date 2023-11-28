@@ -769,7 +769,7 @@ export class QueryQueue {
         await queueConnection.optimisticQueryUpdate(queryKeyHashed, { startQueryTime }, processingId, queueId);
 
         const heartBeatTimer = setInterval(
-          () => queueConnection.updateHeartBeat(queryKeyHashed),
+          () => queueConnection.updateHeartBeat(queryKeyHashed, queueId),
           this.heartBeatInterval * 1000
         );
         try {
@@ -857,7 +857,7 @@ export class QueryQueue {
             error: (e.stack || e).toString()
           });
           if (e instanceof TimeoutError) {
-            const queryWithCancelHandle = await queueConnection.getQueryDef(queryKeyHashed);
+            const queryWithCancelHandle = await queueConnection.getQueryDef(queryKeyHashed, queueId);
             if (queryWithCancelHandle) {
               this.logger('Cancelling query due to timeout', {
                 queueId,
