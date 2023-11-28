@@ -11,7 +11,7 @@ use datafusion::{
             StructBuilder, TimestampMicrosecondArray, TimestampMillisecondArray,
             TimestampNanosecondArray, TimestampSecondArray, UInt32Builder,
         },
-        compute::{cast, concat},
+        compute::{cast, cast_with_options, concat, CastOptions},
         datatypes::{
             DataType, Date32Type, Field, Float64Type, Int32Type, Int64Type, IntervalDayTimeType,
             IntervalUnit, IntervalYearMonthType, TimeUnit, TimestampNanosecondType, UInt32Type,
@@ -1129,7 +1129,7 @@ macro_rules! date_math_udf {
         let intervals = downcast_primitive_arg!(&$ARGS[1], "interval", $SECOND_ARG_TYPE);
         let mut builder = TimestampNanosecondArray::builder(timestamps.len());
         for i in 0..timestamps.len() {
-            if timestamps.is_null(i) {
+            if timestamps.is_null(i) || intervals.is_null(i) {
                 builder.append_null()?;
             } else {
                 let timestamp = timestamps.value_as_datetime(i).unwrap();
@@ -1348,7 +1348,20 @@ pub fn create_interval_mul_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
         assert!(args.len() == 2);
 
-        let multiplicands = downcast_primitive_arg!(args[1], "multiplicand", Int64Type);
+        let multiplicands = match args[1].data_type() {
+            DataType::Utf8 => {
+                cast_with_options(&args[1], &DataType::Int64, &CastOptions { safe: false })?
+            }
+            DataType::Int64 => Arc::clone(&args[1]),
+            t => {
+                return Err(DataFusionError::Execution(format!(
+                    "unsupported multiplicand type {}",
+                    t
+                )))
+            }
+        };
+
+        let multiplicands = downcast_primitive_arg!(multiplicands, "multiplicand", Int64Type);
 
         match &args[0].data_type() {
             DataType::Interval(IntervalUnit::YearMonth) => {
@@ -1424,6 +1437,18 @@ pub fn create_interval_mul_udf() -> ScalarUDF {
                 TypeSignature::Exact(vec![
                     DataType::Interval(IntervalUnit::MonthDayNano),
                     DataType::Int64,
+                ]),
+                TypeSignature::Exact(vec![
+                    DataType::Interval(IntervalUnit::YearMonth),
+                    DataType::Utf8,
+                ]),
+                TypeSignature::Exact(vec![
+                    DataType::Interval(IntervalUnit::DayTime),
+                    DataType::Utf8,
+                ]),
+                TypeSignature::Exact(vec![
+                    DataType::Interval(IntervalUnit::MonthDayNano),
+                    DataType::Utf8,
                 ]),
             ],
             Volatility::Immutable,

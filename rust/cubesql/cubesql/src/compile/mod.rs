@@ -20035,4 +20035,20 @@ ORDER BY \"COUNT(count)\" DESC"
             .sql;
         assert!(sql.contains("+ '7 day'::interval"));
     }
+
+    #[tokio::test]
+    async fn test_string_multiply_interval() -> Result<(), CubeError> {
+        init_logger();
+
+        insta::assert_snapshot!(
+            "test_string_multiply_interval",
+            execute_query(
+                "SELECT NULL * INTERVAL '1 day' n, '5' * INTERVAL '1 day' d5".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
 }
