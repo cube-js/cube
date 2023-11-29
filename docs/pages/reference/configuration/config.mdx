@@ -1085,9 +1085,14 @@ implementation verifies user name and password from environment variables:
 `CUBEJS_SQL_USER`, `CUBEJS_SQL_PASSWORD`, but in [development
 mode][ref-development-mode] it ignores validation.
 
-Called on each request from Cube SQL API.
+Called on each new connection to Cube SQL API, on change user by `SET USER` or `__user` field, every `CUBESQL_AUTH_EXPIRE_SECS`.
 
 For example, you can use `check_sql_auth` to validate username and password.
+`password` argument is provided only when new connections are established.
+`check_sql_auth` implementation should gracefully handle missing `password` field to handle change user and re-authentication flows.
+`check_sql_auth` should always return `password` as it used for validation of password provided by user.
+If clear text password can't be obtained, best practice is to return `password` provided as an argument after password validation.
+Only security context is used for change user and re-authentication flows so returned `password` isn't checked in this case.
 
 <CodeTabs>
 
@@ -1095,10 +1100,12 @@ For example, you can use `check_sql_auth` to validate username and password.
 from cube import config
 
 @config('check_sql_auth')
-def check_sql_auth(req: dict, user_name: str) -> dict:
+def check_sql_auth(req: dict, user_name: str, password: str) -> dict:
   if user_name == 'my_user':
+    if password && password != 'my_password':
+      raise Exception('Access denied')
     return {
-      'password': 'my_password',
+      'password': password,
       'securityContext': {
         'some': 'data'
       }
@@ -1110,10 +1117,13 @@ def check_sql_auth(req: dict, user_name: str) -> dict:
 
 ```javascript
 module.exports = {
-  checkSqlAuth: (req, user_name) => {
+  checkSqlAuth: (req, user_name, password) => {
     if (user_name === 'my_user') {
+      if (password && password !== 'my_password') {
+        throw new Error('Access denied');
+      }
       return {
-        password: 'my_password',
+        password,
         securityContext: {
           some: 'data'
         },
