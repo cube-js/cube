@@ -200,12 +200,8 @@ export class SQLServer {
   protected wrapCheckSqlAuthFn(checkSqlAuth: CheckSQLAuthFn): CheckSQLAuthFn {
     return async (req, user, password) => {
       const response = await checkSqlAuth(req, user, password);
-      if (typeof response !== 'object' || response.password === null) {
+      if (typeof response !== 'object') {
         throw new Error('checkSqlAuth must return an object');
-      }
-
-      if (!response.password) {
-        throw new Error('checkSqlAuth must return an object with password field');
       }
 
       return response;

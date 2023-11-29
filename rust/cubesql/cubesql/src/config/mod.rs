@@ -120,6 +120,8 @@ pub trait ConfigObj: DIService + Debug {
     fn nonce(&self) -> &Option<Vec<u8>>;
 
     fn disable_strict_agg_type_match(&self) -> bool;
+
+    fn auth_expire_secs(&self) -> u64;
 }
 
 #[derive(Debug, Clone)]
@@ -128,6 +130,7 @@ pub struct ConfigObjImpl {
     pub postgres_bind_address: Option<String>,
     pub nonce: Option<Vec<u8>>,
     pub query_timeout: u64,
+    pub auth_expire_secs: u64,
     pub timezone: Option<String>,
     pub disable_strict_agg_type_match: bool,
 }
@@ -154,6 +157,7 @@ impl ConfigObjImpl {
                 "CUBESQL_DISABLE_STRICT_AGG_TYPE_MATCH",
                 false,
             ),
+            auth_expire_secs: env_parse("CUBESQL_AUTH_EXPIRE_SECS", 300),
         }
     }
 }
@@ -180,6 +184,10 @@ impl ConfigObj for ConfigObjImpl {
     fn disable_strict_agg_type_match(&self) -> bool {
         self.disable_strict_agg_type_match
     }
+
+    fn auth_expire_secs(&self) -> u64 {
+        self.auth_expire_secs
+    }
 }
 
 lazy_static! {
@@ -205,6 +213,7 @@ impl Config {
                 postgres_bind_address: None,
                 nonce: None,
                 query_timeout,
+                auth_expire_secs: 60,
                 timezone,
                 disable_strict_agg_type_match: false,
             }),

@@ -331,6 +331,8 @@ impl QueryPlanner {
             let projection_expr = query.meta_as_df_projection_expr();
             let projection_schema = query.meta_as_df_projection_schema();
 
+            self.reauthenticate_if_needed().await?;
+
             let scan_node = LogicalPlan::Extension(Extension {
                 node: Arc::new(CubeScanNode::new(
                     schema.clone(),
@@ -1079,6 +1081,8 @@ WHERE `TABLE_SCHEMA` = '{}'",
             .collect::<Vec<_>>();
 
         for v in user_variables {
+            self.reauthenticate_if_needed().await?;
+
             let auth_context = self.state.auth_context().ok_or(CompilationError::user(
                 "No auth context set but tried to set current user".to_string(),
             ))?;
@@ -1289,6 +1293,26 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx
     }
 
+    async fn reauthenticate_if_needed(&self) -> CompilationResult<()> {
+        if self.state.is_auth_context_expired() {
+            let authenticate_response = self
+                .session_manager
+                .server
+                .auth
+                .authenticate(self.state.user(), None)
+                .await
+                .map_err(|e| {
+                    CompilationError::internal(format!(
+                        "Error calling authenticate during re-authentication: {}",
+                        e
+                    ))
+                })?;
+            self.state
+                .set_auth_context(Some(authenticate_response.context));
+        }
+        Ok(())
+    }
+
     async fn create_df_logical_plan(
         &self,
         stmt: ast::Statement,
@@ -1362,6 +1386,9 @@ WHERE `TABLE_SCHEMA` = '{}'",
         let root = converter
             .add_logical_plan(&optimized_plan)
             .map_err(|e| CompilationError::internal(e.to_string()))?;
+
+        self.reauthenticate_if_needed().await?;
+
         let result = converter
             .take_rewriter()
             .find_best_plan(root, self.state.auth_context().unwrap(), qtrace)
