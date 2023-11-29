@@ -213,6 +213,8 @@ version.
 
 <WarningBox>
 
+Rollup join is designed to join data across different data sources.
+To join data within the same data source you can list members from different cubes within a regular rollup.
 Rollup join can be used only to join two tables, and one can't contain more than
 one partition so that the join can operate correctly. It means that at least one
 table should be less than 1M of rows. There's work in progress to remove those

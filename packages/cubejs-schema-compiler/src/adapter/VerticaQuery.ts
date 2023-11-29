@@ -12,16 +12,16 @@ const GRANULARITY_TO_INTERVAL = {
 };
 
 export class VerticaQuery extends BaseQuery {
-  convertTz(field) {
+  public convertTz(field) {
     return `${field} AT TIME ZONE '${this.timezone}'`;
   }
 
   // eslint-disable-next-line no-unused-vars
-  timeStampParam(timeDimension) {
+  public timeStampParam(timeDimension) {
     return this.timeStampCast('?');
   }
 
-  timeGroupedColumn(granularity, dimension) {
+  public timeGroupedColumn(granularity, dimension) {
     return `TRUNC(${dimension}, '${GRANULARITY_TO_INTERVAL[granularity]}')`;
   }
 }

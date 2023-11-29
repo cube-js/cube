@@ -13,13 +13,13 @@ const GRANULARITY_TO_INTERVAL = {
 };
 
 class PrestodbFilter extends BaseFilter {
-  likeIgnoreCase(column, not, param, type) {
+  public likeIgnoreCase(column, not, param, type) {
     const p = (!type || type === 'contains' || type === 'ends') ? '%' : '';
     const s = (!type || type === 'contains' || type === 'starts') ? '%' : '';
     return `LOWER(${column})${not ? ' NOT' : ''} LIKE CONCAT('${p}', LOWER(${this.allocateParam(param)}) , '${s}') ESCAPE '\\'`;
   }
 
-  castParameter() {
+  public castParameter() {
     if (this.definition().type === 'boolean') {
       return 'CAST(? AS BOOLEAN)';
     } else if (this.measure || this.definition().type === 'number') {
@@ -32,84 +32,84 @@ class PrestodbFilter extends BaseFilter {
 }
 
 export class PrestodbQuery extends BaseQuery {
-  newFilter(filter) {
+  public newFilter(filter) {
     return new PrestodbFilter(this, filter);
   }
 
-  timeStampParam() {
+  public timeStampParam() {
     return 'from_iso8601_timestamp(?)';
   }
 
-  timeStampCast(value) {
+  public timeStampCast(value) {
     return `from_iso8601_timestamp(${value})`;
   }
 
-  dateTimeCast(value) {
+  public dateTimeCast(value) {
     return `from_iso8601_timestamp(${value})`;
   }
 
-  convertTz(field) {
+  public convertTz(field) {
     const atTimezone = `${field} AT TIME ZONE '${this.timezone}'`;
     return this.timezone ?
       `CAST(date_add('minute', timezone_minute(${atTimezone}), date_add('hour', timezone_hour(${atTimezone}), ${field})) AS TIMESTAMP)` :
       field;
   }
 
-  timeGroupedColumn(granularity, dimension) {
+  public timeGroupedColumn(granularity, dimension) {
     return `date_trunc('${GRANULARITY_TO_INTERVAL[granularity]}', ${dimension})`;
   }
 
-  subtractInterval(date, interval) {
+  public subtractInterval(date, interval) {
     const [intervalValue, intervalUnit] = interval.split(' ');
     return `${date} - interval '${intervalValue}' ${intervalUnit}`;
   }
 
-  addInterval(date, interval) {
+  public addInterval(date, interval) {
     const [intervalValue, intervalUnit] = interval.split(' ');
     return `${date} + interval '${intervalValue}' ${intervalUnit}`;
   }
 
-  seriesSql(timeDimension) {
+  public seriesSql(timeDimension) {
     const values = timeDimension.timeSeries().map(
       ([from, to]) => `select '${from}' f, '${to}' t`
     ).join(' UNION ALL ');
     return `SELECT from_iso8601_timestamp(dates.f) date_from, from_iso8601_timestamp(dates.t) date_to FROM (${values}) AS dates`;
   }
 
-  unixTimestampSql() {
+  public unixTimestampSql() {
     return `to_unixtime(${this.nowTimestampSql()})`;
   }
 
-  defaultRefreshKeyRenewalThreshold() {
+  public defaultRefreshKeyRenewalThreshold() {
     return 120;
   }
 
-  defaultEveryRefreshKey() {
+  public defaultEveryRefreshKey() {
     return {
       every: '2 minutes'
     };
   }
 
-  hllInit(sql) {
+  public hllInit(sql) {
     return `cast(approx_set(${sql}) as varbinary)`;
   }
 
-  hllMerge(sql) {
+  public hllMerge(sql) {
     return `cardinality(merge(cast(${sql} as HyperLogLog)))`;
   }
 
-  countDistinctApprox(sql) {
+  public countDistinctApprox(sql) {
     return `approx_distinct(${sql})`;
   }
 
-  groupByDimensionLimit() {
+  public groupByDimensionLimit() {
     const limitClause = this.rowLimit === null ? '' : ` LIMIT ${this.rowLimit && parseInt(this.rowLimit, 10) || 10000}`;
     const offsetClause = this.offset ? ` OFFSET ${parseInt(this.offset, 10)}` : '';
 
     return `${offsetClause}${limitClause}`;
   }
 
-  sqlTemplates() {
+  public sqlTemplates() {
     const templates = super.sqlTemplates();
     templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
     templates.functions.DATEPART = 'DATE_PART({{ args_concat }})';

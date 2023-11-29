@@ -1,6 +1,7 @@
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
 import { UserError } from '../compiler/UserError';
+import { BaseTimeDimension } from './BaseTimeDimension';
 
 const GRANULARITY_TO_INTERVAL = {
   day: 'Day',
@@ -13,13 +14,13 @@ const GRANULARITY_TO_INTERVAL = {
 };
 
 class ClickHouseFilter extends BaseFilter {
-  likeIgnoreCase(column, not, param, type) {
+  public likeIgnoreCase(column, not, param, type) {
     const p = (!type || type === 'contains' || type === 'ends') ? '%' : '';
     const s = (!type || type === 'contains' || type === 'starts') ? '%' : '';
     return `lower(${column}) ${not ? 'NOT' : ''} LIKE CONCAT('${p}', lower(${this.allocateParam(param)}), '${s}')`;
   }
 
-  castParameter() {
+  public castParameter() {
     if (this.measure || this.definition().type === 'number') {
       // TODO here can be measure type of string actually
       return 'toFloat64(?)';
@@ -29,15 +30,15 @@ class ClickHouseFilter extends BaseFilter {
 }
 
 export class ClickHouseQuery extends BaseQuery {
-  newFilter(filter) {
+  public newFilter(filter) {
     return new ClickHouseFilter(this, filter);
   }
 
-  escapeColumnName(name) {
+  public escapeColumnName(name) {
     return `\`${name}\``;
   }
 
-  convertTz(field) {
+  public convertTz(field) {
     //
     // field yields a Date or a DateTime so add in the extra toDateTime to support the Date case
     //
@@ -48,7 +49,7 @@ export class ClickHouseQuery extends BaseQuery {
     return `toTimeZone(toDateTime(${field}), '${this.timezone}')`;
   }
 
-  timeGroupedColumn(granularity, dimension) {
+  public timeGroupedColumn(granularity, dimension) {
     if (granularity === 'week') {
       return `toDateTime(toMonday(${dimension}, '${this.timezone}'), '${this.timezone}')`;
     } else {
@@ -57,22 +58,22 @@ export class ClickHouseQuery extends BaseQuery {
     }
   }
 
-  calcInterval(operation, date, interval) {
+  public calcInterval(operation, date, interval) {
     const [intervalValue, intervalUnit] = interval.split(' ');
     // eslint-disable-next-line prefer-template
     const fn = operation + intervalUnit[0].toUpperCase() + intervalUnit.substring(1) + 's';
     return `${fn}(${date}, ${intervalValue})`;
   }
 
-  subtractInterval(date, interval) {
+  public subtractInterval(date, interval) {
     return this.calcInterval('subtract', date, interval);
   }
 
-  addInterval(date, interval) {
+  public addInterval(date, interval) {
     return this.calcInterval('add', date, interval);
   }
 
-  timeStampCast(value) {
+  public timeStampCast(value) {
     // value yields a string formatted in ISO8601, so this function returns a expression to parse a string to a DateTime
 
     //
@@ -83,7 +84,7 @@ export class ClickHouseQuery extends BaseQuery {
     return `parseDateTimeBestEffort(${value})`;
   }
 
-  dateTimeCast(value) {
+  public dateTimeCast(value) {
     // value yields a string formatted in ISO8601, so this function returns a expression to parse a string to a DateTime
 
     //
@@ -94,7 +95,7 @@ export class ClickHouseQuery extends BaseQuery {
     return `parseDateTimeBestEffort(${value})`;
   }
 
-  dimensionsJoinCondition(leftAlias, rightAlias) {
+  public dimensionsJoinCondition(leftAlias, rightAlias) {
     const dimensionAliases = this.dimensionAliasNames();
     if (!dimensionAliases.length) {
       return '1 = 1';
@@ -104,7 +105,7 @@ export class ClickHouseQuery extends BaseQuery {
       .join(' AND ');
   }
 
-  getFieldAlias(id) {
+  public getFieldAlias(id) {
     const equalIgnoreCase = (a, b) => (
       typeof a === 'string' && typeof b === 'string' && a.toUpperCase() === b.toUpperCase()
     );
@@ -130,7 +131,7 @@ export class ClickHouseQuery extends BaseQuery {
     return null;
   }
 
-  orderHashToString(hash) {
+  public orderHashToString(hash) {
     //
     // ClickHouse doesn't support order by index column, so map these to the alias names
     //
@@ -149,7 +150,7 @@ export class ClickHouseQuery extends BaseQuery {
     return `${fieldAlias} ${direction}`;
   }
 
-  groupByClause() {
+  public groupByClause() {
     if (this.ungrouped) {
       return '';
     }
@@ -161,7 +162,7 @@ export class ClickHouseQuery extends BaseQuery {
     return names.length ? ` GROUP BY ${names.join(', ')}` : '';
   }
 
-  primaryKeyCount(cubeName, distinct) {
+  public primaryKeyCount(cubeName, distinct) {
     const primaryKeys = this.cubeEvaluator.primaryKeys[cubeName];
     const primaryKeySql = primaryKeys.length > 1 ?
       this.concatStringsSql(primaryKeys.map((pk) => this.castToString(this.primaryKeySql(pk, cubeName)))) :
@@ -173,11 +174,11 @@ export class ClickHouseQuery extends BaseQuery {
     }
   }
 
-  castToString(sql) {
+  public castToString(sql) {
     return `CAST(${sql} as String)`;
   }
 
-  seriesSql(timeDimension) {
+  public seriesSql(timeDimension: BaseTimeDimension) {
     /*
     postgres uses :
 
@@ -209,25 +210,27 @@ export class ClickHouseQuery extends BaseQuery {
    )
    */
 
-    const datesFrom = [];
-    const datesTo = [];
+    const datesFrom: string[] = [];
+    const datesTo: string[] = [];
+
     timeDimension.timeSeries().forEach(([from, to]) => {
       datesFrom.push(from);
       datesTo.push(to);
     });
+
     return `SELECT parseDateTimeBestEffort(arrayJoin(['${datesFrom.join('\',\'')}'])) as date_from, parseDateTimeBestEffort(arrayJoin(['${datesTo.join('\',\'')}'])) as date_to`;
   }
 
-  concatStringsSql(strings) {
+  public concatStringsSql(strings) {
     // eslint-disable-next-line prefer-template
     return 'toString(' + strings.join(') || toString(') + ')';
   }
 
-  unixTimestampSql() {
+  public unixTimestampSql() {
     return `toUnixTimestamp(${this.nowTimestampSql()})`;
   }
 
-  preAggregationLoadSql(cube, preAggregation, tableName) {
+  public preAggregationLoadSql(cube, preAggregation, tableName) {
     const sqlAndParams = this.preAggregationSql(cube, preAggregation);
     if (!preAggregation.indexes) {
       throw new UserError('ClickHouse doesn\'t support pre-aggregations without indexes');
@@ -237,11 +240,11 @@ export class ClickHouseQuery extends BaseQuery {
     return [`CREATE TABLE ${tableName} ENGINE = MergeTree() ORDER BY (${indexColumns.join(', ')}) ${this.asSyntaxTable} ${sqlAndParams[0]}`, sqlAndParams[1]];
   }
 
-  createIndexSql(indexName, tableName, escapedColumns) {
+  public createIndexSql(indexName, tableName, escapedColumns) {
     return `ALTER TABLE ${tableName} ADD INDEX ${indexName} (${escapedColumns.join(', ')}) TYPE minmax GRANULARITY 1`;
   }
 
-  sqlTemplates() {
+  public sqlTemplates() {
     const templates = super.sqlTemplates();
     templates.quotes.identifiers = '`';
     templates.quotes.escape = '\\`';

@@ -14,7 +14,7 @@ const GRANULARITY_TO_INTERVAL = {
 };
 
 class AWSElasticSearchQueryFilter extends BaseFilter {
-  likeIgnoreCase(column, not, param, type) {
+  public likeIgnoreCase(column, not, param, type) {
     const p = (!type || type === 'contains' || type === 'ends') ? '%' : '';
     const s = (!type || type === 'contains' || type === 'starts') ? '%' : '';
     return `${column}${not ? ' NOT' : ''} LIKE CONCAT('${p}', ${this.allocateParam(param)}, '${s}')`;
@@ -22,35 +22,35 @@ class AWSElasticSearchQueryFilter extends BaseFilter {
 }
 
 export class AWSElasticSearchQuery extends BaseQuery {
-  newFilter(filter) {
+  public newFilter(filter) {
     return new AWSElasticSearchQueryFilter(this, filter);
   }
 
-  convertTz(field) {
+  public convertTz(field) {
     return `${field}`; // TODO
   }
 
-  timeStampCast(value) {
+  public timeStampCast(value) {
     return `${value}`;
   }
 
-  dateTimeCast(value) {
+  public dateTimeCast(value) {
     return `${value}`; // TODO
   }
 
-  subtractInterval(date, interval) {
+  public subtractInterval(date, interval) {
     return `DATE_SUB(${date}, INTERVAL ${interval})`;
   }
 
-  addInterval(date, interval) {
+  public addInterval(date, interval) {
     return `DATE_ADD(${date}, INTERVAL ${interval})`;
   }
 
-  timeGroupedColumn(granularity, dimension) {
+  public timeGroupedColumn(granularity, dimension) {
     return GRANULARITY_TO_INTERVAL[granularity](dimension);
   }
 
-  groupByClause() {
+  public groupByClause() {
     if (this.ungrouped) {
       return '';
     }
@@ -60,7 +60,7 @@ export class AWSElasticSearchQuery extends BaseQuery {
     return dimensionColumns.length ? ` GROUP BY ${dimensionColumns.join(', ')}` : '';
   }
 
-  orderHashToString(hash) {
+  public orderHashToString(hash) {
     if (!hash || !hash.id) {
       return null;
     }
@@ -75,7 +75,7 @@ export class AWSElasticSearchQuery extends BaseQuery {
     return `${fieldAlias} ${direction}`;
   }
 
-  getFieldAlias(id) {
+  public getFieldAlias(id) {
     const equalIgnoreCase = (a, b) => (
       typeof a === 'string' && typeof b === 'string' && a.toUpperCase() === b.toUpperCase()
     );
@@ -97,7 +97,7 @@ export class AWSElasticSearchQuery extends BaseQuery {
     return null;
   }
 
-  escapeColumnName(name) {
+  public escapeColumnName(name) {
     return `${name}`; // TODO
   }
 }

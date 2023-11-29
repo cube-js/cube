@@ -16,7 +16,7 @@ const GRANULARITY_TO_INTERVAL = {
 };
 
 class ElasticSearchQueryFilter extends BaseFilter {
-  likeIgnoreCase(column, not, param, type) {
+  public likeIgnoreCase(column, not, param, type) {
     if (type === 'starts') {
       return `${not ? ' NOT' : ''} WHERE ${column} LIKE ${this.allocateParam(param)}%`;
     } else if (type === 'ends') {
@@ -28,41 +28,41 @@ class ElasticSearchQueryFilter extends BaseFilter {
 }
 
 export class ElasticSearchQuery extends BaseQuery {
-  newFilter(filter) {
+  public newFilter(filter) {
     return new ElasticSearchQueryFilter(this, filter);
   }
 
-  convertTz(field) {
+  public convertTz(field) {
     return `${field}`; // TODO
   }
 
-  timeStampCast(value) {
+  public timeStampCast(value) {
     return `${value}`;
   }
 
-  dateTimeCast(value) {
+  public dateTimeCast(value) {
     return `${value}`; // TODO
   }
 
-  subtractInterval(date, interval) {
+  public subtractInterval(date, interval) {
     // TODO: Test this, note sure how value gets populated here
     return `${date} - INTERVAL ${interval}`;
   }
 
-  addInterval(date, interval) {
+  public addInterval(date, interval) {
     // TODO: Test this, note sure how value gets populated here
     return `${date} + INTERVAL ${interval}`;
   }
 
-  timeGroupedColumn(granularity, dimension) {
+  public timeGroupedColumn(granularity, dimension) {
     return GRANULARITY_TO_INTERVAL[granularity](dimension);
   }
 
-  unixTimestampSql() {
+  public unixTimestampSql() {
     return `TIMESTAMP_DIFF('seconds', '1970-01-01T00:00:00.000Z'::datetime, CURRENT_TIMESTAMP())`;
   }
 
-  groupByClause() {
+  public groupByClause() {
     if (this.ungrouped) {
       return '';
     }
@@ -74,7 +74,7 @@ export class ElasticSearchQuery extends BaseQuery {
     return dimensionColumns.length ? ` GROUP BY ${dimensionColumns.join(', ')}` : '';
   }
 
-  orderHashToString(hash) {
+  public orderHashToString(hash) {
     if (!hash || !hash.id) {
       return null;
     }
@@ -89,7 +89,7 @@ export class ElasticSearchQuery extends BaseQuery {
     return `${fieldAlias} ${direction}`;
   }
 
-  getFieldAlias(id) {
+  public getFieldAlias(id) {
     const equalIgnoreCase = (a, b) => typeof a === 'string' &&
       typeof b === 'string' &&
       a.toUpperCase() === b.toUpperCase();
@@ -113,7 +113,7 @@ export class ElasticSearchQuery extends BaseQuery {
     return null;
   }
 
-  escapeColumnName(name) {
+  public escapeColumnName(name) {
     return `${name}`; // TODO
   }
 }

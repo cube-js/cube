@@ -14,7 +14,7 @@ const GRANULARITY_TO_INTERVAL = {
 };
 
 class SqliteFilter extends BaseFilter {
-  likeIgnoreCase(column, not, param, type) {
+  public likeIgnoreCase(column, not, param, type) {
     const p = (!type || type === 'contains' || type === 'ends') ? '\'%\' || ' : '';
     const s = (!type || type === 'contains' || type === 'starts') ? ' || \'%\'' : '';
     return `${column}${not ? ' NOT' : ''} LIKE ${p}${this.allocateParam(param)}${s} COLLATE NOCASE`;
@@ -22,11 +22,11 @@ class SqliteFilter extends BaseFilter {
 }
 
 export class SqliteQuery extends BaseQuery {
-  newFilter(filter) {
+  public newFilter(filter) {
     return new SqliteFilter(this, filter);
   }
 
-  convertTz(field) {
+  public convertTz(field) {
     return `${this.timeStampCast(field)} || '${
       moment().tz(this.timezone).format('Z')
         .replace('-', '+')
@@ -34,44 +34,44 @@ export class SqliteQuery extends BaseQuery {
     }'`;
   }
 
-  floorSql(numeric) {
+  public floorSql(numeric) {
     // SQLite doesnt support FLOOR
     return `(CAST((${numeric}) as int) - ((${numeric}) < CAST((${numeric}) as int)))`;
   }
 
-  timeStampCast(value) {
+  public timeStampCast(value) {
     return `strftime('%Y-%m-%dT%H:%M:%f', ${value})`;
   }
 
-  dateTimeCast(value) {
+  public dateTimeCast(value) {
     return `strftime('%Y-%m-%dT%H:%M:%f', ${value})`;
   }
 
-  subtractInterval(date, interval) {
+  public subtractInterval(date, interval) {
     return `strftime('%Y-%m-%dT%H:%M:%f', ${date}, '${interval.replace('-', '+').replace(/(^\+|^)/, '-')}')`;
   }
 
-  addInterval(date, interval) {
+  public addInterval(date, interval) {
     return `strftime('%Y-%m-%dT%H:%M:%f', ${date}, '${interval}')`;
   }
 
-  timeGroupedColumn(granularity, dimension) {
+  public timeGroupedColumn(granularity, dimension) {
     return GRANULARITY_TO_INTERVAL[granularity](dimension);
   }
 
-  seriesSql(timeDimension) {
+  public seriesSql(timeDimension) {
     const values = timeDimension.timeSeries().map(
       ([from, to]) => `select '${from}' f, '${to}' t`
     ).join(' UNION ALL ');
     return `SELECT dates.f date_from, dates.t date_to FROM (${values}) AS dates`;
   }
 
-  nowTimestampSql() {
+  public nowTimestampSql() {
     // eslint-disable-next-line quotes
     return `strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`;
   }
 
-  unixTimestampSql() {
+  public unixTimestampSql() {
     // eslint-disable-next-line quotes
     return `strftime('%s','now')`;
   }
