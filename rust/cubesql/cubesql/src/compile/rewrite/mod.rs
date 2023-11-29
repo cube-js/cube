@@ -892,6 +892,14 @@ fn inlist_expr(expr: impl Display, list: impl Display, negated: impl Display) ->
     format!("(InListExpr {} {} {})", expr, list, negated)
 }
 
+fn inlist_expr_list(left: impl Display, right: impl Display) -> String {
+    format!("(InListExprList {} {})", left, right)
+}
+
+fn inlist_expr_list_empty_tail() -> String {
+    format!("InListExprList")
+}
+
 fn between_expr(
     expr: impl Display,
     negated: impl Display,
