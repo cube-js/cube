@@ -20,8 +20,7 @@
   "scripts": {
     "build": "./node_modules/ng-packagr/cli/main.js -c tsconfig.json -p  ng-package.json && rm dist/package.json",
     "ng:watch": "./node_modules/ng-packagr/cli/main.js -c tsconfig.json -p  ng-package.json --watch && rm dist/package.json",
-    "dev": "yarn build && yalc publish --push",
-    "postinstall": "ngcc"
+    "dev": "yarn build && yalc publish --push"
   },
   "dependencies": {
     "fast-deep-equal": "^3.1.3",
