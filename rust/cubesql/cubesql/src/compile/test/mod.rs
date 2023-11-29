@@ -195,6 +195,10 @@ impl SqlGenerator for SqlGeneratorMock {
 }
 
 pub fn get_test_tenant_ctx() -> Arc<MetaContext> {
+    get_test_tenant_ctx_customized(Vec::new())
+}
+
+pub fn get_test_tenant_ctx_customized(custom_templates: Vec<(String, String)>) -> Arc<MetaContext> {
     let sql_generator: Arc<dyn SqlGenerator + Send + Sync> = Arc::new(SqlGeneratorMock {
         sql_templates: Arc::new(
             SqlTemplates::new(
@@ -213,6 +217,9 @@ pub fn get_test_tenant_ctx() -> Arc<MetaContext> {
                     ("functions/FLOOR".to_string(), "FLOOR({{ args_concat }})".to_string()),
                     ("functions/TRUNC".to_string(), "TRUNC({{ args_concat }})".to_string()),
                     ("functions/LEAST".to_string(), "LEAST({{ args_concat }})".to_string()),
+                    ("functions/DATEDIFF".to_string(), "DATEDIFF({{ date_part }}, {{ args[1] }}, {{ args[2] }})".to_string()),
+                    // DATEADD is being rewritten to DATE_ADD
+                    // ("functions/DATEADD".to_string(), "DATEADD({{ date_part }}, {{ interval }}, {{ args[2] }})".to_string()),
                     ("expressions/extract".to_string(), "EXTRACT({{ date_part }} FROM {{ expr }})".to_string()),
                     (
                         "statements/select".to_string(),
@@ -241,7 +248,7 @@ pub fn get_test_tenant_ctx() -> Arc<MetaContext> {
                     ("quotes/escape".to_string(), "\"\"".to_string()),
                     ("params/param".to_string(), "${{ param_index + 1 }}".to_string())
                 ]
-                .into_iter()
+                .into_iter().chain(custom_templates.into_iter())
                 .collect(),
             )
             .unwrap(),

@@ -344,9 +344,10 @@ class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
     return true;
   }
 
-  public async updateHeartBeat(hash: QueryKeyHash): Promise<void> {
+  public async updateHeartBeat(hash: QueryKeyHash, queueId: QueueId | null): Promise<void> {
     await this.driver.query('QUEUE HEARTBEAT ?', [
-      this.prefixKey(hash)
+      // queryKeyHash as compatibility fallback
+      queueId || this.prefixKey(hash),
     ]);
   }
 }

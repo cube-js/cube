@@ -13,11 +13,10 @@ export class RedshiftQuery extends PostgresQuery {
   }
 
   public sqlTemplates() {
-    return {
-      ...super.sqlTemplates(),
-      COVAR_POP: undefined,
-      COVAR_SAMP: undefined,
-      DLOG10: 'LOG(10, {{ args_concat }})',
-    };
+    const templates = super.sqlTemplates();
+    templates.functions.DLOG10 = 'LOG(10, {{ args_concat }})';
+    delete templates.functions.COVAR_POP;
+    delete templates.functions.COVAR_SAMP;
+    return templates;
   }
 }

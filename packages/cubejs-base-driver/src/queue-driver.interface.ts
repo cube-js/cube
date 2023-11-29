@@ -82,7 +82,7 @@ export interface QueueDriverConnectionInterface {
   // Queries which was not completed with old heartbeat
   getStalledQueries(): Promise<QueryKeysTuple[]>;
   getQueryStageState(onlyKeys: boolean): Promise<QueryStageStateResponse>;
-  updateHeartBeat(hash: QueryKeyHash): Promise<void>;
+  updateHeartBeat(hash: QueryKeyHash, queueId: QueueId | null): Promise<void>;
   getNextProcessingId(): Promise<ProcessingId>;
   // Trying to acquire a lock for processing a queue item, this method can return null when
   // multiple nodes tries to process the same query
