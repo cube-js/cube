@@ -1102,7 +1102,7 @@ from cube import config
 @config('check_sql_auth')
 def check_sql_auth(req: dict, user_name: str, password: str) -> dict:
   if user_name == 'my_user':
-    if password && password != 'my_password':
+    if password and password != 'my_password':
       raise Exception('Access denied')
     return {
       'password': password,
