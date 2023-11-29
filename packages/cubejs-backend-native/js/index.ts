@@ -26,6 +26,7 @@ export interface CheckAuthResponse {
     password: string | null,
     superuser: boolean,
     securityContext: any,
+    skipPasswordCheck?: boolean,
 }
 
 export interface CheckAuthPayload {

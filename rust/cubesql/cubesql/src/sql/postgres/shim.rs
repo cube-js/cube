@@ -136,6 +136,10 @@ impl ConnectionError {
                             protocol::ErrorCode::FeatureNotSupported,
                             e.to_string(),
                         ),
+                        CompilationError::Fatal(_, _) => protocol::ErrorResponse::fatal(
+                            protocol::ErrorCode::InternalError,
+                            e.to_string(),
+                        ),
                     }
                 }
 
@@ -202,6 +206,11 @@ impl AsyncPostgresShim {
 
                         return Ok(());
                     }
+                } else if let ConnectionError::CompilationError(CompilationError::Fatal(_, _)) = &e
+                {
+                    shim.write(e.to_error_response()).await?;
+                    shim.socket.shutdown().await?;
+                    return Ok(());
                 }
 
                 Err(e)
@@ -344,10 +353,11 @@ impl AsyncPostgresShim {
         err: ConnectionError,
     ) -> Result<(), ConnectionError> {
         let (message, props) = match &err {
-            ConnectionError::CompilationError(err) => match err {
+            ConnectionError::CompilationError(e) => match e {
                 CompilationError::Unsupported(msg, meta)
                 | CompilationError::User(msg, meta)
                 | CompilationError::Internal(msg, _, meta) => (msg.clone(), meta.clone()),
+                CompilationError::Fatal(_, _) => return Err(err),
             },
             ConnectionError::Protocol(ProtocolError::IO { source, .. }) => match source.kind() {
                 // Propagate unrecoverable errors to top level - run_on
@@ -515,9 +525,13 @@ impl AsyncPostgresShim {
         let auth_success = match authenticate_response {
             Ok(authenticate_response) => {
                 auth_context = Some(authenticate_response.context);
-                match authenticate_response.password {
-                    None => false,
-                    Some(password) => password == password_message.password,
+                if !authenticate_response.skip_password_check {
+                    match authenticate_response.password {
+                        None => false,
+                        Some(password) => password == password_message.password,
+                    }
+                } else {
+                    true
                 }
             }
             _ => false,

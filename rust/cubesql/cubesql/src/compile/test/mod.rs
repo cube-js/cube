@@ -332,6 +332,7 @@ pub fn get_test_auth() -> Arc<dyn SqlAuthService> {
                     base_path: "fake".to_string(),
                 }),
                 password,
+                skip_password_check: false,
             })
         }
     }

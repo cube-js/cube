@@ -71,13 +71,14 @@ export class SQLServer {
       pgPort: options.pgSqlPort,
       nonce: options.sqlNonce,
       checkAuth: async ({ request, user, password }) => {
-        const { password: returnedPassword, superuser, securityContext } = await checkSqlAuth(request, user, password);
+        const { password: returnedPassword, superuser, securityContext, skipPasswordCheck } = await checkSqlAuth(request, user, password);
 
         // Strip securityContext to improve speed deserialization
         return {
           password: returnedPassword,
           superuser: superuser || false,
-          securityContext
+          securityContext,
+          skipPasswordCheck,
         };
       },
       meta: async ({ request, session }) => {
@@ -249,7 +250,8 @@ export class SQLServer {
 
       return {
         password: allowedPassword,
-        securityContext: {}
+        securityContext: {},
+        skipPasswordCheck: getEnv('devMode') && !allowedPassword
       };
     };
   }

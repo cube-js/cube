@@ -49,6 +49,8 @@ struct CheckAuthResponse {
     superuser: bool,
     #[serde(rename = "securityContext", skip_serializing_if = "Option::is_none")]
     security_context: Option<serde_json::Value>,
+    #[serde(rename = "skipPasswordCheck", skip_serializing_if = "Option::is_none")]
+    skip_password_check: Option<bool>,
 }
 
 #[derive(Debug)]
@@ -98,6 +100,7 @@ impl SqlAuthService for NodeBridgeAuthService {
                 security_context: response.security_context,
             }),
             password: response.password,
+            skip_password_check: response.skip_password_check.unwrap_or(false),
         })
     }
 }

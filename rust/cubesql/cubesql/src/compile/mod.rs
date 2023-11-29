@@ -1302,7 +1302,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
                 .authenticate(self.state.user(), None)
                 .await
                 .map_err(|e| {
-                    CompilationError::internal(format!(
+                    CompilationError::fatal(format!(
                         "Error calling authenticate during re-authentication: {}",
                         e
                     ))

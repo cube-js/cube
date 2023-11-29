@@ -55,7 +55,8 @@ type CheckAuthFn =
 type CheckSQLAuthSuccessResponse = {
   password: string | null,
   superuser?: boolean,
-  securityContext?: any
+  securityContext?: any,
+  skipPasswordCheck?: boolean,
 };
 
 /**

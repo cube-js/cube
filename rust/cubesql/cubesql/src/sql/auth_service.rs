@@ -28,6 +28,7 @@ impl AuthContext for HttpAuthContext {
 pub struct AuthenticateResponse {
     pub context: AuthContextRef,
     pub password: Option<String>,
+    pub skip_password_check: bool,
 }
 
 #[async_trait]
@@ -61,6 +62,7 @@ impl SqlAuthService for SqlAuthDefaultImpl {
                     .unwrap_or_else(|| panic!("CUBESQL_CUBE_URL is a required ENV variable")),
             }),
             password,
+            skip_password_check: false,
         })
     }
 }
