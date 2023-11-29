@@ -420,6 +420,7 @@ class BaseQuery {
       filter.values = filter.values.map(this.initFilter.bind(this));
       return this.newGroupFilter(filter);
     }
+
     return this.newFilter(filter);
   }
 
@@ -428,7 +429,7 @@ class BaseQuery {
   }
 
   newGroupFilter(filter) {
-    return new BaseGroupFilter(this, filter);
+    return new BaseGroupFilter(filter);
   }
 
   newTimeDimension(timeDimension) {
