@@ -1,7 +1,7 @@
 import R from 'ramda';
 
 export class BaseGroupFilter {
-  constructor(query, filter) {
+  constructor(filter) {
     this.values = filter.values;
     this.operator = filter.operator;
     this.measure = filter.measure;
