@@ -24,17 +24,21 @@ export interface Request<Meta> {
 
 export interface CheckAuthResponse {
     password: string | null,
-    superuser: boolean
+    superuser: boolean,
+    securityContext: any,
+    skipPasswordCheck?: boolean,
 }
 
 export interface CheckAuthPayload {
     request: Request<undefined>,
-    user: string | null
+    user: string | null,
+    password: string | null,
 }
 
 export interface SessionContext {
     user: string | null,
     superuser: boolean,
+    securityContext: any,
 }
 
 export interface LoadPayload {
