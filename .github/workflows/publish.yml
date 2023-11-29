@@ -134,7 +134,7 @@ jobs:
         run: cd packages/cubejs-backend-native && npm run native:build-release
       - name: Setup cross compilation
         if: (matrix.target == 'aarch64-unknown-linux-gnu')
-        uses: allenevans/set-env@v2.0.0
+        uses: allenevans/set-env@v3.0.0
         with:
           PYO3_CROSS_PYTHON_VERSION: ${{ matrix.python-version }}
       - name: Build native (with Python)
@@ -824,11 +824,11 @@ jobs:
           target: ${{ matrix.target }}
           override: true
           components: rustfmt
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
         with:
-          working-directory: rust/cubestore
+          workspaces: ./rust/cubestore -> target
           key: cross-${{ runner.OS }}-${{ matrix.target }}
-          sharedKey:  cross-${{ runner.OS }}-${{ matrix.target }}
+          shared-key:  cross-${{ runner.OS }}-${{ matrix.target }}
       - run: source .github/actions/${{ matrix.before_script }}.sh
         if: ${{ matrix.before_script }}
         shell: bash
@@ -841,7 +841,7 @@ jobs:
         if: ${{ startsWith(matrix.os, 'windows') }}
         run: choco install -y --force llvm --version 9.0.1
       - name: Set Env Variables for Windows
-        uses: allenevans/set-env@v2.0.0
+        uses: allenevans/set-env@v3.0.0
         if: ${{ startsWith(matrix.os, 'windows') }}
         with:
           OPENSSL_DIR: 'C:/vcpkg/packages/openssl_x64-windows'

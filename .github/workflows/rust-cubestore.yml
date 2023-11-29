@@ -199,7 +199,7 @@ jobs:
         if: ${{ startsWith(matrix.os, 'windows') }}
         run: choco install -y --force llvm --version 9.0.1
       - name: Set Env Variables for Windows
-        uses: allenevans/set-env@v2.0.0
+        uses: allenevans/set-env@v3.0.0
         if: ${{ startsWith(matrix.os, 'windows') }}
         with:
           OPENSSL_DIR: 'C:/vcpkg/packages/openssl_x64-windows'

@@ -255,7 +255,7 @@ jobs:
       #  env:
       #    VCPKG_ROOT: 'C:\vcpkg'
       - name: Set Env Variables for Darwin
-        uses: allenevans/set-env@v2.0.0
+        uses: allenevans/set-env@v3.0.0
         if: ${{ matrix.target == 'x86_64-apple-darwin' }}
         with:
           OPENSSL_STATIC: "true"
