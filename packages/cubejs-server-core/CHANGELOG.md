@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.28](https://github.com/cube-js/cube/compare/v0.34.27...v0.34.28) (2023-11-30)
+
+
+### Features
+
+* **server-core:** Relative imports resolution for custom drivers ([#7480](https://github.com/cube-js/cube/issues/7480)) ([8f180b3](https://github.com/cube-js/cube/commit/8f180b38e42bed61ebf2dc510631e5390258e8ff))
+
+
+
+
+
 ## [0.34.27](https://github.com/cube-js/cube/compare/v0.34.26...v0.34.27) (2023-11-30)
 
 **Note:** Version bump only for package @cubejs-backend/server-core

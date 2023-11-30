@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/docker",
-  "version": "0.34.27",
+  "version": "0.34.28",
   "description": "Cube.js In Docker (virtual package)",
   "author": "Cube Dev, Inc.",
   "license": "Apache-2.0",
@@ -31,11 +31,11 @@
     "@cubejs-backend/prestodb-driver": "^0.34.26",
     "@cubejs-backend/questdb-driver": "^0.34.27",
     "@cubejs-backend/redshift-driver": "^0.34.27",
-    "@cubejs-backend/server": "^0.34.27",
+    "@cubejs-backend/server": "^0.34.28",
     "@cubejs-backend/snowflake-driver": "^0.34.26",
     "@cubejs-backend/sqlite-driver": "^0.34.26",
     "@cubejs-backend/trino-driver": "^0.34.27",
-    "cubejs-cli": "^0.34.27",
+    "cubejs-cli": "^0.34.28",
     "typescript": "~5.2.2"
   },
   "resolutions": {
