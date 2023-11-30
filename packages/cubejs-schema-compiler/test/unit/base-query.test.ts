@@ -1,7 +1,7 @@
 import moment from 'moment-timezone';
 import { BaseQuery, PostgresQuery, MssqlQuery, UserError } from '../../src';
 import { prepareCompiler, prepareYamlCompiler } from './PrepareCompiler';
-import { createCubeSchema, createCubeSchemaYaml, createJoinedCubesSchema } from './utils';
+import { createCubeSchema, createCubeSchemaYaml, createJoinedCubesSchema, createSchemaYaml } from './utils';
 
 describe('SQL Generation', () => {
   describe('Common - Yaml - syntax sugar', () => {
@@ -610,21 +610,25 @@ describe('SQL Generation', () => {
 
   describe('FILTER_PARAMS', () => {
     /** @type {Compilers} */
-    const compilers = prepareCompiler(`cube('Order', {
-        sql: \`select * from order where \${FILTER_PARAMS.Order.type.filter('type')}\`,
-        measures: {
-          count: {
-            sql: 'id',
-            type: 'count',
+    const compilers = prepareYamlCompiler(
+      createSchemaYaml({
+        cubes: [
+          {
+            name: 'Order',
+            sql: 'select * from order where {FILTER_PARAMS.Order.type.filter(\'type\')}',
+            measures: [{
+              name: 'count',
+              type: 'count',
+            }],
+            dimensions: [{
+              name: 'type',
+              sql: 'type',
+              type: 'string'
+            }]
           },
-        },
-        dimensions: {
-          type: {
-            sql: 'type',
-            type: 'string',
-          },
-        },
-      })`);
+        ]
+      })
+    );
 
     it('inserts filter params into query', async () => {
       await compilers.compiler.compile();
@@ -690,6 +694,92 @@ describe('SQL Generation', () => {
       });
       const cubeSQL = query.cubeSql('Order');
       expect(cubeSQL).toMatch(/where \(\s*type\s*=\s*\$\d\$\s*AND\s*type\s*=\s*\$\d\$\s*\)/);
+    });
+
+    it('inserts "or + and" filter', async () => {
+      await compilers.compiler.compile();
+      const query = new BaseQuery(compilers, {
+        measures: ['Order.count'],
+        filters: [
+          {
+            or: [
+              {
+                and: [
+                  {
+                    member: 'Order.type',
+                    operator: 'equals',
+                    values: ['value1'],
+                  },
+                  {
+                    member: 'Order.type',
+                    operator: 'equals',
+                    values: ['value2'],
+                  }
+                ]
+              },
+              {
+                and: [
+                  {
+                    member: 'Order.type',
+                    operator: 'equals',
+                    values: ['value3'],
+                  },
+                  {
+                    member: 'Order.type',
+                    operator: 'equals',
+                    values: ['value4'],
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      });
+      const cubeSQL = query.cubeSql('Order');
+      expect(cubeSQL).toMatch(/where \(\s*\(\s*type\s*=\s*\$\d\$\s*AND\s*type\s*=\s*\$\d\$\s*\)\s*OR\s*\(\s*type\s*=\s*\$\d\$\s*AND\s*type\s*=\s*\$\d\$\s*\)\s*\)/);
+    });
+
+    fit('inserts "and + or" filter', async () => {
+      await compilers.compiler.compile();
+      const query = new BaseQuery(compilers, {
+        measures: ['Order.count'],
+        filters: [
+          {
+            and: [
+              {
+                or: [
+                  {
+                    member: 'Order.type',
+                    operator: 'equals',
+                    values: ['value1'],
+                  },
+                  {
+                    member: 'Order.type',
+                    operator: 'equals',
+                    values: ['value2'],
+                  }
+                ]
+              },
+              {
+                or: [
+                  {
+                    member: 'Order.type',
+                    operator: 'equals',
+                    values: ['value3'],
+                  },
+                  {
+                    member: 'Order.type',
+                    operator: 'equals',
+                    values: ['value4'],
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      });
+      const cubeSQL = query.cubeSql('Order');
+      expect(cubeSQL).toMatch(/where \(\s*\(\s*type\s*=\s*\$\d\$\s*OR\s*type\s*=\s*\$\d\$\s*\)\s*AND\s*\(\s*type\s*=\s*\$\d\$\s*OR\s*type\s*=\s*\$\d\$\s*\)\s*\)/);
     });
   });
 });

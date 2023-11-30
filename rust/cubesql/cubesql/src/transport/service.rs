@@ -410,12 +410,18 @@ impl SqlTemplates {
         scalar_function: String,
         args: Vec<String>,
         date_part: Option<String>,
+        interval: Option<String>,
     ) -> Result<String, CubeError> {
         let function = scalar_function.to_string().to_uppercase();
         let args_concat = args.join(", ");
         self.render_template(
             &format!("functions/{}", function),
-            context! { args_concat => args_concat, args => args, date_part => date_part },
+            context! {
+                args_concat => args_concat,
+                args => args,
+                date_part => date_part,
+                interval => interval,
+            },
         )
     }
 
@@ -498,6 +504,14 @@ impl SqlTemplates {
         )
     }
 
+    pub fn negative_expr(&self, expr: String) -> Result<String, CubeError> {
+        self.render_template("expressions/negative", context! { expr => expr })
+    }
+
+    pub fn not_expr(&self, expr: String) -> Result<String, CubeError> {
+        self.render_template("expressions/not", context! { expr => expr })
+    }
+
     pub fn sort_expr(
         &self,
         expr: String,
@@ -533,6 +547,24 @@ impl SqlTemplates {
         self.render_template(
             "expressions/cast",
             context! { expr => expr, data_type => data_type },
+        )
+    }
+
+    pub fn in_list_expr(
+        &self,
+        expr: String,
+        in_exprs: Vec<String>,
+        negated: bool,
+    ) -> Result<String, CubeError> {
+        let in_exprs_concat = in_exprs.join(", ");
+        self.render_template(
+            "expressions/in_list",
+            context! {
+                expr => expr,
+                in_exprs_concat => in_exprs_concat,
+                in_exprs => in_exprs,
+                negated => negated
+            },
         )
     }
 

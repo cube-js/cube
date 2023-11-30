@@ -835,7 +835,7 @@ declare module '@cubejs-client/core' {
 
   type QueryArrayRecordType<T extends DeeplyReadonly<Query[]>> =
     T extends readonly [infer First, ...infer Rest]
-    ? SingleQueryRecordType<First> | QueryArrayRecordType<Rest & DeeplyReadonly<Query[]>>
+    ? SingleQueryRecordType<DeeplyReadonly<First>> | QueryArrayRecordType<Rest & DeeplyReadonly<Query[]>>
     : never;
 
   // If we can't infer any members at all, then return any.
@@ -905,7 +905,12 @@ declare module '@cubejs-client/core' {
     name: string;
     title: string;
     shortTitle: string;
+    description?: string;
+    /**
+     * @deprecated use `public` instead
+     */
     isVisible?: boolean;
+    public?: boolean;
     meta?: any;
   };
 
@@ -914,7 +919,12 @@ declare module '@cubejs-client/core' {
     name: string;
     title: string;
     shortTitle: string;
+    description?: string;
+    /**
+     * @deprecated use `public` instead
+     */
     isVisible?: boolean;
+    public?: boolean;
     meta?: any;
   };
 
@@ -931,6 +941,7 @@ declare module '@cubejs-client/core' {
   };
 
   export type TCubeDimension = BaseCubeMember & {
+    primaryKey?: boolean;
     suggestFilterValues: boolean;
   };
 
@@ -968,10 +979,17 @@ declare module '@cubejs-client/core' {
   export type Cube = {
     name: string;
     title: string;
+    description?: string;
     measures: TCubeMeasure[];
     dimensions: TCubeDimension[];
     segments: TCubeSegment[];
     connectedComponent?: number;
+    type?: 'view' | 'cube';
+    /**
+     * @deprecated use `public` instead
+     */
+    isVisible?: boolean;
+    public?: boolean;
   };
 
 

@@ -420,6 +420,7 @@ class BaseQuery {
       filter.values = filter.values.map(this.initFilter.bind(this));
       return this.newGroupFilter(filter);
     }
+
     return this.newFilter(filter);
   }
 
@@ -428,7 +429,7 @@ class BaseQuery {
   }
 
   newGroupFilter(filter) {
-    return new BaseGroupFilter(this, filter);
+    return new BaseGroupFilter(filter);
   }
 
   newTimeDimension(timeDimension) {
@@ -1648,6 +1649,9 @@ class BaseQuery {
     ).filter(s => !!s).join(', ');
   }
 
+  /**
+   * @returns {Array<BaseDimension|BaseMeasure>}
+   */
   forSelect() {
     return this.dimensionsForSelect().concat(this.measures);
   }
@@ -2190,7 +2194,7 @@ class BaseQuery {
    * @param {boolean?} isPreAggregationName Pre-agg flag.
    * @returns {string}
    */
-  aliasName(name, isPreAggregationName) {
+  aliasName(name, isPreAggregationName = false) {
     if (this.options.memberToAlias && this.options.memberToAlias[name]) {
       return this.options.memberToAlias[name];
     }
@@ -2455,14 +2459,36 @@ class BaseQuery {
         EXP: 'EXP({{ args_concat }})',
         LN: 'LN({{ args_concat }})',
         LOG: 'LOG({{ args_concat }})',
+        DLOG10: 'LOG10({{ args_concat }})',
         PI: 'PI()',
         POWER: 'POWER({{ args_concat }})',
         SIN: 'SIN({{ args_concat }})',
         TAN: 'TAN({{ args_concat }})',
         REPEAT: 'REPEAT({{ args_concat }})',
+        NULLIF: 'NULLIF({{ args_concat }})',
+        ROUND: 'ROUND({{ args_concat }})',
+        GREATEST: 'GREATEST({{ args_concat }})',
 
         STDDEV: 'STDDEV_SAMP({{ args_concat }})',
         SUBSTR: 'SUBSTRING({{ args_concat }})',
+        CHARACTERLENGTH: 'CHAR_LENGTH({{ args[0] }})',
+
+        // Non-ANSI functions
+        BTRIM: 'BTRIM({{ args_concat }})',
+        LTRIM: 'LTRIM({{ args_concat }})',
+        RTRIM: 'RTRIM({{ args_concat }})',
+        ATAN2: 'ATAN2({{ args_concat }})',
+        COT: 'COT({{ args_concat }})',
+        DEGREES: 'DEGREES({{ args_concat }})',
+        RADIANS: 'RADIANS({{ args_concat }})',
+        SIGN: 'SIGN({{ args_concat }})',
+        ASCII: 'ASCII({{ args_concat }})',
+        STRPOS: 'POSITION({{ args[1] }} IN {{ args[0] }})',
+        REPLACE: 'REPLACE({{ args_concat }})',
+        DATEDIFF: 'DATEDIFF({{ date_part }}, {{ args[1] }}, {{ args[2] }})',
+        TO_CHAR: 'TO_CHAR({{ args_concat }})',
+        // DATEADD is being rewritten to DATE_ADD
+        // DATEADD: 'DATEADD({{ date_part }}, {{ interval }}, {{ args[2] }})',
       },
       statements: {
         select: 'SELECT {{ select_concat | map(attribute=\'aliased\') | join(\', \') }} \n' +
@@ -2475,11 +2501,14 @@ class BaseQuery {
       expressions: {
         column_aliased: '{{expr}} {{quoted_alias}}',
         case: 'CASE{% if expr %}{{ expr }} {% endif %}{% for when, then in when_then %} WHEN {{ when }} THEN {{ then }}{% endfor %}{% if else_expr %} ELSE {{ else_expr }}{% endif %} END',
-        is_null: '{{ expr }} {% if negate %}NOT {% endif %}IS NULL',
+        is_null: '{{ expr }} IS {% if negate %}NOT {% endif %}NULL',
         binary: '({{ left }} {{ op }} {{ right }})',
         sort: '{{ expr }} {% if asc %}ASC{% else %}DESC{% endif %}{% if nulls_first %} NULLS FIRST{% endif %}',
         cast: 'CAST({{ expr }} AS {{ data_type }})',
-        window_function: '{{ fun_call }} OVER ({% if partition_by %}PARTITION BY {{ partition_by }}{% if order_by %} {% endif %}{% endif %}{% if order_by %}ORDER BY {{ order_by }}{% endif %})'
+        window_function: '{{ fun_call }} OVER ({% if partition_by_concat %}PARTITION BY {{ partition_by_concat }}{% if order_by_concat %} {% endif %}{% endif %}{% if order_by_concat %}ORDER BY {{ order_by_concat }}{% endif %})',
+        in_list: '{{ expr }} {% if negated %}NOT {% endif %}IN ({{ in_exprs_concat }})',
+        negative: '-({{ expr }})',
+        not: 'NOT ({{ expr }})',
       },
       quotes: {
         identifiers: '"',

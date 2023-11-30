@@ -1,4 +1,5 @@
 use crate::cross::*;
+use crate::python::neon_py::format_python_error;
 use crate::python::runtime::py_runtime;
 use crate::python::{python_obj_call_sync, python_obj_method_call_sync};
 use crate::template::mj_value::to_minijinja_value;
@@ -135,7 +136,7 @@ impl Object for JinjaPythonObject {
             Ok(r) => Ok(to_minijinja_value(r)),
             Err(err) => Err(mj::Error::new(
                 minijinja::ErrorKind::InvalidOperation,
-                format!("Error while calling method: {}", err),
+                format!("Error while calling method: {}", format_python_error(err)),
             )),
         }
     }
@@ -153,7 +154,7 @@ impl Object for JinjaPythonObject {
             Ok(r) => Ok(to_minijinja_value(r)),
             Err(err) => Err(mj::Error::new(
                 minijinja::ErrorKind::InvalidOperation,
-                format!("Error while calling method: {}", err),
+                format!("Error while calling method: {}", format_python_error(err)),
             )),
         }
     }
@@ -242,12 +243,22 @@ impl Object for JinjaPythonFunction {
             arguments.push(from_minijinja_value(arg)?);
         }
 
-        let py_runtime = py_runtime()
-            .map_err(|err| mj::Error::new(mj::ErrorKind::EvalBlock, format!("Error: {}", err)))?;
+        let py_runtime = py_runtime().map_err(|err| {
+            mj::Error::new(
+                mj::ErrorKind::EvalBlock,
+                format!("Python runtime error: {}", err),
+            )
+        })?;
+
         let call_future = py_runtime.call_async(self.inner.clone(), arguments);
 
-        let tokio = tokio_runtime()
-            .map_err(|err| mj::Error::new(mj::ErrorKind::EvalBlock, format!("Error: {}", err)))?;
+        let tokio = tokio_runtime().map_err(|err| {
+            mj::Error::new(
+                mj::ErrorKind::EvalBlock,
+                format!("Tokio runtime error: {}", err),
+            )
+        })?;
+
         match tokio.block_on(call_future) {
             Ok(r) => Ok(to_minijinja_value(r)),
             Err(err) => Err(mj::Error::new(

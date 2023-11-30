@@ -331,6 +331,8 @@ impl QueryPlanner {
             let projection_expr = query.meta_as_df_projection_expr();
             let projection_schema = query.meta_as_df_projection_schema();
 
+            self.reauthenticate_if_needed().await?;
+
             let scan_node = LogicalPlan::Extension(Extension {
                 node: Arc::new(CubeScanNode::new(
                     schema.clone(),
@@ -1079,6 +1081,8 @@ WHERE `TABLE_SCHEMA` = '{}'",
             .collect::<Vec<_>>();
 
         for v in user_variables {
+            self.reauthenticate_if_needed().await?;
+
             let auth_context = self.state.auth_context().ok_or(CompilationError::user(
                 "No auth context set but tried to set current user".to_string(),
             ))?;
@@ -1109,7 +1113,8 @@ WHERE `TABLE_SCHEMA` = '{}'",
                     .session_manager
                     .server
                     .auth
-                    .authenticate(Some(to_user.clone()))
+                    // TODO do we want to send actual password here?
+                    .authenticate(Some(to_user.clone()), None)
                     .await
                     .map_err(|e| {
                         CompilationError::internal(format!("Error calling authenticate: {}", e))
@@ -1288,6 +1293,26 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx
     }
 
+    async fn reauthenticate_if_needed(&self) -> CompilationResult<()> {
+        if self.state.is_auth_context_expired() {
+            let authenticate_response = self
+                .session_manager
+                .server
+                .auth
+                .authenticate(self.state.user(), None)
+                .await
+                .map_err(|e| {
+                    CompilationError::fatal(format!(
+                        "Error calling authenticate during re-authentication: {}",
+                        e
+                    ))
+                })?;
+            self.state
+                .set_auth_context(Some(authenticate_response.context));
+        }
+        Ok(())
+    }
+
     async fn create_df_logical_plan(
         &self,
         stmt: ast::Statement,
@@ -1361,6 +1386,9 @@ WHERE `TABLE_SCHEMA` = '{}'",
         let root = converter
             .add_logical_plan(&optimized_plan)
             .map_err(|e| CompilationError::internal(e.to_string()))?;
+
+        self.reauthenticate_if_needed().await?;
+
         let result = converter
             .take_rewriter()
             .find_best_plan(root, self.state.auth_context().unwrap(), qtrace)
@@ -1713,7 +1741,8 @@ mod tests {
         compile::{
             rewrite::rewriter::Rewriter,
             test::{
-                get_string_cube_meta, get_test_session_with_config, get_test_tenant_ctx_with_meta,
+                get_string_cube_meta, get_test_session_with_config, get_test_tenant_ctx_customized,
+                get_test_tenant_ctx_with_meta,
             },
         },
         config::{ConfigObj, ConfigObjImpl},
@@ -1746,14 +1775,25 @@ mod tests {
         }
     }
 
-    async fn convert_select_to_query_plan(query: String, db: DatabaseProtocol) -> QueryPlan {
+    async fn convert_select_to_query_plan_customized(
+        query: String,
+        db: DatabaseProtocol,
+        custom_templates: Vec<(String, String)>,
+    ) -> QueryPlan {
         env::set_var("TZ", "UTC");
 
-        let query =
-            convert_sql_to_cube_query(&query, get_test_tenant_ctx(), get_test_session(db).await)
-                .await;
+        let query = convert_sql_to_cube_query(
+            &query,
+            get_test_tenant_ctx_customized(custom_templates),
+            get_test_session(db).await,
+        )
+        .await;
 
         query.unwrap()
+    }
+
+    async fn convert_select_to_query_plan(query: String, db: DatabaseProtocol) -> QueryPlan {
+        convert_select_to_query_plan_customized(query, db, vec![]).await
     }
 
     async fn convert_select_to_query_plan_with_config(
@@ -18870,6 +18910,44 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_case_wrapper_with_system_fields() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT CASE WHEN customer_gender = 'female' THEN 'f' ELSE 'm' END, __user, __cubeJoinField, AVG(avgPrice) mp FROM KibanaSampleDataEcommerce a GROUP BY 1, 2, 3 LIMIT 1123"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+            .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+
+        assert!(
+            logical_plan
+                .find_cube_scan_wrapper()
+                .wrapped_sql
+                .unwrap()
+                .sql
+                .contains("__user:(KibanaSampleDataEcommerce):$"),
+            "SQL contains __user:(KibanaSampleDataEcommerce):$: {}",
+            logical_plan
+                .find_cube_scan_wrapper()
+                .wrapped_sql
+                .unwrap()
+                .sql
+        );
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+    }
+
+    #[tokio::test]
     async fn test_case_wrapper_with_limit() {
         if !Rewriter::sql_push_down_enabled() {
             return;
@@ -18961,6 +19039,37 @@ ORDER BY \"COUNT(count)\" DESC"
             "Physical plan: {}",
             displayable(physical_plan.as_ref()).indent()
         );
+    }
+
+    #[tokio::test]
+    async fn test_case_wrapper_escaping() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query_plan = convert_sql_to_cube_query(
+            &"SELECT CASE WHEN customer_gender = '\\`' THEN customer_gender ELSE 'N/A' END as \"\\`\" FROM KibanaSampleDataEcommerce a".to_string(),
+            get_test_tenant_ctx_customized(vec![
+                ("expressions/binary".to_string(), "{{ left }} \\`{{ op }} {{ right }}".to_string())
+            ]),
+            get_test_session(DatabaseProtocol::PostgreSQL).await,
+        ).await.unwrap();
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert!(logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql
+            // Expect 6 backslashes as output is JSON and it's escaped one more time
+            .contains("\\\\\\\\\\\\`"));
     }
 
     #[tokio::test]
@@ -19102,6 +19211,58 @@ ORDER BY \"COUNT(count)\" DESC"
                 .sql
                 .contains("OVER"),
             "SQL should contain 'OVER': {}",
+            logical_plan
+                .find_cube_scan_wrapper()
+                .wrapped_sql
+                .unwrap()
+                .sql
+        );
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_wrapper_long_alias_names() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT customer_gender AS long_long_long_long_long_long_long_long_a, AVG(avgPrice) AS long_long_long_long_long_long_long_long_b, SUM(COUNT(count)) OVER() AS long_long_long_long_long_long_long_long_c FROM KibanaSampleDataEcommerce a GROUP BY 1 LIMIT 100"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+            .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert!(
+            logical_plan
+                .find_cube_scan_wrapper()
+                .wrapped_sql
+                .unwrap()
+                .sql
+                .contains("long_l_1"),
+            "SQL should contain long_l_1: {}",
+            logical_plan
+                .find_cube_scan_wrapper()
+                .wrapped_sql
+                .unwrap()
+                .sql
+        );
+
+        assert!(
+            logical_plan
+                .find_cube_scan_wrapper()
+                .wrapped_sql
+                .unwrap()
+                .sql
+                .contains("long_l_1"),
+            "SQL should contain long_l_2: {}",
             logical_plan
                 .find_cube_scan_wrapper()
                 .wrapped_sql
@@ -19590,5 +19751,288 @@ ORDER BY \"COUNT(count)\" DESC"
         );
 
         Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_inlist_expr() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "
+            SELECT
+                CASE
+                    WHEN (customer_gender NOT IN ('1', '2', '3')) THEN customer_gender
+                    ELSE '0'
+                END AS customer_gender
+            FROM KibanaSampleDataEcommerce AS k
+            GROUP BY 1
+            ORDER BY 1 DESC
+            "
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert!(logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql
+            .contains("NOT IN ("));
+    }
+
+    #[tokio::test]
+    async fn test_pi() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "pi",
+            execute_query(
+                "SELECT PI() AS PI".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_negative_expr() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "
+            SELECT -taxful_total_price AS neg_taxful_total_price
+            FROM KibanaSampleDataEcommerce AS k
+            GROUP BY 1
+            ORDER BY 1 DESC
+            "
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert!(logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql
+            .contains("-("));
+    }
+
+    #[tokio::test]
+    async fn test_not_expr() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "
+            SELECT NOT has_subscription AS has_no_subscription
+            FROM KibanaSampleDataEcommerce AS k
+            GROUP BY 1
+            ORDER BY 1 DESC
+            "
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert!(logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql
+            .contains("NOT ("));
+    }
+
+    #[tokio::test]
+    async fn test_datediff_push_down() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "
+            SELECT DATEDIFF(DAY, order_date, last_mod) AS d
+            FROM KibanaSampleDataEcommerce AS k
+            GROUP BY 1
+            ORDER BY 1 DESC
+            "
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert!(logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql
+            .contains("DATEDIFF(day,"));
+
+        // BigQuery
+        let query_plan = convert_select_to_query_plan_customized(
+            "
+            SELECT DATEDIFF(DAY, order_date, last_mod) AS d
+            FROM KibanaSampleDataEcommerce AS k
+            GROUP BY 1
+            ORDER BY 1 DESC
+            "
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+            vec![
+                ("functions/DATEDIFF".to_string(), "DATETIME_DIFF(CAST({{ args[2] }} AS DATETIME), CAST({{ args[1] }} AS DATETIME), {{ date_part }})".to_string()),
+            ]
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql;
+        assert!(sql.contains("DATETIME_DIFF(CAST("));
+        assert!(sql.contains("day)"));
+    }
+
+    // redshift-dateadd-[literal-date32-]to-interval rewrites DATEADD to DATE_ADD
+    #[tokio::test]
+    #[ignore]
+    async fn test_dateadd_push_down() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "
+            SELECT DATEADD(DAY, 7, order_date) AS d
+            FROM KibanaSampleDataEcommerce AS k
+            GROUP BY 1
+            ORDER BY 1 DESC
+            "
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert!(logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql
+            .contains("DATEADD(day, 7,"));
+
+        // BigQuery
+        let query_plan = convert_select_to_query_plan_customized(
+            "
+            SELECT DATEADD(DAY, 7, order_date) AS d
+            FROM KibanaSampleDataEcommerce AS k
+            GROUP BY 1
+            ORDER BY 1 DESC
+            "
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+            vec![
+                ("functions/DATEADD".to_string(), "DATETIME_ADD(CAST({{ args[2] }} AS DATETTIME), INTERVAL {{ interval }} {{ date_part }})".to_string()),
+            ],
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql;
+        assert!(sql.contains("DATETIME_ADD(CAST("));
+        assert!(sql.contains("INTERVAL 7 day)"));
+
+        // Postgres
+        let query_plan = convert_select_to_query_plan_customized(
+            "
+            SELECT DATEADD(DAY, 7, order_date) AS d
+            FROM KibanaSampleDataEcommerce AS k
+            GROUP BY 1
+            ORDER BY 1 DESC
+            "
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+            vec![(
+                "functions/DATEADD".to_string(),
+                "({{ args[2] }} + \'{{ interval }} {{ date_part }}\'::interval)".to_string(),
+            )],
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql;
+        assert!(sql.contains("+ '7 day'::interval"));
     }
 }

@@ -308,6 +308,11 @@ export class CubeEvaluator extends CubeSymbols {
     return cubeAndName[0];
   }
 
+  /**
+   * @param {measures|dimensions|segments} type
+   * @param {string} path
+   * @returns boolean
+   */
   isInstanceOfType(type, path) {
     const cubeAndName = Array.isArray(path) ? path : path.split('.');
     return this.evaluatedCubes[cubeAndName[0]] &&
@@ -315,6 +320,10 @@ export class CubeEvaluator extends CubeSymbols {
       this.evaluatedCubes[cubeAndName[0]][type][cubeAndName[1]];
   }
 
+  /**
+   * @param {string} path
+   * @returns {*}
+   */
   byPathAnyType(path) {
     const type = ['measures', 'dimensions', 'segments'].find(t => this.isInstanceOfType(t, path));
 
@@ -325,6 +334,11 @@ export class CubeEvaluator extends CubeSymbols {
     return this.byPath(type, path);
   }
 
+  /**
+   * @param {measures|dimensions|segments} type
+   * @param {string} path
+   * @returns {*}
+   */
   byPath(type, path) {
     if (!type) {
       throw new Error(`Type can't be undefined for '${path}'`);

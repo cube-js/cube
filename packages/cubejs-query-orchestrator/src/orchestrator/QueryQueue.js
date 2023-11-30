@@ -515,7 +515,7 @@ export class QueryQueue {
       const toCancel = await queueConnection.getQueriesToCancel();
 
       await Promise.all(toCancel.map(async ([queryKey, queueId]) => {
-        const [queryDef] = await queueConnection.getQueryAndRemove(queryKey);
+        const [queryDef] = await queueConnection.getQueryAndRemove(queryKey, queueId);
         if (queryDef) {
           this.logger('Removing orphaned query', {
             queueId: queueId || queryDef.queueId /** Special handling for Redis */,
@@ -768,8 +768,20 @@ export class QueryQueue {
         });
         await queueConnection.optimisticQueryUpdate(queryKeyHashed, { startQueryTime }, processingId, queueId);
 
+        let queryProcessHeartbeat = Date.now();
         const heartBeatTimer = setInterval(
-          () => queueConnection.updateHeartBeat(queryKeyHashed),
+          () => {
+            if ((Date.now() - queryProcessHeartbeat) > 5 * 60 * 1000) {
+              this.logger('Query processing heartbeat', {
+                queueId,
+                queryKey: query.queryKey,
+                requestId: query.requestId,
+              });
+              queryProcessHeartbeat = Date.now();
+            }
+
+            return queueConnection.updateHeartBeat(queryKeyHashed);
+          },
           this.heartBeatInterval * 1000
         );
         try {
@@ -857,7 +869,7 @@ export class QueryQueue {
             error: (e.stack || e).toString()
           });
           if (e instanceof TimeoutError) {
-            const queryWithCancelHandle = await queueConnection.getQueryDef(queryKeyHashed);
+            const queryWithCancelHandle = await queueConnection.getQueryDef(queryKeyHashed, queueId);
             if (queryWithCancelHandle) {
               this.logger('Cancelling query due to timeout', {
                 queueId,
@@ -875,9 +887,10 @@ export class QueryQueue {
               await this.sendCancelMessageFn(queryWithCancelHandle, queueId);
             }
           }
+        } finally {
+          // catch block can throw an exception, it's why it's important to clearInterval here
+          clearInterval(heartBeatTimer);
         }
-
-        clearInterval(heartBeatTimer);
 
         if (!(await queueConnection.setResultAndRemoveQuery(queryKeyHashed, executionResult, processingId, queueId))) {
           this.logger('Orphaned execution result', {

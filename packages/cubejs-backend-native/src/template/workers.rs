@@ -1,4 +1,4 @@
-use crate::template::neon::*;
+use crate::template::neon_mj::*;
 use cubesql::CubeError;
 
 use log::trace;

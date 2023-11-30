@@ -70,6 +70,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use std::time::SystemTime;
 use tokio::net::{TcpListener, TcpStream};
+use tokio::runtime::Runtime;
 use tokio::sync::broadcast::{Receiver, Sender};
 use tokio::sync::{oneshot, watch, Notify, RwLock};
 use tokio::time::timeout;
@@ -225,6 +226,14 @@ impl Configurator for WorkerConfigurator {
     type Config = Config;
     type ServicesRequest = ();
     type ServicesResponse = ();
+
+    fn setup(runtime: &Runtime) {
+        let startup = SELECT_WORKER_SETUP.read().unwrap();
+        if startup.is_some() {
+            startup.as_ref().unwrap()(runtime);
+        }
+    }
+
     async fn configure(
         _services_client: Arc<
             dyn Callable<Request = Self::ServicesRequest, Response = Self::ServicesResponse>,
@@ -347,6 +356,17 @@ lazy_static! {
 lazy_static! {
     static ref SELECT_WORKER_SPAWN_BACKGROUND_FN: std::sync::RwLock<Option<Box<dyn Fn(Config) + Send + Sync>>> =
         std::sync::RwLock::new(None);
+}
+
+lazy_static! {
+    static ref SELECT_WORKER_SETUP: std::sync::RwLock<Option<Box<dyn Fn(&Runtime) + Send + Sync>>> =
+        std::sync::RwLock::new(None);
+}
+
+pub fn register_select_worker_setup(f: fn(&Runtime)) {
+    let mut setup = SELECT_WORKER_SETUP.write().unwrap();
+    assert!(setup.is_none(), "select worker setup already registered");
+    *setup = Some(Box::new(f));
 }
 
 pub fn register_select_worker_configure_fn(f: fn() -> BoxFuture<'static, Config>) {
@@ -1147,7 +1167,8 @@ impl ClusterImpl {
         &self,
         plan_node: SerializedPlan,
     ) -> Result<(SchemaRef, Vec<SerializedRecordBatchStream>), CubeError> {
-        self.process_rate_limiter
+        let wait_ms = self
+            .process_rate_limiter
             .wait_for_allow(
                 TaskType::Select,
                 Some(Duration::from_secs(self.config_obj.query_timeout())),
@@ -1161,13 +1182,18 @@ impl ClusterImpl {
         match res {
             Ok((schema, records, data_loaded_size)) => {
                 self.process_rate_limiter
-                    .commit_task_usage(TaskType::Select, data_loaded_size as i64, trace_index)
+                    .commit_task_usage(
+                        TaskType::Select,
+                        data_loaded_size as i64,
+                        wait_ms,
+                        trace_index,
+                    )
                     .await;
                 Ok((schema, records))
             }
             Err(e) => {
                 self.process_rate_limiter
-                    .commit_task_usage(TaskType::Select, 0, trace_index)
+                    .commit_task_usage(TaskType::Select, 0, wait_ms, trace_index)
                     .await;
                 Err(e)
             }

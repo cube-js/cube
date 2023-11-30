@@ -28,11 +28,16 @@ impl AuthContext for HttpAuthContext {
 pub struct AuthenticateResponse {
     pub context: AuthContextRef,
     pub password: Option<String>,
+    pub skip_password_check: bool,
 }
 
 #[async_trait]
 pub trait SqlAuthService: Send + Sync + Debug {
-    async fn authenticate(&self, user: Option<String>) -> Result<AuthenticateResponse, CubeError>;
+    async fn authenticate(
+        &self,
+        user: Option<String>,
+        password: Option<String>,
+    ) -> Result<AuthenticateResponse, CubeError>;
 }
 
 #[derive(Debug)]
@@ -42,7 +47,11 @@ crate::di_service!(SqlAuthDefaultImpl, [SqlAuthService]);
 
 #[async_trait]
 impl SqlAuthService for SqlAuthDefaultImpl {
-    async fn authenticate(&self, _user: Option<String>) -> Result<AuthenticateResponse, CubeError> {
+    async fn authenticate(
+        &self,
+        _user: Option<String>,
+        password: Option<String>,
+    ) -> Result<AuthenticateResponse, CubeError> {
         Ok(AuthenticateResponse {
             context: Arc::new(HttpAuthContext {
                 access_token: env::var("CUBESQL_CUBE_TOKEN")
@@ -52,7 +61,8 @@ impl SqlAuthService for SqlAuthDefaultImpl {
                     .ok()
                     .unwrap_or_else(|| panic!("CUBESQL_CUBE_URL is a required ENV variable")),
             }),
-            password: None,
+            password,
+            skip_password_check: false,
         })
     }
 }

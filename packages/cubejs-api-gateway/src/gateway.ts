@@ -498,7 +498,6 @@ class ApiGateway {
     return metaConfig
       .map((cube) => ({
         config: {
-          public: cube.isVisible,
           ...cube.config,
           measures: cube.config.measures?.filter(visibilityFilter),
           dimensions: cube.config.dimensions?.filter(visibilityFilter),
@@ -1902,11 +1901,17 @@ class ApiGateway {
 
   protected parseQueryParam(query): Query | Query[] {
     if (!query || query === 'undefined') {
-      throw new UserError('query param is required');
+      throw new UserError('Query param is required');
     }
+
     if (typeof query === 'string') {
-      query = JSON.parse(query);
+      try {
+        return JSON.parse(query) as Query | Query[];
+      } catch (e: any) {
+        throw new UserError(`Unable to decode query param as JSON, error: ${e.message}`);
+      }
     }
+
     return query as Query | Query[];
   }
 

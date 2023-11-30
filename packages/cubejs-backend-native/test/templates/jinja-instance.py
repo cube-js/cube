@@ -104,3 +104,7 @@ def str_filter(i):
 @template.filter
 def filter_return_arg(i):
   return i
+
+@template.function
+def throw_exception():
+    raise Exception('Random Exception')

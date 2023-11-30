@@ -3,6 +3,84 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.27](https://github.com/cube-js/cube.js/compare/v0.34.26...v0.34.27) (2023-11-30)
+
+
+### Features
+
+* **cubesql:** Provide password supplied by Postgres connection as a 3rd argument of `check_sql_auth()` ([#7471](https://github.com/cube-js/cube.js/issues/7471)) ([ee3c19f](https://github.com/cube-js/cube.js/commit/ee3c19f8d467056c90ee407b3ac386dc1892b678)), closes [#5430](https://github.com/cube-js/cube.js/issues/5430)
+
+
+
+
+
+## [0.34.26](https://github.com/cube-js/cube/compare/v0.34.25...v0.34.26) (2023-11-28)
+
+
+### Bug Fixes
+
+* **cubesql:** Missing template backslash escaping ([#7465](https://github.com/cube-js/cube/issues/7465)) ([4a08de5](https://github.com/cube-js/cube/commit/4a08de5791f7353b925c60ee84d2654e95e7967a))
+
+
+### Features
+
+* **cubesql:** Support SQL push down for several functions ([79e5ac8](https://github.com/cube-js/cube/commit/79e5ac8e998005ebf8b5f72ccf1d63f425f6003c))
+
+
+
+
+
+## [0.34.23](https://github.com/cube-js/cube/compare/v0.34.22...v0.34.23) (2023-11-19)
+
+
+### Features
+
+* **cubesql:** Support `-` (unary minus) SQL push down ([a0a2e12](https://github.com/cube-js/cube/commit/a0a2e129e4cf3264df75bbdf53a962a892e4e9c2))
+* **cubesql:** Support `NOT` SQL push down ([#7422](https://github.com/cube-js/cube/issues/7422)) ([7b1ff0d](https://github.com/cube-js/cube/commit/7b1ff0d897ec9a5cfffba1e09444ff7baa8bea5b))
+
+
+
+
+
+## [0.34.22](https://github.com/cube-js/cube.js/compare/v0.34.21...v0.34.22) (2023-11-16)
+
+
+### Bug Fixes
+
+* **cubesql:** Window PARTITION BY, ORDER BY queries fail for SQL push down ([62b359f](https://github.com/cube-js/cube.js/commit/62b359f2d33d0c8fd59aa570e7e3a83718a3f7e8))
+
+
+### Features
+
+* **cubesql:** Ambiguous column references for SQL push down ([c5f1648](https://github.com/cube-js/cube.js/commit/c5f16485f2b7324f5e8c5ce3642ec9e9d29de534))
+
+
+
+
+
+## [0.34.21](https://github.com/cube-js/cube.js/compare/v0.34.20...v0.34.21) (2023-11-15)
+
+
+### Features
+
+* **cubesql:** SQL push down support for synthetic fields ([#7418](https://github.com/cube-js/cube.js/issues/7418)) ([d2bdc1b](https://github.com/cube-js/cube.js/commit/d2bdc1bedbb89ffee14d3bda1c8045b833076e35))
+* **cubesql:** Support SQL push down for more functions ([#7406](https://github.com/cube-js/cube.js/issues/7406)) ([b1606da](https://github.com/cube-js/cube.js/commit/b1606daba70ab92952b1cbbacd94dd7294b17ad5))
+
+
+
+
+
+## [0.34.20](https://github.com/cube-js/cube/compare/v0.34.19...v0.34.20) (2023-11-14)
+
+
+### Features
+
+* **cubesql:** Support `[NOT] IN` SQL push down ([c64994a](https://github.com/cube-js/cube/commit/c64994ac26e1174ce121c79af46fa6a62747b7e9))
+
+
+
+
+
 ## [0.34.19](https://github.com/cube-js/cube.js/compare/v0.34.18...v0.34.19) (2023-11-11)
 
 

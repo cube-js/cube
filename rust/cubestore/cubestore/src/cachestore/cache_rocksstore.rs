@@ -352,7 +352,15 @@ impl RocksCacheStore {
         Ok(())
     }
 
+    fn send_zero_gauge_stats(&self) {
+        app_metrics::CACHESTORE_ROCKSDB_ESTIMATE_LIVE_DATA_SIZE.report(0);
+        app_metrics::CACHESTORE_ROCKSDB_LIVE_SST_FILES_SIZE.report(0);
+        app_metrics::CACHESTORE_ROCKSDB_CF_DEFAULT_SIZE.report(0);
+    }
+
     pub async fn stop_processing_loops(&self) {
+        self.send_zero_gauge_stats();
+
         self.cache_eviction_manager.stop_processing_loops();
         self.upload_loop.stop();
         self.metrics_loop.stop();
