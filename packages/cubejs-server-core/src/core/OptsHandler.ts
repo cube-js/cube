@@ -1,6 +1,4 @@
 import crypto from 'crypto';
-import fs from 'fs-extra';
-import path from 'path';
 import cloneDeep from 'lodash.clonedeep';
 import { BaseDriver } from '@cubejs-backend/query-orchestrator';
 import {
