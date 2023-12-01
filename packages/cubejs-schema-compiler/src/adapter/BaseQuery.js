@@ -63,7 +63,6 @@ const SecondsDurations = {
  * @property {*} headCommitId
  */
 
-
 /**
  * BaseQuery class. BaseQuery object encapsulates the logic of
  * transforming an incoming to a specific cube request to the
