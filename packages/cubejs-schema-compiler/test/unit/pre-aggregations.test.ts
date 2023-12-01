@@ -118,13 +118,14 @@ describe('pre-aggregations', () => {
     const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
     console.log(JSON.stringify(preAggregationsDescription, null, 2));
 
+    expect(preAggregationsDescription[0].preAggregationId).toEqual('orders.orders_by_day_with_day');
     expect(preAggregationsDescription[0].matchedTimeDimensionDateRange).toEqual([
       '2023-01-01T00:00:00.000',
       '2023-01-10T23:59:59.999'
     ]);
   });
 
-  fit('view and pre-aggregation granularity with additional filters test', async () => {
+  it('view and pre-aggregation granularity with additional filters test', async () => {
     const { compiler, cubeEvaluator, joinGraph } = prepareYamlCompiler(
       createSchemaYaml(createECommerceSchema())
     );
@@ -167,6 +168,7 @@ describe('pre-aggregations', () => {
     const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
     console.log(JSON.stringify(preAggregationsDescription, null, 2));
 
+    expect(preAggregationsDescription[0].preAggregationId).toEqual('orders.orders_by_day_with_day_by_status');
     expect(preAggregationsDescription[0].matchedTimeDimensionDateRange).toEqual([
       '2023-01-01T00:00:00.000',
       '2023-01-10T23:59:59.999'
