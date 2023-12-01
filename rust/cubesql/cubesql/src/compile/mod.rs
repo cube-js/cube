@@ -20204,4 +20204,18 @@ ORDER BY \"COUNT(count)\" DESC"
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn test_domo_group_date_by_month() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "domo_group_date_by_month",
+            execute_query(
+                "SELECT TO_CHAR(DATE('2023-10-02 13:47:01')::TIMESTAMP, 'YYYY-Mon') AS \"CalendarMonth\"".to_string(),
+                DatabaseProtocol::PostgreSQL,
+            )
+            .await?
+        );
+
+        Ok(())
+    }
 }

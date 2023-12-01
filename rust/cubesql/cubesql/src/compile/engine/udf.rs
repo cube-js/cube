@@ -1467,6 +1467,7 @@ fn postgres_datetime_format_to_iso(format: String) -> String {
         .replace("yyyy", "%Y")
         // NOTE: "%q" is not a part of chrono
         .replace("Q", "%q")
+        .replace("Mon", "%b")
         .replace("DD", "%d")
         .replace("dd", "%d")
         .replace("HH24", "%H")
