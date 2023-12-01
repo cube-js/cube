@@ -670,6 +670,16 @@ fn single_value_filter_columns<'a>(
             columns.push(c);
             true
         }
+        Expr::Not(e) => {
+            let expr = e.as_ref();
+            match expr {
+                Expr::Column(c) => {
+                    columns.push(c);
+                    true
+                }
+                _ => false,
+            }
+        }
         Expr::Literal(_) => true,
         Expr::BinaryExpr { left, op, right } => match op {
             Operator::Eq => {
