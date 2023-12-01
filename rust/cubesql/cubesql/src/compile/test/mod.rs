@@ -324,13 +324,15 @@ pub fn get_test_auth() -> Arc<dyn SqlAuthService> {
         async fn authenticate(
             &self,
             _user: Option<String>,
+            password: Option<String>,
         ) -> Result<AuthenticateResponse, CubeError> {
             Ok(AuthenticateResponse {
                 context: Arc::new(HttpAuthContext {
                     access_token: "fake".to_string(),
                     base_path: "fake".to_string(),
                 }),
-                password: None,
+                password,
+                skip_password_check: false,
             })
         }
     }

@@ -768,8 +768,20 @@ export class QueryQueue {
         });
         await queueConnection.optimisticQueryUpdate(queryKeyHashed, { startQueryTime }, processingId, queueId);
 
+        let queryProcessHeartbeat = Date.now();
         const heartBeatTimer = setInterval(
-          () => queueConnection.updateHeartBeat(queryKeyHashed, queueId),
+          () => {
+            if ((Date.now() - queryProcessHeartbeat) > 5 * 60 * 1000) {
+              this.logger('Query processing heartbeat', {
+                queueId,
+                queryKey: query.queryKey,
+                requestId: query.requestId,
+              });
+              queryProcessHeartbeat = Date.now();
+            }
+
+            return queueConnection.updateHeartBeat(queryKeyHashed);
+          },
           this.heartBeatInterval * 1000
         );
         try {

@@ -918,7 +918,7 @@ impl PostgresIntegrationTestSuite {
 
         assert_eq!(
             err.to_string(),
-            "db error: ERROR: Internal: Unexpected panic. Reason: attempt to multiply with overflow"
+            "db error: ERROR: Unexpected panic. Reason: attempt to multiply with overflow"
         );
 
         Ok(())

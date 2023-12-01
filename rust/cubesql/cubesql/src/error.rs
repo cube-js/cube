@@ -74,10 +74,8 @@ impl CubeError {
 impl fmt::Display for CubeError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self.cause {
-            CubeErrorCauseType::User(_) => f.write_fmt(format_args!("User: {}", self.message)),
-            CubeErrorCauseType::Internal(_) => {
-                f.write_fmt(format_args!("Internal: {}", self.message))
-            }
+            CubeErrorCauseType::User(_) => f.write_fmt(format_args!("{}", self.message)),
+            CubeErrorCauseType::Internal(_) => f.write_fmt(format_args!("{}", self.message)),
         }
     }
 }
@@ -117,7 +115,8 @@ impl From<crate::compile::CompilationError> for CubeError {
         let cause = match &v {
             crate::compile::CompilationError::User(_, meta)
             | crate::compile::CompilationError::Unsupported(_, meta)
-            | crate::compile::CompilationError::Internal(_, _, meta) => {
+            | crate::compile::CompilationError::Internal(_, _, meta)
+            | crate::compile::CompilationError::Fatal(_, meta) => {
                 CubeErrorCauseType::Internal(meta.clone())
             }
         };

@@ -406,7 +406,7 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for MySqlConnection {
             .session
             .server
             .auth
-            .authenticate(user.clone())
+            .authenticate(user.clone(), None)
             .await
             .map_err(|e| {
                 if e.message != *"Incorrect user name or password" {
