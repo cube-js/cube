@@ -1,42 +1,44 @@
-export class BaseSegment {
-  constructor(query, segment) {
-    this.query = query;
-    this.segment = segment;
-  }
+import type { BaseQuery } from './BaseQuery';
 
-  filterToWhere() {
+export class BaseSegment {
+  public constructor(
+    public readonly query: BaseQuery,
+    public readonly segment: string
+  ) {}
+
+  public filterToWhere() {
     return this.query.segmentSql(this);
   }
 
-  filterParams() {
+  public filterParams() {
     return [];
   }
 
-  segmentDefinition() {
+  public segmentDefinition() {
     return this.query.cubeEvaluator.segmentByPath(this.segment);
   }
 
-  definition() {
+  public definition() {
     return this.segmentDefinition();
   }
 
-  getMembers() {
+  public getMembers() {
     return [this];
   }
 
-  cube() {
+  public cube() {
     return this.query.cubeEvaluator.cubeFromPath(this.segment);
   }
 
-  sqlDefinition() {
+  public sqlDefinition() {
     return this.segmentDefinition().sql;
   }
 
-  path() {
+  public path() {
     return this.query.cubeEvaluator.parsePath('segments', this.segment);
   }
 
-  expressionPath() {
+  public expressionPath() {
     // TODO expression support
     // if (this.expression) {
     //   return `expr:${this.expression.expressionName}`;

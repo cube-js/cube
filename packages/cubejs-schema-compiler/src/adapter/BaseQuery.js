@@ -91,7 +91,8 @@ export class BaseQuery {
 
     this.orderHashToString = this.orderHashToString.bind(this);
     this.defaultOrder = this.defaultOrder.bind(this);
-
+    /** @type {ParamAllocator} */
+    this.paramAllocator = this.options.paramAllocator || this.newParamAllocator(this.options.expressionParams);
     this.initFromOptions();
   }
 
@@ -184,11 +185,6 @@ export class BaseQuery {
       securityContext: {},
       ...this.options.contextSymbols,
     };
-    /**
-     * @protected
-     * @type {ParamAllocator}
-     */
-    this.paramAllocator = this.options.paramAllocator || this.newParamAllocator(this.options.expressionParams);
     this.compilerCache = this.compilers.compiler.compilerCache;
     this.queryCache = this.compilerCache.getQueryCache({
       measures: this.options.measures,
@@ -429,6 +425,9 @@ export class BaseQuery {
     return this.newFilter(filter);
   }
 
+  /**
+   * @returns {BaseFilter}
+   */
   newFilter(filter) {
     return new BaseFilter(this, filter);
   }
@@ -1061,7 +1060,7 @@ export class BaseQuery {
   }
 
   /**
-   * @param {string} timeDimension
+   * @param {import('./BaseDimension').BaseDimension|import('./BaseTimeDimension').BaseTimeDimension} timeDimension
    * @return {string}
    */
   timeStampParam(timeDimension) {
