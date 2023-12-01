@@ -1,0 +1,44 @@
+name: QA Cubejs
+
+on:
+  push:
+    branches:
+      - "DOP-45/Set-up-a-Cube.js-instance-that-can-talk-to-Vertica-pipeline"
+
+jobs:
+  # Job
+  build-cubejs:
+    name: Build Cubejs
+    runs-on: ubuntu-latest
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1-node16
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_QA }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_QA }}
+          aws-region: ap-southeast-2
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+
+      - name: Build, tag, and push image to ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: kia-monocle-cubejs-qa
+          IMAGE_TAG: ${{ github.run_number }}
+        run: |
+          pwd
+          ls
+          git checkout vertica_driver
+          cd packages/cubejs-docker
+          cp ../../yarn.lock .
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:dev -f dev.Dockerfile ../../
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:latest -f local.Dockerfile --build-arg="DEV_BUILD_IMAGE=$ECR_REGISTRY/$ECR_REPOSITORY:dev" .
+          docker images
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY --all-tags
+          echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
