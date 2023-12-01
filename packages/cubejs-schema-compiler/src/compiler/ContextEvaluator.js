@@ -8,7 +8,7 @@ export class ContextEvaluator {
   }
 
   // eslint-disable-next-line no-unused-vars
-  compile(contexts, errorReporter) {
+  compile(contexts, _errorReporter) {
     if (contexts.length === 0) {
       return;
     }

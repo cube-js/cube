@@ -16,7 +16,6 @@ import {
   MAX_SOURCE_ROW_LIMIT,
   inDbTimeZone,
   QueryAlias,
-  getEnv,
 } from '@cubejs-backend/shared';
 
 import { UserError } from '../compiler/UserError';
