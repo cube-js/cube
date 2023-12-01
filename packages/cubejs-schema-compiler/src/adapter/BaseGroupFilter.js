@@ -8,6 +8,10 @@ export class BaseGroupFilter {
     this.dimension = filter.dimension;
   }
 
+  isDateOperator() {
+    return false;
+  }
+
   conditionSql(column) {
     return `(\n${this.values.map(f => f.conditionSql(column)).join(` ${this.operator.toUpperCase()} `)}\n)`;
   }

@@ -9,7 +9,9 @@ export class CubeEvaluator extends CubeSymbols {
   constructor(cubeValidator) {
     super(true);
     this.cubeValidator = cubeValidator;
+    /** @type {*} */
     this.evaluatedCubes = {};
+    /** @type {*} */
     this.primaryKeys = {};
   }
 
@@ -309,7 +311,7 @@ export class CubeEvaluator extends CubeSymbols {
   }
 
   /**
-   * @param {measures|dimensions|segments} type
+   * @param {'measures'|'dimensions'|'segments'} type
    * @param {string} path
    * @returns boolean
    */
@@ -335,7 +337,7 @@ export class CubeEvaluator extends CubeSymbols {
   }
 
   /**
-   * @param {measures|dimensions|segments} type
+   * @param {'measures'|'dimensions'|'segments'} type
    * @param {string} path
    * @returns {*}
    */
