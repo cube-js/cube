@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/schema-compiler",
   "description": "Cube schema compiler",
   "author": "Cube Dev, Inc.",
-  "version": "0.34.27",
+  "version": "0.34.29",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",

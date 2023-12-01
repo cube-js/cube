@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.29](https://github.com/cube-js/cube/compare/v0.34.28...v0.34.29) (2023-12-01)
+
+
+### Bug Fixes
+
+* **schema-compiler:** td.isDateOperator is not a function ([#7483](https://github.com/cube-js/cube/issues/7483)) ([31c272a](https://github.com/cube-js/cube/commit/31c272ae929bc8e7f7972e46666f84bf8509cc3f))
+
+
+
+
+
 ## [0.34.28](https://github.com/cube-js/cube/compare/v0.34.27...v0.34.28) (2023-11-30)
 
 
