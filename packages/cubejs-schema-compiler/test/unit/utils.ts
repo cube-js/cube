@@ -118,24 +118,47 @@ export function createECommerceSchema() {
         name: 'count',
         type: 'count',
       }],
-      dimensions: [{
-        name: 'created_at',
-        sql: 'created_at',
-        type: 'time',
-      }],
-      preAggregations: [{
-        name: 'orders_by_day_with_day',
-        measures: ['count'],
-        timeDimension: 'created_at',
-        granularity: 'day',
-        partition_granularity: 'day',
-        build_range_start: {
-          sql: 'SELECT NOW() - INTERVAL \'1000 day\'',
+      dimensions: [
+        {
+          name: 'created_at',
+          sql: 'created_at',
+          type: 'time',
         },
-        build_range_end: {
-          sql: 'SELECT NOW()'
+        {
+          name: 'status',
+          sql: 'status',
+          type: 'string',
+        }
+      ],
+      preAggregations: [
+        {
+          name: 'orders_by_day_with_day',
+          measures: ['count'],
+          timeDimension: 'created_at',
+          granularity: 'day',
+          partition_granularity: 'day',
+          build_range_start: {
+            sql: 'SELECT NOW() - INTERVAL \'1000 day\'',
+          },
+          build_range_end: {
+            sql: 'SELECT NOW()'
+          },
         },
-      }]
+        {
+          name: 'orders_by_day_with_day_by_status',
+          measures: ['count'],
+          dimensions: ['status'],
+          timeDimension: 'created_at',
+          granularity: 'day',
+          partition_granularity: 'day',
+          build_range_start: {
+            sql: 'SELECT NOW() - INTERVAL \'1000 day\'',
+          },
+          build_range_end: {
+            sql: 'SELECT NOW()'
+          },
+        }
+      ]
     }],
     views: [{
       name: 'orders_view',
@@ -143,7 +166,8 @@ export function createECommerceSchema() {
         join_path: 'orders',
         includes: [
           'created_at',
-          'count'
+          'count',
+          'status',
         ]
       }]
     }]
