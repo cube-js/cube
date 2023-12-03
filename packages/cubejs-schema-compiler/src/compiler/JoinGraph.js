@@ -126,18 +126,23 @@ export class JoinGraph {
       }
       root = newRoot;
     }
+    const nodesJoined = {};
     const result = cubesToJoin.map(joinHints => {
       if (!Array.isArray(joinHints)) {
         joinHints = [joinHints];
       }
       let prevNode = root;
       return joinHints.filter(toJoin => toJoin !== prevNode).map(toJoin => {
+        if (nodesJoined[toJoin]) {
+          return { joins: [] };
+        }
         const path = this.graph.path(prevNode, toJoin);
         if (!path) {
           return null;
         }
         const foundJoins = self.joinsByPath(path);
         prevNode = toJoin;
+        nodesJoined[toJoin] = true;
         return { cubes: path, joins: foundJoins };
       });
     }).reduce((a, b) => a.concat(b), []).reduce((joined, res) => {
