@@ -2,7 +2,7 @@ import type { BaseQuery } from './BaseQuery';
 
 export class BaseSegment {
   public constructor(
-    public readonly query: BaseQuery,
+    protected readonly query: BaseQuery,
     public readonly segment: string
   ) {}
 

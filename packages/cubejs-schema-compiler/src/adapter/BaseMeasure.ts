@@ -11,7 +11,7 @@ export class BaseMeasure {
   public readonly isMemberExpression: boolean = false;
 
   public constructor(
-    public readonly query: BaseQuery,
+    protected readonly query: BaseQuery,
     public readonly measure: any
   ) {
     if (measure.expression) {
