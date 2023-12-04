@@ -1,34 +1,44 @@
 import { UserError } from '../compiler/UserError';
+import type { BaseQuery } from './BaseQuery';
 
 export class BaseMeasure {
-  constructor(query, measure) {
-    this.query = query;
+  public readonly expression: any;
+
+  public readonly expressionCubeName: any;
+
+  public readonly expressionName: any;
+
+  public readonly isMemberExpression: boolean = false;
+
+  public constructor(
+    protected readonly query: BaseQuery,
+    public readonly measure: any
+  ) {
     if (measure.expression) {
       this.expression = measure.expression;
       this.expressionCubeName = measure.cubeName;
       this.expressionName = measure.expressionName || `${measure.cubeName}.${measure.name}`;
       this.isMemberExpression = !!measure.definition;
     }
-    this.measure = measure;
   }
 
-  getMembers() {
+  public getMembers() {
     return [this];
   }
 
-  selectColumns() {
+  public selectColumns() {
     return [`${this.measureSql()} ${this.aliasName()}`];
   }
 
-  hasNoRemapping() {
+  public hasNoRemapping() {
     return this.measureSql() === this.aliasName();
   }
 
-  cumulativeSelectColumns() {
+  public cumulativeSelectColumns() {
     return [`${this.cumulativeMeasureSql()} ${this.aliasName()}`];
   }
 
-  cumulativeMeasureSql() {
+  public cumulativeMeasureSql() {
     return this.query.evaluateSymbolSqlWithContext(
       () => this.measureSql(),
       {
@@ -37,25 +47,25 @@ export class BaseMeasure {
     );
   }
 
-  measureSql() {
+  public measureSql() {
     if (this.expression) {
       return this.query.evaluateSymbolSql(this.expressionCubeName, this.expressionName, this.definition(), 'measure');
     }
     return this.query.measureSql(this);
   }
 
-  cube() {
+  public cube() {
     if (this.expression) {
       return this.query.cubeEvaluator.cubeFromPath(this.expressionCubeName);
     }
     return this.query.cubeEvaluator.cubeFromPath(this.measure);
   }
 
-  measureDefinition() {
+  public measureDefinition() {
     return this.query.cubeEvaluator.measureByPath(this.measure);
   }
 
-  definition() {
+  public definition() {
     if (this.expression) {
       return {
         sql: this.expression,
@@ -66,25 +76,25 @@ export class BaseMeasure {
     return this.measureDefinition();
   }
 
-  aliasName() {
+  public aliasName() {
     return this.query.escapeColumnName(this.unescapedAliasName());
   }
 
-  unescapedAliasName() {
+  public unescapedAliasName() {
     if (this.expression) {
       return this.query.aliasName(this.expressionName);
     }
     return this.query.aliasName(this.measure);
   }
 
-  isCumulative() {
+  public isCumulative() {
     if (this.expression) { // TODO
       return false;
     }
     return BaseMeasure.isCumulative(this.measureDefinition());
   }
 
-  isAdditive() {
+  public isAdditive() {
     if (this.expression) { // TODO
       return false;
     }
@@ -93,18 +103,18 @@ export class BaseMeasure {
       definition.type === 'min' || definition.type === 'max';
   }
 
-  static isCumulative(definition) {
+  public static isCumulative(definition) {
     return definition.type === 'runningTotal' || !!definition.rollingWindow;
   }
 
-  rollingWindowDefinition() {
+  public rollingWindowDefinition() {
     if (this.measureDefinition().type === 'runningTotal') {
       throw new UserError('runningTotal rollups aren\'t supported. Please consider replacing runningTotal measure with rollingWindow.');
     }
     return this.measureDefinition().rollingWindow;
   }
 
-  dateJoinCondition() {
+  public dateJoinCondition() {
     if (this.measureDefinition().type === 'runningTotal') {
       return this.query.runningTotalDateJoinCondition();
     }
@@ -117,7 +127,7 @@ export class BaseMeasure {
     return null;
   }
 
-  windowGranularity() {
+  public windowGranularity() {
     const { rollingWindow } = this.measureDefinition();
     if (rollingWindow) {
       return this.minGranularity(
@@ -128,11 +138,11 @@ export class BaseMeasure {
     return undefined;
   }
 
-  minGranularity(granularityA, granularityB) {
+  public minGranularity(granularityA, granularityB) {
     return this.query.minGranularity(granularityA, granularityB);
   }
 
-  granularityFromInterval(interval) {
+  public granularityFromInterval(interval) {
     if (!interval) {
       return undefined;
     }
@@ -150,22 +160,22 @@ export class BaseMeasure {
     return undefined;
   }
 
-  shouldUngroupForCumulative() {
+  public shouldUngroupForCumulative() {
     return this.measureDefinition().rollingWindow && !this.isAdditive();
   }
 
-  sqlDefinition() {
+  public sqlDefinition() {
     return this.measureDefinition().sql;
   }
 
-  path() {
+  public path() {
     if (this.expression) {
       return null;
     }
     return this.query.cubeEvaluator.parsePath('measures', this.measure);
   }
 
-  expressionPath() {
+  public expressionPath() {
     if (this.expression) {
       return `expr:${this.expression.expressionName}`;
     }

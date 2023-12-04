@@ -15,7 +15,7 @@ class DuckDBFilter extends BaseFilter {
 }
 
 export class DuckDBQuery extends BaseQuery {
-  public newFilter(filter: any) {
+  public newFilter(filter: any): BaseFilter {
     return new DuckDBFilter(this, filter);
   }
 

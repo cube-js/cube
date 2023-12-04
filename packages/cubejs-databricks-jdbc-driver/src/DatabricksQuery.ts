@@ -21,7 +21,7 @@ class DatabricksFilter extends BaseFilter {
 }
 
 export class DatabricksQuery extends BaseQuery {
-  public newFilter(filter: any) {
+  public newFilter(filter: any): BaseFilter {
     return new DatabricksFilter(this, filter);
   }
 

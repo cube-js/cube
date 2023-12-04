@@ -4,64 +4,77 @@ import { timeSeries, FROM_PARTITION_RANGE, TO_PARTITION_RANGE, BUILD_RANGE_START
 
 import { BaseFilter } from './BaseFilter';
 import { UserError } from '../compiler/UserError';
+import type { BaseQuery } from './BaseQuery';
 
-const moment = extendMoment(Moment);
+const moment = extendMoment(Moment as any);
 
 export class BaseTimeDimension extends BaseFilter {
-  constructor(query, timeDimension) {
+  public readonly dateRange: any;
+
+  public readonly granularity: string;
+
+  public readonly boundaryDateRange: any;
+
+  public constructor(
+    query: BaseQuery,
+    timeDimension: any
+  ) {
     super(query, {
       dimension: timeDimension.dimension,
       operator: 'in_date_range',
       values: timeDimension.dateRange
     });
-    this.query = query;
     this.dateRange = timeDimension.dateRange;
     this.granularity = timeDimension.granularity;
     this.boundaryDateRange = timeDimension.boundaryDateRange;
   }
 
-  selectColumns() {
+  public selectColumns() {
     const context = this.query.safeEvaluateSymbolContext();
     if (!context.granularityOverride && !this.granularity) {
       return null;
     }
+
     return super.selectColumns();
   }
 
-  hasNoRemapping() {
+  public hasNoRemapping() {
     const context = this.query.safeEvaluateSymbolContext();
     if (!context.granularityOverride && !this.granularity) {
-      return null;
+      return false;
     }
+
     return super.hasNoRemapping();
   }
 
-  aliasName() {
+  public aliasName() {
     const context = this.query.safeEvaluateSymbolContext();
     if (!context.granularityOverride && !this.granularity) {
       return null;
     }
+
     return super.aliasName();
   }
 
-  unescapedAliasName(granularity) {
+  // @ts-ignore
+  public unescapedAliasName(granularity: string) {
     const actualGranularity = granularity || this.granularity || 'day';
 
     return `${this.query.aliasName(this.dimension)}_${actualGranularity}`; // TODO date here for rollups
   }
 
-  dateSeriesAliasName() {
+  public dateSeriesAliasName() {
     return this.query.escapeColumnName(`${this.dimension}_series`);
   }
 
-  dateSeriesSelectColumn(dateSeriesAliasName) {
+  public dateSeriesSelectColumn(dateSeriesAliasName) {
     if (!this.granularity) {
       return null;
     }
     return `${dateSeriesAliasName || this.dateSeriesAliasName()}.${this.query.escapeColumnName('date_from')} ${this.aliasName()}`;
   }
 
-  dimensionSql() {
+  public dimensionSql() {
     const context = this.query.safeEvaluateSymbolContext();
     const granularity = context.granularityOverride || this.granularity;
 
@@ -77,29 +90,31 @@ export class BaseTimeDimension extends BaseFilter {
     return this.query.timeGroupedColumn(granularity, this.convertedToTz());
   }
 
-  convertTzForRawTimeDimensionIfNeeded(sql) {
+  public convertTzForRawTimeDimensionIfNeeded(sql) {
     return sql();
   }
 
-  convertedToTz() {
+  public convertedToTz() {
     return this.query.convertTz(this.query.dimensionSql(this));
   }
 
-  filterToWhere() {
+  public filterToWhere() {
     if (!this.dateRange) {
       return null;
     }
     return super.filterToWhere();
   }
 
-  filterParams() {
+  public filterParams() {
     if (!this.dateRange) {
       return [];
     }
     return super.filterParams();
   }
 
-  dateFromFormatted() {
+  protected dateFromFormattedValue: any | null = null;
+
+  public dateFromFormatted() {
     if (!this.dateFromFormattedValue) {
       this.dateFromFormattedValue = this.formatFromDate(this.dateRange[0]);
     }
@@ -107,7 +122,9 @@ export class BaseTimeDimension extends BaseFilter {
     return this.dateFromFormattedValue;
   }
 
-  dateFrom() {
+  protected dateFromValue: any | null = null;
+
+  public dateFrom() {
     if (!this.dateFromValue) {
       this.dateFromValue = this.inDbTimeZoneDateFrom(this.dateRange[0]);
     }
@@ -115,49 +132,54 @@ export class BaseTimeDimension extends BaseFilter {
     return this.dateFromValue;
   }
 
-  dateFromParam() {
+  public dateFromParam() {
     return this.query.paramAllocator.allocateParamsForQuestionString(
       this.query.timeStampParam(this), [this.dateFrom()]
     );
   }
 
-  localDateTimeFromParam() {
+  public localDateTimeFromParam() {
     return this.query.dateTimeCast(this.query.paramAllocator.allocateParam(this.dateFromFormatted()));
   }
 
-  localDateTimeFromOrBuildRangeParam() {
+  public localDateTimeFromOrBuildRangeParam() {
     return this.query.dateTimeCast(this.query.paramAllocator.allocateParam(this.dateRange ? this.dateFromFormatted() : BUILD_RANGE_START_LOCAL));
   }
 
-  dateToFormatted() {
+  protected dateToFormattedValue: any | null = null;
+
+  public dateToFormatted() {
     if (!this.dateToFormattedValue) {
       this.dateToFormattedValue = this.formatToDate(this.dateRange[1]);
     }
+
     return this.dateToFormattedValue;
   }
 
-  dateTo() {
+  protected dateToValue: any | null = null;
+
+  public dateTo() {
     if (!this.dateToValue) {
       this.dateToValue = this.inDbTimeZoneDateTo(this.dateRange[1]);
     }
     return this.dateToValue;
   }
 
-  dateToParam() {
+  public dateToParam() {
     return this.query.paramAllocator.allocateParamsForQuestionString(
       this.query.timeStampParam(this), [this.dateTo()]
     );
   }
 
-  localDateTimeToParam() {
+  public localDateTimeToParam() {
     return this.query.dateTimeCast(this.query.paramAllocator.allocateParam(this.dateToFormatted()));
   }
 
-  localDateTimeToOrBuildRangeParam() {
+  public localDateTimeToOrBuildRangeParam() {
     return this.query.dateTimeCast(this.query.paramAllocator.allocateParam(this.dateRange ? this.dateToFormatted() : BUILD_RANGE_END_LOCAL));
   }
 
-  dateRangeGranularity() {
+  public dateRangeGranularity() {
     if (!this.dateRange) {
       return null;
     }
@@ -169,7 +191,9 @@ export class BaseTimeDimension extends BaseFilter {
     );
   }
 
-  rollupGranularity() {
+  protected rollupGranularityValue: any | null = null;
+
+  public rollupGranularity() {
     if (!this.rollupGranularityValue) {
       this.rollupGranularityValue =
         this.query.cacheValue(
@@ -177,10 +201,11 @@ export class BaseTimeDimension extends BaseFilter {
           () => this.query.minGranularity(this.granularity, this.dateRangeGranularity())
         );
     }
+
     return this.rollupGranularityValue;
   }
 
-  timeSeries() {
+  public timeSeries() {
     if (!this.dateRange) {
       throw new UserError('Time series queries without dateRange aren\'t supported');
     }
@@ -194,11 +219,11 @@ export class BaseTimeDimension extends BaseFilter {
     return timeSeries(this.granularity, [this.dateFromFormatted(), this.dateToFormatted()]);
   }
 
-  wildcardRange() {
+  public wildcardRange() {
     return [FROM_PARTITION_RANGE, TO_PARTITION_RANGE];
   }
 
-  boundaryDateRangeFormatted() {
+  public boundaryDateRangeFormatted() {
     // TODO or here is due to boundaryDateRange can be defined in originalSql query used by rollup
     // TODO and dateRange can be defined in rollup query
     return this.boundaryDateRange && [
