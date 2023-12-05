@@ -1662,7 +1662,7 @@ export class BaseQuery {
 
   /**
    * Returns a complete list of the dimensions, including time dimensions.
-   * @returns {Array<BaseDimension>}
+   * @returns {(BaseDimension|BaseTimeDimension)[]}
    */
   dimensionsForSelect() {
     return this.dimensions.concat(this.timeDimensions);

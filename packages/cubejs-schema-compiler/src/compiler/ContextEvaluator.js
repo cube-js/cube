@@ -1,9 +1,11 @@
 import R from 'ramda';
 
 export class ContextEvaluator {
+  /**
+   * @param {import('./CubeEvaluator').CubeEvaluator} cubeEvaluator
+   */
   constructor(cubeEvaluator) {
     this.cubeEvaluator = cubeEvaluator;
-
     this.contextDefinitions = {};
   }
 

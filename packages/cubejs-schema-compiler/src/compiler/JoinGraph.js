@@ -3,6 +3,10 @@ import Graph from 'node-dijkstra';
 import { UserError } from './UserError';
 
 export class JoinGraph {
+  /**
+   * @param {import('./CubeValidator').CubeValidator} cubeValidator
+   * @param {import('./CubeEvaluator').CubeEvaluator} cubeEvaluator
+   */
   constructor(cubeValidator, cubeEvaluator) {
     this.cubeValidator = cubeValidator;
     this.cubeEvaluator = cubeEvaluator;
