@@ -148,6 +148,7 @@ describe('Cube Validation', () => {
     const validationResult = cubeValidator.validate(cube, {
       error: (message, e) => {
         console.log(message);
+        expect(message).toContain('(refreshKey.every = 12h)');
         expect(message).toContain('does not match regexp');
         expect(message).toContain('CronParser');
       }
