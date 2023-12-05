@@ -4,18 +4,49 @@ import R from 'ramda';
 import { CubeSymbols } from './CubeSymbols';
 import { UserError } from './UserError';
 import { BaseQuery } from '../adapter';
+import type { CubeValidator } from './CubeValidator';
+import type { ErrorReporter } from './ErrorReporter';
+
+export type SegmentDefinition = {
+  type: string,
+  sql: Function,
+  primaryKey?: true,
+  ownedByCube: boolean,
+  fieldType?: string,
+};
+
+export type DimensionDefinition = {
+  type: string,
+  sql: Function,
+  primaryKey?: true,
+  ownedByCube: boolean,
+  fieldType?: string,
+};
+
+export type MeasureDefinition = {
+  type: string,
+  sql: Function,
+  ownedByCube: boolean,
+  rollingWindow?: any
+  filters?: any
+  primaryKey?: true,
+  drillFilters?: any
+};
 
 export class CubeEvaluator extends CubeSymbols {
-  constructor(cubeValidator) {
+  public evaluatedCubes: Record<string, any> = {};
+
+  public primaryKeys: Record<string, any> = {};
+
+  public byFileName: Record<string, any> = {};
+
+  public constructor(
+    protected readonly cubeValidator: CubeValidator
+  ) {
     super(true);
-    this.cubeValidator = cubeValidator;
-    /** @type {*} */
-    this.evaluatedCubes = {};
-    /** @type {*} */
-    this.primaryKeys = {};
   }
 
-  compile(cubes, errorReporter) {
+  public compile(cubes: any, errorReporter: ErrorReporter) {
     super.compile(cubes, errorReporter);
     const validCubes = this.cubeList.filter(cube => this.cubeValidator.isCubeValid(cube));
 
@@ -26,8 +57,8 @@ export class CubeEvaluator extends CubeSymbols {
     this.primaryKeys = R.fromPairs(
       validCubes.map((v) => {
         const primaryKeyNamesToSymbols = R.compose(
-          R.map((d) => d[0]),
-          R.filter((d) => d[1].primaryKey),
+          R.map((d: any) => d[0]),
+          R.filter((d: any) => d[1].primaryKey),
           R.toPairs
         )(v.dimensions || {});
         return [v.name, primaryKeyNamesToSymbols];
@@ -35,10 +66,7 @@ export class CubeEvaluator extends CubeSymbols {
     );
   }
 
-  /**
-   * @protected
-   */
-  prepareCube(cube, errorReporter) {
+  protected prepareCube(cube, errorReporter: ErrorReporter) {
     this.prepareJoins(cube, errorReporter);
     this.preparePreAggregations(cube, errorReporter);
     this.prepareMembers(cube.measures, cube, errorReporter);
@@ -46,13 +74,10 @@ export class CubeEvaluator extends CubeSymbols {
     this.prepareMembers(cube.segments, cube, errorReporter);
   }
 
-  /**
-   * @protected
-   */
-  prepareJoins(cube, _errorReporter) {
+  protected prepareJoins(cube: any, _errorReporter: ErrorReporter) {
     if (cube.joins) {
       // eslint-disable-next-line no-restricted-syntax
-      for (const join of Object.values(cube.joins)) {
+      for (const join of Object.values(cube.joins) as any[]) {
         // eslint-disable-next-line default-case
         switch (join.relationship) {
           case 'belongs_to':
@@ -75,13 +100,10 @@ export class CubeEvaluator extends CubeSymbols {
     }
   }
 
-  /**
-   * @protected
-   */
-  preparePreAggregations(cube, errorReporter) {
+  protected preparePreAggregations(cube: any, errorReporter: ErrorReporter) {
     if (cube.preAggregations) {
       // eslint-disable-next-line no-restricted-syntax
-      for (const preAggregation of Object.values(cube.preAggregations)) {
+      for (const preAggregation of Object.values(cube.preAggregations) as any) {
         if (preAggregation.timeDimension) {
           preAggregation.timeDimensionReference = preAggregation.timeDimension;
           delete preAggregation.timeDimension;
@@ -110,7 +132,8 @@ export class CubeEvaluator extends CubeSymbols {
         if (preAggregation.buildRangeStart) {
           if (preAggregation.refreshRangeStart) {
             errorReporter.warning({
-              message: 'You specified both buildRangeStart and refreshRangeStart, buildRangeStart will be used.'
+              message: 'You specified both buildRangeStart and refreshRangeStart, buildRangeStart will be used.',
+              loc: null,
             });
           }
 
@@ -121,7 +144,8 @@ export class CubeEvaluator extends CubeSymbols {
         if (preAggregation.buildRangeEnd) {
           if (preAggregation.refreshRangeEnd) {
             errorReporter.warning({
-              message: 'You specified both buildRangeEnd and refreshRangeEnd, buildRangeEnd will be used.'
+              message: 'You specified both buildRangeEnd and refreshRangeEnd, buildRangeEnd will be used.',
+              loc: null,
             });
           }
 
@@ -132,10 +156,7 @@ export class CubeEvaluator extends CubeSymbols {
     }
   }
 
-  /**
-   * @protected
-   */
-  prepareMembers(members, cube, errorReporter) {
+  protected prepareMembers(members: any, cube: any, errorReporter: ErrorReporter) {
     members = members || {};
 
     for (const memberName of Object.keys(members)) {
@@ -173,23 +194,25 @@ export class CubeEvaluator extends CubeSymbols {
     }
   }
 
-  cubesByFileName(fileName) {
+  public cubesByFileName(fileName) {
     return this.byFileName[fileName] || [];
   }
 
-  timeDimensionPathsForCube(cube) {
+  public timeDimensionPathsForCube(cube: any) {
     return R.compose(
       R.map(nameToDefinition => `${cube}.${nameToDefinition[0]}`),
       R.toPairs,
-      R.filter(d => d.type === 'time')
+      // @ts-ignore
+      R.filter((d: any) => d.type === 'time')
+      // @ts-ignore
     )(this.evaluatedCubes[cube].dimensions || {});
   }
 
-  measuresForCube(cube) {
+  public measuresForCube(cube) {
     return this.cubeFromPath(cube).measures || {};
   }
 
-  preAggregationsForCube(path) {
+  public preAggregationsForCube(path: string) {
     return this.cubeFromPath(path).preAggregations || {};
   }
 
@@ -203,7 +226,7 @@ export class CubeEvaluator extends CubeSymbols {
    * }} filter pre-aggregations selector
    * @returns {*}
    */
-  preAggregations(filter) {
+  public preAggregations(filter) {
     const { scheduled, dataSources, cubes, preAggregationIds } = filter || {};
     const idFactory = ({ cube, preAggregationName }) => `${cube}.${preAggregationName}`;
 
@@ -262,47 +285,47 @@ export class CubeEvaluator extends CubeSymbols {
       .reduce((a, b) => a.concat(b), []);
   }
 
-  scheduledPreAggregations() {
+  public scheduledPreAggregations() {
     return this.preAggregations({ scheduled: true });
   }
 
-  cubeNames() {
+  public cubeNames() {
     return Object.keys(this.evaluatedCubes);
   }
 
-  isMeasure(measurePath) {
+  public isMeasure(measurePath: string): boolean {
     return this.isInstanceOfType('measures', measurePath);
   }
 
-  isDimension(path) {
+  public isDimension(path: string): boolean {
     return this.isInstanceOfType('dimensions', path);
   }
 
-  isSegment(path) {
+  public isSegment(path: string): boolean {
     return this.isInstanceOfType('segments', path);
   }
 
-  measureByPath(measurePath) {
+  public measureByPath(measurePath: string): MeasureDefinition {
     return this.byPath('measures', measurePath);
   }
 
-  dimensionByPath(dimensionPath) {
+  public dimensionByPath(dimensionPath: string): DimensionDefinition {
     return this.byPath('dimensions', dimensionPath);
   }
 
-  segmentByPath(segmentPath) {
+  public segmentByPath(segmentPath: string): SegmentDefinition {
     return this.byPath('segments', segmentPath);
   }
 
-  cubeExists(cube) {
+  public cubeExists(cube) {
     return !!this.evaluatedCubes[cube];
   }
 
-  cubeFromPath(path) {
+  public cubeFromPath(path: string) {
     return this.evaluatedCubes[this.cubeNameFromPath(path)];
   }
 
-  cubeNameFromPath(path) {
+  public cubeNameFromPath(path: string) {
     const cubeAndName = path.split('.');
     if (!this.evaluatedCubes[cubeAndName[0]]) {
       throw new UserError(`Cube '${cubeAndName[0]}' not found for path '${path}'`);
@@ -310,38 +333,30 @@ export class CubeEvaluator extends CubeSymbols {
     return cubeAndName[0];
   }
 
-  /**
-   * @param {'measures'|'dimensions'|'segments'} type
-   * @param {string} path
-   * @returns boolean
-   */
-  isInstanceOfType(type, path) {
+  public isInstanceOfType(type: 'measures' | 'dimensions' | 'segments', path: string | string[]): boolean {
     const cubeAndName = Array.isArray(path) ? path : path.split('.');
     return this.evaluatedCubes[cubeAndName[0]] &&
       this.evaluatedCubes[cubeAndName[0]][type] &&
       this.evaluatedCubes[cubeAndName[0]][type][cubeAndName[1]];
   }
 
-  /**
-   * @param {string} path
-   * @returns {*}
-   */
-  byPathAnyType(path) {
-    const type = ['measures', 'dimensions', 'segments'].find(t => this.isInstanceOfType(t, path));
-
-    if (!type) {
-      throw new UserError(`Can't resolve member '${path.join('.')}'`);
+  public byPathAnyType(path: string[]) {
+    if (this.isInstanceOfType('measures', path)) {
+      return this.byPath('measures', path);
     }
 
-    return this.byPath(type, path);
+    if (this.isInstanceOfType('dimensions', path)) {
+      return this.byPath('dimensions', path);
+    }
+
+    if (this.isInstanceOfType('segments', path)) {
+      return this.byPath('segments', path);
+    }
+
+    throw new UserError(`Can't resolve member '${path.join('.')}'`);
   }
 
-  /**
-   * @param {'measures'|'dimensions'|'segments'} type
-   * @param {string} path
-   * @returns {*}
-   */
-  byPath(type, path) {
+  public byPath(type: 'measures' | 'dimensions' | 'segments', path: string | string[]) {
     if (!type) {
       throw new Error(`Type can't be undefined for '${path}'`);
     }
@@ -366,23 +381,23 @@ export class CubeEvaluator extends CubeSymbols {
     return this.evaluatedCubes[cubeAndName[0]][type][cubeAndName[1]];
   }
 
-  parsePath(type, path) {
+  public parsePath(type, path) {
     // Should throw UserError in case of parse error
     this.byPath(type, path);
     return path.split('.');
   }
 
-  parsePathAnyType(path) {
+  protected parsePathAnyType(path) {
     // Should throw UserError in case of parse error
     this.byPathAnyType(path);
     return path.split('.');
   }
 
-  collectUsedCubeReferences(cube, sqlFn) {
+  public collectUsedCubeReferences(cube: any, sqlFn: any) {
     const cubeEvaluator = this;
 
-    const cubeReferencesUsed = [];
-    const pathReferencesUsed = [];
+    const cubeReferencesUsed: string[] = [];
+    const pathReferencesUsed: string[][] = [];
 
     const evaluatedSql = cubeEvaluator.resolveSymbolsCall(sqlFn, (name) => {
       const referencedCube = cubeEvaluator.symbols[name] && name || cube;
@@ -400,8 +415,8 @@ export class CubeEvaluator extends CubeSymbols {
       return cubeEvaluator.pathFromArray(path);
     }, {
       // eslint-disable-next-line no-shadow
-      sqlResolveFn: (symbol, cube, n) => {
-        const path = [cube, n];
+      sqlResolveFn: (_symbol: unknown, cubeName: string, memberName: string) => {
+        const path = [cubeName, memberName];
         pathReferencesUsed.push(path);
         return cubeEvaluator.pathFromArray(path);
       },
@@ -411,7 +426,7 @@ export class CubeEvaluator extends CubeSymbols {
     return { cubeReferencesUsed, pathReferencesUsed, evaluatedSql };
   }
 
-  evaluatePreAggregationReferences(cube, aggregation) {
+  protected evaluatePreAggregationReferences(cube, aggregation) {
     const timeDimensions = aggregation.timeDimensionReference ? [{
       dimension: this.evaluateReferences(cube, aggregation.timeDimensionReference),
       granularity: aggregation.granularity

@@ -1,4 +1,5 @@
 import type { BaseQuery } from './BaseQuery';
+import type { DimensionDefinition, SegmentDefinition } from '../compiler/CubeEvaluator';
 
 export class BaseDimension {
   public readonly expression: any;
@@ -68,21 +69,23 @@ export class BaseDimension {
     return this.query.cubeEvaluator.cubeFromPath(this.dimension);
   }
 
-  public dimensionDefinition() {
+  public dimensionDefinition(): DimensionDefinition | SegmentDefinition {
     if (this.query.cubeEvaluator.isSegment(this.dimension)) {
       return this.query.cubeEvaluator.segmentByPath(this.dimension);
     }
+
     return this.query.cubeEvaluator.dimensionByPath(this.dimension);
   }
 
-  public definition() {
+  public definition(): DimensionDefinition | SegmentDefinition {
     if (this.expression) {
       return {
         sql: this.expression,
         // TODO use actual dimension type even though it isn't used right now
         type: 'number'
-      };
+      } as DimensionDefinition;
     }
+
     return this.dimensionDefinition();
   }
 
