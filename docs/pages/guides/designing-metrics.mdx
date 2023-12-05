@@ -85,7 +85,7 @@ Views are exposed as tables in Cube SQL API, dimensions can be queried as is
 
 ## Metrics-first
 In metrics-first approach, views are built around measures, or metrics, in your data model.
-Views are built as denormalzied tables, containing one measure and all the relevant dimensions from different cubes. 
+Views are built as denormalzied tables, containing one measure and all the relevant dimensions from different cubes. These include all the dimensions you would group or filter by, and up to one time dimension.  
 Views are usually named after that single measure.
 
 ```yaml
@@ -115,4 +115,30 @@ SELECT
   MEASURE(average_order_value)
 FROM average_order_value
 GROUP BY 1
+```
+
+NOTE: If a metric is interesting across more than one time dimension, create multiple views (metrics), one with each time dimension, and name the metric distinctly for each.  
+This approach improves compatibility with BI tooling and adds clarity for the consumer.
+
+```yaml
+views:
+  - name: order_count_by_order_date
+
+    cubes:
+      - join_path: orders
+        includes:
+          - order_count
+
+          - status
+          - created_at
+
+  - name: order_count_by_ship_date
+
+    cubes:
+      - join_path: orders
+        includes:
+          - order_count
+
+          - status
+          - shipped_at
 ```
