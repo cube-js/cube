@@ -20218,4 +20218,20 @@ ORDER BY \"COUNT(count)\" DESC"
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn test_cast_string_to_interval() -> Result<(), CubeError> {
+        init_logger();
+
+        insta::assert_snapshot!(
+            "test_cast_string_to_interval",
+            execute_query(
+                "SELECT CAST('3 DAY' AS INTERVAL) AS d3".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
 }
