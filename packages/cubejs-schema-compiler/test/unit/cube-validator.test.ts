@@ -1,7 +1,14 @@
 import { CubeValidator, functionFieldsPatterns } from '../../src/compiler/CubeValidator';
 import { CubeSymbols } from '../../src/compiler/CubeSymbols';
+import { ErrorReporter } from '../../src/compiler/ErrorReporter';
 
 describe('Cube Validation', () => {
+  class ConsoleErrorReporter extends ErrorReporter {
+    public error(message, e) {
+      console.log(message);
+    }
+  }
+
   it('transpiledFieldsPatterns', async () => {
     const transpiledFieldsPatterns = functionFieldsPatterns()
       .filter((p) => p.indexOf('extends') < 0 && p.indexOf('allDefinitions') < 0)
@@ -61,12 +68,7 @@ describe('Cube Validation', () => {
       fileName: 'fileName',
     };
 
-    const validationResult = cubeValidator.validate(cube, {
-      error: (message, e) => {
-        console.log(message);
-      }
-    });
-
+    const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
     expect(validationResult.error).toBeFalsy();
   });
 
@@ -78,11 +80,7 @@ describe('Cube Validation', () => {
       fileName: 'fileName',
     };
 
-    const validationResult = cubeValidator.validate(cube, {
-      error: (message, e) => {
-        console.log(message);
-      }
-    });
+    const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
 
     expect(validationResult.error).toBeFalsy();
   });
@@ -95,12 +93,7 @@ describe('Cube Validation', () => {
       fileName: 'fileName',
     };
 
-    const validationResult = cubeValidator.validate(cube, {
-      error: (message, e) => {
-        console.log(message);
-      }
-    });
-
+    const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
     expect(validationResult.error).toBeFalsy();
   });
 
@@ -118,7 +111,7 @@ describe('Cube Validation', () => {
         console.log(message);
         expect(message).toContain('You must use either sql or sqlTable within a model, but not both');
       }
-    });
+    } as any);
 
     expect(validationResult.error).toBeTruthy();
   });
@@ -136,7 +129,7 @@ describe('Cube Validation', () => {
       error: (message, e) => {
         console.log(message);
       }
-    });
+    } as any);
 
     expect(validationResult.error).toBeFalsy();
   });
@@ -158,7 +151,7 @@ describe('Cube Validation', () => {
         expect(message).toContain('does not match regexp');
         expect(message).toContain('CronParser');
       }
-    });
+    } as any);
 
     expect(validationResult.error).toBeTruthy();
   });
@@ -180,7 +173,7 @@ describe('Cube Validation', () => {
         console.log(message);
         expect(message).toContain('unknown timezone');
       }
-    });
+    } as any);
 
     expect(validationResult.error).toBeTruthy();
   });
@@ -203,7 +196,7 @@ describe('Cube Validation', () => {
         console.log(message);
         expect(message).toContain('must be one of [count, number,');
       }
-    });
+    } as any);
 
     expect(validationResult.error).toBeTruthy();
   });
@@ -227,7 +220,7 @@ describe('Cube Validation', () => {
         console.log(message);
         expect(message).toContain('timeDimension) is required');
       }
-    });
+    } as any);
 
     expect(validationResult.error).toBeTruthy();
   });
@@ -251,7 +244,7 @@ describe('Cube Validation', () => {
         expect(message).toContain('granularity) is required');
         expect(message).toContain('rollups) is required');
       }
-    });
+    } as any);
 
     expect(validationResult.error).toBeTruthy();
   });
@@ -285,7 +278,7 @@ describe('Cube Validation', () => {
         console.log(message);
         expect(message).toContain('granularity) is required');
       }
-    });
+    } as any);
 
     expect(validationResult.error).toBeTruthy();
   });
@@ -310,7 +303,7 @@ describe('Cube Validation', () => {
         console.log(message);
         expect(message).toContain('(preAggregations.eventsByType.scheduledRefresh = true) must be [false]');
       }
-    });
+    } as any);
 
     expect(validationResult.error).toBeTruthy();
   });
@@ -339,7 +332,7 @@ describe('Cube Validation', () => {
         expect(message).toContain('number.sql) is required');
         expect(message).toContain('number.columns) is required');
       }
-    });
+    } as any);
 
     expect(validationResult.error).toBeTruthy();
   });
@@ -374,7 +367,7 @@ describe('Cube Validation', () => {
         expect(message).toContain('must be one of');
         expect(message).not.toContain('rollup) must be');
       }
-    });
+    } as any);
 
     expect(validationResult.error).toBeTruthy();
   });
@@ -397,7 +390,7 @@ describe('Cube Validation', () => {
         console.log(message);
         expect(message).toContain('must be');
       }
-    });
+    } as any);
 
     expect(validationResult.error).toBeTruthy();
   });
@@ -421,7 +414,7 @@ describe('Cube Validation', () => {
         console.log(message);
         expect(message).toContain('are deprecated, please, use');
       }
-    });
+    } as any);
 
     expect(validationResult.error).toBeTruthy();
   });
@@ -445,7 +438,7 @@ describe('Cube Validation', () => {
         // this callback should not be invoked
         expect(true).toBeFalsy();
       }
-    });
+    } as any);
 
     expect(validationResult.error).toBeFalsy();
   });
@@ -512,7 +505,7 @@ describe('Cube Validation', () => {
       error: (message, _e) => {
         console.log(message);
       }
-    });
+    } as any);
 
     expect(validationResult.error).toBeFalsy();
   });
