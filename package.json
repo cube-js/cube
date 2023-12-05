@@ -30,10 +30,7 @@
   "dependencies": {
     "@typescript-eslint/eslint-plugin": "^4.17.0",
     "core-js": "^3.34.0",
-    "lerna": "^4.0.0",
-    "ramda": "^0.27.0",
-    "rollup-plugin-dts": "^1.1.8",
-    "whatwg-fetch": "^3.0.0"
+    "lerna": "^4.0.0"
   },
   "files": [
     "src",
