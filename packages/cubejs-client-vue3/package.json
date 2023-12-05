@@ -78,9 +78,6 @@
     "last 2 versions",
     "not ie <= 8"
   ],
-  "jest": {
-    "testEnvironment": "node"
-  },
   "license": "MIT",
   "publishConfig": {
     "access": "public"
