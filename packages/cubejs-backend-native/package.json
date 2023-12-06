@@ -34,10 +34,10 @@
   ],
   "devDependencies": {
     "@cubejs-backend/linter": "^0.34.25",
-    "@types/jest": "^26",
+    "@types/jest": "^28",
     "@types/node": "^14",
     "cargo-cp-artifact": "^0.1",
-    "jest": "^26",
+    "jest": "^29",
     "mysql2": "^2.3.3",
     "typescript": "~5.2.2"
   },

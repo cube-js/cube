@@ -56,14 +56,17 @@
     "@types/cross-spawn": "^6.0.2",
     "@types/fs-extra": "^9.0.2",
     "@types/inquirer": "^7.3.1",
-    "@types/jest": "^26.0.20",
+    "@types/jest": "^29",
     "@types/jsonwebtoken": "^8.5.0",
     "@types/node": "^14",
     "@types/request-promise": "^4.1.46",
     "@types/semver": "^7.3.4",
     "husky": "^4.2.3",
-    "jest": "^26.6.3",
+    "jest": "^29",
     "typescript": "~5.2.2"
+  },
+  "jest": {
+    "testEnvironment": "node"
   },
   "license": "Apache-2.0",
   "eslintConfig": {
