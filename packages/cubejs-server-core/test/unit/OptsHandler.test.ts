@@ -27,6 +27,11 @@ class CubejsServerCoreExposed extends CubejsServerCore {
   public apiGateway = super.apiGateway;
 
   public reloadEnvVariables = super.reloadEnvVariables;
+
+  public startScheduledRefreshTimer() {
+    // disabling interval
+    return null;
+  }
 }
 
 let message: string;
