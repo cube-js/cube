@@ -53,7 +53,8 @@
     ],
     "coveragePathIgnorePatterns": [
       ".*\\.d\\.ts"
-    ]
+    ],
+    "testEnvironment": "node"
   },
   "resolutions": {
     "es5-ext": "0.10.53",

@@ -16,6 +16,9 @@
     "@cubejs-backend/base-driver": "^0.34.26",
     "mssql": "^6.1.0"
   },
+  "jest": {
+    "testEnvironment": "node"
+  },
   "license": "Apache-2.0",
   "publishConfig": {
     "access": "public"

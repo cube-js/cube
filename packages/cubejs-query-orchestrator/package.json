@@ -18,7 +18,7 @@
     "tsc": "tsc",
     "watch": "tsc -w",
     "test": "npm run unit && npm run integration",
-    "unit": "jest --runInBand --coverage --verbose dist/test/unit",
+    "unit": "jest --runInBand --forceExit --coverage --verbose dist/test/unit",
     "integration": "npm run integration:redis dist/test/integration",
     "integration:redis": "jest --runInBand --verbose dist/test/integration/redis",
     "integration:cubestore": "jest --runInBand --verbose dist/test/integration/cubestore",
@@ -60,6 +60,7 @@
     "extends": "../cubejs-linter"
   },
   "jest": {
+    "testEnvironment": "node",
     "collectCoverage": false,
     "coverageDirectory": "coverage/",
     "collectCoverageFrom": [

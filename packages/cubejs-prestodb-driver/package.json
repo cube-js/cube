@@ -44,6 +44,9 @@
     "testcontainers": "^8.12",
     "typescript": "~5.2.2"
   },
+  "jest": {
+    "testEnvironment": "node"
+  },
   "eslintConfig": {
     "extends": "../cubejs-linter"
   }

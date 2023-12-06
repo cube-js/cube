@@ -90,16 +90,19 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
     afterAll(async () => {
       await awaitProcessing();
       // stdout conflict with console.log
-      await pausePromise(100);
+      // TODO: find out why awaitProcessing doesnt work
+      await pausePromise(1 * 1000);
 
-      if (options?.afterAll) {
-        await options?.afterAll();
+      if (options.redisPool) {
+        await options.redisPool.cleanup();
       }
 
-      await options?.redisPool.cleanup();
+      if (options.afterAll) {
+        await options.afterAll();
+      }
     });
 
-    if (options?.beforeAll) {
+    if (options.beforeAll) {
       beforeAll(async () => {
         await options.beforeAll();
       });

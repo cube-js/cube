@@ -41,6 +41,7 @@
     "extends": "../cubejs-linter"
   },
   "jest": {
+    "testEnvironment": "node",
     "testMatch": [
       "**/__tests__/**/*.js?(x)",
       "**/?(*.)+(spec|test|integration).js?(x)"

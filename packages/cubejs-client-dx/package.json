@@ -36,6 +36,9 @@
     "eslint-plugin-node": "^5.2.1",
     "jest": "^26.0.1"
   },
+  "jest": {
+    "testEnvironment": "node"
+  },
   "publishConfig": {
     "access": "public"
   }
