@@ -1,5 +1,8 @@
-const Joi = require('joi');
-const cronParser = require('cron-parser');
+import Joi from 'joi';
+import cronParser from 'cron-parser';
+
+import type { CubeSymbols } from './CubeSymbols';
+import type { ErrorReporter } from './ErrorReporter';
 
 /* *****************************
  * ATTENTION:
@@ -29,11 +32,21 @@ const identifierRegex = /^[_a-zA-Z][_a-zA-Z0-9]*$/;
 
 const identifier = Joi.string().regex(identifierRegex, 'identifier');
 
+function formatStatePath(state: Joi.State): string {
+  if (state.path) {
+    // TODO: Remove cast after upgrade of Joi. It show it as string, while it's array
+    const path = state.path as any as string[];
+    return path.join('.');
+  }
+
+  return '<unknown path>';
+}
+
 const regexTimeInterval = Joi.string().custom((value, helper) => {
   if (value.match(/^(-?\d+) (minute|hour|day|week|month|quarter|year)$/)) {
     return value;
   } else {
-    return helper.message({ custom: `(${helper.state.path.join('.')} = ${value}) does not match regexp: /^(-?\\d+) (minute|hour|day|week|month|quarter|year)$/` });
+    return helper.message({ custom: `(${formatStatePath(helper.state)} = ${value}) does not match regexp: /^(-?\\d+) (minute|hour|day|week|month|quarter|year)$/` });
   }
 });
 
@@ -47,7 +60,7 @@ const everyInterval = Joi.string().custom((value, helper) => {
   if (value.match(/^(\d+) (second|minute|hour|day|week)s?$/)) {
     return value;
   } else {
-    return helper.message({ custom: `(${helper.state.path.join('.')} = ${value}) does not match regexp: /^(\\d+) (second|minute|hour|day|week)s?$/` });
+    return helper.message({ custom: `(${formatStatePath(helper.state)} = ${value}) does not match regexp: /^(\\d+) (second|minute|hour|day|week)s?$/` });
   }
 });
 
@@ -55,8 +68,8 @@ const everyCronInterval = Joi.string().custom((value, helper) => {
   try {
     cronParser.parseExpression(value);
     return value;
-  } catch (e) {
-    return helper.message({ custom: `(${helper.state.path.join('.')} = ${value}) CronParser: ${e.toString()}` });
+  } catch (e: any) {
+    return helper.message({ custom: `(${formatStatePath(helper.state)} = ${value}) CronParser: ${e.toString()}` });
   }
 });
 
@@ -65,7 +78,7 @@ const everyCronTimeZone = Joi.string().custom((value, helper) => {
     cronParser.parseExpression('0 * * * *', { currentDate: '2020-01-01 00:00:01', tz: value });
     return value;
   } catch (e) {
-    return helper.message({ custom: `(${helper.state.path.join('.')} = ${value}) unknown timezone. Take a look here https://cube.dev/docs/schema/reference/cube#supported-timezones to get available time zones` });
+    return helper.message({ custom: `(${formatStatePath(helper.state)} = ${value}) unknown timezone. Take a look here https://cube.dev/docs/schema/reference/cube#supported-timezones to get available time zones` });
   }
 });
 
@@ -614,25 +627,27 @@ function collectFunctionFieldsPatterns(patterns, path, o) {
   }
 }
 
-export function functionFieldsPatterns() {
-  const functionPatterns = new Set();
+export function functionFieldsPatterns(): string[] {
+  const functionPatterns = new Set<string>();
   collectFunctionFieldsPatterns(functionPatterns, '', { ...cubeSchema, ...viewSchema });
   return Array.from(functionPatterns);
 }
 
 export class CubeValidator {
-  constructor(cubeSymbols) {
-    this.cubeSymbols = cubeSymbols;
-    this.validCubes = {};
+  protected readonly validCubes: Map<string, boolean> = new Map();
+
+  public constructor(
+    protected readonly cubeSymbols: CubeSymbols
+  ) {
   }
 
-  compile(cubes, errorReporter) {
+  public compile(cubes, errorReporter: ErrorReporter) {
     return this.cubeSymbols.cubeList.map(
       (v) => this.validate(this.cubeSymbols.getCubeDefinition(v.name), errorReporter.inContext(`${v.name} cube`))
     );
   }
 
-  validate(cube, errorReporter) {
+  public validate(cube, errorReporter: ErrorReporter) {
     const result = cube.isView ? viewSchema.validate(cube) : cubeSchema.validate(cube);
 
     if (result.error != null) {
@@ -644,7 +659,7 @@ export class CubeValidator {
     return result;
   }
 
-  isCubeValid(cube) {
+  public isCubeValid(cube) {
     return this.validCubes[cube.name] || cube.isSplitView;
   }
 }

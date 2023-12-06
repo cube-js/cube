@@ -3,6 +3,11 @@ import R from 'ramda';
 import { UserError } from '../compiler/UserError';
 
 export class PreAggregations {
+  /**
+   * @param {import('../adapter/BaseQuery').BaseQuery} query
+   * @param historyQueries
+   * @param cubeLatticeCache
+   */
   constructor(query, historyQueries, cubeLatticeCache) {
     this.query = query;
     this.historyQueries = historyQueries;

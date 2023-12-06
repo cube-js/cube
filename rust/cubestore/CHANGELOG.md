@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.30](https://github.com/cube-js/cube.js/compare/v0.34.29...v0.34.30) (2023-12-04)
+
+
+### Bug Fixes
+
+* **cubestore:** InplaceAggregate for boolean columns ([#7432](https://github.com/cube-js/cube.js/issues/7432)) ([a6d3579](https://github.com/cube-js/cube.js/commit/a6d3579c6930763edc0f72eabdb7892b8675a5c5))
+
+
+
+
+
 ## [0.34.26](https://github.com/cube-js/cube/compare/v0.34.25...v0.34.26) (2023-11-28)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore

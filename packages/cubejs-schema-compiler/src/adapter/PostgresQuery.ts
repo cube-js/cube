@@ -1,6 +1,5 @@
 import { BaseQuery } from './BaseQuery';
 import { ParamAllocator } from './ParamAllocator';
-import { UserError } from '../compiler/UserError';
 
 const GRANULARITY_TO_INTERVAL = {
   day: 'day',
