@@ -71,7 +71,7 @@
     "@types/semver": "^7.3.4",
     "@types/ws": "^7.2.9",
     "@types/yarnpkg__lockfile": "^1.1.4",
-    "jest": "^26.0.0",
+    "jest": "^27",
     "typescript": "~5.2.2"
   },
   "license": "Apache-2.0",

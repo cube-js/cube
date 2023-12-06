@@ -34,10 +34,10 @@
   },
   "devDependencies": {
     "@cubejs-backend/linter": "^0.34.25",
-    "@types/jest": "^26.0.15",
+    "@types/jest": "^27",
     "@types/node": "^14",
     "@types/ramda": "^0.27.32",
-    "jest": "^26.6.3",
+    "jest": "^27",
     "typescript": "~5.2.2"
   },
   "license": "Apache-2.0",

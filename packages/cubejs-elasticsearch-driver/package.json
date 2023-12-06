@@ -31,8 +31,8 @@
   "license": "Apache-2.0",
   "devDependencies": {
     "@cubejs-backend/linter": "^0.34.25",
-    "@types/jest": "^26.0.20",
-    "jest": "^26.6.3",
+    "@types/jest": "^27",
+    "jest": "^27",
     "testcontainers": "^8.12"
   },
   "eslintConfig": {
