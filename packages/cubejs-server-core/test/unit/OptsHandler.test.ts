@@ -1152,9 +1152,7 @@ describe('OptsHandler class', () => {
     });
 
     const gateway = <any>core.apiGateway();
-    expect(async () => {
-      await gateway.contextToApiScopesFn();
-    }).rejects.toThrow(
+    await expect(async () => gateway.contextToApiScopesFn()).rejects.toThrow(
       'A user-defined contextToApiScopes function returns an inconsistent type.'
     );
   });
@@ -1185,9 +1183,7 @@ describe('OptsHandler class', () => {
     });
 
     const gateway = <any>core.apiGateway();
-    expect(async () => {
-      await gateway.contextToApiScopesFn();
-    }).rejects.toThrow(
+    await expect(async () => gateway.contextToApiScopesFn()).rejects.toThrow(
       'A user-defined contextToApiScopes function returns a wrong scope: job'
     );
   });
