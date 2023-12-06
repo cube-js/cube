@@ -4,7 +4,13 @@ import { afterAll, beforeAll, jest } from '@jest/globals';
 import { StartedTestContainer } from 'testcontainers';
 import { CrateDBRunner } from '@cubejs-backend/testing-shared';
 import { BirdBox, getBirdbox } from '../src';
-import { DEFAULT_API_TOKEN, DEFAULT_CONFIG, testQueryMeasure } from './smoke-tests';
+import {
+  DEFAULT_API_TOKEN,
+  DEFAULT_CONFIG,
+  JEST_AFTER_ALL_DEFAULT_TIMEOUT,
+  JEST_BEFORE_ALL_DEFAULT_TIMEOUT,
+  testQueryMeasure,
+} from './smoke-tests';
 
 describe('crate', () => {
   jest.setTimeout(60 * 5 * 1000);
@@ -33,12 +39,12 @@ describe('crate', () => {
     client = cubejs(async () => DEFAULT_API_TOKEN, {
       apiUrl: birdbox.configuration.apiUrl,
     });
-  });
+  }, JEST_BEFORE_ALL_DEFAULT_TIMEOUT);
 
   afterAll(async () => {
     await birdbox.stop();
     await db.stop();
-  });
+  }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
 
   test('query measure', () => testQueryMeasure(client));
 });
