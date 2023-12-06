@@ -481,7 +481,7 @@ describe('index.test', () => {
       [
         'Cube Store is not supported on your system',
         {
-          warning: 'You are using MockOS platform with x64 architecture, which is not supported by Cube Store.'
+          warning: `You are using MockOS platform with ${process.arch} architecture, which is not supported by Cube Store.`
         }
       ]
     ]);
