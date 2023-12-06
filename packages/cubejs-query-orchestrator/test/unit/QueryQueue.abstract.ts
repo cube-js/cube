@@ -91,7 +91,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
       await awaitProcessing();
       // stdout conflict with console.log
       // TODO: find out why awaitProcessing doesnt work
-      await pausePromise(2 * 1000);
+      await pausePromise(1 * 1000);
 
       if (options.redisPool) {
         await options.redisPool.cleanup();
