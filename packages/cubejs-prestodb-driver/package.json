@@ -39,10 +39,13 @@
   },
   "devDependencies": {
     "@cubejs-backend/linter": "^0.34.25",
-    "jest": "^26.6.3",
+    "jest": "^29",
     "should": "^13.2.3",
     "testcontainers": "^8.12",
     "typescript": "~5.2.2"
+  },
+  "jest": {
+    "testEnvironment": "node"
   },
   "eslintConfig": {
     "extends": "../cubejs-linter"
