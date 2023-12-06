@@ -71,10 +71,9 @@ describe('SQL API', () => {
   }, JEST_BEFORE_ALL_DEFAULT_TIMEOUT);
 
   afterAll(async () => {
+    await connection.end();
     await birdbox.stop();
     await db.stop();
-    // await not working properly
-    await connection.end();
   }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
 
   describe('Postgres (Auth)', () => {
