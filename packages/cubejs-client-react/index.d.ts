@@ -40,7 +40,7 @@ declare module '@cubejs-client/react' {
   
   type CubeProviderProps = {
     cubejsApi?: CubejsApi | null;
-    cubeApi: CubejsApi | null;
+    cubeApi?: CubejsApi | null;
     options?: CubeProviderOptions;
     children: React.ReactNode;
   };
@@ -75,7 +75,7 @@ declare module '@cubejs-client/react' {
 
   type CubeContextProps = {
     cubejsApi?: CubejsApi;
-    cubeApi: CubejsApi;
+    cubeApi?: CubejsApi;
     options?: CubeProviderOptions;
   };
 
