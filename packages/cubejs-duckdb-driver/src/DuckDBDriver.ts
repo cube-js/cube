@@ -1,3 +1,4 @@
+/* eslint-disable linebreak-style */
 import {
   BaseDriver,
   DriverInterface,
@@ -112,6 +113,18 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
         key: 'schema',
         value: getEnv('duckdbSchema', this.config),
       },
+      {
+        key: 's3_use_ssl',
+        value: getEnv('duckdbs3usessl', this.config)
+      },
+      {
+        key: 's3_url_style',
+        value: getEnv('duckdbs3urlstyle', this.config)
+      },
+      {
+        key: 's3_session_token',
+        value: getEnv('duckdbs3sessiontoken', this.config)
+      }
     ];
     
     for (const { key, value } of configuration) {
