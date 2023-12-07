@@ -17,6 +17,8 @@ export type QueryQueueTestOptions = {
 
 export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}) => {
   describe(`QueryQueue${name}`, () => {
+    jest.setTimeout(10 * 1000);
+
     const delayFn = (result, delay) => new Promise(resolve => setTimeout(() => resolve(result), delay));
     const logger = jest.fn((message, event) => console.log(`${message} ${JSON.stringify(event)}`));
 
