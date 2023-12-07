@@ -30,11 +30,11 @@
   },
   "devDependencies": {
     "@cubejs-backend/linter": "^0.34.25",
-    "@jest/globals": "^26.6.2",
+    "@jest/globals": "^27",
     "@types/dedent": "^0.7.0",
-    "@types/jest": "^26.0.22",
+    "@types/jest": "^27",
     "@types/node": "^14",
-    "jest": "^26.6.3",
+    "jest": "^27",
     "typescript": "~5.2.2"
   },
   "jest": {

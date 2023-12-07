@@ -5,7 +5,12 @@ import { afterAll, beforeAll, expect, jest } from '@jest/globals';
 import cubejs, { CubejsApi, Query } from '@cubejs-client/core';
 import { PostgresDBRunner } from '@cubejs-backend/testing-shared';
 import { BirdBox, getBirdbox } from '../src';
-import { DEFAULT_API_TOKEN, DEFAULT_CONFIG } from './smoke-tests';
+import {
+  DEFAULT_API_TOKEN,
+  DEFAULT_CONFIG,
+  JEST_AFTER_ALL_DEFAULT_TIMEOUT,
+  JEST_BEFORE_ALL_DEFAULT_TIMEOUT,
+} from './smoke-tests';
 
 describe('postgres pa', () => {
   jest.setTimeout(60 * 5 * 1000);
@@ -35,12 +40,12 @@ describe('postgres pa', () => {
     client = cubejs(async () => DEFAULT_API_TOKEN, {
       apiUrl: birdbox.configuration.apiUrl,
     });
-  });
+  }, JEST_BEFORE_ALL_DEFAULT_TIMEOUT);
 
   afterAll(async () => {
     await birdbox.stop();
     await db.stop();
-  });
+  }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
 
   test('basic pa', async () => {
     const query: Query = {

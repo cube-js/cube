@@ -17,6 +17,9 @@ export const DEFAULT_API_TOKEN = sign({}, DEFAULT_CONFIG.CUBEJS_API_SECRET, {
   expiresIn: '2 days'
 });
 
+export const JEST_BEFORE_ALL_DEFAULT_TIMEOUT = 2 * 60 * 1000;
+export const JEST_AFTER_ALL_DEFAULT_TIMEOUT = 60 * 1000;
+
 export async function testQueryMeasure(client: CubejsApi) {
   const response = await client.load({
     measures: [

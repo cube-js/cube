@@ -39,7 +39,7 @@
     "@vue/cli-plugin-unit-jest": "^5",
     "@vue/cli-service": "^5",
     "@vue/test-utils": "^1.3",
-    "@vue/vue2-jest": "^26",
+    "@vue/vue2-jest": "^27",
     "eslint": "^7.21.0",
     "eslint-plugin-vue": "^6.2.1",
     "vue": "^2.7",

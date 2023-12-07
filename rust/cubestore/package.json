@@ -28,9 +28,9 @@
   "license": "Apache-2.0",
   "devDependencies": {
     "@cubejs-backend/linter": "^0.34.25",
-    "@types/jest": "^26.0.22",
+    "@types/jest": "^27",
     "@types/node": "^12",
-    "jest": "^26.6.3",
+    "jest": "^27",
     "typescript": "~5.2.2"
   },
   "publishConfig": {
