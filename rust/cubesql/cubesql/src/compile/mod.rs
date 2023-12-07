@@ -19291,13 +19291,13 @@ ORDER BY \"COUNT(count)\" DESC"
         )
             .await;
 
-        // let logical_plan = query_plan.as_logical_plan();
-        // assert!(logical_plan
-        //     .find_cube_scan_wrapper()
-        //     .wrapped_sql
-        //     .unwrap()
-        //     .sql
-        //     .contains("COALESCE"));
+        let logical_plan = query_plan.as_logical_plan();
+        assert!(logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql
+            .contains("CURRENT_DATE()"));
 
         let physical_plan = query_plan.as_physical_plan().await.unwrap();
         println!(
