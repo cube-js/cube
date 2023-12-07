@@ -4,5 +4,6 @@ module.exports = {
   "custom-domains": "Custom domains",
   "deployment-types": "Deployment types",
   "pricing": "Pricing",
+  "support": "Support",
   "limits": "Limits"
 }
