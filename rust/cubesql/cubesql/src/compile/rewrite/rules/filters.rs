@@ -6,12 +6,12 @@ use crate::{
             analysis::{ConstantFolding, LogicalPlanAnalysis},
             between_expr, binary_expr, case_expr, case_expr_var_arg, cast_expr, change_user_member,
             column_expr, cube_scan, cube_scan_filters, cube_scan_filters_empty_tail,
-            cube_scan_members, dimension_expr, expr_column_name, filter,
-            filter_cast_unwrap_replacer, filter_member, filter_op, filter_op_filters,
-            filter_op_filters_empty_tail, filter_replacer, fun_expr, fun_expr_var_arg, inlist_expr,
-            is_not_null_expr, is_null_expr, like_expr, limit, list_expr, literal_bool,
-            literal_expr, literal_int, literal_string, measure_expr, member_name_by_alias,
-            negative_expr, not_expr, projection, rewrite,
+            cube_scan_members, dimension_expr, expr_column_name, filter, filter_member, filter_op,
+            filter_op_filters, filter_op_filters_empty_tail, filter_replacer,
+            filter_simplify_replacer, fun_expr, fun_expr_var_arg, inlist_expr, is_not_null_expr,
+            is_null_expr, like_expr, limit, list_expr, literal_bool, literal_expr, literal_int,
+            literal_string, measure_expr, member_name_by_alias, negative_expr, not_expr,
+            projection, rewrite,
             rewriter::RewriteRules,
             scalar_fun_expr_args, scalar_fun_expr_args_empty_tail, segment_member,
             time_dimension_date_range_replacer, time_dimension_expr, transforming_chain_rewrite,
@@ -78,7 +78,7 @@ impl RewriteRules for FilterRules {
                     cube_scan_filters(
                         "?filters",
                         filter_replacer(
-                            filter_cast_unwrap_replacer("?expr"),
+                            filter_simplify_replacer("?expr"),
                             "?filter_alias_to_cube",
                             "?members",
                             "?filter_aliases",
@@ -283,7 +283,7 @@ impl RewriteRules for FilterRules {
             transforming_rewrite(
                 "filter-replacer",
                 filter_replacer(
-                    binary_expr(column_expr("?column"), "?op", literal_expr("?literal")),
+                    binary_expr(column_expr("?column"), "?op", "?constant"),
                     "?alias_to_cube",
                     "?members",
                     "?filter_aliases",
@@ -292,7 +292,7 @@ impl RewriteRules for FilterRules {
                 self.transform_filter(
                     "?column",
                     "?op",
-                    "?literal",
+                    "?constant",
                     "?alias_to_cube",
                     "?members",
                     "?filter_member",
@@ -1635,7 +1635,7 @@ impl RewriteRules for FilterRules {
                             vec!["?expr".to_string(), literal_expr("?interval")],
                         ),
                         "?op",
-                        literal_expr("?date"),
+                        "?date",
                     ),
                     "?alias_to_cube",
                     "?members",
@@ -1648,7 +1648,7 @@ impl RewriteRules for FilterRules {
                         udf_expr(
                             "date_add",
                             vec![
-                                udf_expr("date_to_timestamp", vec![literal_expr("?date")]),
+                                udf_expr("date_to_timestamp", vec!["?date".to_string()]),
                                 negative_expr(literal_expr("?interval")),
                             ],
                         ),
@@ -2009,24 +2009,45 @@ impl RewriteRules for FilterRules {
                 "?expr".to_string(),
             ),
             // Every expression should be handled by filter cast unwrap replacer otherwise other rules just won't work
+            // Simplify rules
             transforming_rewrite(
-                "filter-cast-unwrap",
-                filter_cast_unwrap_replacer(cast_expr("?expr", "?data_type")),
-                filter_cast_unwrap_replacer("?expr"),
-                self.transform_filter_cast_unwrap("?expr", "?data_type"),
+                "filter-simplify-cast-unwrap",
+                filter_simplify_replacer(cast_expr("?expr", "?data_type")),
+                // TODO alias to make it equivalent transformation
+                filter_simplify_replacer("?expr"),
+                self.transform_filter_cast_unwrap("?expr", "?data_type", false),
+            ),
+            transforming_rewrite(
+                "filter-simplify-cast-push-down",
+                filter_simplify_replacer(cast_expr("?expr", "?data_type")),
+                cast_expr(filter_simplify_replacer("?expr"), "?data_type"),
+                self.transform_filter_cast_unwrap("?expr", "?data_type", true),
             ),
             rewrite(
-                "filter-cast-unwrap-binary-push-down",
-                filter_cast_unwrap_replacer(binary_expr("?left", "?op", "?right")),
+                "filter-simplify-now",
+                filter_simplify_replacer(fun_expr("Now", Vec::<String>::new())),
+                // TODO alias to make it equivalent transformation
+                udf_expr("eval_now", Vec::<String>::new()),
+            ),
+            rewrite(
+                "filter-simplify-current-date",
+                filter_simplify_replacer(fun_expr("CurrentDate", Vec::<String>::new())),
+                // TODO alias to make it equivalent transformation
+                udf_expr("eval_current_date", Vec::<String>::new()),
+            ),
+            // Binary expr
+            rewrite(
+                "filter-simplify-binary-push-down",
+                filter_simplify_replacer(binary_expr("?left", "?op", "?right")),
                 binary_expr(
-                    filter_cast_unwrap_replacer("?left"),
+                    filter_simplify_replacer("?left"),
                     "?op",
-                    filter_cast_unwrap_replacer("?right"),
+                    filter_simplify_replacer("?right"),
                 ),
             ),
             rewrite(
-                "filter-cast-unwrap-like-push-down",
-                filter_cast_unwrap_replacer(like_expr(
+                "filter-simplify-like-push-down",
+                filter_simplify_replacer(like_expr(
                     "?like_type",
                     "?negated",
                     "?expr",
@@ -2036,106 +2057,106 @@ impl RewriteRules for FilterRules {
                 like_expr(
                     "?like_type",
                     "?negated",
-                    filter_cast_unwrap_replacer("?expr"),
-                    filter_cast_unwrap_replacer("?pattern"),
+                    filter_simplify_replacer("?expr"),
+                    filter_simplify_replacer("?pattern"),
                     "?escape_char",
                 ),
             ),
             rewrite(
-                "filter-cast-unwrap-not-push-down",
-                filter_cast_unwrap_replacer(not_expr("?expr")),
-                not_expr(filter_cast_unwrap_replacer("?expr")),
+                "filter-simplify-not-push-down",
+                filter_simplify_replacer(not_expr("?expr")),
+                not_expr(filter_simplify_replacer("?expr")),
             ),
             rewrite(
-                "filter-cast-unwrap-inlist-push-down",
-                filter_cast_unwrap_replacer(inlist_expr("?expr", "?list", "?negated")),
+                "filter-simplify-inlist-push-down",
+                filter_simplify_replacer(inlist_expr("?expr", "?list", "?negated")),
                 // TODO unwrap list as well
-                inlist_expr(filter_cast_unwrap_replacer("?expr"), "?list", "?negated"),
+                inlist_expr(filter_simplify_replacer("?expr"), "?list", "?negated"),
             ),
             rewrite(
-                "filter-cast-unwrap-is-null-push-down",
-                filter_cast_unwrap_replacer(is_null_expr("?expr")),
-                is_null_expr(filter_cast_unwrap_replacer("?expr")),
+                "filter-simplify-is-null-push-down",
+                filter_simplify_replacer(is_null_expr("?expr")),
+                is_null_expr(filter_simplify_replacer("?expr")),
             ),
             rewrite(
-                "filter-cast-unwrap-is-not-null-push-down",
-                filter_cast_unwrap_replacer(is_not_null_expr("?expr")),
-                is_not_null_expr(filter_cast_unwrap_replacer("?expr")),
+                "filter-simplify-is-not-null-push-down",
+                filter_simplify_replacer(is_not_null_expr("?expr")),
+                is_not_null_expr(filter_simplify_replacer("?expr")),
             ),
             rewrite(
-                "filter-cast-unwrap-literal-push-down",
-                filter_cast_unwrap_replacer(literal_expr("?literal")),
+                "filter-simplify-literal-push-down",
+                filter_simplify_replacer(literal_expr("?literal")),
                 literal_expr("?literal"),
             ),
             rewrite(
-                "filter-cast-unwrap-column-push-down",
-                filter_cast_unwrap_replacer(column_expr("?column")),
+                "filter-simplify-column-push-down",
+                filter_simplify_replacer(column_expr("?column")),
                 column_expr("?column"),
             ),
             // scalar
             rewrite(
-                "filter-cast-unwrap-scalar-fun-push-down",
-                filter_cast_unwrap_replacer(fun_expr_var_arg("?fun", "?args")),
-                fun_expr_var_arg("?fun", filter_cast_unwrap_replacer("?args")),
+                "filter-simplify-scalar-fun-push-down",
+                filter_simplify_replacer(fun_expr_var_arg("?fun", "?args")),
+                fun_expr_var_arg("?fun", filter_simplify_replacer("?args")),
             ),
             rewrite(
-                "filter-cast-unwrap-scalar-args-push-down",
-                filter_cast_unwrap_replacer(scalar_fun_expr_args("?left", "?right")),
+                "filter-simplify-scalar-args-push-down",
+                filter_simplify_replacer(scalar_fun_expr_args("?left", "?right")),
                 scalar_fun_expr_args(
-                    filter_cast_unwrap_replacer("?left"),
-                    filter_cast_unwrap_replacer("?right"),
+                    filter_simplify_replacer("?left"),
+                    filter_simplify_replacer("?right"),
                 ),
             ),
             rewrite(
-                "filter-cast-unwrap-scalar-args-empty-tail-push-down",
-                filter_cast_unwrap_replacer(scalar_fun_expr_args_empty_tail()),
+                "filter-simplify-scalar-args-empty-tail-push-down",
+                filter_simplify_replacer(scalar_fun_expr_args_empty_tail()),
                 scalar_fun_expr_args_empty_tail(),
             ),
             // udf
             rewrite(
-                "filter-cast-unwrap-udf-fun-push-down",
-                filter_cast_unwrap_replacer(udf_expr_var_arg("?fun", "?args")),
-                udf_expr_var_arg("?fun", filter_cast_unwrap_replacer("?args")),
+                "filter-simplify-udf-fun-push-down",
+                filter_simplify_replacer(udf_expr_var_arg("?fun", "?args")),
+                udf_expr_var_arg("?fun", filter_simplify_replacer("?args")),
             ),
             rewrite(
-                "filter-cast-unwrap-udf-args-push-down",
-                filter_cast_unwrap_replacer(udf_fun_expr_args("?left", "?right")),
+                "filter-simplify-udf-args-push-down",
+                filter_simplify_replacer(udf_fun_expr_args("?left", "?right")),
                 udf_fun_expr_args(
-                    filter_cast_unwrap_replacer("?left"),
-                    filter_cast_unwrap_replacer("?right"),
+                    filter_simplify_replacer("?left"),
+                    filter_simplify_replacer("?right"),
                 ),
             ),
             rewrite(
-                "filter-cast-unwrap-udf-args-empty-tail-push-down",
-                filter_cast_unwrap_replacer(udf_fun_expr_args_empty_tail()),
+                "filter-simplify-udf-args-empty-tail-push-down",
+                filter_simplify_replacer(udf_fun_expr_args_empty_tail()),
                 udf_fun_expr_args_empty_tail(),
             ),
             // case
             rewrite(
-                "filter-cast-unwrap-case-push-down",
-                filter_cast_unwrap_replacer(case_expr_var_arg("?expr", "?when_then", "?else")),
+                "filter-simplify-case-push-down",
+                filter_simplify_replacer(case_expr_var_arg("?expr", "?when_then", "?else")),
                 case_expr_var_arg(
-                    filter_cast_unwrap_replacer("?expr"),
-                    filter_cast_unwrap_replacer("?when_then"),
-                    filter_cast_unwrap_replacer("?else"),
+                    filter_simplify_replacer("?expr"),
+                    filter_simplify_replacer("?when_then"),
+                    filter_simplify_replacer("?else"),
                 ),
             ),
             rewrite(
-                "filter-cast-unwrap-between-push-down",
-                filter_cast_unwrap_replacer(between_expr("?expr", "?negated", "?low", "?high")),
+                "filter-simplify-between-push-down",
+                filter_simplify_replacer(between_expr("?expr", "?negated", "?low", "?high")),
                 between_expr(
                     "?expr",
                     "?negated",
-                    filter_cast_unwrap_replacer("?low"),
-                    filter_cast_unwrap_replacer("?high"),
+                    filter_simplify_replacer("?low"),
+                    filter_simplify_replacer("?high"),
                 ),
             ),
-            filter_unwrap_cast_push_down("CaseExprExpr"),
-            filter_unwrap_cast_push_down_tail("CaseExprExpr"),
-            filter_unwrap_cast_push_down("CaseExprWhenThenExpr"),
-            filter_unwrap_cast_push_down_tail("CaseExprWhenThenExpr"),
-            filter_unwrap_cast_push_down("CaseExprElseExpr"),
-            filter_unwrap_cast_push_down_tail("CaseExprElseExpr"),
+            filter_simplify_push_down("CaseExprExpr"),
+            filter_simplify_push_down_tail("CaseExprExpr"),
+            filter_simplify_push_down("CaseExprWhenThenExpr"),
+            filter_simplify_push_down_tail("CaseExprWhenThenExpr"),
+            filter_simplify_push_down("CaseExprElseExpr"),
+            filter_simplify_push_down_tail("CaseExprElseExpr"),
             rewrite(
                 "filter-flatten-upper-and-left",
                 cube_scan_filters(
@@ -2611,7 +2632,7 @@ impl FilterRules {
         &self,
         column_var: &'static str,
         op_var: &'static str,
-        literal_var: &'static str,
+        constant_var: &'static str,
         alias_to_cube_var: &'static str,
         members_var: &'static str,
         filter_member_var: &'static str,
@@ -2621,7 +2642,7 @@ impl FilterRules {
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
         let column_var = column_var.parse().unwrap();
         let op_var = op_var.parse().unwrap();
-        let literal_var = literal_var.parse().unwrap();
+        let constant_var = var!(constant_var);
         let alias_to_cube_var = var!(alias_to_cube_var);
         let members_var = var!(members_var);
         let filter_member_var = filter_member_var.parse().unwrap();
@@ -2631,7 +2652,9 @@ impl FilterRules {
         let meta_context = self.cube_context.meta.clone();
         move |egraph, subst| {
             for expr_op in var_iter!(egraph[subst[op_var]], BinaryExprOp) {
-                for literal in var_iter!(egraph[subst[literal_var]], LiteralExprValue) {
+                if let Some(ConstantFolding::Scalar(literal)) =
+                    &egraph[subst[constant_var]].data.constant
+                {
                     for aliases in
                         var_iter!(egraph[subst[filter_aliases_var]], FilterReplacerAliases)
                     {
@@ -4243,6 +4266,7 @@ impl FilterRules {
         &self,
         expr_var: &'static str,
         data_type_var: &'static str,
+        negative: bool,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
         let expr_var = var!(expr_var);
         let data_type_var = var!(data_type_var);
@@ -4253,10 +4277,12 @@ impl FilterRules {
                     return match data_type {
                         // Exclude casts to string for timestamps
                         DataType::Timestamp(_, _) => match expr {
-                            Expr::Literal(ScalarValue::Utf8(_)) => false,
-                            _ => true,
+                            Expr::Literal(ScalarValue::Utf8(_)) => negative,
+                            _ => !negative,
                         },
-                        _ => true,
+                        // Exclude casts to date as those truncate precision and change filter behavior
+                        DataType::Date32 | DataType::Date64 => negative,
+                        _ => !negative,
                     };
                 }
             }
@@ -4356,27 +4382,27 @@ impl FilterRules {
     }
 }
 
-fn filter_unwrap_cast_push_down(
+fn filter_simplify_push_down(
     node_type: impl Display,
 ) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis> {
     rewrite(
-        &format!("filter-cast-unwrap-{}-push-down", node_type),
-        filter_cast_unwrap_replacer(format!("({} ?left ?right)", node_type)),
+        &format!("filter-simplify-{}-push-down", node_type),
+        filter_simplify_replacer(format!("({} ?left ?right)", node_type)),
         format!(
             "({} {} {})",
             node_type,
-            filter_cast_unwrap_replacer("?left"),
-            filter_cast_unwrap_replacer("?right")
+            filter_simplify_replacer("?left"),
+            filter_simplify_replacer("?right")
         ),
     )
 }
 
-fn filter_unwrap_cast_push_down_tail(
+fn filter_simplify_push_down_tail(
     node_type: impl Display,
 ) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis> {
     rewrite(
-        &format!("filter-cast-unwrap-{}-empty-tail-push-down", node_type),
-        filter_cast_unwrap_replacer(node_type.to_string()),
+        &format!("filter-simplify-{}-empty-tail-push-down", node_type),
+        filter_simplify_replacer(node_type.to_string()),
         node_type.to_string(),
     )
 }

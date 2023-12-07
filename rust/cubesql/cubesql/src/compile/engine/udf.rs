@@ -4787,5 +4787,15 @@ pub fn register_fun_stubs(mut ctx: SessionContext) -> SessionContext {
         rettyp = Utf8
     );
 
+    register_fun_stub!(
+        udf,
+        "eval_current_date",
+        argc = 0,
+        rettyp = Date32,
+        vol = Stable
+    );
+
+    register_fun_stub!(udf, "eval_now", argc = 0, rettyp = Timestamp, vol = Stable);
+
     ctx
 }
