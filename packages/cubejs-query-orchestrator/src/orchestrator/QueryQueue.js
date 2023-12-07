@@ -310,22 +310,32 @@ export class QueryQueue {
       if (queryHandler === 'stream') {
         const self = this;
         result = await new Promise((resolve) => {
+          let timeoutTimerId = null;
+
           const onStreamStarted = (streamStartedHash) => {
             if (streamStartedHash === queryKeyHash) {
+              if (timeoutTimerId) {
+                clearTimeout(timeoutTimerId);
+              }
+
               resolve(self.getQueryStream(queryKeyHash));
             }
           };
 
-          setTimeout(() => {
-            self.streamEvents.removeListener('streamStarted', onStreamStarted);
-            resolve(null);
-          }, this.continueWaitTimeout * 1000);
-
           self.streamEvents.addListener('streamStarted', onStreamStarted);
-          const stream = this.getQueryStream(this.redisHash(queryKey));
+
+          const stream = this.getQueryStream(queryKeyHash);
           if (stream) {
             self.streamEvents.removeListener('streamStarted', onStreamStarted);
             resolve(stream);
+          } else {
+            timeoutTimerId = setTimeout(
+              () => {
+                self.streamEvents.removeListener('streamStarted', onStreamStarted);
+                resolve(null);
+              },
+              this.continueWaitTimeout * 10000
+            );
           }
         });
       } else {

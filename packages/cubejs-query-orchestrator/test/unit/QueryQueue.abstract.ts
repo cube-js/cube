@@ -155,7 +155,8 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
     test('timeout', async () => {
       const query = ['select * from 3'];
 
-      await queue.executeInQueue('delay', query, { delay: 60 * 60 * 1000, result: '1', isJob: true });
+      // executionTimeout is 2s, 5s is enough
+      await queue.executeInQueue('delay', query, { delay: 5 * 1000, result: '1', isJob: true });
       await awaitProcessing();
 
       expect(logger.mock.calls.length).toEqual(5);
@@ -324,8 +325,14 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
     test('stream handler', async () => {
       const key: QueryKey = ['select * from table', []];
       key.persistent = true;
-      await queue.executeInQueue('stream', key, { aliasNameToMember: {} }, 0);
+      const stream = await queue.executeInQueue('stream', key, { aliasNameToMember: {} }, 0);
       await awaitProcessing();
+
+      // QueryStream has a debounce timer to destroy stream
+      // without reading it, timer will block exit for jest
+      for await (const chunk of stream) {
+        console.log('streaming chunk: ', chunk);
+      }
 
       expect(streamCount).toEqual(1);
       expect(logger.mock.calls[logger.mock.calls.length - 1][0]).toEqual('Performing query completed');
