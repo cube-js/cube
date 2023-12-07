@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/vue3",
-  "version": "0.34.27",
+  "version": "0.34.31",
   "engines": {},
   "repository": {
     "type": "git",
@@ -36,12 +36,12 @@
     "vue-loader": "^16.2.0"
   },
   "devDependencies": {
+    "@vue/babel-preset-app": "^5",
     "@vue/cli-plugin-babel": "^5.0",
     "@vue/cli-plugin-eslint": "^5.0",
     "@vue/cli-plugin-unit-jest": "^5.0",
     "@vue/cli-service": "^5.0",
     "@vue/test-utils": "^2.4",
-    "@vue/babel-preset-app": "^5",
     "@vue/vue2-jest": "^26",
     "@vue/vue3-jest": "^26",
     "babel-core": "7.0.0-bridge.0",
