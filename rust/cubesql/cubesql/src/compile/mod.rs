@@ -19285,7 +19285,7 @@ ORDER BY \"COUNT(count)\" DESC"
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
-            "SELECT SUM(CAST(FLOOR(EXTRACT(EPOCH FROM CAST(CURRENT_DATE() AS TIMESTAMP))) AS BIGINT)) FROM KibanaSampleDataEcommerce a"
+            "SELECT SUM(CAST(FLOOR(EXTRACT(EPOCH FROM CAST(CURRENT_DATE() AS TIMESTAMP)) / 86400) - FLOOR(EXTRACT(EPOCH FROM CAST(order_date AS TIMESTAMP)) / 86400) AS BIGINT)) FROM KibanaSampleDataEcommerce a"
                 .to_string(),
             DatabaseProtocol::PostgreSQL,
         )
