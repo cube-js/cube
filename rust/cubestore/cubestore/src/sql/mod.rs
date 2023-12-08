@@ -142,6 +142,11 @@ pub struct SqlQueryContext {
     pub trace_obj: Option<String>,
 }
 
+enum FinalizeExternalTableResult {
+    Ok,
+    Orphaned,
+}
+
 impl SqlQueryContext {
     pub fn with_user(&self, user: Option<String>) -> Self {
         let mut res = self.clone();
@@ -231,6 +236,122 @@ impl SqlServiceImpl {
     }
 
     async fn create_table(
+        &self,
+        schema_name: String,
+        table_name: String,
+        columns: &Vec<ColumnDef>,
+        external: bool,
+        if_not_exists: bool,
+        locations: Option<Vec<String>>,
+        import_format: Option<ImportFormat>,
+        build_range_end: Option<DateTime<Utc>>,
+        seal_at: Option<DateTime<Utc>>,
+        select_statement: Option<String>,
+        source_table: Option<String>,
+        stream_offset: Option<String>,
+        indexes: Vec<Statement>,
+        unique_key: Option<Vec<Ident>>,
+        aggregates: Option<Vec<(Ident, Ident)>>,
+        partitioned_index: Option<PartitionedIndexRef>,
+        trace_obj: &Option<String>,
+    ) -> Result<IdRow<Table>, CubeError> {
+        if if_not_exists {
+            let table = self
+                .db
+                .get_table(schema_name.clone(), table_name.clone())
+                .await;
+            if let Ok(table) = table {
+                if table.get_row().is_ready() {
+                    return Ok(table);
+                } else {
+                    //We always delete the table if it is not ready, because otherwise there is an unsolvable race condition for import jobs
+                    if let Err(inner) = self.db.drop_table(table.get_id()).await {
+                        return Err(CubeError::internal(format!(
+                            "Drop not ready table ({}) failed: {}",
+                            table.get_id(),
+                            inner
+                        )));
+                    }
+
+                    log::warn!(
+                        "On CREATED IF NOT EXISTS old inactive table ({}) was deleted",
+                        table.get_id()
+                    );
+                }
+            }
+        };
+        loop {
+            let listener = if external {
+                Some(self.cluster.job_result_listener())
+            } else {
+                None
+            };
+            let table = self
+                .create_table_impl(
+                    schema_name.clone(),
+                    table_name.clone(),
+                    columns,
+                    external,
+                    locations.clone(),
+                    import_format,
+                    build_range_end,
+                    seal_at,
+                    select_statement.clone(),
+                    source_table.clone(),
+                    stream_offset.clone(),
+                    indexes.clone(),
+                    unique_key.clone(),
+                    aggregates.clone(),
+                    partitioned_index.clone(),
+                    trace_obj,
+                )
+                .await?;
+
+            if let Some(listener) = listener {
+                let finalize_res = tokio::time::timeout(
+                    self.create_table_timeout,
+                    self.finalize_external_table(&table, listener, trace_obj),
+                )
+                .await
+                .map_err(|_| {
+                    CubeError::internal(format!(
+                        "Timeout during create table finalization: {:?}",
+                        table
+                    ))
+                })
+                .flatten();
+                match finalize_res {
+                    Ok(FinalizeExternalTableResult::Orphaned) => {
+                        if let Err(inner) = self.db.drop_table(table.get_id()).await {
+                            log::error!(
+                                "Drop table ({}) on orphaned import failed: {}",
+                                table.get_id(),
+                                inner
+                            );
+                        }
+                        log::warn!(
+                            "Some import jobs for table {} are orphaned, table creation restarted",
+                            table.get_id()
+                        );
+                        continue;
+                    }
+                    Err(e) => {
+                        if let Err(inner) = self.db.drop_table(table.get_id()).await {
+                            log::error!(
+                                "Drop table ({}) after error failed: {}",
+                                table.get_id(),
+                                inner
+                            );
+                        }
+                        return Err(e);
+                    }
+                    _ => {}
+                }
+            }
+            return Ok(table);
+        }
+    }
+    async fn create_table_impl(
         &self,
         schema_name: String,
         table_name: String,
@@ -369,7 +490,6 @@ impl SqlServiceImpl {
                 .await;
         }
 
-        let listener = self.cluster.job_result_listener();
         if let Some(locations) = locations.as_ref() {
             self.import_service
                 .validate_locations_size(locations)
@@ -448,28 +568,6 @@ impl SqlServiceImpl {
             )
             .await?;
 
-        let finalize_res = tokio::time::timeout(
-            self.create_table_timeout,
-            self.finalize_external_table(&table, listener, trace_obj),
-        )
-        .await
-        .map_err(|_| {
-            CubeError::internal(format!(
-                "Timeout during create table finalization: {:?}",
-                table
-            ))
-        })
-        .flatten();
-        if let Err(e) = finalize_res {
-            if let Err(inner) = self.db.drop_table(table.get_id()).await {
-                log::error!(
-                    "Drop table ({}) after error failed: {}",
-                    table.get_id(),
-                    inner
-                );
-            }
-            return Err(e);
-        }
         Ok(table)
     }
 
@@ -491,7 +589,7 @@ impl SqlServiceImpl {
         table: &IdRow<Table>,
         listener: JobResultListener,
         trace_obj: &Option<String>,
-    ) -> Result<(), CubeError> {
+    ) -> Result<FinalizeExternalTableResult, CubeError> {
         let wait_for = table
             .get_row()
             .locations()
@@ -520,6 +618,8 @@ impl SqlServiceImpl {
         for r in imports {
             if let JobEvent::Error(_, _, e) = r {
                 return Err(CubeError::user(format!("Create table failed: {}", e)));
+            } else if let JobEvent::Orphaned(_, _) = r {
+                return Ok(FinalizeExternalTableResult::Orphaned);
             }
         }
 
@@ -547,7 +647,7 @@ impl SqlServiceImpl {
             incoming_traffic_agent_event(trace_obj, ready_table.get_row().total_download_size())?;
         }
 
-        Ok(())
+        Ok(FinalizeExternalTableResult::Ok)
     }
 
     async fn create_index(
@@ -1117,27 +1217,13 @@ impl SqlService for SqlServiceImpl {
                         ))),
                     })?;
 
-                let exists_table = if if_not_exists {
-                    let table = self
-                        .db
-                        .get_table(schema_name.clone(), table_name.clone())
-                        .await;
-                    if let Ok(table) = table {
-                        Some(table)
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                };
-                let res = if let Some(table) = exists_table {
-                    table
-                } else {
-                    self.create_table(
+                let res = self
+                    .create_table(
                         schema_name.clone(),
                         table_name.clone(),
                         &columns,
                         external,
+                        if_not_exists,
                         locations,
                         Some(import_format),
                         build_range_end,
@@ -1151,8 +1237,7 @@ impl SqlService for SqlServiceImpl {
                         partitioned_index,
                         &context.trace_obj,
                     )
-                    .await?
-                };
+                    .await?;
                 Ok(Arc::new(DataFrame::from(vec![res])))
             }
             CubeStoreStatement::Statement(Statement::CreateIndex {

@@ -686,6 +686,9 @@ impl SchedulerImpl {
             .await?;
         for job in orphaned_jobs {
             log::info!("Removing orphaned job: {:?}", job);
+            self.meta_store
+                .update_status(job.get_id(), JobStatus::Orphaned)
+                .await?;
             self.meta_store.delete_job(job.get_id()).await?;
         }
         Ok(())
