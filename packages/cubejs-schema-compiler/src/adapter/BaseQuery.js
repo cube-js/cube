@@ -2493,6 +2493,7 @@ export class BaseQuery {
         TO_CHAR: 'TO_CHAR({{ args_concat }})',
         // DATEADD is being rewritten to DATE_ADD
         // DATEADD: 'DATEADD({{ date_part }}, {{ interval }}, {{ args[2] }})',
+        DATE: 'DATE({{ args_concat }})',
       },
       statements: {
         select: 'SELECT {{ select_concat | map(attribute=\'aliased\') | join(\', \') }} \n' +
