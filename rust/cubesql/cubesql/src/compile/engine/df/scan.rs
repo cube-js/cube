@@ -1103,6 +1103,9 @@ pub fn transform_response<V: ValueObject>(
                     {
                         (FieldValue::String(s), builder) => {
                             let date = NaiveDate::parse_from_str(s.as_str(), "%Y-%m-%d")
+                                // FIXME: temporary solution for cases when expected type is Date32
+                                // but underlying data is a Timestamp
+                                .or_else(|_| NaiveDate::parse_from_str(s.as_str(), "%Y-%m-%dT00:00:00.000"))
                                 .map_err(|e| {
                                     DataFusionError::Execution(format!(
                                         "Can't parse date: '{}': {}",
