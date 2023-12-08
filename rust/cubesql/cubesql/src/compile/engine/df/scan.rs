@@ -40,7 +40,10 @@ use crate::{
 };
 use chrono::{Datelike, NaiveDate, NaiveDateTime};
 use datafusion::{
-    arrow::{array::TimestampNanosecondBuilder, datatypes::TimeUnit},
+    arrow::{
+        array::{TimestampMillisecondBuilder, TimestampNanosecondBuilder},
+        datatypes::TimeUnit,
+    },
     execution::context::TaskContext,
     logical_plan::JoinType,
     scalar::ScalarValue,
@@ -1058,6 +1061,36 @@ pub fn transform_response<V: ValueObject>(
                     },
                     {
                         (ScalarValue::TimestampNanosecond(v, None), builder) => builder.append_option(v.clone())?,
+                    }
+                )
+            }
+            DataType::Timestamp(TimeUnit::Millisecond, None) => {
+                build_column!(
+                    DataType::Timestamp(TimeUnit::Millisecond, None),
+                    TimestampMillisecondBuilder,
+                    response,
+                    field_name,
+                    {
+                        (FieldValue::String(s), builder) => {
+                            let timestamp = NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%dT%H:%M:%S.%f")
+                                .or_else(|_| NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%d %H:%M:%S.%f"))
+                                .or_else(|_| NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%dT%H:%M:%S"))
+                                .map_err(|e| {
+                                    DataFusionError::Execution(format!(
+                                        "Can't parse timestamp: '{}': {}",
+                                        s, e
+                                    ))
+                                })?;
+                            // TODO switch parsing to microseconds
+                            if timestamp.timestamp_millis() > (((1 as i64) << 62) / 1_000_000) {
+                                builder.append_null()?;
+                            } else {
+                                builder.append_value(timestamp.timestamp_millis())?;
+                            }
+                        },
+                    },
+                    {
+                        (ScalarValue::TimestampMillisecond(v, None), builder) => builder.append_option(v.clone())?,
                     }
                 )
             }
