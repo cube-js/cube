@@ -16,7 +16,6 @@ import {
   MAX_SOURCE_ROW_LIMIT,
   inDbTimeZone,
   QueryAlias,
-  getEnv,
 } from '@cubejs-backend/shared';
 
 import { UserError } from '../compiler/UserError';
@@ -54,16 +53,14 @@ const SecondsDurations = {
 /**
  * Set of the schema compilers.
  * @typedef {Object} Compilers
- * @property {DataSchemaCompiler} compiler
- * @property {CubeToMetaTransformer} metaTransformer
- * @property {CubeEvaluator} cubeEvaluator
- * @property {ContextEvaluator} contextEvaluator
- * @property {JoinGraph} joinGraph
- * @property {CompilerCache} compilerCache
+ * @property {import('../compiler/DataSchemaCompiler').DataSchemaCompiler} compiler
+ * @property {import('../compiler/CubeToMetaTransformer').CubeToMetaTransformer} metaTransformer
+ * @property {import('../compiler/CubeEvaluator').CubeEvaluator} cubeEvaluator
+ * @property {import('../compiler/ContextEvaluator').ContextEvaluator} contextEvaluator
+ * @property {import('../compiler/JoinGraph').JoinGraph} joinGraph
+ * @property {import('../compiler/CompilerCache').CompilerCache} compilerCache
  * @property {*} headCommitId
  */
-
-export
 
 /**
  * BaseQuery class. BaseQuery object encapsulates the logic of
@@ -78,7 +75,7 @@ export
  * should return query object based on the datasource, database type
  * and {@code CompilerApi} configuration.
  */
-class BaseQuery {
+export class BaseQuery {
   /**
    * BaseQuery class constructor.
    * @param {Compilers|*} compilers
@@ -86,13 +83,16 @@ class BaseQuery {
    */
   constructor(compilers, options) {
     this.compilers = compilers;
+    /** @type {import('../compiler/CubeEvaluator').CubeEvaluator} */
     this.cubeEvaluator = compilers.cubeEvaluator;
+    /** @type {import('../compiler/JoinGraph').JoinGraph} */
     this.joinGraph = compilers.joinGraph;
     this.options = options || {};
 
     this.orderHashToString = this.orderHashToString.bind(this);
     this.defaultOrder = this.defaultOrder.bind(this);
-
+    /** @type {ParamAllocator} */
+    this.paramAllocator = this.options.paramAllocator || this.newParamAllocator(this.options.expressionParams);
     this.initFromOptions();
   }
 
@@ -177,16 +177,14 @@ class BaseQuery {
     });
   }
 
+  /**
+   * @protected
+   */
   initFromOptions() {
     this.contextSymbols = {
       securityContext: {},
       ...this.options.contextSymbols,
     };
-    /**
-     * @protected
-     * @type {ParamAllocator}
-     */
-    this.paramAllocator = this.options.paramAllocator || this.newParamAllocator(this.options.expressionParams);
     this.compilerCache = this.compilers.compiler.compilerCache;
     this.queryCache = this.compilerCache.getQueryCache({
       measures: this.options.measures,
@@ -224,9 +222,9 @@ class BaseQuery {
 
     // measure_filter (the one extracted from filters parameter on measure and
     // used in drill downs) should go to WHERE instead of HAVING
+    /** @type {(BaseFilter|BaseGroupFilter)[]} */
     this.filters = filters.filter(f => f.dimension || f.operator === 'measure_filter' || f.operator === 'measureFilter').map(this.initFilter.bind(this));
     this.measureFilters = filters.filter(f => f.measure && f.operator !== 'measure_filter' && f.operator !== 'measureFilter').map(this.initFilter.bind(this));
-
     this.timeDimensions = (this.options.timeDimensions || []).map(dimension => {
       if (!dimension.dimension) {
         const join = this.joinGraph.buildJoin(this.collectJoinHints(true));
@@ -415,6 +413,9 @@ class BaseQuery {
     return new BaseSegment(this, segmentPath);
   }
 
+  /**
+   * @returns {BaseGroupFilter|BaseFilter}
+   */
   initFilter(filter) {
     if (filter.operator === 'and' || filter.operator === 'or') {
       filter.values = filter.values.map(this.initFilter.bind(this));
@@ -424,6 +425,9 @@ class BaseQuery {
     return this.newFilter(filter);
   }
 
+  /**
+   * @returns {BaseFilter}
+   */
   newFilter(filter) {
     return new BaseFilter(this, filter);
   }
@@ -1056,7 +1060,7 @@ class BaseQuery {
   }
 
   /**
-   * @param {string} timeDimension
+   * @param {import('./BaseDimension').BaseDimension|import('./BaseTimeDimension').BaseTimeDimension} timeDimension
    * @return {string}
    */
   timeStampParam(timeDimension) {
@@ -1658,7 +1662,7 @@ class BaseQuery {
 
   /**
    * Returns a complete list of the dimensions, including time dimensions.
-   * @returns {Array<BaseDimension>}
+   * @returns {(BaseDimension|BaseTimeDimension)[]}
    */
   dimensionsForSelect() {
     return this.dimensions.concat(this.timeDimensions);

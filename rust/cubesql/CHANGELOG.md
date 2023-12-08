@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.31](https://github.com/cube-js/cube.js/compare/v0.34.30...v0.34.31) (2023-12-07)
+
+
+### Bug Fixes
+
+* **cubesql:** Avoid constant folding for current_date() function duri… ([#7498](https://github.com/cube-js/cube.js/issues/7498)) ([e86f4be](https://github.com/cube-js/cube.js/commit/e86f4be42a6e48a115c2765e0cda84fbf1cc56e7))
+
+
+### Features
+
+* **cubesql:** Support `Utf8 * Interval` expression ([ea1fa9c](https://github.com/cube-js/cube.js/commit/ea1fa9ca6e04cf12b4c334b5702d7a5a33f0c364))
+
+
+
+
+
 ## [0.34.27](https://github.com/cube-js/cube.js/compare/v0.34.26...v0.34.27) (2023-11-30)
 
 

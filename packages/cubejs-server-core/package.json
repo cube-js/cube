@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/server-core",
   "description": "Cube.js base component to wire all backend components together",
   "author": "Cube Dev, Inc.",
-  "version": "0.34.28",
+  "version": "0.34.32",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
@@ -26,17 +26,17 @@
     "lint": "eslint src/* test/* --ext .ts,.js",
     "lint:fix": "eslint --fix src/* test/* --ext .ts,.js",
     "test": "npm run unit",
-    "unit": "jest --runInBand --coverage dist/test"
+    "unit": "jest --runInBand --forceExit --coverage dist/test"
   },
   "dependencies": {
-    "@cubejs-backend/api-gateway": "^0.34.27",
-    "@cubejs-backend/cloud": "^0.34.25",
+    "@cubejs-backend/api-gateway": "^0.34.32",
+    "@cubejs-backend/cloud": "^0.34.32",
     "@cubejs-backend/dotenv": "^9.0.2",
-    "@cubejs-backend/native": "^0.34.27",
-    "@cubejs-backend/query-orchestrator": "^0.34.27",
-    "@cubejs-backend/schema-compiler": "^0.34.27",
-    "@cubejs-backend/shared": "^0.34.25",
-    "@cubejs-backend/templates": "^0.34.25",
+    "@cubejs-backend/native": "^0.34.32",
+    "@cubejs-backend/query-orchestrator": "^0.34.32",
+    "@cubejs-backend/schema-compiler": "^0.34.32",
+    "@cubejs-backend/shared": "^0.34.32",
+    "@cubejs-backend/templates": "^0.34.32",
     "codesandbox-import-utils": "^2.1.12",
     "cross-spawn": "^7.0.1",
     "fs-extra": "^8.1.0",
@@ -57,20 +57,20 @@
     "ws": "^7.5.3"
   },
   "devDependencies": {
-    "@cubejs-backend/cubestore-driver": "^0.34.26",
+    "@cubejs-backend/cubestore-driver": "^0.34.32",
     "@cubejs-backend/linter": "^0.34.25",
-    "@cubejs-client/playground": "^0.34.27",
+    "@cubejs-client/playground": "^0.34.32",
     "@types/cross-spawn": "^6.0.2",
     "@types/express": "^4.17.9",
     "@types/fs-extra": "^9.0.8",
-    "@types/jest": "^26.0.20",
+    "@types/jest": "^27",
     "@types/jsonwebtoken": "^8.5.0",
     "@types/lru-cache": "^5.1.0",
     "@types/node": "^14",
     "@types/node-fetch": "^2.5.7",
     "@types/ramda": "^0.27.34",
     "@types/uuid": "^8.3.0",
-    "jest": "^26.6.3",
+    "jest": "^27",
     "typescript": "~5.2.2"
   },
   "license": "Apache-2.0",
@@ -78,6 +78,7 @@
     "extends": "../cubejs-linter"
   },
   "jest": {
+    "testEnvironment": "node",
     "setupFilesAfterEnv": [
       "<rootDir>/dist/test/setup.js"
     ],

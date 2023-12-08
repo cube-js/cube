@@ -6,12 +6,19 @@ import { UserError } from './UserError';
 import { BaseMeasure, BaseQuery } from '../adapter';
 
 export class CubeToMetaTransformer {
+  /**
+   * @param {import('./CubeValidator').CubeValidator} cubeValidator
+   * @param {import('./CubeEvaluator').CubeEvaluator} cubeEvaluator
+   * @param {import('./ContextEvaluator').ContextEvaluator} contextEvaluator
+   * @param {import('./JoinGraph').JoinGraph} joinGraph
+   */
   constructor(cubeValidator, cubeEvaluator, contextEvaluator, joinGraph) {
     this.cubeValidator = cubeValidator;
     this.cubeSymbols = cubeEvaluator;
     this.cubeEvaluator = cubeEvaluator;
     this.contextEvaluator = contextEvaluator;
     this.joinGraph = joinGraph;
+    this.cubes = [];
   }
 
   compile(cubes, errorReporter) {

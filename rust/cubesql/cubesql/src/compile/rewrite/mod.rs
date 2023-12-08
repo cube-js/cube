@@ -379,7 +379,7 @@ crate::plan_to_language! {
             members: Vec<LogicalPlan>,
             aliases: Vec<(String, String)>,
         },
-        FilterCastUnwrapReplacer {
+        FilterSimplifyReplacer {
             filters: Vec<LogicalPlan>,
         },
         OrderReplacer {
@@ -1131,8 +1131,8 @@ fn filter_replacer(
     )
 }
 
-fn filter_cast_unwrap_replacer(members: impl Display) -> String {
-    format!("(FilterCastUnwrapReplacer {})", members)
+fn filter_simplify_replacer(members: impl Display) -> String {
+    format!("(FilterSimplifyReplacer {})", members)
 }
 
 fn inner_aggregate_split_replacer(members: impl Display, alias_to_cube: impl Display) -> String {

@@ -3,6 +3,33 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.32](https://github.com/cube-js/cube/compare/v0.34.31...v0.34.32) (2023-12-07)
+
+
+### Bug Fixes
+
+* **query-orchestrator:** Queue - clear timer on streaming ([#7501](https://github.com/cube-js/cube/issues/7501)) ([ac2357d](https://github.com/cube-js/cube/commit/ac2357dd52f3316dc33158795388067097c32ece))
+
+
+
+
+
+## [0.34.31](https://github.com/cube-js/cube/compare/v0.34.30...v0.34.31) (2023-12-07)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.34.30](https://github.com/cube-js/cube/compare/v0.34.29...v0.34.30) (2023-12-04)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
 ## [0.34.27](https://github.com/cube-js/cube/compare/v0.34.26...v0.34.27) (2023-11-30)
 
 **Note:** Version bump only for package @cubejs-backend/query-orchestrator

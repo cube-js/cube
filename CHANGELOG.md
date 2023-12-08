@@ -3,6 +3,61 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.32](https://github.com/cube-js/cube/compare/v0.34.31...v0.34.32) (2023-12-07)
+
+
+### Bug Fixes
+
+* **query-orchestrator:** Queue - clear timer on streaming ([#7501](https://github.com/cube-js/cube/issues/7501)) ([ac2357d](https://github.com/cube-js/cube/commit/ac2357dd52f3316dc33158795388067097c32ece))
+
+
+### Features
+
+* **cubesql:** Add CURRENT_DATE function definitions for Postgres and Snowflake so those can be pushed down ([ac1ca88](https://github.com/cube-js/cube/commit/ac1ca889add970dd05820b8f077edb968c985994))
+
+
+
+
+
+## [0.34.31](https://github.com/cube-js/cube/compare/v0.34.30...v0.34.31) (2023-12-07)
+
+
+### Bug Fixes
+
+* **cubesql:** Avoid constant folding for current_date() function duri… ([#7498](https://github.com/cube-js/cube/issues/7498)) ([e86f4be](https://github.com/cube-js/cube/commit/e86f4be42a6e48a115c2765e0cda84fbf1cc56e7))
+
+
+### Features
+
+* **cubesql:** Support `Utf8 * Interval` expression ([ea1fa9c](https://github.com/cube-js/cube/commit/ea1fa9ca6e04cf12b4c334b5702d7a5a33f0c364))
+
+
+
+
+
+## [0.34.30](https://github.com/cube-js/cube/compare/v0.34.29...v0.34.30) (2023-12-04)
+
+
+### Bug Fixes
+
+* **cubestore:** InplaceAggregate for boolean columns ([#7432](https://github.com/cube-js/cube/issues/7432)) ([a6d3579](https://github.com/cube-js/cube/commit/a6d3579c6930763edc0f72eabdb7892b8675a5c5))
+* View tries to join cube twice in case there's join ambiguity ([#7487](https://github.com/cube-js/cube/issues/7487)) ([66f7c17](https://github.com/cube-js/cube/commit/66f7c17a19fb594a8c71ff6d449f25a5a9e727aa))
+
+
+
+
+
+## [0.34.29](https://github.com/cube-js/cube/compare/v0.34.28...v0.34.29) (2023-12-01)
+
+
+### Bug Fixes
+
+* **schema-compiler:** td.isDateOperator is not a function ([#7483](https://github.com/cube-js/cube/issues/7483)) ([31c272a](https://github.com/cube-js/cube/commit/31c272ae929bc8e7f7972e46666f84bf8509cc3f))
+
+
+
+
+
 ## [0.34.28](https://github.com/cube-js/cube/compare/v0.34.27...v0.34.28) (2023-11-30)
 
 

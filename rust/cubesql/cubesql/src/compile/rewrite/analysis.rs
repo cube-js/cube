@@ -20,7 +20,9 @@ use datafusion::{
     },
     logical_plan::{Column, DFSchema, Expr},
     physical_plan::{
-        functions::Volatility, planner::DefaultPhysicalPlanner, ColumnarValue, PhysicalPlanner,
+        functions::{BuiltinScalarFunction, Volatility},
+        planner::DefaultPhysicalPlanner,
+        ColumnarValue, PhysicalPlanner,
     },
     scalar::ScalarValue,
 };
@@ -486,7 +488,23 @@ impl LogicalPlanAnalysis {
                 )
                 .ok()?;
                 if let Expr::ScalarUDF { fun, .. } = &expr {
-                    if &fun.name == "str_to_date"
+                    if &fun.name == "eval_now" {
+                        Self::eval_constant_expr(
+                            &egraph,
+                            &Expr::ScalarFunction {
+                                fun: BuiltinScalarFunction::Now,
+                                args: vec![],
+                            },
+                        )
+                    } else if &fun.name == "eval_current_date" {
+                        Self::eval_constant_expr(
+                            &egraph,
+                            &Expr::ScalarFunction {
+                                fun: BuiltinScalarFunction::CurrentDate,
+                                args: vec![],
+                            },
+                        )
+                    } else if &fun.name == "str_to_date"
                         || &fun.name == "date_add"
                         || &fun.name == "date_sub"
                         || &fun.name == "date"
@@ -511,8 +529,12 @@ impl LogicalPlanAnalysis {
                 .ok()?;
 
                 if let Expr::ScalarFunction { fun, .. } = &expr {
-                    if fun.volatility() == Volatility::Immutable
-                        || fun.volatility() == Volatility::Stable
+                    if (fun.volatility() == Volatility::Immutable
+                        || fun.volatility() == Volatility::Stable)
+                        && !matches!(
+                            fun,
+                            BuiltinScalarFunction::CurrentDate | BuiltinScalarFunction::Now
+                        )
                     {
                         Self::eval_constant_expr(&egraph, &expr)
                     } else {
@@ -562,6 +584,7 @@ impl LogicalPlanAnalysis {
                         Expr::Literal(ScalarValue::Utf8(value)) => match (value, data_type) {
                             // Timezone set in Config
                             (Some(_), DataType::Timestamp(_, _)) => (),
+                            (Some(_), DataType::Date32 | DataType::Date64) => (),
                             _ => return None,
                         },
                         _ => (),
@@ -805,10 +828,30 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
 
     fn modify(egraph: &mut EGraph<LogicalPlanLanguage, Self>, id: Id) {
         if let Some(ConstantFolding::Scalar(c)) = &egraph[id].data.constant {
+            // TODO: ideally all constants should be aliased, but this requires
+            // rewrites to extract `.data.constant` instead of `literal_expr`.
+            let alias_name =
+                if c.is_null() || matches!(c, ScalarValue::Date32(_) | ScalarValue::Date64(_)) {
+                    egraph[id]
+                        .data
+                        .original_expr
+                        .as_ref()
+                        .map(|expr| expr.name(&DFSchema::empty()).unwrap())
+                } else {
+                    None
+                };
             let c = c.clone();
             let value = egraph.add(LogicalPlanLanguage::LiteralExprValue(LiteralExprValue(c)));
             let literal_expr = egraph.add(LogicalPlanLanguage::LiteralExpr([value]));
-            egraph.union(id, literal_expr);
+            if let Some(alias_name) = alias_name {
+                let alias = egraph.add(LogicalPlanLanguage::AliasExprAlias(AliasExprAlias(
+                    alias_name,
+                )));
+                let alias_expr = egraph.add(LogicalPlanLanguage::AliasExpr([literal_expr, alias]));
+                egraph.union(id, alias_expr);
+            } else {
+                egraph.union(id, literal_expr);
+            }
         }
     }
 }

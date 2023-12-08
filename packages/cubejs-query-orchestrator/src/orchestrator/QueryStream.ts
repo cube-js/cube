@@ -2,7 +2,7 @@ import * as stream from 'stream';
 import { getEnv } from '@cubejs-backend/shared';
 
 export class QueryStream extends stream.Transform {
-  private timeout = 5 * 60000 || getEnv('dbQueryTimeout');
+  private timeout = 5 * 60 * 1000;
 
   private timer = null;
 

@@ -4,6 +4,7 @@ import { contains, join, map } from 'ramda';
 import { FROM_PARTITION_RANGE, TO_PARTITION_RANGE } from '@cubejs-backend/shared';
 
 import { BaseDimension } from './BaseDimension';
+import type { BaseQuery } from './BaseQuery';
 
 const moment = momentRange.extendMoment(require('moment-timezone'));
 
@@ -12,10 +13,18 @@ const dateTimeLocalMsRegex = /^\d\d\d\d-\d\d-\d\dT\d\d:\d\d:\d\d\.\d\d\d$/;
 const dateRegex = /^\d\d\d\d-\d\d-\d\d$/;
 
 export class BaseFilter extends BaseDimension {
-  constructor(query, filter) {
+  public readonly measure: any;
+
+  public readonly operator: any;
+
+  public readonly values: any;
+
+  public readonly camelizeOperator: any;
+
+  public constructor(query: BaseQuery, filter: any) {
     super(query, filter.dimension);
     this.measure = filter.measure;
-    this.query = query;
+
     this.operator = filter.operator;
     this.values = filter.values;
     this.camelizeOperator = inlection.camelize(this.operator).replace(
@@ -24,7 +33,7 @@ export class BaseFilter extends BaseDimension {
     );
   }
 
-  filterToWhere() {
+  public filterToWhere() {
     if (this.camelizeOperator === 'measureFilter') {
       return this.measureFilterToWhere();
     }
@@ -32,13 +41,13 @@ export class BaseFilter extends BaseDimension {
     return this.conditionSql(this.measure ? this.query.measureSql(this) : this.query.dimensionSql(this));
   }
 
-  convertTzForRawTimeDimensionIfNeeded(sql) {
+  public convertTzForRawTimeDimensionIfNeeded(sql) {
     return sql();
   }
 
   // Evaluates filters on measures to whole where statement in query
   // It used in drill downs
-  measureFilterToWhere() {
+  public measureFilterToWhere() {
     const measureDefinition = this.measureDefinition();
     if (measureDefinition.filters && measureDefinition.filters.length ||
       measureDefinition.drillFilters && measureDefinition.drillFilters.length) {
@@ -51,13 +60,14 @@ export class BaseFilter extends BaseDimension {
     }
   }
 
-  conditionSql(columnSql) {
+  public conditionSql(columnSql) {
     const operatorMethod = `${(this.camelizeOperator)}Where`;
 
     let sql = this[operatorMethod](columnSql);
-    if (sql.match(this.query.paramAllocator.paramsMatchRegex)) {
+    if (this.query.paramAllocator.hasParametersInSql(sql)) {
       return sql;
     }
+
     // TODO DEPRECATED: remove and replace with error
     // columnSql can contain `?` so allocate params first and then substitute columnSql
     // fallback implementation for drivers that still use `?` substitution
@@ -65,11 +75,11 @@ export class BaseFilter extends BaseDimension {
     return this.query.paramAllocator.allocateParamsForQuestionString(sql, this.filterParams()).replace(/\$\$\$COLUMN\$\$\$/g, columnSql);
   }
 
-  measureDefinition() {
+  public measureDefinition() {
     return this.query.cubeEvaluator.measureByPath(this.measure);
   }
 
-  path() {
+  public path() {
     if (this.measure) {
       return this.query.cubeEvaluator.parsePath('measures', this.measure);
     } else if (this.query.cubeEvaluator.isInstanceOfType('segments', this.dimension)) {
@@ -79,24 +89,24 @@ export class BaseFilter extends BaseDimension {
     }
   }
 
-  cube() {
+  public cube() {
     return this.query.cubeEvaluator.cubeFromPath(this.measure || this.dimension);
   }
 
-  definition() {
+  public definition() {
     return this.measure ? this.measureDefinition() : this.dimensionDefinition();
   }
 
   // noinspection JSMethodCanBeStatic
-  escapeWildcardChars(param) {
+  public escapeWildcardChars(param) {
     return typeof param === 'string' ? param.replace(/([_%])/gi, '\\$1') : param;
   }
 
-  isWildcardOperator() {
+  public isWildcardOperator() {
     return this.camelizeOperator === 'contains' || this.camelizeOperator === 'notContains';
   }
 
-  filterParams() {
+  public filterParams() {
     if (this.isDateOperator()) {
       return [this.inDbTimeZoneDateFrom(this.values[0]), this.inDbTimeZoneDateTo(this.values[1])];
     }
@@ -112,23 +122,23 @@ export class BaseFilter extends BaseDimension {
     return params;
   }
 
-  isDateOperator() {
+  public isDateOperator(): boolean {
     return contains(this.camelizeOperator, DATE_OPERATORS);
   }
 
-  valuesArray() {
+  public valuesArray() {
     return Array.isArray(this.values) ? this.values : [this.values];
   }
 
-  valuesContainNull() {
+  public valuesContainNull() {
     return this.valuesArray().indexOf(null) !== -1;
   }
 
-  castParameter() {
+  public castParameter() {
     return '?';
   }
 
-  firstParameter() {
+  public firstParameter() {
     const params = this.filterParams();
     if (!params.length) {
       throw new Error('Expected one parameter but nothing found');
@@ -137,15 +147,15 @@ export class BaseFilter extends BaseDimension {
     return this.allocateCastParam(params[0]);
   }
 
-  allocateCastParam(param) {
+  public allocateCastParam(param) {
     return this.query.paramAllocator.allocateParamsForQuestionString(this.castParameter(), [param]);
   }
 
-  allocateTimestampParam(param) {
+  public allocateTimestampParam(param) {
     return this.query.paramAllocator.allocateParamsForQuestionString(this.query.timeStampParam(this), [param]);
   }
 
-  allocateTimestampParams() {
+  public allocateTimestampParams() {
     return this.filterParams().map((p, i) => {
       if (i > 1) {
         throw new Error(`Expected only 2 parameters for timestamp filter but got: ${this.filterParams()}`);
@@ -154,19 +164,19 @@ export class BaseFilter extends BaseDimension {
     });
   }
 
-  allParamsRepeat(basePart) {
+  public allParamsRepeat(basePart) {
     return this.filterParams().map(p => this.query.paramAllocator.allocateParamsForQuestionString(basePart, [p]));
   }
 
-  isArrayValues() {
+  public isArrayValues() {
     return Array.isArray(this.values) && this.values.length > 1;
   }
 
-  containsWhere(column) {
+  public containsWhere(column) {
     return this.likeOr(column, false, 'contains');
   }
 
-  notContainsWhere(column) {
+  public notContainsWhere(column) {
     return this.likeOr(column, true, 'contains');
   }
 
@@ -175,7 +185,7 @@ export class BaseFilter extends BaseDimension {
    * @param {string} column Column name.
    * @returns string
    */
-  startsWithWhere(column) {
+  public startsWithWhere(column) {
     return this.likeOr(column, false, 'starts');
   }
 
@@ -184,7 +194,7 @@ export class BaseFilter extends BaseDimension {
    * @param {string} column Column name.
    * @returns string
    */
-  notStartsWithWhere(column) {
+  public notStartsWithWhere(column) {
     return this.likeOr(column, true, 'starts');
   }
 
@@ -193,7 +203,7 @@ export class BaseFilter extends BaseDimension {
    * @param {string} column Column name.
    * @returns string
    */
-  endsWithWhere(column) {
+  public endsWithWhere(column) {
     return this.likeOr(column, false, 'ends');
   }
 
@@ -202,7 +212,7 @@ export class BaseFilter extends BaseDimension {
    * @param {string} column Column name.
    * @returns string
    */
-  notEndsWithWhere(column) {
+  public notEndsWithWhere(column) {
     return this.likeOr(column, true, 'ends');
   }
 
@@ -215,7 +225,7 @@ export class BaseFilter extends BaseDimension {
    * startsWith/endsWith).
    * @returns string
    */
-  likeOr(column, not, type) {
+  public likeOr(column, not, type) {
     type = type || 'contains';
     return `${join(not ? ' AND ' : ' OR ', this.filterParams().map(
       p => this.likeIgnoreCase(column, not, p, type)
@@ -230,25 +240,25 @@ export class BaseFilter extends BaseDimension {
    * @param {string} type Type of the condition (i.e. contains/startsWith/endsWith).
    * @returns string
    */
-  likeIgnoreCase(column, not, param, type) {
+  public likeIgnoreCase(column, not, param, type) {
     const p = (!type || type === 'contains' || type === 'ends') ? '\'%\' || ' : '';
     const s = (!type || type === 'contains' || type === 'starts') ? ' || \'%\'' : '';
     return `${column}${not ? ' NOT' : ''} ILIKE ${p}${this.allocateParam(param)}${s}`;
   }
 
-  orIsNullCheck(column, not) {
+  public orIsNullCheck(column, not) {
     return `${this.shouldAddOrIsNull(not) ? ` OR ${column} IS NULL` : ''}`;
   }
 
-  shouldAddOrIsNull(not) {
+  public shouldAddOrIsNull(not) {
     return not ? !this.valuesContainNull() : this.valuesContainNull();
   }
 
-  allocateParam(param) {
+  public allocateParam(param) {
     return this.query.paramAllocator.allocateParam(param);
   }
 
-  equalsWhere(column) {
+  public equalsWhere(column) {
     if (this.isArrayValues()) {
       return this.inWhere(column);
     }
@@ -260,15 +270,15 @@ export class BaseFilter extends BaseDimension {
     return `${column} = ${this.firstParameter()}${this.orIsNullCheck(column, false)}`;
   }
 
-  inPlaceholders() {
+  public inPlaceholders() {
     return `(${join(', ', this.filterParams().map(p => this.allocateCastParam(p)))})`;
   }
 
-  inWhere(column) {
+  public inWhere(column) {
     return `${column} IN ${this.inPlaceholders()}${this.orIsNullCheck(column, false)}`;
   }
 
-  notEqualsWhere(column) {
+  public notEqualsWhere(column) {
     if (this.isArrayValues()) {
       return this.notInWhere(column);
     }
@@ -280,74 +290,74 @@ export class BaseFilter extends BaseDimension {
     return `${column} <> ${this.firstParameter()}${this.orIsNullCheck(column, true)}`;
   }
 
-  notInWhere(column) {
+  public notInWhere(column) {
     return `${column} NOT IN ${this.inPlaceholders()}${this.orIsNullCheck(column, true)}`;
   }
 
-  setWhere(column) {
+  public setWhere(column) {
     return `${column} IS NOT NULL`;
   }
 
-  notSetWhere(column) {
+  public notSetWhere(column) {
     return `${column} IS NULL`;
   }
 
-  gtWhere(column) {
+  public gtWhere(column) {
     return `${column} > ${this.firstParameter()}`;
   }
 
-  gteWhere(column) {
+  public gteWhere(column) {
     return `${column} >= ${this.firstParameter()}`;
   }
 
-  ltWhere(column) {
+  public ltWhere(column) {
     return `${column} < ${this.firstParameter()}`;
   }
 
-  lteWhere(column) {
+  public lteWhere(column) {
     return `${column} <= ${this.firstParameter()}`;
   }
 
-  expressionEqualsWhere(column) {
+  public expressionEqualsWhere(column) {
     return `${column} = ${this.values[0]}`;
   }
 
-  inDateRangeWhere(column) {
+  public inDateRangeWhere(column) {
     const [from, to] = this.allocateTimestampParams();
     return this.query.timeRangeFilter(column, from, to);
   }
 
-  notInDateRangeWhere(column) {
+  public notInDateRangeWhere(column) {
     const [from, to] = this.allocateTimestampParams();
     return this.query.timeNotInRangeFilter(column, from, to);
   }
 
-  onTheDateWhere(column) {
+  public onTheDateWhere(column) {
     const [from, to] = this.allocateTimestampParams();
     return this.query.timeRangeFilter(column, from, to);
   }
 
-  beforeDateWhere(column) {
+  public beforeDateWhere(column) {
     const [before] = this.allocateTimestampParams();
     return this.query.beforeDateFilter(column, before);
   }
 
-  beforeOrOnDateWhere(column) {
+  public beforeOrOnDateWhere(column) {
     const [before] = this.allocateTimestampParams();
     return this.query.beforeOrOnDateFilter(column, before);
   }
 
-  afterDateWhere(column) {
+  public afterDateWhere(column) {
     const [after] = this.allocateTimestampParams();
     return this.query.afterDateFilter(column, after);
   }
 
-  afterOrOnDateWhere(column) {
+  public afterOrOnDateWhere(column) {
     const [after] = this.allocateTimestampParams();
     return this.query.afterOrOnDateFilter(column, after);
   }
 
-  formatFromDate(date) {
+  public formatFromDate(date) {
     if (date && date.match(dateTimeLocalMsRegex)) {
       return date;
     }
@@ -360,14 +370,14 @@ export class BaseFilter extends BaseDimension {
     return moment.tz(date, this.query.timezone).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
   }
 
-  inDbTimeZoneDateFrom(date) {
+  public inDbTimeZoneDateFrom(date) {
     if (date && (date === FROM_PARTITION_RANGE || date === TO_PARTITION_RANGE)) {
       return date;
     }
     return this.query.inDbTimeZone(this.formatFromDate(date));
   }
 
-  formatToDate(date) {
+  public formatToDate(date) {
     if (date && date.match(dateTimeLocalMsRegex)) {
       return date;
     }
@@ -380,18 +390,18 @@ export class BaseFilter extends BaseDimension {
     return moment.tz(date, this.query.timezone).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
   }
 
-  inDbTimeZoneDateTo(date) {
+  public inDbTimeZoneDateTo(date) {
     if (date && (date === FROM_PARTITION_RANGE || date === TO_PARTITION_RANGE)) {
       return date;
     }
     return this.query.inDbTimeZone(this.formatToDate(date));
   }
 
-  formattedDateRange() {
+  public formattedDateRange() {
     return [this.formatFromDate(this.values[0]), this.formatToDate(this.values[1])];
   }
 
-  unescapedAliasName() {
+  public unescapedAliasName() {
     return this.query.aliasName(this.measure || this.dimension);
   }
 }

@@ -30,7 +30,7 @@ class QuestFilter extends BaseFilter {
 }
 
 export class QuestQuery extends BaseQuery {
-  public newFilter(filter: any) {
+  public newFilter(filter: any): BaseFilter {
     return new QuestFilter(this, filter);
   }
 
