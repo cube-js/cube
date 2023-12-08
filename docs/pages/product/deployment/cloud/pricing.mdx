@@ -106,23 +106,23 @@ a couple of teams in Eastern and Pacific time zones.
 
 This organization:
 * Uses the Premium plan of Cube Cloud.
-* Runs a single Production Cluster that is active 12 hours a day, 5 days a week,
-has auto-suspension enabled with an 1-hour threshold, and never auto-scales its
-API instances because the usage is spread evenly with no bursts.
+* Runs a single Production Cluster that is active 24/7 but never has to auto-scale
+its API instances because the usage is spread evenly with no bursts.
 * Operates on a small volume of data that requires the usage of just 2 Cube Store
-Workers to run queries and refresh pre-aggregations during working hours.
+Workers to run queries and refresh pre-aggregations mostly during working hours,
+being active approximately 50% of the time.
 * Updates its data model infrequently and without using a dedicated Development
 Instance for testing purposes, with 2 data engineers spending just 1 hour a day each,
 5 days a week in the development mode of the Production Cluster.
 
-| Resource                                        | Usage per month                                                                                   | CCU per month                    | Cost per month                                             |
-| ----------------------------------------------- | ------------------------------------------------------------------------------------------------- | -------------------------------- | ---------------------------------------------------------- |
-| Production Cluster                              | 1 Production Cluster ×<br/>(12 + 1) hours per day ×<br/>5 days per week ×<br/>4.4 weeks per month | 286 hours ×<br/>4 CCUs per hour  | 1144 CCUs ×<br/>\$&thinsp;0.25 per CCU = **\$&thinsp;286** |
-| Additional Cube API Instance                    | —                                                                                                 | —                                | —                                                          |
-| Cube Store Worker                               | 2 Cube Store Workers ×<br/>(12 + 1) hours per day ×<br/>5 days per week ×<br/>4.4 weeks per month | 572 hours ×<br/>1 CCU per hour   | 572 CCUs ×<br/>\$&thinsp;0.25 per CCU = **\$&thinsp;143**  |
-| Development Instance                            | —                                                                                                 | —                                | —                                                          |
-| Development Instance<br/>(for development mode) | 2 users ×<br/>1 hour per day ×<br/>5 days per week ×<br/>4.4 weeks per month                      | 44 hours ×<br/>1 CCU per hour    | 44 CCUs ×<br/>\$&thinsp;0.25 per CCU = **\$&thinsp;11**    |
-| **Total**                                       |                                                                                                   |                                  | **\$&thinsp;440**                                          |
+| Resource                                        | Usage per month                                                                             | CCU per month                   | Cost per month                                             |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------- | ---------------------------------------------------------- |
+| Production Cluster                              | 1 Production Cluster ×<br/>24 hours per day ×<br/>7 days per week ×<br/>4.4 weeks per month | 739 hours ×<br/>4 CCUs per hour | 2956 CCUs ×<br/>\$&thinsp;0.25 per CCU = **\$&thinsp;739** |
+| Additional Cube API Instance                    | —                                                                                           | —                               | —                                                          |
+| Cube Store Worker                               | 2 Cube Store Workers ×<br/>12 hours per day ×<br/>7 days per week ×<br/>4.4 weeks per month | 740 hours ×<br/>1 CCU per hour  | 740 CCUs ×<br/>\$&thinsp;0.25 per CCU = **\$&thinsp;185**  |
+| Development Instance                            | —                                                                                           | —                               | —                                                          |
+| Development Instance<br/>(for development mode) | 2 users ×<br/>1 hour per day ×<br/>5 days per week ×<br/>4.4 weeks per month                | 44 hours ×<br/>1 CCU per hour   | 44 CCUs ×<br/>\$&thinsp;0.25 per CCU = **\$&thinsp;11**    |
+| **Total**                                       |                                                                                             |                                 | **\$&thinsp;935**                                          |
 
 ### Medium-scale deployment
 
@@ -132,8 +132,8 @@ analytics in its SaaS platform that caters to a vast worldwide customer base.
 
 This organization:
 * Uses the Enterprise plan of Cube Cloud.
-* Runs two Production Clusters that are active 24/7, never auto-suspend, and auto-scale
-up to 8 API instances during a peak hour every day.
+* Runs two Production Clusters that are active 24/7 and auto-scale up to 8 API instances
+during a peak hour every day.
 * Operates on a moderate volume of data that requires the usage of 4 Cube Store
 Workers by both Production Clusters to run queries and refresh pre-aggregations 24/7,
 being active approximately 50% of the time.
