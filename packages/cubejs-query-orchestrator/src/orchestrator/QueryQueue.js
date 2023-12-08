@@ -148,24 +148,26 @@ export class QueryQueue {
    * Returns stream object which will be used to pipe data from data source.
    *
    * @param {QueryKeyHash} queryKeyHash
+   * @return {QueryStream | undefined}
    */
   getQueryStream(queryKeyHash) {
     return this.streams.get(queryKeyHash);
   }
 
   /**
-   * @param {*} queryKey
+   * @param {QueryKeyHash} key
    * @param {{ [alias: string]: string }} aliasNameToMember
+   * @return {QueryStream}
    */
-  createQueryStream(queryKeyHash, aliasNameToMember) {
-    const key = queryKeyHash;
+  createQueryStream(key, aliasNameToMember) {
     const stream = new QueryStream({
       key,
       streams: this.streams,
       aliasNameToMember,
     });
     this.streams.set(key, stream);
-    this.streamEvents.emit('streamStarted', queryKeyHash);
+    this.streamEvents.emit('streamStarted', key);
+
     return stream;
   }
 
@@ -307,6 +309,8 @@ export class QueryQueue {
 
       // Stream processing goes here under assumption there's no way of a stream close just after it was added to the `streams` map.
       // Otherwise `streamStarted` event listener should go before the `reconcileQueue` call.
+      // TODO: Fix an issue with a fast execution of stream handler which caused by removal of QueryStream from streams,
+      // while EventListener doesnt start to listen for started stream event
       if (queryHandler === 'stream') {
         const self = this;
         result = await new Promise((resolve) => {
