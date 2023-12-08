@@ -14,6 +14,8 @@ import { Connection, Database } from 'duckdb';
 import { DuckDBQuery } from './DuckDBQuery';
 import { HydrationStream, transformRow } from './HydrationStream';
 
+const { version } = require('../../package.json');
+
 export type DuckDBDriverConfiguration = {
   dataSource?: string,
   initSql?: string,
@@ -55,8 +57,8 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
 
   protected async init(): Promise<InitPromise> {
     const token = getEnv('duckdbMotherDuckToken', this.config);
-    
-    const db = new Database(token ? `md:?motherduck_token=${token}` : ':memory:');
+
+    const db = new Database(token ? `md:?motherduck_token=${token}&custom_user_agent=Cube/${version}` : ':memory:');
     // Under the hood all methods of Database uses internal default connection, but there is no way to expose it
     const defaultConnection = db.connect();
     const execAsync: (sql: string, ...params: any[]) => Promise<void> = promisify(defaultConnection.exec).bind(defaultConnection) as any;
