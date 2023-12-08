@@ -57,7 +57,7 @@ export class CompilerApi {
     }
 
     if (!this.compilers || this.compilerVersion !== compilerVersion) {
-      const startCompileTime = new Date().getTime();
+      const startCompilingTime = new Date().getTime();
       try {
         this.logger(this.compilers ? 'Recompiling schema' : 'Compiling schema', {
           version: compilerVersion,
@@ -77,13 +77,13 @@ export class CompilerApi {
         this.logger('Compiling schema completed', {
           version: compilerVersion,
           requestId,
-          duration: ((new Date()).getTime() - startCompileTime),
+          duration: ((new Date()).getTime() - startCompilingTime),
         });
       } catch (e) {
         this.logger('Compiling schema error', {
           version: compilerVersion,
           requestId,
-          duration: ((new Date()).getTime() - startCompileTime),
+          duration: ((new Date()).getTime() - startCompilingTime),
           error: (e.stack || e).toString()
         });
         throw e;
