@@ -70,7 +70,7 @@ export class OracleQuery extends BaseQuery {
   }
 
   public dateTimeCast(value) {
-    return `to_date(:"${value}", 'YYYY-MM-DD"T"HH24:MI:SS"Z"')`;
+    return `to_date(:"${value}", 'YYYY-MM-DD"T"HH24:MI:SS****"Z"')`;
   }
 
   public timeStampCast(value) {
