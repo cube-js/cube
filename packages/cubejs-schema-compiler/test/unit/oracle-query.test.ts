@@ -112,7 +112,7 @@ describe('OracleQuery', () => {
         }
       );
 
-      expect(query.dateTimeCast('12-25-2005')).toEqual(`to_date(:"12-25-2005", 'YYYY-MM-DD"T"HH24:MI:SS.SSS"Z"')`);
+      expect(query.dateTimeCast('12-25-2005')).toEqual(`to_date(:"12-25-2005", 'YYYY-MM-DD"T"HH24:MI:SS****"Z"')`);
     }));
 
 });
