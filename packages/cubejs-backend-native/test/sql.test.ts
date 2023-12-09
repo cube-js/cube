@@ -31,6 +31,7 @@ describe('SQLInterface', () => {
       expect(session).toEqual({
         user: expect.toBeTypeOrNull(String),
         superuser: expect.any(Boolean),
+        securityContext: { foo: 'bar' }
       });
 
       // It's just an emulation that ApiGateway returns error
@@ -56,6 +57,7 @@ describe('SQLInterface', () => {
       expect(session).toEqual({
         user: expect.toBeTypeOrNull(String),
         superuser: expect.any(Boolean),
+        securityContext: { foo: 'bar' }
       });
 
       // It's just an emulation that ApiGateway returns error
@@ -98,6 +100,7 @@ describe('SQLInterface', () => {
       expect(session).toEqual({
         user: expect.toBeTypeOrNull(String),
         superuser: expect.any(Boolean),
+        securityContext: { foo: 'bar' },
       });
 
       return metaFixture;
@@ -125,6 +128,7 @@ describe('SQLInterface', () => {
         return {
           password: 'password_for_allowed_user',
           superuser: false,
+          securityContext: { foo: 'bar' },
         };
       }
 
@@ -132,6 +136,7 @@ describe('SQLInterface', () => {
         return {
           password: 'password_for_admin',
           superuser: true,
+          securityContext: { foo: 'admin' },
         };
       }
 
@@ -175,6 +180,7 @@ describe('SQLInterface', () => {
             meta: null,
           },
           user: user || null,
+          password: null,
         });
       };
 
@@ -226,6 +232,7 @@ describe('SQLInterface', () => {
           meta: null,
         },
         user: 'allowed_user',
+        password: null,
       });
 
       expect(meta.mock.calls.length).toEqual(1);
@@ -237,6 +244,7 @@ describe('SQLInterface', () => {
         session: {
           user: 'allowed_user',
           superuser: false,
+          securityContext: { foo: 'bar' },
         }
       });
 

@@ -246,9 +246,26 @@ dump:
   dict_as_obj: \\"{\\\\n    \\\\\\"a_attr\\\\\\": String(\\\\n        \\\\\\"value for attribute a\\\\\\",\\\\n        Normal,\\\\n    ),\\\\n}\\""
 `;
 
-exports[`Jinja (new api) render template_error.jinja: template_error.jinja 1`] = `
-[Error: syntax error: unknown statement unexpected_block_name (in template_error.jinja:10)
--------------------------------------------------------------------------------
+exports[`Jinja (new api) render template_error_python.jinja: template_error_python.jinja 1`] = `
+[Error: could not render block: Call error: Python error: Exception: Random Exception
+Traceback (most recent call last):
+  File "jinja-instance.py", line 110, in throw_exception
+
+------------------------- template_error_python.jinja -------------------------
+   3 | 3
+   4 | 4
+   5 | 5
+   6 > {%- set variable = throw_exception() %}
+     i ^^^^^^^^^^^^^^^^^^^^^^^^ could not render block
+   7 | 7
+   8 | 8
+   9 | 9
+-------------------------------------------------------------------------------]
+`;
+
+exports[`Jinja (new api) render template_error_syntax.jinja: template_error_syntax.jinja 1`] = `
+[Error: syntax error: unknown statement unexpected_block_name
+------------------------- template_error_syntax.jinja -------------------------
    7 | 7
    8 | {%- for country in countries %}
    9 | 9
@@ -257,7 +274,6 @@ exports[`Jinja (new api) render template_error.jinja: template_error.jinja 1`] =
   11 | 11
   12 | 12
   13 | 13
-
 -------------------------------------------------------------------------------]
 `;
 

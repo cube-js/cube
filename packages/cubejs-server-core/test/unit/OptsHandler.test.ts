@@ -14,6 +14,7 @@ import type {
 import type { OptsHandler } from '../../src/core/OptsHandler';
 import { lookupDriverClass } from '../../src/core/DriverResolvers';
 import { CubejsServerCore } from '../../src/core/server';
+import { CreateOptions, SystemOptions } from '../../src/core/types';
 
 class CubejsServerCoreExposed extends CubejsServerCore {
   public options: ServerCoreInitializedOptions;
@@ -27,6 +28,19 @@ class CubejsServerCoreExposed extends CubejsServerCore {
   public apiGateway = super.apiGateway;
 
   public reloadEnvVariables = super.reloadEnvVariables;
+
+  public constructor(
+    opts: CreateOptions = {},
+    systemOptions?: SystemOptions,
+  ) {
+    // disable telemetry while testing
+    super({ ...opts, telemetry: false, }, systemOptions);
+  }
+
+  public startScheduledRefreshTimer() {
+    // disabling interval
+    return null;
+  }
 }
 
 let message: string;
@@ -56,7 +70,7 @@ describe('OptsHandler class', () => {
     'need to be restored after documentation will be added',
     async () => {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const core = new CubejsServerCore({
+      const core = new CubejsServerCoreExposed({
         ...conf,
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         dbType: ((context: DriverContext) => 'postgres'),
@@ -1147,9 +1161,7 @@ describe('OptsHandler class', () => {
     });
 
     const gateway = <any>core.apiGateway();
-    expect(async () => {
-      await gateway.contextToApiScopesFn();
-    }).rejects.toThrow(
+    await expect(async () => gateway.contextToApiScopesFn()).rejects.toThrow(
       'A user-defined contextToApiScopes function returns an inconsistent type.'
     );
   });
@@ -1180,9 +1192,7 @@ describe('OptsHandler class', () => {
     });
 
     const gateway = <any>core.apiGateway();
-    expect(async () => {
-      await gateway.contextToApiScopesFn();
-    }).rejects.toThrow(
+    await expect(async () => gateway.contextToApiScopesFn()).rejects.toThrow(
       'A user-defined contextToApiScopes function returns a wrong scope: job'
     );
   });

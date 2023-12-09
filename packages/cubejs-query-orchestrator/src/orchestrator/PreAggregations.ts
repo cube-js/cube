@@ -353,7 +353,7 @@ class PreAggregationLoadCache {
     return this.tables[redisKey];
   }
 
-  protected async getTableColumnTypes(preAggregation: PreAggregationDescription, tableName: string): Promise<TableStructure> {
+  public async getTableColumnTypes(preAggregation: PreAggregationDescription, tableName: string): Promise<TableStructure> {
     const prefixKey = this.tablesCachePrefixKey(preAggregation);
     if (!this.tableColumnTypes[prefixKey]?.[tableName]) {
       if (!this.preAggregations.options.skipExternalCacheAndQueue && preAggregation.external) {
@@ -423,7 +423,7 @@ class PreAggregationLoadCache {
     return this.versionEntries[redisKey];
   }
 
-  protected async keyQueryResult(sqlQuery: QueryWithParams, waitForRenew, priority) {
+  public async keyQueryResult(sqlQuery: QueryWithParams, waitForRenew: boolean, priority: number) {
     const [query, values, queryOptions]: QueryTuple = Array.isArray(sqlQuery) ? sqlQuery : [sqlQuery, [], {}];
 
     if (!this.queryResults[this.queryCache.queryRedisKey([query, values])]) {
@@ -448,11 +448,11 @@ class PreAggregationLoadCache {
     return this.queryResults[this.queryCache.queryRedisKey([query, values])];
   }
 
-  protected hasKeyQueryResult(keyQuery) {
+  public hasKeyQueryResult(keyQuery) {
     return !!this.queryResults[this.queryCache.queryRedisKey(keyQuery)];
   }
 
-  protected async getQueryStage(stageQueryKey) {
+  public async getQueryStage(stageQueryKey) {
     const queue = await this.preAggregations.getQueue(this.dataSource);
     await this.fetchQueryStageState(queue);
     return queue.getQueryStage(stageQueryKey, undefined, this.queryStageState);
@@ -466,7 +466,7 @@ class PreAggregationLoadCache {
     return this.queryStageState;
   }
 
-  protected async reset(preAggregation) {
+  public async reset(preAggregation) {
     await this.tablesFromCache(preAggregation, true);
     this.tables = {};
     this.tableColumnTypes = {};
@@ -493,8 +493,6 @@ export class PreAggregationLoader {
   public preAggregation: any;
 
   private preAggregationsTablesToTempTables: any;
-
-  private loadCache: any;
 
   /**
    * Determines whether current instance instantiated for a jobed build query
@@ -528,13 +526,12 @@ export class PreAggregationLoader {
     preAggregations: PreAggregations,
     preAggregation,
     preAggregationsTablesToTempTables,
-    loadCache,
+    private readonly loadCache: PreAggregationLoadCache,
     options: any = {}
   ) {
     this.preAggregations = preAggregations;
     this.preAggregation = preAggregation;
     this.preAggregationsTablesToTempTables = preAggregationsTablesToTempTables;
-    this.loadCache = loadCache;
     this.isJob = !!options.isJob;
     this.waitForRenew = options.waitForRenew;
     this.forceBuild = options.forceBuild;
@@ -820,7 +817,7 @@ export class PreAggregationLoader {
     return version(versionArray);
   }
 
-  protected priority(defaultValue) {
+  protected priority(defaultValue: number): number {
     return this.preAggregation.priority != null ? this.preAggregation.priority : defaultValue;
   }
 
@@ -1495,7 +1492,7 @@ export class PreAggregationPartitionRangeLoader {
     private readonly preAggregations: PreAggregations,
     private readonly preAggregation: PreAggregationDescription,
     private readonly preAggregationsTablesToTempTables: [string, LoadPreAggregationResult][],
-    private readonly loadCache: any,
+    private readonly loadCache: PreAggregationLoadCache,
     private readonly options: PreAggsPartitionRangeLoaderOpts = {
       maxPartitions: 10000,
       maxSourceRowLimit: 10000,

@@ -61,6 +61,8 @@ impl NodeBridgeTransport {
 struct SessionContext {
     user: Option<String>,
     superuser: bool,
+    #[serde(rename = "securityContext", skip_serializing_if = "Option::is_none")]
+    security_context: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Serialize)]
@@ -113,6 +115,7 @@ impl TransportService for NodeBridgeTransport {
             session: SessionContext {
                 user: native_auth.user.clone(),
                 superuser: native_auth.superuser,
+                security_context: native_auth.security_context.clone(),
             },
         })?;
         let response = call_js_with_channel_as_callback::<V1MetaResponse>(
@@ -206,6 +209,7 @@ impl TransportService for NodeBridgeTransport {
             session: SessionContext {
                 user: native_auth.user.clone(),
                 superuser: native_auth.superuser,
+                security_context: native_auth.security_context.clone(),
             },
             sql_query: None,
             member_to_alias,
@@ -280,6 +284,7 @@ impl TransportService for NodeBridgeTransport {
                 session: SessionContext {
                     user: native_auth.user.clone(),
                     superuser: native_auth.superuser,
+                    security_context: native_auth.security_context.clone(),
                 },
                 sql_query: sql_query.clone().map(|q| (q.sql, q.values)),
                 member_to_alias: None,
@@ -358,6 +363,7 @@ impl TransportService for NodeBridgeTransport {
                 session: SessionContext {
                     user: native_auth.user.clone(),
                     superuser: native_auth.superuser,
+                    security_context: native_auth.security_context.clone(),
                 },
                 member_to_alias: None,
                 expression_params: None,
@@ -402,6 +408,7 @@ impl TransportService for NodeBridgeTransport {
                 session: SessionContext {
                     user: native_auth.user.clone(),
                     superuser: native_auth.superuser,
+                    security_context: native_auth.security_context.clone(),
                 },
             },
             Box::new(|cx, v| match NodeObjSerializer::serialize(&v, cx) {

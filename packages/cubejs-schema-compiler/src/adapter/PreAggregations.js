@@ -3,6 +3,11 @@ import R from 'ramda';
 import { UserError } from '../compiler/UserError';
 
 export class PreAggregations {
+  /**
+   * @param {import('../adapter/BaseQuery').BaseQuery} query
+   * @param historyQueries
+   * @param cubeLatticeCache
+   */
   constructor(query, historyQueries, cubeLatticeCache) {
     this.query = query;
     this.historyQueries = historyQueries;
@@ -63,6 +68,7 @@ export class PreAggregations {
     if (foundPreAggregation.preAggregation.type === 'rollupLambda') {
       preAggregations = foundPreAggregation.referencedPreAggregations;
     }
+
     return preAggregations.map(preAggregation => {
       if (this.canPartitionsBeUsed(preAggregation)) {
         const { dimension, partitionDimension } = this.partitionDimension(preAggregation);
@@ -151,17 +157,35 @@ export class PreAggregations {
     const queryForSqlEvaluation = this.query.preAggregationQueryForSqlEvaluation(cube, preAggregation);
     const partitionInvalidateKeyQueries = queryForSqlEvaluation.partitionInvalidateKeyQueries && queryForSqlEvaluation.partitionInvalidateKeyQueries(cube, preAggregation);
 
-    const matchedTimeDimension =
-      preAggregation.partitionGranularity &&
-      !this.hasCumulativeMeasures &&
-      this.query.timeDimensions.find(
-        td => td.dimension === foundPreAggregation.references.timeDimensions[0].dimension && td.dateRange
-      );
-    const filters = preAggregation.partitionGranularity && this.query.filters.filter(
-      td => td.dimension === foundPreAggregation.references.timeDimensions[0].dimension &&
-        td.isDateOperator() &&
-        td.camelizeOperator === 'inDateRange' // TODO support all date operators
-    );
+    const matchedTimeDimension = preAggregation.partitionGranularity && !this.hasCumulativeMeasures &&
+      this.query.timeDimensions.find(td => {
+        if (!td.dateRange) {
+          return false;
+        }
+
+        if (td.dimension === foundPreAggregation.references.timeDimensions[0].dimension) {
+          return true;
+        }
+
+        // Handling for views
+        const dimension = this.query.cubeEvaluator.byPath('dimensions', td.expressionPath());
+        return dimension?.aliasMember === foundPreAggregation.references.timeDimensions[0].dimension;
+      });
+
+    const filters = preAggregation.partitionGranularity && this.query.filters.filter(td => {
+      // TODO support all date operators
+      if (td.isDateOperator() && td.camelizeOperator === 'inDateRange') {
+        if (td.dimension === foundPreAggregation.references.timeDimensions[0].dimension) {
+          return true;
+        }
+
+        // Handling for views
+        const dimension = this.query.cubeEvaluator.byPath('dimensions', td.expressionPath());
+        return dimension?.aliasMember === foundPreAggregation.references.timeDimensions[0].dimension && td.dateRange;
+      }
+
+      return false;
+    });
 
     const uniqueKeyColumnsDefault = () => null;
     const uniqueKeyColumns = ({
@@ -557,7 +581,7 @@ export class PreAggregations {
         R.all(m => backAliasMeasures.indexOf(m) !== -1, transformedQuery.leafMeasures)
       ));
     };
-    
+
     /**
      * Wrap granularity string into an array.
      * @param {string} granularity
@@ -565,7 +589,7 @@ export class PreAggregations {
      */
     const expandGranularity = (granularity) => (
       transformedQuery.granularityHierarchies[granularity] ||
-        [granularity]
+      [granularity]
     );
 
     /**
@@ -666,7 +690,7 @@ export class PreAggregations {
       transformedQuery.leafMeasureAdditive &&
       !transformedQuery.hasMultipliedMeasures
         ? (r) => canUsePreAggregationLeafMeasureAdditive(r) ||
-        canUsePreAggregationNotAdditive(r)
+          canUsePreAggregationNotAdditive(r)
         : canUsePreAggregationNotAdditive;
 
     if (refs) {

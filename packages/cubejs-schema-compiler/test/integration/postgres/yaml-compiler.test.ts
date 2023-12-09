@@ -511,4 +511,128 @@ cubes:
       );
     });
   });
+
+  it('view join ambiguity', async () => {
+    const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
+cubes:
+  - name: W
+    sql: |
+      SELECT 1 as w_id, 1 as z_id
+
+    measures: []
+
+    dimensions:
+
+      - name: w_id
+        type: string
+        sql: w_id
+        primary_key: true
+ 
+    joins:
+      
+      - name: Z
+        sql: "{CUBE}.z_id = {Z}.z_id"
+        relationship: many_to_one
+
+  - name: M
+    sql: |
+      SELECT 1 as m_id, 1 as v_id, 1 as w_id
+
+    measures:
+
+      - name: count
+        type: countDistinct
+        sql: "{CUBE}.m_id"
+
+    dimensions:
+
+      - name: m_id
+        type: string
+        sql: m_id
+        primary_key: true
+    
+    joins:
+      
+      - name: V
+        sql: "{CUBE}.v_id = {V}.v_id"
+        relationship: many_to_one
+
+      - name: W
+        sql: "{CUBE}.w_id = {W}.w_id"
+        relationship: many_to_one
+        
+  - name: Z
+    sql: >
+      SELECT 1 as z_id, 'US' as COUNTRY
+    
+    dimensions:
+      - name: country
+        sql: "{CUBE}.COUNTRY"
+        type: string
+
+      - name: z_id
+        sql: "{CUBE}.z_id"
+        type: string
+        primaryKey: true
+        
+  - name: V
+    sql: |
+      SELECT 1 as v_id, 1 as z_id
+
+    dimensions:
+
+      - name: v_id
+        sql: "{CUBE}.v_id"
+        type: string
+        primary_key: true
+
+    joins:
+
+      - name: Z
+        sql: "{CUBE}.z_id = {Z}.z_id"
+        relationship: many_to_one
+
+
+views:
+  - name: m_view
+ 
+    cubes:
+
+      - join_path: M
+        includes: "*"
+        prefix: false
+
+      - join_path: M.V
+        includes: "*"
+        prefix: true
+        alias: v
+
+      - join_path: M.W
+        includes: "*"
+        prefix: true
+        alias: w
+
+      - join_path: M.W.Z
+        includes: "*"
+        prefix: true
+        alias: w_z
+    `);
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: ['m_view.count'],
+      dimensions: ['m_view.w_z_country'],
+      timezone: 'UTC',
+      preAggregationsSchema: ''
+    });
+
+    const res = await dbRunner.evaluateQueryWithPreAggregations(query);
+
+    expect(res).toEqual(
+      [{
+        m_view__count: '1',
+        m_view__w_z_country: 'US',
+      }]
+    );
+  });
 });

@@ -2,7 +2,7 @@ use crate::cachestore::CacheStore;
 use crate::config::ConfigObj;
 use crate::metastore::MetaStoreEvent;
 use crate::shared::deadline_queue::DeadlineQueue;
-use crate::CubeError;
+use crate::{app_metrics, CubeError};
 use datafusion::cube_ext;
 use log::error;
 use std::sync::Arc;
@@ -130,7 +130,13 @@ impl CacheStoreSchedulerImpl {
         }
     }
 
+    fn send_zero_gauge_stats(&self) {
+        app_metrics::CACHESTORE_SCHEDULER_GC_QUEUE.report(0);
+    }
+
     pub fn stop_processing_loops(&self) -> Result<(), CubeError> {
+        self.send_zero_gauge_stats();
+
         self.cancel_token.cancel();
         Ok(())
     }

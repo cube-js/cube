@@ -91,6 +91,32 @@ describe('API Gateway', () => {
     expect(res.body && res.body.error).toStrictEqual('Invalid token');
   });
 
+  test('query field is empty', async () => {
+    const { app } = await createApiGateway();
+
+    const res = await request(app)
+      .get('/cubejs-api/v1/load?query=')
+      .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+      .expect(400);
+
+    expect(res.body && res.body.error).toStrictEqual(
+      'Query param is required'
+    );
+  });
+
+  test('incorrect json for query field', async () => {
+    const { app } = await createApiGateway();
+
+    const res = await request(app)
+      .get('/cubejs-api/v1/load?query=NOT_A_JSON')
+      .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+      .expect(400);
+
+    expect(res.body && res.body.error).toStrictEqual(
+      'Unable to decode query param as JSON, error: Unexpected token N in JSON at position 0'
+    );
+  });
+
   test('requires auth', async () => {
     const { app } = await createApiGateway();
 

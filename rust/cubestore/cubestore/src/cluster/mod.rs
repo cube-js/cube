@@ -1167,7 +1167,8 @@ impl ClusterImpl {
         &self,
         plan_node: SerializedPlan,
     ) -> Result<(SchemaRef, Vec<SerializedRecordBatchStream>), CubeError> {
-        self.process_rate_limiter
+        let wait_ms = self
+            .process_rate_limiter
             .wait_for_allow(
                 TaskType::Select,
                 Some(Duration::from_secs(self.config_obj.query_timeout())),
@@ -1181,13 +1182,18 @@ impl ClusterImpl {
         match res {
             Ok((schema, records, data_loaded_size)) => {
                 self.process_rate_limiter
-                    .commit_task_usage(TaskType::Select, data_loaded_size as i64, trace_index)
+                    .commit_task_usage(
+                        TaskType::Select,
+                        data_loaded_size as i64,
+                        wait_ms,
+                        trace_index,
+                    )
                     .await;
                 Ok((schema, records))
             }
             Err(e) => {
                 self.process_rate_limiter
-                    .commit_task_usage(TaskType::Select, 0, trace_index)
+                    .commit_task_usage(TaskType::Select, 0, wait_ms, trace_index)
                     .await;
                 Err(e)
             }

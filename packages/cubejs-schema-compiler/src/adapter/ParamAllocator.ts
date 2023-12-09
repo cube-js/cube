@@ -12,6 +12,10 @@ export class ParamAllocator {
     return sql.replace(/\?/g, () => this.allocateParam(paramArray[paramIndex++]));
   }
 
+  public hasParametersInSql(sql: string): boolean {
+    return sql.match(PARAMS_MATCH_REGEXP) !== null;
+  }
+
   public buildSqlAndParams(annotatedSql: string, exportAnnotatedSql?: boolean): [string, unknown[]] {
     const paramsInSqlOrder: unknown[] = [];
 
