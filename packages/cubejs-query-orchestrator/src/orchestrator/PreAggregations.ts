@@ -26,6 +26,8 @@ import {
   UnloadOptions,
 } from '@cubejs-backend/base-driver';
 import { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
+import LRUCache from 'lru-cache';
+
 import { PreAggTableToTempTable, Query, QueryBody, QueryCache, QueryTuple, QueryWithParams } from './QueryCache';
 import { ContinueWaitError } from './ContinueWaitError';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
@@ -1968,6 +1970,8 @@ export class PreAggregations {
 
   private readonly getQueueEventsBus: any;
 
+  private readonly touchCache: LRUCache<string, true>;
+
   public constructor(
     private readonly redisPrefix: string,
     private readonly driverFactory: DriverFactoryByDataSource,
@@ -1984,14 +1988,20 @@ export class PreAggregations {
     this.usedTablePersistTime = options.usedTablePersistTime || getEnv('dbQueryTimeout');
     this.externalRefresh = options.externalRefresh;
     this.getQueueEventsBus = options.getQueueEventsBus;
+    this.touchCache = new LRUCache({
+      max: getEnv('touchPreAggregationCacheMaxCount'),
+      maxAge: getEnv('touchPreAggregationCacheMaxAge') * 1000,
+      stale: false,
+      updateAgeOnGet: false
+    });
   }
 
-  protected tablesUsedRedisKey(tableName) {
+  protected tablesUsedRedisKey(tableName: string): string {
     // TODO add dataSource?
     return this.queryCache.getKey('SQL_PRE_AGGREGATIONS_TABLES_USED', tableName);
   }
 
-  protected tablesTouchRedisKey(tableName) {
+  protected tablesTouchRedisKey(tableName: string): string {
     // TODO add dataSource?
     return this.queryCache.getKey('SQL_PRE_AGGREGATIONS_TABLES_TOUCH', tableName);
   }
@@ -2001,8 +2011,12 @@ export class PreAggregations {
     return this.queryCache.getKey('SQL_PRE_AGGREGATIONS_REFRESH_END_REACHED', '');
   }
 
-  public async addTableUsed(tableName) {
-    return this.queryCache.getCacheDriver().set(this.tablesUsedRedisKey(tableName), true, this.usedTablePersistTime);
+  public async addTableUsed(tableName: string): Promise<void> {
+    await this.queryCache.getCacheDriver().set(
+      this.tablesUsedRedisKey(tableName),
+      true,
+      this.usedTablePersistTime
+    );
   }
 
   public async tablesUsed() {
@@ -2010,8 +2024,24 @@ export class PreAggregations {
       .map(k => k.replace(this.tablesUsedRedisKey(''), ''));
   }
 
-  public async updateLastTouch(tableName) {
-    return this.queryCache.getCacheDriver().set(this.tablesTouchRedisKey(tableName), new Date().getTime(), this.touchTablePersistTime);
+  public async updateLastTouch(tableName: string): Promise<void> {
+    if (this.touchCache.has(tableName)) {
+      return;
+    }
+
+    try {
+      this.touchCache.set(tableName, true);
+
+      await this.queryCache.getCacheDriver().set(
+        this.tablesTouchRedisKey(tableName),
+        new Date().getTime(),
+        this.touchTablePersistTime
+      );
+    } catch (e: unknown) {
+      this.touchCache.del(tableName);
+
+      throw e;
+    }
   }
 
   public async tablesTouched() {
