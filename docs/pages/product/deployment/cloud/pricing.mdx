@@ -113,16 +113,16 @@ Workers to run queries and refresh pre-aggregations mostly during working hours,
 being active approximately 50% of the time.
 * Updates its data model infrequently and without using a dedicated Development
 Instance for testing purposes, with 2 data engineers spending just 1 hour a day each,
-5 days a week in the development mode of the Production Cluster.
+in the development mode of the Production Cluster.
 
-| Resource                                        | Usage per month                                                                             | CCU per month                   | Cost per month                                             |
-| ----------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------- | ---------------------------------------------------------- |
-| Production Cluster                              | 1 Production Cluster ×<br/>24 hours per day ×<br/>7 days per week ×<br/>4.4 weeks per month | 739 hours ×<br/>4 CCUs per hour | 2956 CCUs ×<br/>\$&thinsp;0.25 per CCU = **\$&thinsp;739** |
-| Additional Cube API Instance                    | —                                                                                           | —                               | —                                                          |
-| Cube Store Worker                               | 2 Cube Store Workers ×<br/>12 hours per day ×<br/>7 days per week ×<br/>4.4 weeks per month | 740 hours ×<br/>1 CCU per hour  | 740 CCUs ×<br/>\$&thinsp;0.25 per CCU = **\$&thinsp;185**  |
-| Development Instance                            | —                                                                                           | —                               | —                                                          |
-| Development Instance<br/>(for development mode) | 2 users ×<br/>1 hour per day ×<br/>5 days per week ×<br/>4.4 weeks per month                | 44 hours ×<br/>1 CCU per hour   | 44 CCUs ×<br/>\$&thinsp;0.25 per CCU = **\$&thinsp;11**    |
-| **Total**                                       |                                                                                             |                                 | **\$&thinsp;935**                                          |
+| Resource                                        | Usage per month                                           | CCU per month                   | Cost per month                                             |
+| ----------------------------------------------- | --------------------------------------------------------- | ------------------------------- | ---------------------------------------------------------- |
+| Production Cluster                              | 1 Production Cluster ×<br/>24 hours per day ×<br/>30 days | 720 hours ×<br/>4 CCUs per hour | 2880 CCUs ×<br/>\$&thinsp;0.25 per CCU = **\$&thinsp;720** |
+| Additional Cube API Instance                    | —                                                         | —                               | —                                                          |
+| Cube Store Worker                               | 2 Cube Store Workers ×<br/>12 hours per day ×<br/>30 days | 720 hours ×<br/>1 CCU per hour  | 720 CCUs ×<br/>\$&thinsp;0.25 per CCU = **\$&thinsp;180**  |
+| Development Instance                            | —                                                         | —                               | —                                                          |
+| Development Instance<br/>(for development mode) | 2 users ×<br/>1 hour per day ×<br/>30 days                | 60 hours ×<br/>1 CCU per hour   | 60 CCUs ×<br/>\$&thinsp;0.25 per CCU = **\$&thinsp;15**    |
+| **Total**                                       |                                                           |                                 | **\$&thinsp;915**                                          |
 
 ### Medium-scale deployment
 
@@ -137,20 +137,18 @@ during a peak hour every day.
 * Operates on a moderate volume of data that requires the usage of 4 Cube Store
 Workers by both Production Clusters to run queries and refresh pre-aggregations 24/7,
 being active approximately 50% of the time.
-* Uses a dedicated Development Instance for testing purposes that is active 12 hours a day,
-5 days a week, and has auto-suspension enabled with an 1-hour threshold.
+* Uses a dedicated Development Instance for testing purposes that is active 12 hours a day.
 * Has a team of 5 data engineers who frequently update the data model, with each data engineer
-spending about 4 hours a day, 5 days a week in the development mode of the dedicated
-Development Instance.
+spending about 4 hours a day in the development mode of the dedicated Development Instance.
 
-| Resource                                        | Usage per month                                                                                                         | CCU per month                    | Cost per month                                             |
-| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | -------------------------------- | ---------------------------------------------------------- |
-| Production Cluster                              | 2 Production Clusters ×<br/>24 hours per day ×<br/>7 days per week ×<br/>4.4 weeks per month                            | 1478 hours ×<br/>4 CCUs per hour | 5912 CCUs ×<br/>\$&thinsp;0.4 per CCU = **\$&thinsp;2365** |
-| Additional Cube API Instance                    | 2 Production Clusters ×<br/>(8 – 2) API Instances ×<br/>1 hour per day ×<br/>7 days per week ×<br/>4.4 weeks per month  | 370 hours ×<br/>1 CCU per hour   | 370 CCUs ×<br/>\$&thinsp;0.4 per CCU = **\$&thinsp;148**   |
-| Cube Store Worker                               | 2 Production Clusters ×<br/>4 Cube Store Workers ×<br/>12 hours per day ×<br/>7 days per week ×<br/>4.4 weeks per month | 2959 hours ×<br/>1 CCU per hour  | 2959 CCUs ×<br/>\$&thinsp;0.4 per CCU = **\$&thinsp;1184** |
-| Development Instance                            | 1 Development Instance ×<br/>(12 + 1) hours per day ×<br/>5 days per week ×<br/>4.4 weeks per month                     | 286 hours ×<br/>1 CCU per hour   | 286 CCUs ×<br/>\$&thinsp;0.4 per CCU = **\$&thinsp;114**   |
-| Development Instance<br/>(for development mode) | 5 users ×<br/>4 hours per day ×<br/>5 days per week ×<br/>4.4 weeks per month                                           | 440 hours ×<br/>1 CCU per hour   | 440 CCUs ×<br/>\$&thinsp;0.4 per CCU = **\$&thinsp;176**   |
-| **Total**                                       |                                                                                                                         |                                  | **\$&thinsp;3987**                                         |
+| Resource                                        | Usage per month                                                                       | CCU per month                    | Cost per month                                             |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------- | -------------------------------- | ---------------------------------------------------------- |
+| Production Cluster                              | 2 Production Clusters ×<br/>24 hours per day ×<br/>30 days                            | 1440 hours ×<br/>4 CCUs per hour | 5760 CCUs ×<br/>\$&thinsp;0.4 per CCU = **\$&thinsp;2304** |
+| Additional Cube API Instance                    | 2 Production Clusters ×<br/>(8 – 2) API Instances ×<br/>1 hour per day ×<br/>30 days  | 360 hours ×<br/>1 CCU per hour   | 360 CCUs ×<br/>\$&thinsp;0.4 per CCU = **\$&thinsp;144**   |
+| Cube Store Worker                               | 2 Production Clusters ×<br/>4 Cube Store Workers ×<br/>12 hours per day ×<br/>30 days | 2880 hours ×<br/>1 CCU per hour  | 2880 CCUs ×<br/>\$&thinsp;0.4 per CCU = **\$&thinsp;1152** |
+| Development Instance                            | 1 Development Instance ×<br/>12 hours per day ×<br/>30 days                           | 360 hours ×<br/>1 CCU per hour   | 360 CCUs ×<br/>\$&thinsp;0.4 per CCU = **\$&thinsp;144**   |
+| Development Instance<br/>(for development mode) | 5 users ×<br/>4 hours per day ×<br/>30 days                                           | 600 hours ×<br/>1 CCU per hour   | 600 CCUs ×<br/>\$&thinsp;0.4 per CCU = **\$&thinsp;240**   |
+| **Total**                                       |                                                                                       |                                  | **\$&thinsp;3984**                                         |
 
 ## Overages and payment terms
 
