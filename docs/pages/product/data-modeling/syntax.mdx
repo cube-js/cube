@@ -58,6 +58,7 @@ cubes:
       SELECT *
       FROM orders, line_items
       WHERE orders.id = line_items.order_id
+
 ```
 
 </CodeTabs>
@@ -110,6 +111,10 @@ cubes:
       - name: status
         sql: "UPPER(status)"
         type: string
+
+
+
+
 ```
 
 ```javascript
@@ -129,6 +134,26 @@ cube(`orders`, {
       type: `string`,
     },
   },
+});
+```
+
+</CodeTabs>
+
+If your database uses case-sensitive identifiers, make sure to properly
+quote table and column names. For example, here's how you can reference
+a Postgres table that contains uppercase letters in its name:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    sql_table: 'public."Orders"'
+```
+
+```javascript
+cube(`orders`, {
+  sql_table: `public."Orders"`,
 });
 ```
 
@@ -157,6 +182,8 @@ cubes:
       - name: name
         sql: name
         type: string
+
+
 ```
 
 ```javascript
@@ -204,6 +231,10 @@ cubes:
       - name: full_name
         sql: "CONCAT({name}, ' ', {surname})"
         type: string
+
+
+
+
 ```
 
 ```javascript
@@ -274,6 +305,15 @@ cubes:
       - name: name
         sql: "{contacts}.name"
         type: string
+
+
+
+
+
+
+
+
+
 ```
 
 ```javascript
@@ -410,6 +450,15 @@ cubes:
       - name: name
         sql: "{CUBE}.name"
         type: string
+
+
+
+
+
+
+
+
+
 ```
 
 </CodeTabs>
@@ -463,19 +512,36 @@ cubes:
         dimensions:
           - CUBE.status
         measures:
-          - count
+          - CUBE.count
+
+
+
+
 ```
 
 ```javascript
 cube(`orders`, {
   sql_table: `orders`,
 
+  dimensions: {
+    status: {
+      sql: `status`,
+      type: `string`
+    }
+  },
+
+  measures: {
+    count: {
+      type: `count`
+    }
+  },
+
   pre_aggregations: {
     orders_by_status: {
       dimensions: [CUBE.status],
-      measures: [CUBE.count],
-    },
-  },
+      measures: [CUBE.count]
+    }
+  }
 });
 ```
 
