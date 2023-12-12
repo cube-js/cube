@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/ws-transport",
-  "version": "0.34.27",
+  "version": "0.34.32",
   "engines": {},
   "repository": {
     "type": "git",
@@ -20,7 +20,7 @@
   },
   "dependencies": {
     "@babel/runtime": "^7.1.2",
-    "@cubejs-client/core": "^0.34.27",
+    "@cubejs-client/core": "^0.34.32",
     "core-js": "^3.6.5",
     "isomorphic-ws": "^4.0.1",
     "ws": "^7.3.1"
@@ -36,8 +36,8 @@
     "@babel/preset-typescript": "^7.12.1",
     "@cubejs-backend/linter": "^0.34.25",
     "@types/ws": "^7.2.9",
-    "babel-jest": "^26.6.3",
-    "jest": "^26.6.3",
+    "babel-jest": "^27",
+    "jest": "^27",
     "typescript": "~5.2.2"
   },
   "publishConfig": {

@@ -7,7 +7,12 @@ import cubejs, { CubejsApi, Query } from '@cubejs-client/core';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { afterAll, beforeAll, expect, jest } from '@jest/globals';
 import { BirdBox, getBirdbox } from '../src';
-import { DEFAULT_API_TOKEN, DEFAULT_CONFIG } from './smoke-tests';
+import {
+  DEFAULT_API_TOKEN,
+  DEFAULT_CONFIG,
+  JEST_AFTER_ALL_DEFAULT_TIMEOUT,
+  JEST_BEFORE_ALL_DEFAULT_TIMEOUT,
+} from './smoke-tests';
 
 const CubeStoreDriver = require('@cubejs-backend/cubestore-driver');
 const PostgresDriver = require('@cubejs-backend/postgres-driver');
@@ -69,13 +74,13 @@ describe('lambda', () => {
       password: undefined,
       port: 3030,
     });
-  });
+  }, JEST_BEFORE_ALL_DEFAULT_TIMEOUT);
 
   afterAll(async () => {
     await birdbox.stop();
     await db.stop();
     await cubestore.release();
-  });
+  }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
 
   test('query', async () => {
     const query: Query = {

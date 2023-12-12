@@ -336,7 +336,14 @@ const setupScheduler = ({ repository, useOriginalSqlPreAggregations, skipAssertS
   const mockDriver = new MockDriver();
   const externalDriver = new MockDriver();
 
-  const serverCore = new CubejsServerCore({
+  class CubejsServerCoreDisabledRefreshTimer extends CubejsServerCore {
+    public startScheduledRefreshTimer() {
+      // disabling interval
+      return null;
+    }
+  }
+
+  const serverCore = new CubejsServerCoreDisabledRefreshTimer({
     apiSecret: 'foo',
     logger: (msg, params) => console.log(msg, params),
     driverFactory: async ({ securityContext }) => {
@@ -402,7 +409,7 @@ describe('Refresh Scheduler', () => {
 
   afterAll(async () => {
     // align logs from STDOUT
-    await pausePromise(100);
+    await pausePromise(250);
   });
 
   test('Round robin pre-aggregation refresh by history priority', async () => {

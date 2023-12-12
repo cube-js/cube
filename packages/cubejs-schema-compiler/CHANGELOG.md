@@ -3,6 +3,33 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.33](https://github.com/cube-js/cube/compare/v0.34.32...v0.34.33) (2023-12-11)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.34.32](https://github.com/cube-js/cube/compare/v0.34.31...v0.34.32) (2023-12-07)
+
+
+### Features
+
+* **cubesql:** Add CURRENT_DATE function definitions for Postgres and Snowflake so those can be pushed down ([ac1ca88](https://github.com/cube-js/cube/commit/ac1ca889add970dd05820b8f077edb968c985994))
+
+
+
+
+
+## [0.34.31](https://github.com/cube-js/cube/compare/v0.34.30...v0.34.31) (2023-12-07)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
 ## [0.34.30](https://github.com/cube-js/cube/compare/v0.34.29...v0.34.30) (2023-12-04)
 
 

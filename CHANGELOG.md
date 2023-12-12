@@ -3,6 +3,64 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.34](https://github.com/cube-js/cube/compare/v0.34.33...v0.34.34) (2023-12-12)
+
+
+### Bug Fixes
+
+* **api-gateway:** Catch error from contextToApiScopes ([#7521](https://github.com/cube-js/cube/issues/7521)) ([0214472](https://github.com/cube-js/cube/commit/0214472dabf39b8429e11f4830350b2a6bd305a0))
+* **api-gateway:** Fallback to global error middelware for async handlers ([#7520](https://github.com/cube-js/cube/issues/7520)) ([74b0862](https://github.com/cube-js/cube/commit/74b0862800ada31681e702992ff1f7da89924b9f))
+* **api-gateway:** Removed hasOwnProperty check for request object ([#7517](https://github.com/cube-js/cube/issues/7517)) ([2129a1b](https://github.com/cube-js/cube/commit/2129a1b5bac1e2863e8136adb061708d8660354e))
+* **deps:** Upgrade qs (CVE-2022-24999) ([#7518](https://github.com/cube-js/cube/issues/7518)) ([55422a1](https://github.com/cube-js/cube/commit/55422a1b340c8ca067e783952aaed041ab6aed40))
+
+
+
+
+
+## [0.34.33](https://github.com/cube-js/cube/compare/v0.34.32...v0.34.33) (2023-12-11)
+
+
+### Features
+
+* **duckdb-driver:** Declare user agent information ([#7490](https://github.com/cube-js/cube/issues/7490)) ([59557e8](https://github.com/cube-js/cube/commit/59557e8492e4338c457b129c6c59bde542410577))
+* **query-orchestrator:** Reduce number of touches for pre-aggregations ([#7515](https://github.com/cube-js/cube/issues/7515)) ([c22eb91](https://github.com/cube-js/cube/commit/c22eb9183c6c7c02e137662ee935f418ef45f02a))
+
+
+
+
+
+## [0.34.32](https://github.com/cube-js/cube/compare/v0.34.31...v0.34.32) (2023-12-07)
+
+
+### Bug Fixes
+
+* **query-orchestrator:** Queue - clear timer on streaming ([#7501](https://github.com/cube-js/cube/issues/7501)) ([ac2357d](https://github.com/cube-js/cube/commit/ac2357dd52f3316dc33158795388067097c32ece))
+
+
+### Features
+
+* **cubesql:** Add CURRENT_DATE function definitions for Postgres and Snowflake so those can be pushed down ([ac1ca88](https://github.com/cube-js/cube/commit/ac1ca889add970dd05820b8f077edb968c985994))
+
+
+
+
+
+## [0.34.31](https://github.com/cube-js/cube/compare/v0.34.30...v0.34.31) (2023-12-07)
+
+
+### Bug Fixes
+
+* **cubesql:** Avoid constant folding for current_date() function duri… ([#7498](https://github.com/cube-js/cube/issues/7498)) ([e86f4be](https://github.com/cube-js/cube/commit/e86f4be42a6e48a115c2765e0cda84fbf1cc56e7))
+
+
+### Features
+
+* **cubesql:** Support `Utf8 * Interval` expression ([ea1fa9c](https://github.com/cube-js/cube/commit/ea1fa9ca6e04cf12b4c334b5702d7a5a33f0c364))
+
+
+
+
+
 ## [0.34.30](https://github.com/cube-js/cube/compare/v0.34.29...v0.34.30) (2023-12-04)
 
 

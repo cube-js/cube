@@ -3,6 +3,33 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.33](https://github.com/cube-js/cube/compare/v0.34.32...v0.34.33) (2023-12-11)
+
+
+### Features
+
+* **duckdb-driver:** Declare user agent information ([#7490](https://github.com/cube-js/cube/issues/7490)) ([59557e8](https://github.com/cube-js/cube/commit/59557e8492e4338c457b129c6c59bde542410577))
+
+
+
+
+
+## [0.34.32](https://github.com/cube-js/cube/compare/v0.34.31...v0.34.32) (2023-12-07)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [0.34.31](https://github.com/cube-js/cube/compare/v0.34.30...v0.34.31) (2023-12-07)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
 ## [0.34.30](https://github.com/cube-js/cube/compare/v0.34.29...v0.34.30) (2023-12-04)
 
 **Note:** Version bump only for package @cubejs-backend/duckdb-driver

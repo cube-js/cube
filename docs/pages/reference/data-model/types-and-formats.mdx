@@ -733,9 +733,9 @@ cubes:
 
 ## Dimension Formats
 
-### image_url
+### imageUrl
 
-`image_url` is used for displaying images in table visualization. In this case
+`imageUrl` is used for displaying images in table visualization. In this case
 `sql` parameter should contain full path to the image.
 
 <CodeTabs>
@@ -748,7 +748,7 @@ cube(`orders`, {
     image: {
       sql: `CONCAT('https://img.example.com/id/', ${id})`,
       type: `string`,
-      format: `image_url`,
+      format: `imageUrl`,
     },
   },
 });
@@ -763,7 +763,7 @@ cubes:
       - name: image
         sql: "CONCAT('https://img.example.com/id/', {id})"
         type: string
-        format: image_url
+        format: imageUrl
 ```
 
 </CodeTabs>

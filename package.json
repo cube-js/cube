@@ -28,13 +28,9 @@
   },
   "author": "Cube Dev, Inc.",
   "dependencies": {
-    "@babel/runtime-corejs2": "^7.0.0",
     "@typescript-eslint/eslint-plugin": "^4.17.0",
-    "core-js": "^3.6.5",
-    "lerna": "^4.0.0",
-    "ramda": "^0.27.0",
-    "rollup-plugin-dts": "^1.1.8",
-    "whatwg-fetch": "^3.0.0"
+    "core-js": "^3.34.0",
+    "lerna": "^4.0.0"
   },
   "files": [
     "src",
@@ -52,8 +48,7 @@
     "@rollup/plugin-commonjs": "^17.1.0",
     "@rollup/plugin-node-resolve": "^11.2.0",
     "@types/fs-extra": "^9.0.1",
-    "@types/jest": "^26.0.3",
-    "babel-runtime": "^6.26.0",
+    "@types/jest": "^27",
     "flush-promises": "^1.0.2",
     "husky": "^5.0.4",
     "is-ci": "^2.0.0",

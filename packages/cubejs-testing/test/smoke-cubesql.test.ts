@@ -5,7 +5,7 @@ import { PostgresDBRunner } from '@cubejs-backend/testing-shared';
 import type { StartedTestContainer } from 'testcontainers';
 
 import { BirdBox, getBirdbox } from '../src';
-import { DEFAULT_CONFIG } from './smoke-tests';
+import { DEFAULT_CONFIG, JEST_AFTER_ALL_DEFAULT_TIMEOUT, JEST_BEFORE_ALL_DEFAULT_TIMEOUT } from './smoke-tests';
 
 describe('SQL API', () => {
   jest.setTimeout(60 * 5 * 1000);
@@ -68,14 +68,13 @@ describe('SQL API', () => {
       }
     );
     connection = await createPostgresClient('admin', 'admin_password');
-  });
+  }, JEST_BEFORE_ALL_DEFAULT_TIMEOUT);
 
   afterAll(async () => {
+    await connection.end();
     await birdbox.stop();
     await db.stop();
-    // await not working properly
-    await connection.end();
-  });
+  }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
 
   describe('Postgres (Auth)', () => {
     test('Success Admin', async () => {

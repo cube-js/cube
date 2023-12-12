@@ -11749,7 +11749,7 @@ ORDER BY \"COUNT(count)\" DESC"
 
         assert_eq!(
             logical_plan,
-            "Projection: Date32(\"0\") AS COL\
+            "Projection: currentdate() AS COL\
             \n  EmptyRelation",
         );
 
@@ -19269,6 +19269,35 @@ ORDER BY \"COUNT(count)\" DESC"
                 .unwrap()
                 .sql
         );
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_tableau_custom_date_diff() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT SUM(CAST(FLOOR(EXTRACT(EPOCH FROM CAST(CURRENT_DATE() AS TIMESTAMP)) / 86400) - FLOOR(EXTRACT(EPOCH FROM CAST(order_date AS TIMESTAMP)) / 86400) AS BIGINT)) FROM KibanaSampleDataEcommerce a"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+            .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert!(logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql
+            .contains("CURRENT_DATE()"));
 
         let physical_plan = query_plan.as_physical_plan().await.unwrap();
         println!(
