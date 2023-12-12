@@ -711,11 +711,12 @@ export class DatabricksDriver extends JDBCDriver {
     const expr = new RegExp(`${foldername}\\/.*\\.csv$`, 'i');
 
     let credential: StorageSharedKeyCredential | ClientSecretCredential;
-    credential = new StorageSharedKeyCredential(
-      account,
-      this.config.azureKey as string,
-    );
-    if (this.config.azureTenantId && this.config.azureClientId && this.config.azureClientSecret) {
+    if (this.config.azureKey !== undefined) {
+      credential = new StorageSharedKeyCredential(
+        account,
+        this.config.azureKey as string,
+      );
+    } else {
       credential = new ClientSecretCredential(
         this.config.azureTenantId as string,
         this.config.azureClientId as string,
