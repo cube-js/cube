@@ -27,16 +27,17 @@ CUBEJS_DB_PASS=**********
 
 ## Environment Variables
 
-| Environment Variable | Description                                                                         | Possible Values           | Required | [Supports multiple data sources?][ref-config-multiple-ds-decorating-env] |
-| -------------------- | ----------------------------------------------------------------------------------- | ------------------------- | :------: | :----------------------------------------------------------------------: |
-| `CUBEJS_DB_HOST`     | The host URL for a database                                                         | A valid database host URL |    ✅    |                                    ✅                                    |
-| `CUBEJS_DB_PORT`     | The port for the database connection                                                | A valid port number       |    ❌    |                                    ✅                                    |
-| `CUBEJS_DB_NAME`     | The name of the database to connect to                                              | A valid database name     |    ✅    |                                    ✅                                    |
-| `CUBEJS_DB_USER`     | The username used to connect to the database                                        | A valid database username |    ✅    |                                    ✅                                    |
-| `CUBEJS_DB_PASS`     | The password used to connect to the database                                        | A valid database password |    ✅    |                                    ✅                                    |
-| `CUBEJS_DB_SSL`      | If `true`, enables SSL encryption for database connections from Cube                | `true`, `false`           |    ❌    |                                    ✅                                    |
-| `CUBEJS_CONCURRENCY` | The number of concurrent connections each queue has to the database. Default is `2` | A valid number            |    ❌    |                                    ✅                                    |
-| `CUBEJS_DB_MAX_POOL` | The maximum number of concurrent database connections to pool. Default is `8`       | A valid number            |    ❌    |                                    ✅                                    |
+| Environment Variable    | Description                                                                         | Possible Values           | Required |
+| ----------------------- | ----------------------------------------------------------------------------------- | ------------------------- | :------: |
+| `CUBEJS_DB_HOST`        | The host URL for a database                                                         | A valid database host URL |    ✅    |
+| `CUBEJS_DB_SOCKET_PATH` | See [connecting via a Unix socket](#connecting-via-a-unix-socket)                   | A valid path to a socket  |    ❌    |
+| `CUBEJS_DB_PORT`        | The port for the database connection                                                | A valid port number       |    ❌    |
+| `CUBEJS_DB_NAME`        | The name of the database to connect to                                              | A valid database name     |    ✅    |
+| `CUBEJS_DB_USER`        | The username used to connect to the database                                        | A valid database username |    ✅    |
+| `CUBEJS_DB_PASS`        | The password used to connect to the database                                        | A valid database password |    ✅    |
+| `CUBEJS_DB_SSL`         | If `true`, enables SSL encryption for database connections from Cube                | `true`, `false`           |    ❌    |
+| `CUBEJS_CONCURRENCY`    | The number of concurrent connections each queue has to the database. Default is `2` | A valid number            |    ❌    |
+| `CUBEJS_DB_MAX_POOL`    | The maximum number of concurrent database connections to pool. Default is `8`       | A valid number            |    ❌    |
 
 ## Pre-Aggregation Feature Support
 
@@ -78,16 +79,18 @@ To enable SSL-encrypted connections between Cube and MySQL, set the
 configure custom certificates, please check out [Enable SSL Connections to the
 Database][ref-recipe-enable-ssl].
 
-## Additional Configuration
+## Additional configuration
 
-### Local/Docker
+### Connecting via a Unix socket
 
-To connect to a local MySQL database using a Unix socket, use
-`CUBEJS_DB_SOCKET_PATH`. When doing so, `CUBEJS_DB_HOST` will be ignored.
+To connect to a local MySQL database using a Unix socket, use the
+`CUBEJS_DB_SOCKET_PATH` environment variable, for example:
 
-You can connect to an SSL-enabled MySQL database by setting `CUBEJS_DB_SSL` to
-`true`. All other SSL-related environment variables can be left unset. See [the
-SSL section][self-ssl] above for more details.
+```dotenv
+CUBEJS_DB_SOCKET_PATH=/var/run/mysqld/mysqld.sock
+```
+
+When doing so, `CUBEJS_DB_HOST` will be ignored.
 
 [mysql]: https://www.mysql.com/
 [ref-caching-using-preaggs-build-strats]:
