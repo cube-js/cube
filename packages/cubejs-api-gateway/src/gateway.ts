@@ -312,7 +312,7 @@ class ApiGateway {
       `${this.basePath}/v1/meta`,
       userMiddlewares,
       async (req, res) => {
-        if (req.query.hasOwnProperty('extended')) {
+        if ('extended' in req.query) {
           await this.metaExtended({
             context: req.context,
             res: this.resToResultFn(res),
