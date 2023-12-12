@@ -210,23 +210,13 @@ class ApiGateway {
 
     app.use(
       `${this.basePath}/graphql`,
-      [
-        ...userMiddlewares,
-        async (req, res, next) => {
-          try {
-            await this.assertApiScope(
-              'graphql',
-              req?.context?.securityContext
-            );
-            if (next) next();
-          } catch (e: unknown) {
-            if (e instanceof CubejsHandlerError) {
-              res.status(e.status).json({ error: e.message });
-            }
-          }
-        },
-      ],
+      userMiddlewares,
       userAsyncHandler(async (req, res) => {
+        await this.assertApiScope(
+          'graphql',
+          req?.context?.securityContext
+        );
+
         const compilerApi = await this.getCompilerApi(req.context);
         let schema = compilerApi.getGraphQLSchema();
         if (!schema) {
@@ -339,29 +329,20 @@ class ApiGateway {
     // Used by Rollup Designer
     app.post(
       `${this.basePath}/v1/pre-aggregations/can-use`,
-      [
-        ...userMiddlewares,
-        async (req, res, next) => {
-          try {
-            await this.assertApiScope(
-              'meta',
-              req?.context?.securityContext
-            );
-            if (next) next();
-          } catch (e: unknown) {
-            if (e instanceof CubejsHandlerError) {
-              res.status(e.status).json({ error: e.message });
-            }
-          }
-        },
-      ],
+      userMiddlewares,
       userAsyncHandler(async (req, res) => {
+        await this.assertApiScope(
+          'meta',
+          req?.context?.securityContext
+        );
+
         const { transformedQuery, references } = req.body;
         const compilerApi = await this.getCompilerApi(req.context as RequestContext);
         const canUsePreAggregationForTransformedQuery = compilerApi.canUsePreAggregationForTransformedQuery(
           transformedQuery,
           references,
         );
+
         res.json({ canUsePreAggregationForTransformedQuery });
       })
     );
