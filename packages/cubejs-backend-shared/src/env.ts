@@ -575,11 +575,40 @@ const variables: Record<string, (...args: any) => any> = {
     .asInt(),
 
   /**
+   * Max number of elements
+   */
+  touchPreAggregationCacheMaxCount: (): number => get('CUBEJS_TOUCH_PRE_AGG_CACHE_MAX_COUNT')
+    .default(8192)
+    .asInt(),
+
+  /**
+   * Max cache
+   */
+  touchPreAggregationCacheMaxAge: (): number => {
+    // eslint-disable-next-line no-use-before-define
+    const touchPreAggregationTimeout = getEnv('touchPreAggregationTimeout');
+
+    const maxAge = get('CUBEJS_TOUCH_PRE_AGG_CACHE_MAX_AGE')
+      .default(Math.round(touchPreAggregationTimeout / 2))
+      .asIntPositive();
+
+    if (maxAge > touchPreAggregationTimeout) {
+      throw new InvalidConfiguration(
+        'CUBEJS_TOUCH_PRE_AGG_CACHE_MAX_AGE',
+        maxAge,
+        `Must be less or equal then CUBEJS_TOUCH_PRE_AGG_TIMEOUT (${touchPreAggregationTimeout}).`
+      );
+    }
+
+    return maxAge;
+  },
+
+  /**
    * Expire time for touch records
    */
   touchPreAggregationTimeout: (): number => get('CUBEJS_TOUCH_PRE_AGG_TIMEOUT')
     .default(60 * 60 * 24)
-    .asInt(),
+    .asIntPositive(),
 
   /**
    * Expire time for touch records

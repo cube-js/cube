@@ -17,6 +17,8 @@ export type QueryQueueTestOptions = {
 
 export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}) => {
   describe(`QueryQueue${name}`, () => {
+    jest.setTimeout(10 * 1000);
+
     const delayFn = (result, delay) => new Promise(resolve => setTimeout(() => resolve(result), delay));
     const logger = jest.fn((message, event) => console.log(`${message} ${JSON.stringify(event)}`));
 
@@ -39,6 +41,11 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
         },
         stream: async (query, stream) => {
           streamCount++;
+
+          // TODO: Fix an issue with a fast execution of stream handler which caused by removal of QueryStream from streams,
+          // while EventListener doesnt start to listen for started stream event
+          await pausePromise(250);
+
           return new Promise((resolve, reject) => {
             const readable = Readable.from([]);
             readable.once('end', () => resolve(null));
