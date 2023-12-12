@@ -284,7 +284,7 @@ cubes:
 
 In order for a join to work, it is necessary to define a `primary_key` as
 specified below. It is a requirement when a join is defined so that Cube can
-handle row multiplication issues.
+handle row multiplication issues such as chasm and fan traps.
 
 Let's imagine you want to calculate `Order Amount` by `Order Item Product Name`.
 In this case, `Order` rows will be multiplied by the `Order Item` join due to
