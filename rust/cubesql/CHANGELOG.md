@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.35](https://github.com/cube-js/cube.js/compare/v0.34.34...v0.34.35) (2023-12-13)
+
+
+### Bug Fixes
+
+* **cubesql:** Support Sigma Computing table schema sync ([d87bd19](https://github.com/cube-js/cube.js/commit/d87bd19384e25a161fb2424b3b6c01da675de04e))
+
+
+### Features
+
+* **cubesql:** Additional trace event logging for SQL API ([#7524](https://github.com/cube-js/cube.js/issues/7524)) ([6b700cd](https://github.com/cube-js/cube.js/commit/6b700cd493b16d4450ce1efaa449207836a47592))
+
+
+
+
+
 ## [0.34.31](https://github.com/cube-js/cube.js/compare/v0.34.30...v0.34.31) (2023-12-07)
 
 
