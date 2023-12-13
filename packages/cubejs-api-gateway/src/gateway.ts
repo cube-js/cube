@@ -1687,12 +1687,6 @@ class ApiGateway {
         resType = query.responseFormat;
       }
 
-      this.log({
-        type: 'Load Request',
-        query,
-        streaming: request.streaming,
-      }, context);
-
       const [queryType, normalizedQueries] =
         await this.getNormalizedQueries(query, context);
 
@@ -1791,29 +1785,6 @@ class ApiGateway {
           })
         );
       }
-
-      this.log(
-        {
-          type: 'Load Request Success',
-          query,
-          duration: this.duration(requestStarted),
-          apiType,
-          isPlayground: Boolean(
-            context.signedWithPlaygroundAuthSecret
-          ),
-          queries: results.length,
-          queriesWithPreAggregations:
-          results.filter(
-            (r: any) => Object.keys(
-              r.usedPreAggregations || {}
-            ).length
-          ).length,
-          queriesWithData:
-          results.filter((r: any) => r.data?.length).length,
-          dbType: results.map(r => r.dbType),
-        },
-        context,
-      );
 
       res(request.streaming ? results[0] : {
         results,

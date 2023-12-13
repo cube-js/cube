@@ -15,7 +15,7 @@ use crate::{
         ServerManager, Session, SessionManager, SqlAuthService,
     },
     transport::{
-        CubeStreamReceiver, LoadRequestMeta, SqlGenerator, SqlResponse, SqlTemplates,
+        CubeStreamReceiver, LoadRequestMeta, SpanId, SqlGenerator, SqlResponse, SqlTemplates,
         TransportService,
     },
     CubeError,
@@ -354,6 +354,7 @@ pub fn get_test_transport() -> Arc<dyn TransportService> {
 
         async fn sql(
             &self,
+            _span_id: Option<Arc<SpanId>>,
             query: V1LoadRequestQuery,
             _ctx: AuthContextRef,
             _meta_fields: LoadRequestMeta,
@@ -371,6 +372,7 @@ pub fn get_test_transport() -> Arc<dyn TransportService> {
         // Execute load query
         async fn load(
             &self,
+            _span_id: Option<Arc<SpanId>>,
             _query: V1LoadRequestQuery,
             _sql_query: Option<SqlQuery>,
             _ctx: AuthContextRef,
@@ -381,6 +383,7 @@ pub fn get_test_transport() -> Arc<dyn TransportService> {
 
         async fn load_stream(
             &self,
+            _span_id: Option<Arc<SpanId>>,
             _query: V1LoadRequestQuery,
             _sql_query: Option<SqlQuery>,
             _ctx: AuthContextRef,
@@ -401,6 +404,21 @@ pub fn get_test_transport() -> Arc<dyn TransportService> {
             } else {
                 Ok(false)
             }
+        }
+
+        async fn log_load_state(
+            &self,
+            span_id: Option<Arc<SpanId>>,
+            ctx: AuthContextRef,
+            meta_fields: LoadRequestMeta,
+            event: String,
+            properties: serde_json::Value,
+        ) -> Result<(), CubeError> {
+            println!(
+                "Load state: {:?} {:?} {:?} {} {:?}",
+                span_id, ctx, meta_fields, event, properties
+            );
+            Ok(())
         }
     }
 
