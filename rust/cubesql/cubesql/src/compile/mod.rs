@@ -10832,6 +10832,50 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_sigma_computing_attnames() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "sigma_computing_attnames",
+            execute_query(
+                "
+                with
+                    nsp as (
+                        select oid as relnamespace
+                        from pg_catalog.pg_namespace
+                        where nspname = 'public'
+                    ),
+                    tbl as (
+                        select
+                            nsp.relnamespace as connamespace,
+                            tbl.oid as conrelid
+                        from pg_catalog.pg_class tbl
+                        inner join nsp using (relnamespace)
+                        where relname = 'emptytbl'
+                    ),
+                    con as (
+                        select
+                            conrelid,
+                            conkey
+                        from pg_catalog.pg_constraint
+                        inner join tbl using (connamespace, conrelid)
+                        where contype = 'p'
+                    )
+                select attname
+                from pg_catalog.pg_attribute att
+                inner join con on
+                    conrelid = attrelid
+                    and attnum = any(con.conkey)
+                order by attnum
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_google_sheets_pg_database_query() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "google_sheets_pg_database_query",

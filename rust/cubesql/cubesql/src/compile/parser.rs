@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use regex::Regex;
 use sqlparser::{
     ast::Statement,
     dialect::{Dialect, PostgreSqlDialect},
@@ -39,7 +40,7 @@ impl Dialect for MySqlDialectWithBackTicks {
 }
 
 lazy_static! {
-    static ref SIGMA_WORKAROUND: regex::Regex = regex::Regex::new(r#"(?s)^\s*with\s+nsp\sas\s\(.*nspname\s=\s(?P<nspname>'[^']+'|\$\d+).*\),\s+tbl\sas\s\(.*relname\s=\s(?P<relname>'[^']+'|\$\d+).*\).*$"#).unwrap();
+    static ref SIGMA_WORKAROUND: Regex = Regex::new(r#"(?s)^\s*with\s+nsp\sas\s\(.*nspname\s=\s.*\),\s+tbl\sas\s\(.*relname\s=\s.*\).*select\s+attname.*from\spg_attribute.*$"#).unwrap();
 }
 
 pub fn parse_sql_to_statements(
@@ -184,33 +185,17 @@ pub fn parse_sql_to_statements(
     );
 
     // Sigma Computing WITH query workaround
-    let query = match SIGMA_WORKAROUND.captures(&query) {
-        Some(c) => {
-            let nspname = c.name("nspname").unwrap().as_str();
-            let relname = c.name("relname").unwrap().as_str();
-            format!(
-                "
-                select
-                    attname,
-                    typname,
-                    description
-                from pg_attribute a
-                join pg_type on atttypid = pg_type.oid
-                left join pg_description on
-                    attrelid = objoid and
-                    attnum = objsubid
-                join pg_catalog.pg_namespace nsp ON nspname = {}
-                join pg_catalog.pg_class tbl ON relname = {} and relnamespace = nsp.oid
-                where
-                    attnum > 0 and
-                    attrelid = tbl.oid
-                order by attnum
-                ;
-                ",
-                nspname, relname
-            )
-        }
-        None => query,
+    let query = if SIGMA_WORKAROUND.is_match(&query) {
+        let relnamespace_re = Regex::new(r#"(?s)from\spg_catalog\.pg_class\s+where\s+relname\s=\s(?P<relname>'(?:[^']|'')+'|\$\d+)\s+and\s+relnamespace\s=\s\(select\soid\sfrom\snsp\)"#).unwrap();
+        let relnamespace_replaced = relnamespace_re.replace(
+            &query,
+            "from pg_catalog.pg_class join nsp on relnamespace = nsp.oid where relname = $relname",
+        );
+        let attrelid_re = Regex::new(r#"(?s)left\sjoin\spg_description\son\s+attrelid\s=\sobjoid\sand\s+attnum\s=\sobjsubid\s+where\s+attnum\s>\s0\s+and\s+attrelid\s=\s\(select\soid\sfrom\stbl\)"#).unwrap();
+        let attrelid_replaced = attrelid_re.replace(&relnamespace_replaced, "left join pg_description on attrelid = objoid and attnum = objsubid join tbl on attrelid = tbl.oid where attnum > 0");
+        attrelid_replaced.to_string()
+    } else {
+        query
     };
 
     // Metabase
