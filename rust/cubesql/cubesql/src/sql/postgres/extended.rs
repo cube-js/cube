@@ -708,7 +708,7 @@ mod tests {
             Ok(_) => panic!("must panic"),
             Err(e) => assert_eq!(
                 e.to_string(),
-                "Error: Cursor with limited max_rows: 1 for DataFrame is not supported"
+                "ProtocolError: Error: Cursor with limited max_rows: 1 for DataFrame is not supported"
             ),
         }
 
