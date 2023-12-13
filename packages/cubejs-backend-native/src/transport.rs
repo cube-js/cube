@@ -215,7 +215,7 @@ impl TransportService for NodeBridgeTransport {
         let request_id = span_id
             .as_ref()
             .map(|s| s.span_id.clone())
-            .unwrap_or(Uuid::new_v4().to_string());
+            .unwrap_or_else(|| Uuid::new_v4().to_string());
 
         let extra = serde_json::to_string(&LoadRequest {
             request: TransportRequest {
@@ -293,7 +293,7 @@ impl TransportService for NodeBridgeTransport {
         let request_id = span_id
             .as_ref()
             .map(|s| s.span_id.clone())
-            .unwrap_or(Uuid::new_v4().to_string());
+            .unwrap_or_else(|| Uuid::new_v4().to_string());
 
         loop {
             let extra = serde_json::to_string(&LoadRequest {
@@ -369,7 +369,7 @@ impl TransportService for NodeBridgeTransport {
         let request_id = span_id
             .as_ref()
             .map(|s| s.span_id.clone())
-            .unwrap_or(Uuid::new_v4().to_string());
+            .unwrap_or_else(|| Uuid::new_v4().to_string());
         loop {
             let native_auth = ctx
                 .as_any()
@@ -464,7 +464,7 @@ impl TransportService for NodeBridgeTransport {
 
         let request_id = span_id
             .map(|s| s.span_id.clone())
-            .unwrap_or(Uuid::new_v4().to_string());
+            .unwrap_or_else(|| Uuid::new_v4().to_string());
         call_raw_js_with_channel_as_callback(
             self.channel.clone(),
             self.log_load_event.clone(),
