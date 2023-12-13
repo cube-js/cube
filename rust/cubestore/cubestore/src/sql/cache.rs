@@ -9,7 +9,7 @@ use log::trace;
 use moka::future::{Cache, ConcurrentCacheExt, Iter};
 use std::collections::HashSet;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 use tokio::sync::{watch, Mutex};
 
 #[derive(Clone, Hash, Eq, PartialEq, Debug, DeepSizeOf)]
@@ -62,6 +62,11 @@ impl SqlQueueCacheKey {
             inline_tables: (*inline_tables).clone(),
         }
     }
+}
+
+struct SqlPendingCacheItem {
+    plan: SerializedPlan,
+    last_touch: SystemTime,
 }
 
 pub struct SqlResultCache {
