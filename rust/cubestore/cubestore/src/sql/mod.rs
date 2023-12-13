@@ -80,6 +80,7 @@ pub mod cache;
 pub mod cachestore;
 pub mod parser;
 
+use crate::cluster::rate_limiter::ProcessRateLimiter;
 use crate::sql::cachestore::CacheStoreSqlService;
 use crate::util::metrics;
 use mockall::automock;
@@ -197,9 +198,14 @@ impl SqlServiceImpl {
         query_timeout: Duration,
         create_table_timeout: Duration,
         cache: Arc<SqlResultCache>,
+        process_rate_limiter: Arc<dyn ProcessRateLimiter>,
     ) -> Arc<SqlServiceImpl> {
         Arc::new(SqlServiceImpl {
-            cachestore: CacheStoreSqlService::new(cachestore, query_planner.clone()),
+            cachestore: CacheStoreSqlService::new(
+                cachestore,
+                query_planner.clone(),
+                process_rate_limiter,
+            ),
             db,
             chunk_store,
             limits,
@@ -2059,6 +2065,7 @@ mod tests {
 
     use super::*;
     use crate::cachestore::RocksCacheStore;
+    use crate::cluster::rate_limiter::BasicProcessRateLimiter;
     use crate::queryplanner::pretty_printers::{pp_phys_plan, pp_phys_plan_ext, PPOptions};
     use crate::remotefs::queue::QueueRemoteFs;
     use crate::scheduler::SchedulerImpl;
@@ -2124,6 +2131,7 @@ mod tests {
                     config.config_obj().query_cache_max_capacity_bytes(),
                     config.config_obj().query_cache_time_to_idle_secs(),
                 )),
+                BasicProcessRateLimiter::new(),
             );
             let i = service.exec_query("CREATE SCHEMA foo").await.unwrap();
             assert_eq!(
@@ -2199,6 +2207,7 @@ mod tests {
                     config.config_obj().query_cache_max_capacity_bytes(),
                     config.config_obj().query_cache_time_to_idle_secs(),
                 )),
+                BasicProcessRateLimiter::new(),
             );
             let i = service.exec_query("CREATE SCHEMA Foo").await.unwrap();
             assert_eq!(
@@ -2304,6 +2313,7 @@ mod tests {
                     config.config_obj().query_cache_max_capacity_bytes(),
                     config.config_obj().query_cache_time_to_idle_secs(),
                 )),
+                BasicProcessRateLimiter::new(),
             );
             let i = service.exec_query("CREATE SCHEMA Foo").await.unwrap();
             assert_eq!(
