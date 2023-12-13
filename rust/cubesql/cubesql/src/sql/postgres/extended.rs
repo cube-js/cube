@@ -11,7 +11,7 @@ use chrono::{DateTime, Utc};
 use datafusion::arrow::record_batch::RecordBatch;
 use pg_srv::{protocol, BindValue, PgTypeId, ProtocolError};
 use sqlparser::ast;
-use std::{fmt, pin::Pin};
+use std::{fmt, pin::Pin, sync::Arc};
 
 use crate::sql::shim::{ConnectionError, QueryPlanExt};
 use datafusion::{
@@ -21,6 +21,7 @@ use datafusion::{
 use futures::*;
 use pg_srv::protocol::{PortalCompletion, PortalSuspended};
 
+use crate::transport::SpanId;
 use async_stream::stream;
 use futures_core::stream::Stream;
 use futures_util::stream::StreamExt;
@@ -43,6 +44,7 @@ pub enum PreparedStatement {
         /// Prepared statement can be declared from SQL or protocol (Parser)
         from_sql: bool,
         created: DateTime<Utc>,
+        span_id: Option<Arc<SpanId>>,
     },
     Query {
         /// Prepared statement can be declared from SQL or protocol (Parser)
@@ -53,6 +55,7 @@ pub enum PreparedStatement {
         /// Fields which will be returned to the client, It can be None if server doesnt return any field
         /// for example BEGIN
         description: Option<protocol::RowDescription>,
+        span_id: Option<Arc<SpanId>>,
     },
 }
 
@@ -99,6 +102,13 @@ impl PreparedStatement {
 
                 Ok(statement)
             }
+        }
+    }
+
+    pub fn span_id(&self) -> Option<Arc<SpanId>> {
+        match self {
+            PreparedStatement::Empty { span_id, .. } => span_id.clone(),
+            PreparedStatement::Query { span_id, .. } => span_id.clone(),
         }
     }
 }
@@ -189,6 +199,7 @@ pub struct Portal {
     from: PortalFrom,
     // State which holds corresponding data for each step. Option is used for dereferencing
     state: Option<PortalState>,
+    span_id: Option<Arc<SpanId>>,
 }
 
 unsafe impl Send for Portal {}
@@ -215,18 +226,29 @@ fn split_record_batch(batch: RecordBatch, mid: usize) -> (RecordBatch, Option<Re
 }
 
 impl Portal {
-    pub fn new(plan: QueryPlan, format: protocol::Format, from: PortalFrom) -> Self {
+    pub fn new(
+        plan: QueryPlan,
+        format: protocol::Format,
+        from: PortalFrom,
+        span_id: Option<Arc<SpanId>>,
+    ) -> Self {
         Self {
             format,
             from,
+            span_id,
             state: Some(PortalState::Prepared(PreparedState { plan })),
         }
     }
 
-    pub fn new_empty(format: protocol::Format, from: PortalFrom) -> Self {
+    pub fn new_empty(
+        format: protocol::Format,
+        from: PortalFrom,
+        span_id: Option<Arc<SpanId>>,
+    ) -> Self {
         Self {
             format,
             from,
+            span_id,
             state: Some(PortalState::Empty),
         }
     }
@@ -237,12 +259,18 @@ impl Portal {
             Some(PortalState::InExecutionFrame(state)) => Ok(state.description.clone()),
             Some(PortalState::InExecutionStream(state)) => Ok(state.description.clone()),
             Some(PortalState::Finished(state)) => Ok(state.description.clone()),
-            Some(PortalState::Empty) => Err(ConnectionError::Cube(CubeError::internal(
-                "Unable to get description on empty Portal. It's a bug.".to_string(),
-            ))),
-            None => Err(ConnectionError::Cube(CubeError::internal(
-                "Unable to get description on Portal without state. It's a bug.".to_string(),
-            ))),
+            Some(PortalState::Empty) => Err(ConnectionError::Cube(
+                CubeError::internal(
+                    "Unable to get description on empty Portal. It's a bug.".to_string(),
+                ),
+                None,
+            )),
+            None => Err(ConnectionError::Cube(
+                CubeError::internal(
+                    "Unable to get description on Portal without state. It's a bug.".to_string(),
+                ),
+                None,
+            )),
         }
     }
 
@@ -512,6 +540,10 @@ impl Portal {
             }
         }
     }
+
+    pub fn span_id(&self) -> Option<Arc<SpanId>> {
+        self.span_id.clone()
+    }
 }
 
 #[cfg(test)]
@@ -631,6 +663,7 @@ mod tests {
                 generate_testing_data_frame(3),
                 None,
             ))),
+            span_id: None,
         };
 
         let mut portal = Pin::new(&mut p);
@@ -663,6 +696,7 @@ mod tests {
                 generate_testing_data_frame(3),
                 None,
             ))),
+            span_id: None,
         };
 
         let mut portal = Pin::new(&mut p);
@@ -690,6 +724,7 @@ mod tests {
                 generate_testing_data_frame(3),
                 Some(protocol::RowDescription::new(vec![])),
             ))),
+            span_id: None,
         };
 
         let mut portal = Pin::new(&mut p);
@@ -724,6 +759,7 @@ mod tests {
                 stream,
                 Some(protocol::RowDescription::new(vec![])),
             ))),
+            span_id: None,
         };
 
         execute_portal_single_batch(&mut portal, 1, 1).await?;
@@ -746,6 +782,7 @@ mod tests {
                 stream,
                 Some(protocol::RowDescription::new(vec![])),
             ))),
+            span_id: None,
         };
 
         // use 1 batch

@@ -29,7 +29,7 @@ use crate::{
         },
     },
     sql::AuthContextRef,
-    transport::V1CubeMetaExt,
+    transport::{SpanId, V1CubeMetaExt},
     CubeError,
 };
 use cubeclient::models::{
@@ -629,6 +629,7 @@ pub struct LanguageToLogicalPlanConverter {
     best_expr: RecExpr<LogicalPlanLanguage>,
     cube_context: Arc<CubeContext>,
     auth_context: AuthContextRef,
+    span_id: Option<Arc<SpanId>>,
 }
 
 pub fn is_expr_node(node: &LogicalPlanLanguage) -> bool {
@@ -887,11 +888,13 @@ impl LanguageToLogicalPlanConverter {
         best_expr: RecExpr<LogicalPlanLanguage>,
         cube_context: Arc<CubeContext>,
         auth_context: AuthContextRef,
+        span_id: Option<Arc<SpanId>>,
     ) -> Self {
         Self {
             best_expr,
             cube_context,
             auth_context,
+            span_id,
         }
     }
 
@@ -1657,6 +1660,7 @@ impl LanguageToLogicalPlanConverter {
                                 max_records,
                             },
                             alias_to_cube.into_iter().map(|(_, c)| c).unique().collect(),
+                            self.span_id.clone(),
                         ))
                     }
                     x => panic!("Unexpected extension node: {:?}", x),
@@ -1671,6 +1675,7 @@ impl LanguageToLogicalPlanConverter {
                         input,
                         self.cube_context.meta.clone(),
                         self.auth_context.clone(),
+                        self.span_id.clone(),
                     )),
                 })
             }

@@ -35,7 +35,7 @@ use crate::{
         rewrite::WrappedSelectType,
     },
     sql::AuthContextRef,
-    transport::{CubeStreamReceiver, LoadRequestMeta, TransportService},
+    transport::{CubeStreamReceiver, LoadRequestMeta, SpanId, TransportService},
     CubeError,
 };
 use chrono::{Datelike, NaiveDate, NaiveDateTime};
@@ -67,6 +67,7 @@ pub struct CubeScanNode {
     pub auth_context: AuthContextRef,
     pub options: CubeScanOptions,
     pub used_cubes: Vec<String>,
+    pub span_id: Option<Arc<SpanId>>,
 }
 
 impl CubeScanNode {
@@ -77,6 +78,7 @@ impl CubeScanNode {
         auth_context: AuthContextRef,
         options: CubeScanOptions,
         used_cubes: Vec<String>,
+        span_id: Option<Arc<SpanId>>,
     ) -> Self {
         Self {
             schema,
@@ -85,6 +87,7 @@ impl CubeScanNode {
             auth_context,
             options,
             used_cubes,
+            span_id,
         }
     }
 }
@@ -129,6 +132,7 @@ impl UserDefinedLogicalNode for CubeScanNode {
             auth_context: self.auth_context.clone(),
             options: self.options.clone(),
             used_cubes: self.used_cubes.clone(),
+            span_id: self.span_id.clone(),
         })
     }
 }
@@ -361,6 +365,7 @@ impl ExtensionPlanner for CubeScanExtensionPlanner {
                     auth_context: scan_node.auth_context.clone(),
                     options: scan_node.options.clone(),
                     meta: self.meta.clone(),
+                    span_id: scan_node.span_id.clone(),
                 }))
             } else if let Some(wrapper_node) = node.as_any().downcast_ref::<CubeScanWrapperNode>() {
                 // TODO
@@ -395,6 +400,7 @@ impl ExtensionPlanner for CubeScanExtensionPlanner {
                     auth_context: scan_node.auth_context.clone(),
                     options: scan_node.options.clone(),
                     meta: self.meta.clone(),
+                    span_id: scan_node.span_id.clone(),
                 }))
             } else {
                 None
@@ -416,6 +422,7 @@ struct CubeScanExecutionPlan {
     transport: Arc<dyn TransportService>,
     // injected by extension planner
     meta: LoadRequestMeta,
+    span_id: Option<Arc<SpanId>>,
 }
 
 #[derive(Debug)]
@@ -598,12 +605,14 @@ impl ExecutionPlan for CubeScanExecutionPlan {
             meta.clone(),
             self.options.clone(),
             self.wrapped_sql.clone(),
+            self.span_id.clone(),
         );
 
         if stream_mode {
             let result = self
                 .transport
                 .load_stream(
+                    self.span_id.clone(),
                     self.request.clone(),
                     self.wrapped_sql.clone(),
                     self.auth_context.clone(),
@@ -624,6 +633,7 @@ impl ExecutionPlan for CubeScanExecutionPlan {
 
         let mut response = JsonValueObject::new(
             load_data(
+                self.span_id.clone(),
                 request,
                 self.auth_context.clone(),
                 self.transport.clone(),
@@ -687,6 +697,7 @@ struct CubeScanOneShotStream {
     meta: LoadRequestMeta,
     options: CubeScanOptions,
     wrapped_sql: Option<SqlQuery>,
+    span_id: Option<Arc<SpanId>>,
 }
 
 impl CubeScanOneShotStream {
@@ -699,6 +710,7 @@ impl CubeScanOneShotStream {
         meta: LoadRequestMeta,
         options: CubeScanOptions,
         wrapped_sql: Option<SqlQuery>,
+        span_id: Option<Arc<SpanId>>,
     ) -> Self {
         Self {
             data: None,
@@ -710,6 +722,7 @@ impl CubeScanOneShotStream {
             meta,
             options,
             wrapped_sql,
+            span_id,
         }
     }
 
@@ -802,6 +815,7 @@ impl RecordBatchStream for CubeScanStreamRouter {
 }
 
 async fn load_data(
+    span_id: Option<Arc<SpanId>>,
     request: V1LoadRequestQuery,
     auth_context: AuthContextRef,
     transport: Arc<dyn TransportService>,
@@ -833,7 +847,9 @@ async fn load_data(
             data,
         )
     } else {
-        let result = transport.load(request, sql_query, auth_context, meta).await;
+        let result = transport
+            .load(span_id, request, sql_query, auth_context, meta)
+            .await;
         let mut response = result.map_err(|err| ArrowError::ComputeError(err.to_string()))?;
         if let Some(data) = response.results.pop() {
             match (options.max_records, data.data.len()) {
@@ -855,6 +871,7 @@ async fn load_data(
 }
 
 fn load_to_stream_sync(one_shot_stream: &mut CubeScanOneShotStream) -> Result<()> {
+    let span_id = one_shot_stream.span_id.clone();
     let req = one_shot_stream.request.clone();
     let auth = one_shot_stream.auth_context.clone();
     let transport = one_shot_stream.transport.clone();
@@ -864,7 +881,15 @@ fn load_to_stream_sync(one_shot_stream: &mut CubeScanOneShotStream) -> Result<()
 
     let handle = tokio::runtime::Handle::current();
     let res = std::thread::spawn(move || {
-        handle.block_on(load_data(req, auth, transport, meta, options, wrapped_sql))
+        handle.block_on(load_data(
+            span_id,
+            req,
+            auth,
+            transport,
+            meta,
+            options,
+            wrapped_sql,
+        ))
     })
     .join()
     .map_err(|_| DataFusionError::Execution(format!("Can't load to stream")))?;
@@ -1132,6 +1157,7 @@ mod tests {
 
             async fn sql(
                 &self,
+                _span_id: Option<Arc<SpanId>>,
                 _query: V1LoadRequestQuery,
                 _ctx: AuthContextRef,
                 _meta_fields: LoadRequestMeta,
@@ -1144,6 +1170,7 @@ mod tests {
             // Execute load query
             async fn load(
                 &self,
+                _span_id: Option<Arc<SpanId>>,
                 _query: V1LoadRequestQuery,
                 _sql_query: Option<SqlQuery>,
                 _ctx: AuthContextRef,
@@ -1179,6 +1206,7 @@ mod tests {
 
             async fn load_stream(
                 &self,
+                _span_id: Option<Arc<SpanId>>,
                 _query: V1LoadRequestQuery,
                 _sql_query: Option<SqlQuery>,
                 _ctx: AuthContextRef,
@@ -1195,6 +1223,21 @@ mod tests {
                 _to_user: String,
             ) -> Result<bool, CubeError> {
                 panic!("It's a fake transport");
+            }
+
+            async fn log_load_state(
+                &self,
+                span_id: Option<Arc<SpanId>>,
+                ctx: AuthContextRef,
+                meta_fields: LoadRequestMeta,
+                event: String,
+                properties: serde_json::Value,
+            ) -> Result<(), CubeError> {
+                println!(
+                    "Load state: {:?} {:?} {:?} {} {:?}",
+                    span_id, ctx, meta_fields, event, properties
+                );
+                Ok(())
             }
         }
 
@@ -1265,6 +1308,7 @@ mod tests {
             },
             transport: get_test_transport(),
             meta: get_test_load_meta(DatabaseProtocol::PostgreSQL),
+            span_id: None,
         };
 
         let runtime = Arc::new(
