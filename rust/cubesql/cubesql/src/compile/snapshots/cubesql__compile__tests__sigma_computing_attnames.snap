@@ -1,0 +1,8 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"\n                with\n                    nsp as (\n                        select oid as relnamespace\n                        from pg_catalog.pg_namespace\n                        where nspname = 'public'\n                    ),\n                    tbl as (\n                        select\n                            nsp.relnamespace as connamespace,\n                            tbl.oid as conrelid\n                        from pg_catalog.pg_class tbl\n                        inner join nsp using (relnamespace)\n                        where relname = 'emptytbl'\n                    ),\n                    con as (\n                        select\n                            conrelid,\n                            conkey\n                        from pg_catalog.pg_constraint\n                        inner join tbl using (connamespace, conrelid)\n                        where contype = 'p'\n                    )\n                select attname\n                from pg_catalog.pg_attribute att\n                inner join con on\n                    conrelid = attrelid\n                    and attnum = any(con.conkey)\n                order by attnum\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++---------+
+| attname |
++---------+
++---------+
