@@ -2335,6 +2335,98 @@ impl RewriteRules for FilterRules {
                     "?right_out",
                 ),
             ),
+            transforming_rewrite(
+                "filter-domo-date-column-compare-date-str",
+                filter_replacer(
+                    binary_expr(
+                        udf_expr("date", vec![column_expr("?column")]),
+                        "?op",
+                        literal_expr("?literal"),
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                filter_replacer(
+                    binary_expr(
+                        fun_expr(
+                            "DateTrunc",
+                            vec![literal_string("day"), column_expr("?column")],
+                        ),
+                        "?op",
+                        udf_expr(
+                            "to_date",
+                            vec![literal_expr("?literal"), literal_string("yyyy-MM-dd")],
+                        ),
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                self.transform_date_column_compare_date_str("?op", "?literal"),
+            ),
+            rewrite(
+                "filter-domo-date-column-between",
+                filter_replacer(
+                    between_expr(
+                        udf_expr("date", vec![column_expr("?column")]),
+                        "?negated",
+                        "?low",
+                        "?high",
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                filter_replacer(
+                    between_expr(column_expr("?column"), "?negated", "?low", "?high"),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+            ),
+            transforming_rewrite(
+                "filter-domo-not-column-equals-date",
+                filter_replacer(
+                    not_expr(binary_expr(
+                        udf_expr("date", vec![column_expr("?column")]),
+                        "=",
+                        literal_expr("?literal"),
+                    )),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                filter_replacer(
+                    binary_expr(
+                        binary_expr(
+                            column_expr("?column"),
+                            "<",
+                            udf_expr(
+                                "to_date",
+                                vec![literal_expr("?literal"), literal_string("yyyy-MM-dd")],
+                            ),
+                        ),
+                        "OR",
+                        binary_expr(
+                            column_expr("?column"),
+                            ">=",
+                            binary_expr(
+                                udf_expr(
+                                    "to_date",
+                                    vec![literal_expr("?literal"), literal_string("yyyy-MM-dd")],
+                                ),
+                                "+",
+                                literal_expr("?one_day"),
+                            ),
+                        ),
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                self.transform_not_column_equals_date("?literal", "?one_day"),
+            ),
             rewrite(
                 "in-date-range-to-time-dimension-pull-up-left",
                 cube_scan_filters(
@@ -4284,6 +4376,59 @@ impl FilterRules {
                         DataType::Date32 | DataType::Date64 => negative,
                         _ => !negative,
                     };
+                }
+            }
+
+            false
+        }
+    }
+
+    fn transform_date_column_compare_date_str(
+        &self,
+        op_var: &'static str,
+        literal_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let op_var = var!(op_var);
+        let literal_var = var!(literal_var);
+        move |egraph, subst| {
+            for op in var_iter!(egraph[subst[op_var]], BinaryExprOp) {
+                match op {
+                    Operator::Gt
+                    | Operator::GtEq
+                    | Operator::Lt
+                    | Operator::LtEq
+                    | Operator::Eq => (),
+                    _ => continue,
+                };
+
+                for literal in var_iter!(egraph[subst[literal_var]], LiteralExprValue) {
+                    if let ScalarValue::Utf8(_) = literal {
+                        return true;
+                    }
+                }
+            }
+
+            false
+        }
+    }
+
+    fn transform_not_column_equals_date(
+        &self,
+        literal_var: &'static str,
+        one_day_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let literal_var = var!(literal_var);
+        let one_day_var = var!(one_day_var);
+        move |egraph, subst| {
+            for literal in var_iter!(egraph[subst[literal_var]], LiteralExprValue) {
+                if let ScalarValue::Utf8(_) = literal {
+                    subst.insert(
+                        one_day_var,
+                        egraph.add(LogicalPlanLanguage::LiteralExprValue(LiteralExprValue(
+                            ScalarValue::IntervalDayTime(Some(1 << 32)),
+                        ))),
+                    );
+                    return true;
                 }
             }
 

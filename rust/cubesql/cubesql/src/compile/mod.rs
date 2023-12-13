@@ -19754,6 +19754,166 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn test_domo_filter_date_gt() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                "T1"."order_date",
+                COUNT("T1"."count") AS "count",
+                "T1"."customer_gender"
+            FROM "db"."public"."KibanaSampleDataEcommerce" AS "T1"
+            WHERE (DATE("T1"."order_date") > '2020-01-01')
+            GROUP BY
+                "T1"."customer_gender",
+                "T1"."order_date"
+            LIMIT 25000
+            ;"#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.order_date".to_string(),
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                ]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: Some(25000),
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
+                    operator: Some("afterDate".to_string()),
+                    values: Some(vec!["2020-01-02T00:00:00.000Z".to_string()]),
+                    or: None,
+                    and: None,
+                }]),
+                ungrouped: None,
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_domo_filter_date_between() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                "T1"."order_date",
+                COUNT("T1"."count") AS "count",
+                "T1"."customer_gender"
+            FROM "db"."public"."KibanaSampleDataEcommerce" AS "T1"
+            WHERE DATE("T1"."order_date") BETWEEN '2019-01-01' AND '2020-01-01'
+            GROUP BY
+                "T1"."customer_gender",
+                "T1"."order_date"
+            LIMIT 25000
+            ;"#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.order_date".to_string(),
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                ]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: None,
+                    date_range: Some(json!(vec![
+                        "2019-01-01".to_string(),
+                        "2020-01-01".to_string(),
+                    ])),
+                }]),
+                order: None,
+                limit: Some(25000),
+                offset: None,
+                filters: None,
+                ungrouped: None,
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_domo_filter_not_date() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                "T1"."order_date",
+                COUNT("T1"."count") AS "count",
+                "T1"."customer_gender"
+            FROM "db"."public"."KibanaSampleDataEcommerce" AS "T1"
+            WHERE (NOT (DATE("T1"."order_date") = '2019-01-01'))
+            GROUP BY
+                "T1"."customer_gender",
+                "T1"."order_date"
+            LIMIT 25000
+            ;"#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.order_date".to_string(),
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                ]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: Some(25000),
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: None,
+                    operator: None,
+                    values: None,
+                    or: Some(vec![
+                        json!(V1LoadRequestQueryFilterItem {
+                            member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
+                            operator: Some("beforeDate".to_string()),
+                            values: Some(vec!["2019-01-01T00:00:00.000Z".to_string()]),
+                            or: None,
+                            and: None,
+                        }),
+                        json!(V1LoadRequestQueryFilterItem {
+                            member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
+                            operator: Some("afterOrOnDate".to_string()),
+                            values: Some(vec!["2019-01-02T00:00:00.000Z".to_string()]),
+                            or: None,
+                            and: None,
+                        }),
+                    ]),
+                    and: None,
+                }]),
+                ungrouped: None,
+            }
+        )
+    }
+
+    #[tokio::test]
     async fn test_langchain_pgcatalog_schema() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "langchain_pgcatalog_schema",
