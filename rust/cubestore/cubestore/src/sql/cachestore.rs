@@ -207,11 +207,9 @@ impl CacheStoreSqlService {
                 nx,
             } => {
                 let value_size = key.value.deep_size_of() + value.deep_size_of();
-                let key = key.value;
-
                 let success = self
                     .cachestore
-                    .cache_set(CacheItem::new(key, ttl, value), nx)
+                    .cache_set(CacheItem::new(key.value, ttl, value), nx)
                     .await?;
 
                 (
@@ -388,11 +386,17 @@ impl CacheStoreSqlService {
                 (Arc::new(DataFrame::new(vec![], vec![])), None, true)
             }
             QueueCommand::MergeExtra { key, payload } => {
+                let payload_size = payload.deep_size_of();
                 self.cachestore.queue_merge_extra(key, payload).await?;
 
-                (Arc::new(DataFrame::new(vec![], vec![])), None, true)
+                (
+                    Arc::new(DataFrame::new(vec![], vec![])),
+                    Some(payload_size),
+                    true,
+                )
             }
             QueueCommand::Ack { key, result } => {
+                let result_size = result.as_ref().map(|r| r.deep_size_of());
                 let success = self.cachestore.queue_ack(key, result).await?;
 
                 (
@@ -400,7 +404,7 @@ impl CacheStoreSqlService {
                         vec![Column::new("success".to_string(), ColumnType::Boolean, 0)],
                         vec![Row::new(vec![TableValue::Boolean(success)])],
                     )),
-                    None,
+                    result_size,
                     true,
                 )
             }
