@@ -949,7 +949,6 @@ impl RewriteRules for FilterRules {
                 ),
                 self.transform_granularity_to_interval("?granularity", "?interval"),
             ),
-            // TODO define zero
             rewrite(
                 "filter-str-pos-to-like",
                 filter_replacer(
@@ -959,14 +958,22 @@ impl RewriteRules for FilterRules {
                             vec![column_expr("?column"), literal_expr("?value")],
                         ),
                         ">",
-                        literal_expr("?zero"),
+                        literal_int(0),
                     ),
                     "?alias_to_cube",
                     "?members",
                     "?filter_aliases",
                 ),
                 filter_replacer(
-                    binary_expr(column_expr("?column"), "LIKE", literal_expr("?value")),
+                    binary_expr(
+                        column_expr("?column"),
+                        "LIKE",
+                        binary_expr(
+                            binary_expr(literal_string("%"), "||", literal_expr("?value")),
+                            "||",
+                            literal_string("%"),
+                        ),
+                    ),
                     "?alias_to_cube",
                     "?members",
                     "?filter_aliases",
@@ -2795,6 +2802,33 @@ impl FilterRules {
                                         },
                                     };
 
+                                    let op = match literal {
+                                        ScalarValue::Utf8(Some(value)) => match op {
+                                            "contains" => {
+                                                let starts_with_pcnt = value.starts_with("%");
+                                                let ends_with_pcnt = value.ends_with("%");
+                                                match (starts_with_pcnt, ends_with_pcnt) {
+                                                    (false, false) => "equals",
+                                                    (false, true) => "startsWith",
+                                                    (true, false) => "endsWith",
+                                                    (true, true) => "contains",
+                                                }
+                                            }
+                                            "notContains" => {
+                                                let starts_with_pcnt = value.starts_with("%");
+                                                let ends_with_pcnt = value.ends_with("%");
+                                                match (starts_with_pcnt, ends_with_pcnt) {
+                                                    (false, false) => "notEquals",
+                                                    (false, true) => "notStartsWith",
+                                                    (true, false) => "notEndsWith",
+                                                    (true, true) => "notContains",
+                                                }
+                                            }
+                                            _ => op,
+                                        },
+                                        _ => op,
+                                    };
+
                                     let value = match literal {
                                         ScalarValue::Utf8(Some(value)) => {
                                             if op == "startsWith"
@@ -2806,6 +2840,27 @@ impl FilterRules {
                                                 if value.starts_with("%") && value.ends_with("%") {
                                                     let without_wildcard =
                                                         value[1..value.len() - 1].to_string();
+                                                    if without_wildcard.contains("%") {
+                                                        continue;
+                                                    }
+                                                    without_wildcard
+                                                } else {
+                                                    value.to_string()
+                                                }
+                                            } else if op == "startsWith" || op == "notStartsWith" {
+                                                if value.ends_with("%") {
+                                                    let without_wildcard =
+                                                        value[..value.len() - 1].to_string();
+                                                    if without_wildcard.contains("%") {
+                                                        continue;
+                                                    }
+                                                    without_wildcard
+                                                } else {
+                                                    value.to_string()
+                                                }
+                                            } else if op == "endsWith" || op == "notEndsWith" {
+                                                if value.starts_with("%") {
+                                                    let without_wildcard = value[1..].to_string();
                                                     if without_wildcard.contains("%") {
                                                         continue;
                                                     }
