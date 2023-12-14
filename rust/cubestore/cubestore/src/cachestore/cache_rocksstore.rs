@@ -31,6 +31,7 @@ use crate::cachestore::listener::RocksCacheStoreListener;
 use crate::table::{Row, TableValue};
 use chrono::{DateTime, Utc};
 use datafusion::cube_ext;
+use deepsize::DeepSizeOf;
 use itertools::Itertools;
 use log::{trace, warn};
 use serde_derive::{Deserialize, Serialize};
@@ -592,7 +593,7 @@ impl RocksCacheStore {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, DeepSizeOf)]
 pub enum QueueKey {
     ById(u64),
     ByPath(String),
