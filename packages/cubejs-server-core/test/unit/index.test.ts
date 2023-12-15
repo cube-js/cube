@@ -209,7 +209,6 @@ describe('index.test', () => {
       schemaPath: '/test/path/test/',
       basePath: '/basePath',
       webSocketsBasePath: '/webSocketsBasePath',
-      initApp: () => {},
       processSubscriptionsInterval: 5000,
       devServer: false,
       apiSecret: 'randomstring',
