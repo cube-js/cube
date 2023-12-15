@@ -624,7 +624,7 @@ const variables: Record<string, (...args: any) => any> = {
    * This will eventually default to true.
    */
   fetchColumnsByOrdinalPosition: (): boolean => get('CUBEJS_DB_FETCH_COLUMNS_BY_ORDINAL_POSITION')
-    .default('false')
+    .default('true')
     .asBoolStrict(),
 
   /** ****************************************************************
