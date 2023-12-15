@@ -48,11 +48,7 @@ export class OrchestratorStorage {
       return resolvedConfig.type;
     }
 
-    const dbType = await this.dbType(ctx, async (factoryCtx) => {
-      const config = await this.driverFactory(factoryCtx);
-
-      return config;
-    });
+    const dbType = await this.dbType(ctx);
 
     return dbType;
   }

@@ -145,7 +145,7 @@ export type DbTypeFn = (context: DriverContext) =>
 export type DriverFactoryFn = (context: DriverContext) =>
   Promise<BaseDriver | DriverConfig> | BaseDriver | DriverConfig;
 
-export type DbTypeAsyncFn = (context: DriverContext, driverFactory: DriverFactory) =>
+export type DbTypeAsyncFn = (context: DriverContext) =>
   Promise<DatabaseType>;
 export type DriverFactoryAsyncFn = (context: DriverContext) =>
   Promise<BaseDriver | DriverConfig>;
@@ -239,6 +239,7 @@ export type ServerCoreInitializedOptions = Required<
 
 export type SystemOptions = {
   isCubeConfigEmpty: boolean;
+  driverFactoryCache: DriverFactoryAsyncFn,
 };
 
 // Types to support the ContextAcceptance mechanism

@@ -37,7 +37,6 @@ import type {
   ServerCoreInitializedOptions,
   ContextToAppIdFn,
   DatabaseType,
-  DbTypeAsyncFn,
   ExternalDbTypeFn,
   OrchestratorOptionsFn,
   OrchestratorInitedOptions,
