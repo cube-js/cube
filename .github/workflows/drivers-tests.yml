@@ -194,7 +194,7 @@ jobs:
     strategy:
       matrix:
         node: 
-          - 16.x
+          - 18.x
         database:
           - athena
           - bigquery
@@ -218,10 +218,10 @@ jobs:
           override: true
           components: rustfmt
 
-      - name: Install Node.js 16.x
+      - name: Install Node.js 18.x
         uses: actions/setup-node@v3
         with:
-          node-version: 16.x
+          node-version: 18.x
 
       - name: Configure `yarn`
         run: yarn policies set-version v1.22.19

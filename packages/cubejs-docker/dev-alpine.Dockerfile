@@ -1,6 +1,6 @@
 # This image has been deprecated!
 
-FROM node:16.20.2-alpine3.17
+FROM node:18.19.0-alpine3.18
 
 ARG IMAGE_VERSION=dev
 
