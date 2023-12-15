@@ -606,7 +606,9 @@ export async function startBirdBoxFromCli(
       if (options.log === Log.PIPE) {
         process.stdout.write('[Birdbox] Done with DB\n');
       }
-      process.kill(-cli.pid, 'SIGINT');
+      if (cli.pid) {
+        process.kill(-cli.pid, 'SIGINT');
+      }
       if (options.log === Log.PIPE) {
         process.stdout.write('[Birdbox] Closed\n');
       }
