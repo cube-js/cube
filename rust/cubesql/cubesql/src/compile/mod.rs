@@ -1143,11 +1143,10 @@ WHERE `TABLE_SCHEMA` = '{}'",
             }
         }
 
-        let user_variables = session_columns_to_update
-            .drain_filter(|v| {
+        let (user_variables, session_columns_to_update): (Vec<_>, Vec<_>) =
+            session_columns_to_update.into_iter().partition(|v| {
                 v.name.to_lowercase() == "user" || v.name.to_lowercase() == "current_user"
-            })
-            .collect::<Vec<_>>();
+            });
 
         for v in user_variables {
             self.reauthenticate_if_needed().await?;

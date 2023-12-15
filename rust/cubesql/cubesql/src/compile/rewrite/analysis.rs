@@ -10,10 +10,7 @@ use crate::{
             TimeDimensionGranularity, TimeDimensionName, VirtualFieldCube, VirtualFieldName,
         },
     },
-    transport::{
-        ext::{V1CubeMetaDimensionExt, V1CubeMetaMeasureExt, V1CubeMetaSegmentExt},
-        V1CubeMetaExt,
-    },
+    transport::ext::{V1CubeMetaDimensionExt, V1CubeMetaMeasureExt, V1CubeMetaSegmentExt},
     var_iter, CubeError,
 };
 use datafusion::{

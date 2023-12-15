@@ -1,4 +1,4 @@
-use std::{collections::HashMap, error::Error, io};
+use std::{collections::HashMap, io};
 
 use std::{sync::Arc, time::SystemTime};
 
@@ -546,12 +546,6 @@ impl ProcessingLoop for MySqlServer {
                         format!("Error during processing MySQL connection: {}", e).as_str(),
                         None,
                     );
-
-                    if let Some(bt) = e.backtrace() {
-                        trace!("{}", bt.to_string());
-                    } else {
-                        trace!("Backtrace: not found");
-                    }
                 }
 
                 // Handler can finish with panic, it's why we are using additional channel to drop session by moving it here

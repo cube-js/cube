@@ -12,7 +12,7 @@ homepage = "https://cube.dev"
 arc-swap = "1"
 datafusion = { git = 'https://github.com/cube-js/arrow-datafusion.git', rev = "5833202f5a9b69fded3cd45ffc9041ca5c404d33", default-features = false, features = ["regex_expressions", "unicode_expressions"] }
 anyhow = "1.0"
-thiserror = "1.0"
+thiserror = "1.0.50"
 cubeclient = { path = "../cubeclient" }
 pg-srv = { path = "../pg-srv" }
 sqlparser = { git = 'https://github.com/cube-js/sqlparser-rs.git', rev = "037562f7975fcc92b725efbfbaaf050272668593" }
@@ -59,7 +59,7 @@ futures-core = "0.3.23"
 futures-util = "0.3.23"
 sha1_smol = "1.0.0"
 tera = { version = "1", default-features = false }
-minijinja = { version = "1", features = ["json", "loader"] }
+minijinja = { version = "1.0.4", features = ["json", "loader"] }
 
 
 [dev-dependencies]

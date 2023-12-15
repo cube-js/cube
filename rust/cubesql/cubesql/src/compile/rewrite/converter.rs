@@ -1472,9 +1472,8 @@ impl LanguageToLogicalPlanConverter {
                                             FilterMemberValues
                                         );
                                         if op == "inDateRange" {
-                                            let existing_time_dimension = query_time_dimensions
-                                                .iter_mut()
-                                                .find_map(|mut td| {
+                                            let existing_time_dimension =
+                                                query_time_dimensions.iter_mut().find_map(|td| {
                                                     if td.dimension == member
                                                         && td.date_range.is_none()
                                                     {
