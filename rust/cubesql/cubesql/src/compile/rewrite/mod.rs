@@ -5,7 +5,10 @@ pub mod language;
 pub mod rewriter;
 pub mod rules;
 
-use crate::{compile::rewrite::analysis::LogicalPlanAnalysis, CubeError};
+use crate::{
+    compile::rewrite::analysis::{LogicalPlanAnalysis, Member},
+    CubeError,
+};
 use datafusion::{
     arrow::datatypes::DataType,
     error::DataFusionError,
@@ -479,12 +482,28 @@ impl ExprRewriter for WithColumnRelation {
 }
 
 pub fn column_name_to_member_vec(
-    member_name_to_expr: Vec<(Option<String>, Expr)>,
+    member_name_to_expr: Vec<(Option<String>, Member, Expr)>,
 ) -> Vec<(String, Option<String>)> {
     let mut relation = WithColumnRelation(None);
     member_name_to_expr
         .into_iter()
-        .map(|(member, expr)| {
+        .map(|(member, _, expr)| {
+            vec![
+                (expr_column_name(expr.clone(), &None), member.clone()),
+                (expr_column_name_with_relation(expr, &mut relation), member),
+            ]
+        })
+        .flatten()
+        .collect::<Vec<_>>()
+}
+
+pub fn column_name_to_member_def_vec(
+    member_name_to_expr: Vec<(Option<String>, Member, Expr)>,
+) -> Vec<(String, Member)> {
+    let mut relation = WithColumnRelation(None);
+    member_name_to_expr
+        .into_iter()
+        .map(|(_, member, expr)| {
             vec![
                 (expr_column_name(expr.clone(), &None), member.clone()),
                 (expr_column_name_with_relation(expr, &mut relation), member),
