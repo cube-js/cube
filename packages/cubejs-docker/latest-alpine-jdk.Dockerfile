@@ -1,4 +1,4 @@
-FROM node:16.20.2-alpine3.17 as builder
+FROM node:18.19.0-alpine3.19 as builder
 
 WORKDIR /cube
 COPY . .
@@ -19,7 +19,7 @@ ENV PATH "$JAVA_HOME/bin:${PATH}"
 # action. So, a process will use the root lock file here.
 RUN yarn install --prod && yarn cache clean
 
-FROM node:16.20.2-alpine3.17
+FROM node:18.19.0-alpine3.19
 
 ARG IMAGE_VERSION=unknown
 

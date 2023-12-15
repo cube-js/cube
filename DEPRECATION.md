@@ -33,29 +33,30 @@ features:
   migrate to alternatives. In such cases, a warning may be printed, and users
   should not rely on this feature.
 
-| Status     | Feature                                                                                                                           | Deprecated | Remove    |
-| ---------- | --------------------------------------------------------------------------------------------------------------------------------- | ---------- | --------- |
-| Removed    | [Node.js 8](#nodejs-8)                                                                                                            | v0.22.4    | v0.26.0   |
-| Deprecated | [`hearBeatInterval`](#hearbeatinterval)                                                                                           | v0.23.8    | June 2021 |
-| Removed    | [`CUBEJS_ENABLE_TLS`](#cubejs_enable_tls)                                                                                         | v0.23.11   | v0.26.0   |
-| Deprecated | [Embedding Cube.js within Express](#embedding-cubejs-within-express)                                                              | v0.24.0    | June 2021 |
-| Removed    | [Absolute import for `@cubejs-backend/query-orchestrator`](#absolute-import-for-@cubejs-backendquery-orchestrator)                | v0.24.2    | v0.32.0   |
-| Removed    | [`contextToDataSourceId`](#contexttodatasourceid)                                                                                 | v0.25.0    | v0.25.0   |
-| Removed    | [Absolute import for `@cubejs-backend/server-core`](#absolute-import-for-@cubejs-backendserver-core)                              | v0.25.4    | v0.32.0   |
-| Removed    | [Absolute import for `@cubejs-backend/schema-compiler`](#absolute-import-for-@cubejs-backendschema-compiler)                      | v0.25.21   | v0.32.0   |
-| Deprecated | [`checkAuthMiddleware`](#checkauthmiddleware)                                                                                     | v0.26.0    |           |
-| Removed    | [Node.js 10](#nodejs-10)                                                                                                          | v0.26.0    | v0.29.0   |
-| Removed    | [Node.js 15](#nodejs-15)                                                                                                          | v0.26.0    | v0.32.0   |
-| Deprecated | [`USER_CONTEXT`](#user_context)                                                                                                   | v0.26.0    |           |
-| Deprecated | [`authInfo`](#authinfo)                                                                                                           | v0.26.0    |           |
-| Deprecated | [Prefix Redis environment variables with `CUBEJS_`](#prefix-redis-environment-variables-with-cubejs_)                             | v0.27.0    |           |
-| Removed    | [Node.js 12](#nodejs-12)                                                                                                          | v0.29.0    | v0.32.0   |
-| Deprecated | [`CUBEJS_EXTERNAL_DEFAULT` and `CUBEJS_SCHEDULED_REFRESH_DEFAULT`](#cubejs_external_default-and-cubejs_scheduled_refresh_default) | v0.30.0    |           |
-| Deprecated | [Using external databases for pre-aggregations](#using-external-databases-for-pre-aggregations)                                   | v0.30.0    |           |
-| Deprecated | [`dbType`](#dbtype)                                                                                                               | v0.30.30   |           |
-| Deprecated | [Serverless Deployments](#serverless-deployments)                                                                                 | v0.31.64   |           |
-| Deprecated | [Node.js 14](#nodejs-14)                                                                                                          | v0.32.0    |           |
-| Deprecated | [`running_total` measure type](#running_total-measure-type)                                                                       | v0.33.39   |           |
+| Status     | Feature                                                                                                                                 | Deprecated | Remove    |
+|------------|-----------------------------------------------------------------------------------------------------------------------------------------|------------|-----------|
+| Removed    | [Node.js 8](#nodejs-8)                                                                                                                  | v0.22.4    | v0.26.0   |
+| Deprecated | [`hearBeatInterval`](#hearbeatinterval)                                                                                                 | v0.23.8    | June 2021 |
+| Removed    | [`CUBEJS_ENABLE_TLS`](#cubejs_enable_tls)                                                                                               | v0.23.11   | v0.26.0   |
+| Deprecated | [Embedding Cube.js within Express](#embedding-cubejs-within-express)                                                                    | v0.24.0    | June 2021 |
+| Removed    | [Absolute import for `@cubejs-backend/query-orchestrator`](#absolute-import-for-@cubejs-backendquery-orchestrator)                      | v0.24.2    | v0.32.0   |
+| Removed    | [`contextToDataSourceId`](#contexttodatasourceid)                                                                                       | v0.25.0    | v0.25.0   |
+| Removed    | [Absolute import for `@cubejs-backend/server-core`](#absolute-import-for-@cubejs-backendserver-core)                                    | v0.25.4    | v0.32.0   |
+| Removed    | [Absolute import for `@cubejs-backend/schema-compiler`](#absolute-import-for-@cubejs-backendschema-compiler)                            | v0.25.21   | v0.32.0   |
+| Deprecated | [`checkAuthMiddleware`](#checkauthmiddleware)                                                                                           | v0.26.0    |           |
+| Removed    | [Node.js 10](#nodejs-10)                                                                                                                | v0.26.0    | v0.29.0   |
+| Removed    | [Node.js 15](#nodejs-15)                                                                                                                | v0.26.0    | v0.32.0   |
+| Deprecated | [`USER_CONTEXT`](#user_context)                                                                                                         | v0.26.0    |           |
+| Deprecated | [`authInfo`](#authinfo)                                                                                                                 | v0.26.0    |           |
+| Deprecated | [Prefix Redis environment variables with `CUBEJS_`](#prefix-redis-environment-variables-with-cubejs_)                                   | v0.27.0    |           |
+| Removed    | [Node.js 12](#nodejs-12)                                                                                                                | v0.29.0    | v0.32.0   |
+| Deprecated | [`CUBEJS_EXTERNAL_DEFAULT` and `CUBEJS_SCHEDULED_REFRESH_DEFAULT`](#cubejs_external_default-and-cubejs_scheduled_refresh_default)       | v0.30.0    |           |
+| Deprecated | [Using external databases for pre-aggregations](#using-external-databases-for-pre-aggregations)                                         | v0.30.0    |           |
+| Deprecated | [`dbType`](#dbtype)                                                                                                                     | v0.30.30   |           |
+| Deprecated | [Serverless Deployments](#serverless-deployments)                                                                                       | v0.31.64   |           |
+| Removed    | [Node.js 14](#nodejs-14)                                                                                                                | v0.32.0    | v0.35.0   |
+| Deprecated | [`running_total` measure type](#running_total-measure-type)                                                                             | v0.33.39   |           |
+| Deprecated | [Node.js 16](#nodejs-16)                                                                                                                | v0.35.0    |           |
 
 ### Node.js 8
 
@@ -346,12 +347,10 @@ instead.
 
 ### Node.js 14
 
-**Deprecated in Release: v0.32.0**
+**Removed in Release: v0.35.0**
 
 Node.js 14 reached [End of Life on April 30, 2023][link-nodejs-eol]. This means
 no more updates. Please upgrade to Node.js 16 or higher.
-
-[link-nodejs-eol]: https://github.com/nodejs/Release#end-of-life-releases
 
 ### `running_total` measure type
 
@@ -360,3 +359,12 @@ no more updates. Please upgrade to Node.js 16 or higher.
 The `running_total` measure type is now deprecated, and we recommend using
 [`rolling_window`](https://cube.dev/docs/product/data-modeling/reference/measures#rolling_window)
 to calculate running totals instead.
+
+### Node.js 16
+
+**Deprecated in Release: v0.35.0**
+
+Node.js 16 reached [End of Life on September 11, 2023][link-nodejs-eol]. This means
+no more updates. Please upgrade to Node.js 18 or higher.
+
+[link-nodejs-eol]: https://github.com/nodejs/Release#end-of-life-releases
