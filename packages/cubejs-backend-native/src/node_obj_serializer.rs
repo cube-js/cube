@@ -49,7 +49,7 @@ impl<'a, 'b, C: Context<'a>> NodeObjSerializer<'a, 'b, C> {
     {
         let mut serializer = NodeObjSerializer {
             context,
-            phantom: PhantomData::default(),
+            phantom: Default::default(),
         };
         value.serialize(&mut serializer)
     }
@@ -107,7 +107,7 @@ impl<'a, 'b, 'c, C: Context<'a>> ser::Serializer for &'c mut NodeObjSerializer<'
     }
 
     fn serialize_f64(self, v: f64) -> Result<Self::Ok, Self::Error> {
-        Ok(self.context.number(v as f64).upcast())
+        Ok(self.context.number(v).upcast())
     }
 
     fn serialize_char(self, v: char) -> Result<Self::Ok, Self::Error> {

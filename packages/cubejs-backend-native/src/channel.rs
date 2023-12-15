@@ -288,6 +288,7 @@ impl SqlGenerator for NodeSqlGenerator {
         self.sql_templates.clone()
     }
 
+    #[allow(clippy::diverging_sub_expression)]
     async fn call_template(
         &self,
         _name: String,
