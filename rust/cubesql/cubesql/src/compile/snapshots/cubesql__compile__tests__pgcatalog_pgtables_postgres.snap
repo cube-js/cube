@@ -8,4 +8,5 @@ expression: "execute_query(\"SELECT * FROM pg_catalog.pg_tables\".to_string(),\n
 | public     | KibanaSampleDataEcommerce | ovr        |            | true       | false    | false       | false       |
 | public     | Logs                      | ovr        |            | true       | false    | false       | false       |
 | public     | NumberCube                | ovr        |            | true       | false    | false       | false       |
+| public     | WideCube                  | ovr        |            | true       | false    | false       | false       |
 +------------+---------------------------+------------+------------+------------+----------+-------------+-------------+

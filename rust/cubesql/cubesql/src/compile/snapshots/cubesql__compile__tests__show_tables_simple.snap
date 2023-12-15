@@ -8,4 +8,5 @@ expression: "execute_query(\"show tables;\".to_string(), DatabaseProtocol::MySQL
 | KibanaSampleDataEcommerce |
 | Logs                      |
 | NumberCube                |
+| WideCube                  |
 +---------------------------+

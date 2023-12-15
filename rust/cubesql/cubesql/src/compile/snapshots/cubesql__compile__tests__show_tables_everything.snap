@@ -8,4 +8,5 @@ expression: "execute_query(\"show full tables from db like '%';\".to_string(),\n
 | KibanaSampleDataEcommerce | BASE TABLE |
 | Logs                      | BASE TABLE |
 | NumberCube                | BASE TABLE |
+| WideCube                  | BASE TABLE |
 +---------------------------+------------+
