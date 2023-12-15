@@ -1248,31 +1248,6 @@ module.exports = {
 
 ## Deprecated
 
-### `initApp`
-
-<WarningBox>
-
-`initApp` is deprecated and will be removed in a future release.
-
-</WarningBox>
-
-This function allows you to extend the Cube API server with custom Express
-middleware. This is especially useful for adding monitoring and observability
-solutions.
-
-```typescript
-const myCustomMiddleware = (req, res, next) => {
-  req.foo = "bar";
-  next();
-};
-
-module.exports = {
-  initApp: (app) => {
-    app.use(myCustomMiddleware);
-  },
-};
-```
-
 ### `dbType`
 
 <WarningBox>
