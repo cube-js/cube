@@ -53,7 +53,7 @@ features:
 | Deprecated | [`CUBEJS_EXTERNAL_DEFAULT` and `CUBEJS_SCHEDULED_REFRESH_DEFAULT`](#cubejs_external_default-and-cubejs_scheduled_refresh_default)       | v0.30.0    |           |
 | Deprecated | [Using external databases for pre-aggregations](#using-external-databases-for-pre-aggregations)                                         | v0.30.0    |           |
 | Deprecated | [`dbType`](#dbtype)                                                                                                                     | v0.30.30   |           |
-| Deprecated | [Serverless Deployments](#serverless-deployments)                                                                                       | v0.31.64   |           |
+| Deprecated | [Serverless Deployments](#serverless-deployments)                                                                                       | v0.31.64   | v0.35.0   |
 | Removed    | [Node.js 14](#nodejs-14)                                                                                                                | v0.32.0    | v0.35.0   |
 | Deprecated | [`running_total` measure type](#running_total-measure-type)                                                                             | v0.33.39   |           |
 | Deprecated | [Node.js 16](#nodejs-16)                                                                                                                | v0.35.0    |           |
@@ -339,7 +339,7 @@ instead.
 
 ### Serverless Deployments
 
-**Deprecated in Release: v0.31.64**
+**Removed in Release: v0.35.0**
 
 Using Serverless deployments with the `@cubejs-backend/serverless` package is
 now deprecated; we **strongly** recommend using Docker-based deployments
