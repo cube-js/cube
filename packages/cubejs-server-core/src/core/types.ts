@@ -145,7 +145,7 @@ export type DbTypeFn = (context: DriverContext) =>
 export type DriverFactoryFn = (context: DriverContext) =>
   Promise<BaseDriver | DriverConfig> | BaseDriver | DriverConfig;
 
-export type DbTypeAsyncFn = (context: DriverContext) =>
+export type DbTypeAsyncFn = (context: DriverContext, driverFactory: DriverFactory) =>
   Promise<DatabaseType>;
 export type DriverFactoryAsyncFn = (context: DriverContext) =>
   Promise<BaseDriver | DriverConfig>;

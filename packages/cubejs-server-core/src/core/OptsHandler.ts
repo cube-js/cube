@@ -233,12 +233,11 @@ export class OptsHandler {
    * Async driver type getter.
    */
   private getDbType(
-    opts: CreateOptions & {
-      driverFactory: DriverFactoryAsyncFn,
-    },
+    opts: CreateOptions,
   ): DbTypeAsyncFn {
-    const { dbType, driverFactory } = opts;
-    return async (ctx: DriverContext) => {
+    const { dbType } = opts;
+
+    return async (ctx: DriverContext, driverFactory: DriverFactoryAsyncFn) => {
       if (!dbType) {
         let val: undefined | BaseDriver | DriverConfig;
         let type: DatabaseType;
