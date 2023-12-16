@@ -1,0 +1,84 @@
+# Performance Insights
+
+<WarningBox>
+
+This page is work-in-progress.
+
+</WarningBox>
+
+The&nbsp;<Btn>Performance</Btn> page in Cube Cloud displays charts that help
+analyze the performance of your deployment and fine-tune its configuration.
+It's recommended to review Performance Insights when the workload changes
+or if you face any performance-related issues with your deployment.
+
+<SuccessBox>
+
+Performance Insights are available in Cube Cloud on
+[all tiers](https://cube.dev/pricing).
+
+</SuccessBox>
+
+## Charts
+
+Charts provide insights into different aspects of your deployment.
+
+### API instances
+
+The&nbsp;<Btn>API instances</Btn> chart shows the number of API instances
+that served queries to the deployment over time.
+
+{/* TODO: Add screenshot */}
+
+You can use this chart to fine-tune the auto-scaling configuration of API
+instances, e.g., increase the minimum and maximum number of API instances. 
+
+Also, you can use this chart to fine-tune the auto-suspension configuration,
+e.g., by turning auto-suspension off or increasing the auto-suspension
+threshold.
+
+### Data sources
+
+The&nbsp;<Btn>Requests by data source</Btn> chart shows the number of API
+requests that were fulfilled by using cache or querying the upstream data
+source over time. The&nbsp;<Btn>Avg. response time by data source</Btn>
+shows the difference in the response time for
+requests that hit the cache or go to the upstream data source.
+
+{/* TODO: Add screenshot (x2) */}
+
+You can use these charts to see if you'd like to have more queries that hit
+the cache and have lower response time. In that case, consider adding more
+pre-aggregations in Cube Store or fine-tune the existing ones.
+
+### Data model compilation
+
+The&nbsp;<Btn>Requests by data model compilation</Btn> chart shows the
+number of API requests that had or had not to wait for the data model
+compilation. The&nbsp;<Btn>Wait time for data model compilation</Btn> chart
+shows the total time requests had to wait for the data model compilation.
+
+{/* TODO: Add screenshot */}
+
+You can use these charts to identify multitenancy misconfiguration,
+fine-tune the auto-suspension configuration, or consider using a
+multi-cluster deployment.
+
+### Cube Store
+
+The&nbsp;<Btn>Saturation for queries by Cube Store workers</Btn> chart
+shows if Cube Store workers are overloaded with serving **queries**. High
+saturation for queries prevents Cube Store workers from fulfilling requests
+and results in wait time displayed at the&nbsp;<Btn>Wait time for queries
+by Cube Store workers</Btn> chart.
+
+{/* TODO: Add screenshot */}
+
+Similarly, the&nbsp;<Btn>Saturation for jobs by Cube Store workers</Btn>
+and <Btn>Wait time for jobs by Cube Store workers</Btn> charts show if
+Cube Store Workers are overloaded with serving **jobs**, i.e., building
+pre-aggregations or performing internal tasks such as data compaction.
+
+{/* TODO: Add screenshot */}
+
+You can use these charts to consider fine-tuning the number of Cube Store
+workers used by your deployment.

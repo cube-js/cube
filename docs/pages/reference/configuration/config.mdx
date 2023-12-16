@@ -16,6 +16,14 @@ JavaScript (`basePath`).
 
 </InfoBox>
 
+Every configuration option that is a function (e.g., `query_rewrite`)
+can be defined as either synchronous or asynchronous. Cube will await for
+the completion of asynchronous functions.
+
+It's wise to make functions that are called on each request as fast as
+possible to minimize the performance hit. Consider using caching when
+applicable and performing calculations outside of these functions.
+
 ## Data model
 
 ### `schema_path`
@@ -358,7 +366,6 @@ module.exports = {
 ### `driver_factory`
 
 A function to provide a custom configuration for the data source driver.
-Can be asynchronous.
 
 Called once per [`data_source`][ref-schema-ref-datasource] for every
 [orchestrator id][self-orchestrator-id].
@@ -676,8 +683,7 @@ CUBEJS_SCHEDULED_REFRESH_TIMEZONES=America/Los_Angeles,UTC
 When trying to configure scheduled refreshes for pre-aggregations that use the
 `securityContext` inside `context_to_app_id` or `context_to_orchestrator_id`, you must
 also set up `scheduled_refresh_contexts`. This will allow Cube to generate the
-necessary security contexts prior to running the scheduled refreshes. Can
-be asynchronous.
+necessary security contexts prior to running the scheduled refreshes.
 
 <WarningBox>
 
@@ -915,7 +921,7 @@ module.exports = {
 
 This function is used to select accessible [API scopes][ref-rest-scopes]
 and effectively allow or disallow access to REST API endpoints, based on
-the [security context][ref-sec-ctx]. Can be asynchronous.
+the [security context][ref-sec-ctx].
 
 Security context is provided as the first argument. An array of scopes that
 was set via `CUBEJS_DEFAULT_API_SCOPES` is provided as the second argument.
@@ -945,7 +951,7 @@ module.exports = {
 ### `extend_context`
 
 Option to extend the `RequestContext` with custom values. This method is called
-on each request. Can be asynchronous.
+on each request.
 
 The function should return an object which gets appended to the
 [`RequestContext`][self-opts-req-ctx]. Make sure to register your value using
@@ -1005,7 +1011,7 @@ cube(`Users`, {
 
 ### `check_auth`
 
-Used in both REST and WebSockets API. Can be asynchronous.
+Used in both REST and WebSockets API.
 
 Default implementation parses [JSON Web Token (JWT)][link-jwt] in `Authorization`
 header and sets payload to `securityContext` if it's verified. More
@@ -1080,7 +1086,7 @@ Can also be set using `CUBEJS_JWT_CLAIMS_NAMESPACE`.
 
 ### `check_sql_auth`
 
-Used in [SQL API][ref-sql-api], and can be asynchronous. Default
+Used in the [SQL API][ref-sql-api]. Default
 implementation verifies user name and password from environment variables:
 `CUBEJS_SQL_USER`, `CUBEJS_SQL_PASSWORD`, but in [development
 mode][ref-development-mode] it ignores validation.
@@ -1139,7 +1145,7 @@ module.exports = {
 
 ### `can_switch_sql_user`
 
-Used in [SQL API][ref-sql-api], and can asynchronous. Default
+Used in the [SQL API][ref-sql-api],. Default
 implementation depends on `CUBEJS_SQL_SUPERUSER` and return `true` when it's
 equal to session's user.
 

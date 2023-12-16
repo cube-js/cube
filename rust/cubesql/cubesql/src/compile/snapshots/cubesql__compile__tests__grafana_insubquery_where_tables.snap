@@ -8,4 +8,5 @@ expression: "execute_query(r#\"SELECT quote_ident(table_name) AS \"table\" FROM 
 | "KibanaSampleDataEcommerce" |
 | "Logs"                      |
 | "NumberCube"                |
+| "WideCube"                  |
 +-----------------------------+

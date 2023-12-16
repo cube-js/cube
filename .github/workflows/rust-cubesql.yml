@@ -28,7 +28,7 @@ jobs:
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2022-03-22
+          toolchain: nightly-2023-12-13
           override: true
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
@@ -105,7 +105,7 @@ jobs:
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2022-03-22
+          toolchain: nightly-2023-12-13
           override: true
           components: rustfmt
       - uses: Swatinem/rust-cache@v2
@@ -148,7 +148,7 @@ jobs:
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2022-03-22
+          toolchain: nightly-2023-12-13
           override: true
           components: rustfmt
           target: ${{ matrix.target }}
@@ -250,7 +250,7 @@ jobs:
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2022-03-22
+          toolchain: nightly-2023-12-13
           override: true
           components: rustfmt
           target: ${{ matrix.target }}
@@ -332,7 +332,7 @@ jobs:
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2022-03-22
+          toolchain: nightly-2023-12-13
           override: true
           components: rustfmt
       - name: Install Python

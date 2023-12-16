@@ -24,6 +24,22 @@ If you’re building a custom data application, you might use the [`meta` endpoi
 of the REST API. It groups cubes into `connectedComponents` to help select those ones
 that can be joined together.
 
+## `Can't parse timestamp`
+
+```
+Can't parse timestamp: 2023-11-07T14:33:23.16.000
+```
+
+Error message above indicates that the data source was unable to recognize
+the value of a [time dimension](/reference/data-model/types-and-formats#time-1)
+as a timestamp.
+
+**Please check that the [SQL expression](/product/data-modeling/syntax#sql-expressions)
+of this time dimension evaluates to a `TIMESTAMP` type.**
+
+Also, check this recipe to see how you can [work around string values in
+time dimensions](/guides/recipes/data-modeling/string-time-dimensions).
+
 ## `Primary key is required when join is defined`
 
 ```

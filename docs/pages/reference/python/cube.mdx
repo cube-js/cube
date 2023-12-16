@@ -60,11 +60,11 @@ from cube import TemplateContext
 template = TemplateContext()
 ```
 
-#### `template.variable`
+#### `add_variable`
 
-This method registers a variable so that it's available in a Jinja template.
-
-Should be called with two arguments, a `name` and a `value` of the variable.
+The `add_variable` method registers a variable so that it's available in
+a Jinja template. Should be called with two arguments, a `name` and a `value`
+of the variable.
 
 ```python
 from cube import TemplateContext
@@ -72,16 +72,14 @@ from cube import TemplateContext
 template = TemplateContext()
 
 # Accessible from Jinja as 'my_var'
-template.variable('my_var', 123)
+template.add_variable('my_var', 123)
 ```
 
-#### `template.function`
+#### `add_function` and `function`
 
-This method registers a function so that it's callable from a Jinja template
-as a Python function.
-
-In case this method is used as a decorator with a single `name` argument,
-the decorated function will be registered under that `name`.
+The `add_function` method registers a function so that it's callable from
+a Jinja template as a Python function. Should be called with two arguments,
+a `name` and a function that will be registered under that `name`:
 
 ```python
 from cube import TemplateContext
@@ -89,13 +87,13 @@ from cube import TemplateContext
 template = TemplateContext()
 
 # Accessible from Jinja as 'get_data()'
-@template.function('get_data')
 def get_data_1():
   return 1
+template.add_function('get_data', get_data_1)
 ```
 
-In case this method is called with two arguments, a `name` and a function,
-the passed function will be registered under that `name`.
+Also, you can use the `template.function` decorator with a single `name`
+argument; the decorated function will be registered under that `name`:
 
 ```python
 from cube import TemplateContext
@@ -103,18 +101,17 @@ from cube import TemplateContext
 template = TemplateContext()
 
 # Accessible from Jinja as 'get_more_data()'
+@template.function('get_more_data')
 def get_data_2():
   return 2
-template.function('get_more_data', get_data_2)
 ```
 
-#### `template.filter`
+#### `add_filter` and `filter`
 
-This method registers a function so that it's callable from a Jinja template
-as a [Jinja filter][link-jinja-filters].
-
-In case this method is used as a decorator with a single `name` argument,
-the decorated function will be registered as a filter under that `name`.
+The `add_filter` method registers a function so that it's callable from
+a Jinja template as a [Jinja filter][link-jinja-filters]. Should be called
+with two arguments, a `name` and a function that will be registered as a filter
+under that `name`:
 
 ```python
 from cube import TemplateContext
@@ -122,13 +119,14 @@ from cube import TemplateContext
 template = TemplateContext()
 
 # Accessible from Jinja as 'data | wrap'
-@template.filter('wrap')
 def wrap_1(data):
-  return f"<{data}>"
+  return f"< {data} >"
+template.add_filter('wrap', wrap_1)
 ```
 
-In case this method is called with two arguments, a `name` and a function,
-the passed function will be registered as a filter under that `name`.
+Also, you can use the `template.filter` decorator with a single `name`
+argument; the decorated function will be registered as a filter under that
+`name`:
 
 ```python
 from cube import TemplateContext
@@ -136,10 +134,11 @@ from cube import TemplateContext
 template = TemplateContext()
 
 # Accessible from Jinja as 'data | wrap_more'
+@template.filter('wrap_more')
 def wrap_2(data):
-  return f"<<<{data}>>>"
-template.filter('wrap_more', wrap_2)
+  return f"<<< {data} >>>"
 ```
+
 
 [link-cube-repo-issues]: https://github.com/cube-js/cube/issues
 [link-jinja-filters]: https://jinja.palletsprojects.com/en/3.1.x/templates/#filters

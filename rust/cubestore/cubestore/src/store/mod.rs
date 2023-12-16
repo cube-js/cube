@@ -793,6 +793,19 @@ mod tests {
     use std::fs;
     use std::path::{Path, PathBuf};
 
+    #[test]
+    fn dataframe_deep_size_of() {
+        for (v, expected_size) in [(
+            DataFrame::new(
+                vec![Column::new("payload".to_string(), ColumnType::String, 0)],
+                vec![Row::new(vec![TableValue::String("foo".to_string())])],
+            ),
+            162_usize,
+        )] {
+            assert_eq!(v.deep_size_of(), expected_size, "size for {:?}", v);
+        }
+    }
+
     #[tokio::test]
     async fn create_wal_test() {
         let config = Config::test("create_chunk_test");

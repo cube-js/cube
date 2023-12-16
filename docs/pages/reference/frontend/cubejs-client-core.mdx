@@ -838,7 +838,7 @@ resultSet.tablePivot({
 Name | Type | Description |
 ------ | ------ | ------ |
 aliasSeries? | string[] | Give each series a prefix alias. Should have one entry for each query:measure. See [chartPivot](#result-set-chart-pivot) |
-fillMissingDates? | boolean &#124; null | If `true` missing dates on the time dimensions will be filled with `0` for all measures.Note: the `fillMissingDates` option set to `true` will override any **order** applied to the query |
+fillMissingDates? | boolean &#124; null | **`true` by default.** If set to `true`, missing dates on the time dimensions will be filled with `0` for all measures. Note: setting this option to `true` will override any `order` applied to the query. |
 x? | string[] | Dimensions to put on **x** or **rows** axis. |
 y? | string[] | Dimensions to put on **y** or **columns** axis. |
 

@@ -176,12 +176,12 @@
   },
   {
     "source": "/cloud/workspace/alerts",
-    "destination": "/product/monitoring/alerts",
+    "destination": "/product/monitoring",
     "permanent": true
   },
   {
     "source": "/cloud/dev-tools/alerts/",
-    "destination": "/product/monitoring/alerts",
+    "destination": "/product/monitoring",
     "permanent": true
   },
   {

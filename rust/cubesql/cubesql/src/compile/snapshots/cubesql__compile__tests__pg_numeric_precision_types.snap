@@ -95,4 +95,6 @@ expression: "execute_query(\"\n                SELECT t.oid, information_schema.
 | 18020 | NULL  |
 | 18029 | NULL  |
 | 18030 | NULL  |
+| 18035 | NULL  |
+| 18036 | NULL  |
 +-------+-------+

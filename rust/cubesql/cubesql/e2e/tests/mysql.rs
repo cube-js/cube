@@ -145,7 +145,7 @@ impl MySqlIntegrationTestSuite {
         // Close statement
         let statement = conn.prep("SELECT ?".to_string()).await.unwrap();
         conn.exec_iter(&statement, ("test",)).await.unwrap();
-        conn.close(statement);
+        conn.close(statement).await.unwrap();
 
         // Client will allocate a new one
         let statement = conn.prep("SELECT ?".to_string()).await.unwrap();

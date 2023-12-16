@@ -2166,6 +2166,7 @@ impl Config {
                     Duration::from_secs(c.query_timeout()),
                     Duration::from_secs(c.import_job_timeout() * 2),
                     query_cache_to_move,
+                    i.get_service_typed().await,
                 )
             })
             .await;

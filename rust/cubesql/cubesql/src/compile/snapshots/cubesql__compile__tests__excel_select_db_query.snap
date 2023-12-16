@@ -8,4 +8,5 @@ expression: "execute_query(\"\n                SELECT\n                    'db' 
 | db       | public | KibanaSampleDataEcommerce | User      | ovr     | 18000 | NULL | true    | false        | -1        | NULL    | 15           | false          | NULL       | NULL                    |
 | db       | public | Logs                      | User      | ovr     | 18018 | NULL | true    | false        | -1        | NULL    | 7            | false          | NULL       | NULL                    |
 | db       | public | NumberCube                | User      | ovr     | 18028 | NULL | true    | false        | -1        | NULL    | 3            | false          | NULL       | NULL                    |
+| db       | public | WideCube                  | User      | ovr     | 18034 | NULL | true    | false        | -1        | NULL    | 107          | false          | NULL       | NULL                    |
 +----------+--------+---------------------------+-----------+---------+-------+------+---------+--------------+-----------+---------+--------------+----------------+------------+-------------------------+

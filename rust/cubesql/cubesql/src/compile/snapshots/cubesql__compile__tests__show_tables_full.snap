@@ -8,4 +8,5 @@ expression: "execute_query(\"show full tables;\".to_string(), DatabaseProtocol::
 | KibanaSampleDataEcommerce | BASE TABLE |
 | Logs                      | BASE TABLE |
 | NumberCube                | BASE TABLE |
+| WideCube                  | BASE TABLE |
 +---------------------------+------------+

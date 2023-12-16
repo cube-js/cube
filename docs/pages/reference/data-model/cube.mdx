@@ -158,6 +158,33 @@ cubes:
 
 </CodeTabs>
 
+### meta
+
+Custom metadata. Can be used to pass any information to the frontend.
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  sql_table: `orders`,
+  title: `Product Orders`,
+  meta: {
+    any: `value`,
+  }
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    sql_table: orders
+    title: Product Orders
+    meta:
+      any: value
+```
+
+</CodeTabs>
+
 ### extends
 
 You can extend cubes in order to reuse all declared members of a cube. In the

@@ -14,6 +14,7 @@ use crate::{
         },
     },
     sql::AuthContextRef,
+    transport::SpanId,
     CubeError,
 };
 use datafusion::{logical_plan::LogicalPlan, physical_plan::planner::DefaultPhysicalPlanner};
@@ -217,6 +218,7 @@ impl Rewriter {
         root: Id,
         auth_context: AuthContextRef,
         qtrace: &mut Option<Qtrace>,
+        span_id: Option<Arc<SpanId>>,
     ) -> Result<LogicalPlan, CubeError> {
         let cube_context = self.cube_context.clone();
         let egraph = self.graph.clone();
@@ -355,8 +357,12 @@ impl Rewriter {
                         .join(", ")
                 );
                 log::debug!("Best cost: {:?}", best_cost);
-                let converter =
-                    LanguageToLogicalPlanConverter::new(best, cube_context.clone(), auth_context);
+                let converter = LanguageToLogicalPlanConverter::new(
+                    best,
+                    cube_context.clone(),
+                    auth_context,
+                    span_id.clone(),
+                );
                 Ok((
                     converter.to_logical_plan(new_root),
                     qtrace_egraph_iterations,

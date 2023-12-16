@@ -27,7 +27,7 @@ use serde::Serialize;
 use sqlparser::ast::{self, escape_single_quote_string};
 use std::{
     backtrace::Backtrace, collections::HashMap, env, fmt::Formatter, future::Future, pin::Pin,
-    sync::Arc,
+    sync::Arc, time::SystemTime,
 };
 
 use self::{
@@ -106,7 +106,7 @@ pub mod test;
 pub use crate::transport::ctx::*;
 use crate::{
     compile::engine::df::wrapper::CubeScanWrapperNode,
-    transport::{LoadRequestMeta, TransportService},
+    transport::{LoadRequestMeta, SpanId, TransportService},
 };
 pub use error::{CompilationError, CompilationResult};
 
@@ -138,6 +138,7 @@ impl QueryPlanner {
         stmt: &ast::Statement,
         q: &Box<ast::Query>,
         qtrace: &mut Option<Qtrace>,
+        span_id: Option<Arc<SpanId>>,
     ) -> CompilationResult<QueryPlan> {
         // TODO move CUBESQL_REWRITE_ENGINE env to config
         let rewrite_engine = env::var("CUBESQL_REWRITE_ENGINE")
@@ -145,7 +146,50 @@ impl QueryPlanner {
             .map(|v| v.parse::<bool>().unwrap())
             .unwrap_or(true);
         if rewrite_engine {
-            return self.create_df_logical_plan(stmt.clone(), qtrace).await;
+            let planning_start = SystemTime::now();
+            if let Some(span_id) = span_id.as_ref() {
+                if let Some(auth_context) = self.state.auth_context() {
+                    self.session_manager
+                        .server
+                        .transport
+                        .log_load_state(
+                            Some(span_id.clone()),
+                            auth_context,
+                            self.state.get_load_request_meta(),
+                            "SQL API Query Planning".to_string(),
+                            serde_json::json!({
+                                "query": span_id.query_key.clone(),
+                            }),
+                        )
+                        .await
+                        .map_err(|e| CompilationError::internal(e.to_string()))?;
+                }
+            }
+            let result = self
+                .create_df_logical_plan(stmt.clone(), qtrace, span_id.clone())
+                .await?;
+
+            if let Some(span_id) = span_id.as_ref() {
+                if let Some(auth_context) = self.state.auth_context() {
+                    self.session_manager
+                        .server
+                        .transport
+                        .log_load_state(
+                            Some(span_id.clone()),
+                            auth_context,
+                            self.state.get_load_request_meta(),
+                            "SQL API Query Planning Success".to_string(),
+                            serde_json::json!({
+                                "query": span_id.query_key.clone(),
+                                "duration": planning_start.elapsed().unwrap().as_millis() as u64,
+                            }),
+                        )
+                        .await
+                        .map_err(|e| CompilationError::internal(e.to_string()))?;
+                }
+            }
+
+            return Ok(result);
         }
 
         let select = match &q.body {
@@ -166,7 +210,9 @@ impl QueryPlanner {
         let from_table = if select.from.len() == 1 {
             &select.from[0]
         } else {
-            return self.create_df_logical_plan(stmt.clone(), qtrace).await;
+            return self
+                .create_df_logical_plan(stmt.clone(), qtrace, span_id.clone())
+                .await;
         };
 
         let (db_name, schema_name, table_name) = match &from_table.relation {
@@ -221,7 +267,9 @@ impl QueryPlanner {
                 if db_name.to_lowercase() == "information_schema"
                     || db_name.to_lowercase() == "performance_schema"
                 {
-                    return self.create_df_logical_plan(stmt.clone(), &mut None).await;
+                    return self
+                        .create_df_logical_plan(stmt.clone(), &mut None, span_id.clone())
+                        .await;
                 }
             }
             DatabaseProtocol::PostgreSQL => {
@@ -229,7 +277,9 @@ impl QueryPlanner {
                     || schema_name.to_lowercase() == "performance_schema"
                     || schema_name.to_lowercase() == "pg_catalog"
                 {
-                    return self.create_df_logical_plan(stmt.clone(), qtrace).await;
+                    return self
+                        .create_df_logical_plan(stmt.clone(), qtrace, span_id.clone())
+                        .await;
                 }
             }
         };
@@ -350,6 +400,7 @@ impl QueryPlanner {
                     },
                     // Empty as it's not used in the legacy compiler
                     Vec::new(),
+                    span_id.clone(),
                 )),
             });
             let logical_plan = LogicalPlan::Projection(Projection {
@@ -377,9 +428,12 @@ impl QueryPlanner {
         &self,
         stmt: &ast::Statement,
         qtrace: &mut Option<Qtrace>,
+        span_id: Option<Arc<SpanId>>,
     ) -> CompilationResult<QueryPlan> {
         let plan = match (stmt, &self.state.protocol) {
-            (ast::Statement::Query(q), _) => self.select_to_plan(stmt, q, qtrace).await,
+            (ast::Statement::Query(q), _) => {
+                self.select_to_plan(stmt, q, qtrace, span_id.clone()).await
+            }
             (ast::Statement::SetTransaction { .. }, _) => Ok(QueryPlan::MetaTabular(
                 StatusFlags::empty(),
                 Box::new(dataframe::DataFrame::new(vec![], vec![])),
@@ -408,10 +462,10 @@ impl QueryPlanner {
                 self.set_variable_to_plan(&key_values).await
             }
             (ast::Statement::ShowVariable { variable }, _) => {
-                self.show_variable_to_plan(variable).await
+                self.show_variable_to_plan(variable, span_id.clone()).await
             }
             (ast::Statement::ShowVariables { filter }, DatabaseProtocol::MySQL) => {
-                self.show_variables_to_plan(&filter).await
+                self.show_variables_to_plan(&filter, span_id.clone()).await
             }
             (ast::Statement::ShowCreate { obj_name, obj_type }, DatabaseProtocol::MySQL) => {
                 self.show_create_to_plan(&obj_name, &obj_type)
@@ -425,7 +479,7 @@ impl QueryPlanner {
                 },
                 DatabaseProtocol::MySQL,
             ) => {
-                self.show_columns_to_plan(*extended, *full, &filter, &table_name)
+                self.show_columns_to_plan(*extended, *full, &filter, &table_name, span_id.clone())
                     .await
             }
             (
@@ -437,14 +491,15 @@ impl QueryPlanner {
                 },
                 DatabaseProtocol::MySQL,
             ) => {
-                self.show_tables_to_plan(*extended, *full, &filter, &db_name)
+                self.show_tables_to_plan(*extended, *full, &filter, &db_name, span_id.clone())
                     .await
             }
             (ast::Statement::ShowCollation { filter }, DatabaseProtocol::MySQL) => {
-                self.show_collation_to_plan(&filter).await
+                self.show_collation_to_plan(&filter, span_id.clone()).await
             }
             (ast::Statement::ExplainTable { table_name, .. }, DatabaseProtocol::MySQL) => {
-                self.explain_table_to_plan(&table_name).await
+                self.explain_table_to_plan(&table_name, span_id.clone())
+                    .await
             }
             (
                 ast::Statement::Explain {
@@ -513,6 +568,7 @@ impl QueryPlanner {
     async fn show_variable_to_plan(
         &self,
         variable: &Vec<ast::Ident>,
+        span_id: Option<Arc<SpanId>>,
     ) -> CompilationResult<QueryPlan> {
         let name = variable.to_vec()[0].value.clone();
         if self.state.protocol == DatabaseProtocol::PostgreSQL {
@@ -540,7 +596,8 @@ impl QueryPlanner {
                 )?
             };
 
-            self.create_df_logical_plan(stmt, &mut None).await
+            self.create_df_logical_plan(stmt, &mut None, span_id.clone())
+                .await
         } else if name.eq_ignore_ascii_case("databases") || name.eq_ignore_ascii_case("schemas") {
             Ok(QueryPlan::MetaTabular(
                 StatusFlags::empty(),
@@ -572,7 +629,8 @@ impl QueryPlanner {
                 &mut None,
             )?;
 
-            self.create_df_logical_plan(stmt, &mut None).await
+            self.create_df_logical_plan(stmt, &mut None, span_id.clone())
+                .await
         } else if name.eq_ignore_ascii_case("warnings") {
             Ok(QueryPlan::MetaTabular(
                 StatusFlags::empty(),
@@ -603,6 +661,7 @@ impl QueryPlanner {
                     variable: variable.clone(),
                 },
                 &mut None,
+                span_id.clone(),
             )
             .await
         }
@@ -611,6 +670,7 @@ impl QueryPlanner {
     async fn show_variables_to_plan(
         &self,
         filter: &Option<ast::ShowStatementFilter>,
+        span_id: Option<Arc<SpanId>>,
     ) -> Result<QueryPlan, CompilationError> {
         let filter = match filter {
             Some(stmt @ ast::ShowStatementFilter::Like(_)) => {
@@ -637,7 +697,8 @@ impl QueryPlanner {
             &mut None,
         )?;
 
-        self.create_df_logical_plan(stmt, &mut None).await
+        self.create_df_logical_plan(stmt, &mut None, span_id.clone())
+            .await
     }
 
     fn show_create_to_plan(
@@ -707,6 +768,7 @@ impl QueryPlanner {
         full: bool,
         filter: &Option<ast::ShowStatementFilter>,
         table_name: &ast::ObjectName,
+        span_id: Option<Arc<SpanId>>,
     ) -> Result<QueryPlan, CompilationError> {
         let extended = match extended {
             false => "".to_string(),
@@ -768,7 +830,8 @@ impl QueryPlanner {
             &mut None,
         )?;
 
-        self.create_df_logical_plan(stmt, &mut None).await
+        self.create_df_logical_plan(stmt, &mut None, span_id.clone())
+            .await
     }
 
     async fn show_tables_to_plan(
@@ -778,6 +841,7 @@ impl QueryPlanner {
         full: bool,
         filter: &Option<ast::ShowStatementFilter>,
         db_name: &Option<ast::Ident>,
+        span_id: Option<Arc<SpanId>>,
     ) -> Result<QueryPlan, CompilationError> {
         let db_name = match db_name {
             Some(db_name) => db_name.clone(),
@@ -826,12 +890,14 @@ WHERE `TABLE_SCHEMA` = '{}'",
             &mut None,
         )?;
 
-        self.create_df_logical_plan(stmt, &mut None).await
+        self.create_df_logical_plan(stmt, &mut None, span_id.clone())
+            .await
     }
 
     async fn show_collation_to_plan(
         &self,
         filter: &Option<ast::ShowStatementFilter>,
+        span_id: Option<Arc<SpanId>>,
     ) -> Result<QueryPlan, CompilationError> {
         let filter = match filter {
             Some(stmt @ ast::ShowStatementFilter::Like(_)) => {
@@ -859,15 +925,17 @@ WHERE `TABLE_SCHEMA` = '{}'",
             &mut None,
         )?;
 
-        self.create_df_logical_plan(stmt, &mut None).await
+        self.create_df_logical_plan(stmt, &mut None, span_id.clone())
+            .await
     }
 
     async fn explain_table_to_plan(
         &self,
         table_name: &ast::ObjectName,
+        span_id: Option<Arc<SpanId>>,
     ) -> Result<QueryPlan, CompilationError> {
         // EXPLAIN <table> matches the SHOW COLUMNS output exactly, reuse the plan
-        self.show_columns_to_plan(false, false, &None, table_name)
+        self.show_columns_to_plan(false, false, &None, table_name, span_id)
             .await
     }
 
@@ -882,7 +950,8 @@ WHERE `TABLE_SCHEMA` = '{}'",
         let statement = statement.clone();
         // This Boxing construct here because of recursive call to self.plan()
         Box::pin(async move {
-            let plan = self_cloned.plan(&statement, &mut None).await?;
+            // TODO span_id ?
+            let plan = self_cloned.plan(&statement, &mut None, None).await?;
 
             match plan {
                 QueryPlan::MetaOk(_, _) | QueryPlan::MetaTabular(_, _) => Ok(QueryPlan::MetaTabular(
@@ -1074,11 +1143,10 @@ WHERE `TABLE_SCHEMA` = '{}'",
             }
         }
 
-        let user_variables = session_columns_to_update
-            .drain_filter(|v| {
+        let (user_variables, session_columns_to_update): (Vec<_>, Vec<_>) =
+            session_columns_to_update.into_iter().partition(|v| {
                 v.name.to_lowercase() == "user" || v.name.to_lowercase() == "current_user"
-            })
-            .collect::<Vec<_>>();
+            });
 
         for v in user_variables {
             self.reauthenticate_if_needed().await?;
@@ -1317,6 +1385,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         &self,
         stmt: ast::Statement,
         qtrace: &mut Option<Qtrace>,
+        span_id: Option<Arc<SpanId>>,
     ) -> CompilationResult<QueryPlan> {
         match &stmt {
             ast::Statement::Query(query) => match &query.body {
@@ -1391,7 +1460,12 @@ WHERE `TABLE_SCHEMA` = '{}'",
 
         let result = converter
             .take_rewriter()
-            .find_best_plan(root, self.state.auth_context().unwrap(), qtrace)
+            .find_best_plan(
+                root,
+                self.state.auth_context().unwrap(),
+                qtrace,
+                span_id.clone(),
+            )
             .await
             .map_err(|e| match e.cause {
                 CubeErrorCauseType::Internal(_) => CompilationError::Internal(
@@ -1433,9 +1507,14 @@ WHERE `TABLE_SCHEMA` = '{}'",
         // It's not safety to use all optimizers from DF for OLAP queries, because it will lead to errors
         // From another side, 99% optimizers cannot optimize anything
         if is_olap_query(&rewrite_plan)? {
-            let mut guard = ctx.state.write();
-            // TODO: We should find what optimizers will be safety to use for OLAP queries
-            guard.optimizer.rules = vec![];
+            {
+                let mut guard = ctx.state.write();
+                // TODO: We should find what optimizers will be safety to use for OLAP queries
+                guard.optimizer.rules = vec![];
+            }
+            if let Some(span_id) = span_id {
+                span_id.set_is_data_query(true).await;
+            }
         };
 
         log::debug!("Rewrite: {:#?}", rewrite_plan);
@@ -1534,6 +1613,7 @@ pub async fn convert_statement_to_cube_query(
     meta: Arc<MetaContext>,
     session: Arc<Session>,
     qtrace: &mut Option<Qtrace>,
+    span_id: Option<Arc<SpanId>>,
 ) -> CompilationResult<QueryPlan> {
     let stmt = rewrite_statement(stmt);
     if let Some(qtrace) = qtrace {
@@ -1541,7 +1621,7 @@ pub async fn convert_statement_to_cube_query(
     }
 
     let planner = QueryPlanner::new(session.state.clone(), meta, session.session_manager.clone());
-    planner.plan(&stmt, qtrace).await
+    planner.plan(&stmt, qtrace, span_id).await
 }
 
 #[derive(Debug, PartialEq, Serialize)]
@@ -1687,7 +1767,7 @@ pub async fn convert_sql_to_cube_query(
     session: Arc<Session>,
 ) -> CompilationResult<QueryPlan> {
     let stmt = parse_sql_to_statement(&query, session.state.protocol.clone(), &mut None)?;
-    convert_statement_to_cube_query(&stmt, meta, session, &mut None).await
+    convert_statement_to_cube_query(&stmt, meta, session, &mut None, None).await
 }
 
 pub fn find_cube_scans_deep_search(
@@ -10821,6 +10901,50 @@ ORDER BY \"COUNT(count)\" DESC"
                     attrelid = (select oid from tbl)
                 order by attnum
                 ;
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_sigma_computing_attnames() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "sigma_computing_attnames",
+            execute_query(
+                "
+                with
+                    nsp as (
+                        select oid as relnamespace
+                        from pg_catalog.pg_namespace
+                        where nspname = 'public'
+                    ),
+                    tbl as (
+                        select
+                            nsp.relnamespace as connamespace,
+                            tbl.oid as conrelid
+                        from pg_catalog.pg_class tbl
+                        inner join nsp using (relnamespace)
+                        where relname = 'emptytbl'
+                    ),
+                    con as (
+                        select
+                            conrelid,
+                            conkey
+                        from pg_catalog.pg_constraint
+                        inner join tbl using (connamespace, conrelid)
+                        where contype = 'p'
+                    )
+                select attname
+                from pg_catalog.pg_attribute att
+                inner join con on
+                    conrelid = attrelid
+                    and attnum = any(con.conkey)
+                order by attnum
                 "
                 .to_string(),
                 DatabaseProtocol::PostgreSQL

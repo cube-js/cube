@@ -59,8 +59,16 @@ export interface SqlApiLoadPayload {
     request: Request<LoadRequestMeta>,
     session: SessionContext,
     query: any,
+    queryKey: any,
     sqlQuery: any,
     streaming: boolean,
+}
+
+export interface LogLoadEventPayload {
+  request: Request<LoadRequestMeta>,
+  session: SessionContext,
+  event: string,
+  properties: any,
 }
 
 export interface MetaPayload {
@@ -83,6 +91,7 @@ export type SQLInterfaceOptions = {
     meta: (payload: MetaPayload) => unknown | Promise<unknown>,
     stream: (payload: LoadPayload) => unknown | Promise<unknown>,
     sqlApiLoad: (payload: SqlApiLoadPayload) => unknown | Promise<unknown>,
+    logLoadEvent: (payload: LogLoadEventPayload) => unknown | Promise<unknown>,
     sqlGenerators: (paramsJson: string) => unknown | Promise<unknown>,
     canSwitchUserForSession: (payload: CanSwitchUserPayload) => unknown | Promise<unknown>,
 };
@@ -310,6 +319,7 @@ export const registerInterface = async (options: SQLInterfaceOptions): Promise<S
     stream: wrapNativeFunctionWithStream(options.stream),
     sqlApiLoad: wrapNativeFunctionWithStream(options.sqlApiLoad),
     sqlGenerators: wrapRawNativeFunctionWithChannelCallback(options.sqlGenerators),
+    logLoadEvent: wrapRawNativeFunctionWithChannelCallback(options.logLoadEvent),
     canSwitchUserForSession: wrapRawNativeFunctionWithChannelCallback(options.canSwitchUserForSession),
   });
 };
