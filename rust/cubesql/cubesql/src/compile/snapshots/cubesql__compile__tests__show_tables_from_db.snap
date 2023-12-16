@@ -8,4 +8,5 @@ expression: "execute_query(\"show tables from db;\".to_string(),\n            Da
 | KibanaSampleDataEcommerce |
 | Logs                      |
 | NumberCube                |
+| WideCube                  |
 +---------------------------+

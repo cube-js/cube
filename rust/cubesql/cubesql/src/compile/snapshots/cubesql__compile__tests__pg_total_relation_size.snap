@@ -8,4 +8,5 @@ expression: "execute_query(\"SELECT\n                    oid,\n                 
 | 18000 | KibanaSampleDataEcommerce | 8192    |
 | 18018 | Logs                      | 8192    |
 | 18028 | NumberCube                | 8192    |
+| 18034 | WideCube                  | 8192    |
 +-------+---------------------------+---------+

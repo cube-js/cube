@@ -4,7 +4,7 @@ use crate::{
         rewrite::{
             agg_fun_expr, aggregate, alias_expr, all_members,
             analysis::LogicalPlanAnalysis,
-            binary_expr, cast_expr, change_user_expr, column_expr,
+            binary_expr, cast_expr, change_user_expr, column_expr, column_name_to_member_def_vec,
             column_name_to_member_to_aliases, column_name_to_member_vec, cross_join, cube_scan,
             cube_scan_filters_empty_tail, cube_scan_members, cube_scan_members_empty_tail,
             cube_scan_order_empty_tail, dimension_expr, expr_column_name, fun_expr, join,
@@ -147,12 +147,12 @@ impl RewriteRules for MemberRules {
                     cube_scan_members(
                         member_pushdown_replacer(
                             "?group_expr",
-                            list_concat_pushdown_replacer("?old_members"),
+                            "?old_members",
                             "?member_pushdown_replacer_alias_to_cube",
                         ),
                         member_pushdown_replacer(
                             "?aggr_expr",
-                            list_concat_pushdown_replacer("?old_members"),
+                            "?old_members",
                             "?member_pushdown_replacer_alias_to_cube",
                         ),
                     ),
@@ -198,7 +198,7 @@ impl RewriteRules for MemberRules {
                     "?new_alias_to_cube",
                     member_pushdown_replacer(
                         "?expr",
-                        list_concat_pushdown_replacer("?members"),
+                        "?members",
                         "?member_pushdown_replacer_alias_to_cube",
                     ),
                     "?filters",
@@ -491,7 +491,7 @@ impl MemberRules {
                     ),
                     member_pushdown_replacer(
                         column_expr.clone(),
-                        list_concat_pushup_replacer("?old_members"),
+                        "?old_members",
                         "?member_pushdown_replacer_alias_to_cube",
                     ),
                     member_pushdown_replacer(
@@ -1756,22 +1756,14 @@ impl MemberRules {
                         .clone()
                     {
                         let column_name_to_member =
-                            column_name_to_member_vec(left_member_name_to_expr);
+                            column_name_to_member_def_vec(left_member_name_to_expr);
+
                         if let Some(member) = column_name_to_member
                             .iter()
                             .find(|(member_alias, _)| member_alias == &alias_name)
                         {
-                            let cube_to_filter = if member.1.is_some() {
-                                Some(
-                                    member
-                                        .1
-                                        .as_ref()
-                                        .unwrap()
-                                        .split(".")
-                                        .next()
-                                        .unwrap()
-                                        .to_string(),
-                                )
+                            let cube_to_filter = if let Some(cube) = member.1.cube() {
+                                Some(cube)
                             } else {
                                 alias_to_cube
                                     .iter()
@@ -1787,46 +1779,22 @@ impl MemberRules {
                             } else {
                                 alias_to_cube.clone()
                             };
-                            for old_members in
-                                var_list_iter!(egraph[subst[old_members_var]], CubeScanMembers)
-                                    .cloned()
-                            {
-                                let old_member = old_members.iter().find(|m| {
-                                    if let Some(member_to_name_expr) =
-                                        egraph.index(**m).data.member_name_to_expr.clone()
-                                    {
-                                        let column_name_to_member =
-                                            column_name_to_member_vec(member_to_name_expr);
-                                        column_name_to_member
-                                            .iter()
-                                            .any(|(member_alias, _)| member_alias == &alias_name)
-                                    } else {
-                                        false
-                                    }
-                                });
-                                if let Some(old_member) = old_member {
-                                    subst.insert(terminal_member, *old_member);
 
-                                    let filtered_member_pushdown_replacer_alias_to_cube = egraph
-                                        .add(
-                                            LogicalPlanLanguage::MemberPushdownReplacerAliasToCube(
-                                                MemberPushdownReplacerAliasToCube(
-                                                    filtered_alias_to_cube,
-                                                ),
-                                            ),
-                                        );
+                            // TODO remove unwrap
+                            let old_member = member.1.add_to_egraph(egraph).unwrap();
+                            subst.insert(terminal_member, old_member);
 
-                                    subst.insert(
-                                        filtered_member_pushdown_replacer_alias_to_cube_var,
-                                        filtered_member_pushdown_replacer_alias_to_cube,
-                                    );
+                            let filtered_member_pushdown_replacer_alias_to_cube =
+                                egraph.add(LogicalPlanLanguage::MemberPushdownReplacerAliasToCube(
+                                    MemberPushdownReplacerAliasToCube(filtered_alias_to_cube),
+                                ));
 
-                                    return true;
-                                } else {
-                                    log::error!("Unexpected state: can't find {} during member iteration in {:?}", alias_name, column_name_to_member);
-                                    return false;
-                                }
-                            }
+                            subst.insert(
+                                filtered_member_pushdown_replacer_alias_to_cube_var,
+                                filtered_member_pushdown_replacer_alias_to_cube,
+                            );
+
+                            return true;
                         }
                     }
                 }

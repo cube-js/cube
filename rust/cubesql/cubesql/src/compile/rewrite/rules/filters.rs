@@ -4019,7 +4019,7 @@ impl FilterRules {
                 {
                     if member_name_to_expr
                         .iter()
-                        .all(|(m, _)| m.as_ref() != Some(&member))
+                        .all(|(m, _, _)| m.as_ref() != Some(&member))
                     {
                         let date_range = var_iter!(
                             egraph[subst[time_dimension_date_range_var]],
@@ -4085,7 +4085,7 @@ impl FilterRules {
                 {
                     if member_name_to_expr
                         .iter()
-                        .any(|(m, _)| m.as_ref() == Some(member))
+                        .any(|(m, _, _)| m.as_ref() == Some(member))
                     {
                         return true;
                     }
