@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.36](https://github.com/cube-js/cube.js/compare/v0.34.35...v0.34.36) (2023-12-16)
+
+
+### Bug Fixes
+
+* **cubesql:** Improve performance for wide table querying ([#7534](https://github.com/cube-js/cube.js/issues/7534)) ([0f877d4](https://github.com/cube-js/cube.js/commit/0f877d41f08aeb1ebc9b22e9b38da931152435d2))
+
+
+
+
+
 ## [0.34.35](https://github.com/cube-js/cube.js/compare/v0.34.34...v0.34.35) (2023-12-13)
 
 

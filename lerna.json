@@ -1,5 +1,5 @@
 {
-  "version": "0.34.35",
+  "version": "0.34.36",
   "npmClient": "yarn",
   "useWorkspaces": true,
   "packages": [
