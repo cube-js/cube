@@ -90,7 +90,7 @@ describe('OracleQuery', () => {
 
   const joinedSchemaCompilers = prepareCompiler(createJoinedCubesSchema());
 
-  it('should group by the created_at field on the calculated granularity for unbounded trailing windows',
+  it('should cast date with correct oracle format',
     () => compiler.compile().then(() => {
       const query = new OracleQuery(
         { joinGraph, cubeEvaluator, compiler },
@@ -114,5 +114,30 @@ describe('OracleQuery', () => {
 
       expect(query.dateTimeCast('12-25-2005')).toEqual(`to_date(:"12-25-2005", 'YYYY-MM-DD"T"HH24:MI:SS****"Z"')`);
     }));
+
+    it('should correctly truncate date to a quarter',
+        () => compiler.compile().then(() => {
+            const query = new OracleQuery(
+                { joinGraph, cubeEvaluator, compiler },
+                {
+                    measures: ['visitors.count', 'visitors.unboundedCount'],
+                    timeDimensions: [
+                        {
+                            dimension: 'visitors.createdAt',
+                            granularity: 'week',
+                            dateRange: ['2017-01-01', '2017-01-30'],
+                        },
+                    ],
+                    timezone: 'America/Los_Angeles',
+                    order: [
+                        {
+                            id: 'visitors.createdAt',
+                        },
+                    ],
+                }
+            );
+
+            expect(query.timeGroupedColumn('test', 'quarter')).toEqual(`TRUNC(test, 'Q')`);
+        }));
 
 });

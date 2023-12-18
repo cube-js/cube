@@ -10,6 +10,7 @@ const GRANULARITY_VALUE = {
   minute: 'mm',
   second: 'ss',
   month: 'MM',
+  quarter: 'Q',
   year: 'YYYY'
 };
 
