@@ -23,7 +23,7 @@ import { v4 as uuidv4 } from 'uuid';
 import sqlstring from 'sqlstring';
 import * as moment from 'moment';
 
-import { HydrationStream } from './HydrationStream';
+import { HydrationStream, transformRow } from './HydrationStream';
 
 const ClickHouse = require('@apla/clickhouse');
 
@@ -227,32 +227,14 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
   }
 
   protected normaliseResponse(res: any) {
-    //
-    //
-    //  ClickHouse returns DateTime as strings in format "YYYY-DD-MM HH:MM:SS"
-    //  cube.js expects them in format "YYYY-DD-MMTHH:MM:SS.000", so translate them based on the metadata returned
-    //
-    //  ClickHouse returns some number types as js numbers, others as js string, normalise them all to strings
-    //
-    //
     if (res.data) {
+      const meta = res.meta.reduce(
+        (state: any, element: any) => ({ [element.name]: element, ...state }),
+        {}
+      );
+
       res.data.forEach((row: any) => {
-        Object.keys(row).forEach(field => {
-          const value = row[field];
-          if (value !== null) {
-            const meta = res.meta.find((m: any) => m.name === field);
-            if (meta.type === 'DateTime') {
-              row[field] = `${value.substring(0, 10)}T${value.substring(11, 22)}.000`;
-            } else if (meta.type.includes('DateTime64')) {
-              row[field] = moment.utc(value).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
-            } else if (meta.type.includes('Date')) {
-              row[field] = `${value}T00:00:00.000`;
-            } else if (meta.type.includes('Int') || meta.type.includes('Float') || meta.type.includes('Decimal')) {
-              // convert all numbers into strings
-              row[field] = `${value}`;
-            }
-          }
-        });
+        transformRow(row, meta);
       });
     }
     return res.data;

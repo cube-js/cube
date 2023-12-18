@@ -239,7 +239,7 @@ describe('ClickHouseDriver', () => {
     });
   });
 
-  fit('stream', async () => {
+  it('stream', async () => {
     await doWithDriver(async (driver) => {
       const tableData = await driver.stream('SELECT * FROM test.types_test ORDER BY int8', [], {
         highWaterMark: 100,
