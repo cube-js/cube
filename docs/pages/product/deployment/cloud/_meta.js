@@ -1,8 +1,9 @@
 module.exports = {
-  "auto-suspension": "Auto-suspension",
+  "deployments": "Deployments",
+  "deployment-types": "Deployment types",
   "continuous-deployment": "Continuous deployment",
   "custom-domains": "Custom domains",
-  "deployment-types": "Deployment types",
+  "auto-suspension": "Auto-suspension",
   "pricing": "Pricing",
   "support": "Support",
   "limits": "Limits"

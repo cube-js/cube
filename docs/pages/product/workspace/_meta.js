@@ -8,8 +8,8 @@ module.exports = {
   "pre-aggregations": "Pre-Aggregations",
   "performance": "Performance Insights",
   "access-control": "Access Control",
-  "budgets": "Budgets",
   "sso": "Single Sign-On",
+  "budgets": "Budgets",
   "preferences": "Preferences",
   "cli": "CLI"
 }

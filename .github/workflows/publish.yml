@@ -69,7 +69,7 @@ jobs:
     strategy:
       matrix:
         node-version: [16]
-        python-version: ["3.9", "3.10", "3.11", "fallback"]
+        python-version: ["3.9", "3.10", "3.11", "3.12", "fallback"]
         target: ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"]
         include:
           - target: x86_64-unknown-linux-gnu
@@ -170,7 +170,7 @@ jobs:
         node-version: [16.x]
         os-version: ["macos-11"]
         target: ["x86_64-apple-darwin", "aarch64-apple-darwin"]
-        python-version: ["3.9", "3.10", "3.11", "fallback"]
+        python-version: ["3.9", "3.10", "3.11", "3.12", "fallback"]
         include:
           - target: x86_64-apple-darwin
             package_target_arch: x64
@@ -190,6 +190,8 @@ jobs:
             python-version: "3.10"
           - target: "aarch64-apple-darwin"
             python-version: "3.11"
+          - target: "aarch64-apple-darwin"
+            python-version: "3.12"
       fail-fast: false
 
     steps:
