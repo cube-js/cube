@@ -1,3 +1,4 @@
+import R from 'ramda';
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
 import { UserError } from '../compiler/UserError';
@@ -82,6 +83,22 @@ export class ClickHouseQuery extends BaseQuery {
     // However parseDateTimeBestEffort works with ISO8601
     //
     return `parseDateTimeBestEffort(${value})`;
+  }
+
+  public isFilterPreWhere(filter) {
+    if (filter.dimension === undefined) {
+      return false;
+    }
+    return this.cubeEvaluator.dimensionByPath(filter.dimension)['description']?.includes('preWhere');
+  }
+
+  public baseWhere(filters) {
+    const preFilterClause = filters.filter(t => this.isFilterPreWhere(t)).map(t => `(${t.filterToWhere()})`).filter(R.identity);
+    const preWhere = preFilterClause.length ? ` PREWHERE ${preFilterClause.join(' AND ')}` : '';
+
+    const filterClause = filters.filter(t => this.isFilterPreWhere(t) !== true).map(t => `(${t.filterToWhere()})`).filter(R.identity);
+    const where = filterClause.length ? ` WHERE ${filterClause.join(' AND ')}` : '';
+    return preWhere + where;
   }
 
   public dateTimeCast(value) {
