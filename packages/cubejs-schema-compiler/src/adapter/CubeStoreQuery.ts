@@ -123,7 +123,7 @@ export class CubeStoreQuery extends BaseQuery {
       cumulativeMeasuresWithoutMultiplied
     );
     const timeDimension = this.timeDimensions.find(d => d.granularity || d.dateRange);
-    const timeDimensionWithGranularity = timeDimension.granularity ? timeDimension : null;
+    const timeDimensionWithGranularity = timeDimension?.granularity ? timeDimension : null;
     const baseQueryAlias = this.cubeAlias('base');
     const maxRollingWindow = cumulativeMeasuresWithoutMultiplied.reduce((a, b) => this.maxRollingWindow(a, b.rollingWindowDefinition()), <RollingWindow><unknown>null);
     const commonDateCondition =
