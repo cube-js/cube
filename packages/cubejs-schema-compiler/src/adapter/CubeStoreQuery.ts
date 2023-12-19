@@ -132,8 +132,8 @@ export class CubeStoreQuery extends BaseQuery {
       timeDimension?.dateRange && this.dateFromStartToEndConditionSql(commonDateCondition, true, true) || []
     );
     const rollupGranularity = this.preAggregations?.castGranularity(preAggregationForQuery.preAggregation.granularity) || 'day';
-    const granularityOverride = timeDimension &&
-      cumulativeMeasuresWithoutMultiplied.reduce((a, b) => this.minGranularity(a, b.windowGranularity()), timeDimension.granularity) || rollupGranularity;
+    const granularityOverride = timeDimensionWithGranularity &&
+      cumulativeMeasuresWithoutMultiplied.reduce((a, b) => this.minGranularity(a, b.windowGranularity()), timeDimensionWithGranularity.granularity) || rollupGranularity;
     return this.evaluateSymbolSqlWithContext(
       () => this.overTimeSeriesSelectRollup(
         cumulativeMeasuresWithoutMultiplied,
