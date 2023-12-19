@@ -87,6 +87,34 @@ macro_rules! add_expr_list_node {
     }};
 }
 
+macro_rules! add_binary_expr_list_node {
+    ($graph:expr, $value_expr:expr, $field_variant:ident) => {{
+        fn to_binary_tree(
+            graph: &mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+            list: &[Id],
+        ) -> Id {
+            if list.len() == 0 {
+                graph.add(LogicalPlanLanguage::$field_variant(Vec::new()))
+            } else if list.len() == 1 {
+                let empty = graph.add(LogicalPlanLanguage::$field_variant(Vec::new()));
+                graph.add(LogicalPlanLanguage::$field_variant(vec![list[0], empty]))
+            } else if list.len() == 2 {
+                graph.add(LogicalPlanLanguage::$field_variant(vec![list[0], list[1]]))
+            } else {
+                let middle = list.len() / 2;
+                let left = to_binary_tree(graph, &list[..middle]);
+                let right = to_binary_tree(graph, &list[middle..]);
+                graph.add(LogicalPlanLanguage::$field_variant(vec![left, right]))
+            }
+        }
+        let list = $value_expr
+            .iter()
+            .map(|expr| Self::add_expr($graph, expr))
+            .collect::<Result<Vec<_>, _>>()?;
+        to_binary_tree($graph, &list)
+    }};
+}
+
 macro_rules! add_plan_list_node {
     ($converter:expr, $value_expr:expr, $field_variant:ident) => {{
         let list = $value_expr
@@ -353,7 +381,7 @@ impl LogicalPlanToLanguageConverter {
     pub fn add_logical_plan(&mut self, plan: &LogicalPlan) -> Result<Id, CubeError> {
         Ok(match plan {
             LogicalPlan::Projection(node) => {
-                let expr = add_expr_list_node!(&mut self.graph, node.expr, ProjectionExpr);
+                let expr = add_binary_expr_list_node!(&mut self.graph, node.expr, ProjectionExpr);
                 let input = self.add_logical_plan(node.input.as_ref())?;
                 let alias = add_data_node!(self, node.alias, ProjectionAlias);
                 let split = add_data_node!(self, false, ProjectionSplit);
@@ -375,10 +403,13 @@ impl LogicalPlanToLanguageConverter {
             }
             LogicalPlan::Aggregate(node) => {
                 let input = self.add_logical_plan(node.input.as_ref())?;
-                let group_expr =
-                    add_expr_list_node!(&mut self.graph, node.group_expr, AggregateGroupExpr);
+                let group_expr = add_binary_expr_list_node!(
+                    &mut self.graph,
+                    node.group_expr,
+                    AggregateGroupExpr
+                );
                 let aggr_expr =
-                    add_expr_list_node!(&mut self.graph, node.aggr_expr, AggregateAggrExpr);
+                    add_binary_expr_list_node!(&mut self.graph, node.aggr_expr, AggregateAggrExpr);
                 let split = add_data_node!(self, false, AggregateSplit);
                 self.graph.add(LogicalPlanLanguage::Aggregate([
                     input, group_expr, aggr_expr, split,
