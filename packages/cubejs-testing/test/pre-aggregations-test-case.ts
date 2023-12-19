@@ -110,7 +110,6 @@ const asserts: [options: QueryTestOptions, query: Query][] = [
         dateRange: ['2017-01-02', '2017-01-05']
       }],
       order: {
-        'visitors.createdAt': 'asc',
         'visitors.source': 'asc'
       }
     }
