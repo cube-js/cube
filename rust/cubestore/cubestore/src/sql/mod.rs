@@ -235,6 +235,52 @@ impl SqlServiceImpl {
         self.db.create_schema(name, if_not_exists).await
     }
 
+    async fn create_table_if_not_exists(
+        &self,
+        schema_name: String,
+        table_name: String,
+        columns: &Vec<ColumnDef>,
+        external: bool,
+        if_not_exists: bool,
+        locations: Option<Vec<String>>,
+        import_format: Option<ImportFormat>,
+        build_range_end: Option<DateTime<Utc>>,
+        seal_at: Option<DateTime<Utc>>,
+        select_statement: Option<String>,
+        source_table: Option<String>,
+        stream_offset: Option<String>,
+        indexes: Vec<Statement>,
+        unique_key: Option<Vec<Ident>>,
+        aggregates: Option<Vec<(Ident, Ident)>>,
+        partitioned_index: Option<PartitionedIndexRef>,
+        trace_obj: &Option<String>,
+    ) -> Result<IdRow<Table>, CubeError> {
+        let table = self
+            .db
+            .get_table(schema_name.clone(), table_name.clone())
+            .await;
+        if let Ok(table) = table {
+            if table.get_row().is_ready() {
+                return Ok(table);
+            } else {
+                //Try find existing processing in cache
+                //We always delete the table if it is not ready, because otherwise there is an unsolvable race condition for import jobs
+                if let Err(inner) = self.db.drop_table(table.get_id()).await {
+                    return Err(CubeError::internal(format!(
+                        "Drop not ready table ({}) failed: {}",
+                        table.get_id(),
+                        inner
+                    )));
+                }
+
+                log::warn!(
+                    "On CREATED IF NOT EXISTS old inactive table ({}) was deleted",
+                    table.get_id()
+                );
+            }
+        }
+    }
+
     async fn create_table(
         &self,
         schema_name: String,
@@ -280,6 +326,8 @@ impl SqlServiceImpl {
                 }
             }
         };
+        let mut retries = 0;
+        let max_retries = self.config_obj.create_table_max_retries();
         loop {
             let listener = if external {
                 Some(self.cluster.job_result_listener())
@@ -328,12 +376,18 @@ impl SqlServiceImpl {
                                 table.get_id(),
                                 inner
                             );
+                            return Err(CubeError::internal(format!("Error during create table finalization {:?}: some jobs are orphaned", table)));
                         }
                         log::warn!(
                             "Some import jobs for table {} are orphaned, table creation restarted",
                             table.get_id()
                         );
-                        continue;
+                        retries += 1;
+                        if retries > max_retries {
+                            return Err(CubeError::internal(format!("Error during create table finalization {:?}: some jobs are orphaned", table)));
+                        } else {
+                            continue;
+                        }
                     }
                     Err(e) => {
                         if let Err(inner) = self.db.drop_table(table.get_id()).await {

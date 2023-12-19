@@ -1,3 +1,4 @@
+use crate::metastore::{table::Table, IdRow};
 use crate::queryplanner::serialized_plan::SerializedPlan;
 use crate::sql::InlineTables;
 use crate::sql::SqlQueryContext;
@@ -7,7 +8,7 @@ use deepsize::DeepSizeOf;
 use futures::Future;
 use log::trace;
 use moka::future::{Cache, ConcurrentCacheExt, Iter};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{watch, Mutex};
@@ -69,6 +70,8 @@ pub struct SqlResultCache {
         lru::LruCache<SqlQueueCacheKey, watch::Receiver<Option<Result<Arc<DataFrame>, CubeError>>>>,
     >,
     result_cache: Cache<SqlResultCacheKey, Arc<DataFrame>>,
+    create_table_cache:
+        Mutex<HashMap<u64, watch::Receiver<Option<Result<Arc<DataFrame>, CubeError>>>>>,
 }
 
 pub fn sql_result_cache_sizeof(key: &SqlResultCacheKey, df: &Arc<DataFrame>) -> u32 {
@@ -91,6 +94,7 @@ impl SqlResultCache {
                 .max_capacity(capacity_bytes)
                 .weigher(sql_result_cache_sizeof)
                 .build(),
+            create_table_cache: Mutex::new(HashMap::new()),
         }
     }
 
@@ -187,6 +191,81 @@ impl SqlResultCache {
 
         self.wait_for_queue(receiver, query).await
     }
+
+    pub async fn create_table<F>(
+        &self,
+        table_id: u64,
+        exec: impl FnOnce(SerializedPlan) -> F,
+    ) -> Result<IdRow<Table>, CubeError>
+    where
+        F: Future<Output = Result<DataFrame, CubeError>> + Send + 'static,
+    {
+        /* let result_key = SqlResultCacheKey::from_plan(query, &context.inline_tables, &plan);
+
+        if let Some(result) = self.result_cache.get(&result_key) {
+            app_metrics::DATA_QUERIES_CACHE_HIT.increment();
+            trace!("Using result cache for '{}'", query);
+            return Ok(result);
+        }
+
+        let queue_key = SqlQueueCacheKey::from_query(query, &context.inline_tables);
+        let (sender, receiver) = {
+            let key = queue_key.clone();
+            let mut cache = self.queue_cache.lock().await;
+            if !cache.contains(&key) {
+                let (tx, rx) = watch::channel(None);
+                cache.put(key, rx);
+
+                app_metrics::DATA_QUERIES_CACHE_SIZE.report(self.result_cache.entry_count() as i64);
+                app_metrics::DATA_QUERIES_CACHE_WEIGHT
+                    .report(self.result_cache.weighted_size() as i64);
+
+                (Some(tx), None)
+            } else {
+                (None, cache.get(&key).cloned())
+            }
+        };
+
+        if let Some(sender) = sender {
+            trace!("Missing cache for '{}'", query);
+            let result = exec(plan).await.map(|d| Arc::new(d));
+            if let Err(e) = sender.send(Some(result.clone())) {
+                trace!(
+                    "Failed to set cached query result, possibly flushed from LRU cache: {}",
+                    e
+                );
+            }
+            match &result {
+                Ok(r) => {
+                    if !self.result_cache.contains_key(&result_key) {
+                        self.result_cache
+                            .insert(result_key.clone(), r.clone())
+                            .await;
+
+                        app_metrics::DATA_QUERIES_CACHE_SIZE
+                            .report(self.result_cache.entry_count() as i64);
+                        app_metrics::DATA_QUERIES_CACHE_WEIGHT
+                            .report(self.result_cache.weighted_size() as i64);
+                    }
+                }
+                Err(_) => {
+                    trace!("Removing error result from cache");
+                }
+            }
+
+            self.queue_cache.lock().await.pop(&queue_key);
+
+            return result;
+        }
+
+        std::mem::drop(plan);
+        std::mem::drop(result_key);
+        std::mem::drop(context);
+
+        self.wait_for_queue(receiver, query).await */
+    }
+
+    //pub async fn create_table()
 
     #[tracing::instrument(level = "trace", skip(self, receiver))]
     async fn wait_for_queue(
