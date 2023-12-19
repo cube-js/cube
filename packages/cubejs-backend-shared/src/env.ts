@@ -1468,6 +1468,36 @@ const variables: Record<string, (...args: any) => any> = {
     ]
   ),
 
+  duckdbs3UseSsl: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_DUCKDB_S3_USE_SSL', dataSource)
+    ]
+  ),
+
+  duckdbs3UrlStyle: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_DUCKDB_S3_URL_STYLE', dataSource)
+    ]
+  ),
+
+  duckdbs3SessionToken: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_DUCKDB_S3_SESSION_TOKEN', dataSource)
+    ]
+  ),
+  
   /**
    * Presto catalog.
    */
