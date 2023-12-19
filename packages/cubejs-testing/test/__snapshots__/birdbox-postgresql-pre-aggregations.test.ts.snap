@@ -2,6 +2,19 @@
 
 exports[`postgresql-cubestore HTTP Transport Empty partitions: Empty partitions 1`] = `Array []`;
 
+exports[`postgresql-cubestore HTTP Transport Rolling Mixed With Dimension No Granularity: Rolling Mixed With Dimension No Granularity 1`] = `
+Array [
+  Object {
+    "visitors.checkinsRollingTotal": null,
+    "visitors.source": null,
+  },
+  Object {
+    "visitors.checkinsRollingTotal": null,
+    "visitors.source": "some",
+  },
+]
+`;
+
 exports[`postgresql-cubestore HTTP Transport Rolling Mixed With Dimension: Rolling Mixed With Dimension 1`] = `
 Array [
   Object {
