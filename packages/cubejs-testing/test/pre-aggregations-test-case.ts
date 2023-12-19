@@ -104,6 +104,11 @@ const asserts: [options: QueryTestOptions, query: Query][] = [
       dimensions: [
         'visitors.source'
       ],
+      filters: [{
+        member: 'visitors.source',
+        operator: 'equals',
+        values: ['some']
+      }],
       timezone: 'UTC',
       timeDimensions: [{
         dimension: 'visitors.createdAt',

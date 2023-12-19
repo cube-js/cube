@@ -6,10 +6,6 @@ exports[`postgresql HTTP Transport Rolling Mixed With Dimension No Granularity: 
 Array [
   Object {
     "visitors.checkinsRollingTotal": null,
-    "visitors.source": null,
-  },
-  Object {
-    "visitors.checkinsRollingTotal": null,
     "visitors.source": "some",
   },
 ]

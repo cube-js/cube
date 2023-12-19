@@ -6,10 +6,6 @@ exports[`postgresql-cubestore HTTP Transport Rolling Mixed With Dimension No Gra
 Array [
   Object {
     "visitors.checkinsRollingTotal": null,
-    "visitors.source": null,
-  },
-  Object {
-    "visitors.checkinsRollingTotal": null,
     "visitors.source": "some",
   },
 ]
