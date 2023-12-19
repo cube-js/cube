@@ -27,7 +27,8 @@ pub struct NodeObjSeqSerializer<'a, 'b, C>
 where
     C: Context<'a>,
 {
-    _context: &'b mut C,
+    context: &'b mut C,
+    last_id: u32,
     seq: Handle<'a, JsArray>,
 }
 
@@ -175,7 +176,13 @@ impl<'a, 'b, 'c, C: Context<'a>> ser::Serializer for &'c mut NodeObjSerializer<'
     }
 
     fn serialize_seq(self, _len: Option<usize>) -> Result<Self::SerializeSeq, Self::Error> {
-        todo!()
+        let seq = self.context.empty_array();
+
+        Ok(NodeObjSeqSerializer {
+            context: self.context,
+            last_id: 0,
+            seq,
+        })
     }
 
     fn serialize_tuple(self, _len: usize) -> Result<Self::SerializeTuple, Self::Error> {
@@ -375,11 +382,19 @@ impl<'a, 'b, C: Context<'a>> ser::SerializeSeq for NodeObjSeqSerializer<'a, 'b, 
     type Ok = Handle<'a, JsValue>;
     type Error = NodeObjSerializerError;
 
-    fn serialize_element<T: ?Sized>(&mut self, _value: &T) -> Result<(), Self::Error>
+    fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
     where
         T: Serialize,
     {
-        todo!()
+        let value_value = NodeObjSerializer::serialize(value, self.context)?;
+        self.seq
+            .set(self.context, self.last_id, value_value)
+            .map_err(|e| {
+                NodeObjSerializerError::Message(format!("Can't set value to obj: {}", e))
+            })?;
+
+        self.last_id += 1;
+        Ok(())
     }
 
     fn end(self) -> Result<Self::Ok, Self::Error> {
