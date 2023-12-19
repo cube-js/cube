@@ -3,9 +3,10 @@ use crate::{
         engine::provider::CubeContext,
         rewrite::{
             converter::{is_expr_node, node_to_expr, LogicalPlanToLanguageConverter},
-            expr_column_name, AliasExprAlias, AllMembersAlias, AllMembersCube, ChangeUserCube,
-            ColumnExprColumn, DimensionName, FilterMemberMember, FilterMemberOp, LiteralExprValue,
-            LiteralMemberRelation, LiteralMemberValue, LogicalPlanLanguage, MeasureName,
+            expr_column_name, AggregateFunctionExprFun, AggregateUDFExprFun, AliasExprAlias,
+            AllMembersAlias, AllMembersCube, ChangeUserCube, ColumnExprColumn, DimensionName,
+            FilterMemberMember, FilterMemberOp, LiteralExprValue, LiteralMemberRelation,
+            LiteralMemberValue, LogicalPlanLanguage, MeasureName, ScalarFunctionExprFun,
             SegmentName, TableScanSourceTableName, TimeDimensionDateRange,
             TimeDimensionGranularity, TimeDimensionName, VirtualFieldCube, VirtualFieldName,
         },
@@ -21,6 +22,7 @@ use datafusion::{
     },
     logical_plan::{Column, DFSchema, Expr},
     physical_plan::{
+        aggregates::AggregateFunction,
         functions::{BuiltinScalarFunction, Volatility},
         planner::DefaultPhysicalPlanner,
         ColumnarValue, PhysicalPlanner,
@@ -34,6 +36,7 @@ use std::{fmt::Debug, ops::Index, sync::Arc};
 pub struct LogicalPlanData {
     pub original_expr: Option<Expr>,
     pub member_name_to_expr: Option<Vec<(Option<String>, Member, Expr)>>,
+    pub trivial_push_down: Option<usize>,
     pub column: Option<Column>,
     pub expr_to_alias: Option<Vec<(Expr, String, Option<bool>)>>,
     pub referenced_expr: Option<Vec<Expr>>,
@@ -264,6 +267,86 @@ impl LogicalPlanAnalysis {
             None
         };
         original_expr
+    }
+
+    fn make_trivial_push_down(
+        egraph: &EGraph<LogicalPlanLanguage, Self>,
+        enode: &LogicalPlanLanguage,
+    ) -> Option<usize> {
+        let trivial_push_down = |id| egraph.index(id).data.trivial_push_down.clone();
+        match enode {
+            LogicalPlanLanguage::ColumnExpr(_) => Some(0),
+            LogicalPlanLanguage::LiteralExpr(_) => Some(0),
+            LogicalPlanLanguage::AliasExpr(params) => trivial_push_down(params[0]),
+            LogicalPlanLanguage::ProjectionExpr(params)
+            | LogicalPlanLanguage::AggregateAggrExpr(params)
+            | LogicalPlanLanguage::AggregateGroupExpr(params)
+            | LogicalPlanLanguage::AggregateFunctionExprArgs(params)
+            | LogicalPlanLanguage::AggregateUDFExprArgs(params) => {
+                let mut trivial = 0;
+                for id in params.iter() {
+                    trivial = trivial_push_down(*id)?.max(trivial);
+                }
+                Some(trivial)
+            }
+            LogicalPlanLanguage::ScalarFunctionExprFun(ScalarFunctionExprFun(fun)) => {
+                if fun == &BuiltinScalarFunction::DateTrunc {
+                    Some(0)
+                } else {
+                    None
+                }
+            }
+            LogicalPlanLanguage::ScalarFunctionExpr(params) => {
+                let mut trivial = 0;
+                for id in params.iter() {
+                    trivial = trivial_push_down(*id)?.max(trivial);
+                }
+                Some(trivial + 1)
+            }
+            LogicalPlanLanguage::ScalarFunctionExprArgs(params) => {
+                let mut trivial = 0;
+                for id in params.iter() {
+                    trivial = trivial_push_down(*id)?.max(trivial);
+                }
+                Some(trivial)
+            }
+            LogicalPlanLanguage::AggregateUDFExprFun(AggregateUDFExprFun(fun)) => {
+                if fun.to_lowercase() == "measure" {
+                    Some(0)
+                } else {
+                    None
+                }
+            }
+            LogicalPlanLanguage::AggregateFunctionExprFun(AggregateFunctionExprFun(fun)) => {
+                if matches!(
+                    *fun,
+                    AggregateFunction::Count
+                        | AggregateFunction::Sum
+                        | AggregateFunction::Avg
+                        | AggregateFunction::Min
+                        | AggregateFunction::Max
+                ) {
+                    Some(0)
+                } else {
+                    None
+                }
+            }
+            LogicalPlanLanguage::AggregateUDFExpr(params) => {
+                let mut trivial = 0;
+                for id in params.iter() {
+                    trivial = trivial_push_down(*id)?.max(trivial);
+                }
+                Some(trivial + 1)
+            }
+            LogicalPlanLanguage::AggregateFunctionExpr(params) => {
+                let mut trivial = 0;
+                for id in params.iter() {
+                    trivial = trivial_push_down(*id)?.max(trivial);
+                }
+                Some(trivial + 1)
+            }
+            _ => None,
+        }
     }
 
     fn make_member_name_to_expr(
@@ -1084,6 +1167,7 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
         LogicalPlanData {
             original_expr: Self::make_original_expr(egraph, enode),
             member_name_to_expr: Self::make_member_name_to_expr(egraph, enode),
+            trivial_push_down: Self::make_trivial_push_down(egraph, enode),
             column: Self::make_column_name(egraph, enode),
             expr_to_alias: Self::make_expr_to_alias(egraph, enode),
             referenced_expr: Self::make_referenced_expr(egraph, enode),
@@ -1099,6 +1183,7 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
         let (original_expr, b) = self.merge_option_field(a, b, |d| &mut d.original_expr);
         let (member_name_to_expr, b) =
             self.merge_option_field(a, b, |d| &mut d.member_name_to_expr);
+        let (trivial_push_down, b) = self.merge_option_field(a, b, |d| &mut d.trivial_push_down);
         let (column_name_to_alias, b) = self.merge_option_field(a, b, |d| &mut d.expr_to_alias);
         let (referenced_columns, b) = self.merge_option_field(a, b, |d| &mut d.referenced_expr);
         let (constant_in_list, b) = self.merge_option_field(a, b, |d| &mut d.constant_in_list);
@@ -1109,6 +1194,7 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
         let (column_name, _) = self.merge_option_field(a, b, |d| &mut d.column);
         original_expr
             | member_name_to_expr
+            | trivial_push_down
             | column_name_to_alias
             | referenced_columns
             | constant_in_list
