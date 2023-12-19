@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.38](https://github.com/cube-js/cube/compare/v0.34.37...v0.34.38) (2023-12-19)
+
+
+### Bug Fixes
+
+* **dremio-driver:** Fix generation of time series SQL ([#7503](https://github.com/cube-js/cube/issues/7503)) ([7e84d4c](https://github.com/cube-js/cube/commit/7e84d4c0eb3639893faf11a10a11316b9870a0d5))
+
+
+
+
+
 ## [0.34.37](https://github.com/cube-js/cube/compare/v0.34.36...v0.34.37) (2023-12-19)
 
 **Note:** Version bump only for package @cubejs-backend/dremio-driver
