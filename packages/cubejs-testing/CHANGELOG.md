@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.37](https://github.com/cube-js/cube.js/compare/v0.34.36...v0.34.37) (2023-12-19)
+
+
+### Bug Fixes
+
+* Internal: Error during planning: No field named for pre-aggregat… ([#7554](https://github.com/cube-js/cube.js/issues/7554)) ([412213c](https://github.com/cube-js/cube.js/commit/412213cbec40748d0de6f54731686c3d0b263e5c))
+
+
+
+
+
 ## [0.34.36](https://github.com/cube-js/cube.js/compare/v0.34.35...v0.34.36) (2023-12-16)
 
 **Note:** Version bump only for package @cubejs-backend/testing

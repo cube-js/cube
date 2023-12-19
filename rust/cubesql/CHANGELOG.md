@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.37](https://github.com/cube-js/cube.js/compare/v0.34.36...v0.34.37) (2023-12-19)
+
+
+### Features
+
+* **cubesql:** Avoid pushing split down for trivial selects to optimi… ([#7556](https://github.com/cube-js/cube.js/issues/7556)) ([2bf86e5](https://github.com/cube-js/cube.js/commit/2bf86e5a70810f5f081a527d6e7b70c8020673aa))
+
+
+
+
+
 ## [0.34.36](https://github.com/cube-js/cube.js/compare/v0.34.35...v0.34.36) (2023-12-16)
 
 

@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.37](https://github.com/cube-js/cube/compare/v0.34.36...v0.34.37) (2023-12-19)
+
+
+### Bug Fixes
+
+* **clickhouse-driver:** Initial support for DateTime64, fix [#7537](https://github.com/cube-js/cube/issues/7537) ([#7538](https://github.com/cube-js/cube/issues/7538)) ([401e9e1](https://github.com/cube-js/cube/commit/401e9e1b9c07e115804a1f84fade2bb82b55ca29))
+* Internal: Error during planning: No field named for pre-aggregat… ([#7554](https://github.com/cube-js/cube/issues/7554)) ([412213c](https://github.com/cube-js/cube/commit/412213cbec40748d0de6f54731686c3d0b263e5c))
+
+
+### Features
+
+* **client-core:** Add meta field for Cube type definition ([#7527](https://github.com/cube-js/cube/issues/7527)) ([75e201d](https://github.com/cube-js/cube/commit/75e201df5b64538da24103ccf82411b6f46006da))
+* **cubesql:** Avoid pushing split down for trivial selects to optimi… ([#7556](https://github.com/cube-js/cube/issues/7556)) ([2bf86e5](https://github.com/cube-js/cube/commit/2bf86e5a70810f5f081a527d6e7b70c8020673aa))
+* **native:** Support Python 3.12 ([#7550](https://github.com/cube-js/cube/issues/7550)) ([618a81e](https://github.com/cube-js/cube/commit/618a81ea3075473f05dba8a2114358b9b9af4d82))
+
+
+
+
+
 ## [0.34.36](https://github.com/cube-js/cube/compare/v0.34.35...v0.34.36) (2023-12-16)
 
 

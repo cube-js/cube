@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/native",
-  "version": "0.34.36",
+  "version": "0.34.37",
   "author": "Cube Dev, Inc.",
   "description": "Native module for Cube.js (binding to Rust codebase)",
   "main": "dist/js/index.js",
@@ -42,7 +42,7 @@
     "typescript": "~5.2.2"
   },
   "dependencies": {
-    "@cubejs-backend/cubesql": "^0.34.36",
+    "@cubejs-backend/cubesql": "^0.34.37",
     "@cubejs-backend/shared": "^0.34.33",
     "@cubejs-infra/post-installer": "^0.0.7"
   },
