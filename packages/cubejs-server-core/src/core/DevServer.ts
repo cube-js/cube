@@ -578,7 +578,7 @@ export class DevServer {
       const { payload = {} } = req.body;
       const jwtOptions = typeof payload.exp != null ? {} : { expiresIn: '1d' };
 
-      const token = jwt.sign(payload, options.apiSecret, jwtOptions);
+      const token = jwt.sign(payload, process.env.CUBEJS_API_SECRET || options.apiSecret, jwtOptions);
 
       res.json({ token });
     }));
