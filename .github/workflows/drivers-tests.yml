@@ -7,6 +7,8 @@ on:
     paths:
       - '.github/workflows/drivers-tests.yml'
 
+      - 'packages/cubejs-testing-drivers/**'
+      - 'packages/cubejs-testing-shared/**'
       - 'packages/cubejs-query-orchestrator/src/**'
       - 'packages/cubejs-base-driver/src/**'
       - 'packages/cubejs-jdbc-driver/src/**'
@@ -22,6 +24,8 @@ on:
     paths:
       - '.github/workflows/drivers-tests.yml'
 
+      - 'packages/cubejs-testing-drivers/**'
+      - 'packages/cubejs-testing-shared/**'
       - 'packages/cubejs-query-orchestrator/src/**'
       - 'packages/cubejs-base-driver/src/**'
       - 'packages/cubejs-jdbc-driver/src/**'
