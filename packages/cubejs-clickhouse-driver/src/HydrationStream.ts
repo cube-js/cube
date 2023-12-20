@@ -11,8 +11,8 @@ export function transformRow(row: Record<string, any>, meta: any) {
       const metaForField = meta[fieldName];
       if (metaForField.type.includes('DateTime64')) {
         row[fieldName] = moment.utc(value).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
-      } else if (metaForField.type.includes('DateTime')) {
-        row[fieldName] = moment.utc(value).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
+      } else if (metaForField.type.includes('DateTime') /** Can be DateTime or DateTime('timezone') */) {
+        row[fieldName] = `${value.substring(0, 10)}T${value.substring(11, 22)}.000`;
       } else if (metaForField.type.includes('Date')) {
         row[fieldName] = `${value}T00:00:00.000`;
       } else if (metaForField.type.includes('Int')

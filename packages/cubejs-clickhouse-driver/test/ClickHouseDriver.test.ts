@@ -250,7 +250,7 @@ describe('ClickHouseDriver', () => {
     });
   });
 
-  it('query (types)', async () => {
+  it('query types_test', async () => {
     await doWithDriver(async (driver) => {
       const tableData = await driver.query('SELECT date, datetime, datetime64_micros FROM test.types_test ORDER BY int8', []);
       expect(tableData).toEqual([
