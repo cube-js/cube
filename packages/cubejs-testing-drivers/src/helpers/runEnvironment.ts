@@ -1,6 +1,6 @@
 import * as fs from 'fs-extra';
 import * as path from 'path';
-import { ChildProcess, ChildProcessWithoutNullStreams, spawn } from 'child_process';
+import { ChildProcessWithoutNullStreams, spawn } from 'child_process';
 import { config } from 'dotenv';
 import yargs from 'yargs/yargs';
 import { DockerComposeEnvironment, Wait } from 'testcontainers';
@@ -132,6 +132,8 @@ export async function runEnvironment(type: string, suf?: string): Promise<Enviro
   // TODO extract as a config
   if (type === 'mssql') {
     compose.withWaitStrategy('data', Wait.forLogMessage('Service Broker manager has started'));
+  } else {
+    compose.withWaitStrategy('data', Wait.forHealthCheck());
   }
   const environment = await compose.up();
 

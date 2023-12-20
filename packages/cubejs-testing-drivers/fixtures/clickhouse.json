@@ -22,7 +22,14 @@
       "CLICKHOUSE_PASSWORD": "test",
       "CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT": 1
     },
-    "ports" : ["8123"]
+    "ports" : ["8123"],
+    "healthcheck": {
+      "test": "wget --spider -q --spider http://localhost:8123/ping || exit 1",
+      "start_period": "5s",
+      "interval": "10s",
+      "retries": 3,
+      "timeout": "5s"
+    }
   },
   "cast": {
     "SELECT_PREFIX": "",
