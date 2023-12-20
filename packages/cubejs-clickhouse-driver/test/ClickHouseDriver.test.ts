@@ -239,6 +239,29 @@ describe('ClickHouseDriver', () => {
     });
   });
 
+  it('query', async () => {
+    await doWithDriver(async (driver) => {
+      const tableData = await driver.query('SELECT date, datetime, datetime64_micros FROM test.types_test ORDER BY int8', []);
+      expect(tableData).toEqual([
+        {
+          date: '2020-01-01T00:00:00.000',
+          datetime: '2020-01-01T00:00:00.000',
+          datetime64_micros: '2020-01-01T00:00:00.000',
+        },
+        {
+          date: '2020-01-02T00:00:00.000',
+          datetime: '2020-01-02T00:00:00.000',
+          datetime64_micros: '2020-01-02T00:00:00.123',
+        },
+        {
+          date: '2020-01-03T00:00:00.000',
+          datetime: '2020-01-03T00:00:00.000',
+          datetime64_micros: '2020-01-03T00:00:00.234',
+        }
+      ]);
+    });
+  });
+
   it('stream', async () => {
     await doWithDriver(async (driver) => {
       const tableData = await driver.stream('SELECT * FROM test.types_test ORDER BY int8', [], {
