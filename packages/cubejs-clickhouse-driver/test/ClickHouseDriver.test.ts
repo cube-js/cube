@@ -239,7 +239,18 @@ describe('ClickHouseDriver', () => {
     });
   });
 
-  it('query', async () => {
+  it('datetime with specific timezone', async () => {
+    await doWithDriver(async (driver) => {
+      const rows = await driver.query('SELECT toDateTime(?, \'Asia/Istanbul\') as dt', [
+        '2020-01-01 00:00:00'
+      ]);
+      expect(rows).toEqual([{
+        dt: '2020-01-01T00:00:00.000'
+      }]);
+    });
+  });
+
+  it('query (types)', async () => {
     await doWithDriver(async (driver) => {
       const tableData = await driver.query('SELECT date, datetime, datetime64_micros FROM test.types_test ORDER BY int8', []);
       expect(tableData).toEqual([

@@ -9,9 +9,9 @@ export function transformRow(row: Record<string, any>, meta: any) {
   for (const [fieldName, value] of Object.entries(row)) {
     if (value !== null) {
       const metaForField = meta[fieldName];
-      if (metaForField.type === 'DateTime') {
+      if (metaForField.type.includes('DateTime64')) {
         row[fieldName] = moment.utc(value).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
-      } else if (metaForField.type.includes('DateTime64')) {
+      } else if (metaForField.type.includes('DateTime')) {
         row[fieldName] = moment.utc(value).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
       } else if (metaForField.type.includes('Date')) {
         row[fieldName] = `${value}T00:00:00.000`;
