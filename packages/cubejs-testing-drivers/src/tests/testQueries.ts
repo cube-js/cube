@@ -1401,7 +1401,7 @@ export function testQueries(type: string): void {
         timeDimensions: [{
           dimension: 'BigECommerce.orderDate',
           granularity: 'month',
-          "dateRange": ["2020-01-01", "2020-12-31"],
+          dateRange: ['2020-01-01', '2020-12-31'],
         }],
       });
       expect(response.rawData()).toMatchSnapshot();
@@ -1415,7 +1415,7 @@ export function testQueries(type: string): void {
         timeDimensions: [{
           dimension: 'BigECommerce.orderDate',
           granularity: 'month',
-          "dateRange": ["2020-01-01", "2020-12-31"],
+          dateRange: ['2020-01-01', '2020-12-31'],
         }],
       });
       expect(response.rawData()).toMatchSnapshot();
@@ -1429,7 +1429,7 @@ export function testQueries(type: string): void {
         timeDimensions: [{
           dimension: 'BigECommerce.orderDate',
           granularity: 'month',
-          "dateRange": ["2020-01-01", "2020-12-31"],
+          dateRange: ['2020-01-01', '2020-12-31'],
         }],
       });
       expect(response.rawData()).toMatchSnapshot();
