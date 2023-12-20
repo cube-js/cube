@@ -142,3 +142,29 @@ views:
           - status
           - shipped_at
 ```
+
+## Integrations with BI Tools
+Some metrics-based BI tools will specify requirements for the views or be able to accept additional metadata to enrich the experience.  
+Below is an example of using the `meta` property to do this.
+
+```yaml
+views:
+  - name: order_count_by_order_date
+    description: For finance team to track orders on accrual/earned basis.
+    meta:
+      type: metric
+      owner: alice@acme.com
+
+    cubes:
+      - join_path: orders
+        includes:
+          # MEASURE
+          - order_count
+
+          # TIME
+          - created_at
+
+          # DIMENSIONS
+          - status
+          - city
+```
