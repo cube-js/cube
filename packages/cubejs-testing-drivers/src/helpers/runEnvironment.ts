@@ -132,9 +132,12 @@ export async function runEnvironment(type: string, suf?: string): Promise<Enviro
   // TODO extract as a config
   if (type === 'mssql') {
     compose.withWaitStrategy('data', Wait.forLogMessage('Service Broker manager has started'));
-  } else {
+  }
+  // TODO: Add health checks for all drivers
+  if (type === 'clickhouse') {
     compose.withWaitStrategy('data', Wait.forHealthCheck());
   }
+
   const environment = await compose.up();
 
   const store = {
