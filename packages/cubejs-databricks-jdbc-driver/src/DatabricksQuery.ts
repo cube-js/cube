@@ -69,20 +69,12 @@ export class DatabricksQuery extends BaseQuery {
     return 'unix_timestamp()';
   }
 
-  public seriesSql(timeDimension: any) {
-    const values = timeDimension.timeSeries().map(
-      ([from, to]: [string, string]) => `select '${from}' f, '${to}' t`
-    ).join(' UNION ALL ');
-    return `SELECT ${this.timeStampCast('dates.f')} date_from, ${this.timeStampCast('dates.t')} date_to FROM (${values}) AS dates`;
-  }
-
   public orderHashToString(hash: any) {
     if (!hash || !hash.id) {
       return null;
     }
 
     const fieldIndex = this.getFieldIndex(hash.id);
-
     if (fieldIndex === null) {
       return null;
     }
@@ -99,16 +91,6 @@ export class DatabricksQuery extends BaseQuery {
     }
 
     return null;
-  }
-
-  public groupByClause() {
-    const dimensionsForSelect = this.dimensionsForSelect();
-    const dimensionColumns = R.flatten(
-      dimensionsForSelect.map((s: any) => s.selectColumns() && s.aliasName())
-    )
-      .filter(s => !!s);
-
-    return dimensionColumns.length ? ` GROUP BY ${dimensionColumns.join(', ')}` : '';
   }
 
   public defaultRefreshKeyRenewalThreshold() {
