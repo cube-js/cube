@@ -1868,12 +1868,15 @@ export class PreAggregationPartitionRangeLoader {
     if (!range) {
       return;
     }
+
     if (range.length !== 2) {
       throw new Error(`Date range expected to be an array with 2 elements but ${range} found`);
     }
+
     if (typeof range[0] !== 'string' || typeof range[1] !== 'string') {
       throw new Error(`Date range expected to be a string array but ${range} found`);
     }
+
     if (range[0].length !== 23 || range[1].length !== 23) {
       throw new Error(`Date range expected to be in YYYY-MM-DDTHH:mm:ss.SSS format but ${range} found`);
     }

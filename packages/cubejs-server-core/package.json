@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/server-core",
   "description": "Cube.js base component to wire all backend components together",
   "author": "Cube Dev, Inc.",
-  "version": "0.34.36",
+  "version": "0.34.40",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
@@ -29,12 +29,12 @@
     "unit": "jest --runInBand --forceExit --coverage dist/test"
   },
   "dependencies": {
-    "@cubejs-backend/api-gateway": "^0.34.36",
+    "@cubejs-backend/api-gateway": "^0.34.40",
     "@cubejs-backend/cloud": "^0.34.33",
     "@cubejs-backend/dotenv": "^9.0.2",
-    "@cubejs-backend/native": "^0.34.36",
-    "@cubejs-backend/query-orchestrator": "^0.34.36",
-    "@cubejs-backend/schema-compiler": "^0.34.36",
+    "@cubejs-backend/native": "^0.34.40",
+    "@cubejs-backend/query-orchestrator": "^0.34.39",
+    "@cubejs-backend/schema-compiler": "^0.34.40",
     "@cubejs-backend/shared": "^0.34.33",
     "@cubejs-backend/templates": "^0.34.33",
     "codesandbox-import-utils": "^2.1.12",
@@ -57,9 +57,9 @@
     "ws": "^7.5.3"
   },
   "devDependencies": {
-    "@cubejs-backend/cubestore-driver": "^0.34.36",
+    "@cubejs-backend/cubestore-driver": "^0.34.37",
     "@cubejs-backend/linter": "^0.34.25",
-    "@cubejs-client/playground": "^0.34.32",
+    "@cubejs-client/playground": "^0.34.37",
     "@types/cross-spawn": "^6.0.2",
     "@types/express": "^4.17.9",
     "@types/fs-extra": "^9.0.8",

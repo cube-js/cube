@@ -2672,10 +2672,10 @@ export class BaseQuery {
   /**
    * @protected
    * @param {string} interval
-   * @return {(number|*)[]}
+   * @return {[number, string]}
    */
   parseInterval(interval) {
-    const intervalMatch = interval.match(/^(\d+) (second|minute|hour|day|week)s?$/);
+    const intervalMatch = interval.match(/^(\d+) (second|minute|hour|day|week|month|quarter|year)s?$/);
     if (!intervalMatch) {
       throw new UserError(`Invalid interval: ${interval}`);
     }

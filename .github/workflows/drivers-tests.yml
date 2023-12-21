@@ -7,6 +7,8 @@ on:
     paths:
       - '.github/workflows/drivers-tests.yml'
 
+      - 'packages/cubejs-testing-drivers/**'
+      - 'packages/cubejs-testing-shared/**'
       - 'packages/cubejs-query-orchestrator/src/**'
       - 'packages/cubejs-base-driver/src/**'
       - 'packages/cubejs-jdbc-driver/src/**'
@@ -22,6 +24,8 @@ on:
     paths:
       - '.github/workflows/drivers-tests.yml'
 
+      - 'packages/cubejs-testing-drivers/**'
+      - 'packages/cubejs-testing-shared/**'
       - 'packages/cubejs-query-orchestrator/src/**'
       - 'packages/cubejs-base-driver/src/**'
       - 'packages/cubejs-jdbc-driver/src/**'
@@ -69,7 +73,7 @@ jobs:
 
       # Building docker
       - name: Login to DockerHub
-        uses: docker/login-action@v1
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}

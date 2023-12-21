@@ -8,7 +8,7 @@ module.exports = {
   "pre-aggregations": "Pre-Aggregations",
   "performance": "Performance Insights",
   "access-control": "Access Control",
-  "sso": "Single Sign-On",
+  "sso": "Single Sign-on",
   "budgets": "Budgets",
   "preferences": "Preferences",
   "cli": "CLI"
