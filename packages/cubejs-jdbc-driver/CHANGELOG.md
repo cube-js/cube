@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.39](https://github.com/cube-js/cube/compare/v0.34.38...v0.34.39) (2023-12-21)
+
+
+### Features
+
+* **jdbc-driver:** Upgrade java to ^0.14 (to support new JDK & Node.js) ([#7566](https://github.com/cube-js/cube/issues/7566)) ([fe10c9b](https://github.com/cube-js/cube/commit/fe10c9b07ef88162044d86f0552f30b61cc618ed))
+
+
+
+
+
 ## [0.34.33](https://github.com/cube-js/cube/compare/v0.34.32...v0.34.33) (2023-12-11)
 
 **Note:** Version bump only for package @cubejs-backend/jdbc-driver

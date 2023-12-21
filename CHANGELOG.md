@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.39](https://github.com/cube-js/cube/compare/v0.34.38...v0.34.39) (2023-12-21)
+
+
+### Bug Fixes
+
+* **base-driver:** Support parsing intervals with month|quarter|year granularity ([#7561](https://github.com/cube-js/cube/issues/7561)) ([24c850c](https://github.com/cube-js/cube/commit/24c850ccb74b08f74b5314ed97f872b95cb46b43))
+* **clickhouse-driver:** Correct parsing for DateTime('timezone') ([#7565](https://github.com/cube-js/cube/issues/7565)) ([d39e4a2](https://github.com/cube-js/cube/commit/d39e4a25f2982cd2f66434f8095905883b9815ff))
+
+
+### Features
+
+* **jdbc-driver:** Upgrade java to ^0.14 (to support new JDK & Node.js) ([#7566](https://github.com/cube-js/cube/issues/7566)) ([fe10c9b](https://github.com/cube-js/cube/commit/fe10c9b07ef88162044d86f0552f30b61cc618ed))
+
+
+
+
+
 ## [0.34.38](https://github.com/cube-js/cube/compare/v0.34.37...v0.34.38) (2023-12-19)
 
 
