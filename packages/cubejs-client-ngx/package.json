@@ -44,7 +44,7 @@
   "publishConfig": {
     "access": "public"
   },
-  "module": "dist/fesm5/cubejs-client-ngx.js",
+  "module": "dist/fesm2015/cubejs-client-ngx.js",
   "es2015_ivy_ngcc": "__ivy_ngcc__/dist/fesm2015/cubejs-client-ngx.js",
   "es2015": "dist/fesm2015/cubejs-client-ngx.js",
   "esm5": "dist/esm5/cubejs-client-ngx.js",
