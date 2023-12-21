@@ -313,7 +313,9 @@ jobs:
           path: ./rust/cubestore/target/debug/
           name: cubestored-x86_64-unknown-linux-gnu-debug
       - name: Run Cube Store in background
-        run: RUNNER_TRACKING_ID="" && ./rust/cubestore/target/debug/cubestored &
+        run: |
+          chmod +x ./rust/cubestore/target/debug/cubestored
+          RUNNER_TRACKING_ID="" && ./rust/cubestore/target/debug/cubestored &
       - name: Run Cubestore Integration
         timeout-minutes: 10
         run: |
@@ -444,6 +446,9 @@ jobs:
         with:
           path: rust/cubestore/downloaded/latest/bin/
           name: cubestored-x86_64-unknown-linux-gnu-debug
+      - name: Chmod +x for cubestored
+        run: |
+          chmod +x ./rust/cubestore/downloaded/latest/bin/cubestored
       - name: Run Integration smoke tests
         timeout-minutes: 30
         run: ./.github/actions/smoke.sh
