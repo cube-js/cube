@@ -234,19 +234,20 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: ./rust/cubestore -> target
-          shared-key: cubestore
+          # Separate path for release key to protect cache bloating
+          shared-key: cubestore-release
           key: ubuntu-20.04
       - name: Build cubestore
         uses: actions-rs/cargo@v1
         with:
           command: build
-          args: --manifest-path rust/cubestore/Cargo.toml -j 4
-      - name: 'Upload cubestored-x86_64-unknown-linux-gnu-debug artifact'
+          args: --manifest-path rust/cubestore/Cargo.toml -j 4 --release
+      - name: 'Upload cubestored-x86_64-unknown-linux-gnu-release artifact'
         uses: actions/upload-artifact@v3
         with:
-          name: cubestored-x86_64-unknown-linux-gnu-debug
-          path: ./rust/cubestore/target/debug/cubestored
-          retention-days: 7
+          name: cubestored-x86_64-unknown-linux-gnu-release
+          path: ./rust/cubestore/target/release/cubestored
+          retention-days: 5
 
   integration-cubestore:
     needs: [latest-tag-sha, build-cubestore]
@@ -307,15 +308,15 @@ jobs:
           command: yarn install --frozen-lockfile
       - name: Lerna tsc
         run: yarn tsc
-      - name: Download cubestored-x86_64-unknown-linux-gnu-debug artifact
+      - name: Download cubestored-x86_64-unknown-linux-gnu-release artifact
         uses: actions/download-artifact@v3
         with:
-          path: ./rust/cubestore/target/debug/
-          name: cubestored-x86_64-unknown-linux-gnu-debug
+          path: ./rust/cubestore/target/release/
+          name: cubestored-x86_64-unknown-linux-gnu-release
       - name: Run Cube Store in background
         run: |
-          chmod +x ./rust/cubestore/target/debug/cubestored
-          RUNNER_TRACKING_ID="" && ./rust/cubestore/target/debug/cubestored &
+          chmod +x ./rust/cubestore/target/release/cubestored
+          RUNNER_TRACKING_ID="" && ./rust/cubestore/target/release/cubestored &
       - name: Run Cubestore Integration
         timeout-minutes: 10
         run: |
@@ -441,11 +442,11 @@ jobs:
         run: yarn build
       - name: Lerna tsc
         run: yarn tsc
-      - name: Download cubestored-x86_64-unknown-linux-gnu-debug artifact
+      - name: Download cubestored-x86_64-unknown-linux-gnu-release artifact
         uses: actions/download-artifact@v3
         with:
           path: rust/cubestore/downloaded/latest/bin/
-          name: cubestored-x86_64-unknown-linux-gnu-debug
+          name: cubestored-x86_64-unknown-linux-gnu-release
       - name: Chmod +x for cubestored
         run: |
           chmod +x ./rust/cubestore/downloaded/latest/bin/cubestored
