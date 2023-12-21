@@ -126,6 +126,11 @@
     "querying ECommerce: partitioned pre-agg higher granularity",
     "querying BigECommerce: partitioned pre-agg",
     "querying BigECommerce: null sum",
-    "querying BigECommerce: null boolean"
+    "querying BigECommerce: null boolean",
+    "Unsupported JOIN ON conditions. Unexpected 'big_e_commerce__order_date_month > subtractWeeks(date_to, 2)'",
+    "--------------------",
+    "querying BigECommerce: rolling window by 2 day",
+    "querying BigECommerce: rolling window by 2 week",
+    "querying BigECommerce: rolling window by 2 month"
   ]
 }
