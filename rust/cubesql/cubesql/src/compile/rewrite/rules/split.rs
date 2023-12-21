@@ -5864,6 +5864,12 @@ impl SplitRules {
                 for alias_to_cube in
                     var_iter!(egraph[subst[alias_to_cube_var]], CubeScanAliasToCube).cloned()
                 {
+                    if matches!(
+                        egraph[subst[projection_expr_var]].data.trivial_push_down,
+                        Some(0) | Some(1)
+                    ) {
+                        continue;
+                    }
                     // Replace outer projection columns with unqualified variants
                     if let Some(expr_name_to_alias) = expr_to_alias
                         .clone()
