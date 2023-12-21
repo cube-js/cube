@@ -4,7 +4,7 @@ import { ChildProcessWithoutNullStreams, spawn } from 'child_process';
 import { config } from 'dotenv';
 import yargs from 'yargs/yargs';
 import { DockerComposeEnvironment, Wait } from 'testcontainers';
-import { pausePromise } from '@cubejs-backend/shared';
+import { isCI, pausePromise } from '@cubejs-backend/shared';
 import { getFixtures } from './getFixtures';
 import { getTempPath } from './getTempPath';
 import { getComposePath } from './getComposePath';
@@ -105,8 +105,9 @@ export async function runEnvironment(type: string, suf?: string): Promise<Enviro
     composePath,
     composeFile,
   );
-  compose.withStartupTimeout(30 * 1000);
+  compose.withStartupTimeout((isCI() ? 60 : 30) * 1000);
   compose.withEnvironment({ CUBEJS_TELEMETRY: 'false' });
+
   const _path = `${path.resolve(process.cwd(), `./fixtures/${type}.env`)}`;
   if (fs.existsSync(_path)) {
     config({
