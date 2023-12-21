@@ -278,12 +278,6 @@ jobs:
           df -h
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly-2022-06-22
-          override: true
-          components: rustfmt
       - name: Install Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v3
         with:
@@ -316,7 +310,7 @@ jobs:
       - name: Download cubestored-x86_64-unknown-linux-gnu-debug artifact
         uses: actions/download-artifact@v3
         with:
-          path: ./rust/cubestore/target/debug/cubestored
+          path: ./rust/cubestore/target/debug/
           name: cubestored-x86_64-unknown-linux-gnu-debug
       - name: Run Cube Store in background
         run: RUNNER_TRACKING_ID="" && ./rust/cubestore/target/debug/cubestored &
@@ -412,12 +406,6 @@ jobs:
           df -h
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly-2022-06-22
-          override: true
-          components: rustfmt
       - name: Install Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v3
         with:
@@ -454,7 +442,7 @@ jobs:
       - name: Download cubestored-x86_64-unknown-linux-gnu-debug artifact
         uses: actions/download-artifact@v3
         with:
-          path: rust/cubestore/downloaded/latest/bin/cubestored
+          path: rust/cubestore/downloaded/latest/bin/
           name: cubestored-x86_64-unknown-linux-gnu-debug
       - name: Run Integration smoke tests
         timeout-minutes: 30
