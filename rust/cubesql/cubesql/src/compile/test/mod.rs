@@ -164,38 +164,49 @@ pub fn get_test_meta() -> Vec<V1CubeMeta> {
                     _type: "number".to_string(),
                 })
                 .collect(),
-            measures: vec![
-                V1CubeMetaMeasure {
-                    name: "KibanaSampleDataEcommerce.count".to_string(),
-                    title: None,
+            measures: (0..100)
+                .map(|i| V1CubeMetaMeasure {
+                    name: format!("WideCube.measure{}", i),
                     _type: "number".to_string(),
-                    agg_type: Some("count".to_string()),
-                },
-                V1CubeMetaMeasure {
-                    name: "KibanaSampleDataEcommerce.maxPrice".to_string(),
+                    agg_type: Some("number".to_string()),
                     title: None,
-                    _type: "number".to_string(),
-                    agg_type: Some("max".to_string()),
-                },
-                V1CubeMetaMeasure {
-                    name: "KibanaSampleDataEcommerce.minPrice".to_string(),
-                    title: None,
-                    _type: "number".to_string(),
-                    agg_type: Some("min".to_string()),
-                },
-                V1CubeMetaMeasure {
-                    name: "KibanaSampleDataEcommerce.avgPrice".to_string(),
-                    title: None,
-                    _type: "number".to_string(),
-                    agg_type: Some("avg".to_string()),
-                },
-                V1CubeMetaMeasure {
-                    name: "KibanaSampleDataEcommerce.countDistinct".to_string(),
-                    title: None,
-                    _type: "number".to_string(),
-                    agg_type: Some("countDistinct".to_string()),
-                },
-            ],
+                })
+                .chain(
+                    vec![
+                        V1CubeMetaMeasure {
+                            name: "KibanaSampleDataEcommerce.count".to_string(),
+                            title: None,
+                            _type: "number".to_string(),
+                            agg_type: Some("count".to_string()),
+                        },
+                        V1CubeMetaMeasure {
+                            name: "KibanaSampleDataEcommerce.maxPrice".to_string(),
+                            title: None,
+                            _type: "number".to_string(),
+                            agg_type: Some("max".to_string()),
+                        },
+                        V1CubeMetaMeasure {
+                            name: "KibanaSampleDataEcommerce.minPrice".to_string(),
+                            title: None,
+                            _type: "number".to_string(),
+                            agg_type: Some("min".to_string()),
+                        },
+                        V1CubeMetaMeasure {
+                            name: "KibanaSampleDataEcommerce.avgPrice".to_string(),
+                            title: None,
+                            _type: "number".to_string(),
+                            agg_type: Some("avg".to_string()),
+                        },
+                        V1CubeMetaMeasure {
+                            name: "KibanaSampleDataEcommerce.countDistinct".to_string(),
+                            title: None,
+                            _type: "number".to_string(),
+                            agg_type: Some("countDistinct".to_string()),
+                        },
+                    ]
+                    .into_iter(),
+                )
+                .collect(),
             segments: Vec::new(),
             joins: Some(Vec::new()),
         },
