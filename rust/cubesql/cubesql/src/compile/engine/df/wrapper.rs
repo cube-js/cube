@@ -746,6 +746,16 @@ impl CubeScanWrapperNode {
             sql = new_sql_query;
 
             let original_alias = expr_name(&original_expr, &schema)?;
+            let original_alias_key = Column::from_name(&original_alias);
+            if let Some(alias_column) = next_remapping.get(&original_alias_key) {
+                let alias = alias_column.name.clone();
+                aliased_columns.push(AliasedColumn {
+                    expr: expr_sql,
+                    alias,
+                });
+                continue;
+            }
+
             let alias = if can_rename_columns {
                 let alias = expr_name(&expr, &schema)?;
                 let mut truncated_alias = non_id_regex.replace_all(&alias, "_").to_lowercase();
@@ -766,10 +776,7 @@ impl CubeScanWrapperNode {
             };
             if original_alias != alias {
                 if !next_remapping.contains_key(&Column::from_name(&alias)) {
-                    next_remapping.insert(
-                        Column::from_name(&original_alias),
-                        Column::from_name(&alias),
-                    );
+                    next_remapping.insert(original_alias_key, Column::from_name(&alias));
                     next_remapping.insert(
                         Column {
                             name: original_alias.clone(),

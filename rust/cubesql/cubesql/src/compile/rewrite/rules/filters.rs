@@ -949,7 +949,6 @@ impl RewriteRules for FilterRules {
                 ),
                 self.transform_granularity_to_interval("?granularity", "?interval"),
             ),
-            // TODO define zero
             rewrite(
                 "filter-str-pos-to-like",
                 filter_replacer(
@@ -959,14 +958,22 @@ impl RewriteRules for FilterRules {
                             vec![column_expr("?column"), literal_expr("?value")],
                         ),
                         ">",
-                        literal_expr("?zero"),
+                        literal_int(0),
                     ),
                     "?alias_to_cube",
                     "?members",
                     "?filter_aliases",
                 ),
                 filter_replacer(
-                    binary_expr(column_expr("?column"), "LIKE", literal_expr("?value")),
+                    binary_expr(
+                        column_expr("?column"),
+                        "LIKE",
+                        binary_expr(
+                            binary_expr(literal_string("%"), "||", literal_expr("?value")),
+                            "||",
+                            literal_string("%"),
+                        ),
+                    ),
                     "?alias_to_cube",
                     "?members",
                     "?filter_aliases",
@@ -2335,6 +2342,98 @@ impl RewriteRules for FilterRules {
                     "?right_out",
                 ),
             ),
+            transforming_rewrite(
+                "filter-domo-date-column-compare-date-str",
+                filter_replacer(
+                    binary_expr(
+                        udf_expr("date", vec![column_expr("?column")]),
+                        "?op",
+                        literal_expr("?literal"),
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                filter_replacer(
+                    binary_expr(
+                        fun_expr(
+                            "DateTrunc",
+                            vec![literal_string("day"), column_expr("?column")],
+                        ),
+                        "?op",
+                        udf_expr(
+                            "to_date",
+                            vec![literal_expr("?literal"), literal_string("yyyy-MM-dd")],
+                        ),
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                self.transform_date_column_compare_date_str("?op", "?literal"),
+            ),
+            rewrite(
+                "filter-domo-date-column-between",
+                filter_replacer(
+                    between_expr(
+                        udf_expr("date", vec![column_expr("?column")]),
+                        "?negated",
+                        "?low",
+                        "?high",
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                filter_replacer(
+                    between_expr(column_expr("?column"), "?negated", "?low", "?high"),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+            ),
+            transforming_rewrite(
+                "filter-domo-not-column-equals-date",
+                filter_replacer(
+                    not_expr(binary_expr(
+                        udf_expr("date", vec![column_expr("?column")]),
+                        "=",
+                        literal_expr("?literal"),
+                    )),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                filter_replacer(
+                    binary_expr(
+                        binary_expr(
+                            column_expr("?column"),
+                            "<",
+                            udf_expr(
+                                "to_date",
+                                vec![literal_expr("?literal"), literal_string("yyyy-MM-dd")],
+                            ),
+                        ),
+                        "OR",
+                        binary_expr(
+                            column_expr("?column"),
+                            ">=",
+                            binary_expr(
+                                udf_expr(
+                                    "to_date",
+                                    vec![literal_expr("?literal"), literal_string("yyyy-MM-dd")],
+                                ),
+                                "+",
+                                literal_expr("?one_day"),
+                            ),
+                        ),
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                self.transform_not_column_equals_date("?literal", "?one_day"),
+            ),
             rewrite(
                 "in-date-range-to-time-dimension-pull-up-left",
                 cube_scan_filters(
@@ -2703,6 +2802,33 @@ impl FilterRules {
                                         },
                                     };
 
+                                    let op = match literal {
+                                        ScalarValue::Utf8(Some(value)) => match op {
+                                            "contains" => {
+                                                let starts_with_pcnt = value.starts_with("%");
+                                                let ends_with_pcnt = value.ends_with("%");
+                                                match (starts_with_pcnt, ends_with_pcnt) {
+                                                    (false, false) => "equals",
+                                                    (false, true) => "startsWith",
+                                                    (true, false) => "endsWith",
+                                                    (true, true) => "contains",
+                                                }
+                                            }
+                                            "notContains" => {
+                                                let starts_with_pcnt = value.starts_with("%");
+                                                let ends_with_pcnt = value.ends_with("%");
+                                                match (starts_with_pcnt, ends_with_pcnt) {
+                                                    (false, false) => "notEquals",
+                                                    (false, true) => "notStartsWith",
+                                                    (true, false) => "notEndsWith",
+                                                    (true, true) => "notContains",
+                                                }
+                                            }
+                                            _ => op,
+                                        },
+                                        _ => op,
+                                    };
+
                                     let value = match literal {
                                         ScalarValue::Utf8(Some(value)) => {
                                             if op == "startsWith"
@@ -2714,6 +2840,27 @@ impl FilterRules {
                                                 if value.starts_with("%") && value.ends_with("%") {
                                                     let without_wildcard =
                                                         value[1..value.len() - 1].to_string();
+                                                    if without_wildcard.contains("%") {
+                                                        continue;
+                                                    }
+                                                    without_wildcard
+                                                } else {
+                                                    value.to_string()
+                                                }
+                                            } else if op == "startsWith" || op == "notStartsWith" {
+                                                if value.ends_with("%") {
+                                                    let without_wildcard =
+                                                        value[..value.len() - 1].to_string();
+                                                    if without_wildcard.contains("%") {
+                                                        continue;
+                                                    }
+                                                    without_wildcard
+                                                } else {
+                                                    value.to_string()
+                                                }
+                                            } else if op == "endsWith" || op == "notEndsWith" {
+                                                if value.starts_with("%") {
+                                                    let without_wildcard = value[1..].to_string();
                                                     if without_wildcard.contains("%") {
                                                         continue;
                                                     }
@@ -4284,6 +4431,59 @@ impl FilterRules {
                         DataType::Date32 | DataType::Date64 => negative,
                         _ => !negative,
                     };
+                }
+            }
+
+            false
+        }
+    }
+
+    fn transform_date_column_compare_date_str(
+        &self,
+        op_var: &'static str,
+        literal_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let op_var = var!(op_var);
+        let literal_var = var!(literal_var);
+        move |egraph, subst| {
+            for op in var_iter!(egraph[subst[op_var]], BinaryExprOp) {
+                match op {
+                    Operator::Gt
+                    | Operator::GtEq
+                    | Operator::Lt
+                    | Operator::LtEq
+                    | Operator::Eq => (),
+                    _ => continue,
+                };
+
+                for literal in var_iter!(egraph[subst[literal_var]], LiteralExprValue) {
+                    if let ScalarValue::Utf8(_) = literal {
+                        return true;
+                    }
+                }
+            }
+
+            false
+        }
+    }
+
+    fn transform_not_column_equals_date(
+        &self,
+        literal_var: &'static str,
+        one_day_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let literal_var = var!(literal_var);
+        let one_day_var = var!(one_day_var);
+        move |egraph, subst| {
+            for literal in var_iter!(egraph[subst[literal_var]], LiteralExprValue) {
+                if let ScalarValue::Utf8(_) = literal {
+                    subst.insert(
+                        one_day_var,
+                        egraph.add(LogicalPlanLanguage::LiteralExprValue(LiteralExprValue(
+                            ScalarValue::IntervalDayTime(Some(1 << 32)),
+                        ))),
+                    );
+                    return true;
                 }
             }
 

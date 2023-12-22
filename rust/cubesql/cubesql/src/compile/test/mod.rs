@@ -276,6 +276,8 @@ pub fn get_test_tenant_ctx_customized(custom_templates: Vec<(String, String)>) -
                     ("functions/CURRENTDATE".to_string(), "CURRENT_DATE({{ args_concat }})".to_string()),
                     // DATEADD is being rewritten to DATE_ADD
                     // ("functions/DATEADD".to_string(), "DATEADD({{ date_part }}, {{ interval }}, {{ args[2] }})".to_string()),
+                    ("functions/CONCAT".to_string(), "CONCAT({{ args_concat }})".to_string()),
+                    ("functions/DATE".to_string(), "DATE({{ args_concat }})".to_string()),
                     ("expressions/extract".to_string(), "EXTRACT({{ date_part }} FROM {{ expr }})".to_string()),
                     (
                         "statements/select".to_string(),
