@@ -201,8 +201,56 @@ jobs:
         env:
           NODE_OPTIONS: --max_old_space_size=4096
 
-  integration-cubestore:
+  build-cubestore:
     needs: [latest-tag-sha]
+    runs-on: ubuntu-20.04
+    timeout-minutes: 60
+    if: (needs['latest-tag-sha'].outputs.sha != github.sha)
+    steps:
+      - name: Maximize build space (disk space limitations)
+        run: |
+          echo "Before"
+          df -h
+          sudo apt-get remove -y 'php.*'
+          sudo apt-get remove -y '^mongodb-.*'
+          sudo apt-get remove -y '^mysql-.*'
+          sudo apt-get autoremove -y
+          sudo apt-get clean
+
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          echo "After"
+          df -h
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2022-06-22
+          override: true
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ./rust/cubestore -> target
+          # Separate path for release key to protect cache bloating
+          shared-key: cubestore-release
+          key: ubuntu-20.04
+      - name: Build cubestore
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --manifest-path rust/cubestore/Cargo.toml -j 4 --release
+      - name: 'Upload cubestored-x86_64-unknown-linux-gnu-release artifact'
+        uses: actions/upload-artifact@v3
+        with:
+          name: cubestored-x86_64-unknown-linux-gnu-release
+          path: ./rust/cubestore/target/release/cubestored
+          retention-days: 5
+
+  integration-cubestore:
+    needs: [latest-tag-sha, build-cubestore]
     runs-on: ubuntu-20.04
     timeout-minutes: 60
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)
@@ -231,12 +279,6 @@ jobs:
           df -h
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly-2022-06-22
-          override: true
-          components: rustfmt
       - name: Install Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v3
         with:
@@ -266,18 +308,15 @@ jobs:
           command: yarn install --frozen-lockfile
       - name: Lerna tsc
         run: yarn tsc
-      - uses: Swatinem/rust-cache@v2
+      - name: Download cubestored-x86_64-unknown-linux-gnu-release artifact
+        uses: actions/download-artifact@v3
         with:
-          workspaces: ./rust/cubestore -> target
-          shared-key: cubestore
-          key: ubuntu-20.04
-      - name: Build cubestore
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --manifest-path rust/cubestore/Cargo.toml -j 4
+          path: ./rust/cubestore/target/release/
+          name: cubestored-x86_64-unknown-linux-gnu-release
       - name: Run Cube Store in background
-        run: RUNNER_TRACKING_ID="" && ./rust/cubestore/target/debug/cubestored &
+        run: |
+          chmod +x ./rust/cubestore/target/release/cubestored
+          RUNNER_TRACKING_ID="" && ./rust/cubestore/target/release/cubestored &
       - name: Run Cubestore Integration
         timeout-minutes: 10
         run: |
@@ -341,7 +380,7 @@ jobs:
         run: ./.github/actions/integration/${{ matrix.db }}.sh
 
   integration-smoke:
-    needs: [ latest-tag-sha ]
+    needs: [ latest-tag-sha, build-cubestore ]
     runs-on: ubuntu-20.04
     timeout-minutes: 90
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)
@@ -370,12 +409,6 @@ jobs:
           df -h
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly-2022-06-22
-          override: true
-          components: rustfmt
       - name: Install Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v3
         with:
@@ -409,20 +442,14 @@ jobs:
         run: yarn build
       - name: Lerna tsc
         run: yarn tsc
-      - uses: Swatinem/rust-cache@v2
+      - name: Download cubestored-x86_64-unknown-linux-gnu-release artifact
+        uses: actions/download-artifact@v3
         with:
-          workspaces: ./rust/cubestore -> target
-          shared-key: cubestore
-          key: ubuntu-20.04
-      - name: Build cubestore
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --manifest-path rust/cubestore/Cargo.toml -j 4 --release
-      - name: Copy Cube Store
+          path: rust/cubestore/downloaded/latest/bin/
+          name: cubestored-x86_64-unknown-linux-gnu-release
+      - name: Chmod +x for cubestored
         run: |
-          mkdir -p rust/cubestore/downloaded/latest/bin
-          cp rust/cubestore/target/release/cubestored rust/cubestore/downloaded/latest/bin/cubestored
+          chmod +x ./rust/cubestore/downloaded/latest/bin/cubestored
       - name: Run Integration smoke tests
         timeout-minutes: 30
         run: ./.github/actions/smoke.sh
