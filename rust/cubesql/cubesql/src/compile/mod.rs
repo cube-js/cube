@@ -20135,6 +20135,61 @@ limit
     }
 
     #[tokio::test]
+    async fn test_sigma_visitor_group_by() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                datetrunc_12 AS "Day",
+                sum_14 AS "Sum"
+            FROM
+            (
+                SELECT
+                    DATE_TRUNC('day', CAST(order_date AS TIMESTAMP)) AS datetrunc_12,
+                    SUM(count) AS sum_14
+                FROM
+                    "public".KibanaSampleDataEcommerce AS KibanaSampleDataEcommerce
+                GROUP BY
+                    DATE_TRUNC('day', CAST(order_date AS timestamptz))
+            ) AS q1
+            ORDER BY
+                datetrunc_12 ASC
+            LIMIT
+                25000
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        let cube_scan = logical_plan.find_cube_scan();
+
+        assert_eq!(
+            cube_scan.request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("day".to_string()),
+                    date_range: None
+                }]),
+                order: Some(vec![vec![
+                    "KibanaSampleDataEcommerce.order_date".to_string(),
+                    "asc".to_string(),
+                ]]),
+                limit: Some(25000),
+                offset: None,
+                filters: None,
+                ungrouped: None,
+            }
+        );
+    }
+
+    #[tokio::test]
     async fn test_langchain_pgcatalog_schema() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "langchain_pgcatalog_schema",
