@@ -335,6 +335,10 @@ trait Visitor<'ast, E: Error> {
             self.visit_expr(having)?;
         }
 
+        for group_by in &mut select.group_by {
+            self.visit_expr(group_by)?;
+        }
+
         Ok(())
     }
 
