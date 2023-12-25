@@ -3,12 +3,12 @@ use crate::{
         engine::provider::CubeContext,
         rewrite::{
             converter::{is_expr_node, node_to_expr, LogicalPlanToLanguageConverter},
-            expr_column_name, AggregateFunctionExprFun, AggregateUDFExprFun, AliasExprAlias,
-            AllMembersAlias, AllMembersCube, ChangeUserCube, ColumnExprColumn, DimensionName,
-            FilterMemberMember, FilterMemberOp, LiteralExprValue, LiteralMemberRelation,
-            LiteralMemberValue, LogicalPlanLanguage, MeasureName, ScalarFunctionExprFun,
-            SegmentName, TableScanSourceTableName, TimeDimensionDateRange,
-            TimeDimensionGranularity, TimeDimensionName, VirtualFieldCube, VirtualFieldName,
+            expr_column_name, AggregateUDFExprFun, AliasExprAlias, AllMembersAlias, AllMembersCube,
+            ChangeUserCube, ColumnExprColumn, DimensionName, FilterMemberMember, FilterMemberOp,
+            LiteralExprValue, LiteralMemberRelation, LiteralMemberValue, LogicalPlanLanguage,
+            MeasureName, ScalarFunctionExprFun, SegmentName, TableScanSourceTableName,
+            TimeDimensionDateRange, TimeDimensionGranularity, TimeDimensionName, VirtualFieldCube,
+            VirtualFieldName,
         },
     },
     transport::ext::{V1CubeMetaDimensionExt, V1CubeMetaMeasureExt, V1CubeMetaSegmentExt},
@@ -22,7 +22,6 @@ use datafusion::{
     },
     logical_plan::{Column, DFSchema, Expr},
     physical_plan::{
-        aggregates::AggregateFunction,
         functions::{BuiltinScalarFunction, Volatility},
         planner::DefaultPhysicalPlanner,
         ColumnarValue, PhysicalPlanner,
@@ -317,28 +316,7 @@ impl LogicalPlanAnalysis {
                     None
                 }
             }
-            LogicalPlanLanguage::AggregateFunctionExprFun(AggregateFunctionExprFun(fun)) => {
-                if matches!(
-                    *fun,
-                    AggregateFunction::Count
-                        | AggregateFunction::Sum
-                        | AggregateFunction::Avg
-                        | AggregateFunction::Min
-                        | AggregateFunction::Max
-                ) {
-                    Some(0)
-                } else {
-                    None
-                }
-            }
             LogicalPlanLanguage::AggregateUDFExpr(params) => {
-                let mut trivial = 0;
-                for id in params.iter() {
-                    trivial = trivial_push_down(*id)?.max(trivial);
-                }
-                Some(trivial + 1)
-            }
-            LogicalPlanLanguage::AggregateFunctionExpr(params) => {
                 let mut trivial = 0;
                 for id in params.iter() {
                     trivial = trivial_push_down(*id)?.max(trivial);
