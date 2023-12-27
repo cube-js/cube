@@ -1468,7 +1468,7 @@ const variables: Record<string, (...args: any) => any> = {
     ]
   ),
 
-  duckdbs3UseSsl: ({
+  duckdbS3UseSsl: ({
     dataSource
   }: {
     dataSource: string,
@@ -1478,7 +1478,7 @@ const variables: Record<string, (...args: any) => any> = {
     ]
   ),
 
-  duckdbs3UrlStyle: ({
+  duckdbS3UrlStyle: ({
     dataSource
   }: {
     dataSource: string,
@@ -1488,7 +1488,7 @@ const variables: Record<string, (...args: any) => any> = {
     ]
   ),
 
-  duckdbs3SessionToken: ({
+  duckdbS3SessionToken: ({
     dataSource
   }: {
     dataSource: string,
