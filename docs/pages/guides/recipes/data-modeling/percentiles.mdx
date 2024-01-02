@@ -55,12 +55,14 @@ information about users, including their age:
 
 Calculating the average age is as simple as defining a measure with the built-in
 [`avg` type](/reference/data-model/types-and-formats#avg).
+
 Calculating the percentiles would require using database-specific functions.
 However, almost every database has them under names of `PERCENTILE_CONT` and
 `PERCENTILE_DISC`,
 [Postgres](https://www.postgresql.org/docs/current/functions-aggregate.html) and
-[BigQuery](https://cloud.google.com/bigquery/docs/reference/standard-sql/functions-and-operators#aggregate_functions)
-included.
+[Snowflake](https://docs.snowflake.com/en/sql-reference/functions-aggregation)
+included. For [BigQuery](https://cloud.google.com/bigquery/docs/reference/standard-sql/functions-and-operators#approx_quantiles),
+you'd need to use the `APPROX_QUANTILES` function.
 
 <CodeTabs>
 
