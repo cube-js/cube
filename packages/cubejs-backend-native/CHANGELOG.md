@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.41](https://github.com/cube-js/cube/compare/v0.34.40...v0.34.41) (2024-01-02)
+
+
+### Features
+
+* **cubesql:** Support Domo data queries ([#7509](https://github.com/cube-js/cube/issues/7509)) ([6d644dc](https://github.com/cube-js/cube/commit/6d644dc5265245b8581eb2c2e3b75f5d6d9f929c))
+
+
+
+
+
 ## [0.34.40](https://github.com/cube-js/cube/compare/v0.34.39...v0.34.40) (2023-12-21)
 
 **Note:** Version bump only for package @cubejs-backend/native
