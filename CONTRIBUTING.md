@@ -137,7 +137,7 @@ The rest will be done by `BaseDriver` class.
 ### Implementing a JDBC Driver
 
 If there's existing JDBC Driver in place for Database of interest you can just create `DbTypes` configuration inside
-[cubejs-jdbc-driver/driver/JDBCDriver.js](https://github.com/statsbotco/cube.js/blob/master/packages/cubejs-jdbc-driver/driver/JDBCDriver.js#L31).
+[cubejs-jdbc-driver/driver/JDBCDriver.ts](https://github.com/cube-js/cube/blob/master/packages/cubejs-jdbc-driver/src/JDBCDriver.ts).
 Most of the time no additional adjustments required for base `JDBCDriver` implementation as JDBC is pretty standard.
 In case you need to tweak it a little please follow [Implementing Driver](#implementing-driver) steps but use `JDBCDriver` as your base driver class.
 

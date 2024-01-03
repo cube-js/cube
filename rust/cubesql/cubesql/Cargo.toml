@@ -10,15 +10,15 @@ homepage = "https://cube.dev"
 
 [dependencies]
 arc-swap = "1"
-datafusion = { git = 'https://github.com/cube-js/arrow-datafusion.git', rev = "5833202f5a9b69fded3cd45ffc9041ca5c404d33", default-features = false, features = ["regex_expressions", "unicode_expressions"] }
+datafusion = { git = 'https://github.com/cube-js/arrow-datafusion.git', rev = "dc15ce71abc4b4a2a41a1c149afc8b293027c49f", default-features = false, features = ["regex_expressions", "unicode_expressions"] }
 anyhow = "1.0"
-thiserror = "1.0"
+thiserror = "1.0.50"
 cubeclient = { path = "../cubeclient" }
 pg-srv = { path = "../pg-srv" }
-sqlparser = { git = 'https://github.com/cube-js/sqlparser-rs.git', rev = "037562f7975fcc92b725efbfbaaf050272668593" }
+sqlparser = { git = 'https://github.com/cube-js/sqlparser-rs.git', rev = "2c1becf622f2283514ecbb7e3f01bd858edeaa71" }
 lazy_static = "1.4.0"
 base64 = "0.13.0"
-tokio = { version = "1.0", features = ["full", "rt", "tracing"] }
+tokio = { version = "^1.35", features = ["full", "rt", "tracing"] }
 serde = { version = "^1.0", features = ["derive"] }
 itertools = "0.10.2"
 serde_derive = "^1.0"
@@ -48,12 +48,12 @@ reqwest = { version = "0.11.0", features = ["json", "rustls-tls"], default-featu
 nanoid = "0.3.0"
 tokio-util = { version = "0.6.2", features=["compat"] }
 mysql_common = "0.26.0"
-comfy-table = "4.1.1"
+comfy-table = "7.1.0"
 bitflags = "1.3.2"
 egg = "0.7.1"
 paste = "1.0.6"
 csv = "1.1.6"
-tracing = { version = "0.1.35", features = ["async-await"] }
+tracing = { version = "0.1.40", features = ["async-await"] }
 async-stream = "0.3.3"
 futures-core = "0.3.23"
 futures-util = "0.3.23"
@@ -71,7 +71,7 @@ tokio-postgres = { version = "0.7.7", features = ["with-chrono-0_4", "runtime"] 
 rust_decimal = { version = "1.23", features = ["db-tokio-postgres"] }
 pg_interval = "0.4.1"
 criterion = { version = "0.4.0", features = ["html_reports"] }
-console-subscriber = "0.1.6"
+console-subscriber = "0.2.0"
 
 [[test]]
 name = "e2e"

@@ -8,4 +8,5 @@ expression: "execute_query(\"select t.oid as oid from (select oid as oid from pg
 | 18000 |
 | 18018 |
 | 18028 |
+| 18034 |
 +-------+

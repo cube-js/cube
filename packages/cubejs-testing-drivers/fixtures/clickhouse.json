@@ -22,7 +22,14 @@
       "CLICKHOUSE_PASSWORD": "test",
       "CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT": 1
     },
-    "ports" : ["8123"]
+    "ports" : ["8123"],
+    "healthcheck": {
+      "test": "wget --spider -q --spider http://localhost:8123/ping || exit 1",
+      "start_period": "5s",
+      "interval": "10s",
+      "retries": 3,
+      "timeout": "5s"
+    }
   },
   "cast": {
     "SELECT_PREFIX": "",
@@ -119,6 +126,11 @@
     "querying ECommerce: partitioned pre-agg higher granularity",
     "querying BigECommerce: partitioned pre-agg",
     "querying BigECommerce: null sum",
-    "querying BigECommerce: null boolean"
+    "querying BigECommerce: null boolean",
+    "Unsupported JOIN ON conditions. Unexpected 'big_e_commerce__order_date_month > subtractWeeks(date_to, 2)'",
+    "--------------------",
+    "querying BigECommerce: rolling window by 2 day",
+    "querying BigECommerce: rolling window by 2 week",
+    "querying BigECommerce: rolling window by 2 month"
   ]
 }

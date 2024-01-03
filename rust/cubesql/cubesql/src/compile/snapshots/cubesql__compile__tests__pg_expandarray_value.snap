@@ -14,4 +14,7 @@ expression: "execute_query(\"SELECT (information_schema._pg_expandarray(t.a)).x 
 | 5                                                  |
 | 10                                                 |
 | 15                                                 |
+| 5                                                  |
+| 10                                                 |
+| 15                                                 |
 +----------------------------------------------------+

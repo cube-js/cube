@@ -143,6 +143,10 @@ describe('SQLInterface', () => {
       throw new Error('Please specify user');
     });
 
+    const logLoadEvent = ({ event, properties }: { event: string, properties: any }) => {
+      console.log(`Load event: ${JSON.stringify({ type: event, ...properties })}`);
+    };
+
     const instance = await native.registerInterface({
       // nonce: '12345678910111213141516'.substring(0, 20),
       port: 4545,
@@ -152,6 +156,7 @@ describe('SQLInterface', () => {
       sql,
       meta,
       stream,
+      logLoadEvent,
       sqlGenerators,
       canSwitchUserForSession: (_payload) => true,
     });

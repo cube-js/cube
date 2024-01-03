@@ -21,8 +21,8 @@ paths.
 
 Views **can not** have their own members. Instead, use the `cubes` or `includes`
 parameters to include measures and dimensions from other cubes into the view. In
-the example below, we create a new view `active_users` which is made up of
-properties from the `users` cube:
+the example below, we create a new view `orders` which is made up of
+properties from `base_orders`, `products`, and `users` cubes:
 
 <CodeTabs>
 
@@ -83,19 +83,28 @@ views:
         includes: "*"
         excludes:
           - company
+
+
+
+
+
+
+
 ```
 
 </CodeTabs>
 
 Views can be queried the same way as cubes; the example below show how to query
-the above view with SQL API:
+the above view with the SQL API:
 
 ```sql
 SELECT
+  product,
   users_city,
+  MEASURE(count),
   MEASURE(total_amount)
 FROM orders
-GROUP BY 1
+GROUP BY 1, 2
 ```
 
 Views also do not define any pre-aggregations, instead they re-use
@@ -103,7 +112,7 @@ pre-aggregations defined by the underlying cubes.
 
 ## Parameters
 
-### name
+### `name`
 
 The `name` parameter serves as the identifier of a view. It must be unique among
 _all cubes and views_ within a deployment and follow the [naming
@@ -113,6 +122,7 @@ conventions][ref-naming].
 
 ```javascript
 view(`active_users`, {});
+
 ```
 
 ```yaml
@@ -122,7 +132,7 @@ views:
 
 </CodeTabs>
 
-### description
+### `description`
 
 A description of the view allows your team to better understand what its purpose
 is. It is a very simple and yet useful tool that gives a hint to everyone and
@@ -144,7 +154,31 @@ views:
 
 </CodeTabs>
 
-### cubes
+### `meta`
+
+Custom metadata. Can be used to pass any information to the frontend.
+
+<CodeTabs>
+
+```javascript
+view(`active_users`, {
+  meta: {
+    any: `value`
+  }
+});
+```
+
+```yaml
+views:
+  - name: active_users
+    meta:
+      any: value
+
+```
+
+</CodeTabs>
+
+### `cubes`
 
 Use `cubes` parameter in view to include exposed cubes in bulk. You can build
 your view by combining multiple joined cubes together and specifying the path by
@@ -211,67 +245,53 @@ views:
         includes: "*"
         excludes:
           - company
+
+
+
+
+
+
+
+
+
 ```
 
 </CodeTabs>
 
-When listing cubes to expose, you need to provide a `join_path` parameter. It
-uses dot notation to describe the join path: `cube_1.cube_2.cube_3`. For the
-root cube of the view, just put the cube name as in the example above for
-`base_orders`.
+#### `join_path`
 
-The other required parameter inside the `cubes` block is `includes`. You can
-simply list measures, dimensions, or segments you'd like to include. In case you
-need to rename some of them, you can provide `name` and `alias` parameters.
-Alternatively, you can use the `excludes` parameter in conjunction with the
-includes all definition `includes: "*"`.
+When listing cubes to expose, you need to provide a `join_path` parameter.
+It uses the "dot notation" to describe the join path: `cube_1.cube_2.cube_3`.
+
+For the root cube of the view, just use the cube name as in the example
+above for `base_orders`.
+
+#### `includes` and `excludes`
+
+The other required parameter inside the `cubes` block is `includes`. Use it
+to list measures, dimensions, or segments you'd like to include into the view. 
+
+To include all members from a cube, use the "includes all" form: `includes: "*"`.
+In that case, you can also use the `excludes` parameter to list members that
+you'd like to exclude. 
+
+#### `alias`
+
+Optionally, in case you need to rename some of included members, you can provide
+`name` and `alias` parameters.
+
+#### `prefix`
 
 Optionally, if you'd like to prefix exposed measures, dimensions, or segments
 with the cube name, you can use the `prefix: true` parameter. It will prefix
 them with the cube name, e.g. `users_city`. You can use the `alias` parameter to
-rename the cube for the prefixing purpose.
+specify a custom prefix.
 
-### includes
-
-The `includes` property is used to bulk add measures or dimensions to a view.
-
-<CodeTabs>
-
-```javascript
-view(`active_users`, {
-  description: `14 days rolling count of active users`,
-
-  includes: [
-    // Measures
-    users.rolling_count,
-
-    // Dimensions
-    users.city,
-    users.created_at,
-  ],
-});
-```
-
-```yaml
-views:
-  - name: active_users
-
-    includes:
-      # Measures
-      - users.rolling_count
-
-      # Dimensions
-      - users.city
-      - users.created_at
-```
-
-</CodeTabs>
-
-### public
+### `public`
 
 <InfoBox>
 
-Prior to v0.33, this property was called `shown`.
+Prior to v0.33, this parameter was called  `shown`.
 
 </InfoBox>
 
@@ -330,6 +350,49 @@ views:
 To learn more about using `public` to control visibility based on security
 context, read the [Controlling access to cubes and views
 recipe][ref-recipe-control-access-cubes-views].
+
+### `includes` (deprecated)
+
+<WarningBox>
+
+The top-level `includes` parameter is deprecated and might be removed in
+the future. Please always use the `includes` parameter with `cubes` and
+`join_path` parameters so you can explicitly control the join path.
+
+</WarningBox>
+
+The top-level `includes` parameter is used to bulk add measures or dimensions
+to a view.
+
+<CodeTabs>
+
+```javascript
+view(`active_users`, {
+  includes: [
+    // Measures
+    users.rolling_count,
+
+    // Dimensions
+    users.city,
+    users.created_at,
+  ],
+});
+```
+
+```yaml
+views:
+  - name: active_users
+
+    includes:
+      # Measures
+      - users.rolling_count
+
+      # Dimensions
+      - users.city
+      - users.created_at
+```
+
+</CodeTabs>
 
 ## Using views with pre-aggregations
 

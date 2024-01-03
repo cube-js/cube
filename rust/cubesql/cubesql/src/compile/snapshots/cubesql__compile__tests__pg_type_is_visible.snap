@@ -95,4 +95,6 @@ expression: "execute_query(\"\n                SELECT t.oid, t.typname, n.nspnam
 | 18020 | _Logs                      | public             | true       |
 | 18029 | NumberCube                 | public             | true       |
 | 18030 | _NumberCube                | public             | true       |
+| 18035 | WideCube                   | public             | true       |
+| 18036 | _WideCube                  | public             | true       |
 +-------+----------------------------+--------------------+------------+

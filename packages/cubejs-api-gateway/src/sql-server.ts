@@ -118,13 +118,14 @@ export class SQLServer {
           }
         });
       },
-      sqlApiLoad: async ({ request, session, query, sqlQuery, streaming }) => {
+      sqlApiLoad: async ({ request, session, query, queryKey, sqlQuery, streaming }) => {
         const context = await contextByRequest(request, session);
 
         // eslint-disable-next-line no-async-promise-executor
         return new Promise(async (resolve, reject) => {
           try {
             await this.apiGateway.sqlApiLoad({
+              queryKey,
               query,
               sqlQuery,
               streaming,
@@ -174,6 +175,14 @@ export class SQLServer {
             reject(e);
           }
         });
+      },
+      logLoadEvent: async ({ request, session, event, properties }) => {
+        const context = await contextByRequest(request, session);
+
+        this.apiGateway.log({
+          type: event,
+          ...properties
+        }, context);
       },
       sqlGenerators: async (paramsJson: string) => {
         // TODO get rid of it

@@ -8,4 +8,5 @@ expression: "execute_query(\"\n                SELECT\n                    relna
 | KibanaSampleDataEcommerce | 3c796c1800e3b900420ac37506b3a985601aa7d2 |
 | Logs                      | 126dd3b70a5ca7818e0e26ad1e008d23b0f14a53 |
 | NumberCube                | 92f23824492eeb1e3e4bdaf3785b15b572fae065 |
+| WideCube                  | ed78b17e120aa84861a4be45f4458a4fb9ec55d3 |
 +---------------------------+------------------------------------------+

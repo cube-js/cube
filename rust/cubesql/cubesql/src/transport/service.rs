@@ -11,7 +11,12 @@ use datafusion::{
 };
 use minijinja::{context, value::Value, Environment};
 use serde_derive::*;
-use std::{collections::HashMap, fmt::Debug, sync::Arc, time::Duration};
+use std::{
+    collections::HashMap,
+    fmt::Debug,
+    sync::Arc,
+    time::{Duration, SystemTime},
+};
 use tokio::{
     sync::{mpsc::Receiver, RwLock as RwLockAsync},
     time::Instant,
@@ -23,7 +28,7 @@ use crate::{
         MetaContext,
     },
     sql::{AuthContextRef, HttpAuthContext},
-    CubeError,
+    CubeError, RWLockAsync,
 };
 
 #[derive(Debug, Clone, Serialize)]
@@ -63,6 +68,42 @@ pub struct SqlResponse {
     pub sql: SqlQuery,
 }
 
+#[derive(Debug)]
+pub struct SpanId {
+    pub span_id: String,
+    pub query_key: serde_json::Value,
+    span_start: SystemTime,
+    is_data_query: RWLockAsync<bool>,
+}
+
+impl SpanId {
+    pub fn new(span_id: String, query_key: serde_json::Value) -> Self {
+        Self {
+            span_id,
+            query_key,
+            span_start: SystemTime::now(),
+            is_data_query: tokio::sync::RwLock::new(false),
+        }
+    }
+
+    pub async fn set_is_data_query(&self, is_data_query: bool) {
+        let mut write = self.is_data_query.write().await;
+        *write = is_data_query;
+    }
+
+    pub async fn is_data_query(&self) -> bool {
+        let read = self.is_data_query.read().await;
+        *read
+    }
+
+    pub fn duration(&self) -> u64 {
+        self.span_start
+            .elapsed()
+            .unwrap_or_else(|_| Duration::from_secs(0))
+            .as_millis() as u64
+    }
+}
+
 #[async_trait]
 pub trait TransportService: Send + Sync + Debug {
     // Load meta information about cubes
@@ -71,6 +112,7 @@ pub trait TransportService: Send + Sync + Debug {
     // Get sql for query to be used in wrapped SQL query
     async fn sql(
         &self,
+        span_id: Option<Arc<SpanId>>,
         query: V1LoadRequestQuery,
         ctx: AuthContextRef,
         meta_fields: LoadRequestMeta,
@@ -81,6 +123,7 @@ pub trait TransportService: Send + Sync + Debug {
     // Execute load query
     async fn load(
         &self,
+        span_id: Option<Arc<SpanId>>,
         query: V1LoadRequestQuery,
         sql_query: Option<SqlQuery>,
         ctx: AuthContextRef,
@@ -89,6 +132,7 @@ pub trait TransportService: Send + Sync + Debug {
 
     async fn load_stream(
         &self,
+        span_id: Option<Arc<SpanId>>,
         query: V1LoadRequestQuery,
         sql_query: Option<SqlQuery>,
         ctx: AuthContextRef,
@@ -102,6 +146,15 @@ pub trait TransportService: Send + Sync + Debug {
         ctx: AuthContextRef,
         to_user: String,
     ) -> Result<bool, CubeError>;
+
+    async fn log_load_state(
+        &self,
+        span_id: Option<Arc<SpanId>>,
+        ctx: AuthContextRef,
+        meta_fields: LoadRequestMeta,
+        event: String,
+        properties: serde_json::Value,
+    ) -> Result<(), CubeError>;
 }
 
 #[async_trait]
@@ -195,6 +248,7 @@ impl TransportService for HttpTransport {
 
     async fn sql(
         &self,
+        _span_id: Option<Arc<SpanId>>,
         _query: V1LoadRequestQuery,
         _ctx: AuthContextRef,
         _meta_fields: LoadRequestMeta,
@@ -206,6 +260,7 @@ impl TransportService for HttpTransport {
 
     async fn load(
         &self,
+        _span_id: Option<Arc<SpanId>>,
         query: V1LoadRequestQuery,
         _sql_query: Option<SqlQuery>,
         ctx: AuthContextRef,
@@ -231,6 +286,7 @@ impl TransportService for HttpTransport {
 
     async fn load_stream(
         &self,
+        _span_id: Option<Arc<SpanId>>,
         _query: V1LoadRequestQuery,
         _sql_query: Option<SqlQuery>,
         _ctx: AuthContextRef,
@@ -247,6 +303,21 @@ impl TransportService for HttpTransport {
         _to_user: String,
     ) -> Result<bool, CubeError> {
         panic!("Does not work for standalone mode yet");
+    }
+
+    async fn log_load_state(
+        &self,
+        span_id: Option<Arc<SpanId>>,
+        ctx: AuthContextRef,
+        meta_fields: LoadRequestMeta,
+        event: String,
+        properties: serde_json::Value,
+    ) -> Result<(), CubeError> {
+        println!(
+            "Load state: {:?} {:?} {:?} {} {:?}",
+            span_id, ctx, meta_fields, event, properties
+        );
+        Ok(())
     }
 }
 

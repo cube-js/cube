@@ -122,7 +122,8 @@ export class CubeStoreQuery extends BaseQuery {
     const allMeasures = regularMeasures.concat(multipliedMeasures).concat(
       cumulativeMeasuresWithoutMultiplied
     );
-    const timeDimension = this.timeDimensions.find(d => d.granularity);
+    const timeDimension = this.timeDimensions.find(d => d.granularity || d.dateRange);
+    const timeDimensionWithGranularity = timeDimension?.granularity ? timeDimension : null;
     const baseQueryAlias = this.cubeAlias('base');
     const maxRollingWindow = cumulativeMeasuresWithoutMultiplied.reduce((a, b) => this.maxRollingWindow(a, b.rollingWindowDefinition()), <RollingWindow><unknown>null);
     const commonDateCondition =
@@ -131,8 +132,8 @@ export class CubeStoreQuery extends BaseQuery {
       timeDimension?.dateRange && this.dateFromStartToEndConditionSql(commonDateCondition, true, true) || []
     );
     const rollupGranularity = this.preAggregations?.castGranularity(preAggregationForQuery.preAggregation.granularity) || 'day';
-    const granularityOverride = timeDimension &&
-      cumulativeMeasuresWithoutMultiplied.reduce((a, b) => this.minGranularity(a, b.windowGranularity()), timeDimension.granularity) || rollupGranularity;
+    const granularityOverride = timeDimensionWithGranularity &&
+      cumulativeMeasuresWithoutMultiplied.reduce((a, b) => this.minGranularity(a, b.windowGranularity()), timeDimensionWithGranularity.granularity) || rollupGranularity;
     return this.evaluateSymbolSqlWithContext(
       () => this.overTimeSeriesSelectRollup(
         cumulativeMeasuresWithoutMultiplied,
@@ -142,7 +143,7 @@ export class CubeStoreQuery extends BaseQuery {
           overTimeSeriesAggregate: true
         }),
         baseQueryAlias,
-        timeDimension,
+        timeDimensionWithGranularity,
         preAggregationForQuery
       ),
       {

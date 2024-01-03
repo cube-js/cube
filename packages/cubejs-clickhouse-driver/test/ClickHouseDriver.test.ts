@@ -1,10 +1,11 @@
-import { GenericContainer } from 'testcontainers';
+import { ClickhouseDBRunner } from '@cubejs-backend/testing-shared';
+import { streamToArray } from '@cubejs-backend/shared';
 
-import { ClickHouseDriver } from '../src/ClickHouseDriver';
-
-const streamToArray = require('stream-to-array');
+import { ClickHouseDriver } from '../src';
 
 describe('ClickHouseDriver', () => {
+  jest.setTimeout(20 * 1000);
+
   let container: any;
   let config: any;
 
@@ -20,13 +21,7 @@ describe('ClickHouseDriver', () => {
 
   // eslint-disable-next-line func-names
   beforeAll(async () => {
-    jest.setTimeout(20 * 1000);
-
-    const version = process.env.TEST_CLICKHOUSE_VERSION || 'latest';
-
-    container = await new GenericContainer(`yandex/clickhouse-server:${version}`)
-      .withExposedPorts(8123)
-      .start();
+    container = await ClickhouseDBRunner.startContainer({});
 
     config = {
       host: 'localhost',
@@ -35,13 +30,14 @@ describe('ClickHouseDriver', () => {
 
     await doWithDriver(async (driver) => {
       await driver.createSchemaIfNotExists('test');
-      // Unsupported in old servers
-      // datetime64 DateTime64,
       await driver.query(
         `
             CREATE TABLE test.types_test (
               date Date,
               datetime DateTime,
+              datetime64_millis DateTime64(3, 'UTC'),
+              datetime64_micros DateTime64(6, 'UTC'),
+              datetime64_nanos DateTime64(9, 'UTC'),
               int8 Int8,
               int16 Int16,
               int32 Int32,
@@ -60,17 +56,17 @@ describe('ClickHouseDriver', () => {
         []
       );
 
-      await driver.query('INSERT INTO test.types_test VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [
-        '2020-01-01', '2020-01-01 00:00:00', 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1.01, 1.01, 1.01
+      await driver.query('INSERT INTO test.types_test VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [
+        '2020-01-01', '2020-01-01 00:00:00', '2020-01-01 00:00:00.000', '2020-01-01 00:00:00.000000', '2020-01-01 00:00:00.000000000', 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1.01, 1.01, 1.01
       ]);
-      await driver.query('INSERT INTO test.types_test VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [
-        '2020-01-02', '2020-01-02 00:00:00', 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2.02, 2.02, 2.02
+      await driver.query('INSERT INTO test.types_test VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [
+        '2020-01-02', '2020-01-02 00:00:00', '2020-01-02 00:00:00.123', '2020-01-02 00:00:00.123456', '2020-01-02 00:00:00.123456789', 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2.02, 2.02, 2.02
       ]);
-      await driver.query('INSERT INTO test.types_test VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [
-        '2020-01-03', '2020-01-03 00:00:00', 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3.03, 3.03, 3.03
+      await driver.query('INSERT INTO test.types_test VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [
+        '2020-01-03', '2020-01-03 00:00:00', '2020-01-03 00:00:00.234', '2020-01-03 00:00:00.234567', '2020-01-03 00:00:00.234567890', 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3.03, 3.03, 3.03
       ]);
     });
-  });
+  }, 30 * 1000);
 
   // eslint-disable-next-line func-names
   afterAll(async () => {
@@ -83,7 +79,7 @@ describe('ClickHouseDriver', () => {
     if (container) {
       await container.stop();
     }
-  });
+  }, 30 * 1000);
 
   it('should construct', async () => {
     await doWithDriver(async () => {
@@ -160,8 +156,9 @@ describe('ClickHouseDriver', () => {
       expect(values).toEqual([{
         date: '2020-01-01T00:00:00.000',
         datetime: '2020-01-01T00:00:00.000',
-        // Unsupported in old servers
-        // datetime64: '2020-01-01T00:00:00.00.000',
+        datetime64_millis: '2020-01-01T00:00:00.000',
+        datetime64_micros: '2020-01-01T00:00:00.000',
+        datetime64_nanos: '2020-01-01T00:00:00.000',
         int8: '1',
         int16: '1',
         int32: '1',
@@ -242,6 +239,40 @@ describe('ClickHouseDriver', () => {
     });
   });
 
+  it('datetime with specific timezone', async () => {
+    await doWithDriver(async (driver) => {
+      const rows = await driver.query('SELECT toDateTime(?, \'Asia/Istanbul\') as dt', [
+        '2020-01-01 00:00:00'
+      ]);
+      expect(rows).toEqual([{
+        dt: '2020-01-01T00:00:00.000'
+      }]);
+    });
+  });
+
+  it('query types_test', async () => {
+    await doWithDriver(async (driver) => {
+      const tableData = await driver.query('SELECT date, datetime, datetime64_micros FROM test.types_test ORDER BY int8', []);
+      expect(tableData).toEqual([
+        {
+          date: '2020-01-01T00:00:00.000',
+          datetime: '2020-01-01T00:00:00.000',
+          datetime64_micros: '2020-01-01T00:00:00.000',
+        },
+        {
+          date: '2020-01-02T00:00:00.000',
+          datetime: '2020-01-02T00:00:00.000',
+          datetime64_micros: '2020-01-02T00:00:00.123',
+        },
+        {
+          date: '2020-01-03T00:00:00.000',
+          datetime: '2020-01-03T00:00:00.000',
+          datetime64_micros: '2020-01-03T00:00:00.234',
+        }
+      ]);
+    });
+  });
+
   it('stream', async () => {
     await doWithDriver(async (driver) => {
       const tableData = await driver.stream('SELECT * FROM test.types_test ORDER BY int8', [], {
@@ -252,8 +283,9 @@ describe('ClickHouseDriver', () => {
         expect(tableData.types).toEqual([
           { name: 'date', type: 'date' },
           { name: 'datetime', type: 'timestamp' },
-          // Unsupported in old servers
-          // { name: 'datetime64', type: 'timestamp' },
+          { name: 'datetime64_millis', type: 'timestamp' },
+          { name: 'datetime64_micros', type: 'timestamp' },
+          { name: 'datetime64_nanos', type: 'timestamp' },
           { name: 'int8', type: 'int' },
           { name: 'int16', type: 'int' },
           { name: 'int32', type: 'int' },
@@ -268,10 +300,10 @@ describe('ClickHouseDriver', () => {
           { name: 'decimal64', type: 'decimal' },
           { name: 'decimal128', type: 'decimal' },
         ]);
-        expect(await streamToArray(tableData.rowStream)).toEqual([
-          ['2020-01-01T00:00:00.000', '2020-01-01T00:00:00.000', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1.01', '1.01', '1.01'],
-          ['2020-01-02T00:00:00.000', '2020-01-02T00:00:00.000', '2', '2', '2', '2', '2', '2', '2', '2', '2', '2', '2.02', '2.02', '2.02'],
-          ['2020-01-03T00:00:00.000', '2020-01-03T00:00:00.000', '3', '3', '3', '3', '3', '3', '3', '3', '3', '3', '3.03', '3.03', '3.03'],
+        expect(await streamToArray(tableData.rowStream as any)).toEqual([
+          ['2020-01-01T00:00:00.000', '2020-01-01T00:00:00.000', '2020-01-01T00:00:00.000', '2020-01-01T00:00:00.000', '2020-01-01T00:00:00.000', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1.01', '1.01', '1.01'],
+          ['2020-01-02T00:00:00.000', '2020-01-02T00:00:00.000', '2020-01-02T00:00:00.123', '2020-01-02T00:00:00.123', '2020-01-02T00:00:00.123', '2', '2', '2', '2', '2', '2', '2', '2', '2', '2', '2.02', '2.02', '2.02'],
+          ['2020-01-03T00:00:00.000', '2020-01-03T00:00:00.000', '2020-01-03T00:00:00.234', '2020-01-03T00:00:00.234', '2020-01-03T00:00:00.234', '3', '3', '3', '3', '3', '3', '3', '3', '3', '3', '3.03', '3.03', '3.03'],
         ]);
       } finally {
         // @ts-ignore

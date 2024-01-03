@@ -5,7 +5,7 @@ use pyo3::types::{
     PyBool, PyComplex, PyDate, PyDict, PyFloat, PyFrame, PyFunction, PyInt, PyList, PySequence,
     PySet, PyString, PyTraceback, PyTuple,
 };
-use pyo3::{AsPyPointer, Py, PyAny, PyErr, PyObject, Python, ToPyObject};
+use pyo3::{Py, PyAny, PyErr, PyObject, Python, ToPyObject};
 
 #[derive(Debug, Clone)]
 pub enum PythonRef {

@@ -5,7 +5,8 @@ use crate::{
     },
     sql::AuthContextRef,
     transport::{
-        AliasedColumn, LoadRequestMeta, MetaContext, SqlGenerator, SqlTemplates, TransportService,
+        AliasedColumn, LoadRequestMeta, MetaContext, SpanId, SqlGenerator, SqlTemplates,
+        TransportService,
     },
     CubeError,
 };
@@ -101,6 +102,7 @@ pub struct CubeScanWrapperNode {
     pub wrapped_sql: Option<SqlQuery>,
     pub request: Option<V1LoadRequestQuery>,
     pub member_fields: Option<Vec<MemberField>>,
+    pub span_id: Option<Arc<SpanId>>,
 }
 
 impl CubeScanWrapperNode {
@@ -108,6 +110,7 @@ impl CubeScanWrapperNode {
         wrapped_plan: Arc<LogicalPlan>,
         meta: Arc<MetaContext>,
         auth_context: AuthContextRef,
+        span_id: Option<Arc<SpanId>>,
     ) -> Self {
         Self {
             wrapped_plan,
@@ -116,6 +119,7 @@ impl CubeScanWrapperNode {
             wrapped_sql: None,
             request: None,
             member_fields: None,
+            span_id,
         }
     }
 
@@ -132,6 +136,7 @@ impl CubeScanWrapperNode {
             wrapped_sql: Some(sql),
             request: Some(request),
             member_fields: Some(member_fields),
+            span_id: self.span_id.clone(),
         }
     }
 }
@@ -260,6 +265,7 @@ impl CubeScanWrapperNode {
                         }
                         let sql = transport
                             .sql(
+                                node.span_id.clone(),
                                 node.request.clone(),
                                 node.auth_context,
                                 load_request_meta.as_ref().clone(),
@@ -610,6 +616,7 @@ impl CubeScanWrapperNode {
 
                                 let sql_response = transport
                                     .sql(
+                                        ungrouped_scan_node.span_id.clone(),
                                         load_request.clone(),
                                         ungrouped_scan_node.auth_context.clone(),
                                         load_request_meta.as_ref().clone(),
@@ -739,6 +746,16 @@ impl CubeScanWrapperNode {
             sql = new_sql_query;
 
             let original_alias = expr_name(&original_expr, &schema)?;
+            let original_alias_key = Column::from_name(&original_alias);
+            if let Some(alias_column) = next_remapping.get(&original_alias_key) {
+                let alias = alias_column.name.clone();
+                aliased_columns.push(AliasedColumn {
+                    expr: expr_sql,
+                    alias,
+                });
+                continue;
+            }
+
             let alias = if can_rename_columns {
                 let alias = expr_name(&expr, &schema)?;
                 let mut truncated_alias = non_id_regex.replace_all(&alias, "_").to_lowercase();
@@ -759,10 +776,7 @@ impl CubeScanWrapperNode {
             };
             if original_alias != alias {
                 if !next_remapping.contains_key(&Column::from_name(&alias)) {
-                    next_remapping.insert(
-                        Column::from_name(&original_alias),
-                        Column::from_name(&alias),
-                    );
+                    next_remapping.insert(original_alias_key, Column::from_name(&alias));
                     next_remapping.insert(
                         Column {
                             name: original_alias.clone(),
@@ -1590,6 +1604,7 @@ impl UserDefinedLogicalNode for CubeScanWrapperNode {
             wrapped_sql: self.wrapped_sql.clone(),
             request: self.request.clone(),
             member_fields: self.member_fields.clone(),
+            span_id: self.span_id.clone(),
         })
     }
 }

@@ -31,8 +31,8 @@ convert_case = "0.6.0"
 minijinja = { version = "1", features = ["json", "loader"] }
 log-reroute = "0.1"
 # python
-pyo3 = { version = "0.19", features = [], optional = true }
-pyo3-asyncio = { version = "0.19", features = ["tokio-runtime", "attributes"], optional = true }
+pyo3 = { version = "0.20.0", features = [], optional = true }
+pyo3-asyncio = { version = "0.20.0", features = ["tokio-runtime", "attributes"], optional = true }
 
 [dependencies.neon]
 version = "=0.10.1"

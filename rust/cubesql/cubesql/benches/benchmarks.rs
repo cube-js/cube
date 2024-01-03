@@ -182,9 +182,175 @@ pub fn wrapped_query(c: &mut Criterion) {
     bench_func!("wrapped_query", get_wrapped_query(), c);
 }
 
+fn get_power_bi_wrap() -> String {
+    "
+    select
+  \"rows\".\"dim33\" as \"dim33\",
+  \"rows\".\"dim40\" as \"dim40\"
+from
+  (
+    select
+      \"_\".\"dim1\",
+      \"_\".\"dim2\",
+      \"_\".\"dim3\",
+      \"_\".\"dim4\",
+      \"_\".\"dim5\",
+      \"_\".\"dim6\",
+      \"_\".\"dim7\",
+      \"_\".\"dim8\",
+      \"_\".\"dim9\",
+      \"_\".\"dim10\",
+      \"_\".\"dim11\",
+      \"_\".\"dim12\",
+      \"_\".\"dim13\",
+      \"_\".\"dim14\",
+      \"_\".\"dim15\",
+      \"_\".\"dim17\",
+      \"_\".\"dim18\",
+      \"_\".\"dim19\",
+      \"_\".\"dim20\",
+      \"_\".\"dim21\",
+      \"_\".\"dim22\",
+      \"_\".\"dim23\",
+      \"_\".\"dim24\",
+      \"_\".\"dim25\",
+      \"_\".\"dim26\",
+      \"_\".\"dim27\",
+      \"_\".\"dim28\",
+      \"_\".\"dim29\",
+      \"_\".\"dim30\",
+      \"_\".\"dim31\",
+      \"_\".\"dim32\",
+      \"_\".\"dim33\",
+      \"_\".\"dim34\",
+      \"_\".\"dim35\",
+      \"_\".\"dim36\",
+      \"_\".\"dim37\",
+      \"_\".\"dim38\",
+      \"_\".\"dim39\",
+      \"_\".\"dim40\",
+      \"_\".\"__user\",
+      \"_\".\"__cubeJoinField\"
+    from
+      \"public\".\"WideCube\" \"_\"
+    where
+      cast(\"_\".\"dim33\" as decimal) = cast(2002 as decimal)
+      and \"_\".\"dim49\" = 10
+  ) \"rows\"
+group by
+  \"dim33\",
+  \"dim40\"
+limit
+  1000001"
+        .to_string()
+}
+
+pub fn power_bi_wrap(c: &mut Criterion) {
+    bench_func!("power_bi_wrap", get_power_bi_wrap(), c);
+}
+
+fn get_power_bi_sum_wrap() -> String {
+    r#"select
+  "_"."dim1",
+  "_"."a0",
+  "_"."a1",
+  "_"."a2",
+  "_"."a3"
+from
+  (
+    select
+      "rows"."dim1" as "dim1",
+      sum(cast("rows"."measure1" as decimal)) as "a0",
+      sum(cast("rows"."measure2" as decimal)) as "a1",
+      sum(
+        cast("rows"."measure3" as decimal)
+      ) as "a2",
+      sum(cast("rows"."measure4" as decimal)) as "a3"
+    from
+      (
+        select
+          "_"."dim0",
+          "_"."measure1",
+          "_"."measure2",
+          "_"."measure3",
+          "_"."measure4",
+          "_"."measure5",
+          "_"."measure6",
+          "_"."measure7",
+          "_"."measure8",
+          "_"."measure9",
+          "_"."measure10",
+          "_"."measure11",
+          "_"."measure12",
+          "_"."measure13",
+          "_"."measure14",
+          "_"."measure15",
+          "_"."measure16",
+          "_"."measure17",
+          "_"."measure18",
+          "_"."measure19",
+          "_"."measure20",
+          "_"."dim1",
+          "_"."dim2",
+          "_"."dim3",
+          "_"."dim4",
+          "_"."dim5",
+          "_"."dim6",
+          "_"."dim7",
+          "_"."dim8",
+          "_"."dim9",
+          "_"."dim10",
+          "_"."dim11",
+          "_"."dim12",
+          "_"."dim13",
+          "_"."dim14",
+          "_"."dim15",
+          "_"."dim16",
+          "_"."dim17",
+          "_"."dim18",
+          "_"."dim19",
+          "_"."dim20",
+          "_"."dim21",
+          "_"."dim22",
+          "_"."dim23",
+          "_"."dim24",
+          "_"."dim25",
+          "_"."dim26",
+          "_"."dim27",
+          "_"."dim28",
+          "_"."dim29",
+          "_"."dim30",
+          "_"."__user",
+          "_"."__cubeJoinField"
+        from
+          "public"."WideCube" "_"
+        where
+          "_"."dim1" = 'Jewelry'
+      ) "rows"
+    group by
+      "dim1"
+  ) "_"
+where
+  (
+    not "_"."a0" is null
+    or not "_"."a1" is null
+  )
+  or (
+    not "_"."a2" is null
+    or not "_"."a3" is null
+  )
+limit
+  1000001"#
+        .to_string()
+}
+
+pub fn power_bi_sum_wrap(c: &mut Criterion) {
+    bench_func!("power_bi_sum_wrap", get_power_bi_sum_wrap(), c);
+}
+
 criterion_group! {
     name = benches;
-    config = Criterion::default().measurement_time(std::time::Duration::from_secs(300));
-    targets = split_query, split_query_count_distinct, wrapped_query
+    config = Criterion::default().measurement_time(std::time::Duration::from_secs(30)).sample_size(10);
+    targets = split_query, split_query_count_distinct, wrapped_query, power_bi_wrap, power_bi_sum_wrap
 }
 criterion_main!(benches);

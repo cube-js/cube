@@ -8,4 +8,5 @@ expression: "execute_query(\"SELECT NULL          AS TABLE_CAT,\n               
 | NULL      | public      | KibanaSampleDataEcommerce | TABLE      | NULL    |          |            |           |                           |                |
 | NULL      | public      | Logs                      | TABLE      | NULL    |          |            |           |                           |                |
 | NULL      | public      | NumberCube                | TABLE      | NULL    |          |            |           |                           |                |
+| NULL      | public      | WideCube                  | TABLE      | NULL    |          |            |           |                           |                |
 +-----------+-------------+---------------------------+------------+---------+----------+------------+-----------+---------------------------+----------------+

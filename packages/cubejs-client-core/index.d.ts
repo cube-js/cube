@@ -990,6 +990,7 @@ declare module '@cubejs-client/core' {
      */
     isVisible?: boolean;
     public?: boolean;
+    meta?: any;
   };
 
 

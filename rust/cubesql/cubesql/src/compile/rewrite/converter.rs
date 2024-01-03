@@ -29,7 +29,7 @@ use crate::{
         },
     },
     sql::AuthContextRef,
-    transport::V1CubeMetaExt,
+    transport::{SpanId, V1CubeMetaExt},
     CubeError,
 };
 use cubeclient::models::{
@@ -65,21 +65,53 @@ macro_rules! add_data_node {
     };
 }
 
+macro_rules! add_expr_data_node {
+    ($graph:expr, $value_expr:expr, $field_variant:ident) => {
+        $graph.add(LogicalPlanLanguage::$field_variant($field_variant(
+            $value_expr.clone(),
+        )))
+    };
+}
+
 macro_rules! add_expr_list_node {
-    ($converter:expr, $value_expr:expr, $field_variant:ident) => {{
+    ($graph:expr, $value_expr:expr, $field_variant:ident) => {{
         let list = $value_expr
             .iter()
-            .map(|expr| $converter.add_expr(expr))
+            .map(|expr| Self::add_expr($graph, expr))
             .collect::<Result<Vec<_>, _>>()?;
-        let mut current = $converter
-            .graph
-            .add(LogicalPlanLanguage::$field_variant(Vec::new()));
+        let mut current = $graph.add(LogicalPlanLanguage::$field_variant(Vec::new()));
         for i in list.into_iter().rev() {
-            current = $converter
-                .graph
-                .add(LogicalPlanLanguage::$field_variant(vec![i, current]));
+            current = $graph.add(LogicalPlanLanguage::$field_variant(vec![i, current]));
         }
         current
+    }};
+}
+
+macro_rules! add_binary_expr_list_node {
+    ($graph:expr, $value_expr:expr, $field_variant:ident) => {{
+        fn to_binary_tree(
+            graph: &mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+            list: &[Id],
+        ) -> Id {
+            if list.len() == 0 {
+                graph.add(LogicalPlanLanguage::$field_variant(Vec::new()))
+            } else if list.len() == 1 {
+                let empty = graph.add(LogicalPlanLanguage::$field_variant(Vec::new()));
+                graph.add(LogicalPlanLanguage::$field_variant(vec![list[0], empty]))
+            } else if list.len() == 2 {
+                graph.add(LogicalPlanLanguage::$field_variant(vec![list[0], list[1]]))
+            } else {
+                let middle = list.len() / 2;
+                let left = to_binary_tree(graph, &list[..middle]);
+                let right = to_binary_tree(graph, &list[middle..]);
+                graph.add(LogicalPlanLanguage::$field_variant(vec![left, right]))
+            }
+        }
+        let list = $value_expr
+            .iter()
+            .map(|expr| Self::add_expr($graph, expr))
+            .collect::<Result<Vec<_>, _>>()?;
+        to_binary_tree($graph, &list)
     }};
 }
 
@@ -119,48 +151,47 @@ impl LogicalPlanToLanguageConverter {
         }
     }
 
-    pub fn add_expr(&mut self, expr: &Expr) -> Result<Id, CubeError> {
+    pub fn add_expr(
+        graph: &mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        expr: &Expr,
+    ) -> Result<Id, CubeError> {
         Ok(match expr {
             Expr::Alias(expr, alias) => {
-                let expr = self.add_expr(expr)?;
-                let alias = add_data_node!(self, alias, AliasExprAlias);
-                self.graph
-                    .add(LogicalPlanLanguage::AliasExpr([expr, alias]))
+                let expr = Self::add_expr(graph, expr)?;
+                let alias = add_expr_data_node!(graph, alias, AliasExprAlias);
+                graph.add(LogicalPlanLanguage::AliasExpr([expr, alias]))
             }
             Expr::Column(column) => {
-                let column = add_data_node!(self, column, ColumnExprColumn);
-                self.graph.add(LogicalPlanLanguage::ColumnExpr([column]))
+                let column = add_expr_data_node!(graph, column, ColumnExprColumn);
+                graph.add(LogicalPlanLanguage::ColumnExpr([column]))
             }
             Expr::OuterColumn(data_type, column) => {
-                let data_type = add_data_node!(self, data_type, OuterColumnExprDataType);
-                let column = add_data_node!(self, column, OuterColumnExprColumn);
-                self.graph
-                    .add(LogicalPlanLanguage::OuterColumnExpr([data_type, column]))
+                let data_type = add_expr_data_node!(graph, data_type, OuterColumnExprDataType);
+                let column = add_expr_data_node!(graph, column, OuterColumnExprColumn);
+                graph.add(LogicalPlanLanguage::OuterColumnExpr([data_type, column]))
             }
             Expr::ScalarVariable(data_type, variable) => {
-                let data_type = add_data_node!(self, data_type, ScalarVariableExprDataType);
-                let variable = add_data_node!(self, variable, ScalarVariableExprVariable);
-                self.graph.add(LogicalPlanLanguage::ScalarVariableExpr([
+                let data_type = add_expr_data_node!(graph, data_type, ScalarVariableExprDataType);
+                let variable = add_expr_data_node!(graph, variable, ScalarVariableExprVariable);
+                graph.add(LogicalPlanLanguage::ScalarVariableExpr([
                     data_type, variable,
                 ]))
             }
             Expr::Literal(value) => {
-                let value = add_data_node!(self, value, LiteralExprValue);
-                self.graph.add(LogicalPlanLanguage::LiteralExpr([value]))
+                let value = add_expr_data_node!(graph, value, LiteralExprValue);
+                graph.add(LogicalPlanLanguage::LiteralExpr([value]))
             }
             Expr::AnyExpr { left, op, right } => {
-                let left = self.add_expr(left)?;
-                let op = add_data_node!(self, op, AnyExprOp);
-                let right = self.add_expr(right)?;
-                self.graph
-                    .add(LogicalPlanLanguage::AnyExpr([left, op, right]))
+                let left = Self::add_expr(graph, left)?;
+                let op = add_expr_data_node!(graph, op, AnyExprOp);
+                let right = Self::add_expr(graph, right)?;
+                graph.add(LogicalPlanLanguage::AnyExpr([left, op, right]))
             }
             Expr::BinaryExpr { left, op, right } => {
-                let left = self.add_expr(left)?;
-                let op = add_data_node!(self, op, BinaryExprOp);
-                let right = self.add_expr(right)?;
-                self.graph
-                    .add(LogicalPlanLanguage::BinaryExpr([left, op, right]))
+                let left = Self::add_expr(graph, left)?;
+                let op = add_expr_data_node!(graph, op, BinaryExprOp);
+                let right = Self::add_expr(graph, right)?;
+                graph.add(LogicalPlanLanguage::BinaryExpr([left, op, right]))
             }
             ast @ Expr::Like(Like {
                 negated,
@@ -180,8 +211,8 @@ impl LogicalPlanToLanguageConverter {
                 pattern,
                 escape_char,
             }) => {
-                let like_type = add_data_node!(
-                    self,
+                let like_type = add_expr_data_node!(
+                    graph,
                     match ast {
                         Expr::Like(_) => LikeType::Like,
                         Expr::ILike(_) => LikeType::ILike,
@@ -190,11 +221,11 @@ impl LogicalPlanToLanguageConverter {
                     },
                     LikeExprLikeType
                 );
-                let negated = add_data_node!(self, negated, LikeExprNegated);
-                let expr = self.add_expr(expr)?;
-                let pattern = self.add_expr(pattern)?;
-                let escape_char = add_data_node!(self, escape_char, LikeExprEscapeChar);
-                self.graph.add(LogicalPlanLanguage::LikeExpr([
+                let negated = add_expr_data_node!(graph, negated, LikeExprNegated);
+                let expr = Self::add_expr(graph, expr)?;
+                let pattern = Self::add_expr(graph, pattern)?;
+                let escape_char = add_expr_data_node!(graph, escape_char, LikeExprEscapeChar);
+                graph.add(LogicalPlanLanguage::LikeExpr([
                     like_type,
                     negated,
                     expr,
@@ -203,20 +234,20 @@ impl LogicalPlanToLanguageConverter {
                 ]))
             }
             Expr::Not(expr) => {
-                let expr = self.add_expr(expr)?;
-                self.graph.add(LogicalPlanLanguage::NotExpr([expr]))
+                let expr = Self::add_expr(graph, expr)?;
+                graph.add(LogicalPlanLanguage::NotExpr([expr]))
             }
             Expr::IsNotNull(expr) => {
-                let expr = self.add_expr(expr)?;
-                self.graph.add(LogicalPlanLanguage::IsNotNullExpr([expr]))
+                let expr = Self::add_expr(graph, expr)?;
+                graph.add(LogicalPlanLanguage::IsNotNullExpr([expr]))
             }
             Expr::IsNull(expr) => {
-                let expr = self.add_expr(expr)?;
-                self.graph.add(LogicalPlanLanguage::IsNullExpr([expr]))
+                let expr = Self::add_expr(graph, expr)?;
+                graph.add(LogicalPlanLanguage::IsNullExpr([expr]))
             }
             Expr::Negative(expr) => {
-                let expr = self.add_expr(expr)?;
-                self.graph.add(LogicalPlanLanguage::NegativeExpr([expr]))
+                let expr = Self::add_expr(graph, expr)?;
+                graph.add(LogicalPlanLanguage::NegativeExpr([expr]))
             }
             Expr::Between {
                 expr,
@@ -224,78 +255,72 @@ impl LogicalPlanToLanguageConverter {
                 low,
                 high,
             } => {
-                let expr = self.add_expr(expr)?;
-                let negated = add_data_node!(self, negated, BetweenExprNegated);
-                let low = self.add_expr(low)?;
-                let high = self.add_expr(high)?;
-                self.graph
-                    .add(LogicalPlanLanguage::BetweenExpr([expr, negated, low, high]))
+                let expr = Self::add_expr(graph, expr)?;
+                let negated = add_expr_data_node!(graph, negated, BetweenExprNegated);
+                let low = Self::add_expr(graph, low)?;
+                let high = Self::add_expr(graph, high)?;
+                graph.add(LogicalPlanLanguage::BetweenExpr([expr, negated, low, high]))
             }
             Expr::Case {
                 expr,
                 when_then_expr,
                 else_expr,
             } => {
-                let expr = add_expr_list_node!(self, expr, CaseExprExpr);
+                let expr = add_expr_list_node!(graph, expr, CaseExprExpr);
                 let when_then_expr = when_then_expr
                     .iter()
                     .map(|(when, then)| vec![when, then])
                     .flatten()
                     .collect::<Vec<_>>();
                 let when_then_expr =
-                    add_expr_list_node!(self, when_then_expr, CaseExprWhenThenExpr);
-                let else_expr = add_expr_list_node!(self, else_expr, CaseExprElseExpr);
-                self.graph.add(LogicalPlanLanguage::CaseExpr([
+                    add_expr_list_node!(graph, when_then_expr, CaseExprWhenThenExpr);
+                let else_expr = add_expr_list_node!(graph, else_expr, CaseExprElseExpr);
+                graph.add(LogicalPlanLanguage::CaseExpr([
                     expr,
                     when_then_expr,
                     else_expr,
                 ]))
             }
             Expr::Cast { expr, data_type } => {
-                let expr = self.add_expr(expr)?;
-                let data_type = add_data_node!(self, data_type, CastExprDataType);
-                self.graph
-                    .add(LogicalPlanLanguage::CastExpr([expr, data_type]))
+                let expr = Self::add_expr(graph, expr)?;
+                let data_type = add_expr_data_node!(graph, data_type, CastExprDataType);
+                graph.add(LogicalPlanLanguage::CastExpr([expr, data_type]))
             }
             Expr::TryCast { expr, data_type } => {
-                let expr = self.add_expr(expr)?;
-                let data_type = add_data_node!(self, data_type, TryCastExprDataType);
-                self.graph
-                    .add(LogicalPlanLanguage::TryCastExpr([expr, data_type]))
+                let expr = Self::add_expr(graph, expr)?;
+                let data_type = add_expr_data_node!(graph, data_type, TryCastExprDataType);
+                graph.add(LogicalPlanLanguage::TryCastExpr([expr, data_type]))
             }
             Expr::Sort {
                 expr,
                 asc,
                 nulls_first,
             } => {
-                let expr = self.add_expr(expr)?;
-                let asc = add_data_node!(self, asc, SortExprAsc);
-                let nulls_first = add_data_node!(self, nulls_first, SortExprNullsFirst);
-                self.graph
-                    .add(LogicalPlanLanguage::SortExpr([expr, asc, nulls_first]))
+                let expr = Self::add_expr(graph, expr)?;
+                let asc = add_expr_data_node!(graph, asc, SortExprAsc);
+                let nulls_first = add_expr_data_node!(graph, nulls_first, SortExprNullsFirst);
+                graph.add(LogicalPlanLanguage::SortExpr([expr, asc, nulls_first]))
             }
             Expr::ScalarFunction { fun, args } => {
-                let fun = add_data_node!(self, fun, ScalarFunctionExprFun);
-                let args = add_expr_list_node!(self, args, ScalarFunctionExprArgs);
+                let fun = add_expr_data_node!(graph, fun, ScalarFunctionExprFun);
+                let args = add_expr_list_node!(graph, args, ScalarFunctionExprArgs);
 
-                self.graph
-                    .add(LogicalPlanLanguage::ScalarFunctionExpr([fun, args]))
+                graph.add(LogicalPlanLanguage::ScalarFunctionExpr([fun, args]))
             }
             Expr::ScalarUDF { fun, args } => {
-                let fun = add_data_node!(self, fun.name, ScalarUDFExprFun);
-                let args = add_expr_list_node!(self, args, ScalarUDFExprArgs);
-                self.graph
-                    .add(LogicalPlanLanguage::ScalarUDFExpr([fun, args]))
+                let fun = add_expr_data_node!(graph, fun.name, ScalarUDFExprFun);
+                let args = add_expr_list_node!(graph, args, ScalarUDFExprArgs);
+                graph.add(LogicalPlanLanguage::ScalarUDFExpr([fun, args]))
             }
             Expr::AggregateFunction {
                 fun,
                 args,
                 distinct,
             } => {
-                let fun = add_data_node!(self, fun, AggregateFunctionExprFun);
-                let args = add_expr_list_node!(self, args, AggregateFunctionExprArgs);
-                let distinct = add_data_node!(self, distinct, AggregateFunctionExprDistinct);
-                self.graph.add(LogicalPlanLanguage::AggregateFunctionExpr([
+                let fun = add_expr_data_node!(graph, fun, AggregateFunctionExprFun);
+                let args = add_expr_list_node!(graph, args, AggregateFunctionExprArgs);
+                let distinct = add_expr_data_node!(graph, distinct, AggregateFunctionExprDistinct);
+                graph.add(LogicalPlanLanguage::AggregateFunctionExpr([
                     fun, args, distinct,
                 ]))
             }
@@ -306,15 +331,15 @@ impl LogicalPlanToLanguageConverter {
                 order_by,
                 window_frame,
             } => {
-                let fun = add_data_node!(self, fun, WindowFunctionExprFun);
-                let args = add_expr_list_node!(self, args, WindowFunctionExprArgs);
+                let fun = add_expr_data_node!(graph, fun, WindowFunctionExprFun);
+                let args = add_expr_list_node!(graph, args, WindowFunctionExprArgs);
                 let partition_by =
-                    add_expr_list_node!(self, partition_by, WindowFunctionExprPartitionBy);
-                let order_by = add_expr_list_node!(self, order_by, WindowFunctionExprOrderBy);
+                    add_expr_list_node!(graph, partition_by, WindowFunctionExprPartitionBy);
+                let order_by = add_expr_list_node!(graph, order_by, WindowFunctionExprOrderBy);
                 let window_frame =
-                    add_data_node!(self, window_frame, WindowFunctionExprWindowFrame);
+                    add_expr_data_node!(graph, window_frame, WindowFunctionExprWindowFrame);
 
-                self.graph.add(LogicalPlanLanguage::WindowFunctionExpr([
+                graph.add(LogicalPlanLanguage::WindowFunctionExpr([
                     fun,
                     args,
                     partition_by,
@@ -323,34 +348,30 @@ impl LogicalPlanToLanguageConverter {
                 ]))
             }
             Expr::AggregateUDF { fun, args } => {
-                let fun = add_data_node!(self, fun.name, AggregateUDFExprFun);
-                let args = add_expr_list_node!(self, args, AggregateUDFExprArgs);
-                self.graph
-                    .add(LogicalPlanLanguage::AggregateUDFExpr([fun, args]))
+                let fun = add_expr_data_node!(graph, fun.name, AggregateUDFExprFun);
+                let args = add_expr_list_node!(graph, args, AggregateUDFExprArgs);
+                graph.add(LogicalPlanLanguage::AggregateUDFExpr([fun, args]))
             }
             Expr::TableUDF { fun, args } => {
-                let fun = add_data_node!(self, fun.name, TableUDFExprFun);
-                let args = add_expr_list_node!(self, args, TableUDFExprArgs);
-                self.graph
-                    .add(LogicalPlanLanguage::TableUDFExpr([fun, args]))
+                let fun = add_expr_data_node!(graph, fun.name, TableUDFExprFun);
+                let args = add_expr_list_node!(graph, args, TableUDFExprArgs);
+                graph.add(LogicalPlanLanguage::TableUDFExpr([fun, args]))
             }
             Expr::InList {
                 expr,
                 list,
                 negated,
             } => {
-                let expr = self.add_expr(expr)?;
-                let list = add_expr_list_node!(self, list, InListExprList);
-                let negated = add_data_node!(self, negated, InListExprNegated);
-                self.graph
-                    .add(LogicalPlanLanguage::InListExpr([expr, list, negated]))
+                let expr = Self::add_expr(graph, expr)?;
+                let list = add_expr_list_node!(graph, list, InListExprList);
+                let negated = add_expr_data_node!(graph, negated, InListExprNegated);
+                graph.add(LogicalPlanLanguage::InListExpr([expr, list, negated]))
             }
-            Expr::Wildcard => self.graph.add(LogicalPlanLanguage::WildcardExpr([])),
+            Expr::Wildcard => graph.add(LogicalPlanLanguage::WildcardExpr([])),
             Expr::GetIndexedField { expr, key } => {
-                let expr = self.add_expr(expr)?;
-                let key = self.add_expr(key)?;
-                self.graph
-                    .add(LogicalPlanLanguage::GetIndexedFieldExpr([expr, key]))
+                let expr = Self::add_expr(graph, expr)?;
+                let key = Self::add_expr(graph, key)?;
+                graph.add(LogicalPlanLanguage::GetIndexedFieldExpr([expr, key]))
             }
             // TODO: Support all
             _ => unimplemented!("Unsupported node type: {:?}", expr),
@@ -360,7 +381,7 @@ impl LogicalPlanToLanguageConverter {
     pub fn add_logical_plan(&mut self, plan: &LogicalPlan) -> Result<Id, CubeError> {
         Ok(match plan {
             LogicalPlan::Projection(node) => {
-                let expr = add_expr_list_node!(self, node.expr, ProjectionExpr);
+                let expr = add_binary_expr_list_node!(&mut self.graph, node.expr, ProjectionExpr);
                 let input = self.add_logical_plan(node.input.as_ref())?;
                 let alias = add_data_node!(self, node.alias, ProjectionAlias);
                 let split = add_data_node!(self, false, ProjectionSplit);
@@ -368,28 +389,34 @@ impl LogicalPlanToLanguageConverter {
                     .add(LogicalPlanLanguage::Projection([expr, input, alias, split]))
             }
             LogicalPlan::Filter(node) => {
-                let predicate = self.add_expr(&node.predicate)?;
+                let predicate = Self::add_expr(&mut self.graph, &node.predicate)?;
                 let input = self.add_logical_plan(node.input.as_ref())?;
                 self.graph
                     .add(LogicalPlanLanguage::Filter([predicate, input]))
             }
             LogicalPlan::Window(node) => {
                 let input = self.add_logical_plan(node.input.as_ref())?;
-                let window_expr = add_expr_list_node!(self, node.window_expr, WindowWindowExpr);
+                let window_expr =
+                    add_expr_list_node!(&mut self.graph, node.window_expr, WindowWindowExpr);
                 self.graph
                     .add(LogicalPlanLanguage::Window([input, window_expr]))
             }
             LogicalPlan::Aggregate(node) => {
                 let input = self.add_logical_plan(node.input.as_ref())?;
-                let group_expr = add_expr_list_node!(self, node.group_expr, AggregateGroupExpr);
-                let aggr_expr = add_expr_list_node!(self, node.aggr_expr, AggregateAggrExpr);
+                let group_expr = add_binary_expr_list_node!(
+                    &mut self.graph,
+                    node.group_expr,
+                    AggregateGroupExpr
+                );
+                let aggr_expr =
+                    add_binary_expr_list_node!(&mut self.graph, node.aggr_expr, AggregateAggrExpr);
                 let split = add_data_node!(self, false, AggregateSplit);
                 self.graph.add(LogicalPlanLanguage::Aggregate([
                     input, group_expr, aggr_expr, split,
                 ]))
             }
             LogicalPlan::Sort(node) => {
-                let expr = add_expr_list_node!(self, node.expr, SortExp);
+                let expr = add_expr_list_node!(&mut self.graph, node.expr, SortExp);
                 let input = self.add_logical_plan(node.input.as_ref())?;
                 self.graph.add(LogicalPlanLanguage::Sort([expr, input]))
             }
@@ -443,7 +470,7 @@ impl LogicalPlanToLanguageConverter {
                     .add(LogicalPlanLanguage::Subquery([input, subqueries]))
             }
             LogicalPlan::TableUDFs(node) => {
-                let expr = add_expr_list_node!(self, node.expr, TableUDFsExpr);
+                let expr = add_expr_list_node!(&mut self.graph, node.expr, TableUDFsExpr);
                 let input = self.add_logical_plan(node.input.as_ref())?;
                 self.graph
                     .add(LogicalPlanLanguage::TableUDFs([expr, input]))
@@ -458,7 +485,7 @@ impl LogicalPlanToLanguageConverter {
 
                 let table_name = add_data_node!(self, node.table_name, TableScanTableName);
                 let projection = add_data_node!(self, node.projection, TableScanProjection);
-                let filters = add_expr_list_node!(self, node.filters, TableScanFilters);
+                let filters = add_expr_list_node!(&mut self.graph, node.filters, TableScanFilters);
                 let fetch = add_data_node!(self, node.fetch, TableScanFetch);
                 self.graph.add(LogicalPlanLanguage::TableScan([
                     source_table_name,
@@ -629,6 +656,7 @@ pub struct LanguageToLogicalPlanConverter {
     best_expr: RecExpr<LogicalPlanLanguage>,
     cube_context: Arc<CubeContext>,
     auth_context: AuthContextRef,
+    span_id: Option<Arc<SpanId>>,
 }
 
 pub fn is_expr_node(node: &LogicalPlanLanguage) -> bool {
@@ -887,11 +915,13 @@ impl LanguageToLogicalPlanConverter {
         best_expr: RecExpr<LogicalPlanLanguage>,
         cube_context: Arc<CubeContext>,
         auth_context: AuthContextRef,
+        span_id: Option<Arc<SpanId>>,
     ) -> Self {
         Self {
             best_expr,
             cube_context,
             auth_context,
+            span_id,
         }
     }
 
@@ -1473,9 +1503,8 @@ impl LanguageToLogicalPlanConverter {
                                             FilterMemberValues
                                         );
                                         if op == "inDateRange" {
-                                            let existing_time_dimension = query_time_dimensions
-                                                .iter_mut()
-                                                .find_map(|mut td| {
+                                            let existing_time_dimension =
+                                                query_time_dimensions.iter_mut().find_map(|td| {
                                                     if td.dimension == member
                                                         && td.date_range.is_none()
                                                     {
@@ -1657,6 +1686,7 @@ impl LanguageToLogicalPlanConverter {
                                 max_records,
                             },
                             alias_to_cube.into_iter().map(|(_, c)| c).unique().collect(),
+                            self.span_id.clone(),
                         ))
                     }
                     x => panic!("Unexpected extension node: {:?}", x),
@@ -1671,6 +1701,7 @@ impl LanguageToLogicalPlanConverter {
                         input,
                         self.cube_context.meta.clone(),
                         self.auth_context.clone(),
+                        self.span_id.clone(),
                     )),
                 })
             }

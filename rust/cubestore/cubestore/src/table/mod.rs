@@ -314,6 +314,7 @@ mod tests {
             (TableValue::Int(1), 32_usize),
             (TableValue::Decimal(Decimal::new(1)), 32_usize),
             (TableValue::String("foo".into()), 35_usize),
+            (TableValue::String("foofoo".into()), 38_usize),
         ] {
             assert_eq!(v.deep_size_of(), expected_size, "size for {:?}", v);
         }

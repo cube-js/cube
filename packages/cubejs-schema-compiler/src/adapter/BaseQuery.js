@@ -2493,6 +2493,7 @@ export class BaseQuery {
         TO_CHAR: 'TO_CHAR({{ args_concat }})',
         // DATEADD is being rewritten to DATE_ADD
         // DATEADD: 'DATEADD({{ date_part }}, {{ interval }}, {{ args[2] }})',
+        DATE: 'DATE({{ args_concat }})',
       },
       statements: {
         select: 'SELECT {{ select_concat | map(attribute=\'aliased\') | join(\', \') }} \n' +
@@ -2672,10 +2673,10 @@ export class BaseQuery {
   /**
    * @protected
    * @param {string} interval
-   * @return {(number|*)[]}
+   * @return {[number, string]}
    */
   parseInterval(interval) {
-    const intervalMatch = interval.match(/^(\d+) (second|minute|hour|day|week)s?$/);
+    const intervalMatch = interval.match(/^(\d+) (second|minute|hour|day|week|month|quarter|year)s?$/);
     if (!intervalMatch) {
       throw new UserError(`Invalid interval: ${interval}`);
     }

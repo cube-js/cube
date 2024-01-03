@@ -8,4 +8,5 @@ expression: "execute_query(\"select\n                    relname,\n             
 | KibanaSampleDataEcommerce | public  | r       |
 | Logs                      | public  | r       |
 | NumberCube                | public  | r       |
+| WideCube                  | public  | r       |
 +---------------------------+---------+---------+

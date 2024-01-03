@@ -15,7 +15,7 @@ use crate::{
         ServerManager, Session, SessionManager, SqlAuthService,
     },
     transport::{
-        CubeStreamReceiver, LoadRequestMeta, SqlGenerator, SqlResponse, SqlTemplates,
+        CubeStreamReceiver, LoadRequestMeta, SpanId, SqlGenerator, SqlResponse, SqlTemplates,
         TransportService,
     },
     CubeError,
@@ -155,6 +155,61 @@ pub fn get_test_meta() -> Vec<V1CubeMeta> {
             segments: vec![],
             joins: None,
         },
+        V1CubeMeta {
+            name: "WideCube".to_string(),
+            title: None,
+            dimensions: (0..100)
+                .map(|i| V1CubeMetaDimension {
+                    name: format!("WideCube.dim{}", i),
+                    _type: "number".to_string(),
+                })
+                .collect(),
+            measures: (0..100)
+                .map(|i| V1CubeMetaMeasure {
+                    name: format!("WideCube.measure{}", i),
+                    _type: "number".to_string(),
+                    agg_type: Some("number".to_string()),
+                    title: None,
+                })
+                .chain(
+                    vec![
+                        V1CubeMetaMeasure {
+                            name: "KibanaSampleDataEcommerce.count".to_string(),
+                            title: None,
+                            _type: "number".to_string(),
+                            agg_type: Some("count".to_string()),
+                        },
+                        V1CubeMetaMeasure {
+                            name: "KibanaSampleDataEcommerce.maxPrice".to_string(),
+                            title: None,
+                            _type: "number".to_string(),
+                            agg_type: Some("max".to_string()),
+                        },
+                        V1CubeMetaMeasure {
+                            name: "KibanaSampleDataEcommerce.minPrice".to_string(),
+                            title: None,
+                            _type: "number".to_string(),
+                            agg_type: Some("min".to_string()),
+                        },
+                        V1CubeMetaMeasure {
+                            name: "KibanaSampleDataEcommerce.avgPrice".to_string(),
+                            title: None,
+                            _type: "number".to_string(),
+                            agg_type: Some("avg".to_string()),
+                        },
+                        V1CubeMetaMeasure {
+                            name: "KibanaSampleDataEcommerce.countDistinct".to_string(),
+                            title: None,
+                            _type: "number".to_string(),
+                            agg_type: Some("countDistinct".to_string()),
+                        },
+                    ]
+                    .into_iter(),
+                )
+                .collect(),
+            segments: Vec::new(),
+            joins: Some(Vec::new()),
+        },
     ]
 }
 
@@ -221,6 +276,8 @@ pub fn get_test_tenant_ctx_customized(custom_templates: Vec<(String, String)>) -
                     ("functions/CURRENTDATE".to_string(), "CURRENT_DATE({{ args_concat }})".to_string()),
                     // DATEADD is being rewritten to DATE_ADD
                     // ("functions/DATEADD".to_string(), "DATEADD({{ date_part }}, {{ interval }}, {{ args[2] }})".to_string()),
+                    ("functions/CONCAT".to_string(), "CONCAT({{ args_concat }})".to_string()),
+                    ("functions/DATE".to_string(), "DATE({{ args_concat }})".to_string()),
                     ("expressions/extract".to_string(), "EXTRACT({{ date_part }} FROM {{ expr }})".to_string()),
                     (
                         "statements/select".to_string(),
@@ -354,6 +411,7 @@ pub fn get_test_transport() -> Arc<dyn TransportService> {
 
         async fn sql(
             &self,
+            _span_id: Option<Arc<SpanId>>,
             query: V1LoadRequestQuery,
             _ctx: AuthContextRef,
             _meta_fields: LoadRequestMeta,
@@ -371,6 +429,7 @@ pub fn get_test_transport() -> Arc<dyn TransportService> {
         // Execute load query
         async fn load(
             &self,
+            _span_id: Option<Arc<SpanId>>,
             _query: V1LoadRequestQuery,
             _sql_query: Option<SqlQuery>,
             _ctx: AuthContextRef,
@@ -381,6 +440,7 @@ pub fn get_test_transport() -> Arc<dyn TransportService> {
 
         async fn load_stream(
             &self,
+            _span_id: Option<Arc<SpanId>>,
             _query: V1LoadRequestQuery,
             _sql_query: Option<SqlQuery>,
             _ctx: AuthContextRef,
@@ -401,6 +461,21 @@ pub fn get_test_transport() -> Arc<dyn TransportService> {
             } else {
                 Ok(false)
             }
+        }
+
+        async fn log_load_state(
+            &self,
+            span_id: Option<Arc<SpanId>>,
+            ctx: AuthContextRef,
+            meta_fields: LoadRequestMeta,
+            event: String,
+            properties: serde_json::Value,
+        ) -> Result<(), CubeError> {
+            println!(
+                "Load state: {:?} {:?} {:?} {} {:?}",
+                span_id, ctx, meta_fields, event, properties
+            );
+            Ok(())
         }
     }
 

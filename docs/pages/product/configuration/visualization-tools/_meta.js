@@ -4,6 +4,7 @@ module.exports = {
   "budibase": "Budibase",
   "deepnote": "Deepnote",
   "delphi": "Delphi",
+  "explo": "Explo",
   "hex": "Hex",
   "jupyter": "Jupyter",
   "langchain": "LangChain",

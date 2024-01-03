@@ -8,7 +8,6 @@ use neon::types::Deferred;
 use once_cell::sync::OnceCell;
 use pyo3::prelude::*;
 use pyo3::types::{PyFunction, PyTuple};
-use pyo3::AsPyPointer;
 use std::fmt::Formatter;
 use std::future::Future;
 use std::pin::Pin;
