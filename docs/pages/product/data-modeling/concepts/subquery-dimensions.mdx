@@ -15,14 +15,10 @@ Consider the following tables, where we have `deals` and `sales_managers`.
 `deals` belong to `sales_managers` and have the `amount` dimension. What we want
 is to calculate the amount of deals for `sales_managers`:
 
-<div style={{ textAlign: "center" }}>
-  <img
-    alt="Subquery Example with Deals and SalesManager cubes"
-    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Schema/Fundamentals/subquery.png"
-    style={{ border: "none" }}
-    width="100%"
-  />
-</div>
+<Diagram
+  alt="Subquery Example with Deals and SalesManager cubes"
+  src="https://ucarecdn.com/ab72fa00-6e4e-41dc-881f-e18a9e15c340/"
+/>
 
 To calculate the deals amount for sales managers in pure SQL, we can use a
 correlated subquery, which will look like this:
