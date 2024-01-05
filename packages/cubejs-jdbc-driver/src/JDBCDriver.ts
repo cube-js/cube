@@ -35,11 +35,14 @@ type JdbcStatement = {
   execute: (q: string) => any,
 };
 
-const initMvn = (customClassPath: any) => {
+const initMvn = (customClassPath: any, packageJsonDir?: string) => {
   if (!mvnPromise) {
+    const packageJsonPath = packageJsonDir
+      ? `${packageJsonDir}/package.json`
+      : `${path.join(__dirname, '../..')}/package.json`;
     mvnPromise = new Promise((resolve, reject) => {
       const options = {
-        packageJsonPath: `${path.join(__dirname, '../..')}/package.json`,
+        packageJsonPath,
       };
       mvn(options, (err: any, mvnResults: any) => {
         if (err && !err.message.includes('Could not find java property')) {
@@ -48,7 +51,9 @@ const initMvn = (customClassPath: any) => {
           if (!jinst.isJvmCreated()) {
             jinst.addOption('-Xrs');
             jinst.addOption('-Dfile.encoding=UTF8');
-            const classPath = (mvnResults && mvnResults.classpath || []).concat(customClassPath || []);
+            const classPath = ((mvnResults && mvnResults.classpath) || []).concat(
+              customClassPath || []
+            );
             jinst.setupClasspath(classPath);
           }
           resolve();
@@ -133,7 +138,7 @@ export class JDBCDriver extends BaseDriver {
 
     this.pool = genericPool.createPool({
       create: async () => {
-        await initMvn(await this.getCustomClassPath());
+        await initMvn(await this.getCustomClassPath(), this.config.packageJsonDir);
 
         if (!this.jdbcProps) {
           /** @protected */
