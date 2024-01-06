@@ -100,6 +100,11 @@ type ResponseResultFn =
     extra?: { status: number }
   ) => void;
 
+type MetaResponseResultFn =
+  (
+    message: { cubes: any[], compilerId?: string }
+  ) => void;
+
 /**
  * Base HTTP request parameters map data type.
  * @todo map it to Request.
@@ -199,6 +204,7 @@ export {
   SecurityContextExtractorFn,
   ExtendContextFn,
   ResponseResultFn,
+  MetaResponseResultFn,
   BaseRequest,
   QueryRequest,
   PreAggsJobsRequest,

@@ -122,8 +122,8 @@ impl CompiledExpression {
         match self {
             CompiledExpression::DateLiteral(date) => Some(*date),
             CompiledExpression::StringLiteral(s) => {
-                if let Ok(datetime) = Utc.datetime_from_str(s.as_str(), "%Y-%m-%d %H:%M:%S.%f") {
-                    return Some(datetime);
+                if let Ok(datetime) = DateTime::parse_from_str(s.as_str(), "%Y-%m-%d %H:%M:%S.%f") {
+                    return Some(datetime.into());
                 };
 
                 if let Ok(datetime) = DateTime::parse_from_rfc3339(s.as_str()) {
@@ -227,13 +227,12 @@ fn str_to_date_function(f: &ast::Function) -> CompilationResult<CompiledExpressi
         )));
     }
 
-    let parsed_date = Utc
-        .datetime_from_str(date.as_str(), "%Y-%m-%d %H:%M:%S.%f")
-        .map_err(|e| {
+    let parsed_date =
+        DateTime::parse_from_str(date.as_str(), "%Y-%m-%d %H:%M:%S.%f").map_err(|e| {
             CompilationError::user(format!("Unable to parse {}, err: {}", date, e.to_string(),))
         })?;
 
-    Ok(CompiledExpression::DateLiteral(parsed_date))
+    Ok(CompiledExpression::DateLiteral(parsed_date.into()))
 }
 
 // DATE(expr)
@@ -253,8 +252,7 @@ fn date_function(f: &ast::Function, ctx: &QueryContext) -> CompilationResult<Com
     match compiled {
         date @ CompiledExpression::DateLiteral(_) => Ok(date),
         CompiledExpression::StringLiteral(ref input) => {
-            let parsed_date = Utc
-                .datetime_from_str(input.as_str(), "%Y-%m-%d %H:%M:%S.%f")
+            let parsed_date = DateTime::parse_from_str(input.as_str(), "%Y-%m-%d %H:%M:%S.%f")
                 .map_err(|e| {
                     CompilationError::user(format!(
                         "Unable to parse {}, err: {}",
@@ -263,7 +261,7 @@ fn date_function(f: &ast::Function, ctx: &QueryContext) -> CompilationResult<Com
                     ))
                 })?;
 
-            Ok(CompiledExpression::DateLiteral(parsed_date))
+            Ok(CompiledExpression::DateLiteral(parsed_date.into()))
         }
         _ => {
             return Err(CompilationError::user(format!(

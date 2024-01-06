@@ -1862,10 +1862,11 @@ mod tests {
     ) -> QueryPlan {
         env::set_var("TZ", "UTC");
 
+        let meta_context = get_test_tenant_ctx_customized(custom_templates);
         let query = convert_sql_to_cube_query(
             &query,
-            get_test_tenant_ctx_customized(custom_templates),
-            get_test_session(db).await,
+            meta_context.clone(),
+            get_test_session(db, meta_context).await,
         )
         .await;
 
@@ -1883,10 +1884,11 @@ mod tests {
     ) -> QueryPlan {
         env::set_var("TZ", "UTC");
 
+        let meta_context = get_test_tenant_ctx();
         let query = convert_sql_to_cube_query(
             &query,
-            get_test_tenant_ctx(),
-            get_test_session_with_config(db, config_obj).await,
+            meta_context.clone(),
+            get_test_session_with_config(db, config_obj, meta_context).await,
         )
         .await;
 
@@ -1899,10 +1901,11 @@ mod tests {
     ) -> QueryPlan {
         env::set_var("TZ", "UTC");
 
+        let meta_context = get_test_tenant_ctx_with_meta(meta);
         let query = convert_sql_to_cube_query(
             &query,
-            get_test_tenant_ctx_with_meta(meta),
-            get_test_session(DatabaseProtocol::PostgreSQL).await,
+            meta_context.clone(),
+            get_test_session(DatabaseProtocol::PostgreSQL, meta_context).await,
         )
         .await;
 
@@ -2500,11 +2503,12 @@ mod tests {
     #[tokio::test]
     async fn test_change_user_via_filter_or() {
         // OR is not allowed for __user
+        let meta = get_test_tenant_ctx();
         let query =
             convert_sql_to_cube_query(
                 &"SELECT COUNT(*) as cnt FROM KibanaSampleDataEcommerce WHERE __user = 'gopher' OR customer_gender = 'male'".to_string(),
-                get_test_tenant_ctx(),
-                get_test_session(DatabaseProtocol::PostgreSQL).await
+                meta.clone(),
+                get_test_session(DatabaseProtocol::PostgreSQL, meta).await
             ).await;
 
         // TODO: We need to propagate error to result, to assert message
@@ -3830,10 +3834,11 @@ ORDER BY \"COUNT(count)\" DESC"
     async fn measure_used_on_dimension() {
         init_logger();
 
+        let meta = get_test_tenant_ctx();
         let create_query = convert_sql_to_cube_query(
             &"SELECT MEASURE(customer_gender) FROM \"public\".\"KibanaSampleDataEcommerce\" \"KibanaSampleDataEcommerce\"".to_string(),
-            get_test_tenant_ctx(),
-            get_test_session(DatabaseProtocol::PostgreSQL).await,
+            meta.clone(),
+            get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
         ).await;
 
         assert_eq!(
@@ -4434,10 +4439,11 @@ limit
         ];
 
         for (input_query, expected_error) in variants.iter() {
+            let meta = get_test_tenant_ctx();
             let query = convert_sql_to_cube_query(
                 &input_query,
-                get_test_tenant_ctx(),
-                get_test_session(DatabaseProtocol::PostgreSQL).await,
+                meta.clone(),
+                get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
             )
             .await;
 
@@ -5200,6 +5206,7 @@ limit
         ];
 
         for (sql, expected_error) in to_check.iter() {
+            let meta = get_test_tenant_ctx();
             let query = convert_sql_to_cube_query(
                 &format!(
                     "SELECT
@@ -5209,8 +5216,8 @@ limit
                     GROUP BY __timestamp",
                     sql
                 ),
-                get_test_tenant_ctx(),
-                get_test_session(DatabaseProtocol::MySQL).await,
+                meta.clone(),
+                get_test_session(DatabaseProtocol::MySQL, meta).await,
             )
             .await;
 
@@ -5559,7 +5566,7 @@ limit
         env::set_var("TZ", "UTC");
 
         let meta = get_test_tenant_ctx();
-        let session = get_test_session(db).await;
+        let session = get_test_session(db, meta.clone()).await;
 
         let mut output: Vec<String> = Vec::new();
         let mut output_flags = StatusFlags::empty();
@@ -10021,14 +10028,15 @@ limit
 
     #[tokio::test]
     async fn tableau_temporary_tables() {
+        let meta = get_test_tenant_ctx();
         let create_query = convert_sql_to_cube_query(
             &"
             CREATE LOCAL TEMPORARY TABLE \"#Tableau_91262_83C81E14-EFF9-4FBD-AA5C-A9D7F5634757_2_Connect_C\" (
                 \"COL\" INTEGER
             ) ON COMMIT PRESERVE ROWS
             ".to_string(),
-            get_test_tenant_ctx(),
-            get_test_session(DatabaseProtocol::PostgreSQL).await,
+            meta.clone(),
+            get_test_session(DatabaseProtocol::PostgreSQL, meta.clone()).await,
         ).await;
         match create_query {
             Err(CompilationError::Unsupported(msg, _)) => assert_eq!(msg, "Unsupported query type: CREATE LOCAL TEMPORARY TABLE \"#Tableau_91262_83C81E14-EFF9-4FBD-AA5C-A9D7F5634757_2_Connect_C\" (\"COL\" INT) ON COMMIT PRESERVE ROWS"),
@@ -10043,8 +10051,8 @@ limit
             LIMIT 1
             "
             .to_string(),
-            get_test_tenant_ctx(),
-            get_test_session(DatabaseProtocol::PostgreSQL).await,
+            meta.clone(),
+            get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
         )
         .await;
         match select_into_query {
@@ -14926,8 +14934,8 @@ limit
             }
         );
 
-        let query = convert_sql_to_cube_query(
-            &r#"
+        convert_select_to_query_plan(
+            r#"
             SELECT
                 EXTRACT(MONTH FROM "ta_1"."order_date") "ca_1",
                 count(DISTINCT "ta_1"."countDistinct") "ca_2"
@@ -14936,12 +14944,9 @@ limit
                 "ca_1"
             ;"#
             .to_string(),
-            get_test_tenant_ctx(),
-            get_test_session(DatabaseProtocol::PostgreSQL).await,
+            DatabaseProtocol::PostgreSQL,
         )
         .await;
-
-        query.unwrap();
     }
 
     #[tokio::test]
@@ -16173,6 +16178,7 @@ limit
     async fn test_join_cubes_on_wrong_field_error() {
         init_logger();
 
+        let meta = get_test_tenant_ctx();
         let query = convert_sql_to_cube_query(
             &r#"
             SELECT *
@@ -16180,8 +16186,8 @@ limit
             LEFT JOIN Logs ON (KibanaSampleDataEcommerce.has_subscription = Logs.read) 
             "#
             .to_string(),
-            get_test_tenant_ctx(),
-            get_test_session(DatabaseProtocol::PostgreSQL).await,
+            meta.clone(),
+            get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
         )
         .await;
 
@@ -16195,6 +16201,7 @@ limit
     async fn test_join_cubes_filter_from_wrong_side_error() {
         init_logger();
 
+        let meta = get_test_tenant_ctx();
         let query = convert_sql_to_cube_query(
             &r#"
             SELECT count(KibanaSampleDataEcommerce.count), Logs.read
@@ -16203,8 +16210,8 @@ limit
             GROUP BY 2
             "#
             .to_string(),
-            get_test_tenant_ctx(),
-            get_test_session(DatabaseProtocol::PostgreSQL).await,
+            meta.clone(),
+            get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
         )
         .await;
 
@@ -16222,6 +16229,7 @@ limit
     async fn test_join_cubes_with_aggr_error() {
         init_logger();
 
+        let meta = get_test_tenant_ctx();
         let query = convert_sql_to_cube_query(
             &r#"
             SELECT *
@@ -16229,8 +16237,8 @@ limit
             LEFT JOIN (SELECT read, __cubeJoinField FROM Logs) Logs ON (KibanaSampleDataEcommerce.__cubeJoinField = Logs.__cubeJoinField) 
             "#
             .to_string(),
-            get_test_tenant_ctx(),
-            get_test_session(DatabaseProtocol::PostgreSQL).await,
+            meta.clone(),
+            get_test_session(DatabaseProtocol::PostgreSQL, meta).await,
         )
         .await;
 
@@ -19393,13 +19401,13 @@ limit
         }
         init_logger();
 
-        let query_plan = convert_sql_to_cube_query(
-            &"SELECT CASE WHEN customer_gender = '\\`' THEN customer_gender ELSE 'N/A' END as \"\\`\" FROM KibanaSampleDataEcommerce a".to_string(),
-            get_test_tenant_ctx_customized(vec![
+        let query_plan = convert_select_to_query_plan_customized(
+            "SELECT CASE WHEN customer_gender = '\\`' THEN customer_gender ELSE 'N/A' END as \"\\`\" FROM KibanaSampleDataEcommerce a".to_string(),
+            DatabaseProtocol::PostgreSQL,
+            vec![
                 ("expressions/binary".to_string(), "{{ left }} \\`{{ op }} {{ right }}".to_string())
-            ]),
-            get_test_session(DatabaseProtocol::PostgreSQL).await,
-        ).await.unwrap();
+            ],
+        ).await;
 
         let physical_plan = query_plan.as_physical_plan().await.unwrap();
         println!(

@@ -1,27 +1,19 @@
-use std::sync::Arc;
-
 use egg::{EGraph, Rewrite, Subst};
 
 use crate::{
-    compile::{
-        engine::provider::CubeContext,
-        rewrite::{
-            aggr_aggr_expr_empty_tail, aggr_group_expr, aggr_group_expr_empty_tail,
-            case_expr_else_expr, case_expr_expr, case_expr_replacer, case_expr_var_arg,
-            case_expr_when_then_expr, case_expr_when_then_expr_empty_tail, column_expr,
-            group_aggregate_split_replacer, group_expr_split_replacer,
-            inner_aggregate_split_replacer, is_not_null_expr, is_null_expr, literal_expr,
-            outer_aggregate_split_replacer, rewrite, rewriter::RewriteRules, transforming_rewrite,
-            CaseExprReplacerAliasToCube, InnerAggregateSplitReplacerAliasToCube,
-            LogicalPlanAnalysis, LogicalPlanLanguage,
-        },
+    compile::rewrite::{
+        aggr_aggr_expr_empty_tail, aggr_group_expr, aggr_group_expr_empty_tail,
+        case_expr_else_expr, case_expr_expr, case_expr_replacer, case_expr_var_arg,
+        case_expr_when_then_expr, case_expr_when_then_expr_empty_tail, column_expr,
+        group_aggregate_split_replacer, group_expr_split_replacer, inner_aggregate_split_replacer,
+        is_not_null_expr, is_null_expr, literal_expr, outer_aggregate_split_replacer, rewrite,
+        rewriter::RewriteRules, transforming_rewrite, CaseExprReplacerAliasToCube,
+        InnerAggregateSplitReplacerAliasToCube, LogicalPlanAnalysis, LogicalPlanLanguage,
     },
     var, var_iter,
 };
 
-pub struct CaseRules {
-    _cube_context: Arc<CubeContext>,
-}
+pub struct CaseRules {}
 
 impl RewriteRules for CaseRules {
     fn rewrite_rules(&self) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
@@ -171,10 +163,8 @@ impl RewriteRules for CaseRules {
 }
 
 impl CaseRules {
-    pub fn new(cube_context: Arc<CubeContext>) -> Self {
-        Self {
-            _cube_context: cube_context,
-        }
+    pub fn new() -> Self {
+        Self {}
     }
 
     fn transform_inner_replacer_to_case_replacer(

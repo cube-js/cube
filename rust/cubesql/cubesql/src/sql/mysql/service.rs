@@ -202,7 +202,7 @@ impl MySqlConnection {
         } else if !ignore {
             trace!("query was not detected");
 
-            let meta = self.session.server.transport
+            let meta = self.session.server.compiler_cache
                 .meta(self.auth_context()?)
                 .await?;
 
