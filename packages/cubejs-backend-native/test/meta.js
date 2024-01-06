@@ -1,3 +1,5 @@
+const uuidv4 = require('uuid').v4;
+
 module.exports = {
   cubes: [
     {
@@ -215,5 +217,6 @@ module.exports = {
       ],
       segments: []
     }
-  ]
+  ],
+  compilerId: uuidv4()
 };
