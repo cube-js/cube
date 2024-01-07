@@ -10239,6 +10239,21 @@ limit
             .await?
         );
 
+        insta::assert_snapshot!(
+            "to_char_3",
+            execute_query(
+                "
+                SELECT to_char(c, 'YYYY-MM-DD HH24:MI:SS.US') c2
+                FROM (
+                    SELECT str_to_date('2021-08-31 11:05', '%Y-%m-%d %H:%i') c
+                ) t
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
         Ok(())
     }
 
@@ -13968,6 +13983,44 @@ limit
                     and: None,
                 }]),
                 ungrouped: None,
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn test_holistics_to_char_with_cast() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            "SELECT * FROM (
+            SELECT DISTINCT
+              TO_CHAR((CAST ( \"public_kibana\".\"order_date\" AS timestamptz )) AT TIME ZONE 'Etc/UTC', 'YYYY-MM-DD HH24:MI:SS.US') AS \"po_ca_6bbc97\"
+            FROM
+              \"public\".\"KibanaSampleDataEcommerce\" \"public_kibana\"
+            LIMIT 100000
+            ) holistics_awesome_table LIMIT 1000000".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        let cube_scan = logical_plan.find_cube_scan();
+
+        assert_eq!(
+            cube_scan.request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+                ungrouped: Some(true),
             }
         );
     }

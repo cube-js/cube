@@ -1476,7 +1476,7 @@ fn postgres_datetime_format_to_iso(format: String) -> String {
         .replace("mi", "%M")
         .replace("SS", "%S")
         .replace("ss", "%S")
-        .replace(".US", "%.f")
+        .replace(".US", "%.6f")
         .replace("MM", "%m")
         .replace(".MS", "%.3f")
 }
