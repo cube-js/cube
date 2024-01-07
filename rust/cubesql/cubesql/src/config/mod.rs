@@ -24,6 +24,7 @@ use std::{
 
 use std::sync::Arc;
 
+use crate::sql::compiler_cache::{CompilerCache, CompilerCacheImpl};
 use tokio::task::JoinHandle;
 
 #[derive(Clone)]
@@ -122,6 +123,8 @@ pub trait ConfigObj: DIService + Debug {
     fn disable_strict_agg_type_match(&self) -> bool;
 
     fn auth_expire_secs(&self) -> u64;
+
+    fn compiler_cache_size(&self) -> usize;
 }
 
 #[derive(Debug, Clone)]
@@ -133,6 +136,7 @@ pub struct ConfigObjImpl {
     pub auth_expire_secs: u64,
     pub timezone: Option<String>,
     pub disable_strict_agg_type_match: bool,
+    pub compiler_cache_size: usize,
 }
 
 impl ConfigObjImpl {
@@ -158,6 +162,7 @@ impl ConfigObjImpl {
                 false,
             ),
             auth_expire_secs: env_parse("CUBESQL_AUTH_EXPIRE_SECS", 300),
+            compiler_cache_size: env_parse("CUBEJS_COMPILER_CACHE_SIZE", 100),
         }
     }
 }
@@ -188,6 +193,10 @@ impl ConfigObj for ConfigObjImpl {
     fn auth_expire_secs(&self) -> u64 {
         self.auth_expire_secs
     }
+
+    fn compiler_cache_size(&self) -> usize {
+        self.compiler_cache_size
+    }
 }
 
 lazy_static! {
@@ -216,6 +225,7 @@ impl Config {
                 auth_expire_secs: 60,
                 timezone,
                 disable_strict_agg_type_match: false,
+                compiler_cache_size: 100,
             }),
         }
     }
@@ -252,9 +262,20 @@ impl Config {
             .await;
 
         self.injector
+            .register_typed::<dyn CompilerCache, _, _, _>(async move |i| {
+                let config = i.get_service_typed::<dyn ConfigObj>().await;
+                Arc::new(CompilerCacheImpl::new(
+                    config.clone(),
+                    i.get_service_typed().await,
+                ))
+            })
+            .await;
+
+        self.injector
             .register_typed::<ServerManager, _, _, _>(async move |i| {
                 let config = i.get_service_typed::<dyn ConfigObj>().await;
                 Arc::new(ServerManager::new(
+                    i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     config.nonce().clone(),

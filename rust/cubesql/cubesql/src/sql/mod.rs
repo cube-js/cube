@@ -1,4 +1,5 @@
 pub(crate) mod auth_service;
+pub(crate) mod compiler_cache;
 pub(crate) mod database_variables;
 pub(crate) mod dataframe;
 pub(crate) mod mysql;
