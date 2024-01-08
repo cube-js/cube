@@ -269,6 +269,10 @@ impl WorkerProcessing for WorkerProcessor {
         Ok(())
     }
 
+    fn is_single_job_process() -> bool {
+        false
+    }
+
     async fn process(
         config: &Self::Config,
         args: WorkerMessage,

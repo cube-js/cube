@@ -49,6 +49,8 @@ pub trait WorkerProcessing: Send + Sync + 'static {
         args: Self::Request,
     ) -> Result<Self::Response, CubeError>;
 
+    fn is_single_job_process() -> bool;
+
     fn process_titile() -> String;
 }
 
