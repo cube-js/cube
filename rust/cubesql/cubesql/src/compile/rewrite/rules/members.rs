@@ -1,33 +1,31 @@
 use crate::{
-    compile::{
-        engine::provider::CubeContext,
-        rewrite::{
-            agg_fun_expr, aggregate, alias_expr, all_members,
-            analysis::LogicalPlanAnalysis,
-            binary_expr, cast_expr, change_user_expr, column_expr, column_name_to_member_def_vec,
-            column_name_to_member_to_aliases, column_name_to_member_vec, cross_join, cube_scan,
-            cube_scan_filters_empty_tail, cube_scan_members, cube_scan_members_empty_tail,
-            cube_scan_order_empty_tail, dimension_expr, expr_column_name, fun_expr, join,
-            like_expr, limit, list_concat_pushdown_replacer, list_concat_pushup_replacer,
-            literal_expr, literal_member, measure_expr, member_pushdown_replacer, member_replacer,
-            merged_members_replacer, original_expr_name, projection, referenced_columns, rewrite,
-            rewriter::RewriteRules,
-            rules::{replacer_push_down_node, replacer_push_down_node_substitute_rules, utils},
-            segment_expr, table_scan, time_dimension_expr, transforming_chain_rewrite,
-            transforming_rewrite, udaf_expr, udf_expr, virtual_field_expr,
-            AggregateFunctionExprDistinct, AggregateFunctionExprFun, AliasExprAlias,
-            AllMembersAlias, AllMembersCube, BinaryExprOp, CastExprDataType, ChangeUserCube,
-            ColumnExprColumn, CubeScanAliasToCube, CubeScanCanPushdownJoin, CubeScanLimit,
-            CubeScanOffset, CubeScanUngrouped, DimensionName, JoinLeftOn, JoinRightOn,
-            LikeExprEscapeChar, LikeExprLikeType, LikeExprNegated, LikeType, LimitFetch, LimitSkip,
-            LiteralExprValue, LiteralMemberRelation, LiteralMemberValue, LogicalPlanLanguage,
-            MeasureName, MemberErrorAliasToCube, MemberErrorError, MemberErrorPriority,
-            MemberPushdownReplacerAliasToCube, MemberReplacerAliasToCube, ProjectionAlias,
-            SegmentName, TableScanSourceTableName, TableScanTableName, TimeDimensionDateRange,
-            TimeDimensionGranularity, TimeDimensionName, VirtualFieldCube, VirtualFieldName,
-        },
+    compile::rewrite::{
+        agg_fun_expr, aggregate, alias_expr, all_members,
+        analysis::LogicalPlanAnalysis,
+        binary_expr, cast_expr, change_user_expr, column_expr, column_name_to_member_def_vec,
+        column_name_to_member_to_aliases, column_name_to_member_vec, cross_join, cube_scan,
+        cube_scan_filters_empty_tail, cube_scan_members, cube_scan_members_empty_tail,
+        cube_scan_order_empty_tail, dimension_expr, expr_column_name, fun_expr, join, like_expr,
+        limit, list_concat_pushdown_replacer, list_concat_pushup_replacer, literal_expr,
+        literal_member, measure_expr, member_pushdown_replacer, member_replacer,
+        merged_members_replacer, original_expr_name, projection, referenced_columns, rewrite,
+        rewriter::RewriteRules,
+        rules::{replacer_push_down_node, replacer_push_down_node_substitute_rules, utils},
+        segment_expr, table_scan, time_dimension_expr, transforming_chain_rewrite,
+        transforming_rewrite, udaf_expr, udf_expr, virtual_field_expr,
+        AggregateFunctionExprDistinct, AggregateFunctionExprFun, AliasExprAlias, AllMembersAlias,
+        AllMembersCube, BinaryExprOp, CastExprDataType, ChangeUserCube, ColumnExprColumn,
+        CubeScanAliasToCube, CubeScanCanPushdownJoin, CubeScanLimit, CubeScanOffset,
+        CubeScanUngrouped, DimensionName, JoinLeftOn, JoinRightOn, LikeExprEscapeChar,
+        LikeExprLikeType, LikeExprNegated, LikeType, LimitFetch, LimitSkip, LiteralExprValue,
+        LiteralMemberRelation, LiteralMemberValue, LogicalPlanLanguage, MeasureName,
+        MemberErrorAliasToCube, MemberErrorError, MemberErrorPriority,
+        MemberPushdownReplacerAliasToCube, MemberReplacerAliasToCube, ProjectionAlias, SegmentName,
+        TableScanSourceTableName, TableScanTableName, TimeDimensionDateRange,
+        TimeDimensionGranularity, TimeDimensionName, VirtualFieldCube, VirtualFieldName,
     },
-    transport::{V1CubeMetaDimensionExt, V1CubeMetaExt, V1CubeMetaMeasureExt},
+    config::ConfigObj,
+    transport::{MetaContext, V1CubeMetaDimensionExt, V1CubeMetaExt, V1CubeMetaMeasureExt},
     var, var_iter, var_list_iter, CubeError,
 };
 use cubeclient::models::V1CubeMetaMeasure;
@@ -46,7 +44,8 @@ use std::{
 };
 
 pub struct MemberRules {
-    cube_context: Arc<CubeContext>,
+    meta_context: Arc<MetaContext>,
+    config_obj: Arc<dyn ConfigObj>,
     enable_ungrouped: bool,
 }
 
@@ -424,9 +423,14 @@ impl RewriteRules for MemberRules {
 }
 
 impl MemberRules {
-    pub fn new(cube_context: Arc<CubeContext>, enable_ungrouped: bool) -> Self {
+    pub fn new(
+        meta_context: Arc<MetaContext>,
+        config_obj: Arc<dyn ConfigObj>,
+        enable_ungrouped: bool,
+    ) -> Self {
         Self {
-            cube_context,
+            meta_context,
+            config_obj,
             enable_ungrouped,
         }
     }
@@ -1119,7 +1123,7 @@ impl MemberRules {
         let table_name_var = var!(table_name_var);
         let alias_to_cube_var = var!(alias_to_cube_var);
         let cube_scan_members_var = var!(cube_scan_members_var);
-        let meta_context = self.cube_context.meta.clone();
+        let meta_context = self.meta_context.clone();
         move |egraph, subst| {
             for name in var_iter!(
                 egraph[subst[source_table_name_var]],
@@ -1611,7 +1615,7 @@ impl MemberRules {
         let date_range_var = date_range_var.parse().unwrap();
         let original_expr_var = var!(original_expr_var);
         let alias_var = var!(alias_var);
-        let meta_context = self.cube_context.meta.clone();
+        let meta_context = self.meta_context.clone();
         move |egraph, subst| {
             for alias_to_cube in
                 var_iter!(egraph[subst[cube_var]], MemberPushdownReplacerAliasToCube)
@@ -1816,7 +1820,7 @@ impl MemberRules {
             var!(member_pushdown_replacer_alias_to_cube_var);
         let column_var = var!(column_var);
         let member_var = var!(member_var);
-        let cube_context = self.cube_context.clone();
+        let meta = self.meta_context.clone();
         move |egraph, subst| {
             for alias_to_cube in var_iter!(
                 egraph[subst[member_pushdown_replacer_alias_to_cube_var]],
@@ -1835,7 +1839,7 @@ impl MemberRules {
                             .collect()
                     };
                     for column in column_iter {
-                        if let Some(cube) = cube_context.meta.find_cube_with_name(&cube) {
+                        if let Some(cube) = meta.find_cube_with_name(&cube) {
                             let alias_expr = |egraph| {
                                 Self::add_alias_column(
                                     egraph,
@@ -1942,13 +1946,8 @@ impl MemberRules {
         let original_expr_var = var!(original_expr_var);
         let cast_data_type_var = cast_data_type_var.map(|var| var!(var));
         let measure_out_var = var!(measure_out_var);
-        let meta_context = self.cube_context.meta.clone();
-        let disable_strict_agg_type_match = self
-            .cube_context
-            .sessions
-            .server
-            .config_obj
-            .disable_strict_agg_type_match();
+        let meta_context = self.meta_context.clone();
+        let disable_strict_agg_type_match = self.config_obj.disable_strict_agg_type_match();
         move |egraph, subst| {
             if let Some(alias) = original_expr_name(egraph, subst[original_expr_var]) {
                 for measure_name in var_iter!(egraph[subst[measure_name_var]], MeasureName)
@@ -2062,13 +2061,8 @@ impl MemberRules {
         let aggr_expr_var = aggr_expr_var.parse().unwrap();
         let cast_data_type_var = cast_data_type_var.map(|var| var!(var));
         let measure_out_var = measure_out_var.parse().unwrap();
-        let meta_context = self.cube_context.meta.clone();
-        let disable_strict_agg_type_match = self
-            .cube_context
-            .sessions
-            .server
-            .config_obj
-            .disable_strict_agg_type_match();
+        let meta_context = self.meta_context.clone();
+        let disable_strict_agg_type_match = self.config_obj.disable_strict_agg_type_match();
         move |egraph, subst| {
             for column in measure_var
                 .map(|measure_var| {

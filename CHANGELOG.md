@@ -3,6 +3,37 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.42](https://github.com/cube-js/cube/compare/v0.34.41...v0.34.42) (2024-01-07)
+
+
+### Features
+
+* **cubesql:** Compiler cache for rewrite rules ([#7604](https://github.com/cube-js/cube/issues/7604)) ([995889f](https://github.com/cube-js/cube/commit/995889fb7722cda3bf839095949d6d71693dd329))
+
+
+
+
+
+## [0.34.41](https://github.com/cube-js/cube/compare/v0.34.40...v0.34.41) (2024-01-02)
+
+
+### Bug Fixes
+
+* **@cubejs-client/ngx:** set module to fesm2015 ([#7571](https://github.com/cube-js/cube/issues/7571)) Thanks [@loremaps](https://github.com/loremaps)! ([aaa8bfd](https://github.com/cube-js/cube/commit/aaa8bfd23e91ff033b4c048c4e6ee4e419c45d98)), closes [#7570](https://github.com/cube-js/cube/issues/7570)
+* **cubesql:** Enable `Visitor` on `GROUP BY` expressions ([#7575](https://github.com/cube-js/cube/issues/7575)) ([bcc1a89](https://github.com/cube-js/cube/commit/bcc1a8911fe99f33b0a82e865597dec38101ecad))
+* **cubestore:** Panic in hash join ([#7573](https://github.com/cube-js/cube/issues/7573)) ([aa6c08b](https://github.com/cube-js/cube/commit/aa6c08b65dbb16c1008a46fbeca7590715bca46b))
+* **databricks-jdbc-driver:** Time series queries with rolling window & time dimension ([#7564](https://github.com/cube-js/cube/issues/7564)) ([79d033e](https://github.com/cube-js/cube/commit/79d033eecc54c4ae5a4e04ed7713fb34957af091))
+* Do not fail extractDate on missing result set ([c8567ef](https://github.com/cube-js/cube/commit/c8567eff0a8ccafe04be2948331c11f80bfeab09))
+
+
+### Features
+
+* **cubesql:** Support Domo data queries ([#7509](https://github.com/cube-js/cube/issues/7509)) ([6d644dc](https://github.com/cube-js/cube/commit/6d644dc5265245b8581eb2c2e3b75f5d6d9f929c))
+
+
+
+
+
 ## [0.34.40](https://github.com/cube-js/cube/compare/v0.34.39...v0.34.40) (2023-12-21)
 
 

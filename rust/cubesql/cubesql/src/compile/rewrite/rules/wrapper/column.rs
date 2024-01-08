@@ -55,7 +55,7 @@ impl WrapperRules {
         let column_name_var = var!(column_name_var);
         let members_var = var!(members_var);
         let dimension_var = var!(dimension_var);
-        let cube_context = self.cube_context.clone();
+        let meta = self.meta_context.clone();
         move |egraph, subst| {
             for column in var_iter!(egraph[subst[column_name_var]], ColumnExprColumn).cloned() {
                 if let Some(member_name_to_expr) =
@@ -66,11 +66,8 @@ impl WrapperRules {
                         .iter()
                         .find(|(cn, _)| cn == &column.name)
                     {
-                        if cube_context
-                            .meta
-                            .find_dimension_with_name(member.to_string())
-                            .is_some()
-                            || cube_context.meta.is_synthetic_field(member.to_string())
+                        if meta.find_dimension_with_name(member.to_string()).is_some()
+                            || meta.is_synthetic_field(member.to_string())
                         {
                             let column_expr_column =
                                 egraph.add(LogicalPlanLanguage::ColumnExprColumn(

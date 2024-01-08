@@ -21,6 +21,7 @@ use tokio::{
     sync::{mpsc::Receiver, RwLock as RwLockAsync},
     time::Instant,
 };
+use uuid::Uuid;
 
 use crate::{
     compile::{
@@ -108,6 +109,11 @@ impl SpanId {
 pub trait TransportService: Send + Sync + Debug {
     // Load meta information about cubes
     async fn meta(&self, ctx: AuthContextRef) -> Result<Arc<MetaContext>, CubeError>;
+
+    async fn compiler_id(&self, ctx: AuthContextRef) -> Result<Uuid, CubeError> {
+        let meta = self.meta(ctx).await?;
+        Ok(meta.compiler_id)
+    }
 
     // Get sql for query to be used in wrapped SQL query
     async fn sql(
@@ -236,6 +242,7 @@ impl TransportService for HttpTransport {
             response.cubes.unwrap_or_else(Vec::new),
             HashMap::new(),
             HashMap::new(),
+            Uuid::new_v4(),
         ));
 
         *store = Some(MetaCacheBucket {

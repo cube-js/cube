@@ -81,7 +81,7 @@ export class SQLServer {
           skipPasswordCheck,
         };
       },
-      meta: async ({ request, session }) => {
+      meta: async ({ request, session, onlyCompilerId }) => {
         const context = await this.apiGateway.contextByReq(<any> request, session.securityContext, request.id);
 
         // eslint-disable-next-line no-async-promise-executor
@@ -90,8 +90,13 @@ export class SQLServer {
             await this.apiGateway.meta({
               context,
               res: (message) => {
-                resolve(message);
+                if (onlyCompilerId) {
+                  resolve({ compilerId: message.compilerId });
+                } else {
+                  resolve(message);
+                }
               },
+              includeCompilerId: true
             });
           } catch (e) {
             reject(e);

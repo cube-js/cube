@@ -67,7 +67,7 @@ impl WrapperRules {
         let fun_var = var!(fun_var);
         let distinct_var = var!(distinct_var);
         let alias_to_cube_var = var!(alias_to_cube_var);
-        let meta = self.cube_context.meta.clone();
+        let meta = self.meta_context.clone();
         move |egraph, subst| {
             for alias_to_cube in var_iter!(
                 egraph[subst[alias_to_cube_var]],

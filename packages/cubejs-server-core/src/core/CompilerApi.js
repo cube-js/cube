@@ -217,7 +217,15 @@ export class CompilerApi {
   }
 
   async metaConfig(options = {}) {
-    return (await this.getCompilers(options)).metaTransformer.cubes;
+    const { includeCompilerId, ...restOptions } = options;
+    const compilers = await this.getCompilers(restOptions);
+    if (includeCompilerId) {
+      return {
+        cubes: compilers.metaTransformer.cubes,
+        compilerId: compilers.compilerId,
+      };
+    }
+    return compilers.metaTransformer.cubes;
   }
 
   async metaConfigExtended(options) {
@@ -226,6 +234,10 @@ export class CompilerApi {
       metaConfig: metaTransformer?.cubes,
       cubeDefinitions: metaTransformer?.cubeEvaluator?.cubeDefinitions,
     };
+  }
+
+  async compilerId(options = {}) {
+    return (await this.getCompilers(options)).compilerId;
   }
 
   async cubeNameToDataSource(query) {

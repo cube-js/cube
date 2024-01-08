@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.42](https://github.com/cube-js/cube/compare/v0.34.41...v0.34.42) (2024-01-07)
+
+**Note:** Version bump only for package @cubejs-backend/databricks-jdbc-driver
+
+
+
+
+
+## [0.34.41](https://github.com/cube-js/cube/compare/v0.34.40...v0.34.41) (2024-01-02)
+
+
+### Bug Fixes
+
+* **databricks-jdbc-driver:** Time series queries with rolling window & time dimension ([#7564](https://github.com/cube-js/cube/issues/7564)) ([79d033e](https://github.com/cube-js/cube/commit/79d033eecc54c4ae5a4e04ed7713fb34957af091))
+
+
+
+
+
 ## [0.34.40](https://github.com/cube-js/cube/compare/v0.34.39...v0.34.40) (2023-12-21)
 
 **Note:** Version bump only for package @cubejs-backend/databricks-jdbc-driver

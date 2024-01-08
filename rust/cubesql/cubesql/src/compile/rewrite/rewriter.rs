@@ -13,8 +13,9 @@ use crate::{
             LogicalPlanLanguage,
         },
     },
+    config::ConfigObj,
     sql::AuthContextRef,
-    transport::SpanId,
+    transport::{MetaContext, SpanId},
     CubeError,
 };
 use datafusion::{logical_plan::LogicalPlan, physical_plan::planner::DefaultPhysicalPlanner};
@@ -226,9 +227,15 @@ impl Rewriter {
             qtrace.set_original_graph(&egraph);
         }
 
+        let rules = cube_context
+            .sessions
+            .server
+            .compiler_cache
+            .rewrite_rules(auth_context.clone())
+            .await?;
+
         let (plan, qtrace_egraph_iterations, qtrace_best_graph) =
             tokio::task::spawn_blocking(move || {
-                let rules = Self::rewrite_rules(cube_context.clone());
                 let runner = Self::rewrite_runner(cube_context.clone(), egraph);
                 let runner = runner.run(rules.iter());
                 if !IterInfo::egraph_debug_enabled() {
@@ -386,23 +393,30 @@ impl Rewriter {
     }
 
     pub fn rewrite_rules(
-        cube_context: Arc<CubeContext>,
+        meta_context: Arc<MetaContext>,
+        config_obj: Arc<dyn ConfigObj>,
     ) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
         let sql_push_down = Self::sql_push_down_enabled();
         let rules: Vec<Box<dyn RewriteRules>> = vec![
-            Box::new(MemberRules::new(cube_context.clone(), sql_push_down)),
-            Box::new(FilterRules::new(cube_context.clone())),
-            Box::new(DateRules::new(cube_context.clone())),
-            Box::new(OrderRules::new(cube_context.clone())),
-            Box::new(SplitRules::new(cube_context.clone())),
-            Box::new(CaseRules::new(cube_context.clone())),
+            Box::new(MemberRules::new(
+                meta_context.clone(),
+                config_obj.clone(),
+                sql_push_down,
+            )),
+            Box::new(FilterRules::new(meta_context.clone())),
+            Box::new(DateRules::new()),
+            Box::new(OrderRules::new()),
+            Box::new(SplitRules::new(meta_context.clone(), config_obj.clone())),
+            Box::new(CaseRules::new()),
         ];
         let mut rewrites = Vec::new();
         for r in rules {
             rewrites.extend(r.rewrite_rules());
         }
         if sql_push_down {
-            rewrites.extend(WrapperRules::new(cube_context.clone()).rewrite_rules());
+            rewrites.extend(
+                WrapperRules::new(meta_context.clone(), config_obj.clone()).rewrite_rules(),
+            );
         }
         if let Ok(disabled_rule_names) = env::var("CUBESQL_DISABLE_REWRITES") {
             let disabled_rule_names = disabled_rule_names

@@ -946,7 +946,7 @@ impl AsyncPostgresShim {
                 let meta = self
                     .session
                     .server
-                    .transport
+                    .compiler_cache
                     .meta(self.auth_context()?)
                     .await?;
 
@@ -1038,7 +1038,7 @@ impl AsyncPostgresShim {
         let meta = self
             .session
             .server
-            .transport
+            .compiler_cache
             .meta(self.auth_context()?)
             .await?;
 
@@ -1637,7 +1637,7 @@ impl AsyncPostgresShim {
         let meta = self
             .session
             .server
-            .transport
+            .compiler_cache
             .meta(self.auth_context()?)
             .await?;
 
