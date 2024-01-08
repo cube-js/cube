@@ -102,6 +102,8 @@ struct LogEvent {
 struct MetaRequest {
     request: TransportRequest,
     session: SessionContext,
+    #[serde(rename = "onlyCompilerId")]
+    only_compiler_id: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -130,6 +132,7 @@ impl TransportService for NodeBridgeTransport {
                 superuser: native_auth.superuser,
                 security_context: native_auth.security_context.clone(),
             },
+            only_compiler_id: false,
         })?;
         let response = call_js_with_channel_as_callback::<V1MetaResponse>(
             self.channel.clone(),
@@ -187,15 +190,67 @@ impl TransportService for NodeBridgeTransport {
             .await?;
 
         #[cfg(debug_assertions)]
-        trace!("[transport] Meta <- {:?}", response);
+        trace!(
+            "[transport] Meta <- {:?} {:?}",
+            response.compiler_id,
+            response
+        );
         #[cfg(not(debug_assertions))]
-        trace!("[transport] Meta <- <hidden>");
+        trace!("[transport] Meta <- {:?} <hidden>", response.compiler_id);
 
+        let compiler_id = Uuid::parse_str(response.compiler_id.as_ref().ok_or_else(|| {
+            CubeError::user(format!("No compiler_id in response: {:?}", response))
+        })?)
+        .map_err(|e| {
+            CubeError::user(format!(
+                "Can't parse compiler id: {:?} error: {}",
+                response.compiler_id, e
+            ))
+        })?;
         Ok(Arc::new(MetaContext::new(
             response.cubes.unwrap_or_default(),
             cube_to_data_source,
             data_source_to_sql_generator,
+            compiler_id,
         )))
+    }
+
+    async fn compiler_id(&self, ctx: AuthContextRef) -> Result<Uuid, CubeError> {
+        let native_auth = ctx
+            .as_any()
+            .downcast_ref::<NativeAuthContext>()
+            .expect("Unable to cast AuthContext to NativeAuthContext");
+
+        let request_id = Uuid::new_v4().to_string();
+        let extra = serde_json::to_string(&MetaRequest {
+            request: TransportRequest {
+                id: format!("{}-span-1", request_id),
+                meta: None,
+            },
+            session: SessionContext {
+                user: native_auth.user.clone(),
+                superuser: native_auth.superuser,
+                security_context: native_auth.security_context.clone(),
+            },
+            only_compiler_id: true,
+        })?;
+        let response = call_js_with_channel_as_callback::<V1MetaResponse>(
+            self.channel.clone(),
+            self.on_meta.clone(),
+            Some(extra.clone()),
+        )
+        .await?;
+
+        let compiler_id = Uuid::parse_str(response.compiler_id.as_ref().ok_or_else(|| {
+            CubeError::user(format!("No compiler_id in response: {:?}", response))
+        })?)
+        .map_err(|e| {
+            CubeError::user(format!(
+                "Can't parse compiler id: {:?} error: {}",
+                response.compiler_id, e
+            ))
+        })?;
+        Ok(compiler_id)
     }
 
     async fn sql(

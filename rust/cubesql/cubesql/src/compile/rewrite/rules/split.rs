@@ -1,26 +1,24 @@
 use super::utils;
 use crate::{
-    compile::{
-        engine::provider::CubeContext,
-        rewrite::{
-            agg_fun_expr, aggr_aggr_expr, aggr_aggr_expr_empty_tail, aggr_group_expr,
-            aggr_group_expr_empty_tail, aggregate, alias_expr, analysis::LogicalPlanAnalysis,
-            binary_expr, cast_expr, cast_expr_explicit, column_expr, cube_scan, event_notification,
-            fun_expr, group_aggregate_split_replacer, group_expr_split_replacer,
-            inner_aggregate_split_replacer, is_not_null_expr, is_null_expr, literal_expr,
-            literal_float, literal_int, literal_string, original_expr_name,
-            outer_aggregate_split_replacer, outer_projection_split_replacer, projection,
-            projection_expr, projection_expr_empty_tail, rewrite, rewriter::RewriteRules,
-            rules::members::MemberRules, transforming_chain_rewrite, transforming_rewrite,
-            udf_expr, AggregateFunctionExprDistinct, AggregateFunctionExprFun, AliasExprAlias,
-            BinaryExprOp, CastExprDataType, ColumnExprColumn, CubeScanAliasToCube,
-            EventNotificationMeta, GroupAggregateSplitReplacerAliasToCube,
-            GroupExprSplitReplacerAliasToCube, InnerAggregateSplitReplacerAliasToCube,
-            LiteralExprValue, LogicalPlanLanguage, OuterAggregateSplitReplacerAliasToCube,
-            OuterProjectionSplitReplacerAliasToCube, ProjectionAlias, ScalarFunctionExprFun,
-        },
+    compile::rewrite::{
+        agg_fun_expr, aggr_aggr_expr, aggr_aggr_expr_empty_tail, aggr_group_expr,
+        aggr_group_expr_empty_tail, aggregate, alias_expr, analysis::LogicalPlanAnalysis,
+        binary_expr, cast_expr, cast_expr_explicit, column_expr, cube_scan, event_notification,
+        fun_expr, group_aggregate_split_replacer, group_expr_split_replacer,
+        inner_aggregate_split_replacer, is_not_null_expr, is_null_expr, literal_expr,
+        literal_float, literal_int, literal_string, original_expr_name,
+        outer_aggregate_split_replacer, outer_projection_split_replacer, projection,
+        projection_expr, projection_expr_empty_tail, rewrite, rewriter::RewriteRules,
+        rules::members::MemberRules, transforming_chain_rewrite, transforming_rewrite, udf_expr,
+        AggregateFunctionExprDistinct, AggregateFunctionExprFun, AliasExprAlias, BinaryExprOp,
+        CastExprDataType, ColumnExprColumn, CubeScanAliasToCube, EventNotificationMeta,
+        GroupAggregateSplitReplacerAliasToCube, GroupExprSplitReplacerAliasToCube,
+        InnerAggregateSplitReplacerAliasToCube, LiteralExprValue, LogicalPlanLanguage,
+        OuterAggregateSplitReplacerAliasToCube, OuterProjectionSplitReplacerAliasToCube,
+        ProjectionAlias, ScalarFunctionExprFun,
     },
-    transport::{V1CubeMetaExt, V1CubeMetaMeasureExt},
+    config::ConfigObj,
+    transport::{MetaContext, V1CubeMetaExt, V1CubeMetaMeasureExt},
     var, var_iter, CubeError,
 };
 use datafusion::{
@@ -33,7 +31,8 @@ use egg::{EGraph, Id, Rewrite, Subst, Var};
 use std::{fmt::Display, ops::Index, sync::Arc};
 
 pub struct SplitRules {
-    cube_context: Arc<CubeContext>,
+    meta_context: Arc<MetaContext>,
+    config_obj: Arc<dyn ConfigObj>,
 }
 
 impl RewriteRules for SplitRules {
@@ -4992,9 +4991,10 @@ impl RewriteRules for SplitRules {
 }
 
 impl SplitRules {
-    pub fn new(cube_context: Arc<CubeContext>) -> Self {
+    pub fn new(meta_context: Arc<MetaContext>, config_obj: Arc<dyn ConfigObj>) -> Self {
         Self {
-            cube_context: cube_context,
+            meta_context,
+            config_obj,
         }
     }
 
@@ -5272,7 +5272,7 @@ impl SplitRules {
         let column_var = var!(column_var);
         let alias_to_cube_var = var!(alias_to_cube_var);
         let alias_expr_var = var!(alias_expr_var);
-        let meta_context = self.cube_context.meta.clone();
+        let meta_context = self.meta_context.clone();
         move |egraph, subst| {
             let original_expr_id = subst[original_expr_var];
             let res =
@@ -5326,7 +5326,7 @@ impl SplitRules {
         let left_column_var = var!(left_column_var);
         let right_column_var = var!(right_column_var);
         let alias_to_cube_var = var!(alias_to_cube_var);
-        let meta_context = self.cube_context.meta.clone();
+        let meta_context = self.meta_context.clone();
         move |egraph, subst| {
             for alias_to_cube in var_iter!(
                 egraph[subst[alias_to_cube_var]],
@@ -5412,7 +5412,7 @@ impl SplitRules {
         let arg_expr_var = var!(arg_expr_var);
         let column_var = var!(column_var);
         let alias_var = var!(alias_var);
-        let meta = self.cube_context.meta.clone();
+        let meta = self.meta_context.clone();
         move |egraph, subst| {
             for alias_to_cube in var_iter!(
                 egraph[subst[cube_expr_var]],
@@ -5469,13 +5469,8 @@ impl SplitRules {
         let fun_var = fun_var.map(|v| var!(v));
         let distinct_var = distinct_var.map(|v| var!(v));
         let out_expr_var = out_expr_var.map(|v| var!(v));
-        let meta = self.cube_context.meta.clone();
-        let disable_strict_agg_type_match = self
-            .cube_context
-            .sessions
-            .server
-            .config_obj
-            .disable_strict_agg_type_match();
+        let meta = self.meta_context.clone();
+        let disable_strict_agg_type_match = self.config_obj.disable_strict_agg_type_match();
         move |egraph, subst| {
             for alias_to_cube in var_iter!(
                 egraph[subst[cube_expr_var]],
@@ -5606,7 +5601,7 @@ impl SplitRules {
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let column_var = var!(column_var);
-        let meta = self.cube_context.meta.clone();
+        let meta = self.meta_context.clone();
         move |egraph, subst| {
             for alias_to_cube in var_iter!(
                 egraph[subst[alias_to_cube_var]],
@@ -5629,7 +5624,7 @@ impl SplitRules {
         cube_expr_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
         let cube_expr_var = var!(cube_expr_var);
-        let meta = self.cube_context.meta.clone();
+        let meta = self.meta_context.clone();
         move |egraph, subst| {
             for alias_to_cube in var_iter!(
                 egraph[subst[cube_expr_var]],
@@ -5664,7 +5659,7 @@ impl SplitRules {
     {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let column_var = column_var.map(|column_var| var!(column_var));
-        let meta = self.cube_context.meta.clone();
+        let meta = self.meta_context.clone();
         move |egraph, subst| {
             if let Some(column_var) = column_var {
                 for alias_to_cube in var_iter!(
@@ -5700,7 +5695,7 @@ impl SplitRules {
     {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let column_var = column_var.map(|column_var| var!(column_var));
-        let meta = self.cube_context.meta.clone();
+        let meta = self.meta_context.clone();
         move |egraph, subst| {
             if !original_transform_fn(egraph, subst) {
                 return false;
@@ -5748,7 +5743,7 @@ impl SplitRules {
         let column_var = column_var.map(|column_var| var!(column_var));
         let output_fun_var = output_fun_var.map(|output_fun_var| var!(output_fun_var));
         let distinct_var = distinct_var.map(|distinct_var| var!(distinct_var));
-        let meta = self.cube_context.meta.clone();
+        let meta = self.meta_context.clone();
         move |egraph, subst| {
             if !original_transform_fn(egraph, subst) {
                 return false;
@@ -5810,7 +5805,7 @@ impl SplitRules {
     {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let column_var = column_var.map(|column_var| var!(column_var));
-        let meta = self.cube_context.meta.clone();
+        let meta = self.meta_context.clone();
         move |egraph, subst| {
             if let Some(column_var) = column_var {
                 for alias_to_cube in var_iter!(
@@ -5856,7 +5851,7 @@ impl SplitRules {
         let group_aggregate_cube_var = var!(group_aggregate_cube_var);
         let new_expr_var = var!(new_expr_var);
         let inner_projection_alias_var = var!(inner_projection_alias_var);
-        let meta = self.cube_context.meta.clone();
+        let meta = self.meta_context.clone();
         move |egraph, subst| {
             if let Some(expr_to_alias) =
                 &egraph.index(subst[projection_expr_var]).data.expr_to_alias
@@ -6198,7 +6193,7 @@ impl SplitRules {
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let column_var = var!(column_var);
-        let meta = self.cube_context.meta.clone();
+        let meta = self.meta_context.clone();
         move |egraph, subst| {
             for alias_to_cube in var_iter!(
                 egraph[subst[alias_to_cube_var]],
@@ -6240,7 +6235,7 @@ impl SplitRules {
         let output_fun_var = var!(output_fun_var);
         let distinct_var = var!(distinct_var);
         let output_distinct_var = var!(output_distinct_var);
-        let meta = self.cube_context.meta.clone();
+        let meta = self.meta_context.clone();
         move |egraph, subst| {
             for fun in var_iter!(egraph[subst[fun_expr_var]], AggregateFunctionExprFun) {
                 for distinct in
@@ -6369,7 +6364,7 @@ impl SplitRules {
         let alias_expr_var = var!(alias_expr_var);
         let outer_alias_expr_var = var!(outer_alias_expr_var);
         let meta_var = var!(meta_var);
-        let meta = self.cube_context.meta.clone();
+        let meta = self.meta_context.clone();
         move |egraph, subst| {
             for alias_to_cube in var_iter!(
                 egraph[subst[cube_var]],
@@ -6443,7 +6438,7 @@ impl SplitRules {
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
         let cube_var = var!(cube_var);
         let fun_expr_var = var!(fun_expr_var);
-        let meta = self.cube_context.meta.clone();
+        let meta = self.meta_context.clone();
         move |egraph, subst| {
             for fun in var_iter!(egraph[subst[fun_expr_var]], AggregateFunctionExprFun) {
                 if fun == &AggregateFunction::Count || fun == &AggregateFunction::Sum {
@@ -6482,7 +6477,7 @@ impl SplitRules {
         let original_expr_var = var!(original_expr_var);
         let column_var = column_var.map(|v| var!(v));
         let alias_expr_var = var!(alias_expr_var);
-        let meta = self.cube_context.meta.clone();
+        let meta = self.meta_context.clone();
         move |egraph, subst| {
             for alias_to_cube in var_iter!(
                 egraph[subst[cube_var]],

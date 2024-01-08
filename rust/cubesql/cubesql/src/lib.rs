@@ -28,5 +28,6 @@ pub mod transport;
 
 pub type RWLockSync<A> = std::sync::RwLock<A>;
 pub type RWLockAsync<B> = tokio::sync::RwLock<B>;
+pub type MutexAsync<A> = tokio::sync::Mutex<A>;
 
 pub use error::{CubeError, CubeErrorCauseType};

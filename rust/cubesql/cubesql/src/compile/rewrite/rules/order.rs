@@ -1,22 +1,17 @@
 use crate::{
-    compile::{
-        engine::provider::CubeContext,
-        rewrite::{
-            analysis::LogicalPlanAnalysis, column_name_to_member_vec, cube_scan, cube_scan_order,
-            cube_scan_order_empty_tail, expr_column_name, order, order_replacer,
-            referenced_columns, rewrite, rewriter::RewriteRules, sort, sort_exp,
-            sort_exp_empty_tail, sort_expr, transforming_rewrite, LogicalPlanLanguage, OrderAsc,
-            OrderMember, OrderReplacerColumnNameToMember, SortExprAsc,
-        },
+    compile::rewrite::{
+        analysis::LogicalPlanAnalysis, column_name_to_member_vec, cube_scan, cube_scan_order,
+        cube_scan_order_empty_tail, expr_column_name, order, order_replacer, referenced_columns,
+        rewrite, rewriter::RewriteRules, sort, sort_exp, sort_exp_empty_tail, sort_expr,
+        transforming_rewrite, LogicalPlanLanguage, OrderAsc, OrderMember,
+        OrderReplacerColumnNameToMember, SortExprAsc,
     },
     var, var_iter,
 };
 use egg::{EGraph, Rewrite, Subst};
-use std::{ops::Index, sync::Arc};
+use std::ops::Index;
 
-pub struct OrderRules {
-    _cube_context: Arc<CubeContext>,
-}
+pub struct OrderRules {}
 
 impl RewriteRules for OrderRules {
     fn rewrite_rules(&self) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
@@ -77,10 +72,8 @@ impl RewriteRules for OrderRules {
 }
 
 impl OrderRules {
-    pub fn new(cube_context: Arc<CubeContext>) -> Self {
-        Self {
-            _cube_context: cube_context,
-        }
+    pub fn new() -> Self {
+        Self {}
     }
 
     fn push_down_sort(

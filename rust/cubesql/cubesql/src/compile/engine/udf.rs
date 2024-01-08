@@ -933,7 +933,8 @@ pub fn create_date_udf() -> ScalarUDF {
                         builder.append_value(
                             NaiveDateTime::parse_from_str(strings.value(i), "%Y-%m-%d %H:%M:%S%.f")
                                 .map_err(|e| DataFusionError::Execution(e.to_string()))?
-                                .timestamp_nanos(),
+                                .timestamp_nanos_opt()
+                                .unwrap(),
                         )?;
                     }
                     Ok(ColumnarValue::Array(Arc::new(builder.finish())))
@@ -1134,7 +1135,11 @@ macro_rules! date_math_udf {
             } else {
                 let timestamp = timestamps.value_as_datetime(i).unwrap();
                 let interval = intervals.value(i).into();
-                builder.append_value($FUN(timestamp, interval, $IS_ADD)?.timestamp_nanos())?;
+                builder.append_value(
+                    $FUN(timestamp, interval, $IS_ADD)?
+                        .timestamp_nanos_opt()
+                        .unwrap(),
+                )?;
             }
         }
         return Ok(Arc::new(builder.finish()));
@@ -1518,7 +1523,7 @@ pub fn create_str_to_date_udf() -> ScalarUDF {
             })?;
 
             Ok(ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(
-                Some(res.timestamp_nanos()),
+                Some(res.timestamp_nanos_opt().unwrap()),
                 None,
             )))
         });
@@ -3039,7 +3044,11 @@ pub fn create_date_to_timestamp_udf() -> ScalarUDF {
                                     "Cannot initalize default zero NaiveTime".to_string(),
                                 ),
                             )?;
-                            Ok(Some(NaiveDateTime::new(date, time).timestamp_nanos()))
+                            Ok(Some(
+                                NaiveDateTime::new(date, time)
+                                    .timestamp_nanos_opt()
+                                    .unwrap(),
+                            ))
                         }
                         None => Ok(None),
                     })

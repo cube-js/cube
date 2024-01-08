@@ -1,5 +1,6 @@
 import { SchemaFileRepository } from '@cubejs-backend/shared';
 import { NativeInstance } from '@cubejs-backend/native';
+import { v4 as uuidv4 } from 'uuid';
 
 import { CubeValidator } from './CubeValidator';
 import { DataSchemaCompiler } from './DataSchemaCompiler';
@@ -81,7 +82,8 @@ export const prepareCompiler = (repo: SchemaFileRepository, options: PrepareComp
     contextEvaluator,
     joinGraph,
     compilerCache,
-    headCommitId: options.headCommitId
+    headCommitId: options.headCommitId,
+    compilerId: uuidv4(),
   };
 };
 

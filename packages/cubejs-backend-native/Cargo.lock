@@ -29,6 +29,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "ahash"
+version = "0.8.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77c3a9648d43b9cd48db467b3f87fdd6e146bcc88ab0180006cef2179fe11d01"
+dependencies = [
+ "cfg-if 1.0.0",
+ "once_cell",
+ "version_check",
+ "zerocopy",
+]
+
+[[package]]
 name = "aho-corasick"
 version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -51,6 +63,12 @@ checksum = "94fb8275041c72129eb51b7d0322c29b8387a0386127718b096429201a5d6ece"
 dependencies = [
  "alloc-no-stdlib",
 ]
+
+[[package]]
+name = "allocator-api2"
+version = "0.2.16"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0942ffc6dcaadf03badf6e6a2d0228460359d5e34b57ccdc720b7382dfbd5ec5"
 
 [[package]]
 name = "android-tzdata"
@@ -760,6 +778,7 @@ dependencies = [
  "itertools",
  "lazy_static",
  "log",
+ "lru",
  "minijinja",
  "mockall",
  "msql-srv",
@@ -792,7 +811,7 @@ name = "datafusion"
 version = "7.0.0"
 source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=dc15ce71abc4b4a2a41a1c149afc8b293027c49f#dc15ce71abc4b4a2a41a1c149afc8b293027c49f"
 dependencies = [
- "ahash",
+ "ahash 0.7.7",
  "arrow",
  "async-trait",
  "chrono",
@@ -849,7 +868,7 @@ name = "datafusion-expr"
 version = "7.0.0"
 source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=dc15ce71abc4b4a2a41a1c149afc8b293027c49f#dc15ce71abc4b4a2a41a1c149afc8b293027c49f"
 dependencies = [
- "ahash",
+ "ahash 0.7.7",
  "arrow",
  "datafusion-common",
  "sqlparser",
@@ -860,7 +879,7 @@ name = "datafusion-physical-expr"
 version = "7.0.0"
 source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=dc15ce71abc4b4a2a41a1c149afc8b293027c49f#dc15ce71abc4b4a2a41a1c149afc8b293027c49f"
 dependencies = [
- "ahash",
+ "ahash 0.7.7",
  "arrow",
  "blake2",
  "blake3",
@@ -1326,7 +1345,7 @@ version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a9ee70c43aaf417c914396645a0fa852624801b24ebb7ae78fe8272889ac888"
 dependencies = [
- "ahash",
+ "ahash 0.7.7",
 ]
 
 [[package]]
@@ -1334,6 +1353,10 @@ name = "hashbrown"
 version = "0.14.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "290f1a1d9242c78d09ce40a5e87e7554ee637af1351968159f4952f028f75604"
+dependencies = [
+ "ahash 0.8.7",
+ "allocator-api2",
+]
 
 [[package]]
 name = "heck"
@@ -1747,6 +1770,15 @@ dependencies = [
  "arc-swap",
  "log",
  "once_cell",
+]
+
+[[package]]
+name = "lru"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2994eeba8ed550fd9b47a0b38f0242bc3344e496483c6180b69139cc2fa5d1d7"
+dependencies = [
+ "hashbrown 0.14.3",
 ]
 
 [[package]]
@@ -4265,6 +4297,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "05f360fc0b24296329c78fda852a1e9ae82de9cf7b27dae4b7f62f118f77b9ed"
 dependencies = [
  "tap",
+]
+
+[[package]]
+name = "zerocopy"
+version = "0.7.32"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "74d4d3961e53fa4c9a25a8637fc2bfaf2595b3d3ae34875568a5cf64787716be"
+dependencies = [
+ "zerocopy-derive",
+]
+
+[[package]]
+name = "zerocopy-derive"
+version = "0.7.32"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9ce1b18ccd8e73a9321186f97e46f9f04b778851177567b1975109d26a08d2a6"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.41",
 ]
 
 [[package]]
