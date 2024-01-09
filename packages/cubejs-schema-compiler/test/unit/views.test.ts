@@ -14,6 +14,7 @@ describe('Views YAML', () => {
               sql: 'id',
               type: 'number',
               description: 'Description for CubeA.id',
+              title: 'Title for CubeA.id',
               meta: {
                 key: 'Meta.key for CubeA.id'
               },
@@ -34,6 +35,7 @@ describe('Views YAML', () => {
                 sql: 'id',
                 type: 'number',
                 description: 'Description for CubeB.id',
+                title: 'Title for CubeB.id',
                 meta: {
                   key: 'Meta.key for CubeB.id'
                 },
@@ -44,6 +46,7 @@ describe('Views YAML', () => {
                 sql: 'other_id',
                 type: 'number',
                 description: 'Description for CubeB.other_id',
+                title: 'Title for CubeB.other_id',
                 meta: {
                   key: 'Meta.key for CubeB.other_id'
                 },
@@ -61,6 +64,7 @@ describe('Views YAML', () => {
                 type: 'number',
                 primary_key: true,
                 description: 'Description for CubeC.id',
+                title: 'Title for CubeC.id',
                 meta: {
                   key: 'Meta.key for CubeC.id'
                 },
@@ -70,6 +74,7 @@ describe('Views YAML', () => {
                 sql: 'dimension_1',
                 type: 'number',
                 description: 'Description for CubeC.dimension_1',
+                title: 'Title for CubeC.dimension_1',
                 meta: {
                   key: 'Meta.key for CubeC.dimension_1'
                 },
@@ -98,6 +103,7 @@ describe('Views YAML', () => {
       ownedByCube: false,
       sql: expect.any(Function),
       aliasMember: aliasName,
+      title: `Title for ${name}`,
       type: 'number',
     };
   }
@@ -118,7 +124,7 @@ describe('Views YAML', () => {
         },
       ]
     }]);
-
+    
     expect(cubeEvaluator.getCubeDefinition('simple_view').dimensions).toEqual({
       CubeA_id: dimensionFixtureForCube('CubeA.id'),
       CubeB_id: dimensionFixtureForCube('CubeB.id'),

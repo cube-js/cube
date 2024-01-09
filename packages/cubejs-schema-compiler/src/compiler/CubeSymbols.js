@@ -369,6 +369,7 @@ export class CubeSymbols {
           type: 'number',
           aggType: resolvedMember.type,
           meta: resolvedMember.meta,
+          title: resolvedMember.title,
           description: resolvedMember.description,
         };
       } else if (type === 'dimensions') {
@@ -376,6 +377,7 @@ export class CubeSymbols {
           sql,
           type: resolvedMember.type,
           meta: resolvedMember.meta,
+          title: resolvedMember.title,
           description: resolvedMember.description,
         };
       } else if (type === 'segments') {
