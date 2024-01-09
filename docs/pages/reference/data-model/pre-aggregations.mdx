@@ -801,9 +801,10 @@ tenants in case different tenants have different pre-aggregation SQL.
 <WarningBox>
 
 Choose the count of partitions wisely as those consume memory and CPU resources.
-As a rule of thumb, you do not want to go over 5,000-10,000 partitions in total
+As a rule of thumb, you do not want to go over 500-1,000 partitions per pre-aggregation in total
 to keep the partitioning overhead low. Too many partitions will most likely
-cause out of memory.
+cause out of memory. 
+In case of very long build ranges please consider use [Lambda pre-aggregations][ref-caching-lambda-preaggs] to reduce partition count per pre-aggregation.
 
 </WarningBox>
 
