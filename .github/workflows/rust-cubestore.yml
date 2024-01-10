@@ -21,7 +21,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        rust: [nightly-2022-06-22]
+        rust: [nightly-2024-01-29]
     env:
       RUST: ${{ matrix.rust }}
     steps:
@@ -152,7 +152,7 @@ jobs:
       - name: Setup Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2022-06-22
+          toolchain: nightly-2024-01-29
           target: ${{ matrix.target }}
           override: true
           components: rustfmt

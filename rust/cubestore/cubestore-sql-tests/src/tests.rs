@@ -6785,7 +6785,7 @@ async fn assert_limit_pushdown(
 async fn cache_incr(service: Box<dyn SqlClient>) {
     let query = r#"CACHE INCR "prefix:key""#;
 
-    let r = service.exec_query(query.clone()).await.unwrap();
+    let r = service.exec_query(query).await.unwrap();
 
     assert_eq!(
         r.get_rows(),
