@@ -3,7 +3,7 @@
 [DuckDB][duckdb] is an in-process SQL OLAP database management system, and has
 support for querying data in CSV, JSON and Parquet formats from an AWS
 S3-compatible blob storage. This means you can [query data stored in AWS S3,
-Google Cloud Storage, or CloudFlare R2][duckdb-docs-s3-import].
+Google Cloud Storage, or Cloudflare R2][duckdb-docs-s3-import].
 
 <Diagram src="https://ucarecdn.com/d3e42677-83ce-4ad8-8ac9-c39d3b74e252/" />
 
@@ -33,19 +33,27 @@ CUBEJS_DB_TYPE=duckdb
 
 ### Cube Cloud
 
-In Cube Cloud, select **DuckDB** when creating a new deployment and fill in the
-required fields:
-
-<InfoBox>
-
-If you are not using MotherDuck, leave the **MotherDuck Token** field blank.
-
-</InfoBox>
+In Cube Cloud, select&nbsp;<Btn>DuckDB</Btn> when creating a new deployment
+and fill in the required fields:
 
 <Screenshot
   alt="Cube Cloud DuckDB Configuration Screen"
   src="https://ucarecdn.com/ffad02b1-a563-47e4-bbc0-0302ab046ccd/"
 />
+
+<InfoBox>
+
+If you are not using MotherDuck, leave the&nbsp;<Btn>MotherDuck Token</Btn>
+field blank.
+
+</InfoBox>
+
+<InfoBox>
+
+You can also explore how DuckDB works with Cube if you create a [demo
+deployment][ref-demo-deployment] in Cube Cloud.
+
+</InfoBox>
 
 ## Environment Variables
 
@@ -124,3 +132,4 @@ connections are made over HTTPS.
 [ref-schema-ref-types-formats-countdistinctapprox]:
   /reference/data-model/types-and-formats#count-distinct-approx
 [self-preaggs-batching]: #batching
+[ref-demo-deployment]: /product/deployment/cloud/deployments#demo-deployments
