@@ -74,7 +74,6 @@ tempfile = "3.2.0"
 tarpc = { version = "0.24", features = ["tokio1"] }
 pin-project-lite = "0.2.4"
 paste = "1.0.4"
-mysql_common = "0.26.0"
 flatbuffers = "23.1.21"
 http-auth-basic = "0.1.2"
 tracing = "0.1.25"

@@ -1259,7 +1259,6 @@ dependencies = [
  "mockall",
  "moka 0.10.1",
  "msql-srv",
- "mysql_common 0.26.0",
  "nanoid",
  "num 0.3.1",
  "parquet",
@@ -2791,7 +2790,7 @@ dependencies = [
  "async-trait",
  "byteorder",
  "chrono",
- "mysql_common 0.22.2",
+ "mysql_common",
  "nom 5.1.2",
  "rand 0.8.4",
  "time 0.2.7",
@@ -2867,35 +2866,6 @@ dependencies = [
  "serde_json",
  "sha1 0.6.0",
  "sha2 0.8.2",
- "time 0.2.7",
- "twox-hash",
- "uuid 0.8.2",
-]
-
-[[package]]
-name = "mysql_common"
-version = "0.26.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3694c35738725021e85c7b644b94bdab050d4ea6acca2b5624287f41e2abc5a"
-dependencies = [
- "base64 0.13.0",
- "bigdecimal 0.2.0",
- "bitflags",
- "byteorder",
- "bytes 1.0.1",
- "chrono",
- "flate2",
- "lazy_static",
- "lexical",
- "num-bigint 0.3.2",
- "num-traits 0.2.14",
- "rand 0.8.4",
- "regex",
- "rust_decimal",
- "serde",
- "serde_json",
- "sha1 0.6.0",
- "sha2 0.9.5",
  "time 0.2.7",
  "twox-hash",
  "uuid 0.8.2",
