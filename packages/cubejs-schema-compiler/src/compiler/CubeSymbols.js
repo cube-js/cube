@@ -371,6 +371,8 @@ export class CubeSymbols {
           meta: resolvedMember.meta,
           title: resolvedMember.title,
           description: resolvedMember.description,
+          format: resolvedMember.format,
+          drillMembers: resolvedMember.drillMembers,
         };
       } else if (type === 'dimensions') {
         memberDefinition = {
@@ -379,6 +381,7 @@ export class CubeSymbols {
           meta: resolvedMember.meta,
           title: resolvedMember.title,
           description: resolvedMember.description,
+          format: resolvedMember.format,
         };
       } else if (type === 'segments') {
         memberDefinition = {

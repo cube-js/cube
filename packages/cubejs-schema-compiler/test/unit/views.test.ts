@@ -15,6 +15,7 @@ describe('Views YAML', () => {
               type: 'number',
               description: 'Description for CubeA.id',
               title: 'Title for CubeA.id',
+              format: 'imageUrl',
               meta: {
                 key: 'Meta.key for CubeA.id'
               },
@@ -24,6 +25,17 @@ describe('Views YAML', () => {
               name: 'CubeC',
               relationship: 'one_to_one',
               sql: 'SQL clause',
+            }],
+            measures: [{
+              name: 'count_a',
+              type: 'number',
+              sql: 'count(*)',
+              meta: {
+                key: 'Meta.key for CubeA.count_a'
+              },
+              title: 'Title for CubeA.count_a',
+              description: 'Description for CubeA.count_a',
+              format: 'number',
             }]
           },
           {
@@ -36,6 +48,7 @@ describe('Views YAML', () => {
                 type: 'number',
                 description: 'Description for CubeB.id',
                 title: 'Title for CubeB.id',
+                format: 'imageUrl',
                 meta: {
                   key: 'Meta.key for CubeB.id'
                 },
@@ -47,11 +60,23 @@ describe('Views YAML', () => {
                 type: 'number',
                 description: 'Description for CubeB.other_id',
                 title: 'Title for CubeB.other_id',
+                format: 'imageUrl',
                 meta: {
                   key: 'Meta.key for CubeB.other_id'
                 },
               }
-            ]
+            ],
+            measures: [{
+              name: 'count_b',
+              type: 'number',
+              sql: 'count(*)',
+              meta: {
+                key: 'Meta.key for CubeB.count_b'
+              },
+              title: 'Title for CubeB.count_b',
+              description: 'Description for CubeB.count_b',
+              format: 'number',
+            }]
           },
           // A -> C
           {
@@ -65,6 +90,7 @@ describe('Views YAML', () => {
                 primary_key: true,
                 description: 'Description for CubeC.id',
                 title: 'Title for CubeC.id',
+                format: 'imageUrl',
                 meta: {
                   key: 'Meta.key for CubeC.id'
                 },
@@ -75,11 +101,23 @@ describe('Views YAML', () => {
                 type: 'number',
                 description: 'Description for CubeC.dimension_1',
                 title: 'Title for CubeC.dimension_1',
+                format: 'imageUrl',
                 meta: {
                   key: 'Meta.key for CubeC.dimension_1'
                 },
               }
-            ]
+            ],
+            measures: [{
+              name: 'count_c',
+              type: 'number',
+              sql: 'count(*)',
+              meta: {
+                key: 'Meta.key for CubeC.count_c'
+              },
+              title: 'Title for CubeC.count_c',
+              description: 'Description for CubeC.count_c',
+              format: 'number',
+            }]
           },
           {
             name: 'CubeBChild',
@@ -103,6 +141,23 @@ describe('Views YAML', () => {
       ownedByCube: false,
       sql: expect.any(Function),
       aliasMember: aliasName,
+      format: 'imageUrl',
+      title: `Title for ${name}`,
+      type: 'number',
+    };
+  }
+  
+  function measuresFixtureForCube(aliasName: string, name: string = aliasName) {
+    return {
+      description: `Description for ${name}`,
+      meta: {
+        key: `Meta.key for ${name}`
+      },
+      ownedByCube: false,
+      sql: expect.any(Function),
+      aliasMember: aliasName,
+      format: 'number',
+      aggType: 'number',
       title: `Title for ${name}`,
       type: 'number',
     };
@@ -129,6 +184,11 @@ describe('Views YAML', () => {
       CubeA_id: dimensionFixtureForCube('CubeA.id'),
       CubeB_id: dimensionFixtureForCube('CubeB.id'),
       CubeB_other_id: dimensionFixtureForCube('CubeB.other_id'),
+    });
+
+    expect(cubeEvaluator.getCubeDefinition('simple_view').measures).toEqual({
+      CubeA_count_a: measuresFixtureForCube('CubeA.count_a'),
+      CubeB_count_b: measuresFixtureForCube('CubeB.count_b'),
     });
   });
 
