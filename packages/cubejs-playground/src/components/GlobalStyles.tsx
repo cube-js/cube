@@ -288,6 +288,54 @@ const GlobalStyles = createGlobalStyle`
       color: var(--purple-color);
     }
   }
+  
+  .ant-tabs {
+    overflow: visible;
+  } 
+  
+  .test {
+    .ant-dropdown-menu-item {
+      clear: both;
+      margin: 0;
+      padding: 5px 12px;
+      color: #5b5c7d;
+      font-weight: 400;
+      font-size: 14px;
+      line-height: 22px;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: all .3s;  
+      height: auto;
+      margin-bottom: 0 !important;
+      padding-left: 24px;
+    }
+    
+    .ant-dropdown-menu-item.ant-menu-item-active {
+      background: rgb(243, 243, 251);
+    }
+    
+    .ant-dropdown-menu-item-group-list {
+      margin: 0 8px;
+      padding: 0;
+      list-style: none;
+    }    
+    
+    .ant-menu-item-group-title {
+      font-size: 15px;
+    }
+  }
+  
+  .simple-overlay {
+    .ant-dropdown-menu-item {
+      padding-left: 8px;
+    }
+  }
+  
+  .cube-section {
+    .ant-btn-icon-only {
+      height: 100% !important;
+    }
+  }  
 `;
 
 export default GlobalStyles;

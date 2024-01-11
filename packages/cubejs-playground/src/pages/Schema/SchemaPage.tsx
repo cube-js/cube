@@ -1,10 +1,5 @@
 import React, { Component } from 'react';
-import {
-  Layout,
-  Modal,
-  Empty,
-  Typography,
-} from 'antd';
+import { Layout, Modal, Empty, Typography } from 'antd';
 import { RouterProps } from 'react-router-dom';
 
 import PrismCode from '../../PrismCode';
@@ -13,7 +8,7 @@ import { Menu, Tabs, Tree } from '../../components';
 import { Alert, CubeLoader } from '../../atoms';
 import { playgroundFetch } from '../../shared/helpers';
 import { AppContext, AppContextConsumer } from '../../components/AppContext';
-import ButtonDropdown from '../../QueryBuilder/ButtonDropdown';
+import { ButtonDropdown } from '../../QueryBuilder/ButtonDropdown';
 import { SchemaFormat } from '../../types';
 
 const { Content, Sider } = Layout;
@@ -54,6 +49,7 @@ export class SchemaPage extends Component<SchemaPageProps, any> {
       activeTab: 'schema',
       files: [],
       isDocker: null,
+      shown: false
     };
   }
 
@@ -99,7 +95,7 @@ export class SchemaPage extends Component<SchemaPageProps, any> {
     const result = await res.json();
     this.setState({
       files: result.files,
-      activeTab: (result.files && result.files.length > 0) ? "files" : "schema"
+      activeTab: result.files && result.files.length > 0 ? 'files' : 'schema',
     });
   }
 
@@ -130,7 +126,8 @@ export class SchemaPage extends Component<SchemaPageProps, any> {
       this.setState({ checkedKeys: [], activeTab: 'files' });
       Modal.success({
         title: 'Data model files successfully generated!',
-        content: 'You can start exploring your data model and building the charts',
+        content:
+          'You can start exploring your data model and building the charts',
         okText: 'Build',
         cancelText: 'Close',
         okCancel: true,
@@ -250,6 +247,7 @@ export class SchemaPage extends Component<SchemaPageProps, any> {
             onChange={(tab) => this.setState({ activeTab: tab })}
             tabBarExtraContent={
               <ButtonDropdown
+                show={this.state.shown}
                 disabled={!checkedKeys.length}
                 type="primary"
                 data-testid="chart-type-btn"
@@ -272,6 +270,9 @@ export class SchemaPage extends Component<SchemaPageProps, any> {
                   </Menu>
                 }
                 style={{ border: 0 }}
+                onOverlayOpen={() => this.setState({ shown: true })}
+                onOverlayClose={() => this.setState({ shown: false })}
+                onItemClick={() => this.setState({ shown: false })}
               >
                 Generate Data Model
               </ButtonDropdown>
