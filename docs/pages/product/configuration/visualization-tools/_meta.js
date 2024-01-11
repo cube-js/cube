@@ -12,6 +12,7 @@ module.exports = {
   "observable": "Observable",
   "powerbi": "Power BI",
   "retool": "Retool",
+  "steep": "Steep",
   "streamlit": "Streamlit",
   "superset": "Superset / Preset",
   "tableau": "Tableau",
