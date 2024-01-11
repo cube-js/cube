@@ -250,6 +250,7 @@ impl CostFunction<LogicalPlanLanguage> for BestCubePlan {
             LogicalPlanLanguage::CaseExprReplacer(_) => 1,
             LogicalPlanLanguage::WrapperPushdownReplacer(_) => 1,
             LogicalPlanLanguage::WrapperPullupReplacer(_) => 1,
+            LogicalPlanLanguage::QueryParam(_) => 1,
             _ => 0,
         };
 

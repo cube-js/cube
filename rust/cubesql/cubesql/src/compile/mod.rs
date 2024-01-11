@@ -1387,6 +1387,8 @@ WHERE `TABLE_SCHEMA` = '{}'",
         qtrace: &mut Option<Qtrace>,
         span_id: Option<Arc<SpanId>>,
     ) -> CompilationResult<QueryPlan> {
+        self.reauthenticate_if_needed().await?;
+
         match &stmt {
             ast::Statement::Query(query) => match &query.body {
                 ast::SetExpr::Select(select) if select.into.is_some() => {
@@ -1451,20 +1453,25 @@ WHERE `TABLE_SCHEMA` = '{}'",
             qtrace.set_optimized_plan(&optimized_plan);
         }
 
-        let mut converter = LogicalPlanToLanguageConverter::new(Arc::new(cube_ctx));
+        let cube_ctx = Arc::new(cube_ctx);
+        let mut converter = LogicalPlanToLanguageConverter::new(cube_ctx.clone());
+        let mut query_params = Some(HashMap::new());
         let root = converter
-            .add_logical_plan(&optimized_plan)
+            .add_logical_plan_replace_params(&optimized_plan, &mut query_params)
             .map_err(|e| CompilationError::internal(e.to_string()))?;
 
-        self.reauthenticate_if_needed().await?;
-
-        let result = converter
-            .take_rewriter()
-            .find_best_plan(
-                root,
+        let result = self
+            .session_manager
+            .server
+            .compiler_cache
+            .rewrite(
                 self.state.auth_context().unwrap(),
-                qtrace,
+                cube_ctx.clone(),
+                root,
+                converter.take_egraph(),
+                &query_params.unwrap(),
                 span_id.clone(),
+                qtrace,
             )
             .await
             .map_err(|e| match e.cause {
@@ -15679,7 +15686,10 @@ limit
             // Quarter of Year
             ["EXTRACT(QUARTER FROM t.\"order_date\")", "quarter"],
             // Year
-            ["CAST(EXTRACT(YEAR FROM t.\"order_date\") AS varchar)", "year"],
+            [
+                "CAST(EXTRACT(YEAR FROM t.\"order_date\") AS varchar)",
+                "year",
+            ],
         ];
 
         for [expr, expected_granularity] in &supported_granularities {
@@ -18248,7 +18258,7 @@ limit
                 segments: Some(vec![]),
                 time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
-                    granularity: Some("quarter".to_string()),
+                    granularity: Some("month".to_string()),
                     date_range: None
                 }]),
                 order: None,

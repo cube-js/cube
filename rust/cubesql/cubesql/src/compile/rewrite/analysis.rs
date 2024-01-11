@@ -1187,16 +1187,22 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
         if let Some(ConstantFolding::Scalar(c)) = &egraph[id].data.constant {
             // TODO: ideally all constants should be aliased, but this requires
             // rewrites to extract `.data.constant` instead of `literal_expr`.
-            let alias_name =
-                if c.is_null() || matches!(c, ScalarValue::Date32(_) | ScalarValue::Date64(_)) {
-                    egraph[id]
-                        .data
-                        .original_expr
-                        .as_ref()
-                        .map(|expr| expr.name(&DFSchema::empty()).unwrap())
-                } else {
-                    None
-                };
+            let alias_name = if c.is_null()
+                || matches!(
+                    c,
+                    ScalarValue::Date32(_)
+                        | ScalarValue::Date64(_)
+                        | ScalarValue::Int64(_)
+                        | ScalarValue::Float64(_)
+                ) {
+                egraph[id]
+                    .data
+                    .original_expr
+                    .as_ref()
+                    .map(|expr| expr.name(&DFSchema::empty()).unwrap())
+            } else {
+                None
+            };
             let c = c.clone();
             let value = egraph.add(LogicalPlanLanguage::LiteralExprValue(LiteralExprValue(c)));
             let literal_expr = egraph.add(LogicalPlanLanguage::LiteralExpr([value]));

@@ -125,6 +125,10 @@ pub trait ConfigObj: DIService + Debug {
     fn auth_expire_secs(&self) -> u64;
 
     fn compiler_cache_size(&self) -> usize;
+
+    fn query_cache_size(&self) -> usize;
+
+    fn enable_parameterized_rewrite_cache(&self) -> bool;
 }
 
 #[derive(Debug, Clone)]
@@ -137,6 +141,8 @@ pub struct ConfigObjImpl {
     pub timezone: Option<String>,
     pub disable_strict_agg_type_match: bool,
     pub compiler_cache_size: usize,
+    pub query_cache_size: usize,
+    pub enable_parameterized_rewrite_cache: bool,
 }
 
 impl ConfigObjImpl {
@@ -163,6 +169,11 @@ impl ConfigObjImpl {
             ),
             auth_expire_secs: env_parse("CUBESQL_AUTH_EXPIRE_SECS", 300),
             compiler_cache_size: env_parse("CUBEJS_COMPILER_CACHE_SIZE", 100),
+            query_cache_size: env_parse("CUBESQL_QUERY_CACHE_SIZE", 500),
+            enable_parameterized_rewrite_cache: env_parse(
+                "CUBESQL_ENABLE_PARAMETERIZED_REWRITE_CACHE",
+                false,
+            ),
         }
     }
 }
@@ -197,6 +208,14 @@ impl ConfigObj for ConfigObjImpl {
     fn compiler_cache_size(&self) -> usize {
         self.compiler_cache_size
     }
+
+    fn query_cache_size(&self) -> usize {
+        self.query_cache_size
+    }
+
+    fn enable_parameterized_rewrite_cache(&self) -> bool {
+        self.enable_parameterized_rewrite_cache
+    }
 }
 
 lazy_static! {
@@ -226,6 +245,8 @@ impl Config {
                 timezone,
                 disable_strict_agg_type_match: false,
                 compiler_cache_size: 100,
+                query_cache_size: 500,
+                enable_parameterized_rewrite_cache: false,
             }),
         }
     }

@@ -1,14 +1,20 @@
 use crate::{
-    compile::rewrite::{analysis::LogicalPlanAnalysis, rewriter::Rewriter, LogicalPlanLanguage},
+    compile::{
+        engine::provider::CubeContext,
+        qtrace::Qtrace,
+        rewrite::{analysis::LogicalPlanAnalysis, rewriter::Rewriter, LogicalPlanLanguage},
+    },
     config::ConfigObj,
     sql::AuthContextRef,
-    transport::{MetaContext, TransportService},
+    transport::{MetaContext, SpanId, TransportService},
+    utils::egraph_hash,
     CubeError, MutexAsync, RWLockAsync,
 };
 use async_trait::async_trait;
-use egg::Rewrite;
+use datafusion::{logical_plan::LogicalPlan, scalar::ScalarValue};
+use egg::{EGraph, Id, Rewrite};
 use lru::LruCache;
-use std::{fmt::Debug, num::NonZeroUsize, sync::Arc};
+use std::{collections::HashMap, fmt::Debug, num::NonZeroUsize, sync::Arc};
 use uuid::Uuid;
 
 #[async_trait]
@@ -19,6 +25,25 @@ pub trait CompilerCache: Send + Sync + Debug {
     ) -> Result<Arc<Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>>, CubeError>;
 
     async fn meta(&self, ctx: AuthContextRef) -> Result<Arc<MetaContext>, CubeError>;
+
+    async fn parameterized_rewrite(
+        &self,
+        ctx: AuthContextRef,
+        cube_context: Arc<CubeContext>,
+        input_plan: EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        qtrace: &mut Option<Qtrace>,
+    ) -> Result<EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, CubeError>;
+
+    async fn rewrite(
+        &self,
+        ctx: AuthContextRef,
+        cube_context: Arc<CubeContext>,
+        root: Id,
+        input_plan: EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        param_values: &HashMap<usize, ScalarValue>,
+        span_id: Option<Arc<SpanId>>,
+        qtrace: &mut Option<Qtrace>,
+    ) -> Result<LogicalPlan, CubeError>;
 }
 
 #[derive(Debug)]
@@ -31,6 +56,9 @@ pub struct CompilerCacheImpl {
 pub struct CompilerCacheEntry {
     meta_context: Arc<MetaContext>,
     rewrite_rules: RWLockAsync<Option<Arc<Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>>>>,
+    parameterized_cache:
+        MutexAsync<LruCache<[u8; 32], EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>>>,
+    queries_cache: MutexAsync<LruCache<[u8; 32], LogicalPlan>>,
 }
 
 crate::di_service!(CompilerCacheImpl, [CompilerCache]);
@@ -64,6 +92,62 @@ impl CompilerCache for CompilerCacheImpl {
     async fn meta(&self, ctx: AuthContextRef) -> Result<Arc<MetaContext>, CubeError> {
         let cache_entry = self.get_cache_entry(ctx.clone()).await?;
         Ok(cache_entry.meta_context.clone())
+    }
+
+    async fn parameterized_rewrite(
+        &self,
+        ctx: AuthContextRef,
+        cube_context: Arc<CubeContext>,
+        parameterized_graph: EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        qtrace: &mut Option<Qtrace>,
+    ) -> Result<EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, CubeError> {
+        let cache_entry = self.get_cache_entry(ctx.clone()).await?;
+
+        let graph_key = egraph_hash(&parameterized_graph);
+
+        let mut rewrites_cache_lock = cache_entry.parameterized_cache.lock().await;
+        if let Some(rewrite_entry) = rewrites_cache_lock.get(&graph_key) {
+            Ok(rewrite_entry.clone())
+        } else {
+            let mut rewriter = Rewriter::new(parameterized_graph, cube_context);
+            let rewrite_entry = rewriter
+                .run_rewrite_to_completion(ctx.clone(), qtrace)
+                .await?;
+            rewrites_cache_lock.put(graph_key, rewrite_entry.clone());
+            Ok(rewrite_entry)
+        }
+    }
+
+    async fn rewrite(
+        &self,
+        ctx: AuthContextRef,
+        cube_context: Arc<CubeContext>,
+        root: Id,
+        input_plan: EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        param_values: &HashMap<usize, ScalarValue>,
+        span_id: Option<Arc<SpanId>>,
+        qtrace: &mut Option<Qtrace>,
+    ) -> Result<LogicalPlan, CubeError> {
+        let cache_entry = self.get_cache_entry(ctx.clone()).await?;
+
+        let graph_key = egraph_hash(&input_plan);
+
+        let mut rewrites_cache_lock = cache_entry.queries_cache.lock().await;
+        if let Some(plan) = rewrites_cache_lock.get(&graph_key) {
+            Ok(plan.clone())
+        } else {
+            let graph = if self.config_obj.enable_parameterized_rewrite_cache() {
+                self.parameterized_rewrite(ctx.clone(), cube_context.clone(), input_plan, qtrace)
+                    .await?
+            } else {
+                input_plan
+            };
+            let mut rewriter = Rewriter::new(graph, cube_context);
+            rewriter.add_param_values(param_values)?;
+            let final_plan = rewriter.find_best_plan(root, ctx, qtrace, span_id).await?;
+            rewrites_cache_lock.put(graph_key, final_plan.clone());
+            Ok(final_plan)
+        }
     }
 }
 
@@ -104,6 +188,12 @@ impl CompilerCacheImpl {
                     let cache_entry = Arc::new(CompilerCacheEntry {
                         meta_context: meta_context.clone(),
                         rewrite_rules: RWLockAsync::new(None),
+                        parameterized_cache: MutexAsync::new(LruCache::new(
+                            NonZeroUsize::new(self.config_obj.query_cache_size()).unwrap(),
+                        )),
+                        queries_cache: MutexAsync::new(LruCache::new(
+                            NonZeroUsize::new(self.config_obj.query_cache_size()).unwrap(),
+                        )),
                     });
                     compiler_id_to_entry.put(meta_context.compiler_id.clone(), cache_entry.clone());
                     cache_entry
