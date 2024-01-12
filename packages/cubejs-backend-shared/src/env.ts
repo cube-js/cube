@@ -1408,6 +1408,16 @@ const variables: Record<string, (...args: any) => any> = {
     ]
   ),
   
+  duckdbDatabasePath: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_DUCKDB_DATABASE_PATH', dataSource)
+    ]
+  ),
+
   duckdbS3Region: ({
     dataSource
   }: {
