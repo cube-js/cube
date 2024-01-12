@@ -236,7 +236,10 @@ impl Rewriter {
             .sessions
             .server
             .compiler_cache
-            .rewrite_rules(auth_context.clone())
+            .rewrite_rules(
+                auth_context.clone(),
+                cube_context.session_state.protocol.clone(),
+            )
             .await?;
 
         let (plan, qtrace_egraph_iterations) = tokio::task::spawn_blocking(move || {
@@ -315,7 +318,10 @@ impl Rewriter {
             .sessions
             .server
             .compiler_cache
-            .rewrite_rules(auth_context.clone())
+            .rewrite_rules(
+                auth_context.clone(),
+                cube_context.session_state.protocol.clone(),
+            )
             .await?;
 
         let (plan, qtrace_egraph_iterations, qtrace_best_graph) =

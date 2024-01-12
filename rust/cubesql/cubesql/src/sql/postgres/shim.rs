@@ -947,7 +947,7 @@ impl AsyncPostgresShim {
                     .session
                     .server
                     .compiler_cache
-                    .meta(self.auth_context()?)
+                    .meta(self.auth_context()?, self.session.state.protocol.clone())
                     .await?;
 
                 let plan = convert_statement_to_cube_query(
@@ -1039,7 +1039,7 @@ impl AsyncPostgresShim {
             .session
             .server
             .compiler_cache
-            .meta(self.auth_context()?)
+            .meta(self.auth_context()?, self.session.state.protocol.clone())
             .await?;
 
         let stmt_replacer = StatementPlaceholderReplacer::new();
@@ -1638,7 +1638,7 @@ impl AsyncPostgresShim {
             .session
             .server
             .compiler_cache
-            .meta(self.auth_context()?)
+            .meta(self.auth_context()?, self.session.state.protocol.clone())
             .await?;
 
         let statements =

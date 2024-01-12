@@ -5,7 +5,7 @@ use crate::{
         rewrite::{analysis::LogicalPlanAnalysis, rewriter::Rewriter, LogicalPlanLanguage},
     },
     config::ConfigObj,
-    sql::AuthContextRef,
+    sql::{session::DatabaseProtocol, AuthContextRef},
     transport::{MetaContext, SpanId, TransportService},
     utils::egraph_hash,
     CubeError, MutexAsync, RWLockAsync,
@@ -22,9 +22,14 @@ pub trait CompilerCache: Send + Sync + Debug {
     async fn rewrite_rules(
         &self,
         ctx: AuthContextRef,
+        protocol: DatabaseProtocol,
     ) -> Result<Arc<Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>>, CubeError>;
 
-    async fn meta(&self, ctx: AuthContextRef) -> Result<Arc<MetaContext>, CubeError>;
+    async fn meta(
+        &self,
+        ctx: AuthContextRef,
+        protocol: DatabaseProtocol,
+    ) -> Result<Arc<MetaContext>, CubeError>;
 
     async fn parameterized_rewrite(
         &self,
@@ -50,7 +55,7 @@ pub trait CompilerCache: Send + Sync + Debug {
 pub struct CompilerCacheImpl {
     config_obj: Arc<dyn ConfigObj>,
     transport: Arc<dyn TransportService>,
-    compiler_id_to_entry: MutexAsync<LruCache<Uuid, Arc<CompilerCacheEntry>>>,
+    compiler_id_to_entry: MutexAsync<LruCache<(Uuid, DatabaseProtocol), Arc<CompilerCacheEntry>>>,
 }
 
 pub struct CompilerCacheEntry {
@@ -68,8 +73,9 @@ impl CompilerCache for CompilerCacheImpl {
     async fn rewrite_rules(
         &self,
         ctx: AuthContextRef,
+        protocol: DatabaseProtocol,
     ) -> Result<Arc<Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>>, CubeError> {
-        let cache_entry = self.get_cache_entry(ctx.clone()).await?;
+        let cache_entry = self.get_cache_entry(ctx.clone(), protocol).await?;
 
         let rewrite_rules = { cache_entry.rewrite_rules.read().await.clone() };
         if let Some(rewrite_rules) = rewrite_rules {
@@ -89,8 +95,12 @@ impl CompilerCache for CompilerCacheImpl {
         }
     }
 
-    async fn meta(&self, ctx: AuthContextRef) -> Result<Arc<MetaContext>, CubeError> {
-        let cache_entry = self.get_cache_entry(ctx.clone()).await?;
+    async fn meta(
+        &self,
+        ctx: AuthContextRef,
+        protocol: DatabaseProtocol,
+    ) -> Result<Arc<MetaContext>, CubeError> {
+        let cache_entry = self.get_cache_entry(ctx.clone(), protocol).await?;
         Ok(cache_entry.meta_context.clone())
     }
 
@@ -101,7 +111,9 @@ impl CompilerCache for CompilerCacheImpl {
         parameterized_graph: EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
         qtrace: &mut Option<Qtrace>,
     ) -> Result<EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, CubeError> {
-        let cache_entry = self.get_cache_entry(ctx.clone()).await?;
+        let cache_entry = self
+            .get_cache_entry(ctx.clone(), cube_context.session_state.protocol.clone())
+            .await?;
 
         let graph_key = egraph_hash(&parameterized_graph);
 
@@ -128,7 +140,9 @@ impl CompilerCache for CompilerCacheImpl {
         span_id: Option<Arc<SpanId>>,
         qtrace: &mut Option<Qtrace>,
     ) -> Result<LogicalPlan, CubeError> {
-        let cache_entry = self.get_cache_entry(ctx.clone()).await?;
+        let cache_entry = self
+            .get_cache_entry(ctx.clone(), cube_context.session_state.protocol.clone())
+            .await?;
 
         let graph_key = egraph_hash(&input_plan);
 
@@ -166,13 +180,14 @@ impl CompilerCacheImpl {
     pub async fn get_cache_entry(
         &self,
         ctx: AuthContextRef,
+        protocol: DatabaseProtocol,
     ) -> Result<Arc<CompilerCacheEntry>, CubeError> {
         let compiler_id = self.transport.compiler_id(ctx.clone()).await?;
         let cache_entry = {
             self.compiler_id_to_entry
                 .lock()
                 .await
-                .get(&compiler_id)
+                .get(&(compiler_id, protocol.clone()))
                 .cloned()
         };
         // Double checked locking
@@ -182,7 +197,7 @@ impl CompilerCacheImpl {
             let meta_context = self.transport.meta(ctx.clone()).await?;
             let mut compiler_id_to_entry = self.compiler_id_to_entry.lock().await;
             compiler_id_to_entry
-                .get(&meta_context.compiler_id)
+                .get(&(meta_context.compiler_id, protocol.clone()))
                 .cloned()
                 .unwrap_or_else(|| {
                     let cache_entry = Arc::new(CompilerCacheEntry {
@@ -195,7 +210,10 @@ impl CompilerCacheImpl {
                             NonZeroUsize::new(self.config_obj.query_cache_size()).unwrap(),
                         )),
                     });
-                    compiler_id_to_entry.put(meta_context.compiler_id.clone(), cache_entry.clone());
+                    compiler_id_to_entry.put(
+                        (meta_context.compiler_id.clone(), protocol.clone()),
+                        cache_entry.clone(),
+                    );
                     cache_entry
                 })
         };
