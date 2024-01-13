@@ -295,15 +295,15 @@ impl RewriteRules for DateRules {
                         "?date_trunc_alias",
                     ),
                     "+",
-                    negative_expr(binary_expr(
-                        fun_expr(
+                    binary_expr(
+                        negative_expr(fun_expr(
                             "DatePart",
                             vec![literal_string("DOW"), column_expr("?column")],
-                        ),
+                        )),
                         "*",
                         // TODO match
                         literal_expr("?interval_one_day"),
-                    )),
+                    ),
                 ),
                 alias_expr(
                     fun_expr(
