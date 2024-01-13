@@ -46,11 +46,13 @@ use super::information_schema::postgres::{
     PgCatalogAttrdefProvider, PgCatalogAttributeProvider, PgCatalogClassProvider,
     PgCatalogConstraintProvider, PgCatalogDatabaseProvider, PgCatalogDependProvider,
     PgCatalogDescriptionProvider, PgCatalogEnumProvider, PgCatalogExtensionProvider,
-    PgCatalogIndexProvider, PgCatalogMatviewsProvider, PgCatalogNamespaceProvider,
-    PgCatalogProcProvider, PgCatalogRangeProvider, PgCatalogRolesProvider,
-    PgCatalogSequenceProvider, PgCatalogSettingsProvider, PgCatalogStatActivityProvider,
+    PgCatalogIndexProvider, PgCatalogInheritsProvider, PgCatalogMatviewsProvider,
+    PgCatalogNamespaceProvider, PgCatalogPartitionedTableProvider, PgCatalogProcProvider,
+    PgCatalogRangeProvider, PgCatalogRolesProvider, PgCatalogSequenceProvider,
+    PgCatalogSettingsProvider, PgCatalogStatActivityProvider, PgCatalogStatUserTablesProvider,
     PgCatalogStatioUserTablesProvider, PgCatalogStatsProvider, PgCatalogTableProvider,
-    PgCatalogTypeProvider, PgCatalogUserProvider, PgPreparedStatementsProvider,
+    PgCatalogTypeProvider, PgCatalogUserProvider, PgCatalogViewsProvider,
+    PgPreparedStatementsProvider,
 };
 
 use super::information_schema::redshift::{
@@ -338,6 +340,14 @@ impl DatabaseProtocol {
             "pg_catalog.pg_user".to_string()
         } else if let Some(_) = any.downcast_ref::<PgCatalogExtensionProvider>() {
             "pg_catalog.pg_extension".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogPartitionedTableProvider>() {
+            "pg_catalog.pg_partitioned_table".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogInheritsProvider>() {
+            "pg_catalog.pg_inherits".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogViewsProvider>() {
+            "pg_catalog.pg_views".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogStatUserTablesProvider>() {
+            "pg_catalog.pg_stat_user_tables".to_string()
         } else if let Some(_) = any.downcast_ref::<RedshiftSvvTablesTableProvider>() {
             "public.svv_tables".to_string()
         } else if let Some(_) = any.downcast_ref::<RedshiftSvvExternalSchemasTableProvider>() {
@@ -568,6 +578,16 @@ impl DatabaseProtocol {
                     )))
                 }
                 "pg_extension" => return Some(Arc::new(PgCatalogExtensionProvider::new())),
+                "pg_partitioned_table" => {
+                    return Some(Arc::new(PgCatalogPartitionedTableProvider::new()))
+                }
+                "pg_inherits" => return Some(Arc::new(PgCatalogInheritsProvider::new())),
+                "pg_views" => return Some(Arc::new(PgCatalogViewsProvider::new())),
+                "pg_stat_user_tables" => {
+                    return Some(Arc::new(PgCatalogStatUserTablesProvider::new(
+                        &context.meta.tables,
+                    )))
+                }
                 _ => return None,
             },
             _ => return None,
