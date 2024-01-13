@@ -1057,7 +1057,7 @@ impl RewriteRules for FilterRules {
                             vec!["?expr".to_string(), literal_expr("?literal_length")],
                         ),
                         "=",
-                        literal_expr("?literal"),
+                        "?literal",
                     ),
                     "?alias_to_cube",
                     "?members",
@@ -1087,7 +1087,7 @@ impl RewriteRules for FilterRules {
                             vec!["?expr".to_string(), literal_expr("?literal_length")],
                         ),
                         "=",
-                        literal_expr("?literal"),
+                        "?literal",
                     ),
                     "?alias_to_cube",
                     "?members",
@@ -1113,7 +1113,7 @@ impl RewriteRules for FilterRules {
                 filter_replacer(
                     fun_expr(
                         "StartsWith",
-                        vec![column_expr("?column"), literal_expr("?literal")],
+                        vec![column_expr("?column"), "?literal".to_string()],
                     ),
                     "?alias_to_cube",
                     "?members",
@@ -1138,7 +1138,7 @@ impl RewriteRules for FilterRules {
                 filter_replacer(
                     not_expr(fun_expr(
                         "StartsWith",
-                        vec![column_expr("?column"), literal_expr("?literal")],
+                        vec![column_expr("?column"), "?literal".to_string()],
                     )),
                     "?alias_to_cube",
                     "?members",
@@ -1163,7 +1163,7 @@ impl RewriteRules for FilterRules {
                 filter_replacer(
                     not_expr(udf_expr(
                         "ends_with",
-                        vec![column_expr("?column"), literal_expr("?literal")],
+                        vec![column_expr("?column"), "?literal".to_string()],
                     )),
                     "?alias_to_cube",
                     "?members",
@@ -1188,7 +1188,7 @@ impl RewriteRules for FilterRules {
                 filter_replacer(
                     udf_expr(
                         "ends_with",
-                        vec![column_expr("?column"), literal_expr("?literal")],
+                        vec![column_expr("?column"), "?literal".to_string()],
                     ),
                     "?alias_to_cube",
                     "?members",
@@ -1274,7 +1274,7 @@ impl RewriteRules for FilterRules {
                         udf_expr(
                             "position",
                             vec![
-                                literal_expr("?literal"),
+                                "?literal".to_string(),
                                 fun_expr("Lower", vec![column_expr("?column")]),
                             ],
                         ),
@@ -1306,7 +1306,7 @@ impl RewriteRules for FilterRules {
                         udf_expr(
                             "position",
                             vec![
-                                literal_expr("?literal"),
+                                "?literal".to_string(),
                                 fun_expr("Lower", vec![column_expr("?column")]),
                             ],
                         ),
@@ -1338,7 +1338,7 @@ impl RewriteRules for FilterRules {
                         udf_expr(
                             "position",
                             vec![
-                                literal_expr("?literal"),
+                                "?literal".to_string(),
                                 fun_expr("Lower", vec![column_expr("?column")]),
                             ],
                         ),
@@ -1370,7 +1370,7 @@ impl RewriteRules for FilterRules {
                         udf_expr(
                             "position",
                             vec![
-                                literal_expr("?literal"),
+                                "?literal".to_string(),
                                 fun_expr("Lower", vec![column_expr("?column")]),
                             ],
                         ),
@@ -1402,7 +1402,7 @@ impl RewriteRules for FilterRules {
                         udf_expr(
                             "position",
                             vec![
-                                fun_expr("Reverse", vec![literal_expr("?literal")]),
+                                fun_expr("Reverse", vec!["?literal".to_string()]),
                                 fun_expr(
                                     "Reverse",
                                     vec![fun_expr("Lower", vec![column_expr("?column")])],
@@ -1437,7 +1437,7 @@ impl RewriteRules for FilterRules {
                         udf_expr(
                             "position",
                             vec![
-                                fun_expr("Reverse", vec![literal_expr("?literal")]),
+                                fun_expr("Reverse", vec!["?literal".to_string()]),
                                 fun_expr(
                                     "Reverse",
                                     vec![fun_expr("Lower", vec![column_expr("?column")])],
@@ -2977,7 +2977,9 @@ impl FilterRules {
         let filter_aliases_var = var!(filter_aliases_var);
         let meta_context = self.meta_context.clone();
         move |egraph, subst| {
-            for literal in var_iter!(egraph[subst[literal_var]], LiteralExprValue) {
+            if let Some(ConstantFolding::Scalar(literal)) =
+                &egraph[subst[literal_var]].data.constant
+            {
                 for aliases in var_iter!(egraph[subst[filter_aliases_var]], FilterReplacerAliases) {
                     let literal_value = match literal {
                         ScalarValue::Utf8(Some(literal_value)) => literal_value.to_string(),
