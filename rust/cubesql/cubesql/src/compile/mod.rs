@@ -20373,6 +20373,65 @@ limit
     }
 
     #[tokio::test]
+    async fn test_sigma_sunday_week_push_down() {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            r#"
+            select 
+                datetrunc_12 "Week of Event Date",
+                sum_15 "Active_Events_SUM_Metric"
+            from (
+                select 
+                    (
+                        date_trunc(
+                            'week',
+                            (
+                                order_date :: timestamptz + cast(1 || ' day' as interval)
+                            )
+                        ) + cast(-1 || ' day' as interval)
+                    ) datetrunc_12,
+                    sum(count) sum_15
+                from
+                    "public"."KibanaSampleDataEcommerce" "KibanaSampleDataEcommerce"
+                group by
+                    (
+                        date_trunc(
+                            'week',
+                            (
+                                order_date :: timestamptz + cast(1 || ' day' as interval)
+                            )
+                        ) + cast(-1 || ' day' as interval) 
+                    )
+            ) q1
+            order by
+                datetrunc_12 asc
+            limit
+                25000
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql;
+        assert!(sql.contains("DATE_TRUNC("));
+        assert!(sql.contains("order_date"));
+        assert!(sql.contains("count"));
+    }
+
+    #[tokio::test]
     async fn test_langchain_pgcatalog_schema() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "langchain_pgcatalog_schema",
