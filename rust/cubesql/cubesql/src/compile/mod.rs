@@ -20830,4 +20830,75 @@ limit
             .sql
             .contains("DATE("));
     }
+
+    #[tokio::test]
+    async fn test_extended_table_introspection() -> Result<(), CubeError> {
+        init_logger();
+
+        insta::assert_snapshot!(
+            "test_extended_table_introspection",
+            execute_query(
+                "SELECT current_database()        as TABLE_CAT,\
+                \nCOALESCE(T.table_schema, MV.schemaname) as TABLE_SCHEM,\
+                \nCOALESCE(T.table_name, MV.matviewname)  as TABLE_NAME,\
+                \n(CASE\
+                \n  WHEN c.reltuples < 0 THEN NULL\
+                \n  WHEN c.relpages = 0 THEN float8 '0'\
+                \n  ELSE c.reltuples / c.relpages END\
+                \n  * (pg_relation_size(c.oid) / pg_catalog.current_setting('block_size')::int)\
+                \n)::bigint                               as ROW_COUNT,\
+                \nC.relnatts                              as COLUMN_COUNT,\
+                \nC.relkind                               as TABLE_KIND,\
+                \nC.relispartition                        as IS_PARTITION,\
+                \nP.partstrat                             as PARTITION_STRATEGY,\
+                \nPC.parition_count                       as PARTITION_COUNT,\
+                \nPARTITION.parent_name                   as PARENT_TABLE_NAME,\
+                \nPARTITION.parent_table_kind             as PARTITIONED_PARENT_TABLE,\
+                \nPARTITION_RANGE.PARTITION_CONSTRAINT    as PARTITION_CONSTRAINT,\
+                \nP.partnatts                             as NUMBER_COLUMNS_IN_PART_KEY,\
+                \nP.partattrs                             as COLUMNS_PARTICIPATING_IN_PART_KEY,\
+                \nCOALESCE(V.definition, MV.definition)   as VIEW_DEFINITION,\
+                \nT.*\
+                \nFROM pg_class C\
+                \n        LEFT JOIN pg_namespace N ON (N.oid = C.relnamespace)\
+                \n        LEFT JOIN pg_stat_user_tables PSUT ON (C.oid = PSUT.relid)\
+                \n        LEFT JOIN information_schema.tables T ON (C.relname = T.table_name AND N.nspname = T.table_schema)\
+                \n        LEFT JOIN pg_views V ON (T.table_name = V.viewname)\
+                \n        LEFT JOIN pg_matviews MV ON (C.relname = MV.matviewname)\
+                \n        LEFT JOIN pg_partitioned_table P on C.oid = P.partrelid\
+                \n        LEFT JOIN (SELECT parent.relname AS table_name,\
+                \n                        COUNT(*)       as parition_count\
+                \n                    FROM pg_inherits\
+                \n                            JOIN pg_class parent ON pg_inherits.inhparent = parent.oid\
+                \n                            JOIN pg_class child ON pg_inherits.inhrelid = child.oid\
+                \n                            JOIN pg_namespace nmsp_parent ON nmsp_parent.oid = parent.relnamespace\
+                \n                            JOIN pg_namespace nmsp_child ON nmsp_child.oid = child.relnamespace\
+                \n                    GROUP BY table_name) AS PC ON (C.relname = PC.table_name)\
+                \n        LEFT JOIN (SELECT child.relname  AS table_name,\
+                \n                        parent.relname AS parent_name,\
+                \n                        parent.relispartition AS parent_table_kind\
+                \n                    FROM pg_inherits\
+                \n                            JOIN pg_class parent ON pg_inherits.inhparent = parent.oid\
+                \n                            JOIN pg_class child ON pg_inherits.inhrelid = child.oid\
+                \n                            JOIN pg_namespace nmsp_parent ON nmsp_parent.oid = parent.relnamespace\
+                \n                            JOIN pg_namespace nmsp_child ON nmsp_child.oid = child.relnamespace\
+                \n                    WHERE parent.relkind = 'p') AS PARTITION ON (C.relname = PARTITION.table_name)\
+                \n        LEFT JOIN (SELECT c.relname AS PARTITION_NAME, pg_get_expr(c.relpartbound, c.oid, true) AS PARTITION_CONSTRAINT\
+                \n                    from pg_class c\
+                \n                    where c.relispartition = 'true'\
+                \n                    and c.relkind = 'r') AS PARTITION_RANGE ON (C.relname = PARTITION_RANGE.PARTITION_NAME)\
+                \nWHERE N.nspname in (SELECT schema_name\
+                \n                    FROM INFORMATION_SCHEMA.SCHEMATA\
+                \n                    WHERE schema_name not like 'pg_%%'\
+                \n                    and schema_name != 'information_schema')\
+                \nAND C.relkind != 'i'\
+                \nAND C.relkind != 'I'\
+                \nORDER BY T.table_name ASC".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
 }
