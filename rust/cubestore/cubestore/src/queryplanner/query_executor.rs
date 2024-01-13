@@ -120,12 +120,6 @@ impl QueryExecutor for QueryExecutorImpl {
     ) -> Result<(SchemaRef, Vec<RecordBatch>), CubeError> {
         let collect_span = tracing::span!(tracing::Level::TRACE, "collect_physical_plan");
         let trace_obj = plan.trace_obj();
-        if !phys_plan_contains_merge_sort(split_plan.as_ref()) {
-            if let Some(trace_obj) = trace_obj.as_ref() {
-                non_merge_sort_query_detected_event(trace_obj)?;
-            }
-        }
-
         let (physical_plan, logical_plan) = self.router_plan(plan, cluster).await?;
         let split_plan = physical_plan;
 
@@ -133,6 +127,12 @@ impl QueryExecutor for QueryExecutorImpl {
             "Router Query Physical Plan: {}",
             pp_phys_plan(split_plan.as_ref())
         );
+
+        if !phys_plan_contains_merge_sort(split_plan.as_ref()) {
+            if let Some(trace_obj) = trace_obj.as_ref() {
+                non_merge_sort_query_detected_event(trace_obj)?;
+            }
+        }
 
         let execution_time = SystemTime::now();
 
