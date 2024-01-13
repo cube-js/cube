@@ -387,6 +387,19 @@ pub fn incoming_traffic_agent_event(trace_obj: &str, bytes: u64) -> Result<(), C
     }
 }
 
+pub fn non_merge_sort_query_detected_event(trace_obj: &str) -> Result<(), CubeError> {
+    let obj: Value = serde_json::from_str(trace_obj)?;
+    if let Value::Object(obj) = obj {
+        agent_event_spawn("Non Merge Sort Query Detected".to_string(), obj);
+        Ok(())
+    } else {
+        Err(CubeError::user(format!(
+            "Trace object expected to be a JSON object but found: {}",
+            trace_obj
+        )))
+    }
+}
+
 pub async fn start_track_event_loop() {
     let sender = SENDER.clone();
     sender.send_loop().await;

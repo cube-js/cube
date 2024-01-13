@@ -493,3 +493,18 @@ fn pp_row_range(r: &RowRange) -> String {
     };
     format!("[{},{})", s, e)
 }
+
+pub fn phys_plan_contains_merge_sort(p: &dyn ExecutionPlan) -> bool {
+    // Check current node
+    if p.as_any().is::<MergeSortExec>() {
+        return true;
+    }
+    // Check children recursively
+    for child in p.children() {
+        if phys_plan_contains_merge_sort(child.as_ref()) {
+            return true;
+        }
+    }
+    // MergeSortExec not found
+    false
+}

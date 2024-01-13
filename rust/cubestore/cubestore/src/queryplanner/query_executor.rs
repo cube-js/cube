@@ -7,7 +7,7 @@ use crate::metastore::{Column, ColumnType, IdRow, Index, Partition};
 use crate::queryplanner::filter_by_key_range::FilterByKeyRangeExec;
 use crate::queryplanner::optimizations::CubeQueryPlanner;
 use crate::queryplanner::planning::{get_worker_plan, Snapshot, Snapshots};
-use crate::queryplanner::pretty_printers::{pp_phys_plan, pp_plan};
+use crate::queryplanner::pretty_printers::{pp_phys_plan, pp_plan, phys_plan_contains_merge_sort};
 use crate::queryplanner::serialized_plan::{IndexSnapshot, RowFilter, RowRange, SerializedPlan};
 use crate::queryplanner::trace_data_loaded::DataLoadedSize;
 use crate::store::DataFrame;
@@ -16,6 +16,7 @@ use crate::table::parquet::CubestoreParquetMetadataCache;
 use crate::table::{Row, TableValue, TimestampValue};
 use crate::util::memory::MemoryHandler;
 use crate::{app_metrics, CubeError};
+use crate::telemetry::non_merge_sort_query_detected_event;
 use arrow::array::{
     make_array, Array, ArrayRef, BinaryArray, BooleanArray, Float64Array, Int16Array, Int32Array,
     Int64Array, Int64Decimal0Array, Int64Decimal10Array, Int64Decimal1Array, Int64Decimal2Array,
@@ -118,6 +119,13 @@ impl QueryExecutor for QueryExecutorImpl {
         cluster: Arc<dyn Cluster>,
     ) -> Result<(SchemaRef, Vec<RecordBatch>), CubeError> {
         let collect_span = tracing::span!(tracing::Level::TRACE, "collect_physical_plan");
+        let trace_obj = plan.trace_obj();
+        if !phys_plan_contains_merge_sort(split_plan.as_ref()) {
+            if let Some(trace_obj) = trace_obj.as_ref() {
+                non_merge_sort_query_detected_event(trace_obj)?;
+            }
+        }
+
         let (physical_plan, logical_plan) = self.router_plan(plan, cluster).await?;
         let split_plan = physical_plan;
 
