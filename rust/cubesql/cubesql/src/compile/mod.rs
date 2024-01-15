@@ -105,7 +105,7 @@ pub mod test;
 
 pub use crate::transport::ctx::*;
 use crate::{
-    compile::engine::df::wrapper::CubeScanWrapperNode,
+    compile::{engine::df::wrapper::CubeScanWrapperNode, rewrite::rewriter::Rewriter},
     transport::{LoadRequestMeta, SpanId, TransportService},
 };
 pub use error::{CompilationError, CompilationResult};
@@ -1460,18 +1460,56 @@ WHERE `TABLE_SCHEMA` = '{}'",
             .add_logical_plan_replace_params(&optimized_plan, &mut query_params)
             .map_err(|e| CompilationError::internal(e.to_string()))?;
 
-        let result = self
+        let finalized_graph = self
             .session_manager
             .server
             .compiler_cache
             .rewrite(
                 self.state.auth_context().unwrap(),
                 cube_ctx.clone(),
-                root,
                 converter.take_egraph(),
                 &query_params.unwrap(),
-                span_id.clone(),
                 qtrace,
+            )
+            .await
+            .map_err(|e| match e.cause {
+                CubeErrorCauseType::Internal(_) => CompilationError::Internal(
+                    format!(
+                        "Error during rewrite: {}. Please check logs for additional information.",
+                        e.message
+                    ),
+                    e.to_backtrace().unwrap_or_else(|| Backtrace::capture()),
+                    Some(HashMap::from([
+                        ("query".to_string(), stmt.to_string()),
+                        (
+                            "sanitizedQuery".to_string(),
+                            SensitiveDataSanitizer::new().replace(&stmt).to_string(),
+                        ),
+                    ])),
+                ),
+                CubeErrorCauseType::User(_) => CompilationError::User(
+                    format!(
+                        "Error during rewrite: {}. Please check logs for additional information.",
+                        e.message
+                    ),
+                    Some(HashMap::from([
+                        ("query".to_string(), stmt.to_string()),
+                        (
+                            "sanitizedQuery".to_string(),
+                            SensitiveDataSanitizer::new().replace(&stmt).to_string(),
+                        ),
+                    ])),
+                ),
+            })?;
+
+        let mut rewriter = Rewriter::new(finalized_graph, cube_ctx.clone());
+
+        let result = rewriter
+            .find_best_plan(
+                root,
+                self.state.auth_context().unwrap(),
+                qtrace,
+                span_id.clone(),
             )
             .await
             .map_err(|e| match e.cause {

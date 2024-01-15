@@ -6,13 +6,13 @@ use crate::{
     },
     config::ConfigObj,
     sql::{session::DatabaseProtocol, AuthContextRef},
-    transport::{MetaContext, SpanId, TransportService},
+    transport::{MetaContext, TransportService},
     utils::egraph_hash,
     CubeError, MutexAsync, RWLockAsync,
 };
 use async_trait::async_trait;
-use datafusion::{logical_plan::LogicalPlan, scalar::ScalarValue};
-use egg::{EGraph, Id, Rewrite};
+use datafusion::scalar::ScalarValue;
+use egg::{EGraph, Rewrite};
 use lru::LruCache;
 use std::{collections::HashMap, fmt::Debug, num::NonZeroUsize, sync::Arc};
 use uuid::Uuid;
@@ -43,12 +43,10 @@ pub trait CompilerCache: Send + Sync + Debug {
         &self,
         ctx: AuthContextRef,
         cube_context: Arc<CubeContext>,
-        root: Id,
         input_plan: EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
         param_values: &HashMap<usize, ScalarValue>,
-        span_id: Option<Arc<SpanId>>,
         qtrace: &mut Option<Qtrace>,
-    ) -> Result<LogicalPlan, CubeError>;
+    ) -> Result<EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, CubeError>;
 }
 
 #[derive(Debug)]
@@ -63,7 +61,7 @@ pub struct CompilerCacheEntry {
     rewrite_rules: RWLockAsync<Option<Arc<Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>>>>,
     parameterized_cache:
         MutexAsync<LruCache<[u8; 32], EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>>>,
-    queries_cache: MutexAsync<LruCache<[u8; 32], LogicalPlan>>,
+    queries_cache: MutexAsync<LruCache<[u8; 32], EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>>>,
 }
 
 crate::di_service!(CompilerCacheImpl, [CompilerCache]);
@@ -134,12 +132,10 @@ impl CompilerCache for CompilerCacheImpl {
         &self,
         ctx: AuthContextRef,
         cube_context: Arc<CubeContext>,
-        root: Id,
         input_plan: EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
         param_values: &HashMap<usize, ScalarValue>,
-        span_id: Option<Arc<SpanId>>,
         qtrace: &mut Option<Qtrace>,
-    ) -> Result<LogicalPlan, CubeError> {
+    ) -> Result<EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, CubeError> {
         let cache_entry = self
             .get_cache_entry(ctx.clone(), cube_context.session_state.protocol.clone())
             .await?;
@@ -158,7 +154,7 @@ impl CompilerCache for CompilerCacheImpl {
             };
             let mut rewriter = Rewriter::new(graph, cube_context);
             rewriter.add_param_values(param_values)?;
-            let final_plan = rewriter.find_best_plan(root, ctx, qtrace, span_id).await?;
+            let final_plan = rewriter.run_rewrite_to_completion(ctx, qtrace).await?;
             rewrites_cache_lock.put(graph_key, final_plan.clone());
             Ok(final_plan)
         }
