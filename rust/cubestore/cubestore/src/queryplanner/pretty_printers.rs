@@ -43,8 +43,6 @@ use datafusion::physical_plan::parquet::ParquetExec;
 use datafusion::physical_plan::projection::ProjectionExec;
 use datafusion::physical_plan::skip::SkipExec;
 use datafusion::physical_plan::union::UnionExec;
-use serde::Serialize;
-use serde_json::{json, Value};
 
 #[derive(Default, Clone, Copy)]
 pub struct PPOptions {
@@ -494,45 +492,4 @@ fn pp_row_range(r: &RowRange) -> String {
         Some(e) => format!("{:?}", e.values()),
     };
     format!("[{},{})", s, e)
-}
-
-#[derive(Serialize)]
-pub struct PhysPlanFlags {
-    pub merge_sort_node: bool,
-}
-
-impl PhysPlanFlags {
-    pub fn enough_to_fill(&self) -> bool {
-        self.merge_sort_node
-    }
-
-    pub fn is_suboptimal_query(&self) -> bool {
-        !self.merge_sort_node
-    }
-
-    pub fn to_json(&self) -> Value {
-        json!(self)
-    }
-}
-
-pub fn phys_plan_flags(p: &dyn ExecutionPlan) -> PhysPlanFlags {
-    let mut flags = PhysPlanFlags {
-        merge_sort_node: false,
-    };
-    phys_plan_flags_fill(p, &mut flags);
-    flags
-}
-
-fn phys_plan_flags_fill(p: &dyn ExecutionPlan, flags: &mut PhysPlanFlags) {
-    if p.as_any().is::<MergeSortExec>() {
-        flags.merge_sort_node = true;
-    }
-
-    if flags.enough_to_fill() {
-        return;
-    }
-
-    for child in p.children() {
-        phys_plan_flags_fill(child.as_ref(), flags);
-    }
 }

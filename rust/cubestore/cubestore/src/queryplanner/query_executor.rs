@@ -6,8 +6,9 @@ use crate::metastore::table::Table;
 use crate::metastore::{Column, ColumnType, IdRow, Index, Partition};
 use crate::queryplanner::filter_by_key_range::FilterByKeyRangeExec;
 use crate::queryplanner::optimizations::CubeQueryPlanner;
+use crate::queryplanner::physical_plan_flags::PhysicalPlanFlags;
 use crate::queryplanner::planning::{get_worker_plan, Snapshot, Snapshots};
-use crate::queryplanner::pretty_printers::{phys_plan_flags, pp_phys_plan, pp_plan};
+use crate::queryplanner::pretty_printers::{pp_phys_plan, pp_plan};
 use crate::queryplanner::serialized_plan::{IndexSnapshot, RowFilter, RowRange, SerializedPlan};
 use crate::queryplanner::trace_data_loaded::DataLoadedSize;
 use crate::store::DataFrame;
@@ -128,7 +129,7 @@ impl QueryExecutor for QueryExecutorImpl {
             pp_phys_plan(split_plan.as_ref())
         );
 
-        let flags = phys_plan_flags(split_plan.as_ref());
+        let flags = PhysicalPlanFlags::with_execution_plan(split_plan.as_ref());
         if flags.is_suboptimal_query() {
             if let Some(trace_obj) = trace_obj.as_ref() {
                 suboptimal_query_plan_event(trace_obj, flags.to_json())?;
