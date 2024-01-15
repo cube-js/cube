@@ -1,7 +1,9 @@
 use crate::compile::rewrite::{analysis::LogicalPlanAnalysis, LogicalPlanLanguage};
+use datafusion::scalar::ScalarValue;
 use egg::EGraph;
 use sha2::{Digest, Sha256};
 use std::{
+    collections::HashMap,
     convert::TryInto,
     hash::{Hash, Hasher},
 };
@@ -36,13 +38,22 @@ impl ShaHasher {
     }
 }
 
-pub fn egraph_hash(egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>) -> [u8; 32] {
+pub fn egraph_hash(
+    egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+    params: Option<&HashMap<usize, ScalarValue>>,
+) -> [u8; 32] {
     let mut hasher = ShaHasher::new();
     for class in egraph.classes() {
         class.id.hash(&mut hasher);
         class.nodes.len().hash(&mut hasher);
         for node in &class.nodes {
             node.hash(&mut hasher);
+        }
+    }
+    if let Some(params) = params {
+        for (k, v) in params.iter() {
+            k.hash(&mut hasher);
+            v.hash(&mut hasher);
         }
     }
     hasher.take_hasher().finalize().into()

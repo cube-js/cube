@@ -113,7 +113,7 @@ impl CompilerCache for CompilerCacheImpl {
             .get_cache_entry(ctx.clone(), cube_context.session_state.protocol.clone())
             .await?;
 
-        let graph_key = egraph_hash(&parameterized_graph);
+        let graph_key = egraph_hash(&parameterized_graph, None);
 
         let mut rewrites_cache_lock = cache_entry.parameterized_cache.lock().await;
         if let Some(rewrite_entry) = rewrites_cache_lock.get(&graph_key) {
@@ -140,7 +140,7 @@ impl CompilerCache for CompilerCacheImpl {
             .get_cache_entry(ctx.clone(), cube_context.session_state.protocol.clone())
             .await?;
 
-        let graph_key = egraph_hash(&input_plan);
+        let graph_key = egraph_hash(&input_plan, Some(param_values));
 
         let mut rewrites_cache_lock = cache_entry.queries_cache.lock().await;
         if let Some(plan) = rewrites_cache_lock.get(&graph_key) {
