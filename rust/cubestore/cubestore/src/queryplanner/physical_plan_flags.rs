@@ -1,3 +1,4 @@
+use datafusion::physical_plan::hash_aggregate::HashAggregateExec;
 use datafusion::physical_plan::merge_sort::MergeSortExec;
 use datafusion::physical_plan::ExecutionPlan;
 
@@ -31,7 +32,14 @@ impl PhysicalPlanFlags {
     }
 
     fn physical_plan_flags_fill(p: &dyn ExecutionPlan, flags: &mut PhysicalPlanFlags) {
-        if p.as_any().is::<MergeSortExec>() {
+        let a = p.as_any();
+        // For queries without dimensions
+        if let Some(agg) = a.downcast_ref::<HashAggregateExec>() {
+            if agg.group_expr().len() == 0 {
+                flags.merge_sort_node = true;
+            }
+        }
+        if a.is::<MergeSortExec>() {
             flags.merge_sort_node = true;
         }
         if flags.enough_to_fill() {
