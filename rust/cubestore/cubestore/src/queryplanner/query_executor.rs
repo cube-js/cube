@@ -7,14 +7,14 @@ use crate::metastore::{Column, ColumnType, IdRow, Index, Partition};
 use crate::queryplanner::filter_by_key_range::FilterByKeyRangeExec;
 use crate::queryplanner::optimizations::CubeQueryPlanner;
 use crate::queryplanner::planning::{get_worker_plan, Snapshot, Snapshots};
-use crate::queryplanner::pretty_printers::{phys_plan_contains_merge_sort, pp_phys_plan, pp_plan};
+use crate::queryplanner::pretty_printers::{phys_plan_flags, pp_phys_plan, pp_plan};
 use crate::queryplanner::serialized_plan::{IndexSnapshot, RowFilter, RowRange, SerializedPlan};
 use crate::queryplanner::trace_data_loaded::DataLoadedSize;
 use crate::store::DataFrame;
 use crate::table::data::rows_to_columns;
 use crate::table::parquet::CubestoreParquetMetadataCache;
 use crate::table::{Row, TableValue, TimestampValue};
-use crate::telemetry::non_merge_sort_query_detected_event;
+use crate::telemetry::suboptimal_query_plan_event;
 use crate::util::memory::MemoryHandler;
 use crate::{app_metrics, CubeError};
 use arrow::array::{
@@ -128,9 +128,10 @@ impl QueryExecutor for QueryExecutorImpl {
             pp_phys_plan(split_plan.as_ref())
         );
 
-        if !phys_plan_contains_merge_sort(split_plan.as_ref()) {
+        let flags = phys_plan_flags(split_plan.as_ref());
+        if flags.is_suboptimal_query() {
             if let Some(trace_obj) = trace_obj.as_ref() {
-                non_merge_sort_query_detected_event(trace_obj)?;
+                suboptimal_query_plan_event(trace_obj, flags.to_json())?;
             }
         }
 

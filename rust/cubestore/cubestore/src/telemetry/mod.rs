@@ -387,10 +387,11 @@ pub fn incoming_traffic_agent_event(trace_obj: &str, bytes: u64) -> Result<(), C
     }
 }
 
-pub fn non_merge_sort_query_detected_event(trace_obj: &str) -> Result<(), CubeError> {
+pub fn suboptimal_query_plan_event(trace_obj: &str, flags: Value) -> Result<(), CubeError> {
     let obj: Value = serde_json::from_str(trace_obj)?;
-    if let Value::Object(obj) = obj {
-        agent_event_spawn("Non merge sort query detected".to_string(), obj);
+    if let Value::Object(mut obj) = obj {
+        obj.insert("flags".to_string(), flags);
+        agent_event_spawn("Suboptimal Query Plan".to_string(), obj);
         Ok(())
     } else {
         Err(CubeError::user(format!(

@@ -43,6 +43,8 @@ use datafusion::physical_plan::parquet::ParquetExec;
 use datafusion::physical_plan::projection::ProjectionExec;
 use datafusion::physical_plan::skip::SkipExec;
 use datafusion::physical_plan::union::UnionExec;
+use serde::Serialize;
+use serde_json::{json, Value};
 
 #[derive(Default, Clone, Copy)]
 pub struct PPOptions {
@@ -494,17 +496,43 @@ fn pp_row_range(r: &RowRange) -> String {
     format!("[{},{})", s, e)
 }
 
-pub fn phys_plan_contains_merge_sort(p: &dyn ExecutionPlan) -> bool {
-    // Check current node
+#[derive(Serialize)]
+pub struct PhysPlanFlags {
+    pub merge_sort_node: bool,
+}
+
+impl PhysPlanFlags {
+    pub fn enough_to_fill(&self) -> bool {
+        self.merge_sort_node
+    }
+
+    pub fn is_suboptimal_query(&self) -> bool {
+        !self.merge_sort_node
+    }
+
+    pub fn to_json(&self) -> Value {
+        json!(self)
+    }
+}
+
+pub fn phys_plan_flags(p: &dyn ExecutionPlan) -> PhysPlanFlags {
+    let mut flags = PhysPlanFlags {
+        merge_sort_node: false,
+    };
+    phys_plan_flags_fill(p, &mut flags);
+    flags
+}
+
+fn phys_plan_flags_fill(p: &dyn ExecutionPlan, flags: &mut PhysPlanFlags) {
     if p.as_any().is::<MergeSortExec>() {
-        return true;
+        flags.merge_sort_node = true;
     }
-    // Check children recursively
+
+    if flags.enough_to_fill() {
+        return;
+    }
+
     for child in p.children() {
-        if phys_plan_contains_merge_sort(child.as_ref()) {
-            return true;
-        }
+        phys_plan_flags_fill(child.as_ref(), flags);
     }
-    // MergeSortExec not found
-    false
 }
