@@ -15,7 +15,7 @@ use datafusion::{
         projection_drop_out::ProjectionDropOut,
         utils::from_plan,
     },
-    physical_plan::ExecutionPlan,
+    physical_plan::{planner::DefaultPhysicalPlanner, ExecutionPlan},
     prelude::*,
     scalar::ScalarValue,
     sql::{parser::Statement as DFStatement, planner::SqlToRel},
@@ -105,7 +105,10 @@ pub mod test;
 
 pub use crate::transport::ctx::*;
 use crate::{
-    compile::engine::df::wrapper::CubeScanWrapperNode,
+    compile::{
+        engine::df::wrapper::CubeScanWrapperNode,
+        rewrite::{analysis::LogicalPlanAnalysis, rewriter::Rewriter},
+    },
     transport::{LoadRequestMeta, SpanId, TransportService},
 };
 pub use error::{CompilationError, CompilationResult};
@@ -1387,6 +1390,8 @@ WHERE `TABLE_SCHEMA` = '{}'",
         qtrace: &mut Option<Qtrace>,
         span_id: Option<Arc<SpanId>>,
     ) -> CompilationResult<QueryPlan> {
+        self.reauthenticate_if_needed().await?;
+
         match &stmt {
             ast::Statement::Query(query) => match &query.body {
                 ast::SetExpr::Select(select) if select.into.is_some() => {
@@ -1451,15 +1456,64 @@ WHERE `TABLE_SCHEMA` = '{}'",
             qtrace.set_optimized_plan(&optimized_plan);
         }
 
-        let mut converter = LogicalPlanToLanguageConverter::new(Arc::new(cube_ctx));
+        let cube_ctx = Arc::new(cube_ctx);
+        let mut converter = LogicalPlanToLanguageConverter::new(cube_ctx.clone());
+        let mut query_params = Some(HashMap::new());
         let root = converter
-            .add_logical_plan(&optimized_plan)
+            .add_logical_plan_replace_params(&optimized_plan, &mut query_params)
             .map_err(|e| CompilationError::internal(e.to_string()))?;
 
-        self.reauthenticate_if_needed().await?;
+        let mut finalized_graph = self
+            .session_manager
+            .server
+            .compiler_cache
+            .rewrite(
+                self.state.auth_context().unwrap(),
+                cube_ctx.clone(),
+                converter.take_egraph(),
+                &query_params.unwrap(),
+                qtrace,
+            )
+            .await
+            .map_err(|e| match e.cause {
+                CubeErrorCauseType::Internal(_) => CompilationError::Internal(
+                    format!(
+                        "Error during rewrite: {}. Please check logs for additional information.",
+                        e.message
+                    ),
+                    e.to_backtrace().unwrap_or_else(|| Backtrace::capture()),
+                    Some(HashMap::from([
+                        ("query".to_string(), stmt.to_string()),
+                        (
+                            "sanitizedQuery".to_string(),
+                            SensitiveDataSanitizer::new().replace(&stmt).to_string(),
+                        ),
+                    ])),
+                ),
+                CubeErrorCauseType::User(_) => CompilationError::User(
+                    format!(
+                        "Error during rewrite: {}. Please check logs for additional information.",
+                        e.message
+                    ),
+                    Some(HashMap::from([
+                        ("query".to_string(), stmt.to_string()),
+                        (
+                            "sanitizedQuery".to_string(),
+                            SensitiveDataSanitizer::new().replace(&stmt).to_string(),
+                        ),
+                    ])),
+                ),
+            })?;
 
-        let result = converter
-            .take_rewriter()
+        // Replace Analysis as at least time has changed but it might be also context may affect rewriting in some other ways
+        finalized_graph.analysis = LogicalPlanAnalysis::new(
+            cube_ctx.clone(),
+            Arc::new(DefaultPhysicalPlanner::default()),
+        );
+
+        let mut rewriter = Rewriter::new(finalized_graph, cube_ctx.clone());
+
+        let result = rewriter
             .find_best_plan(
                 root,
                 self.state.auth_context().unwrap(),
@@ -3244,15 +3298,9 @@ mod tests {
 
         let logical_plan = &query_plan.print(true).unwrap();
 
-        let re = Regex::new(r"TimestampNanosecond\(\d+, None\)").unwrap();
-        let logical_plan = re
-            .replace_all(logical_plan, "TimestampNanosecond(0, None)")
-            .as_ref()
-            .to_string();
-
         assert_eq!(
             logical_plan,
-            "Projection: TimestampNanosecond(0, None) AS COL\
+            "Projection: CAST(utctimestamp() AS current_timestamp() AS Timestamp(Nanosecond, None)) AS COL\
             \n  EmptyRelation",
         );
     }
@@ -15679,7 +15727,10 @@ limit
             // Quarter of Year
             ["EXTRACT(QUARTER FROM t.\"order_date\")", "quarter"],
             // Year
-            ["CAST(EXTRACT(YEAR FROM t.\"order_date\") AS varchar)", "year"],
+            [
+                "CAST(EXTRACT(YEAR FROM t.\"order_date\") AS varchar)",
+                "year",
+            ],
         ];
 
         for [expr, expected_granularity] in &supported_granularities {
@@ -18248,7 +18299,7 @@ limit
                 segments: Some(vec![]),
                 time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
-                    granularity: Some("quarter".to_string()),
+                    granularity: Some("month".to_string()),
                     date_range: None
                 }]),
                 order: None,
