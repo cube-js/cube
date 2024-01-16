@@ -239,6 +239,7 @@ impl Rewriter {
             .rewrite_rules(
                 auth_context.clone(),
                 cube_context.session_state.protocol.clone(),
+                false,
             )
             .await?;
 
@@ -321,6 +322,7 @@ impl Rewriter {
             .rewrite_rules(
                 auth_context.clone(),
                 cube_context.session_state.protocol.clone(),
+                true,
             )
             .await?;
 
@@ -493,6 +495,7 @@ impl Rewriter {
     pub fn rewrite_rules(
         meta_context: Arc<MetaContext>,
         config_obj: Arc<dyn ConfigObj>,
+        eval_stable_functions: bool,
     ) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
         let sql_push_down = Self::sql_push_down_enabled();
         let rules: Vec<Box<dyn RewriteRules>> = vec![
@@ -501,7 +504,10 @@ impl Rewriter {
                 config_obj.clone(),
                 sql_push_down,
             )),
-            Box::new(FilterRules::new(meta_context.clone())),
+            Box::new(FilterRules::new(
+                meta_context.clone(),
+                eval_stable_functions,
+            )),
             Box::new(DateRules::new()),
             Box::new(OrderRules::new()),
             Box::new(SplitRules::new(meta_context.clone(), config_obj.clone())),

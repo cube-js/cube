@@ -833,6 +833,7 @@ impl LogicalPlanAnalysis {
                     _ => panic!("Expected Literal but got: {:?}", expr),
                 }
             }
+            LogicalPlanLanguage::AliasExpr(params) => constant_node(params[0]),
             LogicalPlanLanguage::ScalarUDFExpr(_) => {
                 let expr = node_to_expr(
                     enode,
@@ -855,6 +856,14 @@ impl LogicalPlanAnalysis {
                             &egraph,
                             &Expr::ScalarFunction {
                                 fun: BuiltinScalarFunction::CurrentDate,
+                                args: vec![],
+                            },
+                        )
+                    } else if &fun.name == "eval_utc_timestamp" {
+                        Self::eval_constant_expr(
+                            &egraph,
+                            &Expr::ScalarFunction {
+                                fun: BuiltinScalarFunction::UtcTimestamp,
                                 args: vec![],
                             },
                         )
@@ -883,13 +892,10 @@ impl LogicalPlanAnalysis {
                 .ok()?;
 
                 if let Expr::ScalarFunction { fun, .. } = &expr {
-                    if (fun.volatility() == Volatility::Immutable
-                        || fun.volatility() == Volatility::Stable)
-                        && !matches!(
-                            fun,
-                            BuiltinScalarFunction::CurrentDate | BuiltinScalarFunction::Now
-                        )
-                    {
+                    // Removed stable evaluation as it affects caching and SQL push down.
+                    // Whatever stable function should be evaluated it should be addressed as a special rewrite rule
+                    // as it seems LogicalPlanAnalysis can't change it's state.
+                    if fun.volatility() == Volatility::Immutable {
                         Self::eval_constant_expr(&egraph, &expr)
                     } else {
                         None
@@ -1185,6 +1191,11 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
 
     fn modify(egraph: &mut EGraph<LogicalPlanLanguage, Self>, id: Id) {
         if let Some(ConstantFolding::Scalar(c)) = &egraph[id].data.constant {
+            // As ConstantFolding goes through Alias we can't add LiteralExpr at this level otherwise it gets dropped.
+            // In case there's wrapping node on top of Alias that can be evaluated to LiteralExpr further it gets replaced instead.
+            if let Some(Expr::Alias(_, _)) = egraph[id].data.original_expr.as_ref() {
+                return;
+            }
             // TODO: ideally all constants should be aliased, but this requires
             // rewrites to extract `.data.constant` instead of `literal_expr`.
             let alias_name = if c.is_null()

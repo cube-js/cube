@@ -6,8 +6,9 @@ use crate::{
         binary_expr, cast_expr, cast_expr_explicit, column_expr, fun_expr, literal_expr,
         literal_int, literal_string, negative_expr, rewrite,
         rewriter::RewriteRules,
-        to_day_interval_expr, transforming_rewrite, transforming_rewrite_with_root, udf_expr,
-        AliasExprAlias, CastExprDataType, LiteralExprValue, LogicalPlanLanguage,
+        to_day_interval_expr, transform_original_expr_to_alias, transforming_rewrite,
+        transforming_rewrite_with_root, udf_expr, AliasExprAlias, CastExprDataType,
+        LiteralExprValue, LogicalPlanLanguage,
     },
     var, var_iter,
 };
@@ -271,15 +272,17 @@ impl RewriteRules for DateRules {
                 ),
                 self.unwrap_cast_to_timestamp("?data_type", "?granularity", "?alias"),
             ),
-            rewrite(
+            transforming_rewrite_with_root(
                 "current-timestamp-to-now",
                 udf_expr("current_timestamp", Vec::<String>::new()),
-                fun_expr("UtcTimestamp", Vec::<String>::new()),
+                alias_expr(fun_expr("UtcTimestamp", Vec::<String>::new()), "?alias"),
+                transform_original_expr_to_alias("?alias"),
             ),
-            rewrite(
+            transforming_rewrite_with_root(
                 "localtimestamp-to-now",
                 udf_expr("localtimestamp", Vec::<String>::new()),
-                fun_expr("UtcTimestamp", Vec::<String>::new()),
+                alias_expr(fun_expr("UtcTimestamp", Vec::<String>::new()), "?alias"),
+                transform_original_expr_to_alias("?alias"),
             ),
             transforming_rewrite_with_root(
                 "tableau-week",

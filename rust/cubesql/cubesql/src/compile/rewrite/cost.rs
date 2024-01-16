@@ -1,5 +1,6 @@
 use crate::compile::rewrite::{
-    CubeScanWrapped, LogicalPlanLanguage, MemberErrorPriority, TimeDimensionGranularity,
+    CubeScanWrapped, LogicalPlanLanguage, MemberErrorPriority, ScalarUDFExprFun,
+    TimeDimensionGranularity,
 };
 use egg::{CostFunction, Id, Language};
 
@@ -251,6 +252,19 @@ impl CostFunction<LogicalPlanLanguage> for BestCubePlan {
             LogicalPlanLanguage::WrapperPushdownReplacer(_) => 1,
             LogicalPlanLanguage::WrapperPullupReplacer(_) => 1,
             LogicalPlanLanguage::QueryParam(_) => 1,
+            // Not really replacers but those should be deemed as mandatory rewrites and as soon as
+            // there's always rewrite rule it's fine to have replacer cost.
+            // Needs to be added as alias rewrite always more expensive than original function.
+            LogicalPlanLanguage::ScalarUDFExprFun(ScalarUDFExprFun(fun))
+                if fun.as_str() == "current_timestamp" =>
+            {
+                1
+            }
+            LogicalPlanLanguage::ScalarUDFExprFun(ScalarUDFExprFun(fun))
+                if fun.as_str() == "localtimestamp" =>
+            {
+                1
+            }
             _ => 0,
         };
 

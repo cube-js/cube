@@ -1,6 +1,7 @@
 use super::utils;
 use crate::{
     compile::rewrite::{
+        alias_expr,
         analysis::{ConstantFolding, LogicalPlanAnalysis},
         between_expr, binary_expr, case_expr, case_expr_var_arg, cast_expr, change_user_member,
         column_expr, cube_scan, cube_scan_filters, cube_scan_filters_empty_tail, cube_scan_members,
@@ -46,11 +47,12 @@ use std::{fmt::Display, ops::Index, sync::Arc};
 
 pub struct FilterRules {
     meta_context: Arc<MetaContext>,
+    eval_stable_functions: bool,
 }
 
 impl RewriteRules for FilterRules {
     fn rewrite_rules(&self) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
-        vec![
+        let mut rules = vec![
             transforming_rewrite(
                 "push-down-filter",
                 filter(
@@ -2026,17 +2028,11 @@ impl RewriteRules for FilterRules {
                 cast_expr(filter_simplify_replacer("?expr"), "?data_type"),
                 self.transform_filter_cast_unwrap("?expr", "?data_type", true),
             ),
+            // Alias
             rewrite(
-                "filter-simplify-now",
-                filter_simplify_replacer(fun_expr("Now", Vec::<String>::new())),
-                // TODO alias to make it equivalent transformation
-                udf_expr("eval_now", Vec::<String>::new()),
-            ),
-            rewrite(
-                "filter-simplify-current-date",
-                filter_simplify_replacer(fun_expr("CurrentDate", Vec::<String>::new())),
-                // TODO alias to make it equivalent transformation
-                udf_expr("eval_current_date", Vec::<String>::new()),
+                "filter-simplify-alias-push-down",
+                filter_simplify_replacer(alias_expr("?expr", "?alias")),
+                alias_expr(filter_simplify_replacer("?expr"), "?alias"),
             ),
             // Binary expr
             rewrite(
@@ -2606,13 +2602,39 @@ impl RewriteRules for FilterRules {
                     "?output_date_range",
                 ),
             ),
-        ]
+        ];
+        if self.eval_stable_functions {
+            rules.extend(vec![
+                rewrite(
+                    "filter-simplify-now",
+                    filter_simplify_replacer(fun_expr("Now", Vec::<String>::new())),
+                    // TODO alias to make it equivalent transformation
+                    udf_expr("eval_now", Vec::<String>::new()),
+                ),
+                rewrite(
+                    "filter-simplify-utc-timestamp",
+                    filter_simplify_replacer(fun_expr("UtcTimestamp", Vec::<String>::new())),
+                    // TODO alias to make it equivalent transformation
+                    udf_expr("eval_utc_timestamp", Vec::<String>::new()),
+                ),
+                rewrite(
+                    "filter-simplify-current-date",
+                    filter_simplify_replacer(fun_expr("CurrentDate", Vec::<String>::new())),
+                    // TODO alias to make it equivalent transformation
+                    udf_expr("eval_current_date", Vec::<String>::new()),
+                ),
+            ]);
+        }
+        rules
     }
 }
 
 impl FilterRules {
-    pub fn new(meta_context: Arc<MetaContext>) -> Self {
-        Self { meta_context }
+    pub fn new(meta_context: Arc<MetaContext>, eval_stable_functions: bool) -> Self {
+        Self {
+            meta_context,
+            eval_stable_functions,
+        }
     }
 
     fn push_down_filter(

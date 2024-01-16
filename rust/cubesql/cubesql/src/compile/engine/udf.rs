@@ -4805,7 +4805,20 @@ pub fn register_fun_stubs(mut ctx: SessionContext) -> SessionContext {
         vol = Stable
     );
 
-    register_fun_stub!(udf, "eval_now", argc = 0, rettyp = Timestamp, vol = Stable);
+    register_fun_stub!(
+        udf,
+        "eval_now",
+        argc = 0,
+        rettyp = TimestampTz,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "eval_utc_timestamp",
+        argc = 0,
+        rettyp = Timestamp,
+        vol = Stable
+    );
 
     ctx
 }

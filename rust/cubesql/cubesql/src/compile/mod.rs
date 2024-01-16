@@ -15,7 +15,7 @@ use datafusion::{
         projection_drop_out::ProjectionDropOut,
         utils::from_plan,
     },
-    physical_plan::ExecutionPlan,
+    physical_plan::{planner::DefaultPhysicalPlanner, ExecutionPlan},
     prelude::*,
     scalar::ScalarValue,
     sql::{parser::Statement as DFStatement, planner::SqlToRel},
@@ -105,7 +105,10 @@ pub mod test;
 
 pub use crate::transport::ctx::*;
 use crate::{
-    compile::{engine::df::wrapper::CubeScanWrapperNode, rewrite::rewriter::Rewriter},
+    compile::{
+        engine::df::wrapper::CubeScanWrapperNode,
+        rewrite::{analysis::LogicalPlanAnalysis, rewriter::Rewriter},
+    },
     transport::{LoadRequestMeta, SpanId, TransportService},
 };
 pub use error::{CompilationError, CompilationResult};
@@ -1460,7 +1463,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
             .add_logical_plan_replace_params(&optimized_plan, &mut query_params)
             .map_err(|e| CompilationError::internal(e.to_string()))?;
 
-        let finalized_graph = self
+        let mut finalized_graph = self
             .session_manager
             .server
             .compiler_cache
@@ -1501,6 +1504,12 @@ WHERE `TABLE_SCHEMA` = '{}'",
                     ])),
                 ),
             })?;
+
+        // Replace Analysis as at least time has changed but it might be also context may affect rewriting in some other ways
+        finalized_graph.analysis = LogicalPlanAnalysis::new(
+            cube_ctx.clone(),
+            Arc::new(DefaultPhysicalPlanner::default()),
+        );
 
         let mut rewriter = Rewriter::new(finalized_graph, cube_ctx.clone());
 
@@ -3289,15 +3298,9 @@ mod tests {
 
         let logical_plan = &query_plan.print(true).unwrap();
 
-        let re = Regex::new(r"TimestampNanosecond\(\d+, None\)").unwrap();
-        let logical_plan = re
-            .replace_all(logical_plan, "TimestampNanosecond(0, None)")
-            .as_ref()
-            .to_string();
-
         assert_eq!(
             logical_plan,
-            "Projection: TimestampNanosecond(0, None) AS COL\
+            "Projection: CAST(utctimestamp() AS current_timestamp() AS Timestamp(Nanosecond, None)) AS COL\
             \n  EmptyRelation",
         );
     }

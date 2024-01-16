@@ -23,6 +23,7 @@ pub trait CompilerCache: Send + Sync + Debug {
         &self,
         ctx: AuthContextRef,
         protocol: DatabaseProtocol,
+        eval_stable_functions: bool,
     ) -> Result<Arc<Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>>, CubeError>;
 
     async fn meta(
@@ -58,7 +59,8 @@ pub struct CompilerCacheImpl {
 
 pub struct CompilerCacheEntry {
     meta_context: Arc<MetaContext>,
-    rewrite_rules: RWLockAsync<Option<Arc<Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>>>>,
+    rewrite_rules:
+        RWLockAsync<HashMap<bool, Arc<Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>>>>,
     parameterized_cache:
         MutexAsync<LruCache<[u8; 32], EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>>>,
     queries_cache: MutexAsync<LruCache<[u8; 32], EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>>>,
@@ -72,22 +74,32 @@ impl CompilerCache for CompilerCacheImpl {
         &self,
         ctx: AuthContextRef,
         protocol: DatabaseProtocol,
+        eval_stable_functions: bool,
     ) -> Result<Arc<Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>>, CubeError> {
         let cache_entry = self.get_cache_entry(ctx.clone(), protocol).await?;
 
-        let rewrite_rules = { cache_entry.rewrite_rules.read().await.clone() };
+        let rewrite_rules = {
+            cache_entry
+                .rewrite_rules
+                .read()
+                .await
+                .get(&eval_stable_functions)
+                .cloned()
+        };
         if let Some(rewrite_rules) = rewrite_rules {
             Ok(rewrite_rules)
         } else {
             let mut rewrite_rules_lock = cache_entry.rewrite_rules.write().await;
-            if let Some(rewrite_rules) = rewrite_rules_lock.clone() {
+            if let Some(rewrite_rules) = rewrite_rules_lock.get(&eval_stable_functions).cloned() {
                 Ok(rewrite_rules)
             } else {
                 let rewrite_rules = Arc::new(Rewriter::rewrite_rules(
                     cache_entry.meta_context.clone(),
                     self.config_obj.clone(),
+                    eval_stable_functions,
                 ));
-                *rewrite_rules_lock = Some(rewrite_rules.clone());
+
+                rewrite_rules_lock.insert(eval_stable_functions, rewrite_rules.clone());
                 Ok(rewrite_rules)
             }
         }
@@ -198,7 +210,7 @@ impl CompilerCacheImpl {
                 .unwrap_or_else(|| {
                     let cache_entry = Arc::new(CompilerCacheEntry {
                         meta_context: meta_context.clone(),
-                        rewrite_rules: RWLockAsync::new(None),
+                        rewrite_rules: RWLockAsync::new(HashMap::new()),
                         parameterized_cache: MutexAsync::new(LruCache::new(
                             NonZeroUsize::new(self.config_obj.query_cache_size()).unwrap(),
                         )),
