@@ -1,13 +1,12 @@
 use datafusion::physical_plan::hash_aggregate::{
     AggregateMode, AggregateStrategy, HashAggregateExec,
 };
-use datafusion::physical_plan::merge_sort::MergeSortExec;
 use datafusion::physical_plan::ExecutionPlan;
 
 use serde::Serialize;
 use serde_json::{json, Value};
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub struct PhysicalPlanFlags {
     pub merge_sort_node: bool,
 }
@@ -43,7 +42,10 @@ impl PhysicalPlanFlags {
             let is_full_inplace_agg = agg.mode() == &AggregateMode::Full
                 && agg.strategy() == AggregateStrategy::InplaceSorted;
 
-            if is_final_hash_agg_without_groups || is_full_inplace_agg {
+            let is_final_inplace_agg = agg.mode() == &AggregateMode::Final
+                && agg.strategy() == AggregateStrategy::InplaceSorted;
+
+            if is_final_hash_agg_without_groups || is_full_inplace_agg || is_final_inplace_agg {
                 flags.merge_sort_node = true;
             }
         }
