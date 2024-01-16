@@ -10,7 +10,7 @@ In that case, the fiscal year may either lag or lead by a number of months.
 We'd like to analyze business metrics by attributing them to specific fiscal
 years and quarters within those years. In this recipe, we'll be using
 [Australia][wiki-fiscal-year-australia] as an example: in this country, the
-"financial year" 6 month earlier than the calendar year, i.e., FY 2024
+"financial year" begins 6 month earlier than the calendar year, i.e., FY 2024
 started on July 1, 2023.
 
 ## Data modeling
@@ -49,7 +49,7 @@ cubes:
 
       # TODO: Adjust to your fiscal calendar
     - name: fiscal_year_internal
-      sql: "EXTRACT(YEAR FROM {timestamp} - INTERVAL '6 MONTH')"
+      sql: "EXTRACT(YEAR FROM {timestamp} + INTERVAL '6 MONTH')"
       type: string
       public: false
 
@@ -75,7 +75,7 @@ cubes:
 
 Now you can use the `fiscal_quarter` dimension in your queries and get desired result:
 
-<Screenshot src="https://ucarecdn.com/c03579f2-f7e0-40aa-a723-310a5762ab54/"/>
+<Screenshot src="https://ucarecdn.com/7d106eba-ca32-45eb-b246-217c9bd11c1e/"/>
 
 
 [wiki-fiscal-year]: https://en.wikipedia.org/wiki/Fiscal_year

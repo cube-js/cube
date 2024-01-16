@@ -151,7 +151,7 @@ Only some operators are available for measures. For dimensions, the available
 operators depend on the
 [type of the dimension](/reference/data-model/types-and-formats#dimension-types).
 
-### equals
+### `equals`
 
 Use it when you need an exact match. It supports multiple values.
 
@@ -166,7 +166,7 @@ Use it when you need an exact match. It supports multiple values.
 }
 ```
 
-### notEquals
+### `notEquals`
 
 The opposite operator of `equals`. It supports multiple values.
 
@@ -181,7 +181,7 @@ The opposite operator of `equals`. It supports multiple values.
 }
 ```
 
-### contains
+### `contains`
 
 The `contains` filter acts as a wildcard case-insensitive `LIKE` operator. In
 the majority of SQL backends it uses `ILIKE` operator with values being
@@ -197,7 +197,7 @@ surrounded by `%`. It supports multiple values.
 }
 ```
 
-### notContains
+### `notContains`
 
 The opposite operator of `contains`. It supports multiple values.
 
@@ -222,11 +222,11 @@ This operator adds `IS NULL` check to include `NULL` values unless you add
 }
 ```
 
-### startsWith
+### `startsWith`
 
 The `startsWith` filter acts as a case-insensitive `LIKE` operator with a
-wildcard at the beginning. In the majority of SQL backends, it uses the `ILIKE`
-operator with `%` at the start of each value. It supports multiple values.
+wildcard at the end. In the majority of SQL backends, it uses the `ILIKE`
+operator with `%` at the end of each value. It supports multiple values.
 
 - Dimension types: `string`.
 
@@ -238,11 +238,15 @@ operator with `%` at the start of each value. It supports multiple values.
 }
 ```
 
-### endsWith
+### `notStartsWith`
+
+The opposite operator of `startsWith`.
+
+### `endsWith`
 
 The `endsWith` filter acts as a case-insensitive `LIKE` operator with a wildcard
-at the end. In the majority of SQL backends, it uses the `ILIKE` operator with
-`%` at the end of each value. It supports multiple values.
+at the beginning. In the majority of SQL backends, it uses the `ILIKE` operator with
+`%` at the beginning of each value. It supports multiple values.
 
 - Dimension types: `string`.
 
@@ -254,7 +258,11 @@ at the end. In the majority of SQL backends, it uses the `ILIKE` operator with
 }
 ```
 
-### gt
+### `notEndsWith`
+
+The opposite operator of `endsWith`.
+
+### `gt`
 
 The `gt` operator means **greater than** and is used with measures or dimensions
 of type `number`.
@@ -270,7 +278,7 @@ of type `number`.
 }
 ```
 
-### gte
+### `gte`
 
 The `gte` operator means **greater than or equal to** and is used with measures
 or dimensions of type `number`.
@@ -286,7 +294,7 @@ or dimensions of type `number`.
 }
 ```
 
-### lt
+### `lt`
 
 The `lt` operator means **less than** and is used with measures or dimensions of
 type `number`.
@@ -302,7 +310,7 @@ type `number`.
 }
 ```
 
-### lte
+### `lte`
 
 The `lte` operator means **less than or equal to** and is used with measures or
 dimensions of type `number`.
@@ -318,7 +326,7 @@ dimensions of type `number`.
 }
 ```
 
-### set
+### `set`
 
 Operator `set` checks whether the value of the member **is not** `NULL`. You
 don't need to pass `values` for this operator.
@@ -333,7 +341,7 @@ don't need to pass `values` for this operator.
 }
 ```
 
-### notSet
+### `notSet`
 
 An opposite to the `set` operator. It checks whether the value of the member
 **is** `NULL`. You don't need to pass `values` for this operator.
@@ -348,7 +356,7 @@ An opposite to the `set` operator. It checks whether the value of the member
 }
 ```
 
-### inDateRange
+### `inDateRange`
 
 <WarningBox>
 
@@ -380,7 +388,7 @@ There is a convenient way to use date filters with grouping -
 }
 ```
 
-### notInDateRange
+### `notInDateRange`
 
 <WarningBox>
 
@@ -405,7 +413,7 @@ dates. The values format is the same as for `inDateRange`.
 }
 ```
 
-### beforeDate
+### `beforeDate`
 
 <WarningBox>
 
@@ -430,7 +438,7 @@ values should be an array of one element in `YYYY-MM-DD` format.
 }
 ```
 
-### afterDate
+### `afterDate`
 
 <WarningBox>
 
@@ -454,7 +462,7 @@ The same as `beforeDate`, but is used to get all results after a specific date.
 }
 ```
 
-### measureFilter
+### `measureFilter`
 
 The `measureFilter` operator is used to apply an existing measure's filters to
 the current query.

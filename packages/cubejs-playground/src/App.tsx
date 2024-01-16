@@ -1,24 +1,23 @@
 /* eslint-disable no-undef,react/jsx-no-target-blank */
-import { Component, useEffect } from 'react';
 import '@ant-design/compatible/assets/index.css';
-import { Layout, Alert } from 'antd';
+import { Alert, Layout } from 'antd';
+import { Component, useEffect } from 'react';
 import { RouteComponentProps, withRouter } from 'react-router-dom';
 import styled from 'styled-components';
 
-import Header from './components/Header/Header';
-import GlobalStyles from './components/GlobalStyles';
 import { CubeLoader } from './atoms';
+import { AppContextConsumer, PlaygroundContext } from './components/AppContext';
+import GlobalStyles from './components/GlobalStyles';
+import Header from './components/Header/Header';
+import { LivePreviewContextProvider } from './components/LivePreviewContext/LivePreviewContextProvider';
 import {
   event,
   setAnonymousId,
-  setTracker,
   setTelemetry,
+  setTracker,
   trackImpl,
 } from './events';
-import { AppContextConsumer, PlaygroundContext } from './components/AppContext';
 import { useAppContext } from './hooks';
-import { LivePreviewContextProvider } from './components/LivePreviewContext/LivePreviewContextProvider';
-
 const StyledLayoutContent = styled(Layout.Content)`
   height: 100%;
 `;

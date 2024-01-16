@@ -3,6 +3,33 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.44](https://github.com/cube-js/cube/compare/v0.34.43...v0.34.44) (2024-01-15)
+
+
+### Bug Fixes
+
+* **query-orchestrator:** QueryQueue - reduce trafic (unexpected call for query stage) ([#7646](https://github.com/cube-js/cube/issues/7646)) ([ecf3826](https://github.com/cube-js/cube/commit/ecf3826df0e8f7ff5855b725ded4ac7d4f566582))
+
+
+### Features
+
+* **query-orchestrator:** Queue - reduce traffic for processing (Cube Store only) ([#7644](https://github.com/cube-js/cube/issues/7644)) ([7db90fb](https://github.com/cube-js/cube/commit/7db90fb7532d53d7ce46ba342e89250110f32c6b))
+
+
+
+
+
+## [0.34.43](https://github.com/cube-js/cube/compare/v0.34.42...v0.34.43) (2024-01-11)
+
+
+### Bug Fixes
+
+* **playground:** replace antd overlay ([#7645](https://github.com/cube-js/cube/issues/7645)) ([bb6a7d3](https://github.com/cube-js/cube/commit/bb6a7d3ff4b6d6b7972c196877749d3dbc2aecf6))
+
+
+
+
+
 ## [0.34.42](https://github.com/cube-js/cube/compare/v0.34.41...v0.34.42) (2024-01-07)
 
 

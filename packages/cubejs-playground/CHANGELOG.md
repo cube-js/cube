@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.43](https://github.com/cube-js/cube/compare/v0.34.42...v0.34.43) (2024-01-11)
+
+
+### Bug Fixes
+
+* **playground:** replace antd overlay ([#7645](https://github.com/cube-js/cube/issues/7645)) ([bb6a7d3](https://github.com/cube-js/cube/commit/bb6a7d3ff4b6d6b7972c196877749d3dbc2aecf6))
+
+
+
+
+
 ## [0.34.37](https://github.com/cube-js/cube/compare/v0.34.36...v0.34.37) (2023-12-19)
 
 **Note:** Version bump only for package @cubejs-client/playground
