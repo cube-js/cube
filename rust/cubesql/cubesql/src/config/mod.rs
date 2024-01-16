@@ -129,6 +129,8 @@ pub trait ConfigObj: DIService + Debug {
     fn query_cache_size(&self) -> usize;
 
     fn enable_parameterized_rewrite_cache(&self) -> bool;
+
+    fn enable_rewrite_cache(&self) -> bool;
 }
 
 #[derive(Debug, Clone)]
@@ -143,6 +145,7 @@ pub struct ConfigObjImpl {
     pub compiler_cache_size: usize,
     pub query_cache_size: usize,
     pub enable_parameterized_rewrite_cache: bool,
+    pub enable_rewrite_cache: bool,
 }
 
 impl ConfigObjImpl {
@@ -171,9 +174,10 @@ impl ConfigObjImpl {
             compiler_cache_size: env_parse("CUBEJS_COMPILER_CACHE_SIZE", 100),
             query_cache_size: env_parse("CUBESQL_QUERY_CACHE_SIZE", 500),
             enable_parameterized_rewrite_cache: env_parse(
-                "CUBESQL_ENABLE_PARAMETERIZED_REWRITE_CACHE",
+                "CUBESQL_PARAMETERIZED_REWRITE_CACHE",
                 false,
             ),
+            enable_rewrite_cache: env_parse("CUBESQL_REWRITE_CACHE", false),
         }
     }
 }
@@ -216,6 +220,10 @@ impl ConfigObj for ConfigObjImpl {
     fn enable_parameterized_rewrite_cache(&self) -> bool {
         self.enable_parameterized_rewrite_cache
     }
+
+    fn enable_rewrite_cache(&self) -> bool {
+        self.enable_rewrite_cache
+    }
 }
 
 lazy_static! {
@@ -247,6 +255,7 @@ impl Config {
                 compiler_cache_size: 100,
                 query_cache_size: 500,
                 enable_parameterized_rewrite_cache: false,
+                enable_rewrite_cache: false,
             }),
         }
     }

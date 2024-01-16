@@ -148,6 +148,11 @@ impl CompilerCache for CompilerCacheImpl {
         param_values: &HashMap<usize, ScalarValue>,
         qtrace: &mut Option<Qtrace>,
     ) -> Result<EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, CubeError> {
+        if !self.config_obj.enable_rewrite_cache() {
+            let mut rewriter = Rewriter::new(input_plan, cube_context);
+            rewriter.add_param_values(param_values)?;
+            return Ok(rewriter.run_rewrite_to_completion(ctx, qtrace).await?);
+        }
         let cache_entry = self
             .get_cache_entry(ctx.clone(), cube_context.session_state.protocol.clone())
             .await?;
