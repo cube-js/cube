@@ -10,8 +10,8 @@ use cubeclient::models::{V1LoadRequestQuery, V1LoadResult, V1LoadResultAnnotatio
 pub use datafusion::{
     arrow::{
         array::{
-            ArrayRef, BooleanBuilder, Date32Builder, Float64Builder, Int32Builder, Int64Builder,
-            StringBuilder,
+            ArrayRef, BooleanBuilder, Date32Builder, DecimalBuilder, Float64Builder, Int32Builder,
+            Int64Builder, StringBuilder,
         },
         datatypes::{DataType, SchemaRef},
         error::{ArrowError, Result as ArrowResult},
@@ -499,11 +499,17 @@ macro_rules! build_column {
         let len = $response.len()?;
         let mut builder = <$builder_ty>::new(len);
 
+        build_column_custom_builder!($data_type, len, builder, $response, $field_name, { $($builder_block)* }, { $($scalar_block)* })
+    }}
+}
+
+macro_rules! build_column_custom_builder {
+    ($data_type:expr, $len:expr, $builder:expr, $response:expr, $field_name: expr, { $($builder_block:tt)* }, { $($scalar_block:tt)* }) => {{
         match $field_name {
             MemberField::Member(field_name) => {
-                for i in 0..len {
+                for i in 0..$len {
                     let value = $response.get(i, field_name)?;
-                    match (value, &mut builder) {
+                    match (value, &mut $builder) {
                         (FieldValue::Null, builder) => builder.append_null()?,
                         $($builder_block)*
                         #[allow(unreachable_patterns)]
@@ -518,8 +524,8 @@ macro_rules! build_column {
                 }
             }
             MemberField::Literal(value) => {
-                for _ in 0..len {
-                    match (value, &mut builder) {
+                for _ in 0..$len {
+                    match (value, &mut $builder) {
                         $($scalar_block)*
                         (v, _) => {
                             return Err(CubeError::user(format!(
@@ -533,7 +539,7 @@ macro_rules! build_column {
             }
         };
 
-        Arc::new(builder.finish()) as ArrayRef
+        Arc::new($builder.finish()) as ArrayRef
     }}
 }
 
@@ -1131,6 +1137,54 @@ pub fn transform_response<V: ValueObject>(
                     },
                     {
                         (ScalarValue::Date32(v), builder) => builder.append_option(v.clone())?,
+                    }
+                )
+            }
+            DataType::Decimal(precision, scale) => {
+                let len = response.len()?;
+                let mut builder = DecimalBuilder::new(len, *precision, *scale);
+
+                build_column_custom_builder!(
+                    DataType::Decimal(*precision, *scale),
+                    len,
+                    builder,
+                    response,
+                    field_name,
+                    {
+                        (FieldValue::String(s), builder) => {
+                            let mut parts = s.split(".");
+                            match parts.next() {
+                                None => builder.append_null()?,
+                                Some(int_part) => {
+                                    let frac_part = format!("{:0<width$}", parts.next().unwrap_or(""), width=scale);
+                                    if frac_part.len() > *scale {
+                                        Err(DataFusionError::Execution(format!("Decimal scale is higher than requested: expected {}, got {}", scale, frac_part.len())))?;
+                                    }
+                                    if let Some(_) = parts.next() {
+                                        Err(DataFusionError::Execution(format!("Unable to parse decimal, value contains two dots: {}", s)))?;
+                                    }
+                                    let decimal_str = format!("{}{}", int_part, frac_part);
+                                    if decimal_str.len() > *precision {
+                                        Err(DataFusionError::Execution(format!("Decimal precision is higher than requested: expected {}, got {}", precision, decimal_str.len())))?;
+                                    }
+                                    if let Ok(value) = decimal_str.parse::<i128>() {
+                                        builder.append_value(value)?;
+                                    } else {
+                                        Err(DataFusionError::Execution(format!("Unable to parse decimal as an i128: {}", decimal_str)))?;
+                                    }
+                                }
+                            };
+                        },
+                    },
+                    {
+                        (ScalarValue::Decimal128(v, _, _), builder) => {
+                            // TODO: check precision and scale, adjust accordingly
+                            if let Some(v) = v {
+                                builder.append_value(*v)?;
+                            } else {
+                                builder.append_null()?;
+                            }
+                        },
                     }
                 )
             }

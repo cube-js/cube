@@ -20901,4 +20901,88 @@ limit
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn test_thoughtspot_kpi_monthly() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            r#"
+            SELECT 
+                DATE_TRUNC('MONTH', CAST("ta_1"."order_date" AS date)) AS "ca_1", 
+                COALESCE(sum("ta_1"."count"), 0) AS "ca_2", 
+                min((MOD(CAST((EXTRACT(MONTH FROM "ta_1"."order_date") - 1) AS numeric), 3) + 1)) AS "ca_3", 
+                min(CEIL((EXTRACT(MONTH FROM "ta_1"."order_date") / NULLIF(3.0,0.0)))) AS "ca_4"
+            FROM "db"."public"."KibanaSampleDataEcommerce" AS "ta_1"
+            GROUP BY "ca_1"
+            ORDER BY "ca_1" ASC
+            LIMIT 5000
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert!(logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql
+            .contains("EXTRACT(MONTH FROM "));
+    }
+
+    #[tokio::test]
+    async fn test_thoughtspot_kpi_daily() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            r#"
+            SELECT 
+                CAST("ta_1"."order_date" AS date) AS "ca_1", 
+                COALESCE(sum("ta_1"."count"), 0) AS "ca_2", 
+                min((MOD(CAST((CAST("ta_1"."order_date" AS date) - CAST(DATE '1970-01-01' AS date) + 3) AS numeric), 7) + 1)) AS "ca_3", 
+                min(EXTRACT(DAY FROM "ta_1"."order_date")) AS "ca_4", 
+                min((CAST("ta_1"."order_date" AS date) - CAST((CAST(EXTRACT(YEAR FROM "ta_1"."order_date") || '-' || EXTRACT(MONTH FROM "ta_1"."order_date") || '-01' AS DATE) + ((EXTRACT(MONTH FROM "ta_1"."order_date") - 1) * -1) * INTERVAL '1 month') AS date) + 1)) AS "ca_5", 
+                min(FLOOR(((EXTRACT(DAY FROM ("ta_1"."order_date" + (4 - (MOD(CAST((CAST("ta_1"."order_date" AS date) - CAST(DATE '1970-01-01' AS date) + 3) AS numeric), 7) + 1)) * INTERVAL '1 day')) + 6) / NULLIF(7,0)))) AS "ca_6", 
+                min(FLOOR(((CAST(("ta_1"."order_date" + (4 - (MOD(CAST((CAST("ta_1"."order_date" AS date) - CAST(DATE '1970-01-01' AS date) + 3) AS numeric), 7) + 1)) * INTERVAL '1 day') AS date) - CAST((CAST(EXTRACT(YEAR FROM ("ta_1"."order_date" + (4 - (MOD(CAST((CAST("ta_1"."order_date" AS date) - CAST(DATE '1970-01-01' AS date) + 3) AS numeric), 7) + 1)) * INTERVAL '1 day')) || '-' || EXTRACT(MONTH FROM ("ta_1"."order_date" + (4 - (MOD(CAST((CAST("ta_1"."order_date" AS date) - CAST(DATE '1970-01-01' AS date) + 3) AS numeric), 7) + 1)) * INTERVAL '1 day')) || '-01' AS DATE) + ((EXTRACT(MONTH FROM ("ta_1"."order_date" + (4 - (MOD(CAST((CAST("ta_1"."order_date" AS date) - CAST(DATE '1970-01-01' AS date) + 3) AS numeric), 7) + 1)) * INTERVAL '1 day')) - 1) * -1) * INTERVAL '1 month') AS date) + 1 + 6) / NULLIF(7,0)))) AS "ca_7", 
+                min((MOD(CAST((EXTRACT(MONTH FROM "ta_1"."order_date") - 1) AS numeric), 3) + 1)) AS "ca_8", 
+                min(CEIL((EXTRACT(MONTH FROM "ta_1"."order_date") / NULLIF(3.0,0.0)))) AS "ca_9"
+            FROM "db"."public"."KibanaSampleDataEcommerce" AS "ta_1"
+            GROUP BY "ca_1"
+            ORDER BY "ca_1" ASC
+            LIMIT 5000
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql;
+        assert!(sql.contains("order_date"));
+        assert!(sql.contains("EXTRACT(DAY FROM"))
+    }
 }

@@ -1281,6 +1281,7 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
                         | ScalarValue::Date64(_)
                         | ScalarValue::Int64(_)
                         | ScalarValue::Float64(_)
+                        | ScalarValue::IntervalYearMonth(_)
                 ) {
                 egraph[id]
                     .data
