@@ -3,7 +3,7 @@ use crate::{
     compile::rewrite::{
         agg_fun_expr, aggr_aggr_expr, aggr_aggr_expr_empty_tail, aggr_group_expr,
         aggr_group_expr_empty_tail, aggregate, alias_expr,
-        analysis::{ConstantFolding, LogicalPlanAnalysis},
+        analysis::{ConstantFolding, LogicalPlanAnalysis, OriginalExpr},
         binary_expr, cast_expr, cast_expr_explicit, column_expr, cube_scan, event_notification,
         fun_expr, group_aggregate_split_replacer, group_expr_split_replacer,
         inner_aggregate_split_replacer, is_not_null_expr, is_null_expr, literal_expr,
@@ -4867,7 +4867,7 @@ impl SplitRules {
                         original_expr_id
                     )));
 
-            if let Ok(expr) = res {
+            if let Ok(OriginalExpr::Expr(expr)) = res {
                 // TODO unwrap
                 let name = expr.name(&DFSchema::empty()).unwrap();
                 let column = Column::from_name(name.to_string());
@@ -4925,7 +4925,7 @@ impl SplitRules {
                         "Original expr wasn't prepared for {:?}",
                         original_expr_id
                     )));
-            if let Ok(expr) = res {
+            if let Ok(OriginalExpr::Expr(expr)) = res {
                 for alias_to_cube in alias_to_cube_fn(egraph, subst[alias_to_cube_var]) {
                     for column in var_iter!(egraph[subst[column_var]], ColumnExprColumn).cloned() {
                         if let Some((alias, _)) =
@@ -6215,7 +6215,7 @@ impl SplitRules {
                         "Original expr wasn't prepared for {:?}",
                         original_expr_id
                     )));
-            if let Ok(expr) = res {
+            if let Ok(OriginalExpr::Expr(expr)) = res {
                 let name = expr.name(&DFSchema::empty()).unwrap();
                 subst.insert(
                     alias_val,
@@ -6355,7 +6355,7 @@ impl SplitRules {
                     expr_id
                 )));
 
-            if let Ok(expr) = res {
+            if let Ok(OriginalExpr::Expr(expr)) = res {
                 let inner_expr_id = subst[inner_expr_var];
                 let res =
                     egraph[inner_expr_id]
@@ -6367,7 +6367,7 @@ impl SplitRules {
                             inner_expr_id
                         )));
 
-                if let Ok(inner_expr) = res {
+                if let Ok(OriginalExpr::Expr(inner_expr)) = res {
                     match inner_expr {
                         Expr::Column(_) => {
                             for data_type in
@@ -6462,7 +6462,7 @@ impl SplitRules {
                     expr_id
                 )));
 
-            if let Ok(expr) = res {
+            if let Ok(OriginalExpr::Expr(expr)) = res {
                 let inner_expr_id = subst[inner_expr_var];
                 let res =
                     egraph[inner_expr_id]
@@ -6474,7 +6474,7 @@ impl SplitRules {
                             inner_expr_id
                         )));
 
-                if let Ok(inner_expr) = res {
+                if let Ok(OriginalExpr::Expr(inner_expr)) = res {
                     match inner_expr {
                         Expr::Column(_) => {
                             for data_type in

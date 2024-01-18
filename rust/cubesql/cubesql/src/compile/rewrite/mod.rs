@@ -6,7 +6,7 @@ pub mod rewriter;
 pub mod rules;
 
 use crate::{
-    compile::rewrite::analysis::{LogicalPlanAnalysis, Member},
+    compile::rewrite::analysis::{LogicalPlanAnalysis, Member, OriginalExpr},
     CubeError,
 };
 use datafusion::{
@@ -1361,10 +1361,18 @@ pub fn original_expr_name(
     egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
     id: Id,
 ) -> Option<String> {
-    egraph[id].data.original_expr.as_ref().map(|e| match e {
-        Expr::Column(c) => c.name.to_string(),
-        _ => e.name(&DFSchema::empty()).unwrap(),
-    })
+    egraph[id]
+        .data
+        .original_expr
+        .as_ref()
+        .and_then(|e| match e {
+            OriginalExpr::Expr(e) => Some(e),
+            _ => None,
+        })
+        .map(|e| match e {
+            Expr::Column(c) => c.name.to_string(),
+            _ => e.name(&DFSchema::empty()).unwrap(),
+        })
 }
 
 fn search_match_chained<'a>(
