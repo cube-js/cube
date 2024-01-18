@@ -245,7 +245,7 @@ impl Rewriter {
 
         let (plan, qtrace_egraph_iterations) = tokio::task::spawn_blocking(move || {
             let (runner, qtrace_egraph_iterations) =
-                Self::run_rewrites(&cube_context, egraph, rules)?;
+                Self::run_rewrites(&cube_context, egraph, rules, "intermediate")?;
 
             Ok::<_, CubeError>((runner.egraph, qtrace_egraph_iterations))
         })
@@ -329,7 +329,7 @@ impl Rewriter {
         let (plan, qtrace_egraph_iterations, qtrace_best_graph) =
             tokio::task::spawn_blocking(move || {
                 let (runner, qtrace_egraph_iterations) =
-                    Self::run_rewrites(&cube_context, egraph, rules)?;
+                    Self::run_rewrites(&cube_context, egraph, rules, "final")?;
 
                 let extractor = Extractor::new(&runner.egraph, BestCubePlan);
                 let (best_cost, best) = extractor.find_best(root);
@@ -374,6 +374,7 @@ impl Rewriter {
         cube_context: &Arc<CubeContext>,
         egraph: EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
         rules: Arc<Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>>,
+        stage: &str,
     ) -> Result<(CubeRunner, Vec<QtraceEgraphIteration>), CubeError> {
         let runner = Self::rewrite_runner(cube_context.clone(), egraph);
         let runner = runner.run(rules.iter());
@@ -394,20 +395,21 @@ impl Rewriter {
             }
         };
         if IterInfo::egraph_debug_enabled() {
-            let _ = fs::create_dir_all("egraph-debug");
-            let _ = fs::create_dir_all("egraph-debug/public");
-            let _ = fs::create_dir_all("egraph-debug/src");
+            let dir = format!("egraph-debug-{}", stage);
+            let _ = fs::create_dir_all(dir.clone());
+            let _ = fs::create_dir_all(format!("{}/public", dir));
+            let _ = fs::create_dir_all(format!("{}/src", dir));
             fs::copy(
                 "egraph-debug-template/public/index.html",
-                "egraph-debug/public/index.html",
+                format!("{}/public/index.html", dir),
             )?;
             fs::copy(
                 "egraph-debug-template/package.json",
-                "egraph-debug/package.json",
+                format!("{}/package.json", dir),
             )?;
             fs::copy(
                 "egraph-debug-template/src/index.js",
-                "egraph-debug/src/index.js",
+                format!("{}/src/index.js", dir),
             )?;
 
             let mut iterations = Vec::new();
@@ -451,7 +453,7 @@ impl Rewriter {
                 last_debug_data = Some(debug_data_clone);
             }
             fs::write(
-                "egraph-debug/src/iterations.js",
+                format!("{}/src/iterations.js", dir),
                 &format!(
                     "export const iterations = {};",
                     serde_json::to_string_pretty(&iterations)?

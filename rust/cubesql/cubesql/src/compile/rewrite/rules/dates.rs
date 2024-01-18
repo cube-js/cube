@@ -2,7 +2,7 @@ use super::utils;
 use crate::{
     compile::rewrite::{
         agg_fun_expr, alias_expr,
-        analysis::{ConstantFolding, LogicalPlanAnalysis},
+        analysis::{ConstantFolding, LogicalPlanAnalysis, OriginalExpr},
         binary_expr, cast_expr, cast_expr_explicit, column_expr, fun_expr, literal_expr,
         literal_int, literal_string, negative_expr, rewrite,
         rewriter::RewriteRules,
@@ -611,7 +611,9 @@ impl DateRules {
         let alias_var = var!(alias_var);
         move |egraph, root, subst| {
             for data_type in var_iter!(egraph[subst[data_type_var]], CastExprDataType) {
-                if let Some(original_expr) = egraph[root].data.original_expr.as_ref() {
+                if let Some(OriginalExpr::Expr(original_expr)) =
+                    egraph[root].data.original_expr.as_ref()
+                {
                     let alias = original_expr.name(&DFSchema::empty()).unwrap();
                     match data_type {
                         DataType::Timestamp(TimeUnit::Nanosecond, None) => {
@@ -663,7 +665,9 @@ impl DateRules {
     {
         let alias_var = var!(alias_var);
         move |egraph, root, subst| {
-            if let Some(original_expr) = egraph[root].data.original_expr.as_ref() {
+            if let Some(OriginalExpr::Expr(original_expr)) =
+                egraph[root].data.original_expr.as_ref()
+            {
                 let alias = original_expr.name(&DFSchema::empty()).unwrap();
                 subst.insert(
                     alias_var,

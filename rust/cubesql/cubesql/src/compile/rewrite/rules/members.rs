@@ -1,7 +1,7 @@
 use crate::{
     compile::rewrite::{
         agg_fun_expr, aggregate, alias_expr, all_members,
-        analysis::LogicalPlanAnalysis,
+        analysis::{LogicalPlanAnalysis, OriginalExpr},
         binary_expr, cast_expr, change_user_expr, column_expr, column_name_to_member_def_vec,
         column_name_to_member_to_aliases, column_name_to_member_vec, cross_join, cube_scan,
         cube_scan_filters_empty_tail, cube_scan_members, cube_scan_members_empty_tail,
@@ -1232,7 +1232,7 @@ impl MemberRules {
                         None => continue,
                     };
 
-                if let Ok(expr) = res {
+                if let Ok(OriginalExpr::Expr(expr)) = res {
                     // TODO unwrap
                     let name = expr.name(&DFSchema::empty()).unwrap();
                     let suffix_alias = format!("{}_{}", name, granularity);

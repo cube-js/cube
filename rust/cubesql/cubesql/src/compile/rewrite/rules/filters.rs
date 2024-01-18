@@ -2,7 +2,7 @@ use super::utils;
 use crate::{
     compile::rewrite::{
         alias_expr,
-        analysis::{ConstantFolding, LogicalPlanAnalysis},
+        analysis::{ConstantFolding, LogicalPlanAnalysis, OriginalExpr},
         between_expr, binary_expr, case_expr, case_expr_var_arg, cast_expr, change_user_member,
         column_expr, cube_scan, cube_scan_filters, cube_scan_filters_empty_tail, cube_scan_members,
         dimension_expr, expr_column_name, filter, filter_member, filter_op, filter_op_filters,
@@ -4436,7 +4436,9 @@ impl FilterRules {
         let expr_var = var!(expr_var);
         let data_type_var = var!(data_type_var);
         move |egraph, subst| {
-            if let Some(expr) = egraph[subst[expr_var]].data.original_expr.clone() {
+            if let Some(OriginalExpr::Expr(expr)) =
+                egraph[subst[expr_var]].data.original_expr.clone()
+            {
                 for data_type in var_iter!(egraph[subst[data_type_var]], CastExprDataType).cloned()
                 {
                     return match data_type {

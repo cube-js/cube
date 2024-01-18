@@ -3879,6 +3879,38 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn tableau_mul_null_by_timestamp() {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT ((CAST('1900-01-01 00:00:00' AS TIMESTAMP) + NULL * INTERVAL '1 DAY') + 1 * INTERVAL '1 DAY') AS \"TEMP(Test)(4169571243)(0)\" FROM \"public\".\"KibanaSampleDataEcommerce\" \"KibanaSampleDataEcommerce\" HAVING (COUNT(1) > 0)".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        ).await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.count".to_string()),
+                    operator: Some("gt".to_string()),
+                    values: Some(vec!["0".to_string()]),
+                    or: None,
+                    and: None,
+                }]),
+                ungrouped: None,
+            }
+        );
+    }
+
+    #[tokio::test]
     async fn measure_used_on_dimension() {
         init_logger();
 
