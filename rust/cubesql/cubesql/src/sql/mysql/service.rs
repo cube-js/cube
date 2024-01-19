@@ -203,7 +203,7 @@ impl MySqlConnection {
             trace!("query was not detected");
 
             let meta = self.session.server.compiler_cache
-                .meta(self.auth_context()?)
+                .meta(self.auth_context()?, self.session.state.protocol.clone())
                 .await?;
 
             let plan = convert_sql_to_cube_query(&query, meta, self.session.clone()).await?;

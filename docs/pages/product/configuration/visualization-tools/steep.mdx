@@ -1,0 +1,51 @@
+# Steep
+
+[Steep](https://steep.app) is a modern analytics platform powered by and
+specifically built for semantic layers. It features modern, user-friendly
+UI as well as web, desktop, and mobile applications.
+
+<Screenshot src="https://ucarecdn.com/1303c503-4094-4f92-b59f-c1382eeff2fd/"/>
+
+<InfoBox>
+
+Watch how Cube and Steep work together in this webinar recording: [A New Way
+to do BI: Cube + Steep](https://cube.dev/events/a-new-way-to-do-bi-cube-steep).
+
+</InfoBox>
+
+## REST API
+
+You can use the [REST API][ref-rest-api] to connect Cube to Steep.
+
+### Cube Cloud
+
+When you have set up your Cube project in Cube Cloud, you need **REST API
+endpoint** and **API Secret** for your setup in order to connect Steep to
+Cube. Log in to your Cube console and follow the steps below.
+
+**REST API endpoint** can be found on the&nbsp;<Btn>Overview</Btn> page:
+
+<Screenshot src="https://ucarecdn.com/fddce1b2-fbdd-4711-82d9-3967af0e2641/"/>
+
+**API Secret** can be found on the&nbsp;<Btn>Settings → Configuration</Btn>
+page under&nbsp;<Btn>Environment variables</Btn> where it’s named
+`CUBEJS_API_SECRET`:
+
+<Screenshot src="https://ucarecdn.com/d978e95b-9e9c-443e-8b85-3106352a74cb/"/>
+
+Copy **REST API endpoint** and **API Secret** you got from Cube Cloud and
+paste them into Steep form for creating the Cube data source:
+
+<Screenshot src="https://ucarecdn.com/bde0cacf-9c25-4dce-af20-29855d20b3a0/"/>
+
+Hit&nbsp;<Btn>Continue</Btn> for your connection to be established and your
+Cube metrics to be synced into Steep:
+
+<Screenshot src="https://ucarecdn.com/eecf1cc4-8912-44d8-a984-7808f540c66f/"/>
+
+[ref-rest-api]: /product/apis-integrations/rest-api
+
+## Defining and syncing metrics
+
+See [Steep documention](https://help.steep.app/integrations/cube) for
+guidance on defining and synchronizing metrics from Cube to Steep.

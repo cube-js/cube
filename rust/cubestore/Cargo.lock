@@ -1259,7 +1259,6 @@ dependencies = [
  "mockall",
  "moka 0.10.1",
  "msql-srv",
- "mysql_common 0.26.0",
  "nanoid",
  "num 0.3.1",
  "parquet",
@@ -2461,7 +2460,7 @@ checksum = "348108ab3fba42ec82ff6e9564fc4ca0247bdccdc68dd8af9764bbc79c3c8ffb"
 [[package]]
 name = "librocksdb-sys"
 version = "0.10.0+7.9.2"
-source = "git+https://github.com/cube-js/rust-rocksdb?branch=cubestore#00ce1268184d0b1290c6cc92c1174724967a02da"
+source = "git+https://github.com/cube-js/rust-rocksdb?branch=cubestore#6ce33cfef170fc7b09d1945af3733c2a2a48725f"
 dependencies = [
  "bindgen",
  "bzip2-sys",
@@ -2791,7 +2790,7 @@ dependencies = [
  "async-trait",
  "byteorder",
  "chrono",
- "mysql_common 0.22.2",
+ "mysql_common",
  "nom 5.1.2",
  "rand 0.8.4",
  "time 0.2.7",
@@ -2867,35 +2866,6 @@ dependencies = [
  "serde_json",
  "sha1 0.6.0",
  "sha2 0.8.2",
- "time 0.2.7",
- "twox-hash",
- "uuid 0.8.2",
-]
-
-[[package]]
-name = "mysql_common"
-version = "0.26.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3694c35738725021e85c7b644b94bdab050d4ea6acca2b5624287f41e2abc5a"
-dependencies = [
- "base64 0.13.0",
- "bigdecimal 0.2.0",
- "bitflags",
- "byteorder",
- "bytes 1.0.1",
- "chrono",
- "flate2",
- "lazy_static",
- "lexical",
- "num-bigint 0.3.2",
- "num-traits 0.2.14",
- "rand 0.8.4",
- "regex",
- "rust_decimal",
- "serde",
- "serde_json",
- "sha1 0.6.0",
- "sha2 0.9.5",
  "time 0.2.7",
  "twox-hash",
  "uuid 0.8.2",
@@ -4147,7 +4117,7 @@ dependencies = [
 [[package]]
 name = "rocksdb"
 version = "0.20.1"
-source = "git+https://github.com/cube-js/rust-rocksdb?branch=cubestore#00ce1268184d0b1290c6cc92c1174724967a02da"
+source = "git+https://github.com/cube-js/rust-rocksdb?branch=cubestore#6ce33cfef170fc7b09d1945af3733c2a2a48725f"
 dependencies = [
  "libc",
  "librocksdb-sys",
@@ -5431,7 +5401,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "97fee6b57c6a41524a810daee9286c02d7752c4253064d0b05472833a438f675"
 dependencies = [
  "cfg-if 1.0.0",
- "rand 0.6.5",
+ "rand 0.8.4",
  "static_assertions",
 ]
 

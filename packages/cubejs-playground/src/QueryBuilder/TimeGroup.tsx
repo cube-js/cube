@@ -4,7 +4,7 @@ import moment from 'moment';
 import { useState, Fragment } from 'react';
 import styled from 'styled-components';
 
-import ButtonDropdown from './ButtonDropdown';
+import { ButtonDropdown } from './ButtonDropdown';
 import MemberDropdown from './MemberDropdown';
 import RemoveButtonGroup from './RemoveButtonGroup';
 import MissingMemberTooltip from './MissingMemberTooltip';
@@ -43,6 +43,8 @@ const TimeGroup = ({
   updateMethods,
   parsedDateRange,
 }: any) => {
+  const [shown, setShown] = useState(false);
+  const [granularityShown, setGranularityShown] = useState(false);
   const isCustomDateRange = Array.isArray(members[0]?.dateRange);
   const [isRangePickerVisible, toggleRangePicker] = useState(false);
 
@@ -56,27 +58,35 @@ const TimeGroup = ({
   }
 
   const granularityMenu = (member, onClick) => (
-    <Menu>
-      {member.granularities.length ? (
-        member.granularities.map((m) => (
-          <Menu.Item key={m.title} onClick={() => onClick(m)}>
-            {m.title}
-          </Menu.Item>
-        ))
-      ) : (
-        <Menu.Item disabled>No members found</Menu.Item>
-      )}
-    </Menu>
+    <div className="test simple-overlay">
+      <Menu className="ant-dropdown-menu ant-dropdown-menu-root">
+        {member.granularities.length ? (
+          member.granularities.map((m) => (
+            <Menu.Item key={m.title} className="ant-dropdown-menu-item" onClick={() => onClick(m)}>
+              {m.title}
+            </Menu.Item>
+          ))
+        ) : (
+          <Menu.Item disabled>No members found</Menu.Item>
+        )}
+      </Menu>
+    </div>
   );
 
   const dateRangeMenu = (onClick) => (
-    <Menu>
-      {DateRanges.map((m) => (
-        <Menu.Item key={m.title || m.value} onClick={() => onClick(m)}>
-          {m.title || m.value}
-        </Menu.Item>
-      ))}
-    </Menu>
+    <div className="test simple-overlay">
+      <Menu className="ant-dropdown-menu ant-dropdown-menu-root">
+        {DateRanges.map((m) => (
+          <Menu.Item
+            key={m.title || m.value}
+            className="ant-dropdown-menu-item"
+            onClick={() => onClick(m)}
+          >
+            {m.title || m.value}
+          </Menu.Item>
+        ))}
+      </Menu>
+    </div>
   );
 
   return (
@@ -114,6 +124,7 @@ const TimeGroup = ({
             <Label>for</Label>
 
             <ButtonDropdown
+              show={shown}
               disabled={disabled}
               overlay={dateRangeMenu((dateRange) => {
                 if (dateRange.value === 'custom') {
@@ -126,6 +137,9 @@ const TimeGroup = ({
                   toggleRangePicker(false);
                 }
               })}
+              onOverlayOpen={() => setShown(true)}
+              onOverlayClose={() => setShown(false)}
+              onItemClick={() => setShown(false)}
             >
               {isRangePickerVisible || isCustomDateRange
                 ? 'Custom'
@@ -146,10 +160,14 @@ const TimeGroup = ({
             <Label>by</Label>
 
             <ButtonDropdown
+              show={granularityShown}
               disabled={disabled}
               overlay={granularityMenu(m.dimension, (granularity) =>
                 updateMethods.update(m, { ...m, granularity: granularity.name })
               )}
+              onOverlayOpen={() => setGranularityShown(true)}
+              onOverlayClose={() => setGranularityShown(false)}
+              onItemClick={() => setGranularityShown(false)}
             >
               {m.dimension.granularities.find(
                 (g) => g.name === m.granularity

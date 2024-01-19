@@ -547,6 +547,13 @@ export class QueryQueue {
         }
       }));
 
+      /**
+       * There is a bug somewhere in Redis (maybe in memory too?),
+       * which doesn't remove queue item from pending, while it's in active state
+       *
+       * TODO(ovr): Check LocalQueueDriver for strict guarantees that item cannot be in active & pending in the same time
+       * TODO(ovr): Migrate to getToProcessQueries after removal of Redis
+       */
       const [active, toProcess] = await queueConnection.getActiveAndToProcess();
 
       await Promise.all(

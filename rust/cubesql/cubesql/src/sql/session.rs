@@ -27,7 +27,7 @@ use super::{
 
 extern crate lazy_static;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum DatabaseProtocol {
     MySQL,
     PostgreSQL,
