@@ -1618,13 +1618,11 @@ pub fn create_to_char_udf() -> ScalarUDF {
 
             for (i, duration) in durations.iter().enumerate() {
                 if duration.is_zero() {
-                    builder
-                        .append_null()
-                        .unwrap();
+                    builder.append_null().unwrap();
                 } else {
                     let format = formats.value(i);
-                    let format =
-                        postgres_datetime_format_to_iso(format.to_string()).replace("TZ", &timezone);
+                    let format = postgres_datetime_format_to_iso(format.to_string())
+                        .replace("TZ", &timezone);
 
                     let secs = duration.num_seconds();
                     let nanosecs = duration.num_nanoseconds().unwrap_or(0) - secs * 1_000_000_000;
