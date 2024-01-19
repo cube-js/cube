@@ -344,7 +344,7 @@ impl Portal {
         for row in frame.to_rows().into_iter() {
             for value in row.to_values() {
                 match value {
-                    TableValue::Null => writer.write_value::<Option<bool>>(None)?,
+                    TableValue::Null => writer.write_value::<Option<String>>(None)?,
                     TableValue::String(v) => writer.write_value(v)?,
                     TableValue::Int16(v) => writer.write_value(v)?,
                     TableValue::Int32(v) => writer.write_value(v)?,

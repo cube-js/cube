@@ -7,7 +7,7 @@ use cubeclient::{
 use datafusion::{
     arrow::{datatypes::SchemaRef, record_batch::RecordBatch},
     logical_plan::window_frames::WindowFrame,
-    physical_plan::{aggregates::AggregateFunction, window_functions::WindowFunction},
+    physical_plan::{aggregates::AggregateFunction, windows::WindowFunction},
 };
 use minijinja::{context, value::Value, Environment};
 use serde_derive::*;

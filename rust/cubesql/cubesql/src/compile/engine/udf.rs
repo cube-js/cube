@@ -395,17 +395,31 @@ pub fn create_isnull_udf() -> ScalarUDF {
                 Arc::new(builder.finish()) as ArrayRef
             }
             2 => {
-                if args[0].data_type() != &DataType::Utf8 || args[1].data_type() != &DataType::Utf8
-                {
-                    return Err(DataFusionError::Internal(format!(
-                        "isnull with 2 arguments supports only (Utf8, Utf8), actual: ({}, {})",
-                        args[0].data_type(),
-                        args[1].data_type(),
-                    )));
-                }
+                let expr = match args[0].data_type() {
+                    DataType::Utf8 => Arc::clone(&args[0]),
+                    DataType::Null => cast(&args[0], &DataType::Utf8)?,
+                    _ => {
+                        return Err(DataFusionError::Internal(format!(
+                            "isnull with 2 arguments supports only (Utf8, Utf8), actual: ({}, {})",
+                            args[0].data_type(),
+                            args[1].data_type(),
+                        )))
+                    }
+                };
+                let replacement = match args[1].data_type() {
+                    DataType::Utf8 => Arc::clone(&args[1]),
+                    DataType::Null => cast(&args[1], &DataType::Utf8)?,
+                    _ => {
+                        return Err(DataFusionError::Internal(format!(
+                            "isnull with 2 arguments supports only (Utf8, Utf8), actual: ({}, {})",
+                            args[0].data_type(),
+                            args[1].data_type(),
+                        )))
+                    }
+                };
 
-                let exprs = downcast_string_arg!(&args[0], "expr", i32);
-                let replacements = downcast_string_arg!(&args[1], "replacement", i32);
+                let exprs = downcast_string_arg!(expr, "expr", i32);
+                let replacements = downcast_string_arg!(replacement, "replacement", i32);
 
                 let result = exprs
                     .iter()

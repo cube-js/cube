@@ -6,7 +6,7 @@ use crate::{
     },
     var, var_iter,
 };
-use datafusion::physical_plan::window_functions::WindowFunction;
+use datafusion::physical_plan::windows::WindowFunction;
 use egg::{EGraph, Rewrite, Subst};
 
 impl WrapperRules {

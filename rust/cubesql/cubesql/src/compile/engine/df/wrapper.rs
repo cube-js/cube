@@ -1334,6 +1334,7 @@ impl CubeScanWrapperNode {
                         }
                         // ScalarValue::IntervalMonthDayNano(_) => {}
                         // ScalarValue::Struct(_, _) => {}
+                        ScalarValue::Null => ("NULL".to_string(), sql_query),
                         x => {
                             return Err(DataFusionError::Internal(format!(
                                 "Can't generate SQL for literal: {:?}",
