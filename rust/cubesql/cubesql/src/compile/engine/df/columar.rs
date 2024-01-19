@@ -9,13 +9,23 @@ use std::sync::Arc;
 
 macro_rules! if_then_else {
     ($BUILDER_TYPE:ty, $ARRAY_TYPE:ty, $BOOLS:expr, $TRUE:expr, $FALSE:expr) => {{
-        let true_values = $TRUE
+        let true_values = if $TRUE.data_type() == &DataType::Null {
+            Arc::new(<$ARRAY_TYPE>::from(vec![None; $TRUE.len()]))
+        } else {
+            $TRUE
+        };
+        let true_values = true_values
             .as_ref()
             .as_any()
             .downcast_ref::<$ARRAY_TYPE>()
             .expect("true_values downcast failed");
 
-        let false_values = $FALSE
+        let false_values = if $FALSE.data_type() == &DataType::Null {
+            Arc::new(<$ARRAY_TYPE>::from(vec![None; $FALSE.len()]))
+        } else {
+            $FALSE
+        };
+        let false_values = false_values
             .as_ref()
             .as_any()
             .downcast_ref::<$ARRAY_TYPE>()

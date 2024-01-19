@@ -392,6 +392,7 @@ pub fn arrow_to_column_type(arrow_type: DataType) -> Result<ColumnType, CubeErro
         | DataType::UInt8
         | DataType::UInt16
         | DataType::UInt64 => Ok(ColumnType::Int64),
+        DataType::Null => Ok(ColumnType::String),
         x => Err(CubeError::internal(format!("unsupported type {:?}", x))),
     }
 }
@@ -623,6 +624,11 @@ pub fn batch_to_dataframe(
                         } else {
                             TableValue::List(ListValue::new(a.value(i)))
                         });
+                    }
+                }
+                DataType::Null => {
+                    for i in 0..num_rows {
+                        rows[i].push(TableValue::Null)
                     }
                 }
                 x => panic!("Unsupported data type: {:?}", x),
