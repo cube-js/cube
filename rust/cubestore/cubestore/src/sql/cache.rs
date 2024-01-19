@@ -71,7 +71,7 @@ pub struct SqlResultCache {
     >,
     result_cache: Cache<SqlResultCacheKey, Arc<DataFrame>>,
     create_table_cache:
-        Mutex<HashMap<u64, watch::Receiver<Option<Result<Arc<DataFrame>, CubeError>>>>>,
+        Mutex<HashMap<(String, String), watch::Receiver<Option<Result<IdRow<Table>, CubeError>>>>>,
 }
 
 pub fn sql_result_cache_sizeof(key: &SqlResultCacheKey, df: &Arc<DataFrame>) -> u32 {
@@ -194,31 +194,20 @@ impl SqlResultCache {
 
     pub async fn create_table<F>(
         &self,
-        table_id: u64,
-        exec: impl FnOnce(SerializedPlan) -> F,
+        schema_name: String,
+        table_name: String,
+        exec: impl FnOnce() -> F,
     ) -> Result<IdRow<Table>, CubeError>
     where
-        F: Future<Output = Result<DataFrame, CubeError>> + Send + 'static,
+        F: Future<Output = Result<IdRow<Table>, CubeError>> + Send + 'static,
     {
-        /* let result_key = SqlResultCacheKey::from_plan(query, &context.inline_tables, &plan);
-
-        if let Some(result) = self.result_cache.get(&result_key) {
-            app_metrics::DATA_QUERIES_CACHE_HIT.increment();
-            trace!("Using result cache for '{}'", query);
-            return Ok(result);
-        }
-
-        let queue_key = SqlQueueCacheKey::from_query(query, &context.inline_tables);
-        let (sender, receiver) = {
-            let key = queue_key.clone();
-            let mut cache = self.queue_cache.lock().await;
-            if !cache.contains(&key) {
+        let key = (schema_name.clone(), table_name.clone());
+        let (sender, mut receiver) = {
+            let mut cache = self.create_table_cache.lock().await;
+            let key = key.clone();
+            if !cache.contains_key(&key) {
                 let (tx, rx) = watch::channel(None);
-                cache.put(key, rx);
-
-                app_metrics::DATA_QUERIES_CACHE_SIZE.report(self.result_cache.entry_count() as i64);
-                app_metrics::DATA_QUERIES_CACHE_WEIGHT
-                    .report(self.result_cache.weighted_size() as i64);
+                cache.insert(key, rx);
 
                 (Some(tx), None)
             } else {
@@ -227,45 +216,31 @@ impl SqlResultCache {
         };
 
         if let Some(sender) = sender {
-            trace!("Missing cache for '{}'", query);
-            let result = exec(plan).await.map(|d| Arc::new(d));
+            let result = exec().await;
             if let Err(e) = sender.send(Some(result.clone())) {
                 trace!(
                     "Failed to set cached query result, possibly flushed from LRU cache: {}",
                     e
                 );
             }
-            match &result {
-                Ok(r) => {
-                    if !self.result_cache.contains_key(&result_key) {
-                        self.result_cache
-                            .insert(result_key.clone(), r.clone())
-                            .await;
 
-                        app_metrics::DATA_QUERIES_CACHE_SIZE
-                            .report(self.result_cache.entry_count() as i64);
-                        app_metrics::DATA_QUERIES_CACHE_WEIGHT
-                            .report(self.result_cache.weighted_size() as i64);
-                    }
-                }
-                Err(_) => {
-                    trace!("Removing error result from cache");
-                }
-            }
-
-            self.queue_cache.lock().await.pop(&queue_key);
+            self.create_table_cache.lock().await.remove(&key);
 
             return result;
         }
 
-        std::mem::drop(plan);
-        std::mem::drop(result_key);
-        std::mem::drop(context);
-
-        self.wait_for_queue(receiver, query).await */
+        if let Some(receiver) = &mut receiver {
+            loop {
+                receiver.changed().await?;
+                let x = receiver.borrow();
+                let value = x.as_ref();
+                if let Some(value) = value {
+                    return value.clone();
+                }
+            }
+        }
+        panic!("Unexpected state: wait receiver expected but cache was empty")
     }
-
-    //pub async fn create_table()
 
     #[tracing::instrument(level = "trace", skip(self, receiver))]
     async fn wait_for_queue(
