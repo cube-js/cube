@@ -10327,6 +10327,42 @@ limit
             .await?
         );
 
+        insta::assert_snapshot!(
+            "to_char_3",
+            execute_query(
+                "
+                SELECT TO_CHAR(CAST(NULL AS TIMESTAMP), 'FMDay')
+                UNION ALL
+                SELECT TO_CHAR(CAST('2024-01-01 00:00:00' AS TIMESTAMP), 'FMDay')
+                UNION ALL
+                SELECT TO_CHAR(CAST('2024-01-02 00:00:00' AS TIMESTAMP), 'FMDay')
+                UNION ALL
+                SELECT TO_CHAR(CAST('2024-01-07 00:00:00' AS TIMESTAMP), 'FMDay')
+                UNION ALL
+                SELECT TO_CHAR(CAST('2024-01-01 00:00:00' AS TIMESTAMP), 'Day')
+                UNION ALL
+                SELECT TO_CHAR(CAST('2024-01-02 00:00:00' AS TIMESTAMP), 'Day')
+                UNION ALL
+                SELECT TO_CHAR(CAST('2024-01-07 00:00:00' AS TIMESTAMP), 'Day')
+                UNION ALL
+                SELECT TO_CHAR(CAST('2024-01-01 00:00:00' AS TIMESTAMP), 'FMMonth')
+                UNION ALL
+                SELECT TO_CHAR(CAST('2024-03-01 00:00:00' AS TIMESTAMP), 'FMMonth')
+                UNION ALL
+                SELECT TO_CHAR(CAST('2024-12-01 00:00:00' AS TIMESTAMP), 'FMMonth')
+                UNION ALL
+                SELECT TO_CHAR(CAST('2024-01-01 00:00:00' AS TIMESTAMP), 'Month')
+                UNION ALL
+                SELECT TO_CHAR(CAST('2024-03-01 00:00:00' AS TIMESTAMP), 'Month')
+                UNION ALL
+                SELECT TO_CHAR(CAST('2024-12-01 00:00:00' AS TIMESTAMP), 'Month')
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
         Ok(())
     }
 
