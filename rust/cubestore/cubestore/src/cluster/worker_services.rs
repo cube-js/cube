@@ -393,9 +393,8 @@ impl<P: Callable> ServicesServerImpl<P> {
                 payload,
             } = match req {
                 Ok(message) => message,
-                Err(e) => {
+                Err(_) => {
                     if !cancel_token.is_cancelled() {
-                        log::error!("Error while reading ipc service request: {:?}", e);
                         cancel_token.cancel();
                     }
                     break;
