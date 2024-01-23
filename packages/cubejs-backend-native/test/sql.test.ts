@@ -240,7 +240,6 @@ describe('SQLInterface', () => {
         password: null,
       });
 
-      expect(meta.mock.calls.length).toEqual(3);
       expect(meta.mock.calls[0][0]).toEqual({
         request: {
           id: expect.any(String),

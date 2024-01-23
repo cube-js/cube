@@ -6,7 +6,7 @@ pub mod rewriter;
 pub mod rules;
 
 use crate::{
-    compile::rewrite::analysis::{LogicalPlanAnalysis, Member},
+    compile::rewrite::analysis::{LogicalPlanAnalysis, Member, OriginalExpr},
     CubeError,
 };
 use datafusion::{
@@ -430,6 +430,9 @@ crate::plan_to_language! {
             name: String,
             members: Vec<LogicalPlan>,
             meta: Option<Vec<(String, String)>>,
+        },
+        QueryParam {
+            index: usize,
         },
     }
 }
@@ -1358,10 +1361,18 @@ pub fn original_expr_name(
     egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
     id: Id,
 ) -> Option<String> {
-    egraph[id].data.original_expr.as_ref().map(|e| match e {
-        Expr::Column(c) => c.name.to_string(),
-        _ => e.name(&DFSchema::empty()).unwrap(),
-    })
+    egraph[id]
+        .data
+        .original_expr
+        .as_ref()
+        .and_then(|e| match e {
+            OriginalExpr::Expr(e) => Some(e),
+            _ => None,
+        })
+        .map(|e| match e {
+            Expr::Column(c) => c.name.to_string(),
+            _ => e.name(&DFSchema::empty()).unwrap(),
+        })
 }
 
 fn search_match_chained<'a>(
@@ -1512,6 +1523,23 @@ where
                 .apply_one(egraph, eclass, &new_subst, searcher_ast, rule_name)
         } else {
             Vec::new()
+        }
+    }
+}
+
+pub fn transform_original_expr_to_alias(
+    alias_expr_var: &'static str,
+) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &mut Subst) -> bool {
+    let alias_expr_var = var!(alias_expr_var);
+    move |egraph, root, subst| {
+        if let Some(original_expr) = original_expr_name(egraph, root) {
+            let alias = egraph.add(LogicalPlanLanguage::AliasExprAlias(AliasExprAlias(
+                original_expr,
+            )));
+            subst.insert(alias_expr_var, alias);
+            true
+        } else {
+            false
         }
     }
 }

@@ -3,6 +3,39 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.47](https://github.com/cube-js/cube.js/compare/v0.34.46...v0.34.47) (2024-01-23)
+
+
+### Features
+
+* **cubesql:** TO_CHAR - support more formats, correct NULL handling ([#7671](https://github.com/cube-js/cube.js/issues/7671)) ([2d1e2d2](https://github.com/cube-js/cube.js/commit/2d1e2d216c99af68a2d5cf1b2acd2f5e2a623323))
+
+
+
+
+
+## [0.34.46](https://github.com/cube-js/cube.js/compare/v0.34.45...v0.34.46) (2024-01-18)
+
+
+### Features
+
+* **cubesql:** Cache plan rewrites with and without replaced parameters ([#7670](https://github.com/cube-js/cube.js/issues/7670)) ([c360d3c](https://github.com/cube-js/cube.js/commit/c360d3c9da61b45f8215cc17db098cfa0a74c899))
+
+
+
+
+
+## [0.34.45](https://github.com/cube-js/cube.js/compare/v0.34.44...v0.34.45) (2024-01-16)
+
+
+### Features
+
+* **cubesql:** Query rewrite cache ([#7647](https://github.com/cube-js/cube.js/issues/7647)) ([79888af](https://github.com/cube-js/cube.js/commit/79888afc3823a3ef29ba76c440828c8c5d719ae4))
+
+
+
+
+
 ## [0.34.42](https://github.com/cube-js/cube.js/compare/v0.34.41...v0.34.42) (2024-01-07)
 
 

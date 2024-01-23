@@ -273,6 +273,30 @@ The AWS region to use for S3 connections.
 | -------------------------------------- | ---------------------- | --------------------- |
 | [A valid AWS region][aws-docs-regions] | N/A                    | N/A                   |
 
+## `CUBEJS_DB_DUCKDB_S3_USE_SSL`
+
+Use SSL when connecting to S3.
+
+| Possible Values                        | Default in Development | Default in Production |
+| -------------------------------------- | ---------------------- | --------------------- |
+| True or false                          | N/A                    | N/A                   |
+
+## `CUBEJS_DB_DUCKDB_S3_URL_STYLE`
+
+The URL style to be used by S3.
+
+| Possible Values                        | Default in Development | Default in Production |
+| -------------------------------------- | ---------------------- | --------------------- |
+| [vhost/path]                           | N/A                    | N/A                   |
+
+## `CUBEJS_DB_DUCKDB_S3_SESSION_TOKEN`
+
+The S3 session token.
+
+| Possible Values                        | Default in Development | Default in Production |
+| -------------------------------------- | ---------------------- | --------------------- |
+| A valid S3 session token               | N/A                    | N/A                   |
+
 ## `CUBEJS_DB_ELASTIC_APIKEY_ID`
 
 The [ID of the API key from elastic.co][elastic-docs-api-keys]. Required when

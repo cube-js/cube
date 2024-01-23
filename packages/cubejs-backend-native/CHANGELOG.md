@@ -3,6 +3,33 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.47](https://github.com/cube-js/cube/compare/v0.34.46...v0.34.47) (2024-01-23)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+
+
+
+
+## [0.34.46](https://github.com/cube-js/cube/compare/v0.34.45...v0.34.46) (2024-01-18)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+
+
+
+
+## [0.34.45](https://github.com/cube-js/cube/compare/v0.34.44...v0.34.45) (2024-01-16)
+
+
+### Features
+
+* **cubesql:** Query rewrite cache ([#7647](https://github.com/cube-js/cube/issues/7647)) ([79888af](https://github.com/cube-js/cube/commit/79888afc3823a3ef29ba76c440828c8c5d719ae4))
+
+
+
+
+
 ## [0.34.42](https://github.com/cube-js/cube/compare/v0.34.41...v0.34.42) (2024-01-07)
 
 

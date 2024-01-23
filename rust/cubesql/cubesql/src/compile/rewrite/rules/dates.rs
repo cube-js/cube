@@ -2,12 +2,13 @@ use super::utils;
 use crate::{
     compile::rewrite::{
         agg_fun_expr, alias_expr,
-        analysis::{ConstantFolding, LogicalPlanAnalysis},
+        analysis::{ConstantFolding, LogicalPlanAnalysis, OriginalExpr},
         binary_expr, cast_expr, cast_expr_explicit, column_expr, fun_expr, literal_expr,
         literal_int, literal_string, negative_expr, rewrite,
         rewriter::RewriteRules,
-        to_day_interval_expr, transforming_rewrite, transforming_rewrite_with_root, udf_expr,
-        AliasExprAlias, CastExprDataType, LiteralExprValue, LogicalPlanLanguage,
+        to_day_interval_expr, transform_original_expr_to_alias, transforming_rewrite,
+        transforming_rewrite_with_root, udf_expr, AliasExprAlias, CastExprDataType,
+        LiteralExprValue, LogicalPlanLanguage,
     },
     var, var_iter,
 };
@@ -271,15 +272,17 @@ impl RewriteRules for DateRules {
                 ),
                 self.unwrap_cast_to_timestamp("?data_type", "?granularity", "?alias"),
             ),
-            rewrite(
+            transforming_rewrite_with_root(
                 "current-timestamp-to-now",
                 udf_expr("current_timestamp", Vec::<String>::new()),
-                fun_expr("UtcTimestamp", Vec::<String>::new()),
+                alias_expr(fun_expr("UtcTimestamp", Vec::<String>::new()), "?alias"),
+                transform_original_expr_to_alias("?alias"),
             ),
-            rewrite(
+            transforming_rewrite_with_root(
                 "localtimestamp-to-now",
                 udf_expr("localtimestamp", Vec::<String>::new()),
-                fun_expr("UtcTimestamp", Vec::<String>::new()),
+                alias_expr(fun_expr("UtcTimestamp", Vec::<String>::new()), "?alias"),
+                transform_original_expr_to_alias("?alias"),
             ),
             transforming_rewrite_with_root(
                 "tableau-week",
@@ -608,7 +611,9 @@ impl DateRules {
         let alias_var = var!(alias_var);
         move |egraph, root, subst| {
             for data_type in var_iter!(egraph[subst[data_type_var]], CastExprDataType) {
-                if let Some(original_expr) = egraph[root].data.original_expr.as_ref() {
+                if let Some(OriginalExpr::Expr(original_expr)) =
+                    egraph[root].data.original_expr.as_ref()
+                {
                     let alias = original_expr.name(&DFSchema::empty()).unwrap();
                     match data_type {
                         DataType::Timestamp(TimeUnit::Nanosecond, None) => {
@@ -660,7 +665,9 @@ impl DateRules {
     {
         let alias_var = var!(alias_var);
         move |egraph, root, subst| {
-            if let Some(original_expr) = egraph[root].data.original_expr.as_ref() {
+            if let Some(OriginalExpr::Expr(original_expr)) =
+                egraph[root].data.original_expr.as_ref()
+            {
                 let alias = original_expr.name(&DFSchema::empty()).unwrap();
                 subst.insert(
                     alias_var,

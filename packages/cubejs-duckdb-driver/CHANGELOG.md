@@ -3,6 +3,33 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.47](https://github.com/cube-js/cube/compare/v0.34.46...v0.34.47) (2024-01-23)
+
+
+### Features
+
+* **duckdb-driver:** Support advanced configuration for S3 via env variables ([#7544](https://github.com/cube-js/cube/issues/7544)) ([4862195](https://github.com/cube-js/cube/commit/4862195d57a8796c3bbd74696eb41df4505e545c))
+
+
+
+
+
+## [0.34.46](https://github.com/cube-js/cube/compare/v0.34.45...v0.34.46) (2024-01-18)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
+## [0.34.45](https://github.com/cube-js/cube/compare/v0.34.44...v0.34.45) (2024-01-16)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+
+
+
+
 ## [0.34.44](https://github.com/cube-js/cube/compare/v0.34.43...v0.34.44) (2024-01-15)
 
 **Note:** Version bump only for package @cubejs-backend/duckdb-driver
