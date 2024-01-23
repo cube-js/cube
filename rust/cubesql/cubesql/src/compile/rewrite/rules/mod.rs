@@ -2,6 +2,7 @@ use crate::compile::rewrite::{analysis::LogicalPlanAnalysis, rewrite, LogicalPla
 use egg::Rewrite;
 
 pub mod case;
+pub mod common;
 pub mod dates;
 pub mod filters;
 pub mod members;
