@@ -6,6 +6,7 @@ use crate::metastore::table::Table;
 use crate::metastore::{Column, ColumnType, IdRow, Index, Partition};
 use crate::queryplanner::filter_by_key_range::FilterByKeyRangeExec;
 use crate::queryplanner::optimizations::CubeQueryPlanner;
+use crate::queryplanner::physical_plan_flags::PhysicalPlanFlags;
 use crate::queryplanner::planning::{get_worker_plan, Snapshot, Snapshots};
 use crate::queryplanner::pretty_printers::{pp_phys_plan, pp_plan};
 use crate::queryplanner::serialized_plan::{IndexSnapshot, RowFilter, RowRange, SerializedPlan};
@@ -14,6 +15,7 @@ use crate::store::DataFrame;
 use crate::table::data::rows_to_columns;
 use crate::table::parquet::CubestoreParquetMetadataCache;
 use crate::table::{Row, TableValue, TimestampValue};
+use crate::telemetry::suboptimal_query_plan_event;
 use crate::util::memory::MemoryHandler;
 use crate::{app_metrics, CubeError};
 use arrow::array::{
@@ -118,6 +120,7 @@ impl QueryExecutor for QueryExecutorImpl {
         cluster: Arc<dyn Cluster>,
     ) -> Result<(SchemaRef, Vec<RecordBatch>), CubeError> {
         let collect_span = tracing::span!(tracing::Level::TRACE, "collect_physical_plan");
+        let trace_obj = plan.trace_obj();
         let (physical_plan, logical_plan) = self.router_plan(plan, cluster).await?;
         let split_plan = physical_plan;
 
@@ -125,6 +128,13 @@ impl QueryExecutor for QueryExecutorImpl {
             "Router Query Physical Plan: {}",
             pp_phys_plan(split_plan.as_ref())
         );
+
+        let flags = PhysicalPlanFlags::with_execution_plan(split_plan.as_ref());
+        if flags.is_suboptimal_query() {
+            if let Some(trace_obj) = trace_obj.as_ref() {
+                suboptimal_query_plan_event(trace_obj, flags.to_json())?;
+            }
+        }
 
         let execution_time = SystemTime::now();
 
