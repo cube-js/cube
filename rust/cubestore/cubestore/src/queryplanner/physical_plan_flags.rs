@@ -8,16 +8,16 @@ use serde_json::{json, Value};
 
 #[derive(Serialize, Debug)]
 pub struct PhysicalPlanFlags {
-    pub merge_sort_node: bool,
+    pub merge_sort_plan: bool,
 }
 
 impl PhysicalPlanFlags {
     pub fn enough_to_fill(&self) -> bool {
-        self.merge_sort_node
+        self.merge_sort_plan
     }
 
     pub fn is_suboptimal_query(&self) -> bool {
-        !self.merge_sort_node
+        !self.merge_sort_plan
     }
 
     pub fn to_json(&self) -> Value {
@@ -26,7 +26,7 @@ impl PhysicalPlanFlags {
 
     pub fn with_execution_plan(p: &dyn ExecutionPlan) -> Self {
         let mut flags = PhysicalPlanFlags {
-            merge_sort_node: false,
+            merge_sort_plan: false,
         };
         PhysicalPlanFlags::physical_plan_flags_fill(p, &mut flags);
         flags
@@ -46,7 +46,7 @@ impl PhysicalPlanFlags {
                 && agg.strategy() == AggregateStrategy::InplaceSorted;
 
             if is_final_hash_agg_without_groups || is_full_inplace_agg || is_final_inplace_agg {
-                flags.merge_sort_node = true;
+                flags.merge_sort_plan = true;
             }
         }
         if flags.enough_to_fill() {
