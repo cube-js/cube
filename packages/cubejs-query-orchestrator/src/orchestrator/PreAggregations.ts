@@ -661,12 +661,7 @@ export class PreAggregationLoader {
       };
     }
 
-    // TODO this check can be redundant due to structure version is already checked in loadPreAggregation()
-    if (
-      !this.waitForRenew &&
-      // eslint-disable-next-line no-use-before-define
-      await this.loadCache.getQueryStage(PreAggregations.preAggregationQueryCacheKey(this.preAggregation))
-    ) {
+    if (!this.waitForRenew) {
       const versionEntryByStructureVersion = versionEntries.byStructure[`${this.preAggregation.tableName}_${structureVersion}`];
       if (versionEntryByStructureVersion) {
         const targetTableName = this.targetTableName(versionEntryByStructureVersion);

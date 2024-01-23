@@ -53,6 +53,8 @@ When a deployment is auto-suspended:
 
 - [Data model][ref-data-model] compilation artifacts are discarded since the
 API instances are de-provisioned.
+- [Refresh worker][ref-refresh-worker] is suspended, which prevents
+the pre-aggregations from being kept up-to-date.
 - [Monitoring integrations][ref-monitoring] are also suspended, which prevents
 the export of metrics and logs.
 
@@ -62,6 +64,9 @@ When a deployment is resumed from auto-suspension:
 It applies to all tenants in case [multitenancy][ref-multitenancy] is set up.
 Consequently, one or more queries served after a deployment is resumed from
 auto-suspension are likely to have suboptimal performance.
+- [Refresh worker][ref-refresh-worker] would need to refresh all
+pre-aggregations that became stale during the suspension, competing for the
+query queue with API instances and compromising the end-user experience.
 
 ## Configuration
 
@@ -123,3 +128,4 @@ response times to be significantly longer than usual.
 [ref-data-model]: /product/data-modeling/overview
 [ref-multitenancy]: /product/configuration/advanced/multitenancy
 [self-effects]: #effects-on-experience
+[ref-refresh-worker]: /product/deployment#refresh-worker

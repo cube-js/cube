@@ -67,7 +67,7 @@ pub fn rewrite_rules(
             cube_context.sessions.server.config_obj.clone(),
             false,
         )),
-        Box::new(FilterRules::new(cube_context.meta.clone())),
+        Box::new(FilterRules::new(cube_context.meta.clone(), true)),
         Box::new(DateRules::new()),
         Box::new(OrderRules::new()),
         Box::new(SplitRules::new(

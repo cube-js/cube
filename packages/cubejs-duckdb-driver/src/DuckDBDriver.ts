@@ -114,6 +114,18 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
         key: 'schema',
         value: getEnv('duckdbSchema', this.config),
       },
+      {
+        key: 's3_use_ssl',
+        value: getEnv('duckdbS3UseSsl', this.config),
+      },
+      {
+        key: 's3_url_style',
+        value: getEnv('duckdbS3UrlStyle', this.config),
+      },
+      {
+        key: 's3_session_token',
+        value: getEnv('duckdbS3SessionToken', this.config),
+      }
     ];
     
     for (const { key, value } of configuration) {
