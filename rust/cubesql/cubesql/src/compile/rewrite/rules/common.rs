@@ -36,7 +36,7 @@ impl RewriteRules for CommonRules {
                     ),
                     "?alias",
                 ),
-                self.transform_aggregate_binary_unwrap("?literal", "?alias"),
+                self.transform_aggregate_binary_unwrap("?literal", "?alias", true),
             ));
             rules.push(transforming_rewrite_with_root(
                 "aggregate-expr-mut-unwrap",
@@ -53,7 +53,7 @@ impl RewriteRules for CommonRules {
                     ),
                     "?alias",
                 ),
-                self.transform_aggregate_binary_unwrap("?literal", "?alias"),
+                self.transform_aggregate_binary_unwrap("?literal", "?alias", false),
             ));
         }
 
@@ -70,37 +70,64 @@ impl CommonRules {
         &self,
         literal_var: &'static str,
         alias_var: &'static str,
+        check_not_zero: bool,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &mut Subst) -> bool
     {
         let literal_var = var!(literal_var);
         let alias_var = var!(alias_var);
 
         move |egraph, root, subst| {
-            if let Some(ConstantFolding::Scalar(interval)) =
-                &egraph[subst[literal_var]].data.constant
+            if let Some(ConstantFolding::Scalar(number)) = &egraph[subst[literal_var]].data.constant
             {
-                match interval {
-                    ScalarValue::Float64(_)
-                    | ScalarValue::Float32(_)
-                    | ScalarValue::Int64(_)
-                    | ScalarValue::Int32(_) => {
-                        if let Some(OriginalExpr::Expr(original_expr)) =
-                            egraph[root].data.original_expr.as_ref()
-                        {
-                            let alias = original_expr.name(&DFSchema::empty()).unwrap();
-                            subst.insert(
-                                alias_var,
-                                egraph.add(LogicalPlanLanguage::AliasExprAlias(AliasExprAlias(
-                                    alias.to_string(),
-                                ))),
-                            );
-
-                            return true;
+                let is_valid_number = match number {
+                    ScalarValue::Float64(Some(v)) => {
+                        if check_not_zero {
+                            *v != 0.0
                         } else {
-                            return false;
+                            true
                         }
                     }
-                    _ => (),
+                    ScalarValue::Float32(Some(v)) => {
+                        if check_not_zero {
+                            *v != 0.0
+                        } else {
+                            true
+                        }
+                    }
+                    ScalarValue::Int32(Some(v)) => {
+                        if check_not_zero {
+                            *v != 0
+                        } else {
+                            true
+                        }
+                    }
+                    ScalarValue::Int64(Some(v)) => {
+                        if check_not_zero {
+                            *v != 0
+                        } else {
+                            true
+                        }
+                    }
+                    _ => false,
+                };
+                if !is_valid_number {
+                    return true;
+                }
+
+                if let Some(OriginalExpr::Expr(original_expr)) =
+                    egraph[root].data.original_expr.as_ref()
+                {
+                    let alias = original_expr.name(&DFSchema::empty()).unwrap();
+                    subst.insert(
+                        alias_var,
+                        egraph.add(LogicalPlanLanguage::AliasExprAlias(AliasExprAlias(
+                            alias.to_string(),
+                        ))),
+                    );
+
+                    return true;
+                } else {
+                    return false;
                 }
             }
 

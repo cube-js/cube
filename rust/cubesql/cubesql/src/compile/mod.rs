@@ -14818,6 +14818,39 @@ limit
     }
 
     #[tokio::test]
+    async fn test_thoughtspot_sum_measure_binary_expr_unwrap() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT SUM("ta_1"."sumPrice" / NULLIF(CAST(10.0 AS FLOAT8), 0.0)) "cl"
+            FROM "db"."public"."KibanaSampleDataEcommerce" "ta_1";
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.sumPrice".to_string(),]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+                ungrouped: Some(true),
+            }
+        )
+    }
+    #[tokio::test]
     async fn test_in_filter() {
         init_logger();
 
