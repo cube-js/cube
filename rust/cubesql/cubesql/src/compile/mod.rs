@@ -14846,7 +14846,7 @@ limit
                 limit: None,
                 offset: None,
                 filters: None,
-                ungrouped: Some(true),
+                ungrouped: None,
             }
         )
     }
