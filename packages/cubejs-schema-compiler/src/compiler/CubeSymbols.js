@@ -369,14 +369,19 @@ export class CubeSymbols {
           type: 'number',
           aggType: resolvedMember.type,
           meta: resolvedMember.meta,
+          title: resolvedMember.title,
           description: resolvedMember.description,
+          format: resolvedMember.format,
+          drillMembers: resolvedMember.drillMembers,
         };
       } else if (type === 'dimensions') {
         memberDefinition = {
           sql,
           type: resolvedMember.type,
           meta: resolvedMember.meta,
+          title: resolvedMember.title,
           description: resolvedMember.description,
+          format: resolvedMember.format,
         };
       } else if (type === 'segments') {
         memberDefinition = {
