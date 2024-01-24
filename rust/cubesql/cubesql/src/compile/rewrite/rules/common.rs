@@ -36,7 +36,7 @@ impl RewriteRules for CommonRules {
                     ),
                     "?alias",
                 ),
-                self.transform_aggregate_binary_unwrap("?literal", "?alias", true),
+                self.transform_aggregate_binary_unwrap("?literal", "?alias"),
             ));
             rules.push(transforming_rewrite_with_root(
                 "aggregate-expr-mut-unwrap",
@@ -53,7 +53,7 @@ impl RewriteRules for CommonRules {
                     ),
                     "?alias",
                 ),
-                self.transform_aggregate_binary_unwrap("?literal", "?alias", false),
+                self.transform_aggregate_binary_unwrap("?literal", "?alias"),
             ));
         }
 
@@ -70,7 +70,6 @@ impl CommonRules {
         &self,
         literal_var: &'static str,
         alias_var: &'static str,
-        check_not_zero: bool,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &mut Subst) -> bool
     {
         let literal_var = var!(literal_var);
@@ -79,40 +78,13 @@ impl CommonRules {
         move |egraph, root, subst| {
             if let Some(ConstantFolding::Scalar(number)) = &egraph[subst[literal_var]].data.constant
             {
-                let is_valid_number = match number {
-                    ScalarValue::Float64(Some(v)) => {
-                        if check_not_zero {
-                            *v != 0.0
-                        } else {
-                            true
-                        }
-                    }
-                    ScalarValue::Float32(Some(v)) => {
-                        if check_not_zero {
-                            *v != 0.0
-                        } else {
-                            true
-                        }
-                    }
-                    ScalarValue::Int32(Some(v)) => {
-                        if check_not_zero {
-                            *v != 0
-                        } else {
-                            true
-                        }
-                    }
-                    ScalarValue::Int64(Some(v)) => {
-                        if check_not_zero {
-                            *v != 0
-                        } else {
-                            true
-                        }
-                    }
-                    _ => false,
+                match number {
+                    ScalarValue::Float64(Some(_)) => {}
+                    ScalarValue::Float32(Some(_)) => {}
+                    ScalarValue::Int32(Some(_)) => {}
+                    ScalarValue::Int64(Some(_)) => {}
+                    _ => return false,
                 };
-                if !is_valid_number {
-                    return true;
-                }
 
                 if let Some(OriginalExpr::Expr(original_expr)) =
                     egraph[root].data.original_expr.as_ref()
