@@ -72,6 +72,12 @@ pub fn get_test_meta() -> Vec<V1CubeMeta> {
                     agg_type: Some("max".to_string()),
                 },
                 V1CubeMetaMeasure {
+                    name: "KibanaSampleDataEcommerce.sumPrice".to_string(),
+                    title: None,
+                    _type: "number".to_string(),
+                    agg_type: Some("sum".to_string()),
+                },
+                V1CubeMetaMeasure {
                     name: "KibanaSampleDataEcommerce.minPrice".to_string(),
                     title: None,
                     _type: "number".to_string(),
