@@ -135,6 +135,73 @@ impl InlineTable {
     }
 }
 
+#[async_trait]
+pub trait SelectExecutor: Send + Sync + 'static {
+    fn serialized_plan(&self) -> &SerializedPlan;
+
+    async fn execute(&self) -> Result<DataFrame, CubeError>;
+}
+#[derive(Clone)]
+pub struct SelectExecutorImpl {
+    serialized_plan: SerializedPlan,
+    workers: Vec<String>,
+    cluster: Arc<dyn Cluster>,
+    executor: Arc<dyn QueryExecutor>,
+}
+
+impl SelectExecutorImpl {
+    pub fn new(
+        serialized_plan: SerializedPlan,
+        workers: Vec<String>,
+        cluster: Arc<dyn Cluster>,
+        executor: Arc<dyn QueryExecutor>,
+    ) -> Arc<Self> {
+        Arc::new(Self {
+            serialized_plan,
+            workers,
+            cluster,
+            executor,
+        })
+    }
+}
+
+#[async_trait]
+impl SelectExecutor for SelectExecutorImpl {
+    fn serialized_plan(&self) -> &SerializedPlan {
+        &self.serialized_plan
+    }
+
+    async fn execute(&self) -> Result<DataFrame, CubeError> {
+        let records;
+        if self.workers.len() == 0 {
+            records = self
+                .executor
+                .execute_router_plan(self.serialized_plan.clone(), self.cluster.clone())
+                .await?
+                .1;
+        } else {
+            // Pick one of the workers to run as main for the request.
+            let i = thread_rng().sample(Uniform::new(0, self.workers.len()));
+            let rs = self
+                .cluster
+                .route_select(&self.workers[i], self.serialized_plan.clone())
+                .await?
+                .1;
+            records = rs
+                .into_iter()
+                .map(|r| r.read())
+                .collect::<Result<Vec<_>, _>>()?;
+        }
+        Ok(
+            cube_ext::spawn_blocking(move || -> Result<DataFrame, CubeError> {
+                let df = batch_to_dataframe(&records)?;
+                Ok(df)
+            })
+            .await??,
+        )
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct SqlQueryContext {
     pub user: Option<String>,
@@ -1355,31 +1422,12 @@ impl SqlService for SqlServiceImpl {
 
                         let cluster = self.cluster.clone();
                         let executor = self.query_executor.clone();
+                        let select_executor =
+                            SelectExecutorImpl::new(serialized, workers, cluster, executor);
                         timeout(
                             self.query_timeout,
                             self.cache
-                                .get(query, context, serialized, async move |plan| {
-                                    let records;
-                                    if workers.len() == 0 {
-                                        records =
-                                            executor.execute_router_plan(plan, cluster).await?.1;
-                                    } else {
-                                        // Pick one of the workers to run as main for the request.
-                                        let i = thread_rng().sample(Uniform::new(0, workers.len()));
-                                        let rs = cluster.route_select(&workers[i], plan).await?.1;
-                                        records = rs
-                                            .into_iter()
-                                            .map(|r| r.read())
-                                            .collect::<Result<Vec<_>, _>>()?;
-                                    }
-                                    Ok(cube_ext::spawn_blocking(
-                                        move || -> Result<DataFrame, CubeError> {
-                                            let df = batch_to_dataframe(&records)?;
-                                            Ok(df)
-                                        },
-                                    )
-                                    .await??)
-                                })
+                                .get(query, context, select_executor)
                                 .with_current_subscriber(),
                         )
                         .await??
@@ -2130,6 +2178,9 @@ mod tests {
                 Arc::new(SqlResultCache::new(
                     config.config_obj().query_cache_max_capacity_bytes(),
                     config.config_obj().query_cache_time_to_idle_secs(),
+                    config.config_obj().max_query_queue_size(),
+                    config.config_obj().max_query_pending_size(),
+                    config.config_obj().query_pending_timout(),
                 )),
                 BasicProcessRateLimiter::new(),
             );
@@ -2206,6 +2257,9 @@ mod tests {
                 Arc::new(SqlResultCache::new(
                     config.config_obj().query_cache_max_capacity_bytes(),
                     config.config_obj().query_cache_time_to_idle_secs(),
+                    config.config_obj().max_query_queue_size(),
+                    config.config_obj().max_query_pending_size(),
+                    config.config_obj().query_pending_timout(),
                 )),
                 BasicProcessRateLimiter::new(),
             );
@@ -2312,6 +2366,9 @@ mod tests {
                 Arc::new(SqlResultCache::new(
                     config.config_obj().query_cache_max_capacity_bytes(),
                     config.config_obj().query_cache_time_to_idle_secs(),
+                    config.config_obj().max_query_queue_size(),
+                    config.config_obj().max_query_pending_size(),
+                    config.config_obj().query_pending_timout(),
                 )),
                 BasicProcessRateLimiter::new(),
             );
