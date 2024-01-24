@@ -13369,6 +13369,7 @@ limit
                 measures: Some(vec![
                     "KibanaSampleDataEcommerce.count".to_string(),
                     "KibanaSampleDataEcommerce.maxPrice".to_string(),
+                    "KibanaSampleDataEcommerce.sumPrice".to_string(),
                     "KibanaSampleDataEcommerce.minPrice".to_string(),
                     "KibanaSampleDataEcommerce.avgPrice".to_string(),
                     "KibanaSampleDataEcommerce.countDistinct".to_string(),
