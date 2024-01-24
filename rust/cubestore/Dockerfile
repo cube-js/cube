@@ -41,13 +41,13 @@ COPY cubestore cubestore
 RUN [ "$WITH_AVX2" -eq "1" ] && export RUSTFLAGS="-C target-feature=+avx2"; \
 	cargo build --release -p cubestore
 
-FROM debian:bullseye-slim
+FROM debian:12-slim
 
 WORKDIR /cube
 
 RUN set -ex; \
 	apt-get update; \
-	apt-get install -y libssl1.1 curl
+	apt-get install -y libssl3 curl
 
 COPY --from=builder /build/cubestore/target/release/cubestored .
 
