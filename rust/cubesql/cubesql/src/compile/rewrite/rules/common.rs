@@ -24,13 +24,13 @@ impl RewriteRules for CommonRules {
             rules.push(transforming_rewrite_with_root(
                 "aggregate-expr-division-unwrap",
                 agg_fun_expr(
-                    "?fun",
+                    "Sum",
                     vec![binary_expr(column_expr("?column"), "/", "?literal")],
                     "?distinct",
                 ),
                 alias_expr(
                     binary_expr(
-                        agg_fun_expr("?fun", vec![column_expr("?column")], "?distinct"),
+                        agg_fun_expr("Sum", vec![column_expr("?column")], "?distinct"),
                         "/",
                         "?literal",
                     ),
@@ -39,15 +39,15 @@ impl RewriteRules for CommonRules {
                 self.transform_aggregate_binary_unwrap("?literal", "?alias"),
             ));
             rules.push(transforming_rewrite_with_root(
-                "aggregate-expr-mut-unwrap",
+                "aggregate-expr-mul-unwrap",
                 agg_fun_expr(
-                    "?fun",
+                    "Sum",
                     vec![binary_expr(column_expr("?column"), "*", "?literal")],
                     "?distinct",
                 ),
                 alias_expr(
                     binary_expr(
-                        agg_fun_expr("?fun", vec![column_expr("?column")], "?distinct"),
+                        agg_fun_expr("Sum", vec![column_expr("?column")], "?distinct"),
                         "*",
                         "?literal",
                     ),
