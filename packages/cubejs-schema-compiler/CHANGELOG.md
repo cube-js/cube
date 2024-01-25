@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.48](https://github.com/cube-js/cube/compare/v0.34.47...v0.34.48) (2024-01-25)
+
+
+### Bug Fixes
+
+* Join order is incorrect for snowflake schema views with defined join paths ([#7689](https://github.com/cube-js/cube/issues/7689)) ([454d456](https://github.com/cube-js/cube/commit/454d4563120f591445c219c42dd5bd2fd937f7a6)), closes [#7663](https://github.com/cube-js/cube/issues/7663)
+
+
+### Features
+
+* View members inherit title, format and drillMembers attribute ([#7617](https://github.com/cube-js/cube/issues/7617)) Thanks @CallumWalterWhite ! ([302a756](https://github.com/cube-js/cube/commit/302a7560fd65e1437249701e1fc42b32da5df8fa))
+
+
+
+
+
 ## [0.34.47](https://github.com/cube-js/cube/compare/v0.34.46...v0.34.47) (2024-01-23)
 
 **Note:** Version bump only for package @cubejs-backend/schema-compiler
