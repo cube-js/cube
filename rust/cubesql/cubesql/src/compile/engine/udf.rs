@@ -1,6 +1,6 @@
 use std::{any::type_name, collections::HashMap, convert::TryFrom, sync::Arc, thread};
 
-use chrono::{Datelike, Duration, NaiveDate, NaiveDateTime, NaiveTime};
+use chrono::{Datelike, NaiveDate, NaiveDateTime, NaiveTime};
 use datafusion::{
     arrow::{
         array::{
@@ -933,7 +933,8 @@ pub fn create_date_udf() -> ScalarUDF {
                         builder.append_value(
                             NaiveDateTime::parse_from_str(strings.value(i), "%Y-%m-%d %H:%M:%S%.f")
                                 .map_err(|e| DataFusionError::Execution(e.to_string()))?
-                                .timestamp_nanos(),
+                                .timestamp_nanos_opt()
+                                .unwrap(),
                         )?;
                     }
                     Ok(ColumnarValue::Array(Arc::new(builder.finish())))
@@ -1134,7 +1135,11 @@ macro_rules! date_math_udf {
             } else {
                 let timestamp = timestamps.value_as_datetime(i).unwrap();
                 let interval = intervals.value(i).into();
-                builder.append_value($FUN(timestamp, interval, $IS_ADD)?.timestamp_nanos())?;
+                builder.append_value(
+                    $FUN(timestamp, interval, $IS_ADD)?
+                        .timestamp_nanos_opt()
+                        .unwrap(),
+                )?;
             }
         }
         return Ok(Arc::new(builder.finish()));
@@ -1322,7 +1327,7 @@ fn date_addsub_day_time(t: NaiveDateTime, interval: i64, is_add: bool) -> Result
 
     let days: i64 = i.signum() * (i.abs() >> 32);
     let millis: i64 = i.signum() * ((i.abs() << 32) >> 32);
-    return Ok(t + Duration::days(days) + Duration::milliseconds(millis));
+    return Ok(t + chrono::Duration::days(days) + chrono::Duration::milliseconds(millis));
 }
 
 fn change_ym(t: NaiveDateTime, y: i32, m: u32) -> Option<NaiveDateTime> {
@@ -1460,6 +1465,11 @@ pub fn create_interval_mul_udf() -> ScalarUDF {
 
 fn postgres_datetime_format_to_iso(format: String) -> String {
     format
+        // Workaround for FM modifier
+        .replace("FMDay", "%A")
+        .replace("FMMonth", "%B")
+        .replace("Day", "%A")
+        .replace("Month", "%B")
         .replace("%i", "%M")
         .replace("%s", "%S")
         .replace(".%f", "%.f")
@@ -1518,7 +1528,7 @@ pub fn create_str_to_date_udf() -> ScalarUDF {
             })?;
 
             Ok(ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(
-                Some(res.timestamp_nanos()),
+                Some(res.timestamp_nanos_opt().unwrap()),
                 None,
             )))
         });
@@ -1556,7 +1566,7 @@ macro_rules! parse_timestamp_arr {
             let mut result = Vec::new();
             let arr = arr.unwrap();
             for i in 0..arr.len() {
-                result.push(Duration::$FN_NAME(arr.value(i)));
+                result.push(chrono::Duration::$FN_NAME(arr.value(i)));
             }
 
             Some(result)
@@ -1607,22 +1617,26 @@ pub fn create_to_char_udf() -> ScalarUDF {
             let mut builder = StringBuilder::new(durations.len());
 
             for (i, duration) in durations.iter().enumerate() {
-                let format = formats.value(i);
-                let format =
-                    postgres_datetime_format_to_iso(format.to_string()).replace("TZ", &timezone);
+                if duration.is_zero() {
+                    builder.append_null().unwrap();
+                } else {
+                    let format = formats.value(i);
+                    let format = postgres_datetime_format_to_iso(format.to_string())
+                        .replace("TZ", &timezone);
 
-                let secs = duration.num_seconds();
-                let nanosecs = duration.num_nanoseconds().unwrap_or(0) - secs * 1_000_000_000;
-                let timestamp = NaiveDateTime::from_timestamp_opt(secs, nanosecs as u32)
-                    .expect(format!("Invalid secs {} nanosecs {}", secs, nanosecs).as_str());
+                    let secs = duration.num_seconds();
+                    let nanosecs = duration.num_nanoseconds().unwrap_or(0) - secs * 1_000_000_000;
+                    let timestamp = NaiveDateTime::from_timestamp_opt(secs, nanosecs as u32)
+                        .expect(format!("Invalid secs {} nanosecs {}", secs, nanosecs).as_str());
 
-                // chrono's strftime is missing quarter format, as such a workaround is required
-                let quarter = &format!("{}", timestamp.date().month0() / 3 + 1);
-                let format = format.replace("%q", quarter);
+                    // chrono's strftime is missing quarter format, as such a workaround is required
+                    let quarter = &format!("{}", timestamp.date().month0() / 3 + 1);
+                    let format = format.replace("%q", quarter);
 
-                builder
-                    .append_value(timestamp.format(&format).to_string())
-                    .unwrap();
+                    builder
+                        .append_value(timestamp.format(&format).to_string())
+                        .unwrap();
+                }
             }
 
             Ok(Arc::new(builder.finish()) as ArrayRef)
@@ -3039,7 +3053,11 @@ pub fn create_date_to_timestamp_udf() -> ScalarUDF {
                                     "Cannot initalize default zero NaiveTime".to_string(),
                                 ),
                             )?;
-                            Ok(Some(NaiveDateTime::new(date, time).timestamp_nanos()))
+                            Ok(Some(
+                                NaiveDateTime::new(date, time)
+                                    .timestamp_nanos_opt()
+                                    .unwrap(),
+                            ))
                         }
                         None => Ok(None),
                     })
@@ -4796,7 +4814,20 @@ pub fn register_fun_stubs(mut ctx: SessionContext) -> SessionContext {
         vol = Stable
     );
 
-    register_fun_stub!(udf, "eval_now", argc = 0, rettyp = Timestamp, vol = Stable);
+    register_fun_stub!(
+        udf,
+        "eval_now",
+        argc = 0,
+        rettyp = TimestampTz,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "eval_utc_timestamp",
+        argc = 0,
+        rettyp = Timestamp,
+        vol = Stable
+    );
 
     ctx
 }

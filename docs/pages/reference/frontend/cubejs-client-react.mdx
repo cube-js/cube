@@ -4,7 +4,7 @@
 
 ## `useCubeQuery`
 
->  **useCubeQuery**‹**TData**›(**query**: Query | Query[], **options?**: [UseCubeQueryOptions](#use-cube-query-options)): *[UseCubeQueryResult](#use-cube-query-result)‹TData›*
+>  **useCubeQuery**‹**TData**›(**query**: Query | Query[], **options?**: [UseCubeQueryOptions](#use-cube-query-options)): *[UseCubeQueryResult](#use-cube-query-result)‹Query, TData›*
 
 A React hook for executing Cube queries
 ```js
@@ -52,12 +52,13 @@ Name | Type | Description | Optional? |
 `subscribe` | `boolean` | Use continuous fetch behavior. See [Real-Time Data Fetch](real-time-data-fetch) | ✅ Yes |
 `castNumerics` | `boolean` | Pass `true` if you'd like all members with the `number` type to be automatically converted to JavaScript `Number` type. Note that this is a potentially unsafe operation since numbers more than [`Number.MAX_SAFE_INTEGER`][link-mdn-max-safe-integer] or less than `Number.MIN_SAFE_INTEGER` can't be represented as JavaScript `Number` | ✅ Yes |
 
-### `UseCubeQueryResult`
+### `UseCubeQueryResult<TQuery, TData>`
 
 Name | Type |
 ------ | ------ |
 error | Error &#124; null |
 isLoading | boolean |
+previousQuery | TQuery |
 progress | ProgressResponse |
 resultSet | ResultSet‹TData› &#124; null |
 

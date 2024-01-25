@@ -6,13 +6,15 @@ use cubeclient::models::{
     V1LoadRequestQuery, V1LoadResponse,
 };
 use datafusion::arrow::datatypes::SchemaRef;
+use uuid::Uuid;
 
 use crate::{
     compile::engine::df::{scan::MemberField, wrapper::SqlQuery},
     config::{ConfigObj, ConfigObjImpl},
     sql::{
-        session::DatabaseProtocol, AuthContextRef, AuthenticateResponse, HttpAuthContext,
-        ServerManager, Session, SessionManager, SqlAuthService,
+        compiler_cache::CompilerCacheImpl, session::DatabaseProtocol, AuthContextRef,
+        AuthenticateResponse, HttpAuthContext, ServerManager, Session, SessionManager,
+        SqlAuthService,
     },
     transport::{
         CubeStreamReceiver, LoadRequestMeta, SpanId, SqlGenerator, SqlResponse, SqlTemplates,
@@ -327,25 +329,37 @@ pub fn get_test_tenant_ctx_customized(custom_templates: Vec<(String, String)>) -
         vec![("default".to_string(), sql_generator)]
             .into_iter()
             .collect(),
+        Uuid::new_v4(),
     ))
 }
 
 pub fn get_test_tenant_ctx_with_meta(meta: Vec<V1CubeMeta>) -> Arc<MetaContext> {
     // TODO
-    Arc::new(MetaContext::new(meta, HashMap::new(), HashMap::new()))
+    Arc::new(MetaContext::new(
+        meta,
+        HashMap::new(),
+        HashMap::new(),
+        Uuid::new_v4(),
+    ))
 }
 
-pub async fn get_test_session(protocol: DatabaseProtocol) -> Arc<Session> {
-    get_test_session_with_config(protocol, Arc::new(ConfigObjImpl::default())).await
+pub async fn get_test_session(
+    protocol: DatabaseProtocol,
+    meta_context: Arc<MetaContext>,
+) -> Arc<Session> {
+    get_test_session_with_config(protocol, Arc::new(ConfigObjImpl::default()), meta_context).await
 }
 
 pub async fn get_test_session_with_config(
     protocol: DatabaseProtocol,
     config_obj: Arc<dyn ConfigObj>,
+    meta_context: Arc<MetaContext>,
 ) -> Arc<Session> {
+    let test_transport = get_test_transport(meta_context);
     let server = Arc::new(ServerManager::new(
         get_test_auth(),
-        get_test_transport(),
+        test_transport.clone(),
+        Arc::new(CompilerCacheImpl::new(config_obj.clone(), test_transport)),
         None,
         config_obj,
     ));
@@ -398,15 +412,17 @@ pub fn get_test_auth() -> Arc<dyn SqlAuthService> {
     Arc::new(TestSqlAuth {})
 }
 
-pub fn get_test_transport() -> Arc<dyn TransportService> {
+pub fn get_test_transport(meta_context: Arc<MetaContext>) -> Arc<dyn TransportService> {
     #[derive(Debug)]
-    struct TestConnectionTransport {}
+    struct TestConnectionTransport {
+        meta_context: Arc<MetaContext>,
+    }
 
     #[async_trait]
     impl TransportService for TestConnectionTransport {
         // Load meta information about cubes
         async fn meta(&self, _ctx: AuthContextRef) -> Result<Arc<MetaContext>, CubeError> {
-            panic!("It's a fake transport");
+            Ok(self.meta_context.clone())
         }
 
         async fn sql(
@@ -479,5 +495,5 @@ pub fn get_test_transport() -> Arc<dyn TransportService> {
         }
     }
 
-    Arc::new(TestConnectionTransport {})
+    Arc::new(TestConnectionTransport { meta_context })
 }

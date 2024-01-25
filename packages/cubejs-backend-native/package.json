@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/native",
-  "version": "0.34.40",
+  "version": "0.34.46",
   "author": "Cube Dev, Inc.",
   "description": "Native module for Cube.js (binding to Rust codebase)",
   "main": "dist/js/index.js",
@@ -39,11 +39,12 @@
     "cargo-cp-artifact": "^0.1",
     "jest": "^27",
     "mysql2": "^2.3.3",
-    "typescript": "~5.2.2"
+    "typescript": "~5.2.2",
+    "uuid": "^8.3.2"
   },
   "dependencies": {
-    "@cubejs-backend/cubesql": "^0.34.40",
-    "@cubejs-backend/shared": "^0.34.33",
+    "@cubejs-backend/cubesql": "^0.34.46",
+    "@cubejs-backend/shared": "^0.34.41",
     "@cubejs-infra/post-installer": "^0.0.7"
   },
   "resources": {

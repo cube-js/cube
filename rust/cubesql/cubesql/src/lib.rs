@@ -25,8 +25,10 @@ pub mod error;
 pub mod sql;
 pub mod telemetry;
 pub mod transport;
+pub mod utils;
 
 pub type RWLockSync<A> = std::sync::RwLock<A>;
 pub type RWLockAsync<B> = tokio::sync::RwLock<B>;
+pub type MutexAsync<A> = tokio::sync::Mutex<A>;
 
 pub use error::{CubeError, CubeErrorCauseType};

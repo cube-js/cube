@@ -1055,7 +1055,7 @@ pub fn transform_response<V: ValueObject>(
                             if timestamp.timestamp_millis() > (((1 as i64) << 62) / 1_000_000) {
                                 builder.append_null()?;
                             } else {
-                                builder.append_value(timestamp.timestamp_nanos())?;
+                                builder.append_value(timestamp.timestamp_nanos_opt().unwrap())?;
                             }
                         },
                     },

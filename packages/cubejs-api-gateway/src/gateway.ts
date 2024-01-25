@@ -40,7 +40,7 @@ import {
   PreAggJobStatusItem,
   PreAggJobStatusObject,
   PreAggJobStatusResponse,
-  SqlApiRequest,
+  SqlApiRequest, MetaResponseResultFn,
 } from './types/request';
 import {
   CheckAuthInternalOptions,
@@ -481,12 +481,12 @@ class ApiGateway {
     }
   }
 
-  private filterVisibleItemsInMeta(context: RequestContext, metaConfig: any) {
+  private filterVisibleItemsInMeta(context: RequestContext, cubes: any[]) {
     function visibilityFilter(item) {
       return getEnv('devMode') || context.signedWithPlaygroundAuthSecret || item.isVisible;
     }
 
-    return metaConfig
+    return cubes
       .map((cube) => ({
         config: {
           ...cube.config,
@@ -497,7 +497,11 @@ class ApiGateway {
       })).filter(cube => cube.config.measures?.length || cube.config.dimensions?.length || cube.config.segments?.length);
   }
 
-  public async meta({ context, res }: { context: RequestContext, res: ResponseResultFn }) {
+  public async meta({ context, res, includeCompilerId }: {
+    context: RequestContext,
+    res: MetaResponseResultFn,
+    includeCompilerId?: boolean
+  }) {
     const requestStarted = new Date();
 
     try {
@@ -505,9 +509,15 @@ class ApiGateway {
       const compilerApi = await this.getCompilerApi(context);
       const metaConfig = await compilerApi.metaConfig({
         requestId: context.requestId,
+        includeCompilerId
       });
-      const cubes = this.filterVisibleItemsInMeta(context, metaConfig).map(cube => cube.config);
-      res({ cubes });
+      const cubesConfig = includeCompilerId ? metaConfig.cubes : metaConfig;
+      const cubes = this.filterVisibleItemsInMeta(context, cubesConfig).map(cube => cube.config);
+      const response: { cubes: any[], compilerId?: string } = { cubes };
+      if (includeCompilerId) {
+        response.compilerId = metaConfig.compilerId;
+      }
+      res(response);
     } catch (e) {
       this.handleError({
         e,

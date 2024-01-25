@@ -27,12 +27,9 @@ use crate::{
 };
 
 pub async fn cube_context() -> CubeContext {
-    let session = get_test_session(DatabaseProtocol::PostgreSQL).await;
-    let planner = QueryPlanner::new(
-        session.state.clone(),
-        get_test_tenant_ctx(),
-        session.session_manager.clone(),
-    );
+    let meta = get_test_tenant_ctx();
+    let session = get_test_session(DatabaseProtocol::PostgreSQL, meta.clone()).await;
+    let planner = QueryPlanner::new(session.state.clone(), meta, session.session_manager.clone());
     let ctx = planner.create_execution_ctx();
     let df_state = Arc::new(ctx.state.write().clone());
 
@@ -65,11 +62,18 @@ pub fn rewrite_rules(
     cube_context: Arc<CubeContext>,
 ) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
     let rules: Vec<Box<dyn RewriteRules>> = vec![
-        Box::new(MemberRules::new(cube_context.clone(), false)),
-        Box::new(FilterRules::new(cube_context.clone())),
-        Box::new(DateRules::new(cube_context.clone())),
-        Box::new(OrderRules::new(cube_context.clone())),
-        Box::new(SplitRules::new(cube_context.clone())),
+        Box::new(MemberRules::new(
+            cube_context.meta.clone(),
+            cube_context.sessions.server.config_obj.clone(),
+            false,
+        )),
+        Box::new(FilterRules::new(cube_context.meta.clone(), true)),
+        Box::new(DateRules::new()),
+        Box::new(OrderRules::new()),
+        Box::new(SplitRules::new(
+            cube_context.meta.clone(),
+            cube_context.sessions.server.config_obj.clone(),
+        )),
     ];
     let mut rewrites = Vec::new();
     for r in rules {

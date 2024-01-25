@@ -1,29 +1,26 @@
 use super::utils;
 use crate::{
-    compile::{
-        engine::provider::CubeContext,
-        rewrite::{
-            analysis::{ConstantFolding, LogicalPlanAnalysis},
-            between_expr, binary_expr, case_expr, case_expr_var_arg, cast_expr, change_user_member,
-            column_expr, cube_scan, cube_scan_filters, cube_scan_filters_empty_tail,
-            cube_scan_members, dimension_expr, expr_column_name, filter, filter_member, filter_op,
-            filter_op_filters, filter_op_filters_empty_tail, filter_replacer,
-            filter_simplify_replacer, fun_expr, fun_expr_var_arg, inlist_expr, is_not_null_expr,
-            is_null_expr, like_expr, limit, list_expr, literal_bool, literal_expr, literal_int,
-            literal_string, measure_expr, member_name_by_alias, negative_expr, not_expr,
-            projection, rewrite,
-            rewriter::RewriteRules,
-            scalar_fun_expr_args, scalar_fun_expr_args_empty_tail, segment_member,
-            time_dimension_date_range_replacer, time_dimension_expr, transforming_chain_rewrite,
-            transforming_rewrite, udf_expr, udf_expr_var_arg, udf_fun_expr_args,
-            udf_fun_expr_args_empty_tail, BetweenExprNegated, BinaryExprOp, CastExprDataType,
-            ChangeUserMemberValue, ColumnExprColumn, CubeScanAliasToCube, CubeScanLimit,
-            FilterMemberMember, FilterMemberOp, FilterMemberValues, FilterReplacerAliasToCube,
-            FilterReplacerAliases, InListExprNegated, LikeExprEscapeChar, LikeExprNegated,
-            LimitFetch, LimitSkip, LiteralExprValue, LogicalPlanLanguage, SegmentMemberMember,
-            TimeDimensionDateRange, TimeDimensionDateRangeReplacerDateRange,
-            TimeDimensionDateRangeReplacerMember, TimeDimensionGranularity, TimeDimensionName,
-        },
+    compile::rewrite::{
+        alias_expr,
+        analysis::{ConstantFolding, LogicalPlanAnalysis, OriginalExpr},
+        between_expr, binary_expr, case_expr, case_expr_var_arg, cast_expr, change_user_member,
+        column_expr, cube_scan, cube_scan_filters, cube_scan_filters_empty_tail, cube_scan_members,
+        dimension_expr, expr_column_name, filter, filter_member, filter_op, filter_op_filters,
+        filter_op_filters_empty_tail, filter_replacer, filter_simplify_replacer, fun_expr,
+        fun_expr_var_arg, inlist_expr, is_not_null_expr, is_null_expr, like_expr, limit, list_expr,
+        literal_bool, literal_expr, literal_int, literal_string, measure_expr,
+        member_name_by_alias, negative_expr, not_expr, projection, rewrite,
+        rewriter::RewriteRules,
+        scalar_fun_expr_args, scalar_fun_expr_args_empty_tail, segment_member,
+        time_dimension_date_range_replacer, time_dimension_expr, transforming_chain_rewrite,
+        transforming_rewrite, udf_expr, udf_expr_var_arg, udf_fun_expr_args,
+        udf_fun_expr_args_empty_tail, BetweenExprNegated, BinaryExprOp, CastExprDataType,
+        ChangeUserMemberValue, ColumnExprColumn, CubeScanAliasToCube, CubeScanLimit,
+        FilterMemberMember, FilterMemberOp, FilterMemberValues, FilterReplacerAliasToCube,
+        FilterReplacerAliases, InListExprNegated, LikeExprEscapeChar, LikeExprNegated, LimitFetch,
+        LimitSkip, LiteralExprValue, LogicalPlanLanguage, SegmentMemberMember,
+        TimeDimensionDateRange, TimeDimensionDateRangeReplacerDateRange,
+        TimeDimensionDateRangeReplacerMember, TimeDimensionGranularity, TimeDimensionName,
     },
     transport::{ext::V1CubeMetaExt, MemberType, MetaContext},
     var, var_iter,
@@ -49,12 +46,13 @@ use egg::{EGraph, Rewrite, Subst, Var};
 use std::{fmt::Display, ops::Index, sync::Arc};
 
 pub struct FilterRules {
-    cube_context: Arc<CubeContext>,
+    meta_context: Arc<MetaContext>,
+    eval_stable_functions: bool,
 }
 
 impl RewriteRules for FilterRules {
     fn rewrite_rules(&self) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
-        vec![
+        let mut rules = vec![
             transforming_rewrite(
                 "push-down-filter",
                 filter(
@@ -2030,17 +2028,11 @@ impl RewriteRules for FilterRules {
                 cast_expr(filter_simplify_replacer("?expr"), "?data_type"),
                 self.transform_filter_cast_unwrap("?expr", "?data_type", true),
             ),
+            // Alias
             rewrite(
-                "filter-simplify-now",
-                filter_simplify_replacer(fun_expr("Now", Vec::<String>::new())),
-                // TODO alias to make it equivalent transformation
-                udf_expr("eval_now", Vec::<String>::new()),
-            ),
-            rewrite(
-                "filter-simplify-current-date",
-                filter_simplify_replacer(fun_expr("CurrentDate", Vec::<String>::new())),
-                // TODO alias to make it equivalent transformation
-                udf_expr("eval_current_date", Vec::<String>::new()),
+                "filter-simplify-alias-push-down",
+                filter_simplify_replacer(alias_expr("?expr", "?alias")),
+                alias_expr(filter_simplify_replacer("?expr"), "?alias"),
             ),
             // Binary expr
             rewrite(
@@ -2610,13 +2602,39 @@ impl RewriteRules for FilterRules {
                     "?output_date_range",
                 ),
             ),
-        ]
+        ];
+        if self.eval_stable_functions {
+            rules.extend(vec![
+                rewrite(
+                    "filter-simplify-now",
+                    filter_simplify_replacer(fun_expr("Now", Vec::<String>::new())),
+                    // TODO alias to make it equivalent transformation
+                    udf_expr("eval_now", Vec::<String>::new()),
+                ),
+                rewrite(
+                    "filter-simplify-utc-timestamp",
+                    filter_simplify_replacer(fun_expr("UtcTimestamp", Vec::<String>::new())),
+                    // TODO alias to make it equivalent transformation
+                    udf_expr("eval_utc_timestamp", Vec::<String>::new()),
+                ),
+                rewrite(
+                    "filter-simplify-current-date",
+                    filter_simplify_replacer(fun_expr("CurrentDate", Vec::<String>::new())),
+                    // TODO alias to make it equivalent transformation
+                    udf_expr("eval_current_date", Vec::<String>::new()),
+                ),
+            ]);
+        }
+        rules
     }
 }
 
 impl FilterRules {
-    pub fn new(cube_context: Arc<CubeContext>) -> Self {
-        Self { cube_context }
+    pub fn new(meta_context: Arc<MetaContext>, eval_stable_functions: bool) -> Self {
+        Self {
+            meta_context,
+            eval_stable_functions,
+        }
     }
 
     fn push_down_filter(
@@ -2748,7 +2766,7 @@ impl FilterRules {
         let filter_op_var = filter_op_var.parse().unwrap();
         let filter_values_var = filter_values_var.parse().unwrap();
         let filter_aliases_var = filter_aliases_var.parse().unwrap();
-        let meta_context = self.cube_context.meta.clone();
+        let meta_context = self.meta_context.clone();
         move |egraph, subst| {
             for expr_op in var_iter!(egraph[subst[op_var]], BinaryExprOp) {
                 if let Some(ConstantFolding::Scalar(literal)) =
@@ -2957,7 +2975,7 @@ impl FilterRules {
         let filter_op_var = var!(filter_op_var);
         let filter_values_var = var!(filter_values_var);
         let filter_aliases_var = var!(filter_aliases_var);
-        let meta_context = self.cube_context.meta.clone();
+        let meta_context = self.meta_context.clone();
         move |egraph, subst| {
             for literal in var_iter!(egraph[subst[literal_var]], LiteralExprValue) {
                 for aliases in var_iter!(egraph[subst[filter_aliases_var]], FilterReplacerAliases) {
@@ -3108,7 +3126,7 @@ impl FilterRules {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let members_var = var!(members_var);
         let filter_aliases_var = var!(filter_aliases_var);
-        let meta_context = self.cube_context.meta.clone();
+        let meta_context = self.meta_context.clone();
         move |egraph, subst| {
             for aliases in var_iter!(egraph[subst[filter_aliases_var]], FilterReplacerAliases) {
                 if let Some((left_member_name, _)) = Self::filter_member_name(
@@ -3153,7 +3171,7 @@ impl FilterRules {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let members_var = var!(members_var);
         let filter_aliases_var = var!(filter_aliases_var);
-        let meta_context = self.cube_context.meta.clone();
+        let meta_context = self.meta_context.clone();
         move |egraph, subst| {
             for aliases in var_iter!(egraph[subst[filter_aliases_var]], FilterReplacerAliases) {
                 if let Some((left_member_name, _)) = Self::filter_member_name(
@@ -3247,7 +3265,7 @@ impl FilterRules {
         let member_var = var!(member_var);
         let values_var = var!(values_var);
         let filter_aliases_var = var!(filter_aliases_var);
-        let meta_context = self.cube_context.meta.clone();
+        let meta_context = self.meta_context.clone();
         move |egraph, subst| {
             for year in var_iter!(egraph[subst[year_var]], LiteralExprValue) {
                 for aliases in var_iter!(egraph[subst[filter_aliases_var]], FilterReplacerAliases) {
@@ -3314,7 +3332,7 @@ impl FilterRules {
         let members_var = var!(members_var);
         let segment_member_var = segment_member_var.parse().unwrap();
         let filter_aliases_var = filter_aliases_var.parse().unwrap();
-        let meta_context = self.cube_context.meta.clone();
+        let meta_context = self.meta_context.clone();
         move |egraph, subst| {
             for expr_op in var_iter!(egraph[subst[op_var]], BinaryExprOp) {
                 for literal in var_iter!(egraph[subst[literal_var]], LiteralExprValue) {
@@ -3486,7 +3504,7 @@ impl FilterRules {
         let filter_op_var = var!(filter_op_var);
         let filter_values_var = var!(filter_values_var);
         let filter_aliases_var = var!(filter_aliases_var);
-        let meta_context = self.cube_context.meta.clone();
+        let meta_context = self.meta_context.clone();
         move |egraph, subst| {
             for aliases in var_iter!(egraph[subst[filter_aliases_var]], FilterReplacerAliases) {
                 if let Some(list) = &egraph[subst[list_var]].data.constant_in_list {
@@ -3605,7 +3623,7 @@ impl FilterRules {
         let filter_op_var = var!(filter_op_var);
         let filter_values_var = var!(filter_values_var);
         let filter_aliases_var = var!(filter_aliases_var);
-        let meta_context = self.cube_context.meta.clone();
+        let meta_context = self.meta_context.clone();
         move |egraph, subst| {
             for aliases in var_iter!(egraph[subst[filter_aliases_var]], FilterReplacerAliases) {
                 if let Some((member_name, cube)) = Self::filter_member_name(
@@ -3777,7 +3795,7 @@ impl FilterRules {
         let filter_op_var = var!(filter_op_var);
         let filter_values_var = var!(filter_values_var);
         let filter_aliases_var = var!(filter_aliases_var);
-        let meta_context = self.cube_context.meta.clone();
+        let meta_context = self.meta_context.clone();
         move |egraph, subst| {
             for aliases in var_iter!(egraph[subst[filter_aliases_var]], FilterReplacerAliases) {
                 if let Some((member_name, cube)) = Self::filter_member_name(
@@ -3860,7 +3878,7 @@ impl FilterRules {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let members_var = var!(members_var);
         let filter_aliases_var = var!(filter_aliases_var);
-        let meta_context = self.cube_context.meta.clone();
+        let meta_context = self.meta_context.clone();
         move |egraph, subst| {
             for aliases in var_iter!(egraph[subst[filter_aliases_var]], FilterReplacerAliases) {
                 if let Some((member_name, cube)) = Self::filter_member_name(
@@ -4338,7 +4356,7 @@ impl FilterRules {
         let filter_member_var = var!(filter_member_var);
         let filter_op_var = var!(filter_op_var);
         let filter_values_var = var!(filter_values_var);
-        let meta_context = self.cube_context.meta.clone();
+        let meta_context = self.meta_context.clone();
         move |egraph, subst| {
             for escape_char in var_iter!(egraph[subst[escape_char_var]], LikeExprEscapeChar) {
                 if let Some('!') = escape_char {
@@ -4418,7 +4436,9 @@ impl FilterRules {
         let expr_var = var!(expr_var);
         let data_type_var = var!(data_type_var);
         move |egraph, subst| {
-            if let Some(expr) = egraph[subst[expr_var]].data.original_expr.clone() {
+            if let Some(OriginalExpr::Expr(expr)) =
+                egraph[subst[expr_var]].data.original_expr.clone()
+            {
                 for data_type in var_iter!(egraph[subst[data_type_var]], CastExprDataType).cloned()
                 {
                     return match data_type {

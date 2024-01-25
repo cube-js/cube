@@ -237,14 +237,10 @@ have an associative table in your database.
 The diagram below shows the tables `posts`, `topics`, `post_topics`, and their
 relationships.
 
-<div style={{ textAlign: "center" }}>
-  <img
-    alt="Many-to-Many Entity Diagram for posts, topics and post_topics"
-    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Schema/Fundamentals/many-to-many-1.png"
-    style={{ border: "none" }}
-    width="100%"
-  />
-</div>
+<Diagram
+  alt="Many-to-Many Entity Diagram for posts, topics and post_topics"
+  src="https://ucarecdn.com/61343995-dedc-40ae-9367-e21a645051ee/"
+/>
 
 In the same way the `post_topics` table was specifically created to handle this
 association in the database, we need to create an associative cube
@@ -511,14 +507,10 @@ cubes:
 
 The following diagram shows our data model with the `Campaigns` cube:
 
-<div style={{ textAlign: "center" }}>
-  <img
-    alt="Many-to-Many Entity Diagram for emails, campaigns and transactions"
-    src="https://raw.githubusercontent.com/cube-js/cube.js/master/docs/content/Schema/Fundamentals/many-to-many-2.png"
-    style={{ border: "none" }}
-    width="100%"
-  />
-</div>
+<Diagram
+  alt="Many-to-Many Entity Diagram for emails, campaigns and transactions"
+  src="https://ucarecdn.com/9803e369-cb00-4e00-9c61-1a3d3e90873e/"
+/>
 
 The last piece is to finally declare a many-to-many relationship. This should be
 done by declaring a [`one_to_many`

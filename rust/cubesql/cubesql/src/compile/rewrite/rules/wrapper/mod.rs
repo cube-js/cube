@@ -22,21 +22,23 @@ mod window;
 mod window_function;
 mod wrapper_pull_up;
 
-use crate::compile::{
-    engine::provider::CubeContext,
-    rewrite::{
+use crate::{
+    compile::rewrite::{
         analysis::LogicalPlanAnalysis,
         rewrite,
         rewriter::RewriteRules,
         rules::{replacer_pull_up_node, replacer_push_down_node},
         wrapper_pullup_replacer, wrapper_pushdown_replacer, LogicalPlanLanguage,
     },
+    config::ConfigObj,
+    transport::MetaContext,
 };
 use egg::Rewrite;
 use std::sync::Arc;
 
 pub struct WrapperRules {
-    cube_context: Arc<CubeContext>,
+    meta_context: Arc<MetaContext>,
+    config_obj: Arc<dyn ConfigObj>,
 }
 
 impl RewriteRules for WrapperRules {
@@ -72,8 +74,11 @@ impl RewriteRules for WrapperRules {
 }
 
 impl WrapperRules {
-    pub fn new(cube_context: Arc<CubeContext>) -> Self {
-        Self { cube_context }
+    pub fn new(meta_context: Arc<MetaContext>, config_obj: Arc<dyn ConfigObj>) -> Self {
+        Self {
+            meta_context,
+            config_obj,
+        }
     }
 
     fn list_pushdown_pullup_rules(

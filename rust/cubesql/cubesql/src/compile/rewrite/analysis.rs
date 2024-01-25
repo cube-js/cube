@@ -33,7 +33,7 @@ use std::{fmt::Debug, ops::Index, sync::Arc};
 
 #[derive(Clone, Debug)]
 pub struct LogicalPlanData {
-    pub original_expr: Option<Expr>,
+    pub original_expr: Option<OriginalExpr>,
     pub member_name_to_expr: Option<Vec<(Option<String>, Member, Expr)>>,
     pub trivial_push_down: Option<usize>,
     pub column: Option<Column>,
@@ -44,6 +44,12 @@ pub struct LogicalPlanData {
     pub cube_reference: Option<String>,
     pub filter_operators: Option<Vec<(String, String)>>,
     pub is_empty_list: Option<bool>,
+}
+
+#[derive(Debug, Clone)]
+pub enum OriginalExpr {
+    Expr(Expr),
+    List(Vec<Expr>),
 }
 
 #[derive(Debug, Clone)]
@@ -230,7 +236,13 @@ impl<'a> Index<Id> for SingleNodeIndex<'a> {
         //     "Single node expected but {:?} found",
         //     self.egraph.index(index).nodes
         // );
-        &self.egraph.index(index).nodes[0]
+        &self
+            .egraph
+            .index(index)
+            .nodes
+            .iter()
+            .find(|n| !matches!(n, LogicalPlanLanguage::QueryParam(_)))
+            .unwrap_or(&self.egraph.index(index).nodes[0])
     }
 }
 
@@ -245,13 +257,22 @@ impl LogicalPlanAnalysis {
     fn make_original_expr(
         egraph: &EGraph<LogicalPlanLanguage, Self>,
         enode: &LogicalPlanLanguage,
-    ) -> Option<Expr> {
-        let id_to_expr = |id| {
+    ) -> Option<OriginalExpr> {
+        let id_to_original_expr = |id| {
             egraph[id].data.original_expr.clone().ok_or_else(|| {
                 CubeError::internal(format!(
                     "Original expr wasn't prepared for {:?}",
                     egraph[id]
                 ))
+            })
+        };
+        let id_to_expr = |id| {
+            id_to_original_expr(id).and_then(|e| match e {
+                OriginalExpr::Expr(expr) => Ok(expr),
+                OriginalExpr::List(_) => Err(CubeError::internal(format!(
+                    "Original expr list can't be used in expr eval {:?}",
+                    egraph[id]
+                ))),
             })
         };
         let original_expr = if is_expr_node(enode) {
@@ -262,8 +283,29 @@ impl LogicalPlanAnalysis {
                 &SingleNodeIndex { egraph },
             )
             .ok()
+            .map(|expr| OriginalExpr::Expr(expr))
         } else {
-            None
+            // While not used directly in expression evaluation OriginalExpr::List is used to trigger parent data invalidation
+            // Going forward should be used for expression evaluation as well
+            match enode {
+                LogicalPlanLanguage::CaseExprWhenThenExpr(params)
+                | LogicalPlanLanguage::CaseExprElseExpr(params)
+                | LogicalPlanLanguage::CaseExprExpr(params)
+                | LogicalPlanLanguage::AggregateFunctionExprArgs(params)
+                | LogicalPlanLanguage::AggregateUDFExprArgs(params)
+                | LogicalPlanLanguage::ScalarFunctionExprArgs(params)
+                | LogicalPlanLanguage::ScalarUDFExprArgs(params) => {
+                    let mut list = Vec::new();
+                    for id in params {
+                        match id_to_original_expr(*id).ok()? {
+                            OriginalExpr::Expr(expr) => list.push(expr),
+                            OriginalExpr::List(exprs) => list.extend(exprs),
+                        }
+                    }
+                    Some(OriginalExpr::List(list))
+                }
+                _ => None,
+            }
         };
         original_expr
     }
@@ -276,6 +318,7 @@ impl LogicalPlanAnalysis {
         match enode {
             LogicalPlanLanguage::ColumnExpr(_) => Some(0),
             LogicalPlanLanguage::LiteralExpr(_) => Some(0),
+            LogicalPlanLanguage::QueryParam(_) => Some(0),
             LogicalPlanLanguage::AliasExpr(params) => trivial_push_down(params[0]),
             LogicalPlanLanguage::ProjectionExpr(params)
             | LogicalPlanLanguage::AggregateAggrExpr(params)
@@ -333,7 +376,17 @@ impl LogicalPlanAnalysis {
     ) -> Option<Vec<(Option<String>, Member, Expr)>> {
         let column_name = |id| egraph.index(id).data.column.clone();
         let id_to_column_name_to_expr = |id| egraph.index(id).data.member_name_to_expr.clone();
-        let original_expr = |id| egraph.index(id).data.original_expr.clone();
+        let original_expr = |id| {
+            egraph
+                .index(id)
+                .data
+                .original_expr
+                .clone()
+                .and_then(|e| match e {
+                    OriginalExpr::Expr(expr) => Some(expr),
+                    OriginalExpr::List(_) => None,
+                })
+        };
         let literal_member_relation = |id| {
             egraph
                 .index(id)
@@ -641,7 +694,17 @@ impl LogicalPlanAnalysis {
         egraph: &EGraph<LogicalPlanLanguage, Self>,
         enode: &LogicalPlanLanguage,
     ) -> Option<Vec<(Expr, String, Option<bool>)>> {
-        let original_expr = |id| egraph.index(id).data.original_expr.clone();
+        let original_expr = |id| {
+            egraph
+                .index(id)
+                .data
+                .original_expr
+                .clone()
+                .and_then(|e| match e {
+                    OriginalExpr::Expr(expr) => Some(expr),
+                    OriginalExpr::List(_) => None,
+                })
+        };
         let id_to_column_name = |id| egraph.index(id).data.column.clone();
         let column_name_to_alias = |id| egraph.index(id).data.expr_to_alias.clone();
         let mut map = Vec::new();
@@ -686,7 +749,17 @@ impl LogicalPlanAnalysis {
         enode: &LogicalPlanLanguage,
     ) -> Option<Vec<Expr>> {
         let referenced_columns = |id| egraph.index(id).data.referenced_expr.clone();
-        let original_expr = |id| egraph.index(id).data.original_expr.clone();
+        let original_expr = |id| {
+            egraph
+                .index(id)
+                .data
+                .original_expr
+                .clone()
+                .and_then(|e| match e {
+                    OriginalExpr::Expr(expr) => Some(expr),
+                    OriginalExpr::List(_) => None,
+                })
+        };
         let column_name = |id| egraph.index(id).data.column.clone();
         let push_referenced_columns = |id, columns: &mut Vec<Expr>| -> Option<()> {
             if let Some(col) = column_name(id) {
@@ -769,6 +842,7 @@ impl LogicalPlanAnalysis {
                 Some(vec)
             }
             LogicalPlanLanguage::LiteralExpr(_) => Some(vec),
+            LogicalPlanLanguage::QueryParam(_) => Some(vec),
             LogicalPlanLanguage::SortExpr(params) => {
                 if column_name(params[0]).is_some() {
                     let expr = original_expr(params[0])?;
@@ -821,18 +895,19 @@ impl LogicalPlanAnalysis {
         };
         match enode {
             LogicalPlanLanguage::LiteralExpr(_) => {
-                let expr = node_to_expr(
+                let result = node_to_expr(
                     enode,
                     &egraph.analysis.cube_context,
                     &constant_expr,
                     &SingleNodeIndex { egraph },
-                )
-                .ok()?;
+                );
+                let expr = result.ok()?;
                 match expr {
                     Expr::Literal(value) => Some(ConstantFolding::Scalar(value)),
                     _ => panic!("Expected Literal but got: {:?}", expr),
                 }
             }
+            LogicalPlanLanguage::AliasExpr(params) => constant_node(params[0]),
             LogicalPlanLanguage::ScalarUDFExpr(_) => {
                 let expr = node_to_expr(
                     enode,
@@ -855,6 +930,14 @@ impl LogicalPlanAnalysis {
                             &egraph,
                             &Expr::ScalarFunction {
                                 fun: BuiltinScalarFunction::CurrentDate,
+                                args: vec![],
+                            },
+                        )
+                    } else if &fun.name == "eval_utc_timestamp" {
+                        Self::eval_constant_expr(
+                            &egraph,
+                            &Expr::ScalarFunction {
+                                fun: BuiltinScalarFunction::UtcTimestamp,
                                 args: vec![],
                             },
                         )
@@ -883,13 +966,10 @@ impl LogicalPlanAnalysis {
                 .ok()?;
 
                 if let Expr::ScalarFunction { fun, .. } = &expr {
-                    if (fun.volatility() == Volatility::Immutable
-                        || fun.volatility() == Volatility::Stable)
-                        && !matches!(
-                            fun,
-                            BuiltinScalarFunction::CurrentDate | BuiltinScalarFunction::Now
-                        )
-                    {
+                    // Removed stable evaluation as it affects caching and SQL push down.
+                    // Whatever stable function should be evaluated it should be addressed as a special rewrite rule
+                    // as it seems LogicalPlanAnalysis can't change it's state.
+                    if fun.volatility() == Volatility::Immutable {
                         Self::eval_constant_expr(&egraph, &expr)
                     } else {
                         None
@@ -1120,7 +1200,7 @@ impl LogicalPlanAnalysis {
         }
     }
 
-    fn merge_option_field<T: Clone>(
+    fn merge_option_field<T: Clone + Debug>(
         &mut self,
         a: &mut LogicalPlanData,
         mut b: LogicalPlanData,
@@ -1185,18 +1265,35 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
 
     fn modify(egraph: &mut EGraph<LogicalPlanLanguage, Self>, id: Id) {
         if let Some(ConstantFolding::Scalar(c)) = &egraph[id].data.constant {
+            // As ConstantFolding goes through Alias we can't add LiteralExpr at this level otherwise it gets dropped.
+            // In case there's wrapping node on top of Alias that can be evaluated to LiteralExpr further it gets replaced instead.
+            if let Some(OriginalExpr::Expr(Expr::Alias(_, _))) =
+                egraph[id].data.original_expr.as_ref()
+            {
+                return;
+            }
             // TODO: ideally all constants should be aliased, but this requires
             // rewrites to extract `.data.constant` instead of `literal_expr`.
-            let alias_name =
-                if c.is_null() || matches!(c, ScalarValue::Date32(_) | ScalarValue::Date64(_)) {
-                    egraph[id]
-                        .data
-                        .original_expr
-                        .as_ref()
-                        .map(|expr| expr.name(&DFSchema::empty()).unwrap())
-                } else {
-                    None
-                };
+            let alias_name = if c.is_null()
+                || matches!(
+                    c,
+                    ScalarValue::Date32(_)
+                        | ScalarValue::Date64(_)
+                        | ScalarValue::Int64(_)
+                        | ScalarValue::Float64(_)
+                ) {
+                egraph[id]
+                    .data
+                    .original_expr
+                    .as_ref()
+                    .and_then(|e| match e {
+                        OriginalExpr::Expr(expr) => Some(expr),
+                        OriginalExpr::List(_) => None,
+                    })
+                    .map(|expr| expr.name(&DFSchema::empty()).unwrap())
+            } else {
+                None
+            };
             let c = c.clone();
             let value = egraph.add(LogicalPlanLanguage::LiteralExprValue(LiteralExprValue(c)));
             let literal_expr = egraph.add(LogicalPlanLanguage::LiteralExpr([value]));

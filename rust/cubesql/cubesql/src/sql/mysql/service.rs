@@ -202,8 +202,8 @@ impl MySqlConnection {
         } else if !ignore {
             trace!("query was not detected");
 
-            let meta = self.session.server.transport
-                .meta(self.auth_context()?)
+            let meta = self.session.server.compiler_cache
+                .meta(self.auth_context()?, self.session.state.protocol.clone())
                 .await?;
 
             let plan = convert_sql_to_cube_query(&query, meta, self.session.clone()).await?;

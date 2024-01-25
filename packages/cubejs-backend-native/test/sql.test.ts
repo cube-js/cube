@@ -240,7 +240,6 @@ describe('SQLInterface', () => {
         password: null,
       });
 
-      expect(meta.mock.calls.length).toEqual(1);
       expect(meta.mock.calls[0][0]).toEqual({
         request: {
           id: expect.any(String),
@@ -250,7 +249,8 @@ describe('SQLInterface', () => {
           user: 'allowed_user',
           superuser: false,
           securityContext: { foo: 'bar' },
-        }
+        },
+        onlyCompilerId: true
       });
 
       try {

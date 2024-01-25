@@ -185,13 +185,8 @@ impl WrapperRules {
         // let cast_data_type_var = cast_data_type_var.map(|v| var!(v));
         let cube_members_var = var!(cube_members_var);
         let measure_out_var = var!(measure_out_var);
-        let cube_context = self.cube_context.clone();
-        let disable_strict_agg_type_match = self
-            .cube_context
-            .sessions
-            .server
-            .config_obj
-            .disable_strict_agg_type_match();
+        let meta = self.meta_context.clone();
+        let disable_strict_agg_type_match = self.config_obj.disable_strict_agg_type_match();
         move |egraph, subst| {
             if let Some(alias) = original_expr_name(egraph, subst[original_expr_var]) {
                 for fun in fun_name_var
@@ -233,7 +228,7 @@ impl WrapperRules {
                                     .find(|(cn, _)| cn == &column.name)
                                 {
                                     if let Some(measure) =
-                                        cube_context.meta.find_measure_with_name(member.to_string())
+                                        meta.find_measure_with_name(member.to_string())
                                     {
                                         if call_agg_type.is_none()
                                             || measure.is_same_agg_type(

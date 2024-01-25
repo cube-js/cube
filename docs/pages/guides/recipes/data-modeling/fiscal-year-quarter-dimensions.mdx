@@ -1,0 +1,84 @@
+# Implementing fiscal year or fiscal quarter dimensions
+
+Businesses and governments use the concept of a [fiscal year][wiki-fiscal-year]
+for the convenience of their accounting, budgeting, and reporting. Often,
+the fiscal year would not align with the calendar year (January 1 to December 31).
+In that case, the fiscal year may either lag or lead by a number of months.
+
+## Use case
+
+We'd like to analyze business metrics by attributing them to specific fiscal
+years and quarters within those years. In this recipe, we'll be using
+[Australia][wiki-fiscal-year-australia] as an example: in this country, the
+"financial year" begins 6 month earlier than the calendar year, i.e., FY 2024
+started on July 1, 2023.
+
+## Data modeling
+
+Let's define a couple of auxillary dimensions (`fiscal_year_internal` and
+`fiscal_quarter_internal`) that would translate the time dimension into
+numeric values of the fiscal year and fiscal quarter, respectively. Make
+sure to adjust the calculations in these dimensions if your fiscal year is
+defined differently. Also, you can see that these dimensions are defined
+as [private][ref-dimension-public] so they are not visible to end users.
+
+Then, define a string dimension (`fiscal_quarter`) that would format the
+fiscal quarter value and expose it to end users:
+
+```yml
+cubes:
+  - name: fiscal
+    sql: >
+      SELECT '2024-01-15T00:00:00.000Z'::TIMESTAMP AS timestamp UNION ALL
+      SELECT '2024-02-15T00:00:00.000Z'::TIMESTAMP AS timestamp UNION ALL
+      SELECT '2024-03-15T00:00:00.000Z'::TIMESTAMP AS timestamp UNION ALL
+      SELECT '2024-04-15T00:00:00.000Z'::TIMESTAMP AS timestamp UNION ALL
+      SELECT '2024-05-15T00:00:00.000Z'::TIMESTAMP AS timestamp UNION ALL
+      SELECT '2024-06-15T00:00:00.000Z'::TIMESTAMP AS timestamp UNION ALL
+      SELECT '2024-07-15T00:00:00.000Z'::TIMESTAMP AS timestamp UNION ALL
+      SELECT '2024-08-15T00:00:00.000Z'::TIMESTAMP AS timestamp UNION ALL
+      SELECT '2024-09-15T00:00:00.000Z'::TIMESTAMP AS timestamp UNION ALL
+      SELECT '2024-10-15T00:00:00.000Z'::TIMESTAMP AS timestamp UNION ALL
+      SELECT '2024-11-15T00:00:00.000Z'::TIMESTAMP AS timestamp UNION ALL
+      SELECT '2024-12-15T00:00:00.000Z'::TIMESTAMP AS timestamp
+
+    dimensions:
+    - name: timestamp
+      sql: timestamp
+      type: time
+
+      # TODO: Adjust to your fiscal calendar
+    - name: fiscal_year_internal
+      sql: "EXTRACT(YEAR FROM {timestamp} + INTERVAL '6 MONTH')"
+      type: string
+      public: false
+
+      # TODO: Adjust to your fiscal calendar
+    - name: fiscal_quarter_internal
+      sql: >
+        CASE
+          WHEN EXTRACT(MONTH FROM {timestamp}) BETWEEN 7 AND 9 THEN 1
+          WHEN EXTRACT(MONTH FROM {timestamp}) BETWEEN 10 AND 12 THEN 2
+          WHEN EXTRACT(MONTH FROM {timestamp}) BETWEEN 1 AND 3 THEN 3
+          WHEN EXTRACT(MONTH FROM {timestamp}) BETWEEN 4 AND 6 THEN 4
+        END
+      type: string
+      public: false
+
+    - name: fiscal_quarter
+      sql: >
+        'FY' || {fiscal_year_internal} || '-Q' || {fiscal_quarter_internal}
+      type: string
+```
+
+## Result
+
+Now you can use the `fiscal_quarter` dimension in your queries and get desired result:
+
+<Screenshot src="https://ucarecdn.com/7d106eba-ca32-45eb-b246-217c9bd11c1e/"/>
+
+
+[wiki-fiscal-year]: https://en.wikipedia.org/wiki/Fiscal_year
+[wiki-fiscal-year-australia]: https://en.wikipedia.org/wiki/Fiscal_year#Australia
+
+[ref-dimension-public]: /reference/data-model/dimensions#public
