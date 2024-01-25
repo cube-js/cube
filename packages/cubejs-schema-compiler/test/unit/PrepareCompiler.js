@@ -7,12 +7,23 @@ export const prepareCompiler = (content, options) => originalPrepareCompiler({
   ])
 }, { adapter: 'postgres', ...options });
 
-export const prepareYamlCompiler = (content, yamlExtension, options = {}) => originalPrepareCompiler({
-  localPath: () => __dirname,
-  dataSchemaFiles: () => Promise.resolve([
-    { fileName: yamlExtension ? 'main.yaml' : 'main.yml', content }
-  ])
-}, { adapter: 'postgres', ...options });
+export const prepareYamlCompiler = (content, yamlExtension, options = {}) => {
+  let files = [];
+  
+  if (Array.isArray(content)) {
+    files = content;
+  } else {
+    files.push({
+      fileName: yamlExtension ? 'main.yaml' : 'main.yml',
+      content
+    });
+  }
+  
+  return originalPrepareCompiler({
+    localPath: () => __dirname,
+    dataSchemaFiles: () => Promise.resolve(files)
+  }, { adapter: 'postgres', ...options });
+};
 
 export const prepareCube = (cubeName, cube, options) => {
   const fileName = `${cubeName}.js`;

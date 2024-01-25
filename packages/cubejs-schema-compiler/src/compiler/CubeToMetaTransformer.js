@@ -1,9 +1,9 @@
+import camelCase from 'camelcase';
 import inflection from 'inflection';
 import R from 'ramda';
-import camelCase from 'camelcase';
 
-import { UserError } from './UserError';
 import { BaseMeasure, BaseQuery } from '../adapter';
+import { UserError } from './UserError';
 
 export class CubeToMetaTransformer {
   /**
@@ -22,6 +22,8 @@ export class CubeToMetaTransformer {
   }
 
   compile(cubes, errorReporter) {
+    this.assignSplitJoins();
+    
     this.cubes = this.cubeSymbols.cubeList
       .filter(this.cubeValidator.isCubeValid.bind(this.cubeValidator))
       .map((v) => this.transform(v, errorReporter.inContext(`${v.name} cube`)))
@@ -37,6 +39,77 @@ export class CubeToMetaTransformer {
   /**
    * @protected
    */
+  assignSplitJoins() {
+    const joinPathsBySplitId = {};
+    for (const entity of this.cubeSymbols.cubeList) {
+      if (entity.splitId) {
+        joinPathsBySplitId[entity.splitId] = [...(joinPathsBySplitId[entity.splitId] || []), entity.fullPath];
+      }
+    }
+    
+    const foundJoins = {};
+
+    for (const [splitId, joinPaths] of Object.entries(joinPathsBySplitId)) {
+      for (const [index, joinPath] of joinPaths.entries()) {
+        let j = index + 1;
+        while (j < joinPaths.length) {
+          const pair = ([joinPath, joinPaths[j]].map((p) => (p.split('.').length > 1 ? p.split('.') : p)));
+          
+          try {
+            const join = this.joinGraph.buildJoin(pair);
+            
+            const { relationship } = join.joins[0].join;
+            
+            if (!foundJoins[splitId]) {
+              foundJoins[splitId] = [];
+            }
+            
+            // We only need to know if 2 split views are joinable,
+            // actual joins are defined by cubes' `joins` field
+            let to = joinPath;
+            if (to === join.root) {
+              to = joinPaths[j];
+            }
+            
+            foundJoins[splitId].push({
+              pair,
+              // where to put this join
+              fullPath: join.root,
+              // joinpath on splitId
+              to,
+              relationship,
+              actualJoin: join
+            });
+          } catch (_) {
+          //
+          }
+
+          j++;
+        }
+      }
+    }
+    
+    const { cubeList } = this.cubeSymbols;
+          
+    for (const [splitId, joins] of Object.entries(foundJoins)) {
+      for (const join of joins) {
+        const root = cubeList.find((cl) => cl.splitId === splitId && cl.fullPath === join.fullPath);
+        const to = cubeList.find((cl) => cl.splitId === splitId && cl.fullPath === join.to);
+
+        if (!root.splitJoins) {
+          root.splitJoins = [];
+        }
+        root.splitJoins.push({
+          relationship: join.relationship,
+          to: to.name
+        });
+      }
+    }
+  }
+  
+  /**
+   * @protected
+   */
   transform(cube) {
     const cubeTitle = cube.title || this.titleize(cube.name);
     
@@ -46,6 +119,8 @@ export class CubeToMetaTransformer {
       config: {
         name: cube.name,
         type: cube.isView ? 'view' : 'cube',
+        splitId: cube.splitId || undefined,
+        splitJoins: cube.splitJoins,
         title: cubeTitle,
         isVisible: isCubeVisible,
         public: isCubeVisible,
