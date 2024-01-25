@@ -1,7 +1,12 @@
 import { BaseQuery } from './BaseQuery';
-import { BaseFilter } from './BaseFilter';
 import { UserError } from '../compiler/UserError';
 import { BaseDimension } from './BaseDimension';
+import { BaseTimeDimension } from './BaseTimeDimension';
+import { ParamAllocator } from './ParamAllocator';
+import { OracleParamAllocator } from './OracleParamAllocator';
+import { OracleFilter } from './OracleFilter';
+import { OracleTimeDimension } from './OracleTimeDimension';
+import { BaseFilter } from './BaseFilter';
 
 const GRANULARITY_VALUE = {
   day: 'DD',
@@ -14,95 +19,102 @@ const GRANULARITY_VALUE = {
   year: 'YYYY'
 };
 
-class OracleFilter extends BaseFilter {
-  public castParameter() {
-    return ':"?"';
-  }
-
-  /**
-   * "ILIKE" does't support
-   */
-  public likeIgnoreCase(column, not, param, type) {
-    const p = (!type || type === 'contains' || type === 'ends') ? '\'%\' || ' : '';
-    const s = (!type || type === 'contains' || type === 'starts') ? ' || \'%\'' : '';
-    return `${column}${not ? ' NOT' : ''} LIKE ${p}${this.allocateParam(param)}${s}`;
-  }
-}
-
 export class OracleQuery extends BaseQuery {
-  /**
-   * "LIMIT" on Oracle it's illegal
-   */
-  public groupByDimensionLimit() {
-    const limitClause = this.rowLimit === null ? '' : ` FETCH NEXT ${this.rowLimit && parseInt(this.rowLimit, 10) || 10000} ROWS ONLY`;
-    const offsetClause = this.offset ? ` OFFSET ${parseInt(this.offset, 10)} ROWS` : '';
-    return `${offsetClause}${limitClause}`;
-  }
+    bindPosition = 0;
 
-  /**
-   * "AS" for table aliasing on Oracle it's illegal
-   */
-  public get asSyntaxTable() {
-    return '';
-  }
+    /**
+     * "LIMIT" on Oracle it's illegal
+     */
+    public groupByDimensionLimit() {
+      const limitClause = this.rowLimit === null ? '' : ` FETCH NEXT ${this.rowLimit && parseInt(this.rowLimit, 10) || 10000} ROWS ONLY`;
+      const offsetClause = this.offset ? ` OFFSET ${parseInt(this.offset, 10)} ROWS` : '';
+      return `${offsetClause}${limitClause}`;
+    }
 
-  public get asSyntaxJoin() {
-    return this.asSyntaxTable;
-  }
-
-  /**
-   * Oracle doesn't support group by index,
-   * using forSelect dimensions for grouping
-   */
-  public groupByClause() {
-    const dimensions = this.forSelect().filter((item: any) => !!item.dimension) as BaseDimension[];
-    if (!dimensions.length) {
+    /**
+     * "AS" for table aliasing on Oracle it's illegal
+     */
+    public get asSyntaxTable() {
       return '';
     }
 
-    return ` GROUP BY ${dimensions.map(item => item.dimensionSql()).join(', ')}`;
-  }
+    public get asSyntaxJoin() {
+      return this.asSyntaxTable;
+    }
 
-  public convertTz(field) {
+    public preAggregationLoadSql(cube: string, preAggregation: unknown, tableName: string) {
+      const sqlAndParams = this.preAggregationSql(cube, preAggregation);
+      return [`CREATE TABLE ${tableName} AS ${sqlAndParams[0]}`, sqlAndParams[1]];
+    }
+
     /**
-     * TODO: add offset timezone
+     * Oracle doesn't support group by index,
+     * using forSelect dimensions for grouping
      */
-    return field;
-  }
+    public groupByClause() {
+      const dimensions = this.forSelect().filter((item: any) => !!item.dimension) as BaseDimension[];
+      if (!dimensions.length) {
+        return '';
+      }
 
-  public dateTimeCast(value) {
-    return `to_date(:"${value}", 'YYYY-MM-DD"T"HH24:MI:SS****"Z"')`;
-  }
-
-  public timeStampCast(value) {
-    return this.dateTimeCast(value);
-  }
-
-  public timeStampParam(timeDimension) {
-    return timeDimension.dateFieldType() === 'string' ? ':"?"' : this.timeStampCast('?');
-  }
-
-  public timeGroupedColumn(granularity, dimension) {
-    if (!granularity) {
-      return dimension;
+      return ` GROUP BY ${dimensions.map(item => item.dimensionSql()).join(', ')}`;
     }
-    return `TRUNC(${dimension}, '${GRANULARITY_VALUE[granularity]}')`;
-  }
 
-  public newFilter(filter) {
-    return new OracleFilter(this, filter);
-  }
-
-  public unixTimestampSql() {
-    // eslint-disable-next-line quotes
-    return `((cast (systimestamp at time zone 'UTC' as date) - date '1970-01-01') * 86400)`;
-  }
-
-  public preAggregationTableName(cube, preAggregationName, skipSchema) {
-    const name = super.preAggregationTableName(cube, preAggregationName, skipSchema);
-    if (name.length > 128) {
-      throw new UserError(`Oracle can not work with table names that longer than 64 symbols. Consider using the 'sqlAlias' attribute in your cube and in your pre-aggregation definition for ${name}.`);
+    public convertTz(field: string) {
+      /**
+         * TODO: add offset timezone
+         */
+      return `${field} AT TIME ZONE '${this.timezone}'`;
     }
-    return name;
-  }
+
+    public dateTimeCast(value: string) {
+      return `TO_UTC_TIMESTAMP_TZ(${value})`; // . + 3 digits + TZ
+    }
+
+    public newParamAllocator(expressionParams: unknown[]): ParamAllocator {
+      return new OracleParamAllocator(expressionParams);
+    }
+
+    public timeStampCast(value: string) {
+      return this.dateTimeCast(value);
+    }
+
+    public timeStampParam(timeDimension: BaseDimension | BaseTimeDimension | OracleTimeDimension) {
+      return this.timeStampCast('?');
+    }
+
+    public timeGroupedColumn(granularity: string, dimension: string) {
+      if (!granularity) {
+        return dimension;
+      }
+      return `TRUNC(${dimension}, '${GRANULARITY_VALUE[granularity]}')`;
+    }
+
+    public newFilter(filter: BaseFilter) {
+      return new OracleFilter(this, filter);
+    }
+
+    public newTimeDimension(timeDimension: BaseDimension | BaseTimeDimension | OracleTimeDimension) {
+      return <any>(new OracleTimeDimension(this, timeDimension));
+    }
+
+    public nowTimestampSql(): string {
+      return 'SYSTIMESTAMP';
+    }
+
+    public unixTimestampSql() {
+      return '( CAST(SYSTIMESTAMP AT TIME ZONE \'UTC\' as DATE) - DATE \'1970-01-01\' ) * 86400';
+    }
+
+    public preAggregationTableName(cube, preAggregationName, skipSchema) {
+      const name = super.preAggregationTableName(cube, preAggregationName, skipSchema);
+      if (name.length > 128) {
+        throw new UserError(`Oracle can not work with table names that are longer than 128 bytes. Consider using the 'sqlAlias' attribute in your cube and in your pre-aggregation definition for ${name}.`);
+      }
+      return name;
+    }
+
+    public refreshKeySelect(sql: string) {
+      return `SELECT ${sql} as refresh_key FROM DUAL`;
+    }
 }

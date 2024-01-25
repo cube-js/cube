@@ -24,3 +24,4 @@ testings/
 schema/
 .env
 
+/build/config.gypi

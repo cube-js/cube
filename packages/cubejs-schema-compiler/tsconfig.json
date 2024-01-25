@@ -9,6 +9,11 @@
     "checkJs": false,
     "noImplicitAny": false,
     "resolveJsonModule": true,
-    "experimentalDecorators": true
+    "experimentalDecorators": true,
+    "types": ["node","oracledb","jest"],
+    "typeRoots": ["../../node_modules/@types","node_modules/@types"]
   },
+  "watchOptions": {
+    "fallbackPolling": "priorityInterval"
+  }
 }
