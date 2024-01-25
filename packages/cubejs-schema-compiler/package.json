@@ -26,7 +26,7 @@
     "integration": "TZ=UTC jest dist/test/integration/*",
     "integration:mssql": "TZ=UTC jest dist/test/integration/mssql",
     "integration:mysql": "TZ=UTC jest dist/test/integration/mysql",
-    "integration:oracle": "TZ=UTC MAPPED_ORACLE_PORT=1521 DPI_DEBUG_LEVEL=16 jest dist/test/integration/oracle",
+    "integration:oracle": "TZ=UTC jest dist/test/integration/oracle",
     "integration:postgres": "TZ=UTC jest dist/test/integration/postgres",
     "integration:clickhouse": "TZ=UTC jest dist/test/integration/clickhouse",
     "lint": "eslint src/* test/* --ext .ts,.js",

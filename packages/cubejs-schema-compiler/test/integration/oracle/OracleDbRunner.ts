@@ -7,9 +7,8 @@ import { BaseDbRunner } from '../postgres/BaseDbRunner';
 export class OracleDbRunner extends BaseDbRunner {
     private _connection: Connection | undefined;
 
-    public async connectionLazyInit(port: number): Promise<{
-        testQueries: (queries: any, fixture: any) => Promise<any>;
-    }> {
+    public async connectionLazyInit(port: number): Promise<any> {
+      // _connection is a singleton
       if (!this._connection) {
         this._connection = await oracle.getConnection({
           user: 'system',
@@ -18,24 +17,17 @@ export class OracleDbRunner extends BaseDbRunner {
         });
         await this.prepareFixture(this._connection);
       }
+      // connection is a singleton
       if (!this.connection) {
         this.connection = {
           close: async () => {
             await this._connection?.close();
             this._connection = undefined;
           },
-          testQueries: async (queries: [string, BindParameters][], fixture): Promise<Record<string, unknown>[]> => {
-            try {
-              const queryResults = queries.map((query) => this._connection?.execute<Record<string, unknown>>(query[0], query[1], { outFormat: oracle.OUT_FORMAT_OBJECT }));
-              const finalResults = await Promise.all(queryResults);
-              return JSON.parse(JSON.stringify(finalResults?.pop()?.rows || []));
-            } catch (error) {
-              console.log((<Error>error).message);
-              queries.forEach(([q]) => {
-                console.log(q);
-              });
-              return [];
-            }
+          testQueries: async (queries: [string, BindParameters][]): Promise<Record<string, unknown>[]> => {
+            const queryResults = queries.map((query) => this._connection?.execute<Record<string, unknown>>(query[0], query[1], { outFormat: oracle.OUT_FORMAT_OBJECT }));
+            const finalResults = await Promise.all(queryResults);
+            return JSON.parse(JSON.stringify(finalResults?.pop()?.rows || []));
           }
         };
       }
@@ -125,8 +117,6 @@ export class OracleDbRunner extends BaseDbRunner {
       return process.env.TEST_DB_PASSWORD || 'OracleDB1';
     }
 
-    private _startedContainer: StartedTestContainer | undefined;
-
     containerLazyInit = async () => {
       if (process.env.MAPPED_ORACLE_PORT) {
         return {
@@ -147,6 +137,7 @@ export class OracleDbRunner extends BaseDbRunner {
           }
         };
       } else {
+        // container is a singleton
         if (!this.container) {
           this.container = await new GenericContainer('aleanca/oracledb-21.3.0-ee:21.3.0-ee')
             .withEnv('ORACLE_PWD', this.password())
