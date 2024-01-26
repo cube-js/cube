@@ -2514,6 +2514,8 @@ export class BaseQuery {
         in_list: '{{ expr }} {% if negated %}NOT {% endif %}IN ({{ in_exprs_concat }})',
         negative: '-({{ expr }})',
         not: 'NOT ({{ expr }})',
+        true: 'TRUE',
+        false: 'FALSE',
       },
       quotes: {
         identifiers: '"',
