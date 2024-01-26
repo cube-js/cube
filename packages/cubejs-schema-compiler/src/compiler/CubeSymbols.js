@@ -372,7 +372,6 @@ export class CubeSymbols {
           title: resolvedMember.title,
           description: resolvedMember.description,
           format: resolvedMember.format,
-          drillMembers: resolvedMember.drillMembers,
         };
       } else if (type === 'dimensions') {
         memberDefinition = {
