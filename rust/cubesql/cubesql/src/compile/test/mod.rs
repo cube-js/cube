@@ -311,6 +311,8 @@ pub fn get_test_tenant_ctx_customized(custom_templates: Vec<(String, String)>) -
                     ("expressions/in_list".to_string(), "{{ expr }} {% if negated %}NOT {% endif %}IN ({{ in_exprs_concat }})".to_string()),
                     ("expressions/negative".to_string(), "-({{ expr }})".to_string()),
                     ("expressions/not".to_string(), "NOT ({{ expr }})".to_string()),
+                    ("expressions/true".to_string(), "TRUE".to_string()),
+                    ("expressions/false".to_string(), "FALSE".to_string()),
                     ("quotes/identifiers".to_string(), "\"".to_string()),
                     ("quotes/escape".to_string(), "\"\"".to_string()),
                     ("params/param".to_string(), "${{ param_index + 1 }}".to_string())
