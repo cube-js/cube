@@ -2986,6 +2986,7 @@ mod tests {
                 measures: Some(vec![
                     "KibanaSampleDataEcommerce.count".to_string(),
                     "KibanaSampleDataEcommerce.maxPrice".to_string(),
+                    "KibanaSampleDataEcommerce.sumPrice".to_string(),
                     "KibanaSampleDataEcommerce.minPrice".to_string(),
                     "KibanaSampleDataEcommerce.avgPrice".to_string(),
                     "KibanaSampleDataEcommerce.countDistinct".to_string(),
@@ -3424,6 +3425,62 @@ ORDER BY \"COUNT(count)\" DESC"
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
                     operator: Some("equals".to_string()),
                     values: Some(vec!["female".to_string()]),
+                    or: None,
+                    and: None
+                }]),
+                ungrouped: None,
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn superset_pg_time_filter_with_in_filter() {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT \"notes\", DATE_TRUNC('week', \"order_date\") AS __timestamp,
+               count(count) AS \"COUNT(count)\"
+FROM public.\"KibanaSampleDataEcommerce\"
+WHERE \"notes\" IN ('1', '2', '3', '4', '5') AND \"is_female\" = true AND \"order_date\" >= TO_TIMESTAMP('2021-05-15 00:00:00.000000', 'YYYY-MM-DD HH24:MI:SS.US')
+  AND \"order_date\" < TO_TIMESTAMP('2022-05-15 00:00:00.000000', 'YYYY-MM-DD HH24:MI:SS.US')
+GROUP BY \"notes\", DATE_TRUNC('week', \"order_date\")
+ORDER BY \"COUNT(count)\" DESC LIMIT 10000"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                segments: Some(vec!["KibanaSampleDataEcommerce.is_female".to_string()]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.notes".to_string()]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("week".to_string()),
+                    date_range: Some(json!(vec![
+                        "2021-05-15T00:00:00.000Z".to_string(),
+                        "2022-05-14T23:59:59.999Z".to_string()
+                    ]))
+                }]),
+                order: Some(vec![vec![
+                    "KibanaSampleDataEcommerce.count".to_string(),
+                    "desc".to_string()
+                ]]),
+                limit: Some(10000),
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.notes".to_string()),
+                    operator: Some("equals".to_string()),
+                    values: Some(vec![
+                        "1".to_string(),
+                        "2".to_string(),
+                        "3".to_string(),
+                        "4".to_string(),
+                        "5".to_string()
+                    ]),
                     or: None,
                     and: None
                 }]),
@@ -13368,6 +13425,7 @@ limit
                 measures: Some(vec![
                     "KibanaSampleDataEcommerce.count".to_string(),
                     "KibanaSampleDataEcommerce.maxPrice".to_string(),
+                    "KibanaSampleDataEcommerce.sumPrice".to_string(),
                     "KibanaSampleDataEcommerce.minPrice".to_string(),
                     "KibanaSampleDataEcommerce.avgPrice".to_string(),
                     "KibanaSampleDataEcommerce.countDistinct".to_string(),
@@ -14818,6 +14876,39 @@ limit
     }
 
     #[tokio::test]
+    async fn test_thoughtspot_sum_measure_binary_expr_unwrap() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT SUM("ta_1"."sumPrice" / NULLIF(CAST(10.0 AS FLOAT8), 0.0)) "cl"
+            FROM "db"."public"."KibanaSampleDataEcommerce" "ta_1";
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.sumPrice".to_string(),]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+                ungrouped: None,
+            }
+        )
+    }
+    #[tokio::test]
     async fn test_in_filter() {
         init_logger();
 
@@ -15935,6 +16026,7 @@ limit
                 measures: Some(vec![
                     "KibanaSampleDataEcommerce.count".to_string(),
                     "KibanaSampleDataEcommerce.maxPrice".to_string(),
+                    "KibanaSampleDataEcommerce.sumPrice".to_string(),
                     "KibanaSampleDataEcommerce.minPrice".to_string(),
                     "KibanaSampleDataEcommerce.avgPrice".to_string(),
                     "KibanaSampleDataEcommerce.countDistinct".to_string(),
@@ -20317,6 +20409,65 @@ limit
     }
 
     #[tokio::test]
+    async fn test_sigma_sunday_week_push_down() {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            r#"
+            select 
+                datetrunc_12 "Week of Event Date",
+                sum_15 "Active_Events_SUM_Metric"
+            from (
+                select 
+                    (
+                        date_trunc(
+                            'week',
+                            (
+                                order_date :: timestamptz + cast(1 || ' day' as interval)
+                            )
+                        ) + cast(-1 || ' day' as interval)
+                    ) datetrunc_12,
+                    sum(count) sum_15
+                from
+                    "public"."KibanaSampleDataEcommerce" "KibanaSampleDataEcommerce"
+                group by
+                    (
+                        date_trunc(
+                            'week',
+                            (
+                                order_date :: timestamptz + cast(1 || ' day' as interval)
+                            )
+                        ) + cast(-1 || ' day' as interval) 
+                    )
+            ) q1
+            order by
+                datetrunc_12 asc
+            limit
+                25000
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql;
+        assert!(sql.contains("DATE_TRUNC("));
+        assert!(sql.contains("order_date"));
+        assert!(sql.contains("count"));
+    }
+
+    #[tokio::test]
     async fn test_langchain_pgcatalog_schema() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "langchain_pgcatalog_schema",
@@ -20900,5 +21051,89 @@ limit
         );
 
         Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_thoughtspot_kpi_monthly() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            r#"
+            SELECT 
+                DATE_TRUNC('MONTH', CAST("ta_1"."order_date" AS date)) AS "ca_1", 
+                COALESCE(sum("ta_1"."count"), 0) AS "ca_2", 
+                min((MOD(CAST((EXTRACT(MONTH FROM "ta_1"."order_date") - 1) AS numeric), 3) + 1)) AS "ca_3", 
+                min(CEIL((EXTRACT(MONTH FROM "ta_1"."order_date") / NULLIF(3.0,0.0)))) AS "ca_4"
+            FROM "db"."public"."KibanaSampleDataEcommerce" AS "ta_1"
+            GROUP BY "ca_1"
+            ORDER BY "ca_1" ASC
+            LIMIT 5000
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert!(logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql
+            .contains("EXTRACT(MONTH FROM "));
+    }
+
+    #[tokio::test]
+    async fn test_thoughtspot_kpi_daily() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            r#"
+            SELECT 
+                CAST("ta_1"."order_date" AS date) AS "ca_1", 
+                COALESCE(sum("ta_1"."count"), 0) AS "ca_2", 
+                min((MOD(CAST((CAST("ta_1"."order_date" AS date) - CAST(DATE '1970-01-01' AS date) + 3) AS numeric), 7) + 1)) AS "ca_3", 
+                min(EXTRACT(DAY FROM "ta_1"."order_date")) AS "ca_4", 
+                min((CAST("ta_1"."order_date" AS date) - CAST((CAST(EXTRACT(YEAR FROM "ta_1"."order_date") || '-' || EXTRACT(MONTH FROM "ta_1"."order_date") || '-01' AS DATE) + ((EXTRACT(MONTH FROM "ta_1"."order_date") - 1) * -1) * INTERVAL '1 month') AS date) + 1)) AS "ca_5", 
+                min(FLOOR(((EXTRACT(DAY FROM ("ta_1"."order_date" + (4 - (MOD(CAST((CAST("ta_1"."order_date" AS date) - CAST(DATE '1970-01-01' AS date) + 3) AS numeric), 7) + 1)) * INTERVAL '1 day')) + 6) / NULLIF(7,0)))) AS "ca_6", 
+                min(FLOOR(((CAST(("ta_1"."order_date" + (4 - (MOD(CAST((CAST("ta_1"."order_date" AS date) - CAST(DATE '1970-01-01' AS date) + 3) AS numeric), 7) + 1)) * INTERVAL '1 day') AS date) - CAST((CAST(EXTRACT(YEAR FROM ("ta_1"."order_date" + (4 - (MOD(CAST((CAST("ta_1"."order_date" AS date) - CAST(DATE '1970-01-01' AS date) + 3) AS numeric), 7) + 1)) * INTERVAL '1 day')) || '-' || EXTRACT(MONTH FROM ("ta_1"."order_date" + (4 - (MOD(CAST((CAST("ta_1"."order_date" AS date) - CAST(DATE '1970-01-01' AS date) + 3) AS numeric), 7) + 1)) * INTERVAL '1 day')) || '-01' AS DATE) + ((EXTRACT(MONTH FROM ("ta_1"."order_date" + (4 - (MOD(CAST((CAST("ta_1"."order_date" AS date) - CAST(DATE '1970-01-01' AS date) + 3) AS numeric), 7) + 1)) * INTERVAL '1 day')) - 1) * -1) * INTERVAL '1 month') AS date) + 1 + 6) / NULLIF(7,0)))) AS "ca_7", 
+                min((MOD(CAST((EXTRACT(MONTH FROM "ta_1"."order_date") - 1) AS numeric), 3) + 1)) AS "ca_8", 
+                min(CEIL((EXTRACT(MONTH FROM "ta_1"."order_date") / NULLIF(3.0,0.0)))) AS "ca_9"
+            FROM "db"."public"."KibanaSampleDataEcommerce" AS "ta_1"
+            GROUP BY "ca_1"
+            ORDER BY "ca_1" ASC
+            LIMIT 5000
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql;
+        assert!(sql.contains("order_date"));
+        assert!(sql.contains("EXTRACT(DAY FROM"))
     }
 }

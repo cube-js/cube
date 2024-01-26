@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.48](https://github.com/cube-js/cube/compare/v0.34.47...v0.34.48) (2024-01-25)
+
+
+### Bug Fixes
+
+* **cubesql:** Fix unary minus operator precedence ([d5a935a](https://github.com/cube-js/cube/commit/d5a935ac3bb16c1dda6c30982cdc9ef787a24967))
+
+
+### Features
+
+* **cubesql:** Support KPI chart in Thoughtspot ([dbab39e](https://github.com/cube-js/cube/commit/dbab39e63a1c752a56a2cb06169a479a3e9cb11e))
+
+
+
+
+
 ## [0.34.47](https://github.com/cube-js/cube/compare/v0.34.46...v0.34.47) (2024-01-23)
 
 **Note:** Version bump only for package @cubejs-backend/native

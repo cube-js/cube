@@ -10,6 +10,7 @@ use crate::{
     },
     CubeError,
 };
+use chrono::{Days, NaiveDate};
 use cubeclient::models::V1LoadRequestQuery;
 use datafusion::{
     error::{DataFusionError, Result},
@@ -23,7 +24,10 @@ use datafusion::{
 use itertools::Itertools;
 use regex::{Captures, Regex};
 use serde_derive::*;
-use std::{any::Any, collections::HashMap, fmt, future::Future, pin::Pin, result, sync::Arc};
+use std::{
+    any::Any, collections::HashMap, convert::TryInto, fmt, future::Future, pin::Pin, result,
+    sync::Arc,
+};
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct SqlQuery {
@@ -1099,30 +1103,33 @@ impl CubeScanWrapperNode {
                     )
                     .await?;
                     let data_type = match data_type {
-                        DataType::Null => "NULL",
-                        DataType::Boolean => "BOOLEAN",
-                        DataType::Int8 => "INTEGER",
-                        DataType::Int16 => "INTEGER",
-                        DataType::Int32 => "INTEGER",
-                        DataType::Int64 => "INTEGER",
-                        DataType::UInt8 => "INTEGER",
-                        DataType::UInt16 => "INTEGER",
-                        DataType::UInt32 => "INTEGER",
-                        DataType::UInt64 => "INTEGER",
-                        DataType::Float16 => "FLOAT",
-                        DataType::Float32 => "FLOAT",
-                        DataType::Float64 => "DOUBLE PRECISION",
-                        DataType::Timestamp(_, _) => "TIMESTAMP",
-                        DataType::Date32 => "DATE",
-                        DataType::Date64 => "DATE",
-                        DataType::Time32(_) => "TIME",
-                        DataType::Time64(_) => "TIME",
-                        DataType::Duration(_) => "INTERVAL",
-                        DataType::Interval(_) => "INTERVAL",
-                        DataType::Binary => "BYTEA",
-                        DataType::FixedSizeBinary(_) => "BYTEA",
-                        DataType::Utf8 => "TEXT",
-                        DataType::LargeUtf8 => "TEXT",
+                        DataType::Null => "NULL".to_string(),
+                        DataType::Boolean => "BOOLEAN".to_string(),
+                        DataType::Int8 => "INTEGER".to_string(),
+                        DataType::Int16 => "INTEGER".to_string(),
+                        DataType::Int32 => "INTEGER".to_string(),
+                        DataType::Int64 => "INTEGER".to_string(),
+                        DataType::UInt8 => "INTEGER".to_string(),
+                        DataType::UInt16 => "INTEGER".to_string(),
+                        DataType::UInt32 => "INTEGER".to_string(),
+                        DataType::UInt64 => "INTEGER".to_string(),
+                        DataType::Float16 => "FLOAT".to_string(),
+                        DataType::Float32 => "FLOAT".to_string(),
+                        DataType::Float64 => "DOUBLE PRECISION".to_string(),
+                        DataType::Timestamp(_, _) => "TIMESTAMP".to_string(),
+                        DataType::Date32 => "DATE".to_string(),
+                        DataType::Date64 => "DATE".to_string(),
+                        DataType::Time32(_) => "TIME".to_string(),
+                        DataType::Time64(_) => "TIME".to_string(),
+                        DataType::Duration(_) => "INTERVAL".to_string(),
+                        DataType::Interval(_) => "INTERVAL".to_string(),
+                        DataType::Binary => "BYTEA".to_string(),
+                        DataType::FixedSizeBinary(_) => "BYTEA".to_string(),
+                        DataType::Utf8 => "TEXT".to_string(),
+                        DataType::LargeUtf8 => "TEXT".to_string(),
+                        DataType::Decimal(precision, scale) => {
+                            format!("NUMERIC({}, {})", precision, scale)
+                        }
                         x => {
                             return Err(DataFusionError::Execution(format!(
                                 "Can't generate SQL for cast: type isn't supported: {:?}",
@@ -1132,7 +1139,7 @@ impl CubeScanWrapperNode {
                     };
                     let resulting_sql = sql_generator
                         .get_sql_templates()
-                        .cast_expr(expr, data_type.to_string())
+                        .cast_expr(expr, data_type)
                         .map_err(|e| {
                             DataFusionError::Internal(format!("Can't generate SQL for cast: {}", e))
                         })?;
@@ -1217,13 +1224,68 @@ impl CubeScanWrapperNode {
                         // ScalarValue::Binary(_) => {}
                         // ScalarValue::LargeBinary(_) => {}
                         // ScalarValue::List(_, _) => {}
-                        // ScalarValue::Date32(_) => {}
+                        ScalarValue::Date32(x) => {
+                            if let Some(x) = x {
+                                let days = Days::new(x.abs().try_into().unwrap());
+                                let epoch = NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
+                                let new_date = if x < 0 {
+                                    epoch.checked_sub_days(days)
+                                } else {
+                                    epoch.checked_add_days(days)
+                                };
+                                let Some(new_date) = new_date else {
+                                    return Err(DataFusionError::Internal(format!(
+                                        "Can't generate SQL for date: day out of bounds ({})",
+                                        x
+                                    )));
+                                };
+                                let formatted_date = new_date.format("%Y-%m-%d").to_string();
+                                (
+                                    sql_generator
+                                        .get_sql_templates()
+                                        .scalar_function(
+                                            "DATE".to_string(),
+                                            vec![format!("'{}'", formatted_date)],
+                                            None,
+                                            None,
+                                        )
+                                        .map_err(|e| {
+                                            DataFusionError::Internal(format!(
+                                                "Can't generate SQL for date: {}",
+                                                e
+                                            ))
+                                        })?,
+                                    sql_query,
+                                )
+                            } else {
+                                ("NULL".to_string(), sql_query)
+                            }
+                        }
                         // ScalarValue::Date64(_) => {}
                         // ScalarValue::TimestampSecond(_, _) => {}
                         // ScalarValue::TimestampMillisecond(_, _) => {}
                         // ScalarValue::TimestampMicrosecond(_, _) => {}
                         // ScalarValue::TimestampNanosecond(_, _) => {}
-                        // ScalarValue::IntervalYearMonth(_) => {}
+                        ScalarValue::IntervalYearMonth(x) => {
+                            if let Some(x) = x {
+                                let (num, date_part) = (x, "MONTH");
+                                let interval = format!("{} {}", num, date_part);
+                                (
+                                    sql_generator
+                                        .get_sql_templates()
+                                        .interval_expr(interval, num.into(), date_part.to_string())
+                                        .map_err(|e| {
+                                            DataFusionError::Internal(format!(
+                                                "Can't generate SQL for interval: {}",
+                                                e
+                                            ))
+                                        })?,
+                                    sql_query,
+                                )
+                            } else {
+                                ("NULL".to_string(), sql_query)
+                            }
+                        }
                         ScalarValue::IntervalDayTime(x) => {
                             if let Some(x) = x {
                                 let days = x >> 32;
