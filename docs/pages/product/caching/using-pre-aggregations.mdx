@@ -886,10 +886,10 @@ Cube Store in parallel:
 Enabling the export bucket functionality requires extra configuration; please
 refer to the database-specific documentation for more details:
 
-- [AWS Athena][ref-connect-db-athena]
-- [AWS Redshift][ref-connect-db-redshift]
-- [BigQuery][ref-connect-db-bigquery]
-- [Snowflake][ref-connect-db-snowflake]
+- [AWS Athena][ref-export-athena]
+- [AWS Redshift][ref-export-redshift]
+- [BigQuery][ref-export-bigquery]
+- [Snowflake][ref-export-snowflake]
 
 When using cloud storage, it is important to correctly configure any data
 retention policies to clean up the data in the export bucket as Cube does not
@@ -916,6 +916,10 @@ please [let us know](https://cube.dev/contact) if you are interested in early
 access to any of these drivers or would like Cube to support any other SQL
 streaming engine.
 
+[ref-export-athena]: /product/configuration/data-sources/aws-athena#export-bucket
+[ref-export-redshift]: /product/configuration/data-sources/aws-redshift#export-bucket
+[ref-export-bigquery]: /product/configuration/data-sources/google-bigquery#export-bucket
+[ref-export-snowflake]: /product/configuration/data-sources/snowflake#export-bucket
 [ref-caching-in-mem-default-refresh-key]: /product/caching#default-refresh-keys
 [ref-config-db]: /product/configuration/data-sources
 [ref-config-driverfactory]: /reference/configuration/config#driverfactory
