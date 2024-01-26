@@ -101,7 +101,7 @@ impl RewriteRules for FilterRules {
             transforming_rewrite(
                 "push-down-limit-filter",
                 filter(
-                    literal_expr("?literal"),
+                    "?literal_false",
                     cube_scan(
                         "?source_table_name",
                         "?members",
@@ -132,7 +132,7 @@ impl RewriteRules for FilterRules {
                     ),
                 ),
                 self.push_down_limit_filter(
-                    "?literal",
+                    "?literal_false",
                     "?new_limit",
                     "?new_limit_skip",
                     "?new_limit_fetch",
@@ -141,18 +141,19 @@ impl RewriteRules for FilterRules {
             // Transform Filter: Boolean(true)
             // It's safe to push down filter under projection, next filter-truncate-true will truncate it
             // TODO: Find a better solution how to drop filter node at all once
-            rewrite(
+            transforming_rewrite(
                 "push-down-filter-projection",
                 filter(
-                    literal_bool(true),
+                    "?literal_true",
                     projection("?expr", "?input", "?alias", "?projection_split"),
                 ),
                 projection(
                     "?expr",
-                    filter(literal_bool(true), "?input"),
+                    filter("?literal_true", "?input"),
                     "?alias",
                     "?projection_split",
                 ),
+                self.transform_literal_true("?literal_true"),
             ),
             rewrite(
                 "swap-limit-filter",
@@ -257,26 +258,28 @@ impl RewriteRules for FilterRules {
                 ),
             ),
             // Transform Filter: Boolean(True) same as TRUE = TRUE, which is useless
-            rewrite(
+            transforming_rewrite(
                 "filter-truncate-true",
                 filter_replacer(
-                    literal_bool(true),
+                    "?literal_true",
                     "?alias_to_cube",
                     "?members",
                     "?filter_aliases",
                 ),
                 cube_scan_filters_empty_tail(),
+                self.transform_literal_true("?literal_true"),
             ),
             // We use this rule to transform: (?expr IN (?list..)) = TRUE and ((?expr IN (?list..)) = TRUE) = TRUE
-            rewrite(
+            transforming_rewrite(
                 "filter-truncate-in-list-true",
                 filter_replacer(
-                    binary_expr("?expr", "=", literal_bool(true)),
+                    binary_expr("?expr", "=", "?literal_true"),
                     "?alias_to_cube",
                     "?members",
                     "?filter_aliases",
                 ),
                 filter_replacer("?expr", "?alias_to_cube", "?members", "?filter_aliases"),
+                self.transform_literal_true("?literal_true"),
             ),
             transforming_rewrite(
                 "filter-replacer",
@@ -2686,7 +2689,9 @@ impl FilterRules {
         let new_limit_skip_var = var!(new_limit_skip_var);
         let new_limit_fetch_var = var!(new_limit_fetch_var);
         move |egraph, subst| {
-            for literal_value in var_iter!(egraph[subst[literal_var]], LiteralExprValue) {
+            if let Some(ConstantFolding::Scalar(literal_value)) =
+                &egraph[subst[literal_var]].data.constant
+            {
                 if let ScalarValue::Boolean(Some(false)) = literal_value {
                     subst.insert(
                         new_limit_var,
@@ -2700,6 +2705,23 @@ impl FilterRules {
                         new_limit_fetch_var,
                         egraph.add(LogicalPlanLanguage::LimitFetch(LimitFetch(Some(0)))),
                     );
+                    return true;
+                }
+            }
+            false
+        }
+    }
+
+    fn transform_literal_true(
+        &self,
+        literal_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let literal_var = var!(literal_var);
+        move |egraph, subst| {
+            if let Some(ConstantFolding::Scalar(literal)) =
+                &egraph[subst[literal_var]].data.constant
+            {
+                if let ScalarValue::Boolean(Some(true)) = literal {
                     return true;
                 }
             }
