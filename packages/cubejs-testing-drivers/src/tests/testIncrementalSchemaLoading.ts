@@ -26,7 +26,7 @@ export function incrementalSchemaLoadingSuite(
   });
 
   execute('should load schemas', async () => {
-    let inputSchemas: QuerySchemasResult[] = await driver().getSchemas();
+    const inputSchemas: QuerySchemasResult[] = await driver().getSchemas();
     expect(inputSchemas).toBeInstanceOf(Array);
     expect(inputSchemas.length).toBeGreaterThan(0);
     expect(inputSchemas).toContainEqual({
@@ -36,8 +36,8 @@ export function incrementalSchemaLoadingSuite(
 
   execute('should load tables for specific schemas', async () => {
     let inputSchemas: QuerySchemasResult[] = await driver().getSchemas();
-    inputSchemas= inputSchemas.filter((s) => !!s.schema_name);
-    let inputTables = await driver().getTablesForSpecificSchemas(inputSchemas);
+    inputSchemas = inputSchemas.filter((s) => !!s.schema_name);
+    const inputTables = await driver().getTablesForSpecificSchemas(inputSchemas);
     expect(inputTables).toBeInstanceOf(Array);
     expect(inputTables.length).toBeGreaterThan(0);
     expect(inputTables).toContainEqual({
@@ -48,7 +48,7 @@ export function incrementalSchemaLoadingSuite(
 
   execute('should load columns for specific tables', async () => {
     const createdTables = tables.map((t) => t.split('.').pop()?.toUpperCase());
-    let inputSchemas: QuerySchemasResult[] = await driver().getSchemas();
+    const inputSchemas: QuerySchemasResult[] = await driver().getSchemas();
     let inputTables: QueryTablesResult[] = await driver().getTablesForSpecificSchemas(inputSchemas);
     inputTables = inputTables.filter((t) => createdTables.includes(t.table_name.toUpperCase()));
     const columnsForTables = await driver().getColumnsForSpecificTables(inputTables);
