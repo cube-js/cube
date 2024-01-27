@@ -10,6 +10,59 @@ import {
   runEnvironment,
 } from '../helpers';
 
+export function incrementalSchemaLoadingSuite(
+  execute: (name: string, test: () => Promise<void>) => void,
+  driver: () => BaseDriver & { stream?: (query: string, values: string[], options: { highWaterMark: number }) => Promise<any> },
+  tables: string[]
+) {
+  execute('should establish a connection', async () => {
+    await driver().testConnection();
+  });
+
+  execute('should load and check driver capabilities', async () => {
+    const capabilities = driver().capabilities();
+    expect(capabilities).toHaveProperty('incrementalSchemaLoading');
+    expect(capabilities.incrementalSchemaLoading).toBe(true);
+  });
+
+  execute('should load schemas', async () => {
+    let inputSchemas: QuerySchemasResult[] = await driver().getSchemas();
+    expect(inputSchemas).toBeInstanceOf(Array);
+    expect(inputSchemas.length).toBeGreaterThan(0);
+    expect(inputSchemas).toContainEqual({
+      schema_name: expect.any(String),
+    });
+  });
+
+  execute('should load tables for specific schemas', async () => {
+    let inputSchemas: QuerySchemasResult[] = await driver().getSchemas();
+    inputSchemas= inputSchemas.filter((s) => !!s.schema_name);
+    let inputTables = await driver().getTablesForSpecificSchemas(inputSchemas);
+    expect(inputTables).toBeInstanceOf(Array);
+    expect(inputTables.length).toBeGreaterThan(0);
+    expect(inputTables).toContainEqual({
+      schema_name: expect.any(String),
+      table_name: expect.any(String),
+    });
+  });
+
+  execute('should load columns for specific tables', async () => {
+    const createdTables = tables.map((t) => t.split('.').pop()?.toUpperCase());
+    let inputSchemas: QuerySchemasResult[] = await driver().getSchemas();
+    let inputTables: QueryTablesResult[] = await driver().getTablesForSpecificSchemas(inputSchemas);
+    inputTables = inputTables.filter((t) => createdTables.includes(t.table_name.toUpperCase()));
+    const columnsForTables = await driver().getColumnsForSpecificTables(inputTables);
+    expect(columnsForTables).toBeInstanceOf(Array);
+    expect(columnsForTables.length).toBeGreaterThan(0);
+    expect(columnsForTables).toContainEqual({
+      schema_name: expect.any(String),
+      table_name: expect.any(String),
+      column_name: expect.any(String),
+      data_type: expect.any(String),
+    });
+  });
+}
+
 export function testIncrementalSchemaLoading(type: string): void {
   describe(`Incremental schema loading @cubejs-backend/${type}-driver`, () => {
     jest.setTimeout(60 * 5 * 1000);
@@ -71,49 +124,7 @@ export function testIncrementalSchemaLoading(type: string): void {
         await env.stop();
       }
     });
-  
-    execute('should establish a connection', async () => {
-      await driver.testConnection();
-    });
 
-    execute('should load and check driver capabilities', async () => {
-      const capabilities = driver.capabilities();
-      expect(capabilities).toHaveProperty('incrementalSchemaLoading');
-      expect(capabilities.incrementalSchemaLoading).toBe(true);
-    });
-
-    execute('should load schemas', async () => {
-      inputSchemas = await driver.getSchemas();
-      expect(inputSchemas).toBeInstanceOf(Array);
-      expect(inputSchemas.length).toBeGreaterThan(0);
-      expect(inputSchemas).toContainEqual({
-        schema_name: expect.any(String),
-      });
-    });
-
-    execute('should load tables for specific schemas', async () => {
-      inputSchemas = inputSchemas.filter((s) => !!s.schema_name);
-      inputTables = await driver.getTablesForSpecificSchemas(inputSchemas);
-      expect(inputTables).toBeInstanceOf(Array);
-      expect(inputTables.length).toBeGreaterThan(0);
-      expect(inputTables).toContainEqual({
-        schema_name: expect.any(String),
-        table_name: expect.any(String),
-      });
-    });
-
-    execute('should load columns for specific tables', async () => {
-      const createdTables = tables.map((t) => t.split('.').pop()?.toUpperCase());
-      inputTables = inputTables.filter((t) => createdTables.includes(t.table_name.toUpperCase()));
-      const columnsForTables = await driver.getColumnsForSpecificTables(inputTables);
-      expect(columnsForTables).toBeInstanceOf(Array);
-      expect(columnsForTables.length).toBeGreaterThan(0);
-      expect(columnsForTables).toContainEqual({
-        schema_name: expect.any(String),
-        table_name: expect.any(String),
-        column_name: expect.any(String),
-        data_type: expect.any(String),
-      });
-    });
+    incrementalSchemaLoadingSuite(execute, () => driver, tables);
   });
 }
