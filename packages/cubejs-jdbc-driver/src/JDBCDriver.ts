@@ -296,7 +296,10 @@ export class JDBCDriver extends BaseDriver {
               rowStream,
               release: () => this.pool.release(conn),
               types: res.types.map(
-                (t, i) => ({ name: res.labels[i], type: this.toGenericType(resultSet._types[t].toLowerCase()) })
+                (t, i) => ({
+                  name: res.labels[i],
+                  type: this.toGenericType((resultSet._types[t] || 'string').toLowerCase())
+                })
               )!
             });
           }
