@@ -133,8 +133,10 @@ class MockDriver {
     return {};
   }
 
-  async streamQuery(sql) {
-    return Readable.from((await this.query(sql)).map(r => (typeof r === 'string' ? { query: r } : r)));
+  async stream(sql) {
+    return {
+      rowStream: Readable.from((await this.query(sql)).map(r => (typeof r === 'string' ? { query: r } : r)))
+    };
   }
 }
 
