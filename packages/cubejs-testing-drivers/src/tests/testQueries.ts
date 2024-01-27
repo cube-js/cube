@@ -12,7 +12,7 @@ import {
 } from '../helpers';
 import { incrementalSchemaLoadingSuite } from './testIncrementalSchemaLoading';
 
-export function testQueries(type: string, { includeIncrementalSchemaSuite } : { includeIncrementalSchemaSuite?: boolean} = {}): void {
+export function testQueries(type: string, { includeIncrementalSchemaSuite }: { includeIncrementalSchemaSuite?: boolean} = {}): void {
   describe(`Queries with the @cubejs-backend/${type}-driver`, () => {
     jest.setTimeout(60 * 5 * 1000);
 
