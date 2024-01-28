@@ -90,10 +90,7 @@ export async function runEnvironment(
   suf?: string,
   { extendedEnv }: { extendedEnv?: string } = {}
 ): Promise<Environment> {
-  let fixtures = getFixtures(type);
-  if (extendedEnv) {
-    fixtures = deepMerge(fixtures, fixtures.extendedEnvs[extendedEnv]);
-  }
+  const fixtures = getFixtures(type, extendedEnv);
   getTempPath();
   getSchemaPath(type, suf);
   getCubeJsPath(type);
@@ -209,16 +206,4 @@ export async function runEnvironment(
       }
     },
   };
-}
-
-function deepMerge(a: any, b: any): any {
-  a = { ...a };
-  for (let k of Object.keys(b)) {
-    if (a[k] && typeof a[k] === 'object') {
-      a[k] = deepMerge(a[k], b[k]);
-    } else {
-      a[k] = b[k];
-    }
-  }
-  return a;
 }

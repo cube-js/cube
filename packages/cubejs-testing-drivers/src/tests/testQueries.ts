@@ -1,4 +1,5 @@
 import { jest, expect, beforeAll, afterAll } from '@jest/globals';
+import { randomBytes }  from 'crypto';
 import { BaseDriver } from '@cubejs-backend/base-driver';
 import cubejs, { CubejsApi } from '@cubejs-client/core';
 import { sign } from 'jsonwebtoken';
@@ -16,7 +17,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
   describe(`Queries with the @cubejs-backend/${type}-driver${extendedEnv ? ` ${extendedEnv}` : ''}`, () => {
     jest.setTimeout(60 * 5 * 1000);
 
-    const fixtures = getFixtures(type);
+    const fixtures = getFixtures(type, extendedEnv);
     let client: CubejsApi;
     let driver: BaseDriver;
     let queries: string[];
@@ -31,7 +32,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
     }
     const apiToken = sign({}, 'mysupersecret');
 
-    const suffix = new Date().getTime().toString(32);
+    const suffix = randomBytes(8).toString('hex');
     const tables = Object
       .keys(fixtures.tables)
       .map((key: string) => `${fixtures.tables[key]}_${suffix}`);

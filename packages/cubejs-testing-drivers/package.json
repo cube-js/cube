@@ -26,6 +26,7 @@
     "databricks-jdbc-driver": "jest --forceExit --runInBand --verbose -i dist/test/databricks-jdbc-driver.test.js",
     "databricks-jdbc-core": "jest --forceExit --runInBand --verbose -i dist/test/databricks-jdbc-core.test.js",
     "databricks-jdbc-full": "jest --forceExit --runInBand --verbose -i dist/test/databricks-jdbc-full.test.js",
+    "databricks-jdbc-export-bucket-full": "jest --forceExit --runInBand --verbose -i dist/test/databricks-jdbc-export-bucket-full.test.js",
     "mssql-driver": "jest --forceExit --runInBand --verbose -i dist/test/mssql-driver.test.js",
     "mssql-core": "jest --forceExit --runInBand --verbose -i dist/test/mssql-core.test.js",
     "mssql-full": "jest --forceExit --runInBand --verbose -i dist/test/mssql-full.test.js",
