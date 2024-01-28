@@ -301,9 +301,9 @@ export class JDBCDriver extends BaseDriver {
               types: res.types.map(
                 (t, i) => ({
                   name: res.labels[i],
-                  type: this.toGenericType((resultSet._types[t] || 'string').toLowerCase())
+                  type: this.toGenericType(((t === -5 ? 'bigint' : resultSet._types[t]) || 'string').toLowerCase())
                 })
-              )!
+              )
             });
           }
         );

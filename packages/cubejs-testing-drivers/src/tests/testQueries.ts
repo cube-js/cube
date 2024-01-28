@@ -12,8 +12,8 @@ import {
 } from '../helpers';
 import { incrementalSchemaLoadingSuite } from './testIncrementalSchemaLoading';
 
-export function testQueries(type: string, { includeIncrementalSchemaSuite }: { includeIncrementalSchemaSuite?: boolean} = {}): void {
-  describe(`Queries with the @cubejs-backend/${type}-driver`, () => {
+export function testQueries(type: string, { includeIncrementalSchemaSuite, extendedEnv }: { includeIncrementalSchemaSuite?: boolean, extendedEnv?: string } = {}): void {
+  describe(`Queries with the @cubejs-backend/${type}-driver${extendedEnv ? ` ${extendedEnv}` : ''}`, () => {
     jest.setTimeout(60 * 5 * 1000);
 
     const fixtures = getFixtures(type);
@@ -37,7 +37,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite }: { i
       .map((key: string) => `${fixtures.tables[key]}_${suffix}`);
 
     beforeAll(async () => {
-      env = await runEnvironment(type, suffix);
+      env = await runEnvironment(type, suffix, { extendedEnv });
       process.env.CUBEJS_REFRESH_WORKER = 'true';
       process.env.CUBEJS_CUBESTORE_HOST = '127.0.0.1';
       process.env.CUBEJS_CUBESTORE_PORT = `${env.store.port}`;

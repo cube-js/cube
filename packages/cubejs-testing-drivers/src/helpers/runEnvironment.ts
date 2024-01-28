@@ -74,14 +74,26 @@ class CubeCliEnvironment implements CubeEnvironment {
 
   public async down() {
     if (this.cli) {
-      process.kill(-this.cli.pid, 'SIGINT');
+      let cli = this.cli;
+      await new Promise((resolve) => {
+        cli.once('disconnect', () => resolve(null));
+        cli.once('exit', () => resolve(null));
+        cli.kill('SIGKILL');
+      });
       process.stdout.write('Cube Exited\n');
     }
   }
 }
 
-export async function runEnvironment(type: string, suf?: string): Promise<Environment> {
-  const fixtures = getFixtures(type);
+export async function runEnvironment(
+  type: string,
+  suf?: string,
+  { extendedEnv }: { extendedEnv?: string } = {}
+): Promise<Environment> {
+  let fixtures = getFixtures(type);
+  if (extendedEnv) {
+    fixtures = deepMerge(fixtures, fixtures.extendedEnvs[extendedEnv]);
+  }
   getTempPath();
   getSchemaPath(type, suf);
   getCubeJsPath(type);
@@ -197,4 +209,16 @@ export async function runEnvironment(type: string, suf?: string): Promise<Enviro
       }
     },
   };
+}
+
+function deepMerge(a: any, b: any): any {
+  a = { ...a };
+  for (let k of Object.keys(b)) {
+    if (a[k] && typeof a[k] === 'object') {
+      a[k] = deepMerge(a[k], b[k]);
+    } else {
+      a[k] = b[k];
+    }
+  }
+  return a;
 }
