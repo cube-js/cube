@@ -290,7 +290,10 @@ export class JDBCDriver extends BaseDriver {
                 rows: { next: nextFn },
               },
           ) => {
-            if (err) reject(err);
+            if (err) {
+              reject(err);
+              return;
+            }
             const rowStream = new QueryStream(res.rows.next, highWaterMark);
             resolve({
               rowStream,
