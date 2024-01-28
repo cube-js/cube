@@ -1,5 +1,5 @@
 import { jest, expect, beforeAll, afterAll } from '@jest/globals';
-import { randomBytes }  from 'crypto';
+import { randomBytes } from 'crypto';
 import { BaseDriver } from '@cubejs-backend/base-driver';
 import cubejs, { CubejsApi } from '@cubejs-client/core';
 import { sign } from 'jsonwebtoken';

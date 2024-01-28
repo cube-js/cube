@@ -74,7 +74,7 @@ class CubeCliEnvironment implements CubeEnvironment {
 
   public async down() {
     if (this.cli) {
-      let cli = this.cli;
+      const { cli } = this;
       await new Promise((resolve) => {
         cli.once('disconnect', () => resolve(null));
         cli.once('exit', () => resolve(null));
