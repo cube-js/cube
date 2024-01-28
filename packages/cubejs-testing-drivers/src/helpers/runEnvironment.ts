@@ -74,14 +74,23 @@ class CubeCliEnvironment implements CubeEnvironment {
 
   public async down() {
     if (this.cli) {
-      process.kill(-this.cli.pid, 'SIGINT');
+      const { cli } = this;
+      await new Promise((resolve) => {
+        cli.once('disconnect', () => resolve(null));
+        cli.once('exit', () => resolve(null));
+        cli.kill('SIGKILL');
+      });
       process.stdout.write('Cube Exited\n');
     }
   }
 }
 
-export async function runEnvironment(type: string, suf?: string): Promise<Environment> {
-  const fixtures = getFixtures(type);
+export async function runEnvironment(
+  type: string,
+  suf?: string,
+  { extendedEnv }: { extendedEnv?: string } = {}
+): Promise<Environment> {
+  const fixtures = getFixtures(type, extendedEnv);
   getTempPath();
   getSchemaPath(type, suf);
   getCubeJsPath(type);
@@ -132,7 +141,7 @@ export async function runEnvironment(type: string, suf?: string): Promise<Enviro
   });
   // TODO extract as a config
   if (type === 'mssql') {
-    compose.withWaitStrategy('data', Wait.forLogMessage('Service Broker manager has started'));
+    compose.withWaitStrategy('data', Wait.forLogMessage('SQL Server is now ready for client connections'));
   }
   // TODO: Add health checks for all drivers
   if (type === 'clickhouse') {

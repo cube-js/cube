@@ -1,4 +1,17 @@
 {
+  "extendedEnvs": {
+    "export-bucket": {
+      "cube": {
+        "environment": {
+          "CUBEJS_DB_EXPORT_BUCKET_TYPE": "s3",
+          "CUBEJS_DB_EXPORT_BUCKET": "s3://databricks-drivers-tests-preaggs",
+          "CUBEJS_DB_EXPORT_BUCKET_AWS_KEY": "${DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_KEY}",
+          "CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET": "${DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET}",
+          "CUBEJS_DB_EXPORT_BUCKET_AWS_REGION": "us-east-1"
+        }
+      }
+    }
+  },
   "cube": {
     "environment": {
       "CUBEJS_API_SECRET": "mysupersecret",
@@ -9,11 +22,6 @@
       "CUBEJS_DB_DATABRICKS_TOKEN": "${DRIVERS_TESTS_CUBEJS_DB_DATABRICKS_TOKEN}",
       "CUBEJS_DB_DATABRICKS_URL": "${DRIVERS_TESTS_CUBEJS_DB_DATABRICKS_URL}",
       "CUBEJS_DB_DATABRICKS_ACCEPT_POLICY": "true",
-      "CUBEJS_DB_EXPORT_BUCKET_TYPE": "s3",
-      "CUBEJS_DB_EXPORT_BUCKET": "s3://databricks-drivers-tests-preaggs",
-      "CUBEJS_DB_EXPORT_BUCKET_AWS_KEY": "${DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_KEY}",
-      "CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET": "${DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET}",
-      "CUBEJS_DB_EXPORT_BUCKET_AWS_REGION": "us-east-1",
       "CUBEJS_PRE_AGGREGATIONS_SCHEMA": "drivers_tests_preaggs"
     },
     "ports" : ["4000"]
@@ -36,8 +44,52 @@
   },
   "preAggregations": {
     "Products": [],
-    "Customers": [],
-    "ECommerce": []
+    "Customers": [
+      {
+        "name": "RA",
+        "measures": ["CUBE.count", "CUBE.runningTotal"]
+      }
+    ],
+    "ECommerce": [
+      {
+        "name": "SA",
+        "dimensions": ["CUBE.productName"],
+        "measures": [
+          "CUBE.totalQuantity",
+          "CUBE.avgDiscount",
+          "CUBE.totalSales",
+          "CUBE.totalProfit"
+        ]
+      },
+      {
+        "name": "TA",
+        "time_dimension": "CUBE.orderDate",
+        "granularity": "month",
+        "partition_granularity": "month",
+        "dimensions": ["CUBE.productName"],
+        "measures": [
+          "CUBE.totalQuantity",
+          "CUBE.avgDiscount",
+          "CUBE.totalSales",
+          "CUBE.totalProfit"
+        ]
+      }
+    ],
+    "BigECommerce": [
+      {
+        "name": "TA",
+        "time_dimension": "CUBE.orderDate",
+        "granularity": "month",
+        "partition_granularity": "year",
+        "dimensions": ["CUBE.productName", "CUBE.id"],
+        "measures": [
+          "CUBE.totalQuantity",
+          "CUBE.avgDiscount",
+          "CUBE.totalSales",
+          "CUBE.totalProfit"
+        ]
+      }
+    ]
   },
   "skip": [
     "---------------------------------------",
@@ -57,23 +109,11 @@
     "for the ECommerce.TimeAnalysisExternal",
 
     "---------------------------------------",
-    "Full tests                             ",
-    "---------------------------------------",
-    "must built pre-aggregations",
-    "querying Customers: dimentions + order + total + offset",
-    "querying Customers: dimentions + order + limit + total + offset",
-    "querying ECommerce: dimentions + order + total + offset",
-    "querying ECommerce: dimentions + order + limit + total + offset",
-
-    "---------------------------------------",
     "SKIPED FOR ALL                         ",
     "---------------------------------------",
     "querying Products: dimensions -- doesn't work wo ordering",
     "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- rounding in athena",
     "querying ECommerce: total sales, total profit by month + order (date) + total -- doesn't work with the BigQuery",
-    "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- noisy test",
-    "querying ECommerce: partitioned pre-agg",
-    "querying ECommerce: partitioned pre-agg higher granularity",
-    "querying BigECommerce: partitioned pre-agg"
+    "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- noisy test"
   ]
 }

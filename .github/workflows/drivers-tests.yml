@@ -108,6 +108,7 @@ jobs:
           - bigquery
           - clickhouse
           - databricks-jdbc
+          - databricks-jdbc-export-bucket
           - mssql
           - mysql
           - postgres

@@ -2,9 +2,15 @@ import crypto from 'crypto';
 import csvWriter from 'csv-write-stream';
 import LRUCache from 'lru-cache';
 import { pipeline } from 'stream';
-import { MaybeCancelablePromise, streamToArray } from '@cubejs-backend/shared';
+import { getEnv, MaybeCancelablePromise, streamToArray } from '@cubejs-backend/shared';
 import { CubeStoreCacheDriver, CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
-import { BaseDriver, InlineTables, CacheDriverInterface, TableStructure } from '@cubejs-backend/base-driver';
+import {
+  BaseDriver,
+  InlineTables,
+  CacheDriverInterface,
+  TableStructure,
+  DriverInterface,
+} from '@cubejs-backend/base-driver';
 
 import { QueryQueue } from './QueryQueue';
 import { ContinueWaitError } from './ContinueWaitError';
@@ -605,17 +611,18 @@ export class QueryCache {
             let logged = false;
             Promise
               .all([clientFactory()])
-              // TODO use stream method instead
-              .then(([client]) => client.streamQuery(req.query, req.values))
+              .then(([client]) => (<DriverInterface>client).stream(req.query, req.values, { highWaterMark: getEnv('dbQueryStreamHighWaterMark') }))
               .then((source) => {
-                const cleanup = (error) => {
-                  if (error && !source.destroyed) {
-                    source.destroy(error);
+                const cleanup = async (error) => {
+                  if (source.release) {
+                    const toRelease = source.release;
+                    delete source.release;
+                    await toRelease();
                   }
                   if (error && !target.destroyed) {
                     target.destroy(error);
                   }
-                  if (!logged && source.destroyed && target.destroyed) {
+                  if (!logged && target.destroyed) {
                     logged = true;
                     if (error) {
                       queue.logger('Streaming done with error', {
@@ -633,15 +640,15 @@ export class QueryCache {
                   }
                 };
 
-                source.once('end', () => cleanup(undefined));
-                source.once('error', cleanup);
-                source.once('close', () => cleanup(undefined));
+                source.rowStream.once('end', () => cleanup(undefined));
+                source.rowStream.once('error', cleanup);
+                source.rowStream.once('close', () => cleanup(undefined));
       
                 target.once('end', () => cleanup(undefined));
                 target.once('error', cleanup);
                 target.once('close', () => cleanup(undefined));
       
-                source.pipe(target);
+                source.rowStream.pipe(target);
               })
               .catch((reason) => {
                 target.emit('error', reason);
