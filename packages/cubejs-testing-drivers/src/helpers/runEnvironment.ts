@@ -132,7 +132,7 @@ export async function runEnvironment(type: string, suf?: string): Promise<Enviro
   });
   // TODO extract as a config
   if (type === 'mssql') {
-    compose.withWaitStrategy('data', Wait.forLogMessage('Service Broker manager has started'));
+    compose.withWaitStrategy('data', Wait.forLogMessage('SQL Server is now ready for client connections'));
   }
   // TODO: Add health checks for all drivers
   if (type === 'clickhouse') {
