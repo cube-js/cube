@@ -72,7 +72,6 @@ const DbTypeToGenericType: Record<string, string> = {
   bool: 'boolean',
   float4: 'float',
   float8: 'double',
-  bigdecimal: 'decimal',
 };
 
 const DB_BIG_INT_MAX = BigInt('9223372036854775807');
