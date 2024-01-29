@@ -19848,6 +19848,39 @@ limit
     }
 
     #[tokio::test]
+    async fn test_tableau_extract_epoch() {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT EXTRACT(EPOCH FROM (TIMESTAMP '2050-01-01T23:01:01.22')) as t
+            FROM KibanaSampleDataEcommerce a
+            HAVING (COUNT(1) > 0)
+        "
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        match logical_plan {
+            LogicalPlan::Projection(p) => {
+                let expr = &p.expr;
+                let expr_str = format!("{}", expr[0]);
+                assert!(expr_str.contains("Float64(2524690861.22)"));
+            }
+            _ => {
+                assert!(false)
+            }
+        }
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+    }
+
+    #[tokio::test]
     async fn test_thoughtspot_pg_date_trunc_year() {
         init_logger();
 
