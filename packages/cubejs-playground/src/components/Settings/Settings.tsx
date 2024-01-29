@@ -5,7 +5,13 @@ import { useState } from 'react';
 import Axes from '../Pivot/Axes';
 import Options from '../Pivot/Options';
 import OrderGroup from '../Order/OrderGroup';
-import { Button, Popover } from '../../atoms';
+import { ButtonDropdown } from '../../QueryBuilder/ButtonDropdown';
+import styled from 'styled-components';
+
+const PivotPopover = styled.div`
+  background: #fff;
+  width: 450px;
+`;
 
 export default function Settings({
   pivotConfig,
@@ -18,45 +24,50 @@ export default function Settings({
   onOrderChange,
   isQueryPresent,
 }) {
+  const [pivotShown, setPivotShown] = useState(false);
+  const [orderShown, setOrderShown] = useState(false);
+  const [limitShown, setLimitShown] = useState(false);
+
   const [limit, setLimit] = useState<number>(initialLimit);
-  const [isLimitPopoverVisible, setIsLimitPopoverVisible] =
-    useState<boolean>(false);
 
   return (
     <>
       <Text style={{ lineHeight: '32px' }}>Settings:</Text>
-      <Popover
-        content={
+
+      <ButtonDropdown
+        show={pivotShown}
+        disabled={!isQueryPresent || disabled}
+        style={{ border: 0 }}
+        overlay={
           pivotConfig === null ? (
             <Spin />
           ) : (
-            <div data-testid="pivot-popover">
+            <PivotPopover data-testid="pivot-popover">
               <Axes pivotConfig={pivotConfig} onMove={onMove} />
               <Divider style={{ margin: 0 }} />
               <div style={{ padding: '8px' }}>
                 <Options pivotConfig={pivotConfig} onUpdate={onUpdate} />
               </div>
-            </div>
+            </PivotPopover>
           )
         }
-        placement="bottomLeft"
-        trigger="click"
+        onOverlayOpen={() => setPivotShown(true)}
+        onOverlayClose={() => setPivotShown(false)}
       >
-        <Button
-          data-testid="pivot-btn"
-          disabled={!isQueryPresent || disabled}
-          style={{ border: 0 }}
-        >
-          Pivot
-        </Button>
-      </Popover>
+        Pivot
+      </ButtonDropdown>
 
-      <Popover
-        content={
+      <ButtonDropdown
+        show={orderShown}
+        disabled={!isQueryPresent || disabled}
+        style={{ border: 0 }}
+        overlay={
           <div
             style={{
               padding: '8px',
               paddingBottom: 1,
+              width: 400,
+              backgroundColor: '#fff',
             }}
           >
             <OrderGroup
@@ -66,24 +77,24 @@ export default function Settings({
             />
           </div>
         }
-        placement="bottomLeft"
-        trigger="click"
+        onOverlayOpen={() => setOrderShown(true)}
+        onOverlayClose={() => setOrderShown(false)}
       >
-        <Button
-          data-testid="order-btn"
-          disabled={!isQueryPresent || disabled}
-          style={{ border: 0 }}
-        >
-          Order
-        </Button>
-      </Popover>
+        Order
+      </ButtonDropdown>
 
-      <Popover
-        visible={isLimitPopoverVisible}
-        content={
-          <div style={{ padding: '8px' }}>
+      <ButtonDropdown
+        show={limitShown}
+        disabled={!isQueryPresent || disabled}
+        style={{ border: 0 }}
+        overlay={
+          <div
+            style={{
+              padding: '8px',
+              background: 'white',
+            }}
+          >
             <label>
-              Limit{' '}
               <InputNumber
                 prefix="Limit"
                 type="number"
@@ -93,30 +104,18 @@ export default function Settings({
                 onChange={setLimit}
                 onPressEnter={() => {
                   onUpdate({ limit });
-                  setIsLimitPopoverVisible(false);
+                  setLimitShown(false);
                 }}
               />
             </label>
           </div>
         }
-        placement="bottomLeft"
-        trigger="click"
-        onVisibleChange={(visible) => {
-          setIsLimitPopoverVisible(visible);
-
-          if (!visible) {
-            onUpdate({ limit });
-          }
-        }}
+        onOverlayOpen={() => setLimitShown(true)}
+        onOverlayClose={() => setLimitShown(false)}
       >
-        <Button
-          data-testid="limit-btn"
-          disabled={!isQueryPresent || disabled}
-          style={{ border: 0 }}
-        >
-          Limit
-        </Button>
-      </Popover>
+        Limit
+      </ButtonDropdown>
+
     </>
   );
 }
