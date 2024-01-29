@@ -1,5 +1,6 @@
 module.exports = {
   "percentiles": "Calculating averages and percentiles",
+  "nested-aggregates": "Calculating nested aggregates",
   "period-over-period": "Calculating period-over-period changes",
   "snapshots": "Implementing data snapshots",
   "entity-attribute-value": "Implementing Entity-Attribute-Value Model (EAV)",
