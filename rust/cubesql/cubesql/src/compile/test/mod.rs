@@ -129,10 +129,6 @@ pub fn get_test_meta() -> Vec<V1CubeMeta> {
                     name: "Logs.content".to_string(),
                     _type: "string".to_string(),
                 },
-                V1CubeMetaDimension {
-                    name: "Logs.agent".to_string(),
-                    _type: "string".to_string(),
-                },
             ],
             measures: vec![
                 V1CubeMetaMeasure {

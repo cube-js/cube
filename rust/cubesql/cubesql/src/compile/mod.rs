@@ -13497,7 +13497,7 @@ limit
         // COALESCE is used to trigger SQL push down
         let logical_plan = convert_select_to_query_plan(
             r#"
-            SELECT COUNT("ta_2"."count"), COALESCE("ta_1"."agent", 'N/A') as ca_2
+            SELECT COUNT("ta_2"."count"), COALESCE("ta_1"."content", 'N/A') as ca_2
             FROM "KibanaSampleDataEcommerce" "ta_2"
             JOIN Logs "ta_1"  ON "ta_2"."__cubeJoinField" = "ta_1"."__cubeJoinField"
             GROUP BY "ca_2"
