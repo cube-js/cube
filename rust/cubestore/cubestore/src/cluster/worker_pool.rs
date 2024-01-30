@@ -215,10 +215,15 @@ impl<C: Configurator, P: WorkerProcessing, S: ServicesTransport> WorkerProcess<C
                         break;
                     }
                 };
-                let (args_tx, res_rx) = if args_channel.is_none()
-                    || handle_guard.is_none()
-                    || !handle_guard.as_mut().unwrap().is_alive()
-                {
+
+                let can_use_existing_process = !P::is_single_job_process()
+                    && args_channel.is_some()
+                    && handle_guard.is_some()
+                    && handle_guard.as_mut().unwrap().is_alive();
+
+                let (args_tx, res_rx) = if can_use_existing_process {
+                    args_channel.unwrap()
+                } else {
                     let process = self.spawn_process().await;
                     match process {
                         Ok((args_tx, res_rx, handle, c_t)) => {
@@ -241,8 +246,6 @@ impl<C: Configurator, P: WorkerProcessing, S: ServicesTransport> WorkerProcess<C
                             break;
                         }
                     }
-                } else {
-                    args_channel.unwrap()
                 };
 
                 let process_message_res_timeout = tokio::time::timeout(
@@ -434,6 +437,9 @@ where
                     return 0;
                 }
             }
+            if P::is_single_job_process() {
+                return 0;
+            }
         }
     })
 }
@@ -508,6 +514,10 @@ mod tests {
 
         fn spawn_background_processes(_config: Self::Config) -> Result<(), CubeError> {
             Ok(())
+        }
+
+        fn is_single_job_process() -> bool {
+            false
         }
         async fn process(_config: &Config, args: Message) -> Result<Response, CubeError> {
             match args {
@@ -712,6 +722,10 @@ mod tests {
 
         fn spawn_background_processes(_config: Self::Config) -> Result<(), CubeError> {
             Ok(())
+        }
+
+        fn is_single_job_process() -> bool {
+            false
         }
         async fn process(
             config: &Self::Config,
