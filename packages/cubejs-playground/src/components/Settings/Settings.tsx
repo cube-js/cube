@@ -58,6 +58,7 @@ export default function Settings({
       </ButtonDropdown>
 
       <ButtonDropdown
+        data-testid="order-btn"
         show={orderShown}
         disabled={!isQueryPresent || disabled}
         style={{ border: 0 }}
@@ -84,6 +85,7 @@ export default function Settings({
       </ButtonDropdown>
 
       <ButtonDropdown
+        data-testid="limit-btn"
         show={limitShown}
         disabled={!isQueryPresent || disabled}
         style={{ border: 0 }}
