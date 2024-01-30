@@ -13488,6 +13488,50 @@ limit
     }
 
     #[tokio::test]
+    async fn test_thoughtspot_join_rexport_alias() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        // COALESCE is used to trigger SQL push down
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT COUNT("ta_2"."count"), COALESCE("ta_1"."agent", 'N/A') as ca_2
+            FROM "KibanaSampleDataEcommerce" "ta_2"
+            JOIN Logs "ta_1"  ON "ta_2"."__cubeJoinField" = "ta_1"."__cubeJoinField"
+            GROUP BY "ca_2"
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        let cube_scan = logical_plan.find_cube_scan();
+        assert_eq!(
+            cube_scan.request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+                ungrouped: Some(true),
+            }
+        );
+        assert!(logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql
+            .contains(r#"SELECT ta_2."count_ta_2_count" "count_ta_2_count", ta_2."coalesce_ta_1_ag" "ca_2""#));
+    }
+
+    #[tokio::test]
     async fn test_sort_relations() -> Result<(), CubeError> {
         init_logger();
 

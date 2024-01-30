@@ -156,7 +156,7 @@ fn expr_name(e: &Expr, schema: &Arc<DFSchema>) -> Result<String> {
 fn expr_relation(e: &Expr, schema: &Arc<DFSchema>) -> Option<String> {
     match e {
         Expr::Column(col) => col.relation.clone(),
-        Expr::Sort { expr, .. } =>  expr_relation(expr, schema),
+        Expr::Sort { expr, .. } => expr_relation(expr, schema),
         _ => None,
     }
 }
