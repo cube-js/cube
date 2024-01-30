@@ -153,6 +153,14 @@ fn expr_name(e: &Expr, schema: &Arc<DFSchema>) -> Result<String> {
     }
 }
 
+fn expr_relation(e: &Expr, schema: &Arc<DFSchema>) -> Option<String> {
+    match e {
+        Expr::Column(col) => col.relation.clone(),
+        Expr::Sort { expr, .. } =>  expr_relation(expr, schema),
+        _ => None,
+    }
+}
+
 pub struct SqlGenerationResult {
     pub data_source: Option<String>,
     pub from_alias: Option<String>,
@@ -707,14 +715,18 @@ impl CubeScanWrapperNode {
         mut sql: SqlQuery,
         generator: Arc<dyn SqlGenerator>,
         column_remapping: &Option<HashMap<Column, Column>>,
+        // it will be used for outer query as map for remapping
         next_remapping: &mut HashMap<Column, Column>,
-        from_alias: Option<String>,
+        // current query alias, for example: SELECT from_query_alias.field_1 (SELECT field_1 FROM t) as from_query_alias
+        from_query_alias: Option<String>,
         can_rename_columns: bool,
         ungrouped_scan_node: Option<Arc<CubeScanNode>>,
     ) -> result::Result<(Vec<AliasedColumn>, SqlQuery), CubeError> {
         let non_id_regex = Regex::new(r"[^a-zA-Z0-9_]")
             .map_err(|e| CubeError::internal(format!("Can't parse regex: {}", e)))?;
+
         let mut aliased_columns = Vec::new();
+
         for original_expr in exprs {
             let expr = if let Some(column_remapping) = column_remapping.as_ref() {
                 let mut expr = replace_col(
@@ -737,6 +749,7 @@ impl CubeScanWrapperNode {
             } else {
                 original_expr.clone()
             };
+
             let (expr_sql, new_sql_query) = Self::generate_sql_for_expr(
                 plan.clone(),
                 sql,
@@ -749,8 +762,10 @@ impl CubeScanWrapperNode {
                 Self::escape_interpolation_quotes(expr_sql, ungrouped_scan_node.is_some());
             sql = new_sql_query;
 
+            let original_relation = expr_relation(&original_expr, &schema);
             let original_alias = expr_name(&original_expr, &schema)?;
             let original_alias_key = Column::from_name(&original_alias);
+
             if let Some(alias_column) = next_remapping.get(&original_alias_key) {
                 let alias = alias_column.name.clone();
                 aliased_columns.push(AliasedColumn {
@@ -760,7 +775,7 @@ impl CubeScanWrapperNode {
                 continue;
             }
 
-            let alias = if can_rename_columns {
+            let new_alias = if can_rename_columns {
                 let alias = expr_name(&expr, &schema)?;
                 let mut truncated_alias = non_id_regex.replace_all(&alias, "_").to_lowercase();
                 truncated_alias.truncate(16);
@@ -778,32 +793,34 @@ impl CubeScanWrapperNode {
             } else {
                 original_alias.clone()
             };
-            if original_alias != alias {
-                if !next_remapping.contains_key(&Column::from_name(&alias)) {
-                    next_remapping.insert(original_alias_key, Column::from_name(&alias));
+
+            if original_alias != new_alias || original_relation != from_query_alias {
+                if !next_remapping.contains_key(&Column::from_name(&new_alias)) {
+                    next_remapping.insert(original_alias_key, Column::from_name(&new_alias));
                     next_remapping.insert(
                         Column {
                             name: original_alias.clone(),
-                            relation: from_alias.clone(),
+                            relation: original_relation.clone(),
                         },
                         Column {
-                            name: alias.clone(),
-                            relation: from_alias.clone(),
+                            name: new_alias.clone(),
+                            relation: from_query_alias.clone(),
                         },
                     );
                 } else {
                     return Err(CubeError::internal(format!(
                         "Can't generate SQL for column expr: duplicate alias {}",
-                        alias
+                        new_alias
                     )));
                 }
             }
 
             aliased_columns.push(AliasedColumn {
                 expr: expr_sql,
-                alias,
+                alias: new_alias,
             });
         }
+
         Ok((aliased_columns, sql))
     }
 
