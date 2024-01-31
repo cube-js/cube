@@ -131,6 +131,6 @@ export class OracleQuery extends BaseQuery {
     }
 
     public refreshKeySelect(sql: string) {
-      return `SELECT ${sql} as refresh_key FROM DUAL`;
+      return `SELECT ${sql} as refresh_key`;
     }
 }
