@@ -280,6 +280,10 @@ impl<C: Configurator, P: WorkerProcessing, S: ServicesTransport> WorkerProcess<C
                         break;
                     }
                 }
+
+                if P::is_single_job_process() {
+                    break;
+                }
             }
         }
     }
@@ -436,9 +440,6 @@ where
                     error!("Worker message receive error: {:?}", e);
                     return 0;
                 }
-            }
-            if P::is_single_job_process() {
-                return 0;
             }
         }
     })
