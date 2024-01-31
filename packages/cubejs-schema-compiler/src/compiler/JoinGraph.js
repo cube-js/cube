@@ -154,7 +154,7 @@ export class JoinGraph {
         return null;
       }
       const indexedPairs = R.compose(
-        R.addIndex(R.map)((j, i) => [i, j])
+        R.addIndex(R.map)((j, i) => [i + joined.joins.length, j])
       );
       return {
         joins: joined.joins.concat(indexedPairs(res.joins))

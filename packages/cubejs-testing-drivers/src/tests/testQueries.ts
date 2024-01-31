@@ -1,4 +1,5 @@
 import { jest, expect, beforeAll, afterAll } from '@jest/globals';
+import { randomBytes } from 'crypto';
 import { BaseDriver } from '@cubejs-backend/base-driver';
 import cubejs, { CubejsApi } from '@cubejs-client/core';
 import { sign } from 'jsonwebtoken';
@@ -10,12 +11,13 @@ import {
   runEnvironment,
   buildPreaggs,
 } from '../helpers';
+import { incrementalSchemaLoadingSuite } from './testIncrementalSchemaLoading';
 
-export function testQueries(type: string): void {
-  describe(`Queries with the @cubejs-backend/${type}-driver`, () => {
+export function testQueries(type: string, { includeIncrementalSchemaSuite, extendedEnv }: { includeIncrementalSchemaSuite?: boolean, extendedEnv?: string } = {}): void {
+  describe(`Queries with the @cubejs-backend/${type}-driver${extendedEnv ? ` ${extendedEnv}` : ''}`, () => {
     jest.setTimeout(60 * 5 * 1000);
 
-    const fixtures = getFixtures(type);
+    const fixtures = getFixtures(type, extendedEnv);
     let client: CubejsApi;
     let driver: BaseDriver;
     let queries: string[];
@@ -30,9 +32,13 @@ export function testQueries(type: string): void {
     }
     const apiToken = sign({}, 'mysupersecret');
 
-    const suffix = new Date().getTime().toString(32);
+    const suffix = randomBytes(8).toString('hex');
+    const tables = Object
+      .keys(fixtures.tables)
+      .map((key: string) => `${fixtures.tables[key]}_${suffix}`);
+
     beforeAll(async () => {
-      env = await runEnvironment(type, suffix);
+      env = await runEnvironment(type, suffix, { extendedEnv });
       process.env.CUBEJS_REFRESH_WORKER = 'true';
       process.env.CUBEJS_CUBESTORE_HOST = '127.0.0.1';
       process.env.CUBEJS_CUBESTORE_PORT = `${env.store.port}`;
@@ -62,9 +68,6 @@ export function testQueries(type: string): void {
   
     afterAll(async () => {
       try {
-        const tables = Object
-          .keys(fixtures.tables)
-          .map((key: string) => `${fixtures.tables[key]}_${suffix}`);
         console.log(`Dropping ${tables.length} fixture tables`);
         for (const t of tables) {
           await driver.dropTable(t);
@@ -1434,5 +1437,9 @@ export function testQueries(type: string): void {
       });
       expect(response.rawData()).toMatchSnapshot();
     });
+
+    if (includeIncrementalSchemaSuite) {
+      incrementalSchemaLoadingSuite(execute, () => driver, tables);
+    }
   });
 }

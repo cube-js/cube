@@ -28,6 +28,8 @@ const GenericTypeToCubeStore: Record<string, string> = {
   // Cube Store uses an old version of sql parser which doesn't support timestamp with custom precision, but
   // athena driver (I believe old version) allowed to use it
   'timestamp(3)': 'timestamp',
+  // TODO comes from JDBC. We might consider decimal96 here
+  bigdecimal: 'decimal'
 };
 
 type Column = {

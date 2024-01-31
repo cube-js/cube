@@ -267,6 +267,40 @@ pub fn parse_sql_to_statements(
         "select NULL, NULL AS NULL2, NULL AS NULL3",
     );
 
+    // Work around an issue with lowercase table name when queried as uppercase,
+    // an uncommon way of casting literals, and skip a few funcs along the way
+    let query = query.replace(
+        "(CASE\
+        \n  WHEN c.reltuples < 0 THEN NULL\
+        \n  WHEN c.relpages = 0 THEN float8 '0'\
+        \n  ELSE c.reltuples / c.relpages END\
+        \n  * (pg_relation_size(c.oid) / pg_catalog.current_setting('block_size')::int)\
+        \n)::bigint",
+        "NULL::bigint",
+    );
+
+    // Work around an aliasing issue (lowercase-uppercase). This is fine
+    // since it must be equivalent in PostgreSQL
+    let query = query.replace(
+        "c.relname AS PARTITION_NAME,",
+        "c.relname AS partition_name,",
+    );
+
+    // Work around lack of WHERE subqueries for INFORMATION_SCHEMA.SCHEMATA filter
+    let query = query.replace(
+        "WHERE N.nspname in (SELECT schema_name\
+        \n                    FROM INFORMATION_SCHEMA.SCHEMATA\
+        \n                    WHERE schema_name not like 'pg_%%'\
+        \n                    and schema_name != 'information_schema')",
+        "WHERE N.nspname = 'public'",
+    );
+
+    // Work around an issue with NULL, NULL, NULL in SELECT
+    let query = query.replace(
+        "p.proname AS PROCEDURE_NAME, NULL, NULL, NULL, ",
+        "p.proname AS PROCEDURE_NAME, NULL AS NULL, NULL AS NULL2, NULL AS NULL3, ",
+    );
+
     if let Some(qtrace) = qtrace {
         qtrace.set_replaced_query(&query)
     }

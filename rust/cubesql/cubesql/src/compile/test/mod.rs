@@ -72,6 +72,12 @@ pub fn get_test_meta() -> Vec<V1CubeMeta> {
                     agg_type: Some("max".to_string()),
                 },
                 V1CubeMetaMeasure {
+                    name: "KibanaSampleDataEcommerce.sumPrice".to_string(),
+                    title: None,
+                    _type: "number".to_string(),
+                    agg_type: Some("sum".to_string()),
+                },
+                V1CubeMetaMeasure {
                     name: "KibanaSampleDataEcommerce.minPrice".to_string(),
                     title: None,
                     _type: "number".to_string(),
@@ -272,6 +278,7 @@ pub fn get_test_tenant_ctx_customized(custom_templates: Vec<(String, String)>) -
                     ("functions/DATETRUNC".to_string(), "DATE_TRUNC({{ args_concat }})".to_string()),
                     ("functions/DATEPART".to_string(), "DATE_PART({{ args_concat }})".to_string()),
                     ("functions/FLOOR".to_string(), "FLOOR({{ args_concat }})".to_string()),
+                    ("functions/CEIL".to_string(), "CEIL({{ args_concat }})".to_string()),
                     ("functions/TRUNC".to_string(), "TRUNC({{ args_concat }})".to_string()),
                     ("functions/LEAST".to_string(), "LEAST({{ args_concat }})".to_string()),
                     ("functions/DATEDIFF".to_string(), "DATEDIFF({{ date_part }}, {{ args[1] }}, {{ args[2] }})".to_string()),
