@@ -6,9 +6,9 @@ use crate::{
             expr_column_name, AggregateUDFExprFun, AliasExprAlias, AllMembersAlias, AllMembersCube,
             ChangeUserCube, ColumnExprColumn, DimensionName, FilterMemberMember, FilterMemberOp,
             LiteralExprValue, LiteralMemberRelation, LiteralMemberValue, LogicalPlanLanguage,
-            MeasureName, ScalarFunctionExprFun, SegmentName, TableScanSourceTableName,
-            TimeDimensionDateRange, TimeDimensionGranularity, TimeDimensionName, VirtualFieldCube,
-            VirtualFieldName,
+            MeasureName, ScalarFunctionExprFun, SegmentMemberMember, SegmentName,
+            TableScanSourceTableName, TimeDimensionDateRange, TimeDimensionGranularity,
+            TimeDimensionName, VirtualFieldCube, VirtualFieldName,
         },
     },
     transport::ext::{V1CubeMetaDimensionExt, V1CubeMetaMeasureExt, V1CubeMetaSegmentExt},
@@ -686,6 +686,13 @@ impl LogicalPlanAnalysis {
                     .to_string();
                 Some(vec![(member, op)])
             }
+            LogicalPlanLanguage::SegmentMember(params) => {
+                let member = var_iter!(egraph[params[0]], SegmentMemberMember)
+                    .next()
+                    .unwrap()
+                    .to_string();
+                Some(vec![(member, "equals".to_string())])
+            }
             _ => None,
         }
     }
@@ -1281,6 +1288,9 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
                         | ScalarValue::Date64(_)
                         | ScalarValue::Int64(_)
                         | ScalarValue::Float64(_)
+                        | ScalarValue::IntervalYearMonth(_)
+                        | ScalarValue::IntervalDayTime(_)
+                        | ScalarValue::Utf8(_)
                 ) {
                 egraph[id]
                     .data

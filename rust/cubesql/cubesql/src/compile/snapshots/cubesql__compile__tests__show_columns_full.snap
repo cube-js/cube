@@ -1,5 +1,6 @@
 ---
 source: cubesql/src/compile/mod.rs
+assertion_line: 6868
 expression: "execute_query(\"show full columns from KibanaSampleDataEcommerce;\".to_string(),\n            DatabaseProtocol::MySQL).await?"
 ---
 +--------------------+--------------+--------------------+------+-----+---------+-------+------------+---------+
@@ -7,6 +8,7 @@ expression: "execute_query(\"show full columns from KibanaSampleDataEcommerce;\"
 +--------------------+--------------+--------------------+------+-----+---------+-------+------------+---------+
 | count              | int          | NULL               | NO   |     | NULL    |       | select     |         |
 | maxPrice           | numeric      | NULL               | NO   |     | NULL    |       | select     |         |
+| sumPrice           | numeric      | NULL               | NO   |     | NULL    |       | select     |         |
 | minPrice           | numeric      | NULL               | NO   |     | NULL    |       | select     |         |
 | avgPrice           | numeric      | NULL               | NO   |     | NULL    |       | select     |         |
 | countDistinct      | int          | NULL               | NO   |     | NULL    |       | select     |         |

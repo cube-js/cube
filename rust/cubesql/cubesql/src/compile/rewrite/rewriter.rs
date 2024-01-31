@@ -7,8 +7,8 @@ use crate::{
             converter::LanguageToLogicalPlanConverter,
             cost::BestCubePlan,
             rules::{
-                case::CaseRules, dates::DateRules, filters::FilterRules, members::MemberRules,
-                order::OrderRules, split::SplitRules, wrapper::WrapperRules,
+                case::CaseRules, common::CommonRules, dates::DateRules, filters::FilterRules,
+                members::MemberRules, order::OrderRules, split::SplitRules, wrapper::WrapperRules,
             },
             LiteralExprValue, LogicalPlanLanguage, QueryParamIndex,
         },
@@ -512,6 +512,7 @@ impl Rewriter {
             )),
             Box::new(DateRules::new()),
             Box::new(OrderRules::new()),
+            Box::new(CommonRules::new()),
             Box::new(SplitRules::new(meta_context.clone(), config_obj.clone())),
             Box::new(CaseRules::new()),
         ];

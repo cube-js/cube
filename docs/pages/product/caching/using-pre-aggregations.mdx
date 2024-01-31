@@ -224,6 +224,22 @@ cube(`orders`, {
 
 </CodeTabs>
 
+### Partitioning by non-time dimension
+
+Cube Store uses an auto-partitioning technique to split Cube logical partitions into multiple physical ones.
+The partitioning key is the same as the sorting key of an index.
+Every physical partition is stored as a separate parquet file.
+Split is performed based on underlying parquet file sizes and rows inside those files.
+So simplest way to ensure proper partitioning is to introduce an index.
+For bigger pre-aggregations first columns of an index will determine the partitioning scheme.
+An interesting consequence of having time dimension partitioning enabled with an index is data partitioned by time and then by sorting the key of an index.
+It leads to that even in case of optimal index in place querying time is proportional to count of involved time partitions.
+This issue can be addressed by lambda pre-aggregations.
+
+Alternatively, if you want to explicitly introduce key partitioning, you can use multi-tenancy to introduce multiple orchestrator IDs.
+Each orchestrator ID can use a different pre-aggregation schema, so you may define those based on the partitioning key you want to introduce.
+This technique, together with multi router Cube Store approach, allows you to
+
 ## Using Indexes
 
 ### When to use indexes?

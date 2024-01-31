@@ -5,6 +5,7 @@ mod partition_filter;
 mod planning;
 pub use planning::PlanningMeta;
 mod check_memory;
+pub mod physical_plan_flags;
 pub mod pretty_printers;
 pub mod query_executor;
 pub mod serialized_plan;
