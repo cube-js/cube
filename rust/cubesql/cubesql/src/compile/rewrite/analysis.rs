@@ -999,7 +999,7 @@ impl LogicalPlanAnalysis {
                 // TODO In case multiple node variant exists ConstantFolding::List will choose one which contains actual constants.
                 Some(ConstantFolding::List(list))
             }
-            LogicalPlanLanguage::AnyExpr(_) => {
+            LogicalPlanLanguage::AnyExpr(_) | LogicalPlanLanguage::NegativeExpr(_) => {
                 let expr = node_to_expr(
                     enode,
                     &egraph.analysis.cube_context,

@@ -301,7 +301,7 @@ pub fn get_test_tenant_ctx_customized(custom_templates: Vec<(String, String)>) -
                         "expressions/column_aliased".to_string(),
                         "{{expr}} {{quoted_alias}}".to_string(),
                     ),
-                    ("expressions/binary".to_string(), "{{ left }} {{ op }} {{ right }}".to_string()),
+                    ("expressions/binary".to_string(), "({{ left }} {{ op }} {{ right }})".to_string()),
                     ("expressions/is_null".to_string(), "{{ expr }} IS {% if negate %}NOT {% endif %}NULL".to_string()),
                     ("expressions/case".to_string(), "CASE{% if expr %}{{ expr }} {% endif %}{% for when, then in when_then %} WHEN {{ when }} THEN {{ then }}{% endfor %}{% if else_expr %} ELSE {{ else_expr }}{% endif %} END".to_string()),
                     ("expressions/sort".to_string(), "{{ expr }} {% if asc %}ASC{% else %}DESC{% endif %}{% if nulls_first %} NULLS FIRST {% endif %}".to_string()),
