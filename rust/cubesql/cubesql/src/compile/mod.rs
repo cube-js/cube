@@ -21136,4 +21136,38 @@ limit
         assert!(sql.contains("order_date"));
         assert!(sql.contains("EXTRACT(DAY FROM"))
     }
+
+    #[tokio::test]
+    async fn test_unary_minus_constant_folding() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            r#"
+            SELECT order_date + (-EXTRACT(YEAR FROM order_date) * INTERVAL '1 day') AS t
+            FROM KibanaSampleDataEcommerce
+            GROUP BY 1
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql;
+        assert!(sql.contains("-(EXTRACT(YEAR FROM"));
+        assert!(sql.contains("* INTERVAL '1 DAY'"));
+    }
 }
