@@ -23,6 +23,12 @@ deployments**. See [effects on experience][self-effects] for details.
 
 </WarningBox>
 
+<InfoBox>
+
+Auto-suspension is not avaiable for [production multi-clusters][ref-prod-multi-cluster].
+
+</InfoBox>
+
 Auto-suspension will hibernate the deployment when **no** API
 requests are received after a period of time, and automatically resume the
 deployment when API requests start coming in again:
@@ -32,10 +38,9 @@ deployment when API requests start coming in again:
   src="https://ucarecdn.com/e9a22d59-e0af-40c5-b590-02f2566663d1/"
 />
 
-[Development Instances][ref-deployment-dev-instance] are auto-suspended
-automatically when not in use for 10 minutes, whereas [Production
-Clusters][ref-deployment-prod-cluster] and [Production
-Multi-Clusters][ref-deployment-prod-multi-cluster] can auto-suspend after no API
+[Development instances][ref-deployment-dev-instance] are auto-suspended
+automatically when not in use for 10 minutes, whereas [production
+clusters][ref-deployment-prod-cluster] can auto-suspend after no API
 requests were received within a configurable time period. While suspended,
 [pre-aggregation][ref-caching-preaggs-gs] builds will also be paused to prevent
 unnecessary resource consumption.
@@ -120,8 +125,7 @@ response times to be significantly longer than usual.
   /product/deployment/cloud/deployment-types#development-instance
 [ref-deployment-prod-cluster]:
   /product/deployment/cloud/deployment-types#production-cluster
-[ref-deployment-prod-multi-cluster]:
-  /product/deployment/cloud/deployment-types#production-multi-cluster
+[ref-prod-multi-cluster]: /product/deployment/cloud/deployment-types#production-multi-cluster
 [ref-deployment-pricing]: /product/deployment/cloud/pricing
 [ref-workspace-dev-api]: /product/workspace/dev-mode
 [ref-monitoring]: /product/monitoring/integrations
