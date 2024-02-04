@@ -8,7 +8,8 @@ use crate::{
             cost::BestCubePlan,
             rules::{
                 case::CaseRules, common::CommonRules, dates::DateRules, filters::FilterRules,
-                members::MemberRules, order::OrderRules, split::SplitRules, wrapper::WrapperRules,
+                members::MemberRules, old_split::OldSplitRules, order::OrderRules,
+                wrapper::WrapperRules,
             },
             LiteralExprValue, LogicalPlanLanguage, QueryParamIndex,
         },
@@ -513,7 +514,7 @@ impl Rewriter {
             Box::new(DateRules::new()),
             Box::new(OrderRules::new()),
             Box::new(CommonRules::new()),
-            Box::new(SplitRules::new(meta_context.clone(), config_obj.clone())),
+            Box::new(OldSplitRules::new(meta_context.clone(), config_obj.clone())),
             Box::new(CaseRules::new()),
         ];
         let mut rewrites = Vec::new();

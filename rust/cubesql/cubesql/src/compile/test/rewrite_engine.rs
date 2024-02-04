@@ -16,8 +16,8 @@ use crate::{
             converter::{CubeRunner, LogicalPlanToLanguageConverter},
             rewriter::RewriteRules,
             rules::{
-                dates::DateRules, filters::FilterRules, members::MemberRules, order::OrderRules,
-                split::SplitRules,
+                dates::DateRules, filters::FilterRules, members::MemberRules,
+                old_split::OldSplitRules, order::OrderRules,
             },
             LogicalPlanLanguage,
         },
@@ -70,7 +70,7 @@ pub fn rewrite_rules(
         Box::new(FilterRules::new(cube_context.meta.clone(), true)),
         Box::new(DateRules::new()),
         Box::new(OrderRules::new()),
-        Box::new(SplitRules::new(
+        Box::new(OldSplitRules::new(
             cube_context.meta.clone(),
             cube_context.sessions.server.config_obj.clone(),
         )),
