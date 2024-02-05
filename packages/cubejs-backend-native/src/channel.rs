@@ -1,14 +1,14 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
-#[cfg(build = "debug")]
-use std::sync::atomic::AtomicU64;
+#[cfg(debug_assertions)]
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
 use crate::transport::MapCubeErrExt;
 use async_trait::async_trait;
 use cubesql::transport::{SqlGenerator, SqlTemplates};
 use cubesql::CubeError;
-#[cfg(build = "debug")]
+#[cfg(debug_assertions)]
 use log::trace;
 use neon::prelude::*;
 use tokio::sync::oneshot;
@@ -22,11 +22,11 @@ type JsAsyncChannelCallback = Box<
         + Send,
 >;
 
-#[cfg(build = "debug")]
+#[cfg(debug_assertions)]
 static JS_ASYNC_CHANNEL_DEBUG_ID_SEQ: AtomicU64 = AtomicU64::new(0);
 
 pub struct JsAsyncChannel {
-    #[cfg(build = "debug")]
+    #[cfg(debug_assertions)]
     _id: u64,
     callback: Option<JsAsyncChannelCallback>,
 }
@@ -38,8 +38,8 @@ impl Finalize for JsAsyncChannel {}
 fn js_async_channel_resolve(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let this = cx.this().downcast_or_throw::<BoxedChannel, _>(&mut cx)?;
 
-    #[cfg(build = "debug")]
-    trace!("JsAsyncChannel.resolved {}", this.id);
+    #[cfg(debug_assertions)]
+    trace!("JsAsyncChannel.resolved {}", this.borrow()._id);
 
     let result = cx.argument::<JsValue>(0)?;
 
@@ -55,8 +55,8 @@ fn js_async_channel_resolve(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 fn js_async_channel_reject(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let this = cx.this().downcast_or_throw::<BoxedChannel, _>(&mut cx)?;
 
-    #[cfg(build = "debug")]
-    trace!("JsAsyncChannel.reject {}", this.id);
+    #[cfg(debug_assertions)]
+    trace!("JsAsyncChannel.reject {}", this.borrow()._id);
 
     let error = cx.argument::<JsString>(0)?;
 
@@ -87,7 +87,7 @@ impl JsAsyncChannel {
 
     pub fn new_raw(callback: JsAsyncChannelCallback) -> Self {
         Self {
-            #[cfg(build = "debug")]
+            #[cfg(debug_assertions)]
             _id: JS_ASYNC_CHANNEL_DEBUG_ID_SEQ.fetch_add(1, Ordering::SeqCst),
             callback: Some(callback),
         }
