@@ -66,8 +66,8 @@ configured to auto-suspend with a tiny threshold:
 ### Cache type
 
 The&nbsp;<Btn>Requests by cache type</Btn> chart shows the number of API
-requests that were fulfilled by using pre-aggregations, in-memory cache,
-or no cache (i.e., by querying the upstream data source). For example, the
+requests that were fulfilled by specific [cache types][ref-cache-types],
+e.g., pre-aggregations, in-memory cache, no cache, etc. For example, the
 following chart shows a deployment that fulfills about 50% of requests by
 using pre-aggregations:
 
@@ -84,7 +84,8 @@ the data source take much longer:
 You can use these charts to see if you'd like to have more queries that hit
 the cache and have lower response time. In that case, **consider adding more
 [pre-aggregations][ref-pre-aggregations] in Cube Store** or fine-tune the
-existing ones.
+existing ones, e.g., by **[using indexes][ref-indexes] to speed up 
+pre-aggregations with suboptimal query plans**.
 
 ### Data model compilation
 
@@ -158,3 +159,5 @@ for queries and jobs.
 [ref-pre-aggregations]: /product/caching/using-pre-aggregations
 [ref-multitenancy]: /product/configuration/advanced/multitenancy
 [ref-context-to-app-id]: /reference/configuration/config#context_to_app_id
+[ref-cache-types]: /product/caching#cache-type
+[ref-indexes]: /product/caching/using-pre-aggregations#using-indexes
