@@ -9,8 +9,8 @@ use crate::{
         wrapped_select_joins_empty_tail, wrapped_select_order_expr_empty_tail,
         wrapped_select_projection_expr_empty_tail, wrapped_select_window_expr_empty_tail,
         wrapper_pullup_replacer, wrapper_pushdown_replacer, AggregateFunctionExprDistinct,
-        AggregateFunctionExprFun, AliasExprAlias, ColumnExprColumn, LogicalPlanLanguage,
-        WrappedSelectUngrouped, WrapperPullupReplacerUngrouped,
+        AggregateFunctionExprFun, AliasExprAlias, AliasExprSplit, ColumnExprColumn,
+        LogicalPlanLanguage, WrappedSelectUngrouped, WrapperPullupReplacerUngrouped,
     },
     transport::V1CubeMetaMeasureExt,
     var, var_iter,
@@ -250,10 +250,16 @@ impl WrapperRules {
                                                     AliasExprAlias(alias.clone()),
                                                 ));
 
+                                            let split =
+                                                egraph.add(LogicalPlanLanguage::AliasExprSplit(
+                                                    AliasExprSplit(false),
+                                                ));
+
                                             let alias_expr =
                                                 egraph.add(LogicalPlanLanguage::AliasExpr([
                                                     column_expr,
                                                     alias_expr_alias,
+                                                    split,
                                                 ]));
 
                                             subst.insert(measure_out_var, alias_expr);

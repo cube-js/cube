@@ -572,6 +572,13 @@ impl MemberRules {
             agg_fun_expr("?fun_name", vec![column_expr("?column")], "?distinct"),
         ));
         rules.extend(find_matching_old_member(
+            "agg-fun-alias",
+            alias_expr(
+                agg_fun_expr("?fun_name", vec![column_expr("?column")], "?distinct"),
+                "?alias",
+            ),
+        ));
+        rules.extend(find_matching_old_member(
             "udaf-fun",
             udaf_expr("?fun_name", vec![column_expr("?column")]),
         ));
@@ -1006,6 +1013,18 @@ impl MemberRules {
         rules.push(pushdown_measure_rewrite(
             "member-pushdown-replacer-agg-fun",
             agg_fun_expr("?fun_name", vec![column_expr("?column")], "?distinct"),
+            measure_expr("?name", "?old_alias"),
+            Some("?fun_name"),
+            Some("?distinct"),
+            None,
+            Some("?column"),
+        ));
+        rules.push(pushdown_measure_rewrite(
+            "member-pushdown-replacer-agg-fun-alias",
+            alias_expr(
+                agg_fun_expr("?fun_name", vec![column_expr("?column")], "?distinct"),
+                "?alias",
+            ),
             measure_expr("?name", "?old_alias"),
             Some("?fun_name"),
             Some("?distinct"),
@@ -1682,7 +1701,7 @@ impl MemberRules {
         }
     }
 
-    fn add_alias_column(
+    pub fn add_alias_column(
         egraph: &mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
         alias: String,
         cube_alias: Option<String>,

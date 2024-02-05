@@ -9,7 +9,7 @@ use crate::{
             rules::{
                 case::CaseRules, common::CommonRules, dates::DateRules, filters::FilterRules,
                 members::MemberRules, old_split::OldSplitRules, order::OrderRules,
-                wrapper::WrapperRules,
+                split::SplitRules, wrapper::WrapperRules,
             },
             LiteralExprValue, LogicalPlanLanguage, QueryParamIndex,
         },
@@ -514,8 +514,6 @@ impl Rewriter {
             Box::new(DateRules::new()),
             Box::new(OrderRules::new()),
             Box::new(CommonRules::new()),
-            Box::new(OldSplitRules::new(meta_context.clone(), config_obj.clone())),
-            Box::new(CaseRules::new()),
         ];
         let mut rewrites = Vec::new();
         for r in rules {
@@ -525,6 +523,14 @@ impl Rewriter {
             rewrites.extend(
                 WrapperRules::new(meta_context.clone(), config_obj.clone()).rewrite_rules(),
             );
+            rewrites
+                .extend(SplitRules::new(meta_context.clone(), config_obj.clone()).rewrite_rules());
+        } else {
+            rewrites.extend(
+                Box::new(OldSplitRules::new(meta_context.clone(), config_obj.clone()))
+                    .rewrite_rules(),
+            );
+            rewrites.extend(Box::new(CaseRules::new()).rewrite_rules());
         }
         if let Ok(disabled_rule_names) = env::var("CUBESQL_DISABLE_REWRITES") {
             let disabled_rule_names = disabled_rule_names

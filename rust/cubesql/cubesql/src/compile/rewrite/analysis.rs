@@ -3,12 +3,12 @@ use crate::{
         engine::provider::CubeContext,
         rewrite::{
             converter::{is_expr_node, node_to_expr, LogicalPlanToLanguageConverter},
-            expr_column_name, AggregateUDFExprFun, AliasExprAlias, AllMembersAlias, AllMembersCube,
-            ChangeUserCube, ColumnExprColumn, DimensionName, FilterMemberMember, FilterMemberOp,
-            LiteralExprValue, LiteralMemberRelation, LiteralMemberValue, LogicalPlanLanguage,
-            MeasureName, ScalarFunctionExprFun, SegmentMemberMember, SegmentName,
-            TableScanSourceTableName, TimeDimensionDateRange, TimeDimensionGranularity,
-            TimeDimensionName, VirtualFieldCube, VirtualFieldName,
+            expr_column_name, AggregateUDFExprFun, AliasExprAlias, AliasExprSplit, AllMembersAlias,
+            AllMembersCube, ChangeUserCube, ColumnExprColumn, DimensionName, FilterMemberMember,
+            FilterMemberOp, LiteralExprValue, LiteralMemberRelation, LiteralMemberValue,
+            LogicalPlanLanguage, MeasureName, ScalarFunctionExprFun, SegmentMemberMember,
+            SegmentName, TableScanSourceTableName, TimeDimensionDateRange,
+            TimeDimensionGranularity, TimeDimensionName, VirtualFieldCube, VirtualFieldName,
         },
     },
     transport::ext::{V1CubeMetaDimensionExt, V1CubeMetaMeasureExt, V1CubeMetaSegmentExt},
@@ -1286,6 +1286,7 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
                     c,
                     ScalarValue::Date32(_)
                         | ScalarValue::Date64(_)
+                        | ScalarValue::Int32(_)
                         | ScalarValue::Int64(_)
                         | ScalarValue::Float64(_)
                         | ScalarValue::IntervalYearMonth(_)
@@ -1309,9 +1310,11 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
             let literal_expr = egraph.add(LogicalPlanLanguage::LiteralExpr([value]));
             if let Some(alias_name) = alias_name {
                 let alias = egraph.add(LogicalPlanLanguage::AliasExprAlias(AliasExprAlias(
-                    alias_name,
+                    alias_name.clone(),
                 )));
-                let alias_expr = egraph.add(LogicalPlanLanguage::AliasExpr([literal_expr, alias]));
+                let split = egraph.add(LogicalPlanLanguage::AliasExprSplit(AliasExprSplit(false)));
+                let alias_expr =
+                    egraph.add(LogicalPlanLanguage::AliasExpr([literal_expr, alias, split]));
                 egraph.union(id, alias_expr);
             } else {
                 egraph.union(id, literal_expr);
