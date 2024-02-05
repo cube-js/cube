@@ -7,7 +7,7 @@ use cubeclient::{
 use datafusion::{
     arrow::{datatypes::SchemaRef, record_batch::RecordBatch},
     logical_plan::window_frames::WindowFrame,
-    physical_plan::{aggregates::AggregateFunction, window_functions::WindowFunction},
+    physical_plan::{aggregates::AggregateFunction, windows::WindowFunction},
 };
 use minijinja::{context, value::Value, Environment};
 use serde_derive::*;
@@ -644,6 +644,13 @@ impl SqlTemplates {
                 negated => negated
             },
         )
+    }
+
+    pub fn literal_bool_expr(&self, value: bool) -> Result<String, CubeError> {
+        match value {
+            true => self.render_template("expressions/true", context! {}),
+            false => self.render_template("expressions/false", context! {}),
+        }
     }
 
     pub fn param(&self, param_index: usize) -> Result<String, CubeError> {

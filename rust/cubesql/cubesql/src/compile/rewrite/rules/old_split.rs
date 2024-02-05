@@ -32,12 +32,12 @@ use datafusion::{
 use egg::{EGraph, Id, Rewrite, Subst, Var};
 use std::{fmt::Display, ops::Index, sync::Arc};
 
-pub struct SplitRules {
+pub struct OldSplitRules {
     meta_context: Arc<MetaContext>,
     config_obj: Arc<dyn ConfigObj>,
 }
 
-impl RewriteRules for SplitRules {
+impl RewriteRules for OldSplitRules {
     fn rewrite_rules(&self) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
         let mut rules = vec![
             transforming_rewrite(
@@ -4631,7 +4631,7 @@ impl RewriteRules for SplitRules {
     }
 }
 
-impl SplitRules {
+impl OldSplitRules {
     pub fn new(meta_context: Arc<MetaContext>, config_obj: Arc<dyn ConfigObj>) -> Self {
         Self {
             meta_context,

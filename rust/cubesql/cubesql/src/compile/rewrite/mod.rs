@@ -17,8 +17,7 @@ use datafusion::{
         JoinConstraint, JoinType, Operator,
     },
     physical_plan::{
-        aggregates::AggregateFunction, functions::BuiltinScalarFunction,
-        window_functions::WindowFunction,
+        aggregates::AggregateFunction, functions::BuiltinScalarFunction, windows::WindowFunction,
     },
     scalar::ScalarValue,
 };

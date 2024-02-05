@@ -20803,6 +20803,69 @@ limit
             .sql;
         assert!(sql.contains("DATETIME_DIFF(CAST("));
         assert!(sql.contains("day)"));
+
+        // Databricks
+        let query_plan = convert_select_to_query_plan_customized(
+            "
+            SELECT DATEDIFF(DAY, order_date, last_mod) AS d
+            FROM KibanaSampleDataEcommerce AS k
+            GROUP BY 1
+            ORDER BY 1 DESC
+            "
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+            vec![
+                ("functions/DATEDIFF".to_string(), "DATEDIFF({{ date_part }}, DATE_TRUNC(\'{{ date_part }}\', {{ args[1] }}), DATE_TRUNC(\'{{ date_part }}\', {{ args[2] }}))".to_string()),
+            ]
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql;
+        assert!(sql.contains("DATEDIFF(day,"));
+        assert!(sql.contains("DATE_TRUNC('day',"));
+
+        // PostgreSQL
+        let query_plan = convert_select_to_query_plan_customized(
+            "
+            SELECT DATEDIFF(DAY, order_date, last_mod) AS d
+            FROM KibanaSampleDataEcommerce AS k
+            GROUP BY 1
+            ORDER BY 1 DESC
+            "
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+            vec![
+                ("functions/DATEDIFF".to_string(), "CASE WHEN LOWER(\'{{ date_part }}\') IN (\'year\', \'quarter\', \'month\') THEN (EXTRACT(YEAR FROM AGE(DATE_TRUNC(\'{{ date_part }}\', {{ args[2] }}), DATE_TRUNC(\'{{ date_part }}\', {{ args[1] }}))) * 12 + EXTRACT(MONTH FROM AGE(DATE_TRUNC(\'{{ date_part }}\', {{ args[2] }}), DATE_TRUNC(\'{{ date_part }}\', {{ args[1] }})))) / CASE LOWER(\'{{ date_part }}\') WHEN \'year\' THEN 12 WHEN \'quarter\' THEN 3 WHEN \'month\' THEN 1 END ELSE EXTRACT(EPOCH FROM DATE_TRUNC(\'{{ date_part }}\', {{ args[2] }}) - DATE_TRUNC(\'{{ date_part }}\', {{ args[1] }})) / EXTRACT(EPOCH FROM \'1 {{ date_part }}\'::interval) END::bigint".to_string()),
+            ]
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql;
+        assert!(sql.contains("CASE WHEN LOWER('day')"));
+        assert!(sql.contains("WHEN 'year' THEN 12 WHEN 'quarter' THEN 3 WHEN 'month' THEN 1 END"));
+        assert!(sql.contains("EXTRACT(EPOCH FROM"));
     }
 
     // redshift-dateadd-[literal-date32-]to-interval rewrites DATEADD to DATE_ADD
@@ -21169,5 +21232,32 @@ limit
             .sql;
         assert!(sql.contains("-(EXTRACT(YEAR FROM"));
         assert!(sql.contains("* INTERVAL '1 DAY'"));
+    }
+
+    #[tokio::test]
+    async fn test_case_mixed_values_with_null() -> Result<(), CubeError> {
+        init_logger();
+
+        insta::assert_snapshot!(
+            "test_case_mixed_values_with_null",
+            execute_query(
+                "
+                SELECT LEFT(ACOS(
+                    CASE i
+                        WHEN 0 THEN NULL
+                        ELSE (i::float / 10.0)
+                    END
+                )::text, 10) AS acos
+                FROM (
+                    SELECT generate_series(0, 5) AS i
+                ) AS t
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
     }
 }
