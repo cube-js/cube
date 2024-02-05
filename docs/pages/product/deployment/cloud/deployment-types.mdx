@@ -35,16 +35,16 @@ features.
   />
 </div>
 
-Development Instances are designed for development use cases only. This makes it
+Development instances are designed for development use cases only. This makes it
 easy to get started with Cube Cloud quickly, and also allows you to build and
 query pre-aggregations on-demand.
 
-Development Instances do not provide high-availability nor do they guarantee
-fast response times. Development Instances also hibernate after 10 minutes of
-inactivity, which can cause the first request after hibernation to take
-additional time to process. They also have [limits][ref-limits] on the maximum
-number of queries per day and the maximum number of Cube Store Workers. We
-**strongly** advise not using a development instance in a production
+Development instances do not provide high-availability nor do they guarantee
+fast response times. Development instances also [auto-suspend][ref-auto-sus]
+after 1 hour of inactivity, which can cause the first request after the instance
+wakes up to take additional time to process. They also have [limits][ref-limits]
+on the maximum number of queries per day and the maximum number of Cube Store
+Workers. We **strongly** advise not using a development instance in a production
 environment, it is for testing and learning about Cube only and will not deliver
 a production-level experience for your users.
 
@@ -179,3 +179,4 @@ and select from the available options:
 [ref-limits]: /product/deployment/cloud/limits#resources
 [ref-scalability]: /product/deployment/cloud/scalability
 [ref-multitenancy]: /product/configuration/advanced/multitenancy
+[ref-auto-sus]: /product/deployment/cloud/auto-suspension

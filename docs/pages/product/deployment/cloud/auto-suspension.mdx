@@ -39,11 +39,9 @@ deployment when API requests start coming in again:
 />
 
 [Development instances][ref-deployment-dev-instance] are auto-suspended
-automatically when not in use for 10 minutes, whereas [production
+automatically when not in use for 1 hour, whereas [production
 clusters][ref-deployment-prod-cluster] can auto-suspend after no API
-requests were received within a configurable time period. While suspended,
-[pre-aggregation][ref-caching-preaggs-gs] builds will also be paused to prevent
-unnecessary resource consumption.
+requests were received within a configurable time period.
 
 During auto-suspension, resources are monitored in 5 minute intervals. This
 means that if a deployment was suspended 4 minutes ago, and a request comes in,
@@ -58,8 +56,8 @@ When a deployment is auto-suspended:
 
 - [Data model][ref-data-model] compilation artifacts are discarded since the
 API instances are de-provisioned.
-- [Refresh worker][ref-refresh-worker] is suspended, which prevents
-the pre-aggregations from being kept up-to-date.
+- [Refresh worker][ref-refresh-worker] is suspended, which stops pre-aggregation
+builds and prevents the pre-aggregations from being kept up-to-date.
 - [Monitoring integrations][ref-monitoring] are also suspended, which prevents
 the export of metrics and logs.
 
@@ -75,26 +73,21 @@ query queue with API instances and compromising the end-user experience.
 
 ## Configuration
 
-To configure auto-suspension settings, navigate to the <Btn>Settings</Btn>
-screen in your deployment and click the <Btn>Configuration</Btn> tab, then
-ensure <Btn>Enable Auto-suspend</Btn> is turned on:
+To enable auto-suspension, navigate to <Btn>Settings → Configuration</Btn>
+of your Cube Cloud deployment and ensure that <Btn>Enable auto-suspend</Btn>
+is turned on:
 
 <Screenshot
-  highlight="inset(40% 43% 50% 8% round 10px)"
-  src="https://ucarecdn.com/5747b03a-d414-455e-a5bf-dbebc64d8ddf/"
+  highlight="inset(81% 30% 1% 34% round 10px)"
+  src="https://ucarecdn.com/b0a3f38d-6631-47a8-b952-45747cf5255c/"
 />
 
-To configure how long Cube Cloud should wait before suspending the deployment,
-adjust <Btn>Auto-suspend threshold (minutes)</Btn> to the desired value and
-click <Btn>Apply</Btn>:
+To configure how long Cube Cloud should wait before suspending
+the deployment, adjust <Btn>Auto-suspend threshold</Btn>. For best experience,
+it's not recommended to choose anything below 1 hour.
 
-<Screenshot
-  highlight="inset(50% 43% 23% 8% round 10px)"
-  src="https://ucarecdn.com/4aaa1b98-2af8-4ff9-84f6-e7b9c44c317a/"
-/>
-
-The Cube API instances will temporarily become unavailable while they are
-configured; this usually takes less than a minute.
+The deployment will temporarily become unavailable for reconfiguration; this
+usually takes less than a minute.
 
 ## Resuming a suspended deployment
 
