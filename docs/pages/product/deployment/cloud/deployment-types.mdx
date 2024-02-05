@@ -41,7 +41,7 @@ query pre-aggregations on-demand.
 
 Development instances do not provide high-availability nor do they guarantee
 fast response times. Development instances also [auto-suspend][ref-auto-sus]
-after 1 hour of inactivity, which can cause the first request after the instance
+after 30 minutes of inactivity, which can cause the first request after the instance
 wakes up to take additional time to process. They also have [limits][ref-limits]
 on the maximum number of queries per day and the maximum number of Cube Store
 Workers. We **strongly** advise not using a development instance in a production
