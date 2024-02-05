@@ -31,7 +31,7 @@ We do not recommend changing the default **in-memory** caching configuration
 unless it is necessary. To speed up query performance, consider using
 **pre-aggregations**.
 
-## Pre-Aggregations
+## Pre-aggregations
 
 Pre-aggregations is a layer of the aggregated data built and refreshed by Cube.
 It can dramatically improve the query performance and provide a higher
@@ -106,7 +106,7 @@ cube(`orders`, {
 
 </CodeTabs>
 
-## In-memory Cache
+## In-memory cache
 
 Cube caches the results of executed queries using in-memory cache. The cache key
 is a generated SQL statement with any existing query-dependent pre-aggregations.
@@ -253,6 +253,34 @@ timestamp, and the time spent to build the pre-aggregation. You can also inspect
 every pre-aggregation's details: the list of queries it serves and all its
 versions.
 
+### Cache type
+
+Any query that is fulfilled by Cube will use one of the following cache types:
+
+- **[Pre-aggregations](#pre-aggregations) in Cube Store.** This is the most
+advantageous and performant option.
+- **Pre-aggregations in Cube Store with a suboptimal query plan.** This cache
+type indicates that queries still benefit from pre-aggregations in Cube Store
+but it's possible to get a performance boost by [using indexes][ref-indexes].
+- **Pre-aggregations in the data source.** This cache type indicates that
+queries don't benefit from pre-aggregations in Cube Store and it's possible
+to get a massive performance boost by using Cube Store as [pre-aggregation
+storage][ref-storage].
+- **[In-memory cache.](#in-memory-cache)** This cache type indicates that
+queries don't benefit from pre-aggregations at all. Queries directly hit the
+upstream data source and in-memory cache is used to speed up the execution of
+identical queries that arrive within a short period of time.
+- **No cache.** This cache type indicates queries that directly hit the
+upstream data source and have the worst performance possible.
+
+In [Query History][ref-query-history] and throughout Cube Cloud, colored bolt
+icons are used to indicate the cache type. Also, [Performance
+Insights][ref-perf-insights] provide an overview of API requests by specific
+cache types.
+
+<Screenshot src="https://ucarecdn.com/cd63c899-3f0d-444d-9476-7d60001ff113/"/>
+
+
 [link-cube-cloud]: https://cube.dev/cloud
 [ref-config-preagg-schema]:
   /reference/configuration/config#preaggregationsschema
@@ -264,3 +292,7 @@ versions.
 [ref-schema-ref-cube-refresh-key]:
   /reference/data-model/cube#refresh_key
 [ref-schema-ref-preaggs]: /reference/data-model/pre-aggregations
+[ref-query-history]: /product/workspace/query-history#inspecting-api-queries
+[ref-perf-insights]: /product/workspace/performance#cache-type
+[ref-indexes]: /product/caching/using-pre-aggregations#using-indexes
+[ref-storage]: /product/caching/using-pre-aggregations#pre-aggregations-storage
