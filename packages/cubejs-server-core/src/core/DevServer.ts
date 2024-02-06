@@ -52,7 +52,7 @@ export class DevServer {
     const cubejsToken = jwt.sign({}, options.apiSecret || 'secret', { expiresIn: '1d' });
 
     if (process.env.NODE_ENV !== 'production') {
-      console.log('🔓 Authentication checks are disabled in developer mode. Please use NODE_ENV=production to enable it.');
+      console.log('🔓 Authentication checks are disabled in development mode.');
     } else {
       console.log(`🔒 Your temporary cube.js token: ${cubejsToken}`);
     }
