@@ -16,7 +16,9 @@ import {
   ContainerSASPermissions,
   SASProtocol,
   generateBlobSASQueryParameters,
+  BlobSASSignatureValues,
 } from '@azure/storage-blob';
+import { ClientSecretCredential } from '@azure/identity';
 import { DriverCapabilities, QueryColumnsResult, QueryOptions, QuerySchemasResult, QueryTablesResult, UnloadOptions } from '@cubejs-backend/base-driver';
 import {
   JDBCDriver,
@@ -87,6 +89,21 @@ export type DatabricksDriverConfiguration = JDBCDriverConfiguration &
      * Databricks security token (PWD).
      */
     token?: string,
+
+    /**
+     * Azure tenant id
+     */
+    azureTenantId?: string,
+
+    /**
+     * Azure service principal client id
+     */
+    azureClientId?: string,
+
+    /**
+     * Azure service principal client sceret
+     */
+    azureClientSecret?: string,
   };
 
 type ShowTableRow = {
@@ -214,6 +231,16 @@ export class DatabricksDriver extends JDBCDriver {
         getEnv('dbExportBucketAzureKey', { dataSource }),
       exportBucketCsvEscapeSymbol:
         getEnv('dbExportBucketCsvEscapeSymbol', { dataSource }),
+      // Azure service principal
+      azureTenantId:
+        conf?.azureTenantId ||
+        getEnv('dbExportBucketAzureTenantId', { dataSource }),
+      azureClientId:
+        conf?.azureClientId ||
+        getEnv('dbExportBucketAzureClientId', { dataSource }),
+      azureClientSecret:
+        conf?.azureClientSecret ||
+        getEnv('dbExportBucketAzureClientSecret', { dataSource }),
     };
     super(config);
     this.config = config;
@@ -683,10 +710,19 @@ export class DatabricksDriver extends JDBCDriver {
       pathname.split(`${this.config.exportBucket}/`)[1];
     const expr = new RegExp(`${foldername}\\/.*\\.csv$`, 'i');
 
-    const credential = new StorageSharedKeyCredential(
-      account,
-      this.config.azureKey as string,
-    );
+    let credential: StorageSharedKeyCredential | ClientSecretCredential;
+    if (this.config.azureKey !== undefined) {
+      credential = new StorageSharedKeyCredential(
+        account,
+        this.config.azureKey as string,
+      );
+    } else {
+      credential = new ClientSecretCredential(
+        this.config.azureTenantId as string,
+        this.config.azureClientId as string,
+        this.config.azureClientSecret as string,
+      );
+    }
     const blobClient = new BlobServiceClient(
       `https://${account}.blob.core.windows.net`,
       credential,
@@ -695,19 +731,38 @@ export class DatabricksDriver extends JDBCDriver {
     const blobsList = containerClient.listBlobsFlat({ prefix: foldername });
     for await (const blob of blobsList) {
       if (blob.name && expr.test(blob.name)) {
-        const sas = generateBlobSASQueryParameters(
-          {
-            containerName: container,
-            blobName: blob.name,
-            permissions: ContainerSASPermissions.parse('r'),
-            startsOn: new Date(new Date().valueOf()),
-            expiresOn:
-              new Date(new Date().valueOf() + 1000 * 60 * 60),
-            protocol: SASProtocol.Https,
-            version: '2020-08-04',
-          },
-          credential,
-        ).toString();
+        const startsOnDate = new Date(new Date().valueOf());
+        const expiresOnDate = new Date(new Date().valueOf() + 1000 * 60 * 60);
+        const signatureValues: BlobSASSignatureValues = {
+          containerName: container,
+          blobName: blob.name,
+          permissions: ContainerSASPermissions.parse('r'),
+          startsOn: startsOnDate,
+          expiresOn: expiresOnDate,
+          protocol: SASProtocol.Https,
+          version: '2020-08-04',
+        };
+
+        let sas: string;
+        if (credential instanceof StorageSharedKeyCredential) {
+          sas = generateBlobSASQueryParameters(
+            signatureValues,
+            credential,
+          ).toString();
+        } else if (credential instanceof ClientSecretCredential) {
+          sas = generateBlobSASQueryParameters(
+            signatureValues,
+            await blobClient.getUserDelegationKey(
+              startsOnDate,
+              expiresOnDate,
+            ),
+            account
+          ).toString();
+        } else {
+          const credentialType = typeof credential;
+          throw new Error(`Unexpected credentials type: ${credentialType}`);
+        }
+
         csvFile.push(`https://${
           account
         }.blob.core.windows.net/${
