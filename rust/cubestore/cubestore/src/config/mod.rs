@@ -149,6 +149,13 @@ impl CubeServices {
                 futures.extend(scheduler.spawn_processing_loops());
             }
 
+            if self.injector.has_service_typed::<SqlResultCache>().await {
+                let cache = self.injector.get_service_typed::<SqlResultCache>().await;
+                futures.push(cube_ext::spawn(async move {
+                    cache.wait_processing_loop().await
+                }));
+            }
+
             if self
                 .injector
                 .has_service_typed::<CacheStoreSchedulerImpl>()
@@ -233,6 +240,11 @@ impl CubeServices {
         if self.injector.has_service_typed::<SchedulerImpl>().await {
             let scheduler = self.injector.get_service_typed::<SchedulerImpl>().await;
             scheduler.stop_processing_loops()?;
+        }
+
+        if self.injector.has_service_typed::<SqlResultCache>().await {
+            let cache = self.injector.get_service_typed::<SqlResultCache>().await;
+            cache.stop_processing_loops();
         }
 
         if self.injector.has_service_typed::<RemoteFsCleanup>().await {
@@ -535,6 +547,12 @@ pub trait ConfigObj: DIService {
     fn remote_files_cleanup_delay_secs(&self) -> u64;
 
     fn remote_files_cleanup_batch_size(&self) -> u64;
+
+    fn max_query_queue_size(&self) -> usize;
+
+    fn max_query_pending_size(&self) -> usize;
+
+    fn query_pending_timout(&self) -> u64;
 }
 
 #[derive(Debug, Clone)]
@@ -631,6 +649,9 @@ pub struct ConfigObjImpl {
     pub local_files_cleanup_delay_secs: u64,
     pub remote_files_cleanup_delay_secs: u64,
     pub remote_files_cleanup_batch_size: u64,
+    pub max_query_queue_size: usize,
+    pub max_query_pending_size: usize,
+    pub query_pending_timout: u64,
 }
 
 crate::di_service!(ConfigObjImpl, [ConfigObj]);
@@ -985,6 +1006,18 @@ impl ConfigObj for ConfigObjImpl {
 
     fn remote_files_cleanup_batch_size(&self) -> u64 {
         self.remote_files_cleanup_batch_size
+    }
+
+    fn max_query_queue_size(&self) -> usize {
+        self.max_query_queue_size
+    }
+
+    fn max_query_pending_size(&self) -> usize {
+        self.max_query_pending_size
+    }
+
+    fn query_pending_timout(&self) -> u64 {
+        self.query_pending_timout
     }
 
     fn cachestore_cache_eviction_below_threshold(&self) -> u8 {
@@ -1496,6 +1529,9 @@ impl Config {
                     "CUBESTORE_REMOTE_FILES_CLEANUP_BATCH_SIZE",
                     50000,
                 ),
+                max_query_queue_size: env_parse("CUBESTORE_MAX_QUERY_QUEUE_SIZE", 500),
+                max_query_pending_size: env_parse("CUBESTORE_MAX_QUERY_PENDING_SIZE", 1500),
+                query_pending_timout: env_parse("CUBESTORE_QUERY_PENDING_TIMEOUT", 5 * 60),
             }),
         }
     }
@@ -1604,6 +1640,9 @@ impl Config {
                 local_files_cleanup_delay_secs: 600,
                 remote_files_cleanup_delay_secs: 3600,
                 remote_files_cleanup_batch_size: 50000,
+                max_query_queue_size: 500,
+                max_query_pending_size: 1500,
+                query_pending_timout: 5 * 60,
             }),
         }
     }
@@ -2104,19 +2143,26 @@ impl Config {
             })
             .await;
 
-        let query_cache = Arc::new(SqlResultCache::new(
-            self.config_obj.query_cache_max_capacity_bytes(),
-            self.config_obj.query_cache_time_to_idle_secs(),
-        ));
+        self.injector
+            .register_typed::<SqlResultCache, _, _, _>(async move |i| {
+                let config_obj = i.get_service_typed::<dyn ConfigObj>().await;
+                Arc::new(SqlResultCache::new(
+                    config_obj.query_cache_max_capacity_bytes(),
+                    config_obj.query_cache_time_to_idle_secs(),
+                    config_obj.max_query_queue_size(),
+                    config_obj.max_query_pending_size(),
+                    config_obj.query_pending_timout(),
+                ))
+            })
+            .await;
 
-        let query_cache_to_move = query_cache.clone();
         self.injector
             .register_typed::<dyn QueryPlanner, _, _, _>(async move |i| {
                 QueryPlannerImpl::new(
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
-                    query_cache_to_move,
+                    i.get_service_typed().await,
                 )
             })
             .await;
@@ -2147,7 +2193,6 @@ impl Config {
             .register_typed::<dyn MemoryHandler, _, _, _>(async move |_| MemoryHandlerImpl::new())
             .await;
 
-        let query_cache_to_move = query_cache.clone();
         self.injector
             .register_typed::<dyn SqlService, _, _, _>(async move |i| {
                 let c = i.get_service_typed::<dyn ConfigObj>().await;
@@ -2165,7 +2210,7 @@ impl Config {
                     c.wal_split_threshold() as usize,
                     Duration::from_secs(c.query_timeout()),
                     Duration::from_secs(c.import_job_timeout() * 2),
-                    query_cache_to_move,
+                    i.get_service_typed().await,
                     i.get_service_typed().await,
                 )
             })
