@@ -155,12 +155,10 @@ where
             Err(err) => Err(CubeError::internal(err.to_string())),
         };
 
-        tx.send(to_channel).map_err(|_| {
-            CubeError::internal(
-                "AsyncChannel: Unable to send result from JS back to Rust, channel closed"
-                    .to_string(),
-            )
-        })
+        if tx.send(to_channel).is_err() {
+            log::debug!("AsyncChannel: Unable to send result from JS back to Rust, channel closed");
+        }
+        Ok(())
     }));
 
     channel
