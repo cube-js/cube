@@ -873,6 +873,7 @@ mod tests {
                     None,
                     None,
                     None,
+                    false,
                 )
                 .await
                 .unwrap();
@@ -968,6 +969,7 @@ mod tests {
                     None,
                     None,
                     None,
+                    false,
                 )
                 .await
                 .unwrap();
@@ -1077,6 +1079,7 @@ mod tests {
                     Some(vec![("sum".to_string(), "sum_int".to_string())]),
                     None,
                     None,
+                    false,
                 )
                 .await
                 .unwrap();
