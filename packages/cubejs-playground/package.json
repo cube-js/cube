@@ -58,6 +58,7 @@
     "uuid": "^8.3.2"
   },
   "devDependencies": {
+    "@cube-dev/ui-kit": "0.30.0",
     "@ant-design/compatible": "^1.0.2",
     "@ant-design/icons": "^4.7.0",
     "@cubejs-client/core": "^0.34.37",
@@ -98,6 +99,7 @@
     "prismjs": ">=1.25.0",
     "react": ">=17.0.1",
     "react-dom": ">=17.0.1",
-    "styled-components": ">=5.2.0"
+    "styled-components": ">=5.2.0",
+    "@cube-dev/ui-kit": ">=0.30.0"
   }
 }
