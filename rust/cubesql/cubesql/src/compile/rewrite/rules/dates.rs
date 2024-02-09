@@ -1,7 +1,7 @@
 use super::utils;
 use crate::{
     compile::rewrite::{
-        add_root_original_expr_alias, agg_fun_expr, alias_expr,
+        agg_fun_expr, alias_expr,
         analysis::{ConstantFolding, LogicalPlanAnalysis, OriginalExpr},
         binary_expr, cast_expr, cast_expr_explicit, column_expr, fun_expr, literal_expr,
         literal_int, literal_string, negative_expr, original_expr_name, rewrite,
@@ -173,43 +173,6 @@ impl RewriteRules for DateRules {
                 fun_expr(
                     "DateTrunc",
                     vec![literal_string("minute"), column_expr("?column")],
-                ),
-            ),
-            rewrite(
-                "superset-second-to-date-trunc",
-                udf_expr(
-                    "date_add",
-                    vec![
-                        udf_expr("date", vec![column_expr("?column")]),
-                        to_day_interval_expr(
-                            binary_expr(
-                                binary_expr(
-                                    binary_expr(
-                                        udf_expr("hour", vec![column_expr("?column")]),
-                                        "*",
-                                        literal_int(60),
-                                    ),
-                                    "*",
-                                    literal_int(60),
-                                ),
-                                "+",
-                                binary_expr(
-                                    binary_expr(
-                                        udf_expr("minute", vec![column_expr("?column")]),
-                                        "*",
-                                        literal_int(60),
-                                    ),
-                                    "+",
-                                    udf_expr("second", vec![column_expr("?column")]),
-                                ),
-                            ),
-                            literal_string("second"),
-                        ),
-                    ],
-                ),
-                fun_expr(
-                    "DateTrunc",
-                    vec![literal_string("second"), column_expr("?column")],
                 ),
             ),
             rewrite(

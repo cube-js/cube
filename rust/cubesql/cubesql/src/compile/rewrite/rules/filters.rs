@@ -12,14 +12,14 @@ use crate::{
         member_name_by_alias, negative_expr, not_expr, projection, rewrite,
         rewriter::RewriteRules,
         scalar_fun_expr_args, scalar_fun_expr_args_empty_tail, segment_member,
-        time_dimension_date_range_replacer, time_dimension_expr, transforming_chain_rewrite,
-        transforming_rewrite, udf_expr, udf_expr_var_arg, udf_fun_expr_args,
-        udf_fun_expr_args_empty_tail, BetweenExprNegated, BinaryExprOp, CastExprDataType,
-        ChangeUserMemberValue, ColumnExprColumn, CubeScanAliasToCube, CubeScanLimit,
-        FilterMemberMember, FilterMemberOp, FilterMemberValues, FilterReplacerAliasToCube,
-        FilterReplacerAliases, InListExprNegated, LikeExprEscapeChar, LikeExprNegated, LimitFetch,
-        LimitSkip, LiteralExprValue, LogicalPlanLanguage, SegmentMemberMember,
-        TimeDimensionDateRange, TimeDimensionDateRangeReplacerDateRange,
+        time_dimension_date_range_replacer, time_dimension_expr, transform_original_expr_to_alias,
+        transforming_chain_rewrite, transforming_rewrite, transforming_rewrite_with_root, udf_expr,
+        udf_expr_var_arg, udf_fun_expr_args, udf_fun_expr_args_empty_tail, BetweenExprNegated,
+        BinaryExprOp, CastExprDataType, ChangeUserMemberValue, ColumnExprColumn,
+        CubeScanAliasToCube, CubeScanLimit, FilterMemberMember, FilterMemberOp, FilterMemberValues,
+        FilterReplacerAliasToCube, FilterReplacerAliases, InListExprNegated, LikeExprEscapeChar,
+        LikeExprNegated, LimitFetch, LimitSkip, LiteralExprValue, LogicalPlanLanguage,
+        SegmentMemberMember, TimeDimensionDateRange, TimeDimensionDateRangeReplacerDateRange,
         TimeDimensionDateRangeReplacerMember, TimeDimensionGranularity, TimeDimensionName,
     },
     transport::{ext::V1CubeMetaExt, MemberType, MetaContext},
@@ -1229,15 +1229,18 @@ impl RewriteRules for FilterRules {
                                     ">",
                                     literal_int(0),
                                 ),
-                                fun_expr(
-                                    "Strpos",
-                                    vec![
-                                        fun_expr(
-                                            "Substr",
-                                            vec!["?expr".to_string(), literal_int(1)],
-                                        ),
-                                        literal_expr("?literal"),
-                                    ],
+                                alias_expr(
+                                    fun_expr(
+                                        "Strpos",
+                                        vec![
+                                            fun_expr(
+                                                "Substr",
+                                                vec!["?expr".to_string(), literal_int(1)],
+                                            ),
+                                            literal_expr("?literal"),
+                                        ],
+                                    ),
+                                    "?plus_minus_one_alias",
                                 ),
                             )],
                             Some(literal_int(0)),
@@ -1784,24 +1787,20 @@ impl RewriteRules for FilterRules {
                                 "DateTrunc",
                                 vec![
                                     literal_expr("?granularity"),
-                                    binary_expr(
-                                        column_expr("?column"),
-                                        "+",
-                                        literal_expr("?same_interval"),
-                                    ),
+                                    binary_expr(column_expr("?column"), "+", "?same_interval"),
                                 ],
                             ),
                             "-",
-                            literal_expr("?same_interval"),
+                            "?same_interval",
                         ),
                         "<=",
                         binary_expr(
                             fun_expr(
                                 "DateTrunc",
-                                vec![literal_expr("?granularity"), literal_expr("?expr")],
+                                vec![literal_expr("?granularity"), "?literal_expr".to_string()],
                             ),
                             "-",
-                            literal_expr("?same_interval"),
+                            "?same_interval",
                         ),
                     ),
                     "?alias_to_cube",
@@ -1816,10 +1815,10 @@ impl RewriteRules for FilterRules {
                             binary_expr(
                                 fun_expr(
                                     "DateTrunc",
-                                    vec![literal_expr("?granularity"), literal_expr("?expr")],
+                                    vec![literal_expr("?granularity"), "?literal_expr".to_string()],
                                 ),
                                 "-",
-                                literal_expr("?same_interval"),
+                                "?same_interval",
                             ),
                             "+",
                             literal_expr("?interval"),
@@ -2004,14 +2003,15 @@ impl RewriteRules for FilterRules {
                 ),
                 self.transform_negate_like_expr("?negated", "?new_negated"),
             ),
-            rewrite(
+            transforming_rewrite_with_root(
                 "plus-value-minus-value",
                 binary_expr(
                     binary_expr("?expr", "+", literal_expr("?value")),
                     "-",
                     literal_expr("?value"),
                 ),
-                "?expr".to_string(),
+                alias_expr("?expr", "?alias"),
+                transform_original_expr_to_alias("?alias"),
             ),
             // Every expression should be handled by filter cast unwrap replacer otherwise other rules just won't work
             // Simplify rules

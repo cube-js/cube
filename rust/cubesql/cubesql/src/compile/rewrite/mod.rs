@@ -150,7 +150,6 @@ crate::plan_to_language! {
         AliasExpr {
             expr: Box<Expr>,
             alias: String,
-            split: bool,
         },
         ColumnExpr {
             column: Column,
@@ -423,10 +422,6 @@ crate::plan_to_language! {
             outer_expr: Arc<Expr>,
             list_node: Arc<Expr>,
             alias_to_cube: Vec<(String, String)>,
-        },
-        AliasExprSplitReplacer {
-            expr: Box<Expr>,
-            alias: String,
         },
         GroupExprSplitReplacer {
             members: Vec<LogicalPlan>,
@@ -996,15 +991,7 @@ fn cast_expr_explicit(expr: impl Display, data_type: DataType) -> String {
 }
 
 fn alias_expr(column: impl Display, alias: impl Display) -> String {
-    format!("(AliasExpr {} {} AliasExprSplit:false)", column, alias)
-}
-
-fn alias_expr_split(column: impl Display, alias: impl Display, split: impl Display) -> String {
-    format!("(AliasExpr {} {} {})", column, alias, split)
-}
-
-fn alias_expr_split_replacer(column: impl Display, alias: impl Display) -> String {
-    format!("(AliasExprSplitReplacer {} {})", column, alias)
+    format!("(AliasExpr {} {})", column, alias)
 }
 
 fn case_expr_var_arg(

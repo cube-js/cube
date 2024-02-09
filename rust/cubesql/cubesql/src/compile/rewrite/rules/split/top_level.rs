@@ -1,6 +1,6 @@
 use crate::{
     compile::rewrite::{
-        aggr_aggr_expr, aggr_aggr_expr_empty_tail, aggr_group_expr_empty_tail, aggregate,
+        aggr_aggr_expr_empty_tail, aggr_group_expr_empty_tail, aggregate,
         aggregate_split_pullup_replacer, aggregate_split_pushdown_replacer,
         analysis::LogicalPlanAnalysis, cube_scan, projection, projection_expr,
         projection_expr_empty_tail, projection_split_pullup_replacer,

@@ -10,16 +10,16 @@ use crate::{
         rewrite::{
             analysis::LogicalPlanAnalysis, rewriter::Rewriter, AggregateFunctionExprDistinct,
             AggregateFunctionExprFun, AggregateSplit, AggregateUDFExprFun, AliasExprAlias,
-            AliasExprSplit, AnyExprOp, BetweenExprNegated, BinaryExprOp, CastExprDataType,
-            ChangeUserMemberValue, ColumnExprColumn, CubeScanAliasToCube, CubeScanLimit,
-            CubeScanOffset, CubeScanUngrouped, CubeScanWrapped, DimensionName,
-            EmptyRelationProduceOneRow, FilterMemberMember, FilterMemberOp, FilterMemberValues,
-            FilterOpOp, InListExprNegated, JoinJoinConstraint, JoinJoinType, JoinLeftOn,
-            JoinRightOn, LikeExprEscapeChar, LikeExprLikeType, LikeExprNegated, LikeType,
-            LimitFetch, LimitSkip, LiteralExprValue, LiteralMemberRelation, LiteralMemberValue,
-            LogicalPlanLanguage, MeasureName, MemberErrorError, OrderAsc, OrderMember,
-            OuterColumnExprColumn, OuterColumnExprDataType, ProjectionAlias, ProjectionSplit,
-            QueryParamIndex, ScalarFunctionExprFun, ScalarUDFExprFun, ScalarVariableExprDataType,
+            AnyExprOp, BetweenExprNegated, BinaryExprOp, CastExprDataType, ChangeUserMemberValue,
+            ColumnExprColumn, CubeScanAliasToCube, CubeScanLimit, CubeScanOffset,
+            CubeScanUngrouped, CubeScanWrapped, DimensionName, EmptyRelationProduceOneRow,
+            FilterMemberMember, FilterMemberOp, FilterMemberValues, FilterOpOp, InListExprNegated,
+            JoinJoinConstraint, JoinJoinType, JoinLeftOn, JoinRightOn, LikeExprEscapeChar,
+            LikeExprLikeType, LikeExprNegated, LikeType, LimitFetch, LimitSkip, LiteralExprValue,
+            LiteralMemberRelation, LiteralMemberValue, LogicalPlanLanguage, MeasureName,
+            MemberErrorError, OrderAsc, OrderMember, OuterColumnExprColumn,
+            OuterColumnExprDataType, ProjectionAlias, ProjectionSplit, QueryParamIndex,
+            ScalarFunctionExprFun, ScalarUDFExprFun, ScalarVariableExprDataType,
             ScalarVariableExprVariable, SegmentMemberMember, SortExprAsc, SortExprNullsFirst,
             TableScanFetch, TableScanProjection, TableScanSourceTableName, TableScanTableName,
             TableUDFExprFun, TimeDimensionDateRange, TimeDimensionGranularity, TimeDimensionName,
@@ -187,8 +187,7 @@ impl LogicalPlanToLanguageConverter {
             Expr::Alias(expr, alias) => {
                 let expr = Self::add_expr_replace_params(graph, expr, query_params)?;
                 let alias = add_expr_data_node!(graph, alias, AliasExprAlias);
-                let split = graph.add(LogicalPlanLanguage::AliasExprSplit(AliasExprSplit(false)));
-                graph.add(LogicalPlanLanguage::AliasExpr([expr, alias, split]))
+                graph.add(LogicalPlanLanguage::AliasExpr([expr, alias]))
             }
             Expr::Column(column) => {
                 let column = add_expr_data_node!(graph, column, ColumnExprColumn);

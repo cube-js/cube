@@ -252,15 +252,23 @@ impl RewriteRules for MemberRules {
                 self.push_down_limit("?skip", "?fetch", "?new_skip", "?new_fetch"),
             ),
             // Binary expression associative properties
-            rewrite(
+            transforming_rewrite_with_root(
                 "binary-expr-addition-assoc",
                 binary_expr(binary_expr("?a", "+", "?b"), "+", "?c"),
-                binary_expr("?a", "+", binary_expr("?b", "+", "?c")),
+                alias_expr(
+                    binary_expr("?a", "+", binary_expr("?b", "+", "?c")),
+                    "?alias",
+                ),
+                transform_original_expr_to_alias("?alias"),
             ),
-            rewrite(
+            transforming_rewrite_with_root(
                 "binary-expr-multi-assoc",
                 binary_expr(binary_expr("?a", "*", "?b"), "*", "?c"),
-                binary_expr("?a", "*", binary_expr("?b", "*", "?c")),
+                alias_expr(
+                    binary_expr("?a", "*", binary_expr("?b", "*", "?c")),
+                    "?alias",
+                ),
+                transform_original_expr_to_alias("?alias"),
             ),
             // MOD function to binary expr
             transforming_rewrite_with_root(

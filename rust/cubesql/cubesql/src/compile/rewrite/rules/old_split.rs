@@ -13,12 +13,11 @@ use crate::{
         rewriter::RewriteRules,
         rules::members::MemberRules,
         transforming_chain_rewrite, transforming_rewrite, udf_expr, AggregateFunctionExprDistinct,
-        AggregateFunctionExprFun, AliasExprAlias, AliasExprSplit, BinaryExprOp, CastExprDataType,
-        ColumnExprColumn, CubeScanAliasToCube, EventNotificationMeta,
-        GroupAggregateSplitReplacerAliasToCube, GroupExprSplitReplacerAliasToCube,
-        InnerAggregateSplitReplacerAliasToCube, LiteralExprValue, LogicalPlanLanguage,
-        OuterAggregateSplitReplacerAliasToCube, OuterProjectionSplitReplacerAliasToCube,
-        ProjectionAlias, ScalarFunctionExprFun,
+        AggregateFunctionExprFun, AliasExprAlias, BinaryExprOp, CastExprDataType, ColumnExprColumn,
+        CubeScanAliasToCube, EventNotificationMeta, GroupAggregateSplitReplacerAliasToCube,
+        GroupExprSplitReplacerAliasToCube, InnerAggregateSplitReplacerAliasToCube,
+        LiteralExprValue, LogicalPlanLanguage, OuterAggregateSplitReplacerAliasToCube,
+        OuterProjectionSplitReplacerAliasToCube, ProjectionAlias, ScalarFunctionExprFun,
     },
     config::ConfigObj,
     transport::{MetaContext, V1CubeMetaExt, V1CubeMetaMeasureExt},
@@ -1393,18 +1392,6 @@ impl RewriteRules for OldSplitRules {
                     "?expr",
                     "?alias",
                     Some("?outer_column"),
-                ),
-            ),
-            // Redshift CHARINDEX to STRPOS
-            rewrite(
-                "redshift-charindex-to-strpos",
-                udf_expr(
-                    "charindex",
-                    vec!["?substring", "?string"],
-                ),
-                fun_expr(
-                    "Strpos",
-                    vec!["?string", "?substring"],
                 ),
             ),
             //
@@ -4947,10 +4934,8 @@ impl OldSplitRules {
                             let column = egraph.add(LogicalPlanLanguage::ColumnExpr([alias]));
                             // TODO re-aliasing underlying column as it'll be fully qualified which will break outer alias in case date_trunc is wrapped in some other function
                             // TODO alias in plans should be generally no-op however there's no place in datafusion where it's used like that
-                            let split = egraph
-                                .add(LogicalPlanLanguage::AliasExprSplit(AliasExprSplit(true)));
-                            let alias = egraph
-                                .add(LogicalPlanLanguage::AliasExpr([column, alias_name, split]));
+                            let alias =
+                                egraph.add(LogicalPlanLanguage::AliasExpr([column, alias_name]));
                             subst.insert(alias_expr_var, alias);
                             return true;
                         }
@@ -5209,15 +5194,9 @@ impl OldSplitRules {
                                                             ),
                                                         );
 
-                                                        let split = egraph.add(
-                                                            LogicalPlanLanguage::AliasExprSplit(
-                                                                AliasExprSplit(true),
-                                                            ),
-                                                        );
-
                                                         let alias_expr = egraph.add(
                                                             LogicalPlanLanguage::AliasExpr([
-                                                                aggr_expr, alias, split,
+                                                                aggr_expr, alias,
                                                             ]),
                                                         );
                                                         subst.insert(out_expr_var, alias_expr);
@@ -5559,14 +5538,10 @@ impl OldSplitRules {
                                     let alias_expr_alias = egraph.add(
                                         LogicalPlanLanguage::AliasExprAlias(AliasExprAlias(alias)),
                                     );
-                                    let split = egraph.add(LogicalPlanLanguage::AliasExprSplit(
-                                        AliasExprSplit(true),
-                                    ));
 
                                     return egraph.add(LogicalPlanLanguage::AliasExpr([
                                         column_expr,
                                         alias_expr_alias,
-                                        split,
                                     ]));
                                 }
                                 column_expr
@@ -6424,14 +6399,10 @@ impl OldSplitRules {
                                     let alias_id = egraph.add(LogicalPlanLanguage::AliasExprAlias(
                                         AliasExprAlias(name),
                                     ));
-                                    let split = egraph.add(LogicalPlanLanguage::AliasExprSplit(
-                                        AliasExprSplit(true),
-                                    ));
                                     let alias_expr_id =
                                         egraph.add(LogicalPlanLanguage::AliasExpr([
                                             date_trunc_id,
                                             alias_id,
-                                            split,
                                         ]));
 
                                     subst.insert(new_expr_var, alias_expr_id);
@@ -6516,14 +6487,10 @@ impl OldSplitRules {
                                     let alias_id = egraph.add(LogicalPlanLanguage::AliasExprAlias(
                                         AliasExprAlias(name),
                                     ));
-                                    let split = egraph.add(LogicalPlanLanguage::AliasExprSplit(
-                                        AliasExprSplit(true),
-                                    ));
                                     let alias_expr_id =
                                         egraph.add(LogicalPlanLanguage::AliasExpr([
                                             cast_expr_id,
                                             alias_id,
-                                            split,
                                         ]));
 
                                     subst.insert(new_expr_var, alias_expr_id);

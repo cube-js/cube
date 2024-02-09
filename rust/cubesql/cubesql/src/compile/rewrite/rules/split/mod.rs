@@ -3,7 +3,7 @@ pub mod alias;
 pub mod binary_expr;
 pub mod case;
 pub mod column;
-pub mod date_part;
+pub mod dates;
 pub mod functions;
 pub mod granularity;
 pub mod top_level;
@@ -11,25 +11,23 @@ pub mod top_level;
 use crate::{
     compile::rewrite::{
         aggregate_split_pullup_replacer, aggregate_split_pushdown_replacer, alias_expr,
-        alias_expr_split,
         analysis::LogicalPlanAnalysis,
         original_expr_name, projection_split_pullup_replacer, projection_split_pushdown_replacer,
         rewrite,
         rewriter::RewriteRules,
-        rules::{members::MemberRules, replacer_pull_up_node, replacer_push_down_node},
-        transforming_chain_rewrite, AggregateSplitPushDownReplacerAliasToCube, AliasExprAlias,
-        LogicalPlanLanguage, ProjectionSplitPushDownReplacerAliasToCube,
+        rules::{members::MemberRules, replacer_push_down_node},
+        transforming_chain_rewrite, AliasExprAlias, LogicalPlanLanguage,
     },
     config::ConfigObj,
     transport::MetaContext,
-    var, var_iter,
+    var,
 };
 use egg::Rewrite;
-use futures_util::StreamExt;
 use std::sync::Arc;
 
 pub struct SplitRules {
     meta_context: Arc<MetaContext>,
+    #[allow(dead_code)]
     config_obj: Arc<dyn ConfigObj>,
 }
 
@@ -154,11 +152,10 @@ impl SplitRules {
             aggregate_split_pushdown_replacer("?match_expr", "?list_node", "?alias_to_cube"),
             vec![("?match_expr", match_rule())],
             aggregate_split_pullup_replacer(
-                alias_expr_split(inner_rule(), "?inner_alias", "AliasExprSplit:true"),
-                alias_expr_split(
+                alias_expr(inner_rule(), "?inner_alias"),
+                alias_expr(
                     outer_rule("?outer_alias_column".to_string()),
                     "?inner_alias",
-                    "AliasExprSplit:true",
                 ),
                 "?list_node",
                 "?alias_to_cube",
@@ -166,7 +163,6 @@ impl SplitRules {
             self.transform_single_arg_split_point(
                 "?match_expr",
                 "?inner_alias",
-                "?alias_to_cube",
                 "?outer_alias_column",
                 false,
                 transform_fn.clone(),
@@ -178,11 +174,10 @@ impl SplitRules {
                 projection_split_pushdown_replacer("?match_expr", "?list_node", "?alias_to_cube"),
                 vec![("?match_expr", match_rule())],
                 projection_split_pullup_replacer(
-                    alias_expr_split(inner_rule(), "?inner_alias", "AliasExprSplit:true"),
-                    alias_expr_split(
+                    alias_expr(inner_rule(), "?inner_alias"),
+                    alias_expr(
                         outer_rule("?outer_alias_column".to_string()),
                         "?inner_alias",
-                        "AliasExprSplit:true",
                     ),
                     "?list_node",
                     "?alias_to_cube",
@@ -190,7 +185,6 @@ impl SplitRules {
                 self.transform_single_arg_split_point(
                     "?match_expr",
                     "?inner_alias",
-                    "?alias_to_cube",
                     "?outer_alias_column",
                     true,
                     transform_fn.clone(),
@@ -203,7 +197,6 @@ impl SplitRules {
         &self,
         match_expr_var: &str,
         inner_alias_var: &str,
-        alias_to_cube_var: &str,
         outer_alias_column_var: &str,
         is_projection: bool,
         transform_fn: impl Fn(
@@ -220,34 +213,22 @@ impl SplitRules {
            + Clone {
         let match_expr_var = var!(match_expr_var);
         let inner_alias_var = var!(inner_alias_var);
-        let alias_to_cube_var = var!(alias_to_cube_var);
         let outer_alias_column_var = var!(outer_alias_column_var);
 
         move |egraph, subst| {
             if let Some(original_expr) = original_expr_name(egraph, subst[match_expr_var]) {
                 if transform_fn(is_projection, egraph, subst) {
-                    for alias_to_cube in var_iter!(
-                        egraph[subst[alias_to_cube_var]],
-                        AggregateSplitPushDownReplacerAliasToCube
-                    )
-                    .chain(var_iter!(
-                        egraph[subst[alias_to_cube_var]],
-                        ProjectionSplitPushDownReplacerAliasToCube
-                    ))
-                    .cloned()
-                    {
-                        let inner_alias = egraph.add(LogicalPlanLanguage::AliasExprAlias(
-                            AliasExprAlias(original_expr.to_string()),
-                        ));
-                        subst.insert(inner_alias_var, inner_alias.clone());
+                    let inner_alias = egraph.add(LogicalPlanLanguage::AliasExprAlias(
+                        AliasExprAlias(original_expr.to_string()),
+                    ));
+                    subst.insert(inner_alias_var, inner_alias.clone());
 
-                        let outer_alias_column =
-                            MemberRules::add_alias_column(egraph, original_expr, None);
+                    let outer_alias_column =
+                        MemberRules::add_alias_column(egraph, original_expr, None);
 
-                        subst.insert(outer_alias_column_var, outer_alias_column);
+                    subst.insert(outer_alias_column_var, outer_alias_column);
 
-                        return true;
-                    }
+                    return true;
                 }
             }
             false

@@ -1,9 +1,7 @@
 use crate::compile::rewrite::{
-    alias_expr, analysis::LogicalPlanAnalysis, cast_expr, cast_expr_explicit, column_expr,
-    fun_expr, is_not_null_expr, is_null_expr, literal_expr, rules::split::SplitRules,
-    transforming_rewrite, udf_expr, LogicalPlanLanguage,
+    analysis::LogicalPlanAnalysis, cast_expr, fun_expr, is_not_null_expr, is_null_expr,
+    literal_expr, rules::split::SplitRules, udf_expr, LogicalPlanLanguage,
 };
-use datafusion::arrow::datatypes::{DataType, TimeUnit};
 use egg::Rewrite;
 
 impl SplitRules {
@@ -61,7 +59,40 @@ impl SplitRules {
         );
         self.single_arg_pass_through_rules(
             "to-char",
-            |expr| udf_expr("to_char", vec![expr]),
+            |expr| udf_expr("to_char", vec![expr, "?format".to_string()]),
+            false,
+            rules,
+        );
+        self.single_arg_pass_through_rules(
+            "substring",
+            |expr| {
+                fun_expr(
+                    "Substr",
+                    vec![expr, "?from".to_string(), "?for".to_string()],
+                )
+            },
+            false,
+            rules,
+        );
+        self.single_arg_pass_through_rules(
+            "lpad",
+            |expr| {
+                fun_expr(
+                    "Lpad",
+                    vec![expr, "?length".to_string(), "?char".to_string()],
+                )
+            },
+            false,
+            rules,
+        );
+        self.single_arg_pass_through_rules(
+            "rpad",
+            |expr| {
+                fun_expr(
+                    "Rpad",
+                    vec![expr, "?length".to_string(), "?char".to_string()],
+                )
+            },
             false,
             rules,
         );

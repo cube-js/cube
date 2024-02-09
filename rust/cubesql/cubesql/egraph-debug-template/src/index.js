@@ -35,7 +35,7 @@ const initialEdges = data.edges.map(toEdge);
 
 const elk = new ELK();
 
-function layout(options, nodes, edges, setNodes, setEdges, fitView) {
+function layout(options, nodes, edges, setNodes, setEdges, fitView, navHistory) {
     const defaultOptions = {
         'elk.algorithm': 'layered',
         'elk.layered.spacing.nodeNodeBetweenLayers': 100,
@@ -83,19 +83,26 @@ function layout(options, nodes, edges, setNodes, setEdges, fitView) {
         setNodes(flattenChildren);
         setEdges(edges);
         window.requestAnimationFrame(() => {
-            fitView();
+            if (navHistory?.length) {
+                setTimeout(() => {
+                    zoomTo(fitView, navHistory);
+                }, 500)
+            } else {
+                fitView();
+            }
         });
         return flattenChildren;
     });
 }
 
 const highlightColor = 'rgba(170,255,170,0.71)';
+const selectColor = 'rgba(170,187,255,0.71)';
 
 const useLayoutedElements = () => {
     const { getNodes, setNodes, getEdges, setEdges, fitView } = useReactFlow();
     const [iteration, setIteration] = useState(0);
 
-    const prevIter = () => {
+    const prevIter = (navHistory) => {
         if (iteration === 0) {
             return;
         }
@@ -112,13 +119,13 @@ const useLayoutedElements = () => {
         edges = edges.concat(Object.keys(edgeMap).map(key => edgeMap[key]));
         const toHighlight = iterations[iteration - 1];
         const toHighlightNodeIds = toHighlight.nodes.concat(toHighlight.combos).map((n) => n.id);
-        nodes = nodes.map(n => ({...n, style: { ...n.style, 'background-color': toHighlightNodeIds.includes(n.id) ? highlightColor : undefined }}));
+        nodes = nodes.map(n => ({...n, style: { ...n.style, backgroundColor: toHighlightNodeIds.includes(n.id) ? highlightColor : undefined }}));
         setIteration(iteration - 1);
-        layout({}, nodes, edges, setNodes, setEdges, fitView);
+        layout({}, nodes, edges, setNodes, setEdges, fitView, navHistory);
         // (toHighlight.nodes || []).forEach((n) => graph.setItemState(graph.findById(n.id), 'justAdded', true));
     }
 
-    const nextIter = () => {
+    const nextIter = (navHistory) => {
         if (iteration === iterations.length - 1) {
             return;
         }
@@ -132,15 +139,15 @@ const useLayoutedElements = () => {
         let toRemoveEdgeIds = toAdd.removedEdges.map((n) => toEdge(n).id);
         nodes = nodes.filter((n) => !toRemoveNodeIds.includes(n.id));
         edges = edges.filter((n) => !toRemoveEdgeIds.includes(n.id));
-        nodes = nodes.map(n => ({...n, style: { ...n.style, 'background-color': undefined }}));
+        nodes = nodes.map(n => ({...n, style: { ...n.style, backgroundColor: undefined }}));
         nodes = nodes.concat(
             (toAdd.combos || []).map(toGroupNode).concat((toAdd.nodes || []).map(toRegularNode))
-                .map((n) => ({...n, style: { ...n.style, 'background-color': highlightColor }}))
+                .map((n) => ({...n, style: { ...n.style, backgroundColor: highlightColor }}))
         );
         const edgeMap = (toAdd.edges || []).map(toEdge).reduce((acc, val) => ({ ...acc, [val.id]: val }), {});
         edges = edges.concat(Object.keys(edgeMap).map(key => edgeMap[key]));
 
-        layout({}, nodes, edges, setNodes, setEdges, fitView);
+        layout({}, nodes, edges, setNodes, setEdges, fitView, navHistory);
     };
 
     const getLayoutedElements = useCallback((options) => {
@@ -157,7 +164,19 @@ const zoomTo = (fitView, classId) => {
     if (!classId) {
         return;
     }
-    fitView({ duration: 600, nodes: [{ id: `c${classId}`}]});
+    fitView({ duration: 600, nodes: classId.map(id => ({ id: `c${id}`}))});
+}
+
+const nodeStyles = (nodes, navHistory) => {
+    return nodes.map((n) => {
+        return {
+            ...n,
+            style: {
+                ...n.style,
+                backgroundColor: navHistory.indexOf(n.id.replace('c', '')) !== -1 ? selectColor : n.style?.backgroundColor
+            }
+        };
+    });
 }
 
 const LayoutFlow = () => {
@@ -175,9 +194,11 @@ const LayoutFlow = () => {
         }, 100);
     }, []);
 
+    const existingNavHistory = () => navHistory.filter(id => nodes.map(n => n.id).includes(`c${id}`));
+
     return (
         <ReactFlow
-            nodes={nodes}
+            nodes={nodeStyles(nodes, navHistory)}
             edges={edges}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
@@ -187,12 +208,12 @@ const LayoutFlow = () => {
         >
             <Panel position="top-left">
                 <div>
-                    <button onClick={() => prevIter()}>Prev Iter</button>
-                    <button onClick={() => nextIter()}>Next Iter</button>
+                    <button onClick={() => prevIter(existingNavHistory())}>Prev Iter</button>
+                    <button onClick={() => nextIter(existingNavHistory())}>Next Iter</button>
                     <span style={{ paddingLeft: 4, paddingRight: 4 }}>Iteration #{iteration + 1} / {iterations.length}</span>
                     <input placeholder="Search Class ID" onChange={(e) => setNavigateTo(e.target.value)} value={navigateTo}></input>
                     <button onClick={() => {
-                        zoomTo(fitView, navigateTo);
+                        zoomTo(fitView, [navigateTo]);
                         if (!navHistory.includes(navigateTo)) {
                             setNavHistory(navHistory.concat(navigateTo));
                         }
@@ -202,7 +223,7 @@ const LayoutFlow = () => {
                     {
                         navHistory.map(item => (
                             <span style={{ paddingLeft: 4 }} key={item}>
-                        <button onClick={() => zoomTo(fitView, item)}>{item}</button>
+                        <button onClick={() => zoomTo(fitView, [item])}>{item}</button>
                         <button onClick={() => setNavHistory(navHistory.filter(i => i !== item))}>X</button>
                     </span>
                         ))

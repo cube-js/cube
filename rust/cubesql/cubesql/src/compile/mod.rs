@@ -4685,58 +4685,6 @@ limit
     }
 
     #[tokio::test]
-    async fn test_group_by_date_granularity_superset() {
-        let supported_granularities = vec![
-            // With MAKEDATE
-            ["MAKEDATE(YEAR(order_date), 1) + INTERVAL QUARTER(order_date) QUARTER - INTERVAL 1 QUARTER".to_string(), "quarter".to_string()],
-            // With DATE
-            ["DATE(DATE_SUB(order_date, INTERVAL DAYOFWEEK(DATE_SUB(order_date, INTERVAL 1 DAY)) - 1 DAY))".to_string(), "week".to_string()],
-            // With escaping by `
-            ["DATE(DATE_SUB(`order_date`, INTERVAL DAYOFWEEK(DATE_SUB(`order_date`, INTERVAL 1 DAY)) - 1 DAY))".to_string(), "week".to_string()],
-            // @todo enable support when cube.js will support it
-            // ["DATE(DATE_SUB(order_date, INTERVAL DAYOFWEEK(order_date) - 1 DAY))".to_string(), "week".to_string()],
-            ["DATE(DATE_SUB(order_date, INTERVAL DAYOFMONTH(order_date) - 1 DAY))".to_string(), "month".to_string()],
-            ["DATE(DATE_SUB(order_date, INTERVAL DAYOFYEAR(order_date) - 1 DAY))".to_string(), "year".to_string()],
-            // Simple DATE
-            ["DATE(order_date)".to_string(), "day".to_string()],
-            ["DATE(`order_date`)".to_string(), "day".to_string()],
-            ["DATE(`KibanaSampleDataEcommerce`.`order_date`)".to_string(), "day".to_string()],
-            // With DATE_ADD
-            ["DATE_ADD(DATE(order_date), INTERVAL HOUR(order_date) HOUR)".to_string(), "hour".to_string()],
-            ["DATE_ADD(DATE(order_date), INTERVAL HOUR(`order_date`) HOUR)".to_string(), "hour".to_string()],
-            ["DATE_ADD(DATE(order_date), INTERVAL (HOUR(order_date) * 60 + MINUTE(order_date)) MINUTE)".to_string(), "minute".to_string()],
-            ["DATE_ADD(DATE(order_date), INTERVAL (HOUR(`order_date`) * 60 + MINUTE(`order_date`)) MINUTE)".to_string(), "minute".to_string()],
-            ["DATE_ADD(DATE(order_date), INTERVAL (HOUR(order_date) * 60 * 60 + MINUTE(order_date) * 60 + SECOND(order_date)) SECOND)".to_string(), "second".to_string()],
-            ["DATE_ADD(DATE(order_date), INTERVAL (HOUR(`order_date`) * 60 * 60 + MINUTE(`order_date`) * 60 + SECOND(`order_date`)) SECOND)".to_string(), "second".to_string()],
-        ];
-
-        for [subquery, expected_granularity] in supported_granularities.iter() {
-            let logical_plan = convert_select_to_query_plan(
-                format!("SELECT COUNT(*), {} AS __timestamp FROM KibanaSampleDataEcommerce GROUP BY __timestamp", subquery), DatabaseProtocol::MySQL
-            ).await.as_logical_plan();
-
-            assert_eq!(
-                logical_plan.find_cube_scan().request,
-                V1LoadRequestQuery {
-                    measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
-                    dimensions: Some(vec![]),
-                    segments: Some(vec![]),
-                    time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
-                        dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
-                        granularity: Some(expected_granularity.to_string()),
-                        date_range: None,
-                    }]),
-                    order: None,
-                    limit: None,
-                    offset: None,
-                    filters: None,
-                    ungrouped: None,
-                }
-            )
-        }
-    }
-
-    #[tokio::test]
     async fn test_date_part_quarter_granularity() {
         let logical_plan = convert_select_to_query_plan(
             "
@@ -9212,6 +9160,8 @@ limit
 
     #[tokio::test]
     async fn test_redshift_charindex() -> Result<(), CubeError> {
+        init_logger();
+
         insta::assert_snapshot!(
             "redshift_charindex",
             execute_query(
@@ -13164,6 +13114,9 @@ limit
 
     #[tokio::test]
     async fn test_datastudio_min_max_date() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         init_logger();
 
         for fun in vec!["Max", "Min"].iter() {
@@ -13189,16 +13142,12 @@ limit
                     measures: Some(vec![]),
                     dimensions: Some(vec![]),
                     segments: Some(vec![]),
-                    time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
-                        dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
-                        granularity: Some("second".to_string()),
-                        date_range: None,
-                    },]),
+                    time_dimensions: None,
                     order: None,
                     limit: None,
                     offset: None,
                     filters: None,
-                    ungrouped: None,
+                    ungrouped: Some(true),
                 }
             )
         }
@@ -13297,6 +13246,9 @@ limit
 
     #[tokio::test]
     async fn test_extract_date_trunc_week() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         init_logger();
 
         let supported_granularities = vec![
@@ -13310,7 +13262,7 @@ limit
             ),
         ];
 
-        for (expr, granularity) in supported_granularities {
+        for (expr, _granularity) in supported_granularities {
             let logical_plan = convert_select_to_query_plan(
                 format!(
                     "SELECT {} AS \"qt_u3dj8wr1vc\" FROM KibanaSampleDataEcommerce GROUP BY \"qt_u3dj8wr1vc\"",
@@ -13327,16 +13279,12 @@ limit
                     measures: Some(vec![]),
                     dimensions: Some(vec![]),
                     segments: Some(vec![]),
-                    time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
-                        dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
-                        granularity: Some(granularity.to_string()),
-                        date_range: None,
-                    }]),
+                    time_dimensions: None,
                     order: None,
                     limit: None,
                     offset: None,
                     filters: None,
-                    ungrouped: None,
+                    ungrouped: Some(true),
                 }
             )
         }
@@ -14897,7 +14845,7 @@ limit
         assert_eq!(
             logical_plan.find_cube_scan().request,
             V1LoadRequestQuery {
-                measures: Some(vec![]),
+                measures: Some(vec!["KibanaSampleDataEcommerce.sumPrice".to_string()]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
                 time_dimensions: None,
@@ -14905,7 +14853,7 @@ limit
                 limit: None,
                 offset: None,
                 filters: None,
-                ungrouped: Some(true),
+                ungrouped: None,
             }
         )
     }
@@ -17580,6 +17528,9 @@ limit
 
     #[tokio::test]
     async fn test_thoughtspot_avg_cast_arg() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         init_logger();
 
         let logical_plan = convert_select_to_query_plan(
@@ -17603,15 +17554,15 @@ limit
         assert_eq!(
             logical_plan.find_cube_scan().request,
             V1LoadRequestQuery {
-                measures: Some(vec!["KibanaSampleDataEcommerce.avgPrice".to_string()]),
-                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
+                measures: Some(vec![]),
+                dimensions: Some(vec![]),
                 segments: Some(vec![]),
                 time_dimensions: None,
                 order: None,
                 limit: None,
                 offset: None,
                 filters: None,
-                ungrouped: None,
+                ungrouped: Some(true),
             }
         )
     }
@@ -18847,12 +18798,16 @@ limit
                 measures: Some(vec![]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("month".to_string()),
+                    date_range: None
+                }]),
                 order: None,
                 limit: None,
                 offset: None,
                 filters: None,
-                ungrouped: Some(true),
+                ungrouped: None,
             }
         )
     }
@@ -19191,7 +19146,7 @@ limit
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
-            "SELECT COALESCE(customer_gender, 'N/A'), AVG(avgPrice) mp FROM KibanaSampleDataEcommerce a GROUP BY 1"
+            "SELECT COALESCE(customer_gender, 'N/A', 'NN'), AVG(avgPrice) mp FROM KibanaSampleDataEcommerce a GROUP BY 1"
                 .to_string(),
             DatabaseProtocol::PostgreSQL,
         )
@@ -20017,14 +19972,18 @@ limit
             logical_plan.find_cube_scan().request,
             V1LoadRequestQuery {
                 measures: Some(vec![]),
-                dimensions: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 segments: Some(vec![]),
-                time_dimensions: None,
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("month".to_string()),
+                    date_range: None,
+                }]),
                 order: None,
                 limit: None,
                 offset: None,
                 filters: None,
-                ungrouped: Some(true),
+                ungrouped: None,
             }
         )
     }
@@ -20152,14 +20111,17 @@ limit
             logical_plan.find_cube_scan().request,
             V1LoadRequestQuery {
                 measures: Some(vec![]),
-                dimensions: Some(vec![]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.order_date".to_string(),
+                    "KibanaSampleDataEcommerce.customer_gender".to_string()
+                ]),
                 segments: Some(vec![]),
                 time_dimensions: None,
                 order: None,
                 limit: None,
                 offset: None,
                 filters: None,
-                ungrouped: Some(true),
+                ungrouped: None,
             }
         )
     }

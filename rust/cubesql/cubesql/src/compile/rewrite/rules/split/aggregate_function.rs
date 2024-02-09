@@ -2,13 +2,13 @@ use crate::{
     compile::rewrite::{
         agg_fun_expr,
         analysis::LogicalPlanAnalysis,
-        column_expr, literal_expr,
+        column_expr, literal_expr, literal_int,
         rules::{members::MemberRules, split::SplitRules},
         AggregateFunctionExprDistinct, AggregateFunctionExprFun,
         AggregateSplitPushDownReplacerAliasToCube, ColumnExprColumn, LogicalPlanLanguage,
         ProjectionSplitPushDownReplacerAliasToCube,
     },
-    transport::V1CubeMetaExt,
+    transport::{V1CubeMetaExt, V1CubeMetaMeasureExt},
     var, var_iter,
 };
 use datafusion::{logical_plan::Column, physical_plan::aggregates::AggregateFunction};
@@ -31,6 +31,7 @@ impl SplitRules {
                 Some("?distinct"),
                 "?output_fun_name",
                 "?alias_to_cube",
+                true,
             ),
             true,
             rules,
@@ -47,6 +48,30 @@ impl SplitRules {
                 Some("?distinct"),
                 "?output_fun_name",
                 "?alias_to_cube",
+                true,
+            ),
+            true,
+            rules,
+        );
+        self.single_arg_split_point_rules(
+            "aggregate-function-non-matching-count",
+            || agg_fun_expr("?fun_name", vec![column_expr("?column")], "?distinct"),
+            || {
+                agg_fun_expr(
+                    "Count",
+                    vec![literal_int(1)],
+                    "AggregateFunctionExprDistinct:false",
+                )
+            },
+            // ?distinct would always match
+            |alias_column| agg_fun_expr("?output_fun_name", vec![alias_column], "?distinct"),
+            self.transform_aggregate_function(
+                Some("?fun_name"),
+                Some("?column"),
+                Some("?distinct"),
+                "?output_fun_name",
+                "?alias_to_cube",
+                false,
             ),
             true,
             rules,
@@ -60,6 +85,7 @@ impl SplitRules {
         distinct_var: Option<&str>,
         output_fun_var: &str,
         alias_to_cube_var: &str,
+        should_match_agg_fun: bool,
     ) -> impl Fn(
         bool,
         &mut egg::EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
@@ -123,6 +149,25 @@ impl SplitRules {
                                                 _ => continue,
                                             }
                                         };
+
+                                        let agg_type =
+                                            MemberRules::get_agg_type(Some(&fun), *distinct);
+
+                                        if should_match_agg_fun {
+                                            if !measure.is_same_agg_type(&agg_type.unwrap(), false)
+                                            {
+                                                continue;
+                                            }
+                                        } else {
+                                            match fun {
+                                                AggregateFunction::Count if *distinct => continue,
+                                                AggregateFunction::Count => (),
+                                                _ => continue,
+                                            }
+                                            if measure.is_same_agg_type(&agg_type.unwrap(), false) {
+                                                continue;
+                                            }
+                                        }
 
                                         let output_fun = egraph.add(
                                             LogicalPlanLanguage::AggregateFunctionExprFun(

@@ -1,14 +1,11 @@
 use crate::{
-    compile::{
-        engine::df::scan::DataType,
-        rewrite::{
-            analysis::{ConstantFolding, LogicalPlanAnalysis},
-            cast_expr, cast_expr_explicit, column_expr, fun_expr, literal_expr, literal_string,
-            rules::{split::SplitRules, utils::parse_granularity_string},
-            udf_expr, AliasExprAlias, LiteralExprValue, LogicalPlanLanguage,
-        },
+    compile::rewrite::{
+        analysis::{ConstantFolding, LogicalPlanAnalysis},
+        column_expr, fun_expr, literal_expr,
+        rules::{split::SplitRules, utils::parse_granularity_string},
+        LiteralExprValue, LogicalPlanLanguage,
     },
-    var, var_iter,
+    var,
 };
 use datafusion::scalar::ScalarValue;
 use egg::Rewrite;
@@ -93,7 +90,7 @@ impl SplitRules {
            + Clone {
         let granularity_var = var!(granularity_var);
         let output_granularity_var = var!(output_granularity_var);
-        move |is_projection, egraph, subst| {
+        move |_, egraph, subst| {
             if let Some(ConstantFolding::Scalar(ScalarValue::Utf8(Some(granularity)))) =
                 &egraph[subst[granularity_var]].data.constant
             {

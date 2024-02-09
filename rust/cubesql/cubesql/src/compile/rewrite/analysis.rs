@@ -3,16 +3,16 @@ use crate::{
         engine::provider::CubeContext,
         rewrite::{
             converter::{is_expr_node, node_to_expr, LogicalPlanToLanguageConverter},
-            expr_column_name, AggregateUDFExprFun, AliasExprAlias, AliasExprSplit, AllMembersAlias,
-            AllMembersCube, ChangeUserCube, ColumnExprColumn, DimensionName, FilterMemberMember,
-            FilterMemberOp, LiteralExprValue, LiteralMemberRelation, LiteralMemberValue,
-            LogicalPlanLanguage, MeasureName, ScalarFunctionExprFun, SegmentMemberMember,
-            SegmentName, TableScanSourceTableName, TimeDimensionDateRange,
-            TimeDimensionGranularity, TimeDimensionName, VirtualFieldCube, VirtualFieldName,
+            expr_column_name, AggregateUDFExprFun, AliasExprAlias, AllMembersAlias, AllMembersCube,
+            ChangeUserCube, ColumnExprColumn, DimensionName, FilterMemberMember, FilterMemberOp,
+            LiteralExprValue, LiteralMemberRelation, LiteralMemberValue, LogicalPlanLanguage,
+            MeasureName, ScalarFunctionExprFun, SegmentMemberMember, SegmentName,
+            TableScanSourceTableName, TimeDimensionDateRange, TimeDimensionGranularity,
+            TimeDimensionName, VirtualFieldCube, VirtualFieldName,
         },
     },
     transport::ext::{V1CubeMetaDimensionExt, V1CubeMetaMeasureExt, V1CubeMetaSegmentExt},
-    var_iter, CubeError,
+    var_iter, var_list_iter, CubeError,
 };
 use datafusion::{
     arrow::{
@@ -1274,8 +1274,8 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
         if let Some(ConstantFolding::Scalar(c)) = &egraph[id].data.constant {
             // As ConstantFolding goes through Alias we can't add LiteralExpr at this level otherwise it gets dropped.
             // In case there's wrapping node on top of Alias that can be evaluated to LiteralExpr further it gets replaced instead.
-            if let Some(OriginalExpr::Expr(Expr::Alias(_, _))) =
-                egraph[id].data.original_expr.as_ref()
+            if var_list_iter!(egraph[id], AliasExpr).next().is_some()
+                || var_list_iter!(egraph[id], LiteralExpr).next().is_some()
             {
                 return;
             }
@@ -1312,9 +1312,7 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
                 let alias = egraph.add(LogicalPlanLanguage::AliasExprAlias(AliasExprAlias(
                     alias_name.clone(),
                 )));
-                let split = egraph.add(LogicalPlanLanguage::AliasExprSplit(AliasExprSplit(false)));
-                let alias_expr =
-                    egraph.add(LogicalPlanLanguage::AliasExpr([literal_expr, alias, split]));
+                let alias_expr = egraph.add(LogicalPlanLanguage::AliasExpr([literal_expr, alias]));
                 egraph.union(id, alias_expr);
             } else {
                 egraph.union(id, literal_expr);

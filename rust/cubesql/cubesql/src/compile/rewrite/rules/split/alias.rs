@@ -1,9 +1,6 @@
 use crate::compile::rewrite::{
     aggregate_split_pullup_replacer, aggregate_split_pushdown_replacer, alias_expr,
-    alias_expr_split_replacer, analysis::LogicalPlanAnalysis, column_expr,
-    projection_split_pullup_replacer, projection_split_pushdown_replacer, rewrite,
-    rules::split::SplitRules, transforming_chain_rewrite, transforming_rewrite,
-    LogicalPlanLanguage,
+    analysis::LogicalPlanAnalysis, rewrite, rules::split::SplitRules, LogicalPlanLanguage,
 };
 use egg::Rewrite;
 

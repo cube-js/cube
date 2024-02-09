@@ -527,10 +527,10 @@ impl Rewriter {
                 .extend(SplitRules::new(meta_context.clone(), config_obj.clone()).rewrite_rules());
         } else {
             rewrites.extend(
-                Box::new(OldSplitRules::new(meta_context.clone(), config_obj.clone()))
+                OldSplitRules::new(meta_context.clone(), config_obj.clone())
                     .rewrite_rules(),
             );
-            rewrites.extend(Box::new(CaseRules::new()).rewrite_rules());
+            rewrites.extend(CaseRules::new().rewrite_rules());
         }
         if let Ok(disabled_rule_names) = env::var("CUBESQL_DISABLE_REWRITES") {
             let disabled_rule_names = disabled_rule_names
