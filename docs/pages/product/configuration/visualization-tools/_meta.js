@@ -11,6 +11,7 @@ module.exports = {
   "metabase": "Metabase",
   "observable": "Observable",
   "powerbi": "Power BI",
+  "push-ai": "Push AI",
   "retool": "Retool",
   "steep": "Steep",
   "streamlit": "Streamlit",
