@@ -1,0 +1,112 @@
+# Microsoft Entra ID
+
+Cube Cloud supports authenticating users through [Microsoft Entra
+ID][ext-ms-entra-id] (formerly Azure Active Directory), which is
+useful when you want your users to access Cube Cloud using single sign-on.
+
+This guide will walk you through the steps of configuring SAML authentication
+in Cube Cloud with Entra ID. You **must** have sufficient permissions in your
+Azure account to create a new Enterprise Application and configure SAML
+integration.
+
+<SuccessBox>
+
+Single sign-on with Microsoft Entra ID is available in Cube Cloud on
+[Enterprise](https://cube.dev/pricing) tier.
+[Contact us](https://cube.dev/contact) for details.
+
+</SuccessBox>
+
+## Enable SAML in Cube Cloud
+
+First, we'll enable SAML 2.0 authentication in Cube Cloud:
+
+1. Click your username from the top-right corner, then click <Btn>Team &
+   Security</Btn>.
+
+2. On the <Btn>Authentication & SSO</Btn> tab, ensure <Btn>SAML 2.0</Btn> is
+   enabled:
+
+<Screenshot
+  alt="Cube Cloud Team Authentication and SSO tab"
+  src="https://ucarecdn.com/f5ff1413-f37c-4476-afcc-0ff29e87e80a/"
+/>
+
+Take note of the <Btn>Single Sign On URL</Btn> and <Btn>Service Provider Entity
+ID</Btn> values here, as we will need them in the next step when we configure
+the SAML integration in Entra ID.
+
+## Create a new Enterprise Application in Azure
+
+Go to [Enterprise Applications](https://portal.azure.com/#view/Microsoft_AAD_IAM/StartboardApplicationsMenuBlade/~/AppAppsPreview)
+in your Azure account and click <Btn>New application</Btn>.
+
+<Screenshot src="https://ucarecdn.com/57ed6718-5c4e-46e1-831b-f372153696bd/"/>
+
+Select <Btn>Create your own application</Btn> at the top:
+
+<Screenshot src="https://ucarecdn.com/06f40439-995a-4156-81b1-7d340b87e945/"/>
+
+Give it a name and choose a *non-gallery application*:
+
+<Screenshot src="https://ucarecdn.com/36f6c0c1-4d4d-460a-a640-0aba178490d8/"/>
+
+Go to the <Btn>Single sign-on</Btn> section and select <Btn>SAML</Btn>:
+
+<Screenshot src="https://ucarecdn.com/81d9df03-a08f-452f-b55a-574b2d4db875/"/>
+
+Fill-in <Btn>Entity ID</Btn> and <Btn>Reply URL</Btn> from the [SAML
+configuration page](#enable-saml-in-cube-cloud) in Cube Cloud:
+
+<Screenshot src="https://ucarecdn.com/266696dc-09ef-403f-a3e5-5ba913941875/"/>
+
+Go to <Btn>Attributes & Claims → Edit → Advanced settings</Btn>:
+
+<Screenshot src="https://ucarecdn.com/752b5a3a-29eb-4863-8ce8-8cc8a7caa0c2/"/>
+
+Set the audience claim override to the value given you by the [SAML
+configuration page](#enable-saml-in-cube-cloud) in Cube Cloud:
+
+<Screenshot src="https://ucarecdn.com/a2650781-be3a-48a1-8e79-7e1e7a8607a5/"/>
+
+Go to <Btn>SAML Certificates → Edit</Btn> and select <Btn>Sign SAML response
+and assertion</Btn> for <Btn>Signing Option</Btn>:
+
+<Screenshot src="https://ucarecdn.com/c81e7900-d448-4e8c-85be-99854ec1b582/"/>
+
+Download <Btn>Federation Metadata XML</Btn>:
+
+<Screenshot src="https://ucarecdn.com/d98970cf-a6ea-4206-be23-078e460515ff/"/>
+
+## Complete configuration in Cube Cloud
+
+Upload it to Cube Cloud through <Btn>Advanced Settings</Btn> tab on the [SAML
+configuration page](#enable-saml-in-cube-cloud) in Cube Cloud:
+
+<Screenshot src="https://ucarecdn.com/3ae24797-bd0a-477c-9b9a-420602694616/"/>
+
+Select <Btn>SHA-256</Btn> as <Btn>Signature Algorithm</Btn>:
+
+<Screenshot src="https://ucarecdn.com/e0c8c608-9b1e-4b84-a51e-0613362c6aec/"/>
+
+Enter “[http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name](http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name)”
+or a preferred attribute to lookup email address in <Btn>Attributes → Email</Btn>:
+
+<Screenshot src="https://ucarecdn.com/4fe50791-8203-49d4-9056-e5de6dc5643c/"/>
+
+Save settings on the Cube Cloud side.
+
+## Final steps
+
+Make sure the new Azure application is assigned to some users or a group:
+
+<Screenshot src="https://ucarecdn.com/05b7cd95-5afd-4b00-8946-5ab0c955365b/"/>
+
+At the bottom of the <Btn>Single sign-on</Btn> section, select <Btn>Test</Btn>
+and verify that the SAML integration now works for your Cube Cloud account:
+
+<Screenshot src="https://ucarecdn.com/f30f9416-64da-4cf6-ae45-e24ce678e001/"/>
+
+Done! 🎉
+
+[ext-ms-entra-id]: https://www.microsoft.com/en-us/security/business/identity-access/microsoft-entra-id
