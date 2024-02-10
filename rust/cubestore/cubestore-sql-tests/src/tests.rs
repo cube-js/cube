@@ -5281,7 +5281,7 @@ async fn rolling_window_filtered(service: Box<dyn SqlClient>) {
             "INSERT INTO s.data(category, day, count, claimed_count)\
                         VALUES \
                          ('eth', '2023-12-12T00:00:00.000Z', 1, 1), \
-                         ('github', '2023-12-12T00:00:00.000Z', 0, 0), \
+                         ('github', '2023-12-08T00:00:00.000Z', 1, 1), \
                          ('github', '2023-12-06T00:00:00.000Z', 2, 2), \
                          ('starkex', '2023-12-05T00:00:00.000Z', 0, 0), \
                          ('starkex', '2023-12-07T00:00:00.000Z', 1, 1)",
@@ -5320,18 +5320,34 @@ async fn rolling_window_filtered(service: Box<dyn SqlClient>) {
                         s.data \
                          \
                     ) AS `starknet_test_provisions__eth_cumulative` \
+                    WHERE `starknet_test_provisions__eth_cumulative`.category = 'github'
                     GROUP BY \
                     1 \
                 ) `base` ROLLING_WINDOW DIMENSION `day` \
                 GROUP BY \
                 DIMENSION `day` \
                 FROM \
-                date_trunc('day', to_timestamp('2023-12-01T00:00:00.000')) TO date_trunc('day', to_timestamp('2023-12-20T13:41:12.000')) EVERY INTERVAL '1 day' 
+                date_trunc('day', to_timestamp('2023-12-04T00:00:00.000')) TO date_trunc('day', to_timestamp('2023-12-10T13:41:12.000')) EVERY INTERVAL '1 day'
+                ORDER BY 1
             ",
         )
         .await
         .unwrap();
-    println!("{:?}", r);
+    let days = (4..=10)
+        .map(|d| timestamp_from_string(&format!("2023-12-{:02}T00:00:00.000Z", d)).unwrap())
+        .collect_vec();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (days[0], None, None),
+            (days[1], None, None),
+            (days[2], Some(2), Some(2)),
+            (days[3], Some(2), None),
+            (days[4], Some(3), Some(1)),
+            (days[5], Some(3), None),
+            (days[6], Some(3), None),
+        ])
+    );
 }
 
 async fn decimal_index(service: Box<dyn SqlClient>) {
