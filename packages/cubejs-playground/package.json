@@ -1,7 +1,7 @@
 {
   "name": "@cubejs-client/playground",
   "author": "Cube Dev, Inc.",
-  "version": "0.34.50",
+  "version": "0.34.51",
   "engines": {},
   "repository": {
     "type": "git",
@@ -58,9 +58,9 @@
     "uuid": "^8.3.2"
   },
   "devDependencies": {
-    "@cube-dev/ui-kit": "0.30.0",
     "@ant-design/compatible": "^1.0.2",
     "@ant-design/icons": "^4.7.0",
+    "@cube-dev/ui-kit": "0.30.0",
     "@cubejs-client/core": "^0.34.37",
     "@cubejs-client/react": "^0.34.46",
     "@types/flexsearch": "^0.7.3",
@@ -92,6 +92,7 @@
   },
   "peerDependencies": {
     "@ant-design/icons": ">=4.7.0",
+    "@cube-dev/ui-kit": ">=0.30.0",
     "@cubejs-client/core": ">=0.30.0",
     "@cubejs-client/react": ">=0.30.0",
     "antd": ">=4.16.13",
@@ -99,7 +100,6 @@
     "prismjs": ">=1.25.0",
     "react": ">=17.0.1",
     "react-dom": ">=17.0.1",
-    "styled-components": ">=5.2.0",
-    "@cube-dev/ui-kit": ">=0.30.0"
+    "styled-components": ">=5.2.0"
   }
 }

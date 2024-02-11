@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.51](https://github.com/cube-js/cube.js/compare/v0.34.50...v0.34.51) (2024-02-11)
+
+
+### Bug Fixes
+
+* **cubesql:** Stabilize split operations for SQL push down ([#7725](https://github.com/cube-js/cube.js/issues/7725)) ([6241e5e](https://github.com/cube-js/cube.js/commit/6241e5e9335148947a687f7e3d6b56929ba46c36))
+
+
+
+
+
 ## [0.34.50](https://github.com/cube-js/cube/compare/v0.34.49...v0.34.50) (2024-01-31)
 
 **Note:** Version bump only for package @cubejs-backend/docker

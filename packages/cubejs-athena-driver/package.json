@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/athena-driver",
   "description": "Cube.js Athena database driver",
   "author": "Cube Dev, Inc.",
-  "version": "0.34.50",
+  "version": "0.34.51",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
@@ -37,7 +37,7 @@
   },
   "devDependencies": {
     "@cubejs-backend/linter": "^0.34.25",
-    "@cubejs-backend/testing-shared": "^0.34.50",
+    "@cubejs-backend/testing-shared": "^0.34.51",
     "@types/ramda": "^0.27.40",
     "typescript": "~5.2.2"
   },
