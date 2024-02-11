@@ -31,7 +31,6 @@
     "@aws-sdk/client-s3": "^3.49.0",
     "@aws-sdk/s3-request-presigner": "^3.49.0",
     "@azure/storage-blob": "^12.9.0",
-    "@azure/core-util": "1.6.1",
     "@cubejs-backend/base-driver": "^0.34.47",
     "@cubejs-backend/jdbc-driver": "^0.34.50",
     "@cubejs-backend/schema-compiler": "^0.34.50",
