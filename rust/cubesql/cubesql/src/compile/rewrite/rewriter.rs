@@ -9,7 +9,7 @@ use crate::{
             rules::{
                 case::CaseRules, common::CommonRules, dates::DateRules, filters::FilterRules,
                 members::MemberRules, old_split::OldSplitRules, order::OrderRules,
-                wrapper::WrapperRules,
+                split::SplitRules, wrapper::WrapperRules,
             },
             LiteralExprValue, LogicalPlanLanguage, QueryParamIndex,
         },
@@ -332,7 +332,8 @@ impl Rewriter {
                 let (runner, qtrace_egraph_iterations) =
                     Self::run_rewrites(&cube_context, egraph, rules, "final")?;
 
-                let extractor = Extractor::new(&runner.egraph, BestCubePlan);
+                let extractor =
+                    Extractor::new(&runner.egraph, BestCubePlan::new(cube_context.meta.clone()));
                 let (best_cost, best) = extractor.find_best(root);
                 let qtrace_best_graph = if Qtrace::is_enabled() {
                     best.as_ref().iter().cloned().collect()
@@ -514,8 +515,6 @@ impl Rewriter {
             Box::new(DateRules::new()),
             Box::new(OrderRules::new()),
             Box::new(CommonRules::new()),
-            Box::new(OldSplitRules::new(meta_context.clone(), config_obj.clone())),
-            Box::new(CaseRules::new()),
         ];
         let mut rewrites = Vec::new();
         for r in rules {
@@ -525,6 +524,15 @@ impl Rewriter {
             rewrites.extend(
                 WrapperRules::new(meta_context.clone(), config_obj.clone()).rewrite_rules(),
             );
+        }
+        if config_obj.push_down_pull_up_split() {
+            rewrites
+                .extend(SplitRules::new(meta_context.clone(), config_obj.clone()).rewrite_rules());
+        } else {
+            rewrites.extend(
+                OldSplitRules::new(meta_context.clone(), config_obj.clone()).rewrite_rules(),
+            );
+            rewrites.extend(CaseRules::new().rewrite_rules());
         }
         if let Ok(disabled_rule_names) = env::var("CUBESQL_DISABLE_REWRITES") {
             let disabled_rule_names = disabled_rule_names

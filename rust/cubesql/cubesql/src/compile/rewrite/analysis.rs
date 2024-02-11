@@ -12,7 +12,7 @@ use crate::{
         },
     },
     transport::ext::{V1CubeMetaDimensionExt, V1CubeMetaMeasureExt, V1CubeMetaSegmentExt},
-    var_iter, CubeError,
+    var_iter, var_list_iter, CubeError,
 };
 use datafusion::{
     arrow::{
@@ -366,6 +366,25 @@ impl LogicalPlanAnalysis {
                 }
                 Some(trivial + 1)
             }
+            // TODO if there's an aggregate function then we should have more complex logic than that
+            // LogicalPlanLanguage::AggregateFunctionExprFun(AggregateFunctionExprFun(fun)) => {
+            //     match fun {
+            //         AggregateFunction::Count
+            //         | AggregateFunction::Sum
+            //         | AggregateFunction::Avg
+            //         | AggregateFunction::Min
+            //         | AggregateFunction::Max => Some(0),
+            //         _ => None,
+            //     }
+            // }
+            // LogicalPlanLanguage::AggregateFunctionExpr(params) => {
+            //     let mut trivial = 0;
+            //     for id in params.iter() {
+            //         trivial = trivial_push_down(*id)?.max(trivial);
+            //     }
+            //     Some(trivial + 1)
+            // }
+            // LogicalPlanLanguage::AggregateFunctionExprDistinct(_) => Some(0),
             _ => None,
         }
     }
@@ -1022,23 +1041,15 @@ impl LogicalPlanAnalysis {
                 // Some casts from string can have unpredictable behavior
                 if let Expr::Cast { expr, data_type } = &expr {
                     match expr.as_ref() {
-                        Expr::Literal(ScalarValue::Utf8(value)) => match (value, data_type) {
+                        Expr::Literal(ScalarValue::Utf8(Some(value))) => match (value, data_type) {
                             // Timezone set in Config
-                            (Some(_), DataType::Timestamp(_, _)) => (),
-                            (Some(_), DataType::Date32 | DataType::Date64) => (),
+                            (_, DataType::Timestamp(_, _)) => (),
+                            (_, DataType::Date32 | DataType::Date64) => (),
+                            (_, DataType::Interval(_)) => (),
                             _ => return None,
                         },
                         _ => (),
                     }
-                }
-
-                // TODO: Support decimal type in filters and remove it
-                if let Expr::Cast {
-                    data_type: DataType::Decimal(_, _),
-                    ..
-                } = &expr
-                {
-                    return None;
                 }
 
                 Self::eval_constant_expr(&egraph, &expr)
@@ -1274,8 +1285,8 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
         if let Some(ConstantFolding::Scalar(c)) = &egraph[id].data.constant {
             // As ConstantFolding goes through Alias we can't add LiteralExpr at this level otherwise it gets dropped.
             // In case there's wrapping node on top of Alias that can be evaluated to LiteralExpr further it gets replaced instead.
-            if let Some(OriginalExpr::Expr(Expr::Alias(_, _))) =
-                egraph[id].data.original_expr.as_ref()
+            if var_list_iter!(egraph[id], AliasExpr).next().is_some()
+                || var_list_iter!(egraph[id], LiteralExpr).next().is_some()
             {
                 return;
             }
@@ -1286,6 +1297,7 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
                     c,
                     ScalarValue::Date32(_)
                         | ScalarValue::Date64(_)
+                        | ScalarValue::Int32(_)
                         | ScalarValue::Int64(_)
                         | ScalarValue::Int32(_)
                         | ScalarValue::Float64(_)
@@ -1311,7 +1323,7 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
             let literal_expr = egraph.add(LogicalPlanLanguage::LiteralExpr([value]));
             if let Some(alias_name) = alias_name {
                 let alias = egraph.add(LogicalPlanLanguage::AliasExprAlias(AliasExprAlias(
-                    alias_name,
+                    alias_name.clone(),
                 )));
                 let alias_expr = egraph.add(LogicalPlanLanguage::AliasExpr([literal_expr, alias]));
                 egraph.union(id, alias_expr);

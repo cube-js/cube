@@ -1,10 +1,25 @@
-use crate::compile::rewrite::{
-    CubeScanWrapped, LogicalPlanLanguage, MemberErrorPriority, ScalarUDFExprFun,
-    TimeDimensionGranularity,
+use crate::{
+    compile::{
+        rewrite::{
+            rules::utils::granularity_str_to_int_order, CubeScanWrapped, DimensionName,
+            LogicalPlanLanguage, MemberErrorPriority, ScalarUDFExprFun, TimeDimensionGranularity,
+        },
+        MetaContext,
+    },
+    transport::V1CubeMetaDimensionExt,
 };
 use egg::{CostFunction, Id, Language};
+use std::sync::Arc;
 
-pub struct BestCubePlan;
+pub struct BestCubePlan {
+    meta_context: Arc<MetaContext>,
+}
+
+impl BestCubePlan {
+    pub fn new(meta_context: Arc<MetaContext>) -> Self {
+        Self { meta_context }
+    }
+}
 
 /// This cost struct maintains following structural relationships:
 /// - `replacers` > other nodes - having replacers in structure means not finished processing
@@ -33,7 +48,10 @@ pub struct CubePlanCost {
     ast_size_outside_wrapper: usize,
     cube_members: i64,
     errors: i64,
+    time_dimensions_used_as_dimensions: i64,
+    max_time_dimensions_granularity: i64,
     cube_scan_nodes: i64,
+    ast_size_without_alias: usize,
     ast_size: usize,
     ast_size_inside_wrapper: usize,
 }
@@ -113,6 +131,12 @@ impl CubePlanCost {
                 + other.ast_size_outside_wrapper,
             wrapper_nodes: self.wrapper_nodes + other.wrapper_nodes,
             cube_scan_nodes: self.cube_scan_nodes + other.cube_scan_nodes,
+            time_dimensions_used_as_dimensions: self.time_dimensions_used_as_dimensions
+                + other.time_dimensions_used_as_dimensions,
+            max_time_dimensions_granularity: self
+                .max_time_dimensions_granularity
+                .max(other.max_time_dimensions_granularity),
+            ast_size_without_alias: self.ast_size_without_alias + other.ast_size_without_alias,
             ast_size: self.ast_size + other.ast_size,
             ast_size_inside_wrapper: self.ast_size_inside_wrapper + other.ast_size_inside_wrapper,
         }
@@ -150,8 +174,11 @@ impl CubePlanCost {
                     }
                 }
             } + self.empty_wrappers,
+            time_dimensions_used_as_dimensions: self.time_dimensions_used_as_dimensions,
+            max_time_dimensions_granularity: self.max_time_dimensions_granularity,
             wrapper_nodes: self.wrapper_nodes,
             cube_scan_nodes: self.cube_scan_nodes,
+            ast_size_without_alias: self.ast_size_without_alias,
             ast_size: self.ast_size,
             ast_size_inside_wrapper: self.ast_size_inside_wrapper,
         }
@@ -268,6 +295,28 @@ impl CostFunction<LogicalPlanLanguage> for BestCubePlan {
             _ => 0,
         };
 
+        let time_dimensions_used_as_dimensions = match enode {
+            LogicalPlanLanguage::DimensionName(DimensionName(name)) => {
+                if let Some(dimension) = self.meta_context.find_dimension_with_name(name.clone()) {
+                    if dimension.is_time() {
+                        1
+                    } else {
+                        0
+                    }
+                } else {
+                    0
+                }
+            }
+            _ => 0,
+        };
+
+        let max_time_dimensions_granularity = match enode {
+            LogicalPlanLanguage::TimeDimensionGranularity(TimeDimensionGranularity(Some(
+                granularity,
+            ))) => (8 - granularity_str_to_int_order(granularity, Some(false)).unwrap_or(0)) as i64,
+            _ => 0,
+        };
+
         let this_errors = match enode {
             LogicalPlanLanguage::MemberErrorPriority(MemberErrorPriority(priority)) => {
                 (100 - priority) as i64
@@ -282,6 +331,13 @@ impl CostFunction<LogicalPlanLanguage> for BestCubePlan {
             LogicalPlanLanguage::CrossJoin(_) => 1,
             _ => 0,
         };
+
+        let ast_size_without_alias = match enode {
+            LogicalPlanLanguage::AliasExpr(_) => 0,
+            LogicalPlanLanguage::AliasExprAlias(_) => 0,
+            _ => 1,
+        };
+
         let initial_cost = CubePlanCostAndState {
             cost: CubePlanCost {
                 replacers: this_replacers,
@@ -293,12 +349,15 @@ impl CostFunction<LogicalPlanLanguage> for BestCubePlan {
                 non_pushed_down_window,
                 cube_members,
                 errors: this_errors,
+                time_dimensions_used_as_dimensions,
+                max_time_dimensions_granularity,
                 structure_points,
                 wrapper_nodes,
                 empty_wrappers: 0,
                 ast_size_outside_wrapper: 0,
                 ast_size_inside_wrapper,
                 cube_scan_nodes,
+                ast_size_without_alias,
                 ast_size: 1,
             },
             state: match enode {

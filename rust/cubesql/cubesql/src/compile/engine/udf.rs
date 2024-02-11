@@ -1,6 +1,6 @@
 use std::{any::type_name, collections::HashMap, convert::TryFrom, sync::Arc, thread};
 
-use chrono::{Datelike, NaiveDate, NaiveDateTime, NaiveTime};
+use chrono::{Datelike, Days, Duration, Months, NaiveDate, NaiveDateTime, NaiveTime};
 use datafusion::{
     arrow::{
         array::{
@@ -14,8 +14,8 @@ use datafusion::{
         compute::{cast, cast_with_options, concat, CastOptions},
         datatypes::{
             DataType, Date32Type, Field, Float64Type, Int32Type, Int64Type, IntervalDayTimeType,
-            IntervalUnit, IntervalYearMonthType, TimeUnit, TimestampNanosecondType, UInt32Type,
-            UInt64Type,
+            IntervalMonthDayNanoType, IntervalUnit, IntervalYearMonthType, TimeUnit,
+            TimestampNanosecondType, UInt32Type, UInt64Type,
         },
     },
     error::{DataFusionError, Result},
@@ -1180,6 +1180,15 @@ pub fn create_date_add_udf() -> ScalarUDF {
                 true
             )
         }
+        DataType::Interval(IntervalUnit::MonthDayNano) => {
+            date_math_udf!(
+                args,
+                TimestampNanosecondType,
+                IntervalMonthDayNanoType,
+                date_addsub_month_day_nano,
+                true
+            )
+        }
         _ => Err(DataFusionError::Execution(format!(
             "unsupported interval type"
         ))),
@@ -1207,6 +1216,14 @@ pub fn create_date_add_udf() -> ScalarUDF {
                 TypeSignature::Exact(vec![
                     DataType::Timestamp(TimeUnit::Nanosecond, Some("UTC".to_string())),
                     DataType::Interval(IntervalUnit::YearMonth),
+                ]),
+                TypeSignature::Exact(vec![
+                    DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    DataType::Interval(IntervalUnit::MonthDayNano),
+                ]),
+                TypeSignature::Exact(vec![
+                    DataType::Timestamp(TimeUnit::Nanosecond, Some("UTC".to_string())),
+                    DataType::Interval(IntervalUnit::MonthDayNano),
                 ]),
             ],
             Volatility::Immutable,
@@ -1331,6 +1348,36 @@ fn date_addsub_year_month(t: NaiveDateTime, i: i32, is_add: bool) -> Result<Naiv
             )))
         }
     };
+}
+
+fn date_addsub_month_day_nano(t: NaiveDateTime, i: i128, is_add: bool) -> Result<NaiveDateTime> {
+    let month = (i >> (64 + 32)) & 0xFFFFFFFF;
+    let day = (i >> 64) & 0xFFFFFFFF;
+    let nano = i & 0xFFFFFFFFFFFFFFFF;
+
+    let result = if month > 0 && is_add || month < 0 && !is_add {
+        t.checked_add_months(Months::new(month as u32))
+    } else {
+        t.checked_sub_months(Months::new(month.abs() as u32))
+    };
+
+    let result = if day > 0 && is_add || day < 0 && !is_add {
+        result.and_then(|t| t.checked_add_days(Days::new(day as u64)))
+    } else {
+        result.and_then(|t| t.checked_sub_days(Days::new(day.abs() as u64)))
+    };
+
+    let result = result.and_then(|t| {
+        t.checked_add_signed(Duration::nanoseconds(
+            (nano as i64) * (if !is_add { -1 } else { 1 }),
+        ))
+    });
+    result.ok_or_else(|| {
+        DataFusionError::Execution(format!(
+            "Failed to add interval: {} month {} day {} nano",
+            month, day, nano
+        ))
+    })
 }
 
 fn date_addsub_day_time(t: NaiveDateTime, interval: i64, is_add: bool) -> Result<NaiveDateTime> {

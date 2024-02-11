@@ -400,6 +400,28 @@ crate::plan_to_language! {
             members: Vec<LogicalPlan>,
             alias_to_cube: Vec<(String, String)>,
         },
+        AggregateSplitPushDownReplacer {
+            expr: Arc<Expr>,
+            list_node: Arc<Expr>,
+            alias_to_cube: Vec<(String, String)>,
+        },
+        AggregateSplitPullUpReplacer {
+            inner_expr: Arc<Expr>,
+            outer_expr: Arc<Expr>,
+            list_node: Arc<Expr>,
+            alias_to_cube: Vec<(String, String)>,
+        },
+        ProjectionSplitPushDownReplacer {
+            expr: Arc<Expr>,
+            list_node: Arc<Expr>,
+            alias_to_cube: Vec<(String, String)>,
+        },
+        ProjectionSplitPullUpReplacer {
+            inner_expr: Arc<Expr>,
+            outer_expr: Arc<Expr>,
+            list_node: Arc<Expr>,
+            alias_to_cube: Vec<(String, String)>,
+        },
         GroupExprSplitReplacer {
             members: Vec<LogicalPlan>,
             alias_to_cube: Vec<(String, String)>,
@@ -1177,6 +1199,52 @@ fn outer_aggregate_split_replacer(members: impl Display, alias_to_cube: impl Dis
     )
 }
 
+fn aggregate_split_pushdown_replacer(
+    expr: impl Display,
+    list_node: impl Display,
+    alias_to_cube: impl Display,
+) -> String {
+    format!(
+        "(AggregateSplitPushDownReplacer {} {} {})",
+        expr, list_node, alias_to_cube
+    )
+}
+
+fn aggregate_split_pullup_replacer(
+    inner_expr: impl Display,
+    outer_expr: impl Display,
+    list_node: impl Display,
+    alias_to_cube: impl Display,
+) -> String {
+    format!(
+        "(AggregateSplitPullUpReplacer {} {} {} {})",
+        inner_expr, outer_expr, list_node, alias_to_cube
+    )
+}
+
+fn projection_split_pushdown_replacer(
+    expr: impl Display,
+    list_node: impl Display,
+    alias_to_cube: impl Display,
+) -> String {
+    format!(
+        "(ProjectionSplitPushDownReplacer {} {} {})",
+        expr, list_node, alias_to_cube
+    )
+}
+
+fn projection_split_pullup_replacer(
+    inner_expr: impl Display,
+    outer_expr: impl Display,
+    list_node: impl Display,
+    alias_to_cube: impl Display,
+) -> String {
+    format!(
+        "(ProjectionSplitPullUpReplacer {} {} {} {})",
+        inner_expr, outer_expr, list_node, alias_to_cube
+    )
+}
+
 fn group_expr_split_replacer(members: impl Display, alias_to_cube: impl Display) -> String {
     format!("(GroupExprSplitReplacer {} {})", members, alias_to_cube)
 }
@@ -1530,15 +1598,22 @@ pub fn transform_original_expr_to_alias(
     alias_expr_var: &'static str,
 ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &mut Subst) -> bool {
     let alias_expr_var = var!(alias_expr_var);
-    move |egraph, root, subst| {
-        if let Some(original_expr) = original_expr_name(egraph, root) {
-            let alias = egraph.add(LogicalPlanLanguage::AliasExprAlias(AliasExprAlias(
-                original_expr,
-            )));
-            subst.insert(alias_expr_var, alias);
-            true
-        } else {
-            false
-        }
+    move |egraph, root, subst| add_root_original_expr_alias(egraph, root, subst, alias_expr_var)
+}
+
+pub fn add_root_original_expr_alias(
+    egraph: &mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+    root: Id,
+    subst: &mut Subst,
+    alias_expr_var: Var,
+) -> bool {
+    if let Some(original_expr) = original_expr_name(egraph, root) {
+        let alias = egraph.add(LogicalPlanLanguage::AliasExprAlias(AliasExprAlias(
+            original_expr,
+        )));
+        subst.insert(alias_expr_var, alias);
+        true
+    } else {
+        false
     }
 }

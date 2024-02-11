@@ -1394,18 +1394,6 @@ impl RewriteRules for OldSplitRules {
                     Some("?outer_column"),
                 ),
             ),
-            // Redshift CHARINDEX to STRPOS
-            rewrite(
-                "redshift-charindex-to-strpos",
-                udf_expr(
-                    "charindex",
-                    vec!["?substring", "?string"],
-                ),
-                fun_expr(
-                    "Strpos",
-                    vec!["?string", "?substring"],
-                ),
-            ),
             //
             rewrite(
                 "split-push-down-to-char-date-trunc-literal-inner-replacer",
@@ -5550,6 +5538,7 @@ impl OldSplitRules {
                                     let alias_expr_alias = egraph.add(
                                         LogicalPlanLanguage::AliasExprAlias(AliasExprAlias(alias)),
                                     );
+
                                     return egraph.add(LogicalPlanLanguage::AliasExpr([
                                         column_expr,
                                         alias_expr_alias,
