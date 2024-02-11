@@ -14,11 +14,7 @@ use crate::{
         rewrite::{
             analysis::LogicalPlanAnalysis,
             converter::{CubeRunner, LogicalPlanToLanguageConverter},
-            rewriter::RewriteRules,
-            rules::{
-                dates::DateRules, filters::FilterRules, members::MemberRules,
-                old_split::OldSplitRules, order::OrderRules,
-            },
+            rewriter::Rewriter,
             LogicalPlanLanguage,
         },
         rewrite_statement, QueryPlanner,
@@ -61,23 +57,9 @@ pub fn rewrite_runner(plan: LogicalPlan, context: Arc<CubeContext>) -> CubeRunne
 pub fn rewrite_rules(
     cube_context: Arc<CubeContext>,
 ) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
-    let rules: Vec<Box<dyn RewriteRules>> = vec![
-        Box::new(MemberRules::new(
-            cube_context.meta.clone(),
-            cube_context.sessions.server.config_obj.clone(),
-            false,
-        )),
-        Box::new(FilterRules::new(cube_context.meta.clone(), true)),
-        Box::new(DateRules::new()),
-        Box::new(OrderRules::new()),
-        Box::new(OldSplitRules::new(
-            cube_context.meta.clone(),
-            cube_context.sessions.server.config_obj.clone(),
-        )),
-    ];
-    let mut rewrites = Vec::new();
-    for r in rules {
-        rewrites.extend(r.rewrite_rules());
-    }
-    rewrites
+    Rewriter::rewrite_rules(
+        cube_context.meta.clone(),
+        cube_context.sessions.server.config_obj.clone(),
+        true,
+    )
 }
