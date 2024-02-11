@@ -366,6 +366,25 @@ impl LogicalPlanAnalysis {
                 }
                 Some(trivial + 1)
             }
+            // TODO if there's an aggregate function then we should have more complex logic than that
+            // LogicalPlanLanguage::AggregateFunctionExprFun(AggregateFunctionExprFun(fun)) => {
+            //     match fun {
+            //         AggregateFunction::Count
+            //         | AggregateFunction::Sum
+            //         | AggregateFunction::Avg
+            //         | AggregateFunction::Min
+            //         | AggregateFunction::Max => Some(0),
+            //         _ => None,
+            //     }
+            // }
+            // LogicalPlanLanguage::AggregateFunctionExpr(params) => {
+            //     let mut trivial = 0;
+            //     for id in params.iter() {
+            //         trivial = trivial_push_down(*id)?.max(trivial);
+            //     }
+            //     Some(trivial + 1)
+            // }
+            // LogicalPlanLanguage::AggregateFunctionExprDistinct(_) => Some(0),
             _ => None,
         }
     }

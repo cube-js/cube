@@ -520,10 +520,12 @@ impl Rewriter {
         for r in rules {
             rewrites.extend(r.rewrite_rules());
         }
-        if config_obj.push_down_pull_up_split() {
+        if sql_push_down {
             rewrites.extend(
                 WrapperRules::new(meta_context.clone(), config_obj.clone()).rewrite_rules(),
             );
+        }
+        if config_obj.push_down_pull_up_split() {
             rewrites
                 .extend(SplitRules::new(meta_context.clone(), config_obj.clone()).rewrite_rules());
         } else {

@@ -61,7 +61,13 @@ impl SplitRules {
                 ),
                 "AggregateSplit:true",
             ),
-            self.transform_projection_aggregate("?alias_to_cube", "?split_alias_to_cube"),
+            self.transform_projection_aggregate(
+                "?alias_to_cube",
+                "?split_alias_to_cube",
+                Some("?group_expr"),
+                Some("?aggr_expr"),
+                None,
+            ),
         ));
 
         rules.push(transforming_rewrite(
@@ -162,7 +168,12 @@ impl SplitRules {
                 ),
                 "AggregateSplit:true",
             ),
-            self.transform_aggregate_aggregate("?alias_to_cube", "?split_alias_to_cube"),
+            self.transform_aggregate_aggregate(
+                "?alias_to_cube",
+                "?split_alias_to_cube",
+                "?group_expr",
+                "?aggr_expr",
+            ),
         ));
 
         rules.push(rewrite(
@@ -258,7 +269,13 @@ impl SplitRules {
                 "?projection_alias",
                 "ProjectionSplit:true",
             ),
-            self.transform_projection_aggregate("?alias_to_cube", "?split_alias_to_cube"),
+            self.transform_projection_aggregate(
+                "?alias_to_cube",
+                "?split_alias_to_cube",
+                None,
+                None,
+                Some("?projection_expr"),
+            ),
         ));
 
         rules.push(transforming_rewrite(
@@ -319,10 +336,31 @@ impl SplitRules {
         &self,
         alias_to_cube_var: &str,
         split_alias_to_cube_var: &str,
+        group_expr_var: Option<&str>,
+        aggr_expr_var: Option<&str>,
+        projection_expr_var: Option<&str>,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let split_alias_to_cube_var = var!(split_alias_to_cube_var);
+        let group_expr_var = group_expr_var.map(|group_expr_var| var!(group_expr_var));
+        let aggr_expr_var = aggr_expr_var.map(|aggr_expr_var| var!(aggr_expr_var));
+        let projection_expr_var =
+            projection_expr_var.map(|projection_expr_var| var!(projection_expr_var));
         move |egraph, subst| {
+            if matches!(
+                projection_expr_var.and_then(|v| egraph[subst[v]].data.trivial_push_down),
+                Some(0) | Some(1)
+            ) {
+                return false;
+            } else if matches!(
+                aggr_expr_var
+                    .and_then(|v| egraph[subst[v]].data.trivial_push_down)
+                    .zip(group_expr_var.and_then(|v| egraph[subst[v]].data.trivial_push_down))
+                    .map(|(a, b)| a.max(b)),
+                Some(0) | Some(1)
+            ) {
+                return false;
+            }
             for alias_to_cube in
                 var_iter!(egraph[subst[alias_to_cube_var]], CubeScanAliasToCube).cloned()
             {
@@ -343,10 +381,24 @@ impl SplitRules {
         &self,
         alias_to_cube_var: &str,
         split_alias_to_cube_var: &str,
+        group_expr_var: &str,
+        aggr_expr_var: &str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let split_alias_to_cube_var = var!(split_alias_to_cube_var);
+        let group_expr_var = var!(group_expr_var);
+        let aggr_expr_var = var!(aggr_expr_var);
         move |egraph, subst| {
+            if matches!(
+                egraph[subst[aggr_expr_var]]
+                    .data
+                    .trivial_push_down
+                    .zip(egraph[subst[group_expr_var]].data.trivial_push_down)
+                    .map(|(a, b)| a.max(b)),
+                Some(0) | Some(1)
+            ) {
+                return false;
+            }
             for alias_to_cube in
                 var_iter!(egraph[subst[alias_to_cube_var]], CubeScanAliasToCube).cloned()
             {
