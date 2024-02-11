@@ -53,6 +53,9 @@
     "jest": "^27",
     "typescript": "~5.2.2"
   },
+  "resolutions": {
+    "@azure/core-util": "1.6.1"
+  },
   "publishConfig": {
     "access": "public"
   },
