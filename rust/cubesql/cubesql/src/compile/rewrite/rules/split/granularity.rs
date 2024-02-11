@@ -59,6 +59,59 @@ impl SplitRules {
             true,
             rules,
         );
+        // DATE_TRUNC('month', CAST(CAST(((((EXTRACT(YEAR FROM "ta_1"."createdAt") * 100) + 1) * 100) + 1) AS CHARACTER VARYING) AS timestamp))
+        self.single_arg_split_point_rules(
+            "thoughtspot-extract-year",
+            || {
+                fun_expr(
+                    "DateTrunc",
+                    vec![
+                        // Any granularity will do as long as our max is YEAR.
+                        // If maximum raises to DECADE, ?granularity needs to be checked
+                        literal_expr("?granularity"),
+                        cast_expr(
+                            cast_expr_explicit(
+                                binary_expr(
+                                    binary_expr(
+                                        binary_expr(
+                                            binary_expr(
+                                                fun_expr(
+                                                    "DatePart",
+                                                    vec![
+                                                        literal_string("YEAR"),
+                                                        "?column".to_string(),
+                                                    ],
+                                                ),
+                                                "*",
+                                                literal_int(100),
+                                            ),
+                                            "+",
+                                            literal_int(1),
+                                        ),
+                                        "*",
+                                        literal_int(100),
+                                    ),
+                                    "+",
+                                    literal_int(1),
+                                ),
+                                ArrowDataType::Utf8,
+                            ),
+                            "?timestamp_type",
+                        ),
+                    ],
+                )
+            },
+            || {
+                fun_expr(
+                    "DateTrunc",
+                    vec![literal_string("year"), "?column".to_string()],
+                )
+            },
+            |alias_column| alias_column,
+            |_, _, _| true,
+            true,
+            rules,
+        );
         // FLOOR(((EXTRACT(DAY FROM DATEADD(day, CAST((4 - (((DATEDIFF(day, DATE '1970-01-01', "ta_1"."LO_COMMITDATE") + 3) % 7) + 1)) AS int), "ta_1"."LO_COMMITDATE")) + 6) / NULLIF(CAST(7 AS FLOAT8),0.0)))
         self.single_arg_split_point_rules(
             "thoughtspot-week-num-in-month",
@@ -576,6 +629,32 @@ impl SplitRules {
             },
             self.transform_sunday_week("?day_interval", "?neg_day_interval"),
             false,
+            rules,
+        );
+        // DATE_TRUNC('month', DATE_TRUNC('month', "ta_1"."order_date"))
+        self.single_arg_split_point_rules(
+            "date-trunc-within-date-trunc-same-granularity",
+            || {
+                fun_expr(
+                    "DateTrunc",
+                    vec![
+                        literal_expr("?inner_granularity"),
+                        fun_expr(
+                            "DateTrunc",
+                            vec![literal_expr("?inner_granularity"), column_expr("?column")],
+                        ),
+                    ],
+                )
+            },
+            || {
+                fun_expr(
+                    "DateTrunc",
+                    vec![literal_expr("?inner_granularity"), column_expr("?column")],
+                )
+            },
+            |alias_column| alias_column,
+            |_, _, _| true,
+            true,
             rules,
         );
     }

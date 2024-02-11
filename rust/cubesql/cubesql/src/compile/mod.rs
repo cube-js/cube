@@ -17927,7 +17927,10 @@ limit
                     granularity: Some("month".to_string()),
                     date_range: None
                 }]),
-                order: None,
+                order: Some(vec![vec![
+                    "KibanaSampleDataEcommerce.order_date".to_string(),
+                    "asc".to_string()
+                ]]),
                 limit: None,
                 offset: None,
                 filters: None,
@@ -17959,7 +17962,10 @@ limit
                     granularity: Some("year".to_string()),
                     date_range: None
                 }]),
-                order: None,
+                order: Some(vec![vec![
+                    "KibanaSampleDataEcommerce.order_date".to_string(),
+                    "asc".to_string()
+                ]]),
                 limit: None,
                 offset: None,
                 filters: None,
