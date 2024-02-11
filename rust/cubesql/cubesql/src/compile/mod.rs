@@ -3946,7 +3946,6 @@ ORDER BY \"COUNT(count)\" DESC"
             DatabaseProtocol::PostgreSQL,
         ).await;
 
-        // TODO make this query execute
         let logical_plan = query_plan.as_logical_plan();
         assert_eq!(
             logical_plan.find_cube_scan().request,

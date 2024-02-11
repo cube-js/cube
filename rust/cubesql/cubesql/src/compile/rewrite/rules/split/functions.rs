@@ -15,12 +15,6 @@ impl SplitRules {
             false,
             rules,
         );
-        // self.single_arg_pass_through_rules(
-        //     "cast-timestamp",
-        //     |expr| cast_expr_explicit(expr, DataType::Timestamp(TimeUnit::Nanosecond, None)),
-        //     true,
-        //     rules,
-        // );
         self.single_arg_pass_through_rules(
             "trunc",
             |expr| fun_expr("Trunc", vec![expr]),
