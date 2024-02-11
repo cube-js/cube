@@ -332,7 +332,7 @@ impl Rewriter {
                 let (runner, qtrace_egraph_iterations) =
                     Self::run_rewrites(&cube_context, egraph, rules, "final")?;
 
-                let extractor = Extractor::new(&runner.egraph, BestCubePlan);
+                let extractor = Extractor::new(&runner.egraph, BestCubePlan::new(cube_context.meta.clone()));
                 let (best_cost, best) = extractor.find_best(root);
                 let qtrace_best_graph = if Qtrace::is_enabled() {
                     best.as_ref().iter().cloned().collect()

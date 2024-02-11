@@ -1,9 +1,15 @@
-use crate::compile::rewrite::{
-    alias_expr, analysis::LogicalPlanAnalysis, binary_expr, cast_expr, cast_expr_explicit,
-    column_expr, fun_expr, literal_expr, literal_float, literal_int, literal_string,
-    rules::split::SplitRules, udf_expr, LogicalPlanLanguage,
+use crate::{
+    compile::rewrite::{
+        alias_expr,
+        analysis::{ConstantFolding, LogicalPlanAnalysis},
+        binary_expr, cast_expr, cast_expr_explicit, column_expr, fun_expr, literal_expr,
+        literal_float, literal_int, literal_string,
+        rules::split::SplitRules,
+        udf_expr, LogicalPlanLanguage,
+    },
+    var,
 };
-use datafusion::arrow::datatypes::DataType as ArrowDataType;
+use datafusion::{arrow::datatypes::DataType as ArrowDataType, scalar::ScalarValue};
 use egg::Rewrite;
 
 impl SplitRules {
@@ -524,5 +530,94 @@ impl SplitRules {
             false,
             rules,
         );
+        // date_trunc('week', (order_date :: timestamptz + cast(1 || ' day' as interval))) + cast(-1 || ' day' as interval)
+        self.single_arg_split_point_rules(
+            "sunday-week",
+            || {
+                binary_expr(
+                    fun_expr(
+                        "DateTrunc",
+                        vec![
+                            literal_string("week"),
+                            binary_expr(
+                                cast_expr(column_expr("?column"), "?data_type"),
+                                "+",
+                                "?day_interval",
+                            ),
+                        ],
+                    ),
+                    "+",
+                    "?neg_day_interval",
+                )
+            },
+            || {
+                fun_expr(
+                    "DateTrunc",
+                    vec![literal_string("day"), column_expr("?column")],
+                )
+            },
+            |alias_column| {
+                udf_expr(
+                    "date_add",
+                    vec![
+                        fun_expr(
+                            "DateTrunc",
+                            vec![
+                                literal_string("week"),
+                                udf_expr(
+                                    "date_add",
+                                    vec![alias_column, "?day_interval".to_string()],
+                                ),
+                            ],
+                        ),
+                        "?neg_day_interval".to_string(),
+                    ],
+                )
+            },
+            self.transform_sunday_week("?day_interval", "?neg_day_interval"),
+            false,
+            rules,
+        );
+    }
+
+    fn transform_sunday_week(
+        &self,
+        day_interval_var: &str,
+        neg_day_interval_var: &str,
+    ) -> impl Fn(
+        bool,
+        &mut egg::EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        &mut egg::Subst,
+    ) -> bool
+           + Sync
+           + Send
+           + Clone
+           + 'static {
+        let day_interval = var!(day_interval_var);
+        let neg_day_interval = var!(neg_day_interval_var);
+        move |_, egraph, subst| {
+            if let Some(ConstantFolding::Scalar(value)) =
+                &egraph[subst[day_interval]].data.constant.clone()
+            {
+                if let Some(ConstantFolding::Scalar(neg_value)) =
+                    &egraph[subst[neg_day_interval]].data.constant.clone()
+                {
+                    match (value, neg_value) {
+                        (
+                            ScalarValue::IntervalMonthDayNano(Some(value)),
+                            ScalarValue::IntervalMonthDayNano(Some(neg_value)),
+                        ) => {
+                            if value & 0xFFFFFFFFFFFFFFFF == 0
+                                && neg_value & 0xFFFFFFFFFFFFFFFF == 0
+                            {
+                                return true;
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            false
+        }
     }
 }

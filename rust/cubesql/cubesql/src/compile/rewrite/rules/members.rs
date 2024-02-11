@@ -1,7 +1,7 @@
 use crate::{
     compile::rewrite::{
         agg_fun_expr, aggregate, alias_expr, all_members,
-        analysis::{LogicalPlanAnalysis, OriginalExpr},
+        analysis::{ConstantFolding, LogicalPlanAnalysis, OriginalExpr},
         binary_expr, cast_expr, change_user_expr, column_expr, column_name_to_member_def_vec,
         column_name_to_member_to_aliases, column_name_to_member_vec, cross_join, cube_scan,
         cube_scan_filters_empty_tail, cube_scan_members, cube_scan_members_empty_tail,
@@ -876,27 +876,8 @@ impl MemberRules {
         ));
         rules.push(transforming_rewrite(
             "pushdown-literal-member",
-            member_pushdown_replacer(literal_expr("?value"), "?old_members", "?alias_to_cube"),
-            literal_member("?literal_member_value", literal_expr("?value"), "?relation"),
-            self.pushdown_literal_member(
-                "?value",
-                "?literal_member_value",
-                "?alias_to_cube",
-                "?relation",
-            ),
-        ));
-        rules.push(transforming_rewrite(
-            "pushdown-literal-member-alias",
-            member_pushdown_replacer(
-                alias_expr(literal_expr("?value"), "?alias"),
-                "?old_members",
-                "?alias_to_cube",
-            ),
-            literal_member(
-                "?literal_member_value",
-                alias_expr(literal_expr("?value"), "?alias"),
-                "?relation",
-            ),
+            member_pushdown_replacer("?value", "?old_members", "?alias_to_cube"),
+            literal_member("?literal_member_value", "?value", "?relation"),
             self.pushdown_literal_member(
                 "?value",
                 "?literal_member_value",
@@ -1590,7 +1571,9 @@ impl MemberRules {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let relation_var = var!(relation_var);
         move |egraph, subst| {
-            for value in var_iter!(egraph[subst[literal_value_var]], LiteralExprValue).cloned() {
+            if let Some(ConstantFolding::Scalar(value)) =
+                egraph[subst[literal_value_var]].data.constant.clone()
+            {
                 for alias_to_cube in var_iter!(
                     egraph[subst[alias_to_cube_var]],
                     MemberPushdownReplacerAliasToCube
@@ -2840,7 +2823,7 @@ lazy_static! {
     .collect();
 }
 
-fn min_granularity(granularity_a: &String, granularity_b: &String) -> Option<String> {
+pub fn min_granularity(granularity_a: &String, granularity_b: &String) -> Option<String> {
     let granularity_a = granularity_a.to_lowercase();
     let granularity_b = granularity_b.to_lowercase();
 

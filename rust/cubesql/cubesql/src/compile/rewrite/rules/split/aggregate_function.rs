@@ -1,7 +1,7 @@
 use crate::{
     compile::rewrite::{
         agg_fun_expr,
-        analysis::LogicalPlanAnalysis,
+        analysis::{ConstantFolding, LogicalPlanAnalysis},
         column_expr, literal_expr, literal_int,
         rules::{members::MemberRules, split::SplitRules},
         AggregateFunctionExprDistinct, AggregateFunctionExprFun,
@@ -73,6 +73,16 @@ impl SplitRules {
                 "?alias_to_cube",
                 false,
             ),
+            true,
+            rules,
+        );
+        self.single_arg_split_point_rules(
+            "aggregate-function-invariant-constant",
+            || agg_fun_expr("?fun_name", vec!["?constant"], "?distinct"),
+            || "?constant".to_string(),
+            // ?distinct would always match
+            |alias_column| agg_fun_expr("?fun_name", vec![alias_column], "?distinct"),
+            self.transform_invariant_constant("?fun_name", "?distinct", "?constant"),
             true,
             rules,
         );
@@ -182,6 +192,47 @@ impl SplitRules {
                                 }
                             }
                         }
+                    }
+                }
+            }
+            false
+        }
+    }
+
+    fn transform_invariant_constant(
+        &self,
+        fun_name_var: &str,
+        distinct_var: &str,
+        constant_var: &str,
+    ) -> impl Fn(
+        bool,
+        &mut egg::EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        &mut egg::Subst,
+    ) -> bool
+           + Sync
+           + Send
+           + Clone
+           + 'static {
+        let fun_name_var = var!(fun_name_var);
+        let distinct_var = var!(distinct_var);
+        let constant_var = var!(constant_var);
+        move |_, egraph, subst| {
+            for fun in var_iter!(egraph[subst[fun_name_var]], AggregateFunctionExprFun) {
+                for distinct in
+                    var_iter!(egraph[subst[distinct_var]], AggregateFunctionExprDistinct)
+                {
+                    if let Some(ConstantFolding::Scalar(_)) =
+                        &egraph[subst[constant_var]].data.constant
+                    {
+                        match fun {
+                            AggregateFunction::Count if *distinct => (),
+                            AggregateFunction::Avg => (),
+                            AggregateFunction::Min => (),
+                            AggregateFunction::Max => (),
+                            _ => continue,
+                        }
+
+                        return true;
                     }
                 }
             }

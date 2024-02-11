@@ -1,7 +1,7 @@
 use super::utils;
 use crate::{
     compile::rewrite::{
-        agg_fun_expr, alias_expr,
+        alias_expr,
         analysis::{ConstantFolding, LogicalPlanAnalysis, OriginalExpr},
         binary_expr, cast_expr, cast_expr_explicit, column_expr, fun_expr, literal_expr,
         literal_int, literal_string, negative_expr, original_expr_name, rewrite,
@@ -295,20 +295,29 @@ impl RewriteRules for DateRules {
             transforming_rewrite_with_root(
                 "binary-expr-interval-add-right",
                 binary_expr("?left", "+", "?interval"),
-                udf_expr("date_add", vec!["?left", "?interval"]),
-                self.transform_interval_binary_expr("?interval"),
+                alias_expr(udf_expr("date_add", vec!["?left", "?interval"]), "?alias"),
+                self.transform_interval_binary_expr_with_chain_transform(
+                    "?interval",
+                    transform_original_expr_to_alias("?alias"),
+                ),
             ),
             transforming_rewrite_with_root(
                 "binary-expr-interval-add-left",
                 binary_expr("?interval", "+", "?right"),
-                udf_expr("date_add", vec!["?right", "?interval"]),
-                self.transform_interval_binary_expr("?interval"),
+                alias_expr(udf_expr("date_add", vec!["?right", "?interval"]), "?alias"),
+                self.transform_interval_binary_expr_with_chain_transform(
+                    "?interval",
+                    transform_original_expr_to_alias("?alias"),
+                ),
             ),
             transforming_rewrite_with_root(
                 "binary-expr-interval-sub",
                 binary_expr("?left", "-", "?interval"),
-                udf_expr("date_sub", vec!["?left", "?interval"]),
-                self.transform_interval_binary_expr("?interval"),
+                alias_expr(udf_expr("date_sub", vec!["?left", "?interval"]), "?alias"),
+                self.transform_interval_binary_expr_with_chain_transform(
+                    "?interval",
+                    transform_original_expr_to_alias("?alias"),
+                ),
             ),
             transforming_rewrite_with_root(
                 "binary-expr-interval-mul-right",
@@ -325,8 +334,14 @@ impl RewriteRules for DateRules {
             transforming_rewrite_with_root(
                 "binary-expr-interval-mul-left",
                 binary_expr("?interval", "*", "?right"),
-                udf_expr("interval_mul", vec!["?interval", "?right"]),
-                self.transform_interval_binary_expr("?interval"),
+                alias_expr(
+                    udf_expr("interval_mul", vec!["?interval", "?right"]),
+                    "?alias",
+                ),
+                self.transform_interval_binary_expr_with_chain_transform(
+                    "?interval",
+                    transform_original_expr_to_alias("?alias"),
+                ),
             ),
             transforming_rewrite_with_root(
                 "binary-expr-interval-neg",
@@ -437,16 +452,6 @@ impl RewriteRules for DateRules {
                     "DateTrunc",
                     vec!["?granularity".to_string(), column_expr("?column")],
                 ),
-            ),
-            transforming_rewrite(
-                "unwrap-cast-to-date",
-                agg_fun_expr(
-                    "?aggr_fun",
-                    vec![cast_expr(column_expr("?column"), "?data_type")],
-                    "?distinct",
-                ),
-                agg_fun_expr("?aggr_fun", vec![column_expr("?column")], "?distinct"),
-                self.unwrap_cast_to_date("?data_type"),
             ),
         ]
     }
@@ -581,28 +586,6 @@ impl DateRules {
                     _ => (),
                 }
             }
-            false
-        }
-    }
-
-    fn unwrap_cast_to_date(
-        &self,
-        data_type_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
-        let data_type_var = var!(data_type_var);
-        move |egraph, subst| {
-            for node in egraph[subst[data_type_var]].nodes.iter() {
-                match node {
-                    LogicalPlanLanguage::CastExprDataType(expr) => match expr {
-                        CastExprDataType(DataType::Date32) | CastExprDataType(DataType::Date64) => {
-                            return true
-                        }
-                        _ => (),
-                    },
-                    _ => (),
-                }
-            }
-
             false
         }
     }

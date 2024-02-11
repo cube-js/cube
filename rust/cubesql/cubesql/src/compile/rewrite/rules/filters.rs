@@ -25,6 +25,7 @@ use crate::{
     transport::{ext::V1CubeMetaExt, MemberType, MetaContext},
     var, var_iter,
 };
+use bigdecimal::{num_bigint::BigInt, BigDecimal};
 use chrono::{
     format::{
         Fixed, Item,
@@ -1638,9 +1639,13 @@ impl RewriteRules for FilterRules {
                 "filter-thoughtspot-date-add-column-comp-date",
                 filter_replacer(
                     binary_expr(
-                        udf_expr(
-                            "date_add",
-                            vec!["?expr".to_string(), literal_expr("?interval")],
+                        // TODO unwrap alias for filter_replacer?
+                        alias_expr(
+                            udf_expr(
+                                "date_add",
+                                vec!["?expr".to_string(), "?interval".to_string()],
+                            ),
+                            "?fun_alias",
                         ),
                         "?op",
                         "?date",
@@ -1657,7 +1662,7 @@ impl RewriteRules for FilterRules {
                             "date_add",
                             vec![
                                 udf_expr("date_to_timestamp", vec!["?date".to_string()]),
-                                negative_expr(literal_expr("?interval")),
+                                negative_expr("?interval"),
                             ],
                         ),
                     ),
@@ -1756,7 +1761,7 @@ impl RewriteRules for FilterRules {
                         "<=",
                         fun_expr(
                             "DateTrunc",
-                            vec![literal_expr("?granularity"), literal_expr("?expr")],
+                            vec![literal_expr("?granularity"), "?expr".to_string()],
                         ),
                     ),
                     "?alias_to_cube",
@@ -1769,7 +1774,7 @@ impl RewriteRules for FilterRules {
                         "<=",
                         fun_expr(
                             "DateTrunc",
-                            vec![literal_expr("?granularity"), literal_expr("?expr")],
+                            vec![literal_expr("?granularity"), "?expr".to_string()],
                         ),
                     ),
                     "?alias_to_cube",
@@ -2893,6 +2898,9 @@ impl FilterRules {
                                         ScalarValue::Int64(Some(value)) => value.to_string(),
                                         ScalarValue::Boolean(Some(value)) => value.to_string(),
                                         ScalarValue::Float64(Some(value)) => value.to_string(),
+                                        ScalarValue::Decimal128(Some(value), _, scale) => {
+                                            Decimal::new(*value).to_string(*scale)
+                                        }
                                         ScalarValue::TimestampNanosecond(_, _)
                                         | ScalarValue::Date32(_)
                                         | ScalarValue::Date64(_) => {
@@ -3570,6 +3578,9 @@ impl FilterRules {
             ScalarValue::Int64(Some(value)) => value.to_string(),
             ScalarValue::Boolean(Some(value)) => value.to_string(),
             ScalarValue::Float64(Some(value)) => value.to_string(),
+            ScalarValue::Decimal128(Some(value), _, scale) => {
+                Decimal::new(*value).to_string(*scale)
+            }
             ScalarValue::TimestampNanosecond(_, _)
             | ScalarValue::Date32(_)
             | ScalarValue::Date64(_) => {
@@ -4650,4 +4661,36 @@ fn format_iso_timestamp(dt: NaiveDateTime) -> String {
         .iter(),
     )
     .to_string()
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[repr(transparent)]
+pub struct Decimal {
+    raw_value: i128,
+}
+
+impl Decimal {
+    pub fn new(raw_value: i128) -> Decimal {
+        Decimal { raw_value }
+    }
+
+    pub fn to_string(&self, scale: usize) -> String {
+        let big_decimal = BigDecimal::new(BigInt::from(self.raw_value), scale as i64);
+        let mut res = big_decimal.to_string();
+        if res.contains(".") {
+            let mut truncate_len = res.len();
+            for (i, c) in res.char_indices().rev() {
+                if c == '0' {
+                    truncate_len = i;
+                } else if c == '.' {
+                    truncate_len = i;
+                    break;
+                } else {
+                    break;
+                }
+            }
+            res.truncate(truncate_len);
+        }
+        res
+    }
 }

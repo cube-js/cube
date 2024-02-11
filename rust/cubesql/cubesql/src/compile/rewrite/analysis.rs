@@ -1022,23 +1022,15 @@ impl LogicalPlanAnalysis {
                 // Some casts from string can have unpredictable behavior
                 if let Expr::Cast { expr, data_type } = &expr {
                     match expr.as_ref() {
-                        Expr::Literal(ScalarValue::Utf8(value)) => match (value, data_type) {
+                        Expr::Literal(ScalarValue::Utf8(Some(value))) => match (value, data_type) {
                             // Timezone set in Config
-                            (Some(_), DataType::Timestamp(_, _)) => (),
-                            (Some(_), DataType::Date32 | DataType::Date64) => (),
+                            (_, DataType::Timestamp(_, _)) => (),
+                            (_, DataType::Date32 | DataType::Date64) => (),
+                            (_, DataType::Interval(_)) => (),
                             _ => return None,
                         },
                         _ => (),
                     }
-                }
-
-                // TODO: Support decimal type in filters and remove it
-                if let Expr::Cast {
-                    data_type: DataType::Decimal(_, _),
-                    ..
-                } = &expr
-                {
-                    return None;
                 }
 
                 Self::eval_constant_expr(&egraph, &expr)
