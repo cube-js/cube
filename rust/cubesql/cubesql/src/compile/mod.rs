@@ -51,8 +51,8 @@ use self::{
             create_date_udf, create_dateadd_udf, create_datediff_udf, create_dayofmonth_udf,
             create_dayofweek_udf, create_dayofyear_udf, create_db_udf, create_ends_with_udf,
             create_format_type_udf, create_generate_series_udtf, create_generate_subscripts_udtf,
-            create_has_schema_privilege_udf, create_hour_udf, create_if_udf,
-            create_inet_server_addr_udf, create_instr_udf, create_interval_mul_udf,
+            create_has_schema_privilege_udf, create_has_table_privilege_udf, create_hour_udf,
+            create_if_udf, create_inet_server_addr_udf, create_instr_udf, create_interval_mul_udf,
             create_isnull_udf, create_json_build_object_udf, create_least_udf, create_locate_udf,
             create_makedate_udf, create_measure_udaf, create_minute_udf, create_pg_backend_pid_udf,
             create_pg_datetime_precision_udf, create_pg_encoding_to_char_udf,
@@ -1325,6 +1325,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_pg_my_temp_schema());
         ctx.register_udf(create_pg_is_other_temp_schema());
         ctx.register_udf(create_has_schema_privilege_udf(self.state.clone()));
+        ctx.register_udf(create_has_table_privilege_udf(self.state.clone()));
         ctx.register_udf(create_pg_total_relation_size_udf());
         ctx.register_udf(create_cube_regclass_cast_udf());
         ctx.register_udf(create_pg_get_serial_sequence_udf());
@@ -8942,6 +8943,43 @@ limit
                     has_schema_privilege(nspname, 'USAGE') usage
                 FROM pg_namespace
                 ORDER BY nspname ASC
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_has_table_privilege_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "has_table_privilege",
+            execute_query(
+                "SELECT
+                    relname,
+                    has_table_privilege('ovr', relname, 'SELECT') \"select\",
+                    has_table_privilege('ovr', relname, 'INSERT') \"insert\"
+                FROM pg_class
+                ORDER BY relname ASC
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "has_table_privilege_default_user",
+            execute_query(
+                "SELECT
+                    relname,
+                    has_table_privilege(relname, 'SELECT') \"select\",
+                    has_table_privilege(relname, 'INSERT') \"insert\"
+                FROM pg_class
+                ORDER BY relname ASC
                 "
                 .to_string(),
                 DatabaseProtocol::PostgreSQL
@@ -21276,5 +21314,43 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
             .unwrap()
             .sql;
         assert!(sql.contains("OFFSET 1\nLIMIT 2"));
+    }
+
+    #[tokio::test]
+    async fn test_metabase_table_privilege_query() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "metabase_table_privilege_query",
+            execute_query(
+                r#"
+                with table_privileges as (
+	 select
+	   NULL as role,
+	   t.schemaname as schema,
+	   t.objectname as table,
+	   pg_catalog.has_table_privilege(current_user, '"' || t.schemaname || '"' || '.' || '"' || t.objectname || '"',  'UPDATE') as update,
+	   pg_catalog.has_table_privilege(current_user, '"' || t.schemaname || '"' || '.' || '"' || t.objectname || '"',  'SELECT') as select,
+	   pg_catalog.has_table_privilege(current_user, '"' || t.schemaname || '"' || '.' || '"' || t.objectname || '"',  'INSERT') as insert,
+	   pg_catalog.has_table_privilege(current_user, '"' || t.schemaname || '"' || '.' || '"' || t.objectname || '"',  'DELETE') as delete
+	 from (
+	   select schemaname, tablename as objectname from pg_catalog.pg_tables
+	   union
+	   select schemaname, viewname as objectname from pg_catalog.pg_views
+	   union
+	   select schemaname, matviewname as objectname from pg_catalog.pg_matviews
+	 ) t
+	 where t.schemaname !~ '^pg_'
+	   and t.schemaname <> 'information_schema'
+	   and pg_catalog.has_schema_privilege(current_user, t.schemaname, 'USAGE')
+	)
+	select t.*
+	from table_privileges t
+    order by t.schema, t.table
+                "#.to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
     }
 }

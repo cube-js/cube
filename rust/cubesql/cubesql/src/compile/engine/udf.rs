@@ -2824,6 +2824,77 @@ pub fn create_has_schema_privilege_udf(state: Arc<SessionState>) -> ScalarUDF {
     )
 }
 
+pub fn create_has_table_privilege_udf(state: Arc<SessionState>) -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        let (users, tables, privileges) = if args.len() == 3 {
+            (
+                Some(downcast_string_arg!(args[0], "user", i32)),
+                downcast_string_arg!(args[1], "table", i32),
+                downcast_string_arg!(args[2], "privilege", i32),
+            )
+        } else {
+            (
+                None,
+                downcast_string_arg!(args[0], "table", i32),
+                downcast_string_arg!(args[1], "privilege", i32),
+            )
+        };
+
+        let result = izip!(tables, privileges)
+            .enumerate()
+            .map(|(i, args)| {
+                Ok(match args {
+                    (Some(_table), Some(privilege)) => {
+                        match (users, state.user()) {
+                            (Some(users), Some(session_user)) => {
+                                let user = users.value(i);
+                                if user != session_user {
+                                    return Err(DataFusionError::Execution(format!(
+                                        "role \"{}\" does not exist",
+                                        user
+                                    )));
+                                }
+                            }
+                            _ => (),
+                        }
+
+                        // TODO: check if table exists
+
+                        match privilege {
+                            "SELECT" => Some(true),
+                            "UPDATE" | "INSERT" | "DELETE" => Some(false),
+                            _ => {
+                                return Err(DataFusionError::Execution(format!(
+                                    "unrecognized privilege type: \"{}\"",
+                                    privilege
+                                )))
+                            }
+                        }
+                    }
+                    _ => None,
+                })
+            })
+            .collect::<Result<BooleanArray>>();
+
+        Ok(Arc::new(result?))
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Boolean)));
+
+    ScalarUDF::new(
+        "has_table_privilege",
+        &Signature::one_of(
+            vec![
+                TypeSignature::Exact(vec![DataType::Utf8, DataType::Utf8, DataType::Utf8]),
+                TypeSignature::Exact(vec![DataType::Utf8, DataType::Utf8]),
+            ],
+            Volatility::Stable,
+        ),
+        &return_type,
+        &fun,
+    )
+}
+
 pub fn create_pg_total_relation_size_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
         assert!(args.len() == 1);
@@ -3854,20 +3925,6 @@ pub fn register_fun_stubs(mut ctx: SessionContext) -> SessionContext {
     register_fun_stub!(
         udf,
         "has_server_privilege",
-        tsigs = [
-            [Utf8, Utf8],
-            [Oid, Utf8],
-            [Utf8, Utf8, Utf8],
-            [Utf8, Oid, Utf8],
-            [Oid, Utf8, Utf8],
-            [Oid, Oid, Utf8],
-        ],
-        rettyp = Boolean,
-        vol = Stable
-    );
-    register_fun_stub!(
-        udf,
-        "has_table_privilege",
         tsigs = [
             [Utf8, Utf8],
             [Oid, Utf8],
