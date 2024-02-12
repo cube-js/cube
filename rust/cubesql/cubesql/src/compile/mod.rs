@@ -19848,6 +19848,21 @@ limit
     }
 
     #[tokio::test]
+    async fn test_tableau_extract_epoch() -> Result<(), CubeError> {
+        init_logger();
+
+        insta::assert_snapshot!(
+            "tableau_extract_epoch",
+            execute_query(
+                "SELECT EXTRACT(EPOCH FROM (TIMESTAMP '2050-01-01T23:01:01.22')) as t".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_thoughtspot_pg_date_trunc_year() {
         init_logger();
 
